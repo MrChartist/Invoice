@@ -1,73 +1,148 @@
-# React + TypeScript + Vite
+<p align="center">
+  <img src="https://img.shields.io/badge/MrChartist-Invoice%20Creator-f07020?style=for-the-badge&logo=receipt&logoColor=white" alt="MrChartist Invoice Creator" />
+</p>
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<h1 align="center">MrChartist — Premium Invoice Creator</h1>
 
-Currently, two official plugins are available:
+<p align="center">
+  <strong>Institutional-grade, offline-first invoice generation tool built for speed, precision, and professional aesthetics.</strong>
+</p>
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+<p align="center">
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript" />
+  <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite" />
+  <img src="https://img.shields.io/badge/Zustand-State-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/Storage-localStorage-green?style=flat-square" />
+  <img src="https://img.shields.io/badge/PDF-jsPDF-red?style=flat-square" />
+</p>
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## ✨ Features
 
-## Expanding the ESLint configuration
+### 📄 Invoice Creation
+- **Real-time Invoice Builder** — Split-column layout with instant calculations for subtotal, discount, tax, and grand total
+- **Pixel-Perfect PDF Export** — High-fidelity A4 preview rendered via `html-to-image` + `jsPDF` at 3× pixel ratio
+- **GST Compliance** — Supports IGST (inter-state) and CGST+SGST (intra-state) tax modes
+- **Multi-Currency** — INR (₹) and USD ($) support with proper locale formatting
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 📊 Dashboard & Analytics
+- **Revenue Overview** — Real-time stat cards tracking Total Revenue, Pending Balances, and Total Invoices
+- **Recent Activity Feed** — Quick view of your most recent invoices with status badges
+- **Transactions Ledger** — Comprehensive table view of all invoices with filtering by status
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 🗂️ Local CRM & Service Catalog
+- **Client Directory** — Automatically saves client details when invoices are generated. Search and auto-fill returning clients instantly
+- **Item Catalog** — Saved services and rates auto-populate via inline search. Never re-type your common line items
+- **Zero Setup** — Everything persists in `localStorage`. No database, no server, no accounts
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 🎨 Design System
+- **Universal Theme Plan** — Consistent with the MrChartist ecosystem using HSL-based CSS custom properties
+- **Light & Dark Mode** — Full theme parity with smooth transitions
+- **Premium Typography** — Inter, Outfit, JetBrains Mono, Playfair Display font stack
+- **Glassmorphic UI** — Frosted cards, subtle shadows, and micro-animations throughout
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 🏗️ Architecture
+
+```
+src/
+├── components/
+│   ├── modals/          # ClientSearchModal, ItemSearchModal
+│   ├── preview/         # InvoicePreviewModal (A4 PDF renderer)
+│   └── ui/              # Toast, Button, Card, Input primitives
+├── layouts/
+│   └── DashboardLayout  # Sidebar + header shell
+├── lib/
+│   ├── localDb.ts       # localStorage CRUD API (invoices, clients, items)
+│   └── utils.ts         # formatCurrency, formatDate, cn()
+├── pages/
+│   ├── Dashboard.tsx     # Analytics overview
+│   ├── InvoiceCreator.tsx# Main invoice form
+│   └── Transactions.tsx  # Invoice ledger
+├── store/
+│   └── useInvoiceStore.ts# Zustand store for active invoice state
+├── types/
+│   └── invoice.ts        # TypeScript interfaces
+└── index.css             # Global design tokens
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🚀 Quick Start
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Clone the repository
+git clone https://github.com/MrChartist/Invoice.git
+cd Invoice
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
 ```
+
+The app runs at `http://localhost:5173` with zero external dependencies — everything is local-first.
+
+---
+
+## 📋 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Framework** | React 18 + TypeScript |
+| **Build** | Vite 8 |
+| **State** | Zustand |
+| **Routing** | React Router v7 |
+| **Icons** | Lucide React |
+| **PDF** | html-to-image + jsPDF |
+| **Styling** | Vanilla CSS + CSS Modules |
+| **Storage** | localStorage (offline-first) |
+
+---
+
+## 🎯 Workflow
+
+1. **Create** → Navigate to Invoices → Fill in client details, add line items, set tax & discount
+2. **Preview** → Click "Preview" for a pixel-perfect A4 render with your branding
+3. **Export** → Click "Download PDF" for a publication-ready PDF at 3× resolution
+4. **Save** → Click "Save Invoice & Close" to persist to the local database
+5. **Track** → View all invoices in the Transactions Ledger with status tracking
+
+---
+
+## 🔧 Configuration
+
+### Company Profile
+Edit the default company profile in `src/store/InvoiceContext.tsx`:
+```typescript
+{
+  name: 'Rohit Singh',
+  tagline: 'Premium Financial Research & Analytics',
+  address: 'Mumbai, Maharashtra, India',
+  email: 'rohit@mrchartist.com',
+  website: 'mrchartist.com',
+  invoicePrefix: 'MRC'
+}
+```
+
+### Invoice Numbering
+Auto-generated sequential numbers in format: `INV-{YEAR}-{XXXX}` (e.g., `INV-2026-0001`)
+
+---
+
+## 📄 License
+
+Private — MrChartist Ecosystem. All rights reserved.
+
+---
+
+<p align="center">
+  <sub>Built with precision by <strong>Rohit Singh</strong> for the MrChartist ecosystem.</sub>
+</p>
