@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { localDb } from '../lib/localDb';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
-import { LayoutDashboard, ArrowUpRight, ArrowDownRight, Clock, FileText, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, ArrowUpRight, ArrowDownRight, Clock, FileText, ChevronRight, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import styles from './InvoiceCreator.module.css';
 
@@ -18,10 +18,13 @@ export function Dashboard() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
+      <div className={styles.header} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <LayoutDashboard size={24} /> Dashboard Overview
         </h1>
+        <Link to="/invoice" className={cn(styles.btn, styles.btnPrimary)} style={{ padding: '0.75rem 1.5rem', fontSize: '0.9375rem', textDecoration: 'none' }}>
+          <Plus size={18} /> New Invoice
+        </Link>
       </div>
 
       {/* Stats Row */}

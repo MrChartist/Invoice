@@ -284,6 +284,7 @@ export function InvoiceCreator() {
                   invoice.saveInvoice();
                   setToastMessage("Invoice Saved Successfully!");
                   setTimeout(() => {
+                    invoice.reset();
                     navigate('/transactions');
                   }, 1500);
                 }}
