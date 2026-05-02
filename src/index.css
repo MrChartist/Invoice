@@ -1,0 +1,222 @@
+/* ================================================================
+   MrChartist Invoice Creator — Global Design System
+   Universal Theme Plan tokens + global resets only.
+   All component styling lives in CSS Modules.
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,700&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700;1,800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ── Design Tokens ─────────────────────────────────────────────── */
+:root {
+  /* Fonts */
+  --font-display: 'Outfit', 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
+  --font-serif: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+
+  /* ── Light Mode (default) ──────────────────────────────────── */
+  --background: #faf9f7;
+  --foreground: #1a1612;
+
+  --card: #ffffff;
+  --card-foreground: #1a1612;
+  --card-inner: #f5f3f0;
+
+  --popover: #ffffff;
+  --popover-foreground: #1a1612;
+
+  --primary: #f07020;
+  --primary-hover: #d96418;
+  --primary-foreground: #ffffff;
+  --primary-glow: rgba(240, 112, 32, 0.15);
+
+  --secondary: #f0eeeb;
+  --secondary-foreground: #1a1612;
+
+  --muted: #f0efec;
+  --muted-foreground: #6b6158;
+
+  --accent: #f3f1ee;
+  --accent-foreground: #1a1612;
+
+  --destructive: #e03c3c;
+  --destructive-foreground: #ffffff;
+
+  --border: #e2dfdb;
+  --input-border: #d8d5d0;
+  --ring: #f07020;
+
+  --profit: #25a05a;
+  --loss: #d93636;
+  --warning: #e69a06;
+
+  /* Radius */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 20px rgba(240, 112, 32, 0.15);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.02);
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+  --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Dark Mode ───────────────────────────────────────────────── */
+.dark {
+  --background: #0a0f1c;
+  --foreground: #e8ecf0;
+
+  --card: #101828;
+  --card-foreground: #e8ecf0;
+  --card-inner: #152035;
+
+  --popover: #152035;
+  --popover-foreground: #e8ecf0;
+
+  --primary: #e88040;
+  --primary-hover: #f09050;
+  --primary-foreground: #0a0a0a;
+  --primary-glow: rgba(232, 128, 64, 0.2);
+
+  --secondary: #14203a;
+  --secondary-foreground: #dde2e8;
+
+  --muted: #131e34;
+  --muted-foreground: #8a9ab5;
+
+  --accent: #182844;
+  --accent-foreground: #e8ecf0;
+
+  --destructive: #d94848;
+  --destructive-foreground: #f5f5f5;
+
+  --border: #1e2d4a;
+  --input-border: #253550;
+  --ring: #e88040;
+
+  --profit: #30b86a;
+  --loss: #d94848;
+  --warning: #e8a010;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.5), 0 8px 16px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 24px rgba(232, 128, 64, 0.18);
+  --shadow-card: 0 1px 4px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+/* ── Global Reset ────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background);
+  color: var(--foreground);
+  transition: background-color var(--transition-smooth), color var(--transition-smooth);
+  overflow: hidden; /* Prevent body scroll — panels scroll independently */
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+img, svg {
+  display: block;
+  max-width: 100%;
+}
+
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font: inherit; }
+input, textarea, select { font: inherit; }
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  opacity: 0.2;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { opacity: 0.4; }
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+/* ── Focus Ring ──────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ── Selection ───────────────────────────────────────────────── */
+::selection {
+  background: var(--primary-glow);
+  color: var(--foreground);
+}
+
+/* ── Animations (globally available) ─────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--primary-glow); }
+  50%      { box-shadow: 0 0 0 8px transparent; }
+}
+
+/* ── Print ───────────────────────────────────────────────────── */
+@media print {
+  body { background: white !important; color: black !important; overflow: visible !important; height: auto !important; }
+  #root { overflow: visible !important; height: auto !important; }
+  .no-print { display: none !important; }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

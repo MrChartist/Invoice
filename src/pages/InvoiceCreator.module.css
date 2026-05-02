@@ -1,0 +1,195 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badgeDraft {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.badgeSent {
+  background-color: rgba(37, 160, 90, 0.1);
+  color: var(--profit);
+}
+
+.badgePaid {
+  background-color: var(--profit);
+  color: white;
+}
+
+.badgeOverdue {
+  background-color: rgba(217, 54, 54, 0.1);
+  color: var(--loss);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 2rem;
+  align-items: start;
+}
+
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Card Styles */
+.card {
+  background-color: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.cardDark {
+  background-color: var(--card-inner);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+}
+
+.cardHeader {
+  padding: 1.5rem 1.5rem 0 1.5rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.125rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardBody {
+  padding: 1.5rem;
+}
+
+/* Form Styles */
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.inputGroup:last-child {
+  margin-bottom: 0;
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--input-border);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  color: var(--foreground);
+  transition: all var(--transition-fast);
+  font-family: var(--font-body);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.inputGhost {
+  border-color: transparent;
+  padding: 0.5rem 0;
+  font-weight: 500;
+}
+
+.inputGhost:focus, .inputGhost:hover {
+  border-color: var(--input-border);
+  padding: 0.5rem 0.75rem;
+  background-color: var(--accent);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: all var(--transition-fast);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-display);
+}
+
+.btnPrimary {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.btnPrimary:hover {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.btnOutline {
+  background-color: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+
+.btnOutline:hover {
+  background-color: var(--primary-glow);
+}
+
+.btnGhost {
+  background-color: transparent;
+  color: var(--muted-foreground);
+  padding: 0.5rem 1rem;
+}
+
+.btnGhost:hover {
+  background-color: var(--accent);
+  color: var(--foreground);
+}

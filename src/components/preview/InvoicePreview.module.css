@@ -1,0 +1,362 @@
+/* ── Invoice Preview ───────────────────────────────────────────── */
+
+/* Toolbar above the preview */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 680px;
+  padding: 10px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbarLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  letter-spacing: -0.01em;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+.toolBtn:hover {
+  background: var(--accent);
+  border-color: var(--input-border);
+  box-shadow: var(--shadow-xs);
+}
+
+.toolBtnPrimary {
+  composes: toolBtn;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.toolBtnPrimary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ── A4 Paper ────────────────────────────────────────────────── */
+.paperShadow {
+  width: 100%;
+  max-width: 680px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  transition: box-shadow var(--transition-smooth);
+}
+.paperShadow:hover {
+  box-shadow: var(--shadow-xl), 0 0 0 1px var(--border);
+}
+
+.paper {
+  width: 100%;
+  aspect-ratio: 1 / 1.414;
+  background: #ffffff;
+  color: #1a1612;
+  position: relative;
+  overflow: hidden;
+  font-family: var(--font-body);
+  font-size: 11px; /* scale down for the preview */
+}
+
+/* ── Top Accent Strip ────────────────────────────────────────── */
+.accentStrip {
+  height: 6px;
+  background: linear-gradient(90deg, #f07020, #f09040, #f07020);
+  width: 100%;
+}
+
+/* ── Paper Content ───────────────────────────────────────────── */
+.paperContent {
+  padding: 40px 44px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 6px);
+}
+
+/* ── Invoice Header ──────────────────────────────────────────── */
+.invoiceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 36px;
+}
+
+.invoiceTitle {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #f07020;
+  line-height: 1;
+}
+
+.invoiceNumber {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: #8a8580;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+.senderBlock {
+  text-align: right;
+  max-width: 220px;
+}
+
+.senderName {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1a1612;
+  line-height: 1.25;
+}
+
+.senderTagline {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f07020;
+  margin-top: 3px;
+}
+
+.senderMeta {
+  font-size: 9px;
+  color: #8a8580;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+/* ── Details Row ─────────────────────────────────────────────── */
+.detailsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e8e5e2;
+}
+
+.detailBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.detailLabel {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #b0aaa2;
+}
+
+.detailValue {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1a1612;
+}
+
+.detailValueMono {
+  composes: detailValue;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.detailSubtext {
+  font-size: 9px;
+  color: #8a8580;
+  line-height: 1.5;
+}
+
+.datesRow {
+  display: flex;
+  gap: 40px;
+}
+
+/* ── Items Table ─────────────────────────────────────────────── */
+.tableSection {
+  flex: 1;
+  margin-bottom: 16px;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 5fr 1.2fr 1.5fr 1.8fr;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #1a1612;
+  margin-bottom: 8px;
+}
+
+.tableHeaderCell {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #1a1612;
+}
+
+.tableHeaderCellRight {
+  composes: tableHeaderCell;
+  text-align: right;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 5fr 1.2fr 1.5fr 1.8fr;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0eeeb;
+  transition: background 150ms ease;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableCell {
+  font-size: 10.5px;
+  color: #1a1612;
+  font-weight: 500;
+}
+
+.tableCellRight {
+  composes: tableCell;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableCellMuted {
+  composes: tableCellRight;
+  color: #6b6158;
+  font-weight: 400;
+}
+
+.tableCellBold {
+  composes: tableCellRight;
+  font-weight: 700;
+}
+
+/* ── Footer Section ──────────────────────────────────────────── */
+.footerSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: auto;
+}
+
+.notesBox {
+  max-width: 240px;
+  padding: 12px 14px;
+  background: #f8f7f5;
+  border-radius: 8px;
+  border: 1px solid #f0eeeb;
+}
+
+.notesLabel {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #b0aaa2;
+  margin-bottom: 4px;
+}
+
+.notesText {
+  font-size: 9px;
+  color: #6b6158;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+/* ── Totals ──────────────────────────────────────────────────── */
+.totals {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 10px;
+}
+
+.totalLabel {
+  color: #8a8580;
+  font-weight: 500;
+}
+
+.totalValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: #1a1612;
+}
+
+.totalRowDiscount {
+  composes: totalRow;
+}
+.totalRowDiscount .totalLabel,
+.totalRowDiscount .totalValue {
+  color: #25a05a;
+}
+
+.totalRowGrand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0 4px;
+  margin-top: 8px;
+  border-top: 2px solid #1a1612;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1a1612;
+}
+
+.totalRowGrand .totalValue {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+/* ── Watermark Footer ────────────────────────────────────────── */
+.watermark {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid #e8e5e2;
+  text-align: center;
+  font-size: 8px;
+  color: #c0bbb5;
+  letter-spacing: 0.02em;
+}

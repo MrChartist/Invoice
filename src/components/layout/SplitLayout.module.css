@@ -1,0 +1,81 @@
+/* ── Split Layout ──────────────────────────────────────────────── */
+.container {
+  display: flex;
+  flex: 1;
+  min-height: 0; /* crucial for flex children to scroll independently */
+  overflow: hidden;
+}
+
+/* ── Left Panel (Form) ─────────────────────────────────────────── */
+.leftPanel {
+  width: 42%;
+  min-width: 380px;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--background);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: background var(--transition-smooth);
+}
+
+.leftScroll {
+  padding: 24px 24px 80px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Right Panel (Preview Stage) ────────────────────────────────── */
+.rightPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--muted);
+  transition: background var(--transition-smooth);
+  position: relative;
+}
+
+/* Subtle grid pattern for the preview stage */
+.rightPanel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.rightScroll {
+  position: relative;
+  z-index: 1;
+  padding: 32px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .container {
+    flex-direction: column;
+  }
+  .leftPanel {
+    width: 100%;
+    min-width: unset;
+    max-width: unset;
+    max-height: 50vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .rightPanel {
+    flex: 1;
+  }
+}
