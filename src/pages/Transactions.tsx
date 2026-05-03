@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { localDb, setTable, getTable, generateId } from '../lib/localDb';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
-import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy, ReceiptText, Plus } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
 import { Toast } from '../components/ui/Toast';
+import { Link } from 'react-router-dom';
 import styles from './InvoiceCreator.module.css';
 
 export function Transactions() {
@@ -58,29 +59,53 @@ export function Transactions() {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
       <div className={styles.header}>
         <h1 className={styles.title}>Transactions Ledger</h1>
       </div>
 
       {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-        <div className={styles.card} style={{ padding: '1.5rem' }}>
-          <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Total Received</div>
-          <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--profit)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ArrowDownRight size={24} /> {formatCurrency(totalRevenue)}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Received</div>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(37,160,90,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowDownRight size={16} color="var(--profit)" />
+            </div>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--profit)', fontFamily: 'var(--font-display)' }}>
+            {formatCurrency(totalRevenue)}
           </div>
         </div>
-        <div className={styles.card} style={{ padding: '1.5rem' }}>
-          <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Pending Invoices</div>
-          <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ArrowUpRight size={24} /> {formatCurrency(pendingRevenue)}
+        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending</div>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(230,154,6,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowUpRight size={16} color="var(--warning)" />
+            </div>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'var(--font-display)' }}>
+            {formatCurrency(pendingRevenue)}
           </div>
         </div>
-        <div className={styles.card} style={{ padding: '1.5rem' }}>
-          <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Total Invoices</div>
-          <div style={{ fontSize: '2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={24} /> {invoices.length}
+        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Invoices</div>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(240,112,32,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileText size={16} color="var(--primary)" />
+            </div>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>
+            {invoices.length}
           </div>
         </div>
       </div>
@@ -91,27 +116,45 @@ export function Transactions() {
           Recent Invoices
         </div>
         <div style={{ padding: '0 1.5rem' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '1rem 0', fontWeight: 600 }}>Invoice Number</th>
-                <th style={{ padding: '1rem 0', fontWeight: 600 }}>Client</th>
-                <th style={{ padding: '1rem 0', fontWeight: 600 }}>Date</th>
-                <th style={{ padding: '1rem 0', fontWeight: 600 }}>Status</th>
-                <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'right' }}>Amount</th>
-                <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'center' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: '2rem 0', textAlign: 'center', color: 'var(--muted-foreground)' }}>No invoices generated yet.</td>
+          {invoices.length === 0 ? (
+            <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+              <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(240,112,32,0.1), rgba(240,112,32,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                <ReceiptText size={36} color="var(--primary)" />
+              </div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '0.5rem' }}>
+                No transactions yet
+              </h3>
+              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', maxWidth: '360px', margin: '0 auto 1.5rem' }}>
+                Once you create and send invoices, they'll appear here as transactions. Track payments, mark as paid, and more.
+              </p>
+              <Link to="/invoice" className={cn(styles.btn, styles.btnPrimary)} style={{ textDecoration: 'none', padding: '0.75rem 2rem' }}>
+                <Plus size={18} /> Create Invoice
+              </Link>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Invoice Number</th>
+                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Client</th>
+                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Date</th>
+                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'right' }}>Amount</th>
+                  <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'center' }}>Actions</th>
                 </tr>
-              ) : (
-                invoices.map((inv, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.875rem' }}>
+              </thead>
+              <tbody>
+                {invoices.map((inv, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.875rem', transition: 'background 150ms ease' }}>
                     <td style={{ padding: '1rem 0', fontWeight: 600, color: 'var(--primary)' }}>{inv.invoice_number}</td>
-                    <td style={{ padding: '1rem 0' }}>{inv.client?.name || 'Unknown Client'}</td>
+                    <td style={{ padding: '1rem 0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'var(--card-inner)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem', color: 'var(--primary)' }}>
+                          {(inv.client?.name || 'U')[0].toUpperCase()}
+                        </div>
+                        {inv.client?.name || 'Unknown Client'}
+                      </div>
+                    </td>
                     <td style={{ padding: '1rem 0' }}>{formatDate(inv.issue_date)}</td>
                     <td style={{ padding: '1rem 0' }}>
                       <span className={cn(
@@ -123,7 +166,7 @@ export function Transactions() {
                         {inv.status}
                       </span>
                     </td>
-                    <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(inv.total, inv.currency)}</td>
+                    <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{formatCurrency(inv.total, inv.currency)}</td>
                     <td style={{ padding: '1rem 0', textAlign: 'center' }}>
                       <div style={{ display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
                         <button onClick={() => handlePreview(inv)} className={styles.btnGhost} style={{ color: 'var(--primary)', padding: '0.4rem' }} title="Preview & Download">
@@ -141,10 +184,10 @@ export function Transactions() {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
