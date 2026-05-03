@@ -10,6 +10,7 @@ import {
   LogOut 
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { getUser, logout } from '../lib/auth';
 import styles from './DashboardLayout.module.css';
 
 const NAV_ITEMS = [
@@ -20,8 +21,19 @@ const NAV_ITEMS = [
   { label: 'Settings', path: '/settings', icon: Settings },
 ];
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+  onLogout?: () => void;
+}
+
+export function DashboardLayout({ children, onLogout }: DashboardLayoutProps) {
   const location = useLocation();
+  const user = getUser();
+
+  const handleLogout = () => {
+    logout();
+    onLogout?.();
+  };
 
   return (
     <div className={styles.layout}>
@@ -57,7 +69,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <HelpCircle className={styles.navIcon} size={18} />
             <span>Help</span>
           </button>
-          <button className={styles.navItem}>
+          <button className={styles.navItem} onClick={handleLogout}>
             <LogOut className={styles.navIcon} size={18} />
             <span>Logout</span>
           </button>
@@ -75,9 +87,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <div className={styles.headerRight}>
             <div className={styles.userProfile}>
               <div className={styles.avatar}>
-                <img src="https://api.dicebear.com/7.x/notionists/svg?seed=mrchartist" alt="User" />
+                <img src={`https://api.dicebear.com/7.x/notionists/svg?seed=${user?.name || 'mrchartist'}`} alt="User" />
               </div>
-              <span className={styles.userName}>Rohit Singh</span>
+              <span className={styles.userName}>{user?.name || 'User'}</span>
             </div>
           </div>
         </header>

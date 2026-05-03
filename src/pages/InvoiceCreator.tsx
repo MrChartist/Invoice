@@ -292,13 +292,13 @@ export function InvoiceCreator() {
             </div>
           </div>
 
-          {/* Template Gallery Card — placed after Actions so it's visible when scrolling to Preview/Download */}
+          {/* Template Gallery Card */}
           <div className={styles.card}>
             <div className={styles.cardHeader} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Palette size={16} /> Template Design
             </div>
             <div className={styles.cardBody}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' }}>
                 {TEMPLATES.map(t => (
                   <button
                     key={t.id}
@@ -306,36 +306,43 @@ export function InvoiceCreator() {
                       setTemplateId(t.id);
                       localStorage.setItem('mrchartist_inv_template', t.id);
                     }}
-                    title={`${t.name} (${t.category})`}
+                    title={`${t.name}\n${t.description}`}
                     style={{
                       width: '100%',
-                      aspectRatio: '1 / 1',
-                      borderRadius: '6px',
-                      border: templateId === t.id ? `2.5px solid ${t.accent}` : '1px solid var(--border)',
-                      background: templateId === t.id ? `${t.accent}15` : 'var(--card)',
+                      borderRadius: '8px',
+                      border: templateId === t.id ? `2px solid ${t.accent}` : '1px solid var(--border)',
+                      background: templateId === t.id ? `${t.accent}10` : 'var(--card)',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '3px',
-                      padding: '6px 4px 4px',
+                      justifyContent: 'flex-start',
+                      gap: '2px',
+                      padding: '8px 4px 6px',
                       transition: 'all 150ms ease',
-                      boxShadow: templateId === t.id ? `0 0 0 1px ${t.accent}40, 0 2px 8px ${t.accent}20` : 'none',
+                      boxShadow: templateId === t.id ? `0 0 0 1px ${t.accent}40, 0 2px 8px ${t.accent}15` : 'none',
                     }}
                   >
-                    <div style={{ width: '100%', height: '5px', borderRadius: '2px', background: t.accent }} />
-                    <div style={{ width: '75%', height: '2px', borderRadius: '1px', background: '#ddd', marginTop: '2px' }} />
-                    <div style={{ width: '55%', height: '2px', borderRadius: '1px', background: '#ddd' }} />
-                    <div style={{ fontSize: '7px', fontWeight: 700, color: templateId === t.id ? t.accent : 'var(--muted-foreground)', marginTop: 'auto', textAlign: 'center', lineHeight: 1 }}>
+                    <span style={{ fontSize: '16px', lineHeight: 1 }}>{t.icon}</span>
+                    <div style={{ width: '100%', height: '3px', borderRadius: '2px', background: t.accent, marginTop: '4px' }} />
+                    <div style={{ fontSize: '7px', fontWeight: 700, color: templateId === t.id ? t.accent : 'var(--muted-foreground)', marginTop: '2px', textAlign: 'center', lineHeight: 1.2 }}>
                       {t.name.split(' ')[0]}
                     </div>
                   </button>
                 ))}
               </div>
-              <div style={{ fontSize: '0.8125rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '8px 0', background: 'var(--card-inner)', borderRadius: '6px', fontWeight: 500 }}>
-                Using: <strong style={{ color: 'var(--foreground)' }}>{TEMPLATES.find(t => t.id === templateId)?.name || 'Classic Orange'}</strong>
-              </div>
+              {(() => {
+                const active = TEMPLATES.find(t => t.id === templateId);
+                return active ? (
+                  <div style={{ padding: '10px 12px', background: 'var(--card-inner)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '24px' }}>{active.icon}</span>
+                    <div>
+                      <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--foreground)' }}>{active.name}</div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--muted-foreground)', lineHeight: 1.3, marginTop: '2px' }}>{active.description}</div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
             </div>
           </div>
 
