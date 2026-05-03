@@ -201,8 +201,8 @@ export const TemplateEngine: React.FC<TemplateProps & { templateId: string }> = 
             {/* Notes */}
             <div style={{ padding: '12px 16px', background: '#fcfcfc', borderRadius: '8px', border: '1px dashed #eee' }}>
               <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888', marginBottom: '6px' }}>Notes & Terms</div>
-              <div style={{ fontSize: '9px', color: '#666', lineHeight: 1.5 }}>
-                Please make payment within 15 days of receiving this invoice. Thank you for your business.
+              <div style={{ fontSize: '9px', color: '#666', lineHeight: 1.5, whiteSpace: 'pre-line' }}>
+                {invoice.notes || 'Payment is due within 15 days of receiving this invoice. Thank you for your business.'}
               </div>
             </div>
           </div>
