@@ -65,19 +65,19 @@ export function InvoiceCreator() {
         {/* Left Column */}
         <div className={styles.leftColumn}>
           
-          {/* Sender Profile Card (Dark style) */}
+          {/* Sender Profile Card */}
           <div className={cn(styles.card, styles.cardDark)}>
-            <div className={styles.cardHeader} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.6)' }}>Issuing As</span>
+            <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>Issuing As</span>
               {profiles.length > 1 && (
                 <select 
                   className={styles.input} 
-                  style={{ width: 'auto', backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.2)', color: 'white', padding: '0.25rem 0.5rem', height: 'auto' }}
+                  style={{ width: 'auto', backgroundColor: 'transparent', borderColor: 'var(--input-border)', color: 'var(--foreground)', padding: '0.25rem 0.5rem', height: 'auto' }}
                   value={invoice.sender?.id || ''}
                   onChange={handleProfileSelect}
                 >
                   {profiles.map(p => (
-                    <option key={p.id} value={p.id} style={{ color: 'black' }}>{p.companyName}</option>
+                    <option key={p.id} value={p.id} style={{ color: 'var(--foreground)', backgroundColor: 'var(--background)' }}>{p.companyName}</option>
                   ))}
                 </select>
               )}
@@ -88,11 +88,11 @@ export function InvoiceCreator() {
                   {invoice.sender?.companyName?.[0]?.toUpperCase() || 'M'}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>{invoice.sender?.companyName || 'Select Profile'}</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem' }}>{invoice.sender?.companyTagline}</p>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>{invoice.sender?.companyName || 'Select Profile'}</h3>
+                  <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>{invoice.sender?.companyTagline}</p>
                 </div>
               </div>
-              <div style={{ textAlign: 'right', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
+              <div style={{ textAlign: 'right', fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
                 {invoice.sender?.companyAddress?.split('\n').map((line, i) => (
                   <p key={i} style={{ margin: 0 }}>{line}</p>
                 ))}
