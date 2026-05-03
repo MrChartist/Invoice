@@ -79,8 +79,22 @@
   color: #1a1612;
   position: relative;
   overflow: hidden;
-  font-family: var(--font-body);
   font-size: 11px; /* scale down for the preview */
+  /* New age defaults */
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.03);
+}
+
+.paperBordered {
+  border: 12px solid var(--template-accent, #eee);
+  border-radius: 8px;
+}
+
+.paperFrame {
+  border: 1px solid var(--template-accent, #eee);
+  margin: 12px;
+  width: calc(100% - 24px);
+  height: calc(100% - 24px);
+  border-radius: 4px;
 }
 
 /* ── Top Accent Strip ────────────────────────────────────────── */
@@ -141,10 +155,9 @@
 .senderTagline {
   font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: #f07020;
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 .senderMeta {
@@ -209,19 +222,17 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 5fr 1.2fr 1.5fr 1.8fr;
-  gap: 8px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #1a1612;
+  grid-template-columns: 2fr 0.5fr 0.75fr 0.75fr;
+  padding: 8px 16px;
+  border-bottom: 2px solid #e8e5e2;
   margin-bottom: 8px;
 }
 
 .tableHeaderCell {
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #1a1612;
 }
 
 .tableHeaderCellRight {
@@ -231,10 +242,9 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 5fr 1.2fr 1.5fr 1.8fr;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0eeeb;
+  grid-template-columns: 2fr 0.5fr 0.75fr 0.75fr;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f4f2f0;
   transition: background 150ms ease;
 }
 
