@@ -1,0 +1,17 @@
+{
+  "short_name": "Invoice",
+  "name": "MrChartist Premium Invoice Creator",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a0f1c",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#0a0f1c",
+  "description": "Institutional-grade, offline-first invoice generation tool for the MrChartist ecosystem."
+}
