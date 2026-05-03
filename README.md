@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/MrChartist-Invoice%20Creator-f07020?style=for-the-badge&logo=receipt&logoColor=white" alt="MrChartist Invoice Creator" />
 </p>
 
-<h1 align="center">MrChartist — Premium Invoice Creator</h1>
+<h1 align="center">MrChartist — Premium Invoice Creator (v2.0)</h1>
 
 <p align="center">
   <strong>Institutional-grade, offline-first invoice generation tool built for speed, precision, and professional aesthetics.</strong>
@@ -12,66 +12,45 @@
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript" />
   <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite" />
-  <img src="https://img.shields.io/badge/Zustand-State-orange?style=flat-square" />
-  <img src="https://img.shields.io/badge/Storage-localStorage-green?style=flat-square" />
+  <img src="https://img.shields.io/badge/Architecture-Local%20First-green?style=flat-square" />
   <img src="https://img.shields.io/badge/PDF-jsPDF-red?style=flat-square" />
 </p>
 
 ---
 
-## ✨ Features
+## ✨ What's New in v2.0
 
-### 📄 Invoice Creation
-- **Real-time Invoice Builder** — Split-column layout with instant calculations for subtotal, discount, tax, and grand total
-- **Pixel-Perfect PDF Export** — High-fidelity A4 preview rendered via `html-to-image` + `jsPDF` at 3× pixel ratio
-- **GST Compliance** — Supports IGST (inter-state) and CGST+SGST (intra-state) tax modes
-- **Multi-Currency** — INR (₹) and USD ($) support with proper locale formatting
-
-### 📊 Dashboard & Analytics
-- **Revenue Overview** — Real-time stat cards tracking Total Revenue, Pending Balances, and Total Invoices
-- **Recent Activity Feed** — Quick view of your most recent invoices with status badges
-- **Transactions Ledger** — Comprehensive table view of all invoices with filtering by status
-
-### 🗂️ Local CRM & Service Catalog
-- **Client Directory** — Automatically saves client details when invoices are generated. Search and auto-fill returning clients instantly
-- **Item Catalog** — Saved services and rates auto-populate via inline search. Never re-type your common line items
-- **Zero Setup** — Everything persists in `localStorage`. No database, no server, no accounts
-
-### 🎨 Design System
-- **Universal Theme Plan** — Consistent with the MrChartist ecosystem using HSL-based CSS custom properties
-- **Light & Dark Mode** — Full theme parity with smooth transitions
-- **Premium Typography** — Inter, Outfit, JetBrains Mono, Playfair Display font stack
-- **Glassmorphic UI** — Frosted cards, subtle shadows, and micro-animations throughout
+- **Multi-Profile Architecture:** Issue invoices from multiple entities (e.g., "Rohit Singh", "MrChartist Global") with independent bank details, logos, and signatures.
+- **20+ Dynamic Templates:** A new Template Engine featuring 20 distinct visual styles (Classic, Corporate, Minimal, Creative) powered by dynamic layout wrappers.
+- **Historical Snapshotting:** When an invoice is created, it embeds a permanent "snapshot" of the sender profile. If you change your business address tomorrow, your past invoices remain untouched and legally accurate.
+- **Direct-to-Disk Sync:** Backup and restore your database directly to a Windows/Mac folder using the native Chrome File System Access API.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & AI Guide
 
-```
+This repository follows strict architectural rules. If you are an AI assistant (Cursor, Windsurf), **read `.cursorrules` before modifying code.**
+
+```text
 src/
 ├── components/
-│   ├── modals/          # ClientSearchModal, ItemSearchModal
-│   ├── preview/         # InvoicePreviewModal (A4 PDF renderer)
-│   └── ui/              # Toast, Button, Card, Input primitives
-├── layouts/
-│   └── DashboardLayout  # Sidebar + header shell
+│   ├── templates/       # Template Engine (20+ styles, 4 core layouts)
+│   ├── preview/         # PDF rendering boundary
+│   └── ui/              # Primitives
 ├── lib/
-│   ├── localDb.ts       # localStorage CRUD API (invoices, clients, items)
-│   └── utils.ts         # formatCurrency, formatDate, cn()
+│   ├── localDb.ts       # localStorage CRUD API wrapper
+│   └── utils.ts         # Math, currency, and date formatters
 ├── pages/
-│   ├── Dashboard.tsx     # Analytics overview
-│   ├── InvoiceCreator.tsx# Main invoice form
-│   └── Transactions.tsx  # Invoice ledger
+│   ├── InvoiceCreator   # The main generation UI
+│   └── Settings         # Multi-profile manager + Disk Sync
 ├── store/
-│   └── useInvoiceStore.ts# Zustand store for active invoice state
-├── types/
-│   └── invoice.ts        # TypeScript interfaces
-└── index.css             # Global design tokens
+│   └── useInvoiceStore  # Zustand global state (handles snapshotting)
+└── index.css            # Global CSS Variables (NO Tailwind)
 ```
 
----
-
 ## 🚀 Quick Start
+
+Zero external dependencies, zero backend.
 
 ```bash
 # Clone the repository
@@ -88,60 +67,19 @@ npm run dev
 npm run build
 ```
 
-The app runs at `http://localhost:5173` with zero external dependencies — everything is local-first.
-
----
-
-## 📋 Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Framework** | React 18 + TypeScript |
-| **Build** | Vite 8 |
-| **State** | Zustand |
-| **Routing** | React Router v7 |
-| **Icons** | Lucide React |
-| **PDF** | html-to-image + jsPDF |
-| **Styling** | Vanilla CSS + CSS Modules |
-| **Storage** | localStorage (offline-first) |
-
----
-
 ## 🎯 Workflow
 
-1. **Create** → Navigate to Invoices → Fill in client details, add line items, set tax & discount
-2. **Preview** → Click "Preview" for a pixel-perfect A4 render with your branding
-3. **Export** → Click "Download PDF" for a publication-ready PDF at 3× resolution
-4. **Save** → Click "Save Invoice & Close" to persist to the local database
-5. **Track** → View all invoices in the Transactions Ledger with status tracking
-
----
-
-## 🔧 Configuration
-
-### Company Profile
-Edit the default company profile in `src/store/InvoiceContext.tsx`:
-```typescript
-{
-  name: 'Rohit Singh',
-  tagline: 'Premium Financial Research & Analytics',
-  address: 'Mumbai, Maharashtra, India',
-  email: 'rohit@mrchartist.com',
-  website: 'mrchartist.com',
-  invoicePrefix: 'MRC'
-}
-```
-
-### Invoice Numbering
-Auto-generated sequential numbers in format: `INV-{YEAR}-{XXXX}` (e.g., `INV-2026-0001`)
+1. **Setup Profiles** → Go to Settings. Add your logo, signature, PAN, and Bank Details.
+2. **Create Invoice** → Select which profile is issuing the invoice from the top-left dropdown. Add clients and items.
+3. **Choose Template** → Click Preview, and use the Template Selector in the toolbar to cycle through 20+ professional designs.
+4. **Export** → Download the pixel-perfect A4 PDF.
+5. **Backup** → Periodically go to Settings -> "Save to Disk" to export your `localStorage` data safely.
 
 ---
 
 ## 📄 License
 
 Private — MrChartist Ecosystem. All rights reserved.
-
----
 
 <p align="center">
   <sub>Built with precision by <strong>Rohit Singh</strong> for the MrChartist ecosystem.</sub>

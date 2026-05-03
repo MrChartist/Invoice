@@ -1,0 +1,37 @@
+# AI Assistant Guidelines for MrChartist Invoice Creator
+
+Welcome to the MrChartist Invoice Creator repository. As an AI coding assistant (Cursor, Windsurf, Copilot, etc.), you MUST strictly adhere to the following rules when modifying this codebase. Failure to do so will break the application's architecture.
+
+## 1. Core Architecture (DO NOT VIOLATE)
+- **Local-First & Serverless**: This application has NO backend, NO database, and NO API calls. Everything runs entirely in the browser. Do not add `axios`, `express`, or suggest adding a backend database (like PostgreSQL or MongoDB).
+- **Storage Layer**: All data is persisted in `localStorage`. The database wrapper is `src/lib/localDb.ts`. Do not replace this with anything else.
+- **Chrome File System API**: We use the native File System Access API to sync data to the user's hard drive as JSON backups.
+
+## 2. Tech Stack Constraints
+- **React 18** + **TypeScript** + **Vite**.
+- **State Management**: `zustand` is used for global state (e.g., `useInvoiceStore.ts`).
+- **Styling**: **NO TailwindCSS.** This project uses Vanilla CSS (`.css` and `.module.css`) with CSS Variables defined in `src/index.css`. The UI follows a strict glassmorphic/minimalist design system. Do not inject inline styles unless dynamic (like template colors).
+- **PDF Generation**: We use `html-to-image` and `jsPDF`. Do not switch to `@react-pdf/renderer` or server-side PDF generation.
+
+## 3. Critical Business Logic
+
+### Invoice Snapshotting
+- **Rule**: When an invoice is created, it takes a "snapshot" of the currently selected sender profile (including Bank Details, Logo, and Address) and embeds it inside the `invoice.sender` object.
+- **Why**: This ensures that if the user changes their company name or bank details 6 months from now, their historical invoices do NOT change.
+- **Action**: Never modify the preview component to read directly from global settings. It must always read from `invoice.sender` first, and only fall back to global settings for legacy invoices.
+
+### Multi-Profile System
+- The app supports multiple sender identities (e.g., "Rohit Singh Individual", "MrChartist Global"). The profiles are stored as an array in `localStorage` under `mrchartist_inv_settings`.
+
+### Indian Financial Year Numbering
+- Invoices are numbered based on the Indian Financial Year (April 1 to March 31). Format: `INV/FY25-26/0001`. Do not change this to calendar year numbering.
+
+## 4. The Template Engine
+- Invoices are rendered via `src/components/templates/TemplateEngine.tsx`.
+- There are 20+ templates configured in `registry.ts`.
+- Templates are built dynamically using 4 core structural layouts (`classic`, `corporate`, `minimal`, `centered`) and CSS variables (`accent`, `fontFamily`). Do not hardcode colors in the layouts; always use the `accent` prop.
+
+## 5. Development Workflow
+- When building new features, ensure absolute type safety in TypeScript.
+- Run `npm run build` to verify there are no TS errors before committing.
+- Do not add heavy dependencies. Keep the bundle size small.

@@ -1,10 +1,11 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { Download, Printer, X } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
-import { formatCurrency, formatDate, amountInWords } from '../../lib/utils';
 import styles from './InvoicePreview.module.css';
+import { TEMPLATES } from '../templates/registry';
+import { TemplateEngine } from '../templates/TemplateEngine';
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
@@ -54,8 +55,14 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
   const previewRef = useRef<HTMLDivElement>(null);
   const invoice = useInvoiceStore();
   const sender = useMemo(() => getSenderProfile(invoice.sender), [isOpen, invoice.sender]);
-  
+  const [templateId, setTemplateId] = useState(() => localStorage.getItem('mrchartist_inv_template') || 'classic_orange');
+
   if (!isOpen) return null;
+
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTemplateId(e.target.value);
+    localStorage.setItem('mrchartist_inv_template', e.target.value);
+  };
 
   const handleExportPDF = async () => {
     if (!previewRef.current) return;
@@ -71,8 +78,6 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
     }
   };
 
-  const addressLines = sender.companyAddress.split('\n');
-
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999, 
@@ -82,7 +87,18 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
     }}>
       {/* Toolbar */}
       <div className={`${styles.toolbar} no-print`} style={{ marginBottom: '1rem', position: 'sticky', top: 0, zIndex: 10 }}>
-        <span className={styles.toolbarLabel}>Preview (A4)</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span className={styles.toolbarLabel}>Preview (A4)</span>
+          <select 
+            value={templateId} 
+            onChange={handleTemplateChange} 
+            style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)' }}
+          >
+            {TEMPLATES.map(t => (
+              <option key={t.id} value={t.id}>{t.name} ({t.category})</option>
+            ))}
+          </select>
+        </div>
         <div className={styles.toolbarActions}>
           <button className={styles.toolBtn} onClick={() => window.print()}>
             <Printer size={13} /> Print
@@ -98,143 +114,8 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
 
       {/* Paper */}
       <div className={styles.paperShadow}>
-        <div ref={previewRef} className={styles.paper}>
-          {/* Orange Accent */}
-          <div className={styles.accentStrip} />
-
-          <div className={styles.paperContent}>
-            {/* Header */}
-            <div className={styles.invoiceHeader}>
-              <div>
-                <div className={styles.invoiceTitle}>INVOICE</div>
-                <div className={styles.invoiceNumber}>#{invoice.invoice_number}</div>
-              </div>
-              <div className={styles.senderBlock}>
-                <div className={styles.senderName}>{sender.companyName}</div>
-                <div className={styles.senderTagline}>{sender.companyTagline}</div>
-                <div className={styles.senderMeta}>
-                  {addressLines.map((line: string, i: number) => (
-                    <span key={i}>{line}{i < addressLines.length - 1 && <br />}</span>
-                  ))}
-                  {sender.companyPhone && <><br />Mobile: {sender.companyPhone}</>}
-                  {sender.companyEmail && <><br />{sender.companyEmail}</>}
-                </div>
-              </div>
-            </div>
-
-            {/* Details Row */}
-            <div className={styles.detailsRow}>
-              <div className={styles.detailBlock}>
-                <span className={styles.detailLabel}>Bill To</span>
-                <span className={styles.detailValue}>{invoice.client.name || 'Client Name'}</span>
-                <span className={styles.detailSubtext}>
-                  {invoice.client.address || 'Address Line 1'}<br />
-                  {invoice.client.city || 'City'} {invoice.client.zip || ''}<br />
-                  {invoice.client.email || ''}
-                </span>
-              </div>
-              <div className={styles.datesRow}>
-                <div className={styles.detailBlock}>
-                  <span className={styles.detailLabel}>Issue Date</span>
-                  <span className={styles.detailValueMono}>{formatDate(invoice.issue_date)}</span>
-                </div>
-                <div className={styles.detailBlock}>
-                  <span className={styles.detailLabel}>Due Date</span>
-                  <span className={styles.detailValueMono}>{formatDate(invoice.due_date)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Items Table */}
-            <div className={styles.tableSection}>
-              <div className={styles.tableHeader}>
-                <span className={styles.tableHeaderCell}>Description</span>
-                <span className={styles.tableHeaderCellRight}>Qty</span>
-                <span className={styles.tableHeaderCellRight}>Rate</span>
-                <span className={styles.tableHeaderCellRight}>Amount</span>
-              </div>
-              {invoice.items?.map(item => (
-                <div key={item.id} className={styles.tableRow}>
-                  <span className={styles.tableCell}>{item.name || '—'}</span>
-                  <span className={styles.tableCellMuted}>{item.quantity}</span>
-                  <span className={styles.tableCellMuted}>
-                    {formatCurrency(item.rate, invoice.currency)}
-                  </span>
-                  <span className={styles.tableCellBold}>
-                    {formatCurrency(item.amount, invoice.currency)}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Footer: Bank Details + Notes + Totals */}
-            <div className={styles.footerSection}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Bank Details */}
-                {(sender.accountNumber || sender.upiId) && (
-                  <div className={styles.notesBox} style={{ background: '#fdf8f4', borderColor: '#f0e8e0' }}>
-                    <div className={styles.notesLabel} style={{ color: '#f07020' }}>Bank Details for Payment</div>
-                    <div className={styles.notesText} style={{ fontSize: '8.5px', lineHeight: '1.7' }}>
-                      {sender.accountName && <><strong>Name:</strong> {sender.accountName}<br /></>}
-                      {sender.accountNumber && <><strong>A/C No:</strong> {sender.accountNumber}<br /></>}
-                      {sender.ifsc && <><strong>IFSC:</strong> {sender.ifsc}<br /></>}
-                      {sender.bankName && <><strong>Bank:</strong> {sender.bankName}<br /></>}
-                      {sender.upiId && <><strong>UPI:</strong> {sender.upiId}</>}
-                    </div>
-                  </div>
-                )}
-                {/* Notes */}
-                <div className={styles.notesBox}>
-                  <div className={styles.notesLabel}>Notes & Terms</div>
-                  <div className={styles.notesText}>
-                    Please make payment within 15 days of receiving this invoice.
-                    <br />Thank you for your business.
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.totals}>
-                <div className={styles.totalRow}>
-                  <span className={styles.totalLabel}>Subtotal</span>
-                  <span className={styles.totalValue}>
-                    {formatCurrency(invoice.subtotal, invoice.currency)}
-                  </span>
-                </div>
-                {invoice.discount_amount > 0 && (
-                  <div className={styles.totalRowDiscount}>
-                    <span className={styles.totalLabel}>Discount ({invoice.discount_rate}%)</span>
-                    <span className={styles.totalValue}>
-                      -{formatCurrency(invoice.discount_amount, invoice.currency)}
-                    </span>
-                  </div>
-                )}
-                
-                {invoice.tax_amount > 0 && (
-                  <div className={styles.totalRow}>
-                    <span className={styles.totalLabel}>Tax ({invoice.tax_rate}%)</span>
-                    <span className={styles.totalValue}>
-                      {formatCurrency(invoice.tax_amount, invoice.currency)}
-                    </span>
-                  </div>
-                )}
-
-                <div className={styles.totalRowGrand}>
-                  <span>Total</span>
-                  <span className={styles.totalValue}>
-                    {formatCurrency(invoice.total, invoice.currency)}
-                  </span>
-                </div>
-                <div style={{ textAlign: 'right', fontSize: '8px', fontStyle: 'italic', color: '#8a8580', marginTop: '6px', lineHeight: 1.4 }}>
-                  {amountInWords(invoice.total, invoice.currency)}
-                </div>
-              </div>
-            </div>
-
-            {/* Watermark */}
-            <div className={styles.watermark}>
-              Generated with MrChartist Invoice Creator
-            </div>
-          </div>
+        <div ref={previewRef}>
+          <TemplateEngine invoice={invoice} sender={sender} templateId={templateId} />
         </div>
       </div>
     </div>

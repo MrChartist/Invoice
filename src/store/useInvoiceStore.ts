@@ -27,7 +27,10 @@ export interface SenderProfile {
   companyPhone: string;
   companyAddress: string;
   companyGstin: string;
+  pan?: string;
   companyWebsite: string;
+  logo?: string;
+  signature?: string;
   bankName: string;
   accountName: string;
   accountNumber: string;

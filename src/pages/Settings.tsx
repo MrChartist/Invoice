@@ -119,6 +119,24 @@ export function Settings() {
   const editingProfile = profiles.find(p => p.id === editingProfileId) || profiles[0];
 
   // (Export/Import logic remains same)
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'signature') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 500 * 1024) {
+      alert("Image is too large. Please upload an image under 500KB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (ev.target?.result) {
+        updateEditingProfile(field, ev.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleExportData = () => {
     const data: Record<string, any> = {};
     for (let i = 0; i < localStorage.length; i++) {
@@ -276,6 +294,40 @@ export function Settings() {
               <div className={styles.inputGroup}>
                 <label className={styles.label}>Address</label>
                 <textarea className={styles.input} rows={3} value={editingProfile.companyAddress} onChange={e => updateEditingProfile('companyAddress', e.target.value)} style={{ resize: 'none' }} />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className={styles.inputGroup}>
+                  <label className={styles.label}>GSTIN</label>
+                  <input className={styles.input} value={editingProfile.companyGstin || ''} onChange={e => updateEditingProfile('companyGstin', e.target.value)} />
+                </div>
+                <div className={styles.inputGroup}>
+                  <label className={styles.label}>PAN</label>
+                  <input className={styles.input} value={editingProfile.pan || ''} onChange={e => updateEditingProfile('pan', e.target.value)} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '1rem', backgroundColor: 'var(--background-alt)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
+                <div className={styles.inputGroup}>
+                  <label className={styles.label}>Company Logo (Max 500KB)</label>
+                  <input type="file" accept="image/png, image/jpeg" onChange={(e) => handleImageUpload(e, 'logo')} style={{ fontSize: '0.8125rem' }} />
+                  {editingProfile.logo && (
+                    <div style={{ marginTop: '0.5rem', position: 'relative', width: 'fit-content' }}>
+                      <img src={editingProfile.logo} alt="Logo" style={{ height: '40px', objectFit: 'contain' }} />
+                      <button onClick={() => updateEditingProfile('logo', '')} className={styles.btnGhost} style={{ position: 'absolute', top: '-10px', right: '-10px', padding: '0.2rem', background: 'var(--card)', borderRadius: '50%', color: 'var(--destructive)' }} title="Remove Logo"><Trash2 size={12} /></button>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.inputGroup}>
+                  <label className={styles.label}>Signature (Max 500KB)</label>
+                  <input type="file" accept="image/png, image/jpeg" onChange={(e) => handleImageUpload(e, 'signature')} style={{ fontSize: '0.8125rem' }} />
+                  {editingProfile.signature && (
+                    <div style={{ marginTop: '0.5rem', position: 'relative', width: 'fit-content' }}>
+                      <img src={editingProfile.signature} alt="Signature" style={{ height: '40px', objectFit: 'contain' }} />
+                      <button onClick={() => updateEditingProfile('signature', '')} className={styles.btnGhost} style={{ position: 'absolute', top: '-10px', right: '-10px', padding: '0.2rem', background: 'var(--card)', borderRadius: '50%', color: 'var(--destructive)' }} title="Remove Signature"><Trash2 size={12} /></button>
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div style={{ padding: '1rem', backgroundColor: 'var(--background-alt)', borderRadius: '8px', border: '1px solid var(--border)' }}>
