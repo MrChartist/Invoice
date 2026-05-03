@@ -214,7 +214,7 @@ export function Settings() {
   if (!editingProfile) return null;
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
       <div className={styles.header}>
         <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <SettingsIcon size={24} /> Settings

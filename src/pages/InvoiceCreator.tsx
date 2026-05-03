@@ -52,14 +52,35 @@ export function InvoiceCreator() {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
       <div className={styles.header}>
         <h1 className={styles.title}>
-          New Invoices: {invoice.invoice_number || 'MGL...'}
+          New Invoice: {invoice.invoice_number || 'Draft...'}
           <span className={cn(styles.badge, handleStatusClass())}>{invoice.status}</span>
         </h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          {/* Top right actions could go here */}
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <select
+            className={styles.input}
+            style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.8125rem', height: 'auto', borderRadius: '6px' }}
+            value={invoice.status}
+            onChange={e => invoice.setStatus(e.target.value as any)}
+          >
+            <option value="Draft">Draft</option>
+            <option value="Sent">Sent</option>
+            <option value="Paid">Paid</option>
+            <option value="Overdue">Overdue</option>
+          </select>
+          <select
+            className={styles.input}
+            style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.8125rem', height: 'auto', borderRadius: '6px' }}
+            value={invoice.currency}
+            onChange={e => invoice.setCurrency(e.target.value)}
+          >
+            <option value="INR">₹ INR</option>
+            <option value="USD">$ USD</option>
+            <option value="EUR">€ EUR</option>
+            <option value="GBP">£ GBP</option>
+          </select>
         </div>
       </div>
       
@@ -232,6 +253,19 @@ export function InvoiceCreator() {
                   </span>
                 </div>
               </div>
+
+              {/* Notes & Terms */}
+              <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                <label className={styles.label} style={{ marginBottom: '0.5rem', display: 'block' }}>Notes & Payment Terms</label>
+                <textarea
+                  className={styles.input}
+                  placeholder="Payment is due within 14 days. Late payments are subject to 2% monthly interest. Bank details are mentioned above."
+                  rows={3}
+                  value={invoice.notes}
+                  onChange={e => invoice.setNotes(e.target.value)}
+                  style={{ resize: 'none', fontSize: '0.875rem' }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -271,6 +305,8 @@ export function InvoiceCreator() {
                 <input 
                   className={cn(styles.input, styles.inputGhost)} 
                   placeholder="Company Name (Optional)"
+                  value={invoice.client.company || ''}
+                  onChange={(e) => invoice.setClient({ company: e.target.value })}
                 />
                 <textarea 
                   className={cn(styles.input, styles.inputGhost)} 
@@ -279,6 +315,13 @@ export function InvoiceCreator() {
                   value={invoice.client.address}
                   onChange={(e) => invoice.setClient({ address: e.target.value })}
                   style={{ resize: 'none' }}
+                />
+                <input 
+                  className={cn(styles.input, styles.inputGhost)} 
+                  placeholder="Client GSTIN (Optional)"
+                  value={invoice.client.gstin || ''}
+                  onChange={(e) => invoice.setClient({ gstin: e.target.value.toUpperCase() })}
+                  style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.03em', fontSize: '0.875rem' }}
                 />
               </div>
 

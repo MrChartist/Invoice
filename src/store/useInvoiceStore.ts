@@ -17,6 +17,10 @@ export interface Client {
   address: string;
   city: string;
   zip: string;
+  company?: string;
+  gstin?: string;
+  phone?: string;
+  state?: string;
 }
 
 export interface SenderProfile {
@@ -45,6 +49,7 @@ export interface InvoiceState {
   due_date: string;
   status: "Draft" | "Sent" | "Paid" | "Overdue";
   currency: string;
+  notes: string;
   
   client: Client;
   sender: SenderProfile | null;
@@ -63,6 +68,8 @@ export interface InvoiceState {
   setClient: (client: Partial<Client>) => void;
   setSender: (sender: SenderProfile) => void;
   setDates: (issue: string, due: string) => void;
+  setStatus: (status: "Draft" | "Sent" | "Paid" | "Overdue") => void;
+  setNotes: (notes: string) => void;
   addItem: () => void;
   updateItem: (id: string, field: keyof InvoiceItem, value: any) => void;
   removeItem: (id: string) => void;
@@ -79,7 +86,11 @@ const defaultClient: Client = {
   email: '',
   address: '',
   city: '',
-  zip: ''
+  zip: '',
+  company: '',
+  gstin: '',
+  phone: '',
+  state: '',
 };
 
 const initialState = {
@@ -89,6 +100,7 @@ const initialState = {
   due_date: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0], // +14 days
   status: "Draft" as const,
   currency: 'INR',
+  notes: '',
   client: { ...defaultClient },
   sender: null,
   items: [{ id: generateId(), name: '', type: 'Service', rate: 0, quantity: 1, amount: 0 }],
@@ -110,6 +122,10 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
   setSender: (sender) => set({ sender }),
 
   setDates: (issue, due) => set({ issue_date: issue, due_date: due }),
+
+  setStatus: (status) => set({ status }),
+
+  setNotes: (notes) => set({ notes }),
 
   addItem: () => set((state) => ({
     items: [...state.items, { id: generateId(), name: '', type: 'Service', rate: 0, quantity: 1, amount: 0 }]
@@ -166,7 +182,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
   saveInvoice: () => {
     const state = get();
     // Exclude methods from the save payload
-    const { setClient, setSender, setDates, addItem, updateItem, removeItem, setRates, setCurrency, recalculate, loadInvoice, saveInvoice, reset, ...payload } = state;
+    const { setClient, setSender, setDates, setStatus, setNotes, addItem, updateItem, removeItem, setRates, setCurrency, recalculate, loadInvoice, saveInvoice, reset, ...payload } = state;
     
     const saved = localDb.invoices.save(payload);
     
@@ -176,5 +192,5 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
     }
   },
 
-  reset: () => set({ ...initialState, id: '', invoice_number: '', items: [{ id: generateId(), name: '', type: 'Service', rate: 0, quantity: 1, amount: 0 }] })
+  reset: () => set({ ...initialState, id: '', invoice_number: '', notes: '', items: [{ id: generateId(), name: '', type: 'Service', rate: 0, quantity: 1, amount: 0 }] })
 }));
