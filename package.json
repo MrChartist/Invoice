@@ -1,7 +1,10 @@
 {
-  "name": "invoice",
+  "name": "mrchartist-invoice",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
+  "description": "Institutional-grade, offline-first invoice generation tool with 20+ templates and UPI QR code.",
+  "author": "Rohit Singh <mrchartist@zohomail.in>",
+  "homepage": "https://invoice.mrchartist.in",
   "type": "module",
   "scripts": {
     "dev": "vite",
