@@ -239,65 +239,6 @@ export function InvoiceCreator() {
         {/* Right Column */}
         <div className={styles.rightColumn}>
           
-          {/* Template Gallery Card */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Palette size={16} /> Template Design
-            </div>
-            <div className={styles.cardBody}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
-                {TEMPLATES.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setTemplateId(t.id);
-                      localStorage.setItem('mrchartist_inv_template', t.id);
-                    }}
-                    title={`${t.name} (${t.category})`}
-                    style={{
-                      width: '100%',
-                      aspectRatio: '1 / 1.2',
-                      borderRadius: '6px',
-                      border: templateId === t.id ? `2px solid ${t.accent}` : '1px solid var(--border)',
-                      background: templateId === t.id ? `${t.accent}12` : 'var(--card)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                      padding: '4px',
-                      transition: 'all 150ms ease',
-                      boxShadow: templateId === t.id ? `0 0 0 1px ${t.accent}40` : 'none',
-                    }}
-                  >
-                    <div style={{
-                      width: '100%', height: '4px', borderRadius: '2px', 
-                      background: t.accent,
-                    }} />
-                    <div style={{
-                      width: '80%', height: '2px', borderRadius: '1px',
-                      background: '#e5e5e5', marginTop: '2px',
-                    }} />
-                    <div style={{
-                      width: '60%', height: '2px', borderRadius: '1px',
-                      background: '#e5e5e5',
-                    }} />
-                    <div style={{
-                      fontSize: '6px', fontWeight: 600, color: 'var(--muted-foreground)', 
-                      marginTop: 'auto', textAlign: 'center', lineHeight: 1.1, overflow: 'hidden',
-                    }}>
-                      {t.name.split(' ')[0]}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div style={{ fontSize: '0.8125rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '6px 0', background: 'var(--card-inner)', borderRadius: '6px' }}>
-                Active: <strong style={{ color: 'var(--foreground)' }}>{TEMPLATES.find(t => t.id === templateId)?.name || 'Classic Orange'}</strong>
-              </div>
-            </div>
-          </div>
-
           {/* Client Details Card */}
           <div className={styles.card}>
             <div className={styles.cardHeader}>
@@ -348,6 +289,53 @@ export function InvoiceCreator() {
               >
                 <Search size={16} /> Search Local CRM
               </button>
+            </div>
+          </div>
+
+          {/* Template Gallery Card — placed after Actions so it's visible when scrolling to Preview/Download */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Palette size={16} /> Template Design
+            </div>
+            <div className={styles.cardBody}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                {TEMPLATES.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setTemplateId(t.id);
+                      localStorage.setItem('mrchartist_inv_template', t.id);
+                    }}
+                    title={`${t.name} (${t.category})`}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '1 / 1',
+                      borderRadius: '6px',
+                      border: templateId === t.id ? `2.5px solid ${t.accent}` : '1px solid var(--border)',
+                      background: templateId === t.id ? `${t.accent}15` : 'var(--card)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '3px',
+                      padding: '6px 4px 4px',
+                      transition: 'all 150ms ease',
+                      boxShadow: templateId === t.id ? `0 0 0 1px ${t.accent}40, 0 2px 8px ${t.accent}20` : 'none',
+                    }}
+                  >
+                    <div style={{ width: '100%', height: '5px', borderRadius: '2px', background: t.accent }} />
+                    <div style={{ width: '75%', height: '2px', borderRadius: '1px', background: '#ddd', marginTop: '2px' }} />
+                    <div style={{ width: '55%', height: '2px', borderRadius: '1px', background: '#ddd' }} />
+                    <div style={{ fontSize: '7px', fontWeight: 700, color: templateId === t.id ? t.accent : 'var(--muted-foreground)', marginTop: 'auto', textAlign: 'center', lineHeight: 1 }}>
+                      {t.name.split(' ')[0]}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: '0.8125rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '8px 0', background: 'var(--card-inner)', borderRadius: '6px', fontWeight: 500 }}>
+                Using: <strong style={{ color: 'var(--foreground)' }}>{TEMPLATES.find(t => t.id === templateId)?.name || 'Classic Orange'}</strong>
+              </div>
             </div>
           </div>
 
