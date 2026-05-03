@@ -59,9 +59,9 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
 
   if (!isOpen) return null;
 
-  const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setTemplateId(e.target.value);
-    localStorage.setItem('mrchartist_inv_template', e.target.value);
+  const handleTemplateChange = (id: string) => {
+    setTemplateId(id);
+    localStorage.setItem('mrchartist_inv_template', id);
   };
 
   const handleExportPDF = async () => {
@@ -86,18 +86,27 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
       overflowY: 'auto', padding: '2rem 1rem'
     }}>
       {/* Toolbar */}
-      <div className={`${styles.toolbar} no-print`} style={{ marginBottom: '1rem', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className={`${styles.toolbar} no-print`} style={{ marginBottom: '1rem', position: 'sticky', top: 0, zIndex: 10, maxWidth: '780px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span className={styles.toolbarLabel}>Preview (A4)</span>
-          <select 
-            value={templateId} 
-            onChange={handleTemplateChange} 
-            style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)' }}
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '320px', overflowX: 'auto', padding: '2px 0' }}>
             {TEMPLATES.map(t => (
-              <option key={t.id} value={t.id}>{t.name} ({t.category})</option>
+              <button
+                key={t.id}
+                onClick={() => handleTemplateChange(t.id)}
+                title={`${t.name} (${t.category})`}
+                style={{
+                  width: '20px', height: '20px', borderRadius: '4px', flexShrink: 0,
+                  background: t.accent, border: templateId === t.id ? '2px solid #fff' : '1px solid rgba(255,255,255,0.2)',
+                  cursor: 'pointer', boxShadow: templateId === t.id ? `0 0 0 2px ${t.accent}` : 'none',
+                  transition: 'all 150ms ease',
+                }}
+              />
             ))}
-          </select>
+          </div>
+          <span style={{ fontSize: '10px', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+            {TEMPLATES.find(t => t.id === templateId)?.name}
+          </span>
         </div>
         <div className={styles.toolbarActions}>
           <button className={styles.toolBtn} onClick={() => window.print()}>
