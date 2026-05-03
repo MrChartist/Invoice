@@ -51,14 +51,14 @@ export function InvoiceCreator() {
                   M
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>MrChartist</h3>
-                  <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>billing@mrchartist.com</p>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Rohit Singh</h3>
+                  <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Financial Consultant</p>
                 </div>
               </div>
               <div style={{ textAlign: 'right', fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-                <p>123 Dalal Street</p>
-                <p>Mumbai, MH 400001</p>
-                <p>India</p>
+                <p>73 Sagouni Post Chouka Teh Kesli</p>
+                <p>Sagar, MP 470235</p>
+                <p>Mob: 7581838868</p>
               </div>
             </div>
           </div>

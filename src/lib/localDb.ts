@@ -24,13 +24,27 @@ export function generateId(): string {
   return 'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
 }
 
-export function generateInvoiceNumber(): string {
+export function getIndianFY(dateStr?: string): { label: string; startYear: number; endYear: number } {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const month = d.getMonth(); // 0-indexed (0=Jan, 3=Apr)
+  const year = d.getFullYear();
+  // FY starts in April (month index 3)
+  const startYear = month >= 3 ? year : year - 1;
+  const endYear = startYear + 1;
+  return {
+    label: `${startYear.toString().slice(2)}-${endYear.toString().slice(2)}`,
+    startYear,
+    endYear,
+  };
+}
+
+export function generateInvoiceNumber(dateStr?: string): string {
   const invoices = getTable("invoices");
-  const year = new Date().getFullYear();
-  // Filter invoices for current year
-  const currentYearInvoices = invoices.filter((i: any) => i.invoice_number?.includes(`INV-${year}`));
-  const count = currentYearInvoices.length + 1;
-  return `INV-${year}-${count.toString().padStart(4, '0')}`;
+  const fy = getIndianFY(dateStr);
+  // Filter invoices for this financial year
+  const fyInvoices = invoices.filter((i: any) => i.invoice_number?.includes(`FY${fy.label}`));
+  const count = fyInvoices.length + 1;
+  return `INV/FY${fy.label}/${count.toString().padStart(4, '0')}`;
 }
 
 // ─── API Emulation ──────────────────────────────────────────

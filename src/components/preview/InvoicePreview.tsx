@@ -1,9 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import { Download, Printer, X } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
-import { formatCurrency, formatDate } from '../../lib/utils';
+import { formatCurrency, formatDate, amountInWords } from '../../lib/utils';
 import styles from './InvoicePreview.module.css';
 
 interface InvoicePreviewModalProps {
@@ -11,9 +11,38 @@ interface InvoicePreviewModalProps {
   onClose: () => void;
 }
 
+function getSenderProfile() {
+  const defaults = {
+    companyName: 'Rohit Singh',
+    companyEmail: 'mrchartist@zohomail.in',
+    companyAddress: '73 Sagouni Post Chouka Teh Kesli\nSagar, Madhya Pradesh 470235',
+    companyPhone: '7581838868',
+    companyGstin: '',
+    companyWebsite: '',
+    companyTagline: 'Financial Consultant',
+  };
+  try {
+    const stored = localStorage.getItem('mrchartist_inv_settings');
+    if (stored) {
+      const s = JSON.parse(stored);
+      return {
+        companyName: s.companyName || defaults.companyName,
+        companyEmail: s.companyEmail || defaults.companyEmail,
+        companyAddress: s.companyAddress || defaults.companyAddress,
+        companyPhone: s.companyPhone || defaults.companyPhone,
+        companyGstin: s.companyGstin || '',
+        companyWebsite: s.companyWebsite || '',
+        companyTagline: s.companyTagline || defaults.companyTagline,
+      };
+    }
+  } catch {}
+  return defaults;
+}
+
 export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const invoice = useInvoiceStore();
+  const sender = useMemo(() => getSenderProfile(), [isOpen]);
   
   if (!isOpen) return null;
 
@@ -30,6 +59,8 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
       console.error('Failed to generate PDF', err);
     }
   };
+
+  const addressLines = sender.companyAddress.split('\n');
 
   return (
     <div style={{
@@ -68,10 +99,14 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
                 <div className={styles.invoiceNumber}>#{invoice.invoice_number}</div>
               </div>
               <div className={styles.senderBlock}>
-                <div className={styles.senderName}>MrChartist</div>
-                <div className={styles.senderTagline}>Premium Financial Research</div>
+                <div className={styles.senderName}>{sender.companyName}</div>
+                <div className={styles.senderTagline}>{sender.companyTagline}</div>
                 <div className={styles.senderMeta}>
-                  123 Dalal Street<br />Mumbai, MH 400001<br />billing@mrchartist.com
+                  {addressLines.map((line: string, i: number) => (
+                    <span key={i}>{line}{i < addressLines.length - 1 && <br />}</span>
+                  ))}
+                  {sender.companyPhone && <><br />Mobile: {sender.companyPhone}</>}
+                  {sender.companyEmail && <><br />{sender.companyEmail}</>}
                 </div>
               </div>
             </div>
@@ -84,7 +119,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
                 <span className={styles.detailSubtext}>
                   {invoice.client.address || 'Address Line 1'}<br />
                   {invoice.client.city || 'City'} {invoice.client.zip || ''}<br />
-                  {invoice.client.email || 'email@example.com'}
+                  {invoice.client.email || ''}
                 </span>
               </div>
               <div className={styles.datesRow}>
@@ -121,9 +156,21 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
               ))}
             </div>
 
-            {/* Footer: Notes + Totals */}
+            {/* Footer: Bank Details + Notes + Totals */}
             <div className={styles.footerSection}>
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Bank Details */}
+                <div className={styles.notesBox} style={{ background: '#fdf8f4', borderColor: '#f0e8e0' }}>
+                  <div className={styles.notesLabel} style={{ color: '#f07020' }}>Bank Details for Payment</div>
+                  <div className={styles.notesText} style={{ fontSize: '8.5px', lineHeight: '1.7' }}>
+                    <strong>Name:</strong> ROHIT SINGH<br />
+                    <strong>A/C No:</strong> 081801505319<br />
+                    <strong>IFSC:</strong> ICIC0000949<br />
+                    <strong>Bank:</strong> ICICI Bank (Savings)<br />
+                    <strong>UPI:</strong> 8726696911@icici
+                  </div>
+                </div>
+                {/* Notes */}
                 <div className={styles.notesBox}>
                   <div className={styles.notesLabel}>Notes & Terms</div>
                   <div className={styles.notesText}>
@@ -163,6 +210,9 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
                   <span className={styles.totalValue}>
                     {formatCurrency(invoice.total, invoice.currency)}
                   </span>
+                </div>
+                <div style={{ textAlign: 'right', fontSize: '8px', fontStyle: 'italic', color: '#8a8580', marginTop: '6px', lineHeight: 1.4 }}>
+                  {amountInWords(invoice.total, invoice.currency)}
                 </div>
               </div>
             </div>

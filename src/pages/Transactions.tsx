@@ -1,18 +1,61 @@
 import { useState, useEffect } from 'react';
-import { localDb } from '../lib/localDb';
+import { localDb, setTable, getTable, generateId } from '../lib/localDb';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
-import { ArrowDownRight, ArrowUpRight, FileText } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy } from 'lucide-react';
+import { useInvoiceStore } from '../store/useInvoiceStore';
+import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
+import { Toast } from '../components/ui/Toast';
 import styles from './InvoiceCreator.module.css';
 
 export function Transactions() {
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const store = useInvoiceStore();
 
-  useEffect(() => {
-    setInvoices(localDb.invoices.getAll());
-  }, []);
+  const reload = () => setInvoices(localDb.invoices.getAll());
+
+  useEffect(() => { reload(); }, []);
 
   const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.total, 0);
   const pendingRevenue = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft').reduce((sum, i) => sum + i.total, 0);
+
+  const handlePreview = (inv: any) => {
+    store.loadInvoice(inv.id);
+    setPreviewOpen(true);
+  };
+
+  const handleMarkPaid = (inv: any) => {
+    const all = getTable('invoices');
+    const idx = all.findIndex((i: any) => i.id === inv.id);
+    if (idx >= 0) {
+      all[idx].status = all[idx].status === 'Paid' ? 'Sent' : 'Paid';
+      setTable('invoices', all);
+      reload();
+      setToastMsg(all[idx].status === 'Paid' ? 'Marked as Paid ✓' : 'Reverted to Sent');
+    }
+  };
+
+  const handleDelete = (inv: any) => {
+    const all = getTable('invoices').filter((i: any) => i.id !== inv.id);
+    setTable('invoices', all);
+    reload();
+    setToastMsg('Invoice deleted');
+  };
+
+  const handleDuplicate = (inv: any) => {
+    const clone = {
+      ...inv,
+      id: generateId(),
+      invoice_number: '', // will be auto-generated
+      status: 'Draft',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    localDb.invoices.save(clone);
+    reload();
+    setToastMsg(`Duplicated as ${clone.invoice_number || 'new draft'}`);
+  };
 
   return (
     <div className={styles.container}>
@@ -56,12 +99,13 @@ export function Transactions() {
                 <th style={{ padding: '1rem 0', fontWeight: 600 }}>Date</th>
                 <th style={{ padding: '1rem 0', fontWeight: 600 }}>Status</th>
                 <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'right' }}>Amount</th>
+                <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {invoices.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '2rem 0', textAlign: 'center', color: 'var(--muted-foreground)' }}>No invoices generated yet.</td>
+                  <td colSpan={6} style={{ padding: '2rem 0', textAlign: 'center', color: 'var(--muted-foreground)' }}>No invoices generated yet.</td>
                 </tr>
               ) : (
                 invoices.map((inv, idx) => (
@@ -80,6 +124,22 @@ export function Transactions() {
                       </span>
                     </td>
                     <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(inv.total, inv.currency)}</td>
+                    <td style={{ padding: '1rem 0', textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
+                        <button onClick={() => handlePreview(inv)} className={styles.btnGhost} style={{ color: 'var(--primary)', padding: '0.4rem' }} title="Preview & Download">
+                          <Eye size={15} />
+                        </button>
+                        <button onClick={() => handleMarkPaid(inv)} className={styles.btnGhost} style={{ color: inv.status === 'Paid' ? 'var(--profit)' : 'var(--muted-foreground)', padding: '0.4rem' }} title={inv.status === 'Paid' ? 'Mark Unpaid' : 'Mark as Paid'}>
+                          <CheckCircle size={15} />
+                        </button>
+                        <button onClick={() => handleDuplicate(inv)} className={styles.btnGhost} style={{ color: 'var(--muted-foreground)', padding: '0.4rem' }} title="Duplicate Invoice">
+                          <Copy size={15} />
+                        </button>
+                        <button onClick={() => handleDelete(inv)} className={styles.btnGhost} style={{ color: 'var(--destructive)', padding: '0.4rem' }} title="Delete Invoice">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -87,6 +147,9 @@ export function Transactions() {
           </table>
         </div>
       </div>
+
+      <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
     </div>
   );
 }
