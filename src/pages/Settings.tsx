@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Building, Palette, Database, Download, Upload } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Building, Palette, Database, Download, Upload, Plus, Trash2, CheckCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { generateId } from '../lib/localDb';
 import styles from './InvoiceCreator.module.css';
+import { type SenderProfile } from '../store/useInvoiceStore';
 
 export function Settings() {
-  const [companyName, setCompanyName] = useState('Rohit Singh');
-  const [companyEmail, setCompanyEmail] = useState('mrchartist@zohomail.in');
-  const [companyAddress, setCompanyAddress] = useState('73 Sagouni Post Chouka Teh Kesli\nSagar, Madhya Pradesh 470235');
-  const [companyPhone, setCompanyPhone] = useState('7581838868');
-  const [companyTagline, setCompanyTagline] = useState('Financial Consultant');
-  const [companyGstin, setCompanyGstin] = useState('');
-  const [companyWebsite, setCompanyWebsite] = useState('');
+  const [profiles, setProfiles] = useState<SenderProfile[]>([]);
+  const [activeProfileId, setActiveProfileId] = useState<string>('');
+  const [editingProfileId, setEditingProfileId] = useState<string>('');
+  
   const [defaultCurrency, setDefaultCurrency] = useState('INR');
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
   const [invoicePrefix, setInvoicePrefix] = useState('INV');
@@ -21,34 +20,110 @@ export function Settings() {
     if (stored) {
       try {
         const s = JSON.parse(stored);
-        setCompanyName(s.companyName || 'Rohit Singh');
-        setCompanyEmail(s.companyEmail || '');
-        setCompanyAddress(s.companyAddress || '');
-        setCompanyPhone(s.companyPhone || '');
-        setCompanyTagline(s.companyTagline || 'Financial Consultant');
-        setCompanyGstin(s.companyGstin || '');
-        setCompanyWebsite(s.companyWebsite || '');
+        
+        // Migration from old flat settings to new profiles array
+        if (!s.profiles) {
+          const defaultProfile: SenderProfile = {
+            id: generateId(),
+            companyName: s.companyName || 'Rohit Singh',
+            companyEmail: s.companyEmail || 'mrchartist@zohomail.in',
+            companyAddress: s.companyAddress || '73 Sagouni Post Chouka Teh Kesli\nSagar, Madhya Pradesh 470235',
+            companyPhone: s.companyPhone || '7581838868',
+            companyTagline: s.companyTagline || 'Financial Consultant',
+            companyGstin: s.companyGstin || '',
+            companyWebsite: s.companyWebsite || '',
+            bankName: 'ICICI Bank (Savings)',
+            accountName: 'ROHIT SINGH',
+            accountNumber: '081801505319',
+            ifsc: 'ICIC0000949',
+            upiId: '8726696911@icici'
+          };
+          setProfiles([defaultProfile]);
+          setActiveProfileId(defaultProfile.id!);
+          setEditingProfileId(defaultProfile.id!);
+        } else {
+          setProfiles(s.profiles);
+          setActiveProfileId(s.activeProfileId);
+          setEditingProfileId(s.profiles.length > 0 ? s.profiles[0].id : '');
+        }
+
         setDefaultCurrency(s.defaultCurrency || 'INR');
         setDefaultTaxRate(s.defaultTaxRate ?? 0);
         setInvoicePrefix(s.invoicePrefix || 'INV');
       } catch {}
+    } else {
+      // Setup initial default
+      const pId = generateId();
+      setProfiles([{
+        id: pId,
+        companyName: 'Rohit Singh',
+        companyEmail: 'mrchartist@zohomail.in',
+        companyAddress: '73 Sagouni Post Chouka Teh Kesli\nSagar, Madhya Pradesh 470235',
+        companyPhone: '7581838868',
+        companyTagline: 'Financial Consultant',
+        companyGstin: '',
+        companyWebsite: '',
+        bankName: 'ICICI Bank (Savings)',
+        accountName: 'ROHIT SINGH',
+        accountNumber: '081801505319',
+        ifsc: 'ICIC0000949',
+        upiId: '8726696911@icici'
+      }]);
+      setActiveProfileId(pId);
+      setEditingProfileId(pId);
     }
   }, []);
 
   const handleSave = () => {
-    const settings = { companyName, companyEmail, companyAddress, companyPhone, companyTagline, companyGstin, companyWebsite, defaultCurrency, defaultTaxRate, invoicePrefix };
+    const settings = { profiles, activeProfileId, defaultCurrency, defaultTaxRate, invoicePrefix };
     localStorage.setItem('mrchartist_inv_settings', JSON.stringify(settings));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleAddProfile = () => {
+    const newProfile: SenderProfile = {
+      id: generateId(),
+      companyName: 'New Entity',
+      companyEmail: '',
+      companyAddress: '',
+      companyPhone: '',
+      companyTagline: '',
+      companyGstin: '',
+      companyWebsite: '',
+      bankName: '',
+      accountName: '',
+      accountNumber: '',
+      ifsc: '',
+      upiId: ''
+    };
+    setProfiles([...profiles, newProfile]);
+    setEditingProfileId(newProfile.id!);
+  };
+
+  const handleDeleteProfile = (id: string) => {
+    if (profiles.length <= 1) {
+      alert("You must have at least one profile.");
+      return;
+    }
+    const updated = profiles.filter(p => p.id !== id);
+    setProfiles(updated);
+    if (activeProfileId === id) setActiveProfileId(updated[0].id!);
+    if (editingProfileId === id) setEditingProfileId(updated[0].id!);
+  };
+
+  const updateEditingProfile = (field: keyof SenderProfile, value: string) => {
+    setProfiles(profiles.map(p => p.id === editingProfileId ? { ...p, [field]: value } : p));
+  };
+
+  const editingProfile = profiles.find(p => p.id === editingProfileId) || profiles[0];
+
+  // (Export/Import logic remains same)
   const handleExportData = () => {
     const data: Record<string, any> = {};
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('mrchartist_inv_')) {
-        data[key] = localStorage.getItem(key);
-      }
+      if (key && key.startsWith('mrchartist_inv_')) data[key] = localStorage.getItem(key);
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -70,31 +145,24 @@ export function Settings() {
       reader.onload = (ev) => {
         try {
           const data = JSON.parse(ev.target?.result as string);
-          Object.entries(data).forEach(([key, value]) => {
-            localStorage.setItem(key, value as string);
-          });
+          Object.entries(data).forEach(([key, value]) => localStorage.setItem(key, value as string));
           alert('Data restored successfully! Refreshing...');
           window.location.reload();
-        } catch {
-          alert('Invalid backup file.');
-        }
+        } catch { alert('Invalid backup file.'); }
       };
       reader.readAsText(file);
     };
     input.click();
   };
 
-  const handleSaveToDisk = async () => {
+  const handleSaveToDisk = async () => { /* ... skipped for brevity if not changing, but we should include it */
     try {
       const data: Record<string, any> = {};
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('mrchartist_inv_')) {
-          data[key] = localStorage.getItem(key);
-        }
+        if (key && key.startsWith('mrchartist_inv_')) data[key] = localStorage.getItem(key);
       }
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      // Use Chrome File System Access API
       if ('showSaveFilePicker' in window) {
         const handle = await (window as any).showSaveFilePicker({
           suggestedName: `mrchartist-invoice-backup-${new Date().toISOString().split('T')[0]}.json`,
@@ -105,12 +173,8 @@ export function Settings() {
         await writable.close();
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
-      } else {
-        alert('File System Access API not supported. Use Chrome for direct disk sync.');
-      }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') alert('Failed to save: ' + e.message);
-    }
+      } else { alert('File System Access API not supported.'); }
+    } catch (e: any) { if (e.name !== 'AbortError') alert('Failed to save: ' + e.message); }
   };
 
   const handleLoadFromDisk = async () => {
@@ -122,18 +186,14 @@ export function Settings() {
         const file = await handle.getFile();
         const text = await file.text();
         const data = JSON.parse(text);
-        Object.entries(data).forEach(([key, value]) => {
-          localStorage.setItem(key, value as string);
-        });
+        Object.entries(data).forEach(([key, value]) => localStorage.setItem(key, value as string));
         alert('Data restored from disk! Refreshing...');
         window.location.reload();
-      } else {
-        alert('File System Access API not supported. Use Chrome for direct disk sync.');
-      }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') alert('Failed to load: ' + e.message);
-    }
+      } else { alert('File System Access API not supported.'); }
+    } catch (e: any) { if (e.name !== 'AbortError') alert('Failed to load: ' + e.message); }
   };
+
+  if (!editingProfile) return null;
 
   return (
     <div className={styles.container}>
@@ -144,44 +204,111 @@ export function Settings() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-        {/* Company Profile Card */}
-        <div className={styles.card}>
-          <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Building size={16} /> Company Profile
-          </div>
-          <div className={styles.cardBody} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>Your Name / Company</label>
-              <input className={styles.input} value={companyName} onChange={e => setCompanyName(e.target.value)} />
+        
+        {/* Left Column: Profiles Management */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          <div className={styles.card}>
+            <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Building size={16} /> Sender Profiles
+              </div>
+              <button onClick={handleAddProfile} className={styles.btnGhost} style={{ padding: '0.25rem', color: 'var(--primary)' }}>
+                <Plus size={16} />
+              </button>
             </div>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>Tagline (shown on invoice)</label>
-              <input className={styles.input} value={companyTagline} onChange={e => setCompanyTagline(e.target.value)} placeholder="e.g. Financial Consultant" />
+            
+            <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
+              {profiles.map(p => (
+                <div 
+                  key={p.id} 
+                  onClick={() => setEditingProfileId(p.id!)}
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: '8px',
+                    border: `1px solid ${editingProfileId === p.id ? 'var(--primary)' : 'var(--border)'}`,
+                    backgroundColor: editingProfileId === p.id ? 'var(--primary-light)' : 'transparent',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {p.companyName || 'Unnamed'} 
+                  {activeProfileId === p.id && <CheckCircle size={12} color="var(--primary)" />}
+                </div>
+              ))}
             </div>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>Email</label>
-              <input className={styles.input} value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} />
-            </div>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>Phone / Mobile</label>
-              <input className={styles.input} value={companyPhone} onChange={e => setCompanyPhone(e.target.value)} />
-            </div>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>Address</label>
-              <textarea className={styles.input} rows={3} value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} style={{ resize: 'none' }} />
-            </div>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>GSTIN</label>
-              <input className={styles.input} value={companyGstin} onChange={e => setCompanyGstin(e.target.value)} placeholder="Optional" />
-            </div>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>Website</label>
-              <input className={styles.input} value={companyWebsite} onChange={e => setCompanyWebsite(e.target.value)} placeholder="Optional" />
+
+            <div className={styles.cardBody} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Editing: {editingProfile.companyName}</span>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {activeProfileId !== editingProfile.id && (
+                    <button className={styles.btnGhost} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }} onClick={() => setActiveProfileId(editingProfile.id!)}>
+                      Set as Default
+                    </button>
+                  )}
+                  <button className={styles.btnGhost} style={{ color: 'var(--destructive)', padding: '0.25rem' }} onClick={() => handleDeleteProfile(editingProfile.id!)}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Company / Sender Name</label>
+                <input className={styles.input} value={editingProfile.companyName} onChange={e => updateEditingProfile('companyName', e.target.value)} />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Tagline</label>
+                <input className={styles.input} value={editingProfile.companyTagline} onChange={e => updateEditingProfile('companyTagline', e.target.value)} />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Email</label>
+                <input className={styles.input} value={editingProfile.companyEmail} onChange={e => updateEditingProfile('companyEmail', e.target.value)} />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Phone / Mobile</label>
+                <input className={styles.input} value={editingProfile.companyPhone} onChange={e => updateEditingProfile('companyPhone', e.target.value)} />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Address</label>
+                <textarea className={styles.input} rows={3} value={editingProfile.companyAddress} onChange={e => updateEditingProfile('companyAddress', e.target.value)} style={{ resize: 'none' }} />
+              </div>
+              
+              <div style={{ padding: '1rem', backgroundColor: 'var(--background-alt)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '1rem' }}>Bank Details (for this profile)</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label}>Bank Name</label>
+                    <input className={styles.input} value={editingProfile.bankName} onChange={e => updateEditingProfile('bankName', e.target.value)} />
+                  </div>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label}>Account Name</label>
+                    <input className={styles.input} value={editingProfile.accountName} onChange={e => updateEditingProfile('accountName', e.target.value)} />
+                  </div>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label}>A/C No</label>
+                    <input className={styles.input} value={editingProfile.accountNumber} onChange={e => updateEditingProfile('accountNumber', e.target.value)} />
+                  </div>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label}>IFSC</label>
+                    <input className={styles.input} value={editingProfile.ifsc} onChange={e => updateEditingProfile('ifsc', e.target.value)} />
+                  </div>
+                  <div className={styles.inputGroup} style={{ gridColumn: '1 / -1' }}>
+                    <label className={styles.label}>UPI ID</label>
+                    <input className={styles.input} value={editingProfile.upiId} onChange={e => updateEditingProfile('upiId', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
 
-        {/* Preferences Card */}
+        {/* Right Column: Preferences & Data */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className={styles.card}>
             <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -209,7 +336,6 @@ export function Settings() {
             </div>
           </div>
 
-          {/* Data Management Card */}
           <div className={styles.card}>
             <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Database size={16} /> Data Management
@@ -227,7 +353,6 @@ export function Settings() {
                 </button>
               </div>
 
-              {/* Chrome File System Sync */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '0.5rem' }}>
                 <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
                   💾 Direct Disk Sync (Chrome)

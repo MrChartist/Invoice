@@ -19,6 +19,22 @@ export interface Client {
   zip: string;
 }
 
+export interface SenderProfile {
+  id?: string;
+  companyName: string;
+  companyTagline: string;
+  companyEmail: string;
+  companyPhone: string;
+  companyAddress: string;
+  companyGstin: string;
+  companyWebsite: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  ifsc: string;
+  upiId: string;
+}
+
 export interface InvoiceState {
   id: string;
   invoice_number: string;
@@ -28,6 +44,7 @@ export interface InvoiceState {
   currency: string;
   
   client: Client;
+  sender: SenderProfile | null;
   items: InvoiceItem[];
   
   discount_rate: number;
@@ -41,6 +58,7 @@ export interface InvoiceState {
 
   // Actions
   setClient: (client: Partial<Client>) => void;
+  setSender: (sender: SenderProfile) => void;
   setDates: (issue: string, due: string) => void;
   addItem: () => void;
   updateItem: (id: string, field: keyof InvoiceItem, value: any) => void;
@@ -69,6 +87,7 @@ const initialState = {
   status: "Draft" as const,
   currency: 'INR',
   client: { ...defaultClient },
+  sender: null,
   items: [{ id: generateId(), name: '', type: 'Service', rate: 0, quantity: 1, amount: 0 }],
   discount_rate: 0,
   tax_rate: 0,
@@ -84,6 +103,8 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
   setClient: (clientData) => set((state) => ({ 
     client: { ...state.client, ...clientData } 
   })),
+
+  setSender: (sender) => set({ sender }),
 
   setDates: (issue, due) => set({ issue_date: issue, due_date: due }),
 
@@ -142,7 +163,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => ({
   saveInvoice: () => {
     const state = get();
     // Exclude methods from the save payload
-    const { setClient, setDates, addItem, updateItem, removeItem, setRates, setCurrency, recalculate, loadInvoice, saveInvoice, reset, ...payload } = state;
+    const { setClient, setSender, setDates, addItem, updateItem, removeItem, setRates, setCurrency, recalculate, loadInvoice, saveInvoice, reset, ...payload } = state;
     
     const saved = localDb.invoices.save(payload);
     

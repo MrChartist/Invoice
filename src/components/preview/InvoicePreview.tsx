@@ -11,28 +11,39 @@ interface InvoicePreviewModalProps {
   onClose: () => void;
 }
 
-function getSenderProfile() {
+function getSenderProfile(invoiceSender: any) {
+  if (invoiceSender) return invoiceSender;
+
   const defaults = {
     companyName: 'Rohit Singh',
     companyEmail: 'mrchartist@zohomail.in',
     companyAddress: '73 Sagouni Post Chouka Teh Kesli\nSagar, Madhya Pradesh 470235',
     companyPhone: '7581838868',
-    companyGstin: '',
-    companyWebsite: '',
     companyTagline: 'Financial Consultant',
+    bankName: 'ICICI Bank (Savings)',
+    accountName: 'ROHIT SINGH',
+    accountNumber: '081801505319',
+    ifsc: 'ICIC0000949',
+    upiId: '8726696911@icici'
   };
   try {
     const stored = localStorage.getItem('mrchartist_inv_settings');
     if (stored) {
       const s = JSON.parse(stored);
+      if (s.profiles && s.profiles.length > 0) {
+        return s.profiles.find((p: any) => p.id === s.activeProfileId) || s.profiles[0];
+      }
       return {
         companyName: s.companyName || defaults.companyName,
         companyEmail: s.companyEmail || defaults.companyEmail,
         companyAddress: s.companyAddress || defaults.companyAddress,
         companyPhone: s.companyPhone || defaults.companyPhone,
-        companyGstin: s.companyGstin || '',
-        companyWebsite: s.companyWebsite || '',
         companyTagline: s.companyTagline || defaults.companyTagline,
+        bankName: defaults.bankName,
+        accountName: defaults.accountName,
+        accountNumber: defaults.accountNumber,
+        ifsc: defaults.ifsc,
+        upiId: defaults.upiId
       };
     }
   } catch {}
@@ -42,7 +53,7 @@ function getSenderProfile() {
 export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const invoice = useInvoiceStore();
-  const sender = useMemo(() => getSenderProfile(), [isOpen]);
+  const sender = useMemo(() => getSenderProfile(invoice.sender), [isOpen, invoice.sender]);
   
   if (!isOpen) return null;
 
@@ -160,16 +171,18 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
             <div className={styles.footerSection}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* Bank Details */}
-                <div className={styles.notesBox} style={{ background: '#fdf8f4', borderColor: '#f0e8e0' }}>
-                  <div className={styles.notesLabel} style={{ color: '#f07020' }}>Bank Details for Payment</div>
-                  <div className={styles.notesText} style={{ fontSize: '8.5px', lineHeight: '1.7' }}>
-                    <strong>Name:</strong> ROHIT SINGH<br />
-                    <strong>A/C No:</strong> 081801505319<br />
-                    <strong>IFSC:</strong> ICIC0000949<br />
-                    <strong>Bank:</strong> ICICI Bank (Savings)<br />
-                    <strong>UPI:</strong> 8726696911@icici
+                {(sender.accountNumber || sender.upiId) && (
+                  <div className={styles.notesBox} style={{ background: '#fdf8f4', borderColor: '#f0e8e0' }}>
+                    <div className={styles.notesLabel} style={{ color: '#f07020' }}>Bank Details for Payment</div>
+                    <div className={styles.notesText} style={{ fontSize: '8.5px', lineHeight: '1.7' }}>
+                      {sender.accountName && <><strong>Name:</strong> {sender.accountName}<br /></>}
+                      {sender.accountNumber && <><strong>A/C No:</strong> {sender.accountNumber}<br /></>}
+                      {sender.ifsc && <><strong>IFSC:</strong> {sender.ifsc}<br /></>}
+                      {sender.bankName && <><strong>Bank:</strong> {sender.bankName}<br /></>}
+                      {sender.upiId && <><strong>UPI:</strong> {sender.upiId}</>}
+                    </div>
                   </div>
-                </div>
+                )}
                 {/* Notes */}
                 <div className={styles.notesBox}>
                   <div className={styles.notesLabel}>Notes & Terms</div>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useInvoiceStore } from '../store/useInvoiceStore';
+import { useState, useEffect } from 'react';
+import { useInvoiceStore, type SenderProfile } from '../store/useInvoiceStore';
 import { Download, Send, Plus, Search, Trash2, Library } from 'lucide-react';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
 import { ClientSearchModal } from '../components/modals/ClientSearchModal';
@@ -16,6 +16,28 @@ export function InvoiceCreator() {
   const [isCrmOpen, setIsCrmOpen] = useState(false);
   const [itemSearchTargetId, setItemSearchTargetId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<SenderProfile[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mrchartist_inv_settings');
+    if (stored) {
+      try {
+        const s = JSON.parse(stored);
+        if (s.profiles && s.profiles.length > 0) {
+          setProfiles(s.profiles);
+          if (!invoice.sender) {
+            const defaultProf = s.profiles.find((p: any) => p.id === s.activeProfileId) || s.profiles[0];
+            invoice.setSender(defaultProf);
+          }
+        }
+      } catch {}
+    }
+  }, []);
+
+  const handleProfileSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const prof = profiles.find(p => p.id === e.target.value);
+    if (prof) invoice.setSender(prof);
+  };
 
   const handleStatusClass = () => {
     switch (invoice.status) {
@@ -43,22 +65,38 @@ export function InvoiceCreator() {
         {/* Left Column */}
         <div className={styles.leftColumn}>
           
-          {/* Company Card (Dark style) */}
+          {/* Sender Profile Card (Dark style) */}
           <div className={cn(styles.card, styles.cardDark)}>
+            <div className={styles.cardHeader} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.6)' }}>Issuing As</span>
+              {profiles.length > 1 && (
+                <select 
+                  className={styles.input} 
+                  style={{ width: 'auto', backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.2)', color: 'white', padding: '0.25rem 0.5rem', height: 'auto' }}
+                  value={invoice.sender?.id || ''}
+                  onChange={handleProfileSelect}
+                >
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id} style={{ color: 'black' }}>{p.companyName}</option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className={styles.cardBody} style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ width: 48, height: 48, backgroundColor: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem', color: 'white' }}>
-                  M
+                  {invoice.sender?.companyName?.[0]?.toUpperCase() || 'M'}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Rohit Singh</h3>
-                  <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Financial Consultant</p>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>{invoice.sender?.companyName || 'Select Profile'}</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem' }}>{invoice.sender?.companyTagline}</p>
                 </div>
               </div>
-              <div style={{ textAlign: 'right', fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-                <p>73 Sagouni Post Chouka Teh Kesli</p>
-                <p>Sagar, MP 470235</p>
-                <p>Mob: 7581838868</p>
+              <div style={{ textAlign: 'right', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
+                {invoice.sender?.companyAddress?.split('\n').map((line, i) => (
+                  <p key={i} style={{ margin: 0 }}>{line}</p>
+                ))}
+                {invoice.sender?.companyPhone && <p style={{ margin: 0 }}>Mob: {invoice.sender.companyPhone}</p>}
               </div>
             </div>
           </div>
