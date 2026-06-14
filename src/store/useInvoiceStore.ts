@@ -47,9 +47,10 @@ export interface InvoiceState {
   invoice_number: string;
   issue_date: string;
   due_date: string;
-  status: "Draft" | "Sent" | "Paid" | "Overdue";
+  status: "Draft" | "Sent" | "Paid" | "Overdue" | "Partially Paid";
   currency: string;
   notes: string;
+  amount_paid?: number;
   
   client: Client;
   sender: SenderProfile | null;
@@ -68,7 +69,7 @@ export interface InvoiceState {
   setClient: (client: Partial<Client>) => void;
   setSender: (sender: SenderProfile) => void;
   setDates: (issue: string, due: string) => void;
-  setStatus: (status: "Draft" | "Sent" | "Paid" | "Overdue") => void;
+  setStatus: (status: "Draft" | "Sent" | "Paid" | "Overdue" | "Partially Paid") => void;
   setNotes: (notes: string) => void;
   addItem: () => void;
   updateItem: (id: string, field: keyof InvoiceItem, value: any) => void;

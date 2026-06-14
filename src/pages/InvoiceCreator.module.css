@@ -46,6 +46,11 @@
   color: white;
 }
 
+.badgePartial {
+  background-color: rgba(230, 154, 6, 0.12);
+  color: var(--warning);
+}
+
 .badgeOverdue {
   background-color: rgba(217, 54, 54, 0.1);
   color: var(--loss);

@@ -38,13 +38,26 @@ export function getIndianFY(dateStr?: string): { label: string; startYear: numbe
   };
 }
 
+/** Read a value from the saved settings object (key: mrchartist_inv_settings). */
+export function getSetting<T = any>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(DB_PREFIX + "settings");
+    if (!raw) return fallback;
+    const s = JSON.parse(raw);
+    return (s[key] ?? fallback) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export function generateInvoiceNumber(dateStr?: string): string {
   const invoices = getTable("invoices");
   const fy = getIndianFY(dateStr);
+  const prefix = (getSetting("invoicePrefix", "INV") || "INV").trim();
   // Filter invoices for this financial year
   const fyInvoices = invoices.filter((i: any) => i.invoice_number?.includes(`FY${fy.label}`));
   const count = fyInvoices.length + 1;
-  return `INV/FY${fy.label}/${count.toString().padStart(4, '0')}`;
+  return `${prefix}/FY${fy.label}/${count.toString().padStart(4, '0')}`;
 }
 
 // ─── API Emulation ──────────────────────────────────────────
@@ -128,33 +141,64 @@ export const localDb = {
     }
   },
 
-  transactions: {
+  payments: {
     getAll: () => getTable("transactions"),
-    recordPayment: (invoiceId: string, amount: number, method: string) => {
+
+    /** All payments recorded against a given invoice, oldest first. */
+    getForInvoice: (invoiceId: string) =>
+      getTable("transactions")
+        .filter((t: any) => t.invoice_id === invoiceId)
+        .sort((a: any, b: any) => (a.date < b.date ? -1 : 1)),
+
+    /** Total amount paid against an invoice. */
+    totalForInvoice: (invoiceId: string) =>
+      getTable("transactions")
+        .filter((t: any) => t.invoice_id === invoiceId)
+        .reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
+
+    /** Record a payment and reconcile the invoice's status. */
+    record: (invoiceId: string, payment: { amount: number; method: string; date?: string; note?: string }) => {
       const tx = getTable("transactions");
       const newTx = {
         id: generateId(),
         invoice_id: invoiceId,
-        amount,
-        method,
-        date: new Date().toISOString()
+        amount: payment.amount,
+        method: payment.method,
+        note: payment.note || '',
+        date: payment.date || new Date().toISOString(),
       };
       tx.push(newTx);
       setTable("transactions", tx);
-
-      // Update invoice status if fully paid
-      const invoices = getTable("invoices");
-      const invIdx = invoices.findIndex((i: any) => i.id === invoiceId);
-      if (invIdx >= 0) {
-        const totalPaid = tx.filter((t: any) => t.invoice_id === invoiceId).reduce((sum, t) => sum + t.amount, 0);
-        if (totalPaid >= invoices[invIdx].total) {
-          invoices[invIdx].status = "Paid";
-        } else {
-          invoices[invIdx].status = "Partially Paid";
-        }
-        setTable("invoices", invoices);
-      }
+      localDb.payments.reconcile(invoiceId);
       return newTx;
-    }
+    },
+
+    /** Delete a recorded payment and reconcile the invoice. */
+    delete: (txId: string) => {
+      const tx = getTable("transactions");
+      const removed = tx.find((t: any) => t.id === txId);
+      setTable("transactions", tx.filter((t: any) => t.id !== txId));
+      if (removed) localDb.payments.reconcile(removed.invoice_id);
+    },
+
+    /** Re-derive an invoice's paid amount and status from its payments. */
+    reconcile: (invoiceId: string) => {
+      const invoices = getTable("invoices");
+      const idx = invoices.findIndex((i: any) => i.id === invoiceId);
+      if (idx < 0) return;
+      const paid = localDb.payments.totalForInvoice(invoiceId);
+      invoices[idx].amount_paid = paid;
+      if (paid <= 0) {
+        // Revert to Sent unless it was an explicit Draft.
+        if (invoices[idx].status === 'Paid' || invoices[idx].status === 'Partially Paid') {
+          invoices[idx].status = 'Sent';
+        }
+      } else if (paid >= invoices[idx].total) {
+        invoices[idx].status = 'Paid';
+      } else {
+        invoices[idx].status = 'Partially Paid';
+      }
+      setTable("invoices", invoices);
+    },
   }
 };

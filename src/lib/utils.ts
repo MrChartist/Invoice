@@ -66,7 +66,37 @@ export function amountInWords(amount: number, currency: string = 'INR'): string 
   if (hundred) words += threeDigit(hundred);
 
   words = words.trim();
-  const prefix = currency === 'INR' ? 'Rupees' : 'Dollars';
-  const suffix = paise > 0 ? ` and ${twoDigit(paise)} Paise` : '';
-  return `${prefix} ${words}${suffix} Only`;
+  const units: Record<string, { major: string; minor: string }> = {
+    INR: { major: 'Rupees', minor: 'Paise' },
+    USD: { major: 'Dollars', minor: 'Cents' },
+    EUR: { major: 'Euros', minor: 'Cents' },
+    GBP: { major: 'Pounds', minor: 'Pence' },
+  };
+  const unit = units[currency] || { major: currency, minor: 'Cents' };
+  const suffix = paise > 0 ? ` and ${twoDigit(paise)} ${unit.minor}` : '';
+  return `${unit.major} ${words}${suffix} Only`;
+}
+
+// ─── Invoice status helpers ─────────────────────────────────
+export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Partially Paid';
+
+/** Amount actually received for an invoice (from recorded payments, or full total if marked Paid). */
+export function amountReceived(inv: { amount_paid?: number; status?: string; total?: number }): number {
+  if (typeof inv.amount_paid === 'number') return inv.amount_paid;
+  return inv.status === 'Paid' ? (inv.total || 0) : 0;
+}
+
+/**
+ * Returns the status to display, auto-flagging unpaid invoices whose due date
+ * has passed as "Overdue" without mutating stored data.
+ */
+export function effectiveStatus(inv: { status?: string; due_date?: string }): InvoiceStatus {
+  const status = (inv?.status as InvoiceStatus) || 'Draft';
+  if (status === 'Sent' && inv.due_date) {
+    const due = new Date(inv.due_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (due < today) return 'Overdue';
+  }
+  return status;
 }

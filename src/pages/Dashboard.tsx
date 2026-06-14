@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { localDb } from '../lib/localDb';
-import { formatCurrency, formatDate, cn } from '../lib/utils';
+import { formatCurrency, formatDate, cn, effectiveStatus, amountReceived } from '../lib/utils';
 import { LayoutDashboard, ArrowUpRight, ArrowDownRight, Clock, FileText, ChevronRight, Plus, Sparkles, TrendingUp, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getUser } from '../lib/auth';
@@ -14,8 +14,10 @@ export function Dashboard() {
     setInvoices(localDb.invoices.getAll().reverse());
   }, []);
 
-  const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.total, 0);
-  const pendingRevenue = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft').reduce((sum, i) => sum + i.total, 0);
+  const totalRevenue = invoices.reduce((sum, i) => sum + amountReceived(i), 0);
+  const pendingRevenue = invoices
+    .filter(i => i.status !== 'Draft')
+    .reduce((sum, i) => sum + Math.max(0, (i.total || 0) - amountReceived(i)), 0);
   const clientCount = localDb.clients.getAll().length;
   const recentInvoices = invoices.slice(0, 5);
 
@@ -25,22 +27,25 @@ export function Dashboard() {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('en-US', { month: 'short' }), total: 0 };
   });
-  invoices.filter(i => i.status === 'Paid').forEach(i => {
+  invoices.forEach(i => {
+    const received = amountReceived(i);
+    if (received <= 0) return;
     const d = new Date(i.issue_date);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     const bucket = months.find(m => m.key === key);
-    if (bucket) bucket.total += i.total;
+    if (bucket) bucket.total += received;
   });
   const maxMonth = Math.max(1, ...months.map(m => m.total));
 
-  // ── Status breakdown ──
+  // ── Status breakdown (auto-flags overdue) ──
   const STATUS_META: { label: string; color: string }[] = [
     { label: 'Paid', color: 'var(--profit)' },
+    { label: 'Partially Paid', color: 'var(--warning)' },
     { label: 'Sent', color: 'var(--primary)' },
     { label: 'Overdue', color: 'var(--loss)' },
     { label: 'Draft', color: 'var(--muted-foreground)' },
   ];
-  const statusCounts = STATUS_META.map(s => ({ ...s, count: invoices.filter(i => i.status === s.label).length }));
+  const statusCounts = STATUS_META.map(s => ({ ...s, count: invoices.filter(i => effectiveStatus(i) === s.label).length }));
 
   return (
     <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
@@ -279,14 +284,14 @@ export function Dashboard() {
                     <div style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-mono)' }}>
                       {formatCurrency(inv.total, inv.currency)}
                     </div>
-                    <span className={cn(
-                      styles.badge, 
-                      inv.status === 'Draft' ? styles.badgeDraft : 
-                      inv.status === 'Paid' ? styles.badgePaid : 
-                      inv.status === 'Overdue' ? styles.badgeOverdue : styles.badgeSent
-                    )} style={{ minWidth: '80px', textAlign: 'center' }}>
-                      {inv.status}
-                    </span>
+                    {(() => {
+                      const st = effectiveStatus(inv);
+                      const cls = st === 'Draft' ? styles.badgeDraft :
+                        st === 'Paid' ? styles.badgePaid :
+                        st === 'Partially Paid' ? styles.badgePartial :
+                        st === 'Overdue' ? styles.badgeOverdue : styles.badgeSent;
+                      return <span className={cn(styles.badge, cls)} style={{ minWidth: '80px', textAlign: 'center' }}>{st}</span>;
+                    })()}
                   </div>
                 </div>
               ))}

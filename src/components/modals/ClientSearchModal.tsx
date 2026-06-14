@@ -33,7 +33,11 @@ export function ClientSearchModal({ isOpen, onClose }: ClientSearchModalProps) {
       email: client.email || '',
       address: client.address || '',
       city: client.city || '',
-      zip: client.zip || ''
+      zip: client.zip || '',
+      company: client.company || '',
+      gstin: client.gstin || '',
+      phone: client.phone || '',
+      state: client.state || '',
     });
     onClose();
   };

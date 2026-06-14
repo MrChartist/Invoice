@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { localDb, setTable, getTable, generateId } from '../lib/localDb';
-import { formatCurrency, formatDate, cn } from '../lib/utils';
-import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy, ReceiptText, Plus, Search } from 'lucide-react';
+import { formatCurrency, formatDate, cn, effectiveStatus, amountReceived } from '../lib/utils';
+import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy, ReceiptText, Plus, Search, Wallet } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
+import { PaymentModal } from '../components/modals/PaymentModal';
 import { Toast } from '../components/ui/Toast';
 import { Link } from 'react-router-dom';
 import styles from './InvoiceCreator.module.css';
@@ -14,18 +15,21 @@ export function Transactions() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [paymentInvoice, setPaymentInvoice] = useState<any>(null);
   const store = useInvoiceStore();
 
   const reload = () => setInvoices(localDb.invoices.getAll());
 
   useEffect(() => { reload(); }, []);
 
-  const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.total, 0);
-  const pendingRevenue = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft').reduce((sum, i) => sum + i.total, 0);
+  const totalRevenue = invoices.reduce((sum, i) => sum + amountReceived(i), 0);
+  const pendingRevenue = invoices
+    .filter(i => i.status !== 'Draft')
+    .reduce((sum, i) => sum + Math.max(0, (i.total || 0) - amountReceived(i)), 0);
 
-  const STATUS_TABS = ['All', 'Draft', 'Sent', 'Paid', 'Overdue'];
+  const STATUS_TABS = ['All', 'Draft', 'Sent', 'Partially Paid', 'Paid', 'Overdue'];
   const filtered = invoices.filter(i => {
-    const matchesStatus = statusFilter === 'All' || i.status === statusFilter;
+    const matchesStatus = statusFilter === 'All' || effectiveStatus(i) === statusFilter;
     const q = search.trim().toLowerCase();
     const matchesSearch = !q ||
       i.invoice_number?.toLowerCase().includes(q) ||
@@ -55,6 +59,12 @@ export function Transactions() {
     reload();
     setToastMsg('Invoice deleted');
   };
+
+  const badgeClass = (status: string) =>
+    status === 'Draft' ? styles.badgeDraft :
+    status === 'Paid' ? styles.badgePaid :
+    status === 'Partially Paid' ? styles.badgePartial :
+    status === 'Overdue' ? styles.badgeOverdue : styles.badgeSent;
 
   const handleDuplicate = (inv: any) => {
     const clone = {
@@ -215,20 +225,25 @@ export function Transactions() {
                     </td>
                     <td style={{ padding: '1rem 0' }}>{formatDate(inv.issue_date)}</td>
                     <td style={{ padding: '1rem 0' }}>
-                      <span className={cn(
-                        styles.badge, 
-                        inv.status === 'Draft' ? styles.badgeDraft : 
-                        inv.status === 'Paid' ? styles.badgePaid : 
-                        inv.status === 'Overdue' ? styles.badgeOverdue : styles.badgeSent
-                      )}>
-                        {inv.status}
+                      <span className={cn(styles.badge, badgeClass(effectiveStatus(inv)))}>
+                        {effectiveStatus(inv)}
                       </span>
                     </td>
-                    <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{formatCurrency(inv.total, inv.currency)}</td>
+                    <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                      {formatCurrency(inv.total, inv.currency)}
+                      {amountReceived(inv) > 0 && amountReceived(inv) < inv.total && (
+                        <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--warning)' }}>
+                          Bal {formatCurrency(inv.total - amountReceived(inv), inv.currency)}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '1rem 0', textAlign: 'center' }}>
                       <div style={{ display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
                         <button onClick={() => handlePreview(inv)} className={styles.btnGhost} style={{ color: 'var(--primary)', padding: '0.4rem' }} title="Preview & Download">
                           <Eye size={15} />
+                        </button>
+                        <button onClick={() => setPaymentInvoice(inv)} className={styles.btnGhost} style={{ color: 'var(--profit)', padding: '0.4rem' }} title="Record Payment">
+                          <Wallet size={15} />
                         </button>
                         <button onClick={() => handleMarkPaid(inv)} className={styles.btnGhost} style={{ color: inv.status === 'Paid' ? 'var(--profit)' : 'var(--muted-foreground)', padding: '0.4rem' }} title={inv.status === 'Paid' ? 'Mark Unpaid' : 'Mark as Paid'}>
                           <CheckCircle size={15} />
@@ -250,6 +265,12 @@ export function Transactions() {
       </div>
 
       <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+      <PaymentModal
+        isOpen={!!paymentInvoice}
+        invoice={paymentInvoice}
+        onClose={() => setPaymentInvoice(null)}
+        onRecorded={() => { reload(); setToastMsg('Payment recorded'); }}
+      />
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
     </div>
   );

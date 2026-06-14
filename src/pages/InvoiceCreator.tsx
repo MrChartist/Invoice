@@ -32,6 +32,11 @@ export function InvoiceCreator() {
             invoice.setSender(defaultProf);
           }
         }
+        // Apply defaults to a brand-new invoice only (never overwrite an edit).
+        if (!invoice.id) {
+          if (s.defaultCurrency) invoice.setCurrency(s.defaultCurrency);
+          if (s.defaultTaxRate) invoice.setRates(invoice.discount_rate, Number(s.defaultTaxRate) || 0);
+        }
       } catch {}
     }
   }, []);
@@ -46,6 +51,7 @@ export function InvoiceCreator() {
       case 'Draft': return styles.badgeDraft;
       case 'Sent': return styles.badgeSent;
       case 'Paid': return styles.badgePaid;
+      case 'Partially Paid': return styles.badgePartial;
       case 'Overdue': return styles.badgeOverdue;
       default: return '';
     }
@@ -67,6 +73,7 @@ export function InvoiceCreator() {
           >
             <option value="Draft">Draft</option>
             <option value="Sent">Sent</option>
+            <option value="Partially Paid">Partially Paid</option>
             <option value="Paid">Paid</option>
             <option value="Overdue">Overdue</option>
           </select>
@@ -259,7 +266,7 @@ export function InvoiceCreator() {
                 <label className={styles.label} style={{ marginBottom: '0.5rem', display: 'block' }}>Notes & Payment Terms</label>
                 <textarea
                   className={styles.input}
-                  placeholder="Payment is due within 14 days. Late payments are subject to 2% monthly interest. Bank details are mentioned above."
+                  placeholder="Payment is due within 15 days. Late payments are subject to 2% monthly interest. Bank details are mentioned above."
                   rows={3}
                   value={invoice.notes}
                   onChange={e => invoice.setNotes(e.target.value)}

@@ -129,9 +129,12 @@ export const TemplateEngine: React.FC<TemplateProps & { templateId: string }> = 
             <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: accent, marginBottom: '8px' }}>Bill To</div>
             <div style={{ fontSize: '14px', fontWeight: 800, color: '#111', marginBottom: '4px' }}>{invoice.client.name || 'Client Name'}</div>
             <div style={{ fontSize: '10px', color: '#555', lineHeight: 1.5 }}>
+              {invoice.client.company && <>{invoice.client.company}<br /></>}
               {invoice.client.address || 'Address Line 1'}<br />
-              {invoice.client.city || 'City'} {invoice.client.zip || ''}<br />
-              {invoice.client.email || ''}
+              {(invoice.client.city || invoice.client.state) && <>{[invoice.client.city, invoice.client.state].filter(Boolean).join(', ')} {invoice.client.zip || ''}<br /></>}
+              {invoice.client.email && <>{invoice.client.email}<br /></>}
+              {invoice.client.phone && <>M: {invoice.client.phone}<br /></>}
+              {invoice.client.gstin && <><span style={{ color: '#888' }}>GSTIN:</span> <span style={{ fontFamily: 'var(--font-mono)' }}>{invoice.client.gstin}</span></>}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
