@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Building, Palette, Database, Download, Upload, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Building, Palette, Database, Download, Upload, Plus, Trash2, CheckCircle, Sun, Moon, Monitor, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateId } from '../lib/localDb';
 import styles from './InvoiceCreator.module.css';
 import { type SenderProfile } from '../store/useInvoiceStore';
+import { ACCENT_PRESETS, getThemeMode, setThemeMode, getAccentId, setAccent, type ThemeMode } from '../lib/theme';
 
 export function Settings() {
   const [profiles, setProfiles] = useState<SenderProfile[]>([]);
@@ -14,6 +15,19 @@ export function Settings() {
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
   const [invoicePrefix, setInvoicePrefix] = useState('INV');
   const [saved, setSaved] = useState(false);
+
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode());
+  const [accentId, setAccentIdState] = useState<string>(getAccentId());
+
+  const handleThemeChange = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    setThemeModeState(mode);
+  };
+
+  const handleAccentChange = (id: string) => {
+    setAccent(id);
+    setAccentIdState(id);
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem('mrchartist_inv_settings');
@@ -362,6 +376,80 @@ export function Settings() {
 
         {/* Right Column: Preferences & Data */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Appearance */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Sun size={16} /> Appearance
+            </div>
+            <div className={styles.cardBody} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Theme</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                  {([
+                    { mode: 'light' as ThemeMode, icon: Sun, label: 'Light' },
+                    { mode: 'dark' as ThemeMode, icon: Moon, label: 'Dark' },
+                    { mode: 'system' as ThemeMode, icon: Monitor, label: 'System' },
+                  ]).map(({ mode, icon: Icon, label }) => {
+                    const active = themeMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => handleThemeChange(mode)}
+                        className={styles.btn}
+                        style={{
+                          flexDirection: 'column',
+                          gap: '0.4rem',
+                          padding: '0.875rem 0.5rem',
+                          fontSize: '0.8125rem',
+                          border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+                          background: active ? 'var(--primary-light)' : 'transparent',
+                          color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+                        }}
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Accent Color</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem' }}>
+                  {ACCENT_PRESETS.map((a) => {
+                    const active = accentId === a.id;
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => handleAccentChange(a.id)}
+                        title={a.name}
+                        aria-label={a.name}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: a.primary,
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: active ? `0 0 0 2px var(--card), 0 0 0 4px ${a.primary}` : 'var(--shadow-xs)',
+                          transition: 'transform var(--transition-fast)',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                      >
+                        {active && <Check size={15} color="#fff" strokeWidth={3} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className={styles.card}>
             <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Palette size={16} /> Defaults & Preferences

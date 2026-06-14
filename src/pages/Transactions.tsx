@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { localDb, setTable, getTable, generateId } from '../lib/localDb';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
-import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy, ReceiptText, Plus } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy, ReceiptText, Plus, Search } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
 import { Toast } from '../components/ui/Toast';
@@ -12,6 +12,8 @@ export function Transactions() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
   const store = useInvoiceStore();
 
   const reload = () => setInvoices(localDb.invoices.getAll());
@@ -20,6 +22,16 @@ export function Transactions() {
 
   const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.total, 0);
   const pendingRevenue = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft').reduce((sum, i) => sum + i.total, 0);
+
+  const STATUS_TABS = ['All', 'Draft', 'Sent', 'Paid', 'Overdue'];
+  const filtered = invoices.filter(i => {
+    const matchesStatus = statusFilter === 'All' || i.status === statusFilter;
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      i.invoice_number?.toLowerCase().includes(q) ||
+      i.client?.name?.toLowerCase().includes(q);
+    return matchesStatus && matchesSearch;
+  });
 
   const handlePreview = (inv: any) => {
     store.loadInvoice(inv.id);
@@ -110,10 +122,50 @@ export function Transactions() {
         </div>
       </div>
 
+      {/* Search + status filter */}
+      {invoices.length > 0 && (
+        <div className={styles.card} style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '200px' }}>
+            <Search size={18} color="var(--muted-foreground)" />
+            <input
+              type="text"
+              className={styles.inputGhost}
+              placeholder="Search by invoice number or client..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ flex: 1, fontSize: '0.9375rem' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
+            {STATUS_TABS.map(tab => {
+              const active = statusFilter === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setStatusFilter(tab)}
+                  className={styles.btn}
+                  style={{
+                    padding: '0.4rem 0.875rem',
+                    fontSize: '0.8125rem',
+                    borderRadius: '999px',
+                    border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+                    background: active ? 'var(--primary)' : 'transparent',
+                    color: active ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
+                  }}
+                >
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Invoices Table */}
       <div className={styles.card}>
         <div className={styles.cardHeader} style={{ paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
           Recent Invoices
+          {invoices.length > 0 && <span style={{ fontSize: '0.8125rem', fontWeight: 400, color: 'var(--muted-foreground)' }}>{filtered.length} of {invoices.length}</span>}
         </div>
         <div style={{ padding: '0 1.5rem' }}>
           {invoices.length === 0 ? (
@@ -131,6 +183,12 @@ export function Transactions() {
                 <Plus size={18} /> Create Invoice
               </Link>
             </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: '3.5rem 2rem', textAlign: 'center' }}>
+              <Search size={32} color="var(--muted-foreground)" style={{ margin: '0 auto 1rem' }} />
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '0.35rem' }}>No matching invoices</h3>
+              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>Try a different search term or status filter.</p>
+            </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
@@ -144,7 +202,7 @@ export function Transactions() {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((inv, idx) => (
+                {filtered.map((inv, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.875rem', transition: 'background 150ms ease' }}>
                     <td style={{ padding: '1rem 0', fontWeight: 600, color: 'var(--primary)' }}>{inv.invoice_number}</td>
                     <td style={{ padding: '1rem 0' }}>

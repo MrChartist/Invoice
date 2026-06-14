@@ -13,6 +13,17 @@ export function formatDate(date: string | Date) {
   }).format(new Date(date));
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  INR: '₹',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+};
+
+export function currencySymbol(currency: string = 'INR'): string {
+  return CURRENCY_SYMBOLS[currency] || currency;
+}
+
 export function formatCurrency(amount: number, currency: string = 'INR') {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',

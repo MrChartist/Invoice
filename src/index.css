@@ -29,9 +29,12 @@
   --primary-hover: #d96418;
   --primary-foreground: #ffffff;
   --primary-glow: rgba(240, 112, 32, 0.15);
+  --primary-light: rgba(240, 112, 32, 0.1);
 
   --secondary: #f0eeeb;
   --secondary-foreground: #1a1612;
+
+  --background-alt: #f5f3f0;
 
   --muted: #f0efec;
   --muted-foreground: #6b6158;
@@ -90,9 +93,12 @@
   --primary-hover: #f09050;
   --primary-foreground: #0a0a0a;
   --primary-glow: rgba(232, 128, 64, 0.2);
+  --primary-light: rgba(232, 128, 64, 0.14);
 
   --secondary: #14203a;
   --secondary-foreground: #dde2e8;
+
+  --background-alt: #152035;
 
   --muted: #131e34;
   --muted-foreground: #8a9ab5;

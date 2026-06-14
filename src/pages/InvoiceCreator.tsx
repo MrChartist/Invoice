@@ -7,7 +7,7 @@ import { ClientSearchModal } from '../components/modals/ClientSearchModal';
 import { ItemSearchModal } from '../components/modals/ItemSearchModal';
 import { Toast } from '../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
-import { cn, formatCurrency, formatDate } from '../lib/utils';
+import { cn, formatCurrency, formatDate, currencySymbol } from '../lib/utils';
 import styles from './InvoiceCreator.module.css';
 
 export function InvoiceCreator() {
@@ -193,7 +193,7 @@ export function InvoiceCreator() {
                     onChange={(e) => invoice.updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ color: 'var(--muted-foreground)' }}>₹</span>
+                    <span style={{ color: 'var(--muted-foreground)' }}>{currencySymbol(invoice.currency)}</span>
                     <input 
                       type="number" 
                       className={cn(styles.input, styles.inputGhost)} 

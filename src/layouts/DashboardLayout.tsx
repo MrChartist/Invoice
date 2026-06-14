@@ -12,10 +12,13 @@ import {
   Heart,
   Keyboard,
   Shield,
-  ExternalLink
+  ExternalLink,
+  Search,
+  Command
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getUser, logout } from '../lib/auth';
+import { CommandPalette } from '../components/ui/CommandPalette';
 import styles from './DashboardLayout.module.css';
 
 const NAV_ITEMS = [
@@ -30,6 +33,15 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   onLogout?: () => void;
 }
+
+const kbdStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  border: '1px solid var(--border)',
+  borderRadius: '5px',
+  padding: '0.05rem 0.35rem',
+  fontSize: '0.6875rem',
+  color: 'var(--foreground)',
+};
 
 export function DashboardLayout({ children, onLogout }: DashboardLayoutProps) {
   const location = useLocation();
@@ -87,9 +99,24 @@ export function DashboardLayout({ children, onLogout }: DashboardLayoutProps) {
         {/* Header */}
         <header className={styles.header}>
           <div className={styles.headerLeft}>
-            {/* Header title can be injected via children or context, but for now we leave it empty as the pages will handle their own titles */}
+            <button
+              onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.625rem',
+                padding: '0.5rem 0.875rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)', background: 'var(--card)',
+                color: 'var(--muted-foreground)', fontSize: '0.8125rem', minWidth: '240px',
+              }}
+              title="Open command palette (⌘K)"
+            >
+              <Search size={15} />
+              <span style={{ flex: 1, textAlign: 'left' }}>Search or jump to…</span>
+              <kbd style={{ display: 'flex', alignItems: 'center', gap: '0.1rem', fontSize: '0.6875rem', border: '1px solid var(--border)', borderRadius: '5px', padding: '0.1rem 0.35rem', fontFamily: 'var(--font-mono)' }}>
+                <Command size={10} /> K
+              </kbd>
+            </button>
           </div>
-          
+
           <div className={styles.headerRight}>
             <div className={styles.userProfile}>
               <div className={styles.avatar}>
@@ -105,6 +132,9 @@ export function DashboardLayout({ children, onLogout }: DashboardLayoutProps) {
           {children}
         </div>
       </main>
+
+      {/* Command Palette (⌘K) */}
+      <CommandPalette />
 
       {/* Help Modal */}
       {helpOpen && (
@@ -149,9 +179,12 @@ export function DashboardLayout({ children, onLogout }: DashboardLayoutProps) {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--card-inner)', borderRadius: '10px' }}>
                   <Keyboard size={18} color="var(--primary)" />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>20+ Premium Templates</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Industry-specific designs for every business type.</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Keyboard Shortcuts</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.25rem' }}>
+                      <span><kbd style={kbdStyle}>⌘ K</kbd> Command palette</span>
+                      <span><kbd style={kbdStyle}>N</kbd> New invoice</span>
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--card-inner)', borderRadius: '10px' }}>

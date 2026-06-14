@@ -19,6 +19,29 @@ export function Dashboard() {
   const clientCount = localDb.clients.getAll().length;
   const recentInvoices = invoices.slice(0, 5);
 
+  // ── Revenue trend: paid revenue over the last 6 months ──
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('en-US', { month: 'short' }), total: 0 };
+  });
+  invoices.filter(i => i.status === 'Paid').forEach(i => {
+    const d = new Date(i.issue_date);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const bucket = months.find(m => m.key === key);
+    if (bucket) bucket.total += i.total;
+  });
+  const maxMonth = Math.max(1, ...months.map(m => m.total));
+
+  // ── Status breakdown ──
+  const STATUS_META: { label: string; color: string }[] = [
+    { label: 'Paid', color: 'var(--profit)' },
+    { label: 'Sent', color: 'var(--primary)' },
+    { label: 'Overdue', color: 'var(--loss)' },
+    { label: 'Draft', color: 'var(--muted-foreground)' },
+  ];
+  const statusCounts = STATUS_META.map(s => ({ ...s, count: invoices.filter(i => i.status === s.label).length }));
+
   return (
     <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
       <div className={styles.header} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -142,6 +165,65 @@ export function Dashboard() {
             </div>
           </div>
         </Link>
+      </div>
+
+      {/* Analytics */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+        {/* Revenue trend */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+            <TrendingUp size={18} /> Revenue Trend
+            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 400, color: 'var(--muted-foreground)' }}>Last 6 months · Paid</span>
+          </div>
+          <div className={styles.cardBody}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.75rem', height: '160px' }}>
+              {months.map((m) => (
+                <div key={m.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', height: '100%' }}>
+                  <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <div
+                      title={formatCurrency(m.total)}
+                      style={{
+                        width: '70%',
+                        minHeight: m.total > 0 ? '6px' : '2px',
+                        height: `${(m.total / maxMonth) * 100}%`,
+                        background: m.total > 0 ? 'linear-gradient(180deg, var(--primary), var(--primary-hover))' : 'var(--card-inner)',
+                        borderRadius: '6px 6px 2px 2px',
+                        transition: 'height var(--transition-smooth)',
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>{m.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Status breakdown */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+            <FileText size={18} /> By Status
+          </div>
+          <div className={styles.cardBody} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {statusCounts.map((s) => {
+              const pct = invoices.length ? Math.round((s.count / invoices.length) * 100) : 0;
+              return (
+                <div key={s.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '0.35rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+                      <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: s.color }} />
+                      {s.label}
+                    </span>
+                    <span style={{ color: 'var(--muted-foreground)' }}>{s.count}</span>
+                  </div>
+                  <div style={{ height: '6px', background: 'var(--card-inner)', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: s.color, borderRadius: '999px', transition: 'width var(--transition-smooth)' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Recent Activity */}
