@@ -10,12 +10,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc -b",
+    "test": "node --experimental-strip-types --import ./tests/hooks/register.mjs --test \"tests/**/*.test.ts\"",
     "preview": "vite preview"
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
-    "framer-motion": "^12.38.0",
     "html-to-image": "^1.11.13",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.14.0",
@@ -23,7 +24,6 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",
-    "tailwind-merge": "^3.5.0",
     "uuid": "^14.0.0",
     "zustand": "^5.0.12"
   },

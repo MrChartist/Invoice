@@ -47,7 +47,9 @@ function getSenderProfile(invoiceSender: any) {
         upiId: defaults.upiId
       };
     }
-  } catch {}
+  } catch (err) {
+    console.error('getSenderProfile: failed to parse stored settings; using defaults', err);
+  }
   return defaults;
 }
 
@@ -124,7 +126,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
       {/* Paper */}
       <div className={styles.paperShadow}>
         <div ref={previewRef}>
-          <TemplateEngine invoice={invoice} sender={sender} templateId={templateId} />
+          <TemplateEngine invoice={invoice} sender={sender} totals={invoice.totals} templateId={templateId} />
         </div>
       </div>
     </div>

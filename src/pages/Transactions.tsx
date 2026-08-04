@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { localDb, setTable, getTable, generateId } from '../lib/localDb';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
+import type { InvoiceRecord } from '../types/invoice';
 import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy, ReceiptText, Plus } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
@@ -27,8 +28,8 @@ export function Transactions() {
   };
 
   const handleMarkPaid = (inv: any) => {
-    const all = getTable('invoices');
-    const idx = all.findIndex((i: any) => i.id === inv.id);
+    const all = getTable<InvoiceRecord>('invoices');
+    const idx = all.findIndex((i) => i.id === inv.id);
     if (idx >= 0) {
       all[idx].status = all[idx].status === 'Paid' ? 'Sent' : 'Paid';
       setTable('invoices', all);

@@ -1,0 +1,338 @@
+/* ================================================================
+   Shared controls — labels, inputs, selects, buttons, toggles.
+   Touch targets stay >= 44px on small screens.
+   ================================================================ */
+
+/* ── Fields ───────────────────────────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.error {
+  font-size: 0.75rem;
+  color: var(--loss);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.ok {
+  font-size: 0.75rem;
+  color: var(--profit);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+.row3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.875rem;
+}
+
+/* ── Inputs ───────────────────────────────────────────────────── */
+.input {
+  width: 100%;
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--input-border);
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--muted-foreground);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.input:disabled,
+.input[readonly] {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+.inputInvalid {
+  border-color: var(--loss);
+}
+
+.inputInvalid:focus {
+  box-shadow: 0 0 0 3px rgba(217, 54, 54, 0.18);
+}
+
+.inputMono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.inputNumeric {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.textarea {
+  composes: input;
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.55;
+}
+
+.select {
+  composes: input;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 2rem;
+}
+
+/* Amount input with a leading currency symbol */
+.moneyWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.moneySymbol {
+  position: absolute;
+  left: 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  font-family: var(--font-mono);
+}
+
+.moneyInput {
+  composes: input;
+  padding-left: 2rem;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Borderless input used inside dense tables */
+.ghost {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  padding: 0.4rem 0.5rem;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ghost::placeholder { color: var(--muted-foreground); opacity: 0.65; }
+.ghost:hover:not(:disabled) { border-color: var(--input-border); }
+.ghost:focus {
+  outline: none;
+  background: var(--card);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.ghostNumeric {
+  composes: ghost;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Checkbox / switch row ────────────────────────────────────── */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Segmented control ────────────────────────────────────────── */
+.segment {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.segmentBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.375rem 0.75rem;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.segmentBtn:hover { color: var(--foreground); }
+
+.segmentBtnActive {
+  composes: segmentBtn;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.125rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn:active:not(:disabled) { transform: translateY(1px); }
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  composes: btn;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-sm);
+}
+.btnPrimary:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.btnOutline {
+  composes: btn;
+  border-color: var(--border);
+  background-color: var(--card);
+  color: var(--foreground);
+}
+.btnOutline:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btnGhost {
+  composes: btn;
+  background-color: transparent;
+  color: var(--muted-foreground);
+  padding: 0.5rem 0.75rem;
+}
+.btnGhost:hover:not(:disabled) {
+  background-color: var(--accent);
+  color: var(--foreground);
+}
+
+.btnDanger {
+  composes: btn;
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--destructive);
+  padding: 0.5rem;
+}
+.btnDanger:hover:not(:disabled) {
+  background-color: rgba(224, 60, 60, 0.1);
+}
+
+.btnIcon {
+  composes: btn;
+  padding: 0.5rem;
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.btnIcon:hover:not(:disabled) {
+  background-color: var(--accent);
+  color: var(--foreground);
+}
+
+.btnSm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.btnLg {
+  padding: 0.875rem 1.5rem;
+  font-size: 0.9375rem;
+}
+
+.btnBlock {
+  width: 100%;
+}
+
+@media (max-width: 780px) {
+  .row, .row3 { grid-template-columns: 1fr; }
+  .btn { min-height: 44px; }
+  .btnIcon, .btnDanger { min-height: 40px; min-width: 40px; }
+  .input, .select, .textarea { font-size: 1rem; min-height: 44px; }
+}

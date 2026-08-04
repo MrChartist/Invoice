@@ -1,160 +1,345 @@
 /**
- * Local Database — Browser-resident storage layer for Invoice Generator
- * ================================================
- * Provides a complete offline data store using localStorage.
+ * Local Database — browser-resident storage layer.
+ * Repositories on top of `storage.ts`. No network, no backend.
+ *
+ * Payment model: `invoice.amount_paid` is the total received so far. An advance
+ * entered while drafting seeds it; every payment recorded in the ledger adds to
+ * it and appends a row to the `transactions` table.
  */
 
-const DB_PREFIX = "mrchartist_inv_";
+import type {
+  Client,
+  DocumentType,
+  InvoiceItem,
+  InvoiceRecord,
+  Payment,
+  SenderProfile,
+} from '../types/invoice';
+import { round2 } from './invoice-calc';
+import { nextInvoiceNumber } from './invoice-number';
+import {
+  KEYS,
+  SINGLETON_KEYS,
+  generateId,
+  getJson,
+  getTable,
+  setJson,
+  setTable,
+} from './storage';
 
-export function getTable<T = any>(name: string): T[] {
-  try {
-    const raw = localStorage.getItem(DB_PREFIX + name);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+export { getTable, setTable, generateId } from './storage';
+export { getIndianFY, getIndianFY as financialYearOf } from './invoice-number';
+
+export interface AppSettings {
+  profiles: SenderProfile[];
+  activeProfileId: string;
+  defaultCurrency: string;
+  defaultTaxRate: number;
+  invoicePrefix: string;
+  defaultDueDays: number;
+  defaultTerms: string;
+  defaultNotes: string;
+  roundOff: boolean;
+  /** False until the user has filled in their own sender profile. */
+  onboarded: boolean;
 }
 
-export function setTable<T = any>(name: string, rows: T[]): void {
-  localStorage.setItem(DB_PREFIX + name, JSON.stringify(rows));
-}
+export const DEFAULT_TERMS =
+  'Payment due within 14 days of the invoice date. Please quote the invoice number with your payment.';
 
-export function generateId(): string {
-  if (crypto.randomUUID) return crypto.randomUUID();
-  return 'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
-}
-
-export function getIndianFY(dateStr?: string): { label: string; startYear: number; endYear: number } {
-  const d = dateStr ? new Date(dateStr) : new Date();
-  const month = d.getMonth(); // 0-indexed (0=Jan, 3=Apr)
-  const year = d.getFullYear();
-  // FY starts in April (month index 3)
-  const startYear = month >= 3 ? year : year - 1;
-  const endYear = startYear + 1;
+function blankProfile(): SenderProfile {
   return {
-    label: `${startYear.toString().slice(2)}-${endYear.toString().slice(2)}`,
-    startYear,
-    endYear,
+    id: generateId(),
+    companyName: '',
+    companyTagline: '',
+    companyEmail: '',
+    companyPhone: '',
+    companyAddress: '',
+    companyGstin: '',
+    pan: '',
+    companyWebsite: '',
+    stateCode: '',
+    regLine: '',
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    ifsc: '',
+    upiId: '',
+    invoicePrefix: '',
+    defaultTerms: '',
   };
 }
 
-export function generateInvoiceNumber(dateStr?: string): string {
-  const invoices = getTable("invoices");
-  const fy = getIndianFY(dateStr);
-  // Filter invoices for this financial year
-  const fyInvoices = invoices.filter((i: any) => i.invoice_number?.includes(`FY${fy.label}`));
-  const count = fyInvoices.length + 1;
-  return `INV/FY${fy.label}/${count.toString().padStart(4, '0')}`;
+/** Reads settings, upgrading the pre-2.1 flat shape to the profiles array. */
+function readSettings(): AppSettings {
+  const raw = getJson<Record<string, unknown> | null>(SINGLETON_KEYS.settings, null);
+  const base: AppSettings = {
+    profiles: [],
+    activeProfileId: '',
+    defaultCurrency: 'INR',
+    defaultTaxRate: 18,
+    invoicePrefix: 'INV',
+    defaultDueDays: 14,
+    defaultTerms: DEFAULT_TERMS,
+    defaultNotes: '',
+    roundOff: true,
+    onboarded: false,
+  };
+
+  if (!raw) {
+    const starter = blankProfile();
+    return { ...base, profiles: [starter], activeProfileId: starter.id! };
+  }
+
+  const stored = raw as Partial<AppSettings> & Record<string, unknown>;
+  let profiles = Array.isArray(stored.profiles) ? (stored.profiles as SenderProfile[]) : [];
+
+  if (profiles.length === 0) {
+    // Legacy flat settings — lift the company fields into a single profile.
+    const legacy: SenderProfile = {
+      ...blankProfile(),
+      companyName: String(stored.companyName ?? ''),
+      companyTagline: String(stored.companyTagline ?? ''),
+      companyEmail: String(stored.companyEmail ?? ''),
+      companyPhone: String(stored.companyPhone ?? ''),
+      companyAddress: String(stored.companyAddress ?? ''),
+      companyGstin: String(stored.companyGstin ?? ''),
+      companyWebsite: String(stored.companyWebsite ?? ''),
+    };
+    profiles = [legacy];
+  }
+
+  profiles = profiles.map((p) => ({ ...blankProfile(), ...p, id: p.id ?? generateId() }));
+  const activeProfileId = profiles.some((p) => p.id === stored.activeProfileId)
+    ? String(stored.activeProfileId)
+    : profiles[0].id!;
+
+  return {
+    ...base,
+    ...stored,
+    profiles,
+    activeProfileId,
+    defaultCurrency: String(stored.defaultCurrency ?? base.defaultCurrency),
+    defaultTaxRate: Number(stored.defaultTaxRate ?? base.defaultTaxRate),
+    invoicePrefix: String(stored.invoicePrefix ?? base.invoicePrefix),
+    defaultDueDays: Number(stored.defaultDueDays ?? base.defaultDueDays),
+    defaultTerms: String(stored.defaultTerms ?? base.defaultTerms),
+    defaultNotes: String(stored.defaultNotes ?? base.defaultNotes),
+    roundOff: Boolean(stored.roundOff ?? base.roundOff),
+    onboarded: Boolean(stored.onboarded ?? Boolean(profiles[0]?.companyName)),
+  };
 }
 
-// ─── API Emulation ──────────────────────────────────────────
-
 export const localDb = {
-  clients: {
-    getAll: () => getTable("clients"),
-    getById: (id: string) => getTable("clients").find((c: any) => c.id === id),
-    upsert: (client: any) => {
-      const clients = getTable("clients");
-      const idx = clients.findIndex((c: any) => c.id === client.id);
-      if (idx >= 0) {
-        clients[idx] = { ...clients[idx], ...client };
-      } else {
-        clients.push({ id: generateId(), created_at: new Date().toISOString(), ...client });
-      }
-      setTable("clients", clients);
-      return client.id || clients[clients.length - 1].id;
+  settings: {
+    get: readSettings,
+    save: (settings: AppSettings) => setJson(SINGLETON_KEYS.settings, settings),
+    activeProfile: (): SenderProfile | null => {
+      const s = readSettings();
+      return s.profiles.find((p) => p.id === s.activeProfileId) ?? s.profiles[0] ?? null;
     },
-    search: (query: string) => {
-      const q = query.toLowerCase();
-      return getTable("clients").filter((c: any) => 
-        c.name?.toLowerCase().includes(q) || 
-        c.email?.toLowerCase().includes(q)
-      );
-    }
   },
-  
+
+  template: {
+    get: (): string => getJson<string>(SINGLETON_KEYS.template, '') || 'classic_orange',
+    set: (id: string) => setJson(SINGLETON_KEYS.template, id),
+  },
+
+  clients: {
+    getAll: () => getTable<Client>(KEYS.clients),
+    getById: (id: string) => getTable<Client>(KEYS.clients).find((c) => c.id === id),
+    /** Matches on id first, then on a case-insensitive name, so the same client
+     *  typed twice does not become two rows. Returns the row id. */
+    upsert: (client: Partial<Client> & { name: string }): string => {
+      const clients = getTable<Client>(KEYS.clients);
+      const name = client.name.trim().toLowerCase();
+      const idx = clients.findIndex(
+        (c) => (client.id && c.id === client.id) || c.name?.trim().toLowerCase() === name,
+      );
+      if (idx >= 0) {
+        clients[idx] = { ...clients[idx], ...client, id: clients[idx].id };
+        setTable(KEYS.clients, clients);
+        return clients[idx].id!;
+      }
+      const id = client.id ?? generateId();
+      clients.push({ ...(client as Client), id, created_at: new Date().toISOString() } as Client);
+      setTable(KEYS.clients, clients);
+      return id;
+    },
+    remove: (id: string) =>
+      setTable(KEYS.clients, getTable<Client>(KEYS.clients).filter((c) => c.id !== id)),
+    search: (query: string) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return getTable<Client>(KEYS.clients);
+      return getTable<Client>(KEYS.clients).filter((c) =>
+        [c.name, c.email, c.company, c.gstin, c.city].some((f) => f?.toLowerCase().includes(q)),
+      );
+    },
+  },
+
   items: {
-    getAll: () => getTable("items_catalog"),
-    upsert: (item: any) => {
-      const items = getTable("items_catalog");
-      const idx = items.findIndex((i: any) => i.name.toLowerCase() === item.name.toLowerCase());
+    getAll: () => getTable<InvoiceItem>(KEYS.items),
+    upsert: (item: Partial<InvoiceItem> & { name: string }) => {
+      const items = getTable<InvoiceItem>(KEYS.items);
+      const name = item.name.trim().toLowerCase();
+      if (!name) return;
+      const idx = items.findIndex((i) => i.name?.trim().toLowerCase() === name);
       if (idx >= 0) {
         items[idx] = { ...items[idx], ...item };
       } else {
-        items.push({ id: generateId(), created_at: new Date().toISOString(), ...item });
+        items.push({ ...(item as InvoiceItem), id: generateId() });
       }
-      setTable("items_catalog", items);
+      setTable(KEYS.items, items);
     },
+    remove: (id: string) =>
+      setTable(KEYS.items, getTable<InvoiceItem>(KEYS.items).filter((i) => i.id !== id)),
     search: (query: string) => {
-      const q = query.toLowerCase();
-      return getTable("items_catalog").filter((i: any) => i.name?.toLowerCase().includes(q));
-    }
+      const q = query.trim().toLowerCase();
+      if (!q) return getTable<InvoiceItem>(KEYS.items);
+      return getTable<InvoiceItem>(KEYS.items).filter(
+        (i) => i.name?.toLowerCase().includes(q) || i.hsn?.toLowerCase().includes(q),
+      );
+    },
   },
 
   invoices: {
-    getAll: () => getTable("invoices"),
-    getById: (id: string) => getTable("invoices").find((i: any) => i.id === id),
-    save: (invoice: any) => {
-      const invoices = getTable("invoices");
-      const idx = invoices.findIndex((i: any) => i.id === invoice.id);
-      
-      const toSave = {
-        ...invoice,
-        updated_at: new Date().toISOString()
-      };
+    getAll: () => getTable<InvoiceRecord>(KEYS.invoices),
+    getById: (id: string) => getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id),
+
+    /** Next number in the series, derived from the highest one already issued. */
+    nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string) =>
+      nextInvoiceNumber({
+        existingNumbers: getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
+        dateStr,
+        docType,
+        customPrefix: prefix ?? readSettings().invoicePrefix,
+      }),
+
+    save: (invoice: InvoiceRecord): InvoiceRecord => {
+      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+      const idx = invoices.findIndex((i) => i.id === invoice.id);
+      const now = new Date().toISOString();
+      const toSave: InvoiceRecord = { ...invoice, updated_at: now };
 
       if (idx >= 0) {
+        toSave.created_at = invoices[idx].created_at ?? now;
         invoices[idx] = toSave;
       } else {
         toSave.id = invoice.id || generateId();
-        toSave.created_at = new Date().toISOString();
-        if (!toSave.invoice_number) toSave.invoice_number = generateInvoiceNumber();
+        toSave.created_at = now;
+        if (!toSave.invoice_number) {
+          toSave.invoice_number = localDb.invoices.nextNumber(toSave.issue_date, toSave.doc_type);
+        }
         invoices.push(toSave);
       }
-      
-      setTable("invoices", invoices);
+      setTable(KEYS.invoices, invoices);
 
-      // Auto-save any new clients/items when invoice is saved
-      if (toSave.client?.name) {
-        localDb.clients.upsert(toSave.client);
+      // Grow the local CRM / catalogue from real usage.
+      if (toSave.client?.name?.trim()) localDb.clients.upsert(toSave.client);
+      for (const item of toSave.items ?? []) {
+        if (item.name?.trim()) {
+          localDb.items.upsert({
+            name: item.name,
+            type: item.type,
+            rate: item.rate,
+            hsn: item.hsn,
+            unit: item.unit,
+            tax_rate: item.tax_rate,
+          });
+        }
       }
-      if (toSave.items && toSave.items.length > 0) {
-        toSave.items.forEach((item: any) => {
-          if (item.name) localDb.items.upsert({ name: item.name, rate: item.rate, type: item.type });
-        });
-      }
-
       return toSave;
-    }
+    },
+
+    remove: (id: string) => {
+      setTable(KEYS.invoices, getTable<InvoiceRecord>(KEYS.invoices).filter((i) => i.id !== id));
+      setTable(
+        KEYS.transactions,
+        getTable<Payment>(KEYS.transactions).filter((t) => t.invoice_id !== id),
+      );
+    },
+
+    setStatus: (id: string, status: InvoiceRecord['status']) => {
+      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+      const idx = invoices.findIndex((i) => i.id === id);
+      if (idx < 0) return;
+      invoices[idx] = { ...invoices[idx], status, updated_at: new Date().toISOString() };
+      setTable(KEYS.invoices, invoices);
+    },
   },
 
-  transactions: {
-    getAll: () => getTable("transactions"),
-    recordPayment: (invoiceId: string, amount: number, method: string) => {
-      const tx = getTable("transactions");
-      const newTx = {
-        id: generateId(),
-        invoice_id: invoiceId,
-        amount,
-        method,
-        date: new Date().toISOString()
-      };
-      tx.push(newTx);
-      setTable("transactions", tx);
+  payments: {
+    getAll: () => getTable<Payment>(KEYS.transactions),
+    listFor: (invoiceId: string) =>
+      getTable<Payment>(KEYS.transactions).filter((t) => t.invoice_id === invoiceId),
+    totalFor: (invoiceId: string) =>
+      round2(
+        getTable<Payment>(KEYS.transactions)
+          .filter((t) => t.invoice_id === invoiceId)
+          .reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+      ),
 
-      // Update invoice status if fully paid
-      const invoices = getTable("invoices");
-      const invIdx = invoices.findIndex((i: any) => i.id === invoiceId);
-      if (invIdx >= 0) {
-        const totalPaid = tx.filter((t: any) => t.invoice_id === invoiceId).reduce((sum, t) => sum + t.amount, 0);
-        if (totalPaid >= invoices[invIdx].total) {
-          invoices[invIdx].status = "Paid";
-        } else {
-          invoices[invIdx].status = "Partially Paid";
-        }
-        setTable("invoices", invoices);
-      }
-      return newTx;
-    }
-  }
+    /** Appends a payment and re-derives amount_paid / balance_due / status. */
+    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string }): Payment => {
+      const payment: Payment = {
+        id: generateId(),
+        invoice_id: input.invoiceId,
+        amount: round2(Number(input.amount) || 0),
+        method: input.method || 'Bank Transfer',
+        reference: input.reference,
+        note: input.note,
+        date: input.date || new Date().toISOString(),
+      };
+      const rows = getTable<Payment>(KEYS.transactions);
+      rows.push(payment);
+      setTable(KEYS.transactions, rows);
+      syncPaymentState(input.invoiceId, payment.amount);
+      return payment;
+    },
+
+    remove: (paymentId: string) => {
+      const rows = getTable<Payment>(KEYS.transactions);
+      const row = rows.find((t) => t.id === paymentId);
+      if (!row) return;
+      setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));
+      syncPaymentState(row.invoice_id, -row.amount);
+    },
+  },
 };
+
+/** Apply a delta to an invoice's paid amount and re-derive its money status. */
+function syncPaymentState(invoiceId: string, delta: number): void {
+  const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+  const idx = invoices.findIndex((i) => i.id === invoiceId);
+  if (idx < 0) return;
+
+  const inv = invoices[idx];
+  const paid = round2(Math.max((Number(inv.amount_paid) || 0) + delta, 0));
+  const total = Number(inv.total) || 0;
+  let status = inv.status;
+  if (paid >= total && total > 0) status = 'Paid';
+  else if (paid > 0) status = 'Partially Paid';
+  else if (status === 'Paid' || status === 'Partially Paid') status = 'Sent';
+
+  invoices[idx] = {
+    ...inv,
+    amount_paid: paid,
+    balance_due: round2(total - paid),
+    status,
+    updated_at: new Date().toISOString(),
+  };
+  setTable(KEYS.invoices, invoices);
+}
+
+/**
+ * Kept for the legacy call signature used by the regression test:
+ * `generateInvoiceNumber('2025-04-10')` -> `INV/FY25-26/0001`.
+ */
+export function generateInvoiceNumber(dateStr?: string): string {
+  return nextInvoiceNumber({
+    existingNumbers: getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
+    dateStr,
+    docType: 'INVOICE',
+    customPrefix: 'INV',
+  });
+}

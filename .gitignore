@@ -34,3 +34,6 @@ pnpm-debug.log*
 # Misc
 .vercel
 .netlify
+
+# Upgrade audit trail (scratch)
+_upgrade/

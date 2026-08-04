@@ -8,7 +8,7 @@ Welcome to the MrChartist Invoice Creator repository. As an AI coding assistant 
 - **Chrome File System API**: We use the native File System Access API to sync data to the user's hard drive as JSON backups.
 
 ## 2. Tech Stack Constraints
-- **React 18** + **TypeScript** + **Vite**.
+- **React 19** + **TypeScript** + **Vite**.
 - **State Management**: `zustand` is used for global state (e.g., `useInvoiceStore.ts`).
 - **Styling**: **NO TailwindCSS.** This project uses Vanilla CSS (`.css` and `.module.css`) with CSS Variables defined in `src/index.css`. The UI follows a strict glassmorphic/minimalist design system. Do not inject inline styles unless dynamic (like template colors).
 - **PDF Generation**: We use `html-to-image` and `jsPDF`. Do not switch to `@react-pdf/renderer` or server-side PDF generation.

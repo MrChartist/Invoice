@@ -50,7 +50,9 @@ export function Settings() {
         setDefaultCurrency(s.defaultCurrency || 'INR');
         setDefaultTaxRate(s.defaultTaxRate ?? 0);
         setInvoicePrefix(s.invoicePrefix || 'INV');
-      } catch {}
+      } catch (err) {
+        console.error('Settings: failed to parse stored settings', err);
+      }
     } else {
       // Setup initial default
       const pId = generateId();

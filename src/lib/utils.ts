@@ -4,58 +4,114 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
-export function formatDate(date: string | Date) {
-  if (!date) return "";
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(date));
+/* ── Currency ─────────────────────────────────────────────────── */
+
+export interface CurrencyOption {
+  code: string;
+  symbol: string;
+  label: string;
+  locale: string;
 }
 
+export const CURRENCIES: CurrencyOption[] = [
+  { code: 'INR', symbol: '₹', label: 'Indian Rupee', locale: 'en-IN' },
+  { code: 'USD', symbol: '$', label: 'US Dollar', locale: 'en-US' },
+  { code: 'EUR', symbol: '€', label: 'Euro', locale: 'de-DE' },
+  { code: 'GBP', symbol: '£', label: 'Pound Sterling', locale: 'en-GB' },
+  { code: 'AED', symbol: 'AED', label: 'UAE Dirham', locale: 'en-AE' },
+  { code: 'SGD', symbol: 'S$', label: 'Singapore Dollar', locale: 'en-SG' },
+  { code: 'AUD', symbol: 'A$', label: 'Australian Dollar', locale: 'en-AU' },
+  { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar', locale: 'en-CA' },
+  { code: 'JPY', symbol: '¥', label: 'Japanese Yen', locale: 'ja-JP' },
+];
+
+const CURRENCY_MAP = new Map(CURRENCIES.map((c) => [c.code, c]));
+
+export function currencySymbol(currency: string = 'INR'): string {
+  return CURRENCY_MAP.get((currency || 'INR').toUpperCase())?.symbol ?? '';
+}
+
+/**
+ * Money with symbol. INR keeps the Indian 2-2-3 grouping (12,34,567.50);
+ * every other currency uses its own locale grouping.
+ */
 export function formatCurrency(amount: number, currency: string = 'INR') {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: currency,
+  const code = (currency || 'INR').toUpperCase();
+  const option = CURRENCY_MAP.get(code);
+  const value = Number.isFinite(amount) ? amount : 0;
+  try {
+    return new Intl.NumberFormat(option?.locale ?? 'en-IN', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    // Unknown ISO code — fall back to a plain grouped number.
+    return `${option?.symbol ?? code} ${formatMoney(value)}`;
+  }
+}
+
+/** Grouped number without a currency symbol — for tables, CSV and PDFs. */
+export function formatMoney(amount: number, currency: string = 'INR') {
+  const locale = CURRENCY_MAP.get((currency || 'INR').toUpperCase())?.locale ?? 'en-IN';
+  return new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(Number.isFinite(amount) ? amount : 0);
 }
 
-// ─── Amount in Words (Indian system) ────────────────────────
-const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
-function twoDigit(n: number): string {
-  if (n < 20) return ones[n];
-  return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+/** Quantities: no forced decimals, but keeps up to 3 when present. */
+export function formatQuantity(value: number) {
+  return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 3 }).format(
+    Number.isFinite(value) ? value : 0,
+  );
 }
 
-function threeDigit(n: number): string {
-  if (n === 0) return '';
-  if (n < 100) return twoDigit(n);
-  return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + twoDigit(n % 100) : '');
+/* ── Dates ────────────────────────────────────────────────────── */
+
+/** "1 Apr 2026" — the day-first order used on Indian invoices. */
+export function formatDate(date: string | Date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(d);
 }
 
-export function amountInWords(amount: number, currency: string = 'INR'): string {
-  if (amount === 0) return 'Zero';
-  const n = Math.floor(Math.abs(amount));
-  const paise = Math.round((Math.abs(amount) - n) * 100);
+/** "2026-04-01" — the value format every <input type="date"> expects. */
+export function toDateInput(date: string | Date = new Date()): string {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
-  const crore = Math.floor(n / 10000000);
-  const lakh = Math.floor((n % 10000000) / 100000);
-  const thousand = Math.floor((n % 100000) / 1000);
-  const hundred = n % 1000;
+export function todayInput(): string {
+  return toDateInput(new Date());
+}
 
-  let words = '';
-  if (crore) words += threeDigit(crore) + ' Crore ';
-  if (lakh) words += twoDigit(lakh) + ' Lakh ';
-  if (thousand) words += twoDigit(thousand) + ' Thousand ';
-  if (hundred) words += threeDigit(hundred);
+export function addDaysInput(days: number, from: string | Date = new Date()): string {
+  const d = new Date(from);
+  if (Number.isNaN(d.getTime())) return todayInput();
+  d.setDate(d.getDate() + days);
+  return toDateInput(d);
+}
 
-  words = words.trim();
-  const prefix = currency === 'INR' ? 'Rupees' : 'Dollars';
-  const suffix = paise > 0 ? ` and ${twoDigit(paise)} Paise` : '';
-  return `${prefix} ${words}${suffix} Only`;
+/** Whole days a due date is past — 0 when it is today or in the future. */
+export function daysOverdue(dueDate?: string, now: Date = new Date()): number {
+  if (!dueDate) return 0;
+  const due = new Date(dueDate);
+  if (Number.isNaN(due.getTime())) return 0;
+  const startOfDue = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+  const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const diff = Math.floor((startOfNow - startOfDue) / 86400000);
+  return diff > 0 ? diff : 0;
+}
+
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

@@ -32,7 +32,9 @@ export function InvoiceCreator() {
             invoice.setSender(defaultProf);
           }
         }
-      } catch {}
+      } catch (err) {
+        console.error('InvoiceCreator: failed to load stored settings', err);
+      }
     }
   }, []);
 

@@ -1,0 +1,531 @@
+/* ================================================================
+   Invoice paper — the printed document.
+   Always a white A4 page, so it deliberately does NOT use the app theme
+   tokens. Per-template colour arrives as --tpl-accent; the paper's own
+   neutrals are declared here once and never hardcoded further down.
+   A4 @96dpi = 794 x 1123 px.
+   ================================================================ */
+
+.paper {
+  --tpl-accent: #f07020;
+  --tpl-ink: #14100c;
+  --tpl-body: #3f3a34;
+  --tpl-muted: #857d74;
+  --tpl-line: #e4e0db;
+  --tpl-soft: #f7f6f4;
+
+  width: 794px;
+  min-height: 1123px;
+  background: #ffffff;
+  color: var(--tpl-ink);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  overflow: hidden;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 44px 48px 36px;
+}
+
+/* Layout skins */
+.frameRail::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: var(--tpl-accent);
+  z-index: 2;
+}
+
+.frameRail > .inner {
+  padding-left: 58px;
+}
+
+.bordered {
+  border: 10px solid var(--tpl-accent);
+}
+
+.watermark {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-size: 210px;
+  font-weight: 900;
+  color: var(--tpl-accent);
+  opacity: 0.035;
+  pointer-events: none;
+  z-index: 0;
+  white-space: nowrap;
+  letter-spacing: -0.05em;
+}
+
+.stamp {
+  position: absolute;
+  top: 300px;
+  right: 60px;
+  z-index: 2;
+  transform: rotate(-14deg);
+  border: 3px solid currentColor;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  opacity: 0.5;
+}
+
+/* ── Type helpers ─────────────────────────────────────────────── */
+.eyebrow {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.eyebrowMuted {
+  composes: eyebrow;
+  color: var(--tpl-muted);
+}
+
+.docTitle {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--tpl-accent);
+  font-size: 38px;
+}
+
+.docNumber {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tpl-muted);
+  margin-top: 5px;
+  letter-spacing: 0.01em;
+}
+
+.orgName {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.meta {
+  font-size: 10.5px;
+  color: var(--tpl-body);
+  line-height: 1.65;
+}
+
+.metaLabel {
+  color: var(--tpl-muted);
+}
+
+.logo {
+  max-height: 62px;
+  max-width: 230px;
+  object-fit: contain;
+}
+
+/* ── Header layouts ───────────────────────────────────────────── */
+.headClassic {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.headBand {
+  background: var(--tpl-accent);
+  color: #fff;
+  margin: -44px -48px 0;
+  padding: 34px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.headBand .docTitle,
+.headBand .eyebrow,
+.headBand .docNumber,
+.headBand .orgName {
+  color: #fff;
+}
+
+.headBand .docNumber {
+  opacity: 0.85;
+}
+
+.headSwiss {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  align-items: start;
+  border-bottom: 2px solid var(--tpl-accent);
+  padding-bottom: 18px;
+}
+
+.headCentered {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.centeredRule {
+  display: inline-block;
+  border-top: 2px solid var(--tpl-accent);
+  border-bottom: 2px solid var(--tpl-accent);
+  padding: 9px 26px;
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  color: var(--tpl-ink);
+}
+
+/* ── Party / meta panel ───────────────────────────────────────── */
+.parties {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 26px;
+  padding: 16px 18px;
+  background: var(--tpl-soft);
+  border-radius: 8px;
+  border: 1px solid var(--tpl-line);
+}
+
+.partiesPlain {
+  composes: parties;
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
+.partyName {
+  font-size: 13.5px;
+  font-weight: 800;
+  margin: 6px 0 3px;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  font-size: 10.5px;
+  align-content: start;
+}
+
+.metaKey {
+  color: var(--tpl-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.metaVal {
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-align: right;
+}
+
+/* ── Items table ──────────────────────────────────────────────── */
+.items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.items thead th {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 9px 8px;
+  border-bottom: 1.5px solid var(--tpl-accent);
+  background: var(--tpl-soft);
+  color: var(--tpl-ink);
+  white-space: nowrap;
+}
+
+.itemsBand thead th {
+  background: var(--tpl-accent);
+  color: #fff;
+  border-bottom: none;
+}
+
+.items tbody td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--tpl-line);
+  vertical-align: top;
+}
+
+.itemsZebra tbody tr:nth-child(even) td {
+  background: var(--tpl-soft);
+}
+
+.itemsBoxed tbody td,
+.itemsBoxed thead th {
+  border: 1px solid var(--tpl-line);
+}
+
+.right { text-align: right; }
+.center { text-align: center; }
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.itemName {
+  font-weight: 600;
+  color: var(--tpl-ink);
+}
+
+.itemDesc {
+  font-size: 9.5px;
+  color: var(--tpl-muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+/* ── Footer region ────────────────────────────────────────────── */
+.footer {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 26px;
+  margin-top: auto;
+  padding-top: 8px;
+  align-items: start;
+}
+
+.box {
+  border: 1px solid var(--tpl-line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.boxAccent {
+  composes: box;
+  border-left: 3px solid var(--tpl-accent);
+}
+
+.boxSoft {
+  composes: box;
+  background: var(--tpl-soft);
+  border-style: dashed;
+}
+
+.payGrid {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.payLines {
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--tpl-body);
+}
+
+.payLines strong {
+  color: var(--tpl-muted);
+  font-weight: 600;
+}
+
+.qrBox {
+  text-align: center;
+  padding: 5px;
+  border: 1px dashed var(--tpl-line);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.qrCaption {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tpl-muted);
+  margin-top: 3px;
+}
+
+.notesText {
+  font-size: 9.5px;
+  color: var(--tpl-body);
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+/* ── Totals ───────────────────────────────────────────────────── */
+.totals {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  background: var(--tpl-soft);
+  border-radius: 8px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--tpl-body);
+}
+
+.totalRowStrong {
+  composes: totalRow;
+  color: var(--tpl-ink);
+  font-weight: 700;
+  border-top: 1px solid var(--tpl-line);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.totalGreen { color: #1f8a4c; }
+
+.grand {
+  background: var(--tpl-accent);
+  color: #fff;
+  padding: 14px 16px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.grandLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.grandValue {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.words {
+  font-size: 9.5px;
+  font-style: italic;
+  color: var(--tpl-muted);
+  margin-top: 7px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.balance {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--tpl-accent);
+  border-radius: 6px;
+  color: var(--tpl-ink);
+}
+
+/* ── Tax summary ──────────────────────────────────────────────── */
+.summary {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5px;
+}
+
+.summary th {
+  text-align: right;
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tpl-muted);
+  padding: 6px 7px;
+  border-bottom: 1px solid var(--tpl-line);
+}
+
+.summary th:first-child,
+.summary td:first-child {
+  text-align: left;
+}
+
+.summary td {
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--tpl-line);
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary tfoot td {
+  font-weight: 800;
+  border-bottom: none;
+  border-top: 1.5px solid var(--tpl-line);
+}
+
+/* ── Signature + strip ────────────────────────────────────────── */
+.signature {
+  margin-top: 18px;
+  text-align: right;
+}
+
+.signatureImg {
+  max-height: 46px;
+  margin-left: auto;
+}
+
+.signatureLine {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tpl-muted);
+  border-top: 1px solid var(--tpl-line);
+  padding-top: 6px;
+  margin-top: 6px;
+  display: inline-block;
+  min-width: 160px;
+}
+
+.strip {
+  border-top: 1px solid var(--tpl-line);
+  margin-top: 14px;
+  padding-top: 9px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 8.5px;
+  color: var(--tpl-muted);
+}

@@ -7,6 +7,7 @@
     <meta name="description" content="Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline, zero backend. 20+ premium templates, UPI QR codes, multi-profile support." />
     <meta name="keywords" content="invoice creator, GST invoice, PDF invoice, free invoice tool, UPI QR code invoice, offline invoice, MrChartist" />
     <meta name="author" content="Rohit Singh" />
+    <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#0a0f1c" />
     <link rel="canonical" href="https://invoice.mrchartist.in/" />
     <link rel="manifest" href="/manifest.json" />
@@ -35,6 +36,45 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,700&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700;1,800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <!-- Structured data (SEO) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://invoice.mrchartist.in/#organization",
+          "name": "MrChartist",
+          "url": "https://invoice.mrchartist.in/",
+          "logo": "https://invoice.mrchartist.in/logo.png",
+          "founder": {
+            "@type": "Person",
+            "name": "Rohit Singh",
+            "jobTitle": "SEBI Registered Research Analyst",
+            "identifier": "INH000015297"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://invoice.mrchartist.in/#website",
+          "url": "https://invoice.mrchartist.in/",
+          "name": "MrChartist Invoice Creator",
+          "description": "Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline.",
+          "publisher": { "@id": "https://invoice.mrchartist.in/#organization" }
+        },
+        {
+          "@type": "WebApplication",
+          "name": "MrChartist Invoice Creator",
+          "url": "https://invoice.mrchartist.in/",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "browserRequirements": "Requires JavaScript",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+          "publisher": { "@id": "https://invoice.mrchartist.in/#organization" }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -10,11 +10,12 @@ interface ClientFormData {
   phone: string;
   address: string;
   city: string;
+  zip: string;
   state: string;
   gstin: string;
 }
 
-const emptyForm: ClientFormData = { name: '', email: '', phone: '', address: '', city: '', state: '', gstin: '' };
+const emptyForm: ClientFormData = { name: '', email: '', phone: '', address: '', city: '', zip: '', state: '', gstin: '' };
 
 export function Clients() {
   const [clients, setClients] = useState<any[]>([]);
@@ -46,6 +47,7 @@ export function Clients() {
       phone: client.phone || '',
       address: client.address || '',
       city: client.city || '',
+      zip: client.zip || '',
       state: client.state || '',
       gstin: client.gstin || '',
     });
@@ -237,9 +239,15 @@ export function Clients() {
                 </div>
               </div>
 
-              <div className={styles.inputGroup} style={{ marginBottom: 0 }}>
-                <label className={styles.label}>GSTIN</label>
-                <input className={styles.input} value={form.gstin} onChange={e => setForm({...form, gstin: e.target.value.toUpperCase()})} placeholder="22AAAAA0000A1Z5" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className={styles.inputGroup} style={{ marginBottom: 0 }}>
+                  <label className={styles.label}>ZIP / PIN</label>
+                  <input className={styles.input} value={form.zip} onChange={e => setForm({...form, zip: e.target.value})} placeholder="400001" />
+                </div>
+                <div className={styles.inputGroup} style={{ marginBottom: 0 }}>
+                  <label className={styles.label}>GSTIN</label>
+                  <input className={styles.input} value={form.gstin} onChange={e => setForm({...form, gstin: e.target.value.toUpperCase()})} placeholder="22AAAAA0000A1Z5" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }} />
+                </div>
               </div>
             </div>
 
