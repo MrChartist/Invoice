@@ -1,0 +1,363 @@
+/* Books — shared styles for the tab panels, charts and statements. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.toolbarGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── Period bar ───────────────────────────────────────────────── */
+.periodBar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.chip {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.4375rem 0.875rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  min-height: 36px;
+  transition: all var(--transition-fast);
+}
+
+.chip:hover {
+  color: var(--foreground);
+  border-color: var(--input-border);
+}
+
+.chipActive {
+  composes: chip;
+  background: var(--primary-glow);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.chip:focus-visible,
+.chipActive:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.dateRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.dateField {
+  min-width: 150px;
+  flex: 1 1 150px;
+  max-width: 220px;
+}
+
+.periodSummary {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+/* ── Statement tables ─────────────────────────────────────────── */
+.dayRow td {
+  background-color: var(--card-inner);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.dayRow:hover td {
+  background-color: var(--card-inner);
+}
+
+.totalRow td {
+  font-weight: 800;
+  border-top: 2px solid var(--border);
+  background-color: var(--card-inner);
+}
+
+.narration {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  max-width: 320px;
+}
+
+.link {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.vtype {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.1875rem 0.5rem;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.vSales { background: var(--primary-glow); color: var(--primary); }
+.vReceipt { background: rgba(37, 160, 90, 0.14); color: var(--profit); }
+.vCredit { background: rgba(230, 154, 6, 0.14); color: var(--warning); }
+.vPurchase { background: rgba(99, 102, 241, 0.12); color: var(--muted-foreground); }
+.vExpense { background: rgba(217, 54, 54, 0.12); color: var(--loss); }
+.vPayment { background: var(--accent); color: var(--foreground); }
+
+.pos { color: var(--profit); }
+.neg { color: var(--loss); }
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--card-inner);
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.noticeWarn {
+  composes: notice;
+  border-color: var(--warning);
+}
+
+.noticeIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--warning);
+}
+
+.indicative {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
+  background: rgba(230, 154, 6, 0.14);
+  color: var(--warning);
+}
+
+/* ── Two-column statements (P&L, balance sheet) ───────────────── */
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.statement {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stmtRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.stmtRow:last-child {
+  border-bottom: none;
+}
+
+.stmtSub {
+  composes: stmtRow;
+  padding-left: 2rem;
+  color: var(--muted-foreground);
+}
+
+.stmtTotal {
+  composes: stmtRow;
+  font-family: var(--font-display);
+  font-weight: 800;
+  background: var(--card-inner);
+}
+
+.stmtHead {
+  composes: stmtRow;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+.amt {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Charts ───────────────────────────────────────────────────── */
+.chartWrap {
+  overflow-x: auto;
+  padding: 0.5rem 1rem 1rem;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  min-width: 520px;
+  height: auto;
+}
+
+.axis { stroke: var(--border); stroke-width: 1; }
+.gridLine { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
+.axisText { fill: var(--muted-foreground); font-size: 12px; font-family: var(--font-body); }
+.barIncome { fill: var(--primary); }
+.barExpense { fill: var(--muted-foreground); opacity: 0.55; }
+.profitLine { fill: none; stroke: var(--profit); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.profitDot { fill: var(--card); stroke: var(--profit); stroke-width: 2; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0 1.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.swatchIncome { background: var(--primary); }
+.swatchExpense { background: var(--muted-foreground); opacity: 0.55; }
+.swatchProfit { background: var(--profit); }
+
+/* ── Horizontal bars (expense mix) ────────────────────────────── */
+.barList {
+  list-style: none;
+  margin: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.barItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+}
+
+.barMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.barTrack {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  min-width: 2px;
+}
+
+.barFillDirect {
+  composes: barFill;
+  background: var(--muted-foreground);
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.dateInline {
+  max-width: 190px;
+}
+
+.numInput {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 860px) {
+  .twoCol { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .stmtRow { padding: 0.625rem 1rem; }
+  .stmtSub { padding-left: 1.5rem; }
+  .dateField { max-width: none; }
+  .chip { min-height: 44px; }
+}
