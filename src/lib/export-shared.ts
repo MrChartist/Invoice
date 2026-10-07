@@ -9,6 +9,8 @@
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
 import { resolveStateCode, stateByCode } from './india-states';
+import { isoDay } from './dates';
+import { isVoidStatus, readPurchase } from './purchase-normalize';
 
 /* ── Dates ────────────────────────────────────────────────────── */
 
@@ -20,15 +22,8 @@ export interface DateRange {
 
 /** Normalise any date-ish value to 'YYYY-MM-DD' ('' when unparseable). */
 export function isoDate(value: unknown): string {
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return '';
-    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  }
-  const s = String(value ?? '').trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  if (!s) return '';
-  return isoDate(new Date(s));
+  // Bare days keep their written day; real instants (…Z) become the LOCAL day.
+  return isoDay(value);
 }
 
 export type DateFormat = 'iso' | 'dmy';
@@ -132,8 +127,12 @@ export interface InvoiceAmounts {
   tax: number;
   /** shipping + other charges (untaxed). */
   charges: number;
+  /** GST cess (kept out of `tax`, which is CGST+SGST+IGST). */
+  cess: number;
+  /** TCS collected on the invoice: a liability to the government, not income. */
+  tcs: number;
   total: number;
-  /** total - (taxable + tax + charges): rounding plus any legacy inconsistency. Signed. */
+  /** total - (taxable + tax + charges + cess + tcs): rounding plus any legacy inconsistency. Signed. */
   roundOff: number;
 }
 
@@ -147,9 +146,11 @@ export function invoiceAmounts(inv: InvoiceRecord): InvoiceAmounts {
   const tax = round2(Math.max(num(inv.tax_amount), cgst + sgst + igst));
   const otherTax = round2(Math.max(0, tax - cgst - sgst - igst));
   const charges = round2(num(inv.shipping) + num(inv.other_charges));
-  const parts = taxable + tax + charges;
+  const cess = round2(num(inv.cess_amount));
+  const tcs = round2(num(inv.tcs_amount));
+  const parts = round2(taxable + tax + charges + cess + tcs);
   const total = round2(num(inv.total) !== 0 ? num(inv.total) : parts + num(inv.round_off));
-  return { taxable, cgst, sgst, igst, otherTax, tax, charges, total, roundOff: round2(total - parts) };
+  return { taxable, cgst, sgst, igst, otherTax, tax, charges, cess, tcs, total, roundOff: round2(total - parts) };
 }
 
 export function invoiceStateCode(inv: InvoiceRecord): string {
@@ -211,60 +212,41 @@ export interface NormalPurchase {
   roundOff: number;
   status: string;
   notes: string;
+  /** Additive: false when the GST on this bill is NOT claimed as input credit. */
+  itcEligible: boolean;
 }
 
 type Rec = Record<string, unknown>;
 const asRec = (v: unknown): Rec => (v && typeof v === 'object' ? (v as Rec) : {});
-const pick = (r: Rec, keys: string[]): unknown => {
-  for (const k of keys) if (r[k] !== undefined && r[k] !== null && r[k] !== '') return r[k];
-  return undefined;
-};
 
 export function normalizePurchase(raw: unknown, vendors: unknown[] = []): NormalPurchase | null {
   const r = asRec(raw);
   if (!Object.keys(r).length) return null;
-  const vid = pick(r, ['vendor_id', 'supplier_id', 'party_id']);
-  const vendorRow = asRec(
-    vendors.find((v) => vid !== undefined && asRec(v).id === vid) ?? pick(r, ['vendor', 'supplier']),
-  );
-  const partyName =
-    clean(pick(r, ['vendor_name', 'supplier_name', 'party_name'])) ||
-    clean(vendorRow.company) ||
-    clean(vendorRow.name);
-  const partyGstin = clean(pick(r, ['vendor_gstin', 'supplier_gstin', 'gstin']) ?? vendorRow.gstin).toUpperCase();
-  const cgst = round2(num(pick(r, ['cgst_amount', 'cgst'])));
-  const sgst = round2(num(pick(r, ['sgst_amount', 'sgst'])));
-  const igst = round2(num(pick(r, ['igst_amount', 'igst'])));
-  const tax = round2(Math.max(num(pick(r, ['tax_amount', 'total_tax', 'tax'])), cgst + sgst + igst));
-  let taxable = round2(num(pick(r, ['taxable_value', 'taxable_amount', 'taxable'])));
-  const totalRaw = num(pick(r, ['total', 'grand_total', 'amount', 'total_amount']));
-  if (!taxable) taxable = round2(num(pick(r, ['subtotal'])) - num(pick(r, ['discount_amount'])));
-  if (!taxable && totalRaw) taxable = round2(totalRaw - tax);
-  const total = totalRaw ? round2(totalRaw) : round2(taxable + tax);
-  const date = isoDate(pick(r, ['bill_date', 'purchase_date', 'date', 'issue_date', 'created_at']));
-  if (!date || !partyName || !total) return null;
+  // One shared reader for the purchases table (see purchase-normalize.ts).
+  const c = readPurchase(r, vendors);
+  const date = c?.date || isoDate(r.created_at);
+  if (!c || !date || !c.partyName || !c.total) return null;
   return {
-    id: String(pick(r, ['id']) ?? ''),
-    number: clean(
-      pick(r, ['bill_number', 'purchase_number', 'vendor_invoice_number', 'invoice_number', 'number', 'reference']),
-    ),
+    id: c.id,
+    number: c.number,
     date,
-    partyName,
-    partyGstin,
+    partyName: c.partyName,
+    partyGstin: c.partyGstin,
     stateCode: resolveStateCode({
-      code: String(pick(r, ['place_of_supply', 'state_code']) ?? vendorRow.state_code ?? ''),
-      gstin: partyGstin,
-      name: String(vendorRow.state ?? ''),
+      code: c.placeOfSupply || c.vendorStateCode,
+      gstin: c.partyGstin,
+      name: '',
     }),
-    taxable,
-    cgst,
-    sgst,
-    igst,
-    tax,
-    total,
-    roundOff: round2(total - taxable - tax),
-    status: clean(pick(r, ['status'])),
-    notes: clean(pick(r, ['notes', 'narration'])),
+    taxable: c.taxable,
+    cgst: c.cgst,
+    sgst: c.sgst,
+    igst: c.igst,
+    tax: c.tax,
+    total: c.total,
+    roundOff: c.roundOff,
+    status: clean(r.status),
+    notes: c.notes,
+    itcEligible: c.itcEligible,
   };
 }
 
@@ -277,7 +259,7 @@ export function filterPurchases(
     .map((p) => normalizePurchase(p, vendors))
     .filter(
       (p): p is NormalPurchase =>
-        p !== null && p.status.toLowerCase() !== 'cancelled' && inRange(p.date, range),
+        p !== null && !isVoidStatus(p.status) && inRange(p.date, range),
     )
     .sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number));
 }

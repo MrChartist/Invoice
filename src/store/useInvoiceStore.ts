@@ -458,7 +458,12 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       // Drop the empty trailing row users leave behind.
       record.items = record.items.filter((i) => i.name.trim() || num(i.rate) > 0);
       if (!record.invoice_number) {
-        record.invoice_number = localDb.invoices.nextNumber(record.issue_date, record.doc_type);
+        // The sender profile's own prefix wins (the creator page previews it); else the global one.
+        record.invoice_number = localDb.invoices.nextNumber(
+          record.issue_date,
+          record.doc_type,
+          record.sender?.invoicePrefix || undefined,
+        );
       }
       if (record.status === 'Draft' && !opts?.asDraft) record.status = 'Sent';
 

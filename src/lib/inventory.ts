@@ -15,6 +15,8 @@
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
 import { round2, num } from './invoice-calc';
 import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from './storage';
+import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
+import { toCsv } from './csv';
 
 /* ── Types ───────────────────────────────────────────────────── */
 
@@ -224,10 +226,6 @@ function invoiceEffect(
   return null; // QUOTATION / PROFORMA never touch stock
 }
 
-function purchaseDate(p: PurchaseLike): string {
-  return dayOf(p.bill_date ?? p.date ?? p.issue_date ?? p.invoice_date);
-}
-
 /** Collect every stock event for every tracked item. Pure; inputs untouched. */
 export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
   const { items, moves, invoices, purchases = [], includeChallans = false, asOf, excludeInvoiceId } = input;
@@ -314,25 +312,22 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
   }
 
   for (const p of purchases) {
-    if (!p) continue;
-    const st = norm(p.status);
-    if (st === 'draft' || st === 'cancelled' || st === 'canceled') continue;
-    const date = purchaseDate(p);
-    for (const line of p.lines ?? p.items ?? []) {
-      const it = index.find(line.name ?? line.description ?? '', line.hsn);
-      const q = num(line.quantity ?? line.qty);
+    // Same reader as Books / GST / exports: drafts, cancelled bills and direct
+    // expenses (rent, fees ...) never move stock.
+    const bill = readPurchase(p);
+    if (!bill || isVoidStatus(bill.status) || bill.isExpense) continue;
+    for (const line of readPurchaseLines(p)) {
+      const it = index.find(line.name, line.hsn);
+      const q = line.quantity;
       if (!it || q <= 0) continue;
-      let rate = num(line.rate ?? line.unit_price);
-      if (!rate && num(line.amount)) rate = num(line.amount) / q;
-      rate *= 1 - Math.min(Math.max(num(line.discount_percent), 0), 100) / 100;
       push(it.id, {
-        date,
+        date: bill.date,
         kind: 'purchase',
         qty: q,
-        rate,
-        particulars: `Purchase — ${p.bill_number ?? p.invoice_number ?? ''}${p.vendor_name ? ` · ${p.vendor_name}` : ''}`,
+        rate: line.unitCost,
+        particulars: `Purchase — ${bill.number}${bill.partyName ? ` · ${bill.partyName}` : ''}`,
         refType: 'purchase',
-        refId: p.id,
+        refId: bill.id || undefined,
       });
     }
   }
@@ -727,12 +722,6 @@ export function describeShortfall(s: StockShortfall): string {
 
 /* ── CSV ─────────────────────────────────────────────────────── */
 
-function csvCell(v: unknown): string {
-  let s = String(v ?? '');
-  if (/^[=+\-@\t\r]/.test(s) && Number.isNaN(Number(s))) s = `'${s}`; // spreadsheet-injection guard
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
 export function stockSummaryCsv(positions: StockPosition[]): string {
   const head = ['Item', 'SKU', 'HSN', 'Unit', 'Location', 'Tracked', 'Quantity', 'Avg cost', 'Stock value', 'Reorder level', 'Sale rate', 'GST %', 'Status'];
   const rows = positions.map((p) => [
@@ -740,13 +729,13 @@ export function stockSummaryCsv(positions: StockPosition[]): string {
     p.item.track_stock ? 'Yes' : 'No', p.qty, p.avgCost, p.value, num(p.item.reorder_level),
     num(p.item.sale_rate), num(p.item.tax_rate), p.status,
   ]);
-  return [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+  return toCsv([head, ...rows]);
 }
 
 export function ledgerCsv(p: StockPosition): string {
   const head = ['Date', 'Particulars', 'In', 'Out', 'Rate', 'Balance', 'Value'];
   const rows = p.ledger.map((r) => [r.date, r.particulars, r.qtyIn || '', r.qtyOut || '', r.rate, r.balance, r.value]);
-  return [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+  return toCsv([head, ...rows]);
 }
 
 /* ================================================================

@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import { parseDay } from './dates';
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -73,7 +74,7 @@ export function formatQuantity(value: number) {
 /** "1 Apr 2026" — the day-first order used on Indian invoices. */
 export function formatDate(date: string | Date) {
   if (!date) return '';
-  const d = new Date(date);
+  const d = parseDay(date);
   if (Number.isNaN(d.getTime())) return '';
   return new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
@@ -84,7 +85,7 @@ export function formatDate(date: string | Date) {
 
 /** "2026-04-01" — the value format every <input type="date"> expects. */
 export function toDateInput(date: string | Date = new Date()): string {
-  const d = new Date(date);
+  const d = parseDay(date);
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -95,7 +96,8 @@ export function todayInput(): string {
 }
 
 export function addDaysInput(days: number, from: string | Date = new Date()): string {
-  const d = new Date(from);
+  // Copy: parseDay hands back a caller-supplied Date as-is and we must not mutate it.
+  const d = new Date(parseDay(from).getTime());
   if (Number.isNaN(d.getTime())) return todayInput();
   d.setDate(d.getDate() + days);
   return toDateInput(d);
@@ -104,11 +106,12 @@ export function addDaysInput(days: number, from: string | Date = new Date()): st
 /** Whole days a due date is past — 0 when it is today or in the future. */
 export function daysOverdue(dueDate?: string, now: Date = new Date()): number {
   if (!dueDate) return 0;
-  const due = new Date(dueDate);
+  const due = parseDay(dueDate);
   if (Number.isNaN(due.getTime())) return 0;
   const startOfDue = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
   const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const diff = Math.floor((startOfNow - startOfDue) / 86400000);
+  // Round, not floor: a local day is 23h or 25h across a DST change.
+  const diff = Math.round((startOfNow - startOfDue) / 86400000);
   return diff > 0 ? diff : 0;
 }
 

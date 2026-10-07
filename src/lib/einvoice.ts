@@ -10,7 +10,7 @@
  */
 
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
-import { calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, round2 } from './invoice-calc';
 import { stateByCode, stateByName } from './india-states';
 import { getTable, setTable } from './storage';
 
@@ -70,6 +70,10 @@ export interface EInvItem {
   IgstAmt: number;
   CgstAmt: number;
   SgstAmt: number;
+  /** Additive: ad valorem cess rate / amount and fixed (non-advol) cess amount. */
+  CesRt?: number;
+  CesAmt?: number;
+  CesNonAdvlAmt?: number;
   TotItemVal: number;
 }
 
@@ -78,6 +82,8 @@ export interface EInvValDtls {
   CgstVal: number;
   SgstVal: number;
   IgstVal: number;
+  /** Additive: total cess (ad valorem + fixed). */
+  CesVal?: number;
   Disc?: number;
   OthChrg?: number;
   RndOffAmt: number;
@@ -300,17 +306,8 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   const sender = record.sender ?? options.fallbackSender ?? null;
   const client = record.client ?? ({} as InvoiceRecord['client']);
 
-  const calc = calculateInvoice({
-    items: record.items ?? [],
-    gst_mode: record.gst_mode,
-    discount_type: record.discount_type,
-    discount_rate: num(record.discount_rate),
-    tax_rate: num(record.tax_rate),
-    shipping: num(record.shipping),
-    other_charges: num(record.other_charges),
-    round_off_enabled: !!record.round_off_enabled,
-    amount_paid: num(record.amount_paid),
-  });
+  // Full record in: supply type, tax-inclusive pricing, cess, TCS and round mode all change ValDtls.
+  const calc = calculateInvoice(calcInputFromRecord(record));
 
   // ── Seller ──
   const sellerGstin = clean(sender?.companyGstin).toUpperCase();
@@ -341,10 +338,24 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
 
   // ── Supply classification ──
   const pos = (record.place_of_supply ?? '').trim();
-  const isExport = pos === '99' || options.supplyType?.startsWith('EXP') === true || options.supplyType === 'DEXP';
+  const st = record.supply_type;
+  // "99" is the app's Other-Country code, "96" the GSTN one: both mean an overseas buyer.
+  const isExport =
+    pos === '99' ||
+    pos === '96' ||
+    st === 'EXPORT_LUT' ||
+    st === 'EXPORT_WITH_PAYMENT' ||
+    options.supplyType?.startsWith('EXP') === true;
   const hasIgst = calc.igst_amount > 0;
+  const fromRecord: EInvoiceSupplyType | undefined =
+    st === 'EXPORT_LUT' ? 'EXPWOP'
+    : st === 'EXPORT_WITH_PAYMENT' ? 'EXPWP'
+    : st === 'SEZ_WITH_PAYMENT' ? 'SEZWP'
+    : st === 'SEZ_WITHOUT_PAYMENT' ? 'SEZWOP'
+    : st === 'DEEMED_EXPORT' ? 'DEXP'
+    : undefined;
   const supTyp: EInvoiceSupplyType =
-    options.supplyType ?? (isExport ? (hasIgst ? 'EXPWP' : 'EXPWOP') : 'B2B');
+    options.supplyType ?? fromRecord ?? (isExport ? (hasIgst ? 'EXPWP' : 'EXPWOP') : 'B2B');
 
   // ── Buyer ──
   const buyerGstinRaw = clean(client.gstin).toUpperCase();
@@ -395,6 +406,20 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
     const raw = (record.items ?? [])[i];
     const description = clean(raw?.name) || clean(raw?.description) || `Item ${i + 1}`;
     const rate = noTax ? 0 : l.tax_rate;
+    const advol = round2(l.taxable * (l.cess_rate / 100));
+    const nonAdvol = round2(l.cess - advol);
+    // Tax-inclusive pricing: the IRP wants the EX-tax gross (TotAmt = Qty x UnitPrice, AssAmt = TotAmt - Discount),
+    // so back the GST + ad valorem cess out of the inclusive amount instead of printing 11,800 against a 10,000 base.
+    const inclusive =
+      !!record.price_includes_tax && (l.tax_rate > 0 || l.cess_rate > 0 || l.cess_per_unit > 0);
+    const fixedCess = round2(l.quantity * l.cess_per_unit);
+    const totAmt = inclusive
+      ? round2(Math.max(l.gross - fixedCess, 0) / (1 + (l.tax_rate + l.cess_rate) / 100))
+      : l.gross;
+    const discount = inclusive
+      ? Math.max(round2(totAmt - l.taxable), 0)
+      : round2(l.line_discount + l.invoice_discount);
+    const unitPrice = inclusive && l.quantity ? totAmt / l.quantity : l.rate;
     return {
       SlNo: String(i + 1),
       PrdDesc: description.slice(0, 300),
@@ -402,25 +427,30 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
       HsnCd: l.hsn,
       Qty: Math.round(l.quantity * 1000) / 1000,
       Unit: mapUnitToUqc(l.unit),
-      UnitPrice: Math.round(l.rate * 1000) / 1000,
-      TotAmt: l.gross,
-      Discount: round2(l.line_discount + l.invoice_discount),
+      UnitPrice: Math.round(unitPrice * 1000) / 1000,
+      TotAmt: totAmt,
+      Discount: discount,
       AssAmt: l.taxable,
       GstRt: rate,
       IgstAmt: l.igst,
       CgstAmt: l.cgst,
       SgstAmt: l.sgst,
-      TotItemVal: round2(l.taxable + l.cgst + l.sgst + l.igst),
+      ...(l.cess > 0
+        ? { CesRt: l.cess_rate, CesAmt: advol, CesNonAdvlAmt: nonAdvol }
+        : {}),
+      TotItemVal: round2(l.taxable + l.cgst + l.sgst + l.igst + l.cess),
     };
   });
 
   const intra = !!sellerStcd && pos === sellerStcd;
-  const othChrg = round2(calc.shipping + calc.other_charges);
+  // The IRP has no TCS field: it travels in "other charges" so TotInvVal still reconciles.
+  const othChrg = round2(calc.shipping + calc.other_charges + calc.tcs_amount);
   const valDtls: EInvValDtls = {
     AssVal: calc.taxable_value,
     CgstVal: calc.cgst_amount,
     SgstVal: calc.sgst_amount,
     IgstVal: calc.igst_amount,
+    ...(calc.cess_amount > 0 ? { CesVal: calc.cess_amount } : {}),
     RndOffAmt: calc.round_off,
     TotInvVal: calc.total,
   };

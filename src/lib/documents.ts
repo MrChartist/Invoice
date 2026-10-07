@@ -12,7 +12,7 @@
  * original by a `debit_note` doc_link.
  */
 
-import { calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { localDb } from './localDb';
 import {
@@ -121,17 +121,9 @@ export function addDays(isoDate: string, days: number): string {
 }
 
 function recompute(rec: InvoiceRecord): InvoiceRecord {
-  const t = calculateInvoice({
-    items: rec.items,
-    gst_mode: rec.gst_mode,
-    discount_type: rec.discount_type,
-    discount_rate: rec.discount_rate,
-    tax_rate: rec.tax_rate,
-    shipping: rec.shipping,
-    other_charges: rec.other_charges,
-    round_off_enabled: rec.round_off_enabled,
-    amount_paid: rec.amount_paid,
-  });
+  // The FULL record goes in (supply type, tax-inclusive pricing, cess, TCS/TDS,
+  // round mode): a credit note against an export/LUT invoice must stay zero-rated.
+  const t = calculateInvoice(calcInputFromRecord(rec));
   return {
     ...rec,
     subtotal: t.subtotal,
@@ -144,6 +136,9 @@ function recompute(rec: InvoiceRecord): InvoiceRecord {
     round_off: t.round_off,
     total: t.total,
     balance_due: t.balance_due,
+    cess_amount: t.cess_amount,
+    tcs_amount: t.tcs_amount,
+    tds_amount: t.tds_amount,
   };
 }
 
@@ -194,6 +189,9 @@ export function buildConvertedDraft(
     client: { ...source.client },
     sender: source.sender ? { ...source.sender } : null,
     amount_paid: 0,
+    // A derived document is not itself the recurring occurrence it was copied from.
+    recurring_id: undefined,
+    recurring_date: undefined,
     created_at: undefined,
     updated_at: undefined,
   };
@@ -216,7 +214,7 @@ export function convertDocument(source: InvoiceRecord, target: DocumentType): In
   const settings = localDb.settings.get();
   const draft = buildConvertedDraft(source, target, {
     id: generateId(),
-    invoice_number: localDb.invoices.nextNumber(today, target),
+    invoice_number: localDb.invoices.nextNumber(today, target, source.sender?.invoicePrefix || undefined),
     today,
     dueDays: num(settings.defaultDueDays, 14),
   });
@@ -321,6 +319,7 @@ export function buildCreditNote(
   const errors: string[] = [];
   if (!isInvoiceType(invoice.doc_type)) errors.push('Credit notes can only be raised against invoices.');
   if (invoice.status === 'Cancelled') errors.push('This invoice is cancelled.');
+  if (invoice.status === 'Draft') errors.push('Issue the invoice before raising a credit note against it.');
   if (!input.reason?.trim()) errors.push('Choose a reason for the credit note.');
 
   const status = creditableLines(invoice, links, allInvoices);
@@ -349,17 +348,15 @@ export function buildCreditNote(
 
   // Re-express the original invoice-level discount as an equivalent percent so
   // a partial credit gets a proportional share of it.
-  const origCalc = calculateInvoice({
-    items: invoice.items,
-    gst_mode: invoice.gst_mode,
-    discount_type: invoice.discount_type,
-    discount_rate: invoice.discount_rate,
-    tax_rate: invoice.tax_rate,
-    shipping: 0,
-    other_charges: 0,
-    round_off_enabled: false,
-    amount_paid: 0,
-  });
+  const origCalc = calculateInvoice(
+    calcInputFromRecord(invoice, {
+      shipping: 0,
+      other_charges: 0,
+      round_off_enabled: false,
+      round_mode: 'none',
+      amount_paid: 0,
+    }),
+  );
   const netBase = round2(origCalc.subtotal - origCalc.line_discount_total);
   const discountPct = netBase > 0 ? (origCalc.invoice_discount_amount / netBase) * 100 : 0;
 
@@ -381,6 +378,8 @@ export function buildCreditNote(
     amount_paid: 0,
     po_number: invoice.invoice_number,
     notes: `Credit note against ${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number} dated ${invoice.issue_date}. Reason: ${input.reason.trim()}.`,
+    recurring_id: undefined,
+    recurring_date: undefined,
     created_at: undefined,
     updated_at: undefined,
   };
@@ -388,12 +387,19 @@ export function buildCreditNote(
   // A credit note is not receivable; it reduces the original's balance.
   rec.balance_due = 0;
 
-  const already = totalCredited(invoice.id, links, allInvoices);
-  if (round2(already + rec.total) > round2(num(invoice.total)) + TOTAL_TOLERANCE) {
+  // Compare BEFORE whole-rupee round-off: every credit note is rounded on its own,
+  // so two part-credits that together cover the invoice can each round up and sum
+  // to a rupee more than the (also rounded) invoice — which must not block them.
+  const preRound = (r: Pick<InvoiceRecord, 'total' | 'round_off'>) => num(r.total) - num(r.round_off);
+  const already = round2(
+    creditNotesFor(invoice.id, links, allInvoices).reduce((s, c) => s + preRound(c), 0),
+  );
+  const cap = round2(preRound(invoice));
+  if (round2(already + preRound(rec)) > cap + TOTAL_TOLERANCE) {
     return {
       record: null,
       errors: [
-        `Total credit (${round2(already + rec.total)}) would exceed the invoice total (${round2(num(invoice.total))}).`,
+        `Total credit (${round2(already + preRound(rec))}) would exceed the invoice total (${cap}).`,
       ],
     };
   }
@@ -465,6 +471,8 @@ export function buildDebitNote(
     amount_paid: 0,
     po_number: invoice.invoice_number,
     notes: `Debit note against ${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number} dated ${invoice.issue_date}. Reason: ${input.reason.trim()}.`,
+    recurring_id: undefined,
+    recurring_date: undefined,
     created_at: undefined,
     updated_at: undefined,
   });
@@ -477,7 +485,7 @@ export function createDebitNote(
   const today = localIsoDate();
   const rec = buildDebitNote(invoice, input, {
     id: generateId(),
-    invoice_number: localDb.invoices.nextNumber(today, invoice.doc_type),
+    invoice_number: localDb.invoices.nextNumber(today, invoice.doc_type, invoice.sender?.invoicePrefix || undefined),
     today,
     dueDays: num(localDb.settings.get().defaultDueDays, 14),
   });
@@ -502,7 +510,11 @@ export function effectiveOutstanding(
   if (invoice.status === 'Cancelled') return 0;
   if (!isInvoiceType(invoice.doc_type)) return 0;
   const credit = totalCredited(invoice.id, links, allInvoices);
-  return Math.max(0, round2(num(invoice.total) - num(invoice.amount_paid) - credit));
+  // TDS the customer withholds is never collectable from them (it is settled with the tax office).
+  return Math.max(
+    0,
+    round2(num(invoice.total) - num(invoice.tds_amount) - num(invoice.amount_paid) - credit),
+  );
 }
 
 /* ── Cancellation ──────────────────────────────────────────────── */

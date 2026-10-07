@@ -10,6 +10,7 @@
 
 import { round2 } from './invoice-calc';
 import { toGstnDate } from './gst-reports';
+import { csvCell, toCsv as sharedToCsv } from './csv';
 import type {
   CdnRow,
   DocRow,
@@ -29,7 +30,7 @@ function itemDet(r: RateRow) {
   if (r.igst) det.iamt = round2(r.igst);
   if (r.cgst) det.camt = round2(r.cgst);
   if (r.sgst) det.samt = round2(r.sgst);
-  det.csamt = 0;
+  det.csamt = round2(r.cess ?? 0);
   return det;
 }
 
@@ -64,7 +65,7 @@ export function buildGstr1Json(r: Gstr1Report): Record<string, unknown> {
         val: round2(i.value),
         pos: i.pos,
         rchrg: i.rchrg,
-        inv_typ: 'R',
+        inv_typ: i.invTyp ?? 'R',
         itms: itms(i.items),
       })),
     }));
@@ -94,7 +95,7 @@ export function buildGstr1Json(r: Gstr1Report): Record<string, unknown> {
       if (x.igst) row.iamt = round2(x.igst);
       if (x.cgst) row.camt = round2(x.cgst);
       if (x.sgst) row.samt = round2(x.sgst);
-      row.csamt = 0;
+      row.csamt = round2(x.cess ?? 0);
       return row;
     });
   }
@@ -137,7 +138,7 @@ export function buildGstr1Json(r: Gstr1Report): Record<string, unknown> {
         itms: i.items.map((it) => {
           const row: Record<string, number> = { txval: round2(it.txval), rt: it.rate };
           if (it.igst) row.iamt = round2(it.igst);
-          row.csamt = 0;
+          row.csamt = round2(it.cess ?? 0);
           return row;
         }),
       })),
@@ -168,7 +169,7 @@ export function buildGstr1Json(r: Gstr1Report): Record<string, unknown> {
         iamt: round2(h.igst),
         camt: round2(h.cgst),
         samt: round2(h.sgst),
-        csamt: 0,
+        csamt: round2(h.cess ?? 0),
         rt: h.rate,
       })),
     };
@@ -200,16 +201,11 @@ export function buildGstr1Json(r: Gstr1Report): Record<string, unknown> {
 
 export type CsvCell = string | number;
 
-/** RFC-4180 escaping plus a guard against spreadsheet formula injection. */
-export function csvCell(v: CsvCell): string {
-  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : '';
-  let s = String(v ?? '');
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+export { csvCell };
 
+/** GST CSV files end with a trailing CRLF (the portal's offline tool expects it). */
 export function toCsv(rows: CsvCell[][]): string {
-  return rows.map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+  return sharedToCsv(rows) + '\r\n';
 }
 
 export type SectionId = 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs';
@@ -320,6 +316,8 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
     ['6.1', 'ITC SGST used against IGST / SGST', '', p.itcUsed.sgst.igst, '', p.itcUsed.sgst.sgst],
     itc('6.1', 'Tax payable in cash', p.cash),
     itc('6.1', 'ITC carried forward', p.itcCarry),
+    // Cess has its own column on the portal; here the amount sits in the value column.
+    ...(p.cess ? [['6.1', 'Cess payable in cash (value column = cess amount)', p.cess, '', '', ''] as CsvCell[]] : []),
   ];
 }
 

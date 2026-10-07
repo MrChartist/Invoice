@@ -26,7 +26,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
-import { calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import {
   clean,
   emptySource,
@@ -125,6 +125,10 @@ export interface TallyOptions {
   outputIgst?: string;
   /** Used for legacy single-line tax with no CGST/SGST/IGST split. */
   outputGst?: string;
+  /** GST cess collected on sales (Duties & Taxes). */
+  outputCess?: string;
+  /** TCS collected from the customer (a liability, never income). */
+  tcsLedger?: string;
   inputCgst?: string;
   inputSgst?: string;
   inputIgst?: string;
@@ -141,6 +145,8 @@ export const DEFAULT_LEDGER_NAMES = {
   outputSgst: 'Output SGST',
   outputIgst: 'Output IGST',
   outputGst: 'Output GST',
+  outputCess: 'Output Cess',
+  tcsLedger: 'TCS Payable',
   inputCgst: 'Input CGST',
   inputSgst: 'Input SGST',
   inputIgst: 'Input IGST',
@@ -169,6 +175,8 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
     outputSgst: n(o.outputSgst, DEFAULT_LEDGER_NAMES.outputSgst),
     outputIgst: n(o.outputIgst, DEFAULT_LEDGER_NAMES.outputIgst),
     outputGst: n(o.outputGst, DEFAULT_LEDGER_NAMES.outputGst),
+    outputCess: n(o.outputCess, DEFAULT_LEDGER_NAMES.outputCess),
+    tcsLedger: n(o.tcsLedger, DEFAULT_LEDGER_NAMES.tcsLedger),
     inputCgst: n(o.inputCgst, DEFAULT_LEDGER_NAMES.inputCgst),
     inputSgst: n(o.inputSgst, DEFAULT_LEDGER_NAMES.inputSgst),
     inputIgst: n(o.inputIgst, DEFAULT_LEDGER_NAMES.inputIgst),
@@ -232,7 +240,7 @@ interface LedgerDef {
   pincode?: string;
   email?: string;
   phone?: string;
-  duty?: 'Central Tax' | 'State Tax' | 'Integrated Tax';
+  duty?: 'Central Tax' | 'State Tax' | 'Integrated Tax' | 'Cess';
   billwise?: boolean;
 }
 
@@ -273,17 +281,9 @@ function lineItems(inv: InvoiceRecord): TallyInventoryLine[] {
   const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
   if (!items.length) return [];
   try {
-    const calc = calculateInvoice({
-      items,
-      gst_mode: inv.gst_mode ?? 'NONE',
-      discount_type: inv.discount_type ?? 'PERCENT',
-      discount_rate: num(inv.discount_rate),
-      tax_rate: num(inv.tax_rate),
-      shipping: num(inv.shipping),
-      other_charges: num(inv.other_charges),
-      round_off_enabled: false,
-      amount_paid: 0,
-    });
+    const calc = calculateInvoice(
+      calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 }),
+    );
     return calc.lines
       .filter((l) => clean(l.name))
       .map((l) => ({
@@ -372,6 +372,9 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     push(entries, salesLedger, credit ? 'Dr' : 'Cr', taxable);
     taxLedgers(inv, absA, credit, entries);
     push(entries, o.otherChargesLedger, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.charges)));
+    // Cess and TCS get their own ledgers: left out they would be swallowed by Round Off.
+    push(entries, o.outputCess, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.cess)));
+    push(entries, o.tcsLedger, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.tcs)));
     balanceWithRoundOff(entries, o.roundOffLedger);
 
     std(salesLedger, 'Sales Accounts');
@@ -381,6 +384,8 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     std(o.outputSgst, 'Duties & Taxes', 'State Tax');
     std(o.outputIgst, 'Duties & Taxes', 'Integrated Tax');
     if (a.otherTax > 0) std(o.outputGst, 'Duties & Taxes');
+    if (a.cess > 0) std(o.outputCess, 'Duties & Taxes', 'Cess');
+    if (a.tcs > 0) std(o.tcsLedger, 'Duties & Taxes');
     for (const l of inventory) {
       if (!stockMap.has(l.item)) stockMap.set(l.item, { name: l.item, unit: l.unit, hsn: l.hsn, gstRate: l.gstRate });
     }
@@ -462,10 +467,13 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       if (total === 0) continue;
       const entries: TallyEntry[] = [];
       push(entries, p.partyName, 'Cr', total, { name: p.number || p.id || p.partyName, type: 'New Ref' });
-      push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.taxable)));
-      push(entries, o.inputCgst, 'Dr', Math.abs(toPaise(p.cgst)));
-      push(entries, o.inputSgst, 'Dr', Math.abs(toPaise(p.sgst)));
-      push(entries, o.inputIgst, 'Dr', Math.abs(toPaise(round2(p.tax - p.cgst - p.sgst))));
+      // GST on a bill whose ITC is blocked is part of the cost, never an "Input" credit.
+      push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.itcEligible ? p.taxable : round2(p.taxable + p.tax))));
+      if (p.itcEligible) {
+        push(entries, o.inputCgst, 'Dr', Math.abs(toPaise(p.cgst)));
+        push(entries, o.inputSgst, 'Dr', Math.abs(toPaise(p.sgst)));
+        push(entries, o.inputIgst, 'Dr', Math.abs(toPaise(round2(p.tax - p.cgst - p.sgst))));
+      }
       balanceWithRoundOff(entries, o.roundOffLedger);
       addLedger({
         name: p.partyName,

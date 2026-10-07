@@ -116,7 +116,8 @@ export function validateEInvoice(
 ): PreflightIssue[] {
   const out: PreflightIssue[] = [];
   const now = opts.now ?? new Date();
-  const foreign = payload.TranDtls.SupTyp.startsWith('EXP') || payload.TranDtls.SupTyp === 'DEXP';
+  // Deemed exports (DEXP) are supplies to domestic registered buyers, not overseas ones.
+  const foreign = payload.TranDtls.SupTyp.startsWith('EXP');
 
   // ── Source document ──
   if (record) {
@@ -264,8 +265,9 @@ export function validateEInvoice(
     if (!near((it.AssAmt * it.GstRt) / 100, taxSum)) {
       out.push(issue('error', 'ITEM_TAX', f, `${at}: tax amount (${round2(taxSum)}) does not match ${it.GstRt}% of taxable value (${round2((it.AssAmt * it.GstRt) / 100)}).`));
     }
-    if (!near(it.AssAmt + taxSum, it.TotItemVal)) {
-      out.push(issue('error', 'ITEM_TOTVAL', f, `${at}: item total (${it.TotItemVal}) does not equal taxable + tax (${round2(it.AssAmt + taxSum)}).`));
+    const cessSum = (it.CesAmt ?? 0) + (it.CesNonAdvlAmt ?? 0);
+    if (!near(it.AssAmt + taxSum + cessSum, it.TotItemVal)) {
+      out.push(issue('error', 'ITEM_TOTVAL', f, `${at}: item total (${it.TotItemVal}) does not equal taxable + tax (${round2(it.AssAmt + taxSum + cessSum)}).`));
     }
     sumAss += it.AssAmt;
     sumCgst += it.CgstAmt;

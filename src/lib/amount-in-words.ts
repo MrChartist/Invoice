@@ -3,6 +3,7 @@
  * INR uses the Indian numbering system (Crore / Lakh); every other currency
  * uses the international system (Billion / Million).
  */
+import { round2 } from './invoice-calc';
 
 const ONES = [
   '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
@@ -70,15 +71,18 @@ function internationalWords(n: number): string {
 }
 
 export function amountInWords(amount: number, currency: string = 'INR'): string {
-  if (!Number.isFinite(amount) || amount === 0) return 'Zero';
+  if (!Number.isFinite(amount)) return 'Zero';
 
-  const abs = Math.abs(amount);
+  // Round to paise FIRST: 19.999 must read "Twenty", not "Nineteen and undefined Paise"
+  // (the fractional part used to round to 100 and index past the end of the word table).
+  const abs = round2(Math.abs(amount));
+  if (abs === 0) return 'Zero';
   const whole = Math.floor(abs);
   const minorUnits = Math.round((abs - whole) * 100);
   const code = (currency || 'INR').toUpperCase();
   const { major, minor } = CURRENCY_WORDS[code] ?? { major: code, minor: 'Cents' };
 
-  const body = code === 'INR' ? indianWords(whole) : internationalWords(whole);
+  const body = whole === 0 ? 'Zero' : code === 'INR' ? indianWords(whole) : internationalWords(whole);
   const sign = amount < 0 ? 'Minus ' : '';
   const minorPart = minorUnits > 0 ? ` and ${twoDigit(minorUnits)} ${minor}` : '';
 

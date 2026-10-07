@@ -21,6 +21,8 @@ import { round2, num } from './invoice-calc';
 import { agingBucket } from './invoice-status';
 import { daysOverdue, formatMoney, formatDate } from './utils';
 import { amountInWords } from './amount-in-words';
+import { isoDay } from './dates';
+import { csvCell, toCsv } from './csv';
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -142,9 +144,7 @@ function localIso(d: Date): string {
 /** Normalises 'yyyy-mm-dd', ISO timestamps and parsable text to a local yyyy-mm-dd. */
 export function dateKey(value: string | undefined | null): string {
   if (!value) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '' : localIso(d);
+  return isoDay(value);
 }
 
 function nameKey(name: string | undefined): string {
@@ -203,6 +203,17 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   const now = opts.now ?? new Date();
   const currency = (opts.currency ?? 'INR').toUpperCase();
   const clients = input.clients ?? [];
+  // Indexed once: a per-invoice scan of the client list made this O(invoices x clients).
+  const idByName = new Map<string, string>();
+  const clientById = new Map<string, Client>();
+  for (const c of clients) {
+    if (!c.id) continue;
+    clientById.set(c.id, c);
+    const k = nameKey(c.name);
+    if (!idByName.has(k)) idByName.set(k, c.id);
+  }
+  const keyOf = (c: { id?: string; name?: string } | undefined): string =>
+    c?.id ?? idByName.get(nameKey(c?.name)) ?? nameKey(c?.name);
 
   const docs = input.invoices.filter(
     (i) => isLedgerDoc(i) && (i.currency || 'INR').toUpperCase() === currency,
@@ -248,7 +259,7 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   }
 
   for (const inv of docs) {
-    const key = partyKeyOf(inv.client, clients);
+    const key = keyOf(inv.client);
     const a = acc(key, inv.client?.name ?? '', inv.client?.id);
     const total = round2(num(inv.total));
     const issue = dateKey(inv.issue_date) || dateKey(inv.created_at);
@@ -279,8 +290,20 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
         debit: 0, credit: amt, balance: 0, invoiceId: inv.id,
       });
     }
+    // TDS the customer withholds is settled with the tax office, never paid to us: it
+    // clears that part of the invoice (as Tally does with a TDS journal) so the party
+    // is not chased for it and the dashboard's outstanding (total - TDS - paid) agrees.
+    const tds = round2(Math.min(Math.max(num(inv.tds_amount), 0), total));
+    if (tds > 0) {
+      a.entries.push({
+        date: issue, kind: 'payment', ref: inv.invoice_number,
+        particulars: `TDS withheld by customer (${inv.invoice_number})`,
+        debit: 0, credit: tds, balance: 0, invoiceId: inv.id, derived: true,
+      });
+      paid = round2(paid + tds);
+    }
     // Legacy rows: amount_paid or a Paid status with no matching payment rows.
-    const claimed = inv.status === 'Paid' ? total : round2(num(inv.amount_paid));
+    const claimed = inv.status === 'Paid' ? total : round2(num(inv.amount_paid) + tds);
     const missing = round2(claimed - paid);
     if (missing > 0.004) {
       a.entries.push({
@@ -306,9 +329,9 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   }
 
   for (const p of onAccount) {
-    const known = clients.find((c) => c.id === p.client_id);
+    const known = p.client_id ? clientById.get(p.client_id) : undefined;
     const name = p.client_name ?? known?.name ?? '';
-    const key = partyKeyOf({ id: p.client_id, name }, clients);
+    const key = keyOf({ id: p.client_id, name });
     const a = acc(key, name, p.client_id);
     const amt = round2(num(p.amount));
     a.entries.push({
@@ -460,16 +483,7 @@ export function computeDso(report: ReceivablesReport, windowDays = 90, now: Date
 
 /* ── Export: CSV ──────────────────────────────────────────────── */
 
-export function csvCell(value: string | number): string {
-  const s = String(value ?? '');
-  // Neutralise spreadsheet formula injection in free text.
-  const safe = typeof value === 'string' && /^[=+\-@]/.test(s) ? `'${s}` : s;
-  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
-export function toCsv(rows: (string | number)[][]): string {
-  return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
-}
+export { csvCell, toCsv };
 
 export function statementCsv(ledger: Ledger): string {
   const rows: (string | number)[][] = [

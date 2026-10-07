@@ -9,6 +9,7 @@
 
 import { DB_PREFIX, collectAppData, readRaw, writeRaw } from './storage';
 import { DEVICE_LOCAL_KEYS } from './auth';
+import { localDayOf } from './dates';
 import { CryptoError, decryptString, encryptString, isCipherEnvelope, type CipherEnvelope } from './crypto';
 
 export const BACKUP_APP_ID = 'mrchartist-invoice';
@@ -55,7 +56,7 @@ export function buildBackup(now: Date = new Date()): BackupFile {
 }
 
 export function backupFilename(now: Date = new Date(), encrypted = false): string {
-  return `mrchartist-invoice-backup-${now.toISOString().slice(0, 10)}${encrypted ? '.encrypted' : ''}.json`;
+  return `mrchartist-invoice-backup-${localDayOf(now)}${encrypted ? '.encrypted' : ''}.json`;
 }
 
 /** Records that a backup was just exported. Call it after the file has been handed to the user. */
@@ -174,7 +175,51 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
 
 /** Writes validated backup keys into storage. Throws StorageWriteError if the quota is hit. */
 export function applyBackup(data: Record<string, string>): void {
-  for (const [key, value] of Object.entries(data)) writeRaw(key, value);
+  // All-or-nothing: if the browser refuses a write half-way (quota), put back what was
+  // there before so a failed restore can never leave a mix of old and new tables.
+  const written: Array<[string, string | null]> = [];
+  try {
+    for (const [key, value] of Object.entries(data)) {
+      const before = readRaw(key);
+      writeRaw(key, value);
+      written.push([key, before]);
+    }
+  } catch (err) {
+    for (const [key, before] of written.reverse()) {
+      try {
+        if (before === null) localStorage.removeItem(key);
+        else writeRaw(key, before);
+      } catch {
+        /* best effort: the original error is what the user needs to see */
+      }
+    }
+    throw err;
+  }
+}
+
+/**
+ * A true restore: the device ends up with exactly the backup's tables (anything
+ * the file does not contain is removed), all-or-nothing. If any write fails the
+ * previous contents come back untouched. Device-local keys (PIN, lockout) are
+ * never touched. Prefer this over `applyBackup` when "replace my data" is meant.
+ */
+export function restoreBackup(data: Record<string, string>): void {
+  const snapshot = collectAppData();
+  for (const key of LOCAL_ONLY) delete snapshot[key];
+  try {
+    wipeAppData();
+    applyBackup(data);
+  } catch (err) {
+    wipeAppData();
+    for (const [key, value] of Object.entries(snapshot)) {
+      try {
+        writeRaw(key, value);
+      } catch {
+        /* best effort — the original error below is what the user needs */
+      }
+    }
+    throw err;
+  }
 }
 
 /** Removes every app-owned key except this device's PIN / lock settings. */

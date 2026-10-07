@@ -10,6 +10,7 @@
  */
 
 import { DOCUMENT_CODES, type DocumentType } from '../types/invoice';
+import { parseDay as parseDayShared } from './dates';
 
 export interface FinancialYear {
   /** "25-26" */
@@ -24,8 +25,7 @@ export interface FinancialYear {
  * invoice under the previous financial year. Parse it as a local date instead.
  */
 function parseDay(dateStr: string): Date {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
-  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr);
+  return parseDayShared(dateStr);
 }
 
 export function getIndianFY(dateStr?: string): FinancialYear {
