@@ -1,0 +1,106 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.rowBetween {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.rowText strong {
+  font-size: 0.875rem;
+}
+
+.rowText span {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+.selectWrap {
+  min-width: 11rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.passRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.badgeOk {
+  composes: badge;
+  background: color-mix(in srgb, var(--profit) 14%, transparent);
+  color: var(--profit);
+}
+
+.badgeWarn {
+  composes: badge;
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--foreground);
+}
+
+.note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-inner);
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.note svg {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .passRow {
+    grid-template-columns: 1fr;
+  }
+}

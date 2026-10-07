@@ -1,140 +1,307 @@
-import { useState } from 'react';
-import { ArrowRight, Eye, EyeOff, FileCheck2, Lock, QrCode, ShieldCheck, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck, TimerReset, User, WifiOff } from 'lucide-react';
 import { Logo } from '../components/brand/Logo';
-import { getUser, login, verifyPin } from '../lib/auth';
+import {
+  RESET_PHRASE,
+  getAttemptsLeft,
+  getLockoutRemaining,
+  getUser,
+  isResetPhrase,
+  isValidPinFormat,
+  login,
+  pinStrength,
+  resetAllData,
+  unlock,
+} from '../lib/auth';
 import controls from '../styles/controls.module.css';
 import styles from './LoginPage.module.css';
 
-const PERKS = [
-  { icon: ShieldCheck, text: 'Private by design — data never leaves this device' },
-  { icon: FileCheck2, text: 'GST-ready: CGST / SGST / IGST, HSN, Indian FY numbering' },
-  { icon: QrCode, text: '20 templates with a scannable UPI QR on every invoice' },
-];
+interface LoginPageProps {
+  onSuccess: () => void;
+}
 
-export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
+type Mode = 'login' | 'register' | 'forgot';
+
+function formatCountdown(ms: number): string {
+  const total = Math.ceil(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
+}
+
+const digitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, 6);
+
+export function LoginPage({ onSuccess }: LoginPageProps) {
   const existingUser = getUser();
-  const mode: 'login' | 'register' = existingUser ? 'login' : 'register';
-  const [name, setName] = useState(existingUser?.name || '');
+  const [mode, setMode] = useState<Mode>(existingUser ? 'login' : 'register');
+  const [name, setName] = useState('');
   const [pin, setPin] = useState('');
-  const [showPin, setShowPin] = useState(false);
+  const [confirm, setConfirm] = useState('');
+  const [reveal, setReveal] = useState(false);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [phrase, setPhrase] = useState('');
+  const [lockedMs, setLockedMs] = useState(() => getLockoutRemaining());
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Tick the lockout countdown (persisted deadline, so a reload keeps it).
+  useEffect(() => {
+    if (lockedMs <= 0) return;
+    const id = window.setInterval(() => {
+      const left = getLockoutRemaining();
+      setLockedMs(left);
+      if (left <= 0) setError('');
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [lockedMs > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const locked = lockedMs > 0;
+  const strength = mode === 'register' && pin.length >= 4 ? pinStrength(pin) : null;
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
     setError('');
+    setPin('');
+    setConfirm('');
+    setPhrase('');
+  };
 
-    if (mode === 'register') {
-      if (!name.trim()) return setError('Please enter your name.');
-      if (pin.length < 4) return setError('Your PIN must be at least 4 digits.');
-      if (login(name, pin)) onSuccess();
-      else setError('Could not create the account. Is browser storage blocked?');
-      return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy || locked) return;
+    setError('');
+    setBusy(true);
+    try {
+      if (mode === 'register') {
+        if (!name.trim()) return setError('Please enter your name.');
+        if (!isValidPinFormat(pin)) return setError('Choose a PIN of 4 to 6 digits.');
+        if (pin !== confirm) return setError('The two PINs do not match.');
+        if (await login(name, pin)) onSuccess();
+        else setError('Could not create the account. Please try again.');
+      } else {
+        const result = await unlock(pin);
+        if (result.ok) return onSuccess();
+        setPin('');
+        if (result.locked) {
+          setLockedMs(result.retryInMs);
+          setError('Too many incorrect attempts.');
+        } else {
+          setError(`Incorrect PIN. ${result.attemptsLeft} ${result.attemptsLeft === 1 ? 'attempt' : 'attempts'} left before a temporary lock.`);
+        }
+      }
+    } catch (err) {
+      setError((err as Error).message || 'Something went wrong.');
+    } finally {
+      setBusy(false);
     }
+  };
 
-    if (!verifyPin(pin)) {
-      setPin('');
-      return setError('Incorrect PIN. Please try again.');
-    }
-    login(existingUser!.name, pin);
-    onSuccess();
+  const handleReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetAllData(phrase)) return setError('The confirmation phrase does not match.');
+    // Fresh start: reload so every module re-reads empty storage.
+    window.location.reload();
   };
 
   return (
-    <div className={styles.page}>
-      <aside className={styles.brandPanel}>
-        <Logo height={52} tone="on-dark" />
-        <div className={styles.pitch}>
-          <h2 className={styles.headline}>
-            Invoices that look as sharp as <span>your work.</span>
-          </h2>
-          <ul className={styles.perks}>
-            {PERKS.map(({ icon: Icon, text }) => (
-              <li key={text}>
-                <Icon size={16} /> {text}
-              </li>
-            ))}
-          </ul>
+    <div className={styles.shell}>
+      <aside className={styles.brand}>
+        <Logo height={40} tone="on-dark" />
+        <div className={styles.brandBody}>
+          <h1 className={styles.headline}>
+            Invoices &amp; books, <em>on your device.</em>
+          </h1>
+          <p className={styles.lede}>
+            GST-ready invoicing, ledgers and reports that work offline. Nothing is uploaded — your PIN only unlocks this browser.
+          </p>
         </div>
-        <p className={styles.tagline}>Built with conviction. For traders, by a trader.</p>
+        <ul className={styles.points}>
+          <li><WifiOff size={16} /> Works fully offline, zero tracking</li>
+          <li><ShieldCheck size={16} /> PIN stored as a salted PBKDF2 hash</li>
+          <li><TimerReset size={16} /> Auto-locks when you step away</li>
+        </ul>
       </aside>
 
-      <main className={styles.formPanel}>
-        <div className={styles.formWrap}>
-          <div className={styles.mobileLogo}>
-            <Logo height={46} />
-          </div>
-
-          <h1 className={styles.title}>
-            {mode === 'register' ? 'Set up your workspace' : `Welcome back, ${existingUser?.name}`}
-          </h1>
-          <p className={styles.subtitle}>
-            {mode === 'register'
-              ? 'Create a local PIN. Everything stays in this browser — there is no server and no account to sign up for.'
-              : 'Enter your PIN to unlock your invoices.'}
-          </p>
-
-          <form onSubmit={handleSubmit} className={styles.form} noValidate>
-            {mode === 'register' && (
-              <label className={controls.field}>
-                <span className={controls.label}>Your name</span>
-                <span className={styles.inputWrap}>
-                  <User size={16} className={styles.inputIcon} />
-                  <input
-                    className={`${controls.input} ${styles.withIcon}`}
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Rohit Singh"
-                    autoComplete="name"
-                    autoFocus
-                  />
-                </span>
-              </label>
-            )}
-
-            <label className={controls.field}>
-              <span className={controls.label}>{mode === 'register' ? 'Create a PIN (4–6 digits)' : 'PIN'}</span>
-              <span className={styles.inputWrap}>
-                <Lock size={16} className={styles.inputIcon} />
-                <input
-                  className={`${controls.input} ${styles.withIcon} ${styles.pin}`}
-                  type={showPin ? 'text' : 'password'}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="••••"
-                  maxLength={6}
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                  autoFocus={mode === 'login'}
-                  aria-invalid={!!error}
-                />
-                <button
-                  type="button"
-                  className={styles.reveal}
-                  onClick={() => setShowPin((s) => !s)}
-                  aria-label={showPin ? 'Hide PIN' : 'Show PIN'}
-                >
-                  {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </span>
-            </label>
-
-            {error && (
-              <div className={styles.error} role="alert">
-                {error}
+      <main className={styles.formSide}>
+        <div className={styles.card}>
+          {mode === 'forgot' ? (
+            <form className={styles.form} onSubmit={handleReset} noValidate>
+              <div>
+                <h2 className={styles.title}>Forgot your PIN?</h2>
+                <p className={styles.subtitle}>
+                  Your data lives only in this browser, so there is no server to reset it. The only way back in is to erase everything on this
+                  device and start fresh.
+                </p>
               </div>
-            )}
+              <div className={styles.noticeWarn} role="alert">
+                <AlertTriangle size={16} />
+                <span>
+                  This permanently deletes every invoice, client, item, profile and your PIN. If you have a backup file, you can restore it
+                  afterwards from Settings.
+                </span>
+              </div>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="reset-phrase">
+                  Type <span className={styles.phrase}>{RESET_PHRASE}</span> to confirm
+                </label>
+                <input
+                  id="reset-phrase"
+                  className={controls.input}
+                  value={phrase}
+                  onChange={(e) => setPhrase(e.target.value)}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  autoFocus
+                />
+              </div>
+              {error && <div className={styles.noticeError} role="alert">{error}</div>}
+              <button
+                type="submit"
+                className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock} ${styles.dangerBtn}`}
+                disabled={!isResetPhrase(phrase)}
+              >
+                Erase everything and start over
+              </button>
+              <div className={styles.links}>
+                <button type="button" className={styles.linkBtn} onClick={() => switchMode('login')}>
+                  I remembered it — go back
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className={styles.form} onSubmit={handleSubmit} noValidate>
+              <div>
+                <h2 className={styles.title}>
+                  {mode === 'register' ? 'Create your account' : `Welcome back, ${existingUser?.name ?? ''}`}
+                </h2>
+                <p className={styles.subtitle}>
+                  {mode === 'register'
+                    ? 'Set a PIN to protect your invoices. Your data stays 100% on this device.'
+                    : 'Enter your PIN to unlock.'}
+                </p>
+              </div>
 
-            <button type="submit" className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock}`}>
-              {mode === 'register' ? 'Create workspace' : 'Unlock'} <ArrowRight size={18} />
-            </button>
-          </form>
+              {mode === 'register' && (
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor="login-name">Full name</label>
+                  <div className={styles.inputWrap}>
+                    <User size={16} className={styles.inputIcon} />
+                    <input
+                      id="login-name"
+                      className={`${controls.input} ${styles.withIcon}`}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your name or business"
+                      autoComplete="name"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
 
-          <p className={styles.note}>
-            <Lock size={12} /> The PIN only locks this screen on a shared computer. It is not encryption — use a
-            private browser profile for sensitive data.
-          </p>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="login-pin">
+                  {mode === 'register' ? 'Create a PIN (4–6 digits)' : 'PIN'}
+                </label>
+                <div className={styles.inputWrap}>
+                  <Lock size={16} className={styles.inputIcon} />
+                  <input
+                    id="login-pin"
+                    className={`${controls.input} ${styles.withIcon} ${styles.pinInput}`}
+                    type={reveal ? 'text' : 'password'}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                    value={pin}
+                    onChange={(e) => setPin(digitsOnly(e.target.value))}
+                    placeholder="••••"
+                    maxLength={6}
+                    disabled={locked}
+                    autoFocus={mode === 'login'}
+                    aria-describedby="login-pin-hint"
+                  />
+                  <button
+                    type="button"
+                    className={styles.reveal}
+                    onClick={() => setReveal((r) => !r)}
+                    aria-label={reveal ? 'Hide PIN' : 'Show PIN'}
+                  >
+                    {reveal ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {strength && (
+                  <>
+                    <div className={styles.meter} data-level={strength.level} aria-hidden="true">
+                      <span /><span /><span />
+                    </div>
+                    <span id="login-pin-hint" className={strength.warning ? controls.hint : controls.ok}>
+                      {strength.warning ?? (
+                        <>
+                          <CheckCircle2 size={13} /> Looks good
+                        </>
+                      )}
+                      {strength.level === 'weak' && ' You can still use it, but a less obvious PIN protects you better.'}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {mode === 'register' && (
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor="login-confirm">Confirm PIN</label>
+                  <div className={styles.inputWrap}>
+                    <Lock size={16} className={styles.inputIcon} />
+                    <input
+                      id="login-confirm"
+                      className={`${controls.input} ${styles.withIcon} ${styles.pinInput} ${confirm && confirm !== pin ? controls.inputInvalid : ''}`}
+                      type={reveal ? 'text' : 'password'}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="new-password"
+                      value={confirm}
+                      onChange={(e) => setConfirm(digitsOnly(e.target.value))}
+                      placeholder="••••"
+                      maxLength={6}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {locked && (
+                <div className={styles.noticeError} role="alert">
+                  <Lock size={16} />
+                  <span>
+                    Too many incorrect attempts. Try again in <span className={styles.countdown}>{formatCountdown(lockedMs)}</span>.
+                  </span>
+                </div>
+              )}
+              {!locked && error && <div className={styles.noticeError} role="alert">{error}</div>}
+              {mode === 'login' && !locked && !error && getAttemptsLeft() < 5 && (
+                <div className={styles.noticeWarn}>
+                  <AlertTriangle size={16} />
+                  <span>{getAttemptsLeft()} attempts left before a temporary lock.</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock}`}
+                disabled={busy || locked || pin.length < 4}
+              >
+                {busy ? 'Checking…' : mode === 'register' ? 'Create account' : 'Unlock'} <ArrowRight size={18} />
+              </button>
+
+              {mode === 'login' && (
+                <div className={styles.links}>
+                  <button type="button" className={styles.linkBtn} onClick={() => switchMode('forgot')}>
+                    Forgot PIN?
+                  </button>
+                </div>
+              )}
+            </form>
+          )}
+
+          <p className={styles.foot}>Your data never leaves this device. Zero backend. Zero tracking.</p>
         </div>
       </main>
     </div>
