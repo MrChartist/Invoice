@@ -1,0 +1,95 @@
+/* Bucket tones: severity ramps from green (not due) to deep red (90+). */
+.b0 { --tone: var(--profit); }
+.b1 { --tone: var(--warning); }
+.b2 { --tone: var(--primary); }
+.b3 { --tone: var(--loss); }
+.b4 { --tone: color-mix(in srgb, var(--loss) 62%, var(--foreground)); }
+
+/* ── Stacked aging bar ───────────────────────────────────────── */
+.stack {
+  display: flex;
+  height: 18px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background-color: var(--muted);
+  gap: 2px;
+}
+
+.seg {
+  background-color: var(--tone);
+  min-width: 3px;
+  transition: flex-grow var(--transition-smooth);
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legendItem { display: flex; flex-direction: column; gap: 0.125rem; }
+
+.legendLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background-color: var(--tone);
+  flex-shrink: 0;
+}
+
+.legendValue {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.legendPct { font-size: 0.6875rem; color: var(--muted-foreground); }
+
+/* ── Mini share bar (top debtors) ────────────────────────────── */
+.share {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--muted);
+  overflow: hidden;
+}
+.shareFill { height: 100%; background-color: var(--primary); border-radius: inherit; }
+
+/* ── Collections chart ───────────────────────────────────────── */
+.chartScroll { overflow-x: auto; }
+.svg { display: block; width: 100%; min-width: 560px; height: auto; }
+
+.grid { stroke: var(--border); stroke-width: 1; }
+.axisText { fill: var(--muted-foreground); font-size: 11px; font-family: var(--font-body); }
+.barBilled { fill: var(--muted-foreground); opacity: 0.45; }
+.barReceived { fill: var(--profit); }
+.bar:hover .barBilled { opacity: 0.7; }
+.effText { fill: var(--foreground); font-size: 10px; font-weight: 700; font-family: var(--font-display); }
+
+.keys { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--muted-foreground); font-weight: 600; margin-bottom: 0.5rem; }
+.key { display: inline-flex; align-items: center; gap: 0.4rem; }
+.keyBilled { width: 10px; height: 10px; border-radius: 3px; background-color: var(--muted-foreground); opacity: 0.45; }
+.keyReceived { width: 10px; height: 10px; border-radius: 3px; background-color: var(--profit); }
+
+.chip {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  color: var(--tone);
+  background-color: color-mix(in srgb, var(--tone) 14%, transparent);
+  white-space: nowrap;
+}
