@@ -56,9 +56,9 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
             <thead>
               <tr>
                 <th>Vendor</th>
-                <th>GSTIN</th>
-                <th>State</th>
-                <th className={surface.numeric}>Bills</th>
+                <th className={tabStyles.hideSm}>GSTIN</th>
+                <th className={tabStyles.hideSm}>State</th>
+                <th className={`${surface.numeric} ${tabStyles.hideSm}`}>Bills</th>
                 <th className={surface.numeric}>Outstanding</th>
                 <th aria-label="Actions" />
               </tr>
@@ -77,9 +77,9 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
                         </div>
                       </div>
                     </td>
-                    <td className={surface.mono}>{v.gstin || '—'}</td>
-                    <td>{stateByCode(v.state_code)?.name ?? '—'}</td>
-                    <td className={surface.numeric}>{b?.bills ?? 0}</td>
+                    <td className={`${surface.mono} ${tabStyles.hideSm}`}>{v.gstin || '—'}</td>
+                    <td className={tabStyles.hideSm}>{stateByCode(v.state_code)?.name ?? '—'}</td>
+                    <td className={`${surface.numeric} ${tabStyles.hideSm}`}>{b?.bills ?? 0}</td>
                     <td className={surface.numeric}>{formatCurrency(b?.outstanding ?? 0)}</td>
                     <td>
                       <div className={surface.rowActions}>

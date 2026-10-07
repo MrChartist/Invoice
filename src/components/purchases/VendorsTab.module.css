@@ -49,3 +49,9 @@
   font-weight: 400;
   color: var(--muted-foreground);
 }
+
+/* Phones: keep vendor, outstanding and the row actions on screen; the
+   secondary columns (GSTIN, state, bill count) are available on wider screens. */
+@media (max-width: 640px) {
+  .hideSm { display: none; }
+}

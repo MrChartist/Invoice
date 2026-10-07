@@ -47,7 +47,7 @@
 
 .tabActive {
   composes: tab;
-  color: var(--primary);
+  color: var(--brand-text);
   background: var(--primary-glow);
 }
 
@@ -152,7 +152,7 @@
   flex-shrink: 0;
   font-weight: 700;
   font-size: 0.75rem;
-  color: var(--primary);
+  color: var(--brand-text);
   text-decoration: none;
   white-space: nowrap;
   min-height: 24px;
@@ -195,4 +195,15 @@
   .tabBody { padding: 0.875rem 0.75rem 1rem; }
   .recon { padding: 0.875rem 0.75rem; }
   .issue { flex-wrap: wrap; }
+}
+
+/* ── Touch targets (coarse pointers) ───────────────────────── */
+@media (pointer: coarse), (max-width: 640px) {
+  .tab { min-height: 40px; }
+  .issueLink { display: inline-flex; align-items: center; min-height: 40px; }
+}
+
+/* Touch targets: segmented controls reach 40px on phones / coarse pointers. */
+@media (pointer: coarse), (max-width: 640px) {
+  .touchSeg > button { min-height: 40px; }
 }

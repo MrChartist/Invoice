@@ -66,15 +66,15 @@ export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: Purchas
                       type="button"
                       className={controls.btnIcon}
                       title={balance > 0 ? 'Record payment' : 'Payment history'}
-                      aria-label={`Payments for ${p.vendor_name}`}
+                      aria-label={`Payments for ${p.vendor_name} ${p.bill_number}`}
                       onClick={() => onPay(p)}
                     >
                       <Banknote size={16} />
                     </button>
-                    <button type="button" className={controls.btnIcon} title="Edit" aria-label={`Edit ${p.vendor_name}`} onClick={() => onEdit(p)}>
+                    <button type="button" className={controls.btnIcon} title="Edit" aria-label={`Edit ${p.vendor_name} ${p.bill_number}`} onClick={() => onEdit(p)}>
                       <Pencil size={16} />
                     </button>
-                    <button type="button" className={controls.btnDanger} title="Delete" aria-label={`Delete ${p.vendor_name}`} onClick={() => onDelete(p)}>
+                    <button type="button" className={controls.btnDanger} title="Delete" aria-label={`Delete ${p.vendor_name} ${p.bill_number}`} onClick={() => onDelete(p)}>
                       <Trash2 size={16} />
                     </button>
                   </div>

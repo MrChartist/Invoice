@@ -32,7 +32,7 @@
 
 .tabActive {
   composes: tab;
-  color: var(--primary);
+  color: var(--brand-text);
   border-bottom-color: var(--primary);
 }
 

@@ -127,12 +127,12 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
                             GST {num(l.item.tax_rate)}%
                           </span>
                         </td>
-                        <td className={styles.num}>{fmt(num(l.item.rate))}</td>
-                        <td className={styles.num}>
+                        <td className={styles.num} data-label="Rate">{fmt(num(l.item.rate))}</td>
+                        <td className={styles.num} data-label="Invoiced">
                           {l.originalQty} {l.item.unit ?? ''}
                         </td>
-                        <td className={styles.num}>{l.creditedQty}</td>
-                        <td className={styles.num}>
+                        <td className={styles.num} data-label="Credited">{l.creditedQty}</td>
+                        <td className={`${styles.num} ${styles.qtyCell}`} data-label="Credit qty">
                           <label htmlFor={id} className={styles.srOnly}>
                             Quantity to credit for {l.item.name || 'item'}
                           </label>

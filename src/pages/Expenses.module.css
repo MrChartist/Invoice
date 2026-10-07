@@ -87,3 +87,8 @@
     flex: 1 1 140px;
   }
 }
+
+/* Touch targets: segmented controls reach 40px on phones / coarse pointers. */
+@media (pointer: coarse), (max-width: 640px) {
+  .touchSeg > button { min-height: 40px; }
+}

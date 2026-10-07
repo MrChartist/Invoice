@@ -157,7 +157,7 @@
 }
 
 .kindCardOn svg {
-  color: var(--primary);
+  color: var(--brand-text);
 }
 
 .drop {
@@ -337,7 +337,7 @@
 }
 
 .chipUpdate {
-  color: var(--primary);
+  color: var(--brand-text);
   border-color: color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
@@ -396,7 +396,7 @@
 
 .badge_update {
   background: color-mix(in srgb, var(--primary) 14%, transparent);
-  color: var(--primary);
+  color: var(--brand-text);
 }
 
 .badge_skip {
@@ -513,7 +513,7 @@
 }
 
 .stat_info .statValue {
-  color: var(--primary);
+  color: var(--brand-text);
 }
 
 .stat_bad .statValue {
@@ -555,4 +555,17 @@
 
 .footerSpacer {
   flex: 1;
+}
+
+/* Column-mapping table: stack each field into a card on phones so the
+   "Your column" select and sample values are never clipped off-screen. */
+@media (max-width: 640px) {
+  .mapTable thead { display: none; }
+  .mapTable, .mapTable tbody, .mapTable tr, .mapTable th, .mapTable td { display: block; width: 100%; }
+  .mapTable tr { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+  .mapTable th, .mapTable td { padding: 0.25rem 0; border: 0; }
+  .mapTable tbody th { min-width: 0; }
+  .mapTable select { min-width: 0; width: 100%; min-height: 44px; }
+  .mapTable td:nth-child(3):empty { display: none; }
+  .mapTable .samples { max-width: none; }
 }

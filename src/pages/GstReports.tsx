@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/ui/PageHeader';
+import { useToast } from '../components/ui/useToast';
 import { Download, FileJson, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react';
 import { getJson, getTable, SINGLETON_KEYS } from '../lib/storage';
 import { formatDate, formatMoney } from '../lib/utils';
@@ -65,6 +67,7 @@ const pos = (code: string) => {
 };
 
 export function GstReports() {
+  const { notify, toastNode } = useToast();
   const invoices = useMemo(() => getTable<InvoiceRecord>('invoices'), []);
   const purchases = useMemo(() => getTable<unknown>('purchases'), []);
   const profiles = useMemo(() => {
@@ -88,9 +91,9 @@ export function GstReports() {
 
   const [period, setPeriod] = useState<ReportPeriod>(() => {
     // Default to the previous month — the one that is normally being filed.
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return periodForDate('month', d);
+    // Build from the 1st: setMonth(-1) on e.g. 31 Oct would overflow into October again.
+    const now = new Date();
+    return periodForDate('month', new Date(now.getFullYear(), now.getMonth() - 1, 1));
   });
   const [gstin, setGstin] = useState<string>(() => gstins[0] ?? '');
   const [tab, setTab] = useState<TabId>('overview');
@@ -115,6 +118,7 @@ export function GstReports() {
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     const w = window.open(url, '_blank');
     if (w) w.addEventListener('load', () => w.print());
+    else notify('Your browser blocked the print window — allow pop-ups for this site and try again', 'error');
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
@@ -251,12 +255,11 @@ export function GstReports() {
 
   return (
     <div className={surface.page}>
-      <div className={surface.pageHead}>
-        <div>
-          <h1 className={surface.pageTitle}>GST reports</h1>
-          <p className={surface.pageSubtitle}>GSTR-1 sections and GSTR-3B summary, prepared offline from your invoices and purchases.</p>
-        </div>
-        <div className={surface.pageActions}>
+      <PageHeader
+        title="GST reports"
+        subtitle="GSTR-1 sections and GSTR-3B summary, prepared offline from your invoices and purchases."
+        actions={
+          <>
           <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!hasData || !gstin} title={!gstin ? 'Add a GSTIN in Settings to export GSTR-1 JSON' : undefined}
             onClick={() => download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1), null, 2))}>
             <FileJson size={16} aria-hidden /> GSTR-1 JSON
@@ -268,8 +271,9 @@ export function GstReports() {
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData} onClick={printSummary}>
             <Printer size={16} aria-hidden /> Print summary
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <section className={`${surface.card} ${styles.filters}`} aria-label="Report filters">
         <PeriodPicker value={period} onChange={setPeriod} fyOptions={fyOptions} />
@@ -343,6 +347,7 @@ export function GstReports() {
           )}
         </div>
       </section>
+      {toastNode}
     </div>
   );
 

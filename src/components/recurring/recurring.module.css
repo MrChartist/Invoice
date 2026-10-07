@@ -79,7 +79,7 @@
   margin-top: 0.125rem;
 }
 
-.dueSoon { color: var(--primary); }
+.dueSoon { color: var(--brand-text); }
 .overdue { color: var(--loss); }
 
 .badgeActive { background-color: rgba(37, 160, 90, 0.14); color: var(--profit); }
@@ -230,6 +230,7 @@
     grid-template-columns: 1fr 1fr;
   }
   .itemRow > :first-child { grid-column: 1 / -1; }
+  .itemRow > button { min-height: 44px; width: 100%; }
   .itemHead { display: none; }
   .cardTop { flex-direction: column; }
   .actions > button { flex: 1 1 auto; }

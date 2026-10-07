@@ -56,7 +56,7 @@
 .chipActive {
   composes: chip;
   background: var(--primary-glow);
-  color: var(--primary);
+  color: var(--brand-text);
   border-color: var(--primary);
 }
 
@@ -111,7 +111,7 @@
 }
 
 .link {
-  color: var(--primary);
+  color: var(--brand-text);
   font-weight: 600;
   text-decoration: none;
   font-family: var(--font-mono);
@@ -142,7 +142,7 @@
   color: var(--muted-foreground);
 }
 
-.vSales { background: var(--primary-glow); color: var(--primary); }
+.vSales { background: var(--primary-glow); color: var(--brand-text); }
 .vReceipt { background: rgba(37, 160, 90, 0.14); color: var(--profit); }
 .vCredit { background: rgba(230, 154, 6, 0.14); color: var(--warning); }
 .vPurchase { background: rgba(99, 102, 241, 0.12); color: var(--muted-foreground); }
@@ -360,4 +360,8 @@
   .stmtSub { padding-left: 1.5rem; }
   .dateField { max-width: none; }
   .chip { min-height: 44px; }
+}
+
+@media (pointer: coarse), (max-width: 640px) {
+  .link { display: inline-flex; align-items: center; min-height: 40px; }
 }
