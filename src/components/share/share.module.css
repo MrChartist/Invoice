@@ -1,0 +1,233 @@
+/* Share menu, reminder modal and reminders panel. Tokens only, no raw hex. */
+
+/* ── Share menu ───────────────────────────────────────────────── */
+.menuWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.375rem);
+  z-index: 800;
+  min-width: 15rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.375rem;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  animation: fadeIn 120ms ease both;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background: var(--accent);
+  outline: none;
+}
+
+.menuItem:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.menuItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menuIcon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.menuHint {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.menuSep {
+  height: 1px;
+  margin: 0.25rem 0.25rem;
+  background: var(--border);
+}
+
+/* ── Composer / modal ─────────────────────────────────────────── */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.messageArea {
+  min-height: 11rem;
+  line-height: 1.55;
+  resize: vertical;
+  font-family: var(--font-body);
+}
+
+.counter {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  text-align: right;
+}
+
+.counterWarn {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.chip {
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.chipActive {
+  composes: chip;
+  background: var(--primary-glow);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.footActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.summaryLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.summaryLine strong {
+  color: var(--foreground);
+}
+
+/* ── Reminders panel ──────────────────────────────────────────── */
+.panelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.panelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.panelRow:first-child {
+  border-top: 0;
+}
+
+.panelMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.panelClient {
+  font-weight: 600;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panelMeta {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.625rem;
+}
+
+.panelAside {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.amount {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.stageUpcoming { background: var(--muted); color: var(--muted-foreground); }
+.stageDue { background: rgba(230, 154, 6, 0.14); color: var(--warning); }
+.stageLate { background: rgba(217, 54, 54, 0.13); color: var(--loss); }
+
+@media (max-width: 560px) {
+  .panelRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .panelAside {
+    justify-content: space-between;
+  }
+  .menu {
+    right: auto;
+    left: 0;
+  }
+  .footActions > * {
+    flex: 1 1 auto;
+  }
+}
