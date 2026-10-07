@@ -59,7 +59,8 @@ export async function exportNodeToPdf(node: HTMLElement, filename: string): Prom
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, sy, img.width, h, 0, 0, img.width, h);
     if (i > 0) pdf.addPage();
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, pageH);
+    // JPEG keeps a multi-page statement to a few hundred KB; PNG made it tens of MB.
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, pageH, undefined, 'FAST');
   }
   pdf.save(filename);
 }

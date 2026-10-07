@@ -69,7 +69,6 @@ export function InvoiceCreator() {
     if (store.id) store.newDraft(); // leaving a saved document → start clean
     const draft = getJson<InvoiceRecord | null>(SINGLETON_KEYS.draft, null);
     setHasDraft(Boolean(draft && !draft.id && !useInvoiceStore.getState().dirty));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, searchParams]);
 
   // Keep the sender snapshot populated for brand-new documents.

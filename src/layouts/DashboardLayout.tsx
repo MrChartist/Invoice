@@ -207,13 +207,17 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
         <div className={styles.bottom}>
           <InstallPrompt variant="button" />
-          <button type="button" className={cn(styles.navItem, styles.themeBtn)} onClick={toggle}>
+          <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={toggle}>
             {theme === 'dark' ? <Sun className={styles.navIcon} size={18} /> : <Moon className={styles.navIcon} size={18} />}
             <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
-          <button type="button" className={styles.navItem} onClick={() => setHelpOpen(true)}>
+          <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => setHelpOpen(true)}>
             <HelpCircle className={styles.navIcon} size={18} />
             <span>Help &amp; about</span>
+          </button>
+          <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => setShortcutsOpen(true)}>
+            <Keyboard className={styles.navIcon} size={18} />
+            <span>Keyboard shortcuts</span>
           </button>
 
           <div className={styles.userCard}>
@@ -237,6 +241,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <kbd>{formatCombo('mod+k')}</kbd>
           </button>
           <div className={styles.utilActions}>
+            <button type="button" className={styles.iconBtn} onClick={() => setHelpOpen(true)} aria-label="Help and about" title="Help & about">
+              <HelpCircle size={18} />
+            </button>
             <button type="button" className={styles.iconBtn} onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
               <Keyboard size={18} />
             </button>

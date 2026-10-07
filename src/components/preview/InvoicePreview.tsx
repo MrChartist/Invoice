@@ -89,10 +89,11 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
     setError('');
     try {
       // Loaded on demand — the PDF stack is ~200 KB gzipped and most sessions never export.
-      const [{ toPng }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
+      const [{ toJpeg }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
       const node = paperRef.current;
       const height = Math.max(node.offsetHeight, PAPER_H);
-      const dataUrl = await toPng(node, {
+      const dataUrl = await toJpeg(node, {
+        quality: 0.92,
         pixelRatio: 2.5,
         cacheBust: true,
         width: PAPER_W,
@@ -109,7 +110,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
       slices.forEach((_, page) => {
         if (page > 0) pdf.addPage([pageWmm, pageHmm], 'portrait');
-        pdf.addImage(dataUrl, 'PNG', 0, -page * pageHmm, pageWmm, imgHmm);
+        pdf.addImage(dataUrl, 'JPEG', 0, -page * pageHmm, pageWmm, imgHmm, undefined, 'FAST');
       });
       const safe = (invoice.invoice_number || 'draft').replace(/[\\/:*?"<>|]+/g, '-');
       pdf.save(`${DOCUMENT_LABELS[invoice.doc_type].replace(/\s+/g, '_')}_${safe}.pdf`);

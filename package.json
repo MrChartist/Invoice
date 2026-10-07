@@ -1,8 +1,8 @@
 {
   "name": "mrchartist-invoice",
   "private": true,
-  "version": "2.0.0",
-  "description": "Institutional-grade, offline-first invoice generation tool with 20+ templates and UPI QR code.",
+  "version": "3.0.0",
+  "description": "Free, open-source, offline-first invoicing and light accounting for Indian businesses — GST-ready, private by design.",
   "author": "Rohit Singh <mrchartist@zohomail.in>",
   "homepage": "https://mrchartist.com",
   "type": "module",
