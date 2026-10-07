@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyRound, Lock, ShieldCheck, TimerReset } from 'lucide-react';
+import { KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { ChangePinModal } from './ChangePinModal';
 import { EncryptedBackup } from './EncryptedBackup';
 import { IDLE_CHOICES, getIdleTimeout, logout, setIdleTimeout } from '../../lib/auth';
@@ -51,7 +51,7 @@ export function SecurityPanel({ notify, onLock }: Props) {
 
           <div className={styles.rowBetween}>
             <div className={styles.rowText}>
-              <strong><TimerReset size={14} style={{ verticalAlign: '-2px' }} /> Lock after inactivity</strong>
+              <strong>Lock after inactivity</strong>
               <span>The app locks when you have not touched it for this long. Invoices are autosaved, so nothing is lost.</span>
             </div>
             <div className={`${controls.field} ${styles.selectWrap}`}>

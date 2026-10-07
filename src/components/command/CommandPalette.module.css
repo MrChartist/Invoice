@@ -51,6 +51,10 @@
   padding: 0.25rem 0;
 }
 
+.input:focus-visible {
+  outline: none; /* the row underline is the focus indicator */
+}
+
 .input::placeholder {
   color: var(--muted-foreground);
 }

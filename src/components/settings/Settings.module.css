@@ -56,7 +56,10 @@
 }
 
 .defaultTag {
-  font-size: 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -149,8 +152,9 @@
   z-index: 5;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: flex-start; /* actions stay left so the bottom-right toast never covers Save */
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
   padding: 0.75rem 1rem;
   background: var(--card);
   border: 1px solid var(--brand);

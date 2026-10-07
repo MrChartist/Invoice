@@ -51,13 +51,11 @@ export function DefaultsPanel({ settings, onChange }: Props) {
               <input className={`${controls.input} ${controls.inputMono}`} maxLength={8} value={settings.invoicePrefix} onChange={(e) => onChange({ invoicePrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })} placeholder="INV" />
               <span className={controls.hint}>A profile can override this. Numbering restarts every 1 April.</span>
             </label>
-            <label className={`${controls.check} ${controls.field}`} style={{ justifyContent: 'flex-end' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input type="checkbox" checked={settings.roundOff} onChange={(e) => onChange({ roundOff: e.target.checked })} />
-                Round the total to the nearest rupee
-              </span>
-            </label>
           </div>
+          <label className={controls.check}>
+            <input type="checkbox" checked={settings.roundOff} onChange={(e) => onChange({ roundOff: e.target.checked })} />
+            <span>Round the total to the nearest rupee</span>
+          </label>
           <label className={controls.field}>
             <span className={controls.label}>Default terms &amp; conditions</span>
             <textarea className={controls.textarea} rows={3} value={settings.defaultTerms} onChange={(e) => onChange({ defaultTerms: e.target.value })} />

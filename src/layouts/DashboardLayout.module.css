@@ -26,6 +26,32 @@
   border-radius: var(--radius-md);
 }
 
+.skipLink {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-sm);
+  background: var(--brand-strong);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transform: translateY(-200%);
+}
+
+.skipLink:focus-visible {
+  transform: none;
+}
+
+.mainLocked {
+  overflow: hidden;
+}
+
+.main:focus {
+  outline: none;
+}
+
 .nav {
   display: flex;
   flex-direction: column;
@@ -277,6 +303,15 @@
     left: -0.875rem;
   }
 
+  .iconBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .navItem {
+    min-height: 44px;
+  }
+
   .mobileOnly {
     display: flex;
   }
@@ -297,5 +332,43 @@
 
   .content {
     padding: 1.25rem 1rem 2.5rem;
+  }
+}
+
+/* Short windows: tighten the rail so every group fits without scrolling. */
+@media (min-width: 901px) and (max-height: 820px) {
+  .sidebar {
+    padding-top: 0.75rem;
+    padding-bottom: 0.625rem;
+  }
+  .brand {
+    padding-bottom: 0.5rem;
+  }
+  .nav {
+    gap: 0.5rem;
+  }
+  .groupTitle {
+    padding-bottom: 0.125rem;
+  }
+  .navItem {
+    padding-top: 0.3125rem;
+    padding-bottom: 0.3125rem;
+  }
+  .bottom {
+    padding-top: 0.5rem;
+  }
+  .userCard {
+    margin-top: 0.25rem;
+    padding: 0.4375rem 0.625rem;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 740px) {
+  .nav {
+    gap: 0.375rem;
+  }
+  .navItem {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
   }
 }

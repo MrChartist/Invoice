@@ -96,7 +96,11 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
   const onCta = (n: VisibleNotification) => {
     mutate((s, now) => markRead(s, n.id, now));
     setOpen(false);
-    if (n.href) onNavigate(n.href);
+    if (n.href) {
+      // Backup / storage notices land on the tab that fixes them.
+      const dataTab = n.href === '/settings' && /^(backup|storage):/.test(n.id);
+      onNavigate(dataTab ? '/settings?tab=data' : n.href);
+    }
   };
 
   const label = unread ? `Notifications, ${unread} unread` : 'Notifications';

@@ -172,7 +172,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
             <form className={styles.form} onSubmit={handleSubmit} noValidate>
               <div>
                 <h2 className={styles.title}>
-                  {mode === 'register' ? 'Create your account' : `Welcome back, ${existingUser?.name ?? ''}`}
+                  {mode === 'register' ? 'Create your account' : existingUser?.name ? `Welcome back, ${existingUser.name}` : 'Welcome back'}
                 </h2>
                 <p className={styles.subtitle}>
                   {mode === 'register'
@@ -218,7 +218,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                     maxLength={6}
                     disabled={locked}
                     autoFocus={mode === 'login'}
-                    aria-describedby="login-pin-hint"
+                    aria-describedby={strength ? 'login-pin-hint' : undefined}
                   />
                   <button
                     type="button"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { THEME_KEY } from '../lib/storage';
 
 export type Theme = 'light' | 'dark';
@@ -17,26 +17,42 @@ function readTheme(): Theme {
   return systemPrefersDark() ? 'dark' : 'light';
 }
 
+// One shared store so every useTheme() consumer (top bar, Settings → Defaults, …) stays in sync.
+let current: Theme = typeof window === 'undefined' ? 'light' : readTheme();
+const listeners = new Set<() => void>();
+
+function apply(theme: Theme) {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#06080a' : '#f4f5f0');
+}
+
+function setShared(next: Theme) {
+  if (next === current) return;
+  current = next;
+  apply(next);
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    /* non-fatal: the choice just will not persist */
+  }
+  listeners.forEach((l) => l());
+}
+
+function subscribe(cb: () => void) {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
 /** Light/dark theme. `index.html` applies the saved class before paint; this keeps it in sync. */
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(readTheme);
+  const theme = useSyncExternalStore(subscribe, () => current, () => 'light' as Theme);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute('content', theme === 'dark' ? '#06080a' : '#f4f5f0');
+    apply(theme);
   }, [theme]);
 
-  const set = useCallback((next: Theme) => {
-    setTheme(next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      /* non-fatal: the choice just will not persist */
-    }
-  }, []);
-
-  const toggle = useCallback(() => set(theme === 'dark' ? 'light' : 'dark'), [set, theme]);
+  const set = useCallback((next: Theme) => setShared(next), []);
+  const toggle = useCallback(() => setShared(current === 'dark' ? 'light' : 'dark'), []);
 
   return { theme, setTheme: set, toggle };
 }
