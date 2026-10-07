@@ -102,6 +102,8 @@ export function makeDraft(opts: DraftOptions): InvoiceRecord {
     round_off_enabled: settings.roundOff !== false,
     amount_paid: 0,
 
+    ...advancedTaxDefaults(),
+
     notes: settings.defaultNotes ?? '',
     terms: sender?.defaultTerms || settings.defaultTerms || '',
     po_number: '',
@@ -116,6 +118,27 @@ export function makeDraft(opts: DraftOptions): InvoiceRecord {
     round_off: 0,
     total: 0,
     balance_due: 0,
+    cess_amount: 0,
+    tcs_amount: 0,
+    tds_amount: 0,
+  };
+}
+
+/** Advanced-tax fields, all off. Legacy records fall back to the same values. */
+export function advancedTaxDefaults(): Partial<InvoiceRecord> {
+  return {
+    supply_type: 'B2B',
+    lut_number: '',
+    lut_date: '',
+    price_includes_tax: false,
+    tcs_enabled: false,
+    tcs_rate: 0,
+    tcs_base: 'total',
+    tcs_label: 'TCS',
+    tds_enabled: false,
+    tds_section: '194J',
+    tds_rate: 10,
+    tds_on_taxable: true,
   };
 }
 
@@ -134,6 +157,8 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     rate,
     tax_rate: typeof item.tax_rate === 'number' ? item.tax_rate : fallbackTaxRate,
     discount_percent: num(item.discount_percent),
+    ...(num(item.cess_rate) > 0 ? { cess_rate: num(item.cess_rate) } : {}),
+    ...(num(item.cess_per_unit) > 0 ? { cess_per_unit: num(item.cess_per_unit) } : {}),
     amount: num(item.amount, quantity * rate),
   };
 }
@@ -183,6 +208,22 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     round_off_enabled: Boolean(r.round_off_enabled),
     amount_paid: num(r.amount_paid),
 
+    ...advancedTaxDefaults(),
+    ...(r.supply_type ? { supply_type: r.supply_type } : {}),
+    lut_number: r.lut_number ?? '',
+    lut_date: r.lut_date ?? '',
+    price_includes_tax: Boolean(r.price_includes_tax),
+    // round_mode stays undefined for legacy rows: round_off_enabled decides.
+    ...(r.round_mode ? { round_mode: r.round_mode } : {}),
+    tcs_enabled: Boolean(r.tcs_enabled),
+    tcs_rate: num(r.tcs_rate),
+    tcs_base: r.tcs_base === 'taxable' ? 'taxable' : 'total',
+    tcs_label: r.tcs_label || 'TCS',
+    tds_enabled: Boolean(r.tds_enabled),
+    tds_section: r.tds_section || '194J',
+    tds_rate: num(r.tds_rate, 10),
+    tds_on_taxable: r.tds_on_taxable !== false,
+
     notes: r.notes ?? '',
     terms: r.terms ?? '',
     po_number: r.po_number ?? '',
@@ -197,6 +238,9 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     round_off: num(r.round_off),
     total: num(r.total),
     balance_due: num(r.balance_due, num(r.total) - num(r.amount_paid)),
+    cess_amount: num(r.cess_amount),
+    tcs_amount: num(r.tcs_amount),
+    tds_amount: num(r.tds_amount),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

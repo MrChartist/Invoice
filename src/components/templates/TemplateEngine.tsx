@@ -135,6 +135,19 @@ export function TemplateEngine({ invoice, sender, totals, templateId }: Template
                   <span>{formatCurrency(totals.tax_amount, invoice.currency)}</span>
                 </div>
               )}
+              {/* calc-extensions: cess + TCS lines */}
+              {totals.cess_amount > 0 && (
+                <div className={styles.totalRow}>
+                  <span>Cess</span>
+                  <span>{formatCurrency(totals.cess_amount, invoice.currency)}</span>
+                </div>
+              )}
+              {totals.tcs_amount > 0 && (
+                <div className={styles.totalRow}>
+                  <span>{invoice.tcs_label || 'TCS'}</span>
+                  <span>{formatCurrency(totals.tcs_amount, invoice.currency)}</span>
+                </div>
+              )}
               {totals.shipping > 0 && (
                 <div className={styles.totalRow}>
                   <span>Shipping</span>
@@ -166,7 +179,21 @@ export function TemplateEngine({ invoice, sender, totals, templateId }: Template
 
             <div className={styles.words}>Amount in words: {amountInWords(totals.total, invoice.currency)}</div>
 
-            {totals.amount_paid > 0 && (
+            {/* calc-extensions: LUT declaration + TDS / net payable */}
+            {(invoice.supply_type === 'EXPORT_LUT' || invoice.supply_type === 'SEZ_WITHOUT_PAYMENT') && (
+              <div className={styles.words}>
+                Supply meant for export/SEZ under LUT/bond without payment of IGST
+                {invoice.lut_number ? ` — LUT No. ${invoice.lut_number}` : ''}
+                {invoice.lut_date ? ` dated ${invoice.lut_date}` : ''}.
+              </div>
+            )}
+            {totals.tds_amount > 0 && (
+              <div className={styles.totalRow}>
+                <span>Less: TDS{invoice.tds_section && invoice.tds_section !== 'CUSTOM' ? ` (${invoice.tds_section})` : ''}</span>
+                <span>-{formatCurrency(totals.tds_amount, invoice.currency)}</span>
+              </div>
+            )}
+            {(totals.amount_paid > 0 || totals.tds_amount > 0) && (
               <div className={styles.balance}>
                 <span>Balance due</span>
                 <span>{formatCurrency(totals.balance_due, invoice.currency)}</span>

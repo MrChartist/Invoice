@@ -5,6 +5,7 @@ import {
   calculateInvoice,
   deriveGstMode,
   EMPTY_TOTALS,
+  isIgstZeroRated,
   num,
   round2,
   type CalcTotals,
@@ -20,7 +21,10 @@ import type {
   InvoiceItem,
   InvoiceRecord,
   InvoiceStatus,
+  RoundMode,
   SenderProfile,
+  SupplyType,
+  TcsBase,
 } from '../types/invoice';
 
 export type { Client, InvoiceItem, SenderProfile } from '../types/invoice';
@@ -61,6 +65,12 @@ export interface InvoiceState extends InvoiceRecord {
   setOtherCharges: (amount: number) => void;
   setRoundOff: (on: boolean) => void;
   setAmountPaid: (amount: number) => void;
+  setRoundMode: (mode: RoundMode) => void;
+  setPriceIncludesTax: (on: boolean) => void;
+  setSupplyType: (type: SupplyType) => void;
+  setLut: (number: string, date: string) => void;
+  setTcs: (cfg: { enabled?: boolean; rate?: number; base?: TcsBase; label?: string }) => void;
+  setTds: (cfg: { enabled?: boolean; section?: string; rate?: number; onTaxable?: boolean }) => void;
 
   addItem: () => void;
   updateItem: (id: string, field: keyof InvoiceItem, value: string | number) => void;
@@ -115,6 +125,22 @@ function toRecord(state: InvoiceState): InvoiceRecord {
     round_off: state.round_off,
     total: state.total,
     balance_due: state.balance_due,
+    supply_type: state.supply_type,
+    lut_number: state.lut_number,
+    lut_date: state.lut_date,
+    price_includes_tax: state.price_includes_tax,
+    round_mode: state.round_mode,
+    tcs_enabled: state.tcs_enabled,
+    tcs_rate: state.tcs_rate,
+    tcs_base: state.tcs_base,
+    tcs_label: state.tcs_label,
+    tds_enabled: state.tds_enabled,
+    tds_section: state.tds_section,
+    tds_rate: state.tds_rate,
+    tds_on_taxable: state.tds_on_taxable,
+    cess_amount: state.cess_amount,
+    tcs_amount: state.tcs_amount,
+    tds_amount: state.tds_amount,
     created_at: state.created_at,
     updated_at: state.updated_at,
   };
@@ -251,7 +277,41 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
 
     setShipping: (shipping) => apply({ shipping: num(shipping) }),
     setOtherCharges: (other_charges) => apply({ other_charges: num(other_charges) }),
-    setRoundOff: (round_off_enabled) => apply({ round_off_enabled }),
+    setRoundOff: (round_off_enabled) => {
+      const cur = get().round_mode;
+      apply({
+        round_off_enabled,
+        // Only touch round_mode if the record already uses it.
+        ...(cur !== undefined
+          ? { round_mode: round_off_enabled ? (cur === 'none' ? 'nearest' : cur) : 'none' }
+          : {}),
+      } as Partial<InvoiceRecord>);
+    },
+    setRoundMode: (round_mode) => apply({ round_mode, round_off_enabled: round_mode !== 'none' }),
+    setPriceIncludesTax: (price_includes_tax) => apply({ price_includes_tax }),
+    setSupplyType: (supply_type) => {
+      const gst = get().gst_mode;
+      apply({
+        supply_type,
+        // IGST-with-payment supplies are always inter-state style.
+        ...(isIgstZeroRated(supply_type) && gst === 'CGST_SGST' ? { gst_mode: 'IGST' as GstMode } : {}),
+      });
+    },
+    setLut: (lut_number, lut_date) => apply({ lut_number, lut_date }),
+    setTcs: (c) =>
+      apply({
+        ...(c.enabled !== undefined ? { tcs_enabled: c.enabled } : {}),
+        ...(c.rate !== undefined ? { tcs_rate: Math.max(num(c.rate), 0) } : {}),
+        ...(c.base !== undefined ? { tcs_base: c.base } : {}),
+        ...(c.label !== undefined ? { tcs_label: c.label } : {}),
+      }),
+    setTds: (c) =>
+      apply({
+        ...(c.enabled !== undefined ? { tds_enabled: c.enabled } : {}),
+        ...(c.section !== undefined ? { tds_section: c.section } : {}),
+        ...(c.rate !== undefined ? { tds_rate: Math.max(num(c.rate), 0) } : {}),
+        ...(c.onTaxable !== undefined ? { tds_on_taxable: c.onTaxable } : {}),
+      }),
     setAmountPaid: (amount_paid) => apply({ amount_paid: Math.max(num(amount_paid), 0) }),
 
     addItem: () => apply({ items: [...get().items, blankItem(get().tax_rate)] }),
@@ -312,6 +372,15 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         other_charges: s.other_charges,
         round_off_enabled: s.round_off_enabled,
         amount_paid: s.amount_paid,
+        round_mode: s.round_mode,
+        price_includes_tax: s.price_includes_tax,
+        supply_type: s.supply_type,
+        tcs_enabled: s.tcs_enabled,
+        tcs_rate: s.tcs_rate,
+        tcs_base: s.tcs_base,
+        tds_enabled: s.tds_enabled,
+        tds_rate: s.tds_rate,
+        tds_on_taxable: s.tds_on_taxable,
       });
       set({
         totals,
@@ -325,6 +394,9 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         round_off: totals.round_off,
         total: totals.total,
         balance_due: totals.balance_due,
+        cess_amount: totals.cess_amount,
+        tcs_amount: totals.tcs_amount,
+        tds_amount: totals.tds_amount,
       });
     },
 
@@ -343,7 +415,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       if (s.total <= 0 && s.doc_type !== 'DELIVERY_CHALLAN') {
         errors.push('Document total is zero — check the rates.');
       }
-      if (s.amount_paid > s.total) errors.push('Amount received is more than the total.');
+      if (s.amount_paid > s.total - (s.tds_amount ?? 0)) errors.push('Amount received is more than the total.');
       return errors;
     },
 

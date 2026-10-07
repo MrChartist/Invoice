@@ -8,10 +8,24 @@
  *   4. taxable value    = gross − line discount − allocated invoice discount
  *   5. GST              = taxable × line slab, split CGST/SGST or charged as IGST
  *   6. shipping / other charges are added after tax (not taxed)
- *   7. optional round-off to the nearest whole unit
+ *   7. optional round-off (nearest / up / down) of the invoice value
+ *
+ * Extensions (all default off, legacy records are unaffected):
+ *   - cess per line (ad valorem + fixed per unit), never split CGST/SGST
+ *   - price_includes_tax: line amount is tax-inclusive, taxable is back-calculated
+ *   - supply_type: SEZ/export without payment -> zero tax; with payment -> IGST
+ *   - TCS: added to the invoice value (before round-off)
+ *   - TDS: deducted from what the customer pays; invoice total unchanged
  */
 
-import type { DiscountType, GstMode, InvoiceItem } from '../types/invoice';
+import type {
+  DiscountType,
+  GstMode,
+  InvoiceItem,
+  RoundMode,
+  SupplyType,
+  TcsBase,
+} from '../types/invoice';
 
 export function round2(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -32,6 +46,10 @@ export interface CalcLine {
   quantity: number;
   rate: number;
   tax_rate: number;
+  cess_rate: number;
+  cess_per_unit: number;
+  /** Cess charged on this line. */
+  cess: number;
   gross: number;
   line_discount: number;
   invoice_discount: number;
@@ -76,11 +94,18 @@ export interface CalcTotals {
   sgst_amount: number;
   igst_amount: number;
   tax_amount: number;
+  cess_amount: number;
   shipping: number;
   other_charges: number;
+  tcs_amount: number;
   round_off: number;
+  /** Invoice value (GST invoice total incl. TCS, after rounding). */
   total: number;
+  tds_amount: number;
+  /** total - tds_amount: what the customer actually owes in cash. */
+  payable: number;
   amount_paid: number;
+  /** payable - amount_paid. */
   balance_due: number;
   slabs: TaxSlabRow[];
   hsn_rows: HsnSummaryRow[];
@@ -98,6 +123,41 @@ export interface CalcInput {
   other_charges: number;
   round_off_enabled: boolean;
   amount_paid: number;
+  round_mode?: RoundMode;
+  price_includes_tax?: boolean;
+  supply_type?: SupplyType;
+  tcs_enabled?: boolean;
+  tcs_rate?: number;
+  tcs_base?: TcsBase;
+  tds_enabled?: boolean;
+  tds_rate?: number;
+  tds_on_taxable?: boolean;
+}
+
+/** True when any line carries cess — UIs show a cess column only then. */
+export function hasAnyCess(items: InvoiceItem[]): boolean {
+  return items.some((i) => num(i.cess_rate) > 0 || num(i.cess_per_unit) > 0);
+}
+
+/** Supplies charged no tax at all. */
+export function isZeroRated(t?: SupplyType): boolean {
+  return t === 'SEZ_WITHOUT_PAYMENT' || t === 'EXPORT_LUT';
+}
+/** Zero-rated supplies where IGST is charged and refunded later. */
+export function isIgstZeroRated(t?: SupplyType): boolean {
+  return t === 'SEZ_WITH_PAYMENT' || t === 'EXPORT_WITH_PAYMENT';
+}
+
+export function resolveRoundMode(mode: RoundMode | undefined, enabled: boolean): RoundMode {
+  if (mode === 'nearest' || mode === 'up' || mode === 'down' || mode === 'none') return mode;
+  return enabled ? 'nearest' : 'none';
+}
+
+export function applyRounding(value: number, mode: RoundMode): number {
+  if (mode === 'nearest') return Math.round(value);
+  if (mode === 'up') return Math.ceil(round2(value));
+  if (mode === 'down') return Math.floor(round2(value));
+  return value;
 }
 
 export const EMPTY_TOTALS: CalcTotals = {
@@ -111,10 +171,14 @@ export const EMPTY_TOTALS: CalcTotals = {
   sgst_amount: 0,
   igst_amount: 0,
   tax_amount: 0,
+  cess_amount: 0,
   shipping: 0,
   other_charges: 0,
+  tcs_amount: 0,
   round_off: 0,
   total: 0,
+  tds_amount: 0,
+  payable: 0,
   amount_paid: 0,
   balance_due: 0,
   slabs: [],
@@ -157,7 +221,14 @@ function splitTax(tax: number, mode: GstMode): { cgst: number; sgst: number; igs
 export function calculateInvoice(input: CalcInput): CalcTotals {
   const items = input.items ?? [];
   const fallbackRate = num(input.tax_rate);
-  const taxMode: GstMode = input.gst_mode ?? 'NONE';
+  const baseMode: GstMode = input.gst_mode ?? 'NONE';
+  const zeroRated = isZeroRated(input.supply_type);
+  const taxMode: GstMode = zeroRated
+    ? 'NONE'
+    : isIgstZeroRated(input.supply_type) && baseMode !== 'NONE' && baseMode !== 'SINGLE'
+      ? 'IGST'
+      : baseMode;
+  const inclusive = Boolean(input.price_includes_tax);
 
   // ── Steps 1–2: gross and per-line discount ────────────────────
   const staged = items.map((item) => {
@@ -177,7 +248,9 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
       gross,
       line_discount,
       net: round2(gross - line_discount),
-      tax_rate: Math.max(num(taxRate), 0),
+      tax_rate: zeroRated || taxMode === 'NONE' ? 0 : Math.max(num(taxRate), 0),
+      cess_rate: taxMode === 'NONE' ? 0 : Math.max(num(item.cess_rate), 0),
+      cess_per_unit: taxMode === 'NONE' ? 0 : Math.max(num(item.cess_per_unit), 0),
     };
   });
 
@@ -199,8 +272,22 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
 
   // ── Steps 4–5: taxable value and GST per line ─────────────────
   const lines: CalcLine[] = staged.map((l, i) => {
-    const taxable = round2(l.net - allocations[i]);
-    const tax = round2(taxable * (l.tax_rate / 100));
+    const net = round2(l.net - allocations[i]);
+    const fixedCess = round2(l.quantity * l.cess_per_unit);
+    let taxable: number;
+    let cess: number;
+    let tax: number;
+    if (inclusive && (l.tax_rate > 0 || l.cess_rate > 0 || fixedCess > 0)) {
+      // `net` already contains GST + cess: back-calculate, then let GST absorb
+      // the paise drift so taxable + gst + cess == net exactly.
+      taxable = round2(Math.max(net - fixedCess, 0) / (1 + (l.tax_rate + l.cess_rate) / 100));
+      cess = round2(taxable * (l.cess_rate / 100) + fixedCess);
+      tax = round2(net - taxable - cess);
+    } else {
+      taxable = net;
+      cess = round2(taxable * (l.cess_rate / 100) + fixedCess);
+      tax = round2(taxable * (l.tax_rate / 100));
+    }
     const parts = splitTax(tax, taxMode);
     return {
       id: l.item.id,
@@ -210,6 +297,9 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
       quantity: l.quantity,
       rate: l.rate,
       tax_rate: l.tax_rate,
+      cess_rate: l.cess_rate,
+      cess_per_unit: l.cess_per_unit,
+      cess,
       gross: l.gross,
       line_discount: l.line_discount,
       invoice_discount: allocations[i],
@@ -218,7 +308,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
       sgst: parts.sgst,
       igst: parts.igst,
       tax: round2(parts.cgst + parts.sgst + parts.igst),
-      total: round2(taxable + parts.cgst + parts.sgst + parts.igst),
+      total: round2(taxable + parts.cgst + parts.sgst + parts.igst + cess),
     };
   });
 
@@ -227,13 +317,24 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
   const sgst_amount = round2(lines.reduce((s, l) => s + l.sgst, 0));
   const igst_amount = round2(lines.reduce((s, l) => s + l.igst, 0));
   const tax_amount = round2(cgst_amount + sgst_amount + igst_amount);
+  const cess_amount = round2(lines.reduce((s, l) => s + l.cess, 0));
 
   // ── Steps 6–7: extra charges and round-off ────────────────────
   const shipping = round2(Math.max(num(input.shipping), 0));
   const other_charges = round2(num(input.other_charges));
-  const beforeRounding = round2(taxable_value + tax_amount + shipping + other_charges);
-  const total = input.round_off_enabled ? Math.round(beforeRounding) : beforeRounding;
+  const beforeTcs = round2(taxable_value + tax_amount + cess_amount + shipping + other_charges);
+  const tcsRate = input.tcs_enabled ? Math.max(num(input.tcs_rate), 0) : 0;
+  const tcsBase = input.tcs_base === 'taxable' ? taxable_value : beforeTcs;
+  const tcs_amount = round2(tcsBase * (tcsRate / 100));
+  const beforeRounding = round2(beforeTcs + tcs_amount);
+  const total = applyRounding(beforeRounding, resolveRoundMode(input.round_mode, input.round_off_enabled));
   const round_off = round2(total - beforeRounding);
+
+  // TDS is a deduction from what the customer pays; it never changes `total`.
+  const tdsRate = input.tds_enabled ? Math.max(num(input.tds_rate), 0) : 0;
+  const tdsBase = input.tds_on_taxable === false ? total : taxable_value;
+  const tds_amount = round2(tdsBase * (tdsRate / 100));
+  const payable = round2(total - tds_amount);
 
   const amount_paid = round2(Math.max(num(input.amount_paid), 0));
 
@@ -248,12 +349,16 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
     sgst_amount,
     igst_amount,
     tax_amount,
+    cess_amount,
     shipping,
     other_charges,
+    tcs_amount,
     round_off,
     total,
+    tds_amount,
+    payable,
     amount_paid,
-    balance_due: round2(total - amount_paid),
+    balance_due: round2(payable - amount_paid),
     slabs: buildSlabs(lines),
     hsn_rows: buildHsnRows(lines),
   };
