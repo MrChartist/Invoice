@@ -20,6 +20,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { RemindersPanel } from '../components/share';
 import { localDb } from '../lib/localDb';
 import { getTable } from '../lib/storage';
+import { pendingReminders, type ReminderRecord } from '../lib/reminders';
 import type { CreditLink } from '../lib/stats';
 import { getUser } from '../lib/auth';
 import { getIndianFY } from '../lib/invoice-number';
@@ -71,7 +72,11 @@ export function Dashboard() {
   const fy = getIndianFY();
   const summary = summarize(invoices, now, links);
   const months = monthlyBilled(invoices, 6, now);
-  const attention = attentionList(invoices, 5, now);
+  // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
+  const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders')).map((p) => p.invoice.id));
+  const attention = attentionList(invoices, 50, now)
+    .filter((inv) => !chasing.has(inv.id))
+    .slice(0, 5);
   const recent = [...invoices]
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
     .slice(0, 6);
@@ -171,7 +176,11 @@ export function Dashboard() {
             </Link>
           </div>
           {attention.length === 0 ? (
-            <EmptyState icon={CheckCircle2} title="All clear" text="No unpaid invoices. Nicely done." />
+            <EmptyState
+              icon={CheckCircle2}
+              title="All clear"
+              text={chasing.size > 0 ? "Everything unpaid is already in the payment reminders above." : "No unpaid invoices. Nicely done."}
+            />
           ) : (
             <ul className={styles.list}>
               {attention.map((inv) => {

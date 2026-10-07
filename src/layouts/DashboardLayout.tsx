@@ -52,6 +52,8 @@ interface NavEntry {
   path: string;
   icon: LucideIcon;
   end?: boolean;
+  /** Overrides route matching, e.g. editing an existing invoice belongs under "Invoices". */
+  match?: (pathname: string) => boolean;
 }
 
 const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
@@ -59,8 +61,8 @@ const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
   {
     title: 'Sales',
     items: [
-      { label: 'New invoice', path: '/invoice', icon: FilePlus2 },
-      { label: 'Invoices', path: '/transactions', icon: FileText },
+      { label: 'New invoice', path: '/invoice', icon: FilePlus2, end: true },
+      { label: 'Invoices', path: '/transactions', icon: FileText, match: (p) => p.startsWith('/transactions') || /^\/invoice\/.+/.test(p) },
       { label: 'Clients', path: '/clients', icon: Users },
       { label: 'Recurring', path: '/recurring', icon: Repeat },
       { label: 'Receivables', path: '/receivables', icon: Scale },
@@ -266,7 +268,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
                   key={item.path}
                   to={item.path}
                   end={item.end}
-                  className={({ isActive }) => cn(styles.navItem, isActive && styles.navItemActive)}
+                  className={({ isActive }) =>
+                    cn(styles.navItem, (item.match ? item.match(location.pathname) : isActive) && styles.navItemActive)
+                  }
                 >
                   <item.icon className={styles.navIcon} size={18} />
                   <span>{item.label}</span>

@@ -55,8 +55,11 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
   return (
     <section className={cn(surface.card, className)} aria-label="Payment reminders">
       <div className={surface.cardHead}>
-        <h2 className={surface.pageSubtitle} style={{ margin: 0, color: 'var(--foreground)', fontWeight: 700 }}>
-          <BellRing size={16} style={{ verticalAlign: '-3px', marginRight: '0.5rem' }} />
+        <h2
+          className={surface.pageSubtitle}
+          style={{ margin: 0, color: 'var(--foreground)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <BellRing size={16} aria-hidden="true" />
           Payments to chase
         </h2>
         {pending.length > 0 && (

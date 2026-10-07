@@ -123,14 +123,7 @@
   max-width: 56px;
   display: flex;
   align-items: flex-end;
-  background: repeating-linear-gradient(
-    to top,
-    transparent 0,
-    transparent calc(25% - 1px),
-    var(--border) calc(25% - 1px),
-    var(--border) 25%
-  );
-  border-radius: var(--radius-xs);
+  border-bottom: 1px solid var(--border);
 }
 
 .bar,
