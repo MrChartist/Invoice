@@ -1,0 +1,236 @@
+/* Recurring — cards, editor and preview. Tokens only, no raw hex. */
+
+/* ── Schedule card ────────────────────────────────────────────── */
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: 1rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1.125rem 1.25rem;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.cardPaused { opacity: 0.85; border-style: dashed; }
+.cardEnded { opacity: 0.7; }
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cardSub {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  margin: 0.125rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.amount {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  background-color: var(--card-inner);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.factLabel {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+.factValue {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.125rem;
+}
+
+.dueSoon { color: var(--primary); }
+.overdue { color: var(--loss); }
+
+.badgeActive { background-color: rgba(37, 160, 90, 0.14); color: var(--profit); }
+.badgePaused { background-color: rgba(230, 154, 6, 0.14); color: var(--warning); }
+.badgeEnded { background-color: var(--muted); color: var(--muted-foreground); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.history {
+  font-size: 0.8125rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.625rem;
+}
+
+.history summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  list-style-position: inside;
+}
+
+.history summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.historyList {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.historyRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--foreground);
+}
+
+/* ── Editor ───────────────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.itemRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem 6.5rem 5rem auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.itemHead {
+  composes: itemRow;
+}
+
+.itemHead span {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+.errors {
+  margin: 0;
+  padding: 0.625rem 0.875rem 0.625rem 1.5rem;
+  border: 1px solid var(--loss);
+  border-radius: var(--radius-sm);
+  color: var(--loss);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.preview {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.previewItem {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--card-inner);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.previewFirst {
+  composes: previewItem;
+  border-color: var(--primary);
+  background-color: var(--primary-glow);
+}
+
+.previewDay {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.totalLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .itemRow {
+    grid-template-columns: 1fr 1fr;
+  }
+  .itemRow > :first-child { grid-column: 1 / -1; }
+  .itemHead { display: none; }
+  .cardTop { flex-direction: column; }
+  .actions > button { flex: 1 1 auto; }
+}
