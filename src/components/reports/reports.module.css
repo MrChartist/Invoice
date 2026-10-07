@@ -1,0 +1,248 @@
+/* Reports — toolbars, sortable headers, share bars, charts, cross-check strip. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.toolbarGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.pos { color: var(--profit); }
+.neg { color: var(--loss); }
+
+/* ── Table extras ─────────────────────────────────────────────── */
+.table { min-width: 720px; }
+
+.thNum { text-align: right; }
+
+.sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  padding: 0.25rem 0.375rem;
+  margin: -0.25rem -0.375rem;
+  border-radius: var(--radius-xs);
+}
+
+.sortBtn:hover { color: var(--foreground); }
+.sortBtn:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.sortBtnNum { flex-direction: row-reverse; }
+.sortIdle { opacity: 0.45; }
+
+th[aria-sort='ascending'] .sortBtn,
+th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
+
+.totalCell {
+  font-weight: 800;
+  border-top: 2px solid var(--border);
+  background-color: var(--card-inner);
+}
+
+.link {
+  color: var(--brand-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.link:hover { text-decoration: underline; }
+.link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
+
+.dim { color: var(--muted-foreground); font-size: 0.75rem; display: block; }
+
+/* ── Share bars ───────────────────────────────────────────────── */
+.share {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 118px;
+  justify-content: flex-end;
+}
+
+.shareTrack {
+  width: 56px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.shareFill {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius-full);
+  min-width: 2px;
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 700;
+}
+
+/* ── Bars list (concentration / modes) ────────────────────────── */
+.barList {
+  list-style: none;
+  margin: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.barItem { display: flex; flex-direction: column; gap: 0.3125rem; }
+
+.barMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.barName { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.barVal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.barTrack {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  min-width: 2px;
+}
+
+.barFillAlt { composes: barFill; background: var(--muted-foreground); opacity: 0.7; }
+
+/* ── Banner ───────────────────────────────────────────────────── */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--card-inner);
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.noticeWarn { composes: notice; border-color: var(--warning); color: var(--foreground); }
+.noticeDanger { composes: notice; border-color: var(--loss); color: var(--foreground); }
+.noticeIcon { flex-shrink: 0; margin-top: 2px; color: var(--warning); }
+.noticeIconDanger { flex-shrink: 0; margin-top: 2px; color: var(--loss); }
+
+/* ── KPI strip inside a tab ───────────────────────────────────── */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.kpi {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  background: var(--card);
+}
+
+.kpiLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+.kpiValue {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Chart ────────────────────────────────────────────────────── */
+.chartWrap { overflow-x: auto; padding: 0.5rem 1rem 1rem; }
+.chart { display: block; width: 100%; min-width: 520px; height: auto; }
+.axis { stroke: var(--border); stroke-width: 1; }
+.gridLine { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
+.axisText { fill: var(--muted-foreground); font-size: 12px; font-family: var(--font-body); }
+.barCur { fill: var(--primary); }
+.barPrev { fill: var(--muted-foreground); opacity: 0.5; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem 0;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.legendItem { display: inline-flex; align-items: center; gap: 0.375rem; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.swatchCur { background: var(--primary); }
+.swatchPrev { background: var(--muted-foreground); opacity: 0.5; }
+
+/* ── Cross-check strip ────────────────────────────────────────── */
+.checkList { list-style: none; margin: 0; padding: 0; }
+
+.checkRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 28px;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8125rem;
+}
+
+.checkRow:last-child { border-bottom: none; }
+.checkHead { composes: checkRow; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+.checkNum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.checkIcon { display: flex; justify-content: center; }
+
+@media (max-width: 640px) {
+  .checkRow {
+    grid-template-columns: 1fr 1fr 24px;
+    padding: 0.625rem 1rem;
+  }
+  .checkRow > :first-child { grid-column: 1 / -1; font-weight: 600; }
+  .checkHead { display: none; }
+  .toolbar { align-items: stretch; }
+}
