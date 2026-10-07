@@ -1,0 +1,331 @@
+/* Documents module — convert menu, credit-note table, timeline. Tokens only. */
+
+.menuWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  z-index: 40;
+  min-width: 15rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.375rem;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.menuItem {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  outline: none;
+}
+
+.menuItem:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.menuSep {
+  height: 1px;
+  margin: 0.375rem 0.25rem;
+  background: var(--border);
+}
+
+.menuNote {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+/* ── Credit note modal ────────────────────────────────────────── */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.table th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.qtyInput {
+  width: 5.5rem;
+  text-align: right;
+}
+
+.itemName {
+  font-weight: 600;
+}
+
+.itemMeta {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.fullBtn {
+  font-size: 0.75rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.totals {
+  margin-left: auto;
+  width: min(100%, 20rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+.totalRowStrong {
+  composes: totalRow;
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--foreground);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.errors {
+  margin: 0;
+  padding: 0.625rem 0.875rem 0.625rem 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--loss);
+  color: var(--loss);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.warn {
+  display: flex;
+  gap: 0.625rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--warning);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.check input {
+  margin-top: 0.2rem;
+  accent-color: var(--primary);
+}
+
+/* ── Timeline ─────────────────────────────────────────────────── */
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.node {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0 0 1rem 0;
+}
+
+.node:last-child {
+  padding-bottom: 0;
+}
+
+.rail {
+  position: relative;
+  flex: none;
+  width: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.rail::after {
+  content: '';
+  position: absolute;
+  top: 1.5rem;
+  bottom: -1rem;
+  width: 2px;
+  background: var(--border);
+}
+
+.node:last-child .rail::after {
+  display: none;
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--card-inner);
+  border: 2px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.dotCurrent {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.dotCancelled {
+  border-color: var(--loss);
+  color: var(--loss);
+}
+
+.nodeBody {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.nodeTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.nodeLink {
+  font-weight: 700;
+  color: var(--foreground);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.nodeLink:hover,
+.nodeLink:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.nodeMeta {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.relTag {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+.cancelNote {
+  font-size: 0.75rem;
+  color: var(--loss);
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 480px) {
+  .menu {
+    right: auto;
+    left: 0;
+  }
+}
