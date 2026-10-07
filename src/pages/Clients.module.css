@@ -60,3 +60,35 @@
   align-items: center;
   gap: 0.35rem;
 }
+
+@media (max-width: 640px) {
+  .toolbar { padding: 0.75rem 1rem; }
+  .search { max-width: none; }
+
+  table.directory { min-width: 0; display: block; }
+  table.directory thead { display: none; }
+  table.directory tbody { display: block; }
+  table.directory tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'who billed'
+      'contact contact'
+      'loc gst'
+      'act act';
+    gap: 0.4rem 0.75rem;
+    align-items: start;
+    padding: 0.875rem 1rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  table.directory tbody tr:last-child { border-bottom: none; }
+  table.directory td { display: block; padding: 0; border: none; min-width: 0; }
+  table.directory td[data-empty='true'] { display: none; }
+  table.directory td.cWho { grid-area: who; }
+  table.directory td.cBilled { grid-area: billed; }
+  table.directory td.cContact { grid-area: contact; overflow-wrap: anywhere; }
+  table.directory td.cLoc { grid-area: loc; }
+  table.directory td.cGst { grid-area: gst; justify-self: end; font-size: 0.75rem; }
+  table.directory td.cAct { grid-area: act; margin: 0 -0.5rem; }
+  table.directory td.cAct > div { display: flex; justify-content: flex-end; }
+}

@@ -6,7 +6,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(180px, 3fr) 92px 70px 78px 100px 64px 78px minmax(110px, 1.2fr) 124px;
+  grid-template-columns: minmax(170px, 3fr) 84px 64px 72px 96px 56px 68px minmax(100px, 1.2fr) 112px;
   gap: 0.5rem;
   align-items: start;
   padding: 0.625rem 1rem;
@@ -125,16 +125,17 @@
   padding: 0.875rem 1rem;
 }
 
-/* When the card is narrow the table becomes stacked rows with visible labels. */
-@container (max-width: 900px) {
+/* Narrow card: each line becomes a labelled mini-form (3 fields per row). */
+@container (max-width: 920px) {
   .head {
     display: none;
   }
 
   .body {
-    grid-template-columns: repeat(6, 1fr);
-    padding: 0.875rem 1rem;
-    row-gap: 0.625rem;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding: 1rem;
+    row-gap: 0.75rem;
+    column-gap: 0.625rem;
   }
 
   .cName {
@@ -149,26 +150,57 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--muted-foreground);
-    margin-bottom: 0.15rem;
+    margin-bottom: 0.25rem;
   }
 
-  .cell[data-label='HSN / SAC'] { grid-column: span 2; }
-  .cell[data-label='Qty'] { grid-column: span 2; }
-  .cell[data-label='Unit'] { grid-column: span 2; }
-  .cell[data-label='Rate'] { grid-column: span 2; }
-  .cell[data-label='Disc %'] { grid-column: span 2; }
+  .cell input,
+  .cell select {
+    border-color: var(--input-border);
+    background: var(--card);
+    min-height: 40px;
+  }
+
+  .cell[data-label='HSN / SAC'],
+  .cell[data-label='Qty'],
+  .cell[data-label='Unit'],
+  .cell[data-label='Rate'],
+  .cell[data-label='Disc %'],
   .cell[data-label='GST'] { grid-column: span 2; }
 
   .amount {
     grid-column: span 3;
     text-align: left;
     padding-top: 0;
+    align-self: center;
+    font-size: 0.9375rem;
   }
 
   .actions {
     grid-column: span 3;
     opacity: 1;
+    align-self: center;
   }
+
+  .actions button {
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
+  }
+}
+
+/* Mid width: two compact rows of fields instead of three. */
+@container (min-width: 560px) and (max-width: 920px) {
+  .body {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .cell[data-label='HSN / SAC'] { grid-column: span 3; }
+  .cell[data-label='Qty'] { grid-column: span 2; }
+  .cell[data-label='Unit'] { grid-column: span 3; }
+  .cell[data-label='Rate'] { grid-column: span 4; }
+  .cell[data-label='Disc %'] { grid-column: span 2; }
+  .cell[data-label='GST'] { grid-column: span 2; }
+  .amount { grid-column: span 4; }
+  .actions { grid-column: span 4; }
 }
 
 .cessToggle {

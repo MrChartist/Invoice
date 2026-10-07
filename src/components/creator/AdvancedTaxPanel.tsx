@@ -37,6 +37,7 @@ export function AdvancedTaxPanel() {
           <div className={styles.groupTitle}>Nature of supply</div>
           <select
             className={styles.field}
+            aria-label="Nature of supply"
             value={s.supply_type ?? 'B2B'}
             onChange={(e) => s.setSupplyType(e.target.value as SupplyType)}
           >
@@ -46,9 +47,9 @@ export function AdvancedTaxPanel() {
           </select>
           {(s.supply_type === 'EXPORT_LUT' || s.supply_type === 'SEZ_WITHOUT_PAYMENT') && (
             <div className={styles.row}>
-              <input className={styles.field} placeholder="LUT / bond number" value={s.lut_number ?? ''}
+              <input className={styles.field} aria-label="LUT / bond number" placeholder="LUT / bond number" value={s.lut_number ?? ''}
                 onChange={(e) => s.setLut(e.target.value, s.lut_date ?? '')} />
-              <input className={styles.field} type="date" value={s.lut_date ?? ''}
+              <input className={styles.field} type="date" aria-label="LUT date" value={s.lut_date ?? ''}
                 onChange={(e) => s.setLut(s.lut_number ?? '', e.target.value)} />
             </div>
           )}
@@ -71,13 +72,13 @@ export function AdvancedTaxPanel() {
           </label>
           {s.tcs_enabled && (
             <div className={styles.row}>
-              <select className={styles.field} value="" onChange={(e) => e.target.value && s.setTcs({ rate: Number(e.target.value) })}>
+              <select className={styles.field} aria-label="TCS preset" value="" onChange={(e) => e.target.value && s.setTcs({ rate: Number(e.target.value) })}>
                 <option value="">Preset…</option>
                 {TCS_PRESETS.map((p) => <option key={p.label} value={p.rate}>{p.label}</option>)}
               </select>
               <input className={styles.field} type="number" min={0} step="0.01" value={s.tcs_rate ?? 0}
-                aria-label="TCS rate %" onChange={(e) => s.setTcs({ rate: Number(e.target.value) })} />
-              <select className={styles.field} value={s.tcs_base ?? 'total'}
+                aria-label="TCS rate %" onChange={(e) => s.setTcs({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
+              <select className={styles.field} aria-label="TCS base" value={s.tcs_base ?? 'total'}
                 onChange={(e) => s.setTcs({ base: e.target.value as 'taxable' | 'total' })}>
                 <option value="total">On invoice value (incl. GST)</option>
                 <option value="taxable">On taxable value</option>
@@ -97,7 +98,7 @@ export function AdvancedTaxPanel() {
           {s.tds_enabled && (
             <>
               <div className={styles.row}>
-                <select className={styles.field} value={s.tds_section ?? '194J'}
+                <select className={styles.field} aria-label="TDS section" value={s.tds_section ?? '194J'}
                   onChange={(e) => {
                     const sec = TDS_SECTIONS.find((x) => x.section === e.target.value);
                     s.setTds({ section: e.target.value, ...(sec && sec.section !== 'CUSTOM' ? { rate: sec.rate } : {}) });
@@ -105,7 +106,7 @@ export function AdvancedTaxPanel() {
                   {TDS_SECTIONS.map((x) => <option key={x.section} value={x.section}>{x.label}</option>)}
                 </select>
                 <input className={styles.field} type="number" min={0} step="0.01" value={s.tds_rate ?? 0}
-                  aria-label="TDS rate %" onChange={(e) => s.setTds({ rate: Number(e.target.value), section: 'CUSTOM' })} />
+                  aria-label="TDS rate %" onChange={(e) => s.setTds({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)), section: 'CUSTOM' })} />
               </div>
               <label className={styles.check}>
                 <input type="checkbox" checked={s.tds_on_taxable !== false}
@@ -122,7 +123,7 @@ export function AdvancedTaxPanel() {
 
         <div className={styles.group}>
           <div className={styles.groupTitle}>Rounding</div>
-          <select className={styles.field} value={roundMode} onChange={(e) => s.setRoundMode(e.target.value as RoundMode)}>
+          <select className={styles.field} aria-label="Rounding" value={roundMode} onChange={(e) => s.setRoundMode(e.target.value as RoundMode)}>
             {(Object.keys(ROUND_LABELS) as RoundMode[]).map((k) => <option key={k} value={k}>{ROUND_LABELS[k]}</option>)}
           </select>
         </div>

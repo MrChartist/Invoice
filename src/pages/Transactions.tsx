@@ -44,6 +44,8 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 function matchesFilter(inv: InvoiceRecord, filter: Filter, now: Date): boolean {
   const status = effectiveStatus(inv, now);
+  // Quotations, challans etc. never carry a receivable, so they only appear under All / Draft.
+  if ((filter === 'unpaid' || filter === 'overdue' || filter === 'paid') && !isRevenueDoc(inv)) return false;
   switch (filter) {
     case 'unpaid':
       return status === 'Sent' || status === 'Partially Paid' || status === 'Overdue';
@@ -190,13 +192,12 @@ export function Transactions() {
               aria-label="Search invoices"
             />
           </label>
-          <div className={controls.segment} role="tablist" aria-label="Filter by status">
+          <div className={controls.segment} role="group" aria-label="Filter by status">
             {FILTERS.map((f) => (
               <button
                 key={f.id}
                 type="button"
-                role="tab"
-                aria-selected={filter === f.id}
+                aria-pressed={filter === f.id}
                 className={filter === f.id ? controls.segmentBtnActive : controls.segmentBtn}
                 onClick={() => setFilter(f.id)}
               >
@@ -221,7 +222,7 @@ export function Transactions() {
           <EmptyState icon={Search} title="No matches" text="Try a different search or filter." />
         ) : (
           <div className={surface.tableWrap}>
-            <table className={surface.table}>
+            <table className={cn(surface.table, styles.ledger)}>
               <thead>
                 <tr>
                   <th>Document</th>
@@ -239,32 +240,32 @@ export function Transactions() {
                   const canPay = isRevenueDoc(inv) && (inv.balance_due ?? inv.total) > 0;
                   return (
                     <tr key={inv.id}>
-                      <td>
+                      <td className={styles.cDoc}>
                         <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
                           {inv.invoice_number}
                         </Link>
                         <div className={styles.docType}>{DOCUMENT_LABELS[inv.doc_type] ?? 'Invoice'}</div>
                       </td>
-                      <td>
+                      <td className={styles.cClient}>
                         <div className={styles.client}>
                           <Avatar name={inv.client?.name || '?'} size={28} square />
                           <span>{inv.client?.name || '—'}</span>
                         </div>
                       </td>
-                      <td className={styles.nowrap}>
+                      <td className={cn(styles.nowrap, styles.cDate)}>
                         {formatDate(inv.issue_date)}
                         <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
                           Due {formatDate(inv.due_date) || '—'}
                         </div>
                       </td>
-                      <td>
+                      <td className={styles.cStatus}>
                         <StatusBadge status={status} />
                       </td>
-                      <td className={surface.numeric}>{formatCurrency(inv.total, inv.currency)}</td>
-                      <td className={surface.numeric}>
+                      <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
+                      <td className={cn(surface.numeric, styles.cBal)}>
                         {isRevenueDoc(inv) ? formatCurrency(inv.balance_due ?? inv.total, inv.currency) : '—'}
                       </td>
-                      <td>
+                      <td className={styles.cAct}>
                         <div className={surface.rowActions}>
                           {canPay && (
                             <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} title="Record payment" aria-label={`Record payment for ${inv.invoice_number}`}>

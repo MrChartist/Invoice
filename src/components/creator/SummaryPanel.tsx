@@ -7,9 +7,9 @@ import controls from '../../styles/controls.module.css';
 import styles from './SummaryPanel.module.css';
 
 const GST_MODES: { id: GstMode; label: string }[] = [
-  { id: 'CGST_SGST', label: 'CGST + SGST (same state)' },
-  { id: 'IGST', label: 'IGST (other state)' },
-  { id: 'SINGLE', label: 'Single “Tax” line' },
+  { id: 'CGST_SGST', label: 'CGST + SGST' },
+  { id: 'IGST', label: 'IGST' },
+  { id: 'SINGLE', label: 'Single tax line' },
   { id: 'NONE', label: 'No tax' },
 ];
 
