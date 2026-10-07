@@ -82,7 +82,7 @@ export function Transactions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const invoices = useMemo(() => localDb.invoices.getAll(), [version]);
   const now = new Date();
-  const summary = useMemo(() => summarize(invoices, now, getTable<CreditLink>('doc_links')), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
+  const summary = useMemo(() => summarize(invoices, now, getTable<CreditLink>('doc_links'), 'INR'), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -296,7 +296,7 @@ export function GstReports() {
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
         <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
         <span>
-          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; cess, composition, ISD, imports, e-commerce (TCS), amendments and interest/late fee are not handled. B2CL threshold is ₹2.5 lakh. JSON follows the GST offline-tool layout but is not schema-validated against the portal.
+          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; composition, ISD, imports, e-commerce (TCS), amendments and interest/late fee are not handled. B2CL threshold is ₹2.5 lakh. JSON follows the GST offline-tool layout but is not schema-validated against the portal.
         </span>
       </div>
 

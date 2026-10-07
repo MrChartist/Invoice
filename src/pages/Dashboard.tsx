@@ -70,8 +70,8 @@ export function Dashboard() {
   // Derived values are cheap at this scale; recomputing keeps them honest after edits elsewhere.
   const now = new Date();
   const fy = getIndianFY();
-  const summary = summarize(invoices, now, links);
-  const months = monthlyBilled(invoices, 6, now);
+  const summary = summarize(invoices, now, links, 'INR');
+  const months = monthlyBilled(invoices, 6, now, 'INR');
   // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
   const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders')).map((p) => p.invoice.id));
   const attention = attentionList(invoices, 50, now)

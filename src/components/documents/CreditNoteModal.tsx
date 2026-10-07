@@ -168,6 +168,10 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
               </table>
             </div>
 
+            <p className={controls.hint}>
+              Credit notes cover item lines only — shipping and other charges on the original invoice are not credited.
+            </p>
+
             <div className={controls.field}>
               <label className={controls.label} htmlFor="cn-reason">
                 Reason

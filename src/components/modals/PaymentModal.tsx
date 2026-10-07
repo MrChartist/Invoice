@@ -3,6 +3,8 @@ import { Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
+import { readLinks, totalCredited } from '../../lib/documents';
+import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import type { InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
@@ -15,6 +17,12 @@ export interface PaymentModalProps {
   onClose: () => void;
   /** Called after any change so the caller can refresh its list. */
   onChanged: (message?: string) => void;
+}
+
+/** If the invoice is open in the editor, reload it so the screen shows the new paid amount. */
+function refreshEditor(id: string) {
+  const store = useInvoiceStore.getState();
+  if (store.id === id) store.loadInvoice(id);
 }
 
 export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps) {
@@ -30,7 +38,9 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const live = useMemo(() => (invoice ? localDb.invoices.getById(invoice.id) ?? invoice : null), [invoice, version]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const payments = useMemo(() => (invoice ? localDb.payments.listFor(invoice.id) : []), [invoice, version]);
-  const balance = live ? Math.max(live.balance_due ?? live.total - (live.amount_paid ?? 0), 0) : 0;
+  // What is really still owed: the stored balance (already net of TDS) less any credit notes issued against it.
+  const credited = live ? totalCredited(live.id, readLinks(), localDb.invoices.getAll()) : 0;
+  const balance = live ? Math.max(round2((live.balance_due ?? live.total - (live.amount_paid ?? 0)) - credited), 0) : 0;
 
   useEffect(() => {
     if (!invoice) return;
@@ -53,6 +63,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     try {
       localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date });
       setVersion((v) => v + 1);
+      refreshEditor(live.id);
       setError('');
       const settled = value >= balance - 0.005;
       onChanged(settled ? `${live.invoice_number} marked as paid` : `Recorded ${formatCurrency(value, live.currency)}`);
@@ -66,6 +77,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const removePayment = (id: string) => {
     localDb.payments.remove(id);
     setVersion((v) => v + 1);
+    if (live) refreshEditor(live.id);
     onChanged('Payment removed');
   };
 

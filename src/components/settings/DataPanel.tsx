@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Package, Trash2, Upload } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
-import { backupFilename, applyBackup, buildBackup, markBackupDone, parseBackup, wipeAppData, type BackupSummary } from '../../lib/backup';
+import { backupFilename, restoreBackup, buildBackup, markBackupDone, parseBackup, wipeAppData, type BackupSummary } from '../../lib/backup';
 import { ImportWizard } from '../import/ImportWizard';
 import { appDataSize } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
@@ -78,7 +78,7 @@ export function DataPanel({ notify }: Props) {
   const restore = () => {
     if (!pending) return;
     try {
-      applyBackup(pending.data);
+      restoreBackup(pending.data);
       notify('Backup restored — reloading…');
       setTimeout(() => window.location.reload(), 700);
     } catch (err) {
@@ -238,7 +238,7 @@ export function DataPanel({ notify }: Props) {
         <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
           <strong style={{ color: 'var(--foreground)' }}>{pending?.fileName}</strong> contains {pending?.summary.invoices} invoice
           {pending?.summary.invoices === 1 ? '' : 's'} and {pending?.summary.clients} client{pending?.summary.clients === 1 ? '' : 's'}.
-          Data of the same kind on this device will be replaced. Download a backup first if you are unsure.
+          Everything currently on this device will be replaced by this backup (your PIN is kept). Download a backup first if you are unsure.
         </p>
       </Modal>
 

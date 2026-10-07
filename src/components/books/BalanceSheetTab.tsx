@@ -60,7 +60,7 @@ export function BalanceSheetTab({ data, asOf }: { data: BooksData; asOf: string 
           <ul className={styles.statement}>
             <li className={styles.stmtHead}><span>Liabilities</span><span /></li>
             {row('Payables (you owe vendors)', b.liabilities.payables)}
-            {row('GST payable (output − ITC)', b.liabilities.gstPayable)}
+            {row('GST, cess & TCS payable (output − ITC)', b.liabilities.gstPayable)}
             {row('Advances from customers', b.liabilities.customerAdvances)}
             <li className={styles.stmtTotal}>
               <span>Total liabilities</span>

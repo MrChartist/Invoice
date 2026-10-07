@@ -110,7 +110,7 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
           <div className={surface.cardHead}>Profit &amp; loss statement</div>
           <ul className={styles.statement}>
             <li className={styles.stmtHead}><span>Income</span><span>Amount (₹)</span></li>
-            <li className={styles.stmtRow}><span>Sales (excl. GST)</span><span className={styles.amt}>{formatMoney(pnl.sales)}</span></li>
+            <li className={styles.stmtRow}><span>Sales &amp; charges (excl. GST)</span><span className={styles.amt}>{formatMoney(pnl.sales)}</span></li>
             <li className={styles.stmtSub}><span>Less: credit notes</span><span className={styles.amt}>{formatMoney(pnl.creditNotes)}</span></li>
             <li className={styles.stmtTotal}><span>Net income</span><span className={styles.amt}>{formatMoney(pnl.income)}</span></li>
             <li className={styles.stmtHead}><span>Direct costs</span><span /></li>

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Download, FileLock2, Info, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import {
-  applyBackup,
+  restoreBackup,
   backupFilename,
   buildEncryptedBackup,
   decryptBackup,
@@ -100,7 +100,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
   const restore = () => {
     if (!summary) return;
     try {
-      applyBackup(summary.data);
+      restoreBackup(summary.data);
       notify('Backup restored — reloading…');
       setTimeout(() => window.location.reload(), 700);
     } catch (err) {
@@ -179,7 +179,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
         ) : (
           <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
             Contains {summary?.summary.invoices} invoice{summary?.summary.invoices === 1 ? '' : 's'} and {summary?.summary.clients}{' '}
-            client{summary?.summary.clients === 1 ? '' : 's'}. Data of the same kind on this device will be replaced.
+            client{summary?.summary.clients === 1 ? '' : 's'}. Everything currently on this device will be replaced by this backup (your PIN is kept).
           </p>
         )}
       </Modal>
