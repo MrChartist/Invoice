@@ -9,11 +9,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "postbuild": "node scripts/gen-precache.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -b",
     "test": "node --experimental-strip-types --import ./tests/hooks/register.mjs --test \"tests/**/*.test.ts\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:size": "node scripts/check-bundle-size.mjs",
+    "verify:offline": "node scripts/verify-offline.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -40,5 +43,8 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

@@ -5,10 +5,18 @@ on:
     branches: [main, master]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   verify:
-    name: Typecheck · Lint · Test · Build
+    name: Typecheck · Lint · Test · Build · Budget
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,10 +25,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'npm' # caches ~/.npm keyed on package-lock.json
 
       - name: Install (clean, from lockfile)
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
@@ -31,5 +39,30 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
+      - name: Build (tsc + vite + precache manifest)
         run: npm run build
+
+      - name: Bundle-size budget
+        run: npm run check:size
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 14
+          if-no-files-found: error
+
+  audit:
+    name: Dependency audit (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - run: npm audit --omit=dev --audit-level=high

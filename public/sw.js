@@ -5,11 +5,15 @@
  *   /invoice/abc open offline. The shell is refreshed on every successful navigation.
  * - /assets/* (fingerprinted by Vite): cache-first; discovered at runtime and also precached
  *   from the index.html at install time.
+ * - Install precaches EVERY file listed in /precache-manifest.json (written at build time by
+ *   scripts/gen-precache.mjs), so every route, including lazy chunks never visited online,
+ *   works offline after one visit. Without the manifest it falls back to discovering assets
+ *   from index.html.
  * - Updates: a new worker waits until the page posts {type:'SKIP_WAITING'} (UpdateToast).
- * Bump SW_VERSION to force a clean shell cache.
+ *   BUILD_ID is stamped at build time so sw.js changes bytes on every deploy.
  */
-const SW_VERSION = 'v1';
-const SHELL_CACHE = `mci-shell-${SW_VERSION}`;
+const BUILD_ID = '__BUILD_ID__';
+const SHELL_CACHE = `mci-shell-${BUILD_ID}`;
 const ASSET_CACHE = 'mci-assets'; // fingerprinted files never collide, so it survives versions
 const FONT_CACHE = 'mci-fonts';
 const KEEP = [SHELL_CACHE, ASSET_CACHE, FONT_CACHE];
@@ -35,16 +39,41 @@ async function trim(cache, max) {
   for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
 }
 
+/** Fetches every manifest file into the right cache. Throws if any file fails (install retried later). */
+async function precacheManifest(shell, assets) {
+  const res = await fetch('/precache-manifest.json', { cache: 'no-store' });
+  if (!res.ok) throw new Error('precache manifest ' + res.status);
+  const manifest = await res.json();
+  await Promise.all(
+    manifest.files.map(async (url) => {
+      const r = await fetch(new Request(url, { cache: 'reload' }));
+      if (!r.ok) throw new Error('precache ' + url + ' ' + r.status);
+      // Fingerprinted assets live in the long-lived cache; the shell cache is per build.
+      if (url.startsWith('/assets/')) await assets.put(url, r);
+      else if (url === '/' || url === '/index.html') await shell.put(SHELL_URL, r);
+      else await shell.put(url, r);
+    }),
+  );
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const shell = await caches.open(SHELL_CACHE);
+      const assets = await caches.open(ASSET_CACHE);
+      try {
+        await precacheManifest(shell, assets);
+        return;
+      } catch (err) {
+        // A broken/absent manifest must not brick the install: fall back to discovery below.
+        // (A genuinely failed file is retried by the browser on the next visit.)
+        void err;
+      }
       try {
         const res = await fetch('/', { cache: 'reload' });
         if (res.ok) {
           const copy = res.clone();
           await shell.put(SHELL_URL, res);
-          const assets = await caches.open(ASSET_CACHE);
           await Promise.all(
             discoverAssets(await copy.text()).map((url) =>
               fetch(url).then((r) => (r.ok ? assets.put(url, r) : undefined)).catch(() => undefined),
@@ -140,7 +169,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (url.origin !== self.location.origin) return; // never touch other origins
-  if (url.pathname === '/sw.js') return;
+  if (url.pathname === '/sw.js' || url.pathname === '/precache-manifest.json') return;
 
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request));
