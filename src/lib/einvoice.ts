@@ -320,7 +320,7 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   if (sellerAddr.truncated) {
     assumptions.push(issue('warning', 'SELLER_ADDR_TRUNC', 'Seller', 'Seller address is longer than 200 characters and was truncated.'));
   }
-  let sellerLoc = clean(options.seller?.loc) || guessLocality(sender?.companyAddress ?? '', sellerState?.name);
+  let sellerLoc = clean(options.seller?.loc) || clean(sender?.city) || guessLocality(sender?.companyAddress ?? '', sellerState?.name);
   if (sellerLoc.length < 3) {
     sellerLoc = sellerState?.name ?? '';
     assumptions.push(issue('warning', 'SELLER_LOC_GUESS', 'Seller', `Seller place could not be read from the address; using "${sellerLoc}". Edit the address so the city is the last line before the PIN.`));
@@ -330,7 +330,7 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
     LglNm: clean(sender?.companyName),
     Addr1: sellerAddr.addr1,
     Loc: sellerLoc.slice(0, 50),
-    Pin: toPin(options.seller?.pin) || extractPin(sender?.companyAddress),
+    Pin: toPin(options.seller?.pin) || toPin(sender?.pin) || extractPin(sender?.companyAddress),
     Stcd: sellerStcd,
   };
   if (options.seller?.addr2 ?? sellerAddr.addr2) seller.Addr2 = clean(options.seller?.addr2 ?? sellerAddr.addr2);

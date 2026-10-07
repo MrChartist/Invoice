@@ -101,6 +101,17 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
           <span className={controls.label}>Address</span>
           <textarea className={controls.textarea} rows={3} value={profile.companyAddress} onChange={(e) => onChange({ companyAddress: e.target.value })} placeholder={'Street, area\nCity, State PIN'} />
         </label>
+        <div className={controls.row}>
+          <label className={controls.field}>
+            <span className={controls.label}>City</span>
+            <input className={controls.input} value={profile.city ?? ''} onChange={(e) => onChange({ city: e.target.value })} placeholder="Thane" />
+          </label>
+          <label className={controls.field}>
+            <span className={controls.label}>PIN code</span>
+            <input className={controls.input} inputMode="numeric" maxLength={6} value={profile.pin ?? ''} onChange={(e) => onChange({ pin: e.target.value.replace(/\D/g, '') })} placeholder="400601" />
+            <span className={controls.hint}>Needed for e-Invoice / e-Way bill JSON.</span>
+          </label>
+        </div>
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>Phone</span>

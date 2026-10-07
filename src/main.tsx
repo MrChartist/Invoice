@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { registerServiceWorker } from './lib/pwa';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -8,3 +9,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>,
 );
+
+// Production only: caches the app shell so the tool works fully offline.
+void registerServiceWorker();

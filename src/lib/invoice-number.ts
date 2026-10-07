@@ -18,8 +18,18 @@ export interface FinancialYear {
   endYear: number;
 }
 
+/**
+ * A bare `YYYY-MM-DD` is a calendar day, not a UTC instant — `new Date('2026-04-01')`
+ * is midnight UTC, which is still 31 March in the Americas and would file a 1 April
+ * invoice under the previous financial year. Parse it as a local date instead.
+ */
+function parseDay(dateStr: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr);
+}
+
 export function getIndianFY(dateStr?: string): FinancialYear {
-  const d = dateStr ? new Date(dateStr) : new Date();
+  const d = dateStr ? parseDay(dateStr) : new Date();
   const safe = Number.isNaN(d.getTime()) ? new Date() : d;
   const month = safe.getMonth(); // 0-indexed, April = 3
   const year = safe.getFullYear();

@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Download, Loader2, Printer, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Download, Loader2, Palette, Printer, X } from 'lucide-react';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb, blankProfile } from '../../lib/localDb';
 import { TEMPLATES, templateById } from '../templates/registry';
 import { TemplateEngine } from '../templates/TemplateEngine';
-import { DOCUMENT_LABELS } from '../../types/invoice';
+import { ShareMenu } from '../share';
+import { pageSlices, paperSize, resolve as resolveDesign } from '../../lib/design-prefs';
+import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
 import { cn } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
 
-const PAPER_W = 794; // A4 @ 96dpi
-const PAPER_H = 1123;
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
   const paperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [paperHeight, setPaperHeight] = useState(PAPER_H);
+  const [paperHeight, setPaperHeight] = useState(1123);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,13 +36,22 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
     [invoice.sender, isOpen],
   );
 
+  const design = useMemo(
+    () => resolveDesign(sender.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sender.id, isOpen],
+  );
+  const size = paperSize(design);
+  const PAPER_W = size.width;
+  const PAPER_H = size.height;
+
   const fit = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const available = stage.clientWidth - 8;
     setScale(Math.min(1, Math.max(0.3, available / PAPER_W)));
     if (paperRef.current) setPaperHeight(Math.max(paperRef.current.offsetHeight, PAPER_H));
-  }, []);
+  }, [PAPER_W, PAPER_H]);
 
   useLayoutEffect(() => {
     if (!isOpen) return;
@@ -91,15 +101,16 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
         style: { transform: 'none', transformOrigin: 'top left' },
       });
 
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (height / PAPER_W) * pageW;
-      const pages = Math.max(1, Math.ceil(imgH / pageH - 0.01));
-      for (let page = 0; page < pages; page++) {
-        if (page > 0) pdf.addPage();
-        pdf.addImage(dataUrl, 'PNG', 0, -page * pageH, pageW, imgH);
-      }
+      // Thermal rolls are one tall page; sheet formats are sliced page by page.
+      const slices = pageSlices(height, design);
+      const pageWmm = size.mm.width;
+      const imgHmm = (height / PAPER_W) * pageWmm;
+      const pageHmm = size.autoHeight ? imgHmm : size.mm.height;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
+      slices.forEach((_, page) => {
+        if (page > 0) pdf.addPage([pageWmm, pageHmm], 'portrait');
+        pdf.addImage(dataUrl, 'PNG', 0, -page * pageHmm, pageWmm, imgHmm);
+      });
       const safe = (invoice.invoice_number || 'draft').replace(/[\\/:*?"<>|]+/g, '-');
       pdf.save(`${DOCUMENT_LABELS[invoice.doc_type].replace(/\s+/g, '_')}_${safe}.pdf`);
     } catch (err) {
@@ -137,6 +148,12 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
         </div>
 
         <div className={styles.actions}>
+          <Link to="/design" className={controls.btnIcon} onClick={onClose} aria-label="Customise design" title="Customise design">
+            <Palette size={18} />
+          </Link>
+          {invoice.id && (
+            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} />
+          )}
           <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
             <Printer size={16} /> <span className={styles.hideSm}>Print</span>
           </button>
@@ -155,7 +172,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
         <div className={styles.paperFrame} style={{ width: PAPER_W * scale, height: paperHeight * scale }}>
           <div className={cn(styles.paperScale, 'paper-scale')} style={{ transform: `scale(${scale})`, width: PAPER_W }}>
             <div ref={paperRef}>
-              <TemplateEngine invoice={invoice} sender={sender} totals={invoice.totals} templateId={invoice.template_id} />
+              <TemplateEngine invoice={invoice} sender={sender} totals={invoice.totals} templateId={invoice.template_id} design={design} pageRule />
             </div>
           </div>
         </div>

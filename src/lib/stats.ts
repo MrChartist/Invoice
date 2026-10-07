@@ -21,23 +21,51 @@ function outstandingOf(inv: InvoiceRecord): number {
   return Math.max(balance, 0);
 }
 
+/** Linked credit notes reduce what a customer still owes (see `doc_links`). */
+export interface CreditLink {
+  from_id: string;
+  to_id: string;
+  relation: string;
+}
+
 export interface Summary {
   count: number;
+  /** Gross invoiced value less credit notes issued. */
   billed: number;
+  /** Credit notes issued in the period (positive number). */
+  credited: number;
   received: number;
   outstanding: number;
   overdueAmount: number;
   overdueCount: number;
 }
 
-export function summarize(invoices: InvoiceRecord[], now: Date = new Date()): Summary {
-  const out: Summary = { count: 0, billed: 0, received: 0, outstanding: 0, overdueAmount: 0, overdueCount: 0 };
+export function summarize(
+  invoices: InvoiceRecord[],
+  now: Date = new Date(),
+  links: CreditLink[] = [],
+): Summary {
+  const out: Summary = { count: 0, billed: 0, credited: 0, received: 0, outstanding: 0, overdueAmount: 0, overdueCount: 0 };
+
+  // Credit notes only count when they are live documents, and are matched to their invoice via links.
+  const creditTotals = new Map<string, number>();
+  const byId = new Map(invoices.map((i) => [i.id, i]));
+  for (const link of links) {
+    if (link.relation !== 'credit_note') continue;
+    const note = byId.get(link.to_id);
+    if (!note || note.doc_type !== 'CREDIT_NOTE' || note.status === 'Cancelled') continue;
+    creditTotals.set(link.from_id, (creditTotals.get(link.from_id) ?? 0) + (note.total ?? 0));
+  }
+  for (const inv of invoices) {
+    if (inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft') out.credited += inv.total ?? 0;
+  }
+
   for (const inv of invoices) {
     if (!isRevenueDoc(inv)) continue;
     out.count += 1;
     out.billed += inv.total ?? 0;
     out.received += Math.min(inv.amount_paid ?? 0, inv.total ?? 0);
-    const due = outstandingOf(inv);
+    const due = Math.max(outstandingOf(inv) - (creditTotals.get(inv.id) ?? 0), 0);
     out.outstanding += due;
     if (due > 0 && effectiveStatus(inv, now) === 'Overdue') {
       out.overdueAmount += due;
@@ -46,7 +74,8 @@ export function summarize(invoices: InvoiceRecord[], now: Date = new Date()): Su
   }
   return {
     count: out.count,
-    billed: round2(out.billed),
+    billed: round2(out.billed - out.credited),
+    credited: round2(out.credited),
     received: round2(out.received),
     outstanding: round2(out.outstanding),
     overdueAmount: round2(out.overdueAmount),

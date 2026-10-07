@@ -23,6 +23,7 @@ import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId } from '../lib/localDb';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { effectiveStatus } from '../lib/invoice-status';
+import { readLinks } from '../lib/documents';
 import { isRevenueDoc, summarize } from '../lib/stats';
 import { downloadText, toCsv } from '../lib/download';
 import { addDaysInput, cn, formatCurrency, formatDate, todayInput } from '../lib/utils';
@@ -73,7 +74,7 @@ export function Transactions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const invoices = useMemo(() => localDb.invoices.getAll(), [version]);
   const now = new Date();
-  const summary = useMemo(() => summarize(invoices, now), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
+  const summary = useMemo(() => summarize(invoices, now, readLinks()), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();

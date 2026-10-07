@@ -116,6 +116,8 @@ function toRecord(state: InvoiceState): InvoiceRecord {
     notes: state.notes,
     terms: state.terms,
     po_number: state.po_number,
+    recurring_id: state.recurring_id,
+    recurring_date: state.recurring_date,
     subtotal: state.subtotal,
     discount_amount: state.discount_amount,
     taxable_value: state.taxable_value,

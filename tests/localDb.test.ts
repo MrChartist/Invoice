@@ -19,3 +19,17 @@ test('generateInvoiceNumber: format INV/FY<yy-yy>/0001', () => {
   // No localStorage in this runtime -> getTable() yields [] -> first number is 0001.
   assert.match(generateInvoiceNumber('2025-04-10'), /^INV\/FY25-26\/0001$/);
 });
+
+test('getIndianFY: a bare date is a calendar day in any time zone', () => {
+  const previous = process.env.TZ;
+  try {
+    for (const tz of ['America/New_York', 'Asia/Kolkata', 'Pacific/Auckland']) {
+      process.env.TZ = tz;
+      assert.equal(getIndianFY('2026-04-01').label, '26-27', `1 April in ${tz}`);
+      assert.equal(getIndianFY('2026-03-31').label, '25-26', `31 March in ${tz}`);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+});

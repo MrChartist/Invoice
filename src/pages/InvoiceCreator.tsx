@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -8,6 +8,8 @@ import { useToast } from '../components/ui/useToast';
 import { ItemsTable } from '../components/creator/ItemsTable';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
 import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
+import { DocumentActions } from '../components/creator/DocumentActions';
+import { StockWarnings } from '../components/creator/StockWarnings';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
@@ -28,6 +30,7 @@ const DUE_PRESETS = [0, 7, 15, 30, 45];
 export function InvoiceCreator() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
   const s = useInvoiceStore();
 
@@ -37,6 +40,7 @@ export function InvoiceCreator() {
   const [errors, setErrors] = useState<string[]>([]);
   const [hasDraft, setHasDraft] = useState(false);
   const [missing, setMissing] = useState(false);
+  const [saveTick, setSaveTick] = useState(0);
 
   const profiles = useMemo(() => localDb.settings.get().profiles.filter((p) => p.companyName.trim()), []);
   const editing = Boolean(s.id);
@@ -56,10 +60,17 @@ export function InvoiceCreator() {
       setHasDraft(false);
       return;
     }
+    const requested = searchParams.get('type');
+    if (requested && requested in DOCUMENT_LABELS) {
+      store.newDraft(requested as DocumentType); // e.g. /invoice?type=QUOTATION from the palette
+      setHasDraft(false);
+      return;
+    }
     if (store.id) store.newDraft(); // leaving a saved document → start clean
     const draft = getJson<InvoiceRecord | null>(SINGLETON_KEYS.draft, null);
     setHasDraft(Boolean(draft && !draft.id && !useInvoiceStore.getState().dirty));
-  }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, searchParams]);
 
   // Keep the sender snapshot populated for brand-new documents.
   useEffect(() => {
@@ -77,6 +88,7 @@ export function InvoiceCreator() {
         return;
       }
       setErrors([]);
+      setSaveTick((t) => t + 1);
       const rec = result.record!;
       notify(`${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number} saved`);
       if (!id) navigate(`/invoice/${rec.id}`, { replace: true });
@@ -274,6 +286,7 @@ export function InvoiceCreator() {
               </span>
             </div>
             <ItemsTable onPickCatalog={setItemTarget} />
+            <StockWarnings />
           </section>
 
           <section className={surface.card}>
@@ -308,11 +321,23 @@ export function InvoiceCreator() {
             </div>
           </section>
 
+          {editing && s.id && (
+            <section className={surface.card}>
+              <div className={surface.cardHead}>Document actions</div>
+              <div className={surface.cardBody}>
+                <DocumentActions invoiceId={s.id} refreshKey={saveTick} />
+              </div>
+            </section>
+          )}
+
           <section className={surface.card}>
             <div className={surface.cardHead}>
               <span className={surface.cardHeadIcon}>
                 <Palette size={16} /> Template
               </span>
+              <Link to="/design" className={styles.muted} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+                Customise
+              </Link>
             </div>
             <div className={surface.cardBody}>
               <TemplatePicker />

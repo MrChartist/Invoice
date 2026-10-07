@@ -17,7 +17,11 @@ import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
+import { RemindersPanel } from '../components/share';
 import { localDb } from '../lib/localDb';
+import { readLinks } from '../lib/documents';
+import { lowStockCount } from '../lib/inventory';
+import { getProfitSnapshot } from '../lib/books';
 import { getUser } from '../lib/auth';
 import { getIndianFY } from '../lib/invoice-number';
 import { effectiveStatus } from '../lib/invoice-status';
@@ -35,12 +39,15 @@ function greeting(hour: number): string {
 
 export function Dashboard() {
   const user = getUser();
-  const [{ invoices, clientCount, profileReady }] = useState(() => {
+  const [{ invoices, clientCount, profileReady, links, lowStock, profit }] = useState(() => {
     const settings = localDb.settings.get();
     const profile = localDb.settings.activeProfile();
     return {
       invoices: localDb.invoices.getAll(),
       clientCount: localDb.clients.getAll().length,
+      links: readLinks(),
+      lowStock: lowStockCount(),
+      profit: getProfitSnapshot('this_fy', 'accrual'),
       profileReady:
         settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     };
@@ -49,7 +56,7 @@ export function Dashboard() {
   // Derived values are cheap at this scale; recomputing keeps them honest after edits elsewhere.
   const now = new Date();
   const fy = getIndianFY();
-  const summary = summarize(invoices, now);
+  const summary = summarize(invoices, now, links);
   const months = monthlyBilled(invoices, 6, now);
   const attention = attentionList(invoices, 5, now);
   const recent = [...invoices]
@@ -112,6 +119,8 @@ export function Dashboard() {
           tone={summary.overdueCount ? 'loss' : 'default'}
         />
       </div>
+
+      <RemindersPanel />
 
       <div className={styles.grid}>
         <section className={surface.card}>
@@ -229,6 +238,24 @@ export function Dashboard() {
       </section>
 
       <div className={styles.quick}>
+        <Link to="/books?tab=pnl" className={styles.quickItem}>
+          <Receipt size={18} />
+          <div>
+            <strong>{formatCurrency(profit.netProfit)} net profit</strong>
+            <span>FY{fy.label} · income {formatCurrency(profit.income)} · expenses {formatCurrency(profit.expenses)}</span>
+          </div>
+          <ArrowRight size={16} />
+        </Link>
+        {lowStock > 0 && (
+          <Link to="/inventory" className={styles.quickItem}>
+            <AlertTriangle size={18} />
+            <div>
+              <strong>{lowStock} item{lowStock === 1 ? '' : 's'} low on stock</strong>
+              <span>Review reorder levels</span>
+            </div>
+            <ArrowRight size={16} />
+          </Link>
+        )}
         <Link to="/clients" className={styles.quickItem}>
           <Users size={18} />
           <div>

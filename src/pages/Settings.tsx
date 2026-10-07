@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, Check, Database, Plus, Save, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
+import { Building2, Check, Database, Plus, Save, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -7,6 +7,8 @@ import { useToast } from '../components/ui/useToast';
 import { ProfileEditor } from '../components/settings/ProfileEditor';
 import { DefaultsPanel } from '../components/settings/DefaultsPanel';
 import { DataPanel } from '../components/settings/DataPanel';
+import { SecurityPanel } from '../components/security/SecurityPanel';
+import { AutoBackupPanel } from '../components/pwa/AutoBackupPanel';
 import { blankProfile, localDb, type AppSettings } from '../lib/localDb';
 import { checkGstin } from '../lib/gstin';
 import { isValidIfsc, isValidPan, isValidUpi } from '../lib/validators';
@@ -15,12 +17,13 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/settings/Settings.module.css';
 
-type Tab = 'business' | 'defaults' | 'data';
+type Tab = 'business' | 'defaults' | 'data' | 'security';
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: 'business', label: 'Business profiles', icon: Building2 },
   { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
   { id: 'data', label: 'Data & backup', icon: Database },
+  { id: 'security', label: 'Security', icon: ShieldCheck },
 ];
 
 /** The first problem that should block saving, or '' when the profile is fine. */
@@ -176,7 +179,13 @@ export function Settings() {
       )}
 
       {tab === 'defaults' && <DefaultsPanel settings={settings} onChange={patchSettings} />}
-      {tab === 'data' && <DataPanel notify={notify} />}
+      {tab === 'data' && (
+        <>
+          <DataPanel notify={notify} />
+          <AutoBackupPanel onNotify={notify} />
+        </>
+      )}
+      {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
 
       {dirty && (
         <div className={styles.saveBar} role="region" aria-label="Unsaved changes">

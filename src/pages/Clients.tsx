@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Mail, MapPin, Pencil, Phone, Plus, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { FileUp, Mail, MapPin, Pencil, Phone, Plus, Scale, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { ImportWizard } from '../components/import/ImportWizard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
@@ -21,6 +23,17 @@ export function Clients() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<Client | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // `/clients?new=1` (from the command palette) opens the add dialog directly.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setEditing(null);
+      setFormOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const clients = useMemo(() => localDb.clients.getAll(), [version]);
@@ -63,9 +76,14 @@ export function Clients() {
         title="Clients"
         subtitle={`${clients.length} saved · clients are also added automatically when you save an invoice`}
         actions={
-          <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-            <Plus size={16} /> Add client
-          </button>
+          <>
+            <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
+              <FileUp size={16} /> Import
+            </button>
+            <button type="button" className={controls.btnPrimary} onClick={openAdd}>
+              <Plus size={16} /> Add client
+            </button>
+          </>
         }
       />
 
@@ -164,6 +182,9 @@ export function Clients() {
                       </td>
                       <td>
                         <div className={surface.rowActions}>
+                          <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={`Statement for ${c.name}`} title="Account statement">
+                            <Scale size={16} />
+                          </Link>
                           <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`} title="Edit">
                             <Pencil size={16} />
                           </button>
@@ -181,6 +202,15 @@ export function Clients() {
         )}
       </section>
 
+      <ImportWizard
+        open={importOpen}
+        kind="clients"
+        onClose={() => setImportOpen(false)}
+        onDone={() => {
+          setVersion((v) => v + 1);
+          notify('Clients imported');
+        }}
+      />
       <ClientFormModal
         open={formOpen}
         client={editing}

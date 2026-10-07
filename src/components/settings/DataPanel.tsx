@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { DatabaseBackup, Download, FolderDown, FolderUp, HardDrive, Package, Trash2, Upload } from 'lucide-react';
+import { DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Package, Trash2, Upload } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
-import { backupFilename, applyBackup, buildBackup, parseBackup, wipeAppData, type BackupSummary } from '../../lib/backup';
+import { backupFilename, applyBackup, buildBackup, markBackupDone, parseBackup, wipeAppData, type BackupSummary } from '../../lib/backup';
+import { ImportWizard } from '../import/ImportWizard';
 import { appDataSize } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
 import { downloadText } from '../../lib/download';
@@ -30,6 +31,7 @@ export function DataPanel({ notify }: Props) {
   const [version, setVersion] = useState(0);
   const [pending, setPending] = useState<PendingRestore | null>(null);
   const [wipeOpen, setWipeOpen] = useState(false);
+  const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const used = useMemo(() => appDataSize(), [version]);
@@ -39,6 +41,7 @@ export function DataPanel({ notify }: Props) {
 
   const exportBackup = () => {
     downloadText(backupFilename(), JSON.stringify(buildBackup(), null, 2), 'application/json');
+    markBackupDone();
     notify('Backup downloaded');
   };
 
@@ -53,6 +56,7 @@ export function DataPanel({ notify }: Props) {
       const writable = await handle.createWritable();
       await writable.write(new Blob([JSON.stringify(buildBackup(), null, 2)], { type: 'application/json' }));
       await writable.close();
+      markBackupDone();
       notify('Backup saved to disk');
     } catch (err) {
       if ((err as Error).name !== 'AbortError') notify(`Could not save: ${(err as Error).message}`, 'error');
@@ -133,6 +137,33 @@ export function DataPanel({ notify }: Props) {
       <section className={surface.card}>
         <div className={surface.cardHead}>
           <span className={surface.cardHeadIcon}>
+            <FileUp size={16} /> Import from another tool
+          </span>
+        </div>
+        <div className={surface.cardBody}>
+          <p className={surface.sectionNote}>
+            Bring clients, items or past invoices from Excel, Vyapar, Zoho Books, Tally or Busy exports (CSV). You map the columns and review every row before anything is saved.
+          </p>
+          <div className={styles.actionGrid}>
+            <button type="button" className={styles.action} onClick={() => setImportKind('clients')}>
+              <strong>Clients</strong>
+              <span>Names, GSTIN, address, contact details.</span>
+            </button>
+            <button type="button" className={styles.action} onClick={() => setImportKind('items')}>
+              <strong>Items &amp; services</strong>
+              <span>Name, HSN/SAC, rate, GST %, unit.</span>
+            </button>
+            <button type="button" className={styles.action} onClick={() => setImportKind('invoices')}>
+              <strong>Past invoices</strong>
+              <span>Opening records that keep their original numbers and totals.</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className={surface.card}>
+        <div className={surface.cardHead}>
+          <span className={surface.cardHeadIcon}>
             <Package size={16} /> Item catalogue
           </span>
           <span className={styles.defaultTag}>{catalog.length} saved</span>
@@ -181,6 +212,16 @@ export function DataPanel({ notify }: Props) {
           </button>
         </div>
       </section>
+
+      <ImportWizard
+        open={importKind !== null}
+        kind={importKind ?? undefined}
+        onClose={() => setImportKind(null)}
+        onDone={(report) => {
+          setVersion((v) => v + 1);
+          notify(`Imported ${report.created + report.updated} record${report.created + report.updated === 1 ? '' : 's'}`);
+        }}
+      />
 
       <Modal
         open={!!pending}

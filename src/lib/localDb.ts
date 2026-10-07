@@ -315,7 +315,8 @@ function syncPaymentState(invoiceId: string, delta: number): void {
 
   const inv = invoices[idx];
   const paid = round2(Math.max((Number(inv.amount_paid) || 0) + delta, 0));
-  const total = Number(inv.total) || 0;
+  // TDS the customer withholds is settled with the tax office, so it is never "owed" to us.
+  const total = Math.max((Number(inv.total) || 0) - (Number(inv.tds_amount) || 0), 0);
   let status = inv.status;
   if (paid >= total && total > 0) status = 'Paid';
   else if (paid > 0) status = 'Partially Paid';

@@ -66,3 +66,20 @@ test('compactInr: lakh and crore', () => {
   assert.equal(compactInr(30000000), '3Cr');
   assert.equal(compactInr(999), '999');
 });
+
+test('summarize: credit notes reduce billed and the linked invoice balance', () => {
+  const inv = row({ id: 'inv1', total: 1000, balance_due: 1000 });
+  const note = row({ id: 'cn1', doc_type: 'CREDIT_NOTE', total: 300, balance_due: 0 });
+  const s = summarize([inv, note], NOW, [{ from_id: 'inv1', to_id: 'cn1', relation: 'credit_note' }]);
+  assert.equal(s.billed, 700);
+  assert.equal(s.credited, 300);
+  assert.equal(s.outstanding, 700);
+});
+
+test('summarize: a cancelled credit note is ignored', () => {
+  const inv = row({ id: 'inv1', total: 1000, balance_due: 1000 });
+  const note = row({ id: 'cn1', doc_type: 'CREDIT_NOTE', total: 300, status: 'Cancelled' });
+  const s = summarize([inv, note], NOW, [{ from_id: 'inv1', to_id: 'cn1', relation: 'credit_note' }]);
+  assert.equal(s.billed, 1000);
+  assert.equal(s.outstanding, 1000);
+});

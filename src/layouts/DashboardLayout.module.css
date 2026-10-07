@@ -29,8 +29,27 @@
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.875rem;
   flex-grow: 1;
+  overflow-y: auto;
+  padding-bottom: 0.75rem;
+  min-height: 0;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.groupTitle {
+  padding: 0 0.75rem 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  opacity: 0.8;
 }
 
 .navItem {
@@ -154,6 +173,62 @@
   scroll-behavior: auto;
 }
 
+.utilBar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.625rem 2rem;
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.searchBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: min(420px, 100%);
+  padding: 0.5rem 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  text-align: left;
+  transition: border-color var(--transition-fast);
+}
+
+.searchBtn:hover {
+  border-color: var(--muted-foreground);
+}
+
+.searchBtn span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchBtn kbd {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--card-inner);
+}
+
+.utilActions,
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .content {
   width: 100%;
   max-width: 1280px;
@@ -214,6 +289,10 @@
     background: rgba(9, 9, 11, 0.55);
     backdrop-filter: blur(2px);
     animation: fadeIn 160ms ease both;
+  }
+
+  .utilBar {
+    display: none;
   }
 
   .content {

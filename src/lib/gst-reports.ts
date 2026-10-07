@@ -780,11 +780,15 @@ export function normalizePurchase(raw: unknown, filerStateCode: string): Normali
     stateByCode(pickStr(o, ['supplier_state_code', 'place_of_supply']))?.code ??
     '';
 
-  let igst = pickNum(o, ['igst_amount']) ?? 0;
-  let cgst = pickNum(o, ['cgst_amount']) ?? 0;
-  let sgst = pickNum(o, ['sgst_amount']) ?? 0;
-  const hasSplit = ['igst_amount', 'cgst_amount', 'sgst_amount'].some((k) => o[k] !== undefined && o[k] !== null);
-  let taxable = pickNum(o, ['taxable_value', 'taxable_amount', 'subtotal']);
+  // `cgst` / `sgst` / `igst` / `taxable` are the names the purchases module persists
+  // (src/types/purchases.ts); the *_amount spellings are accepted for imported data.
+  let igst = pickNum(o, ['igst_amount', 'igst']) ?? 0;
+  let cgst = pickNum(o, ['cgst_amount', 'cgst']) ?? 0;
+  let sgst = pickNum(o, ['sgst_amount', 'sgst']) ?? 0;
+  const hasSplit = ['igst_amount', 'cgst_amount', 'sgst_amount', 'igst', 'cgst', 'sgst'].some(
+    (k) => o[k] !== undefined && o[k] !== null,
+  );
+  let taxable = pickNum(o, ['taxable', 'taxable_value', 'taxable_amount', 'subtotal']);
   let tax = pickNum(o, ['tax_amount', 'gst_amount', 'total_tax']);
   if (!hasSplit) {
     if (tax === undefined) {
