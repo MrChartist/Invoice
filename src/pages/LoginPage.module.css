@@ -1,0 +1,284 @@
+/* ================================================================
+   Login — split layout: always-dark brand panel + themed form panel.
+   The brand panel stays dark in both themes; it is derived from the
+   theme tokens with color-mix so no raw hex lives here.
+   ================================================================ */
+.shell {
+  --panel: color-mix(in srgb, black 90%, var(--primary));
+  --panel-text: white;
+  --panel-muted: color-mix(in srgb, white 62%, transparent);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+/* ── Brand panel ──────────────────────────────────────────────── */
+.brand {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel);
+  color: var(--panel-text);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 3rem;
+}
+
+.brand::before {
+  content: '';
+  position: absolute;
+  inset: auto -20% -35% auto;
+  width: 90%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 40%, transparent), transparent 65%);
+  pointer-events: none;
+}
+
+.brandBody {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.headline {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.headline em {
+  font-style: normal;
+  color: var(--primary);
+}
+
+.lede {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--panel-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.points {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.points li {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--panel-muted);
+}
+
+.points svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* ── Form panel ───────────────────────────────────────────────── */
+.formSide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: rise 360ms ease both;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 0.375rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.withIcon {
+  padding-left: 2.5rem;
+}
+
+.pinInput {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  letter-spacing: 0.4em;
+}
+
+.reveal {
+  position: absolute;
+  right: 0.375rem;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+}
+
+.reveal:hover {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+/* Strength meter */
+.meter {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  margin-top: 0.125rem;
+}
+
+.meter span {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  transition: background-color var(--transition-base);
+}
+
+.meter[data-level='weak'] span:nth-child(1) { background: var(--loss); }
+.meter[data-level='ok'] span:nth-child(-n + 2) { background: var(--warning); }
+.meter[data-level='strong'] span { background: var(--profit); }
+
+.notice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  background: var(--card-inner);
+  color: var(--muted-foreground);
+}
+
+.notice svg { flex-shrink: 0; margin-top: 0.125rem; }
+
+.noticeError {
+  composes: notice;
+  border-color: color-mix(in srgb, var(--loss) 35%, transparent);
+  background: color-mix(in srgb, var(--loss) 9%, transparent);
+  color: var(--loss);
+  font-weight: 600;
+}
+
+.noticeWarn {
+  composes: notice;
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: var(--foreground);
+}
+
+.countdown {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.links {
+  display: flex;
+  justify-content: center;
+}
+
+.linkBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.linkBtn:hover { color: var(--primary); }
+
+.dangerBtn {
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
+  border-color: var(--destructive);
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--destructive) 88%, black);
+}
+
+.foot {
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.phrase {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--foreground);
+  user-select: all;
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .brand { padding: 1.5rem 1.25rem; gap: 1rem; }
+  .points { display: none; }
+  .lede { display: none; }
+  .headline { font-size: 1.5rem; }
+  .formSide { align-items: flex-start; padding-top: 1.5rem; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}
