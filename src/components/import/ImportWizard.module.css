@@ -1,0 +1,558 @@
+/* Import wizard — tokens only, no raw colours. */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: end;
+}
+
+/* ── Stepper ─────────────────────────────────────────────────── */
+.steps {
+  list-style: none;
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: var(--card);
+}
+
+.stepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  font-size: 0.75rem;
+}
+
+.stepLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stepActive {
+  border-color: var(--primary);
+  color: var(--foreground);
+  box-shadow: var(--shadow-xs);
+}
+
+.stepActive .stepNum {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.stepDone {
+  color: var(--profit);
+}
+
+.stepDone .stepNum {
+  background: transparent;
+  color: var(--profit);
+}
+
+@media (max-width: 560px) {
+  .stepLabel {
+    display: none;
+  }
+  .stepActive .stepLabel {
+    display: inline;
+  }
+  .stepItem {
+    flex: 0 0 auto;
+  }
+  .stepActive {
+    flex: 1 1 auto;
+  }
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Step 1 ──────────────────────────────────────────────────── */
+.kindSet {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.kindGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.kindCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.kindCard strong {
+  color: var(--foreground);
+  font-size: 0.9375rem;
+}
+
+.kindCard:hover {
+  border-color: var(--muted-foreground);
+}
+
+.kindCard:has(input:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.kindCardOn {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.kindCardOn svg {
+  color: var(--primary);
+}
+
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 1.5rem 1rem;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card-inner, var(--muted));
+  color: var(--muted-foreground);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.dropOn {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.dropTitle {
+  margin: 0;
+  font-weight: 700;
+  color: var(--foreground);
+  word-break: break-all;
+}
+
+.dropActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.paste {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.templates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
+/* ── Step 2 ──────────────────────────────────────────────────── */
+.mapNote {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.tableWrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: auto;
+  max-height: 52vh;
+  background: var(--card);
+}
+
+.mapTable,
+.reviewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.mapTable th,
+.mapTable td,
+.reviewTable th,
+.reviewTable td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.mapTable thead th,
+.reviewTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mapTable tbody th {
+  font-weight: 600;
+  min-width: 9rem;
+}
+
+.mapTable select {
+  min-width: 12rem;
+}
+
+.req {
+  color: var(--loss);
+}
+
+.fieldHint {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  line-height: 1.4;
+}
+
+.samples {
+  max-width: 18rem;
+}
+
+.samples code {
+  display: inline-block;
+  margin: 0 0.25rem 0.25rem 0;
+  padding: 0.1rem 0.4rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: top;
+  background: var(--muted);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.conf {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.confHigh {
+  background: color-mix(in srgb, var(--profit) 15%, transparent);
+  color: var(--profit);
+}
+
+.confMid {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+}
+
+.confLow {
+  background: color-mix(in srgb, var(--loss) 14%, transparent);
+  color: var(--loss);
+}
+
+/* ── Step 3 ──────────────────────────────────────────────────── */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.chipCreate {
+  color: var(--profit);
+  border-color: color-mix(in srgb, var(--profit) 35%, transparent);
+}
+
+.chipUpdate {
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.chipError {
+  color: var(--loss);
+  border-color: color-mix(in srgb, var(--loss) 40%, transparent);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+}
+
+.inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.reviewTable .mono,
+.mono {
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.recordName {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.rowError {
+  background: color-mix(in srgb, var(--loss) 6%, transparent);
+}
+
+.rowSkipped {
+  opacity: 0.6;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge_create {
+  background: color-mix(in srgb, var(--profit) 15%, transparent);
+  color: var(--profit);
+}
+
+.badge_update {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+}
+
+.badge_skip {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.badge_error {
+  background: color-mix(in srgb, var(--loss) 14%, transparent);
+  color: var(--loss);
+}
+
+.issueList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.issueError {
+  color: var(--loss);
+  font-weight: 600;
+}
+
+.issueWarn {
+  color: var(--warning);
+}
+
+.actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.editRow td {
+  background: var(--card-inner, var(--muted));
+}
+
+.editGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .reviewTable thead {
+    display: none;
+  }
+  .reviewTable,
+  .reviewTable tbody,
+  .reviewTable tr,
+  .reviewTable td {
+    display: block;
+    width: 100%;
+  }
+  .reviewTable tr {
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0;
+  }
+  .reviewTable td {
+    border: 0;
+    padding: 0.25rem 0.75rem;
+  }
+  .actions {
+    text-align: left;
+  }
+}
+
+/* ── Step 4 ──────────────────────────────────────────────────── */
+.h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+}
+
+.okIcon {
+  color: var(--profit);
+}
+
+.result {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.stat_ok .statValue {
+  color: var(--profit);
+}
+
+.stat_info .statValue {
+  color: var(--primary);
+}
+
+.stat_bad .statValue {
+  color: var(--loss);
+}
+
+.bar {
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width var(--transition-base);
+}
+
+.errList {
+  margin: 0.75rem 0;
+  padding-left: 1.1rem;
+  font-size: 0.8125rem;
+  color: var(--loss);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.footerSpacer {
+  flex: 1;
+}
