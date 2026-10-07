@@ -11,13 +11,5 @@ export function downloadText(filename: string, content: string, mime = 'text/pla
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** RFC 4180 CSV cell escaping, plus a guard against spreadsheet formula injection. */
-export function csvCell(value: unknown): string {
-  let text = value === null || value === undefined ? '' : String(value);
-  if (/^[=+\-@\t\r]/.test(text) && Number.isNaN(Number(text))) text = `'${text}`;
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-export function toCsv(rows: unknown[][]): string {
-  return rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
-}
+/** CSV helpers live in csv.ts (one implementation, formula-injection guard included). */
+export { csvCell, toCsv } from './csv';

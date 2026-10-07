@@ -16,7 +16,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
-import { calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import {
   clean,
   filterInvoices,
@@ -37,6 +37,7 @@ import {
   type ExportSource,
 } from './export-shared';
 import { generateTallyExport, type TallyOptions } from './tally-xml';
+import { csvCell as baseCsvCell, safeText } from './csv';
 
 export * from './export-shared';
 
@@ -50,22 +51,12 @@ export const money = (n: number): Money => ({ money: round2(num(n)) });
 
 export type Cell = string | number | Money | null | undefined;
 
-const NUMBERISH = /^[+-]?[\d\s().,-]+$/;
-
-/** Neutralise spreadsheet formula injection without mangling phone numbers. */
-export function safeText(s: string): string {
-  if (/^[=@\t\r]/.test(s)) return `'${s}`;
-  if (/^[+-]/.test(s) && !NUMBERISH.test(s)) return `'${s}`;
-  return s;
-}
+export { safeText };
 
 export function csvCell(cell: Cell): string {
-  let text: string;
-  if (cell === null || cell === undefined) text = '';
-  else if (typeof cell === 'number') text = Number.isFinite(cell) ? String(cell) : '';
-  else if (typeof cell === 'object') text = fixed2(cell.money);
-  else text = safeText(cell);
-  return /[",\r\n]|^\s|\s$/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  // A money cell is serialised with exactly two decimals; everything else is shared.
+  if (cell !== null && cell !== undefined && typeof cell === 'object') return baseCsvCell(fixed2(cell.money));
+  return baseCsvCell(cell);
 }
 
 export const UTF8_BOM = '﻿';
@@ -190,6 +181,8 @@ export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}):
       money(s * a.sgst),
       money(s * (a.igst + a.otherTax)),
       money(s * a.tax),
+      money(s * a.cess),
+      money(s * a.tcs),
       money(s * a.charges),
       money(s * a.roundOff),
       money(s * a.total),
@@ -204,7 +197,7 @@ export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}):
     'sales_register',
     [
       'Date', 'Voucher No', 'Document Type', 'Party Name', 'Party GSTIN', 'Place of Supply',
-      'Reverse Charge', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax', 'Other Charges',
+      'Reverse Charge', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax', 'Cess', 'TCS', 'Other Charges',
       'Round Off', 'Invoice Total', 'Amount Received', 'Balance Due', 'Status', 'Currency', 'Due Date',
     ],
     rows,
@@ -218,17 +211,9 @@ export function salesItems(invoices: InvoiceRecord[], opts: CsvOptions = {}): Cs
     const code = invoiceStateCode(inv);
     const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
     const calc = items.length
-      ? calculateInvoice({
-          items,
-          gst_mode: inv.gst_mode ?? 'NONE',
-          discount_type: inv.discount_type ?? 'PERCENT',
-          discount_rate: num(inv.discount_rate),
-          tax_rate: num(inv.tax_rate),
-          shipping: num(inv.shipping),
-          other_charges: num(inv.other_charges),
-          round_off_enabled: false,
-          amount_paid: 0,
-        })
+      ? calculateInvoice(
+          calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 }),
+        )
       : null;
     const s = sign(inv);
     (calc?.lines ?? []).forEach((l, i) => {
@@ -421,17 +406,15 @@ export function gstSummary(source: ExportSource, opts: CsvOptions = {}): CsvTabl
     const doc = clean(inv.invoice_number) || inv.id;
     const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
     const calc = items.length
-      ? calculateInvoice({
-          items,
-          gst_mode: inv.gst_mode ?? 'NONE',
-          discount_type: inv.discount_type ?? 'PERCENT',
-          discount_rate: num(inv.discount_rate),
-          tax_rate: num(inv.tax_rate),
-          shipping: 0,
-          other_charges: 0,
-          round_off_enabled: false,
-          amount_paid: 0,
-        })
+      ? calculateInvoice(
+          calcInputFromRecord(inv, {
+            shipping: 0,
+            other_charges: 0,
+            round_off_enabled: false,
+            round_mode: 'none',
+            amount_paid: 0,
+          }),
+        )
       : null;
     if (calc && calc.lines.length) {
       for (const l of calc.lines) {

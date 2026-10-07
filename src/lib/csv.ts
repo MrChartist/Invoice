@@ -224,3 +224,33 @@ export function writeCsv(rows: unknown[][], options: WriteOptions = {}): string 
   const body = rows.map((r) => r.map((c) => quoteCell(c, delimiter)).join(delimiter)).join(eol);
   return (options.bom ? '﻿' : '') + body + (rows.length ? eol : '');
 }
+
+/* ── Safe CSV *export* cells (single source of truth) ─────────────────────
+ * Every export module (books, receivables, inventory, GST, accounting, ledger)
+ * serialises through these two functions. They differ from `writeCsv` above in
+ * one way: user-entered TEXT is neutralised against spreadsheet formula
+ * injection (a client called `=HYPERLINK(...)` must not run when the file is
+ * opened in Excel). Numbers are emitted as numbers, so a negative amount like
+ * -1250.5 stays numeric and is never turned into text. */
+
+const NUMBERISH = /^[+-]?[\d\s().,-]+$/;
+
+/** Neutralise formula injection in free text without mangling phone numbers / negative figures. */
+export function safeText(s: string): string {
+  if (/^[=@\t\r]/.test(s)) return `'${s}`;
+  if (/^[+-]/.test(s) && !NUMBERISH.test(s)) return `'${s}`;
+  return s;
+}
+
+/** RFC 4180 cell escaping + formula-injection guard. Numbers pass through untouched. */
+export function csvCell(value: unknown): string {
+  let text: string;
+  if (value === null || value === undefined) text = '';
+  else if (typeof value === 'number') text = Number.isFinite(value) ? String(value) : '';
+  else text = safeText(String(value));
+  return /[",\r\n]|^\s|\s$/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export function toCsv(rows: unknown[][]): string {
+  return rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+}

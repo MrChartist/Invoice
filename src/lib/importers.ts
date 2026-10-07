@@ -139,11 +139,13 @@ export function parseDate(raw: unknown): string | null {
     return isoDate(y, b, a);
   }
   if ((m = /^(\d{1,2})(?:st|nd|rd|th)?[-/.\s]+([A-Za-z]{3,9})\.?[-/.,\s]+(\d{2}|\d{4})(?:[\s,].*)?$/.exec(s))) {
-    const mon = MONTHS[m[2].slice(0, 3).toLowerCase()];
+    const mk = m[2].slice(0, 3).toLowerCase();
+    const mon = Object.hasOwn(MONTHS, mk) ? MONTHS[mk] : 0;
     return mon ? isoDate(fullYear(+m[3]), mon, +m[1]) : null;
   }
   if ((m = /^([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/.exec(s))) {
-    const mon = MONTHS[m[1].slice(0, 3).toLowerCase()];
+    const mk = m[1].slice(0, 3).toLowerCase();
+    const mon = Object.hasOwn(MONTHS, mk) ? MONTHS[mk] : 0;
     return mon ? isoDate(+m[3], mon, +m[2]) : null;
   }
   return null;
@@ -195,8 +197,9 @@ export function resolveStateText(raw: string): ResolvedState | undefined {
   const trail = /^(.+?)\s*\(\s*(\d{2})\s*\)$/.exec(s);
   if (trail) return found(trail[2]) ?? resolveStateText(trail[1]);
   const key = squash(s);
-  if (/^[a-z]{2}$/.test(s.toLowerCase()) && STATE_ABBR[key]) return found(STATE_ABBR[key]);
-  return found(STATE_BY_KEY.get(key) ?? STATE_ALIASES[key]);
+  // Own-key lookups only: a cell reading "constructor" must not resolve to Object.prototype.constructor.
+  if (/^[a-z]{2}$/.test(s.toLowerCase()) && Object.hasOwn(STATE_ABBR, key)) return found(STATE_ABBR[key]);
+  return found(STATE_BY_KEY.get(key) ?? (Object.hasOwn(STATE_ALIASES, key) ? STATE_ALIASES[key] : undefined));
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -319,7 +322,8 @@ function cleanDigitsCell(s: string): string {
   if (/^\d+\.0+$/.test(v)) v = v.replace(/\.0+$/, '');
   if (/^\d(\.\d+)?e\+\d+$/i.test(v)) {
     const n = Number(v);
-    if (Number.isFinite(n)) v = n.toLocaleString('fullwide', { useGrouping: false });
+    // BigInt, not toLocaleString(): the latter emits locale digits (e.g. Arabic-Indic) in some browsers.
+    if (Number.isFinite(n)) v = BigInt(Math.round(n)).toString();
   }
   return v;
 }
@@ -470,7 +474,7 @@ export function normalizeUnit(raw: string): string {
   const s = raw.trim();
   if (!s) return '';
   const key = s.toLowerCase().replace(/[^a-z]/g, '');
-  return UNIT_ALIASES[key] ?? s.toUpperCase();
+  return Object.hasOwn(UNIT_ALIASES, key) ? UNIT_ALIASES[key] : s.toUpperCase();
 }
 
 /** Strips punctuation/spaces from an HSN/SAC and checks it has 2-8 digits. */
@@ -773,7 +777,8 @@ function buildInvoiceRecord(
   if (status !== 'Cancelled' && status !== 'Draft') {
     if (finalTotal > 0 && paid >= finalTotal) status = 'Paid';
     else if (paid > 0) status = 'Partially Paid';
-    else if (status === 'Paid' || status === 'Partially Paid' || !status) status = 'Sent';
+    // 'Overdue' is a fact about today's date, never a stored status (see invoice-status.ts).
+    else if (status === 'Paid' || status === 'Partially Paid' || status === 'Overdue' || !status) status = 'Sent';
   }
   if (!status) status = 'Sent';
 

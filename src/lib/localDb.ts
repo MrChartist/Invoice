@@ -16,6 +16,7 @@ import type {
   SenderProfile,
 } from '../types/invoice';
 import { round2 } from './invoice-calc';
+import { localDayOf } from './dates';
 import { nextInvoiceNumber } from './invoice-number';
 import {
   KEYS,
@@ -130,6 +131,15 @@ function readSettings(): AppSettings {
   };
 }
 
+/** Copy of `obj` without undefined / null / empty-string fields. */
+function keepFilled<T extends object>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined && v !== null && v !== '') (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
+}
+
 export const localDb = {
   settings: {
     get: readSettings,
@@ -149,15 +159,20 @@ export const localDb = {
     getAll: () => getTable<Client>(KEYS.clients),
     getById: (id: string) => getTable<Client>(KEYS.clients).find((c) => c.id === id),
     /** Matches on id first, then on a case-insensitive name, so the same client
-     *  typed twice does not become two rows. Returns the row id. */
+     *  typed twice does not become two rows. Returns the row id.
+     *
+     *  An explicit id match is an EDIT (every field is taken, so a field can be cleared).
+     *  A name-only match is "same party typed again" — blank fields in the typed copy must
+     *  NOT wipe what the CRM already knows (GSTIN, phone, address). */
     upsert: (client: Partial<Client> & { name: string }): string => {
       const clients = getTable<Client>(KEYS.clients);
       const name = client.name.trim().toLowerCase();
-      const idx = clients.findIndex(
-        (c) => (client.id && c.id === client.id) || c.name?.trim().toLowerCase() === name,
-      );
+      const byId = client.id ? clients.findIndex((c) => c.id === client.id) : -1;
+      const idx =
+        byId >= 0 ? byId : clients.findIndex((c) => c.name?.trim().toLowerCase() === name);
       if (idx >= 0) {
-        clients[idx] = { ...clients[idx], ...client, id: clients[idx].id };
+        const incoming = byId >= 0 ? client : keepFilled(client);
+        clients[idx] = { ...clients[idx], ...incoming, id: clients[idx].id };
         setTable(KEYS.clients, clients);
         return clients[idx].id!;
       }
@@ -185,7 +200,8 @@ export const localDb = {
       if (!name) return;
       const idx = items.findIndex((i) => i.name?.trim().toLowerCase() === name);
       if (idx >= 0) {
-        items[idx] = { ...items[idx], ...item };
+        // A line typed without an HSN / unit must not erase the catalogue's.
+        items[idx] = { ...items[idx], ...keepFilled(item) };
       } else {
         items.push({ ...(item as InvoiceItem), id: generateId() });
       }
@@ -223,6 +239,13 @@ export const localDb = {
 
       if (idx >= 0) {
         toSave.created_at = invoices[idx].created_at ?? now;
+        // Never let a stale editor copy (opened before a payment was recorded) wipe
+        // receipts: the ledger rows are the floor for what has been received.
+        const ledgerPaid = localDb.payments.totalFor(toSave.id);
+        if (ledgerPaid > round2(Number(toSave.amount_paid) || 0) + 0.004) {
+          const stored = round2(Number(invoices[idx].amount_paid) || 0);
+          Object.assign(toSave, withPaid(toSave, Math.max(stored, ledgerPaid)));
+        }
         invoices[idx] = toSave;
       } else {
         toSave.id = invoice.id || generateId();
@@ -281,14 +304,19 @@ export const localDb = {
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
     record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string }): Payment => {
+      const amount = round2(Number(input.amount) || 0);
+      // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
+      if (!(amount > 0)) throw new Error('Enter a payment amount above zero.');
       const payment: Payment = {
         id: generateId(),
         invoice_id: input.invoiceId,
-        amount: round2(Number(input.amount) || 0),
+        amount,
         method: input.method || 'Bank Transfer',
         reference: input.reference,
         note: input.note,
-        date: input.date || new Date().toISOString(),
+        // A local calendar day, not a UTC timestamp: at 1 am IST on 1 Apr the UTC
+        // stamp still says 31 Mar and would file the receipt in the previous FY.
+        date: input.date || localDayOf(new Date()),
       };
       const rows = getTable<Payment>(KEYS.transactions);
       rows.push(payment);
@@ -307,26 +335,33 @@ export const localDb = {
   },
 };
 
+/**
+ * Re-derive amount_paid / balance_due / status for `inv` given the amount
+ * received so far. TDS the customer withholds is settled with the tax office,
+ * so it is never "owed" to us. A cancelled document stays cancelled: recording
+ * (or removing) a payment must not resurrect it into revenue — the money is
+ * still tracked in amount_paid.
+ */
+function withPaid(inv: InvoiceRecord, paidRaw: number): InvoiceRecord {
+  const paid = round2(Math.max(paidRaw, 0));
+  const total = Math.max((Number(inv.total) || 0) - (Number(inv.tds_amount) || 0), 0);
+  let status = inv.status;
+  if (status !== 'Cancelled') {
+    if (paid >= total && total > 0) status = 'Paid';
+    else if (paid > 0) status = 'Partially Paid';
+    else if (status === 'Paid' || status === 'Partially Paid') status = 'Sent';
+  }
+  return { ...inv, amount_paid: paid, balance_due: round2(total - paid), status };
+}
+
 /** Apply a delta to an invoice's paid amount and re-derive its money status. */
 function syncPaymentState(invoiceId: string, delta: number): void {
   const invoices = getTable<InvoiceRecord>(KEYS.invoices);
   const idx = invoices.findIndex((i) => i.id === invoiceId);
   if (idx < 0) return;
-
   const inv = invoices[idx];
-  const paid = round2(Math.max((Number(inv.amount_paid) || 0) + delta, 0));
-  // TDS the customer withholds is settled with the tax office, so it is never "owed" to us.
-  const total = Math.max((Number(inv.total) || 0) - (Number(inv.tds_amount) || 0), 0);
-  let status = inv.status;
-  if (paid >= total && total > 0) status = 'Paid';
-  else if (paid > 0) status = 'Partially Paid';
-  else if (status === 'Paid' || status === 'Partially Paid') status = 'Sent';
-
   invoices[idx] = {
-    ...inv,
-    amount_paid: paid,
-    balance_due: round2(total - paid),
-    status,
+    ...withPaid(inv, (Number(inv.amount_paid) || 0) + delta),
     updated_at: new Date().toISOString(),
   };
   setTable(KEYS.invoices, invoices);

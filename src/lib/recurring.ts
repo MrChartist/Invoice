@@ -13,7 +13,7 @@
  */
 
 import type { Client, DocumentType, InvoiceItem, InvoiceRecord, SenderProfile } from '../types/invoice';
-import { calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { localDb } from './localDb';
 import { generateId, getTable, setTable } from './storage';
 import { normalizeRecord } from '../store/invoice-defaults';
@@ -55,6 +55,21 @@ export interface RecurringTemplate {
   notes: string;
   terms: string;
   po_number?: string;
+  /* Additive: the tax setup of the source invoice. Without these a recurring export /
+     LUT / TDS / tax-inclusive invoice would silently turn into a plain one. */
+  supply_type?: InvoiceRecord['supply_type'];
+  lut_number?: string;
+  lut_date?: string;
+  price_includes_tax?: boolean;
+  round_mode?: InvoiceRecord['round_mode'];
+  tcs_enabled?: boolean;
+  tcs_rate?: number;
+  tcs_base?: InvoiceRecord['tcs_base'];
+  tcs_label?: string;
+  tds_enabled?: boolean;
+  tds_section?: string;
+  tds_rate?: number;
+  tds_on_taxable?: boolean;
 }
 
 export interface RecurringHistoryEntry {
@@ -169,6 +184,21 @@ function stepFor(s: Pick<RecurringSchedule, 'frequency' | 'interval'>): Step {
 
 type RuleInput = Pick<RecurringSchedule, 'frequency' | 'interval' | 'start_date'>;
 
+/**
+ * Lower bound for the index of the first occurrence at/after `day`, so the scans
+ * below start near the answer instead of at 0 (a daily schedule started years
+ * ago would otherwise cost O(n^2) date maths to catch up).
+ */
+function indexHint(rule: RuleInput, day: string): number {
+  const a = parseYmd(rule.start_date);
+  const b = parseYmd(day);
+  if (!a || !b) return 0;
+  const step = stepFor(rule);
+  const span =
+    step.kind === 'days' ? daysBetween(rule.start_date, day) : (b.y - a.y) * 12 + (b.m - a.m);
+  return Math.max(0, Math.floor(span / step.n) - 1);
+}
+
 /** The n-th occurrence (0 = start_date), always computed from the anchor to avoid drift. */
 export function occurrenceDate(rule: RuleInput, n: number): string {
   const step = stepFor(rule);
@@ -181,7 +211,7 @@ const SCAN_LIMIT = 20000;
 /** First occurrence strictly after `after`. */
 export function nextOccurrence(rule: RuleInput, after: string): string {
   if (!parseYmd(rule.start_date)) return after;
-  for (let n = 0; n < SCAN_LIMIT; n++) {
+  for (let n = indexHint(rule, after); n < SCAN_LIMIT; n++) {
     const d = occurrenceDate(rule, n);
     if (d > after) return d;
   }
@@ -191,7 +221,7 @@ export function nextOccurrence(rule: RuleInput, after: string): string {
 /** First occurrence on or after `from`. */
 export function firstOccurrenceOnOrAfter(rule: RuleInput, from: string): string {
   if (!parseYmd(rule.start_date)) return from;
-  for (let n = 0; n < SCAN_LIMIT; n++) {
+  for (let n = indexHint(rule, from); n < SCAN_LIMIT; n++) {
     const d = occurrenceDate(rule, n);
     if (d >= from) return d;
   }
@@ -315,22 +345,25 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
     notes: inv.notes,
     terms: inv.terms,
     po_number: inv.po_number,
+    supply_type: inv.supply_type,
+    lut_number: inv.lut_number,
+    lut_date: inv.lut_date,
+    price_includes_tax: inv.price_includes_tax,
+    round_mode: inv.round_mode,
+    tcs_enabled: inv.tcs_enabled,
+    tcs_rate: inv.tcs_rate,
+    tcs_base: inv.tcs_base,
+    tcs_label: inv.tcs_label,
+    tds_enabled: inv.tds_enabled,
+    tds_section: inv.tds_section,
+    tds_rate: inv.tds_rate,
+    tds_on_taxable: inv.tds_on_taxable,
   };
 }
 
 /** Totals for one run of a template, via the same engine the creator uses. */
 export function templateTotals(t: RecurringTemplate) {
-  return calculateInvoice({
-    items: t.items,
-    gst_mode: t.gst_mode,
-    discount_type: t.discount_type,
-    discount_rate: t.discount_rate,
-    tax_rate: t.tax_rate,
-    shipping: t.shipping,
-    other_charges: t.other_charges,
-    round_off_enabled: t.round_off_enabled,
-    amount_paid: 0,
-  });
+  return calculateInvoice(calcInputFromRecord(t as Partial<InvoiceRecord>, { amount_paid: 0 }));
 }
 
 /** Approximate revenue per month if the schedule runs forever. */
@@ -399,17 +432,7 @@ export function buildInvoiceFromSchedule(
     terms: applyTokens(t.terms, occurrence),
   };
   const rec = normalizeRecord(raw, t.template_id);
-  const totals = calculateInvoice({
-    items: rec.items,
-    gst_mode: rec.gst_mode,
-    discount_type: rec.discount_type,
-    discount_rate: rec.discount_rate,
-    tax_rate: rec.tax_rate,
-    shipping: rec.shipping,
-    other_charges: rec.other_charges,
-    round_off_enabled: rec.round_off_enabled,
-    amount_paid: 0,
-  });
+  const totals = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
   return {
     ...rec,
     subtotal: totals.subtotal,
@@ -422,6 +445,9 @@ export function buildInvoiceFromSchedule(
     round_off: totals.round_off,
     total: totals.total,
     balance_due: totals.balance_due,
+    cess_amount: totals.cess_amount,
+    tcs_amount: totals.tcs_amount,
+    tds_amount: totals.tds_amount,
     recurring_id: s.id,
     recurring_date: occurrence,
   };
@@ -472,7 +498,11 @@ export function generateInvoiceFromSchedule(
   const issue = issueDate || occurrence;
   // Midday local time: a bare YYYY-MM-DD is parsed as UTC and can land on the
   // wrong side of 1 April in timezones west of Greenwich.
-  const invoiceNumber = localDb.invoices.nextNumber(`${issue}T12:00:00`, s.template.doc_type);
+  const invoiceNumber = localDb.invoices.nextNumber(
+    issue,
+    s.template.doc_type,
+    s.template.sender?.invoicePrefix || undefined,
+  );
   const built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
   const saved = localDb.invoices.save(built);
   return { invoice: saved, created: true };

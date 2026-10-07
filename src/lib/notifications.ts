@@ -17,6 +17,7 @@ import { effectiveStatus } from './invoice-status';
 import { localDb } from './localDb';
 import { KEYS, appDataSize, generateId, getTable, readRaw, setTable, writeRaw } from './storage';
 import { formatCurrency } from './utils';
+import { parseDay } from './dates';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -88,7 +89,8 @@ export function dayDiff(from: Date, to: Date): number {
 
 function parseDate(value?: string): Date | null {
   if (!value) return null;
-  const d = new Date(value);
+  // Bare yyyy-mm-dd is a local calendar day (not midnight UTC).
+  const d = parseDay(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 

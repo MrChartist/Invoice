@@ -14,13 +14,16 @@
  *    aggregated tables (B2CS, nil, HSN, 3B).
  *  - Per-line taxable value / tax is recomputed from the items with the
  *    invoice's own settings so rate-wise splits are exact.
- *  - Cess is not supported (always 0).
+ *  - Cess is carried through per rate row / HSN row / 3B; it is paid in cash (no ITC set-off).
+ *  - Supply type drives placement: EXPORT_* -> exp (WPAY/WOPAY); SEZ_* -> b2b with inv_typ
+ *    SEWP/SEWOP; both are zero-rated (3B 3.1(b)) and keep their nominal rate in the rate rows.
  */
 
 import type { InvoiceRecord, GstMode } from '../types/invoice';
-import { calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, num, round2 } from './invoice-calc';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
+import { isVoidStatus, pickNum, readPurchase } from './purchase-normalize';
 
 /* ───────────────────────── Period ───────────────────────── */
 
@@ -157,6 +160,10 @@ export interface DocRow {
   igst: number;
   cgst: number;
   sgst: number;
+  /** Additive: cess across the document. */
+  cess?: number;
+  /** Additive: GSTN invoice type (R regular, SEWP/SEWOP SEZ, DE deemed export). */
+  invTyp?: 'R' | 'SEWP' | 'SEWOP' | 'DE';
 }
 
 export interface B2csRow {
@@ -227,7 +234,7 @@ export interface Gstr1Report {
   hsn: HsnRow[];
   docIssue: DocIssueRow[];
   /** Totals across every outward table (net of credit notes). */
-  totals: { taxable: number; igst: number; cgst: number; sgst: number; value: number };
+  totals: { taxable: number; igst: number; cgst: number; sgst: number; value: number; cess?: number };
   counts: { included: number; drafts: number; cancelled: number; notTaxDocs: number };
 }
 
@@ -259,6 +266,8 @@ export interface SetOffResult {
   cash: { igst: number; cgst: number; sgst: number };
   /** ITC left after set-off (carried forward). */
   itcCarry: { igst: number; cgst: number; sgst: number };
+  /** Additive: cess liability, payable in cash (no ITC is modelled for cess). */
+  cess?: number;
 }
 
 export interface Gstr3bReport {
@@ -317,6 +326,7 @@ interface PLine {
   igst: number;
   cgst: number;
   sgst: number;
+  cess: number;
   lineTotal: number;
 }
 
@@ -331,6 +341,9 @@ export interface PDoc {
   registered: boolean;
   ctin: string;
   isExport: boolean;
+  /** Zero-rated supply: export or SEZ (GSTR-3B 3.1(b)). */
+  zeroRated: boolean;
+  invTyp: 'R' | 'SEWP' | 'SEWOP' | 'DE';
   rcm: boolean;
   senderGstin: string;
   value: number;
@@ -354,8 +367,11 @@ function filerState(gstin: string, fallback?: string): string {
   return checkGstin(gstin).stateCode ?? stateByCode(fallback)?.code ?? '';
 }
 
+/** The app's own "Other Country (Export)" code is 99; GSTN calls it 96. Both mean an export. */
+const FOREIGN_POS = new Set(['96', '99']);
+
 function recipientState(rec: InvoiceRecord): { pos: string; missing: boolean } {
-  if ((rec.place_of_supply ?? '').trim() === '96') return { pos: '96', missing: false }; // Other Countries
+  if (FOREIGN_POS.has((rec.place_of_supply ?? '').trim())) return { pos: '96', missing: false }; // Other Countries
   const direct = stateByCode(rec.place_of_supply)?.code;
   if (direct) return { pos: direct, missing: false };
   const c = rec.client ?? ({} as InvoiceRecord['client']);
@@ -391,7 +407,16 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
       linkLabel: linkLabel ?? 'Open invoice',
     });
 
-  const isExport = posRaw === '96' || (!!rec.currency && rec.currency !== 'INR' && !posRaw);
+  const st = rec.supply_type;
+  const isSez = st === 'SEZ_WITH_PAYMENT' || st === 'SEZ_WITHOUT_PAYMENT';
+  const isExport =
+    posRaw === '96' ||
+    st === 'EXPORT_LUT' ||
+    st === 'EXPORT_WITH_PAYMENT' ||
+    (!!rec.currency && rec.currency !== 'INR' && !posRaw);
+  const zeroRated = isExport || isSez || isZeroRated(st) || isIgstZeroRated(st);
+  const invTyp: PDoc['invTyp'] =
+    st === 'SEZ_WITH_PAYMENT' ? 'SEWP' : st === 'SEZ_WITHOUT_PAYMENT' ? 'SEWOP' : st === 'DEEMED_EXPORT' ? 'DE' : 'R';
   const pos = posRaw || from;
   if (missing && !isExport) {
     push(
@@ -407,17 +432,8 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   }
 
   const mode = effectiveMode(rec.gst_mode, from, pos);
-  const calc = calculateInvoice({
-    items: rec.items ?? [],
-    gst_mode: mode,
-    discount_type: rec.discount_type ?? 'PERCENT',
-    discount_rate: num(rec.discount_rate),
-    tax_rate: num(rec.tax_rate),
-    shipping: num(rec.shipping),
-    other_charges: num(rec.other_charges),
-    round_off_enabled: !!rec.round_off_enabled,
-    amount_paid: 0,
-  });
+  // Full record in: supply type, tax-inclusive pricing, cess, TCS and round mode all change the split.
+  const calc = calculateInvoice(calcInputFromRecord(rec, { gst_mode: mode, amount_paid: 0 }));
 
   const supply: 'INTRA' | 'INTER' =
     mode === 'CGST_SGST' ? 'INTRA' : mode === 'IGST' ? 'INTER' : from && pos && from !== pos ? 'INTER' : 'INTRA';
@@ -445,7 +461,8 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   }
 
   const lines: PLine[] = calc.lines.map((l) => ({
-    rate: mode === 'NONE' ? 0 : l.tax_rate,
+    // Zero-rated supplies keep the slab they were priced at (GSTR-1 reports txval against it).
+    rate: mode === 'NONE' ? 0 : zeroRated ? l.nominal_rate : l.tax_rate,
     hsn: l.hsn,
     uqc: toUqc(l.unit, l.hsn),
     desc: l.name,
@@ -454,6 +471,7 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     igst: l.igst,
     cgst: l.cgst,
     sgst: l.sgst,
+    cess: l.cess,
     lineTotal: l.total,
   }));
 
@@ -476,6 +494,8 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     registered,
     ctin: registered ? gstinRaw : '',
     isExport,
+    zeroRated,
+    invTyp,
     rcm: !!rec.reverse_charge,
     senderGstin,
     value,
@@ -484,23 +504,26 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
 }
 
 const taxOf = (l: PLine) => l.igst + l.cgst + l.sgst;
+/** A nil / exempt / non-GST line: no rate, no tax and no cess. */
+const isNilLine = (l: PLine) => l.rate <= 0 && taxOf(l) === 0 && l.cess === 0;
 
 function rateRows(lines: PLine[]): RateRow[] {
   const map = new Map<number, RateRow>();
   for (const l of lines) {
-    if (l.rate <= 0 && taxOf(l) === 0) continue; // nil lines go to table 8
+    if (isNilLine(l)) continue; // nil lines go to table 8
     const r = map.get(l.rate) ?? { rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
     r.txval = round2(r.txval + l.taxable);
     r.igst = round2(r.igst + l.igst);
     r.cgst = round2(r.cgst + l.cgst);
     r.sgst = round2(r.sgst + l.sgst);
+    r.cess = round2(r.cess + l.cess);
     map.set(l.rate, r);
   }
   return [...map.values()].sort((a, b) => a.rate - b.rate);
 }
 
 function docRow(d: PDoc, items: RateRow[]): DocRow {
-  const sum = (k: 'txval' | 'igst' | 'cgst' | 'sgst') => round2(items.reduce((s, r) => s + r[k], 0));
+  const sum = (k: 'txval' | 'igst' | 'cgst' | 'sgst' | 'cess') => round2(items.reduce((s, r) => s + r[k], 0));
   return {
     invoiceId: d.rec.id,
     number: d.number,
@@ -515,6 +538,8 @@ function docRow(d: PDoc, items: RateRow[]): DocRow {
     igst: sum('igst'),
     cgst: sum('cgst'),
     sgst: sum('sgst'),
+    cess: sum('cess'),
+    invTyp: d.invTyp,
   };
 }
 
@@ -564,12 +589,13 @@ function buildDocIssue(all: InvoiceRecord[]): DocIssueRow[] {
   return rows.sort((a, b) => a.docType.localeCompare(b.docType) || a.series.localeCompare(b.series));
 }
 
-type Acc = { txval: number; igst: number; cgst: number; sgst: number };
+type Acc = { txval: number; igst: number; cgst: number; sgst: number; cess: number };
 function addLine(target: Acc, l: PLine, sign: number) {
   target.txval = round2(target.txval + sign * l.taxable);
   target.igst = round2(target.igst + sign * l.igst);
   target.cgst = round2(target.cgst + sign * l.cgst);
   target.sgst = round2(target.sgst + sign * l.sgst);
+  target.cess = round2(target.cess + sign * l.cess);
 }
 
 export interface PreparedGstr1 {
@@ -612,7 +638,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   const b2csMap = new Map<string, B2csRow>();
   const nilMap = new Map<NilSupplyType, NilRow>();
   const hsnMap = new Map<string, HsnRow>();
-  const totals = { taxable: 0, igst: 0, cgst: 0, sgst: 0, value: 0 };
+  const totals = { taxable: 0, igst: 0, cgst: 0, sgst: 0, value: 0, cess: 0 };
 
   const nilKey = (d: PDoc): NilSupplyType =>
     d.supply === 'INTER' ? (d.registered ? 'INTRB2B' : 'INTRB2C') : d.registered ? 'INTRAB2B' : 'INTRAB2C';
@@ -650,7 +676,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
       }
     } else {
       for (const l of d.lines) {
-        if (l.rate <= 0 && taxOf(l) === 0) continue;
+        if (isNilLine(l)) continue;
         const key = `${d.supply}|${d.pos}|${l.rate}`;
         const r = b2csMap.get(key) ?? { supply: d.supply, pos: d.pos, rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
         addLine(r, l, d.sign);
@@ -665,9 +691,10 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
       totals.igst = round2(totals.igst + d.sign * l.igst);
       totals.cgst = round2(totals.cgst + d.sign * l.cgst);
       totals.sgst = round2(totals.sgst + d.sign * l.sgst);
+      totals.cess = round2(totals.cess + d.sign * l.cess);
 
-      const isNil = l.rate <= 0 && taxOf(l) === 0 && l.taxable !== 0;
-      if (isNil && !d.isExport) {
+      const isNil = isNilLine(l) && l.taxable !== 0;
+      if (isNil && !d.zeroRated) {
         const k = nilKey(d);
         const n = nilMap.get(k) ?? { type: k, nil: 0, exempt: 0, nonGst: 0 };
         // No GSTIN on the sender means the supply is outside GST altogether.
@@ -676,7 +703,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
         nilMap.set(k, n);
       }
 
-      if (!d.senderGstin && taxOf(l) === 0) continue; // outside GST — not in the HSN summary
+      if (!d.senderGstin && taxOf(l) === 0 && l.cess === 0) continue; // outside GST — not in the HSN summary
       const hsn = l.hsn || 'NA';
       const key = `${hsn}|${l.uqc}|${l.rate}`;
       const h =
@@ -688,6 +715,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
       h.igst = round2(h.igst + d.sign * l.igst);
       h.cgst = round2(h.cgst + d.sign * l.cgst);
       h.sgst = round2(h.sgst + d.sign * l.sgst);
+      h.cess = round2(h.cess + d.sign * l.cess);
       hsnMap.set(key, h);
     }
   }
@@ -713,7 +741,8 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     nil: [...nilMap.values()].sort((a, b) => a.type.localeCompare(b.type)),
     hsn: [...hsnMap.values()].sort((a, b) => a.hsn.localeCompare(b.hsn) || a.rate - b.rate),
     docIssue: buildDocIssue(inScope),
-    totals,
+    // `cess` only appears when there is some, so reports without cess keep their exact shape.
+    totals: totals.cess === 0 ? { taxable: totals.taxable, igst: totals.igst, cgst: totals.cgst, sgst: totals.sgst, value: totals.value } : totals,
     counts,
   };
   return { docs, gstr1 };
@@ -738,62 +767,28 @@ export interface NormalizedPurchase {
   itcReversed: number;
 }
 
-function pickStr(o: Record<string, unknown>, keys: string[]): string {
-  for (const k of keys) {
-    const v = o[k];
-    if (typeof v === 'string' && v.trim()) return v.trim();
-  }
-  return '';
-}
-function pickNum(o: Record<string, unknown>, keys: string[]): number | undefined {
-  for (const k of keys) {
-    if (o[k] === undefined || o[k] === null || o[k] === '') continue;
-    const n = num(o[k], NaN);
-    if (Number.isFinite(n)) return n;
-  }
-  return undefined;
-}
-
 /**
- * Reads a purchase row of unknown exact shape. Returns null for rows that must
- * not count (drafts, cancelled, no usable date). Field aliases tolerated:
- * date: bill_date | purchase_date | date | issue_date | invoice_date;
- * supplier GSTIN: supplier_gstin | vendor_gstin | supplier.gstin | vendor.gstin;
- * tax: cgst_amount / sgst_amount / igst_amount, else tax_amount (split by state).
+ * Reads a purchase row through the shared purchases reader. Returns null for
+ * rows that must not count (drafts, cancelled, no usable date).
  * `itc_eligible === false` marks ineligible ITC; anything else is eligible.
+ * With an explicit cgst/sgst/igst split (what the purchases module writes) that
+ * split is used as-is; otherwise a lump `tax_amount` (or taxable x rate) is split
+ * by supplier state vs the filer's state.
  */
 export function normalizePurchase(raw: unknown, filerStateCode: string): NormalizedPurchase | null {
-  if (!raw || typeof raw !== 'object') return null;
+  const c = readPurchase(raw);
+  if (!c || isVoidStatus(c.status)) return null;
   const o = raw as Record<string, unknown>;
-  const status = pickStr(o, ['status']).toLowerCase();
-  if (status === 'draft' || status === 'cancelled' || status === 'canceled') return null;
-  const date = pickStr(o, ['bill_date', 'purchase_date', 'date', 'issue_date', 'invoice_date']).slice(0, 10);
-  if (!date) return null;
-  const party = (o.supplier ?? o.vendor) as Record<string, unknown> | undefined;
-  const supplierGstin = (
-    pickStr(o, ['supplier_gstin', 'vendor_gstin']) || (party && typeof party === 'object' ? pickStr(party, ['gstin']) : '')
-  ).toUpperCase();
-  const supplierName =
-    pickStr(o, ['supplier_name', 'vendor_name']) || (party && typeof party === 'object' ? pickStr(party, ['name', 'company']) : '');
   const supState =
-    checkGstin(supplierGstin).stateCode ??
-    stateByCode(pickStr(o, ['supplier_state_code', 'place_of_supply']))?.code ??
-    '';
+    checkGstin(c.partyGstin).stateCode ?? stateByCode(c.vendorStateCode || c.placeOfSupply)?.code ?? '';
 
-  // `cgst` / `sgst` / `igst` / `taxable` are the names the purchases module persists
-  // (src/types/purchases.ts); the *_amount spellings are accepted for imported data.
-  let igst = pickNum(o, ['igst_amount', 'igst']) ?? 0;
-  let cgst = pickNum(o, ['cgst_amount', 'cgst']) ?? 0;
-  let sgst = pickNum(o, ['sgst_amount', 'sgst']) ?? 0;
-  const hasSplit = ['igst_amount', 'cgst_amount', 'sgst_amount', 'igst', 'cgst', 'sgst'].some(
-    (k) => o[k] !== undefined && o[k] !== null,
-  );
-  let taxable = pickNum(o, ['taxable', 'taxable_value', 'taxable_amount', 'subtotal']);
-  let tax = pickNum(o, ['tax_amount', 'gst_amount', 'total_tax']);
-  if (!hasSplit) {
+  let { igst, cgst, sgst } = c;
+  let taxable = c.taxable;
+  if (!c.hasSplit) {
+    let tax = c.taxField;
     if (tax === undefined) {
       const rate = pickNum(o, ['tax_rate', 'gst_rate']);
-      if (rate !== undefined && taxable !== undefined) tax = round2((taxable * rate) / 100);
+      if (rate !== undefined) tax = round2((taxable * rate) / 100);
     }
     tax = tax ?? 0;
     const inter = supState && filerStateCode ? supState !== filerStateCode : false;
@@ -802,27 +797,26 @@ export function normalizePurchase(raw: unknown, filerStateCode: string): Normali
       sgst = round2(tax / 2);
       cgst = round2(tax - sgst);
     }
-  }
-  tax = round2(igst + cgst + sgst);
-  if (taxable === undefined) {
-    const total = pickNum(o, ['total', 'grand_total']);
-    taxable = total !== undefined ? round2(total - tax) : 0;
+    // A lump tax_amount was not available to the taxable fallback inside readPurchase.
+    if (c.taxField === undefined && pickNum(o, ['taxable', 'taxable_value', 'taxable_amount', 'subtotal']) === undefined) {
+      taxable = round2(Math.max(c.total - tax, 0));
+    }
   }
 
   return {
-    id: pickStr(o, ['id']) || `${date}:${pickStr(o, ['bill_number', 'invoice_number', 'number'])}`,
-    number: pickStr(o, ['bill_number', 'invoice_number', 'supplier_invoice_number', 'number']),
-    date,
-    supplierName,
-    supplierGstin,
+    id: c.id || `${c.date}:${c.number}`,
+    number: c.number,
+    date: c.date,
+    supplierName: c.partyName,
+    supplierGstin: c.partyGstin,
     supplierState: supState,
-    reverseCharge: o.reverse_charge === true || o.rcm === true,
-    itcEligible: o.itc_eligible !== false,
+    reverseCharge: c.reverseCharge,
+    itcEligible: c.itcEligible,
     taxable: round2(taxable),
     igst: round2(igst),
     cgst: round2(cgst),
     sgst: round2(sgst),
-    itcReversed: round2(Math.max(pickNum(o, ['itc_reversed', 'itc_reversal']) ?? 0, 0)),
+    itcReversed: c.itcReversed,
   };
 }
 
@@ -895,16 +889,18 @@ export function buildGstr3b(
   for (const d of docs) {
     for (const l of d.lines) {
       const s = d.sign;
-      if (d.rcm && !d.isExport) {
+      if (d.rcm && !d.zeroRated) {
         outwardRcmTaxable = round2(outwardRcmTaxable + s * l.taxable);
         continue;
       }
-      if (d.isExport) {
+      if (d.zeroRated) {
+        // 3.1(b): exports and SEZ supplies (with or without IGST payment).
         zero.taxable = round2(zero.taxable + s * l.taxable);
         zero.igst = round2(zero.igst + s * l.igst);
+        zero.cess = round2(zero.cess + s * l.cess);
         continue;
       }
-      if (l.rate <= 0 && taxOf(l) === 0) {
+      if (isNilLine(l)) {
         if (!d.senderGstin) nonGst = round2(nonGst + s * l.taxable);
         else if (d.supply === 'INTER') nil.inter = round2(nil.inter + s * l.taxable);
         else nil.intra = round2(nil.intra + s * l.taxable);
@@ -914,6 +910,7 @@ export function buildGstr3b(
       taxable.igst = round2(taxable.igst + s * l.igst);
       taxable.cgst = round2(taxable.cgst + s * l.cgst);
       taxable.sgst = round2(taxable.sgst + s * l.sgst);
+      taxable.cess = round2(taxable.cess + s * l.cess);
       if (!d.registered && d.supply === 'INTER') {
         const u = unregInter.get(d.pos) ?? { pos: d.pos, taxable: 0, igst: 0 };
         u.taxable = round2(u.taxable + s * l.taxable);
@@ -976,6 +973,8 @@ export function buildGstr3b(
     sgst: Math.max(round2(-liab.sgst), 0),
   };
   const payment = computeSetOff(liab, net, { igst: rcm.igst, cgst: rcm.cgst, sgst: rcm.sgst });
+  // Cess cannot be settled with IGST/CGST/SGST credit, so the whole (net) liability is cash.
+  payment.cess = Math.max(round2(taxable.cess + zero.cess), 0);
 
   void opts;
   return {

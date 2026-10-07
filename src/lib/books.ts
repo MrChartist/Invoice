@@ -20,6 +20,9 @@
 
 import { round2, num } from './invoice-calc';
 import { getTable, setTable, generateId } from './storage';
+import { isoDay } from './dates';
+import { toCsv } from './csv';
+import { isVoidStatus, readPurchase } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 
 /* ════════════════════════════════════════════════════════════════
@@ -124,16 +127,8 @@ export function isoOf(y: number, m: number, d: number): string {
 
 /** Normalise anything date-like to `YYYY-MM-DD` ('' when unusable). */
 export function toIsoDate(value: unknown): string {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime())
-      ? ''
-      : isoOf(value.getFullYear(), value.getMonth() + 1, value.getDate());
-  }
-  if (typeof value !== 'string' || !value) return '';
-  const m = ISO_RE.exec(value);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '' : toIsoDate(d);
+  // Bare days keep their written day; real instants (…Z) become the LOCAL day.
+  return isoDay(value);
 }
 
 function daysInMonth(y: number, m: number): number {
@@ -259,24 +254,6 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-function firstStr(row: Record<string, unknown>, keys: string[]): string {
-  for (const k of keys) {
-    const v = str(row[k]);
-    if (v) return v;
-  }
-  return '';
-}
-
-function firstNum(row: Record<string, unknown>, keys: string[]): number | null {
-  for (const k of keys) {
-    const v = row[k];
-    if (v === undefined || v === null || v === '') continue;
-    const n = num(v, NaN);
-    if (Number.isFinite(n)) return n;
-  }
-  return null;
-}
-
 const SALES_TYPES = new Set(['INVOICE', 'TAX_INVOICE']);
 
 function isLive(inv: InvoiceRecord): boolean {
@@ -299,12 +276,28 @@ function partyOfInvoice(inv: InvoiceRecord): string {
 function invoiceAmounts(inv: InvoiceRecord) {
   const total = Math.abs(num(inv.total));
   const tax = Math.abs(num(inv.tax_amount));
+  const hasTaxable = Number.isFinite(num(inv.taxable_value, NaN));
   let taxable = Math.abs(num(inv.taxable_value, NaN));
-  if (!Number.isFinite(taxable)) taxable = Math.max(total - tax, 0);
+  if (!hasTaxable) taxable = Math.max(total - tax, 0);
+  // Revenue of the document = what it earns EXCLUDING the taxes it collects for the
+  // government (GST, cess, TCS). Freight / other charges and the round-off are the
+  // seller's income too, so they belong in the P&L — otherwise Receivables (which
+  // bills the full total) and the Books disagree by exactly those amounts.
+  const cess = Math.abs(num(inv.cess_amount));
+  const tcs = Math.abs(num(inv.tcs_amount));
+  const charges = num(inv.shipping) + num(inv.other_charges);
+  // Legacy rows with no taxable_value: whatever is left after the taxes is the income.
+  const income = hasTaxable
+    ? round2(taxable + charges + num(inv.round_off))
+    : round2(Math.max(total - tax - cess - tcs, 0));
   return {
     total: round2(total),
     taxable: round2(taxable),
+    income,
     tax: round2(tax),
+    cess: round2(cess),
+    tcs: round2(tcs),
+    tds: round2(Math.abs(num(inv.tds_amount))),
     cgst: round2(Math.abs(num(inv.cgst_amount))),
     sgst: round2(Math.abs(num(inv.sgst_amount))),
     igst: round2(Math.abs(num(inv.igst_amount))),
@@ -334,51 +327,24 @@ export function normalizePurchase(
   raw: RawPurchase,
   vendors: BooksData['vendors'] = [],
 ): NormPurchase | null {
-  const row = raw as Record<string, unknown>;
-  const status = str(row.status).toLowerCase();
-  if (status === 'draft' || status === 'cancelled' || status === 'canceled' || status === 'void') {
-    return null;
-  }
-  const date = toIsoDate(firstStr(row, ['date', 'bill_date', 'purchase_date', 'issue_date']));
-  if (!date) return null;
-
-  const cgst = Math.abs(firstNum(row, ['cgst_amount', 'cgst']) ?? 0);
-  const sgst = Math.abs(firstNum(row, ['sgst_amount', 'sgst']) ?? 0);
-  const igst = Math.abs(firstNum(row, ['igst_amount', 'igst']) ?? 0);
-  const splitGst = cgst + sgst + igst;
-  const gst = Math.abs(firstNum(row, ['tax_amount', 'gst_amount', 'gst', 'tax']) ?? splitGst);
-  let total = firstNum(row, ['total', 'grand_total', 'amount']);
-  let taxable = firstNum(row, ['taxable_value', 'taxable', 'subtotal']);
-  if (taxable === null) taxable = total !== null ? Math.max(total - gst, 0) : 0;
-  if (total === null) total = taxable + gst;
-
-  const vendorId = firstStr(row, ['vendor_id']);
-  const vendorName =
-    firstStr(row, ['vendor_name', 'party', 'supplier_name']) ||
-    str(vendors.find((v) => v.id === vendorId)?.name) ||
-    '';
-
-  const kind = firstStr(row, ['kind', 'type', 'doc_type', 'record_type']).toUpperCase();
-  const itcFlag = row.itc_eligible ?? row.itcEligible;
-  const itcStatus = firstStr(row, ['itc_status']).toLowerCase();
-  const itcEligible =
-    itcFlag === false || itcStatus === 'ineligible' || itcStatus === 'blocked' ? false : true;
-
+  // One shared reader for the purchases table (see purchase-normalize.ts).
+  const c = readPurchase(raw, vendors);
+  if (!c || isVoidStatus(c.status)) return null;
   return {
-    id: str(row.id) || `${date}-${total}`,
-    number: firstStr(row, ['purchase_number', 'bill_number', 'invoice_number', 'number', 'reference']),
-    date,
-    party: vendorName || 'Unknown vendor',
-    category: firstStr(row, ['category', 'expense_category', 'head']) || '',
-    isExpense: kind.includes('EXPENSE'),
-    taxable: round2(Math.abs(taxable)),
-    gst: round2(gst),
-    cgst: round2(cgst),
-    sgst: round2(sgst),
-    igst: round2(igst),
-    total: round2(Math.abs(total)),
-    itcEligible,
-    paidOnRow: round2(Math.abs(firstNum(row, ['amount_paid', 'paid_amount']) ?? 0)),
+    id: c.id || `${c.date}-${c.total}`,
+    number: c.number,
+    date: c.date,
+    party: c.partyName || 'Unknown vendor',
+    category: c.category,
+    isExpense: c.isExpense,
+    taxable: c.taxable,
+    gst: c.tax,
+    cgst: c.cgst,
+    sgst: c.sgst,
+    igst: c.igst,
+    total: c.total,
+    itcEligible: c.itcEligible,
+    paidOnRow: c.paid,
   };
 }
 
@@ -670,7 +636,7 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
       events.push({
         date,
         kind: 'credit_note',
-        amount: invoiceAmounts(inv).taxable,
+        amount: invoiceAmounts(inv).income,
         category: 'Credit notes',
         direct: false,
         ref: inv.id,
@@ -679,7 +645,7 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
       events.push({
         date,
         kind: 'sales',
-        amount: invoiceAmounts(inv).taxable,
+        amount: invoiceAmounts(inv).income,
         category: 'Sales',
         direct: false,
         ref: inv.id,
@@ -697,7 +663,10 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
       if (inv) {
         if (!isSale(inv)) continue; // receipts only count against sales invoices
         const a = invoiceAmounts(inv);
-        amount = a.total > 0 ? round2((paid * a.taxable) / a.total) : paid;
+        // Income is recognised in proportion to what the customer owes in cash: TDS they
+        // withhold is part of the price, so a fully-paid-net-of-TDS invoice books ALL its income.
+        const payable = a.total - a.tds;
+        amount = payable > 0 ? round2((paid * a.income) / payable) : paid;
       }
       events.push({ date, kind: 'sales', amount, category: 'Sales', direct: false, ref: t.id });
     }
@@ -865,18 +834,22 @@ export interface GstSummary {
   blockedGst: number;
   /** output − ITC; negative means a refundable / carry-forward credit. */
   netPayable: number;
+  /** Additive: cess on sales less cess on credit notes. Payable in cash — ITC cannot offset it. */
+  outputCess?: number;
 }
 
 export function gstSummary(data: BooksData, period: Period): GstSummary {
   let cgst = 0;
   let sgst = 0;
   let igst = 0;
+  let cess = 0;
   for (const inv of data.invoices) {
     const sale = isSale(inv);
     if (!sale && !isCreditNote(inv)) continue;
     if (!inPeriod(toIsoDate(inv.issue_date), period)) continue;
     const a = invoiceAmounts(inv);
     const sign = sale ? 1 : -1;
+    cess = round2(cess + sign * a.cess);
     // SINGLE-mode legacy rows only carry tax_amount; treat the remainder as IGST.
     const rest = Math.max(round2(a.tax - a.cgst - a.sgst - a.igst), 0);
     cgst = round2(cgst + sign * a.cgst);
@@ -900,6 +873,7 @@ export function gstSummary(data: BooksData, period: Period): GstSummary {
     itc,
     blockedGst: blocked,
     netPayable: round2(outputTotal - itc),
+    outputCess: cess,
   };
 }
 
@@ -936,25 +910,30 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
 
   let salesTotal = 0;
   let cnTotal = 0;
+  // GST + cess collected are owed to the government; so is TCS. None of it is income.
   let outputGst = 0;
+  let tcsCollected = 0;
   for (const inv of data.invoices) {
     const date = toIsoDate(inv.issue_date);
     if (!upTo(date)) continue;
     const a = invoiceAmounts(inv);
     if (isSale(inv)) {
       salesTotal += a.total;
-      outputGst += a.tax;
+      outputGst += a.tax + a.cess;
+      tcsCollected += a.tcs;
     } else if (isCreditNote(inv)) {
       cnTotal += a.total;
-      outputGst -= a.tax;
+      outputGst -= a.tax + a.cess;
+      tcsCollected -= a.tcs;
     }
   }
-  const invById = new Map(data.invoices.map((i) => [i.id, i]));
+  // Every receipt is cash that is really in the bank (the cash book counts it), so it
+  // must also reduce receivables — even one recorded against a document that was later
+  // cancelled. That money then shows up as a customer advance instead of vanishing
+  // into the balancing figure.
   let receipts = 0;
   for (const t of data.transactions) {
     if (!upTo(toIsoDate(t.date))) continue;
-    const inv = invById.get(t.invoice_id);
-    if (inv && !isSale(inv)) continue;
     receipts += Math.abs(num(t.amount));
   }
 
@@ -967,11 +946,10 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
     purchTotal += p.total;
     itc += purchaseItc(p);
   }
-  const purchIds = new Set(purchases.map((p) => p.id));
+  // Same rule on the payables side: cash that left the bank always reduces payables.
   let paid = 0;
   for (const pp of data.purchasePayments) {
     if (!upTo(toIsoDate(pp.date))) continue;
-    if (pp.purchase_id && !purchIds.has(str(pp.purchase_id))) continue;
     paid += Math.abs(num(pp.amount));
   }
 
@@ -996,7 +974,8 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   );
   const liabilities = {
     payables: Math.max(ap, 0),
-    gstPayable: Math.max(gstNet, 0),
+    // GST / cess payable (net of ITC) plus TCS collected and not yet deposited.
+    gstPayable: round2(Math.max(gstNet, 0) + Math.max(round2(tcsCollected), 0)),
     customerAdvances: Math.max(-ar, 0),
     total: 0,
   };
@@ -1081,17 +1060,7 @@ export function getProfitSnapshot(
    CSV
    ════════════════════════════════════════════════════════════════ */
 
-function csvCell(v: string | number): string {
-  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : '';
-  let s = v;
-  // Neutralise spreadsheet formula injection from user-entered text.
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-export function toCsv(rows: Array<Array<string | number>>): string {
-  return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
-}
+export { toCsv };
 
 export function dayBookCsv(vouchers: Voucher[]): string {
   return toCsv([

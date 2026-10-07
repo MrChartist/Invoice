@@ -40,11 +40,24 @@ export interface Summary {
   overdueCount: number;
 }
 
+/** Documents in one currency (all of them when `currency` is omitted). Amounts in different currencies must never be added together. */
+export function inCurrency(invoices: InvoiceRecord[], currency?: string): InvoiceRecord[] {
+  if (!currency) return invoices;
+  const want = currency.toUpperCase();
+  return invoices.filter((i) => (i.currency || 'INR').toUpperCase() === want);
+}
+
+/**
+ * `currency` (additive, optional): sum only that currency. A dashboard that shows
+ * rupees must pass 'INR' — otherwise a USD 1,000 invoice is added as Rs 1,000.
+ */
 export function summarize(
-  invoices: InvoiceRecord[],
+  all: InvoiceRecord[],
   now: Date = new Date(),
   links: CreditLink[] = [],
+  currency?: string,
 ): Summary {
+  const invoices = inCurrency(all, currency);
   const out: Summary = { count: 0, billed: 0, credited: 0, received: 0, outstanding: 0, overdueAmount: 0, overdueCount: 0 };
 
   // Credit notes only count when they are live documents, and are matched to their invoice via links.
@@ -89,8 +102,9 @@ export interface MonthBucket {
   billed: number;
 }
 
-/** Billed amount per calendar month for the last `months` months, oldest first. */
-export function monthlyBilled(invoices: InvoiceRecord[], months = 6, now: Date = new Date()): MonthBucket[] {
+/** Billed amount (net of credit notes) per calendar month for the last `months` months, oldest first. */
+export function monthlyBilled(all: InvoiceRecord[], months = 6, now: Date = new Date(), currency?: string): MonthBucket[] {
+  const invoices = inCurrency(all, currency);
   const buckets: MonthBucket[] = [];
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -101,9 +115,13 @@ export function monthlyBilled(invoices: InvoiceRecord[], months = 6, now: Date =
     });
   }
   for (const inv of invoices) {
-    if (!isRevenueDoc(inv) || !inv.issue_date) continue;
+    if (!inv.issue_date) continue;
+    // Credit notes reduce what was billed in the month they are issued, exactly as the
+    // headline `summarize().billed` does — otherwise the chart and the KPI disagree.
+    const credit = inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft';
+    if (!isRevenueDoc(inv) && !credit) continue;
     const bucket = buckets.find((b) => inv.issue_date.startsWith(b.key));
-    if (bucket) bucket.billed = round2(bucket.billed + (inv.total ?? 0));
+    if (bucket) bucket.billed = round2(bucket.billed + (credit ? -1 : 1) * (inv.total ?? 0));
   }
   return buckets;
 }

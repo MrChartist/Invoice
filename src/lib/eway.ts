@@ -6,7 +6,7 @@
  */
 
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
-import { calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, num, pctOf, round2 } from './invoice-calc';
 import { stateByCode, stateByName } from './india-states';
 import {
   extractPin,
@@ -40,6 +40,8 @@ export interface EwayItem {
   cgstRate: number;
   igstRate: number;
   cessRate: number;
+  /** Additive: fixed (non-ad-valorem) cess amount on the line. */
+  cessNonadvol?: number;
 }
 
 export interface EwayBill {
@@ -147,17 +149,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const client = record.client ?? ({} as InvoiceRecord['client']);
   const t = options.transport ?? {};
 
-  const calc = calculateInvoice({
-    items: record.items ?? [],
-    gst_mode: record.gst_mode,
-    discount_type: record.discount_type,
-    discount_rate: num(record.discount_rate),
-    tax_rate: num(record.tax_rate),
-    shipping: num(record.shipping),
-    other_charges: num(record.other_charges),
-    round_off_enabled: !!record.round_off_enabled,
-    amount_paid: num(record.amount_paid),
-  });
+  const calc = calculateInvoice(calcInputFromRecord(record));
 
   const sellerGstin = (sender?.companyGstin ?? '').trim().toUpperCase();
   const gstinStateFrom = sellerGstin.slice(0, 2);
@@ -170,7 +162,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
     assumptions.push(issue('warning', 'FROM_PLACE_GUESS', 'Dispatch from', `Dispatch place guessed as "${fromPlace}"; put the city in the sender address.`));
   }
 
-  const isExport = (record.place_of_supply ?? '').trim() === '99';
+  const isExport = ['99', '96'].includes((record.place_of_supply ?? '').trim());
   const buyerGstin = isExport ? 'URP' : (client.gstin ?? '').trim().toUpperCase() || 'URP';
   const toGstinState = /^\d{2}/.test(buyerGstin) ? buyerGstin.slice(0, 2) : '';
   const clientState = stateByCode(client.state_code)?.code ?? stateByName(client.state)?.code ?? '';
@@ -189,8 +181,15 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const cgst = sum((l) => l.cgst);
   const sgst = sum((l) => l.sgst);
   const igst = sum((l) => l.igst);
-  const other = allGoods ? round2(calc.shipping + calc.other_charges) : 0;
-  const totInv = allGoods ? calc.total : round2(taxable + cgst + sgst + igst);
+  // Cess: ad valorem part by rate, the rest is the fixed per-unit part. TCS has no
+  // field of its own on the portal, so it rides in "other value" with freight.
+  const advolOf = (l: (typeof goods)[number]) => pctOf(l.taxable, l.cess_rate);
+  const cessAdvol = sum(advolOf);
+  const cessFixed = sum((l) => round2(l.cess - advolOf(l)));
+  const other = allGoods ? round2(calc.shipping + calc.other_charges + calc.tcs_amount) : 0;
+  const totInv = allGoods
+    ? calc.total
+    : round2(taxable + cgst + sgst + igst + cessAdvol + cessFixed);
 
   const itemList: EwayItem[] = goods.map((l) => {
     const rate = noTax ? 0 : l.tax_rate;
@@ -205,7 +204,8 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
       sgstRate: intraSplit ? rate / 2 : 0,
       cgstRate: intraSplit ? rate / 2 : 0,
       igstRate: intraSplit ? 0 : rate,
-      cessRate: 0,
+      cessRate: l.cess_rate,
+      ...(round2(l.cess - advolOf(l)) > 0 ? { cessNonadvol: round2(l.cess - advolOf(l)) } : {}),
     };
   });
 
@@ -239,8 +239,8 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
     cgstValue: cgst,
     sgstValue: sgst,
     igstValue: igst,
-    cessValue: 0,
-    TotNonAdvolVal: 0,
+    cessValue: cessAdvol,
+    TotNonAdvolVal: cessFixed,
     OthValue: other,
     totInvValue: totInv,
     transMode: TRANS_MODE_CODE[mode],

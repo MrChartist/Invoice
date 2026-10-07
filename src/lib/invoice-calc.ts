@@ -22,20 +22,91 @@ import type {
   DiscountType,
   GstMode,
   InvoiceItem,
+  InvoiceRecord,
   RoundMode,
   SupplyType,
   TcsBase,
 } from '../types/invoice';
 
+/**
+ * Round to paise, half AWAY from zero (so -2.345 and 2.345 round symmetrically,
+ * which keeps a credit note's rounding the exact mirror of its invoice's).
+ *
+ * The scaled-exponent trick (`1.005e2` -> 100.5 exactly) avoids the classic
+ * `1.005 * 100 = 100.49999999999999` binary-float error, which `+ EPSILON`
+ * cannot fix once the magnitude is above ~1.
+ */
 export function round2(n: number): number {
   if (!Number.isFinite(n)) return 0;
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+  const abs = Math.abs(n);
+  const s = String(abs);
+  // Exponent-form strings (1e-7, 1.5e+21) cannot take the "e2" suffix.
+  const scaled = s.includes('e') ? abs * 100 : Number(`${s}e2`);
+  const r = Number(`${Math.round(scaled)}e-2`);
+  return n < 0 && r !== 0 ? -r : r;
 }
 
 /** Coerce anything that arrives from an <input> or legacy JSON into a finite number. */
 export function num(value: unknown, fallback = 0): number {
   const n = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
   return Number.isFinite(n) ? n : fallback;
+}
+
+/* ── Exact decimal arithmetic ─────────────────────────────────────────────
+ * `round2(a * b)` is NOT enough for money: 11 x 0.015 is 0.16499999999999998 in
+ * binary floating point, so a tax of exactly 16.5 paise rounds DOWN to 0.16 where
+ * every accountant (and GSTN) rounds half up to 0.17. About one tax computation
+ * in a thousand lands on such an exact half-paisa. These helpers multiply the
+ * DECIMAL values the user typed (their shortest string form) as BigInt integers
+ * and round half away from zero exactly. */
+
+type Scaled = { n: bigint; s: number };
+
+/** x as an exact decimal `n / 10^s`, or null for non-finite / exponent-form numbers. */
+function scaled(x: number): Scaled | null {
+  if (!Number.isFinite(x)) return null;
+  const str = String(x);
+  if (str.includes('e') || str.includes('E')) return null;
+  const neg = str.startsWith('-');
+  const body = neg ? str.slice(1) : str;
+  const dot = body.indexOf('.');
+  const digits = dot < 0 ? body : body.slice(0, dot) + body.slice(dot + 1);
+  const n = BigInt(digits);
+  return { n: neg ? -n : n, s: dot < 0 ? 0 : body.length - dot - 1 };
+}
+
+/** n / d (d > 0) rounded half away from zero. */
+function divHalfAway(n: bigint, d: bigint): bigint {
+  const neg = n < 0n;
+  const a = neg ? -n : n;
+  const q = (2n * a + d) / (2n * d);
+  return neg ? -q : q;
+}
+
+/** round2(a * b / divisor), computed exactly. `divisor` must be a positive integer (1 or 100). */
+export function mulRound2(a: number, b: number, divisor = 1): number {
+  const A = scaled(a);
+  const B = scaled(b);
+  if (!A || !B) return round2((a * b) / divisor);
+  const numerator = A.n * B.n * 100n;
+  const denominator = 10n ** BigInt(A.s + B.s) * BigInt(divisor);
+  return Number(divHalfAway(numerator, denominator)) / 100;
+}
+
+/** round2(amount x pct / 100) — "pct percent of amount", exactly. */
+export function pctOf(amount: number, pct: number): number {
+  return mulRound2(amount, pct, 100);
+}
+
+/** round2(amount / (1 + ratePct / 100)) — backs a tax-inclusive amount out to its base, exactly. */
+export function backOutPct(amount: number, ratePct: number): number {
+  const A = scaled(amount);
+  const R = scaled(Number(ratePct.toFixed(6)));
+  if (!A || !R) return round2(amount / (1 + ratePct / 100));
+  const scale = 10n ** BigInt(R.s);
+  const numerator = A.n * 100n * 100n * scale;
+  const denominator = 10n ** BigInt(A.s) * (100n * scale + R.n);
+  return Number(divHalfAway(numerator, denominator)) / 100;
 }
 
 export interface CalcLine {
@@ -46,6 +117,12 @@ export interface CalcLine {
   quantity: number;
   rate: number;
   tax_rate: number;
+  /**
+   * The GST slab the line was priced at, kept even when the supply is
+   * zero-rated (SEZ / export under LUT) and `tax_rate` is forced to 0. GSTR-1
+   * needs it to report zero-rated taxable value against the right rate.
+   */
+  nominal_rate: number;
   cess_rate: number;
   cess_per_unit: number;
   /** Cess charged on this line. */
@@ -134,6 +211,40 @@ export interface CalcInput {
   tds_on_taxable?: boolean;
 }
 
+/**
+ * Build the full calculator input from a stored record. Every module that
+ * re-derives money from a record (GST reports, e-Invoice, e-Way, Tally,
+ * exports, credit notes, recurring) goes through here so none of them can
+ * silently drop supply type, tax-inclusive pricing, TCS/TDS or round mode.
+ * `over` wins over the record (e.g. `{ amount_paid: 0, gst_mode }`).
+ */
+export function calcInputFromRecord(
+  rec: Partial<InvoiceRecord>,
+  over: Partial<CalcInput> = {},
+): CalcInput {
+  return {
+    items: rec.items ?? [],
+    gst_mode: rec.gst_mode ?? 'NONE',
+    discount_type: rec.discount_type ?? 'PERCENT',
+    discount_rate: num(rec.discount_rate),
+    tax_rate: num(rec.tax_rate),
+    shipping: num(rec.shipping),
+    other_charges: num(rec.other_charges),
+    round_off_enabled: !!rec.round_off_enabled,
+    amount_paid: num(rec.amount_paid),
+    round_mode: rec.round_mode,
+    price_includes_tax: !!rec.price_includes_tax,
+    supply_type: rec.supply_type,
+    tcs_enabled: !!rec.tcs_enabled,
+    tcs_rate: num(rec.tcs_rate),
+    tcs_base: rec.tcs_base,
+    tds_enabled: !!rec.tds_enabled,
+    tds_rate: num(rec.tds_rate),
+    tds_on_taxable: rec.tds_on_taxable,
+    ...over,
+  };
+}
+
 /** True when any line carries cess — UIs show a cess column only then. */
 export function hasAnyCess(items: InvoiceItem[]): boolean {
   return items.some((i) => num(i.cess_rate) > 0 || num(i.cess_per_unit) > 0);
@@ -154,7 +265,11 @@ export function resolveRoundMode(mode: RoundMode | undefined, enabled: boolean):
 }
 
 export function applyRounding(value: number, mode: RoundMode): number {
-  if (mode === 'nearest') return Math.round(value);
+  // 'nearest' rounds .50 away from zero, consistently for negative documents.
+  if (mode === 'nearest') {
+    const r = Math.round(Math.abs(round2(value)));
+    return value < 0 && r !== 0 ? -r : r;
+  }
   if (mode === 'up') return Math.ceil(round2(value));
   if (mode === 'down') return Math.floor(round2(value));
   return value;
@@ -212,7 +327,8 @@ function splitTax(tax: number, mode: GstMode): { cgst: number; sgst: number; igs
   if (mode === 'IGST' || mode === 'SINGLE') return { cgst: 0, sgst: 0, igst: round2(tax) };
   if (mode === 'CGST_SGST') {
     const half = round2(tax / 2);
-    // Give any odd paisa to CGST so the two halves always re-sum to `tax`.
+    // The half is rounded UP (away from zero), so a lone odd paisa lands on SGST and
+    // the two parts always re-sum to `tax` exactly.
     return { cgst: round2(tax - half), sgst: half, igst: 0 };
   }
   return { cgst: 0, sgst: 0, igst: 0 };
@@ -234,9 +350,9 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
   const staged = items.map((item) => {
     const quantity = num(item.quantity);
     const rate = num(item.rate);
-    const gross = round2(quantity * rate);
+    const gross = mulRound2(quantity, rate);
     const linePct = Math.min(Math.max(num(item.discount_percent), 0), 100);
-    const line_discount = round2(gross * (linePct / 100));
+    const line_discount = pctOf(gross, linePct);
     const taxRate =
       typeof item.tax_rate === 'number' && Number.isFinite(item.tax_rate)
         ? item.tax_rate
@@ -249,6 +365,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
       line_discount,
       net: round2(gross - line_discount),
       tax_rate: zeroRated || taxMode === 'NONE' ? 0 : Math.max(num(taxRate), 0),
+      nominal_rate: Math.max(num(taxRate), 0),
       cess_rate: taxMode === 'NONE' ? 0 : Math.max(num(item.cess_rate), 0),
       cess_per_unit: taxMode === 'NONE' ? 0 : Math.max(num(item.cess_per_unit), 0),
     };
@@ -262,8 +379,8 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
   const rawInvoiceDiscount =
     input.discount_type === 'AMOUNT'
       ? num(input.discount_rate)
-      : netBase * (Math.min(Math.max(num(input.discount_rate), 0), 100) / 100);
-  const invoice_discount_amount = round2(Math.min(Math.max(rawInvoiceDiscount, 0), netBase));
+      : pctOf(netBase, Math.min(Math.max(num(input.discount_rate), 0), 100));
+  const invoice_discount_amount = round2(Math.min(Math.max(rawInvoiceDiscount, 0), Math.max(netBase, 0)));
 
   const allocations = allocateProportionally(
     staged.map((l) => l.net),
@@ -273,20 +390,20 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
   // ── Steps 4–5: taxable value and GST per line ─────────────────
   const lines: CalcLine[] = staged.map((l, i) => {
     const net = round2(l.net - allocations[i]);
-    const fixedCess = round2(l.quantity * l.cess_per_unit);
+    const fixedCess = mulRound2(l.quantity, l.cess_per_unit);
     let taxable: number;
     let cess: number;
     let tax: number;
     if (inclusive && (l.tax_rate > 0 || l.cess_rate > 0 || fixedCess > 0)) {
       // `net` already contains GST + cess: back-calculate, then let GST absorb
       // the paise drift so taxable + gst + cess == net exactly.
-      taxable = round2(Math.max(net - fixedCess, 0) / (1 + (l.tax_rate + l.cess_rate) / 100));
-      cess = round2(taxable * (l.cess_rate / 100) + fixedCess);
+      taxable = backOutPct(Math.max(net - fixedCess, 0), l.tax_rate + l.cess_rate);
+      cess = round2(pctOf(taxable, l.cess_rate) + fixedCess);
       tax = round2(net - taxable - cess);
     } else {
       taxable = net;
-      cess = round2(taxable * (l.cess_rate / 100) + fixedCess);
-      tax = round2(taxable * (l.tax_rate / 100));
+      cess = round2(pctOf(taxable, l.cess_rate) + fixedCess);
+      tax = pctOf(taxable, l.tax_rate);
     }
     const parts = splitTax(tax, taxMode);
     return {
@@ -297,6 +414,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
       quantity: l.quantity,
       rate: l.rate,
       tax_rate: l.tax_rate,
+      nominal_rate: l.nominal_rate,
       cess_rate: l.cess_rate,
       cess_per_unit: l.cess_per_unit,
       cess,
@@ -325,7 +443,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
   const beforeTcs = round2(taxable_value + tax_amount + cess_amount + shipping + other_charges);
   const tcsRate = input.tcs_enabled ? Math.max(num(input.tcs_rate), 0) : 0;
   const tcsBase = input.tcs_base === 'taxable' ? taxable_value : beforeTcs;
-  const tcs_amount = round2(tcsBase * (tcsRate / 100));
+  const tcs_amount = pctOf(tcsBase, tcsRate);
   const beforeRounding = round2(beforeTcs + tcs_amount);
   const total = applyRounding(beforeRounding, resolveRoundMode(input.round_mode, input.round_off_enabled));
   const round_off = round2(total - beforeRounding);
@@ -333,7 +451,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
   // TDS is a deduction from what the customer pays; it never changes `total`.
   const tdsRate = input.tds_enabled ? Math.max(num(input.tds_rate), 0) : 0;
   const tdsBase = input.tds_on_taxable === false ? total : taxable_value;
-  const tds_amount = round2(tdsBase * (tdsRate / 100));
+  const tds_amount = pctOf(tdsBase, tdsRate);
   const payable = round2(total - tds_amount);
 
   const amount_paid = round2(Math.max(num(input.amount_paid), 0));
@@ -370,20 +488,25 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
  */
 export function allocateProportionally(weights: number[], amount: number): number[] {
   const out = weights.map(() => 0);
-  const base = weights.reduce((s, w) => s + Math.max(w, 0), 0);
-  if (amount <= 0 || base <= 0) return out;
+  const w = weights.map((x) => Math.max(x, 0));
+  const base = round2(w.reduce((sum, x) => sum + x, 0));
+  if (!(amount > 0) || !(base > 0)) return out;
 
-  let assigned = 0;
+  // Integer paise + exact rational rounding: shares never drift by a paisa from float error.
+  const P = (x: number) => BigInt(Math.round(round2(x) * 100));
+  const amountP = P(amount);
+  const baseP = P(base);
+  let assigned = 0n;
   let biggest = 0;
-  for (let i = 0; i < weights.length; i++) {
-    const part = round2((amount * Math.max(weights[i], 0)) / base);
-    out[i] = part;
-    assigned = round2(assigned + part);
-    if (Math.max(weights[i], 0) > Math.max(weights[biggest], 0)) biggest = i;
-  }
-  const drift = round2(amount - assigned);
-  if (drift !== 0) out[biggest] = round2(out[biggest] + drift);
-  return out;
+  const parts: bigint[] = w.map((x, i) => {
+    const part = baseP > 0n ? divHalfAway(amountP * P(x), baseP) : 0n;
+    assigned += part;
+    if (x > w[biggest]) biggest = i;
+    return part;
+  });
+  // the largest weight absorbs the rounding remainder so the shares re-sum EXACTLY
+  parts[biggest] += amountP - assigned;
+  return parts.map((p) => Number(p) / 100);
 }
 
 function buildSlabs(lines: CalcLine[]): TaxSlabRow[] {
