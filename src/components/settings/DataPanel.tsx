@@ -127,7 +127,7 @@ export function DataPanel({ notify }: Props) {
             </button>
             <button type="button" className={styles.action} onClick={() => fileInput.current?.click()}>
               <strong><Upload size={16} /> Restore from file</strong>
-              <span>Replaces matching data on this device with the contents of a backup file.</span>
+              <span>Replaces everything on this device with the contents of a backup file (your PIN is kept).</span>
             </button>
           </div>
           <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
