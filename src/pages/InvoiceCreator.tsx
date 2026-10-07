@@ -8,7 +8,6 @@ import { useToast } from '../components/ui/useToast';
 import { ItemsTable } from '../components/creator/ItemsTable';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
 import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
-import { DocumentActions } from '../components/creator/DocumentActions';
 import { StockWarnings } from '../components/creator/StockWarnings';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
@@ -29,6 +28,11 @@ import styles from './InvoiceCreator.module.css';
 // Lock banner (+ PIN dialog) and the saved toast only matter occasionally: keep them out of the entry chunk.
 const LockBanner = lazy(() => import('../components/creator/LockBanner').then((m) => ({ default: m.LockBanner })));
 const SavedToast = lazy(() => import('../components/creator/SavedToast').then((m) => ({ default: m.SavedToast })));
+
+// Actions for saved documents pull in conversions, sharing, e-invoice, recurring and interest.
+const DocumentActions = lazy(() =>
+  import('../components/creator/DocumentActions').then((m) => ({ default: m.DocumentActions })),
+);
 
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
@@ -436,7 +440,9 @@ export function InvoiceCreator() {
             <section className={surface.card}>
               <div className={surface.cardHead}>Document actions</div>
               <div className={surface.cardBody}>
-                <DocumentActions invoiceId={s.id} refreshKey={saveTick + lockTick} onChanged={() => setLockTick((t) => t + 1)} />
+                <Suspense fallback={<p className={styles.muted}>Loading…</p>}>
+                  <DocumentActions invoiceId={s.id} refreshKey={saveTick + lockTick} onChanged={() => setLockTick((t) => t + 1)} />
+                </Suspense>
               </div>
             </section>
           )}

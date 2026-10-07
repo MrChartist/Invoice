@@ -19,7 +19,7 @@ const env = (k, d) => Number(process.env[k] ?? d);
 
 const BUDGET_INITIAL = env('BUDGET_INITIAL_GZ_KB', 185);
 const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 580);
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 650);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 const initial = [...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1]);

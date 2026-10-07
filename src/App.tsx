@@ -13,6 +13,8 @@ import { isAuthenticated } from './lib/auth';
 const Transactions = lazy(() => import('./pages/Transactions').then((m) => ({ default: m.Transactions })));
 const Clients = lazy(() => import('./pages/Clients').then((m) => ({ default: m.Clients })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const Reconcile = lazy(() => import('./pages/Reconcile').then((m) => ({ default: m.Reconcile })));
+const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.Reports })));
 const Expenses = lazy(() => import('./pages/Expenses').then((m) => ({ default: m.Expenses })));
 const Receivables = lazy(() => import('./pages/Receivables').then((m) => ({ default: m.Receivables })));
 const Books = lazy(() => import('./pages/Books').then((m) => ({ default: m.Books })));
@@ -51,6 +53,8 @@ function App() {
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/books" element={<Books />} />
+                <Route path="/reconcile" element={<Reconcile />} />
+                <Route path="/reports" element={<Reports />} />
                 <Route path="/gst-reports" element={<GstReports />} />
                 <Route path="/exports" element={<Exports />} />
                 <Route path="/design" element={<DesignStudio />} />

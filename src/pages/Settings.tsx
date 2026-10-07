@@ -1,12 +1,14 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Check, Copy, Database, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
+import { Building2, Check, Copy, Database, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { ProfileEditor } from '../components/settings/ProfileEditor';
 import { DefaultsPanel } from '../components/settings/DefaultsPanel';
+import { CatalogPanel } from '../components/settings/CatalogPanel';
+import { LateFeeSettings } from '../components/interest';
 import { DataPanel } from '../components/settings/DataPanel';
 import { SecurityPanel } from '../components/security/SecurityPanel';
 import { AutoBackupPanel } from '../components/pwa/AutoBackupPanel';
@@ -21,10 +23,11 @@ import styles from '../components/settings/Settings.module.css';
 // The activity log is only needed on its own tab, so it stays out of the Settings chunk.
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
 
-type Tab = 'business' | 'defaults' | 'data' | 'activity' | 'security';
+type Tab = 'business' | 'items' | 'defaults' | 'data' | 'activity' | 'security';
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: 'business', label: 'Business profiles', icon: Building2 },
+  { id: 'items', label: 'Items & rates', icon: Package },
   { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
   { id: 'data', label: 'Data & backup', icon: Database },
   { id: 'activity', label: 'Activity', icon: ScrollText },
@@ -222,7 +225,16 @@ export function Settings() {
         </div>
       )}
 
-      {tab === 'defaults' && <DefaultsPanel settings={settings} onChange={patchSettings} />}
+      {tab === 'items' && <CatalogPanel notify={notify} />}
+      {tab === 'defaults' && (
+        <>
+          <DefaultsPanel settings={settings} onChange={patchSettings} />
+          <LateFeeSettings
+            profileId={settings.activeProfileId}
+            profileName={settings.profiles.find((p) => p.id === settings.activeProfileId)?.companyName}
+          />
+        </>
+      )}
       {tab === 'data' && (
         <>
           <DataPanel notify={notify} />

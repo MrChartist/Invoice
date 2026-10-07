@@ -33,6 +33,12 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
 | `stock_moves` | inventory | defined by that module |
 | `einvoice_meta` | einvoice | defined by that module |
 | `design_prefs` | templates-studio | defined by that module |
+| `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}` |
+| `audit_log` | audit | `AuditEntry` (`src/types/audit.ts`) — written by `localDb` mutations, capped at 5,000 rows |
+| `bank_statements` | reconcile | imported statement lines + match state (`docs/features/reconcile-reports.md`) |
+| `book_opening` | books | opening cash/bank balances |
+| `export_prefs` | exports | last-used export options |
+| `notif_state` | notifications | read / snoozed / dismissed notice ids |
 
 ## Integration
 Feature modules are **self-contained**: they export a page/component and (optionally) a pure

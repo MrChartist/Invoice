@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -36,6 +36,9 @@ function greeting(hour: number): string {
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+// Pulls in the whole sample-data builder, so it loads after first paint.
+const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
 
 export function Dashboard() {
   const user = getUser();
@@ -102,6 +105,10 @@ export function Dashboard() {
           </Link>
         }
       />
+
+      <Suspense fallback={null}>
+        <DemoNotice />
+      </Suspense>
 
       {showChecklist && (
         <section className={styles.checklist} aria-label="Getting started">

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  BarChart3,
   BookOpen,
   Boxes,
   FileDown,
@@ -9,6 +10,7 @@ import {
   FileText,
   HelpCircle,
   Keyboard,
+  Landmark,
   LayoutDashboard,
   Lock,
   Menu,
@@ -79,20 +81,22 @@ const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
     title: 'Accounts & GST',
     items: [
       { label: 'Books', path: '/books', icon: BookOpen },
+      { label: 'Reconcile', path: '/reconcile', icon: Landmark },
+      { label: 'Reports', path: '/reports', icon: BarChart3 },
       { label: 'GST reports', path: '/gst-reports', icon: FileSpreadsheet },
       { label: 'Exports', path: '/exports', icon: FileDown },
     ],
   },
   {
     title: 'Setup',
-    items: [
-      { label: 'Design studio', path: '/design', icon: Palette },
-      { label: 'Settings', path: '/settings', icon: Settings },
-    ],
+    items: [{ label: 'Design studio', path: '/design', icon: Palette }],
   },
 ];
 
-const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
+// Settings is pinned beside the profile card so it is reachable at any window height.
+const SETTINGS_ENTRY: NavEntry = { label: 'Settings', path: '/settings', icon: Settings };
+
+const NAV_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), SETTINGS_ENTRY];
 
 export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const location = useLocation();
@@ -199,6 +203,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
       { id: 'add-expense', title: 'Add expense or purchase bill', keywords: ['bill', 'vendor'], run: () => navigate('/expenses') },
       { id: 'record-payment', title: 'Record a payment', keywords: ['receipt', 'received'], run: () => navigate('/transactions') },
       { id: 'gst', title: 'Open GST reports', keywords: ['gstr', 'return'], run: () => navigate('/gst-reports') },
+      { id: 'brs', title: 'Bank reconciliation statement', keywords: ['bank', 'brs', 'reconcile', 'statement'], run: () => navigate('/reconcile?tab=brs') },
+      { id: 'top-customers', title: 'Top customers report', keywords: ['sales', 'customers', 'concentration'], run: () => navigate('/reports?tab=top') },
       { id: 'settings', title: 'Go to Settings', run: () => navigate('/settings') },
       { id: 'theme', title: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', keywords: ['dark', 'light', 'theme'], run: toggle },
       {
@@ -281,6 +287,13 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         </nav>
 
         <div className={styles.bottom}>
+          <NavLink
+            to={SETTINGS_ENTRY.path}
+            className={({ isActive }) => cn(styles.navItem, isActive && styles.navItemActive)}
+          >
+            <SETTINGS_ENTRY.icon className={styles.navIcon} size={18} />
+            <span>{SETTINGS_ENTRY.label}</span>
+          </NavLink>
           <InstallPrompt variant="button" />
           <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={toggle}>
             {theme === 'dark' ? <Sun className={styles.navIcon} size={18} /> : <Moon className={styles.navIcon} size={18} />}

@@ -8,10 +8,11 @@ import { DocumentTimeline } from '../documents/DocumentTimeline';
 import { ShareMenu } from '../share';
 import { EInvoiceButton } from '../einvoice';
 import { RecurringButton } from '../recurring';
+import { OverdueInterest } from '../interest';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
 import { isLocked } from '../../lib/period-lock';
-import type { InvoiceRecord } from '../../types/invoice';
+import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './DocumentActions.module.css';
 
@@ -40,6 +41,16 @@ export function DocumentActions({
   }, [invoiceId, refreshKey, tick]);
 
   if (!saved) return null;
+
+  // Interest is informational: only an explicit click turns it into a line, and it goes on a NEW invoice.
+  const addInterestLine = (item: InvoiceItem) => {
+    const store = useInvoiceStore.getState();
+    store.newDraft('INVOICE');
+    store.setClient(saved.client);
+    const blank = useInvoiceStore.getState().items[0];
+    store.applyCatalogItem(blank.id, item);
+    navigate('/invoice');
+  };
 
   const reloadEditor = () => {
     useInvoiceStore.getState().loadInvoice(invoiceId);
@@ -70,6 +81,8 @@ export function DocumentActions({
           {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? 'Reinstate' : 'Cancel document'}
         </button>
       </div>
+
+      <OverdueInterest invoice={saved} onAddLine={addInterestLine} />
 
       <DocumentTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
 

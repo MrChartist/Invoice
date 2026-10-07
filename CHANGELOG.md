@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [3.0.0] — 2026-10-07
 
+### Compliance & workflow (added late in 3.0)
+- Duplicate document numbers are refused; series gaps are surfaced.
+- Audit trail (`audit_log`) for invoices, payments, clients, profiles and settings, with an Activity tab and per-invoice timeline.
+- "Lock books up to" period lock enforced in the data layer, with PIN-guarded, audited overrides.
+- Editable item catalogue with bulk rate revision; saving an invoice no longer overwrites a default rate you set deliberately.
+- Bank reconciliation (statement import, scored suggestions you confirm, BRS) and a Reports page.
+- IRN / signed QR / e-way number printed on every template; inter-state invoices now print IGST instead of "CGST 0.00 / SGST 0.00".
+- Late-fee interest helper (informational), sample-data loader, Tally-style keyboard entry.
+- Sidebar keeps Settings pinned so it is always reachable.
+
 ### Brand & design
 - Adopted the official Mr. Chartist symbol, wordmark, favicon and social image from mrchartist.com, and rebuilt the design tokens on the site's paper / void palette with the brand-orange primary.
 - Rebuilt every screen on shared primitives: Login, Dashboard, invoice editor, invoice list, Clients and Settings. Responsive to 390 px, with a working light/dark toggle.

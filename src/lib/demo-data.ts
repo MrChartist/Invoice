@@ -26,7 +26,7 @@ import { gstinChecksumChar } from './gstin';
 import { localDayOf, shiftDay } from './dates';
 import { buildInvoiceNumber, getIndianFY } from './invoice-number';
 import { localDb, blankProfile } from './localDb';
-import { KEYS, SINGLETON_KEYS, getTable, readRaw, setTable, writeRaw } from './storage';
+import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, readRaw, removeRaw, setTable, writeRaw } from './storage';
 import { DOC_LINKS_TABLE, buildCreditNote, type DocLink } from './documents';
 import { PAYMENTS_TABLE, PURCHASES_TABLE, computePurchaseTotals, type PurchasePayment } from './purchases';
 import { VENDORS_TABLE } from './vendors';
@@ -507,6 +507,8 @@ export interface LoadDemoOptions {
   today?: Date | string;
 }
 
+const AUDIT_KEY = `${DB_PREFIX}audit_log`;
+
 export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
   const status = demoStatus();
   if (status.loaded) return { ok: false, reason: 'already_loaded' };
@@ -523,6 +525,9 @@ export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
   const rawSnapshots = new Map<string, string | null>(
     [SINGLETON_KEYS.settings].map((k) => [k, readRaw(k)] as [string, string | null]),
   );
+  // Sample rows are not real business activity: keep them out of the audit trail entirely.
+  const auditBefore = readRaw(AUDIT_KEY);
+  const restoreAudit = () => (auditBefore === null ? removeRaw(AUDIT_KEY) : writeRaw(AUDIT_KEY, auditBefore));
 
   try {
     // Payments first: `save` keeps the ledger as the floor for what has been received.
@@ -602,8 +607,10 @@ export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
     } catch {
       /* the original error is the useful one */
     }
+    restoreAudit();
     throw err;
   }
+  restoreAudit();
   return { ok: true, counts: demoStatus().counts };
 }
 
@@ -620,6 +627,8 @@ function nextMonthStart(today: string): string {
 export function removeDemoData(): DemoCounts {
   const before = demoStatus().counts;
   const schedules = demoScheduleIds();
+  // Removal itself must not write history either; the audit log is rebuilt at the end without sample rows.
+  const auditRaw = readRaw(AUDIT_KEY);
 
   const invoices = getTable<Demo<InvoiceRecord>>(KEYS.invoices);
   const goneInvoices = new Set(invoices.filter((i) => isDemoInvoice(i, schedules)).map((i) => i.id));
@@ -657,5 +666,25 @@ export function removeDemoData(): DemoCounts {
       });
     }
   }
+  restoreAuditWithoutDemo(auditRaw, goneInvoices);
   return before;
+}
+
+/** Puts the audit log back as it was, minus rows about sample documents. Never throws. */
+function restoreAuditWithoutDemo(raw: string | null, goneInvoices: ReadonlySet<string>): void {
+  try {
+    if (raw === null) return removeRaw(AUDIT_KEY);
+    const rows = JSON.parse(raw) as { entity_id?: string; parent_id?: string; doc_number?: string }[];
+    const kept = Array.isArray(rows)
+      ? rows.filter(
+          (a) =>
+            !(a.entity_id && (a.entity_id.startsWith('demo-') || goneInvoices.has(a.entity_id))) &&
+            !(a.parent_id && goneInvoices.has(a.parent_id)) &&
+            !(a.doc_number && /^DEMO(CN)?\//.test(a.doc_number)),
+        )
+      : rows;
+    writeRaw(AUDIT_KEY, kept === rows ? raw : JSON.stringify(kept));
+  } catch {
+    /* the audit trail must never make a removal fail */
+  }
 }

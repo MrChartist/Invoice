@@ -336,7 +336,7 @@
 }
 
 /* Short windows: tighten the rail so every group fits without scrolling. */
-@media (min-width: 901px) and (max-height: 820px) {
+@media (min-width: 901px) and (max-height: 960px) {
   .sidebar {
     padding-top: 0.75rem;
     padding-bottom: 0.625rem;

@@ -261,14 +261,21 @@ export const localDb = {
 
   items: {
     getAll: () => getTable<InvoiceItem>(KEYS.items),
-    upsert: (item: Partial<InvoiceItem> & { name: string }) => {
+    /**
+     * Adds or updates a catalogue item by name. With `fillOnly`, an existing item keeps every
+     * value it already has and only gains the ones it was missing — used when learning from a
+     * saved invoice, so a one-off price on one invoice never silently rewrites the default rate.
+     */
+    upsert: (item: Partial<InvoiceItem> & { name: string }, opts: { fillOnly?: boolean } = {}) => {
       const items = getTable<InvoiceItem>(KEYS.items);
       const name = item.name.trim().toLowerCase();
       if (!name) return;
       const idx = items.findIndex((i) => i.name?.trim().toLowerCase() === name);
       if (idx >= 0) {
         // A line typed without an HSN / unit must not erase the catalogue's.
-        items[idx] = { ...items[idx], ...keepFilled(item) };
+        items[idx] = opts.fillOnly
+          ? { ...keepFilled(item), ...keepFilled(items[idx]) } as InvoiceItem
+          : { ...items[idx], ...keepFilled(item) };
       } else {
         items.push({ ...(item as InvoiceItem), id: generateId() });
       }
@@ -368,14 +375,17 @@ export const localDb = {
       if (toSave.client?.name?.trim()) localDb.clients.upsert(toSave.client);
       for (const item of toSave.items ?? []) {
         if (item.name?.trim()) {
-          localDb.items.upsert({
-            name: item.name,
-            type: item.type,
-            rate: item.rate,
-            hsn: item.hsn,
-            unit: item.unit,
-            tax_rate: item.tax_rate,
-          });
+          localDb.items.upsert(
+            {
+              name: item.name,
+              type: item.type,
+              rate: item.rate,
+              hsn: item.hsn,
+              unit: item.unit,
+              tax_rate: item.tax_rate,
+            },
+            { fillOnly: true },
+          );
         }
       }
       return toSave;

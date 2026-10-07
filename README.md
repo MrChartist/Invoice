@@ -35,19 +35,24 @@ It aims to cover what a small Indian business actually reaches for in Tally, Zoh
 - 26 templates across 4 layouts, plus a **Design Studio**: accent colour, fonts, column visibility, A4 / A5 / 80 mm thermal paper, PAID / OVERDUE stamps
 - UPI "scan to pay" QR on every invoice; multi-page PDF export and print
 - Recurring invoices, payment reminders (WhatsApp / email / SMS links, English & Hinglish) and share menu
-- Client directory, item catalogue, part-payments with history
+- Client directory, editable item catalogue (default rate, HSN/SAC, GST, unit, bulk % rate revision), part-payments with history
+- Compliance guards: duplicate document numbers are refused (GST rule 46), every change is written to an audit trail, and a "lock books up to" date freezes filed periods (override needs your PIN)
+- IRN, Ack No and the signed e-invoice QR print on all templates once recorded; optional late-fee interest from *your own* invoice terms (informational, never added to a total automatically)
 
 **Accounts & GST**
 - Receivables: aging, party ledgers and printable client statements, DSO, collections trend
 - Purchases & expenses with vendors, payables and input tax credit
 - Inventory with weighted-average or FIFO costing, low-stock alerts and sale-time shortfall warnings
 - Books: day book, cash & bank book, profit & loss (accrual or cash), indicative balance sheet
+- Bank reconciliation: import HDFC / ICICI / SBI / Axis / Kotak CSV statements, review scored match suggestions (nothing is applied until you confirm), print a BRS
+- Reports: sales by customer / item / month (with year-on-year), top customers, tax by rate, payment modes, expenses, item profit — all reconcile with the dashboard and Books
 - GSTR-1 / GSTR-3B working papers with GSTN-offline-tool-style JSON
 - e-Invoice (IRP v1.1) and e-Way Bill JSON generators with pre-flight validation
 - Tally Prime XML export and Zoho / Vyapar / Busy-friendly CSV; CSV import from the same tools
 
 **Everyday comfort**
-- Ctrl/⌘ + K command palette, notification centre, keyboard shortcuts (`?`)
+- Ctrl/⌘ + K command palette, notification centre, keyboard shortcuts (`?`), Tally-style line entry (Enter adds a line, Ctrl/⌘+Enter saves)
+- One-click sample data to explore the app, removable without touching your own records
 - Light & dark themes that follow the mrchartist.com palette
 - Installable PWA with a service worker, auto-backup to a folder you choose, and passphrase-encrypted backups
 - Hashed PIN lock with lockout and idle auto-lock
