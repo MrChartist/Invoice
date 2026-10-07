@@ -182,6 +182,18 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
             <span>{money(totals.tax_amount, cur)}</span>
           </div>
         )}
+        {totals.cess_amount > 0 && (
+          <div className={styles.totalRow}>
+            <span>Cess</span>
+            <span>{money(totals.cess_amount, cur)}</span>
+          </div>
+        )}
+        {totals.tcs_amount > 0 && (
+          <div className={styles.totalRow}>
+            <span>{invoice.tcs_label || 'TCS'}</span>
+            <span>{money(totals.tcs_amount, cur)}</span>
+          </div>
+        )}
         {totals.shipping > 0 && (
           <div className={styles.totalRow}>
             <span>{t('shipping')}</span>
@@ -223,7 +235,20 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
         </div>
       )}
 
-      {totals.amount_paid > 0 && (
+      {(invoice.supply_type === 'EXPORT_LUT' || invoice.supply_type === 'SEZ_WITHOUT_PAYMENT') && (
+        <div className={styles.words}>
+          Supply meant for export/SEZ under LUT/bond without payment of IGST
+          {invoice.lut_number ? ` — LUT No. ${invoice.lut_number}` : ''}
+          {invoice.lut_date ? ` dated ${invoice.lut_date}` : ''}.
+        </div>
+      )}
+      {totals.tds_amount > 0 && (
+        <div className={styles.totalRow}>
+          <span>Less: TDS{invoice.tds_section && invoice.tds_section !== 'CUSTOM' ? ` (${invoice.tds_section})` : ''}</span>
+          <span>-{money(totals.tds_amount, cur)}</span>
+        </div>
+      )}
+      {(totals.amount_paid > 0 || totals.tds_amount > 0) && (
         <div className={styles.balance}>
           <span>{t('balanceDue')}</span>
           <span>{money(totals.balance_due, cur)}</span>

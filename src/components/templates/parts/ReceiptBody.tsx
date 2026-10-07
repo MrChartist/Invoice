@@ -96,6 +96,8 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
         </>
       )}
       {igst && <Row label={invoice.gst_mode === 'SINGLE' ? 'Tax' : 'IGST'} value={money(totals.tax_amount, cur)} />}
+      {totals.cess_amount > 0 && <Row label="Cess" value={money(totals.cess_amount, cur)} />}
+      {totals.tcs_amount > 0 && <Row label={invoice.tcs_label || 'TCS'} value={money(totals.tcs_amount, cur)} />}
       {totals.shipping > 0 && <Row label="Shipping" value={money(totals.shipping, cur)} />}
       {totals.other_charges !== 0 && <Row label="Other charges" value={money(totals.other_charges, cur)} />}
       {totals.round_off !== 0 && <Row label="Round off" value={money(totals.round_off, cur)} />}
@@ -105,9 +107,10 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
         <span>{currency(totals.total, cur)}</span>
       </div>
       {show.words && <div className={cn(styles.rcSmall, styles.rcWords)}>{amountInWords(totals.total, cur)}</div>}
-      {totals.amount_paid > 0 && (
+      {totals.tds_amount > 0 && <Row label="Less: TDS" value={`-${money(totals.tds_amount, cur)}`} />}
+      {(totals.amount_paid > 0 || totals.tds_amount > 0) && (
         <>
-          <Row label="Paid" value={money(totals.amount_paid, cur)} />
+          {totals.amount_paid > 0 && <Row label="Paid" value={money(totals.amount_paid, cur)} />}
           <Row label="Balance due" value={money(totals.balance_due, cur)} strong />
         </>
       )}

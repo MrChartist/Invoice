@@ -170,3 +170,45 @@
     opacity: 1;
   }
 }
+
+.cessToggle {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.cessToggle:hover {
+  color: var(--brand-text);
+}
+
+.cessRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.cessInput {
+  width: 4.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  text-align: right;
+}
+
+.cessInput:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}

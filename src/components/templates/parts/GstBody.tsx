@@ -181,6 +181,18 @@ export function GstBody({ invoice, sender, totals }: Props) {
               <td className={cn(styles.right, styles.num)}>{money(totals.tax_amount, cur)}</td>
             </tr>
           )}
+          {totals.cess_amount > 0 && (
+            <tr className={styles.gLedger}>
+              <td colSpan={spanBefore} className={styles.right}>Cess</td>
+              <td className={cn(styles.right, styles.num)}>{money(totals.cess_amount, cur)}</td>
+            </tr>
+          )}
+          {totals.tcs_amount > 0 && (
+            <tr className={styles.gLedger}>
+              <td colSpan={spanBefore} className={styles.right}>{invoice.tcs_label || 'TCS'}</td>
+              <td className={cn(styles.right, styles.num)}>{money(totals.tcs_amount, cur)}</td>
+            </tr>
+          )}
           {totals.shipping > 0 && (
             <tr className={styles.gLedger}>
               <td colSpan={spanBefore} className={styles.right}>Shipping</td>

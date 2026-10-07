@@ -85,6 +85,9 @@ export function SummaryPanel() {
       {s.gst_mode === 'IGST' && <Row label="IGST">{money(t.igst_amount)}</Row>}
       {s.gst_mode === 'SINGLE' && <Row label="Tax">{money(t.tax_amount)}</Row>}
 
+      {t.cess_amount > 0 && <Row label="Cess">{money(t.cess_amount)}</Row>}
+      {t.tcs_amount > 0 && <Row label={s.tcs_label || 'TCS'}>{money(t.tcs_amount)}</Row>}
+
       <div className={styles.inputRow}>
         <span>Shipping</span>
         <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.shipping} onChange={s.setShipping} placeholder="0.00" aria-label="Shipping" />
@@ -112,7 +115,12 @@ export function SummaryPanel() {
             <span>Amount received</span>
             <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.amount_paid} onChange={s.setAmountPaid} placeholder="0.00" aria-label="Amount received" />
           </div>
-          {s.amount_paid > 0 && (
+          {t.tds_amount > 0 && (
+            <Row label={`Less: TDS${s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${s.tds_section})` : ''}`} tone="good">
+              −{money(t.tds_amount)}
+            </Row>
+          )}
+          {(s.amount_paid > 0 || t.tds_amount > 0) && (
             <Row label="Balance due" strong>
               {money(t.balance_due)}
             </Row>

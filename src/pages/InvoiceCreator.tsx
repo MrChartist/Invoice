@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { useToast } from '../components/ui/useToast';
 import { ItemsTable } from '../components/creator/ItemsTable';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
+import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
@@ -295,6 +296,7 @@ export function InvoiceCreator() {
             <div className={surface.cardHead}>Summary</div>
             <div className={surface.cardBody}>
               <SummaryPanel />
+              <AdvancedTaxPanel />
               <div className={styles.sideActions}>
                 <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()}>
                   <Save size={18} /> Save {label.toLowerCase()}

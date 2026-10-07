@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowDown, ArrowUp, Copy, Library, Plus, Trash2 } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
@@ -13,6 +14,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const currency = useInvoiceStore((s) => s.currency);
   const docType = useInvoiceStore((s) => s.doc_type);
   const { addItem, updateItem, duplicateItem, moveItem, removeItem } = useInvoiceStore.getState();
+  const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});
   const showTax = gstMode !== 'NONE';
   const priced = docType !== 'DELIVERY_CHALLAN';
 
@@ -55,6 +57,19 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 placeholder="Description (optional)"
                 aria-label={`Item ${index + 1} description`}
               />
+              {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
+                <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>
+                  + Add cess
+                </button>
+              )}
+              {showTax && priced && (item.cess_rate || item.cess_per_unit || cessOpen[item.id]) ? (
+                <div className={styles.cessRow}>
+                  <span>Cess %</span>
+                  <NumberInput className={styles.cessInput} value={item.cess_rate ?? 0} onChange={(n) => updateItem(item.id, 'cess_rate', n)} placeholder="0" aria-label={`Item ${index + 1} cess percent`} />
+                  <span>+ per unit</span>
+                  <NumberInput className={styles.cessInput} value={item.cess_per_unit ?? 0} onChange={(n) => updateItem(item.id, 'cess_per_unit', n)} placeholder="0" aria-label={`Item ${index + 1} cess per unit`} />
+                </div>
+              ) : null}
             </div>
 
             <div className={styles.cell} data-label="HSN / SAC">
