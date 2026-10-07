@@ -13,6 +13,9 @@ import { calculateInvoice, deriveGstMode, round2 } from './invoice-calc';
 import { writeCsv } from './csv';
 import { fieldsFor, type ColumnMapping, type ImportKind } from './import-mapping';
 import { KEYS, generateId, getTable, setTable } from './storage';
+import { audit } from './audit';
+import { numberKey } from './invoice-number';
+import { getLockUntil, isDateLocked, prettyDay } from './period-lock';
 import { blankClient, normalizeRecord } from '../store/invoice-defaults';
 
 /* ══════════════════════════════════════════════════════════════
@@ -1096,15 +1099,22 @@ export function createLocalSink(): ImportSink {
     },
     invoices(rows) {
       const all = getTable<InvoiceRecord>(KEYS.invoices);
-      const taken = new Set(all.map((i) => (i.invoice_number ?? '').trim().toLowerCase()));
+      const taken = new Set(all.map((i) => numberKey(i.invoice_number)));
       const clients = getTable<Client>(KEYS.clients);
       const idx = indexClients(clients);
       const now = new Date().toISOString();
       const written: string[] = [];
       let clientsChanged = false;
+      const lockUntil = getLockUntil();
+      let lockedSkipped = 0;
       for (const inv of rows) {
-        const key = inv.invoice_number.trim().toLowerCase();
+        const key = numberKey(inv.invoice_number);
         if (taken.has(key)) continue; // never overwrite an existing number
+        // Period lock: an import may not create documents inside the frozen period.
+        if (isDateLocked(inv.issue_date, lockUntil)) {
+          lockedSkipped++;
+          continue;
+        }
         taken.add(key);
         const g = (inv.client.gstin ?? '').toUpperCase();
         let c = findClient(idx, inv.client.name, g);
@@ -1121,6 +1131,16 @@ export function createLocalSink(): ImportSink {
       }
       setTable(KEYS.invoices, all);
       if (clientsChanged) setTable(KEYS.clients, clients);
+      if (written.length || lockedSkipped) {
+        audit.record({
+          entity: 'invoice',
+          entity_id: 'import',
+          action: 'import',
+          summary:
+            `Imported ${written.length} document${written.length === 1 ? '' : 's'}` +
+            (lockedSkipped ? `; ${lockedSkipped} skipped (dated inside the locked period, books locked up to ${lockUntil})` : ''),
+        });
+      }
       return written;
     },
   };
@@ -1180,7 +1200,15 @@ export async function applyImport(
           if (written.has((r.record as InvoiceRecord).id)) report.created++;
           else {
             report.skipped++;
-            report.errors.push({ line: r.line, label: r.label, message: 'Invoice number already exists — not overwritten' });
+            const lockUntil = getLockUntil();
+            const locked = isDateLocked((r.record as InvoiceRecord).issue_date, lockUntil);
+            report.errors.push({
+              line: r.line,
+              label: r.label,
+              message: locked
+                ? `Dated inside the locked period (books locked up to ${prettyDay(lockUntil)}) — not imported`
+                : 'Invoice number already exists — not overwritten',
+            });
           }
         }
       }

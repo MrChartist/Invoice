@@ -7,6 +7,7 @@ import {
   Eye,
   FilePlus2,
   FileText,
+  Lock,
   Pencil,
   Search,
   Trash2,
@@ -21,6 +22,7 @@ import { useToast } from '../components/ui/useToast';
 
 import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId } from '../lib/localDb';
+import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { effectiveStatus } from '../lib/invoice-status';
 import { getTable } from '../lib/storage';
@@ -244,12 +246,15 @@ export function Transactions() {
                 {rows.map((inv) => {
                   const status = effectiveStatus(inv, now);
                   const canPay = isRevenueDoc(inv) && (inv.balance_due ?? inv.total) > 0;
+                  const locked = isLocked(inv); // period lock: read-only, no edit / delete / payment
+                  const lockedTitle = 'Locked period — open the document to view or unlock it';
                   return (
                     <tr key={inv.id}>
                       <td className={styles.cDoc}>
                         <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
                           {inv.invoice_number}
                         </Link>
+                        {locked && <Lock size={12} aria-label="Locked period" style={{ marginLeft: 6, verticalAlign: '-1px', color: 'var(--warning)' }} />}
                         <div className={styles.docType}>{DOCUMENT_LABELS[inv.doc_type] ?? 'Invoice'}</div>
                       </td>
                       <td className={styles.cClient}>
@@ -274,20 +279,20 @@ export function Transactions() {
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
                           {canPay && (
-                            <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} title="Record payment" aria-label={`Record payment for ${inv.invoice_number}`}>
+                            <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} disabled={locked} title={locked ? lockedTitle : 'Record payment'} aria-label={`Record payment for ${inv.invoice_number}`}>
                               <Banknote size={16} />
                             </button>
                           )}
                           <button type="button" className={controls.btnIcon} onClick={() => handlePreview(inv)} title="Preview / PDF" aria-label={`Preview ${inv.invoice_number}`}>
                             <Eye size={16} />
                           </button>
-                          <button type="button" className={controls.btnIcon} onClick={() => navigate(`/invoice/${inv.id}`)} title="Edit" aria-label={`Edit ${inv.invoice_number}`}>
+                          <button type="button" className={controls.btnIcon} onClick={() => navigate(`/invoice/${inv.id}`)} disabled={locked} title={locked ? lockedTitle : 'Edit'} aria-label={`Edit ${inv.invoice_number}`}>
                             <Pencil size={16} />
                           </button>
                           <button type="button" className={controls.btnIcon} onClick={() => handleDuplicate(inv)} title="Duplicate" aria-label={`Duplicate ${inv.invoice_number}`}>
                             <Copy size={16} />
                           </button>
-                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting(inv)} title="Delete" aria-label={`Delete ${inv.invoice_number}`}>
+                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting(inv)} disabled={locked} title={locked ? lockedTitle : 'Delete'} aria-label={`Delete ${inv.invoice_number}`}>
                             <Trash2 size={16} />
                           </button>
                         </div>

@@ -1,6 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
+import { AlertTriangle, Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -12,10 +12,12 @@ import { DocumentActions } from '../components/creator/DocumentActions';
 import { StockWarnings } from '../components/creator/StockWarnings';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
+import { isSaveShortcut } from '../components/creator/line-keys';
 
 import { ClientSearchModal } from '../components/modals/ClientSearchModal';
 import { ItemSearchModal } from '../components/modals/ItemSearchModal';
 import { localDb } from '../lib/localDb';
+import { lockState } from '../lib/period-lock';
 import { getJson, SINGLETON_KEYS } from '../lib/storage';
 import { STATUS_OPTIONS } from '../lib/invoice-status';
 import { addDaysInput, CURRENCIES, formatCurrency, cn } from '../lib/utils';
@@ -23,6 +25,10 @@ import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord, type InvoiceSta
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
+
+// Lock banner (+ PIN dialog) and the saved toast only matter occasionally: keep them out of the entry chunk.
+const LockBanner = lazy(() => import('../components/creator/LockBanner').then((m) => ({ default: m.LockBanner })));
+const SavedToast = lazy(() => import('../components/creator/SavedToast').then((m) => ({ default: m.SavedToast })));
 
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
@@ -46,6 +52,8 @@ export function InvoiceCreator() {
   const [hasDraft, setHasDraft] = useState(false);
   const [missing, setMissing] = useState(false);
   const [saveTick, setSaveTick] = useState(0);
+  const [lockTick, setLockTick] = useState(0);
+  const [savedToast, setSavedToast] = useState<{ message: string; gapHint: string } | null>(null);
 
   const profiles = useMemo(() => localDb.settings.get().profiles.filter((p) => p.companyName.trim()), []);
   const editing = Boolean(s.id);
@@ -54,6 +62,25 @@ export function InvoiceCreator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [s.invoice_number, s.issue_date, s.doc_type, s.sender?.invoicePrefix, s.id],
   );
+
+  // The stored copy decides whether the document is frozen (the edited date must not unlock itself).
+  const stored = useMemo(
+    () => (s.id ? localDb.invoices.getById(s.id) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [s.id, saveTick, lockTick],
+  );
+  const storedLock = stored ? lockState(stored) : 'open';
+  const readOnly = storedLock === 'locked';
+  const dateLocked = storedLock === 'open' && lockState({ id: s.id, issue_date: s.issue_date }) === 'locked';
+
+  // GST Rule 46: live uniqueness check of a hand-typed number (deferred so typing stays snappy).
+  const typedNumber = useDeferredValue(s.invoice_number);
+  const numberCheck = useMemo(
+    () => (typedNumber.trim() ? localDb.invoices.checkNumber(typedNumber, s.id || undefined) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [typedNumber, s.id, saveTick],
+  );
+  const numberTaken = numberCheck && !numberCheck.ok ? numberCheck.clash : undefined;
 
   // Decide what the editor shows when the route changes.
   useEffect(() => {
@@ -83,10 +110,11 @@ export function InvoiceCreator() {
   }, [profiles, id]);
 
   const save = useCallback(
-    (asDraft = false) => {
+    (asDraft = false, andNew = false) => {
       const result = useInvoiceStore.getState().saveInvoice({ asDraft });
       if (!result.ok) {
         setErrors(result.errors);
+        if (result.locked) setLockTick((t) => t + 1);
         window.scrollTo?.({ top: 0 });
         notify(result.errors[0] ?? 'Could not save.', 'error');
         return;
@@ -94,7 +122,20 @@ export function InvoiceCreator() {
       setErrors([]);
       setSaveTick((t) => t + 1);
       const rec = result.record!;
-      notify(`${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number} saved`);
+      const message = `${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number} saved`;
+      if (andNew) {
+        // Save & new: straight to a clean form of the same type.
+        useInvoiceStore.getState().newDraft(rec.doc_type);
+        setHasDraft(false);
+        if (id) navigate('/invoice');
+        notify(message);
+        return;
+      }
+      const gap = result.gap;
+      const gapHint = gap
+        ? `Series gap: ${gap.missingNumbers.slice(0, 3).join(', ')}${gap.missingCount > 3 ? ` and ${gap.missingCount - 3} more` : ''} left unused.`
+        : '';
+      setSavedToast({ message, gapHint });
       if (!id) navigate(`/invoice/${rec.id}`, { replace: true });
     },
     [id, navigate, notify],
@@ -105,7 +146,10 @@ export function InvoiceCreator() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       const key = e.key.toLowerCase();
-      if (key === 's') {
+      if (isSaveShortcut(e)) {
+        e.preventDefault();
+        save();
+      } else if (key === 's') {
         e.preventDefault();
         save();
       } else if (key === 'p') {
@@ -183,11 +227,11 @@ export function InvoiceCreator() {
               <Eye size={16} /> Preview
             </button>
             {!editing && (
-              <button type="button" className={controls.btnOutline} onClick={() => save(true)}>
+              <button type="button" className={controls.btnOutline} onClick={() => save(true)} disabled={readOnly}>
                 Save draft
               </button>
             )}
-            <button type="button" className={controls.btnPrimary} onClick={() => save()}>
+            <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly} title={readOnly ? 'Locked — unlock with your PIN to edit' : 'Save (Ctrl+S)'}>
               <Save size={16} /> Save
             </button>
           </>
@@ -207,6 +251,16 @@ export function InvoiceCreator() {
         </div>
       )}
 
+      {stored && storedLock !== 'open' ? (
+        <Suspense fallback={<div className={styles.bannerSlot} aria-hidden="true" />}>
+          <LockBanner docId={stored.id} docNumber={stored.invoice_number} issueDate={stored.issue_date} onChange={() => setLockTick((t) => t + 1)} />
+        </Suspense>
+      ) : dateLocked ? (
+        <Suspense fallback={<div className={styles.bannerSlot} aria-hidden="true" />}>
+          <LockBanner docId="" issueDate={s.issue_date} onChange={() => setLockTick((t) => t + 1)} />
+        </Suspense>
+      ) : null}
+
       {errors.length > 0 && (
         <div className={styles.errors} role="alert">
           <div>
@@ -224,7 +278,8 @@ export function InvoiceCreator() {
       )}
 
       <div className={styles.layout}>
-        <div className={styles.main}>
+        <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
+          <legend className={surface.srOnly}>{readOnly ? 'Document (locked, read-only)' : 'Document'}</legend>
           <section className={surface.card}>
             <div className={surface.cardHead}>1 · Document</div>
             <div className={surface.cardBody}>
@@ -247,8 +302,30 @@ export function InvoiceCreator() {
                     value={s.invoice_number}
                     onChange={(e) => s.setInvoiceNumber(e.target.value)}
                     placeholder={nextNumber || 'Auto'}
+                    aria-invalid={numberTaken ? true : undefined}
+                    aria-describedby="number-hint"
                   />
-                  {!editing && <span className={controls.hint}>Leave blank to number automatically.</span>}
+                  <span id="number-hint" aria-live="polite">
+                    {numberTaken ? (
+                      <span className={cn(styles.numberHint, styles.numberBad)}>
+                        <AlertTriangle size={13} aria-hidden="true" />
+                        <span>
+                          Already used by {numberTaken.invoice_number}
+                          {numberTaken.client?.name ? ` (${numberTaken.client.name})` : ''}. Every document needs its own number (GST Rule 46).
+                        </span>
+                      </span>
+                    ) : numberCheck?.gap ? (
+                      <span className={cn(styles.numberHint, styles.numberGap)}>
+                        <AlertTriangle size={13} aria-hidden="true" />
+                        <span>
+                          This skips {numberCheck.gap.missingNumbers.slice(0, 3).join(', ')}
+                          {numberCheck.gap.missingCount > 3 ? ` and ${numberCheck.gap.missingCount - 3} more` : ''}. Allowed, but a gap in the series may need explaining at filing.
+                        </span>
+                      </span>
+                    ) : !editing ? (
+                      <span className={controls.hint}>Leave blank to number automatically.</span>
+                    ) : null}
+                  </span>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>PO / reference no.</span>
@@ -330,17 +407,23 @@ export function InvoiceCreator() {
               </label>
             </div>
           </section>
-        </div>
+        </fieldset>
 
         <aside className={styles.side}>
           <section className={surface.card}>
             <div className={surface.cardHead}>Summary</div>
             <div className={surface.cardBody}>
-              <SummaryPanel />
-              <AdvancedTaxPanel />
+              <fieldset className={cn(styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
+                <legend className={surface.srOnly}>Summary and tax</legend>
+                <SummaryPanel />
+                <AdvancedTaxPanel />
+              </fieldset>
               <div className={styles.sideActions}>
-                <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()}>
+                <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()} disabled={readOnly}>
                   <Save size={18} /> Save {label.toLowerCase()}
+                </button>
+                <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => save(false, true)} disabled={readOnly}>
+                  <FilePlus2 size={16} /> Save &amp; new
                 </button>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => setPreviewOpen(true)}>
                   <Eye size={16} /> Preview &amp; download PDF
@@ -353,7 +436,7 @@ export function InvoiceCreator() {
             <section className={surface.card}>
               <div className={surface.cardHead}>Document actions</div>
               <div className={surface.cardBody}>
-                <DocumentActions invoiceId={s.id} refreshKey={saveTick} />
+                <DocumentActions invoiceId={s.id} refreshKey={saveTick + lockTick} onChanged={() => setLockTick((t) => t + 1)} />
               </div>
             </section>
           )}
@@ -382,7 +465,7 @@ export function InvoiceCreator() {
         <button type="button" className={controls.btnOutline} onClick={() => setPreviewOpen(true)} aria-label="Preview">
           <Eye size={16} />
         </button>
-        <button type="button" className={controls.btnPrimary} onClick={() => save()}>
+        <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly}>
           <Save size={16} /> Save
         </button>
       </div>
@@ -395,6 +478,22 @@ export function InvoiceCreator() {
       <ClientSearchModal isOpen={clientsOpen} onClose={() => setClientsOpen(false)} />
       <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
       {toastNode}
+      {savedToast && (
+        <Suspense fallback={null}>
+        <SavedToast
+          message={savedToast.message}
+          gapHint={savedToast.gapHint}
+          onClose={() => setSavedToast(null)}
+          onView={() => setPreviewOpen(true)}
+          onShare={() => {
+            const anchor = document.querySelector<HTMLElement>('[data-share-anchor] button');
+            anchor?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+            anchor?.click();
+          }}
+          onNew={() => startNew(s.doc_type)}
+        />
+        </Suspense>
+      )}
     </div>
   );
 }

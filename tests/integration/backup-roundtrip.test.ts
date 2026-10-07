@@ -61,8 +61,12 @@ function populate() {
   return inv;
 }
 
+// The audit log is excluded: a restore deliberately appends its own "restore" row (see the audit-lock tests).
+const AUDIT_KEY = DB_PREFIX + 'audit_log';
 const appKeys = (snap: Record<string, string>) =>
-  Object.fromEntries(Object.entries(snap).filter(([k]) => k.startsWith(DB_PREFIX) && !DEVICE_LOCAL_KEYS.includes(k)));
+  Object.fromEntries(
+    Object.entries(snap).filter(([k]) => k.startsWith(DB_PREFIX) && !DEVICE_LOCAL_KEYS.includes(k) && k !== AUDIT_KEY),
+  );
 
 test('backup -> wipe -> restore preserves every table exactly and leaves device-local keys alone', () => {
   populate();

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { localDb } from '../lib/localDb';
+import { DuplicateNumberError, type SeriesGap } from '../lib/invoice-number';
+import { getLockUntil, isPeriodLockedError, lockMessage, lockState, prettyDay } from '../lib/period-lock';
 import { generateId, getJson, removeRaw, setJson, SINGLETON_KEYS } from '../lib/storage';
 import {
   calculateInvoice,
@@ -35,6 +37,10 @@ export interface SaveResult {
   ok: boolean;
   errors: string[];
   record?: InvoiceRecord;
+  /** True when the save was refused by the period lock (the editor shows the Unlock path). */
+  locked?: boolean;
+  /** A hand-typed number that skipped ahead of the series: the numbers left unused (a hint, not an error). */
+  gap?: SeriesGap | null;
 }
 
 export interface InvoiceState extends InvoiceRecord {
@@ -431,6 +437,23 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         errors.push('Document total is zero — check the rates.');
       }
       if (s.amount_paid > s.total - (s.tds_amount ?? 0)) errors.push('Amount received is more than the total.');
+
+      // Period lock: a frozen document is read-only, and nothing may be dated into a frozen period.
+      const lockUntil = getLockUntil();
+      if (lockUntil) {
+        const stored = s.id ? localDb.invoices.getById(s.id) : undefined;
+        if (stored && lockState(stored, lockUntil) === 'locked') {
+          errors.push(lockMessage(lockUntil, 'edit', stored.issue_date, stored.invoice_number));
+        } else if (lockState({ id: s.id, issue_date: s.issue_date }, lockUntil) === 'locked') {
+          errors.push(`Issue date ${prettyDay(s.issue_date)} is inside the locked period (books locked up to ${prettyDay(lockUntil)}). Choose a later date.`);
+        }
+      }
+      // GST Rule 46: the number must be unique.
+      const typed = s.invoice_number.trim();
+      if (typed) {
+        const check = localDb.invoices.checkNumber(typed, s.id || undefined);
+        if (!check.ok && check.clash) errors.push(new DuplicateNumberError(typed, check.clash).message);
+      }
       return errors;
     },
 
@@ -451,9 +474,12 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
 
     saveInvoice: (opts) => {
       const errors = get().validate();
-      if (errors.length) return { ok: false, errors };
+      if (errors.length) return { ok: false, errors, locked: errors.some((e) => e.startsWith('Books are locked')) };
 
       const state = get();
+      // A hand-typed number that skips ahead leaves holes in the series: remember them for the hint.
+      const typedNumber = state.invoice_number.trim();
+      const gap = typedNumber ? localDb.invoices.checkNumber(typedNumber, state.id || undefined).gap : null;
       const record = toRecord(state);
       // Drop the empty trailing row users leave behind.
       record.items = record.items.filter((i) => i.name.trim() || num(i.rate) > 0);
@@ -473,9 +499,9 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         removeRaw(SINGLETON_KEYS.draft);
         set({ ...saved, dirty: false });
         get().recalculate();
-        return { ok: true, errors: [], record: saved };
+        return { ok: true, errors: [], record: saved, gap };
       } catch (err) {
-        return { ok: false, errors: [(err as Error).message] };
+        return { ok: false, errors: [(err as Error).message], locked: isPeriodLockedError(err) };
       }
     },
 
