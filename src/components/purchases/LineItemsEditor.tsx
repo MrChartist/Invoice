@@ -37,7 +37,7 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
           <tbody>
             {lines.map((l, i) => (
               <tr key={l.id}>
-                <td>
+                <td data-label="Item">
                   <input
                     className={controls.ghost}
                     value={l.name}
@@ -46,7 +46,7 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
                     onChange={(e) => patch(l.id, { name: e.target.value })}
                   />
                 </td>
-                <td>
+                <td data-label="HSN / SAC">
                   <input
                     className={controls.ghost}
                     value={l.hsn ?? ''}
@@ -56,7 +56,7 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
                     onChange={(e) => patch(l.id, { hsn: e.target.value.replace(/[^0-9]/g, '').slice(0, 8) })}
                   />
                 </td>
-                <td>
+                <td data-label="Qty">
                   <NumberInput
                     className={controls.ghostNumeric}
                     value={l.quantity}
@@ -65,7 +65,7 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
                     onChange={(quantity) => patch(l.id, { quantity })}
                   />
                 </td>
-                <td>
+                <td data-label="Rate">
                   <NumberInput
                     className={controls.ghostNumeric}
                     value={l.rate}
@@ -74,7 +74,7 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
                     onChange={(rate) => patch(l.id, { rate })}
                   />
                 </td>
-                <td>
+                <td data-label="GST %">
                   <select
                     className={controls.ghost}
                     value={l.tax_rate}
@@ -86,7 +86,7 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
                     ))}
                   </select>
                 </td>
-                <td className={styles.lineAmount}>{formatCurrency(round2(l.quantity * l.rate))}</td>
+                <td className={styles.lineAmount} data-label="Amount">{formatCurrency(round2(l.quantity * l.rate))}</td>
                 <td>
                   <button
                     type="button"

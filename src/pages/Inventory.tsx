@@ -14,6 +14,8 @@ import {
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/useToast';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
 import { ItemFormModal } from '../components/inventory/ItemFormModal';
 import { AdjustModal } from '../components/inventory/AdjustModal';
 import { LedgerModal } from '../components/inventory/LedgerModal';
@@ -134,28 +136,26 @@ export function Inventory() {
 
   return (
     <div className={surface.page}>
-      <div className={surface.pageHead}>
-        <div>
-          <h1 className={surface.pageTitle}><Boxes size={24} /> Inventory</h1>
-          <p className={surface.pageSubtitle}>
-            Live stock from your invoices, purchases and adjustments — nothing is edited on your documents.
-          </p>
-        </div>
-        <div className={surface.pageActions}>
-          <button type="button" className={controls.btnOutline} onClick={() => download(`stock-summary-${todayInput()}.csv`, stockSummaryCsv(positions))} disabled={!hasItems}>
-            <Download size={16} /> Export CSV
-          </button>
-          <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}>
-            <Plus size={16} /> Add item
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Inventory"
+        subtitle="Live stock from your invoices, purchases and adjustments — nothing is edited on your documents."
+        actions={
+          <>
+            <button type="button" className={controls.btnOutline} onClick={() => download(`stock-summary-${todayInput()}.csv`, stockSummaryCsv(positions))} disabled={!hasItems}>
+              <Download size={16} aria-hidden="true" /> Export CSV
+            </button>
+            <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}>
+              <Plus size={16} aria-hidden="true" /> Add item
+            </button>
+          </>
+        }
+      />
 
       <div className={surface.statGrid}>
-        <Stat label="Stock value" value={`₹ ${formatMoney(totals.stockValue)}`} hint={`${settings.method === 'FIFO' ? 'FIFO' : 'Weighted average'} costing`} icon={<Boxes size={16} color="var(--primary)" />} />
-        <Stat label="SKUs" value={String(totals.skus)} hint={`${totals.tracked} tracked`} icon={<PackagePlus size={16} color="var(--primary)" />} />
-        <Stat label="Low stock" value={String(totals.lowCount)} hint={`${totals.outCount} out of stock`} icon={<TrendingDown size={16} color="var(--warning)" />} tone={totals.lowCount ? 'warn' : undefined} />
-        <Stat label="Negative stock" value={String(totals.negativeCount)} hint={totals.negativeCount ? 'Sold more than recorded' : 'All balances valid'} icon={<AlertTriangle size={16} color="var(--loss)" />} tone={totals.negativeCount ? 'bad' : undefined} />
+        <StatCard label="Stock value" value={`₹ ${formatMoney(totals.stockValue)}`} hint={`${settings.method === 'FIFO' ? 'FIFO' : 'Weighted average'} costing`} icon={Boxes} />
+        <StatCard label="SKUs" value={String(totals.skus)} hint={`${totals.tracked} tracked`} icon={PackagePlus} />
+        <StatCard label="Low stock" value={String(totals.lowCount)} hint={`${totals.outCount} out of stock`} icon={TrendingDown} tone={totals.lowCount ? 'warning' : 'default'} />
+        <StatCard label="Negative stock" value={String(totals.negativeCount)} hint={totals.negativeCount ? 'Sold more than recorded' : 'All balances valid'} icon={AlertTriangle} tone={totals.negativeCount ? 'loss' : 'default'} />
       </div>
 
       <div className={surface.card}>
@@ -183,7 +183,7 @@ export function Inventory() {
         </div>
 
         <div className={styles.toolbar}>
-          <div className={controls.segment} role="tablist" aria-label="Inventory reports">
+          <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Inventory reports">
             {([['summary', 'Stock summary'], ['movement', 'Movement'], ['dead', 'Dead stock'], ['margin', 'Margin']] as const).map(([k, label]) => (
               <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(k)}>
                 {label}
@@ -386,19 +386,6 @@ export function Inventory() {
         onConfirm={() => deleting && guard(() => stockDb.deleteItem(deleting.id), 'Item deleted')}
       />
       {toastNode}
-    </div>
-  );
-}
-
-function Stat({ label, value, hint, icon, tone }: { label: string; value: string; hint: string; icon: React.ReactNode; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className={surface.stat}>
-      <div className={surface.statTop}>
-        <span className={surface.statLabel}>{label}</span>
-        <span className={surface.statIcon}>{icon}</span>
-      </div>
-      <div className={surface.statValue} style={tone ? { color: tone === 'bad' ? 'var(--loss)' : 'var(--warning)' } : undefined}>{value}</div>
-      <div className={surface.statHint}>{hint}</div>
     </div>
   );
 }

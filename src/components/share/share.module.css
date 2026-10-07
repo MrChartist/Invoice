@@ -114,14 +114,14 @@
 
 .chip:hover {
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--brand-text);
 }
 
 .chipActive {
   composes: chip;
   background: var(--primary-glow);
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--brand-text);
 }
 
 .history {

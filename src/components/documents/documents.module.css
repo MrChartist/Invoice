@@ -126,7 +126,7 @@
   background: none;
   border: 0;
   padding: 0;
-  color: var(--primary);
+  color: var(--brand-text);
   font-weight: 600;
   cursor: pointer;
 }
@@ -250,7 +250,7 @@
 
 .dotCurrent {
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--brand-text);
 }
 
 .dotCancelled {
@@ -283,7 +283,7 @@
 
 .nodeLink:hover,
 .nodeLink:focus-visible {
-  color: var(--primary);
+  color: var(--brand-text);
   text-decoration: underline;
 }
 
@@ -328,4 +328,33 @@
     right: auto;
     left: 0;
   }
+}
+
+/* Stack the credit-note table into per-line cards on phones so the
+   "Credit qty" input is never hidden off-screen behind a horizontal scroll. */
+@media (max-width: 640px) {
+  .tableScroll { overflow: visible; border: 0; border-radius: 0; }
+  .table { min-width: 0; }
+  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .table tbody, .table tr, .table td { display: block; }
+  .table tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--card);
+  }
+  .table td { border: 0; padding: 0.25rem 0; }
+  .table td.num { display: flex; justify-content: space-between; align-items: center; gap: 1rem; text-align: right !important; }
+  .table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+  }
+  .qtyCell { flex-wrap: wrap; padding-top: 0.5rem !important; }
+  .qtyInput { width: 7rem; min-height: 44px; }
+  .fullBtn { min-height: 40px; }
 }

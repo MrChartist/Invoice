@@ -1,4 +1,4 @@
-import { FileDown } from 'lucide-react';
+import { PageHeader } from '../components/ui/PageHeader';
 import surface from '../styles/surface.module.css';
 import { ExportCenter } from '../components/exports/ExportCenter';
 
@@ -6,16 +6,10 @@ import { ExportCenter } from '../components/exports/ExportCenter';
 export function Exports() {
   return (
     <div className={surface.page}>
-      <div className={surface.pageHead}>
-        <div>
-          <h1 className={surface.pageTitle}>
-            <FileDown size={22} aria-hidden="true" /> Export center
-          </h1>
-          <p className={surface.pageSubtitle}>
-            Tally Prime XML, Zoho / Vyapar / Busy-ready CSVs and a one-click bundle for your accountant.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Export center"
+        subtitle="Tally Prime XML, Zoho / Vyapar / Busy-ready CSVs and a one-click bundle for your accountant."
+      />
       <ExportCenter />
     </div>
   );

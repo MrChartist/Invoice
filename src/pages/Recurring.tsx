@@ -4,6 +4,8 @@ import { CalendarClock, Pause, Plus, Repeat, TrendingUp } from 'lucide-react';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/useToast';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
 import { RecurringEditor } from '../components/recurring/RecurringEditor';
 import { ScheduleCard } from '../components/recurring/ScheduleCard';
 import {
@@ -139,55 +141,21 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
 
   return (
     <div className={surface.page}>
-      <header className={surface.pageHead}>
-        <div>
-          <h1 className={surface.pageTitle}>
-            <Repeat size={24} /> Recurring
-          </h1>
-          <p className={surface.pageSubtitle}>
-            Subscriptions and retainers that invoice themselves — monthly plans, quarterly retainers and more.
-          </p>
-        </div>
-        <div className={surface.pageActions}>
+      <PageHeader
+        title="Recurring"
+        subtitle="Subscriptions and retainers that invoice themselves — monthly plans, quarterly retainers and more."
+        actions={
           <button type="button" className={controls.btnPrimary} onClick={openCreate}>
-            <Plus size={16} /> New schedule
+            <Plus size={16} aria-hidden="true" /> New schedule
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <section className={surface.statGrid} aria-label="Recurring summary">
-        <div className={surface.stat}>
-          <div className={surface.statTop}>
-            <span className={surface.statLabel}>Active</span>
-            <span className={surface.statIcon}><Repeat size={15} color="var(--profit)" /></span>
-          </div>
-          <span className={surface.statValue}>{stats.active}</span>
-          <span className={surface.statHint}>{stats.paused} paused</span>
-        </div>
-        <div className={surface.stat}>
-          <div className={surface.statTop}>
-            <span className={surface.statLabel}>Next run</span>
-            <span className={surface.statIcon}><CalendarClock size={15} color="var(--primary)" /></span>
-          </div>
-          <span className={surface.statValue}>{stats.next ? formatDate(stats.next) : '—'}</span>
-          <span className={surface.statHint}>Across all active schedules</span>
-        </div>
-        <div className={surface.stat}>
-          <div className={surface.statTop}>
-            <span className={surface.statLabel}>Monthly recurring</span>
-            <span className={surface.statIcon}><TrendingUp size={15} color="var(--primary)" /></span>
-          </div>
-          <span className={surface.statValue}>{formatCurrency(stats.mrr)}</span>
-          <span className={surface.statHint}>Estimated, incl. tax</span>
-        </div>
-        <div className={surface.stat}>
-          <div className={surface.statTop}>
-            <span className={surface.statLabel}>Paused</span>
-            <span className={surface.statIcon}><Pause size={15} color="var(--warning)" /></span>
-          </div>
-          <span className={surface.statValue}>{stats.paused}</span>
-          <span className={surface.statHint}>Resume without back-filling</span>
-        </div>
+        <StatCard label="Active" value={stats.active} hint={`${stats.paused} paused`} icon={Repeat} tone="profit" />
+        <StatCard label="Next run" value={stats.next ? formatDate(stats.next) : '—'} hint="Across all active schedules" icon={CalendarClock} />
+        <StatCard label="Monthly recurring" value={formatCurrency(stats.mrr)} hint="Estimated, incl. tax" icon={TrendingUp} tone="brand" />
+        <StatCard label="Paused" value={stats.paused} hint="Resume without back-filling" icon={Pause} tone={stats.paused ? 'warning' : 'default'} />
       </section>
 
       {schedules.length === 0 ? (

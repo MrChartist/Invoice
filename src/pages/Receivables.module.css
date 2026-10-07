@@ -38,7 +38,7 @@
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }
-.tabActive { composes: tab; color: var(--primary); border-bottom-color: var(--primary); }
+.tabActive { composes: tab; color: var(--brand-text); border-bottom-color: var(--primary); }
 
 /* ── Top debtors ──────────────────────────────────────────────── */
 .debtors { list-style: none; margin: 0; padding: 0.5rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
@@ -49,7 +49,7 @@
   background: none; border: none; padding: 0; cursor: pointer;
   font: inherit; font-weight: 600; color: var(--foreground); text-align: left;
 }
-.linkBtn:hover { color: var(--primary); text-decoration: underline; }
+.linkBtn:hover { color: var(--brand-text); text-decoration: underline; }
 
 /* ── Aging table ──────────────────────────────────────────────── */
 .agingTable { min-width: 860px; }
@@ -106,7 +106,7 @@
   font-weight: 700;
   font-size: 1.0625rem;
 }
-.miniStrong { color: var(--primary); font-size: 1.1875rem; }
+.miniStrong { color: var(--brand-text); font-size: 1.1875rem; }
 .openingRow td { color: var(--muted-foreground); }
 .note { padding: 0.75rem 1.25rem 1rem; }
 
@@ -114,3 +114,10 @@
   .filters { grid-template-columns: 1fr 1fr; }
   .filters > div:first-child { grid-column: 1 / -1; }
 }
+
+/* ── Touch targets (coarse pointers) ──────────────────────── */
+@media (pointer: coarse), (max-width: 640px) {
+  .linkBtn { min-height: 40px; display: inline-flex; align-items: center; }
+}
+
+.presetOn { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--foreground); font-weight: 700; }

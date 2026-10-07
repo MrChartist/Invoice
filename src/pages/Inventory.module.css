@@ -67,7 +67,7 @@
 }
 .nameBtn:hover,
 .nameBtn:focus-visible {
-  color: var(--primary);
+  color: var(--brand-text);
   text-decoration: underline;
 }
 
@@ -111,4 +111,9 @@
   .methodSelect {
     width: 100%;
   }
+}
+
+/* Touch targets: segmented controls reach 40px on phones / coarse pointers. */
+@media (pointer: coarse), (max-width: 640px) {
+  .touchSeg > button { min-height: 40px; }
 }

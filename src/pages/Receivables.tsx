@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ChevronRight, Clock, Copy, Download, FileText, Mail, Percent, Wallet, Scale,
+  AlertTriangle, ChevronRight, Clock, Copy, Download, FileText, Mail, Percent, Scale, Wallet,
+  type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
 import {
@@ -11,6 +12,8 @@ import {
 } from '../lib/receivables';
 import { formatMoney, formatCurrency, formatDate, todayInput, toDateInput } from '../lib/utils';
 import { EmptyState } from '../components/ui/EmptyState';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
 import { useToast } from '../components/ui/useToast';
 import { AgingStack, CollectionsChart, ShareBar, AgeChip } from '../components/receivables/Charts';
 import { StatementViewer } from '../components/receivables/StatementViewer';
@@ -110,7 +113,15 @@ export function Receivables() {
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" id={`rcv-tab-${t.id}`} aria-selected={tab === t.id}
             aria-controls={`rcv-panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
-            className={tab === t.id ? styles.tabActive : styles.tab} onClick={() => setTab(t.id)}>
+            className={tab === t.id ? styles.tabActive : styles.tab} onClick={() => setTab(t.id)}
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+              e.preventDefault();
+              const i = TABS.findIndex((x) => x.id === t.id);
+              const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+              setTab(next.id);
+              requestAnimationFrame(() => document.getElementById(`rcv-tab-${next.id}`)?.focus());
+            }}>
             {t.label}
           </button>
         ))}
@@ -162,29 +173,18 @@ export function Receivables() {
 
 function Header({ children }: { children?: ReactNode }) {
   return (
-    <div className={surface.pageHead}>
-      <div>
-        <h1 className={surface.pageTitle}><Scale size={24} aria-hidden="true" /> Receivables</h1>
-        <p className={surface.pageSubtitle}>Who owes you what, how old it is, and a statement to send them.</p>
-      </div>
-      <div className={surface.pageActions}>{children}</div>
-    </div>
+    <PageHeader
+      title="Receivables"
+      subtitle="Who owes you what, how old it is, and a statement to send them."
+      actions={children}
+    />
   );
 }
 
-function Stat({ label, value, hint, icon: Icon, tone }: {
-  label: string; value: string; hint: string; icon: typeof Wallet; tone?: 'loss';
+function Stat({ label, value, hint, icon, tone }: {
+  label: string; value: string; hint: string; icon: LucideIcon; tone?: 'loss';
 }) {
-  return (
-    <div className={surface.stat}>
-      <div className={surface.statTop}>
-        <span className={surface.statLabel}>{label}</span>
-        <span className={surface.statIcon}><Icon size={16} aria-hidden="true" color={tone === 'loss' ? 'var(--loss)' : 'var(--primary)'} /></span>
-      </div>
-      <div className={surface.statValue} style={tone === 'loss' ? { color: 'var(--loss)' } : undefined}>{value}</div>
-      <div className={surface.statHint}>{hint}</div>
-    </div>
-  );
+  return <StatCard label={label} value={value} hint={hint} icon={icon} tone={tone} />;
 }
 
 /* ── Aging ────────────────────────────────────────────────────── */
@@ -342,15 +342,19 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
   const text = useMemo(() => buildStatementText({ sender, party, ledger, currency }), [sender, party, ledger, currency]);
   const closeViewer = useCallback(() => setViewer(false), []);
 
-  const preset = (kind: 'fy' | 'lastfy' | 'q' | 'all') => {
+  const presetRange = (kind: 'fy' | 'lastfy' | 'q' | 'all'): [string, string] => {
     const fy = fyStart(now);
-    if (kind === 'fy') { setFrom(toDateInput(fy)); setTo(toDateInput(now)); }
-    else if (kind === 'lastfy') {
-      setFrom(toDateInput(new Date(fy.getFullYear() - 1, 3, 1)));
-      setTo(toDateInput(new Date(fy.getFullYear(), 2, 31)));
-    } else if (kind === 'q') {
-      setFrom(toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89))); setTo(toDateInput(now));
-    } else { setFrom(''); setTo(''); }
+    if (kind === 'fy') return [toDateInput(fy), toDateInput(now)];
+    if (kind === 'lastfy') {
+      return [toDateInput(new Date(fy.getFullYear() - 1, 3, 1)), toDateInput(new Date(fy.getFullYear(), 2, 31))];
+    }
+    if (kind === 'q') return [toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89)), toDateInput(now)];
+    return ['', ''];
+  };
+  const preset = (kind: 'fy' | 'lastfy' | 'q' | 'all') => {
+    const [f, t] = presetRange(kind);
+    setFrom(f);
+    setTo(t);
   };
 
   const copy = async () => {
@@ -385,7 +389,15 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
         </div>
         <div className={styles.presets} role="group" aria-label="Date range presets">
           {([['fy', 'This FY'], ['lastfy', 'Last FY'], ['q', 'Last 90 days'], ['all', 'All time']] as const).map(([k, l]) => (
-            <button key={k} type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => preset(k)}>{l}</button>
+            <Fragment key={k}>{(() => {
+              const [pf, pt] = presetRange(k);
+              const on = pf === from && pt === to;
+              return (
+                <button key={k} type="button" aria-pressed={on}
+                  className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm} ${on ? styles.presetOn : ''}`}
+                  onClick={() => preset(k)}>{l}</button>
+              );
+            })()}</Fragment>
           ))}
         </div>
         {invalidRange && <p className={controls.error} role="alert">The start date is after the end date.</p>}

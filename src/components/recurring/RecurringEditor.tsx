@@ -54,6 +54,13 @@ function suggestName(t: RecurringTemplate): string {
   return [t.client.name, first].filter(Boolean).join(' — ');
 }
 
+/** 1 -> "1st", 22 -> "22nd", 31 -> "31st", 11 -> "11th". */
+function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
+}
+
 export function RecurringEditor(props: RecurringEditorProps) {
   if (!props.open) return null;
   const { open: _open, ...rest } = props;
@@ -313,6 +320,7 @@ function EditorBody({
                 <input
                   className={cn(controls.input, controls.inputNumeric)}
                   aria-label={`Item ${idx + 1} quantity`}
+                  placeholder="Qty"
                   type="number"
                   min="0"
                   step="any"
@@ -322,6 +330,7 @@ function EditorBody({
                 <input
                   className={cn(controls.input, controls.inputNumeric)}
                   aria-label={`Item ${idx + 1} rate`}
+                  placeholder="Rate (₹)"
                   type="number"
                   min="0"
                   step="any"
@@ -482,7 +491,7 @@ function EditorBody({
           )}
           {parseYmd(startDate) && Number(startDate.slice(8, 10)) > 28 && frequency !== 'weekly' && frequency !== 'custom-days' && (
             <p className={controls.hint}>
-              Started on the {Number(startDate.slice(8, 10))}th: shorter months use their last day, then it returns to the {Number(startDate.slice(8, 10))}th.
+              Started on the {ordinal(Number(startDate.slice(8, 10)))}: shorter months use their last day, then it returns to the {ordinal(Number(startDate.slice(8, 10)))}.
             </p>
           )}
         </section>

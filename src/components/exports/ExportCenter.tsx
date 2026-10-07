@@ -218,7 +218,7 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
           </div>
           <div className={surface.cardBody}>
             <div className={styles.filters}>
-              <div className={controls.field}>
+              <div className={`${controls.field} ${styles.wide}`}>
                 <label className={controls.label} htmlFor="ex-period-sel">Period</label>
                 <select
                   id="ex-period-sel"

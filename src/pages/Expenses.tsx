@@ -141,7 +141,7 @@ export function Expenses() {
       </div>
 
       <div className={styles.tabs}>
-        <div className={controls.segment} role="tablist" aria-label="Section">
+        <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Section">
           <button type="button" role="tab" aria-selected={tab === 'bills'} className={tab === 'bills' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('bills')}>
             Bills & expenses <span className={styles.count}>{purchases.length}</span>
           </button>
@@ -174,7 +174,7 @@ export function Expenses() {
                   aria-label="Search bills and expenses"
                 />
               </label>
-              <div className={controls.segment} role="tablist" aria-label="Filter by type">
+              <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Filter by type">
                 {KINDS.map((k) => (
                   <button
                     key={k.id}

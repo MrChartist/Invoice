@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
 import {
   buildVouchers,
   loadBooksData,
@@ -14,6 +13,7 @@ import {
 } from '../lib/books';
 import { StorageWriteError } from '../lib/storage';
 import { useToast } from '../components/ui/useToast';
+import { PageHeader } from '../components/ui/PageHeader';
 import { PeriodBar } from '../components/books/PeriodBar';
 import { DayBookTab } from '../components/books/DayBookTab';
 import { CashBankTab } from '../components/books/CashBankTab';
@@ -92,16 +92,10 @@ export function Books() {
 
   return (
     <div className={surface.page}>
-      <div className={surface.pageHead}>
-        <div>
-          <h1 className={surface.pageTitle}>
-            <BookOpen size={24} aria-hidden="true" /> Books
-          </h1>
-          <p className={surface.pageSubtitle}>
-            Day book, cash &amp; bank, profit &amp; loss and balance sheet — built from your invoices, receipts and purchases.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Books"
+        subtitle="Day book, cash & bank, profit & loss and balance sheet — built from your invoices, receipts and purchases."
+      />
 
       <PeriodBar
         preset={preset}

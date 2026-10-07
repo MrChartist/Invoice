@@ -20,6 +20,14 @@
   gap: 0.875rem;
 }
 
+.wide {
+  grid-column: 1 / -1;
+}
+
+.filters select {
+  text-overflow: ellipsis;
+}
+
 .checks {
   display: flex;
   flex-wrap: wrap;
@@ -86,7 +94,7 @@
 
 .countOn {
   background: var(--primary-glow);
-  color: var(--primary);
+  color: var(--brand-text);
 }
 
 .datasetActions {

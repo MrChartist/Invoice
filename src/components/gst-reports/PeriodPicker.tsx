@@ -25,7 +25,7 @@ export function PeriodPicker({ value, onChange, fyOptions }: PeriodPickerProps) 
     <div className={styles.periodBar}>
       <div className={styles.periodField}>
         <span className={controls.label} id="gst-period-kind">Period</span>
-        <div className={controls.segment} role="group" aria-labelledby="gst-period-kind">
+        <div className={`${controls.segment} ${styles.touchSeg}`} role="group" aria-labelledby="gst-period-kind">
           {(['month', 'quarter', 'fy'] as const).map((k) => (
             <button
               key={k}
