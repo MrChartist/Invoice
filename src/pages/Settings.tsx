@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, Check, Database, Plus, Save, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Building2, Check, Copy, Database, Plus, Save, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -38,7 +39,11 @@ function profileProblem(p: SenderProfile): string {
 
 export function Settings() {
   const { notify, toastNode } = useToast();
-  const [tab, setTab] = useState<Tab>('business');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = params.get('tab');
+    return TABS.some((x) => x.id === t) ? (t as Tab) : 'business';
+  });
   const [settings, setSettings] = useState<AppSettings>(() => localDb.settings.get());
   const [editingId, setEditingId] = useState(() => localDb.settings.get().activeProfileId);
   const [dirty, setDirty] = useState(false);
@@ -86,6 +91,26 @@ export function Settings() {
     setDirty(true);
   };
 
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const i = TABS.findIndex((t) => t.id === tab);
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (i + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TABS.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    setTab(TABS[next].id);
+    document.getElementById(`settings-tab-${TABS[next].id}`)?.focus();
+  };
+
+  const duplicateProfile = () => {
+    const copy: SenderProfile = { ...blankProfile(), ...editing, id: blankProfile().id, companyName: `${editing.companyName || 'Untitled profile'} (copy)` };
+    setSettings((s) => ({ ...s, profiles: [...s.profiles, copy] }));
+    setEditingId(copy.id!);
+    setDirty(true);
+  };
+
   const save = () => {
     for (const p of settings.profiles) {
       const problem = profileProblem(p);
@@ -116,14 +141,26 @@ export function Settings() {
     <div className={surface.page}>
       <PageHeader title="Settings" subtitle="Your business details, payment info and defaults. Saved only on this device." />
 
-      <div className={controls.segment} role="tablist" aria-label="Settings sections" style={{ alignSelf: 'flex-start' }}>
+      <div className={controls.segment} role="tablist" aria-label="Settings sections" style={{ alignSelf: 'flex-start', maxWidth: '100%', flexWrap: 'wrap' }} onKeyDown={onTabKey}>
         {TABS.map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(id)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Icon size={14} /> {label}
+          <button
+            key={id}
+            id={`settings-tab-${id}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            aria-controls="settings-panel"
+            tabIndex={tab === id ? 0 : -1}
+            className={tab === id ? controls.segmentBtnActive : controls.segmentBtn}
+            onClick={() => setTab(id)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', minHeight: 40 }}
+          >
+            <Icon size={14} aria-hidden="true" /> {label}
           </button>
         ))}
       </div>
 
+      <div id="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${tab}`} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {tab === 'business' && editing && (
         <div className={styles.layout}>
           <section className={surface.card}>
@@ -150,15 +187,18 @@ export function Settings() {
           <section className={surface.card}>
             <div className={surface.cardHead}>
               <div className={styles.editorHead} style={{ width: '100%' }}>
-                <span>{editing.companyName || 'New profile'}</span>
+                <span>{editing.companyName || 'Untitled profile'}</span>
                 <div className={surface.pageActions}>
                   {editing.id === settings.activeProfileId ? (
-                    <span className={styles.defaultTag}><Check size={12} style={{ verticalAlign: '-2px' }} /> Default profile</span>
+                    <span className={styles.defaultTag}><Check size={12} /> Default profile</span>
                   ) : (
                     <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => patchSettings({ activeProfileId: editing.id! })}>
                       <Star size={14} /> Make default
                     </button>
                   )}
+                  <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={duplicateProfile}>
+                    <Copy size={14} /> Duplicate
+                  </button>
                   {settings.profiles.length > 1 && (
                     <button type="button" className={controls.btnDanger} onClick={() => setDeleting(editing)} aria-label="Delete this profile">
                       <Trash2 size={16} />
@@ -186,6 +226,8 @@ export function Settings() {
         </>
       )}
       {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
+
+      </div>
 
       {dirty && (
         <div className={styles.saveBar} role="region" aria-label="Unsaved changes">

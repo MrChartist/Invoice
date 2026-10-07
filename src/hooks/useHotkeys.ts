@@ -139,11 +139,11 @@ export const GLOBAL_SHORTCUTS: ShortcutInfo[] = [
   { combo: 'escape', label: 'Close dialog or palette', group: 'General' },
   { combo: 'g d', label: 'Go to Dashboard', group: 'Go to' },
   { combo: 'g i', label: 'Go to New invoice', group: 'Go to' },
-  { combo: 'g t', label: 'Go to Transactions', group: 'Go to' },
+  { combo: 'g t', label: 'Go to Invoices', group: 'Go to' },
   { combo: 'g c', label: 'Go to Clients', group: 'Go to' },
   { combo: 'g s', label: 'Go to Settings', group: 'Go to' },
   { combo: 'mod+s', label: 'Save invoice', group: 'Invoice editor', external: true },
-  { combo: 'mod+p', label: 'Print / export PDF', group: 'Invoice editor', external: true },
+  { combo: 'mod+p', label: 'Open preview (print or PDF)', group: 'Invoice editor', external: true },
 ];
 
 interface Entry {

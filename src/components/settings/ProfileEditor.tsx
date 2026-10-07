@@ -41,7 +41,7 @@ function ImageSlot({
     try {
       onPick(await imageToDataUrl(file, maxDimension));
     } catch (err) {
-      onError((err as Error).message);
+      onError(err instanceof DOMException || !(err instanceof Error) ? 'That file could not be read as an image.' : err.message);
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -54,7 +54,7 @@ function ImageSlot({
         {value ? <img src={value} alt={`${label} preview`} /> : <ImagePlus size={22} />}
       </div>
       <div className={styles.slotBody}>
-        <div className={controls.label}>{label}</div>
+        <div className={controls.label} id={`slot-${label}`}>{label}</div>
         <p className={controls.hint}>{hint}</p>
         <div className={styles.slotActions}>
           <button type="button" className={controls.btnOutline + ' ' + controls.btnSm} onClick={() => input.current?.click()} disabled={busy}>
@@ -66,7 +66,7 @@ function ImageSlot({
             </button>
           )}
         </div>
-        <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => pick(e.target.files?.[0])} />
+        <input ref={input} type="file" aria-label={`Upload ${label.toLowerCase()} image`} accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => pick(e.target.files?.[0])} />
       </div>
     </div>
   );

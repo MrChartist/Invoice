@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
@@ -100,8 +100,62 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
+  const asideRef = useRef<HTMLElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const onChange = () => {
+      setIsMobile(mq.matches);
+      if (!mq.matches) setMenuOpen(false);
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  // Mobile drawer: focus trap, Esc to close, scroll lock, focus restore.
+  const drawerActive = isMobile && menuOpen;
+  useEffect(() => {
+    if (!drawerActive) return;
+    const aside = asideRef.current;
+    const opener = menuBtnRef.current;
+    const focusables = () =>
+      Array.from(aside?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ?? []).filter((el) => el.offsetParent !== null);
+    focusables()[0]?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMenuOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      // The open drawer covers the opener, so the trap cycles through the drawer only.
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !items.includes(active as HTMLElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      opener?.focus();
+    };
+  }, [drawerActive]);
 
   // Recurring schedules create their due invoices once per session start / tab focus.
   const { generated, dismiss, message } = useRecurringRunner();
@@ -158,12 +212,17 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
   return (
     <div className={styles.layout}>
+      <a href="#main" className={cn(styles.skipLink, 'no-print')} onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>
+        Skip to content
+      </a>
       <header className={cn(styles.topbar, 'no-print')}>
         <button
+          ref={menuBtnRef}
           type="button"
           className={styles.iconBtn}
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={menuOpen}
+          aria-controls="app-sidebar"
           onClick={() => setMenuOpen((o) => !o)}
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -181,7 +240,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
       {menuOpen && <div className={styles.scrim} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
 
-      <aside className={cn(styles.sidebar, menuOpen && styles.sidebarOpen, 'no-print')}>
+      <aside
+        id="app-sidebar"
+        ref={asideRef}
+        className={cn(styles.sidebar, menuOpen && styles.sidebarOpen, 'no-print')}
+        inert={isMobile && !menuOpen}
+      >
         <Link to="/" className={styles.brand} aria-label="Mr. Chartist Invoice home">
           <Logo height={40} />
         </Link>
@@ -233,7 +297,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         </div>
       </aside>
 
-      <main className={styles.main} id="main">
+      <main className={cn(styles.main, drawerActive && styles.mainLocked)} id="main" tabIndex={-1}>
         <div className={cn(styles.utilBar, 'no-print')}>
           <button type="button" className={styles.searchBtn} onClick={() => setPaletteOpen(true)}>
             <Search size={15} />
