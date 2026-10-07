@@ -16,6 +16,7 @@ import type { Client, DocumentType, InvoiceItem, InvoiceRecord, SenderProfile } 
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { localDb } from './localDb';
 import { generateId, getTable, setTable } from './storage';
+import { isPeriodLockedError } from './period-lock';
 import { normalizeRecord } from '../store/invoice-defaults';
 
 export const RECURRING_TABLE = 'recurring';
@@ -564,9 +565,16 @@ export function runDueSchedules(today: string): RunReport {
         });
       }
       for (const occurrence of due.dates) {
-        const { invoice, created } = generateInvoiceFromSchedule(current, occurrence);
-        current = recordGenerated(current, occurrence, invoice);
-        if (created) report.generated.push(invoice);
+        try {
+          const { invoice, created } = generateInvoiceFromSchedule(current, occurrence);
+          current = recordGenerated(current, occurrence, invoice);
+          if (created) report.generated.push(invoice);
+        } catch (err) {
+          // An occurrence inside the locked period is skipped (counted), never forced in.
+          if (!isPeriodLockedError(err)) throw err;
+          current = recurringDb.save(advanceSchedule(current, [occurrence], [], 1));
+          report.errors.push(`${listed.name}: skipped ${occurrence} — ${err.message}`);
+        }
       }
     } catch (err) {
       report.errors.push(`${listed.name}: ${(err as Error).message}`);

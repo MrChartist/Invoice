@@ -80,3 +80,35 @@
 @media (max-width: 480px) {
   .summary dd { font-size: 0.9375rem; }
 }
+
+/* Period-lock notice (kept here so this always-loaded modal does not pull the audit stylesheet). */
+.lockBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-left: 3px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 9%, var(--card));
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.lockBanner svg {
+  flex: none;
+  margin-top: 0.15rem;
+  color: var(--warning);
+}
+
+.lockText {
+  line-height: 1.5;
+}
+
+.lockText strong {
+  display: block;
+}
+
+.lockText span {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}

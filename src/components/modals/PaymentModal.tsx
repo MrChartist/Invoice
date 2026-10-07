@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Lock, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
+import { getLockUntil, isLocked, prettyDay } from '../../lib/period-lock';
 import { readLinks, totalCredited } from '../../lib/documents';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
@@ -54,9 +56,12 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   }, [invoice?.id]);
 
   if (!invoice || !live) return null;
+  // Period lock: a frozen document takes no new payments and loses none.
+  const locked = isLocked(live);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (locked) return setError('This document is in a locked period.');
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) return setError('Enter an amount above zero.');
     if (value > balance + 0.005) return setError(`This is more than the balance of ${formatCurrency(balance, live.currency)}.`);
@@ -75,7 +80,12 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   };
 
   const removePayment = (id: string) => {
-    localDb.payments.remove(id);
+    try {
+      localDb.payments.remove(id);
+    } catch (err) {
+      setError((err as Error).message);
+      return;
+    }
     setVersion((v) => v + 1);
     if (live) refreshEditor(live.id);
     onChanged('Payment removed');
@@ -93,7 +103,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
           <button type="button" className={controls.btnOutline} onClick={onClose}>
             Close
           </button>
-          <button type="submit" form="payment-form" className={controls.btnPrimary} disabled={balance <= 0}>
+          <button type="submit" form="payment-form" className={controls.btnPrimary} disabled={balance <= 0 || locked}>
             Record payment
           </button>
         </>
@@ -114,7 +124,23 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
         </div>
       </dl>
 
-      {balance > 0 ? (
+      {locked && (
+        <div className={styles.lockBanner} role="alert">
+          <Lock size={18} aria-hidden="true" />
+          <div className={styles.lockText}>
+            <strong>Locked period</strong>
+            <span>
+              Books are locked up to {prettyDay(getLockUntil())} and this document is dated {prettyDay(live.issue_date)}, so payments can&apos;t be added or removed.{' '}
+              <Link to={`/invoice/${live.id}`} onClick={onClose}>
+                Open it to unlock with your PIN
+              </Link>
+              .
+            </span>
+          </div>
+        </div>
+      )}
+
+      {balance > 0 && !locked ? (
         <form id="payment-form" onSubmit={submit} className={styles.form} noValidate>
           <div className={controls.row}>
             <label className={controls.field}>
@@ -152,7 +178,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
           </div>
           {error && <p className={controls.error} role="alert">{error}</p>}
         </form>
-      ) : (
+      ) : locked ? null : (
         <p className={controls.ok}>Fully paid. Nothing is outstanding.</p>
       )}
 
@@ -169,7 +195,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                     {p.reference ? ` · ${p.reference}` : ''}
                   </span>
                 </div>
-                <button type="button" className={controls.btnDanger} onClick={() => removePayment(p.id)} aria-label={`Remove payment of ${formatCurrency(p.amount, live.currency)}`}>
+                <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={`Remove payment of ${formatCurrency(p.amount, live.currency)}`}>
                   <Trash2 size={15} />
                 </button>
               </li>

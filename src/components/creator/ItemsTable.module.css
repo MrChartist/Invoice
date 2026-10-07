@@ -123,6 +123,33 @@
 
 .footer {
   padding: 0.875rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.keyHint {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  line-height: 1.8;
+}
+
+.keyHint kbd {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--card-inner);
+  color: var(--foreground);
+}
+
+@media (hover: none) {
+  .keyHint {
+    display: none;
+  }
 }
 
 /* Narrow card: each line becomes a labelled mini-form (3 fields per row). */

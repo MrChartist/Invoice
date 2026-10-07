@@ -10,6 +10,7 @@
 import { DB_PREFIX, collectAppData, readRaw, writeRaw } from './storage';
 import { DEVICE_LOCAL_KEYS } from './auth';
 import { localDayOf } from './dates';
+import { audit } from './audit';
 import { CryptoError, decryptString, encryptString, isCipherEnvelope, type CipherEnvelope } from './crypto';
 
 export const BACKUP_APP_ID = 'mrchartist-invoice';
@@ -195,6 +196,13 @@ export function applyBackup(data: Record<string, string>): void {
     }
     throw err;
   }
+  // Restoring replaces whatever was there; that is allowed even over a locked period, but never silent.
+  audit.record({
+    entity: 'system',
+    entity_id: 'backup',
+    action: 'restore',
+    summary: `Data restored from a backup (${Object.keys(data).length} data keys)`,
+  });
 }
 
 /**

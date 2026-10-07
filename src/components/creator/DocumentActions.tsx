@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, RotateCcw } from 'lucide-react';
+import { Ban, Lock, RotateCcw } from 'lucide-react';
 import { ConvertMenu } from '../documents/ConvertMenu';
 import { CreditNoteModal } from '../documents/CreditNoteModal';
 import { CancelDialog } from '../documents/CancelDialog';
@@ -10,12 +10,24 @@ import { EInvoiceButton } from '../einvoice';
 import { RecurringButton } from '../recurring';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
+import { isLocked } from '../../lib/period-lock';
 import type { InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './DocumentActions.module.css';
 
+const ActivityTimeline = lazy(() => import('../audit/ActivityTimeline').then((m) => ({ default: m.ActivityTimeline })));
+
 /** Everything you can do with an already-saved document, in one place. */
-export function DocumentActions({ invoiceId, refreshKey }: { invoiceId: string; refreshKey: number }) {
+export function DocumentActions({
+  invoiceId,
+  refreshKey,
+  onChanged,
+}: {
+  invoiceId: string;
+  refreshKey: number;
+  /** Called after an action changed the stored document (cancel / reinstate). */
+  onChanged?: () => void;
+}) {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
   const [creditOpen, setCreditOpen] = useState(false);
@@ -32,24 +44,41 @@ export function DocumentActions({ invoiceId, refreshKey }: { invoiceId: string; 
   const reloadEditor = () => {
     useInvoiceStore.getState().loadInvoice(invoiceId);
     setTick((t) => t + 1);
+    onChanged?.();
   };
 
   const cancelled = saved.status === 'Cancelled';
   const canCredit = saved.doc_type === 'INVOICE' || saved.doc_type === 'TAX_INVOICE';
+  const locked = isLocked(saved);
 
   return (
     <div className={styles.wrap}>
       <div className={styles.row}>
-        <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.status === 'Paid'} />
+        <span data-share-anchor>
+          <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.status === 'Paid'} />
+        </span>
         <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} />
         <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />
         <EInvoiceButton invoice={saved} />
-        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setCancelOpen(true)}>
-          {cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? 'Reinstate' : 'Cancel document'}
+        <button
+          type="button"
+          className={`${controls.btnOutline} ${controls.btnSm}`}
+          onClick={() => setCancelOpen(true)}
+          disabled={locked}
+          title={locked ? 'This document is in a locked period — unlock it with your PIN first' : undefined}
+        >
+          {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? 'Reinstate' : 'Cancel document'}
         </button>
       </div>
 
       <DocumentTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
+
+      <section aria-label="Activity" className={styles.activity}>
+        <h3 className={styles.activityHead}>Activity</h3>
+        <Suspense fallback={null}>
+          <ActivityTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
+        </Suspense>
+      </section>
 
       <CreditNoteModal
         invoice={saved}

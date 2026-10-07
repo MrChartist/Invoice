@@ -17,7 +17,32 @@ import type {
 } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { localDayOf } from './dates';
-import { nextInvoiceNumber } from './invoice-number';
+import {
+  DuplicateNumberError,
+  findNumberClash,
+  gapsIfIssued,
+  nextInvoiceNumber,
+  numberKey,
+  type SeriesGap,
+} from './invoice-number';
+import {
+  audit,
+  invoiceCreated,
+  invoiceDeleted,
+  invoiceUpdated,
+  paymentLogged,
+  type AuditInput,
+} from './audit';
+import { clientLogged, settingsLogged } from './audit-events';
+import {
+  PeriodLockedError,
+  SETTINGS_OVERRIDE,
+  assertUnlocked,
+  hasOverride,
+  normalizeLockDate,
+  revokeOverride,
+  type LockAction,
+} from './period-lock';
 import {
   KEYS,
   SINGLETON_KEYS,
@@ -43,6 +68,11 @@ export interface AppSettings {
   roundOff: boolean;
   /** False until the user has filled in their own sender profile. */
   onboarded: boolean;
+  /**
+   * Period lock (YYYY-MM-DD): documents dated on or before this day are frozen.
+   * Additive field — absent / '' means the books are open. See `period-lock.ts`.
+   */
+  lock_until?: string;
 }
 
 export const DEFAULT_TERMS =
@@ -128,8 +158,25 @@ function readSettings(): AppSettings {
     defaultNotes: String(stored.defaultNotes ?? base.defaultNotes),
     roundOff: Boolean(stored.roundOff ?? base.roundOff),
     onboarded: Boolean(stored.onboarded ?? Boolean(profiles[0]?.companyName)),
+    lock_until: normalizeLockDate(stored.lock_until) || undefined,
   };
 }
+
+/**
+ * Run an audit write that can never break the mutation that triggered it:
+ * building the row, formatting the diff and writing it are all best-effort.
+ */
+function logSafe(make: () => AuditInput | AuditInput[] | null): void {
+  try {
+    const rows = make();
+    if (!rows) return;
+    for (const row of Array.isArray(rows) ? rows : [rows]) audit.record(row);
+  } catch {
+    /* logging must never break a save */
+  }
+}
+
+const OVERRIDE_NOTE = ' (period-lock override)';
 
 /** Copy of `obj` without undefined / null / empty-string fields. */
 function keepFilled<T extends object>(obj: T): Partial<T> {
@@ -143,7 +190,19 @@ function keepFilled<T extends object>(obj: T): Partial<T> {
 export const localDb = {
   settings: {
     get: readSettings,
-    save: (settings: AppSettings) => setJson(SINGLETON_KEYS.settings, settings),
+    save: (settings: AppSettings) => {
+      const before = readSettings();
+      const next: AppSettings = { ...settings, lock_until: normalizeLockDate(settings.lock_until) || undefined };
+      const lockBefore = before.lock_until ?? '';
+      const lockAfter = next.lock_until ?? '';
+      const loosening = lockBefore !== '' && (lockAfter === '' || lockAfter < lockBefore);
+      if (loosening && !hasOverride(SETTINGS_OVERRIDE)) {
+        throw new PeriodLockedError({ lockUntil: lockBefore, docDate: lockBefore, action: 'settings' });
+      }
+      setJson(SINGLETON_KEYS.settings, next);
+      if (loosening) revokeOverride(SETTINGS_OVERRIDE);
+      logSafe(() => settingsLogged(before, readSettings()));
+    },
     activeProfile: (): SenderProfile | null => {
       const s = readSettings();
       return s.profiles.find((p) => p.id === s.activeProfileId) ?? s.profiles[0] ?? null;
@@ -172,17 +231,25 @@ export const localDb = {
         byId >= 0 ? byId : clients.findIndex((c) => c.name?.trim().toLowerCase() === name);
       if (idx >= 0) {
         const incoming = byId >= 0 ? client : keepFilled(client);
-        clients[idx] = { ...clients[idx], ...incoming, id: clients[idx].id };
+        const previous = clients[idx];
+        clients[idx] = { ...previous, ...incoming, id: previous.id };
         setTable(KEYS.clients, clients);
+        logSafe(() => clientLogged('update', previous, clients[idx]));
         return clients[idx].id!;
       }
       const id = client.id ?? generateId();
-      clients.push({ ...(client as Client), id, created_at: new Date().toISOString() } as Client);
+      const created = { ...(client as Client), id, created_at: new Date().toISOString() } as Client;
+      clients.push(created);
       setTable(KEYS.clients, clients);
+      logSafe(() => clientLogged('create', undefined, created));
       return id;
     },
-    remove: (id: string) =>
-      setTable(KEYS.clients, getTable<Client>(KEYS.clients).filter((c) => c.id !== id)),
+    remove: (id: string) => {
+      const all = getTable<Client>(KEYS.clients);
+      const gone = all.find((c) => c.id === id);
+      setTable(KEYS.clients, all.filter((c) => c.id !== id));
+      if (gone) logSafe(() => clientLogged('delete', gone, undefined));
+    },
     search: (query: string) => {
       const q = query.trim().toLowerCase();
       if (!q) return getTable<Client>(KEYS.clients);
@@ -231,31 +298,71 @@ export const localDb = {
         customPrefix: prefix ?? readSettings().invoicePrefix,
       }),
 
+    /**
+     * Is `number` free for document `selfId`? Also reports the series gap a skipped-ahead
+     * manual number would leave (a hint, never an error).
+     */
+    checkNumber: (
+      number: string,
+      selfId?: string,
+    ): { ok: boolean; clash?: InvoiceRecord; gap: SeriesGap | null } => {
+      const all = getTable<InvoiceRecord>(KEYS.invoices);
+      const trimmed = (number ?? '').trim();
+      if (!trimmed) return { ok: true, gap: null };
+      const own = selfId ? all.find((i) => i.id === selfId) : undefined;
+      // A document keeps its own number valid, even if legacy data already duplicated it.
+      if (own && numberKey(own.invoice_number) === numberKey(trimmed)) return { ok: true, gap: null };
+      const clash = findNumberClash(all, trimmed, selfId);
+      if (clash) return { ok: false, clash, gap: null };
+      return { ok: true, gap: gapsIfIssued(all.filter((i) => i.id !== selfId).map((i) => i.invoice_number), trimmed) };
+    },
+
     save: (invoice: InvoiceRecord): InvoiceRecord => {
       const invoices = getTable<InvoiceRecord>(KEYS.invoices);
       const idx = invoices.findIndex((i) => i.id === invoice.id);
+      const stored = idx >= 0 ? invoices[idx] : undefined;
       const now = new Date().toISOString();
       const toSave: InvoiceRecord = { ...invoice, updated_at: now };
 
-      if (idx >= 0) {
-        toSave.created_at = invoices[idx].created_at ?? now;
-        // Never let a stale editor copy (opened before a payment was recorded) wipe
-        // receipts: the ledger rows are the floor for what has been received.
-        const ledgerPaid = localDb.payments.totalFor(toSave.id);
-        if (ledgerPaid > round2(Number(toSave.amount_paid) || 0) + 0.004) {
-          const stored = round2(Number(invoices[idx].amount_paid) || 0);
-          Object.assign(toSave, withPaid(toSave, Math.max(stored, ledgerPaid)));
-        }
-        invoices[idx] = toSave;
+      // Period lock: the stored version must be open, and so must the date it is moving to.
+      let overridden = false;
+      const cancelling = stored && stored.status !== 'Cancelled' && toSave.status === 'Cancelled';
+      const reinstating = stored && stored.status === 'Cancelled' && toSave.status !== 'Cancelled';
+      const action: LockAction = !stored ? 'create' : cancelling ? 'cancel' : reinstating ? 'reinstate' : 'edit';
+      if (stored && assertUnlocked(stored, action) === 'overridden') overridden = true;
+      if (assertUnlocked({ ...toSave, id: toSave.id || stored?.id }, stored ? 'edit' : 'create') === 'overridden') overridden = true;
+
+      if (stored) {
+        toSave.created_at = stored.created_at ?? now;
       } else {
         toSave.id = invoice.id || generateId();
         toSave.created_at = now;
         if (!toSave.invoice_number) {
           toSave.invoice_number = localDb.invoices.nextNumber(toSave.issue_date, toSave.doc_type);
         }
+      }
+
+      // GST Rule 46: one number, one document (a document may keep its own legacy number).
+      if (toSave.invoice_number && !(stored && numberKey(stored.invoice_number) === numberKey(toSave.invoice_number))) {
+        const clash = findNumberClash(invoices, toSave.invoice_number, toSave.id);
+        if (clash) throw new DuplicateNumberError(toSave.invoice_number, clash);
+      }
+
+      if (stored) {
+        // Never let a stale editor copy (opened before a payment was recorded) wipe
+        // receipts: the ledger rows are the floor for what has been received.
+        const ledgerPaid = localDb.payments.totalFor(toSave.id);
+        if (ledgerPaid > round2(Number(toSave.amount_paid) || 0) + 0.004) {
+          const was = round2(Number(stored.amount_paid) || 0);
+          Object.assign(toSave, withPaid(toSave, Math.max(was, ledgerPaid)));
+        }
+        invoices[idx] = toSave;
+      } else {
         invoices.push(toSave);
       }
       setTable(KEYS.invoices, invoices);
+
+      logSafe(() => (stored ? invoiceUpdated(stored, toSave, overridden ? OVERRIDE_NOTE : '') : invoiceCreated(toSave)));
 
       // Grow the local CRM / catalogue from real usage.
       if (toSave.client?.name?.trim()) localDb.clients.upsert(toSave.client);
@@ -275,19 +382,31 @@ export const localDb = {
     },
 
     remove: (id: string) => {
-      setTable(KEYS.invoices, getTable<InvoiceRecord>(KEYS.invoices).filter((i) => i.id !== id));
-      setTable(
-        KEYS.transactions,
-        getTable<Payment>(KEYS.transactions).filter((t) => t.invoice_id !== id),
-      );
+      const all = getTable<InvoiceRecord>(KEYS.invoices);
+      const stored = all.find((i) => i.id === id);
+      const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
+      const payments = getTable<Payment>(KEYS.transactions);
+      const mine = payments.filter((t) => t.invoice_id === id).length;
+      setTable(KEYS.invoices, all.filter((i) => i.id !== id));
+      setTable(KEYS.transactions, payments.filter((t) => t.invoice_id !== id));
+      if (stored) logSafe(() => invoiceDeleted(stored, mine, overridden ? OVERRIDE_NOTE : ''));
     },
 
     setStatus: (id: string, status: InvoiceRecord['status']) => {
       const invoices = getTable<InvoiceRecord>(KEYS.invoices);
       const idx = invoices.findIndex((i) => i.id === id);
       if (idx < 0) return;
-      invoices[idx] = { ...invoices[idx], status, updated_at: new Date().toISOString() };
+      const before = invoices[idx];
+      const action: LockAction =
+        status === 'Cancelled' && before.status !== 'Cancelled'
+          ? 'cancel'
+          : before.status === 'Cancelled' && status !== 'Cancelled'
+            ? 'reinstate'
+            : 'edit';
+      const overridden = assertUnlocked(before, action) === 'overridden';
+      invoices[idx] = { ...before, status, updated_at: new Date().toISOString() };
       setTable(KEYS.invoices, invoices);
+      logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
     },
   },
 
@@ -318,10 +437,16 @@ export const localDb = {
         // stamp still says 31 Mar and would file the receipt in the previous FY.
         date: input.date || localDayOf(new Date()),
       };
+      const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
+      const overridden = target ? assertUnlocked(target, 'pay') === 'overridden' : false;
       const rows = getTable<Payment>(KEYS.transactions);
       rows.push(payment);
       setTable(KEYS.transactions, rows);
       syncPaymentState(input.invoiceId, payment.amount);
+      logSafe(() => {
+        const row = paymentLogged('payment_add', payment, target);
+        return overridden ? { ...row, summary: row.summary + OVERRIDE_NOTE } : row;
+      });
       return payment;
     },
 
@@ -329,8 +454,14 @@ export const localDb = {
       const rows = getTable<Payment>(KEYS.transactions);
       const row = rows.find((t) => t.id === paymentId);
       if (!row) return;
+      const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
+      const overridden = target ? assertUnlocked(target, 'unpay') === 'overridden' : false;
       setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));
       syncPaymentState(row.invoice_id, -row.amount);
+      logSafe(() => {
+        const entry = paymentLogged('payment_remove', row, target);
+        return overridden ? { ...entry, summary: entry.summary + OVERRIDE_NOTE } : entry;
+      });
     },
   },
 };

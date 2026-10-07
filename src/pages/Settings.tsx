@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Check, Copy, Database, Plus, Save, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
+import { Building2, Check, Copy, Database, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -18,12 +18,16 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/settings/Settings.module.css';
 
-type Tab = 'business' | 'defaults' | 'data' | 'security';
+// The activity log is only needed on its own tab, so it stays out of the Settings chunk.
+const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
+
+type Tab = 'business' | 'defaults' | 'data' | 'activity' | 'security';
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: 'business', label: 'Business profiles', icon: Building2 },
   { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
   { id: 'data', label: 'Data & backup', icon: Database },
+  { id: 'activity', label: 'Activity', icon: ScrollText },
   { id: 'security', label: 'Security', icon: ShieldCheck },
 ];
 
@@ -224,6 +228,11 @@ export function Settings() {
           <DataPanel notify={notify} />
           <AutoBackupPanel onNotify={notify} />
         </>
+      )}
+      {tab === 'activity' && (
+        <Suspense fallback={<p className={surface.sectionNote}>Loading activity…</p>}>
+          <ActivityPanel />
+        </Suspense>
       )}
       {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
 

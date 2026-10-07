@@ -216,7 +216,7 @@ test('cancel / reinstate with payment acknowledgement', () => {
   assert.equal(back.status, 'Partially Paid');
   assert.equal(docs.activeCancellation('c1', docs.readLinks()), undefined);
 
-  const unpaid = localDb.invoices.save(make({ id: 'c2', status: 'Sent' }));
+  const unpaid = localDb.invoices.save(make({ id: 'c2', invoice_number: 'INV/FY25-26/0002', status: 'Sent' }));
   assert.equal(docs.cancelDocument(unpaid, 'Duplicate').status, 'Cancelled');
 });
 

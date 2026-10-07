@@ -15,6 +15,7 @@
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { localDb } from './localDb';
+import { isPeriodLockedError } from './period-lock';
 import {
   DOCUMENT_LABELS,
   type DocumentType,
@@ -222,7 +223,14 @@ export function convertDocument(source: InvoiceRecord, target: DocumentType): In
   addLink({ from_id: source.id, to_id: saved.id, relation: 'converted' });
 
   const nextStatus = statusAfterConversion(source);
-  if (nextStatus !== source.status) localDb.invoices.setStatus(source.id, nextStatus);
+  if (nextStatus !== source.status) {
+    try {
+      localDb.invoices.setStatus(source.id, nextStatus);
+    } catch (err) {
+      // A source document inside a locked period keeps its status; the conversion itself still stands.
+      if (!isPeriodLockedError(err)) throw err;
+    }
+  }
   return saved;
 }
 

@@ -175,3 +175,59 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
+
+/* <fieldset> used purely to disable a block of controls at once (locked documents). */
+.fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+fieldset.main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Locked document + number hints */
+.frozen {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.numberHint {
+  display: flex;
+  gap: 0.35rem;
+  align-items: flex-start;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.numberBad {
+  color: var(--loss);
+}
+
+.numberGap {
+  color: var(--warning);
+}
+
+.numberHint svg {
+  flex: none;
+  margin-top: 0.1rem;
+}
+
+.frozen:disabled {
+  opacity: 0.78;
+}
+
+/* Reserves the lock banner's height while its chunk loads, so the page does not jump. */
+.bannerSlot {
+  min-height: 4.25rem;
+}

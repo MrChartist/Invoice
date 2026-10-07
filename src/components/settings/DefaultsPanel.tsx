@@ -2,6 +2,7 @@ import { CURRENCIES } from '../../lib/utils';
 import { GST_SLABS } from '../../types/invoice';
 import type { AppSettings } from '../../lib/localDb';
 import { useTheme } from '../../hooks/useTheme';
+import { LockBooksCard } from './LockBooksCard';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
@@ -66,6 +67,8 @@ export function DefaultsPanel({ settings, onChange }: Props) {
           </label>
         </div>
       </section>
+
+      <LockBooksCard settings={settings} onChange={onChange} />
 
       <section className={surface.card}>
         <div className={surface.cardHead}>Appearance</div>
