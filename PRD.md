@@ -72,7 +72,7 @@ MrChartist Invoice Creator is an institutional-grade, zero-dependency, local-fir
 - **Fonts:** Inter, Outfit, Plus Jakarta Sans, Playfair Display, JetBrains Mono (Google Fonts)
 
 ## 6. Deployment
-- **Domain:** https://invoice.mrchartist.in
+- **Domain:** https://mrchartist.com
 - **Hosting:** Any static hosting (Vercel, Netlify, GitHub Pages)
 - **PWA:** Manifest configured for standalone installability
 - **SEO:** Full Open Graph, Twitter Cards, sitemap, robots.txt

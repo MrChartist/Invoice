@@ -1,195 +1,161 @@
-.container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+.page {
+  padding-bottom: 5rem;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-}
-
-.title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-family: var(--font-display);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.badge {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
+.number {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
   font-weight: 600;
-  background-color: var(--muted);
+  letter-spacing: 0;
   color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--card);
 }
 
-.badgeDraft {
-  background-color: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.badgeSent {
-  background-color: rgba(37, 160, 90, 0.1);
-  color: var(--profit);
-}
-
-.badgePaid {
-  background-color: var(--profit);
-  color: white;
-}
-
-.badgeOverdue {
-  background-color: rgba(217, 54, 54, 0.1);
-  color: var(--loss);
-}
-
-.grid {
+.layout {
   display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1.25rem;
   align-items: start;
 }
 
-.leftColumn {
+.main,
+.side {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  min-width: 0;
 }
 
-.rightColumn {
+.side {
+  position: sticky;
+  top: 1rem;
+}
+
+.sideActions {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
-/* Card Styles */
-.card {
-  background-color: var(--card);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
+.muted {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
 }
 
-.cardDark {
-  background-color: var(--card-inner);
-  color: var(--card-foreground);
-  border: 1px solid var(--border);
+.chips {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
 }
 
-.cardHeader {
-  padding: 1.5rem 1.5rem 0 1.5rem;
-  font-family: var(--font-display);
+.chip {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  font-size: 1.125rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--card);
+  color: var(--muted-foreground);
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.chip:hover {
+  border-color: var(--brand);
+  color: var(--brand-text);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  font-size: 0.875rem;
+}
+
+.banner span {
+  flex: 1;
+  min-width: 180px;
+}
+
+.errors {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--loss) 40%, var(--border));
+  background: color-mix(in srgb, var(--loss) 8%, var(--card));
+  border-radius: var(--radius-md);
+  color: var(--loss);
+  font-size: 0.875rem;
 }
 
-.cardBody {
-  padding: 1.5rem;
+.errors strong {
+  display: block;
+  margin-bottom: 0.25rem;
 }
 
-/* Form Styles */
-.inputGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.inputGroup:last-child {
-  margin-bottom: 0;
-}
-
-.label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.input {
-  width: 100%;
-  background: transparent;
-  border: 1px solid var(--input-border);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-sm);
+.errors ul {
+  margin-left: 1.1rem;
   color: var(--foreground);
-  transition: all var(--transition-fast);
-  font-family: var(--font-body);
 }
 
-.input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-glow);
+.mobileBar {
+  display: none;
 }
 
-.inputGhost {
-  border-color: transparent;
-  padding: 0.5rem 0;
-  font-weight: 500;
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .side {
+    position: static;
+  }
 }
 
-.inputGhost:focus, .inputGhost:hover {
-  border-color: var(--input-border);
-  padding: 0.5rem 0.75rem;
-  background-color: var(--accent);
-}
+@media (max-width: 900px) {
+  .mobileBar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.08);
+  }
 
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  transition: all var(--transition-fast);
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-display);
-}
+  .mobileBar > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
 
-.btnPrimary {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow: var(--shadow-sm);
-}
+  .mobileBar span {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+  }
 
-.btnPrimary:hover {
-  background-color: var(--primary-hover);
-  box-shadow: var(--shadow-glow);
-}
-
-.btnOutline {
-  background-color: transparent;
-  border: 1px solid var(--primary);
-  color: var(--primary);
-}
-
-.btnOutline:hover {
-  background-color: var(--primary-glow);
-}
-
-.btnGhost {
-  background-color: transparent;
-  color: var(--muted-foreground);
-  padding: 0.5rem 1rem;
-}
-
-.btnGhost:hover {
-  background-color: var(--accent);
-  color: var(--foreground);
+  .mobileBar strong {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+  }
 }

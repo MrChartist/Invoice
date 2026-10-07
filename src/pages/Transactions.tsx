@@ -1,199 +1,317 @@
-import { useState, useEffect } from 'react';
-import { localDb, setTable, getTable, generateId } from '../lib/localDb';
-import { formatCurrency, formatDate, cn } from '../lib/utils';
-import type { InvoiceRecord } from '../types/invoice';
-import { ArrowDownRight, ArrowUpRight, FileText, Eye, CheckCircle, Trash2, Copy, ReceiptText, Plus } from 'lucide-react';
-import { useInvoiceStore } from '../store/useInvoiceStore';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Banknote,
+  Copy,
+  Download,
+  Eye,
+  FilePlus2,
+  FileText,
+  Pencil,
+  Search,
+  Trash2,
+} from 'lucide-react';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
+import { StatusBadge } from '../components/ui/StatusBadge';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Avatar } from '../components/ui/Avatar';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { useToast } from '../components/ui/useToast';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
-import { Toast } from '../components/ui/Toast';
-import { Link } from 'react-router-dom';
-import styles from './InvoiceCreator.module.css';
+import { PaymentModal } from '../components/modals/PaymentModal';
+import { localDb, generateId } from '../lib/localDb';
+import { useInvoiceStore } from '../store/useInvoiceStore';
+import { effectiveStatus } from '../lib/invoice-status';
+import { isRevenueDoc, summarize } from '../lib/stats';
+import { downloadText, toCsv } from '../lib/download';
+import { addDaysInput, cn, formatCurrency, formatDate, todayInput } from '../lib/utils';
+import { DOCUMENT_LABELS, type InvoiceRecord } from '../types/invoice';
+import controls from '../styles/controls.module.css';
+import surface from '../styles/surface.module.css';
+import styles from './Transactions.module.css';
+
+type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft';
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'unpaid', label: 'Unpaid' },
+  { id: 'overdue', label: 'Overdue' },
+  { id: 'paid', label: 'Paid' },
+  { id: 'draft', label: 'Draft' },
+];
+
+function matchesFilter(inv: InvoiceRecord, filter: Filter, now: Date): boolean {
+  const status = effectiveStatus(inv, now);
+  switch (filter) {
+    case 'unpaid':
+      return status === 'Sent' || status === 'Partially Paid' || status === 'Overdue';
+    case 'overdue':
+      return status === 'Overdue';
+    case 'paid':
+      return status === 'Paid';
+    case 'draft':
+      return status === 'Draft';
+    default:
+      return true;
+  }
+}
 
 export function Transactions() {
-  const [invoices, setInvoices] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const loadInvoice = useInvoiceStore((s) => s.loadInvoice);
+  const { notify, toastNode } = useToast();
+
+  const [version, setVersion] = useState(0);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const store = useInvoiceStore();
+  const [payFor, setPayFor] = useState<InvoiceRecord | null>(null);
+  const [deleting, setDeleting] = useState<InvoiceRecord | null>(null);
 
-  const reload = () => setInvoices(localDb.invoices.getAll());
+  const reload = () => setVersion((v) => v + 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const invoices = useMemo(() => localDb.invoices.getAll(), [version]);
+  const now = new Date();
+  const summary = useMemo(() => summarize(invoices, now), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { reload(); }, []);
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return invoices
+      .filter((inv) => matchesFilter(inv, filter, now))
+      .filter(
+        (inv) =>
+          !q ||
+          [inv.invoice_number, inv.client?.name, inv.client?.company, inv.client?.gstin].some((f) =>
+            f?.toLowerCase().includes(q),
+          ),
+      )
+      .sort((a, b) => (b.issue_date || '').localeCompare(a.issue_date || '') || (b.created_at || '').localeCompare(a.created_at || ''));
+  }, [invoices, query, filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.total, 0);
-  const pendingRevenue = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft').reduce((sum, i) => sum + i.total, 0);
+  const counts = useMemo(
+    () => Object.fromEntries(FILTERS.map((f) => [f.id, invoices.filter((i) => matchesFilter(i, f.id, now)).length])) as Record<Filter, number>,
+    [invoices], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
-  const handlePreview = (inv: any) => {
-    store.loadInvoice(inv.id);
-    setPreviewOpen(true);
+  const handlePreview = (inv: InvoiceRecord) => {
+    if (loadInvoice(inv.id)) setPreviewOpen(true);
+    else notify('Could not open this document.', 'error');
   };
 
-  const handleMarkPaid = (inv: any) => {
-    const all = getTable<InvoiceRecord>('invoices');
-    const idx = all.findIndex((i) => i.id === inv.id);
-    if (idx >= 0) {
-      all[idx].status = all[idx].status === 'Paid' ? 'Sent' : 'Paid';
-      setTable('invoices', all);
+  const handleDuplicate = (inv: InvoiceRecord) => {
+    try {
+      const issue = todayInput();
+      const clone: InvoiceRecord = {
+        ...inv,
+        id: generateId(),
+        invoice_number: '',
+        status: 'Draft',
+        issue_date: issue,
+        due_date: addDaysInput(localDb.settings.get().defaultDueDays, issue),
+        amount_paid: 0,
+        balance_due: inv.total,
+        created_at: undefined,
+        updated_at: undefined,
+      };
+      const saved = localDb.invoices.save(clone);
       reload();
-      setToastMsg(all[idx].status === 'Paid' ? 'Marked as Paid ✓' : 'Reverted to Sent');
+      notify(`Duplicated as ${saved.invoice_number}`);
+    } catch (err) {
+      notify((err as Error).message, 'error');
     }
   };
 
-  const handleDelete = (inv: any) => {
-    const all = getTable('invoices').filter((i: any) => i.id !== inv.id);
-    setTable('invoices', all);
-    reload();
-    setToastMsg('Invoice deleted');
+  const handleDelete = (inv: InvoiceRecord) => {
+    try {
+      localDb.invoices.remove(inv.id);
+      reload();
+      notify(`${inv.invoice_number} deleted`);
+    } catch (err) {
+      notify((err as Error).message, 'error');
+    }
   };
 
-  const handleDuplicate = (inv: any) => {
-    const clone = {
-      ...inv,
-      id: generateId(),
-      invoice_number: '', // will be auto-generated
-      status: 'Draft',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    localDb.invoices.save(clone);
-    reload();
-    setToastMsg(`Duplicated as ${clone.invoice_number || 'new draft'}`);
+  const exportCsv = () => {
+    const header = ['Number', 'Type', 'Date', 'Due date', 'Client', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total', 'Paid', 'Balance', 'Status'];
+    const body = rows.map((i) => [
+      i.invoice_number,
+      DOCUMENT_LABELS[i.doc_type] ?? 'Invoice',
+      i.issue_date,
+      i.due_date,
+      i.client?.name,
+      i.client?.gstin,
+      i.taxable_value,
+      i.cgst_amount,
+      i.sgst_amount,
+      i.igst_amount,
+      i.total,
+      i.amount_paid,
+      i.balance_due,
+      effectiveStatus(i, now),
+    ]);
+    downloadText(`invoice-ledger-${todayInput()}.csv`, toCsv([header, ...body]), 'text/csv');
+    notify(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`);
   };
 
   return (
-    <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Transactions Ledger</h1>
+    <div className={surface.page}>
+      <PageHeader
+        title="Invoices"
+        subtitle="Every document you have issued, with payment status."
+        actions={
+          <>
+            <button type="button" className={controls.btnOutline} onClick={exportCsv} disabled={rows.length === 0}>
+              <Download size={16} /> Export CSV
+            </button>
+            <Link to="/invoice" className={controls.btnPrimary}>
+              <FilePlus2 size={16} /> New invoice
+            </Link>
+          </>
+        }
+      />
+
+      <div className={surface.statGrid}>
+        <StatCard label="Billed" value={formatCurrency(summary.billed)} icon={FileText} hint={`${summary.count} issued`} />
+        <StatCard label="Received" value={formatCurrency(summary.received)} icon={Banknote} tone="profit" />
+        <StatCard label="Outstanding" value={formatCurrency(summary.outstanding)} icon={FileText} tone="warning" />
       </div>
 
-      {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
-        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Received</div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(37,160,90,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowDownRight size={16} color="var(--profit)" />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--profit)', fontFamily: 'var(--font-display)' }}>
-            {formatCurrency(totalRevenue)}
-          </div>
-        </div>
-        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending</div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(230,154,6,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowUpRight size={16} color="var(--warning)" />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'var(--font-display)' }}>
-            {formatCurrency(pendingRevenue)}
+      <section className={surface.card}>
+        <div className={styles.toolbar}>
+          <label className={styles.search}>
+            <Search size={16} />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search number, client or GSTIN"
+              aria-label="Search invoices"
+            />
+          </label>
+          <div className={controls.segment} role="tablist" aria-label="Filter by status">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                role="tab"
+                aria-selected={filter === f.id}
+                className={filter === f.id ? controls.segmentBtnActive : controls.segmentBtn}
+                onClick={() => setFilter(f.id)}
+              >
+                {f.label} <span className={styles.count}>{counts[f.id]}</span>
+              </button>
+            ))}
           </div>
         </div>
-        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Invoices</div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(240,112,32,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={16} color="var(--primary)" />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>
-            {invoices.length}
-          </div>
-        </div>
-      </div>
 
-      {/* Invoices Table */}
-      <div className={styles.card}>
-        <div className={styles.cardHeader} style={{ paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
-          Recent Invoices
-        </div>
-        <div style={{ padding: '0 1.5rem' }}>
-          {invoices.length === 0 ? (
-            <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(240,112,32,0.1), rgba(240,112,32,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                <ReceiptText size={36} color="var(--primary)" />
-              </div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '0.5rem' }}>
-                No transactions yet
-              </h3>
-              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', maxWidth: '360px', margin: '0 auto 1.5rem' }}>
-                Once you create and send invoices, they'll appear here as transactions. Track payments, mark as paid, and more.
-              </p>
-              <Link to="/invoice" className={cn(styles.btn, styles.btnPrimary)} style={{ textDecoration: 'none', padding: '0.75rem 2rem' }}>
-                <Plus size={18} /> Create Invoice
+        {invoices.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="Nothing issued yet"
+            text="Invoices, quotations and credit notes you save will be listed here, with payment tracking."
+            action={
+              <Link to="/invoice" className={controls.btnPrimary}>
+                <FilePlus2 size={16} /> Create an invoice
               </Link>
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            }
+          />
+        ) : rows.length === 0 ? (
+          <EmptyState icon={Search} title="No matches" text="Try a different search or filter." />
+        ) : (
+          <div className={surface.tableWrap}>
+            <table className={surface.table}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted-foreground)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Invoice Number</th>
-                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Client</th>
-                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Date</th>
-                  <th style={{ padding: '1rem 0', fontWeight: 600 }}>Status</th>
-                  <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'right' }}>Amount</th>
-                  <th style={{ padding: '1rem 0', fontWeight: 600, textAlign: 'center' }}>Actions</th>
+                <tr>
+                  <th>Document</th>
+                  <th>Client</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th className={surface.numeric}>Total</th>
+                  <th className={surface.numeric}>Balance</th>
+                  <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((inv, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.875rem', transition: 'background 150ms ease' }}>
-                    <td style={{ padding: '1rem 0', fontWeight: 600, color: 'var(--primary)' }}>{inv.invoice_number}</td>
-                    <td style={{ padding: '1rem 0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'var(--card-inner)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem', color: 'var(--primary)' }}>
-                          {(inv.client?.name || 'U')[0].toUpperCase()}
+                {rows.map((inv) => {
+                  const status = effectiveStatus(inv, now);
+                  const canPay = isRevenueDoc(inv) && (inv.balance_due ?? inv.total) > 0;
+                  return (
+                    <tr key={inv.id}>
+                      <td>
+                        <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
+                          {inv.invoice_number}
+                        </Link>
+                        <div className={styles.docType}>{DOCUMENT_LABELS[inv.doc_type] ?? 'Invoice'}</div>
+                      </td>
+                      <td>
+                        <div className={styles.client}>
+                          <Avatar name={inv.client?.name || '?'} size={28} square />
+                          <span>{inv.client?.name || '—'}</span>
                         </div>
-                        {inv.client?.name || 'Unknown Client'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem 0' }}>{formatDate(inv.issue_date)}</td>
-                    <td style={{ padding: '1rem 0' }}>
-                      <span className={cn(
-                        styles.badge, 
-                        inv.status === 'Draft' ? styles.badgeDraft : 
-                        inv.status === 'Paid' ? styles.badgePaid : 
-                        inv.status === 'Overdue' ? styles.badgeOverdue : styles.badgeSent
-                      )}>
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{formatCurrency(inv.total, inv.currency)}</td>
-                    <td style={{ padding: '1rem 0', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
-                        <button onClick={() => handlePreview(inv)} className={styles.btnGhost} style={{ color: 'var(--primary)', padding: '0.4rem' }} title="Preview & Download">
-                          <Eye size={15} />
-                        </button>
-                        <button onClick={() => handleMarkPaid(inv)} className={styles.btnGhost} style={{ color: inv.status === 'Paid' ? 'var(--profit)' : 'var(--muted-foreground)', padding: '0.4rem' }} title={inv.status === 'Paid' ? 'Mark Unpaid' : 'Mark as Paid'}>
-                          <CheckCircle size={15} />
-                        </button>
-                        <button onClick={() => handleDuplicate(inv)} className={styles.btnGhost} style={{ color: 'var(--muted-foreground)', padding: '0.4rem' }} title="Duplicate Invoice">
-                          <Copy size={15} />
-                        </button>
-                        <button onClick={() => handleDelete(inv)} className={styles.btnGhost} style={{ color: 'var(--destructive)', padding: '0.4rem' }} title="Delete Invoice">
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className={styles.nowrap}>
+                        {formatDate(inv.issue_date)}
+                        <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
+                          Due {formatDate(inv.due_date) || '—'}
+                        </div>
+                      </td>
+                      <td>
+                        <StatusBadge status={status} />
+                      </td>
+                      <td className={surface.numeric}>{formatCurrency(inv.total, inv.currency)}</td>
+                      <td className={surface.numeric}>
+                        {isRevenueDoc(inv) ? formatCurrency(inv.balance_due ?? inv.total, inv.currency) : '—'}
+                      </td>
+                      <td>
+                        <div className={surface.rowActions}>
+                          {canPay && (
+                            <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} title="Record payment" aria-label={`Record payment for ${inv.invoice_number}`}>
+                              <Banknote size={16} />
+                            </button>
+                          )}
+                          <button type="button" className={controls.btnIcon} onClick={() => handlePreview(inv)} title="Preview / PDF" aria-label={`Preview ${inv.invoice_number}`}>
+                            <Eye size={16} />
+                          </button>
+                          <button type="button" className={controls.btnIcon} onClick={() => navigate(`/invoice/${inv.id}`)} title="Edit" aria-label={`Edit ${inv.invoice_number}`}>
+                            <Pencil size={16} />
+                          </button>
+                          <button type="button" className={controls.btnIcon} onClick={() => handleDuplicate(inv)} title="Duplicate" aria-label={`Duplicate ${inv.invoice_number}`}>
+                            <Copy size={16} />
+                          </button>
+                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting(inv)} title="Delete" aria-label={`Delete ${inv.invoice_number}`}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+      </section>
 
       <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
-      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <PaymentModal
+        invoice={payFor}
+        onClose={() => setPayFor(null)}
+        onChanged={(message) => {
+          reload();
+          if (message) notify(message);
+        }}
+      />
+      <ConfirmDialog
+        open={!!deleting}
+        destructive
+        title="Delete this document?"
+        message={`${deleting?.invoice_number ?? ''} and its payment history will be permanently removed from this device. Export a backup first if you may need it.`}
+        confirmLabel="Delete"
+        onConfirm={() => deleting && handleDelete(deleting)}
+        onClose={() => setDeleting(null)}
+      />
+      {toastNode}
     </div>
   );
 }

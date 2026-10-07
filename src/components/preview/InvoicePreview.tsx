@@ -1,134 +1,166 @@
-import { useRef, useMemo, useState } from 'react';
-import { Download, Printer, X } from 'lucide-react';
-import { toPng } from 'html-to-image';
-import { jsPDF } from 'jspdf';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, ChevronRight, Download, Loader2, Printer, X } from 'lucide-react';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
-import styles from './InvoicePreview.module.css';
-import { TEMPLATES } from '../templates/registry';
+import { localDb, blankProfile } from '../../lib/localDb';
+import { TEMPLATES, templateById } from '../templates/registry';
 import { TemplateEngine } from '../templates/TemplateEngine';
+import { DOCUMENT_LABELS } from '../../types/invoice';
+import { cn } from '../../lib/utils';
+import controls from '../../styles/controls.module.css';
+import styles from './InvoicePreview.module.css';
+
+const PAPER_W = 794; // A4 @ 96dpi
+const PAPER_H = 1123;
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-function getSenderProfile(invoiceSender: any) {
-  if (invoiceSender) return invoiceSender;
-
-  const defaults = {
-    companyName: 'Rohit Singh',
-    companyEmail: 'mrchartist@zohomail.in',
-    companyAddress: '73 Sagouni Post Chouka Teh Kesli\nSagar, Madhya Pradesh 470235',
-    companyPhone: '7581838868',
-    companyTagline: 'Financial Consultant',
-    bankName: 'ICICI Bank (Savings)',
-    accountName: 'ROHIT SINGH',
-    accountNumber: '081801505319',
-    ifsc: 'ICIC0000949',
-    upiId: '8726696911@icici'
-  };
-  try {
-    const stored = localStorage.getItem('mrchartist_inv_settings');
-    if (stored) {
-      const s = JSON.parse(stored);
-      if (s.profiles && s.profiles.length > 0) {
-        return s.profiles.find((p: any) => p.id === s.activeProfileId) || s.profiles[0];
-      }
-      return {
-        companyName: s.companyName || defaults.companyName,
-        companyEmail: s.companyEmail || defaults.companyEmail,
-        companyAddress: s.companyAddress || defaults.companyAddress,
-        companyPhone: s.companyPhone || defaults.companyPhone,
-        companyTagline: s.companyTagline || defaults.companyTagline,
-        bankName: defaults.bankName,
-        accountName: defaults.accountName,
-        accountNumber: defaults.accountNumber,
-        ifsc: defaults.ifsc,
-        upiId: defaults.upiId
-      };
-    }
-  } catch (err) {
-    console.error('getSenderProfile: failed to parse stored settings; using defaults', err);
-  }
-  return defaults;
-}
-
+/** Full-screen, scale-to-fit A4 preview with print and multi-page PDF export. */
 export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
-  const previewRef = useRef<HTMLDivElement>(null);
   const invoice = useInvoiceStore();
-  const sender = useMemo(() => getSenderProfile(invoice.sender), [isOpen, invoice.sender]);
-  const [templateId, setTemplateId] = useState(() => localStorage.getItem('mrchartist_inv_template') || 'classic_orange');
+  const paperRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [paperHeight, setPaperHeight] = useState(PAPER_H);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  // Never render someone else's details: snapshot first, then the active profile, then a blank.
+  const sender = useMemo(
+    () => invoice.sender ?? localDb.settings.activeProfile() ?? blankProfile(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [invoice.sender, isOpen],
+  );
+
+  const fit = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const available = stage.clientWidth - 8;
+    setScale(Math.min(1, Math.max(0.3, available / PAPER_W)));
+    if (paperRef.current) setPaperHeight(Math.max(paperRef.current.offsetHeight, PAPER_H));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    fit();
+    const ro = new ResizeObserver(fit);
+    if (stageRef.current) ro.observe(stageRef.current);
+    if (paperRef.current) ro.observe(paperRef.current);
+    return () => ro.disconnect();
+  }, [isOpen, fit, invoice.items.length, invoice.template_id]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setError('');
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const handleTemplateChange = (id: string) => {
-    setTemplateId(id);
-    localStorage.setItem('mrchartist_inv_template', id);
-  };
+  const idx = Math.max(0, TEMPLATES.findIndex((t) => t.id === invoice.template_id));
+  const meta = templateById(invoice.template_id);
+  const step = (dir: -1 | 1) => invoice.setTemplate(TEMPLATES[(idx + dir + TEMPLATES.length) % TEMPLATES.length].id);
 
   const handleExportPDF = async () => {
-    if (!previewRef.current) return;
+    if (!paperRef.current || busy) return;
+    setBusy(true);
+    setError('');
     try {
-      const dataUrl = await toPng(previewRef.current, { quality: 1, pixelRatio: 3, cacheBust: true });
+      // Loaded on demand — the PDF stack is ~200 KB gzipped and most sessions never export.
+      const [{ toPng }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
+      const node = paperRef.current;
+      const height = Math.max(node.offsetHeight, PAPER_H);
+      const dataUrl = await toPng(node, {
+        pixelRatio: 2.5,
+        cacheBust: true,
+        width: PAPER_W,
+        height,
+        backgroundColor: '#ffffff',
+        style: { transform: 'none', transformOrigin: 'top left' },
+      });
+
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Invoice_${invoice.invoice_number || 'draft'}.pdf`);
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (height / PAPER_W) * pageW;
+      const pages = Math.max(1, Math.ceil(imgH / pageH - 0.01));
+      for (let page = 0; page < pages; page++) {
+        if (page > 0) pdf.addPage();
+        pdf.addImage(dataUrl, 'PNG', 0, -page * pageH, pageW, imgH);
+      }
+      const safe = (invoice.invoice_number || 'draft').replace(/[\\/:*?"<>|]+/g, '-');
+      pdf.save(`${DOCUMENT_LABELS[invoice.doc_type].replace(/\s+/g, '_')}_${safe}.pdf`);
     } catch (err) {
-      console.error('Failed to generate PDF', err);
+      console.error('PDF export failed', err);
+      setError('Could not create the PDF. Try Print → Save as PDF instead.');
+    } finally {
+      setBusy(false);
     }
   };
 
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999, 
-      backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      overflowY: 'auto', padding: '2rem 1rem'
-    }}>
-      {/* Toolbar */}
-      <div className={`${styles.toolbar} no-print`} style={{ marginBottom: '1rem', position: 'sticky', top: 0, zIndex: 10, maxWidth: '780px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span className={styles.toolbarLabel}>Preview (A4)</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '320px', overflowX: 'auto', padding: '2px 0' }}>
-            {TEMPLATES.map(t => (
-              <button
-                key={t.id}
-                onClick={() => handleTemplateChange(t.id)}
-                title={`${t.name} (${t.category})`}
-                style={{
-                  width: '20px', height: '20px', borderRadius: '4px', flexShrink: 0,
-                  background: t.accent, border: templateId === t.id ? '2px solid #fff' : '1px solid rgba(255,255,255,0.2)',
-                  cursor: 'pointer', boxShadow: templateId === t.id ? `0 0 0 2px ${t.accent}` : 'none',
-                  transition: 'all 150ms ease',
-                }}
-              />
-            ))}
+  return createPortal(
+    <div className={cn(styles.overlay, 'print-host')} role="dialog" aria-modal="true" aria-label="Document preview">
+      <div className={cn(styles.toolbar, 'no-print')}>
+        <div className={styles.templatePicker}>
+          <button type="button" className={controls.btnIcon} onClick={() => step(-1)} aria-label="Previous template">
+            <ChevronLeft size={18} />
+          </button>
+          <div className={styles.templateName}>
+            <span className={styles.swatch} style={{ background: meta.accent }} />
+            <select
+              value={invoice.template_id}
+              onChange={(e) => invoice.setTemplate(e.target.value)}
+              aria-label="Template"
+            >
+              {TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} — {t.category}
+                </option>
+              ))}
+            </select>
           </div>
-          <span style={{ fontSize: '10px', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
-            {TEMPLATES.find(t => t.id === templateId)?.name}
-          </span>
+          <button type="button" className={controls.btnIcon} onClick={() => step(1)} aria-label="Next template">
+            <ChevronRight size={18} />
+          </button>
         </div>
-        <div className={styles.toolbarActions}>
-          <button className={styles.toolBtn} onClick={() => window.print()}>
-            <Printer size={13} /> Print
+
+        <div className={styles.actions}>
+          <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
+            <Printer size={16} /> <span className={styles.hideSm}>Print</span>
           </button>
-          <button className={styles.toolBtnPrimary} onClick={handleExportPDF}>
-            <Download size={13} /> Download PDF
+          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy}>
+            {busy ? <Loader2 size={16} className={styles.spin} /> : <Download size={16} />} PDF
           </button>
-          <button className={styles.toolBtn} onClick={onClose} style={{ marginLeft: '1rem', color: 'var(--destructive)' }}>
-            <X size={13} /> Close
+          <button type="button" className={controls.btnIcon} onClick={onClose} aria-label="Close preview">
+            <X size={20} />
           </button>
         </div>
       </div>
 
-      {/* Paper */}
-      <div className={styles.paperShadow}>
-        <div ref={previewRef}>
-          <TemplateEngine invoice={invoice} sender={sender} totals={invoice.totals} templateId={templateId} />
+      {error && <div className={cn(styles.error, 'no-print')}>{error}</div>}
+
+      <div className={styles.stage} ref={stageRef}>
+        <div className={styles.paperFrame} style={{ width: PAPER_W * scale, height: paperHeight * scale }}>
+          <div className={cn(styles.paperScale, 'paper-scale')} style={{ transform: `scale(${scale})`, width: PAPER_W }}>
+            <div ref={paperRef}>
+              <TemplateEngine invoice={invoice} sender={sender} totals={invoice.totals} templateId={invoice.template_id} />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

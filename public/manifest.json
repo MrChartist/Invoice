@@ -1,17 +1,15 @@
 {
+  "name": "Mr. Chartist Invoice",
   "short_name": "Invoice",
-  "name": "MrChartist Premium Invoice Creator",
-  "icons": [
-    {
-      "src": "/logo.png",
-      "type": "image/png",
-      "sizes": "1024x1024"
-    }
-  ],
+  "description": "GST-ready, offline-first invoice generator by Mr. Chartist.",
   "start_url": "/",
-  "background_color": "#0a0f1c",
-  "display": "standalone",
   "scope": "/",
-  "theme_color": "#0a0f1c",
-  "description": "Institutional-grade, offline-first invoice generation tool for the MrChartist ecosystem."
+  "display": "standalone",
+  "background_color": "#06080a",
+  "theme_color": "#06080a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
 }

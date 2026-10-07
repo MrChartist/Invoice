@@ -1,16 +1,22 @@
 import { useState } from 'react';
-import { login, getUser, verifyPin } from '../lib/auth';
-import { FileText, Lock, User, ArrowRight } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, FileCheck2, Lock, QrCode, ShieldCheck, User } from 'lucide-react';
+import { Logo } from '../components/brand/Logo';
+import { getUser, login, verifyPin } from '../lib/auth';
+import controls from '../styles/controls.module.css';
+import styles from './LoginPage.module.css';
 
-interface LoginPageProps {
-  onSuccess: () => void;
-}
+const PERKS = [
+  { icon: ShieldCheck, text: 'Private by design — data never leaves this device' },
+  { icon: FileCheck2, text: 'GST-ready: CGST / SGST / IGST, HSN, Indian FY numbering' },
+  { icon: QrCode, text: '20 templates with a scannable UPI QR on every invoice' },
+];
 
-export function LoginPage({ onSuccess }: LoginPageProps) {
+export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
   const existingUser = getUser();
-  const [mode] = useState<'login' | 'register'>(existingUser ? 'login' : 'register');
+  const mode: 'login' | 'register' = existingUser ? 'login' : 'register';
   const [name, setName] = useState(existingUser?.name || '');
   const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -18,152 +24,119 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
     setError('');
 
     if (mode === 'register') {
-      if (!name.trim()) { setError('Please enter your name'); return; }
-      if (pin.length < 4) { setError('PIN must be at least 4 digits'); return; }
-      const ok = login(name, pin);
-      if (ok) onSuccess();
-      else setError('Failed to create account');
-    } else {
-      if (!verifyPin(pin)) { setError('Incorrect PIN. Try again.'); return; }
-      // Re-set the session (refresh timestamp)
-      login(existingUser!.name, pin);
-      onSuccess();
+      if (!name.trim()) return setError('Please enter your name.');
+      if (pin.length < 4) return setError('Your PIN must be at least 4 digits.');
+      if (login(name, pin)) onSuccess();
+      else setError('Could not create the account. Is browser storage blocked?');
+      return;
     }
+
+    if (!verifyPin(pin)) {
+      setPin('');
+      return setError('Incorrect PIN. Please try again.');
+    }
+    login(existingUser!.name, pin);
+    onSuccess();
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(145deg, #0a0f1c 0%, #111827 50%, #0a0f1c 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: 'var(--font-body)',
-      padding: '2rem',
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '420px',
-        background: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '20px',
-        padding: '48px 40px',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
-      }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{
-            width: '64px', height: '64px', borderRadius: '16px',
-            background: 'linear-gradient(135deg, #f07020, #f09040)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px', boxShadow: '0 8px 24px rgba(240,112,32,0.3)',
-          }}>
-            <FileText size={32} color="#fff" />
+    <div className={styles.page}>
+      <aside className={styles.brandPanel}>
+        <Logo height={52} tone="on-dark" />
+        <div className={styles.pitch}>
+          <h2 className={styles.headline}>
+            Invoices that look as sharp as <span>your work.</span>
+          </h2>
+          <ul className={styles.perks}>
+            {PERKS.map(({ icon: Icon, text }) => (
+              <li key={text}>
+                <Icon size={16} /> {text}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className={styles.tagline}>Built with conviction. For traders, by a trader.</p>
+      </aside>
+
+      <main className={styles.formPanel}>
+        <div className={styles.formWrap}>
+          <div className={styles.mobileLogo}>
+            <Logo height={46} />
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)', letterSpacing: '-0.03em', margin: 0 }}>
-            MrChartist
+
+          <h1 className={styles.title}>
+            {mode === 'register' ? 'Set up your workspace' : `Welcome back, ${existingUser?.name}`}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.875rem', marginTop: '6px' }}>
-            Premium Invoice Creator
+          <p className={styles.subtitle}>
+            {mode === 'register'
+              ? 'Create a local PIN. Everything stays in this browser — there is no server and no account to sign up for.'
+              : 'Enter your PIN to unlock your invoices.'}
+          </p>
+
+          <form onSubmit={handleSubmit} className={styles.form} noValidate>
+            {mode === 'register' && (
+              <label className={controls.field}>
+                <span className={controls.label}>Your name</span>
+                <span className={styles.inputWrap}>
+                  <User size={16} className={styles.inputIcon} />
+                  <input
+                    className={`${controls.input} ${styles.withIcon}`}
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Rohit Singh"
+                    autoComplete="name"
+                    autoFocus
+                  />
+                </span>
+              </label>
+            )}
+
+            <label className={controls.field}>
+              <span className={controls.label}>{mode === 'register' ? 'Create a PIN (4–6 digits)' : 'PIN'}</span>
+              <span className={styles.inputWrap}>
+                <Lock size={16} className={styles.inputIcon} />
+                <input
+                  className={`${controls.input} ${styles.withIcon} ${styles.pin}`}
+                  type={showPin ? 'text' : 'password'}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="••••"
+                  maxLength={6}
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                  autoFocus={mode === 'login'}
+                  aria-invalid={!!error}
+                />
+                <button
+                  type="button"
+                  className={styles.reveal}
+                  onClick={() => setShowPin((s) => !s)}
+                  aria-label={showPin ? 'Hide PIN' : 'Show PIN'}
+                >
+                  {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </span>
+            </label>
+
+            {error && (
+              <div className={styles.error} role="alert">
+                {error}
+              </div>
+            )}
+
+            <button type="submit" className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock}`}>
+              {mode === 'register' ? 'Create workspace' : 'Unlock'} <ArrowRight size={18} />
+            </button>
+          </form>
+
+          <p className={styles.note}>
+            <Lock size={12} /> The PIN only locks this screen on a shared computer. It is not encryption — use a
+            private browser profile for sensitive data.
           </p>
         </div>
-
-        {/* Welcome text */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          {mode === 'register' ? (
-            <>
-              <h2 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 700, margin: '0 0 8px 0' }}>Create Your Account</h2>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8125rem', margin: 0 }}>Your data stays 100% on this device</p>
-            </>
-          ) : (
-            <>
-              <h2 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 700, margin: '0 0 8px 0' }}>Welcome back, {existingUser?.name}</h2>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8125rem', margin: 0 }}>Enter your PIN to continue</p>
-            </>
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {mode === 'register' && (
-            <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                Full Name
-              </label>
-              <div style={{ position: 'relative' }}>
-                <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Rohit Singh"
-                  autoFocus
-                  style={{
-                    width: '100%', padding: '14px 14px 14px 40px',
-                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px', color: '#fff', fontSize: '0.9375rem',
-                    outline: 'none', transition: 'border 150ms ease', boxSizing: 'border-box',
-                  }}
-                  onFocus={e => e.target.style.borderColor = 'rgba(240,112,32,0.5)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                />
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '8px' }}>
-              {mode === 'register' ? 'Create a 4-digit PIN' : 'Enter PIN'}
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
-              <input
-                type="password"
-                value={pin}
-                onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="••••"
-                maxLength={6}
-                autoFocus={mode === 'login'}
-                style={{
-                  width: '100%', padding: '14px 14px 14px 40px',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '12px', color: '#fff', fontSize: '1.25rem', letterSpacing: '0.3em',
-                  outline: 'none', transition: 'border 150ms ease', boxSizing: 'border-box',
-                }}
-                onFocus={e => e.target.style.borderColor = 'rgba(240,112,32,0.5)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', color: '#ef4444', fontSize: '0.8125rem', fontWeight: 500 }}>
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            style={{
-              width: '100%', padding: '16px',
-              background: 'linear-gradient(135deg, #f07020, #f09040)',
-              border: 'none', borderRadius: '12px',
-              color: '#fff', fontSize: '1rem', fontWeight: 700,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              boxShadow: '0 4px 16px rgba(240,112,32,0.3)',
-              transition: 'all 150ms ease',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 8px 24px rgba(240,112,32,0.4)')}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(240,112,32,0.3)')}
-          >
-            {mode === 'register' ? 'Create Account' : 'Unlock'} <ArrowRight size={18} />
-          </button>
-        </form>
-
-        <p style={{ textAlign: 'center', marginTop: '32px', color: 'rgba(255,255,255,0.25)', fontSize: '0.6875rem' }}>
-          🔒 Your data never leaves this device. Zero backend. Zero tracking.
-        </p>
-      </div>
+      </main>
     </div>
   );
 }

@@ -1,0 +1,125 @@
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 1.25rem;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.colHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2rem;
+}
+
+.profileSelect {
+  width: auto;
+  max-width: 200px;
+  padding-block: 0.3rem;
+  font-size: 0.8125rem;
+}
+
+.card {
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-inner);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.015em;
+}
+
+.tag {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.lines {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--foreground);
+}
+
+.hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--warning);
+}
+
+.warn {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--warning);
+}
+
+.warn strong {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--foreground);
+}
+
+.warn p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.warn a {
+  color: var(--brand-text);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.supply {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(200px, 320px) 1fr;
+  gap: 1rem;
+  align-items: end;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
+.supplyNote {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 760px) {
+  .grid,
+  .supply {
+    grid-template-columns: 1fr;
+  }
+}

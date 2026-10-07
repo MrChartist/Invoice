@@ -4,7 +4,7 @@
 ## Project Identity
 - **Name**: MrChartist Invoice Creator
 - **Type**: Frontend SPA — professional, offline-first invoice generator
-- **Brand**: @MrChartist · live at https://invoice.mrchartist.in
+- **Brand**: @MrChartist · reference site https://mrchartist.com (no separate invoice subdomain launch)
 - **Owner**: Rohit Singh (SEBI Registered Research Analyst, INH000015297)
 - **Features**: 20+ templates, UPI QR code, multi-profile sender identities, GST-ready
   PDF export, Indian-FY invoice numbering, JSON backup/restore (File System Access API).

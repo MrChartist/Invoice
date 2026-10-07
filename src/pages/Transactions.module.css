@@ -1,0 +1,79 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 240px;
+  max-width: 380px;
+  padding: 0 0.75rem;
+  background: var(--card-inner);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted-foreground);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.search:focus-within {
+  border-color: var(--brand-text);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.55rem 0;
+  font-size: 0.875rem;
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  opacity: 0.6;
+  margin-left: 0.15rem;
+}
+
+.docLink {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.docLink:hover {
+  color: var(--brand-text);
+  text-decoration: underline;
+}
+
+.docType {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  margin-top: 0.1rem;
+}
+
+.overdueText {
+  color: var(--loss);
+  font-weight: 600;
+}
+
+.client {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-weight: 500;
+}
+
+.nowrap {
+  white-space: nowrap;
+}

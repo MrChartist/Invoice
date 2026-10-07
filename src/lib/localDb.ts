@@ -47,7 +47,7 @@ export interface AppSettings {
 export const DEFAULT_TERMS =
   'Payment due within 14 days of the invoice date. Please quote the invoice number with your payment.';
 
-function blankProfile(): SenderProfile {
+export function blankProfile(): SenderProfile {
   return {
     id: generateId(),
     companyName: '',

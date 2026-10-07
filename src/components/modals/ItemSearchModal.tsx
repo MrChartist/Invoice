@@ -1,105 +1,72 @@
-import { useState, useEffect } from 'react';
-import { Search, X, Package } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
+import { Modal } from '../ui/Modal';
 import { localDb } from '../../lib/localDb';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency } from '../../lib/utils';
+import type { InvoiceItem } from '../../types/invoice';
+import styles from './PickerList.module.css';
 
-interface ItemSearchModalProps {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
-  targetItemId: string; // The ID of the line item to update
+  /** The line item that receives the chosen catalogue entry. */
+  targetItemId: string;
 }
 
-export function ItemSearchModal({ isOpen, onClose, targetItemId }: ItemSearchModalProps) {
-  const [items, setItems] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
-  const invoice = useInvoiceStore();
+export function ItemSearchModal({ isOpen, onClose, targetItemId }: Props) {
+  const applyCatalogItem = useInvoiceStore((s) => s.applyCatalogItem);
+  const currency = useInvoiceStore((s) => s.currency);
+  const [query, setQuery] = useState('');
+  const [items, setItems] = useState<InvoiceItem[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       setItems(localDb.items.getAll());
-      setSearch('');
+      setQuery('');
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  const filtered = items.filter(i => 
-    i.name?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleSelect = (item: any) => {
-    invoice.updateItem(targetItemId, 'name', item.name || '');
-    invoice.updateItem(targetItemId, 'rate', item.rate || 0);
-    invoice.updateItem(targetItemId, 'type', item.type || 'Service');
-    onClose();
-  };
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q ? items.filter((i) => i.name?.toLowerCase().includes(q) || i.hsn?.toLowerCase().includes(q)) : items;
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [items, query]);
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '1rem'
-    }}>
-      <div style={{
-        background: 'var(--card)', borderRadius: 'var(--radius-lg)',
-        width: '100%', maxWidth: '480px', border: '1px solid var(--border)',
-        boxShadow: 'var(--shadow-xl)', overflow: 'hidden', display: 'flex', flexDirection: 'column'
-      }}>
-        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Package size={18} /> Select Service / Item
-          </h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}>
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--card-inner)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '0 0.75rem' }}>
-            <Search size={16} color="var(--muted-foreground)" />
-            <input 
-              autoFocus
-              type="text" 
-              placeholder="Search items catalog..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ flex: 1, border: 'none', padding: '0.75rem', background: 'transparent', outline: 'none', color: 'var(--foreground)' }}
-            />
-          </div>
-        </div>
-
-        <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-          {filtered.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
-              No items found. Type item details directly in the form to save automatically.
-            </div>
-          ) : (
-            filtered.map((item) => (
-              <button 
-                key={item.id}
-                onClick={() => handleSelect(item)}
-                style={{
-                  width: '100%', textAlign: 'left', padding: '1rem 1.25rem',
-                  border: 'none', borderBottom: '1px solid var(--border)', background: 'transparent',
-                  cursor: 'pointer', transition: 'background 0.2s ease', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+    <Modal open={isOpen} onClose={onClose} title="Choose from your catalogue" subtitle="Items are remembered when you save an invoice" flush>
+      <label className={styles.search}>
+        <Search size={16} />
+        <input autoFocus type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or HSN / SAC" aria-label="Search items" />
+      </label>
+      {filtered.length === 0 ? (
+        <p className={styles.empty}>
+          {items.length === 0 ? 'Your catalogue is empty. Items you use on a saved invoice appear here automatically.' : 'No items match your search.'}
+        </p>
+      ) : (
+        <ul className={styles.list}>
+          {filtered.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className={styles.item}
+                onClick={() => {
+                  applyCatalogItem(targetItemId, item);
+                  onClose();
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
               >
-                <div>
-                  <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{item.name}</div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--muted-foreground)' }}>{item.type || 'Service'}</div>
-                </div>
-                <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                  {formatCurrency(item.rate, invoice.currency)}
-                </div>
+                <span className={styles.main}>
+                  <span className={styles.title}>{item.name}</span>
+                  <span className={styles.sub}>
+                    {[item.hsn && `HSN/SAC ${item.hsn}`, typeof item.tax_rate === 'number' && `GST ${item.tax_rate}%`, item.unit].filter(Boolean).join(' · ') || item.type || 'Service'}
+                  </span>
+                </span>
+                <span className={styles.price}>{formatCurrency(item.rate, currency)}</span>
               </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
   );
 }

@@ -73,7 +73,8 @@ export interface InvoiceState extends InvoiceRecord {
   validate: () => string[];
   newDraft: (docType?: DocumentType) => void;
   loadInvoice: (id: string) => boolean;
-  saveInvoice: () => SaveResult;
+  /** `asDraft` keeps the status as Draft instead of promoting it to Sent. */
+  saveInvoice: (opts?: { asDraft?: boolean }) => SaveResult;
   restoreDraft: () => boolean;
   reset: () => void;
 }
@@ -151,11 +152,23 @@ function refineGstMode(
 
 let draftTimer: ReturnType<typeof setTimeout> | undefined;
 
-/** Debounced autosave of the in-progress draft so a refresh never loses work. */
-function scheduleDraftSave(state: InvoiceState): void {
-  if (state.id) return; // saved documents are persisted explicitly
+function cancelDraftSave(): void {
   if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = undefined;
+}
+
+/**
+ * Debounced autosave of the in-progress draft so a refresh never loses work.
+ * Reads the live state when it fires (not the state that scheduled it), and is
+ * cancelled by save / reset so a late write can never resurrect a stale draft.
+ */
+function scheduleDraftSave(read: () => InvoiceState): void {
+  if (read().id) return; // saved documents are persisted explicitly
+  cancelDraftSave();
   draftTimer = setTimeout(() => {
+    draftTimer = undefined;
+    const state = read();
+    if (state.id) return;
     try {
       setJson(SINGLETON_KEYS.draft, toRecord(state));
     } catch {
@@ -169,7 +182,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
   const apply = (patch: Partial<InvoiceRecord>) => {
     set({ ...patch, dirty: true } as Partial<InvoiceState>);
     get().recalculate();
-    scheduleDraftSave(get());
+    scheduleDraftSave(get);
   };
 
   const mapItems = (id: string, fn: (item: InvoiceItem) => InvoiceItem) =>
@@ -348,6 +361,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     },
 
     newDraft: (docType) => {
+      cancelDraftSave();
       removeRaw(SINGLETON_KEYS.draft);
       set({ ...freshDraft(docType), totals: EMPTY_TOTALS, dirty: false });
       get().recalculate();
@@ -361,7 +375,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       return true;
     },
 
-    saveInvoice: () => {
+    saveInvoice: (opts) => {
       const errors = get().validate();
       if (errors.length) return { ok: false, errors };
 
@@ -372,10 +386,11 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       if (!record.invoice_number) {
         record.invoice_number = localDb.invoices.nextNumber(record.issue_date, record.doc_type);
       }
-      if (record.status === 'Draft') record.status = 'Sent';
+      if (record.status === 'Draft' && !opts?.asDraft) record.status = 'Sent';
 
       try {
         const saved = localDb.invoices.save(record);
+        cancelDraftSave();
         removeRaw(SINGLETON_KEYS.draft);
         set({ ...saved, dirty: false });
         get().recalculate();

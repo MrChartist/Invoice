@@ -96,13 +96,18 @@
 }
 
 .inputInvalid:focus {
-  box-shadow: 0 0 0 3px rgba(217, 54, 54, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--loss) 22%, transparent);
 }
 
 .inputMono {
   font-family: var(--font-mono);
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+.inputMono::placeholder {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .inputNumeric {
@@ -269,7 +274,6 @@
 }
 .btnPrimary:hover:not(:disabled) {
   background-color: var(--primary-hover);
-  box-shadow: var(--shadow-glow);
 }
 
 .btnOutline {
@@ -279,8 +283,8 @@
   color: var(--foreground);
 }
 .btnOutline:hover:not(:disabled) {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--muted-foreground);
+  background-color: var(--accent);
 }
 
 .btnGhost {
@@ -302,7 +306,7 @@
   padding: 0.5rem;
 }
 .btnDanger:hover:not(:disabled) {
-  background-color: rgba(224, 60, 60, 0.1);
+  background-color: color-mix(in srgb, var(--destructive) 12%, transparent);
 }
 
 .btnIcon {

@@ -183,10 +183,10 @@
 }
 
 .badgeDraft { background-color: var(--muted); color: var(--muted-foreground); }
-.badgeSent { background-color: rgba(99, 102, 241, 0.12); color: #6366f1; }
-.badgePartial { background-color: rgba(230, 154, 6, 0.14); color: var(--warning); }
-.badgePaid { background-color: rgba(37, 160, 90, 0.14); color: var(--profit); }
-.badgeOverdue { background-color: rgba(217, 54, 54, 0.13); color: var(--loss); }
+.badgeSent { background-color: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+.badgePartial { background-color: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
+.badgePaid { background-color: color-mix(in srgb, var(--profit) 15%, transparent); color: var(--profit); }
+.badgeOverdue { background-color: color-mix(in srgb, var(--loss) 14%, transparent); color: var(--loss); }
 .badgeCancelled { background-color: var(--muted); color: var(--muted-foreground); text-decoration: line-through; }
 
 /* ── Tables ───────────────────────────────────────────────────── */
@@ -269,8 +269,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--primary-glow), transparent);
-  color: var(--primary);
+  background: var(--brand-soft);
+  color: var(--brand-text);
 }
 
 .emptyTitle {

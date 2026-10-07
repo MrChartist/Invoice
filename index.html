@@ -2,33 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline, zero backend. 20+ premium templates, UPI QR codes, multi-profile support." />
+    <meta name="description" content="Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline, zero backend. 20 templates, UPI QR codes, multi-profile support." />
     <meta name="keywords" content="invoice creator, GST invoice, PDF invoice, free invoice tool, UPI QR code invoice, offline invoice, MrChartist" />
     <meta name="author" content="Rohit Singh" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#0a0f1c" />
-    <link rel="canonical" href="https://invoice.mrchartist.in/" />
+    <meta name="theme-color" content="#06080a" />
+    <link rel="canonical" href="https://mrchartist.com/" />
     <link rel="manifest" href="/manifest.json" />
     
     <!-- Open Graph / Social -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://invoice.mrchartist.in/" />
-    <meta property="og:title" content="Premium Invoice Creator | MrChartist" />
-    <meta property="og:description" content="Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline. 20+ templates, UPI QR codes, multi-profile support." />
+    <meta property="og:url" content="https://mrchartist.com/" />
+    <meta property="og:title" content="Mr. Chartist Invoice — GST-Ready, Offline Invoice Creator" />
+    <meta property="og:description" content="Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline. 20 templates, UPI QR codes, multi-profile support." />
     <meta property="og:site_name" content="MrChartist" />
-    <meta property="og:image" content="https://invoice.mrchartist.in/og-image.png" />
+    <meta property="og:image" content="https://mrchartist.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="675" />
+    <meta property="og:image:height" content="630" />
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Premium Invoice Creator | MrChartist" />
-    <meta name="twitter:description" content="Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline. 20+ templates, UPI QR codes." />
-    <meta name="twitter:image" content="https://invoice.mrchartist.in/og-image.png" />
+    <meta name="twitter:title" content="Mr. Chartist Invoice — GST-Ready, Offline Invoice Creator" />
+    <meta name="twitter:description" content="Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline. 20 templates, UPI QR codes." />
+    <meta name="twitter:image" content="https://mrchartist.com/og-image.png" />
     
-    <title>MrChartist | Premium Invoice Creator — Offline, GST-Ready, 20+ Templates</title>
+    <title>Mr. Chartist Invoice — GST-Ready, Offline Invoice Creator</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -43,10 +45,10 @@
       "@graph": [
         {
           "@type": "Organization",
-          "@id": "https://invoice.mrchartist.in/#organization",
+          "@id": "https://mrchartist.com/#organization",
           "name": "MrChartist",
-          "url": "https://invoice.mrchartist.in/",
-          "logo": "https://invoice.mrchartist.in/logo.png",
+          "url": "https://mrchartist.com/",
+          "logo": "https://mrchartist.com/branding/logo-horizontal-black.svg",
           "founder": {
             "@type": "Person",
             "name": "Rohit Singh",
@@ -56,27 +58,37 @@
         },
         {
           "@type": "WebSite",
-          "@id": "https://invoice.mrchartist.in/#website",
-          "url": "https://invoice.mrchartist.in/",
+          "@id": "https://mrchartist.com/#website",
+          "url": "https://mrchartist.com/",
           "name": "MrChartist Invoice Creator",
           "description": "Create pixel-perfect, GST-ready PDF invoices instantly — 100% offline.",
-          "publisher": { "@id": "https://invoice.mrchartist.in/#organization" }
+          "publisher": { "@id": "https://mrchartist.com/#organization" }
         },
         {
           "@type": "WebApplication",
           "name": "MrChartist Invoice Creator",
-          "url": "https://invoice.mrchartist.in/",
+          "url": "https://mrchartist.com/",
           "applicationCategory": "BusinessApplication",
           "operatingSystem": "Web",
           "browserRequirements": "Requires JavaScript",
           "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
-          "publisher": { "@id": "https://invoice.mrchartist.in/#organization" }
+          "publisher": { "@id": "https://mrchartist.com/#organization" }
         }
       ]
     }
     </script>
   </head>
   <body>
+    <script>
+      // Apply the saved theme before first paint so there is no light/dark flash.
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

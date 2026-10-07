@@ -1,0 +1,65 @@
+.logo {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+}
+
+.art {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+}
+
+.art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Two files, one visible: the black wordmark on light, the white one on dark. */
+.onDark {
+  display: none !important;
+}
+
+:global(.dark) .onLight {
+  display: none !important;
+}
+
+:global(.dark) .onDark {
+  display: block !important;
+}
+
+.logo[data-tone='on-dark'] .onLight {
+  display: none !important;
+}
+
+.logo[data-tone='on-dark'] .onDark {
+  display: block !important;
+}
+
+.logo[data-tone='on-light'] .onLight {
+  display: block !important;
+}
+
+.logo[data-tone='on-light'] .onDark {
+  display: none !important;
+}
+
+.product {
+  margin-left: 0.2rem;
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.logo[data-tone='on-dark'] .product {
+  color: #b9bbb6;
+}
+
+.tile {
+  border-radius: 22.7%;
+}

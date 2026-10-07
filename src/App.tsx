@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
@@ -7,28 +7,32 @@ import { InvoiceCreator } from './pages/InvoiceCreator';
 import { Clients } from './pages/Clients';
 import { Settings } from './pages/Settings';
 import { LoginPage } from './pages/LoginPage';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { isAuthenticated } from './lib/auth';
 
 function App() {
   const [authed, setAuthed] = useState(isAuthenticated());
 
-  if (!authed) {
-    return <LoginPage onSuccess={() => setAuthed(true)} />;
-  }
-
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<DashboardLayout onLogout={() => setAuthed(false)}><Dashboard /></DashboardLayout>} />
-        <Route path="/invoice" element={<DashboardLayout onLogout={() => setAuthed(false)}><InvoiceCreator /></DashboardLayout>} />
-        <Route path="/invoice/:id" element={<DashboardLayout onLogout={() => setAuthed(false)}><InvoiceCreator /></DashboardLayout>} />
-        <Route path="/transactions" element={<DashboardLayout onLogout={() => setAuthed(false)}><Transactions /></DashboardLayout>} />
-        <Route path="/clients" element={<DashboardLayout onLogout={() => setAuthed(false)}><Clients /></DashboardLayout>} />
-        <Route path="/settings" element={<DashboardLayout onLogout={() => setAuthed(false)}><Settings /></DashboardLayout>} />
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      {authed ? (
+        <BrowserRouter>
+          <Routes>
+            <Route element={<DashboardLayout onLogout={() => setAuthed(false)} />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/invoice" element={<InvoiceCreator />} />
+              <Route path="/invoice/:id" element={<InvoiceCreator />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      ) : (
+        <LoginPage onSuccess={() => setAuthed(true)} />
+      )}
+    </ErrorBoundary>
   );
 }
 

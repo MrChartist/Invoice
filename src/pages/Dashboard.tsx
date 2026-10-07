@@ -1,216 +1,250 @@
-import { useState, useEffect } from 'react';
-import { localDb } from '../lib/localDb';
-import { formatCurrency, formatDate, cn } from '../lib/utils';
-import { LayoutDashboard, ArrowUpRight, ArrowDownRight, Clock, FileText, ChevronRight, Plus, Sparkles, TrendingUp, Users } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Banknote,
+  CheckCircle2,
+  Circle,
+  FilePlus2,
+  FileText,
+  Hourglass,
+  Receipt,
+  Users,
+} from 'lucide-react';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
+import { StatusBadge } from '../components/ui/StatusBadge';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Avatar } from '../components/ui/Avatar';
+import { localDb } from '../lib/localDb';
 import { getUser } from '../lib/auth';
-import styles from './InvoiceCreator.module.css';
+import { getIndianFY } from '../lib/invoice-number';
+import { effectiveStatus } from '../lib/invoice-status';
+import { attentionList, compactInr, isRevenueDoc, monthlyBilled, summarize } from '../lib/stats';
+import { daysOverdue, formatCurrency, formatDate } from '../lib/utils';
+import controls from '../styles/controls.module.css';
+import surface from '../styles/surface.module.css';
+import styles from './Dashboard.module.css';
+
+function greeting(hour: number): string {
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export function Dashboard() {
-  const [invoices, setInvoices] = useState<any[]>([]);
   const user = getUser();
+  const [{ invoices, clientCount, profileReady }] = useState(() => {
+    const settings = localDb.settings.get();
+    const profile = localDb.settings.activeProfile();
+    return {
+      invoices: localDb.invoices.getAll(),
+      clientCount: localDb.clients.getAll().length,
+      profileReady:
+        settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
+    };
+  });
 
-  useEffect(() => {
-    setInvoices(localDb.invoices.getAll().reverse());
-  }, []);
+  // Derived values are cheap at this scale; recomputing keeps them honest after edits elsewhere.
+  const now = new Date();
+  const fy = getIndianFY();
+  const summary = summarize(invoices, now);
+  const months = monthlyBilled(invoices, 6, now);
+  const attention = attentionList(invoices, 5, now);
+  const recent = [...invoices]
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    .slice(0, 6);
+  const peak = Math.max(...months.map((m) => m.billed), 1);
+  const collectedPct = summary.billed > 0 ? Math.round((summary.received / summary.billed) * 100) : 0;
+  const hasData = invoices.some(isRevenueDoc);
 
-  const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.total, 0);
-  const pendingRevenue = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft').reduce((sum, i) => sum + i.total, 0);
-  const clientCount = localDb.clients.getAll().length;
-  const recentInvoices = invoices.slice(0, 5);
+  const checklist = [
+    { done: profileReady, label: 'Add your business & payment details', to: '/settings' },
+    { done: clientCount > 0, label: 'Add your first client', to: '/clients' },
+    { done: invoices.length > 0, label: 'Create your first invoice', to: '/invoice' },
+  ];
+  const showChecklist = checklist.some((c) => !c.done);
 
   return (
-    <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
-      <div className={styles.header} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <LayoutDashboard size={24} /> Dashboard
-          </h1>
-          <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0 }}>
-            Welcome back, <strong style={{ color: 'var(--foreground)' }}>{user?.name || 'User'}</strong> 👋
-          </p>
-        </div>
-        <Link to="/invoice" className={cn(styles.btn, styles.btnPrimary)} style={{ padding: '0.75rem 1.5rem', fontSize: '0.9375rem', textDecoration: 'none' }}>
-          <Plus size={18} /> New Invoice
-        </Link>
+    <div className={surface.page}>
+      <PageHeader
+        title={`${greeting(now.getHours())}, ${user?.name?.split(' ')[0] || 'there'}`}
+        subtitle={`Financial year FY${fy.label} · ${now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`}
+        actions={
+          <Link to="/invoice" className={controls.btnPrimary}>
+            <FilePlus2 size={16} /> New invoice
+          </Link>
+        }
+      />
+
+      {showChecklist && (
+        <section className={styles.checklist} aria-label="Getting started">
+          <div className={styles.checklistHead}>
+            <h2>Get set up</h2>
+            <span>
+              {checklist.filter((c) => c.done).length} of {checklist.length} done
+            </span>
+          </div>
+          <ul>
+            {checklist.map((c) => (
+              <li key={c.label}>
+                <Link to={c.to} className={c.done ? styles.stepDone : styles.step}>
+                  {c.done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                  <span>{c.label}</span>
+                  {!c.done && <ArrowRight size={14} className={styles.stepArrow} />}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className={surface.statGrid}>
+        <StatCard label="Billed" value={formatCurrency(summary.billed)} hint={`${summary.count} issued invoice${summary.count === 1 ? '' : 's'}`} icon={Receipt} />
+        <StatCard label="Received" value={formatCurrency(summary.received)} hint={`${collectedPct}% collected`} icon={Banknote} tone="profit" />
+        <StatCard label="Outstanding" value={formatCurrency(summary.outstanding)} hint="Yet to be paid" icon={Hourglass} tone="warning" />
+        <StatCard
+          label="Overdue"
+          value={formatCurrency(summary.overdueAmount)}
+          hint={summary.overdueCount ? `${summary.overdueCount} past due date` : 'Nothing overdue'}
+          icon={AlertTriangle}
+          tone={summary.overdueCount ? 'loss' : 'default'}
+        />
       </div>
 
-      {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '2rem' }}>
-        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', background: 'linear-gradient(135deg, rgba(37,160,90,0.06) 0%, rgba(37,160,90,0) 100%)', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revenue</div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(37,160,90,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowDownRight size={16} color="var(--profit)" />
-            </div>
+      <div className={styles.grid}>
+        <section className={surface.card}>
+          <div className={surface.cardHead}>
+            <span>Billed · last 6 months</span>
+            <span className={styles.muted}>{formatCurrency(months.reduce((s, m) => s + m.billed, 0))}</span>
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--profit)', fontFamily: 'var(--font-display)' }}>
-            {formatCurrency(totalRevenue)}
+          <div className={styles.chart} role="img" aria-label="Bar chart of amount billed per month">
+            {months.map((m, i) => {
+              const height = Math.max((m.billed / peak) * 100, m.billed > 0 ? 4 : 0);
+              const latest = i === months.length - 1;
+              return (
+                <div key={m.key} className={styles.barCol}>
+                  <span className={styles.barValue}>{m.billed > 0 ? compactInr(m.billed) : ''}</span>
+                  <div className={styles.barTrack}>
+                    <div
+                      className={latest ? styles.barLatest : styles.bar}
+                      style={{ height: `${height}%` }}
+                      title={`${m.label}: ${formatCurrency(m.billed)}`}
+                    />
+                  </div>
+                  <span className={styles.barLabel}>{m.label}</span>
+                </div>
+              );
+            })}
           </div>
-        </div>
+          {!hasData && <p className={styles.chartEmpty}>Your billing trend appears here once you issue an invoice.</p>}
+        </section>
 
-        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', background: 'linear-gradient(135deg, rgba(230,154,6,0.06) 0%, rgba(230,154,6,0) 100%)', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending</div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(230,154,6,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowUpRight size={16} color="var(--warning)" />
-            </div>
+        <section className={surface.card}>
+          <div className={surface.cardHead}>
+            <span>Needs attention</span>
+            <Link to="/transactions" className={styles.link}>
+              View all
+            </Link>
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--warning)', fontFamily: 'var(--font-display)' }}>
-            {formatCurrency(pendingRevenue)}
-          </div>
-        </div>
-
-        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', background: 'linear-gradient(135deg, rgba(240,112,32,0.06) 0%, rgba(240,112,32,0) 100%)', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invoices</div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(240,112,32,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={16} color="var(--primary)" />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>
-            {invoices.length}
-          </div>
-        </div>
-
-        <div className={styles.card} style={{ padding: '1.25rem 1.5rem', background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(99,102,241,0) 100%)', transition: 'transform 200ms ease, box-shadow 200ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clients</div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Users size={16} color="#6366f1" />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>
-            {clientCount}
-          </div>
-        </div>
+          {attention.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="All clear" text="No unpaid invoices. Nicely done." />
+          ) : (
+            <ul className={styles.list}>
+              {attention.map((inv) => {
+                const late = daysOverdue(inv.due_date, now);
+                return (
+                  <li key={inv.id}>
+                    <Link to={`/invoice/${inv.id}`} className={styles.row}>
+                      <Avatar name={inv.client?.name || '?'} size={34} square />
+                      <div className={styles.rowMain}>
+                        <span className={styles.rowTitle}>{inv.client?.name || 'Unknown client'}</span>
+                        <span className={late ? styles.late : styles.muted}>
+                          {late ? `${late} day${late === 1 ? '' : 's'} overdue` : `Due ${formatDate(inv.due_date)}`}
+                        </span>
+                      </div>
+                      <span className={styles.amount}>{formatCurrency(inv.balance_due ?? inv.total, inv.currency)}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
-        <Link to="/invoice" style={{ textDecoration: 'none' }}>
-          <div className={styles.card} style={{ padding: '1.25rem 1.5rem', cursor: 'pointer', transition: 'transform 200ms ease, box-shadow 200ms ease', display: 'flex', alignItems: 'center', gap: '1rem' }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-          >
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #f07020, #f09040)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Plus size={20} color="#fff" />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>Create Invoice</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>New document</div>
-            </div>
-          </div>
-        </Link>
-        <Link to="/clients" style={{ textDecoration: 'none' }}>
-          <div className={styles.card} style={{ padding: '1.25rem 1.5rem', cursor: 'pointer', transition: 'transform 200ms ease, box-shadow 200ms ease', display: 'flex', alignItems: 'center', gap: '1rem' }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-          >
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #6366f1, #818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Users size={20} color="#fff" />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>Client CRM</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Manage contacts</div>
-            </div>
-          </div>
-        </Link>
-        <Link to="/settings" style={{ textDecoration: 'none' }}>
-          <div className={styles.card} style={{ padding: '1.25rem 1.5rem', cursor: 'pointer', transition: 'transform 200ms ease, box-shadow 200ms ease', display: 'flex', alignItems: 'center', gap: '1rem' }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-card)'; }}
-          >
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #10b981, #34d399)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUp size={20} color="#fff" />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>Settings</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>Profiles & bank</div>
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      {/* Recent Activity */}
-      <div className={styles.card}>
-        <div className={styles.cardHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Clock size={18} /> Recent Invoices
-          </div>
-          <Link to="/transactions" style={{ fontSize: '0.875rem', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
-            View All Ledger <ChevronRight size={16} />
+      <section className={surface.card}>
+        <div className={surface.cardHead}>
+          <span className={surface.cardHeadIcon}>
+            <FileText size={16} /> Recent documents
+          </span>
+          <Link to="/transactions" className={styles.link}>
+            Open ledger <ArrowRight size={13} />
           </Link>
         </div>
-        
-        <div style={{ padding: '0 1.5rem' }}>
-          {recentInvoices.length === 0 ? (
-            <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(240,112,32,0.1), rgba(240,112,32,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                <Sparkles size={36} color="var(--primary)" />
-              </div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '0.5rem' }}>
-                No invoices yet
-              </h3>
-              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', marginBottom: '1.5rem', maxWidth: '360px', margin: '0 auto 1.5rem' }}>
-                Create your first professional invoice in seconds. Choose from 20+ premium templates.
-              </p>
-              <Link to="/invoice" className={cn(styles.btn, styles.btnPrimary)} style={{ textDecoration: 'none', padding: '0.75rem 2rem' }}>
-                <Plus size={18} /> Create First Invoice
+        {recent.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="No invoices yet"
+            text="Create your first GST-ready invoice in under a minute. It is saved only on this device."
+            action={
+              <Link to="/invoice" className={controls.btnPrimary}>
+                <FilePlus2 size={16} /> Create an invoice
               </Link>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {recentInvoices.map((inv, idx) => (
-                <div key={idx} style={{ 
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-                  padding: '1.25rem 0', borderBottom: idx !== recentInvoices.length - 1 ? '1px solid var(--border)' : 'none',
-                  transition: 'background 150ms ease',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--card-inner)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem', fontFamily: 'var(--font-display)', color: 'var(--primary)' }}>
-                      {(inv.client?.name || 'U')[0].toUpperCase()}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{inv.client?.name || 'Unknown Client'}</div>
-                      <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</span>
-                        <span>•</span>
-                        <span>{formatDate(inv.issue_date)}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-mono)' }}>
-                      {formatCurrency(inv.total, inv.currency)}
-                    </div>
-                    <span className={cn(
-                      styles.badge, 
-                      inv.status === 'Draft' ? styles.badgeDraft : 
-                      inv.status === 'Paid' ? styles.badgePaid : 
-                      inv.status === 'Overdue' ? styles.badgeOverdue : styles.badgeSent
-                    )} style={{ minWidth: '80px', textAlign: 'center' }}>
-                      {inv.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            }
+          />
+        ) : (
+          <div className={surface.tableWrap}>
+            <table className={surface.table}>
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Client</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th className={surface.numeric}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((inv) => (
+                  <tr key={inv.id}>
+                    <td>
+                      <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
+                        {inv.invoice_number}
+                      </Link>
+                    </td>
+                    <td>{inv.client?.name || '—'}</td>
+                    <td>{formatDate(inv.issue_date)}</td>
+                    <td>
+                      <StatusBadge status={effectiveStatus(inv, now)} />
+                    </td>
+                    <td className={surface.numeric}>{formatCurrency(inv.total, inv.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <div className={styles.quick}>
+        <Link to="/clients" className={styles.quickItem}>
+          <Users size={18} />
+          <div>
+            <strong>{clientCount} client{clientCount === 1 ? '' : 's'}</strong>
+            <span>Manage your directory</span>
+          </div>
+          <ArrowRight size={16} />
+        </Link>
+        <Link to="/settings" className={styles.quickItem}>
+          <FileText size={18} />
+          <div>
+            <strong>Profiles &amp; backup</strong>
+            <span>Business details, bank, UPI</span>
+          </div>
+          <ArrowRight size={16} />
+        </Link>
       </div>
     </div>
   );

@@ -35,3 +35,27 @@ test('formatDate: empty string is safe', () => {
 test('formatDate: ISO renders day-month-year', () => {
   assert.equal(formatDate('2026-04-01'), '1 Apr 2026');
 });
+
+import { csvCell, toCsv } from '../src/lib/download.ts';
+
+test('csvCell: quotes commas and doubles quotes', () => {
+  assert.equal(csvCell('Acme, "Ltd"'), '"Acme, ""Ltd"""');
+});
+
+test('csvCell: neutralises spreadsheet formulas but keeps negative numbers', () => {
+  assert.equal(csvCell('=SUM(A1:A9)'), "'=SUM(A1:A9)");
+  assert.equal(csvCell(-120.5), '-120.5');
+});
+
+test('toCsv: joins rows with CRLF', () => {
+  assert.equal(toCsv([['a', 1], ['b', 2]]), 'a,1\r\nb,2');
+});
+
+import { isValidIfsc, isValidUpi } from '../src/lib/validators.ts';
+
+test('isValidUpi / isValidIfsc: accept real shapes, reject typos', () => {
+  assert.equal(isValidUpi('rohit.singh@okicici'), true);
+  assert.equal(isValidUpi('no-at-sign'), false);
+  assert.equal(isValidIfsc('icic0000949'), true);
+  assert.equal(isValidIfsc('ICIC1000949'), false);
+});

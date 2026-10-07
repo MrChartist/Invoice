@@ -1,461 +1,341 @@
-import { useState, useEffect } from 'react';
-import { useInvoiceStore, type SenderProfile } from '../store/useInvoiceStore';
-import { Download, Send, Plus, Search, Trash2, Library, Palette } from 'lucide-react';
-import { TEMPLATES } from '../components/templates/registry';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
+import { useInvoiceStore } from '../store/useInvoiceStore';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatusBadge } from '../components/ui/StatusBadge';
+import { useToast } from '../components/ui/useToast';
+import { ItemsTable } from '../components/creator/ItemsTable';
+import { SummaryPanel } from '../components/creator/SummaryPanel';
+import { PartiesSection } from '../components/creator/PartiesSection';
+import { TemplatePicker } from '../components/creator/TemplatePicker';
 import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
 import { ClientSearchModal } from '../components/modals/ClientSearchModal';
 import { ItemSearchModal } from '../components/modals/ItemSearchModal';
-import { Toast } from '../components/ui/Toast';
-import { useNavigate } from 'react-router-dom';
-import { cn, formatCurrency, formatDate } from '../lib/utils';
+import { localDb } from '../lib/localDb';
+import { getJson, SINGLETON_KEYS } from '../lib/storage';
+import { STATUS_OPTIONS } from '../lib/invoice-status';
+import { addDaysInput, CURRENCIES, formatCurrency, cn } from '../lib/utils';
+import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord, type InvoiceStatus } from '../types/invoice';
+import controls from '../styles/controls.module.css';
+import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
 
+const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
+const DUE_PRESETS = [0, 7, 15, 30, 45];
+
 export function InvoiceCreator() {
-  const invoice = useInvoiceStore();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isCrmOpen, setIsCrmOpen] = useState(false);
-  const [itemSearchTargetId, setItemSearchTargetId] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<SenderProfile[]>([]);
-  const [templateId, setTemplateId] = useState(() => localStorage.getItem('mrchartist_inv_template') || 'classic_orange');
+  const { notify, toastNode } = useToast();
+  const s = useInvoiceStore();
 
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [clientsOpen, setClientsOpen] = useState(false);
+  const [itemTarget, setItemTarget] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [hasDraft, setHasDraft] = useState(false);
+  const [missing, setMissing] = useState(false);
+
+  const profiles = useMemo(() => localDb.settings.get().profiles.filter((p) => p.companyName.trim()), []);
+  const editing = Boolean(s.id);
+  const nextNumber = useMemo(
+    () => (s.invoice_number ? '' : localDb.invoices.nextNumber(s.issue_date, s.doc_type, s.sender?.invoicePrefix || undefined)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [s.invoice_number, s.issue_date, s.doc_type, s.sender?.invoicePrefix, s.id],
+  );
+
+  // Decide what the editor shows when the route changes.
   useEffect(() => {
-    const stored = localStorage.getItem('mrchartist_inv_settings');
-    if (stored) {
-      try {
-        const s = JSON.parse(stored);
-        if (s.profiles && s.profiles.length > 0) {
-          setProfiles(s.profiles);
-          if (!invoice.sender) {
-            const defaultProf = s.profiles.find((p: any) => p.id === s.activeProfileId) || s.profiles[0];
-            invoice.setSender(defaultProf);
-          }
-        }
-      } catch (err) {
-        console.error('InvoiceCreator: failed to load stored settings', err);
+    const store = useInvoiceStore.getState();
+    setErrors([]);
+    setMissing(false);
+    if (id) {
+      if (store.id !== id && !store.loadInvoice(id)) setMissing(true);
+      setHasDraft(false);
+      return;
+    }
+    if (store.id) store.newDraft(); // leaving a saved document → start clean
+    const draft = getJson<InvoiceRecord | null>(SINGLETON_KEYS.draft, null);
+    setHasDraft(Boolean(draft && !draft.id && !useInvoiceStore.getState().dirty));
+  }, [id]);
+
+  // Keep the sender snapshot populated for brand-new documents.
+  useEffect(() => {
+    const store = useInvoiceStore.getState();
+    if (!store.sender && profiles.length) store.setSender(localDb.settings.activeProfile() ?? profiles[0]);
+  }, [profiles, id]);
+
+  const save = useCallback(
+    (asDraft = false) => {
+      const result = useInvoiceStore.getState().saveInvoice({ asDraft });
+      if (!result.ok) {
+        setErrors(result.errors);
+        window.scrollTo?.({ top: 0 });
+        notify(result.errors[0] ?? 'Could not save.', 'error');
+        return;
       }
-    }
-  }, []);
+      setErrors([]);
+      const rec = result.record!;
+      notify(`${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number} saved`);
+      if (!id) navigate(`/invoice/${rec.id}`, { replace: true });
+    },
+    [id, navigate, notify],
+  );
 
-  const handleProfileSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const prof = profiles.find(p => p.id === e.target.value);
-    if (prof) invoice.setSender(prof);
+  // Ctrl/⌘+S saves, Ctrl/⌘+P previews.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        save();
+      } else if (key === 'p') {
+        e.preventDefault();
+        setPreviewOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [save]);
+
+  const startNew = (docType?: DocumentType) => {
+    useInvoiceStore.getState().newDraft(docType);
+    setErrors([]);
+    setHasDraft(false);
+    if (id) navigate('/invoice');
   };
 
-  const handleStatusClass = () => {
-    switch (invoice.status) {
-      case 'Draft': return styles.badgeDraft;
-      case 'Sent': return styles.badgeSent;
-      case 'Paid': return styles.badgePaid;
-      case 'Overdue': return styles.badgeOverdue;
-      default: return '';
-    }
-  };
+  if (missing) {
+    return (
+      <div className={surface.page}>
+        <PageHeader title="Document not found" subtitle="It may have been deleted, or it lives in another browser." />
+        <button type="button" className={cn(controls.btnPrimary)} style={{ alignSelf: 'flex-start' }} onClick={() => navigate('/transactions')}>
+          Back to invoices
+        </button>
+      </div>
+    );
+  }
+
+  const label = DOCUMENT_LABELS[s.doc_type];
 
   return (
-    <div className={styles.container} style={{ animation: 'fadeInUp 400ms ease' }}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>
-          New Invoice: {invoice.invoice_number || 'Draft...'}
-          <span className={cn(styles.badge, handleStatusClass())}>{invoice.status}</span>
-        </h1>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <select
-            className={styles.input}
-            style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.8125rem', height: 'auto', borderRadius: '6px' }}
-            value={invoice.status}
-            onChange={e => invoice.setStatus(e.target.value as any)}
-          >
-            <option value="Draft">Draft</option>
-            <option value="Sent">Sent</option>
-            <option value="Paid">Paid</option>
-            <option value="Overdue">Overdue</option>
-          </select>
-          <select
-            className={styles.input}
-            style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.8125rem', height: 'auto', borderRadius: '6px' }}
-            value={invoice.currency}
-            onChange={e => invoice.setCurrency(e.target.value)}
-          >
-            <option value="INR">₹ INR</option>
-            <option value="USD">$ USD</option>
-            <option value="EUR">€ EUR</option>
-            <option value="GBP">£ GBP</option>
-          </select>
+    <div className={cn(surface.page, styles.page)}>
+      <PageHeader
+        title={
+          <>
+            {editing ? `Edit ${label.toLowerCase()}` : `New ${label.toLowerCase()}`}
+            {s.invoice_number && <span className={styles.number}>{s.invoice_number}</span>}
+            {editing && <StatusBadge status={s.status} />}
+          </>
+        }
+        subtitle={s.dirty ? 'Unsaved changes — autosaved as a draft on this device' : editing ? 'All changes saved' : 'Fill in the details, then save.'}
+        actions={
+          <>
+            {editing && (
+              <button type="button" className={controls.btnOutline} onClick={() => startNew()}>
+                <FilePlus2 size={16} /> New
+              </button>
+            )}
+            <button type="button" className={controls.btnOutline} onClick={() => setPreviewOpen(true)}>
+              <Eye size={16} /> Preview
+            </button>
+            {!editing && (
+              <button type="button" className={controls.btnOutline} onClick={() => save(true)}>
+                Save draft
+              </button>
+            )}
+            <button type="button" className={controls.btnPrimary} onClick={() => save()}>
+              <Save size={16} /> Save
+            </button>
+          </>
+        }
+      />
+
+      {hasDraft && (
+        <div className={styles.banner} role="status">
+          <History size={16} />
+          <span>You have an unsaved draft from earlier.</span>
+          <button type="button" className={controls.btnOutline + ' ' + controls.btnSm} onClick={() => { useInvoiceStore.getState().restoreDraft(); setHasDraft(false); }}>
+            Restore draft
+          </button>
+          <button type="button" className={controls.btnGhost + ' ' + controls.btnSm} onClick={() => { startNew(); }}>
+            Discard
+          </button>
         </div>
-      </div>
-      
-      <div className={styles.grid}>
-        {/* Left Column */}
-        <div className={styles.leftColumn}>
-          
-          {/* Sender Profile Card */}
-          <div className={cn(styles.card, styles.cardDark)}>
-            <div className={styles.cardHeader} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>Issuing As</span>
-              {profiles.length > 1 && (
-                <select 
-                  className={styles.input} 
-                  style={{ width: 'auto', backgroundColor: 'transparent', borderColor: 'var(--input-border)', color: 'var(--foreground)', padding: '0.25rem 0.5rem', height: 'auto' }}
-                  value={invoice.sender?.id || ''}
-                  onChange={handleProfileSelect}
-                >
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.id} style={{ color: 'var(--foreground)', backgroundColor: 'var(--background)' }}>{p.companyName}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className={styles.cardBody} style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: 48, height: 48, backgroundColor: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem', color: 'white' }}>
-                  {invoice.sender?.companyName?.[0]?.toUpperCase() || 'M'}
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--foreground)' }}>{invoice.sender?.companyName || 'Select Profile'}</h3>
-                  <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>{invoice.sender?.companyTagline}</p>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right', fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-                {invoice.sender?.companyAddress?.split('\n').map((line, i) => (
-                  <p key={i} style={{ margin: 0 }}>{line}</p>
-                ))}
-                {invoice.sender?.companyPhone && <p style={{ margin: 0 }}>Mob: {invoice.sender.companyPhone}</p>}
-              </div>
-            </div>
-          </div>
+      )}
 
-          {/* Invoice Meta */}
-          <div className={styles.card}>
-            <div className={styles.cardBody} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-              <div>
-                <div className={styles.inputGroup}>
-                  <label className={styles.label}>Invoice Number</label>
-                  <input type="text" className={styles.inputGhost} value={invoice.invoice_number} readOnly placeholder="Auto-generated" />
-                </div>
-                <div className={styles.inputGroup}>
-                  <label className={styles.label}>Issued Date</label>
-                  <p style={{ fontWeight: 500, paddingTop: '0.5rem' }}>{formatDate(invoice.issue_date)}</p>
-                </div>
-              </div>
-              <div>
-                <div className={styles.inputGroup}>
-                  <label className={styles.label}>Billed To</label>
-                  <input 
-                    type="text" 
-                    className={styles.inputGhost} 
-                    placeholder="Select or type client name..."
-                    value={invoice.client.name}
-                    onChange={(e) => invoice.setClient({ name: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Items Grid */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span>Item Details</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontWeight: 400 }}>Auto-saving to localDb</span>
-            </div>
-            <div className={styles.cardBody}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 40px', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-                <div className={styles.label}>ITEM</div>
-                <div className={styles.label}>QTY</div>
-                <div className={styles.label}>RATE</div>
-                <div className={styles.label} style={{ textAlign: 'right' }}>AMOUNT</div>
-                <div></div>
-              </div>
-              
-              {invoice.items.map((item) => (
-                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 40px', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <div style={{ position: 'relative' }}>
-                    <input 
-                      className={cn(styles.input, styles.inputGhost)} 
-                      placeholder="Description" 
-                      value={item.name}
-                      onChange={(e) => invoice.updateItem(item.id, 'name', e.target.value)}
-                      style={{ width: '100%', paddingRight: '32px' }}
-                    />
-                    <button 
-                      onClick={() => setItemSearchTargetId(item.id)}
-                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}
-                      title="Search Item Catalog"
-                    >
-                      <Library size={14} />
-                    </button>
-                  </div>
-                  <input 
-                    type="number" 
-                    className={cn(styles.input, styles.inputGhost)} 
-                    placeholder="1" 
-                    value={item.quantity || ''}
-                    onChange={(e) => invoice.updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ color: 'var(--muted-foreground)' }}>₹</span>
-                    <input 
-                      type="number" 
-                      className={cn(styles.input, styles.inputGhost)} 
-                      placeholder="0.00" 
-                      value={item.rate || ''}
-                      onChange={(e) => invoice.updateItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div style={{ textAlign: 'right', fontWeight: 500 }}>
-                    {formatCurrency(item.amount, invoice.currency)}
-                  </div>
-                  <button className={styles.btnGhost} style={{ padding: '0.5rem', color: 'var(--destructive)' }} onClick={() => invoice.removeItem(item.id)}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+      {errors.length > 0 && (
+        <div className={styles.errors} role="alert">
+          <div>
+            <strong>Fix these before saving</strong>
+            <ul>
+              {errors.map((e) => (
+                <li key={e}>{e}</li>
               ))}
-
-              <button className={styles.btnGhost} style={{ marginTop: '1rem', color: 'var(--primary)' }} onClick={invoice.addItem}>
-                <Plus size={16} /> Add Item
-              </button>
-
-              {/* Totals */}
-              <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '2rem', alignItems: 'center' }}>
-                  <span className={styles.label}>Subtotal</span>
-                  <span style={{ textAlign: 'right', fontWeight: 500 }}>{formatCurrency(invoice.subtotal, invoice.currency)}</span>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '2rem', alignItems: 'center' }}>
-                  <span className={styles.label} style={{ color: 'var(--profit)' }}>Discount (%)</span>
-                  <input 
-                    type="number" 
-                    className={cn(styles.input, styles.inputGhost)} 
-                    style={{ textAlign: 'right', padding: 0 }}
-                    value={invoice.discount_rate || ''}
-                    onChange={(e) => invoice.setRates(parseFloat(e.target.value) || 0, invoice.tax_rate)}
-                    placeholder="0"
-                  />
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '2rem', alignItems: 'center' }}>
-                  <span className={styles.label}>Tax (%)</span>
-                  <input 
-                    type="number" 
-                    className={cn(styles.input, styles.inputGhost)} 
-                    style={{ textAlign: 'right', padding: 0 }}
-                    value={invoice.tax_rate || ''}
-                    onChange={(e) => invoice.setRates(invoice.discount_rate, parseFloat(e.target.value) || 0)}
-                    placeholder="0"
-                  />
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '2rem', alignItems: 'center', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '2px solid var(--border)' }}>
-                  <span className={styles.label} style={{ fontSize: '1rem', color: 'var(--foreground)' }}>Total</span>
-                  <span style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.25rem', fontFamily: 'var(--font-display)' }}>
-                    {formatCurrency(invoice.total, invoice.currency)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Notes & Terms */}
-              <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-                <label className={styles.label} style={{ marginBottom: '0.5rem', display: 'block' }}>Notes & Payment Terms</label>
-                <textarea
-                  className={styles.input}
-                  placeholder="Payment is due within 14 days. Late payments are subject to 2% monthly interest. Bank details are mentioned above."
-                  rows={3}
-                  value={invoice.notes}
-                  onChange={e => invoice.setNotes(e.target.value)}
-                  style={{ resize: 'none', fontSize: '0.875rem' }}
-                />
-              </div>
-            </div>
+            </ul>
           </div>
+          <button type="button" className={controls.btnIcon} onClick={() => setErrors([])} aria-label="Dismiss">
+            <X size={16} />
+          </button>
         </div>
+      )}
 
-        {/* Right Column */}
-        <div className={styles.rightColumn}>
-          
-          {/* Client Details Card */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              Client Details
-            </div>
-            <div className={styles.cardBody} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div className={styles.avatar} style={{ width: 48, height: 48 }}>
-                  <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${invoice.client.name || 'Client'}`} alt="Client" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <input 
-                    className={cn(styles.input, styles.inputGhost)} 
-                    style={{ fontSize: '1.125rem', fontWeight: 600, padding: 0, height: 'auto' }}
-                    placeholder="Client Name"
-                    value={invoice.client.name}
-                    onChange={(e) => invoice.setClient({ name: e.target.value })}
+      <div className={styles.layout}>
+        <div className={styles.main}>
+          <section className={surface.card}>
+            <div className={surface.cardHead}>1 · Document</div>
+            <div className={surface.cardBody}>
+              <div className={controls.row3}>
+                <label className={controls.field}>
+                  <span className={controls.label}>Type</span>
+                  <select className={controls.select} value={s.doc_type} onChange={(e) => s.setDocType(e.target.value as DocumentType)} disabled={editing && Boolean(s.invoice_number)}>
+                    {DOC_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {DOCUMENT_LABELS[t]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={controls.field}>
+                  <span className={controls.label}>Number</span>
+                  <input
+                    className={`${controls.input} ${controls.inputMono}`}
+                    style={{ textTransform: 'none' }}
+                    value={s.invoice_number}
+                    onChange={(e) => s.setInvoiceNumber(e.target.value)}
+                    placeholder={nextNumber || 'Auto'}
                   />
-                  <input 
-                    className={cn(styles.input, styles.inputGhost)} 
-                    style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', padding: 0, height: 'auto', marginTop: '0.25rem' }}
-                    placeholder="Email Address"
-                    value={invoice.client.email}
-                    onChange={(e) => invoice.setClient({ email: e.target.value })}
-                  />
-                </div>
+                  <span className={controls.hint}>Leave blank to number automatically.</span>
+                </label>
+                <label className={controls.field}>
+                  <span className={controls.label}>PO / reference no.</span>
+                  <input className={controls.input} value={s.po_number ?? ''} onChange={(e) => s.patch({ po_number: e.target.value })} placeholder="Optional" />
+                </label>
               </div>
-              
-              <div className={styles.inputGroup}>
-                <input 
-                  className={cn(styles.input, styles.inputGhost)} 
-                  placeholder="Company Name (Optional)"
-                  value={invoice.client.company || ''}
-                  onChange={(e) => invoice.setClient({ company: e.target.value })}
-                />
-                <textarea 
-                  className={cn(styles.input, styles.inputGhost)} 
-                  placeholder="Full Address"
-                  rows={2}
-                  value={invoice.client.address}
-                  onChange={(e) => invoice.setClient({ address: e.target.value })}
-                  style={{ resize: 'none' }}
-                />
-                <input 
-                  className={cn(styles.input, styles.inputGhost)} 
-                  placeholder="Client GSTIN (Optional)"
-                  value={invoice.client.gstin || ''}
-                  onChange={(e) => invoice.setClient({ gstin: e.target.value.toUpperCase() })}
-                  style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.03em', fontSize: '0.875rem' }}
-                />
-              </div>
-
-              <button 
-                className={cn(styles.btn, styles.btnGhost)} 
-                style={{ width: '100%', backgroundColor: 'rgba(37, 160, 90, 0.1)', color: 'var(--profit)' }}
-                onClick={() => setIsCrmOpen(true)}
-              >
-                <Search size={16} /> Search Local CRM
-              </button>
-            </div>
-          </div>
-
-          {/* Template Gallery Card */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Palette size={16} /> Template Design
-            </div>
-            <div className={styles.cardBody}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' }}>
-                {TEMPLATES.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setTemplateId(t.id);
-                      localStorage.setItem('mrchartist_inv_template', t.id);
-                    }}
-                    title={`${t.name}\n${t.description}`}
-                    style={{
-                      width: '100%',
-                      borderRadius: '8px',
-                      border: templateId === t.id ? `2px solid ${t.accent}` : '1px solid var(--border)',
-                      background: templateId === t.id ? `${t.accent}10` : 'var(--card)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'flex-start',
-                      gap: '2px',
-                      padding: '8px 4px 6px',
-                      transition: 'all 150ms ease',
-                      boxShadow: templateId === t.id ? `0 0 0 1px ${t.accent}40, 0 2px 8px ${t.accent}15` : 'none',
-                    }}
-                  >
-                    <span style={{ fontSize: '16px', lineHeight: 1 }}>{t.icon}</span>
-                    <div style={{ width: '100%', height: '3px', borderRadius: '2px', background: t.accent, marginTop: '4px' }} />
-                    <div style={{ fontSize: '7px', fontWeight: 700, color: templateId === t.id ? t.accent : 'var(--muted-foreground)', marginTop: '2px', textAlign: 'center', lineHeight: 1.2 }}>
-                      {t.name.split(' ')[0]}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              {(() => {
-                const active = TEMPLATES.find(t => t.id === templateId);
-                return active ? (
-                  <div style={{ padding: '10px 12px', background: 'var(--card-inner)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '24px' }}>{active.icon}</span>
-                    <div>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--foreground)' }}>{active.name}</div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--muted-foreground)', lineHeight: 1.3, marginTop: '2px' }}>{active.description}</div>
-                    </div>
+              <div className={controls.row3}>
+                <label className={controls.field}>
+                  <span className={controls.label}>Issue date</span>
+                  <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, s.due_date)} />
+                </label>
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor="due-date">Due date</label>
+                  <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
+                  <div className={styles.chips}>
+                    {DUE_PRESETS.map((d) => (
+                      <button key={d} type="button" className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>
+                        {d === 0 ? 'On receipt' : `${d}d`}
+                      </button>
+                    ))}
                   </div>
-                ) : null;
-              })()}
-            </div>
-          </div>
-
-          {/* Basic Info & Actions Card */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              Actions & Info
-            </div>
-            <div className={styles.cardBody} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div className={styles.inputGroup}>
-                <label className={styles.label}>Invoice Date</label>
-                <input 
-                  type="date" 
-                  className={styles.input} 
-                  value={invoice.issue_date}
-                  onChange={(e) => invoice.setDates(e.target.value, invoice.due_date)}
-                />
+                </div>
+                <div className={controls.row}>
+                  <label className={controls.field}>
+                    <span className={controls.label}>Currency</span>
+                    <select className={controls.select} value={s.currency} onChange={(e) => s.setCurrency(e.target.value)}>
+                      {CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.symbol} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={controls.field}>
+                    <span className={controls.label}>Status</span>
+                    <select className={controls.select} value={s.status === 'Overdue' ? 'Sent' : s.status} onChange={(e) => s.setStatus(e.target.value as InvoiceStatus)}>
+                      {STATUS_OPTIONS.map((o) => (
+                        <option key={o}>{o}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
-              <div className={styles.inputGroup}>
-                <label className={styles.label}>Due Date</label>
-                <input 
-                  type="date" 
-                  className={styles.input} 
-                  value={invoice.due_date}
-                  onChange={(e) => invoice.setDates(invoice.issue_date, e.target.value)}
-                />
-              </div>
-
-              <button 
-                className={cn(styles.btn, styles.btnPrimary)} 
-                style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}
-                onClick={() => {
-                  invoice.saveInvoice();
-                  setToastMessage("Invoice Saved Successfully!");
-                  setTimeout(() => {
-                    invoice.reset();
-                    navigate('/transactions');
-                  }, 1500);
-                }}
-              >
-                <Send size={18} /> Save Invoice & Close
-              </button>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <button 
-                  className={cn(styles.btn, styles.btnGhost)} 
-                  style={{ border: '1px solid var(--border)' }}
-                  onClick={() => setIsPreviewOpen(true)}
-                >
-                  Preview
-                </button>
-                <button 
-                  className={cn(styles.btn, styles.btnOutline)} 
-                  style={{ color: 'var(--primary)' }}
-                  onClick={() => setIsPreviewOpen(true)} // Can also just open preview which has download button
-                >
-                  <Download size={16} /> Download
-                </button>
-              </div>
+              <label className={controls.check}>
+                <input type="checkbox" checked={s.reverse_charge} onChange={(e) => s.setReverseCharge(e.target.checked)} />
+                Tax is payable on reverse charge
+              </label>
             </div>
-          </div>
-          
+          </section>
+
+          <section className={surface.card}>
+            <div className={surface.cardHead}>2 · Parties</div>
+            <div className={surface.cardBody}>
+              <PartiesSection profiles={profiles} onSearchClients={() => setClientsOpen(true)} />
+            </div>
+          </section>
+
+          <section className={surface.card}>
+            <div className={surface.cardHead}>
+              <span>3 · Items</span>
+              <span className={styles.muted}>
+                {s.items.filter((i) => i.name.trim() || i.rate > 0).length} line{s.items.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <ItemsTable onPickCatalog={setItemTarget} />
+          </section>
+
+          <section className={surface.card}>
+            <div className={surface.cardHead}>4 · Notes &amp; terms</div>
+            <div className={surface.cardBody}>
+              <label className={controls.field}>
+                <span className={controls.label}>Note to client</span>
+                <textarea className={controls.textarea} rows={2} value={s.notes} onChange={(e) => s.setNotes(e.target.value)} placeholder="Thank you for your business." />
+              </label>
+              <label className={controls.field}>
+                <span className={controls.label}>Terms &amp; conditions</span>
+                <textarea className={controls.textarea} rows={3} value={s.terms} onChange={(e) => s.setTerms(e.target.value)} />
+              </label>
+            </div>
+          </section>
         </div>
+
+        <aside className={styles.side}>
+          <section className={surface.card}>
+            <div className={surface.cardHead}>Summary</div>
+            <div className={surface.cardBody}>
+              <SummaryPanel />
+              <div className={styles.sideActions}>
+                <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()}>
+                  <Save size={18} /> Save {label.toLowerCase()}
+                </button>
+                <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => setPreviewOpen(true)}>
+                  <Eye size={16} /> Preview &amp; download PDF
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className={surface.card}>
+            <div className={surface.cardHead}>
+              <span className={surface.cardHeadIcon}>
+                <Palette size={16} /> Template
+              </span>
+            </div>
+            <div className={surface.cardBody}>
+              <TemplatePicker />
+            </div>
+          </section>
+        </aside>
       </div>
-      <InvoicePreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} />
-      <ClientSearchModal isOpen={isCrmOpen} onClose={() => setIsCrmOpen(false)} />
-      <ItemSearchModal isOpen={!!itemSearchTargetId} onClose={() => setItemSearchTargetId(null)} targetItemId={itemSearchTargetId || ''} />
-      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+
+      <div className={cn(styles.mobileBar, 'no-print')}>
+        <div>
+          <span>Total</span>
+          <strong>{formatCurrency(s.total, s.currency)}</strong>
+        </div>
+        <button type="button" className={controls.btnOutline} onClick={() => setPreviewOpen(true)} aria-label="Preview">
+          <Eye size={16} />
+        </button>
+        <button type="button" className={controls.btnPrimary} onClick={() => save()}>
+          <Save size={16} /> Save
+        </button>
+      </div>
+
+      <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+      <ClientSearchModal isOpen={clientsOpen} onClose={() => setClientsOpen(false)} />
+      <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
+      {toastNode}
     </div>
   );
 }

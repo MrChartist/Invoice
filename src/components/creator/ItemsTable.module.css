@@ -1,0 +1,172 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(180px, 3fr) 92px 70px 78px 100px 64px 78px minmax(110px, 1.2fr) 124px;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.625rem 1rem;
+}
+
+.head {
+  padding-block: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  background: var(--card-inner);
+}
+
+.r {
+  text-align: right;
+}
+
+.body {
+  border-bottom: 1px solid var(--border);
+  transition: background-color var(--transition-fast);
+}
+
+.body:focus-within {
+  background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+
+.cell {
+  min-width: 0;
+}
+
+.cName {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.nameWrap {
+  position: relative;
+}
+
+.nameWrap input {
+  padding-right: 2rem;
+  font-weight: 600;
+}
+
+.catalogBtn {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  padding: 0.3rem;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--muted-foreground);
+}
+
+.catalogBtn:hover {
+  color: var(--brand-text);
+  background: var(--accent);
+}
+
+.desc {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.unit,
+.rate {
+  cursor: pointer;
+  padding-inline: 0.25rem;
+}
+
+.rate {
+  text-align: right;
+  text-align-last: right;
+}
+
+.amount {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  padding-top: 0.55rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0.55;
+  transition: opacity var(--transition-fast);
+}
+
+.body:hover .actions,
+.body:focus-within .actions {
+  opacity: 1;
+}
+
+.actions button {
+  padding: 0.3rem;
+  min-width: 0;
+}
+
+.footer {
+  padding: 0.875rem 1rem;
+}
+
+/* When the card is narrow the table becomes stacked rows with visible labels. */
+@container (max-width: 900px) {
+  .head {
+    display: none;
+  }
+
+  .body {
+    grid-template-columns: repeat(6, 1fr);
+    padding: 0.875rem 1rem;
+    row-gap: 0.625rem;
+  }
+
+  .cName {
+    grid-column: 1 / -1;
+  }
+
+  .cell[data-label]:not(.cName)::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin-bottom: 0.15rem;
+  }
+
+  .cell[data-label='HSN / SAC'] { grid-column: span 2; }
+  .cell[data-label='Qty'] { grid-column: span 2; }
+  .cell[data-label='Unit'] { grid-column: span 2; }
+  .cell[data-label='Rate'] { grid-column: span 2; }
+  .cell[data-label='Disc %'] { grid-column: span 2; }
+  .cell[data-label='GST'] { grid-column: span 2; }
+
+  .amount {
+    grid-column: span 3;
+    text-align: left;
+    padding-top: 0;
+  }
+
+  .actions {
+    grid-column: span 3;
+    opacity: 1;
+  }
+}
