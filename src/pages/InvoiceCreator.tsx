@@ -112,6 +112,30 @@ export function InvoiceCreator() {
     return () => window.removeEventListener('keydown', onKey);
   }, [save]);
 
+  // Warn before a refresh/tab close would drop edits to a saved document (new documents autosave as drafts).
+  useEffect(() => {
+    if (!(s.dirty && s.id)) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [s.dirty, s.id]);
+
+  // Lift toasts above the fixed mobile save bar so they never cover Save.
+  useEffect(() => {
+    const mq = window.matchMedia?.('(max-width: 900px)');
+    if (!mq) return;
+    const apply = () => document.documentElement.style.setProperty('--bottom-bar-h', mq.matches ? '4.25rem' : '0px');
+    apply();
+    mq.addEventListener('change', apply);
+    return () => {
+      mq.removeEventListener('change', apply);
+      document.documentElement.style.removeProperty('--bottom-bar-h');
+    };
+  }, []);
+
   const startNew = (docType?: DocumentType) => {
     useInvoiceStore.getState().newDraft(docType);
     setErrors([]);
@@ -219,7 +243,7 @@ export function InvoiceCreator() {
                     onChange={(e) => s.setInvoiceNumber(e.target.value)}
                     placeholder={nextNumber || 'Auto'}
                   />
-                  <span className={controls.hint}>Leave blank to number automatically.</span>
+                  {!editing && <span className={controls.hint}>Leave blank to number automatically.</span>}
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>PO / reference no.</span>
@@ -236,13 +260,13 @@ export function InvoiceCreator() {
                   <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
                   <div className={styles.chips}>
                     {DUE_PRESETS.map((d) => (
-                      <button key={d} type="button" className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>
-                        {d === 0 ? 'On receipt' : `${d}d`}
+                      <button key={d} type="button" aria-label={d === 0 ? 'Due on receipt' : `Due in ${d} days`} className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>
+                        {d === 0 ? 'Now' : `${d}d`}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className={controls.row}>
+                <div className={styles.pair}>
                   <label className={controls.field}>
                     <span className={controls.label}>Currency</span>
                     <select className={controls.select} value={s.currency} onChange={(e) => s.setCurrency(e.target.value)}>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -33,7 +34,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
 
   useEffect(() => {
     if (!invoice) return;
-    setAmount(balance > 0 ? String(balance) : '');
+    setAmount(balance > 0 ? String(round2(balance)) : '');
     setMethod(METHODS[0]);
     setDate(todayInput());
     setReference('');
@@ -56,7 +57,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
       const settled = value >= balance - 0.005;
       onChanged(settled ? `${live.invoice_number} marked as paid` : `Recorded ${formatCurrency(value, live.currency)}`);
       if (settled) onClose();
-      else setAmount(String(Math.max(balance - value, 0)));
+      else setAmount(String(Math.max(round2(balance - value), 0)));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -114,6 +115,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                aria-invalid={Boolean(error) || undefined}
                 autoFocus
               />
             </label>
@@ -136,7 +138,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR / cheque no." />
             </label>
           </div>
-          {error && <p className={controls.error}>{error}</p>}
+          {error && <p className={controls.error} role="alert">{error}</p>}
         </form>
       ) : (
         <p className={controls.ok}>Fully paid. Nothing is outstanding.</p>
@@ -155,7 +157,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                     {p.reference ? ` · ${p.reference}` : ''}
                   </span>
                 </div>
-                <button type="button" className={controls.btnDanger} onClick={() => removePayment(p.id)} aria-label="Remove payment">
+                <button type="button" className={controls.btnDanger} onClick={() => removePayment(p.id)} aria-label={`Remove payment of ${formatCurrency(p.amount, live.currency)}`}>
                   <Trash2 size={15} />
                 </button>
               </li>

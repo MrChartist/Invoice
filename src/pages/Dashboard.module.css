@@ -282,3 +282,25 @@
     padding-inline: 0.75rem;
   }
 }
+
+@media (max-width: 640px) {
+  table.recent { min-width: 0; display: block; }
+  table.recent thead { display: none; }
+  table.recent tbody { display: block; }
+  table.recent tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'doc status' 'client amt' 'date amt';
+    gap: 0.25rem 0.75rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  table.recent tbody tr:last-child { border-bottom: none; }
+  table.recent td { display: block; padding: 0; border: none; min-width: 0; }
+  table.recent td.rDoc { grid-area: doc; }
+  table.recent td.rClient { grid-area: client; }
+  table.recent td.rDate { grid-area: date; font-size: 0.75rem; color: var(--muted-foreground); }
+  table.recent td.rStatus { grid-area: status; justify-self: end; }
+  table.recent td.rAmt { grid-area: amt; align-self: end; justify-self: end; font-weight: 700; }
+}

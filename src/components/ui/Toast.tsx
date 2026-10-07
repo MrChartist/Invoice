@@ -42,7 +42,7 @@ export function Toast({ message, tone = 'success', duration = 3200, onClose }: T
       className="no-print"
       style={{
         position: 'fixed',
-        bottom: '1.25rem',
+        bottom: 'calc(1.25rem + var(--bottom-bar-h, 0px))',
         right: '1.25rem',
         left: 'auto',
         zIndex: 10000,

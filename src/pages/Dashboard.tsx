@@ -205,7 +205,7 @@ export function Dashboard() {
           />
         ) : (
           <div className={surface.tableWrap}>
-            <table className={surface.table}>
+            <table className={`${surface.table} ${styles.recent}`}>
               <thead>
                 <tr>
                   <th>Document</th>
@@ -218,17 +218,17 @@ export function Dashboard() {
               <tbody>
                 {recent.map((inv) => (
                   <tr key={inv.id}>
-                    <td>
+                    <td className={styles.rDoc}>
                       <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
                         {inv.invoice_number}
                       </Link>
                     </td>
-                    <td>{inv.client?.name || '—'}</td>
-                    <td>{formatDate(inv.issue_date)}</td>
-                    <td>
+                    <td className={styles.rClient}>{inv.client?.name || '—'}</td>
+                    <td className={styles.rDate}>{formatDate(inv.issue_date)}</td>
+                    <td className={styles.rStatus}>
                       <StatusBadge status={effectiveStatus(inv, now)} />
                     </td>
-                    <td className={surface.numeric}>{formatCurrency(inv.total, inv.currency)}</td>
+                    <td className={`${surface.numeric} ${styles.rAmt}`}>{formatCurrency(inv.total, inv.currency)}</td>
                   </tr>
                 ))}
               </tbody>

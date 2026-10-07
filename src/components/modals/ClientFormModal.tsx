@@ -87,10 +87,15 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
       }
     >
       <form id="client-form" onSubmit={submit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+        {error && (
+          <p className={controls.error} role="alert" ref={(el) => el?.scrollIntoView?.({ block: 'nearest' })}>
+            {error}
+          </p>
+        )}
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>Client name *</span>
-            <input className={controls.input} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Aarav Mehta" autoFocus />
+            <input className={controls.input} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Aarav Mehta" aria-invalid={error.startsWith('Client name') || undefined} autoFocus />
           </label>
           <label className={controls.field}>
             <span className={controls.label}>Company</span>
@@ -143,7 +148,6 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           <span className={controls.label}>Private notes</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder="Never printed on documents" />
         </label>
-        {error && <p className={controls.error}>{error}</p>}
       </form>
     </Modal>
   );

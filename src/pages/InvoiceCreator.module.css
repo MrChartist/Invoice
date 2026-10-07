@@ -125,6 +125,16 @@
 }
 
 @media (max-width: 900px) {
+  .page {
+    padding-bottom: 5.5rem;
+  }
+
+  .chip {
+    min-height: 40px;
+    padding-inline: 0.875rem;
+    font-size: 0.75rem;
+  }
+
   .mobileBar {
     position: fixed;
     left: 0;
@@ -158,4 +168,10 @@
     font-family: var(--font-display);
     font-size: 1.0625rem;
   }
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
 }

@@ -116,7 +116,7 @@ export function Clients() {
           <EmptyState icon={Users} title="No matches" text="Try a different search." />
         ) : (
           <div className={surface.tableWrap}>
-            <table className={surface.table}>
+            <table className={`${surface.table} ${styles.directory}`}>
               <thead>
                 <tr>
                   <th>Client</th>
@@ -132,7 +132,7 @@ export function Clients() {
                   const b = billed.get(c.name?.trim().toLowerCase() ?? '');
                   return (
                     <tr key={c.id}>
-                      <td>
+                      <td className={styles.cWho}>
                         <div className={styles.who}>
                           <Avatar name={c.name} size={34} square />
                           <div>
@@ -141,7 +141,7 @@ export function Clients() {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td className={styles.cContact} data-empty={!c.email && !c.phone ? 'true' : undefined}>
                         <div className={styles.contact}>
                           {c.email ? (
                             <span>
@@ -156,7 +156,7 @@ export function Clients() {
                           {!c.email && !c.phone && <span className={styles.sub}>—</span>}
                         </div>
                       </td>
-                      <td>
+                      <td className={styles.cLoc} data-empty={!c.city && !c.state ? 'true' : undefined}>
                         {c.city || c.state ? (
                           <span className={styles.contact}>
                             <span>
@@ -167,8 +167,8 @@ export function Clients() {
                           <span className={styles.sub}>—</span>
                         )}
                       </td>
-                      <td className={surface.mono}>{c.gstin || <span className={styles.sub}>—</span>}</td>
-                      <td className={surface.numeric}>
+                      <td className={`${surface.mono} ${styles.cGst}`} data-empty={!c.gstin ? 'true' : undefined}>{c.gstin || <span className={styles.sub}>—</span>}</td>
+                      <td className={`${surface.numeric} ${styles.cBilled}`}>
                         {b ? (
                           <>
                             {formatCurrency(b.total)}
@@ -180,7 +180,7 @@ export function Clients() {
                           <span className={styles.sub}>—</span>
                         )}
                       </td>
-                      <td>
+                      <td className={styles.cAct}>
                         <div className={surface.rowActions}>
                           <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={`Statement for ${c.name}`} title="Account statement">
                             <Scale size={16} />
