@@ -15,6 +15,7 @@ import {
   type ReminderRecord,
   type ReminderStage,
 } from '../../lib/reminders';
+import { interestForReminder } from '../../lib/interest';
 import { isValidEmail, mailtoLink, normalizePhone, smsLink, whatsappLink } from '../../lib/share';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { cn } from '../../lib/utils';
@@ -57,7 +58,9 @@ function ReminderModalBody({
   );
   const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice));
   const [lang, setLang] = useState<ReminderLanguage>('en');
-  const [message, setMessage] = useState(() => buildReminder(invoice, suggestStage(invoice), 'en'));
+  const [message, setMessage] = useState(() =>
+    buildReminder(invoice, suggestStage(invoice), 'en', new Date(), { interestAccrued: interestForReminder(invoice) }),
+  );
   const [phone, setPhone] = useState(invoice.client?.phone ?? '');
   const [email, setEmail] = useState(invoice.client?.email ?? '');
 
@@ -70,7 +73,9 @@ function ReminderModalBody({
   const regenerate = (nextStage: ReminderStage, nextLang: ReminderLanguage) => {
     setStage(nextStage);
     setLang(nextLang);
-    setMessage(buildReminder(invoice, nextStage, nextLang));
+    setMessage(
+      buildReminder(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice) }),
+    );
   };
 
   const cur = invoice.currency || 'INR';

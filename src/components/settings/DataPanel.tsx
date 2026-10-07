@@ -4,6 +4,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
 import { backupFilename, restoreBackup, buildBackup, markBackupDone, parseBackup, wipeAppData, type BackupSummary } from '../../lib/backup';
 import { ImportWizard } from '../import/ImportWizard';
+import { SampleDataCard } from '../demo/SampleDataCard';
 import { appDataSize } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
 import { downloadText } from '../../lib/download';
@@ -160,6 +161,8 @@ export function DataPanel({ notify }: Props) {
           </div>
         </div>
       </section>
+
+      <SampleDataCard notify={notify} />
 
       <section className={surface.card}>
         <div className={surface.cardHead}>

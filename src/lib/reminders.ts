@@ -182,11 +182,21 @@ export function fillTemplate(template: string, vars: Record<string, string>): st
   return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k] : m));
 }
 
+/** Extra facts a caller may supply; kept out of this module so it stays free of storage. */
+export interface ReminderExtras {
+  /**
+   * Late-payment interest accrued to `today` (see `src/lib/interest.ts`). Only ever worded
+   * into the message when the invoice's own terms mention interest / late fees.
+   */
+  interestAccrued?: number;
+}
+
 export function reminderVars(
   invoice: InvoiceRecord,
   stage: ReminderStage,
   lang: ReminderLanguage,
   today: Date = new Date(),
+  extras: ReminderExtras = {},
 ): Record<string, string> {
   const cur = invoice.currency || 'INR';
   const s = invoice.sender;
@@ -198,10 +208,15 @@ export function reminderVars(
       : (lang === 'en' ? `You can pay via UPI to ${upi}` : `UPI se payment: ${upi}`) +
         (payLink ? `\nPay link: ${payLink}` : '') +
         '\n';
+  const accrued = extras.interestAccrued;
   const termsLine = termsMentionInterest(invoice)
-    ? lang === 'en'
-      ? 'As per the terms on the invoice, late-payment charges may apply.\n'
-      : 'Invoice ki terms ke anusaar late-payment charges lag sakte hain.\n'
+    ? accrued !== undefined && Number.isFinite(accrued) && accrued > 0
+      ? lang === 'en'
+        ? `As per the terms on the invoice, late-payment interest of ${formatCurrency(accrued, cur)} has accrued as of ${formatDate(today)}. The balance above does not include it.\n`
+        : `Invoice ki terms ke anusaar ${formatDate(today)} tak ${formatCurrency(accrued, cur)} late-payment interest bana hai. Upar ke balance mein yeh shaamil nahi hai.\n`
+      : lang === 'en'
+        ? 'As per the terms on the invoice, late-payment charges may apply.\n'
+        : 'Invoice ki terms ke anusaar late-payment charges lag sakte hain.\n'
     : '';
   return {
     client: invoice.client?.name?.trim() || 'there',
@@ -234,9 +249,10 @@ export function buildReminder(
   stage: ReminderStage,
   lang: ReminderLanguage = 'en',
   today: Date = new Date(),
+  extras: ReminderExtras = {},
 ): ReminderMessage {
   const t = T[lang][stage];
-  const vars = reminderVars(invoice, stage, lang, today);
+  const vars = reminderVars(invoice, stage, lang, today, extras);
   return { subject: tidy(fillTemplate(t.subject, vars)), body: tidy(fillTemplate(t.body, vars)) };
 }
 
