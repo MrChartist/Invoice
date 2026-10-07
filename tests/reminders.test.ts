@@ -108,3 +108,25 @@ test('log helpers ignore snooze rows', () => {
   assert.equal(lastReminder(log, 'x')?.id, 'b');
   assert.equal(lastReminder(log, 'nope'), null);
 });
+
+test('final notice states accrued interest only when the invoice terms mention interest', () => {
+  const terms = inv({ due_date: '2026-08-01', terms: 'Interest @18% p.a. on late payment' });
+  const stated = buildReminder(terms, 'overdue_final', 'en', TODAY, { interestAccrued: 123.45 });
+  assert.match(stated.body, /late-payment interest of .*123\.45 has accrued as of/);
+  assert.match(stated.body, /does not include it/);
+  const hi = buildReminder(terms, 'overdue_final', 'hinglish', TODAY, { interestAccrued: 123.45 });
+  assert.match(hi.body, /123\.45 late-payment interest bana hai/);
+
+  // terms silent -> never mentioned, even when an amount is supplied
+  const silent = buildReminder(inv({ due_date: '2026-08-01' }), 'overdue_final', 'en', TODAY, { interestAccrued: 500 });
+  assert.ok(!/interest|charges/i.test(silent.body));
+
+  // zero / missing / junk amounts fall back to the generic wording
+  for (const interestAccrued of [0, -5, NaN, undefined]) {
+    const m = buildReminder(terms, 'overdue_final', 'en', TODAY, { interestAccrued });
+    assert.match(m.body, /late-payment charges may apply/);
+  }
+  // other stages never carry the line
+  const firm = buildReminder(terms, 'overdue_firm', 'en', TODAY, { interestAccrued: 10 });
+  assert.ok(!/interest/i.test(firm.body));
+});

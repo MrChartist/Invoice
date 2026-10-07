@@ -9,6 +9,9 @@ import { NotesBlock, PaymentBlock, TaxSummary, TotalsBlock } from './parts/Foote
 import { GstBody } from './parts/GstBody';
 import { ReceiptBody } from './parts/ReceiptBody';
 import { StatusStamp } from './parts/StatusStamp';
+import { IrnBlock } from './parts/IrnBlock';
+import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
+import type { EInvoiceMeta } from '../../lib/einvoice';
 import { cn } from '../../lib/utils';
 import { contrastText, paperSize, printPageCss } from '../../lib/design-prefs';
 import styles from './invoice-paper.module.css';
@@ -20,6 +23,11 @@ export interface TemplateEngineProps extends TemplateProps {
    * on for the single instance that is actually printed.
    */
   pageRule?: boolean;
+  /**
+   * IRP details to print (IRN, Ack, signed QR, e-Way no). Omit to look them up by
+   * `invoice.id` in `einvoice_meta`; pass `null` to print none (e.g. a draft preview).
+   */
+  einvoiceMeta?: EInvoiceMeta | null;
 }
 
 const SKIN: Partial<Record<TemplateLayout, string | undefined>> = {
@@ -38,7 +46,7 @@ const SKIN: Partial<Record<TemplateLayout, string | undefined>> = {
  * Without `design` the output is the template's native A4 look; with it, the
  * user's preferences (accent, font, columns, paper, density, …) are applied.
  */
-export function TemplateEngine({ invoice, sender, totals, templateId, design, pageRule }: TemplateEngineProps) {
+export function TemplateEngine({ invoice, sender, totals, templateId, design, pageRule, einvoiceMeta }: TemplateEngineProps) {
   const meta = templateById(templateId);
   const layout: TemplateLayout = design?.paper === 'thermal80' ? 'receipt' : meta.layout;
   const cfg = useMemo(() => buildPaperConfig(design, layout, layout === 'bilingual'), [design, layout]);
@@ -60,6 +68,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   const dataAttrs = design
     ? { 'data-paper': design.paper.toLowerCase(), 'data-density': design.density }
     : undefined;
+
+  const irn = buildIrnPrint(einvoiceMeta === undefined ? resolveEInvoiceMeta(invoice.id) : einvoiceMeta);
 
   const showInitials = (layout === 'corporate' || layout === 'centered') && sender.companyName;
 
@@ -107,7 +117,10 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
       <div className={outerClass} style={outerStyle} {...dataAttrs}>
         {showInitials && <div className={styles.watermark}>{sender.companyName.substring(0, 2).toUpperCase()}</div>}
         <StatusStamp invoice={invoice} />
-        <div className={styles.inner}>{body}</div>
+        <div className={styles.inner}>
+          {body}
+          {irn && <IrnBlock model={irn} />}
+        </div>
       </div>
     </PaperContext.Provider>
   );
