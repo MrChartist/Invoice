@@ -1,13 +1,31 @@
 import type { CalcTotals } from '../../lib/invoice-calc';
 import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
+import type { DesignPrefs } from '../../lib/design-prefs';
 
 export interface TemplateProps {
   invoice: InvoiceRecord;
   sender: SenderProfile;
   totals: CalcTotals;
+  /** Optional per-profile design preferences. Omit for the template's native look. */
+  design?: DesignPrefs;
 }
 
-export type TemplateLayout = 'classic' | 'minimal' | 'corporate' | 'centered';
+/**
+ * classic / minimal / corporate / centered are the original four skins.
+ * ink / ember / letterhead / bilingual reuse the shared flow with their own
+ * header + skin; gst (Tally-style boxed grid) and receipt have their own body.
+ */
+export type TemplateLayout =
+  | 'classic'
+  | 'minimal'
+  | 'corporate'
+  | 'centered'
+  | 'ink'
+  | 'ember'
+  | 'letterhead'
+  | 'bilingual'
+  | 'gst'
+  | 'receipt';
 export type TemplateTableStyle = 'lines' | 'zebra' | 'boxed' | 'band';
 
 export interface TemplateMetadata {
@@ -23,6 +41,11 @@ export interface TemplateMetadata {
   description: string;
   /** Emoji icon representing the business type */
   icon: string;
+}
+
+/** Layouts that print a second (Hindi) language line under each label. */
+export function isBilingual(layout: TemplateLayout): boolean {
+  return layout === 'bilingual';
 }
 
 export const TEMPLATES: TemplateMetadata[] = [
@@ -46,6 +69,12 @@ export const TEMPLATES: TemplateMetadata[] = [
   { id: 'envelope_format', name: 'Envelope Format', category: 'Minimal', layout: 'minimal', accent: '#52525b', fontFamily: 'var(--font-body)', tableStyle: 'lines', description: 'Letter-style for formal correspondence', icon: '✉️' },
   { id: 'indian_gst', name: 'Indian GST', category: 'Compliance', layout: 'classic', accent: '#1e3a8a', fontFamily: 'var(--font-display)', tableStyle: 'boxed', description: 'GST-compliant layout for Indian businesses', icon: '🇮🇳' },
   { id: 'two_column', name: 'Two-Column Split', category: 'Modern', layout: 'corporate', accent: '#6366f1', fontFamily: 'var(--font-body)', tableStyle: 'band', description: 'Modern split layout for tech & services', icon: '📑' },
+  { id: 'mrchartist_ink', name: 'Mr. Chartist Ink', category: 'Mr. Chartist', layout: 'ink', accent: '#111111', fontFamily: 'var(--font-body)', tableStyle: 'lines', description: 'Monochrome editorial look with a serif title', icon: '🖋️' },
+  { id: 'mrchartist_ember', name: 'Mr. Chartist Ember', category: 'Mr. Chartist', layout: 'ember', accent: '#ee6125', fontFamily: 'var(--font-display)', tableStyle: 'band', description: 'Dark header with the signature orange accent', icon: '🔥' },
+  { id: 'gst_tax_invoice', name: 'GST Tax Invoice', category: 'Compliance', layout: 'gst', accent: '#1e3a8a', fontFamily: 'var(--font-body)', tableStyle: 'boxed', description: 'Tally-style boxed grid with HSN summary and tax breakup', icon: '🧾' },
+  { id: 'bilingual_hindi', name: 'Bilingual (Hindi)', category: 'Compliance', layout: 'bilingual', accent: '#0f766e', fontFamily: "var(--font-body), 'Noto Sans Devanagari', 'Mukta', sans-serif", tableStyle: 'zebra', description: 'English + Hindi labels for local customers', icon: '🔤' },
+  { id: 'compact_receipt', name: 'Compact Receipt', category: 'Retail', layout: 'receipt', accent: '#14100c', fontFamily: 'var(--font-mono)', tableStyle: 'lines', description: 'Narrow single-column receipt; auto-used on 80 mm paper', icon: '🧮' },
+  { id: 'statement_letterhead', name: 'Statement Letterhead', category: 'Professional', layout: 'letterhead', accent: '#9a3412', fontFamily: 'var(--font-body)', tableStyle: 'lines', description: 'Letterhead with an account-summary strip', icon: '📜' },
 ];
 
 export const DEFAULT_TEMPLATE_ID = 'classic_orange';
