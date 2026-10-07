@@ -1,7 +1,9 @@
-import { Fragment } from 'react';
+import { Fragment, type CSSProperties } from 'react';
 import { cn } from '../../../lib/utils';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import type { TemplateMetadata } from '../registry';
+import { DOC_TITLE_HI } from '../labels';
+import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
 
 interface HeaderProps {
@@ -10,7 +12,7 @@ interface HeaderProps {
   meta: TemplateMetadata;
 }
 
-function AddressLines({ sender }: { sender: SenderProfile }) {
+export function AddressLines({ sender }: { sender: SenderProfile }) {
   const lines = (sender.companyAddress ?? '').split('\n').filter(Boolean);
   return (
     <>
@@ -24,12 +26,32 @@ function AddressLines({ sender }: { sender: SenderProfile }) {
   );
 }
 
-function SenderIdentity({ sender, align = 'right' }: { sender: SenderProfile; align?: 'left' | 'right' }) {
+export function Logo({ src, style }: { src: string; style?: CSSProperties }) {
+  const { logoSize } = usePaper();
+  return (
+    <img
+      src={src}
+      alt=""
+      className={cn(styles.logo, logoSize === 's' && styles.logoS, logoSize === 'l' && styles.logoL)}
+      style={style}
+    />
+  );
+}
+
+export function SenderIdentity({
+  sender,
+  align = 'right',
+  hideName = false,
+}: {
+  sender: SenderProfile;
+  align?: 'left' | 'right';
+  hideName?: boolean;
+}) {
   return (
     <div style={{ textAlign: align, maxWidth: 260 }}>
-      <div className={styles.orgName}>{sender.companyName || 'Your business name'}</div>
-      {sender.companyTagline && <div className={styles.eyebrow}>{sender.companyTagline}</div>}
-      <div className={styles.meta} style={{ marginTop: 6 }}>
+      {!hideName && <div className={styles.orgName}>{sender.companyName || 'Your business name'}</div>}
+      {!hideName && sender.companyTagline && <div className={styles.eyebrow}>{sender.companyTagline}</div>}
+      <div className={styles.meta} style={{ marginTop: hideName ? 0 : 6 }}>
         <AddressLines sender={sender} />
         {sender.companyPhone && (
           <>
@@ -67,88 +89,183 @@ function SenderIdentity({ sender, align = 'right' }: { sender: SenderProfile; al
   );
 }
 
-/** The four header treatments the 20 templates are built from. */
-export function PaperHeader({ invoice, sender, meta }: HeaderProps) {
+function DocTitle({ invoice, style }: { invoice: InvoiceRecord; style?: CSSProperties }) {
+  const { bilingual } = usePaper();
   const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
-  const titleStyle = { fontFamily: meta.fontFamily };
+  return (
+    <>
+      <div className={styles.docTitle} style={style}>
+        {title.toUpperCase()}
+      </div>
+      {bilingual && <div className={styles.biTitle}>{DOC_TITLE_HI[invoice.doc_type]}</div>}
+    </>
+  );
+}
 
-  if (meta.layout === 'corporate') {
-    return (
-      <header className={styles.headBand}>
-        <div>
-          {sender.logo ? (
-            <img src={sender.logo} alt="" className={styles.logo} />
-          ) : (
-            <div className={styles.orgName} style={{ ...titleStyle, fontSize: 26 }}>
-              {sender.companyName || 'Your business name'}
-            </div>
-          )}
-          {sender.companyTagline && (
-            <div className={styles.eyebrow} style={{ marginTop: 6 }}>
-              {sender.companyTagline}
-            </div>
-          )}
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className={styles.docTitle} style={{ ...titleStyle, fontSize: 34 }}>
-            {title.toUpperCase()}
-          </div>
-          <div className={styles.docNumber}>#{invoice.invoice_number || 'DRAFT'}</div>
-        </div>
-      </header>
-    );
-  }
+/** Three account-summary cells printed under the letterhead (statement style). */
+export function StatementStrip({ invoice, due }: { invoice: InvoiceRecord; due: string }) {
+  const { t, date, currency } = usePaper();
+  const isQuote = invoice.doc_type === 'QUOTATION';
+  return (
+    <div className={styles.statementStrip}>
+      <div>
+        <div className={styles.eyebrowMuted}>{isQuote ? t('quoteDate') : t('issueDate')}</div>
+        <div className={styles.statementVal}>{date(invoice.issue_date)}</div>
+      </div>
+      <div>
+        <div className={styles.eyebrowMuted}>{isQuote ? t('validUntil') : t('dueDate')}</div>
+        <div className={styles.statementVal}>{date(invoice.due_date) || '—'}</div>
+      </div>
+      <div>
+        <div className={styles.eyebrowMuted}>{t('balanceDue')}</div>
+        <div className={cn(styles.statementVal, styles.statementDue)}>{due || currency(invoice.balance_due ?? 0, invoice.currency)}</div>
+      </div>
+    </div>
+  );
+}
 
-  if (meta.layout === 'minimal') {
-    return (
-      <header className={styles.headSwiss}>
-        <div>
-          <div className={styles.docTitle} style={{ ...titleStyle, fontSize: 27 }}>
-            {title.toUpperCase()}
+/** The header treatments the templates are built from. */
+export function PaperHeader({ invoice, sender, meta }: HeaderProps) {
+  const { logoPosition, bilingual } = usePaper();
+  const layout = meta.layout;
+  const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
+  // The Ink skin sets its own serif title face in CSS; don't override it inline.
+  const titleStyle = layout === 'ink' ? undefined : { fontFamily: meta.fontFamily };
+  const number = invoice.invoice_number || 'DRAFT';
+
+  const band = layout === 'corporate' || layout === 'ember';
+  // An explicit logo position pulls the logo out into its own row above the header
+  // (band headers keep it inside and just re-order).
+  const detached = !!sender.logo && logoPosition !== 'auto' && !band;
+  const logoInline = !!sender.logo && !detached;
+
+  const header = (() => {
+    if (layout === 'corporate') {
+      return (
+        <header className={styles.headBand} data-logopos={logoPosition}>
+          <div>
+            {logoInline && sender.logo ? (
+              <Logo src={sender.logo} />
+            ) : (
+              <div className={styles.orgName} style={{ ...titleStyle, fontSize: 26 }}>
+                {sender.companyName || 'Your business name'}
+              </div>
+            )}
+            {sender.companyTagline && (
+              <div className={styles.eyebrow} style={{ marginTop: 6 }}>
+                {sender.companyTagline}
+              </div>
+            )}
           </div>
-          <div className={styles.docNumber}>NO. {invoice.invoice_number || 'DRAFT'}</div>
+          <div style={{ textAlign: 'right' }}>
+            <div className={styles.docTitle} style={{ ...titleStyle, fontSize: 34 }}>
+              {title.toUpperCase()}
+            </div>
+            {bilingual && <div className={styles.biTitle}>{DOC_TITLE_HI[invoice.doc_type]}</div>}
+            <div className={styles.docNumber}>#{number}</div>
+          </div>
+        </header>
+      );
+    }
+
+    if (layout === 'ember') {
+      return (
+        <header className={styles.headEmber} data-logopos={logoPosition}>
+          <div>
+            {logoInline && sender.logo ? (
+              <Logo src={sender.logo} />
+            ) : (
+              <div className={styles.orgName} style={{ fontSize: 24 }}>
+                {sender.companyName || 'Your business name'}
+              </div>
+            )}
+            {sender.companyTagline && <div className={styles.emberTag}>{sender.companyTagline}</div>}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div className={styles.docTitle} style={{ ...titleStyle, fontSize: 32 }}>
+              {title.toUpperCase()}
+            </div>
+            <div className={styles.docNumber}>#{number}</div>
+          </div>
+        </header>
+      );
+    }
+
+    if (layout === 'minimal') {
+      return (
+        <header className={styles.headSwiss}>
+          <div>
+            <DocTitle invoice={invoice} style={{ ...titleStyle, fontSize: 27 }} />
+            <div className={styles.docNumber}>NO. {number}</div>
+          </div>
+          <div>{logoInline && sender.logo && <Logo src={sender.logo} />}</div>
+          <SenderIdentity sender={sender} />
+        </header>
+      );
+    }
+
+    if (layout === 'centered') {
+      return (
+        <header className={styles.headCentered}>
+          {logoInline && sender.logo && <Logo src={sender.logo} />}
+          <div className={styles.orgName} style={{ ...titleStyle, fontSize: 24 }}>
+            {sender.companyName || 'Your business name'}
+          </div>
+          {sender.companyTagline && <div className={styles.eyebrow}>{sender.companyTagline}</div>}
+          <div className={styles.meta}>
+            <AddressLines sender={sender} />
+            {sender.companyGstin && (
+              <>
+                <span className={styles.metaLabel}>GSTIN:</span> {sender.companyGstin}
+              </>
+            )}
+          </div>
+          <div className={styles.centeredRule}>
+            {title.toUpperCase()} · {number}
+          </div>
+        </header>
+      );
+    }
+
+    if (layout === 'letterhead') {
+      return (
+        <>
+          <header className={styles.headLetter}>
+            <div className={styles.letterBrand}>
+              {logoInline && sender.logo && <Logo src={sender.logo} />}
+              <div className={styles.letterName}>{sender.companyName || 'Your business name'}</div>
+              {sender.companyTagline && <div className={styles.eyebrow}>{sender.companyTagline}</div>}
+            </div>
+            <SenderIdentity sender={sender} hideName />
+          </header>
+          <div className={styles.letterTitle}>
+            <span>{title}</span>
+            <span className={styles.docNumber}>No. {number}</span>
+          </div>
+        </>
+      );
+    }
+
+    // classic, ink, bilingual
+    return (
+      <header className={cn(styles.headClassic, layout === 'ink' && styles.headInk)}>
+        <div>
+          {logoInline && sender.logo && <Logo src={sender.logo} style={{ marginBottom: 12 }} />}
+          <DocTitle invoice={invoice} style={titleStyle} />
+          <div className={styles.docNumber}>#{number}</div>
         </div>
-        <div>{sender.logo && <img src={sender.logo} alt="" className={styles.logo} />}</div>
         <SenderIdentity sender={sender} />
       </header>
     );
-  }
+  })();
 
-  if (meta.layout === 'centered') {
-    return (
-      <header className={styles.headCentered}>
-        {sender.logo && <img src={sender.logo} alt="" className={styles.logo} />}
-        <div className={styles.orgName} style={{ ...titleStyle, fontSize: 24 }}>
-          {sender.companyName || 'Your business name'}
-        </div>
-        {sender.companyTagline && <div className={styles.eyebrow}>{sender.companyTagline}</div>}
-        <div className={styles.meta}>
-          <AddressLines sender={sender} />
-          {sender.companyGstin && (
-            <>
-              <span className={styles.metaLabel}>GSTIN:</span> {sender.companyGstin}
-            </>
-          )}
-        </div>
-        <div className={styles.centeredRule}>
-          {title.toUpperCase()} · {invoice.invoice_number || 'DRAFT'}
-        </div>
-      </header>
-    );
-  }
-
+  if (!detached || !sender.logo) return header;
   return (
-    <header className={cn(styles.headClassic)}>
-      <div>
-        {sender.logo && (
-          <img src={sender.logo} alt="" className={styles.logo} style={{ marginBottom: 12 }} />
-        )}
-        <div className={styles.docTitle} style={titleStyle}>
-          {title.toUpperCase()}
-        </div>
-        <div className={styles.docNumber}>#{invoice.invoice_number || 'DRAFT'}</div>
+    <>
+      <div className={styles.logoRow} data-pos={logoPosition}>
+        <Logo src={sender.logo} />
       </div>
-      <SenderIdentity sender={sender} />
-    </header>
+      {header}
+    </>
   );
 }

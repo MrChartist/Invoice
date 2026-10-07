@@ -1,187 +1,114 @@
-import type { CSSProperties } from 'react';
-import { QRCodeCanvas } from 'qrcode.react';
-import type { TemplateProps } from './registry';
+import { useMemo, type CSSProperties } from 'react';
+import type { TemplateLayout, TemplateProps } from './registry';
 import { templateById } from './registry';
-import { PaperHeader } from './parts/PaperHeader';
+import { PaperContext, buildPaperConfig } from './paper-context';
+import { PaperHeader, StatementStrip } from './parts/PaperHeader';
 import { PartyPanel } from './parts/PartyPanel';
 import { PaperItemsTable } from './parts/PaperItemsTable';
-import { cn, formatCurrency } from '../../lib/utils';
-import { amountInWords } from '../../lib/amount-in-words';
+import { NotesBlock, PaymentBlock, TaxSummary, TotalsBlock } from './parts/FooterBlocks';
+import { GstBody } from './parts/GstBody';
+import { ReceiptBody } from './parts/ReceiptBody';
+import { StatusStamp } from './parts/StatusStamp';
+import { cn } from '../../lib/utils';
+import { contrastText, paperSize, printPageCss } from '../../lib/design-prefs';
 import styles from './invoice-paper.module.css';
 
-function buildUpiUrl(sender: TemplateProps['sender']): string {
-  if (!sender.upiId) return '';
-  const payee = encodeURIComponent(sender.accountName || sender.companyName);
-  return `upi://pay?pa=${sender.upiId}&pn=${payee}&cu=INR`;
+export interface TemplateEngineProps extends TemplateProps {
+  templateId: string;
+  /**
+   * Emit a `@page` rule matching the paper size. Leave off for previews; turn
+   * on for the single instance that is actually printed.
+   */
+  pageRule?: boolean;
 }
 
-/** Renders one invoice/quotation onto an A4 paper, skinned per the chosen template. */
-export function TemplateEngine({ invoice, sender, totals, templateId }: TemplateProps & { templateId: string }) {
-  const meta = templateById(templateId);
-  const { layout, accent, fontFamily } = meta;
-  const taxed = invoice.gst_mode !== 'NONE' && invoice.gst_mode !== 'SINGLE' && totals.tax_amount > 0;
-  const singleTax = invoice.gst_mode === 'SINGLE' && totals.tax_amount > 0;
-  const upiUrl = buildUpiUrl(sender);
+const SKIN: Partial<Record<TemplateLayout, string | undefined>> = {
+  classic: styles.frameRail,
+  corporate: styles.bordered,
+  ink: styles.skinInk,
+  ember: styles.skinEmber,
+  letterhead: styles.skinLetter,
+  bilingual: styles.skinBi,
+  gst: styles.skinGst,
+  receipt: styles.skinReceipt,
+};
 
-  const outerClass = cn(
-    styles.paper,
-    layout === 'classic' && styles.frameRail,
-    layout === 'corporate' && styles.bordered,
-  );
-  const outerStyle: CSSProperties = { '--tpl-accent': accent, fontFamily } as CSSProperties;
+/**
+ * Renders one invoice/quotation onto its paper, skinned per the chosen template.
+ * Without `design` the output is the template's native A4 look; with it, the
+ * user's preferences (accent, font, columns, paper, density, …) are applied.
+ */
+export function TemplateEngine({ invoice, sender, totals, templateId, design, pageRule }: TemplateEngineProps) {
+  const meta = templateById(templateId);
+  const layout: TemplateLayout = design?.paper === 'thermal80' ? 'receipt' : meta.layout;
+  const cfg = useMemo(() => buildPaperConfig(design, layout, layout === 'bilingual'), [design, layout]);
+  const effMeta = layout === meta.layout ? meta : { ...meta, layout };
+
+  const accent = design?.accent ?? meta.accent;
+  const fontFamily = cfg.fontOverride ?? meta.fontFamily;
+  const size = paperSize(design);
+  const plainParties = layout === 'minimal' || layout === 'ink' || layout === 'letterhead';
+
+  const outerStyle = { '--tpl-accent': accent, fontFamily } as CSSProperties & Record<string, string | number>;
+  if (design?.accent) outerStyle['--tpl-on-accent'] = contrastText(design.accent);
+  if (design && design.paper !== 'A4') {
+    outerStyle.width = size.width;
+    outerStyle.minHeight = size.autoHeight ? 0 : size.height;
+  }
+
+  const outerClass = cn(styles.paper, SKIN[layout]);
+  const dataAttrs = design
+    ? { 'data-paper': design.paper.toLowerCase(), 'data-density': design.density }
+    : undefined;
+
+  const showInitials = (layout === 'corporate' || layout === 'centered') && sender.companyName;
+
+  const body = (() => {
+    if (layout === 'gst') return <GstBody invoice={invoice} sender={sender} totals={totals} />;
+    if (layout === 'receipt') return <ReceiptBody invoice={invoice} sender={sender} totals={totals} />;
+    return (
+      <>
+        <PaperHeader invoice={invoice} sender={sender} meta={effMeta} />
+        {cfg.headerNote && <div className={styles.headerNote}>{cfg.headerNote}</div>}
+        {layout === 'letterhead' && (
+          <StatementStrip invoice={invoice} due={cfg.currency(totals.balance_due, invoice.currency)} />
+        )}
+        <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
+        <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />
+        <TaxSummary invoice={invoice} totals={totals} />
+
+        <div className={cn(styles.footer, styles.keepTogether)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <PaymentBlock sender={sender} />
+            <NotesBlock invoice={invoice} />
+          </div>
+          <TotalsBlock invoice={invoice} sender={sender} totals={totals} />
+        </div>
+
+        {layout === 'letterhead' && (
+          <div className={styles.letterFoot}>
+            {[sender.companyName, sender.companyPhone, sender.companyEmail, sender.companyWebsite, sender.regLine]
+              .filter(Boolean)
+              .join('  ·  ')}
+          </div>
+        )}
+        {cfg.footerText && (
+          <div className={styles.strip} style={{ justifyContent: 'center', textAlign: 'center' }}>
+            <span>{cfg.footerText}</span>
+          </div>
+        )}
+      </>
+    );
+  })();
 
   return (
-    <div className={outerClass} style={outerStyle}>
-      {(layout === 'corporate' || layout === 'centered') && sender.companyName && (
-        <div className={styles.watermark}>{sender.companyName.substring(0, 2).toUpperCase()}</div>
-      )}
-
-      <div className={styles.inner}>
-        <PaperHeader invoice={invoice} sender={sender} meta={meta} />
-        <PartyPanel invoice={invoice} plain={layout === 'minimal'} />
-        <PaperItemsTable invoice={invoice} totals={totals} tableStyle={meta.tableStyle} />
-
-        {(taxed || singleTax) && totals.slabs.length > 1 && (
-          <table className={styles.summary}>
-            <thead>
-              <tr>
-                <th>GST rate</th>
-                <th>Taxable</th>
-                {taxed && <th>CGST</th>}
-                {taxed && <th>SGST</th>}
-                {!taxed && <th>IGST</th>}
-                <th>Tax</th>
-              </tr>
-            </thead>
-            <tbody>
-              {totals.slabs.map((slab) => (
-                <tr key={slab.rate}>
-                  <td>{slab.rate}%</td>
-                  <td>{formatCurrency(slab.taxable, invoice.currency)}</td>
-                  {taxed && <td>{formatCurrency(slab.cgst, invoice.currency)}</td>}
-                  {taxed && <td>{formatCurrency(slab.sgst, invoice.currency)}</td>}
-                  {!taxed && <td>{formatCurrency(slab.igst, invoice.currency)}</td>}
-                  <td>{formatCurrency(slab.tax, invoice.currency)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        <div className={styles.footer}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {(sender.accountNumber || sender.upiId) && (
-              <div className={styles.boxAccent}>
-                <div className={styles.eyebrow}>Payment details</div>
-                <div className={styles.payGrid} style={{ marginTop: 8 }}>
-                  <div className={styles.payLines}>
-                    {sender.accountName && <><strong>Account:</strong> {sender.accountName}<br /></>}
-                    {sender.accountNumber && <><strong>A/C No:</strong> {sender.accountNumber}<br /></>}
-                    {sender.ifsc && <><strong>IFSC:</strong> {sender.ifsc}<br /></>}
-                    {sender.bankName && <><strong>Bank:</strong> {sender.bankName}<br /></>}
-                    {sender.upiId && <><strong>UPI:</strong> {sender.upiId}</>}
-                  </div>
-                  {upiUrl && (
-                    <div className={styles.qrBox}>
-                      <QRCodeCanvas value={upiUrl} size={64} level="M" />
-                      <div className={styles.qrCaption}>Scan to pay</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {(invoice.notes || invoice.terms) && (
-              <div className={styles.boxSoft}>
-                <div className={styles.eyebrowMuted}>Notes &amp; terms</div>
-                <div className={styles.notesText}>{invoice.notes || invoice.terms}</div>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className={styles.totals}>
-              <div className={styles.totalRow}>
-                <span>Subtotal</span>
-                <span>{formatCurrency(totals.subtotal, invoice.currency)}</span>
-              </div>
-              {totals.discount_amount > 0 && (
-                <div className={cn(styles.totalRow, styles.totalGreen)}>
-                  <span>Discount</span>
-                  <span>-{formatCurrency(totals.discount_amount, invoice.currency)}</span>
-                </div>
-              )}
-              {taxed && (
-                <>
-                  <div className={styles.totalRow}>
-                    <span>CGST</span>
-                    <span>{formatCurrency(totals.cgst_amount, invoice.currency)}</span>
-                  </div>
-                  <div className={styles.totalRow}>
-                    <span>SGST</span>
-                    <span>{formatCurrency(totals.sgst_amount, invoice.currency)}</span>
-                  </div>
-                </>
-              )}
-              {!taxed && totals.igst_amount > 0 && (
-                <div className={styles.totalRow}>
-                  <span>IGST</span>
-                  <span>{formatCurrency(totals.igst_amount, invoice.currency)}</span>
-                </div>
-              )}
-              {singleTax && (
-                <div className={styles.totalRow}>
-                  <span>Tax</span>
-                  <span>{formatCurrency(totals.tax_amount, invoice.currency)}</span>
-                </div>
-              )}
-              {totals.shipping > 0 && (
-                <div className={styles.totalRow}>
-                  <span>Shipping</span>
-                  <span>{formatCurrency(totals.shipping, invoice.currency)}</span>
-                </div>
-              )}
-              {totals.other_charges !== 0 && (
-                <div className={styles.totalRow}>
-                  <span>Other charges</span>
-                  <span>{formatCurrency(totals.other_charges, invoice.currency)}</span>
-                </div>
-              )}
-              {totals.round_off !== 0 && (
-                <div className={styles.totalRow}>
-                  <span>Round off</span>
-                  <span>{formatCurrency(totals.round_off, invoice.currency)}</span>
-                </div>
-              )}
-              <div className={styles.totalRowStrong}>
-                <span>Total</span>
-                <span>{formatCurrency(totals.total, invoice.currency)}</span>
-              </div>
-            </div>
-
-            <div className={styles.grand}>
-              <span className={styles.grandLabel}>Total</span>
-              <span className={styles.grandValue}>{formatCurrency(totals.total, invoice.currency)}</span>
-            </div>
-
-            <div className={styles.words}>Amount in words: {amountInWords(totals.total, invoice.currency)}</div>
-
-            {totals.amount_paid > 0 && (
-              <div className={styles.balance}>
-                <span>Balance due</span>
-                <span>{formatCurrency(totals.balance_due, invoice.currency)}</span>
-              </div>
-            )}
-
-            {sender.signature && (
-              <div className={styles.signature}>
-                <img src={sender.signature} alt="Signature" className={styles.signatureImg} />
-                <div className={styles.signatureLine}>Authorized signatory</div>
-              </div>
-            )}
-          </div>
-        </div>
+    <PaperContext.Provider value={cfg}>
+      {pageRule && <style>{printPageCss(design)}</style>}
+      <div className={outerClass} style={outerStyle} {...dataAttrs}>
+        {showInitials && <div className={styles.watermark}>{sender.companyName.substring(0, 2).toUpperCase()}</div>}
+        <StatusStamp invoice={invoice} />
+        <div className={styles.inner}>{body}</div>
       </div>
-    </div>
+    </PaperContext.Provider>
   );
 }

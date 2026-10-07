@@ -1,7 +1,8 @@
-import { cn, currencySymbol, formatMoney, formatQuantity } from '../../../lib/utils';
+import { cn, currencySymbol, formatQuantity } from '../../../lib/utils';
 import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord } from '../../../types/invoice';
 import type { TemplateTableStyle } from '../registry';
+import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
 
 interface ItemsTableProps {
@@ -23,12 +24,15 @@ const STYLE_CLASS: Record<TemplateTableStyle, string | undefined> = {
  * a GST invoice shows everything a tax invoice must.
  */
 export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps) {
+  const { t, money, col } = usePaper();
   const lines = totals.lines;
   const symbol = currencySymbol(invoice.currency);
   const taxed = invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
-  const showHsn = lines.some((l) => l.hsn);
-  const showDiscount = totals.line_discount_total > 0;
-  const showUnit = lines.some((l) => l.unit);
+  const showHsn = col.hsn && lines.some((l) => l.hsn);
+  const showDiscount = col.discount && totals.line_discount_total > 0;
+  const showUnit = col.unit && lines.some((l) => l.unit);
+  const showTaxable = taxed && col.taxable;
+  const showGst = taxed && col.taxRate;
 
   return (
     <table className={cn(styles.items, STYLE_CLASS[tableStyle])}>
@@ -37,19 +41,19 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
           <th className={styles.center} style={{ width: 26 }}>
             #
           </th>
-          <th>Description</th>
-          {showHsn && <th className={styles.center} style={{ width: 66 }}>HSN/SAC</th>}
+          <th>{t('desc')}</th>
+          {showHsn && <th className={styles.center} style={{ width: 66 }}>{t('hsn')}</th>}
           <th className={styles.right} style={{ width: showUnit ? 74 : 50 }}>
-            Qty
+            {t('qty')}
           </th>
           <th className={styles.right} style={{ width: 78 }}>
-            Rate
+            {t('rate')}
           </th>
-          {showDiscount && <th className={styles.right} style={{ width: 52 }}>Disc</th>}
-          {taxed && <th className={styles.right} style={{ width: 82 }}>Taxable</th>}
-          {taxed && <th className={styles.right} style={{ width: 46 }}>GST</th>}
+          {showDiscount && <th className={styles.right} style={{ width: 52 }}>{t('disc')}</th>}
+          {showTaxable && <th className={styles.right} style={{ width: 82 }}>{t('taxable')}</th>}
+          {showGst && <th className={styles.right} style={{ width: 46 }}>{t('gst')}</th>}
           <th className={styles.right} style={{ width: 92 }}>
-            Amount ({symbol})
+            {t('amount')} ({symbol})
           </th>
         </tr>
       </thead>
@@ -66,22 +70,22 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
               {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
               <td className={cn(styles.right, styles.num)}>
                 {formatQuantity(line.quantity)}
-                {line.unit ? ` ${line.unit}` : ''}
+                {col.unit && line.unit ? ` ${line.unit}` : ''}
               </td>
-              <td className={cn(styles.right, styles.num)}>{formatMoney(line.rate, invoice.currency)}</td>
+              <td className={cn(styles.right, styles.num)}>{money(line.rate, invoice.currency)}</td>
               {showDiscount && (
                 <td className={cn(styles.right, styles.num)}>
                   {source?.discount_percent ? `${source.discount_percent}%` : '—'}
                 </td>
               )}
-              {taxed && (
+              {showTaxable && (
                 <td className={cn(styles.right, styles.num)}>
-                  {formatMoney(line.taxable, invoice.currency)}
+                  {money(line.taxable, invoice.currency)}
                 </td>
               )}
-              {taxed && <td className={cn(styles.right, styles.num)}>{line.tax_rate}%</td>}
+              {showGst && <td className={cn(styles.right, styles.num)}>{line.tax_rate}%</td>}
               <td className={cn(styles.right, styles.num)} style={{ fontWeight: 700 }}>
-                {formatMoney(taxed ? line.total : line.taxable, invoice.currency)}
+                {money(taxed ? line.total : line.taxable, invoice.currency)}
               </td>
             </tr>
           );
