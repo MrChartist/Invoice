@@ -3,16 +3,16 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { NotFound } from './components/layout/NotFound';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Dashboard } from './pages/Dashboard';
-import { Transactions } from './pages/Transactions';
 import { InvoiceCreator } from './pages/InvoiceCreator';
-import { Clients } from './pages/Clients';
-import { Settings } from './pages/Settings';
 import { LoginPage } from './pages/LoginPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { IdleLock } from './components/security/IdleLock';
 import { isAuthenticated } from './lib/auth';
 
 // Heavier report/ledger pages load on first visit so the editor opens fast.
+const Transactions = lazy(() => import('./pages/Transactions').then((m) => ({ default: m.Transactions })));
+const Clients = lazy(() => import('./pages/Clients').then((m) => ({ default: m.Clients })));
+const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
 const Expenses = lazy(() => import('./pages/Expenses').then((m) => ({ default: m.Expenses })));
 const Receivables = lazy(() => import('./pages/Receivables').then((m) => ({ default: m.Receivables })));
 const Books = lazy(() => import('./pages/Books').then((m) => ({ default: m.Books })));

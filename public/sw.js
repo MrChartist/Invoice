@@ -34,15 +34,26 @@ function discoverAssets(html) {
   return [...found];
 }
 
+/** cache.put can throw QuotaExceededError; serving the response matters more than caching it. */
+async function safePut(cache, request, response) {
+  try {
+    await cache.put(request, response);
+  } catch {
+    /* storage full — carry on without caching */
+  }
+}
+
 async function trim(cache, max) {
   const keys = await cache.keys();
   for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
 }
 
 /** Fetches every manifest file into the right cache. Throws if any file fails (install retried later). */
+class ManifestMissing extends Error {}
+
 async function precacheManifest(shell, assets) {
   const res = await fetch('/precache-manifest.json', { cache: 'no-store' });
-  if (!res.ok) throw new Error('precache manifest ' + res.status);
+  if (!res.ok) throw new ManifestMissing('precache manifest ' + res.status);
   const manifest = await res.json();
   await Promise.all(
     manifest.files.map(async (url) => {
@@ -65,9 +76,14 @@ self.addEventListener('install', (event) => {
         await precacheManifest(shell, assets);
         return;
       } catch (err) {
-        // A broken/absent manifest must not brick the install: fall back to discovery below.
-        // (A genuinely failed file is retried by the browser on the next visit.)
-        void err;
+        if (!(err instanceof ManifestMissing)) {
+          // The manifest exists but a listed file failed (404 / quota / dropped connection):
+          // reject the install so the old worker keeps serving a complete cache, and drop the
+          // half-filled per-build shell cache. Fingerprinted assets already stored are harmless.
+          await caches.delete(SHELL_CACHE);
+          throw err;
+        }
+        // No manifest at all (e.g. dev server): fall back to discovering assets from index.html.
       }
       try {
         const res = await fetch('/', { cache: 'reload' });
@@ -105,7 +121,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  const d = event.data;
+  if (d === 'SKIP_WAITING' || (d && d.type === 'SKIP_WAITING')) self.skipWaiting();
 });
 
 function timeout(ms) {
@@ -117,7 +134,7 @@ async function handleNavigation(request) {
   const cached = await shell.match(SHELL_URL);
   const network = fetch(request).then(async (res) => {
     const type = res.headers.get('content-type') || '';
-    if (res.ok && type.includes('text/html')) await shell.put(SHELL_URL, res.clone());
+    if (res.ok && type.includes('text/html')) await safePut(shell, SHELL_URL, res.clone());
     return res;
   });
   try {
@@ -135,7 +152,7 @@ async function cacheFirst(request, cacheName, max) {
   if (hit) return hit;
   const res = await fetch(request);
   if (res.ok) {
-    await cache.put(request, res.clone());
+    await safePut(cache, request, res.clone());
     trim(cache, max);
   }
   return res;
@@ -148,7 +165,7 @@ async function staleWhileRevalidate(request, cacheName, max) {
     .then(async (res) => {
       // Opaque (no-cors) font responses report status 0; cache those, never errors.
       if (res.ok || res.type === 'opaque') {
-        await cache.put(request, res.clone());
+        await safePut(cache, request, res.clone());
         trim(cache, max);
       }
       return res;

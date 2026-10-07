@@ -79,18 +79,7 @@
     </script>
   </head>
   <body>
-    <script>
-      // Apply the saved theme before first paint so there is no light/dark flash.
-      (function () {
-        try {
-          var t = localStorage.getItem('theme');
-          var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (dark) document.documentElement.classList.add('dark');
-          var m = document.querySelector('meta[name="theme-color"]');
-          if (m) m.setAttribute('content', dark ? '#06080a' : '#f4f5f0');
-        } catch (e) {}
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

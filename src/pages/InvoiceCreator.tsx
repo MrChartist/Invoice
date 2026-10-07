@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
@@ -12,7 +12,7 @@ import { DocumentActions } from '../components/creator/DocumentActions';
 import { StockWarnings } from '../components/creator/StockWarnings';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
-import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
+
 import { ClientSearchModal } from '../components/modals/ClientSearchModal';
 import { ItemSearchModal } from '../components/modals/ItemSearchModal';
 import { localDb } from '../lib/localDb';
@@ -23,6 +23,11 @@ import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord, type InvoiceSta
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
+
+// The preview pulls in the template engine and QR code; load it only when opened.
+const InvoicePreviewModal = lazy(() =>
+  import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
+);
 
 const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
 const DUE_PRESETS = [0, 7, 15, 30, 45];
@@ -382,7 +387,11 @@ export function InvoiceCreator() {
         </button>
       </div>
 
-      <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+      {previewOpen && (
+        <Suspense fallback={null}>
+          <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+        </Suspense>
+      )}
       <ClientSearchModal isOpen={clientsOpen} onClose={() => setClientsOpen(false)} />
       <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
       {toastNode}

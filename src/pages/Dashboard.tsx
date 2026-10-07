@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -19,9 +19,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { RemindersPanel } from '../components/share';
 import { localDb } from '../lib/localDb';
-import { readLinks } from '../lib/documents';
-import { lowStockCount } from '../lib/inventory';
-import { getProfitSnapshot } from '../lib/books';
+import { getTable } from '../lib/storage';
+import type { CreditLink } from '../lib/stats';
 import { getUser } from '../lib/auth';
 import { getIndianFY } from '../lib/invoice-number';
 import { effectiveStatus } from '../lib/invoice-status';
@@ -39,19 +38,33 @@ function greeting(hour: number): string {
 
 export function Dashboard() {
   const user = getUser();
-  const [{ invoices, clientCount, profileReady, links, lowStock, profit }] = useState(() => {
+  const [{ invoices, clientCount, profileReady, links }] = useState(() => {
     const settings = localDb.settings.get();
     const profile = localDb.settings.activeProfile();
     return {
       invoices: localDb.invoices.getAll(),
       clientCount: localDb.clients.getAll().length,
-      links: readLinks(),
-      lowStock: lowStockCount(),
-      profit: getProfitSnapshot('this_fy', 'accrual'),
+      links: getTable<CreditLink>('doc_links'),
       profileReady:
         settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     };
   });
+
+  // Profit and stock live in larger modules; load them after first paint so the dashboard opens fast.
+  const [extras, setExtras] = useState<{ lowStock: number; profit: { netProfit: number; income: number; expenses: number } } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([import('../lib/books'), import('../lib/inventory')])
+      .then(([books, inventory]) => {
+        if (alive) setExtras({ lowStock: inventory.lowStockCount(), profit: books.getProfitSnapshot('this_fy', 'accrual') });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const lowStock = extras?.lowStock ?? 0;
+  const profit = extras?.profit;
 
   // Derived values are cheap at this scale; recomputing keeps them honest after edits elsewhere.
   const now = new Date();
@@ -241,8 +254,12 @@ export function Dashboard() {
         <Link to="/books?tab=pnl" className={styles.quickItem}>
           <Receipt size={18} />
           <div>
-            <strong>{formatCurrency(profit.netProfit)} net profit</strong>
-            <span>FY{fy.label} · income {formatCurrency(profit.income)} · expenses {formatCurrency(profit.expenses)}</span>
+            <strong>{profit ? `${formatCurrency(profit.netProfit)} net profit` : 'Profit & loss'}</strong>
+            <span>
+              {profit
+                ? `FY${fy.label} · income ${formatCurrency(profit.income)} · expenses ${formatCurrency(profit.expenses)}`
+                : `FY${fy.label} · open the books`}
+            </span>
           </div>
           <ArrowRight size={16} />
         </Link>

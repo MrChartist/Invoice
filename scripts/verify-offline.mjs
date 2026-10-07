@@ -75,14 +75,16 @@ try {
   // ── precache contents ───────────────────────────────────────────────
   const cached = await page.evaluate(async () => {
     const names = (await caches.keys()).filter((k) => k.startsWith('mci-'));
-    const cache = await caches.open(names[0]);
-    return { names, urls: (await cache.keys()).map((r) => new URL(r.url).pathname) };
+    const urls = [];
+    for (const n of names) urls.push(...(await (await caches.open(n)).keys()).map((r) => new URL(r.url).pathname));
+    return { names, urls };
   });
-  check(cached.names.length === 1, `exactly one precache (${cached.names.join(',')})`);
-  const missing = manifest.files.filter((u) => !cached.urls.includes(u));
+  check(cached.names.filter((n) => n.startsWith('mci-shell-')).length === 1, `exactly one per-build shell cache (${cached.names.join(',')})`);
+  // The SPA shell for '/' is stored under /index.html.
+  const missing = manifest.files.filter((u) => !cached.urls.includes(u) && !(u === '/' && cached.urls.includes('/index.html')));
   check(missing.length === 0, `all ${manifest.files.length} manifest files precached${missing.length ? ' missing: ' + missing.join(', ') : ''}`);
   check(!cached.urls.includes('/sw.js') && !cached.urls.includes('/precache-manifest.json'), 'sw.js and precache-manifest.json are not cached');
-  check(cached.names[0] === 'mci-' + manifest.version, 'cache name carries the build id');
+  check(cached.names.includes('mci-shell-' + manifest.version), 'shell cache name carries the build id');
   const swText = await (await fetch(srv.origin + '/sw.js')).text();
   check(!swText.includes('__BUILD_ID__'), 'dist/sw.js is stamped with a build id');
 
@@ -122,12 +124,13 @@ try {
     await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); await r.update(); });
     await until(page, async () => !!(await navigator.serviceWorker.getRegistration()).waiting);
     check(true, 'updated worker installs and WAITS (running page keeps its chunks)');
-    let names = await page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('mci-')));
-    check(names.length === 2, `old + new caches coexist while waiting (${names.join(',')})`);
+    const shellNames = () => page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('mci-shell-')));
+    let names = await shellNames();
+    check(names.length === 2, `old + new shell caches coexist while waiting (${names.join(',')})`);
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).waiting.postMessage('SKIP_WAITING'));
-    await until(page, async () => (await caches.keys()).filter((k) => k.startsWith('mci-')).length === 1);
-    names = await page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('mci-')));
-    check(names[0] === 'mci-v2test000000', `old cache deleted on activate (${names.join(',')})`);
+    await until(page, async () => (await caches.keys()).filter((k) => k.startsWith('mci-shell-')).length === 1);
+    names = await shellNames();
+    check(names[0] === 'mci-shell-v2test000000', `old cache deleted on activate (${names.join(',')})`);
 
     // ── broken deploy: manifest lists a 404 -> install fails, v2 keeps serving ──
     const v3 = join(tmp, 'v3');
@@ -141,9 +144,9 @@ try {
     await page.waitForTimeout(1500);
     const st = await page.evaluate(async () => {
       const r = await navigator.serviceWorker.getRegistration();
-      return { active: !!r.active, waiting: !!r.waiting, caches: (await caches.keys()).filter((k) => k.startsWith('mci-')) };
+      return { active: !!r.active, waiting: !!r.waiting, caches: (await caches.keys()).filter((k) => k.startsWith('mci-shell-')) };
     });
-    check(st.active && !st.waiting && st.caches.length === 1 && st.caches[0] === 'mci-v2test000000', `broken deploy rejected, old worker/cache intact (${JSON.stringify(st)})`);
+    check(st.active && !st.waiting && st.caches.length === 1 && st.caches[0] === 'mci-shell-v2test000000', `broken deploy rejected, old worker/cache intact (${JSON.stringify(st)})`);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

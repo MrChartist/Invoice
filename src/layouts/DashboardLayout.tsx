@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
@@ -25,12 +25,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from '../components/brand/Logo';
-import { HelpModal } from '../components/layout/HelpModal';
 import { Avatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/useToast';
-import { CommandPalette, type PaletteAction } from '../components/command/CommandPalette';
+import type { PaletteAction } from '../components/command/CommandPalette';
 import { NotificationBell } from '../components/command/NotificationBell';
-import { ShortcutsOverlay } from '../components/command/ShortcutsOverlay';
 import { InstallPrompt } from '../components/pwa/InstallPrompt';
 import { UpdateToast } from '../components/pwa/UpdateToast';
 import { BackupNudge } from '../components/pwa/BackupNudge';
@@ -43,6 +41,11 @@ import { backupFilename, buildBackup, markBackupDone } from '../lib/backup';
 import { downloadText } from '../lib/download';
 import { useTheme } from '../hooks/useTheme';
 import styles from './DashboardLayout.module.css';
+
+// Overlays that only appear on demand are split out of the entry chunk and mounted on first use.
+const HelpModal = lazy(() => import('../components/layout/HelpModal').then((m) => ({ default: m.HelpModal })));
+const ShortcutsOverlay = lazy(() => import('../components/command/ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
+const CommandPalette = lazy(() => import('../components/command/CommandPalette').then((m) => ({ default: m.CommandPalette })));
 
 interface NavEntry {
   label: string;
@@ -99,6 +102,10 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [loaded, setLoaded] = useState({ help: false, palette: false, shortcuts: false });
+  const openHelp = () => { setLoaded((l) => ({ ...l, help: true })); setHelpOpen(true); };
+  const openPalette = () => { setLoaded((l) => ({ ...l, palette: true })); setPaletteOpen(true); };
+  const openShortcuts = () => { setLoaded((l) => ({ ...l, shortcuts: true })); setShortcutsOpen(true); };
 
   const asideRef = useRef<HTMLElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -172,9 +179,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   };
 
   useHotkeys({
-    'mod+k': () => setPaletteOpen(true),
-    '/': () => setPaletteOpen(true),
-    '?': () => setShortcutsOpen(true),
+    'mod+k': () => openPalette(),
+    '/': () => openPalette(),
+    '?': () => openShortcuts(),
     'g d': () => navigate('/'),
     'g i': () => navigate('/invoice'),
     'g t': () => navigate('/transactions'),
@@ -231,7 +238,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           <Logo height={30} product={false} />
         </Link>
         <div className={styles.topActions}>
-          <button type="button" className={styles.iconBtn} aria-label="Search" onClick={() => setPaletteOpen(true)}>
+          <button type="button" className={styles.iconBtn} aria-label="Search" onClick={() => openPalette()}>
             <Search size={18} />
           </button>
           <NotificationBell onNavigate={navigate} />
@@ -275,11 +282,11 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             {theme === 'dark' ? <Sun className={styles.navIcon} size={18} /> : <Moon className={styles.navIcon} size={18} />}
             <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
-          <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => setHelpOpen(true)}>
+          <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => openHelp()}>
             <HelpCircle className={styles.navIcon} size={18} />
             <span>Help &amp; about</span>
           </button>
-          <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => setShortcutsOpen(true)}>
+          <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => openShortcuts()}>
             <Keyboard className={styles.navIcon} size={18} />
             <span>Keyboard shortcuts</span>
           </button>
@@ -299,16 +306,16 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
       <main className={cn(styles.main, drawerActive && styles.mainLocked)} id="main" tabIndex={-1}>
         <div className={cn(styles.utilBar, 'no-print')}>
-          <button type="button" className={styles.searchBtn} onClick={() => setPaletteOpen(true)}>
+          <button type="button" className={styles.searchBtn} onClick={() => openPalette()}>
             <Search size={15} />
             <span>Search invoices, clients, pages…</span>
             <kbd>{formatCombo('mod+k')}</kbd>
           </button>
           <div className={styles.utilActions}>
-            <button type="button" className={styles.iconBtn} onClick={() => setHelpOpen(true)} aria-label="Help and about" title="Help & about">
+            <button type="button" className={styles.iconBtn} onClick={() => openHelp()} aria-label="Help and about" title="Help & about">
               <HelpCircle size={18} />
             </button>
-            <button type="button" className={styles.iconBtn} onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+            <button type="button" className={styles.iconBtn} onClick={() => openShortcuts()} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
               <Keyboard size={18} />
             </button>
             <button type="button" className={styles.iconBtn} onClick={toggle} aria-label={themeLabel} title={themeLabel}>
@@ -325,15 +332,19 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
       <AutoBackupRunner />
       <UpdateToast />
-      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        navItems={NAV_ITEMS.map((n) => ({ label: n.label, to: n.path, icon: n.icon }))}
-        actions={actions}
-        onNavigate={navigate}
-      />
+      <Suspense fallback={null}>
+        {loaded.help && <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />}
+        {loaded.shortcuts && <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />}
+        {loaded.palette && (
+          <CommandPalette
+            open={paletteOpen}
+            onClose={() => setPaletteOpen(false)}
+            navItems={NAV_ITEMS.map((n) => ({ label: n.label, to: n.path, icon: n.icon }))}
+            actions={actions}
+            onNavigate={navigate}
+          />
+        )}
+      </Suspense>
       {toastNode}
     </div>
   );

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Banknote,
@@ -18,12 +18,13 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
-import { InvoicePreviewModal } from '../components/preview/InvoicePreview';
+
 import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId } from '../lib/localDb';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { effectiveStatus } from '../lib/invoice-status';
-import { readLinks } from '../lib/documents';
+import { getTable } from '../lib/storage';
+import type { CreditLink } from '../lib/stats';
 import { isRevenueDoc, summarize } from '../lib/stats';
 import { downloadText, toCsv } from '../lib/download';
 import { addDaysInput, cn, formatCurrency, formatDate, todayInput } from '../lib/utils';
@@ -31,6 +32,11 @@ import { DOCUMENT_LABELS, type InvoiceRecord } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
+
+// The preview pulls in the template engine and QR code; load it only when opened.
+const InvoicePreviewModal = lazy(() =>
+  import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
+);
 
 type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft';
 
@@ -76,7 +82,7 @@ export function Transactions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const invoices = useMemo(() => localDb.invoices.getAll(), [version]);
   const now = new Date();
-  const summary = useMemo(() => summarize(invoices, now, readLinks()), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
+  const summary = useMemo(() => summarize(invoices, now, getTable<CreditLink>('doc_links')), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -295,7 +301,11 @@ export function Transactions() {
         )}
       </section>
 
-      <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+      {previewOpen && (
+        <Suspense fallback={null}>
+          <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+        </Suspense>
+      )}
       <PaymentModal
         invoice={payFor}
         onClose={() => setPayFor(null)}

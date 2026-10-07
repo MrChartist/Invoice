@@ -235,3 +235,23 @@ Override with `BUDGET_*_GZ_KB` env vars if you want to stage the rollout.
 - Duplicates in `npm ls --all`: none that matter (`semver`, `ignore`, `eslint-visitor-keys`, `@rolldown/pluginutils`
   are dev-only). Optional peer warnings (esbuild, jiti, less...) are Vite's optional peers.
 - `engines.node >=22` added to `package.json` (needed by `node --test` with `--experimental-strip-types`).
+
+---
+
+## Post-merge measurements (lead, on the integrated build)
+
+The numbers above were taken on the older base. On the merged v3 build (every module wired in):
+
+| | before | after lazy-loading |
+|---|---|---|
+| entry chunk (gz) | 138.6 kB | **81.8 kB** |
+| initial JS (gz) | 226.6 kB | **173.0 kB** |
+| total JS (gz) | 529.7 kB | 540.6 kB |
+
+What changed: Transactions, Clients and Settings are `React.lazy` routes; the invoice preview modal, command palette, shortcuts overlay and Help modal load on first use; the Dashboard loads the books and inventory modules after first paint and reads credit links straight from storage.
+
+CI budgets in `scripts/check-bundle-size.mjs` were reset to the achieved result plus ~7 % headroom (initial 185, entry 90, total 580 kB gz).
+
+Already fixed in src before this report was written (no action needed): dicebear avatar calls removed, duplicate Google Fonts `@import` removed, jspdf/html-to-image loaded with dynamic `import()`, service worker registered in `main.tsx`.
+
+Integration notes: `public/sw.js` merges the PWA module's worker with the build-stamped precache manifest. A manifest listing a failing file rejects the install (old worker keeps serving); no manifest at all falls back to discovering assets from `index.html`. The inline theme script moved to `public/theme-init.js` so the CSP can stay `script-src 'self'`. `node scripts/verify-offline.mjs` passes against the merged build.

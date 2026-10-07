@@ -19,6 +19,7 @@ const ROOT_FILES = [
   'offline.html',
   'manifest.json',
   'logo.png',
+  'theme-init.js',
   'favicon.svg',
   'favicon.ico',
   'icon-192.png',
