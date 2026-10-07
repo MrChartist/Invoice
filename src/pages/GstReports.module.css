@@ -1,0 +1,11 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .filters { padding: 0.875rem 0.75rem; }
+}
