@@ -1,0 +1,116 @@
+.h2 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.stack { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.inline { display: flex; flex-direction: column; gap: 0.25rem; }
+
+/* ── Tabs ─────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.75rem 1.125rem;
+  min-height: 44px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.tab:hover { color: var(--foreground); }
+.tab:focus-visible, .expand:focus-visible, .linkBtn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+.tabActive { composes: tab; color: var(--primary); border-bottom-color: var(--primary); }
+
+/* ── Top debtors ──────────────────────────────────────────────── */
+.debtors { list-style: none; margin: 0; padding: 0.5rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+.debtor { display: flex; flex-direction: column; gap: 0.375rem; }
+.debtorTop { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+.amt { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.linkBtn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--foreground); text-align: left;
+}
+.linkBtn:hover { color: var(--primary); text-decoration: underline; }
+
+/* ── Aging table ──────────────────────────────────────────────── */
+.agingTable { min-width: 860px; }
+.agingTable th[scope='row'], .agingTable tfoot th { text-align: left; text-transform: none; letter-spacing: 0; font-size: 0.875rem; color: var(--foreground); font-weight: 600; }
+.partyCell { padding: 0 !important; }
+.expand {
+  display: flex; align-items: center; gap: 0.375rem; width: 100%;
+  background: none; border: none; cursor: pointer; font: inherit; font-weight: 600;
+  color: var(--foreground); padding: 0.875rem 1.25rem; min-height: 44px; text-align: left;
+}
+.noExpand { display: block; padding: 0.875rem 1.25rem 0.875rem 2.375rem; }
+.chev { transition: transform var(--transition-fast); flex-shrink: 0; color: var(--muted-foreground); }
+.chevOpen { composes: chev; transform: rotate(90deg); }
+.credit { color: var(--profit); }
+
+.billsRow td { background-color: var(--card-inner); padding: 0.5rem 1.25rem 1rem; }
+.billsRow:hover td { background-color: var(--card-inner); }
+.bills { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.bills th {
+  text-align: left; padding: 0.5rem 0.75rem; font-size: 0.6875rem; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--muted-foreground); border-bottom: 1px solid var(--border);
+}
+.bills th:nth-child(n + 4):nth-child(-n + 6) { text-align: right; }
+.bills td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+.bills tr:last-child td { border-bottom: none; }
+
+.totalRow th, .totalRow td {
+  border-top: 2px solid var(--border);
+  background-color: var(--card-inner);
+  font-weight: 700;
+}
+
+/* ── Statements ───────────────────────────────────────────────── */
+.filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) repeat(2, minmax(140px, 1fr));
+  gap: 0.875rem;
+  padding: 1.125rem 1.25rem;
+  align-items: end;
+}
+.presets { grid-column: 1 / -1; display: flex; gap: 0.25rem; flex-wrap: wrap; }
+.filters > p { grid-column: 1 / -1; margin: 0; }
+
+.ledgerSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem 1.25rem 1rem;
+}
+.mini { display: flex; flex-direction: column; gap: 0.25rem; }
+.miniValue, .miniStrong {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.0625rem;
+}
+.miniStrong { color: var(--primary); font-size: 1.1875rem; }
+.openingRow td { color: var(--muted-foreground); }
+.note { padding: 0.75rem 1.25rem 1rem; }
+
+@media (max-width: 640px) {
+  .filters { grid-template-columns: 1fr 1fr; }
+  .filters > div:first-child { grid-column: 1 / -1; }
+}

@@ -1,0 +1,59 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.625rem 1rem;
+  background-color: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 1.25rem 1rem 2rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.paperShadow {
+  margin: 0 auto;
+  box-shadow: var(--shadow-xl);
+  flex-shrink: 0;
+}
+
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media print {
+  /* Only the statement paper reaches the printer. */
+  :global(body.statement-printing) :global(#root) { display: none !important; }
+  .overlay { position: static; display: block; background: none; }
+  .scroll { overflow: visible; padding: 0; display: block; }
+  .paperShadow { box-shadow: none; margin: 0; }
+}
+@page { size: A4; margin: 0; }

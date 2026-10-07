@@ -1,0 +1,104 @@
+/* ================================================================
+   Statement paper — the printed client statement.
+   Always a white, brand-neutral A4 page, so it deliberately does NOT use
+   the app theme tokens. Neutrals are declared once below.
+   A4 @96dpi = 794 x 1123 px.
+   ================================================================ */
+
+.paper {
+  --ink: #16181d;
+  --body: #3a3f47;
+  --muted: #7a808a;
+  --line: #dcdfe4;
+  --soft: #f4f5f7;
+
+  width: 794px;
+  min-height: 1123px;
+  box-sizing: border-box;
+  padding: 44px 48px 36px;
+  background: #ffffff;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.company { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.logo { max-height: 52px; max-width: 120px; object-fit: contain; }
+.companyName { font-family: var(--font-display); font-size: 20px; font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+.companyMeta { color: var(--body); font-size: 11px; white-space: pre-line; margin-top: 2px; }
+
+.docTitle { text-align: right; flex-shrink: 0; }
+.docTitle h2 { font-family: var(--font-display); font-size: 18px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.06em; }
+.period { color: var(--muted); font-size: 11px; margin-top: 4px; }
+
+.meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.box {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.boxLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.partyName { font-size: 14px; font-weight: 700; }
+.partyLine { color: var(--body); font-size: 11px; white-space: pre-line; }
+
+.summary { display: grid; grid-template-columns: auto auto; gap: 3px 16px; font-size: 11.5px; }
+.summary dt { color: var(--body); }
+.summary dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.summaryTotal { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 2px; font-size: 13px; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.table th {
+  background: var(--soft);
+  text-align: left;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--body);
+  padding: 7px 8px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.table tr { break-inside: avoid; }
+.num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rowStrong td { font-weight: 700; background: var(--soft); }
+.sub { color: var(--muted); font-size: 10px; }
+
+.words { font-size: 11px; color: var(--body); }
+.words strong { color: var(--ink); }
+
+.bottom { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; break-inside: avoid; }
+.pay { font-size: 11px; color: var(--body); line-height: 1.6; }
+.qr { text-align: center; font-size: 9.5px; color: var(--muted); }
+
+.foot {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  display: flex;
+  justify-content: space-between;
+}
