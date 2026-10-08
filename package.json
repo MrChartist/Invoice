@@ -1,7 +1,7 @@
 {
   "name": "mrchartist-invoice",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Free, open-source, offline-first invoicing and light accounting for Indian businesses — GST-ready, private by design.",
   "author": "Rohit Singh <mrchartist@zohomail.in>",
   "homepage": "https://mrchartist.com",

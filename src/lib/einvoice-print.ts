@@ -70,9 +70,9 @@ export function irnQrSize(paper: PaperKind | undefined): number {
     case 'thermal80':
       return 150;
     case 'A5':
-      return 104;
+      return 88;
     default:
-      return 118;
+      return 100;
   }
 }
 

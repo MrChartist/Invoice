@@ -45,15 +45,22 @@ function groupBy<T>(rows: T[], key: (r: T) => string): Map<string, T[]> {
   return m;
 }
 
-export function buildGstr1Json(r: Gstr1Report): Record<string, unknown> {
+export interface Gstr1JsonOptions {
+  /** Preceding-FY aggregate turnover (GSTN `gt`). Not derivable from this app alone — enter it yourself. */
+  gt?: number;
+  /** Current-FY turnover up to the previous month (GSTN `cur_gt`). Needs verification before filing. */
+  curGt?: number;
+}
+
+export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Record<string, unknown> {
   const out: Record<string, unknown> = {
     gstin: r.gstin,
     fp: r.fp,
     version: 'GST3.0.4',
     hash: 'hash',
-    // Aggregate turnover is not tracked by this app — fill in on the portal / offline tool.
-    gt: 0,
-    cur_gt: 0,
+    // Aggregate turnover is not reliably derivable here — defaults to 0; pass opts or fill on the portal.
+    gt: round2(opts.gt ?? 0),
+    cur_gt: round2(opts.curGt ?? 0),
   };
 
   if (r.b2b.length) {

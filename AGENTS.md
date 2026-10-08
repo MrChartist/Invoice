@@ -10,7 +10,7 @@
   (CGST/SGST/IGST, cess, TCS, TDS, export/LUT), credit notes & conversions, recurring, receivables,
   purchases/ITC, inventory, books, GSTR-1/3B papers, e-Invoice/e-Way JSON, Tally XML, CSV import,
   PWA + encrypted/auto backups. Module contract: `docs/ARCHITECTURE.md`; per-module notes: `docs/features/`.
-- **Brand source of truth**: mrchartist.com (logo `public/branding/*`, tokens in `src/index.css`).
+- **Brand source of truth**: mrchartist.com (logo `public/branding/*`, tokens in `src/index.css`; app palette = blue/gold `--pal-*`, orange kept only for the logo and the Ember template).
 
 ## Stack
 - **React 19** + **TypeScript** + **Vite 8** (rolldown bundler — `vite.config.ts` uses

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0] — 2026-10-08
+
+- Fonts are now self-hosted (no Google Fonts); the app makes no third-party requests and PDFs embed fonts offline. CSP tightened accordingly.
+- e-Invoice block on printed documents is more compact so near-full A4 pages are less likely to spill to a second page.
+- GSTR-1 JSON builder accepts optional `gt` / `curGt` aggregate-turnover values (default 0; verify with your CA before filing).
+- New colour palette (Azurite, Lapis Lazuli, Blue Topaz, Blue Macaw, Earth Yellow, Pottery Clay): blue primary in light mode, gold primary on navy in dark mode, navy brand panel on login. Tokens are `--pal-*` in `src/index.css`. The official logo and the "Mr. Chartist Ember" template keep the brand orange.
+- Known limits: bank reconciliation treats bank as a single account; foreign-currency documents are excluded from INR totals, not converted. GST/e-Invoice/e-Way/Tally outputs are working papers, not portal-validated.
+
 ## [3.0.0] — 2026-10-07
 
 ### Compliance & workflow (added late in 3.0)

@@ -1059,11 +1059,11 @@
 /* ── e-Invoice (IRN + signed QR) — only rendered when details exist ─── */
 .irn {
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: 4px;
   border-top: 1px solid var(--tpl-line);
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   break-inside: avoid;
   page-break-inside: avoid;
   color: var(--tpl-body);
