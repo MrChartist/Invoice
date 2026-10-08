@@ -114,4 +114,6 @@ Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence and disclaimer
 
+This software is released under the [Mr. Chartist Non-Commercial Source License](LICENSE). Free for individuals and businesses to use internally; commercial resale, white-labeling, or offering paid hosted SaaS versions is strictly prohibited.
+
 Mr. Chartist is a SEBI Registered Research Analyst (INH000015297). Registration granted by SEBI and certification from NISM in no way guarantee performance of the intermediary or provide any assurance of returns to investors. This software is provided as is, without warranty; it is a tool, not tax or legal advice.

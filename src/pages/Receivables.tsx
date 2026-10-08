@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ChevronRight, Clock, Copy, Download, FileText, Mail, Percent, Scale, Wallet,
@@ -44,8 +44,14 @@ function loadData() {
 
 export function Receivables() {
   const [params, setParams] = useSearchParams();
-  const [data] = useState(loadData);
+  const [data, setData] = useState(loadData);
   const { notify, toastNode } = useToast();
+
+  useEffect(() => {
+    const refresh = () => setData(loadData());
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, []);
 
   const tab: Tab = (TABS.find((t) => t.id === params.get('tab'))?.id ?? 'aging');
   const setTab = (t: Tab) => {

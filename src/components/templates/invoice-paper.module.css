@@ -325,7 +325,7 @@
 
 .boxAccent {
   composes: box;
-  border-left: 3px solid var(--tpl-accent);
+  border-color: color-mix(in srgb, var(--tpl-accent) 45%, var(--tpl-line));
 }
 
 .boxSoft {
@@ -769,8 +769,7 @@
   gap: 16px;
   padding: 12px 16px;
   background: var(--tpl-soft);
-  border: 1px solid var(--tpl-line);
-  border-left: 4px solid var(--tpl-accent);
+  border: 1px solid color-mix(in srgb, var(--tpl-accent) 45%, var(--tpl-line));
   border-radius: 4px;
 }
 

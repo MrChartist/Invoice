@@ -27,10 +27,10 @@
 /* ── Checklist ───────────────────────────────────────────────── */
 .checklist {
   border: 1px solid var(--border);
-  border-left: 3px solid var(--brand);
   border-radius: var(--radius-lg);
   background: var(--card);
   padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-card);
 }
 
 .checklistHead {

@@ -1,0 +1,61 @@
+MR. CHARTIST NON-COMMERCIAL SOURCE LICENSE
+
+Version 1.0 (2026)
+Copyright (c) 2026 Rohit Singh / Mr. Chartist (https://mrchartist.com)
+
+================================================================================
+1. GRANT OF LICENSE
+================================================================================
+Permission is hereby granted, free of charge, to any individual or business to 
+access, use, view, copy, modify, run, and self-host this software ("Software") 
+solely for Non-Commercial Purposes, subject to the terms and conditions outlined below.
+
+Non-Commercial Purposes include:
+  (a) Using the application internally for personal, non-profit, educational, 
+      or your own individual business invoicing, bookkeeping, and GST operations;
+  (b) Inspecting, debugging, modifying, or contributing improvements to the source code;
+  (c) Self-hosting the application on your own local device or private internal server 
+      for your own direct operational use.
+
+================================================================================
+2. COMMERCIAL RESTRICTIONS & PROHIBITIONS
+================================================================================
+You may NOT use, distribute, or exploit the Software for Commercial Purposes. 
+Prohibited Commercial Purposes include, but are not limited to:
+  (a) SELLING OR RESELLING: Selling, leasing, renting, licensing, sublicensing, or 
+      transferring copies, derivatives, or modified versions of the Software to any 
+      third party for a fee, subscription, or monetary consideration;
+  (b) HOSTED / SAAS SERVICES: Offering or providing the Software (or any modified version 
+      thereof) as a commercial Software-as-a-Service (SaaS), cloud service, managed service, 
+      or paid web service to third parties;
+  (c) REBRANDING & WHITE-LABELING: Rebranding, white-labeling, or repackaging the Software 
+      for distribution as a proprietary or commercial product;
+  (d) COMMERCIAL BUNDLING: Bundling or embedding the Software within any commercial 
+      product, software suite, or paid distribution.
+
+Any commercial distribution, resale, or commercial SaaS deployment requires an explicit, 
+prior written commercial license agreement executed with the copyright owner.
+
+================================================================================
+3. CONDITIONS & ATTRIBUTION
+================================================================================
+  (a) The above copyright notice, this license text, and the original author attribution 
+      must be included in all copies or substantial portions of the Software.
+  (b) Any public distribution of modifications or forks must be made available under 
+      the exact terms of this Non-Commercial Source License and must clearly acknowledge 
+      Mr. Chartist (https://mrchartist.com) as the original creator.
+
+================================================================================
+4. DISCLAIMER OF WARRANTY & LIMITATION OF LIABILITY
+================================================================================
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT. 
+
+IN NO EVENT SHALL THE AUTHORS, COPYRIGHT HOLDERS, OR MR. CHARTIST BE LIABLE 
+FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE 
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Mr. Chartist is a SEBI Registered Research Analyst (INH000015297). This software 
+is a local accounting tool and does not constitute tax, accounting, or financial advice.

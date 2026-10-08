@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Banknote,
@@ -81,6 +81,12 @@ export function Transactions() {
   const [deleting, setDeleting] = useState<InvoiceRecord | null>(null);
 
   const reload = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    window.addEventListener('focus', reload);
+    return () => window.removeEventListener('focus', reload);
+  }, []);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const invoices = useMemo(() => localDb.invoices.getAll(), [version]);
   const now = new Date();

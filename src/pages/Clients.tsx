@@ -35,6 +35,12 @@ export function Clients() {
     }
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    const refresh = () => setVersion((v) => v + 1);
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, []);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const clients = useMemo(() => localDb.clients.getAll(), [version]);
 
