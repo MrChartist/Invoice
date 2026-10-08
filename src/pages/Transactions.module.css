@@ -35,19 +35,19 @@
   background: transparent;
   color: var(--foreground);
   padding: 0.55rem 0;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
 }
 
 .count {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   opacity: 0.6;
   margin-left: 0.15rem;
 }
 
 .docLink {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
@@ -57,7 +57,7 @@
 }
 
 .docType {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
   margin-top: 0.1rem;
 }
@@ -103,11 +103,11 @@
   table.ledger td { display: block; padding: 0; border: none; min-width: 0; }
   table.ledger td.cDoc { grid-area: doc; }
   table.ledger td.cClient { grid-area: client; }
-  table.ledger td.cDate { grid-area: date; white-space: normal; font-size: 0.8125rem; }
+  table.ledger td.cDate { grid-area: date; white-space: normal; font-size: var(--text-base); }
   table.ledger td.cStatus { grid-area: status; justify-self: end; }
   table.ledger td.cTotal { grid-area: total; font-weight: 700; }
-  table.ledger td.cBal { grid-area: bal; font-size: 0.8125rem; color: var(--muted-foreground); }
-  table.ledger td.cBal::before { content: 'Balance '; font-family: var(--font-body); font-size: 0.6875rem; }
+  table.ledger td.cBal { grid-area: bal; font-size: var(--text-base); color: var(--muted-foreground); }
+  table.ledger td.cBal::before { content: 'Balance '; font-family: var(--font-body); font-size: var(--text-xs); }
   table.ledger td.cAct { grid-area: act; margin: 0 -0.5rem; }
   table.ledger td.cAct > div { display: flex; justify-content: space-between; }
 }

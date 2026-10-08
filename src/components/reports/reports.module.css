@@ -23,7 +23,7 @@
 
 .muted {
   color: var(--muted-foreground);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   margin: 0;
   line-height: 1.55;
 }
@@ -74,7 +74,7 @@ th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
 .link:hover { text-decoration: underline; }
 .link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
 
-.dim { color: var(--muted-foreground); font-size: 0.75rem; display: block; }
+.dim { color: var(--muted-foreground); font-size: var(--text-sm); display: block; }
 
 /* ── Share bars ───────────────────────────────────────────────── */
 .share {
@@ -125,7 +125,7 @@ th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 
 .barName { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
@@ -156,7 +156,7 @@ th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--card-inner);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--muted-foreground);
   line-height: 1.5;
 }
@@ -181,7 +181,7 @@ th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
 }
 
 .kpiLabel {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -201,7 +201,7 @@ th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
 .chart { display: block; width: 100%; min-width: 520px; height: auto; }
 .axis { stroke: var(--border); stroke-width: 1; }
 .gridLine { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
-.axisText { fill: var(--muted-foreground); font-size: 12px; font-family: var(--font-body); }
+.axisText { fill: var(--muted-foreground); font-size: var(--text-sm); font-family: var(--font-body); }
 .barCur { fill: var(--primary); }
 .barPrev { fill: var(--muted-foreground); opacity: 0.5; }
 
@@ -210,7 +210,7 @@ th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
   flex-wrap: wrap;
   gap: 1rem;
   padding: 0.75rem 1.25rem 0;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
@@ -229,11 +229,11 @@ th[aria-sort='descending'] .sortBtn { color: var(--brand-text); }
   align-items: center;
   padding: 0.625rem 1.25rem;
   border-bottom: 1px solid var(--border);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 
 .checkRow:last-child { border-bottom: none; }
-.checkHead { composes: checkRow; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+.checkHead { composes: checkRow; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
 .checkNum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .checkIcon { display: flex; justify-content: center; }
 

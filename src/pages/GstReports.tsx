@@ -33,6 +33,8 @@ import controls from '../styles/controls.module.css';
 import styles from './GstReports.module.css';
 import local from '../components/gst-reports/gst-reports.module.css';
 
+const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
+
 type TabId = 'overview' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'gstr3b';
 
 const TABS: { id: TabId; label: string }[] = [
@@ -97,6 +99,23 @@ export function GstReports() {
   });
   const [gstin, setGstin] = useState<string>(() => gstins[0] ?? '');
   const [tab, setTab] = useState<TabId>('overview');
+  // Aggregate turnover for the JSON header — entered by the filer, remembered on this device.
+  const [turnover, setTurnover] = useState<{ gt: string; curGt: string }>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(TURNOVER_KEY) || '{}');
+      return { gt: String(v.gt ?? ''), curGt: String(v.curGt ?? '') };
+    } catch {
+      return { gt: '', curGt: '' };
+    }
+  });
+  const patchTurnover = (next: { gt: string; curGt: string }) => {
+    setTurnover(next);
+    try {
+      localStorage.setItem(TURNOVER_KEY, JSON.stringify(next));
+    } catch {
+      /* storage unavailable — value stays for this session */
+    }
+  };
 
   const report = useMemo(() => {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin);
@@ -261,7 +280,7 @@ export function GstReports() {
         actions={
           <>
           <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!hasData || !gstin} title={!gstin ? 'Add a GSTIN in Settings to export GSTR-1 JSON' : undefined}
-            onClick={() => download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1), null, 2))}>
+            onClick={() => download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1, { gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }), null, 2))}>
             <FileJson size={16} aria-hidden /> GSTR-1 JSON
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData}
@@ -286,6 +305,19 @@ export function GstReports() {
             ))}
           </select>
         </label>
+        <label className={local.periodField}>
+          <span className={controls.label}>Last FY turnover (₹)</span>
+          <input className={controls.input} inputMode="decimal" placeholder="0" value={turnover.gt}
+            onChange={(e) => patchTurnover({ ...turnover, gt: e.target.value.replace(/[^0-9.]/g, '') })} />
+        </label>
+        <label className={local.periodField}>
+          <span className={controls.label}>This FY turnover so far (₹)</span>
+          <input className={controls.input} inputMode="decimal" placeholder="0" value={turnover.curGt}
+            onChange={(e) => patchTurnover({ ...turnover, curGt: e.target.value.replace(/[^0-9.]/g, '') })} />
+        </label>
+        <p className={controls.hint} style={{ margin: 0, flexBasis: '100%' }}>
+          Written to the JSON as <code>gt</code> / <code>cur_gt</code>. Enter from your books; needs verification with your CA.
+        </p>
         {period.kind !== 'month' && (
           <p className={controls.hint} style={{ margin: 0 }}>
             Return period in the JSON is {g1.fp} (last month covered). GSTN files GSTR-1 monthly or quarterly (QRMP); upload one month at a time unless you are a quarterly filer.

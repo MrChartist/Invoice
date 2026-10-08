@@ -47,7 +47,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 1rem;
+  font-size: var(--text-xl);
   padding: 0.25rem 0;
 }
 
@@ -72,7 +72,7 @@
   padding: 0 0.35rem;
   margin-right: 0.2rem;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--muted-foreground);
   background: var(--muted);
@@ -97,7 +97,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0.625rem 0.25rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -109,7 +109,7 @@
   background: none;
   color: var(--muted-foreground);
   font: inherit;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   letter-spacing: 0;
   text-transform: none;
   cursor: pointer;
@@ -165,7 +165,7 @@
 }
 
 .optTitle {
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -173,7 +173,7 @@
 }
 
 .optSub {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
   white-space: nowrap;
   overflow: hidden;
@@ -211,7 +211,7 @@
 
 .emptyHint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--muted-foreground);
 }
 
@@ -228,7 +228,7 @@
   padding: 0.5rem 1rem;
   border-top: 1px solid var(--border);
   background: var(--card-inner);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 

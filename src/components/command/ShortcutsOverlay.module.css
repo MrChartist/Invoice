@@ -5,7 +5,7 @@
 
 .groupTitle {
   margin: 0 0 0.5rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -32,12 +32,12 @@
 }
 
 .label {
-  font-size: 0.875rem;
+  font-size: var(--text-md);
 }
 
 .note {
   color: var(--muted-foreground);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
 }
 
 .keys {
@@ -48,7 +48,7 @@
 }
 
 .then {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 
@@ -60,7 +60,7 @@
   height: 1.6rem;
   padding: 0 0.4rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--foreground);
   background: var(--muted);

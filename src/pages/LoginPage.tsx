@@ -95,6 +95,14 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
     }
   };
 
+  // Easy entry: a full 6-digit PIN unlocks without pressing Enter (shorter PINs: Enter / button).
+  useEffect(() => {
+    if (mode === 'login' && pin.length === 6 && !busy && !locked) {
+      void handleSubmit({ preventDefault() {} } as React.FormEvent);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin, mode]);
+
   const handleReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetAllData(phrase)) return setError('The confirmation phrase does not match.');

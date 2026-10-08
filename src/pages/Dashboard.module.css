@@ -6,7 +6,7 @@
 
 .muted {
   color: var(--muted-foreground);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   font-weight: 500;
 }
 
@@ -15,7 +15,7 @@
   align-items: center;
   gap: 0.25rem;
   font-family: var(--font-body);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--brand-text);
 }
@@ -42,12 +42,12 @@
 
 .checklistHead h2 {
   font-family: var(--font-display);
-  font-size: 0.9375rem;
+  font-size: var(--text-lg);
   font-weight: 700;
 }
 
 .checklistHead span {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
@@ -65,7 +65,7 @@
   gap: 0.625rem;
   padding: 0.5rem 0.25rem;
   border-radius: var(--radius-sm);
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   font-weight: 500;
 }
 
@@ -111,7 +111,7 @@
 
 .barValue {
   height: 1rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   font-family: var(--font-mono);
   color: var(--muted-foreground);
@@ -140,7 +140,7 @@
 }
 
 .barLabel {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -149,7 +149,7 @@
 
 .chartEmpty {
   text-align: center;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--muted-foreground);
   padding: 0 1rem 1.25rem;
   margin-top: -0.5rem;
@@ -186,14 +186,14 @@
 
 .rowTitle {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .late {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--loss);
 }
@@ -201,13 +201,13 @@
 .amount {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   white-space: nowrap;
 }
 
 .docLink {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
@@ -247,11 +247,11 @@
 }
 
 .quickItem strong {
-  font-size: 0.875rem;
+  font-size: var(--text-md);
 }
 
 .quickItem span {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
@@ -293,7 +293,7 @@
   table.recent td { display: block; padding: 0; border: none; min-width: 0; }
   table.recent td.rDoc { grid-area: doc; }
   table.recent td.rClient { grid-area: client; }
-  table.recent td.rDate { grid-area: date; font-size: 0.75rem; color: var(--muted-foreground); }
+  table.recent td.rDate { grid-area: date; font-size: var(--text-sm); color: var(--muted-foreground); }
   table.recent td.rStatus { grid-area: status; justify-self: end; }
   table.recent td.rAmt { grid-area: amt; align-self: end; justify-self: end; font-weight: 700; }
 }

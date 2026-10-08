@@ -50,7 +50,7 @@
   border: none;
   background: transparent;
   color: var(--foreground);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   font-weight: 600;
   padding: 0.5rem 0.25rem;
   max-width: 260px;
@@ -71,7 +71,7 @@
 
 .error {
   padding: 0.5rem 1rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   font-weight: 500;
   color: var(--loss);
   background: color-mix(in srgb, var(--loss) 10%, var(--card));

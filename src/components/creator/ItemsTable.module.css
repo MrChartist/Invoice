@@ -14,7 +14,7 @@
 
 .head {
   padding-block: 0.625rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -74,13 +74,13 @@
 }
 
 .desc {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 
 .unit,
@@ -98,7 +98,7 @@
   text-align: right;
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   padding-top: 0.55rem;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -130,14 +130,14 @@
 }
 
 .keyHint {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
   line-height: 1.8;
 }
 
 .keyHint kbd {
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: var(--text-2xs);
   padding: 0.05rem 0.35rem;
   border: 1px solid var(--border);
   border-bottom-width: 2px;
@@ -172,7 +172,7 @@
   .cell[data-label]:not(.cName)::before {
     content: attr(data-label);
     display: block;
-    font-size: 0.625rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -199,7 +199,7 @@
     text-align: left;
     padding-top: 0;
     align-self: center;
-    font-size: 0.9375rem;
+    font-size: var(--text-lg);
   }
 
   .actions {
@@ -235,7 +235,7 @@
   border: none;
   background: transparent;
   padding: 0.125rem 0.5rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--muted-foreground);
 }
@@ -250,7 +250,7 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0 0.5rem;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
@@ -262,7 +262,7 @@
   background: var(--card);
   color: var(--foreground);
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   text-align: right;
 }
 

@@ -21,7 +21,7 @@
   gap: 0.125rem;
   min-width: 0;
   flex: 1 1 14rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   line-height: 1.4;
 }
 
@@ -43,7 +43,7 @@
   border: 1px solid var(--brand);
   background: var(--brand-soft);
   color: var(--brand-text);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;

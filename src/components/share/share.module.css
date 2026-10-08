@@ -32,7 +32,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   text-align: left;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -60,7 +60,7 @@
 
 .menuHint {
   margin-left: auto;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 
@@ -85,7 +85,7 @@
 }
 
 .counter {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
   text-align: right;
 }
@@ -107,7 +107,7 @@
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--muted-foreground);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
 }
@@ -131,7 +131,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
@@ -147,7 +147,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--muted-foreground);
 }
 
@@ -184,14 +184,14 @@
 
 .panelClient {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .panelMeta {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
   display: flex;
   flex-wrap: wrap;
@@ -207,7 +207,7 @@
 
 .amount {
   font-family: var(--font-mono);
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   font-weight: 600;
 }
 

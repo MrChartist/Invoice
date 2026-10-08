@@ -189,6 +189,20 @@ export function InvoiceCreator() {
     };
   }, []);
 
+  // Easy exit: drafts autosave, so leaving never loses work. Esc closes when no field or dialog is active.
+  const exitCreator = useCallback(() => navigate(id ? '/transactions' : '/'), [id, navigate]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest('input, textarea, select, [contenteditable]') || t.closest('[role="dialog"]'))) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      exitCreator();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [exitCreator]);
+
   const startNew = (docType?: DocumentType) => {
     useInvoiceStore.getState().newDraft(docType);
     setErrors([]);
@@ -237,6 +251,9 @@ export function InvoiceCreator() {
             )}
             <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly} title={readOnly ? 'Locked — unlock with your PIN to edit' : 'Save (Ctrl+S)'}>
               <Save size={16} /> Save
+            </button>
+            <button type="button" className={controls.btnOutline} onClick={exitCreator} title="Close (Esc) — drafts are kept" aria-label="Close">
+              <X size={16} /> Close
             </button>
           </>
         }

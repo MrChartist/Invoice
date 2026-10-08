@@ -10,7 +10,7 @@
   border: 1px solid var(--border);
   background: var(--brand-soft);
   color: var(--brand-text);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.4;
   max-width: 100%;
@@ -34,7 +34,7 @@
 }
 
 .details {
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--muted-foreground);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -56,7 +56,7 @@
   width: 100%;
   border-collapse: collapse;
   margin: 0.5rem 0;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
 }
 
 .table th {
@@ -85,14 +85,14 @@
 
 .note {
   margin: 0.25rem 0 0;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--muted-foreground);
 }
 
 .warn {
   margin: 0.25rem 0 0;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--warning);
 }
@@ -128,12 +128,12 @@
 
 .suffix > span {
   color: var(--muted-foreground);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   white-space: nowrap;
 }
 
 .example {
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--foreground);
   background: var(--card-inner);
   border: 1px solid var(--border);

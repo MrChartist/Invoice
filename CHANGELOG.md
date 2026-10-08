@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file.
 - e-Invoice block on printed documents is more compact so near-full A4 pages are less likely to spill to a second page.
 - GSTR-1 JSON builder accepts optional `gt` / `curGt` aggregate-turnover values (default 0; verify with your CA before filing).
 - New colour palette (Azurite, Lapis Lazuli, Blue Topaz, Blue Macaw, Earth Yellow, Pottery Clay): blue primary in light mode, gold primary on navy in dark mode, navy brand panel on login. Tokens are `--pal-*` in `src/index.css`. The official logo and the "Mr. Chartist Ember" template keep the brand orange.
+- Type scale tokens (`--text-2xs` … `--text-xl`) replace ~370 ad-hoc font sizes; tables and totals use tabular numerals.
+- GST reports: enter last-FY and current-FY turnover once; written to GSTR-1 JSON `gt` / `cur_gt` (needs verification with your CA).
+- Easy entry/exit: a 6-digit PIN unlocks without pressing Enter; invoice screen has a Close button and Esc to leave (drafts are autosaved).
 - Known limits: bank reconciliation treats bank as a single account; foreign-currency documents are excluded from INR totals, not converted. GST/e-Invoice/e-Way/Tally outputs are working papers, not portal-validated.
 
 ## [3.0.0] — 2026-10-07

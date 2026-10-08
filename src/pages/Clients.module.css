@@ -29,7 +29,7 @@
   background: transparent;
   color: var(--foreground);
   padding: 0.55rem 0;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
 }
 
 .who {
@@ -43,7 +43,7 @@
 }
 
 .sub {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
@@ -51,7 +51,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--muted-foreground);
 }
 
@@ -88,7 +88,7 @@
   table.directory td.cBilled { grid-area: billed; }
   table.directory td.cContact { grid-area: contact; overflow-wrap: anywhere; }
   table.directory td.cLoc { grid-area: loc; }
-  table.directory td.cGst { grid-area: gst; justify-self: end; font-size: 0.75rem; }
+  table.directory td.cGst { grid-area: gst; justify-self: end; font-size: var(--text-sm); }
   table.directory td.cAct { grid-area: act; margin: 0 -0.5rem; }
   table.directory td.cAct > div { display: flex; justify-content: flex-end; }
 }

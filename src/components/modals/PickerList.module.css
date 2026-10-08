@@ -23,7 +23,7 @@
   background: transparent;
   color: var(--foreground);
   padding: 0.65rem 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-lg);
 }
 
 .list {
@@ -61,14 +61,14 @@
 
 .title {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sub {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -78,14 +78,14 @@
 .price {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   white-space: nowrap;
 }
 
 .empty {
   padding: 2rem 1.25rem;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   color: var(--muted-foreground);
   line-height: 1.6;
 }

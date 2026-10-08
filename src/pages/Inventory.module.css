@@ -32,7 +32,7 @@
   padding: 0.75rem 1.25rem;
   border-bottom: 1px solid var(--border);
   background: var(--card-inner);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 .settingsBar label.inline {
   display: inline-flex;
@@ -51,7 +51,7 @@
   min-width: 140px;
 }
 .itemMeta {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 .nameBtn {
@@ -96,7 +96,7 @@
   padding: 0.875rem 1.25rem;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--warning) 10%, transparent);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 
 .hiddenInput {

@@ -12,7 +12,7 @@
 }
 
 .summary dt {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -38,7 +38,7 @@
 }
 
 .historyLabel {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -69,16 +69,16 @@
 .history li > div {
   display: flex;
   flex-direction: column;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
 }
 
 .history span {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 
 @media (max-width: 480px) {
-  .summary dd { font-size: 0.9375rem; }
+  .summary dd { font-size: var(--text-lg); }
 }
 
 /* Period-lock notice (kept here so this always-loaded modal does not pull the audit stylesheet). */
@@ -91,7 +91,7 @@
   border-left: 3px solid var(--warning);
   background: color-mix(in srgb, var(--warning) 9%, var(--card));
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  font-size: var(--text-md);
 }
 
 .lockBanner svg {
@@ -110,5 +110,5 @@
 
 .lockText span {
   color: var(--muted-foreground);
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }

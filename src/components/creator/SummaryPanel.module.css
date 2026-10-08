@@ -10,7 +10,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--text-md);
   min-height: 2rem;
 }
 
@@ -61,7 +61,7 @@
   width: auto;
   max-width: 190px;
   padding-block: 0.4rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 
 .checkRow {
@@ -72,7 +72,7 @@
 .roundVal {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
 }
 
 .total {
@@ -89,7 +89,7 @@
 }
 
 .total span:first-child {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -104,7 +104,7 @@
 }
 
 .words {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--muted-foreground);
   font-style: italic;
