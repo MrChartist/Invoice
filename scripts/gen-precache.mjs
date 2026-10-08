@@ -40,6 +40,10 @@ const entries = [{ url: '/', file: join(dist, 'index.html') }];
 for (const f of ROOT_FILES) {
   if (existsSync(join(dist, f))) entries.push({ url: '/' + f, file: join(dist, f) });
 }
+for (const dir of ['fonts']) {
+  if (!existsSync(join(dist, dir))) continue;
+  for (const f of walk(join(dist, dir))) entries.push({ url: '/' + relative(dist, f).split(sep).join('/'), file: f });
+}
 if (existsSync(join(dist, 'assets'))) {
   for (const f of walk(join(dist, 'assets'))) {
     if (f.endsWith('.map')) continue;

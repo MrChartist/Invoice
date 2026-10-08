@@ -29,6 +29,13 @@ const context = await browser.newContext({ serviceWorkers: 'allow' });
 await seedAuth(context);
 const errors = [];
 const page = await context.newPage();
+// Every request the app makes must stay on its own origin (no CDNs, fonts, analytics).
+const foreign = new Set();
+page.on('request', (r) => {
+  const u = new URL(r.url());
+  if (!/^(https?:)$/.test(u.protocol)) return;
+  if (u.origin !== new URL(page.url() === 'about:blank' ? r.url() : page.url()).origin) foreign.add(u.origin);
+});
 watch(page, errors);
 // Google Fonts: simulate unreachable (sandbox and offline alike).
 await context.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
@@ -105,6 +112,7 @@ try {
   const known = errors.filter((e) => isCsp(e) && KNOWN.test(e.text));
   if (known.length) console.log(`WARN  ${known.length} CSP violations from known third-party avatar URLs (src fix pending)`);
   const csp = errors.filter((e) => isCsp(e) && !KNOWN.test(e.text));
+  check(foreign.size === 0, `no third-party requests (${[...foreign].join(', ') || 'none'})`);
   check(csp.length === 0, `no CSP violations (${csp.length})${csp[0] ? ': ' + csp[0].text.slice(0, 200) : ''}`);
   const pageErrs = errors.filter((e) => e.kind === 'pageerror');
   check(pageErrs.length === 0, `no uncaught page errors (${pageErrs.length})${pageErrs[0] ? ': ' + pageErrs[0].text.slice(0, 200) : ''}`);

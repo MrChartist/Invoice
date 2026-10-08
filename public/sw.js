@@ -15,15 +15,12 @@
 const BUILD_ID = '__BUILD_ID__';
 const SHELL_CACHE = `mci-shell-${BUILD_ID}`;
 const ASSET_CACHE = 'mci-assets'; // fingerprinted files never collide, so it survives versions
-const FONT_CACHE = 'mci-fonts';
-const KEEP = [SHELL_CACHE, ASSET_CACHE, FONT_CACHE];
+const KEEP = [SHELL_CACHE, ASSET_CACHE];
 const MAX_ASSETS = 160;
-const MAX_FONTS = 60;
 const NAV_TIMEOUT_MS = 3500;
 const SHELL_URL = '/index.html';
 const PRECACHE = ['/manifest.json', '/logo.png', '/offline.html'];
 
-const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
 /** Pulls same-origin /assets/... URLs out of the built index.html. */
 function discoverAssets(html) {
@@ -181,10 +178,6 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  if (FONT_HOSTS.includes(url.hostname)) {
-    event.respondWith(staleWhileRevalidate(request, FONT_CACHE, MAX_FONTS));
-    return;
-  }
   if (url.origin !== self.location.origin) return; // never touch other origins
   if (url.pathname === '/sw.js' || url.pathname === '/precache-manifest.json') return;
 
