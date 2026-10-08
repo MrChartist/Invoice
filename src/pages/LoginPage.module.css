@@ -4,7 +4,7 @@
    theme tokens with color-mix so no raw hex lives here.
    ================================================================ */
 .shell {
-  --panel: linear-gradient(160deg, var(--pal-azurite), var(--pal-lapis));
+  --panel: linear-gradient(160deg, black, color-mix(in srgb, black 88%, white));
   --panel-text: white;
   --panel-muted: color-mix(in srgb, white 62%, transparent);
   min-height: 100vh;
@@ -35,7 +35,7 @@
   width: 90%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--pal-macaw) 45%, transparent), transparent 65%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--pal-gold) 28%, transparent), transparent 65%);
   pointer-events: none;
 }
 

@@ -6,6 +6,6 @@
     var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (dark) document.documentElement.classList.add('dark');
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#050f2e' : '#f3f5fa');
+    if (meta) meta.setAttribute('content', dark ? '#000000' : '#f6f6f7');
   } catch (e) {}
 })();
