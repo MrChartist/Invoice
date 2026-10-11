@@ -14,11 +14,32 @@
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react" />
   <img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=flat-square&logo=typescript" />
   <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite" />
-  <img src="https://img.shields.io/badge/Local--first-no%20backend-1e5038?style=flat-square" />
-  <img src="https://img.shields.io/badge/Installable-PWA-ee6125?style=flat-square" />
+  <img src="https://img.shields.io/badge/Local--first-no%20backend-1a4d94?style=flat-square" />
+  <img src="https://img.shields.io/badge/Installable-PWA-d5a25e?style=flat-square" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/dashboard-light.png" alt="Dashboard, light theme" width="49%" />
+  <img src="docs/screenshots/dashboard-dark.png" alt="Dashboard, dark theme" width="49%" />
+</p>
+
+<p align="center"><sub>Screenshots use the built-in fictional sample data (Settings → Data → “Try with sample data”).</sub></p>
+
+<p align="center">
+  <b>Free to use</b> · <b>No server</b> · <b>No account</b> · <b>No tracking</b> · <b>Works offline</b>
 </p>
 
 ---
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Invoice preview](docs/screenshots/invoice-preview.png)<br/><sub>Invoice preview with PDF, print and share</sub> | ![Invoice editor](docs/screenshots/invoice-editor.png)<br/><sub>Invoice editor with live GST maths</sub> |
+| ![Invoices list](docs/screenshots/invoices.png)<br/><sub>Invoices with payment status</sub> | ![Receivables](docs/screenshots/receivables.png)<br/><sub>Receivables, aging and statements</sub> |
+| ![GST reports](docs/screenshots/gst-reports.png)<br/><sub>GSTR-1 / GSTR-3B working papers</sub> | ![Books](docs/screenshots/books.png)<br/><sub>Books: day book, P&amp;L, balance sheet</sub> |
+| ![Reports](docs/screenshots/reports.png)<br/><sub>Sales and tax reports</sub> | ![Reconcile](docs/screenshots/reconcile.png)<br/><sub>Bank reconciliation</sub> |
+| ![Inventory](docs/screenshots/inventory.png)<br/><sub>Inventory and stock costing</sub> | ![Design studio](docs/screenshots/design-studio.png)<br/><sub>Design Studio: colours, fonts, paper</sub> |
 
 ## Why this exists
 
@@ -53,7 +74,7 @@ It aims to cover what a small Indian business actually reaches for in Tally, Zoh
 **Everyday comfort**
 - Ctrl/⌘ + K command palette, notification centre, keyboard shortcuts (`?`), Tally-style line entry (Enter adds a line, Ctrl/⌘+Enter saves)
 - One-click sample data to explore the app, removable without touching your own records
-- Light & dark themes that follow the mrchartist.com palette
+- Light (white) and dark (black) themes with a blue and gold accent palette
 - Installable PWA with a service worker, auto-backup to a folder you choose, and passphrase-encrypted backups
 - Hashed PIN lock with lockout and idle auto-lock
 
@@ -113,5 +134,8 @@ Ground rules: no backend, no network calls, no Tailwind, persisted field names a
 Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Run `npm run typecheck && npm run lint && npm test && npm run build` before opening a PR.
 
 ## Licence and disclaimer
+
+Licence: the project is released under the Mr. Chartist Non-Commercial Source License. **The licence text is not yet in this repository (no `LICENSE` file) — it must be added before launch.**
+
 
 Mr. Chartist is a SEBI Registered Research Analyst (INH000015297). Registration granted by SEBI and certification from NISM in no way guarantee performance of the intermediary or provide any assurance of returns to investors. This software is provided as is, without warranty; it is a tool, not tax or legal advice.
