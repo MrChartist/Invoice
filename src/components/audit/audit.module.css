@@ -295,8 +295,7 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   padding: 0.875rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
-  border-left: 3px solid var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
   background: color-mix(in srgb, var(--warning) 9%, var(--card));
   border-radius: var(--radius-md);
   font-size: var(--text-md);
@@ -330,8 +329,7 @@
 }
 
 .overrideBanner {
-  border-color: color-mix(in srgb, var(--info) 45%, var(--border));
-  border-left-color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 35%, var(--border));
   background: color-mix(in srgb, var(--info) 8%, var(--card));
 }
 
@@ -388,8 +386,7 @@
   gap: 0.625rem;
   padding: 0.875rem 1rem;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--profit);
+  border: 1px solid color-mix(in srgb, var(--profit) 35%, var(--border));
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xl);
   font-size: var(--text-md);

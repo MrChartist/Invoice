@@ -169,10 +169,10 @@
   gap: 0.5rem;
   align-items: flex-start;
   padding: 0.75rem 0.875rem;
-  border-radius: var(--radius-sm);
-  background: rgba(230, 154, 6, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(230, 154, 6, 0.09);
   color: var(--foreground);
-  border-left: 3px solid var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
   font-size: var(--text-base);
   line-height: 1.5;
 }

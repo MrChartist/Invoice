@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { Download, FileJson, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react';
-import { getJson, getTable, SINGLETON_KEYS } from '../lib/storage';
+import { getTable } from '../lib/storage';
+import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
 import { stateByCode } from '../lib/india-states';
 import {
@@ -72,10 +73,7 @@ export function GstReports() {
   const { notify, toastNode } = useToast();
   const invoices = useMemo(() => getTable<InvoiceRecord>('invoices'), []);
   const purchases = useMemo(() => getTable<unknown>('purchases'), []);
-  const profiles = useMemo(() => {
-    const raw = getJson<unknown>(SINGLETON_KEYS.settings, []);
-    return (Array.isArray(raw) ? raw : raw ? [raw] : []) as SenderProfile[];
-  }, []);
+  const profiles = useMemo<SenderProfile[]>(() => localDb.settings.get().profiles, []);
 
   const gstins = useMemo(() => {
     const set = new Set<string>();

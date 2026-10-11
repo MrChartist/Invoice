@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ArrowDownToLine, BookOpen, Boxes, Download, Edit3, PackagePlus, Plus,
   Search, SlidersHorizontal, Trash2, TrendingDown,
@@ -53,8 +53,13 @@ export function Inventory() {
   const [from, setFrom] = useState(() => addDaysInput(-30));
   const [to, setTo] = useState(todayInput());
   const { notify, toastNode } = useToast();
-
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  // Re-read stock when user returns to the tab
+  useEffect(() => {
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [refresh]);
 
   // `version` is the cache-buster: every write bumps it so derived stock recomputes.
   /* eslint-disable react-hooks/exhaustive-deps */
