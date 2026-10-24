@@ -18,6 +18,7 @@
  *      Expense    Cr party        Payment      Dr party
  */
 
+import { DEFAULT_BANK_ID, accountIdOf, type BankAccount } from './bank-accounts';
 import { round2, num, untaxedCharges } from './invoice-calc';
 import { inrRecord, inrValue } from './fx';
 import { receiptInr } from './fx-gain';
@@ -60,6 +61,8 @@ export interface Voucher {
   method?: string;
   /** Which cash/bank book the voucher moves money in, if any. */
   account?: CashAccount;
+  /** Bank sub-account (`bank-accounts.ts`) when `account` is 'bank'; missing = the main account. */
+  bank_account_id?: string;
   /** Invoice id for Sales / Credit Note / Receipt vouchers — drill-through. */
   invoice_id?: string;
   /** In-app link for drill-through (`/invoice/:id`). */
@@ -98,6 +101,7 @@ export interface BooksData {
     date?: string;
     method?: string;
     reference?: string;
+    bank_account_id?: string;
   }>;
   openings: OpeningBalance[];
 }
@@ -433,6 +437,7 @@ export function buildVouchers(data: BooksData): Voucher[] {
       credit: amount,
       method: str(t.method) || 'Bank transfer',
       account: accountForMethod(t.method),
+      bank_account_id: accountForMethod(t.method) === 'bank' && t.bank_account_id ? t.bank_account_id : undefined,
       invoice_id: inv?.id,
       link: inv ? `/invoice/${inv.id}` : undefined,
     });
@@ -472,6 +477,7 @@ export function buildVouchers(data: BooksData): Voucher[] {
       credit: 0,
       method: str(pp.method) || 'Bank transfer',
       account: accountForMethod(pp.method),
+      bank_account_id: accountForMethod(pp.method) === 'bank' && pp.bank_account_id ? str(pp.bank_account_id) : undefined,
     });
   }
 
@@ -550,6 +556,37 @@ export function accountBalanceAt(
     bal = round2(bal + movement(v));
   }
   return bal;
+}
+
+/**
+ * Book balance of one bank account at the end of `date`: its own opening plus the bank vouchers
+ * tagged to it. Until the main account has its own opening it uses the Books bank opening, so a
+ * single-account user sees exactly the old figure.
+ */
+export function bankAccountBalanceAt(
+  vouchers: readonly Voucher[],
+  openings: OpeningBalance[],
+  account: BankAccount,
+  date: string,
+): { balance: number; openingMissing: boolean } {
+  let amount = 0;
+  let from = '';
+  let missing = false;
+  if (account.opening !== undefined && account.opening_as_of && account.opening_as_of <= date) {
+    amount = account.opening;
+    from = account.opening_as_of;
+  } else if (account.id === DEFAULT_BANK_ID) {
+    const o = openingFor(openings, 'bank', date);
+    amount = num(o?.amount);
+    from = o?.as_of ?? '';
+    missing = !o;
+  } else missing = true;
+  let bal = round2(amount);
+  for (const v of vouchers) {
+    if (v.account !== 'bank' || v.date > date || v.date < from || accountIdOf(v) !== account.id) continue;
+    bal = round2(bal + (v.type === 'Receipt' ? v.credit : v.type === 'Payment' ? -v.debit : 0));
+  }
+  return { balance: bal, openingMissing: missing };
 }
 
 export interface BookRow {

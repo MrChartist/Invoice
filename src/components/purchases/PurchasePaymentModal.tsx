@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { BankAccountSelect } from '../bank/BankAccountSelect';
 import type { PurchaseRecord } from '../../types/purchases';
 import { PAYMENT_METHODS, balanceOf, paymentsDb, purchasesDb, validatePayment } from '../../lib/purchases';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
@@ -33,6 +34,7 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   const [amount, setAmount] = useState(balance);
   const [date, setDate] = useState(todayInput());
   const [method, setMethod] = useState('UPI');
+  const [bankAccountId, setBankAccountId] = useState('');
   const [reference, setReference] = useState('');
   const [error, setError] = useState('');
 
@@ -43,7 +45,7 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
     const problem = validatePayment(bill, amount, date);
     if (problem) return setError(problem);
     try {
-      paymentsDb.record(purchaseId, { amount, date, method, reference });
+      paymentsDb.record(purchaseId, { amount, date, method, reference, bankAccountId: bankAccountId || undefined });
       setError('');
       setVersion((v) => v + 1);
       const left = balanceOf(purchasesDb.get(purchaseId)!);
@@ -115,6 +117,7 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
               <input id="pp-ref" className={controls.input} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR / cheque no." />
             </div>
           </div>
+          <BankAccountSelect id="pp-bank-account" label="Paid from" method={method} value={bankAccountId} onChange={setBankAccountId} />
           {error && <p className={styles.formError} role="alert">{error}</p>}
           <div className={styles.inlineActions}>
             <button type="button" className={controls.btnOutline} onClick={onClose}>Close</button>

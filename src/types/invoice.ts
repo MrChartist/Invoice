@@ -229,6 +229,8 @@ export interface Payment {
    * `amount` stays in the invoice currency.
    */
   realised_rate?: number;
+  /** Additive (multi-account BRS): the bank account it was received into (`bank-accounts.ts`); missing = main. */
+  bank_account_id?: string;
 }
 
 /** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */

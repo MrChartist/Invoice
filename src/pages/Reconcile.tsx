@@ -24,8 +24,10 @@ import {
   type Candidate,
   type Suggestion,
 } from '../lib/bank-recon';
-import { accountBalanceAt, buildVouchers, loadBooksData, type BooksData } from '../lib/books';
+import { accountBalanceAt, bankAccountBalanceAt, buildVouchers, loadBooksData, type BooksData } from '../lib/books';
 import { StorageWriteError } from '../lib/storage';
+import { DEFAULT_BANK_ID, accountIdOf, bankAccountsDb, type BankAccount } from '../lib/bank-accounts';
+import { BankAccountsCard } from '../components/bank/BankAccountsCard';
 import { formatDate, formatMoney } from '../lib/utils';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
@@ -67,6 +69,10 @@ export function Reconcile() {
   const [statements, setStatements] = useState<BankStatement[]>(() => bankDb.all());
   const [books, setBooks] = useState<BooksData>(() => loadBooksData());
   const [scope, setScope] = useState('all');
+  const [accounts, setAccounts] = useState<BankAccount[]>(() => bankAccountsDb.all());
+  const [accountId, setAccountId] = useState(DEFAULT_BANK_ID);
+  const multi = accounts.filter((a) => a.active !== false).length > 1;
+  const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
   const [filter, setFilter] = useState<Filter>('review');
   const [query, setQuery] = useState('');
   const [pickerLine, setPickerLine] = useState<BankLine | null>(null);
@@ -119,7 +125,9 @@ export function Reconcile() {
   );
 
   /* ── derived data ─────────────────────────────────────────── */
-  const scoped = useMemo(() => (scope === 'all' ? statements : statements.filter((s) => s.id === scope)), [statements, scope]);
+  // Multi-account BRS: everything below works on the selected bank account's statements and entries.
+  const acctStatements = useMemo(() => (multi ? statements.filter((s) => accountIdOf(s) === accountId) : statements), [statements, multi, accountId]);
+  const scoped = useMemo(() => (scope === 'all' ? acctStatements : acctStatements.filter((s) => s.id === scope)), [acctStatements, scope]);
   const index = useMemo(
     () => ({
       payments: new Set(books.transactions.map((t) => t.id)),
@@ -127,8 +135,9 @@ export function Reconcile() {
     }),
     [books],
   );
-  const receipts = useMemo(() => receiptCandidates(books.invoices, books.transactions), [books]);
-  const payouts = useMemo(() => payoutCandidates(books.purchases, books.vendors, books.purchasePayments), [books]);
+  const inAccount = useCallback((c: Candidate) => !multi || accountIdOf(c) === accountId, [multi, accountId]);
+  const receipts = useMemo(() => receiptCandidates(books.invoices, books.transactions).filter(inAccount), [books, inAccount]);
+  const payouts = useMemo(() => payoutCandidates(books.purchases, books.vendors, books.purchasePayments).filter(inAccount), [books, inAccount]);
   const entries = useMemo(() => new Map<string, Candidate>([...receipts, ...payouts].map((c) => [c.id, c])), [receipts, payouts]);
 
   const allLines = useMemo(
@@ -153,8 +162,15 @@ export function Reconcile() {
   const closing = useMemo(() => closingAcross(scoped), [scoped]);
   const vouchers = useMemo(() => buildVouchers(books), [books]);
   const asOf = closing.asOf;
-  const booksBalance = useMemo(() => (asOf ? accountBalanceAt(vouchers, books.openings, 'bank', asOf) : 0), [vouchers, books.openings, asOf]);
-  const openingMissing = !books.openings.some((o) => o.account === 'bank');
+  const acctBalance = useMemo(
+    () => (multi && account && asOf ? bankAccountBalanceAt(vouchers, books.openings, account, asOf) : null),
+    [multi, account, vouchers, books.openings, asOf],
+  );
+  const booksBalance = useMemo(
+    () => (acctBalance ? acctBalance.balance : asOf ? accountBalanceAt(vouchers, books.openings, 'bank', asOf) : 0),
+    [acctBalance, vouchers, books.openings, asOf],
+  );
+  const openingMissing = acctBalance ? acctBalance.openingMissing : !books.openings.some((o) => o.account === 'bank');
   const fromDate = useMemo(() => lines.reduce((m, l) => (!m || l.date < m ? l.date : m), ''), [lines]);
 
   const brs = useMemo(
@@ -198,7 +214,7 @@ export function Reconcile() {
     persist(matchLine(statements, line.id, { type, id: ids[0], ...(ids.length > 1 ? { ids } : {}) }));
 
   const importStatement = (st: BankStatement, info: { duplicates: number }) => {
-    persist([...statements, st]);
+    persist([...statements, multi && accountId !== DEFAULT_BANK_ID ? { ...st, bank_account_id: accountId } : st]);
     setScope('all');
     selectTab('reconcile');
     notify(`Imported ${st.lines.length} transactions${info.duplicates ? ` (${info.duplicates} duplicates skipped)` : ''}`);
@@ -224,10 +240,35 @@ export function Reconcile() {
     />
   );
 
+  const accountPicker = multi && (
+    <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
+      <label className={controls.label} htmlFor="rec-account">Bank account</label>
+      <select id="rec-account" className={controls.select} value={accountId} onChange={(e) => { setAccountId(e.target.value); setScope('all'); }}>
+        {accounts.filter((a) => a.active !== false || a.id === accountId).map((a) => (
+          <option key={a.id} value={a.id}>{a.name}{a.number ? ` (${a.number})` : ''}</option>
+        ))}
+      </select>
+    </div>
+  );
+  const accountsCard = (
+    <BankAccountsCard
+      accounts={accounts}
+      statements={statements}
+      payments={[...books.transactions, ...books.purchasePayments]}
+      onChange={(next) => {
+        setAccounts(next);
+        if (!next.some((a) => a.id === accountId && a.active !== false)) setAccountId(DEFAULT_BANK_ID);
+      }}
+      notify={notify}
+    />
+  );
+
   if (statements.length === 0) {
     return (
       <div className={surface.page}>
         {header}
+        {accountsCard}
+        {accountPicker}
         <ImportPanel existing={statements} onImport={importStatement} />
         {toastNode}
       </div>
@@ -247,7 +288,12 @@ export function Reconcile() {
           value={closing.balance === null ? '—' : rupees(closing.balance)}
           hint={closing.balance === null ? 'Enter it under Statements' : `as on ${formatDate(closing.asOf)}`}
         />
-        <StatCard label="Balance per books" icon={BookOpen} value={rupees(booksBalance)} hint={openingMissing ? 'No bank opening balance set in Books' : 'bank account in Books'} />
+        <StatCard
+          label="Balance per books"
+          icon={BookOpen}
+          value={rupees(booksBalance)}
+          hint={multi && account ? (openingMissing ? `No opening balance for ${account.name} (Statements tab)` : account.name) : openingMissing ? 'No bank opening balance set in Books' : 'bank account in Books'}
+        />
         <StatCard
           label="Difference"
           icon={Scale}
@@ -287,12 +333,13 @@ export function Reconcile() {
       </div>
 
       <div role="tabpanel" id={`rec-panel-${tab}`} aria-labelledby={`rec-tab-${tab}`} tabIndex={0} className={styles.panel}>
-        {tab !== 'import' && tab !== 'statements' && statements.length > 1 && (
+        {accountPicker}
+        {tab !== 'import' && tab !== 'statements' && acctStatements.length > 1 && (
           <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
             <label className={controls.label} htmlFor="rec-scope">Statement</label>
             <select id="rec-scope" className={controls.select} value={scope} onChange={(e) => setScope(e.target.value)}>
-              <option value="all">All statements ({statements.length})</option>
-              {statements.map((s) => (
+              <option value="all">All statements ({acctStatements.length})</option>
+              {acctStatements.map((s) => (
                 <option key={s.id} value={s.id}>{s.bank_label} — {s.file_name}</option>
               ))}
             </select>
@@ -335,7 +382,7 @@ export function Reconcile() {
                   items={items}
                   entries={entries}
                   suggestions={suggestions}
-                  showBank={statements.length > 1 && scope === 'all'}
+                  showBank={acctStatements.length > 1 && scope === 'all'}
                   onConfirm={(s) => persist(applySuggestions(statements, [s]))}
                   onUnmatch={(id) => persist(unmatchLine(statements, id))}
                   onIgnore={(id, v) => persist(ignoreLine(statements, id, v))}
@@ -351,12 +398,13 @@ export function Reconcile() {
         )}
 
         {tab === 'brs' && (
-          <BrsView brs={brs} bankLabel={scope === 'all' ? statements.map((s) => s.bank_label).filter((v, i, a) => a.indexOf(v) === i).join(' + ') : (scoped[0]?.bank_label ?? '')} openingMissing={openingMissing} />
+          <BrsView brs={brs} bankLabel={multi && account ? account.name : scope === 'all' ? acctStatements.map((s) => s.bank_label).filter((v, i, a) => a.indexOf(v) === i).join(' + ') : (scoped[0]?.bank_label ?? '')} openingMissing={openingMissing} />
         )}
 
+        {tab === 'statements' && accountsCard}
         {tab === 'statements' && (
           <StatementsPanel
-            statements={statements}
+            statements={acctStatements}
             index={index}
             onClosingBalance={(id, v) => persist(statements.map((s) => (s.id === id ? { ...s, closing_balance: v } : s)))}
             onRemove={(id) => {
@@ -368,6 +416,7 @@ export function Reconcile() {
         )}
 
         {tab === 'import' && <ImportPanel existing={statements} onImport={importStatement} onCancel={() => selectTab('reconcile')} />}
+        {tab === 'import' && multi && account && <p className={surface.sectionNote}>Imports into: {account.name}</p>}
       </div>
 
       <MatchPicker

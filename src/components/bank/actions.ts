@@ -7,6 +7,7 @@
  */
 
 import {
+  bankDb,
   inferMode,
   methodForMode,
   openBalance,
@@ -29,6 +30,11 @@ import type { PurchaseRecord } from '../../types/purchases';
 
 const lineAmount = (l: Pick<BankLine, 'debit' | 'credit'>) => (l.credit > 0 ? l.credit : l.debit);
 
+/** The bank account of the statement a line came from (multi-account BRS); undefined = main account. */
+function accountOfLine(line: Pick<BankLine, 'id'>): string | undefined {
+  return bankDb.all().find((st) => st.lines.some((l) => l.id === line.id))?.bank_account_id;
+}
+
 /** Record a payment received against an invoice, dated and referenced from the bank line. */
 export function recordReceiptFromLine(line: BankLine, invoiceId: string, amount: number = lineAmount(line)): Payment {
   if (!(line.credit > 0)) throw new Error('Only a credit can be recorded as a receipt.');
@@ -45,6 +51,7 @@ export function recordReceiptFromLine(line: BankLine, invoiceId: string, amount:
     reference: referenceFor(line) || undefined,
     note: 'From bank statement',
     date: line.date,
+    bankAccountId: accountOfLine(line),
   });
 }
 
@@ -89,6 +96,7 @@ export function recordExpenseFromLine(line: BankLine, opts: ExpenseFromLine): { 
     date: line.date,
     method: methodForMode(inferMode(line.narration)),
     reference: referenceFor(line) || undefined,
+    bankAccountId: accountOfLine(line),
   });
   return { bill: saved, payment };
 }
@@ -106,5 +114,6 @@ export function recordBillPaymentFromLine(line: BankLine, purchaseId: string, am
     date: line.date,
     method: methodForMode(inferMode(line.narration)),
     reference: referenceFor(line) || undefined,
+    bankAccountId: accountOfLine(line),
   });
 }

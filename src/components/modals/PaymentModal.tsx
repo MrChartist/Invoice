@@ -14,6 +14,7 @@ import { ReminderModal } from '../share/ReminderModal';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import { realisedFx } from '../../lib/fx-gain';
 import { fxRate, isForeignCurrency } from '../../lib/fx';
+import { BankAccountSelect } from '../bank/BankAccountSelect';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 
@@ -55,6 +56,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const [version, setVersion] = useState(0);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState(METHODS[0]);
+  const [bankAccountId, setBankAccountId] = useState('');
   const [date, setDate] = useState(todayInput());
   const [reference, setReference] = useState('');
   /** Realised rate (₹ per unit) on a foreign-currency receipt (6.19). */
@@ -101,7 +103,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     try {
       const rate = Number(realised);
       if (realised.trim() && !(rate > 0)) return setError('Enter the realised rate in rupees, or leave it blank.');
-      const payment = localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date, realisedRate: foreign && rate > 0 ? rate : undefined });
+      const payment = localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date, realisedRate: foreign && rate > 0 ? rate : undefined, bankAccountId: bankAccountId || undefined });
       setVersion((v) => v + 1);
       refreshEditor(live.id);
       setError('');
@@ -211,6 +213,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value.trimStart())} placeholder={method === 'Cash' ? 'Receipt book no.' : 'e.g. 412345678901'} />
             </label>
           </div>
+          <BankAccountSelect id="pay-bank-account" label="Received into" method={method} value={bankAccountId} onChange={setBankAccountId} />
           {foreign && (
             <label className={controls.field}>
               <span className={controls.label}>Rate realised, ₹ per {live.currency} (optional)</span>

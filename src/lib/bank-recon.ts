@@ -62,6 +62,8 @@ export interface BankStatement {
   opening_balance?: number;
   /** Additive: closing balance typed by the user when the file has no balance column. */
   closing_balance?: number;
+  /** Additive (multi-account BRS): which bank account this statement is for; missing = the main account. */
+  bank_account_id?: string;
 }
 
 export const STATEMENTS_TABLE = 'bank_statements';
@@ -449,8 +451,10 @@ export function makeStatement(
   lines: Omit<BankLine, 'id'>[],
   fileName: string,
   now: Date = new Date(),
+  bankAccountId?: string,
 ): BankStatement {
   return {
+    ...(bankAccountId && bankAccountId !== 'default' ? { bank_account_id: bankAccountId } : {}),
     id: generateId(),
     imported_at: now.toISOString(),
     bank_label: parsed.bankLabel,
@@ -625,6 +629,8 @@ export interface Candidate {
   party: string;
   /** Source document id (invoice id / purchase id), for drill-through. */
   docId: string;
+  /** Bank account it went through (`bank-accounts.ts`); missing = the main account. */
+  bank_account_id?: string;
 }
 
 const isCashMethod = (m: unknown) => String(m ?? '').trim().toLowerCase() === 'cash';
@@ -653,6 +659,7 @@ export function receiptCandidates(invoices: readonly InvoiceRecord[], payments: 
       docNumber: inv?.invoice_number ?? '',
       party: partyOfInvoice(inv),
       docId: p.invoice_id,
+      bank_account_id: p.bank_account_id || undefined,
     });
   }
   return out;
@@ -665,6 +672,7 @@ export interface PurchasePaymentRow {
   date?: string;
   method?: string;
   reference?: string;
+  bank_account_id?: string;
 }
 
 /** Payments made to vendors that can show up on a bank statement. */
@@ -694,6 +702,7 @@ export function payoutCandidates(
       docNumber: bill?.number ?? '',
       party: bill?.partyName ?? '',
       docId: String(pp.purchase_id ?? ''),
+      bank_account_id: pp.bank_account_id || undefined,
     });
   }
   return out;
@@ -1353,6 +1362,7 @@ export function normalizeStatements(rows: unknown[]): BankStatement[] {
       lines,
       ...(Number.isFinite(num(r.opening_balance, NaN)) && r.opening_balance !== undefined ? { opening_balance: num(r.opening_balance) } : {}),
       ...(Number.isFinite(num(r.closing_balance, NaN)) && r.closing_balance !== undefined ? { closing_balance: num(r.closing_balance) } : {}),
+      ...(typeof r.bank_account_id === 'string' && r.bank_account_id ? { bank_account_id: r.bank_account_id } : {}),
     });
   }
   return out;

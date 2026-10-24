@@ -482,7 +482,7 @@ export const localDb = {
       ),
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
-    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number }): Payment => {
+    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string }): Payment => {
       const amount = round2(Number(input.amount) || 0);
       // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
       if (!(amount > 0)) throw new Error('Enter a payment amount above zero.');
@@ -497,6 +497,8 @@ export const localDb = {
         // stamp still says 31 Mar and would file the receipt in the previous FY.
         date: input.date || localDayOf(new Date()),
       };
+      // Multi-account BRS: which bank account it went into (never for cash).
+      if (input.bankAccountId && (input.method || '').toLowerCase() !== 'cash') payment.bank_account_id = input.bankAccountId;
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
       // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
       const realised = Number(input.realisedRate);

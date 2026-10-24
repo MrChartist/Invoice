@@ -163,7 +163,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - GST, e-Invoice, e-Way Bill and Tally outputs are working papers, not portal-validated; JSON key layouts that are not
   verified against the current offline tools are marked in the code. Verify with your CA.
 - No direct portal / IRP / bank / payment-gateway connection (by design: no server).
-- Bank reconciliation treats bank as a single account.
+- Several bank accounts reconcile separately (BRS, statements, receipts and supplier payments name their account), but
+  the Books bank book and the ledger keep one Bank total; cheques clear into the main account.
 - The ledger does not value closing stock or handle fixed-asset disposals automatically — post them with a journal
   voucher. Realised exchange differences are posted automatically when a receipt carries its realised rate;
   unrealised (period-end revaluation) differences are reported only — post the reversing journal if your CA wants it.

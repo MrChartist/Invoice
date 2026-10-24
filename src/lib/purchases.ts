@@ -27,6 +27,8 @@ export interface PurchasePayment {
   method: string;
   reference?: string;
   created_at?: string;
+  /** Additive (multi-account BRS): the bank account it was paid from; missing = the main account. */
+  bank_account_id?: string;
 }
 
 export type PurchaseStatus = 'Unpaid' | 'Partially paid' | 'Paid' | 'Overdue';
@@ -361,7 +363,7 @@ export const paymentsDb = {
     paymentsDb.all().filter((p) => p.purchase_id === id).sort((a, b) => a.date.localeCompare(b.date)),
 
   /** Append a payment and roll it into the bill's `amount_paid`. Throws on invalid input. */
-  record(purchaseId: string, p: { amount: number; date: string; method: string; reference?: string }): PurchasePayment {
+  record(purchaseId: string, p: { amount: number; date: string; method: string; reference?: string; bankAccountId?: string }): PurchasePayment {
     const bill = purchasesDb.get(purchaseId);
     if (!bill) throw new Error('Bill not found.');
     const amount = round2(num(p.amount));
@@ -371,6 +373,7 @@ export const paymentsDb = {
     const payment: PurchasePayment = {
       id: generateId(), purchase_id: purchaseId, amount, date: p.date,
       method: p.method, reference: p.reference?.trim() || undefined, created_at: now(),
+      bank_account_id: p.bankAccountId && p.method.toLowerCase() !== 'cash' ? p.bankAccountId : undefined,
     };
     setTable(PAYMENTS_TABLE, [...paymentsDb.all(), payment]);
     writeBill({ ...bill, amount_paid: round2(num(bill.amount_paid) + amount) });

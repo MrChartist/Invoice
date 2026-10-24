@@ -737,6 +737,23 @@ try {
     const dbs = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name));
     check(!dbs.some((n) => n?.startsWith('mrchartist_inv_kv__')), `the company database is removed (${dbs.join(', ')})`);
   });
+
+  await step('several bank accounts: add one, pick it for the BRS, remove it', async () => {
+    await page.goto(srv.origin + '/reconcile');
+    await page.getByRole('button', { name: 'Add account' }).click();
+    await page.locator('#ba-name').fill('ICICI current');
+    await page.locator('#ba-opening').fill('500');
+    await page.locator('#ba-asof').fill('2026-04-01');
+    await page.getByRole('button', { name: 'Save account' }).click();
+    await page.locator('#rec-account').waitFor();
+    const options = await page.locator('#rec-account option').allTextContents();
+    check(options.length === 2 && options.some((o) => o.startsWith('ICICI current')), `account picker lists both accounts (${options.join(' | ')})`);
+    const stored = await readJson(page, 'bank_accounts', [], (v) => v.length > 0);
+    check(stored.some((a) => a.name === 'ICICI current' && a.opening === 500), 'the account and its opening are saved');
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.locator('#rec-account').waitFor({ state: 'detached' });
+    check(true, 'an unused account can be deleted; the picker goes away with one account');
+  });
 } catch {
   /* already reported */
 } finally {
