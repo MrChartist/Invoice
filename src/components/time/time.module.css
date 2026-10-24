@@ -1,0 +1,104 @@
+/* Time page, timer and forms. Tokens only — no raw colours. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formError {
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--loss) 10%, transparent);
+  color: var(--loss);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.actions,
+.toolbarActions,
+.includeRow,
+.timerActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.actions { justify-content: flex-end; }
+.includeRow { gap: 1.25rem; }
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+p.muted { margin: 0; }
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+}
+
+.timerClock {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.timerMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 12rem;
+}
+
+.timerForm {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 1rem 1.25rem;
+}
+
+.timerForm + .formError { margin: 0 1.25rem 1rem; }
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.875rem 1.25rem;
+}
+
+.weekNav {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.billTotals {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.5rem;
+  font-weight: 600;
+}
+
+.prefs {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .timerForm { grid-template-columns: 1fr; }
+}

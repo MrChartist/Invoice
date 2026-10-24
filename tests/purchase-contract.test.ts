@@ -12,6 +12,8 @@ import { collectEvents } from '../src/lib/inventory.ts';
 import { bookBills } from '../src/lib/gstr2b.ts';
 import { buildGstr9 } from '../src/lib/gstr9.ts';
 import { readPurchase } from '../src/lib/purchase-normalize.ts';
+import { expenseLine, rebillCost, unbilledExpenses, liveInvoiceIds } from '../src/lib/timesheets.ts';
+import { DEFAULT_TIME_PREFS } from '../src/types/time.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
 import { gstinChecksumChar } from '../src/lib/gstin.ts';
 
@@ -174,4 +176,19 @@ test('the double-entry ledger posts the real purchase shape (and legacy rows lik
     const amt = (acc: string) => v.lines.filter((l) => l.account === acc).reduce((s, l) => s + l.dr - l.cr, 0);
     assert.deepEqual([amt(A.purchases), amt(A.inCgst), amt(A.inSgst), amt(A.creditors)], [100000, 9000, 9000, -118000], id);
   }
+});
+
+test('billable-expense fields (6.14) are read by timesheets and ignored by the report readers', () => {
+  const billable: PurchaseRecord = { ...bill, id: 'p3', billable_to_client_id: 'c1', markup_percent: 10, rebilled_in: 'inv-gone' };
+  // Report readers see the same money with or without the re-billing fields.
+  assert.equal(booksNormalize(billable as never)!.total, 1180);
+  assert.equal(exportNormalize(billable)!.taxable, 1000);
+  assert.equal(gstNormalize(billable, '27')!.cgst, 90);
+  assert.equal(readPurchase(billable)!.taxable, 1000);
+  // The timesheets reader: ITC claimed → cost is the taxable value; the link to a deleted invoice frees it.
+  assert.equal(rebillCost(billable), 1000);
+  assert.equal(expenseLine(billable, DEFAULT_TIME_PREFS).rate, 1100);
+  assert.equal(expenseLine({ ...billable, pure_agent: true }, DEFAULT_TIME_PREFS).tax_rate, 0);
+  assert.deepEqual(unbilledExpenses([billable, bill], liveInvoiceIds([])).map((p) => p.id), ['p3']);
+  assert.equal(unbilledExpenses([billable], liveInvoiceIds([{ id: 'inv-gone', status: 'Sent' }])).length, 0);
 });

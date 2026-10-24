@@ -116,6 +116,20 @@ export const blankPurchaseLine = (taxRate = 18): PurchaseLine => ({
   tax_rate: taxRate,
 });
 
+// ── Pure: billable costs (6.14) ──────────────────────────────────
+
+export type BillableValue = Pick<PurchaseRecord, 'billable_to_client_id' | 'markup_percent' | 'pure_agent'>;
+
+/** Persisted billable fields from a form value: all cleared when not billable; no markup on a pure-agent cost. */
+export function billablePatch(v: BillableValue): BillableValue {
+  if (!v.billable_to_client_id) return { billable_to_client_id: undefined, markup_percent: undefined, pure_agent: undefined };
+  return {
+    billable_to_client_id: v.billable_to_client_id,
+    markup_percent: !v.pure_agent && num(v.markup_percent) > 0 ? num(v.markup_percent) : undefined,
+    pure_agent: v.pure_agent || undefined,
+  };
+}
+
 // ── Pure: status & aggregates ────────────────────────────────────
 
 export function balanceOf(p: Pick<PurchaseRecord, 'total' | 'amount_paid'>): number {
@@ -313,6 +327,19 @@ export const purchasesDb = {
     if (existing) assertBillUnlocked(existing, 'edit');
     assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
     return writeBill(input);
+  },
+
+  /**
+   * Stamp (or clear) the invoice a billable cost was re-billed on. Only this link field changes —
+   * no amount or ITC figure — so, like a payment roll-up, it is allowed inside a locked period.
+   */
+  setRebilled(ids: readonly string[], invoiceId: string | undefined): void {
+    const wanted = new Set(ids);
+    if (!wanted.size) return;
+    setTable(
+      PURCHASES_TABLE,
+      purchasesDb.all().map((p) => (wanted.has(p.id) ? { ...p, rebilled_in: invoiceId } : p)),
+    );
   },
 
   /** Remove a bill together with its payment history. */

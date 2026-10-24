@@ -79,6 +79,15 @@ export interface PurchaseRecord {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  /* ── Billable expenses (6.14, all optional; absent = an ordinary cost) ── */
+  /** `clients` row id this cost is re-billed to. */
+  billable_to_client_id?: string;
+  /** Markup on cost when re-billed, percent (ignored for pure-agent reimbursements). */
+  markup_percent?: number;
+  /** Recovered at actual cost as a pure agent (Rule 33, CGST Rules): billed as a 0% line. */
+  pure_agent?: boolean;
+  /** Invoice id it was re-billed on. Billed only while that invoice exists and is not cancelled. */
+  rebilled_in?: string;
 }
 
 export type ImportType = 'GOODS' | 'SERVICES';
