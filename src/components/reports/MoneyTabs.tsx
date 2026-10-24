@@ -1,19 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Boxes, Landmark, Receipt, ShoppingCart } from 'lucide-react';
+import { Landmark, Receipt, ShoppingCart } from 'lucide-react';
 import {
   expensesCsv,
   paymentModesCsv,
-  profitCsv,
   taxRateCsv,
   type ExpenseCategoryRow,
   type ExpenseReport,
   type ExpenseVendorRow,
   type PaymentModeRow,
-  type ProfitRow,
   type TaxRateRow,
   paymentModes,
-  profitByItem,
   taxByRate,
 } from '../../lib/sales-reports';
 import type { Period } from '../../lib/books';
@@ -153,48 +150,6 @@ export function ExpensesTab({ rep, period }: { rep: ExpenseReport; period: Perio
         ) : (
           <SortableTable caption="Expenses by vendor" rows={rep.vendors} columns={venCols} rowKey={(r) => r.vendor} initialSort={{ id: 'cost', dir: 'desc' }} empty={empty} />
         )}
-      </div>
-    </div>
-  );
-}
-
-/* ── Profitability by item ─────────────────────────────────── */
-
-export function ProfitTab({ rep, period, hasStock }: { rep: ReturnType<typeof profitByItem>; period: Period; hasStock: boolean }) {
-  const t = rep.totals;
-  const rows = useMemo(() => rep.rows, [rep]);
-  const cols: Column<ProfitRow>[] = [
-    { id: 'name', label: 'Item', sort: (r) => r.name, cell: (r) => r.name, total: 'Total' },
-    { id: 'qty', label: 'Qty sold', numeric: true, sort: (r) => r.quantity, cell: (r) => r.quantity },
-    { id: 'rev', label: 'Sales (excl. GST)', numeric: true, sort: (r) => r.revenue, cell: (r) => money(r.revenue), total: money(t.revenue) },
-    { id: 'cogs', label: 'Cost of goods', numeric: true, sort: (r) => r.cogs, cell: (r) => money(r.cogs), total: money(t.cogs) },
-    { id: 'profit', label: 'Profit', numeric: true, sort: (r) => r.profit, cell: (r) => <span className={r.profit < 0 ? styles.neg : styles.pos}>{money(r.profit)}</span>, total: money(t.profit) },
-    { id: 'margin', label: 'Margin', numeric: true, sort: (r) => r.margin, cell: (r) => `${r.margin.toFixed(1)}%`, total: `${t.margin.toFixed(1)}%` },
-  ];
-  return (
-    <div className={styles.stack}>
-      <div className={styles.toolbar}>
-        <p className={styles.muted}>
-          Only items with stock tracking switched on in Inventory have a cost. Cost comes from the stock ledger (weighted average or FIFO, as chosen there).
-        </p>
-        <ExportButton filename={`item-profitability-${slug(period)}.csv`} csv={() => profitCsv(rep, period)} />
-      </div>
-      <div className={surface.card}>
-        <SortableTable
-          caption="Profitability by item"
-          rows={rows}
-          columns={cols}
-          rowKey={(r) => r.name}
-          initialSort={{ id: 'profit', dir: 'desc' }}
-          empty={
-            <EmptyState
-              icon={Boxes}
-              title={hasStock ? 'No tracked items were sold in this period' : 'No stock-tracked items yet'}
-              text={hasStock ? 'Sales of tracked items in the period, with their cost of goods, appear here.' : 'Turn on stock tracking for an item under Inventory and its margin shows up here.'}
-              action={<Link to="/inventory" className={controls.btnPrimary}><Boxes size={16} /> Open Inventory</Link>}
-            />
-          }
-        />
       </div>
     </div>
   );

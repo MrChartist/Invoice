@@ -24,7 +24,7 @@ Schedule III balance sheet with a fixed-asset register, and an AS 3 cash-flow st
 1xxx owner's funds: 1000 Capital, 1010 Drawings, 1090 Opening balance difference, 1100 Reserves & surplus ·
 2xxx liabilities: 2000/2010 Secured/Unsecured loans, 2100 Bank OD, 2200 Sundry creditors, **Duties & taxes** 2300–2304 Output CGST/SGST/IGST/cess/unsplit GST, 2310 GST payable — reverse charge, 2311 IGST payable on imports (customs), 2320 TCS payable, 2330 TDS payable, 2350–2353 Input CGST/SGST/IGST/cess (the electronic credit ledger), 2360 GST electronic cash ledger, 2370 TDS receivable, 2400 Other current liabilities, 2500 Provisions ·
 3xxx assets: 3000–3060 fixed assets, 3090 Accumulated depreciation, 3100 Investments, 3200 Security deposits, 3300 Stock-in-hand, 3400 Sundry debtors, 3500 Cash, 3510 Bank, 3600 Advances, 3700 Other current assets ·
-4xxx income: 4000 Sales, 4010 Sales returns, 4020 Freight & charges recovered, 4900 Round off, 4910/4920 Other income / interest ·
+4xxx income: 4000 Sales, 4010 Sales returns, 4020 Freight & charges recovered, 4900 Round off, 4910/4920 Other income / interest, 4930 Foreign exchange gain / loss ·
 5xxx direct: 5000 Purchases, 5100/5110 Direct expenses / freight inward ·
 6xxx indirect: 6000 Salaries, 6100/6110 Interest / bank charges, 6200 Depreciation, 6300–6390 rent, software, professional fees, travel, utilities, marketing, office supplies, GST input credit reversed, other.
 
@@ -46,7 +46,9 @@ Groups follow Schedule III (Division I) headings; `direct` groups (Purchases, Di
 | Depreciation (per FY, dated 31 Mar, for every FY that has started) | Depreciation | Accumulated depreciation |
 
 Foreign-currency documents post in rupees at their `exchange_rate` through `export-shared.invoiceAmounts` /
-`fx.inrValue`; receipts at the invoice's rate (no realised exchange difference — 6.19). The readers are the same as GST
+`fx.inrValue`; receipts clear the debtor at the invoice's rate. When a receipt carries a `realised_rate` (6.19), Bank is
+debited with the realised rupees and the difference goes to **4930 Foreign exchange gain / loss** (Other income; credit
+= gain, debit = loss) — see `docs/features/cash-planning.md`. The readers are the same as GST
 reports, Books and Tally (`invoiceAmounts`, `books.normalizePurchase` → `readPurchase`/`splitLumpTax`), so totals agree.
 A voucher that does not balance or names an unknown account is left out and listed in `ledger.warnings` (shown on
 the Vouchers tab).

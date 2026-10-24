@@ -36,6 +36,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
   const [error, setError] = useState('');
   // Late-fee terms are edited as text so a half-typed number is not coerced on every keystroke.
   const [fee, setFee] = useState<{ mode: '' | ClientLateFeeMode; rate: string; grace: string }>({ mode: '', rate: '', grace: '' });
+  const [credit, setCredit] = useState<{ limit: string; days: string }>({ limit: '', days: '' });
 
   useEffect(() => {
     if (open) {
@@ -43,6 +44,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
       setError('');
       const f = client?.late_fee;
       setFee(f ? { mode: f.mode, rate: String(f.rate), grace: String(f.graceDays) } : { mode: '', rate: '', grace: '' });
+      setCredit({ limit: client?.credit_limit ? String(client.credit_limit) : '', days: client?.credit_days ? String(client.credit_days) : '' });
     }
   }, [open, client]);
 
@@ -66,6 +68,10 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     if (tan && !isValidTan(tan)) return setError('TAN should look like AAAA99999A (four letters, five digits, one letter).');
     const late_fee = fee.mode ? sanitizeClientLateFee({ mode: fee.mode, rate: fee.rate, graceDays: fee.grace }) : undefined;
     if (fee.mode && !late_fee) return setError('Enter a late-fee rate above zero, or choose "No late fee".');
+    const creditLimit = credit.limit.trim() ? Number(credit.limit) : 0;
+    const creditDays = credit.days.trim() ? Number(credit.days) : 0;
+    if (!Number.isFinite(creditLimit) || creditLimit < 0) return setError('Enter the credit limit in rupees, or leave it blank.');
+    if (!Number.isInteger(creditDays) || creditDays < 0 || creditDays > 365) return setError('Credit days should be a whole number from 0 to 365.');
     try {
       const state_code = resolveStateCode({ code: form.state_code, gstin: form.gstin, name: form.state });
       const payload: Client = {
@@ -78,6 +84,8 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         pan: pan || undefined,
         tan: tan || undefined,
         late_fee,
+        credit_limit: creditLimit > 0 ? Math.round(creditLimit * 100) / 100 : undefined,
+        credit_days: creditDays > 0 ? creditDays : undefined,
         updated_at: new Date().toISOString(),
       };
       const id = localDb.clients.upsert({ ...payload, id: client?.id });
@@ -212,6 +220,25 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           <span className={controls.hint}>
             Use the rate in your agreement with this client. Nothing is added automatically: an overdue invoice gets an
             "Add late fee" button in Receivables that creates a new draft invoice for you to review.
+          </span>
+        </fieldset>
+        <fieldset className={controls.field} style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className={controls.label}>Credit control (optional)</legend>
+          <div className={controls.row}>
+            <label className={controls.field}>
+              <span className={controls.label}>Credit limit (₹)</span>
+              <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={credit.limit}
+                onChange={(e) => setCredit((c) => ({ ...c, limit: e.target.value.replace(/[^0-9.]/g, '') }))} placeholder="e.g. 200000" />
+            </label>
+            <label className={controls.field}>
+              <span className={controls.label}>Credit days</span>
+              <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="numeric" value={credit.days}
+                onChange={(e) => setCredit((c) => ({ ...c, days: e.target.value.replace(/\D/g, '') }))} placeholder="e.g. 30" />
+            </label>
+          </div>
+          <span className={controls.hint}>
+            While you draft an invoice, the editor warns when this client's outstanding plus the new invoice goes over the limit,
+            or when a bill is older than the credit days. It never stops you saving.
           </span>
         </fieldset>
         <label className={controls.field}>

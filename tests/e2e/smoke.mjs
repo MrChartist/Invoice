@@ -529,6 +529,74 @@ try {
     check(/1,20,000\.00/.test(row ?? '') && /10,000\.00/.test(row ?? ''), `budget vs actual row (${row})`);
   });
 
+  await step('cheque register: record a post-dated cheque, see the reminder, clear it against the invoice', async () => {
+    const day = (offset) => {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const today = day(0);
+    const invoices = await readJson(page, 'invoices', []);
+    invoices.push({
+      id: 'chq-inv', invoice_number: 'INV/CHQ/0001', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, currency: 'INR',
+      template_id: 'classic_orange', client: { name: 'Cheque Buyer', email: '', address: '', city: '', zip: '' }, sender: null,
+      items: [{ id: 'l1', name: 'Goods', type: 'Goods', quantity: 1, rate: 5000, tax_rate: 0, amount: 5000 }], gst_mode: 'NONE',
+      place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0,
+      round_off_enabled: false, amount_paid: 0, notes: '', terms: '', subtotal: 5000, discount_amount: 0, taxable_value: 5000, cgst_amount: 0,
+      sgst_amount: 0, igst_amount: 0, tax_amount: 0, round_off: 0, total: 5000, balance_due: 5000,
+    });
+    await writeJson(page, 'invoices', invoices);
+    await page.goto(srv.origin + '/cheques');
+    await page.getByRole('button', { name: 'Cheque received' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Record a cheque received' });
+    await dlg.getByLabel('Received from *').fill('Cheque Buyer');
+    await dlg.getByLabel('Cheque no. *').fill('004512');
+    await dlg.getByLabel('Drawn on (bank) *').fill('HDFC Bank');
+    await dlg.getByLabel('Cheque date *').fill(day(2));
+    const linkSelect = dlg.getByLabel('Against invoice (optional)');
+    await linkSelect.selectOption(await linkSelect.locator('option', { hasText: 'INV/CHQ/0001' }).getAttribute('value'));
+    await dlg.getByText(/Post-dated: you will be reminded/).waitFor();
+    await dlg.getByRole('button', { name: 'Save cheque' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const saved = (await readJson(page, 'cheques', [], (v) => v.length === 1))[0];
+    check(saved?.status === 'received' && saved.amount === 5000 && saved.invoice_id === 'chq-inv' && saved.cheque_date === day(2),
+      `post-dated cheque stored, linked to the invoice (${saved?.status}, ${saved?.amount}, ${saved?.cheque_date})`);
+    await page.getByText('PDC', { exact: true }).first().waitFor();
+
+    await page.getByRole('button', { name: /^Notifications/ }).click();
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/post-dated cheque due within 3 days/).waitFor();
+    check(true, 'the notification bell reminds about the post-dated cheque');
+    await page.keyboard.press('Escape');
+
+    // The customer asked us to present it today: move the date, then clear it.
+    await page.getByRole('button', { name: 'Edit cheque 004512' }).click();
+    const edit = page.getByRole('dialog', { name: 'Edit cheque' });
+    await edit.getByLabel('Cheque date *').fill(today);
+    await edit.getByRole('button', { name: 'Save changes' }).click();
+    await edit.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Clear cheque 004512' }).click();
+    const act = page.getByRole('dialog', { name: /Mark cleared · cheque 004512/ });
+    await act.getByText(/Record the payment of ₹5,000\.00 against INV\/CHQ\/0001/).waitFor();
+    await act.getByRole('button', { name: 'Mark cleared' }).click();
+    await act.waitFor({ state: 'detached' });
+    const cleared = (await readJson(page, 'cheques', [], (v) => v[0]?.status === 'cleared'))[0];
+    const tx = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.invoice_id === 'chq-inv'))).find((t) => t.invoice_id === 'chq-inv');
+    const inv = (await readJson(page, 'invoices', [], (v) => v.find((i) => i.id === 'chq-inv')?.status === 'Paid')).find((i) => i.id === 'chq-inv');
+    check(cleared?.status === 'cleared' && tx?.method === 'Cheque' && tx?.reference === '004512' && tx?.amount === 5000 && cleared.payment_id === tx.id,
+      `clearing records the cheque payment (${cleared?.status}, ${tx?.method} ${tx?.reference} ${tx?.amount})`);
+    check(inv?.status === 'Paid' && inv.balance_due === 0, `the invoice is settled (${inv?.status}, balance ${inv?.balance_due})`);
+
+    await page.goto(srv.origin + '/books?tab=fcst');
+    await page.getByText('Estimate, not a statement.').waitFor();
+    await page.getByRole('radio', { name: '30 days' }).click();
+    await page.getByRole('img', { name: /Closing balance goes from/ }).waitFor();
+    await page.goto(srv.origin + '/books?tab=fx');
+    await page.getByText(/Period-end revaluation of open receivables/).waitFor();
+    await page.goto(srv.origin + '/reports?tab=party');
+    await page.getByRole('table', { name: 'Profitability by customer' }).waitFor();
+    check(true, 'forecast, FX gain/loss and party-profit screens render');
+  });
+
   await step('an existing localStorage user moves to IndexedDB on first load', async () => {
     // A device last used by a pre-4.x build: data in localStorage, schema v1, logo inline in the snapshot.
     const logo = `data:image/png;base64,${LOGO_PNG}`;

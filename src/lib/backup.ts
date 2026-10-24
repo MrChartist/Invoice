@@ -221,11 +221,13 @@ const RECORD_TABLES = [
   'purchase_orders',
   // Cost centres & budgets (6.16 / 6.17)
   'cost_centres', 'budgets',
+  // Cheque register (6.26)
+  'cheques',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
-  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', ASSET_TABLE,
+  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', 'cheques', ASSET_TABLE,
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

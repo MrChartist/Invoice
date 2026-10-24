@@ -176,15 +176,15 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.15 | ✅ **Optional automatic late-fee line** per client terms (new draft invoice, never edits the original; `receivables.md`) | FreshBooks, Invoice Ninja | S |
 | 6.16 | ✅ **Cost centres / projects** with project P&L (Books → Projects; `docs/features/cost-centres-budgets.md`) | Tally, Busy, QBO, Xero, Zoho | M |
 | 6.17 | ✅ **Budgets vs actual** (Books → Budgets: monthly per FY / account / cost centre, copy from last year's actuals) | Tally, Zoho, Xero, QBO | S–M |
-| 6.18 | **Cash-flow forecast** 30/90/180 days from open items, recurring and collection lag | Xero | M |
-| 6.19 | **Exchange gain/loss** (realised + period-end revaluation) | Zoho, Tally, Xero | S–M |
+| 6.18 | ✅ **Cash-flow forecast** 30/90/180 days from open items, recurring and collection lag (Books → Forecast, `src/lib/cash-forecast.ts`, `docs/features/cash-planning.md`) | Xero | M |
+| 6.19 | ✅ **Exchange gain/loss** (realised on receipts, posted to ledger 4930; period-end revaluation report; `src/lib/fx-gain.ts`) | Zoho, Tally, Xero | S–M |
 | 6.20 | **Separate companies** on one device (isolated data sets + switcher) | Tally, Busy, Vyapar | M |
 | 6.21 | **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) | Vyapar, myBillBook, Zoho | M |
 | 6.22 | ✅ **.xlsx import/export without a dependency** (native `DecompressionStream` + a hand-written XML tokenizer, `src/lib/xlsx.ts`); ZIP writer `src/lib/zip.ts` ready for a ZIP of PDFs (not wired yet) | most | M |
 | 6.23 | **Custom fields** on documents, items, parties, printable | Tally (UDF), Zoho, Vyapar | S–M |
 | 6.24 | ✅ **Bulk e-Invoice / e-Way JSON** and bulk IRN response import (`einvoice.md`) | Zoho, Tally | S |
-| 6.25 | **Party/item profitability, credit limits at billing** | Vyapar, Zoho | S–M |
-| 6.26 | **Cheque register & PDC reminders**, cheque printing | Tally, Busy | S–M |
+| 6.25 | ✅ **Party/item profitability, credit limits at billing** (Reports → Item / Party profit; editor warning; `profitability.ts`, `credit-limit.ts`) | Vyapar, Zoho | S–M |
+| 6.26 | ✅ **Cheque register & PDC reminders**, cheque printing (`/cheques`, `src/lib/cheques.ts`, `cheque-print.ts`) | Tally, Busy | S–M |
 
 Already planned in Phase 5 and confirmed by the survey: GSTR-2B/IMS matcher (5.1), GSTR-9 (5.2), advances/Table 11
 (5.3), Hindi/regional UI (5.4), POS (5.5 → 6.8), barcode (5.6 → 6.7), folder sync (5.7), vault mode (5.8),

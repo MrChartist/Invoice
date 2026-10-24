@@ -12,6 +12,8 @@ import { buildReceipt, receiptHtml, referenceLabel } from '../../lib/receipts';
 import { downloadText } from '../../lib/download';
 import { ReminderModal } from '../share/ReminderModal';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
+import { realisedFx } from '../../lib/fx-gain';
+import { fxRate, isForeignCurrency } from '../../lib/fx';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 
@@ -55,6 +57,8 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const [method, setMethod] = useState(METHODS[0]);
   const [date, setDate] = useState(todayInput());
   const [reference, setReference] = useState('');
+  /** Realised rate (₹ per unit) on a foreign-currency receipt (6.19). */
+  const [realised, setRealised] = useState('');
   const [error, setError] = useState('');
   /** Set right after a payment clears the balance: offer the receipt and a thank-you. */
   const [settled, setSettled] = useState<Payment | null>(null);
@@ -75,6 +79,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     setMethod(METHODS[0]);
     setDate(todayInput());
     setReference('');
+    setRealised('');
     setError('');
     setSettled(null);
     // Reset the form only when a different document is opened.
@@ -84,6 +89,8 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   if (!invoice || !live) return null;
   // Period lock: a frozen document takes no new payments and loses none.
   const locked = isLocked(live);
+  const foreign = isForeignCurrency(live) && fxRate(live) !== null;
+  const preview = foreign ? realisedFx({ amount: Number(amount) || 0, realised_rate: Number(realised) || undefined }, live) : null;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +99,9 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     if (!Number.isFinite(value) || value <= 0) return setError('Enter an amount above zero.');
     if (value > balance + 0.005) return setError(`This is more than the balance of ${formatCurrency(balance, live.currency)}.`);
     try {
-      const payment = localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date });
+      const rate = Number(realised);
+      if (realised.trim() && !(rate > 0)) return setError('Enter the realised rate in rupees, or leave it blank.');
+      const payment = localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date, realisedRate: foreign && rate > 0 ? rate : undefined });
       setVersion((v) => v + 1);
       refreshEditor(live.id);
       setError('');
@@ -202,6 +211,26 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value.trimStart())} placeholder={method === 'Cash' ? 'Receipt book no.' : 'e.g. 412345678901'} />
             </label>
           </div>
+          {foreign && (
+            <label className={controls.field}>
+              <span className={controls.label}>Rate realised, ₹ per {live.currency} (optional)</span>
+              <input
+                className={controls.inputNumeric + ' ' + controls.input}
+                type="number"
+                min="0"
+                step="0.0001"
+                inputMode="decimal"
+                value={realised}
+                onChange={(e) => setRealised(e.target.value)}
+                placeholder={`Invoice rate ${fxRate(live)}`}
+              />
+              <span className={controls.hint}>
+                {preview
+                  ? `Exchange ${preview.gain >= 0 ? 'gain' : 'loss'} of ₹${Math.abs(preview.gain).toFixed(2)} (₹${preview.realisedInr.toFixed(2)} received vs ₹${preview.bookInr.toFixed(2)} at the invoice rate) — posted to the ledger. GST keeps the invoice rate.`
+                  : 'The rate your bank converted at (see the FIRC / bank advice). The difference from the invoice rate is booked as exchange gain or loss.'}
+              </span>
+            </label>
+          )}
           {error && <p className={controls.error} role="alert">{error}</p>}
         </form>
       ) : locked ? null : settled ? (
@@ -233,6 +262,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                   <span>
                     {p.method} · {formatDate(p.date)}
                     {p.reference ? ` · ${p.reference}` : ''}
+                    {p.realised_rate ? ` · realised @ ₹${p.realised_rate}` : ''}
                   </span>
                 </div>
                 <button type="button" className={controls.btnIcon} onClick={() => openReceipt(live, p)} aria-label={`Receipt for ${formatCurrency(p.amount, live.currency)}`} title="Print receipt">

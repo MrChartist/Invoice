@@ -161,6 +161,13 @@ export interface Client {
    * "Add late fee" on an overdue invoice (a NEW invoice is created; see src/lib/late-fee.ts).
    */
   late_fee?: { mode: 'percent_pa' | 'flat'; rate: number; graceDays: number };
+  /**
+   * Additive (roadmap 6.25): credit limit in rupees. The editor warns (never blocks) when this
+   * client's outstanding plus the invoice being drafted goes over it (`src/lib/credit-limit.ts`).
+   */
+  credit_limit?: number;
+  /** Additive (6.25): credit period in days; bills older than this with a balance raise the same warning. */
+  credit_days?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -204,6 +211,13 @@ export interface Payment {
   reference?: string;
   note?: string;
   date: string;
+  /**
+   * Additive (roadmap 6.19): rupees actually realised per unit of the invoice currency on this
+   * receipt (bank's buying rate). Only meaningful on a foreign-currency invoice with an
+   * `exchange_rate`; the difference is the realised exchange gain/loss (`src/lib/fx-gain.ts`).
+   * `amount` stays in the invoice currency.
+   */
+  realised_rate?: number;
 }
 
 /** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */
