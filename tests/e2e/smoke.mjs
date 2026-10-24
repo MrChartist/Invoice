@@ -174,6 +174,29 @@ try {
     await tab2.close();
   });
 
+  await step('record a part payment and print its receipt', async () => {
+    await page.goto(srv.origin + '/transactions');
+    await page.getByRole('button', { name: /^Record payment for INV/ }).first().click();
+    const dlg = page.getByRole('dialog', { name: 'Record payment' });
+    await dlg.getByLabel('Amount').fill('1000');
+    await dlg.getByRole('combobox').selectOption('Bank transfer');
+    await dlg.getByText('UTR number (optional)').waitFor();
+    check(true, 'reference field asks for the UTR on a bank transfer');
+    await dlg.getByLabel(/UTR number/).fill('HDFC0000123456');
+    await dlg.getByRole('button', { name: 'Record payment' }).click();
+    await dlg.getByText('Payment history').waitFor();
+    const [popup] = await Promise.all([
+      context.waitForEvent('page'),
+      dlg.getByRole('button', { name: /^Receipt for/ }).first().click(),
+    ]);
+    await popup.waitForLoadState();
+    const text = await popup.locator('body').innerText();
+    check(/PAYMENT RECEIPT/i.test(text) && /RCPT\/FY\d{2}-\d{2}\/0001/.test(text) && text.includes('HDFC0000123456') && /One Thousand/.test(text),
+      'receipt shows number, reference and amount in words');
+    await popup.close();
+    await page.keyboard.press('Escape');
+  });
+
   await step('bulk mark paid, then delete with undo', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByLabel('Select INV/FY', { exact: false }).first().check();

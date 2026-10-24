@@ -71,3 +71,12 @@ Optional cross-links:
 ## Notes
 - No network calls, no new dependencies. All colours use theme tokens. The statement paper keeps its own neutral palette, like the invoice paper.
 - `docs/ARCHITECTURE.md`, `src/lib/stats.ts` (`isRevenueDoc`) and the `PageHeader`, `StatCard`, `NumberInput` and `types/purchases.ts` files were not present in this worktree. The page uses `surface.module.css` directly, and `isLedgerDoc` mirrors the revenue-doc rule. If `isRevenueDoc` lands, swap it in.
+
+## Receipts and the paid-in-full step
+
+`src/lib/receipts.ts` builds payment receipts: `receiptNumber` derives `RCPT/FY<yy-yy>/<seq>` from the date order of
+all payments in that financial year (nothing new is stored), `buildReceipt` adds the amount in words and the
+balance left after that payment (net of TDS), and `receiptHtml` renders a script-free page that prints from a plain
+window under the CSP (a blocked pop-up saves it as HTML instead). Each payment in the payment dialog has a Receipt
+button; a payment that clears the balance shows **Paid in full** with Receipt and **Send thank-you** (the existing
+`thank_you` reminder template). The reference field is labelled by method (UTR for bank/UPI, cheque number …).

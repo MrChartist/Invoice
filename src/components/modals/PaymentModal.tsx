@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Lock, Trash2 } from 'lucide-react';
+import { Heart, Lock, Receipt, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
@@ -8,7 +8,10 @@ import { getLockUntil, isLocked, prettyDay } from '../../lib/period-lock';
 import { readLinks, totalCredited } from '../../lib/documents';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
-import type { InvoiceRecord } from '../../types/invoice';
+import { buildReceipt, receiptHtml, referenceLabel } from '../../lib/receipts';
+import { downloadText } from '../../lib/download';
+import { ReminderModal } from '../share/ReminderModal';
+import type { InvoiceRecord, Payment } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 
@@ -19,6 +22,25 @@ export interface PaymentModalProps {
   onClose: () => void;
   /** Called after any change so the caller can refresh its list. */
   onChanged: (message?: string) => void;
+}
+
+/**
+ * Open a printable receipt in its own window (script-free HTML, so the CSP allows it).
+ * A blocked pop-up falls back to saving the receipt as an HTML file.
+ */
+function openReceipt(invoice: InvoiceRecord, payment: Payment) {
+  const data = buildReceipt(invoice, payment, localDb.payments.getAll());
+  const html = receiptHtml(data);
+  const w = window.open('', '_blank');
+  if (w) {
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  } else {
+    downloadText(`${data.number.replace(/\//g, '-')}.html`, html, 'text/html');
+  }
 }
 
 /** If the invoice is open in the editor, reload it so the screen shows the new paid amount. */
@@ -34,6 +56,9 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const [date, setDate] = useState(todayInput());
   const [reference, setReference] = useState('');
   const [error, setError] = useState('');
+  /** Set right after a payment clears the balance: offer the receipt and a thank-you. */
+  const [settled, setSettled] = useState<Payment | null>(null);
+  const [thanksOpen, setThanksOpen] = useState(false);
 
   // Always read the live row — a payment changes the balance under us.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,6 +76,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     setDate(todayInput());
     setReference('');
     setError('');
+    setSettled(null);
     // Reset the form only when a different document is opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice?.id]);
@@ -66,13 +92,13 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     if (!Number.isFinite(value) || value <= 0) return setError('Enter an amount above zero.');
     if (value > balance + 0.005) return setError(`This is more than the balance of ${formatCurrency(balance, live.currency)}.`);
     try {
-      localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date });
+      const payment = localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date });
       setVersion((v) => v + 1);
       refreshEditor(live.id);
       setError('');
-      const settled = value >= balance - 0.005;
-      onChanged(settled ? `${live.invoice_number} marked as paid` : `Recorded ${formatCurrency(value, live.currency)}`);
-      if (settled) onClose();
+      const cleared = value >= balance - 0.005;
+      onChanged(cleared ? `${live.invoice_number} marked as paid` : `Recorded ${formatCurrency(value, live.currency)}`);
+      if (cleared) setSettled(payment);
       else setAmount(String(Math.max(round2(balance - value), 0)));
     } catch (err) {
       setError((err as Error).message);
@@ -172,15 +198,29 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               </select>
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>Reference (optional)</span>
-              <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR / cheque no." />
+              <span className={controls.label}>{referenceLabel(method)} (optional)</span>
+              <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value.trimStart())} placeholder={method === 'Cash' ? 'Receipt book no.' : 'e.g. 412345678901'} />
             </label>
           </div>
           {error && <p className={controls.error} role="alert">{error}</p>}
         </form>
-      ) : locked ? null : (
+      ) : locked ? null : settled ? (
+        <div className={styles.paidPanel} role="status">
+          <strong>Paid in full</strong>
+          <span>{live.invoice_number} is settled. Send the client a receipt or a quick thank-you.</span>
+          <div className={styles.paidActions}>
+            <button type="button" className={controls.btnPrimary} onClick={() => openReceipt(live, settled)}>
+              <Receipt size={16} /> Receipt
+            </button>
+            <button type="button" className={controls.btnOutline} onClick={() => setThanksOpen(true)}>
+              <Heart size={16} /> Send thank-you
+            </button>
+          </div>
+        </div>
+      ) : (
         <p className={controls.ok}>Fully paid. Nothing is outstanding.</p>
       )}
+      {thanksOpen && <ReminderModal invoice={live} open onClose={() => setThanksOpen(false)} />}
 
       {payments.length > 0 && (
         <div>
@@ -195,6 +235,9 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                     {p.reference ? ` · ${p.reference}` : ''}
                   </span>
                 </div>
+                <button type="button" className={controls.btnIcon} onClick={() => openReceipt(live, p)} aria-label={`Receipt for ${formatCurrency(p.amount, live.currency)}`} title="Print receipt">
+                  <Receipt size={15} />
+                </button>
                 <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={`Remove payment of ${formatCurrency(p.amount, live.currency)}`}>
                   <Trash2 size={15} />
                 </button>
