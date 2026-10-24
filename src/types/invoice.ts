@@ -288,6 +288,12 @@ export interface Payment {
   realised_rate?: number;
   /** Additive (multi-account BRS): the bank account it was received into (`bank-accounts.ts`); missing = main. */
   bank_account_id?: string;
+  /**
+   * Additive (roadmap 5.3): this row is an advance (`advances` table) adjusted against the invoice,
+   * not new money. It settles the bill like any payment, but cash books, receipts numbering and
+   * bank matching skip it — the cash came in on the advance's own date.
+   */
+  advance_id?: string;
 }
 
 /** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */

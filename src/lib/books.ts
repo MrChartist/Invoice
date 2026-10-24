@@ -27,6 +27,8 @@ import { isoDay } from './dates';
 import { toCsv } from './csv';
 import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
+import type { AdvanceRecord } from '../types/advances';
+import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment } from './advance-tax';
 
 /* ════════════════════════════════════════════════════════════════
    Types
@@ -104,6 +106,8 @@ export interface BooksData {
     bank_account_id?: string;
   }>;
   openings: OpeningBalance[];
+  /** Advance receipts (5.3, `advances` table). Optional so older callers / fixtures stay valid. */
+  advances?: AdvanceRecord[];
 }
 
 export const EMPTY_BOOKS: BooksData = {
@@ -420,6 +424,8 @@ export function buildVouchers(data: BooksData): Voucher[] {
   }
 
   for (const t of data.transactions) {
+    // An advance adjusted against an invoice moved no money: the cash came in on the advance.
+    if (isAdvanceAdjustment(t)) continue;
     const date = toIsoDate(t.date);
     const inv = invById.get(t.invoice_id);
     // A receipt against a foreign-currency invoice is booked at the rupees actually realised
@@ -478,6 +484,25 @@ export function buildVouchers(data: BooksData): Voucher[] {
       method: str(pp.method) || 'Bank transfer',
       account: accountForMethod(pp.method),
       bank_account_id: accountForMethod(pp.method) === 'bank' && pp.bank_account_id ? str(pp.bank_account_id) : undefined,
+    });
+  }
+
+  // Advance receipts (5.3) are cash in on the day received; refunds of an advance are cash out.
+  for (const m of advanceMovements(data.advances ?? [], data.transactions, data.invoices)) {
+    if (m.kind === 'adjusted') continue;
+    const received = m.kind === 'received';
+    out.push({
+      id: `${received ? 'adv' : 'advrf'}:${m.sourceId}`,
+      date: m.date,
+      type: received ? 'Receipt' : 'Payment',
+      number: received ? m.number : m.ref || m.number,
+      party: m.party,
+      narration: received ? `Advance received${m.taxed ? ` (incl. GST ${round2(m.igst + m.cgst + m.sgst).toFixed(2)})` : ''}` : `Refund of advance ${m.number}`,
+      debit: received ? 0 : m.gross,
+      credit: received ? m.gross : 0,
+      method: str(m.method) || 'Bank transfer',
+      account: accountForMethod(m.method),
+      link: '/receivables?tab=advances',
     });
   }
 
@@ -983,8 +1008,15 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   let receipts = 0;
   const invById = new Map(data.invoices.map((i) => [i.id, i]));
   for (const t of data.transactions) {
-    if (!upTo(toIsoDate(t.date))) continue;
+    if (isAdvanceAdjustment(t) || !upTo(toIsoDate(t.date))) continue;
     receipts += Math.abs(inrValue(num(t.amount), invById.get(t.invoice_id)));
+  }
+  // Advances (5.3): the cash received (less refunds) is a credit to customers. GST paid on an
+  // advance is left out here: the liability and the matching "GST paid on advances" asset cancel
+  // (the double-entry ledger shows both).
+  for (const m of advanceMovements(data.advances ?? [], data.transactions, data.invoices)) {
+    if (!upTo(m.date) || m.kind === 'adjusted') continue;
+    receipts += m.kind === 'received' ? m.gross : -m.gross;
   }
 
   const purchases = data.purchases
@@ -1073,6 +1105,7 @@ export function loadBooksData(): BooksData {
     vendors: getTable<BooksData['vendors'][number]>('vendors'),
     purchasePayments: getTable<BooksData['purchasePayments'][number]>('purchase_payments'),
     openings: loadOpenings(),
+    advances: getTable<AdvanceRecord>(ADVANCES_TABLE),
   };
 }
 

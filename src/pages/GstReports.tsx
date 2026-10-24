@@ -14,6 +14,7 @@ import {
   periodForDate,
   periodLabel,
   periodRange,
+  type AdvanceTableRow,
   type AmendCdnRow,
   type AmendDocRow,
   type CdnRow,
@@ -30,7 +31,9 @@ import {
   sectionCsv,
   type SectionId,
 } from '../lib/gstr-json';
-import type { InvoiceRecord, SenderProfile } from '../types/invoice';
+import type { InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
+import type { AdvanceRecord } from '../types/advances';
+import { advanceTaxEvents } from '../lib/advance-tax';
 import { DataTable, Money, type Column } from '../components/gst-reports/DataTable';
 import { Gstr3bView } from '../components/gst-reports/Gstr3bView';
 import { PeriodPicker } from '../components/gst-reports/PeriodPicker';
@@ -54,7 +57,7 @@ const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 const Gstr9Modal = lazy(() => import('../components/gst-reports/Gstr9Modal'));
 const BulkEInvoiceModal = lazy(() => import('../components/einvoice/BulkEInvoiceModal'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'amend' | 'gstr3b' | 'gstr2b' | 'composition';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'gstr3b' | 'gstr2b' | 'composition';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -65,6 +68,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'cdnur', label: 'CDNUR' },
   { id: 'exp', label: 'Exports' },
   { id: 'nil', label: 'Nil / Exempt' },
+  { id: 'at', label: 'Advances 11A' },
+  { id: 'txpd', label: 'Adjusted 11B' },
   { id: 'hsn', label: 'HSN' },
   { id: 'docs', label: 'Documents' },
   { id: 'amend', label: 'Amendments' },
@@ -95,6 +100,11 @@ export function GstReports() {
   const { notify, toastNode } = useToast();
   const invoices = useMemo(() => getTable<InvoiceRecord>('invoices'), []);
   const purchases = useMemo(() => getTable<unknown>('purchases'), []);
+  // Advance receipts (5.3): GSTR-1 Table 11 and their effect on 3B 3.1(a).
+  const advances = useMemo(
+    () => advanceTaxEvents(getTable<AdvanceRecord>('advances'), getTable<Payment>('transactions'), invoices),
+    [invoices],
+  );
   const profiles = useMemo<SenderProfile[]>(() => localDb.settings.get().profiles, []);
 
   const gstins = useMemo(() => {
@@ -169,19 +179,19 @@ export function GstReports() {
 
   const report = useMemo(() => {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin);
-    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover });
-  }, [invoices, purchases, profiles, period, gstin, lastFyTurnover]);
+    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover, advances });
+  }, [invoices, purchases, profiles, period, gstin, lastFyTurnover, advances]);
 
   const { gstr1: g1, gstr3b: g3, issues } = report;
   const label = periodLabel(period);
   const fileBase = `GSTR1_${gstin || 'all'}_${g1.fp}`;
   const am = g1.amendments;
   const amendCount = am ? am.b2ba.length + am.b2cla.length + am.cdnra.length + am.cdnura.length + am.b2csa.length : 0;
-  const hasData = g1.counts.included > 0 || amendCount > 0;
+  const hasData = g1.counts.included > 0 || amendCount > 0 || !!g1.at?.length || !!g1.txpd?.length;
 
   const counts: Partial<Record<TabId, number>> = {
     b2b: g1.b2b.length, b2cl: g1.b2cl.length, b2cs: g1.b2cs.length, cdnr: g1.cdnr.length,
-    cdnur: g1.cdnur.length, exp: g1.exp.length, nil: g1.nil.length, hsn: g1.hsn.length, docs: g1.docIssue.length,
+    cdnur: g1.cdnur.length, exp: g1.exp.length, nil: g1.nil.length, at: g1.at?.length ?? 0, txpd: g1.txpd?.length ?? 0, hsn: g1.hsn.length, docs: g1.docIssue.length,
     amend: amendCount,
   };
 
@@ -289,6 +299,32 @@ export function GstReports() {
             ]}
           />
         );
+      case 'at':
+      case 'txpd': {
+        const rows = (tab === 'at' ? g1.at : g1.txpd) ?? [];
+        const cols: Column<AdvanceTableRow>[] = [
+          { key: 'pos', label: 'Place of supply', render: (r) => pos(r.pos) },
+          { key: 'sply', label: 'Supply', render: (r) => (r.supply === 'INTRA' ? 'Intra-state' : 'Inter-state') },
+          { key: 'rate', label: 'Rate %', numeric: true, render: (r) => r.rate },
+          { key: 'g', label: 'Gross (incl. tax)', numeric: true, render: (r) => <Money value={r.gross} />, total: (r) => r.gross },
+          { key: 'tx', label: tab === 'at' ? 'Advance received (excl. tax)' : 'Advance adjusted (excl. tax)', numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
+          { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
+          { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
+          { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
+        ];
+        return (
+          <>
+            <p className={controls.hint} style={{ margin: 0 }}>
+              {tab === 'at'
+                ? 'Table 11A: advances received in this period on which GST is due (services; goods only before 15 Nov 2017, Notification 66/2017-CT). Tax worked out on the advance, tax-inclusive.'
+                : 'Table 11B: advances adjusted against invoices (and refunded, Rule 51) in this period — the tax comes off. '}
+              {' '}Also included in GSTR-3B 3.1(a). <Link to="/receivables?tab=advances" className={local.issueLink}>Open advances</Link>. Verify with your CA.
+            </p>
+            <DataTable columns={cols} rows={rows} rowKey={(r) => `${r.pos}${r.rate}${r.supply}`} caption={tab === 'at' ? 'Advances received, Table 11A' : 'Advances adjusted, Table 11B'}
+              emptyText={tab === 'at' ? 'No taxable advances received in this period.' : 'No advances adjusted or refunded in this period.'} />
+          </>
+        );
+      }
       case 'hsn': {
         const hint = (
           <p className={controls.hint} style={{ margin: 0 }}>
@@ -416,7 +452,7 @@ export function GstReports() {
     }
   };
 
-  const csvTabs: SectionId[] = ['b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'hsn', 'docs', 'amend'];
+  const csvTabs: SectionId[] = ['b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'at', 'txpd', 'hsn', 'docs', 'amend'];
   const isCsvTab = (csvTabs as string[]).includes(tab);
 
   const t = g1.totals;
@@ -590,6 +626,8 @@ export function GstReports() {
       { id: 'cdnr' as const, name: 'CDNR - credit notes (registered)', n: g1.cdnr.length, tx: sumOf(g1.cdnr, 'taxable'), tax: sumOf(g1.cdnr, 'igst') + sumOf(g1.cdnr, 'cgst') + sumOf(g1.cdnr, 'sgst') },
       { id: 'cdnur' as const, name: 'CDNUR - credit notes (unregistered / export)', n: g1.cdnur.length, tx: sumOf(g1.cdnur, 'taxable'), tax: sumOf(g1.cdnur, 'igst') + sumOf(g1.cdnur, 'cgst') + sumOf(g1.cdnur, 'sgst') },
       { id: 'exp' as const, name: 'Exports', n: g1.exp.length, tx: sumOf(g1.exp, 'taxable'), tax: sumOf(g1.exp, 'igst') },
+      ...(g1.at?.length ? [{ id: 'at' as const, name: 'Advances received (Table 11A)', n: g1.at.length, tx: sumOf(g1.at, 'taxable'), tax: sumOf(g1.at, 'igst') + sumOf(g1.at, 'cgst') + sumOf(g1.at, 'sgst') }] : []),
+      ...(g1.txpd?.length ? [{ id: 'txpd' as const, name: 'Advances adjusted (Table 11B, deducted)', n: g1.txpd.length, tx: sumOf(g1.txpd, 'taxable'), tax: sumOf(g1.txpd, 'igst') + sumOf(g1.txpd, 'cgst') + sumOf(g1.txpd, 'sgst') }] : []),
     ];
     return (
       <>

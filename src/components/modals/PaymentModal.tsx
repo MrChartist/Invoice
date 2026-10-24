@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Lock, Receipt, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
+import { can } from '../../lib/access';
 import { getLockUntil, isLocked, prettyDay } from '../../lib/period-lock';
 import { readLinks, totalCredited } from '../../lib/documents';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
@@ -19,6 +20,9 @@ import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 
 const METHODS = ['UPI', 'Bank transfer', 'Cash', 'Cheque', 'Card', 'Other'];
+
+// "Apply advance" (5.3) and the advances maths load only when this dialog opens.
+const ApplyAdvancePanel = lazy(() => import('../advances/ApplyAdvancePanel'));
 
 export interface PaymentModalProps {
   invoice: InvoiceRecord | null;
@@ -254,6 +258,21 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
       )}
       {thanksOpen && <ReminderModal invoice={live} open onClose={() => setThanksOpen(false)} />}
 
+      {balance > 0 && !locked && can('payment.record') && (live.currency || 'INR').toUpperCase() === 'INR' && (
+        <Suspense fallback={null}>
+          <ApplyAdvancePanel
+            invoice={live}
+            version={version}
+            onApplied={(message) => {
+              setVersion((v) => v + 1);
+              refreshEditor(live.id);
+              setError('');
+              onChanged(message);
+            }}
+          />
+        </Suspense>
+      )}
+
       {payments.length > 0 && (
         <div>
           <div className={styles.historyLabel}>Payment history</div>
@@ -263,14 +282,16 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                 <div>
                   <strong>{formatCurrency(p.amount, live.currency)}</strong>
                   <span>
-                    {p.method} · {formatDate(p.date)}
-                    {p.reference ? ` · ${p.reference}` : ''}
+                    {p.advance_id ? `Advance ${p.reference ?? ''} adjusted` : p.method} · {formatDate(p.date)}
+                    {p.reference && !p.advance_id ? ` · ${p.reference}` : ''}
                     {p.realised_rate ? ` · realised @ ₹${p.realised_rate}` : ''}
                   </span>
                 </div>
-                <button type="button" className={controls.btnIcon} onClick={() => openReceipt(live, p)} aria-label={`Receipt for ${formatCurrency(p.amount, live.currency)}`} title="Print receipt">
-                  <Receipt size={15} />
-                </button>
+                {!p.advance_id && (
+                  <button type="button" className={controls.btnIcon} onClick={() => openReceipt(live, p)} aria-label={`Receipt for ${formatCurrency(p.amount, live.currency)}`} title="Print receipt">
+                    <Receipt size={15} />
+                  </button>
+                )}
                 <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={`Remove payment of ${formatCurrency(p.amount, live.currency)}`}>
                   <Trash2 size={15} />
                 </button>

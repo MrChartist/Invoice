@@ -3,7 +3,7 @@
  * per-section CSV and a printable summary document. All pure (no DOM access).
  *
  * The JSON follows the structure of the GST offline utility (b2b / b2cl /
- * b2cs / cdnr / cdnur / exp / nil / hsn / doc_issue). It has NOT been validated
+ * b2cs / cdnr / cdnur / exp / nil / at / txpd / hsn / doc_issue). It has NOT been validated
  * against the live portal schema — import it into the offline tool, let it
  * validate, and verify with your CA before filing.
  */
@@ -12,6 +12,7 @@ import { round2 } from './invoice-calc';
 import { toGstnDate } from './gst-reports';
 import { csvCell, toCsv as sharedToCsv } from './csv';
 import type {
+  AdvanceTableRow,
   AmendCdnRow,
   AmendDocRow,
   B2csaRow,
@@ -86,6 +87,32 @@ export const AMEND_JSON_LAYOUT = {
   b2ba: 'b2ba', b2cla: 'b2cla', cdnra: 'cdnra', cdnura: 'cdnura', b2csa: 'b2csa',
   origInvNum: 'oinum', origInvDate: 'oidt', origNoteNum: 'ont_num', origNoteDate: 'ont_dt', origMonth: 'omon',
 } as const;
+
+/**
+ * Table 11 (advances) JSON layout: `at` (11A, advances received) and `txpd` (11B, advances
+ * adjusted), each `[{ pos, sply_ty, itms: [{ rt, ad_amt, iamt | camt + samt, csamt }] }]`, where
+ * `ad_amt` is the advance EXCLUDING tax. Believed to match the offline tool, but NOT verified
+ * against the live schema (same caveat as `HSN_JSON_LAYOUT`) — verify with your CA.
+ */
+export const ADVANCE_JSON_LAYOUT = { receivedKey: 'at', adjustedKey: 'txpd', verified: false } as const;
+
+function advanceJson(rows: AdvanceTableRow[]) {
+  const byPos = groupBy(rows, (r) => `${r.pos}|${r.supply}`);
+  return [...byPos].map(([, list]) => ({
+    pos: list[0].pos,
+    sply_ty: list[0].supply,
+    itms: list.map((r) => {
+      const it: Record<string, number> = { rt: r.rate, ad_amt: round2(r.taxable) };
+      if (r.supply === 'INTER') it.iamt = round2(r.igst);
+      else {
+        it.camt = round2(r.cgst);
+        it.samt = round2(r.sgst);
+      }
+      it.csamt = round2(r.cess ?? 0);
+      return it;
+    }),
+  }));
+}
 
 export interface Gstr1JsonOptions {
   /** Preceding-FY aggregate turnover (GSTN `gt`). Not derivable from this app alone — enter it yourself. */
@@ -209,6 +236,9 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
     };
   }
 
+  if (r.at?.length) out[ADVANCE_JSON_LAYOUT.receivedKey] = advanceJson(r.at);
+  if (r.txpd?.length) out[ADVANCE_JSON_LAYOUT.adjustedKey] = advanceJson(r.txpd);
+
   if (r.hsn.length) {
     const block: Record<string, unknown> = {};
     if (HSN_JSON_LAYOUT.legacy || !r.hsnSplit) block.data = hsnRows(r.hsn);
@@ -324,7 +354,7 @@ export function toCsv(rows: CsvCell[][]): string {
   return sharedToCsv(rows) + '\r\n';
 }
 
-export type SectionId = 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'amend';
+export type SectionId = 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend';
 
 export const SECTION_LABELS: Record<SectionId, string> = {
   b2b: 'B2B',
@@ -334,6 +364,8 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   cdnur: 'CDNUR',
   exp: 'Exports',
   nil: 'Nil / Exempt',
+  at: 'Advances received (11A)',
+  txpd: 'Advances adjusted (11B)',
   hsn: 'HSN summary',
   docs: 'Documents issued',
   amend: 'Amendments',
@@ -383,6 +415,12 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
       return toCsv([
         ['Description', 'Nil rated', 'Exempted', 'Non-GST'],
         ...r.nil.map((n) => [nilLabel(n.type), n.nil, n.exempt, n.nonGst]),
+      ]);
+    case 'at':
+    case 'txpd':
+      return toCsv([
+        ['Place of supply', 'Supply type', 'Rate %', 'Gross advance (incl. tax)', id === 'at' ? 'Advance received (excl. tax)' : 'Advance adjusted (excl. tax)', 'IGST', 'CGST', 'SGST', 'Cess'],
+        ...((id === 'at' ? r.at : r.txpd) ?? []).map((x) => [x.pos, x.supply, x.rate, x.gross, x.taxable, x.igst, x.cgst, x.sgst, x.cess]),
       ]);
     case 'hsn': {
       const head = ['HSN/SAC', 'Description', 'UQC', 'Total quantity', 'Total value', 'Taxable value', 'Rate %', 'IGST', 'CGST', 'SGST', 'Cess'];
@@ -439,6 +477,12 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
   return [
     ['Table', 'Description', 'Taxable value', 'IGST', 'CGST', 'SGST'],
     rowT('3.1(a)', 'Outward taxable supplies (other than zero rated, nil rated, exempted)', b.outward.taxable),
+    ...(b.advances
+      ? [
+          rowT('3.1(a)', 'of which: tax on advances received (GSTR-1 Table 11A)', b.advances.received),
+          rowT('3.1(a)', 'of which: advances adjusted / refunded (GSTR-1 Table 11B), deducted', b.advances.adjusted),
+        ]
+      : []),
     rowT('3.1(b)', 'Outward taxable supplies (zero rated)', b.outward.zeroRated),
     ['3.1(c)', 'Other outward supplies (nil rated, exempted) - inter-state', b.outward.nilExempt.inter, '', '', ''],
     ['3.1(c)', 'Other outward supplies (nil rated, exempted) - intra-state', b.outward.nilExempt.intra, '', '', ''],
@@ -548,6 +592,10 @@ export function buildSummaryHtml(rep: GstReport, periodTitle: string, filerName 
     ['Credit notes (CDNR + CDNUR)', g1.cdnr.length + g1.cdnur.length, sum(g1.cdnr, 'taxable') + sum(g1.cdnur, 'taxable'), sum(g1.cdnr, 'igst') + sum(g1.cdnur, 'igst'), sum(g1.cdnr, 'cgst') + sum(g1.cdnur, 'cgst'), sum(g1.cdnr, 'sgst') + sum(g1.cdnur, 'sgst')],
     ['Exports', g1.exp.length, sum(g1.exp, 'taxable'), sum(g1.exp, 'igst'), 0, 0],
   ];
+  const at = g1.at ?? [];
+  const txpd = g1.txpd ?? [];
+  if (at.length) sections.push(['Advances received (11A)', at.length, sum(at, 'taxable'), sum(at, 'igst'), sum(at, 'cgst'), sum(at, 'sgst')]);
+  if (txpd.length) sections.push(['Advances adjusted (11B, deducted)', txpd.length, sum(txpd, 'taxable'), sum(txpd, 'igst'), sum(txpd, 'cgst'), sum(txpd, 'sgst')]);
   const p = b.payment;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>GST summary - ${esc(periodTitle)}</title>
 <style>
@@ -564,7 +612,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.b td{font-weight
 <h2>GSTR-1 outward supplies</h2>
 <table><thead><tr><th>Section</th><th class="n">Docs / rows</th><th class="n">Taxable value</th><th class="n">IGST</th><th class="n">CGST</th><th class="n">SGST</th></tr></thead><tbody>
 ${sections.map((s) => `<tr><td>${esc(s[0])}</td><td class="n">${s[1]}</td><td class="n">${inr(s[2])}</td><td class="n">${inr(s[3])}</td><td class="n">${inr(s[4])}</td><td class="n">${inr(s[5])}</td></tr>`).join('')}
-${tr(['Net total (all sections incl. nil lines)', '', t.taxable, t.igst, t.cgst, t.sgst], true).replace('<td class="n"></td>', '<td class="n"></td>')}
+${tr(['Net total of documents (incl. nil lines; advances excluded)', '', t.taxable, t.igst, t.cgst, t.sgst], true).replace('<td class="n"></td>', '<td class="n"></td>')}
 </tbody></table>
 <h2>GSTR-3B</h2>
 <table><thead><tr><th>Table</th><th class="n">Taxable</th><th class="n">IGST</th><th class="n">CGST</th><th class="n">SGST</th></tr></thead><tbody>

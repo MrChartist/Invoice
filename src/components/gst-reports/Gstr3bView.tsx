@@ -88,6 +88,11 @@ export function Gstr3bView({ report: b }: { report: Gstr3bReport }) {
       <ul className={styles.notes}>
         <li>Set-off order: IGST credit pays IGST, then CGST, then SGST; CGST and SGST credit pay their own head first, then IGST (never each other). Reverse-charge tax is payable in cash.</li>
         <li>ITC is taken from purchase bills in the period ({b.purchasesConsidered} bill{b.purchasesConsidered === 1 ? '' : 's'} read). Imports, reverse charge, reversals and Sec 17(5) blocked credit follow the flags on each bill; ISD and cess on purchases are not modelled. Verify with your CA.</li>
+        {b.advances && (
+          <li>
+            3.1(a) includes advances (GSTR-1 Table 11): tax on advances received {(b.advances.received.igst + b.advances.received.cgst + b.advances.received.sgst).toFixed(2)} on {b.advances.received.taxable.toFixed(2)}, less advances adjusted or refunded {(b.advances.adjusted.igst + b.advances.adjusted.cgst + b.advances.adjusted.sgst).toFixed(2)} on {b.advances.adjusted.taxable.toFixed(2)}. 3.2 is not adjusted for advances.
+          </li>
+        )}
         {b.outwardRcmTaxable !== 0 && (
           <li>Outward supplies of {b.outwardRcmTaxable.toFixed(2)} where the recipient pays tax under reverse charge are in GSTR-1 (B2B, RC = Y) but excluded from 3.1.</li>
         )}

@@ -7,6 +7,7 @@
  */
 
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
+import type { AdvanceRecord } from '../types/advances';
 import { chargesAreTaxed, num, round2 } from './invoice-calc';
 import { inrRecord } from './fx';
 import { resolveStateCode, stateByCode } from './india-states';
@@ -95,6 +96,8 @@ export interface ExportSource {
   purchases: unknown[];
   /** Raw `vendors` rows — shape owned by another module, read defensively. */
   vendors: unknown[];
+  /** Advance receipts (5.3). Optional: absent = none. */
+  advances?: AdvanceRecord[];
 }
 
 export function emptySource(): ExportSource {

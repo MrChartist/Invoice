@@ -53,6 +53,7 @@ Optional cross-links:
 - Party key is the client `id`, else the case-folded name (so "Beta Co" and "beta co" merge).
 - **Legacy rows:** an invoice with `status: 'Paid'` or `amount_paid` greater than its payment rows gets a derived receipt for the difference. It is dated `updated_at` and flagged `derived: true`. This matches how the Transactions page marks invoices paid.
 - **Advances:** an overpayment on an invoice, and any payment row with no `invoice_id` but a `client_id` or `client_name`, becomes an advance. These are optional additive fields on the payment row. Other modules may write them, and `ReceiptRow` documents the shape.
+- **Advance receipts (5.3, `advances` table, `BuildInput.advances`):** the advance voucher is a credit when received, a refund a debit; the payment row with `advance_id` that applies it settles the bill but is shown as an information line with no amount (the money already came in with the advance). The unadjusted balance counts in `advances`. The **Advances** tab (`?tab=advances`) records, prints, applies and refunds them — see `advances.md`.
 - **Net** = open bills − credit notes − advances. It always equals the ledger closing balance over the full history (tested). A negative net means the party is in credit.
 - Aging buckets come from `agingBucket()` (`Not due`, `1–30`, `31–60`, `61–90`, `90+ days`) and cover bills only. Credits are shown in their own column, as Tally does.
 - Reports are per currency. The page shows a currency picker only when more than one is in use.

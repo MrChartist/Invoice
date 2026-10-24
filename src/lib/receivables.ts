@@ -23,6 +23,8 @@ import { daysOverdue, formatMoney, formatDate } from './utils';
 import { amountInWords } from './amount-in-words';
 import { isoDay } from './dates';
 import { csvCell, toCsv } from './csv';
+import type { AdvanceRecord } from '../types/advances';
+import { advanceMovements } from './advance-tax';
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -107,6 +109,12 @@ export interface BuildInput {
   invoices: InvoiceRecord[];
   payments: ReceiptRow[];
   clients?: Client[];
+  /**
+   * Advance receipts (5.3, INR only). The advance is the credit (dated when received); the payment
+   * row with `advance_id` that applies it settles the bill but adds no second credit; a refund is a
+   * debit. Unadjusted balances count in `advances`.
+   */
+  advances?: AdvanceRecord[];
 }
 
 export interface Ledger {
@@ -283,6 +291,15 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     for (const p of paidByInvoice.get(inv.id) ?? []) {
       const amt = round2(num(p.amount));
       paid = round2(paid + amt);
+      if (p.advance_id) {
+        // The money arrived with the advance (already a credit): show the adjustment, move nothing.
+        a.entries.push({
+          date: dateKey(p.date) || issue, kind: 'advance', ref: p.reference || inv.invoice_number,
+          particulars: `Advance ${p.reference || ''} adjusted against ${inv.invoice_number} (${formatMoney(amt, currency)})`.replace(/\s+/g, ' '),
+          debit: 0, credit: 0, balance: 0, invoiceId: inv.id,
+        });
+        continue;
+      }
       a.entries.push({
         date: dateKey(p.date) || issue, kind: 'payment',
         ref: p.reference || inv.invoice_number,
@@ -340,6 +357,34 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       debit: 0, credit: amt, balance: 0,
     });
     a.advances = round2(a.advances + amt);
+  }
+
+  // Advance receipts (5.3): received = credit, refund = debit, unadjusted balance = advance.
+  if (currency === 'INR' && input.advances?.length) {
+    const unadjusted = new Map<string, number>();
+    for (const m of advanceMovements(input.advances, input.payments, input.invoices)) {
+      const adv = input.advances.find((x) => x.id === m.advanceId);
+      const key = keyOf({ id: adv?.client?.id, name: adv?.client?.name });
+      const a = acc(key, adv?.client?.name ?? m.party, adv?.client?.id);
+      if (m.kind === 'received') {
+        a.entries.push({
+          date: m.date, kind: 'advance', ref: m.number,
+          particulars: `Advance receipt – ${m.method || 'Payment'}${m.ref ? ` (${m.ref})` : ''}`,
+          debit: 0, credit: m.gross, balance: 0,
+        });
+      } else if (m.kind === 'refunded') {
+        a.entries.push({
+          date: m.date, kind: 'advance', ref: m.ref || m.number,
+          particulars: `Refund of advance ${m.number}`, debit: m.gross, credit: 0, balance: 0,
+        });
+      }
+      const sign = m.kind === 'received' ? 1 : -1;
+      unadjusted.set(key, round2((unadjusted.get(key) ?? 0) + sign * m.gross));
+    }
+    for (const [key, open] of unadjusted) {
+      const a = accs.get(key);
+      if (a && open > 0.004) a.advances = round2(a.advances + open);
+    }
   }
 
   const totals: ReceivablesReport['totals'] = {

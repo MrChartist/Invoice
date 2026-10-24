@@ -647,7 +647,8 @@ export function receiptCandidates(invoices: readonly InvoiceRecord[], payments: 
   for (const p of payments) {
     const amount = round2(Math.abs(num(p.amount)));
     const date = isoDay(p.date);
-    if (!date || amount === 0 || isCashMethod(p.method)) continue;
+    // An advance adjusted against an invoice (5.3) moved no money through the bank.
+    if (!date || amount === 0 || isCashMethod(p.method) || p.advance_id) continue;
     const inv = byId.get(p.invoice_id);
     out.push({
       kind: 'payment',

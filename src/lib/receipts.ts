@@ -2,7 +2,7 @@
  * Payment receipts (receipt vouchers for money received against an invoice).
  *
  * Numbers are derived, not stored: every payment in an Indian financial year, in date
- * order (ties by id), gets RCPT/FY<yy-yy>/<seq>. Deriving keeps old data valid and needs
+ * order (ties by id), gets RCPT/FY<yy-yy>/<seq> (advance adjustments excluded). Deriving keeps old data valid and needs
  * no migration; deleting a payment can renumber later receipts in that year, which the
  * receipt notes. The HTML is self-contained (inline styles, no scripts) so it prints from
  * a plain window under the app's CSP and can be saved as a file.
@@ -14,10 +14,12 @@ import { amountInWords } from './amount-in-words';
 import { formatCurrency, formatDate } from './utils';
 import { round2 } from './invoice-calc';
 
-export function receiptNumber(payment: Pick<Payment, 'id' | 'date'>, all: readonly Pick<Payment, 'id' | 'date'>[]): string {
+export function receiptNumber(payment: Pick<Payment, 'id' | 'date'>, all: readonly Pick<Payment, 'id' | 'date' | 'advance_id'>[]): string {
   const fy = getIndianFY(payment.date);
+  // An advance adjusted against an invoice (5.3) is not new money: it already has its own
+  // receipt voucher (ADV/…), so it takes no RCPT number.
   const sameYear = all
-    .filter((p) => getIndianFY(p.date).label === fy.label)
+    .filter((p) => !p.advance_id && getIndianFY(p.date).label === fy.label)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
   const seq = Math.max(1, sameYear.findIndex((p) => p.id === payment.id) + 1);
   return `RCPT/FY${fy.label}/${String(seq).padStart(4, '0')}`;

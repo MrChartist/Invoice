@@ -37,6 +37,7 @@ import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
 import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import { b2clThreshold, b2clThresholdLabel, hsnMinDigits, hsnTableSplit } from './tax-rules';
+import type { AdvanceMovement } from './advance-tax';
 
 /* ───────────────────────── Period ───────────────────────── */
 
@@ -239,6 +240,23 @@ export interface DocIssueRow {
   netIssued: number;
 }
 
+/** GSTR-1 Table 11A (advances received, `at`) / 11B (advances adjusted, `txpd`): one row per POS × rate. */
+export interface AdvanceTableRow {
+  pos: string;
+  supply: 'INTRA' | 'INTER';
+  rate: number;
+  /** Rupees received / adjusted, tax inclusive. */
+  gross: number;
+  /** Gross less tax — the JSON `ad_amt`. */
+  taxable: number;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  cess: number;
+  /** Vouchers / adjustments behind the row. */
+  count: number;
+}
+
 export interface Gstr1Report {
   period: ReportPeriod;
   gstin: string;
@@ -263,7 +281,11 @@ export interface Gstr1Report {
   docIssue: DocIssueRow[];
   /** Additive (5.9): amendments of documents reported in an earlier, filed period (made in this period). */
   amendments?: Gstr1Amendments;
-  /** Totals across every outward table (net of credit notes). */
+  /** Table 11A(1)/(2): advances received in the period on which tax is due (5.3). Absent when none. */
+  at?: AdvanceTableRow[];
+  /** Table 11B(1)/(2): advances adjusted (and refunded) in the period. Absent when none. */
+  txpd?: AdvanceTableRow[];
+  /** Totals across every outward document table (net of credit notes; advances not included). */
   totals: { taxable: number; igst: number; cgst: number; sgst: number; value: number; cess?: number };
   counts: { included: number; drafts: number; cancelled: number; notTaxDocs: number; composition?: number };
 }
@@ -360,6 +382,8 @@ export interface Gstr3bReport {
   purchasesConsidered: number;
   /** Outward reverse-charge invoices (tax payable by the recipient, so not in 3.1). */
   outwardRcmTaxable: number;
+  /** Advances (5.3): tax on advances received (+) and adjusted / refunded (−), already inside 3.1(a). Absent when none. */
+  advances?: { received: Gstr3bTaxRow; adjusted: Gstr3bTaxRow };
 }
 
 export interface GstReport {
@@ -378,6 +402,35 @@ export interface BuildOptions {
   links?: readonly { from_id: string; to_id: string; relation: string }[];
   /** Preceding-FY aggregate turnover (₹, the JSON `gt`): picks the 4- or 6-digit HSN rule. 0 / absent = up to ₹5 crore. */
   turnover?: number;
+  /** Advance movements (`advanceTaxEvents` in advance-tax.ts) for GSTR-1 Table 11 and 3B 3.1(a). */
+  advances?: readonly AdvanceMovement[];
+}
+
+/**
+ * Table 11A / 11B rows for the period: taxed advance movements dated in it (filer GSTIN filter as
+ * for invoices), grouped by place of supply × rate. Refunds of an advance (Rule 51) are reported
+ * in 11B with adjustments — an assumption to confirm with your CA.
+ */
+export function advanceTables(opts: BuildOptions): { at: AdvanceTableRow[]; txpd: AdvanceTableRow[] } {
+  const want = (opts.gstin ?? '').trim().toUpperCase();
+  const at = new Map<string, AdvanceTableRow>();
+  const txpd = new Map<string, AdvanceTableRow>();
+  for (const m of opts.advances ?? []) {
+    if (!m.taxed || !inPeriod(m.date, opts.period)) continue;
+    if (want && m.senderGstin && m.senderGstin !== want) continue;
+    const target = m.kind === 'received' ? at : txpd;
+    const key = `${m.pos}|${m.rate}|${m.supply}`;
+    const r = target.get(key) ?? { pos: m.pos, supply: m.supply, rate: m.rate, gross: 0, taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, count: 0 };
+    r.gross = round2(r.gross + m.gross);
+    r.taxable = round2(r.taxable + m.taxable);
+    r.igst = round2(r.igst + m.igst);
+    r.cgst = round2(r.cgst + m.cgst);
+    r.sgst = round2(r.sgst + m.sgst);
+    r.count++;
+    target.set(key, r);
+  }
+  const sort = (rows: Iterable<AdvanceTableRow>) => [...rows].sort((a, b) => a.pos.localeCompare(b.pos) || a.rate - b.rate);
+  return { at: sort(at.values()), txpd: sort(txpd.values()) };
 }
 
 /* ───────────────────────── Prepared documents ───────────────────────── */
@@ -884,6 +937,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   cdnur.sort(byDate);
   exp.sort(byDate);
 
+  const adv = advanceTables(opts);
   const gstr1: Gstr1Report = {
     period: opts.period,
     gstin: wantGstin,
@@ -901,6 +955,8 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     hsnSplit: hsnTableSplit(periodRange(opts.period).from),
     hsnMinDigits: hsnMinDigits(opts.turnover ?? 0, periodRange(opts.period).to),
     docIssue: buildDocIssue(inScope.filter((r) => !isCompositionDoc(r))),
+    ...(adv.at.length ? { at: adv.at } : {}),
+    ...(adv.txpd.length ? { txpd: adv.txpd } : {}),
     // `cess` only appears when there is some, so reports without cess keep their exact shape.
     totals: totals.cess === 0 ? { taxable: totals.taxable, igst: totals.igst, cgst: totals.cgst, sgst: totals.sgst, value: totals.value } : totals,
     // `composition` only appears when some were left out, so existing report shapes stay exact.
@@ -1189,6 +1245,21 @@ export function buildGstr3b(
     }
   }
 
+  // Advances (5.3): tax on service advances is due in the period received (Table 11A) and comes
+  // off in the period adjusted (11B). The portal folds GSTR-1 Table 11 into 3.1(a), so do we.
+  const adv = advanceTables(opts);
+  let advances: Gstr3bReport['advances'];
+  if (adv.at.length || adv.txpd.length) {
+    const sumRows = (rows: AdvanceTableRow[]): Gstr3bTaxRow => rows.reduce<Gstr3bTaxRow>((acc, r) => ({
+      taxable: round2(acc.taxable + r.taxable), igst: round2(acc.igst + r.igst), cgst: round2(acc.cgst + r.cgst),
+      sgst: round2(acc.sgst + r.sgst), cess: round2(acc.cess + r.cess),
+    }), zeroRow());
+    advances = { received: sumRows(adv.at), adjusted: sumRows(adv.txpd) };
+    for (const k of ['taxable', 'igst', 'cgst', 'sgst', 'cess'] as const) {
+      taxable[k] = round2(taxable[k] + advances.received[k] - advances.adjusted[k]);
+    }
+  }
+
   const rcm = zeroRow();
   const impGoods = zeroHeads();
   const impServices = zeroHeads();
@@ -1257,7 +1328,6 @@ export function buildGstr3b(
   // Cess cannot be settled with IGST/CGST/SGST credit, so the whole (net) liability is cash.
   payment.cess = Math.max(round2(taxable.cess + zero.cess), 0);
 
-  void opts;
   return {
     outward: { taxable, zeroRated: zero, nilExempt: nil, inwardRcm: rcm, nonGst },
     interStateUnreg: [...unregInter.values()].sort((a, b) => a.pos.localeCompare(b.pos)),
@@ -1276,6 +1346,7 @@ export function buildGstr3b(
     unadjustedCredit: unadjusted,
     purchasesConsidered: purchases.length,
     outwardRcmTaxable,
+    ...(advances ? { advances } : {}),
   };
 }
 

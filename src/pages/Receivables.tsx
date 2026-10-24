@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
+import { getTable } from '../lib/storage';
+import type { AdvanceRecord } from '../types/advances';
 import { createLateFeeInvoice, describeClientLateFee, lateFeeRuleFor, type ClientLateFee } from '../lib/late-fee';
 import {
   AGING_BUCKETS, agingCsv, buildLedger, buildReceivables, buildStatementText, computeDso,
@@ -29,12 +31,15 @@ import styles from './Receivables.module.css';
 
 // The TDS register, its 26AS parser and Form 16A tracking load only when opened.
 const TdsTab = lazy(() => import('../components/receivables/TdsTab'));
+// Advance receipts (5.3): register, vouchers, apply / refund — loaded when opened.
+const AdvancesTab = lazy(() => import('../components/advances/AdvancesTab'));
 
-type Tab = 'aging' | 'statements' | 'collections' | 'tds';
+type Tab = 'aging' | 'statements' | 'collections' | 'advances' | 'tds';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'aging', label: 'Aging' },
   { id: 'statements', label: 'Statements' },
   { id: 'collections', label: 'Collections' },
+  { id: 'advances', label: 'Advances' },
   { id: 'tds', label: 'TDS' },
 ];
 
@@ -48,6 +53,7 @@ function loadData() {
     invoices: localDb.invoices.getAll(),
     payments: localDb.payments.getAll() as ReceiptRow[],
     clients: localDb.clients.getAll(),
+    advances: getTable<AdvanceRecord>('advances'),
   };
 }
 
@@ -105,7 +111,7 @@ export function Receivables() {
     }
   };
 
-  if (report.parties.length === 0) {
+  if (report.parties.length === 0 && tab !== 'advances') {
     return (
       <div className={surface.page}>
         <Header />
@@ -114,7 +120,12 @@ export function Receivables() {
             icon={Scale}
             title="Nothing to reconcile yet"
             text="Issue an invoice to a client and record payments against it. Outstanding balances, aging and client statements appear here automatically."
-            action={can('doc.create') ? <Link to="/invoice" className={`${controls.btn} ${controls.btnPrimary}`}>Create invoice</Link> : undefined}
+            action={
+              <>
+                {can('doc.create') && <Link to="/invoice" className={`${controls.btn} ${controls.btnPrimary}`}>Create invoice</Link>}{' '}
+                {can('payment.record') && <Link to="/receivables?tab=advances" className={`${controls.btn} ${controls.btnOutline}`}>Record an advance</Link>}
+              </>
+            }
           />
         </div>
       </div>
@@ -204,6 +215,11 @@ export function Receivables() {
               </table>
             </div>
           </div>
+        )}
+        {tab === 'advances' && (
+          <Suspense fallback={<div className={surface.card}><p className={styles.note}>Loading advances…</p></div>}>
+            <AdvancesTab partyKey={params.get('party') ?? ''} notify={notify} onChanged={() => setData(loadData())} />
+          </Suspense>
         )}
         {tab === 'tds' && (
           <Suspense fallback={<div className={surface.card}><p className={styles.note}>Loading TDS register…</p></div>}>

@@ -21,6 +21,12 @@
  *                       "GST payable — reverse charge" instead of the supplier. Import of goods:
  *                       the IGST is credited to "IGST payable on imports (customs)".
  *                       ITC reversed on the bill: Dr GST input credit reversed | Cr Input heads.
+ *   Advance received    Dr Cash/Bank | Cr Advances from customers (party); GST on a service
+ *                       advance: Dr GST paid on advances | Cr Output CGST/SGST/IGST (5.3)
+ *   Advance adjusted    Dr Advances from customers | Cr Debtors (party) — the payment row with
+ *                       `advance_id`; its share of the advance's GST: Dr Output heads | Cr GST paid
+ *                       on advances (the invoice books the full GST itself)
+ *   Advance refunded    Dr Advances from customers | Cr Cash/Bank; GST share reversed as above
  *   Supplier payment    Dr Creditors | Cr Cash/Bank
  *   Opening (Books)     Dr Cash/Bank | Cr Opening balance difference — sized so the ledger's
  *                       cash/bank balance from that day equals the Books cash/bank book.
@@ -42,6 +48,7 @@ import { realisedFx } from '../fx-gain';
 import { A, EXPENSE_CATEGORY_ACCOUNTS, chartOf, groupOf, type Account } from './accounts';
 import { VOUCHER_TYPE_LABELS, type ManualVoucher } from './vouchers';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
+import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
 
 export interface PostingLine {
   account: string;
@@ -281,6 +288,64 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
   };
 }
 
+/* ── Advances (5.3) ────────────────────────────────────────────── */
+
+/**
+ * One voucher per advance movement. For an 'adjusted' movement `inv` is the invoice and `tds` the
+ * customer's TDS when that payment row is the one that settles it (exactly as on a cash receipt).
+ */
+function advanceVoucher(m: AdvanceMovement, inv: InvoiceRecord | undefined, tds: number): LedgerVoucher | null {
+  const gross = Math.abs(toPaise(m.gross));
+  if (!m.date || gross === 0) return null;
+  const heads: Array<[string, number]> = [
+    [A.outIgst, toPaise(m.igst)],
+    [A.outCgst, toPaise(m.cgst)],
+    [A.outSgst, toPaise(m.sgst)],
+  ];
+  const tax = heads.reduce((s, [, p]) => s + p, 0);
+  const cashAcc = accountForMethod(m.method) === 'cash' ? A.cash : A.bank;
+  const l = new Lines();
+  if (m.kind === 'received') {
+    l.dr(cashAcc, gross).cr(A.custAdvances, gross, m.party);
+    // GST paid on the advance is recovered when the invoice's own GST absorbs it.
+    if (tax) {
+      l.dr(A.gstOnAdvances, tax);
+      for (const [acc, p] of heads) l.cr(acc, p);
+    }
+  } else {
+    l.dr(A.custAdvances, gross, m.party);
+    if (m.kind === 'adjusted') {
+      const party = inv ? partyOfInvoice(inv) : m.party;
+      if (tds > 0) l.dr(A.tdsReceivable, tds);
+      l.cr(A.debtors, gross + tds, party);
+    } else {
+      l.cr(cashAcc, gross);
+    }
+    if (tax) {
+      for (const [acc, p] of heads) l.dr(acc, p);
+      l.cr(A.gstOnAdvances, tax);
+    }
+  }
+  const kind: LedgerVoucherKind = m.kind === 'received' ? 'Receipt' : m.kind === 'refunded' ? 'Payment' : 'Journal';
+  const taxNote = tax ? `GST ${(tax / 100).toFixed(2)}` : '';
+  return {
+    id: `${m.kind === 'received' ? 'adv' : m.kind === 'refunded' ? 'advrf' : 'advadj'}:${m.sourceId}`,
+    source: 'auto',
+    kind,
+    date: m.date,
+    number: m.kind === 'refunded' ? m.ref || m.number : m.number,
+    party: m.party,
+    narration: [
+      m.kind === 'received' ? 'Advance received' : m.kind === 'refunded' ? `Refund of advance ${m.number}` : `Advance ${m.number} adjusted against ${m.invoiceNumber || 'invoice'}`,
+      m.kind === 'adjusted' ? '' : str(m.method),
+      taxNote && (m.kind === 'received' ? `${taxNote} on advance` : `${taxNote} on advance released`),
+      tds > 0 && `TDS ${(tds / 100).toFixed(2)} withheld`,
+    ].filter(Boolean).join(' · '),
+    lines: l.lines,
+    link: m.kind === 'adjusted' && inv ? `/invoice/${inv.id}` : '/receivables?tab=advances',
+  };
+}
+
 /* ── Purchase side ─────────────────────────────────────────────── */
 
 function expenseAccountFor(isExpense: boolean, category: string, chart: Account[]): string {
@@ -468,7 +533,11 @@ export function buildLedger(input: LedgerInput): Ledger {
   const invById = new Map(input.invoices.map((i) => [i.id, i]));
   for (const inv of input.invoices) push(salesVoucher(inv));
   const tds = tdsSettlements(input.invoices, input.transactions);
-  for (const t of input.transactions) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
+  // Advance adjustments are journals from "Advances from customers", not cash (below).
+  for (const t of input.transactions) if (!isAdvanceAdjustment(t)) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
+  for (const m of advanceMovements(input.advances ?? [], input.transactions, input.invoices)) {
+    push(advanceVoucher(m, m.invoiceId ? invById.get(m.invoiceId) : undefined, m.kind === 'adjusted' ? tds.get(m.sourceId) ?? 0 : 0));
+  }
 
   const bills = new Map<string, { number: string; party: string }>();
   for (const raw of input.purchases) {

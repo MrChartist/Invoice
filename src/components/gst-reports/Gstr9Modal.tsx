@@ -5,6 +5,7 @@ import { useToast } from '../ui/useToast';
 import { getTable } from '../../lib/storage';
 import { readLinks } from '../../lib/documents';
 import { fyPeriod, gstSummary, loadBooksData } from '../../lib/books';
+import { advanceTaxEvents } from '../../lib/advance-tax';
 import { periodForDate } from '../../lib/gst-reports';
 import { formatMoney } from '../../lib/utils';
 import {
@@ -15,7 +16,6 @@ import {
   type Gstr9CompareRow,
   type Gstr9Row,
 } from '../../lib/gstr9';
-import type { InvoiceRecord } from '../../types/invoice';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './gstr9.module.css';
@@ -122,7 +122,16 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
   });
   const [itc2b, setItc2b] = useState({ igst: '', cgst: '', sgst: '', cess: '' });
 
-  const data = useMemo(() => ({ invoices: getTable<InvoiceRecord>('invoices'), purchases: getTable<unknown>('purchases'), links: readLinks(), books: loadBooksData() }), []);
+  const data = useMemo(() => {
+    const books = loadBooksData();
+    return {
+      invoices: books.invoices,
+      purchases: getTable<unknown>('purchases'),
+      links: readLinks(),
+      books,
+      advances: advanceTaxEvents(books.advances ?? [], books.transactions, books.invoices),
+    };
+  }, []);
   const report = useMemo(
     () =>
       buildGstr9(data.invoices, data.purchases, {
@@ -130,6 +139,7 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
         gstin,
         filerStateCode,
         links: data.links,
+        advances: data.advances,
         turnover: Number(turnover) || 0,
         books: gstSummary(data.books, fyPeriod(fy)),
         itc2b: { igst: Number(itc2b.igst) || 0, cgst: Number(itc2b.cgst) || 0, sgst: Number(itc2b.sgst) || 0, cess: Number(itc2b.cess) || 0 },
