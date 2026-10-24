@@ -77,8 +77,8 @@ No runtime secrets or environment variables are required (see `.env.example`). A
 build-time config must use Vite's `VITE_` prefix.
 
 ## Known tech debt
-- `tsconfig` does not enable `strict` (there are no `any` annotations left in `src/`; ESLint
-  `no-explicit-any` stays a warning).
+- `src/` compiles with `strict: true`; `tests/` are typechecked too (`tsconfig.test.json`, non-strict —
+  fixtures use partial records). ESLint `no-explicit-any` stays a warning.
 - `react-hooks/set-state-in-effect` kept as a warning — the app's correct localStorage-hydration
   pattern triggers it; rewriting needs care.
 - Purchases are read through the shared `readPurchase` + `splitLumpTax` (`purchase-normalize.ts`);

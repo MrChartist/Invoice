@@ -257,7 +257,7 @@ test('partitionByLock splits rows', () => {
 test('bills dated inside the locked period cannot be created, edited or deleted; payments lock by their own date', async () => {
   const { purchasesDb, paymentsDb } = await import('../src/lib/purchases.ts');
   const bill = (over: Record<string, unknown> = {}) => ({
-    kind: 'PURCHASE' as const, vendor_name: 'Paper Co', bill_number: 'B-1', date: '2026-04-10',
+    kind: 'PURCHASE' as const, vendor_name: 'Paper Co', bill_number: 'B-1', date: '2026-04-10', category: 'Purchases',
     lines: [], taxable: 1000, cgst: 90, sgst: 90, igst: 0, itc_eligible: true, total: 1180, amount_paid: 0, ...over,
   });
   const open = purchasesDb.save(bill());
