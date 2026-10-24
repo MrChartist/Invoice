@@ -129,6 +129,19 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
+  // Phones / small tablets: a bottom tab bar for the daily screens. The editor has its own
+  // save bar, so the tabs step aside there. Its height is published for toasts and padding.
+  const onEditor = location.pathname.startsWith('/invoice');
+  const showTabs = isMobile && !onEditor;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (showTabs) root.style.setProperty('--tab-bar-h', '3.75rem');
+    else root.style.removeProperty('--tab-bar-h');
+    return () => {
+      root.style.removeProperty('--tab-bar-h');
+    };
+  }, [showTabs]);
+
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
@@ -349,6 +362,31 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           <Outlet />
         </div>
       </main>
+
+      {showTabs && (
+        <nav className={cn(styles.tabBar, 'no-print')} aria-label="Quick navigation">
+          <NavLink to="/" end className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
+            <LayoutDashboard size={20} aria-hidden="true" />
+            <span>Home</span>
+          </NavLink>
+          <NavLink to="/transactions" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
+            <FileText size={20} aria-hidden="true" />
+            <span>Invoices</span>
+          </NavLink>
+          <Link to="/invoice" className={cn(styles.tab, styles.tabNew)} aria-label="New invoice">
+            <FilePlus2 size={22} aria-hidden="true" />
+            <span>New</span>
+          </Link>
+          <NavLink to="/clients" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
+            <Users size={20} aria-hidden="true" />
+            <span>Clients</span>
+          </NavLink>
+          <button type="button" className={styles.tab} onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} aria-controls="app-sidebar">
+            <Menu size={20} aria-hidden="true" />
+            <span>More</span>
+          </button>
+        </nav>
+      )}
 
       <AutoBackupRunner />
       <UpdateToast />

@@ -44,7 +44,7 @@ export function Toast({ message, tone = 'success', duration = 3200, action, onCl
       className="no-print"
       style={{
         position: 'fixed',
-        bottom: 'calc(1.25rem + var(--bottom-bar-h, 0px))',
+        bottom: 'calc(1.25rem + var(--bottom-bar-h, 0px) + var(--tab-bar-h, 0px))',
         right: '1.25rem',
         left: 'auto',
         zIndex: 10000,

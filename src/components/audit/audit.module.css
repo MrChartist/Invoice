@@ -377,7 +377,7 @@
 /* ── Saved toast ─────────────────────────────────────── */
 .saved {
   position: fixed;
-  bottom: calc(1.25rem + var(--bottom-bar-h, 0px));
+  bottom: calc(1.25rem + var(--bottom-bar-h, 0px) + var(--tab-bar-h, 0px));
   right: 1.25rem;
   z-index: 10000;
   max-width: min(440px, calc(100vw - 2rem));

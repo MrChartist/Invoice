@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Loader2, Palette, Printer, Share2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2, Palette, Printer, Share2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb, blankProfile } from '../../lib/localDb';
 import { TEMPLATES, templateById } from '../templates/registry';
@@ -33,7 +33,10 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   const paperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [fitScale, setFitScale] = useState(1);
+  /** null = fit the width (default); otherwise an explicit zoom the user chose. */
+  const [zoom, setZoom] = useState<number | null>(null);
+  const scale = zoom ?? fitScale;
   /** A built PDF waiting for a fresh tap when the browser refused the first share attempt. */
   const [readyToShare, setReadyToShare] = useState<File | null>(null);
   const [paperHeight, setPaperHeight] = useState(1123);
@@ -60,7 +63,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
     const stage = stageRef.current;
     if (!stage) return;
     const available = stage.clientWidth - 8;
-    setScale(Math.min(1, Math.max(0.3, available / PAPER_W)));
+    setFitScale(Math.min(1, Math.max(0.3, available / PAPER_W)));
     if (paperRef.current) setPaperHeight(Math.max(paperRef.current.offsetHeight, PAPER_H));
   }, [PAPER_W, PAPER_H]);
 
@@ -215,8 +218,20 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
           </button>
         </div>
 
+        <div className={styles.zoom} role="group" aria-label="Zoom">
+          <button type="button" className={controls.btnIcon} onClick={() => setZoom(Math.max(0.3, Math.round((scale - 0.15) * 100) / 100))} aria-label="Zoom out">
+            <ZoomOut size={17} />
+          </button>
+          <button type="button" className={styles.zoomValue} onClick={() => setZoom(zoom === null ? 1 : null)} title={zoom === null ? 'Show at 100%' : 'Fit to width'}>
+            {zoom === null ? 'Fit' : `${Math.round(scale * 100)}%`}
+          </button>
+          <button type="button" className={controls.btnIcon} onClick={() => setZoom(Math.min(2, Math.round((scale + 0.15) * 100) / 100))} aria-label="Zoom in">
+            <ZoomIn size={17} />
+          </button>
+        </div>
+
         <div className={styles.actions}>
-          <Link to="/design" className={controls.btnIcon} onClick={onClose} aria-label="Customise design" title="Customise design">
+          <Link to="/design" className={cn(controls.btnIcon, styles.hideSm)} onClick={onClose} aria-label="Customise design" title="Customise design">
             <Palette size={18} />
           </Link>
           {invoice.id && (

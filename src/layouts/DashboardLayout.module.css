@@ -331,7 +331,57 @@
   }
 
   .content {
-    padding: 1.25rem 1rem 2.5rem;
+    padding: 1.25rem 1rem calc(2.5rem + var(--tab-bar-h, 0px));
+  }
+
+  .tabBar {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 25;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    height: calc(var(--tab-bar-h, 3.75rem) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+  }
+
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 44px;
+    border: 0;
+    background: none;
+    color: var(--muted-foreground);
+    font: inherit;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .tabActive {
+    color: var(--brand-text);
+  }
+
+  .tabNew {
+    color: var(--primary-foreground);
+  }
+
+  .tabNew svg {
+    box-sizing: content-box;
+    padding: 0.45rem;
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    box-shadow: var(--shadow-md);
+  }
+
+  .tabNew span {
+    color: var(--brand-text);
   }
 }
 
