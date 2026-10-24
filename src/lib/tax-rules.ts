@@ -129,3 +129,88 @@ export const RBI_BANK_RATE_RULES: readonly Versioned<number>[] = [
 export function rbiBankRate(date?: string): number {
   return ruleAt(RBI_BANK_RATE_RULES, date);
 }
+
+// ── HSN digits (invoices and GSTR-1 Table 12) ────────────────────────────────
+
+/** Minimum HSN/SAC digits for a preceding-FY aggregate turnover up to `upTo` (₹, inclusive). */
+export interface HsnDigitTier { upTo: number; digits: number }
+
+export const HSN_DIGIT_RULES: readonly Versioned<HsnDigitTier[]>[] = [
+  {
+    from: '2017-07-01',
+    value: [{ upTo: 1.5e7, digits: 0 }, { upTo: 5e7, digits: 2 }, { upTo: Infinity, digits: 4 }],
+    source: 'Notification 12/2017-CT',
+  },
+  {
+    // GSTR-1 HSN Phase-III applies the same minimum to the B2B and the B2C table.
+    from: '2021-04-01',
+    value: [{ upTo: 5e7, digits: 4 }, { upTo: Infinity, digits: 6 }],
+    source: 'Notification 78/2020-CT (4 digits up to ₹5 crore, 6 above)',
+  },
+];
+
+/** Minimum HSN/SAC digits on `date` for a preceding-FY aggregate turnover of `turnover` (₹). */
+export function hsnMinDigits(turnover: number, date?: string): number {
+  const t = Number.isFinite(turnover) && turnover > 0 ? turnover : 0;
+  const tiers = ruleAt(HSN_DIGIT_RULES, date);
+  return (tiers.find((x) => t <= x.upTo) ?? tiers[tiers.length - 1]).digits;
+}
+
+/** GSTR-1 Table 12 is reported as separate B2B and B2C tables for return periods from this rule on. */
+export const HSN_TABLE_SPLIT_RULES: readonly Versioned<boolean>[] = [
+  { from: '2017-07-01', value: false },
+  { from: '2025-01-01', value: true, source: 'GSTN advisory on HSN Phase-III (Table 12 B2B / B2C tabs)' },
+];
+
+export function hsnTableSplit(periodStart?: string): boolean {
+  return ruleAt(HSN_TABLE_SPLIT_RULES, periodStart);
+}
+
+// ── Return due dates (keyed by the first day of the tax period) ──────────────
+
+export interface ReturnDueDays {
+  /** Day of the next month: GSTR-1 (monthly filer). */
+  gstr1: number;
+  /** Day of the month after the quarter: GSTR-1 (QRMP); 0 = QRMP not available yet. */
+  gstr1Qrmp: number;
+  /** IFF window closes on this day of the next month (months 1 and 2 of a QRMP quarter; optional). */
+  iff: number;
+  /** PMT-06 monthly tax deposit (months 1 and 2 of a QRMP quarter). */
+  pmt06: number;
+  /** Day of the next month: GSTR-3B (monthly filer). */
+  gstr3b: number;
+  /** Day of the month after the quarter: GSTR-3B (QRMP), state category X / Y. */
+  gstr3bQrmpX: number;
+  gstr3bQrmpY: number;
+  /** GSTR-9 (annual): `MM-DD` in the calendar year the FY ends. */
+  gstr9: string;
+}
+
+export const RETURN_DUE_RULES: readonly Versioned<ReturnDueDays>[] = [
+  {
+    from: '2017-07-01',
+    value: { gstr1: 10, gstr1Qrmp: 0, iff: 0, pmt06: 0, gstr3b: 20, gstr3bQrmpX: 0, gstr3bQrmpY: 0, gstr9: '12-31' },
+    source: 'Sec 37, 39, 44 CGST Act; Rule 61(5)',
+  },
+  {
+    from: '2021-01-01',
+    value: { gstr1: 11, gstr1Qrmp: 13, iff: 13, pmt06: 25, gstr3b: 20, gstr3bQrmpX: 22, gstr3bQrmpY: 24, gstr9: '12-31' },
+    source: 'Rules 59, 61 and 61A as amended by Notification 82/2020-CT; Notifications 83/2020, 84/2020, 85/2020-CT (QRMP)',
+  },
+];
+
+export function returnDueDays(periodStart?: string): ReturnDueDays {
+  return ruleAt(RETURN_DUE_RULES, periodStart);
+}
+
+/**
+ * QRMP GSTR-3B state categories by GST state code (Notification 85/2020-CT, proviso to Rule 61(5)).
+ * Category X files by the 22nd, category Y by the 24th; an unknown state is treated as X (the earlier day).
+ */
+export const QRMP_3B_CATEGORY_X: readonly string[] = ['22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37'];
+export const QRMP_3B_CATEGORY_Y: readonly string[] = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '38'];
+
+/** QRMP is open to registrations with preceding-FY aggregate turnover up to this amount (₹). */
+export const QRMP_TURNOVER_LIMIT = 5e7;
+
+// Interest / late-fee rates and caps are date-keyed in `gst-penalties.ts` (loaded only by the GST page).

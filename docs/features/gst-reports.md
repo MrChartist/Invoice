@@ -4,8 +4,8 @@ Offline working papers for GST filing, built from `invoices` (and, defensively, 
 
 - Route: `/gst-reports`
 - Nav label: `GST reports`, icon `FileSpreadsheet` (alt `Landmark`) from lucide-react
-- Tables read (read-only): `invoices`, `purchases` (may be empty or absent). Tables written: none.
-- Persisted fields added: none.
+- Tables read (read-only): `invoices`, `purchases` (may be empty or absent), `doc_links`. Tables written: `compliance` (filed marks, Compliance tab, see `compliance.md`).
+- Persisted fields added: settings `gst_filing_frequency?: 'monthly' | 'qrmp'` (Compliance tab; additive, absent = monthly).
 
 ## Files
 
@@ -14,8 +14,9 @@ Offline working papers for GST filing, built from `invoices` (and, defensively, 
 | `src/lib/gst-reports.ts` | Pure logic: periods, GSTR-1 sections, GSTR-3B, set-off, purchase normaliser, reconciliation issues |
 | `src/lib/gstr-json.ts` | GSTN offline-tool style JSON, CSV per section, GSTR-3B CSV, printable HTML summary |
 | `src/pages/GstReports.tsx` (+ `.module.css`) | Page (default and named export `GstReports`) |
-| `src/components/gst-reports/` | `DataTable`, `ReconBanner`, `PeriodPicker`, `Gstr3bView`, `gst-reports.module.css` |
-| `tests/gst-reports.test.ts` | 43-case suite with hand-computed fixtures |
+| `src/components/gst-reports/` | `DataTable`, `ReconBanner`, `PeriodPicker`, `Gstr3bView`, `ComplianceView`, `gst-reports.module.css` |
+| `tests/gst-reports.test.ts` | Main suite with hand-computed fixtures |
+| `tests/hsn-split.test.ts` | HSN Table 12 B2B/B2C split, JSON/CSV layout, 4/6-digit rule |
 
 ## Exported symbols
 
@@ -58,10 +59,17 @@ Cross-links (optional): from Dashboard / Transactions add `<Link to="/gst-report
 
 Read by `normalizePurchase`; unknown fields are ignored. Date: `bill_date | purchase_date | date | issue_date | invoice_date`. Supplier GSTIN: `supplier_gstin | vendor_gstin | supplier.gstin | vendor.gstin`. Tax: `igst_amount / cgst_amount / sgst_amount`, else `tax_amount` (or `taxable_value x tax_rate`) split by supplier-vs-filer state. Taxable: `taxable_value | taxable_amount | subtotal`, else `total - tax`. Flags: `itc_eligible === false` marks ineligible (default eligible), `reverse_charge` / `rcm` true, `itc_reversed` (amount, spread pro rata) with `itc_reversal_reason`, `import_type` `GOODS` (customs IGST: 4A(1), not in 3.1) / `SERVICES` (always reverse charge: 3.1(d) + 4A(2)). `itc_eligible: false` + reason `SEC_17_5` is blocked credit: shown in 4A and reversed in full in 4B(1). `status` draft/cancelled rows are skipped. If the purchases module uses different names, adapt `normalizePurchase` only.
 
+## HSN summary (Table 12): B2B / B2C split and digit rule
+
+- `Gstr1Report.hsn` is the combined table; `hsnB2b` holds lines of documents to registered recipients (B2B, SEZ, and their CDNR notes), `hsnB2c` everything else (B2CL, B2CS, exports, CDNUR). Notes are netted with their sign (credit −, debit +) in the table of their own recipient.
+- `hsnSplit` is true from the January 2025 return period (`hsnTableSplit(periodStart)` in `tax-rules.ts`, GSTN HSN Phase-III advisory). The page then shows two tables, the HSN CSV gets a leading `Table` column (`B2B` / `B2C`), and the JSON writes `hsn.hsn_b2b` / `hsn.hsn_b2c` (each numbered from 1).
+- **JSON assumption.** The keys `hsn_b2b` / `hsn_b2c` are believed to match the current offline tool but are not verified against the live schema. They are set in one place, `HSN_JSON_LAYOUT` in `gstr-json.ts`; with `legacy: true` (default) the combined `hsn.data` array is also kept so older readers still work. Flip `legacy` to false once the tool is confirmed to reject or double-count it. Periods before Jan 2025 always get `hsn.data` only. The JSON `version` (`GST3.0.4`) is unchanged, because the exact current version string is not known.
+- Digit rule: `hsnMinDigits(turnover, date)` in `tax-rules.ts`. From 1 Apr 2021 (Notification 78/2020-CT), up to ₹5 crore preceding-FY aggregate turnover needs at least 4 digits, above that 6. The same minimum applies to B2B and B2C rows (Phase-III). Before that: none up to ₹1.5 crore, 2 up to ₹5 crore, 4 above (Notification 12/2017-CT). The turnover is the "Last FY turnover" (`gt`) entered on the page (`BuildOptions.turnover`); left blank, it is treated as up to ₹5 crore. Lines with fewer digits raise one `HSN_DIGITS` warning per document (only when the sender has a GSTIN).
+
 ## Reconciliation banner
 
-Errors: invalid client GSTIN, place of supply missing, ITC claimed with invalid supplier GSTIN. Warnings: unregistered inter-state sale above Rs 2.5 lakh (B2CL review), missing HSN/SAC, tax without a sender GSTIN, CGST/SGST vs IGST contradicting the state codes, stored total differing from recomputed, foreign-currency amounts, missing document number, ITC claimed without supplier GSTIN. Info: drafts/cancelled excluded, series gaps, no purchases.
+Errors: invalid client GSTIN, place of supply missing, ITC claimed with invalid supplier GSTIN. Warnings: unregistered inter-state sale above the B2CL threshold (B2CL review), missing HSN/SAC, HSN/SAC shorter than the 4/6-digit rule, tax without a sender GSTIN, CGST/SGST vs IGST contradicting the state codes, stored total differing from recomputed, foreign-currency amounts, missing document number, ITC claimed without supplier GSTIN. Info: drafts/cancelled excluded, series gaps, no purchases.
 
 ## Limits (also shown on the page)
 
-Cess is reported per rate row and in 3B (paid in cash). No composition, ISD, cess on purchases, e-commerce/TCS, amendments (B2BA etc.), advances (Table 11), interest or late fee. JSON `gt`/`cur_gt` (aggregate turnover) come from the turnover you enter on the GST page (0 if blank); the layout is not schema-validated against the live portal. Foreign-currency invoices are reported as-is, not converted to INR. Credit notes are assumed to be stored as positive amounts and are not linked to original invoices (small unregistered ones are netted in B2CS).
+Cess is reported per rate row and in 3B (paid in cash). No composition, ISD, cess on purchases, e-commerce/TCS, amendments (B2BA etc.) or advances (Table 11). Interest and late fee are estimates on the Compliance tab (`compliance.md`), never part of the JSON. JSON `gt`/`cur_gt` (aggregate turnover) come from the turnover you enter on the GST page (0 if blank); the layout is not schema-validated against the live portal. Foreign-currency invoices are reported as-is, not converted to INR. Credit notes are assumed to be stored as positive amounts and are not linked to original invoices (small unregistered ones are netted in B2CS).

@@ -73,6 +73,11 @@ export interface AppSettings {
    * Additive field — absent / '' means the books are open. See `period-lock.ts`.
    */
   lock_until?: string;
+  /**
+   * GST return filing frequency for the compliance calendar (`compliance.ts`).
+   * Additive field — absent means monthly.
+   */
+  gst_filing_frequency?: 'monthly' | 'qrmp';
 }
 
 export const DEFAULT_TERMS =
@@ -159,6 +164,7 @@ function readSettings(): AppSettings {
     roundOff: Boolean(stored.roundOff ?? base.roundOff),
     onboarded: Boolean(stored.onboarded ?? Boolean(profiles[0]?.companyName)),
     lock_until: normalizeLockDate(stored.lock_until) || undefined,
+    gst_filing_frequency: stored.gst_filing_frequency === 'qrmp' ? 'qrmp' : stored.gst_filing_frequency === 'monthly' ? 'monthly' : undefined,
   };
 }
 

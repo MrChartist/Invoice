@@ -16,8 +16,10 @@ import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { localDb } from './localDb';
 import { KEYS, appDataSize, generateId, getTable, readRaw, setTable, writeRaw } from './storage';
-import { formatCurrency } from './utils';
+import { formatCurrency, formatDate } from './utils';
 import { parseDay } from './dates';
+import { COMPLIANCE_TABLE, FORM_LABELS, pendingReturns, type FiledReturn, type FilerFrequency, type ReturnDue } from './compliance';
+import { todayIso } from './tax-rules';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -45,6 +47,10 @@ export interface NotificationContext {
   lastBackup: string | null;
   storageUsedBytes: number;
   storageQuotaBytes: number;
+  /** Returns marked filed (`compliance` table). */
+  gstFiled?: FiledReturn[];
+  /** Settings `gst_filing_frequency` (absent = monthly). */
+  gstFrequency?: FilerFrequency;
 }
 
 export type NotificationProvider = (ctx: NotificationContext) => AppNotification[];
@@ -272,6 +278,37 @@ export const missingGstinProvider: NotificationProvider = (ctx) => {
   ];
 };
 
+/** GST returns overdue or due within 3 days (only once the active profile has a GSTIN and a tax invoice exists). */
+export const gstReturnsProvider: NotificationProvider = (ctx) => {
+  const gstin = ctx.profile?.companyGstin?.trim().toUpperCase();
+  if (!gstin) return [];
+  let since = '';
+  for (const i of ctx.invoices) {
+    const d = String(i.issue_date ?? '').slice(0, 10);
+    if ((i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE') && i.status !== 'Draft' && i.status !== 'Cancelled' && d && (!since || d < since)) since = d;
+  }
+  if (!since) return [];
+  const { overdue, soon } = pendingReturns(
+    { frequency: ctx.gstFrequency ?? 'monthly', stateCode: ctx.profile?.stateCode || gstin.slice(0, 2), today: todayIso(ctx.now), since },
+    ctx.gstFiled ?? [],
+    gstin,
+  );
+  const line = (r: ReturnDue) => `${FORM_LABELS[r.form]} ${r.label} (due ${formatDate(r.due)})`;
+  const make = (list: ReturnDue[], kind: 'overdue' | 'soon'): AppNotification[] =>
+    list.length
+      ? [{
+          id: `gst-${kind}:${list.map((r) => r.id).join('|')}`,
+          severity: kind === 'overdue' ? 'critical' : 'warning',
+          title: kind === 'overdue' ? `${plural(list.length, 'GST return')} overdue` : `${plural(list.length, 'GST return')} due within ${DUE_SOON_DAYS} days`,
+          detail: `${list.slice(0, 2).map(line).join('; ')}${list.length > 2 ? ` +${list.length - 2} more` : ''}. ${kind === 'overdue' ? 'Late fee and interest run daily (estimate on the GST page). ' : ''}Already filed? Mark it filed.`,
+          href: '/gst-reports?tab=compliance',
+          cta: 'Open compliance',
+          at: ctx.now.toISOString(),
+        }]
+      : [];
+  return [...make(overdue, 'overdue'), ...make(soon, 'soon')];
+};
+
 export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   overdueProvider,
   dueSoonProvider,
@@ -280,6 +317,7 @@ export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   storageProvider,
   profileProvider,
   missingGstinProvider,
+  gstReturnsProvider,
 ];
 
 /* ── Registry ───────────────────────────────────────────────── */
@@ -420,6 +458,8 @@ export function buildContext(now: Date = new Date()): NotificationContext {
     invoices: getTable<InvoiceRecord>(KEYS.invoices),
     clients: getTable<Client>(KEYS.clients),
     profile: localDb.settings.activeProfile(),
+    gstFiled: getTable<FiledReturn>(COMPLIANCE_TABLE),
+    gstFrequency: localDb.settings.get().gst_filing_frequency,
     lastBackup: getLastBackup(),
     storageUsedBytes: appDataSize() * 2,
     storageQuotaBytes: STORAGE_QUOTA_BYTES,

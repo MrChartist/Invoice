@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { Download, FileJson, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react';
@@ -30,6 +30,9 @@ import { DataTable, Money, type Column } from '../components/gst-reports/DataTab
 import { Gstr3bView } from '../components/gst-reports/Gstr3bView';
 import { PeriodPicker } from '../components/gst-reports/PeriodPicker';
 import { ReconBanner } from '../components/gst-reports/ReconBanner';
+import { ComplianceView } from '../components/gst-reports/ComplianceView';
+import { checkGstin } from '../lib/gstin';
+import type { HsnRow } from '../lib/gst-reports';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './GstReports.module.css';
@@ -37,7 +40,7 @@ import local from '../components/gst-reports/gst-reports.module.css';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 
-type TabId = 'overview' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'gstr3b';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'gstr3b';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -51,6 +54,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'hsn', label: 'HSN' },
   { id: 'docs', label: 'Documents' },
   { id: 'gstr3b', label: 'GSTR-3B' },
+  { id: 'compliance', label: 'Compliance' },
 ];
 
 function download(name: string, mime: string, text: string) {
@@ -97,7 +101,11 @@ export function GstReports() {
     return periodForDate('month', new Date(now.getFullYear(), now.getMonth() - 1, 1));
   });
   const [gstin, setGstin] = useState<string>(() => gstins[0] ?? '');
-  const [tab, setTab] = useState<TabId>('overview');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<TabId>(() => {
+    const t = params.get('tab');
+    return TABS.some((x) => x.id === t) ? (t as TabId) : 'overview';
+  });
   // Aggregate turnover for the JSON header — entered by the filer, remembered on this device.
   const [turnover, setTurnover] = useState<{ gt: string; curGt: string }>(() => {
     try {
@@ -116,10 +124,15 @@ export function GstReports() {
     }
   };
 
+  const lastFyTurnover = Number(turnover.gt) || 0;
+  const filerStateCode = useMemo(() => {
+    const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin) ?? localDb.settings.activeProfile();
+    return checkGstin(gstin || prof?.companyGstin || '').stateCode ?? prof?.stateCode ?? '';
+  }, [profiles, gstin]);
   const report = useMemo(() => {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin);
-    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks() });
-  }, [invoices, purchases, profiles, period, gstin]);
+    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover });
+  }, [invoices, purchases, profiles, period, gstin, lastFyTurnover]);
 
   const { gstr1: g1, gstr3b: g3, issues } = report;
   const label = periodLabel(period);
@@ -158,6 +171,27 @@ export function GstReports() {
     { key: 'cgst', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
     { key: 'sgst', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
   ];
+
+  const hsnTable = (rows: HsnRow[], caption: string) => (
+    <DataTable
+      caption={caption}
+      emptyText="No HSN/SAC data in this table."
+      rows={rows}
+      rowKey={(r) => `${r.hsn}${r.uqc}${r.rate}`}
+      columns={[
+        { key: 'h', label: 'HSN/SAC', render: (r) => <span className={surface.mono}>{r.hsn}</span> },
+        { key: 'd', label: 'Description', render: (r) => r.description },
+        { key: 'u', label: 'UQC', render: (r) => r.uqc },
+        { key: 'q', label: 'Qty', numeric: true, render: (r) => r.qty },
+        { key: 'v', label: 'Total value', numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
+        { key: 'r', label: 'Rate %', numeric: true, render: (r) => r.rate },
+        { key: 't', label: 'Taxable', numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
+        { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
+        { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
+        { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
+      ]}
+    />
+  );
 
   const sectionBody = () => {
     switch (tab) {
@@ -214,27 +248,24 @@ export function GstReports() {
             ]}
           />
         );
-      case 'hsn':
-        return (
-          <DataTable
-            caption="HSN-wise summary"
-            emptyText="No HSN/SAC data in this period."
-            rows={g1.hsn}
-            rowKey={(r) => `${r.hsn}${r.uqc}${r.rate}`}
-            columns={[
-              { key: 'h', label: 'HSN/SAC', render: (r) => <span className={surface.mono}>{r.hsn}</span> },
-              { key: 'd', label: 'Description', render: (r) => r.description },
-              { key: 'u', label: 'UQC', render: (r) => r.uqc },
-              { key: 'q', label: 'Qty', numeric: true, render: (r) => r.qty },
-              { key: 'v', label: 'Total value', numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
-              { key: 'r', label: 'Rate %', numeric: true, render: (r) => r.rate },
-              { key: 't', label: 'Taxable', numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
-              { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
-              { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
-              { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
-            ]}
-          />
+      case 'hsn': {
+        const hint = (
+          <p className={controls.hint} style={{ margin: 0 }}>
+            Minimum {g1.hsnMinDigits} HSN/SAC digits for a last-FY turnover of {lastFyTurnover ? formatMoney(lastFyTurnover) : '(not entered: assumed up to ₹5 crore)'} — 4 up to ₹5 crore, 6 above (Notification 78/2020-CT).
+            {g1.hsnSplit ? ' From January 2025 Table 12 is filed as two tables: B2B (registered recipients, incl. their credit/debit notes) and B2C (everyone else).' : ''}
+          </p>
         );
+        if (!g1.hsnSplit) return <>{hint}{hsnTable(g1.hsn, 'HSN-wise summary')}</>;
+        return (
+          <>
+            {hint}
+            <h3 className={local.tbHeading}>B2B — supplies to registered persons</h3>
+            {hsnTable(g1.hsnB2b, 'HSN summary, B2B')}
+            <h3 className={local.tbHeading}>B2C — supplies to unregistered persons</h3>
+            {hsnTable(g1.hsnB2c, 'HSN summary, B2C')}
+          </>
+        );
+      }
       case 'docs':
         return (
           <DataTable
@@ -255,6 +286,8 @@ export function GstReports() {
         );
       case 'gstr3b':
         return <Gstr3bView report={g3} />;
+      case 'compliance':
+        return <ComplianceView invoices={invoices} purchases={purchases} gstin={gstin} stateCode={filerStateCode} turnover={lastFyTurnover} notify={notify} />;
       default:
         return null;
     }
@@ -315,7 +348,7 @@ export function GstReports() {
             onChange={(e) => patchTurnover({ ...turnover, curGt: e.target.value.replace(/[^0-9.]/g, '') })} />
         </label>
         <p className={controls.hint} style={{ margin: 0, flexBasis: '100%' }}>
-          Written to the JSON as <code>gt</code> / <code>cur_gt</code>. Enter from your books; needs verification with your CA.
+          Written to the JSON as <code>gt</code> / <code>cur_gt</code>; last-FY turnover also sets the 4/6-digit HSN rule and the late-fee cap. Enter from your books; needs verification with your CA.
         </p>
         {period.kind !== 'month' && (
           <p className={controls.hint} style={{ margin: 0 }}>
@@ -327,7 +360,7 @@ export function GstReports() {
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
         <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
         <span>
-          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; composition, ISD, imports, e-commerce (TCS), amendments and interest/late fee are not handled. B2CL threshold is ₹1 lakh for invoices from 1 Aug 2024 (₹2.5 lakh before). JSON follows the GST offline-tool layout but is not schema-validated against the portal.
+          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; composition, ISD, imports, e-commerce (TCS), amendments are not handled; interest and late fee are estimates on the Compliance tab. B2CL threshold is ₹1 lakh for invoices from 1 Aug 2024 (₹2.5 lakh before). JSON follows the GST offline-tool layout but is not schema-validated against the portal.
         </span>
       </div>
 
@@ -363,7 +396,7 @@ export function GstReports() {
         </div>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>
           <div className={local.toolbar}>
-            <h2 className={local.tbHeading}>{TABS.find((x) => x.id === tab)?.label} · {label}</h2>
+            <h2 className={local.tbHeading}>{TABS.find((x) => x.id === tab)?.label}{tab === 'compliance' ? '' : ` · ${label}`}</h2>
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>

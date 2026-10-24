@@ -24,7 +24,7 @@ import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, nu
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
 import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
-import { b2clThreshold, b2clThresholdLabel } from './tax-rules';
+import { b2clThreshold, b2clThresholdLabel, hsnMinDigits, hsnTableSplit } from './tax-rules';
 
 /* ───────────────────────── Period ───────────────────────── */
 
@@ -234,7 +234,16 @@ export interface Gstr1Report {
   cdnur: CdnRow[];
   exp: ExportRow[];
   nil: NilRow[];
+  /** Table 12, all supplies (the pre-2025 single table). */
   hsn: HsnRow[];
+  /** Table 12 split (HSN Phase-III): supplies to registered recipients (B2B, CDNR)... */
+  hsnB2b: HsnRow[];
+  /** ...and to unregistered recipients (B2CL, B2CS, exports, CDNUR). Notes are netted with their sign. */
+  hsnB2c: HsnRow[];
+  /** True when the period is reported with the split tables (`hsnTableSplit` in tax-rules). */
+  hsnSplit: boolean;
+  /** Minimum HSN/SAC digits applied in the reconciliation (from the preceding-FY turnover). */
+  hsnMinDigits: number;
   docIssue: DocIssueRow[];
   /** Totals across every outward table (net of credit notes). */
   totals: { taxable: number; igst: number; cgst: number; sgst: number; value: number; cess?: number };
@@ -321,6 +330,8 @@ export interface BuildOptions {
   filerStateCode?: string;
   /** `doc_links` rows: a note linked to its original invoice is classified by that invoice. */
   links?: readonly { from_id: string; to_id: string; relation: string }[];
+  /** Preceding-FY aggregate turnover (₹, the JSON `gt`): picks the 4- or 6-digit HSN rule. 0 / absent = up to ₹5 crore. */
+  turnover?: number;
 }
 
 /* ───────────────────────── Prepared documents ───────────────────────── */
@@ -489,6 +500,11 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   if (lines.some((l) => l.taxable > 0 && !l.hsn)) {
     push('warning', 'HSN_MISSING', 'one or more line items have no HSN/SAC code (mandatory in the HSN summary).');
   }
+  const minDigits = hsnMinDigits(opts.turnover ?? 0, String(rec.issue_date).slice(0, 10));
+  const short = [...new Set(lines.filter((l) => senderGstin && l.hsn && l.hsn.replace(/\D/g, '').length < minDigits).map((l) => l.hsn))];
+  if (short.length) {
+    push('warning', 'HSN_DIGITS', `HSN/SAC ${short.join(', ')} has fewer than the ${minDigits} digits required for your last-FY turnover (4 up to ₹5 crore, 6 above).`);
+  }
   if (!senderGstin && lines.some((l) => l.igst + l.cgst + l.sgst > 0)) {
     push('warning', 'NO_FILER_GSTIN', 'tax is charged but the sender profile has no GSTIN.', '/settings', 'Open settings');
   }
@@ -613,6 +629,24 @@ function addLine(target: Acc, l: PLine, sign: number) {
   target.cess = round2(target.cess + sign * l.cess);
 }
 
+function addHsn(map: Map<string, HsnRow>, l: PLine, sign: number) {
+  const hsn = l.hsn || 'NA';
+  const key = `${hsn}|${l.uqc}|${l.rate}`;
+  const h =
+    map.get(key) ??
+    { hsn, description: l.desc, uqc: l.uqc, qty: 0, value: 0, taxable: 0, rate: l.rate, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+  h.qty = round2(h.qty + sign * (l.uqc === 'NA' ? 0 : l.qty));
+  h.value = round2(h.value + sign * l.lineTotal);
+  h.taxable = round2(h.taxable + sign * l.taxable);
+  h.igst = round2(h.igst + sign * l.igst);
+  h.cgst = round2(h.cgst + sign * l.cgst);
+  h.sgst = round2(h.sgst + sign * l.sgst);
+  h.cess = round2(h.cess + sign * l.cess);
+  map.set(key, h);
+}
+
+const sortHsn = (map: Map<string, HsnRow>) => [...map.values()].sort((a, b) => a.hsn.localeCompare(b.hsn) || a.rate - b.rate);
+
 export interface PreparedGstr1 {
   docs: PDoc[];
   gstr1: Gstr1Report;
@@ -653,6 +687,8 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   const b2csMap = new Map<string, B2csRow>();
   const nilMap = new Map<NilSupplyType, NilRow>();
   const hsnMap = new Map<string, HsnRow>();
+  const hsnB2bMap = new Map<string, HsnRow>();
+  const hsnB2cMap = new Map<string, HsnRow>();
   const totals = { taxable: 0, igst: 0, cgst: 0, sgst: 0, value: 0, cess: 0 };
 
   const nilKey = (d: PDoc): NilSupplyType =>
@@ -732,19 +768,9 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
       }
 
       if (!d.senderGstin && taxOf(l) === 0 && l.cess === 0) continue; // outside GST — not in the HSN summary
-      const hsn = l.hsn || 'NA';
-      const key = `${hsn}|${l.uqc}|${l.rate}`;
-      const h =
-        hsnMap.get(key) ??
-        { hsn, description: l.desc, uqc: l.uqc, qty: 0, value: 0, taxable: 0, rate: l.rate, igst: 0, cgst: 0, sgst: 0, cess: 0 };
-      h.qty = round2(h.qty + d.sign * (l.uqc === 'NA' ? 0 : l.qty));
-      h.value = round2(h.value + d.sign * l.lineTotal);
-      h.taxable = round2(h.taxable + d.sign * l.taxable);
-      h.igst = round2(h.igst + d.sign * l.igst);
-      h.cgst = round2(h.cgst + d.sign * l.cgst);
-      h.sgst = round2(h.sgst + d.sign * l.sgst);
-      h.cess = round2(h.cess + d.sign * l.cess);
-      hsnMap.set(key, h);
+      addHsn(hsnMap, l, d.sign);
+      // Table 12 split: by whether the recipient is registered (a note follows its recipient too).
+      addHsn(d.registered ? hsnB2bMap : hsnB2cMap, l, d.sign);
     }
   }
 
@@ -767,7 +793,11 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     cdnur,
     exp,
     nil: [...nilMap.values()].sort((a, b) => a.type.localeCompare(b.type)),
-    hsn: [...hsnMap.values()].sort((a, b) => a.hsn.localeCompare(b.hsn) || a.rate - b.rate),
+    hsn: sortHsn(hsnMap),
+    hsnB2b: sortHsn(hsnB2bMap),
+    hsnB2c: sortHsn(hsnB2cMap),
+    hsnSplit: hsnTableSplit(periodRange(opts.period).from),
+    hsnMinDigits: hsnMinDigits(opts.turnover ?? 0, periodRange(opts.period).to),
     docIssue: buildDocIssue(inScope),
     // `cess` only appears when there is some, so reports without cess keep their exact shape.
     totals: totals.cess === 0 ? { taxable: totals.taxable, igst: totals.igst, cgst: totals.cgst, sgst: totals.sgst, value: totals.value } : totals,
