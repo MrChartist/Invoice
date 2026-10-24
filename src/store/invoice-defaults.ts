@@ -161,6 +161,7 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(num(item.cess_rate) > 0 ? { cess_rate: num(item.cess_rate) } : {}),
     ...(num(item.cess_per_unit) > 0 ? { cess_per_unit: num(item.cess_per_unit) } : {}),
     amount: num(item.amount, quantity * rate),
+    ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
   };
 }
 
@@ -254,6 +255,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.shipping_bill_date ? { shipping_bill_date: String(r.shipping_bill_date).slice(0, 10) } : {}),
     ...(r.port_code ? { port_code: String(r.port_code).toUpperCase() } : {}),
     ...(typeof r.late_fee_for === 'string' && r.late_fee_for ? { late_fee_for: r.late_fee_for } : {}),
+    ...(r.sales_order_id ? { sales_order_id: String(r.sales_order_id) } : {}),
+    ...(r.order_closed_on ? { order_closed_on: String(r.order_closed_on).slice(0, 10) } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

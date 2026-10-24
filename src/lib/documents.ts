@@ -6,16 +6,18 @@
  * storage-backed wrappers that persist through `localDb.invoices.save` (so the
  * client / catalogue sync keeps working) and the `doc_links` table.
  *
- * Debit notes: `DocumentType` has no DEBIT_NOTE (shared type file is frozen),
- * so a debit note is an INVOICE whose `po_number` holds the original invoice
- * number, whose notes say "Debit note against …", and which is tied to the
- * original by a `debit_note` doc_link.
+ * Sales orders convert partially (pending quantities only) — see `sales-orders.ts`.
+ *
+ * Debit notes are their own DEBIT_NOTE type (DBN series), tied to the original
+ * by a `debit_note` doc_link. Sales orders convert partially: only the quantity
+ * still pending goes onto the new challan / invoice (see `sales-orders.ts`).
  */
 
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { localDb } from './localDb';
 import { isPeriodLockedError } from './period-lock';
+import { orderConversionBlocked, orderFulfilment, pendingQuantities } from './sales-orders';
 import {
   DOCUMENT_LABELS,
   type DocumentType,
@@ -65,7 +67,9 @@ export const CREDIT_REASONS = [
 const SALES_INVOICE_TARGETS: DocumentType[] = ['TAX_INVOICE', 'INVOICE'];
 
 const TRANSITIONS: Record<DocumentType, DocumentType[]> = {
-  QUOTATION: ['PROFORMA', ...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
+  QUOTATION: ['SALES_ORDER', 'PROFORMA', ...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
+  // Sales orders convert PARTIALLY: only the quantity still pending (see sales-orders.ts).
+  SALES_ORDER: ['DELIVERY_CHALLAN', ...SALES_INVOICE_TARGETS],
   PROFORMA: [...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
   INVOICE: ['DELIVERY_CHALLAN'],
   TAX_INVOICE: ['DELIVERY_CHALLAN'],
@@ -86,17 +90,20 @@ export function isInvoiceType(t: DocumentType): boolean {
 
 /** Conversions allowed for a document. Cancelled documents cannot be converted. */
 export function allowedConversions(
-  source: Pick<InvoiceRecord, 'doc_type' | 'status'>,
+  source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on'>>,
 ): ConversionOption[] {
   if (source.status === 'Cancelled') return [];
+  // A closed sales order takes no more challans / invoices until it is reopened.
+  if (source.doc_type === 'SALES_ORDER' && source.order_closed_on) return [];
+  const pending = source.doc_type === 'SALES_ORDER' ? ' (pending qty)' : '';
   return (TRANSITIONS[source.doc_type] ?? []).map((target) => ({
     target,
-    label: `Convert to ${DOCUMENT_LABELS[target]}`,
+    label: `Convert to ${DOCUMENT_LABELS[target]}${pending}`,
   }));
 }
 
 export function canConvert(
-  source: Pick<InvoiceRecord, 'doc_type' | 'status'>,
+  source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on'>>,
   target: DocumentType,
 ): boolean {
   return allowedConversions(source).some((o) => o.target === target);
@@ -165,6 +172,55 @@ export interface ConvertContext {
   invoice_number: string;
   today: string;
   dueDays: number;
+  /**
+   * Sales order source only: quantity still pending per order line id. Lines that are absent
+   * (or zero) are left off the new document.
+   */
+  pending?: Record<string, number>;
+  /** Sales order source only: carry shipping / other charges (false once an earlier document of this kind took them). */
+  carryCharges?: boolean;
+}
+
+/** The invoice-level discount re-expressed as a percent of the net line value, so a part-document gets its share. */
+function equivalentDiscountPct(invoice: InvoiceRecord): number {
+  const calc = calculateInvoice(
+    calcInputFromRecord(invoice, {
+      shipping: 0,
+      other_charges: 0,
+      round_off_enabled: false,
+      round_mode: 'none',
+      amount_paid: 0,
+    }),
+  );
+  const netBase = round2(calc.subtotal - calc.line_discount_total);
+  return netBase > 0 ? (calc.invoice_discount_amount / netBase) * 100 : 0;
+}
+
+/** Sales order → challan / invoice: only the pending quantity, each line stamped with the order line it fulfils. */
+function orderPart(source: InvoiceRecord, ctx: ConvertContext): Partial<InvoiceRecord> {
+  const pending = ctx.pending ?? {};
+  const items: InvoiceItem[] = [];
+  let partial = false;
+  for (const line of source.items ?? []) {
+    const q = round2(num(pending[line.id]));
+    if (q <= 0) {
+      if (num(line.quantity) > 0) partial = true;
+      continue;
+    }
+    if (q < num(line.quantity)) partial = true;
+    items.push({ ...line, id: generateId(), quantity: q, amount: round2(q * num(line.rate)), order_line_id: line.id });
+  }
+  if (items.length === 0) throw new DocumentError('Nothing is pending on this sales order.');
+  const carry = ctx.carryCharges !== false;
+  return {
+    items,
+    sales_order_id: source.id,
+    order_closed_on: undefined,
+    ...(partial && source.discount_type === 'AMOUNT' && num(source.discount_rate) > 0
+      ? { discount_type: 'PERCENT' as const, discount_rate: equivalentDiscountPct(source) }
+      : {}),
+    ...(carry ? {} : { shipping: 0, other_charges: 0 }),
+  };
 }
 
 /** Pure: the new draft produced by converting `source` to `target`. */
@@ -197,6 +253,8 @@ export function buildConvertedDraft(
     late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
+    order_closed_on: undefined,
+    ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
   };
   return recompute(draft);
 }
@@ -205,7 +263,7 @@ export function buildConvertedDraft(
 export function statusAfterConversion(
   source: Pick<InvoiceRecord, 'doc_type' | 'status'>,
 ): InvoiceStatus {
-  if ((source.doc_type === 'QUOTATION' || source.doc_type === 'PROFORMA') && source.status === 'Draft') {
+  if ((source.doc_type === 'QUOTATION' || source.doc_type === 'PROFORMA' || source.doc_type === 'SALES_ORDER') && source.status === 'Draft') {
     return 'Sent';
   }
   return source.status;
@@ -215,11 +273,27 @@ export function statusAfterConversion(
 export function convertDocument(source: InvoiceRecord, target: DocumentType): InvoiceRecord {
   const today = localIsoDate();
   const settings = localDb.settings.get();
+  let order: Pick<ConvertContext, 'pending' | 'carryCharges'> = {};
+  if (source.doc_type === 'SALES_ORDER' && canConvert(source, target)) {
+    const all = localDb.invoices.getAll();
+    const links = readLinks();
+    const fresh = all.find((i) => i.id === source.id) ?? source;
+    const f = orderFulfilment(fresh, all, links);
+    const kind = target === 'DELIVERY_CHALLAN' ? 'deliver' : 'invoice';
+    const blocked = orderConversionBlocked(f, kind);
+    if (blocked) throw new DocumentError(blocked);
+    const sameKind = (t: DocumentType) => (kind === 'deliver' ? t === 'DELIVERY_CHALLAN' : isInvoiceType(t));
+    order = {
+      pending: pendingQuantities(f, kind),
+      carryCharges: !all.some((d) => f.documentIds.includes(d.id) && sameKind(d.doc_type)),
+    };
+  }
   const draft = buildConvertedDraft(source, target, {
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, target, source.sender?.invoicePrefix || undefined),
     today,
     dueDays: num(settings.defaultDueDays, 14),
+    ...order,
   });
   const saved = localDb.invoices.save(draft);
   addLink({ from_id: source.id, to_id: saved.id, relation: 'converted' });
@@ -358,17 +432,7 @@ export function buildCreditNote(
 
   // Re-express the original invoice-level discount as an equivalent percent so
   // a partial credit gets a proportional share of it.
-  const origCalc = calculateInvoice(
-    calcInputFromRecord(invoice, {
-      shipping: 0,
-      other_charges: 0,
-      round_off_enabled: false,
-      round_mode: 'none',
-      amount_paid: 0,
-    }),
-  );
-  const netBase = round2(origCalc.subtotal - origCalc.line_discount_total);
-  const discountPct = netBase > 0 ? (origCalc.invoice_discount_amount / netBase) * 100 : 0;
+  const discountPct = equivalentDiscountPct(invoice);
 
   const base: InvoiceRecord = {
     ...invoice,

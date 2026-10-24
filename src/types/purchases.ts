@@ -35,6 +35,8 @@ export interface PurchaseLine {
   tax_rate: number;
   /** Optional link to an inventory/catalogue item id (for stock-in). */
   item_id?: string;
+  /** Additive: the purchase-order line this bill line receives (set by "Convert to bill"). */
+  po_line_id?: string;
 }
 
 /** A supplier bill or a direct expense. Persisted in table `purchases`. */
@@ -88,6 +90,49 @@ export interface PurchaseRecord {
   pure_agent?: boolean;
   /** Invoice id it was re-billed on. Billed only while that invoice exists and is not cancelled. */
   rebilled_in?: string;
+  /** Additive: the purchase order (table `purchase_orders`) this bill was converted from. */
+  po_id?: string;
+}
+
+/** One line of a purchase order. Same shape as a bill line, minus the stock link. */
+export interface PurchaseOrderLine {
+  id: string;
+  name: string;
+  hsn?: string;
+  unit?: string;
+  quantity: number;
+  rate: number;
+  tax_rate: number;
+}
+
+/**
+ * A purchase order sent to a supplier. Persisted in table `purchase_orders`. Not a tax or
+ * books document: nothing posts until the supplier's bill is recorded. Received quantity is
+ * derived from bills whose `po_id` points here (per line through `PurchaseLine.po_line_id`).
+ */
+export interface PurchaseOrder {
+  id: string;
+  /** `PO/FY<yy-yy>/<seq>` (Indian FY of `date`). */
+  po_number: string;
+  /** yyyy-mm-dd */
+  date: string;
+  /** Expected delivery, yyyy-mm-dd. */
+  expected_date?: string;
+  vendor_id?: string;
+  vendor_name: string;
+  vendor_gstin?: string;
+  place_of_supply?: string;
+  lines: PurchaseOrderLine[];
+  taxable: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total: number;
+  notes?: string;
+  /** yyyy-mm-dd the user closed a partly received order. */
+  closed_on?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type ImportType = 'GOODS' | 'SERVICES';

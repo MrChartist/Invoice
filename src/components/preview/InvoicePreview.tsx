@@ -208,7 +208,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
       paperHtml: clone.outerHTML,
       css,
       business: rec.sender?.companyName ?? '',
-      pay: due > 0 && rec.doc_type !== 'QUOTATION' ? { amountText: formatCurrency(due, rec.currency), upiLink: invoiceUpiLink(rec), upiId: rec.sender?.upiId, qrDataUrl } : null,
+      pay: due > 0 && rec.doc_type !== 'QUOTATION' && rec.doc_type !== 'SALES_ORDER' ? { amountText: formatCurrency(due, rec.currency), upiLink: invoiceUpiLink(rec), upiId: rec.sender?.upiId, qrDataUrl } : null,
       generatedOn: formatDate(new Date()),
     });
     const name = pdfFilename().replace(/\.pdf$/, '.html');

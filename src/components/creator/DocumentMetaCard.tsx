@@ -101,7 +101,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
             <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, s.due_date)} />
           </label>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="due-date">Due date</label>
+            <label className={controls.label} htmlFor="due-date">{s.doc_type === 'SALES_ORDER' ? 'Delivery by' : 'Due date'}</label>
             <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
             <div className={styles.chips}>
               {DUE_PRESETS.map((d) => (

@@ -32,6 +32,7 @@ import { localDb, generateId } from '../lib/localDb';
 import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { quoteState, quoteTone } from '../lib/quote-status';
+import { buildOrderIndex, fulfilmentFromIndex, ORDER_STATES, orderTone, type OrderState } from '../lib/sales-orders';
 import { bulkMarkPaid, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
 import { effectiveStatus } from '../lib/invoice-status';
 import { getTable } from '../lib/storage';
@@ -98,7 +99,12 @@ export function Transactions() {
     return open.length === 1 ? open[0] : null;
   });
   const [deleting, setDeleting] = useState<InvoiceRecord[] | null>(null);
-  const [docType, setDocType] = useState<DocumentType | ''>('');
+  const [docType, setDocType] = useState<DocumentType | ''>(() => {
+    const t = params.get('type');
+    return t && t in DOCUMENT_LABELS ? (t as DocumentType) : '';
+  });
+  // Sales orders only: Open / Partly fulfilled / Fulfilled / Closed.
+  const [orderState, setOrderState] = useState<OrderState | ''>('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
@@ -125,6 +131,14 @@ export function Transactions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const links = useMemo(() => getTable<CreditLink & { relation: string }>('doc_links'), [version]);
   const summary = useMemo(() => summarize(invoices, now, links, 'INR'), [invoices, links]); // eslint-disable-line react-hooks/exhaustive-deps
+  // One pass over every document gives each sales order its fulfilment state.
+  const orderStates = useMemo(() => {
+    const out = new Map<string, OrderState>();
+    if (!invoices.some((i) => i.doc_type === 'SALES_ORDER')) return out;
+    const index = buildOrderIndex(invoices, links);
+    for (const so of invoices) if (so.doc_type === 'SALES_ORDER') out.set(so.id, fulfilmentFromIndex(so, index).state);
+    return out;
+  }, [invoices, links]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -132,6 +146,7 @@ export function Transactions() {
       .filter((inv) => !pendingDelete.has(inv.id))
       .filter((inv) => matchesFilter(inv, filter, now))
       .filter((inv) => matchesListFilter(inv, { docType, from, to }))
+      .filter((inv) => docType !== 'SALES_ORDER' || !orderState || orderStates.get(inv.id) === orderState)
       .filter(
         (inv) =>
           !q ||
@@ -140,13 +155,17 @@ export function Transactions() {
           ),
       );
     return sortInvoices(list, sort.key, sort.dir);
-  }, [invoices, query, filter, docType, from, to, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [invoices, query, filter, docType, orderState, orderStates, from, to, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Long lists mount only the rows in view (see useVirtualRows); 100 rows or fewer render as before.
   const rowKeys = useMemo(() => rows.map((r) => r.id), [rows]);
   const virtual = useVirtualRows(rowKeys, { estimate: 66 });
 
-  const docTypes = useMemo(() => [...new Set(invoices.map((i) => i.doc_type))], [invoices]);
+  const docTypes = useMemo(() => {
+    const set = new Set(invoices.map((i) => i.doc_type));
+    if (docType) set.add(docType); // a ?type= link keeps its option even before the first such document
+    return [...set];
+  }, [invoices, docType]);
   const visibleSelected = rows.filter((r) => selected.has(r.id));
   const allSelected = rows.length > 0 && visibleSelected.length === rows.length;
   const toggle = (id: string) =>
@@ -193,6 +212,10 @@ export function Transactions() {
         late_fee_for: undefined,
         created_at: undefined,
         updated_at: undefined,
+        // A copy is a fresh document: it fulfils no sales order and is not closed.
+        sales_order_id: undefined,
+        order_closed_on: undefined,
+        items: (inv.items ?? []).map(({ order_line_id: _drop, ...item }) => item),
       };
       const saved = localDb.invoices.save(clone);
       reload();
@@ -348,6 +371,14 @@ export function Transactions() {
               <option key={t} value={t}>{DOCUMENT_LABELS[t] ?? t}</option>
             ))}
           </select>
+          {docType === 'SALES_ORDER' && (
+            <select className={controls.select} aria-label="Order status" value={orderState} onChange={(e) => setOrderState(e.target.value as OrderState | '')}>
+              <option value="">All orders</option>
+              {ORDER_STATES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
           <label className={styles.range}>
             <span>From</span>
             <input type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
@@ -464,6 +495,11 @@ export function Transactions() {
                           (() => {
                             const q = quoteState(inv, links, now);
                             return <StatusBadge status={q} tone={quoteTone(q)} />;
+                          })()
+                        ) : inv.doc_type === 'SALES_ORDER' ? (
+                          (() => {
+                            const o = orderStates.get(inv.id) ?? 'Open';
+                            return <StatusBadge status={o} tone={orderTone(o)} />;
                           })()
                         ) : (
                           <StatusBadge status={status} />

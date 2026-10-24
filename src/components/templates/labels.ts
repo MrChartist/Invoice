@@ -11,6 +11,7 @@ const EN = {
   quoteDate: 'Quote date',
   dueDate: 'Due date',
   validUntil: 'Valid until',
+  deliveryBy: 'Delivery by',
   poRef: 'PO / Ref',
   placeOfSupply: 'Place of supply',
   currency: 'Currency',
@@ -62,6 +63,7 @@ const HI: Record<LabelKey, string> = {
   quoteDate: 'कोटेशन तिथि',
   dueDate: 'देय तिथि',
   validUntil: 'मान्य तिथि',
+  deliveryBy: 'डिलीवरी तिथि',
   poRef: 'ऑर्डर संदर्भ',
   placeOfSupply: 'आपूर्ति स्थान',
   currency: 'मुद्रा',
@@ -110,6 +112,7 @@ export const DOC_TITLE_HI: Record<DocumentType, string> = {
   CREDIT_NOTE: 'क्रेडिट नोट',
   DEBIT_NOTE: 'डेबिट नोट',
   DELIVERY_CHALLAN: 'डिलीवरी चालान',
+  SALES_ORDER: 'बिक्री आदेश',
 };
 
 export type Labeller = (key: LabelKey) => ReactNode;

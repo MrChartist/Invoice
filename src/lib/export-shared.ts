@@ -108,7 +108,7 @@ export type VoucherKind = 'SALES' | 'CREDIT_NOTE';
 /** Which accounting voucher an invoice becomes, or null if it is not a ledger document. */
 export function voucherKindOf(inv: InvoiceRecord, includeDrafts = false): VoucherKind | null {
   const t = inv.doc_type ?? 'INVOICE';
-  if (t === 'QUOTATION' || t === 'PROFORMA' || t === 'DELIVERY_CHALLAN') return null;
+  if (t === 'QUOTATION' || t === 'PROFORMA' || t === 'DELIVERY_CHALLAN' || t === 'SALES_ORDER') return null;
   if (inv.status === 'Cancelled') return null;
   if (inv.status === 'Draft' && !includeDrafts) return null;
   return t === 'CREDIT_NOTE' ? 'CREDIT_NOTE' : 'SALES';

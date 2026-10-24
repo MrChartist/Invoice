@@ -163,7 +163,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.2 | ✅ **Trial balance + ledger drill-down** | all accounting tools | S (after 6.1) |
 | 6.3 | ✅ **Full balance sheet**: fixed assets & depreciation (IT Act WDV blocks), loans, capital/drawings, GST ledgers (Schedule III vertical format) | Tally, Zoho | M |
 | 6.4 | ✅ **Cash-flow statement** (indirect, AS 3) | Vyapar, Refrens, Zoho, Xero | S–M |
-| 6.5 | **Sales orders & purchase orders** with pending quantities → invoice / challan / bill | Refrens, Odoo, myBillBook, Vyapar, Zoho | M |
+| 6.5 | ✅ **Sales orders & purchase orders** with pending quantities → invoice / challan / bill (`src/lib/sales-orders.ts`, `src/lib/purchase-orders.ts`) | Refrens, Odoo, myBillBook, Vyapar, Zoho | M |
 | 6.6 | **Batch / expiry / MFG** on stock with FEFO and expiry alerts | Vyapar, myBillBook, Busy, Marg | M |
 | 6.7 | **Barcode** scan (BarcodeDetector + keyboard wedge) and Code128/EAN-13 label sheets | Vyapar, myBillBook, Marg | M |
 | 6.8 | **POS quick bill**: walk-in, split cash/UPI tender, 80 mm auto-print, day-end Z report | Vyapar, myBillBook, Marg, Swipe | M |

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, FilePlus2, Landmark, PiggyBank, Receipt, Search, Tags, Wallet, Zap } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
@@ -11,6 +12,9 @@ import { PurchasePaymentModal } from '../components/purchases/PurchasePaymentMod
 import { PurchasesTable } from '../components/purchases/PurchasesTable';
 import { VendorsTab } from '../components/purchases/VendorsTab';
 import { MsmeCard } from '../components/purchases/MsmeCard';
+import type { BillSeed } from '../lib/purchase-orders';
+import { getTable } from '../lib/storage';
+import type { PurchaseOrder } from '../types/purchases';
 import {
   PURCHASE_STATUSES,
   categorySummary,
@@ -32,7 +36,12 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 
-type Tab = 'bills' | 'vendors';
+type Tab = 'bills' | 'orders' | 'vendors';
+
+// Purchase orders are a separate, rarely-opened tab: load it on demand.
+const PurchaseOrdersTab = lazy(() =>
+  import('../components/purchases/PurchaseOrdersTab').then((m) => ({ default: m.PurchaseOrdersTab })),
+);
 
 const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: string }[] = [
   { id: 'ALL', label: 'All' },
@@ -44,7 +53,9 @@ const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: string }[] = [
 export function Expenses() {
   const { notify, toastNode } = useToast();
   const [version, setVersion] = useState(0);
-  const [tab, setTab] = useState<Tab>('bills');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (params.get('tab') === 'orders' ? 'orders' : params.get('tab') === 'vendors' ? 'vendors' : 'bills'));
+  const [seed, setSeed] = useState<BillSeed | null>(null);
   const [filter, setFilter] = useState<PurchaseFilter>({ kind: 'ALL', status: 'ALL', category: 'ALL' });
   const [billOpen, setBillOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
@@ -57,6 +68,8 @@ export function Expenses() {
   const purchases = useMemo(() => purchasesDb.all(), [version]);
   const vendors = useMemo(() => vendorsDb.all(), [version]);
   const payments = useMemo(() => paymentsDb.all(), [version]);
+  // Read straight from the table so the PO library stays in the lazy tab's chunk.
+  const orders = useMemo(() => getTable<PurchaseOrder>('purchase_orders'), [version]);
   const business = useMemo(() => businessContext(), [version]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
@@ -79,6 +92,7 @@ export function Expenses() {
     setBillOpen(false);
     setExpenseOpen(false);
     setEditing(null);
+    setSeed(null);
   };
   const saved = (message: string) => {
     reload();
@@ -148,13 +162,35 @@ export function Expenses() {
           <button type="button" role="tab" aria-selected={tab === 'bills'} className={tab === 'bills' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('bills')}>
             Bills & expenses <span className={styles.count}>{purchases.length}</span>
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'orders'} className={tab === 'orders' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('orders')}>
+            Purchase orders <span className={styles.count}>{orders.length}</span>
+          </button>
           <button type="button" role="tab" aria-selected={tab === 'vendors'} className={tab === 'vendors' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('vendors')}>
             Vendors <span className={styles.count}>{vendors.length}</span>
           </button>
         </div>
       </div>
 
-      {tab === 'vendors' ? (
+      {tab === 'orders' ? (
+        <Suspense fallback={null}>
+          <PurchaseOrdersTab
+            orders={orders}
+            vendors={vendors}
+            purchases={purchases}
+            businessState={business.stateCode}
+            onVendorCreated={reload}
+            onConvert={(s) => {
+              setEditing(null);
+              setSeed(s);
+              setBillOpen(true);
+            }}
+            onChanged={(message, tone) => {
+              reload();
+              if (message) notify(message, tone);
+            }}
+          />
+        </Suspense>
+      ) : tab === 'vendors' ? (
         <VendorsTab
           vendors={vendors}
           purchases={purchases}
@@ -244,6 +280,7 @@ export function Expenses() {
         open={billOpen}
         onClose={closeForms}
         purchase={editing?.kind === 'PURCHASE' ? editing : null}
+        seed={seed}
         vendors={vendors}
         onVendorCreated={reload}
         businessState={business.stateCode}

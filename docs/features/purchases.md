@@ -13,6 +13,7 @@ payables, input tax credit (ITC), vendor master.
 | `vendors` | `Vendor` (`src/types/purchases.ts`) |
 | `purchases` | `PurchaseRecord` (`src/types/purchases.ts`); expenses use `kind: 'EXPENSE'` with one synthesised line |
 | `purchase_payments` | `PurchasePayment { id, purchase_id, amount, date, method, reference?, created_at? }` |
+| `purchase_orders` | `PurchaseOrder` (see "Purchase orders" below) |
 
 `purchases.amount_paid` is the running sum of that bill's `purchase_payments`.
 Status is derived, never stored: Paid / Overdue (balance > 0 and due_date < today) / Partially paid / Unpaid.
@@ -90,6 +91,28 @@ Vendors carry optional `msme_udyam` (`UDYAM-XX-00-0000000`, validated by `valida
 Statutory values (`MSME_PAYMENT_DAYS`, `MSME_43BH_FROM`, `RBI_BANK_RATE_RULES`) live in `src/lib/tax-rules.ts`.
 `MsmeCard` shows open MSE bills and the 43B(h) totals for the current and previous FY on the Expenses
 page; it renders nothing until a vendor is marked micro or small. Estimates — verify with your CA.
+
+## Purchase orders (Roadmap 6.5)
+
+Table `purchase_orders` (`PurchaseOrder` in `src/types/purchases.ts`): `po_number` (`PO/FY<yy-yy>/<seq>`, Indian FY of
+the order date, highest + 1), `date`, `expected_date`, vendor (`vendor_id` / `vendor_name` / `vendor_gstin`),
+`place_of_supply`, `lines` (`PurchaseOrderLine`: name, hsn, unit, quantity, rate, tax_rate), GST totals, `notes`,
+`closed_on`. A PO is **not** a tax or books document: no report reads the table, so GST, ITC, books and stock move
+only when the supplier's bill is saved.
+
+- **Convert to bill**: `billSeedFromPo(po, purchases)` pre-fills `BillModal` (new `seed` prop) with the vendor,
+  place of supply and only the pending quantity per line. The saved bill carries `po_id` and each line `po_line_id`
+  (both additive, optional; guarded by `tests/purchase-contract.test.ts`).
+- **Received is derived** from those bills (`poFulfilment(po, purchases)`): Open / Partly received / Received /
+  Closed. Edit or delete a bill and the PO follows. `purchaseOrdersDb.setClosed(id, day | undefined)` closes or
+  reopens; `remove` refuses a PO that already has bills (close it instead).
+- **Printable PO**: `poHtml(po, buyer, vendor?)` — self-contained, script-free HTML with every value escaped
+  (receipt pattern), opened in a print window or saved as a file when pop-ups are blocked.
+- UI: Expenses → **Purchase orders** tab (`/expenses?tab=orders`, lazy `PurchaseOrdersTab`): list with status filter,
+  new / edit form, convert, print, close / reopen, delete.
+- Lib: `src/lib/purchase-orders.ts` (`nextPoNumber`, `poFulfilment`, `billSeedFromPo`, `poConversionBlocked`,
+  `validatePo`, `poTotals`, `poHtml`, `purchaseOrdersDb`). Backup validates the table (`RECORD_TABLES`).
+  Tests: `tests/integration/orders.test.ts`.
 
 ## Notes
 - No network, no new dependencies; CSV export reuses `src/lib/download.ts`.

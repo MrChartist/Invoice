@@ -89,9 +89,9 @@ export function GstBody({ invoice, sender, totals }: Props) {
           </div>
         </div>
         <div className={styles.gMeta}>
-          <Cell label={isQuote ? 'Quotation No.' : 'Invoice No.'}>{invoice.invoice_number || 'DRAFT'}</Cell>
+          <Cell label={isQuote ? 'Quotation No.' : invoice.doc_type === 'SALES_ORDER' ? 'Order No.' : 'Invoice No.'}>{invoice.invoice_number || 'DRAFT'}</Cell>
           <Cell label="Dated">{date(invoice.issue_date)}</Cell>
-          <Cell label={isQuote ? 'Valid until' : 'Due date'}>{date(invoice.due_date) || '—'}</Cell>
+          <Cell label={isQuote ? 'Valid until' : invoice.doc_type === 'SALES_ORDER' ? 'Delivery by' : 'Due date'}>{date(invoice.due_date) || '—'}</Cell>
           <Cell label="Buyer's Ref / PO">{invoice.po_number || '—'}</Cell>
           {show.place && <Cell label="Place of supply">{place || '—'}</Cell>}
           <Cell label="Reverse charge">{invoice.reverse_charge ? 'Yes' : 'No'}</Cell>

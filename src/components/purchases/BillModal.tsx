@@ -3,6 +3,7 @@ import type { ImportType, ItcReversalReason, PurchaseRecord, Vendor } from '../.
 import { ITC_REVERSAL_REASONS, PURCHASE_CATEGORIES } from '../../types/purchases';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
+import type { BillSeed } from '../../lib/purchase-orders';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 import { BillableFields } from './BillableFields';
@@ -22,10 +23,12 @@ export interface BillModalProps {
   /** State code of the business, drives CGST+SGST vs IGST. */
   businessState: string;
   onSaved: (message: string) => void;
+  /** New bill only: fields pre-filled from a purchase order ("Convert to bill", pending quantities). */
+  seed?: BillSeed | null;
 }
 
 /** Supplier bill with line items, GST split by place of supply, and ITC flag. */
-export function BillModal({ open, onClose, purchase, ...rest }: BillModalProps) {
+export function BillModal({ open, onClose, purchase, seed, ...rest }: BillModalProps) {
   // Re-mount the form per bill so state initialises from props without effects.
   return (
     <Modal
@@ -33,25 +36,27 @@ export function BillModal({ open, onClose, purchase, ...rest }: BillModalProps) 
       onClose={onClose}
       size="xl"
       title={purchase ? 'Edit purchase bill' : 'Add purchase bill'}
-      subtitle="Record a supplier bill. GST is split automatically by place of supply."
+      subtitle={seed && !purchase ? 'Pre-filled with what is still to be received on the purchase order — adjust to match the supplier bill.' : 'Record a supplier bill. GST is split automatically by place of supply.'}
     >
-      <BillForm key={purchase?.id ?? 'new'} purchase={purchase ?? undefined} onClose={onClose} {...rest} />
+      <BillForm key={purchase?.id ?? (seed ? `po-${seed.po_id}` : 'new')} purchase={purchase ?? undefined} seed={purchase ? undefined : seed ?? undefined} onClose={onClose} {...rest} />
     </Modal>
   );
 }
 
-type FormProps = Omit<BillModalProps, 'open' | 'purchase'> & { purchase?: PurchaseRecord };
+type FormProps = Omit<BillModalProps, 'open' | 'purchase' | 'seed'> & { purchase?: PurchaseRecord; seed?: BillSeed };
 
-function BillForm({ purchase, vendors, onVendorCreated, businessState, onSaved, onClose }: FormProps) {
-  const [vendorId, setVendorId] = useState(purchase?.vendor_id ?? '');
+function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onSaved, onClose }: FormProps) {
+  const init = purchase ?? seed;
+  const [vendorId, setVendorId] = useState(init?.vendor_id ?? '');
   const [billNumber, setBillNumber] = useState(purchase?.bill_number ?? '');
   const [date, setDate] = useState(purchase?.date ?? todayInput());
   const [dueDate, setDueDate] = useState(purchase?.due_date ?? addDaysInput(30));
-  const [pos, setPos] = useState(purchase?.place_of_supply ?? businessState);
+  const [pos, setPos] = useState(init?.place_of_supply ?? businessState);
   const [category, setCategory] = useState(purchase?.category ?? 'Purchases');
-  const [lines, setLines] = useState(purchase?.lines?.length ? purchase.lines : [blankPurchaseLine()]);
-  const [itc, setItc] = useState(purchase?.itc_eligible ?? true);
-  const [notes, setNotes] = useState(purchase?.notes ?? '');
+  const [lines, setLines] = useState(init?.lines?.length ? init.lines : [blankPurchaseLine()]);
+  const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
+  const [notes, setNotes] = useState(init?.notes ?? '');
+  const poId = purchase?.po_id ?? seed?.po_id;
   // Advanced GST: reverse charge, imports, ITC reversal, Sec 17(5) blocked credit.
   const [rcm, setRcm] = useState(purchase?.reverse_charge ?? false);
   const [importType, setImportType] = useState<ImportType | ''>(purchase?.import_type ?? '');
@@ -80,7 +85,7 @@ function BillForm({ purchase, vendors, onVendorCreated, businessState, onSaved, 
   const advancedSet = rcm || !!importType || blocked || reversed > 0;
 
   const submit = () => {
-    if (!vendor && !purchase?.vendor_name) return setError('Choose or create a vendor.');
+    if (!vendor && !init?.vendor_name) return setError('Choose or create a vendor.');
     if (!billNumber.trim()) return setError("Enter the supplier's bill number.");
     if (!date) return setError('Choose the bill date.');
     if (dueDate && dueDate < date) return setError('Due date cannot be before the bill date.');
@@ -97,9 +102,10 @@ function BillForm({ purchase, vendors, onVendorCreated, businessState, onSaved, 
       purchasesDb.save({
         ...purchase,
         kind: 'PURCHASE',
-        vendor_id: vendor?.id ?? purchase?.vendor_id,
-        vendor_name: vendor?.name ?? purchase?.vendor_name ?? '',
-        vendor_gstin: vendor?.gstin ?? purchase?.vendor_gstin,
+        vendor_id: vendor?.id ?? init?.vendor_id,
+        vendor_name: vendor?.name ?? init?.vendor_name ?? '',
+        vendor_gstin: vendor?.gstin ?? init?.vendor_gstin,
+        po_id: poId,
         bill_number: billNumber.trim(),
         date,
         due_date: dueDate || undefined,

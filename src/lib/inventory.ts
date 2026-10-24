@@ -223,7 +223,7 @@ function invoiceEffect(
   if (doc === 'INVOICE' || doc === 'TAX_INVOICE' || doc === undefined) return 'out';
   if (doc === 'CREDIT_NOTE') return 'in';
   if (doc === 'DELIVERY_CHALLAN') return includeChallans ? 'out' : null;
-  return null; // QUOTATION / PROFORMA never touch stock
+  return null; // QUOTATION / PROFORMA / SALES_ORDER never touch stock
 }
 
 /** Collect every stock event for every tracked item. Pure; inputs untouched. */

@@ -77,7 +77,7 @@ function EditorBody({
 }: Omit<RecurringEditorProps, 'open'>) {
   const today = todayInput();
   const savedInvoices = useMemo(
-    () => localDb.invoices.getAll().filter((i) => i.doc_type !== 'QUOTATION' && i.doc_type !== 'DELIVERY_CHALLAN'),
+    () => localDb.invoices.getAll().filter((i) => i.doc_type !== 'QUOTATION' && i.doc_type !== 'DELIVERY_CHALLAN' && i.doc_type !== 'SALES_ORDER'),
     [],
   );
   const clients = useMemo(() => localDb.clients.getAll(), []);

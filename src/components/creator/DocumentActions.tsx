@@ -20,6 +20,7 @@ import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './DocumentActions.module.css';
 
+const OrderFulfilment = lazy(() => import('../documents/OrderFulfilment').then((m) => ({ default: m.OrderFulfilment })));
 const ActivityTimeline = lazy(() => import('../audit/ActivityTimeline').then((m) => ({ default: m.ActivityTimeline })));
 
 /** Everything you can do with an already-saved document, in one place. */
@@ -66,16 +67,17 @@ export function DocumentActions({
   const cancelled = saved.status === 'Cancelled';
   const canCredit = saved.doc_type === 'INVOICE' || saved.doc_type === 'TAX_INVOICE';
   const locked = isLocked(saved);
+  const isOrder = saved.doc_type === 'SALES_ORDER';
 
   return (
     <div className={styles.wrap}>
       <div className={styles.row}>
         <span data-share-anchor>
-          <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.status === 'Paid'} />
+          <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.doc_type === 'SALES_ORDER' || saved.status === 'Paid'} />
         </span>
         <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} onRequestDebitNote={canCredit ? () => setDebitOpen(true) : undefined} />
-        <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />
-        <EInvoiceButton invoice={saved} />
+        {!isOrder && <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />}
+        {!isOrder && <EInvoiceButton invoice={saved} />}
         <button
           type="button"
           className={`${controls.btnOutline} ${controls.btnSm}`}
@@ -115,6 +117,12 @@ export function DocumentActions({
           </div>
         );
       })()}
+
+      {isOrder && (
+        <Suspense fallback={null}>
+          <OrderFulfilment order={saved} locked={locked} refreshKey={tick + refreshKey} onChanged={reloadEditor} />
+        </Suspense>
+      )}
 
       <OverdueInterest invoice={saved} onAddLine={addInterestLine} />
 
