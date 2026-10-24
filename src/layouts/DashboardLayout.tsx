@@ -34,6 +34,7 @@ import { NotificationBell } from '../components/command/NotificationBell';
 import { InstallPrompt } from '../components/pwa/InstallPrompt';
 import { UpdateToast } from '../components/pwa/UpdateToast';
 import { BackupNudge } from '../components/pwa/BackupNudge';
+import { CrossTabNotice } from '../components/pwa/CrossTabNotice';
 import { AutoBackupRunner } from '../components/pwa/AutoBackupRunner';
 import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
@@ -107,6 +108,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Bumped by "Refresh" on the cross-tab notice to remount the page with fresh data.
+  const [refreshKey, setRefreshKey] = useState(0);
   const [loaded, setLoaded] = useState({ help: false, palette: false, shortcuts: false });
   const openHelp = () => { setLoaded((l) => ({ ...l, help: true })); setHelpOpen(true); };
   const openPalette = () => { setLoaded((l) => ({ ...l, palette: true })); setPaletteOpen(true); };
@@ -340,7 +343,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <NotificationBell onNavigate={navigate} />
           </div>
         </div>
-        <div className={styles.content} key={location.pathname.startsWith('/invoice') ? 'invoice' : location.pathname}>
+        <div className={styles.content} key={`${location.pathname.startsWith('/invoice') ? 'invoice' : location.pathname}#${refreshKey}`}>
+          <CrossTabNotice onRefresh={() => setRefreshKey((k) => k + 1)} />
           <BackupNudge onResult={(r) => notify(r.ok ? `Backup saved (${r.filename})` : r.message, r.ok ? 'success' : 'error')} />
           <Outlet />
         </div>

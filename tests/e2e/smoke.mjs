@@ -94,6 +94,23 @@ try {
     await dialog.waitFor({ state: 'detached' });
   });
 
+  await step('change in a second tab', async () => {
+    await page.goto(srv.origin + '/transactions');
+    await page.getByText('Acme Buyers').first().waitFor();
+    const tab2 = await context.newPage();
+    await tab2.goto(srv.origin + '/clients');
+    await tab2.evaluate(() => {
+      const rows = JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]');
+      rows[0].notes = 'changed in tab 2';
+      localStorage.setItem('mrchartist_inv_invoices', JSON.stringify(rows));
+    });
+    await page.getByText('Updated in another tab').waitFor();
+    check(true, 'first tab is told about the change made in the second tab');
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.getByText('Updated in another tab').waitFor({ state: 'detached' });
+    await tab2.close();
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');

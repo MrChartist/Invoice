@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { localDb } from '../lib/localDb';
 import { DuplicateNumberError, type SeriesGap } from '../lib/invoice-number';
 import { getLockUntil, isPeriodLockedError, lockMessage, lockState, prettyDay } from '../lib/period-lock';
-import { generateId, getJson, removeRaw, setJson, SINGLETON_KEYS } from '../lib/storage';
+import { DB_PREFIX, generateId, getJson, KEYS, removeRaw, setJson, SINGLETON_KEYS } from '../lib/storage';
+import { changedElsewhereSince } from '../lib/cross-tab';
 import {
   calculateInvoice,
   deriveGstMode,
@@ -150,6 +151,12 @@ function refineGstMode(
     taxEnabled: true,
   });
 }
+
+/** When the editor last loaded or saved its document (for the cross-tab stale-copy check). */
+let loadedAt = Date.now();
+
+export const STALE_COPY_MESSAGE =
+  'This document was changed in another tab or window after you opened it. Reopen it to see the latest version before saving.';
 
 let draftTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -434,6 +441,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     loadInvoice: (id) => {
       const found = localDb.invoices.getById(id);
       if (!found) return false;
+      loadedAt = Date.now();
       set({ ...normalizeRecord(found, localDb.template.get()), dirty: false });
       get().recalculate();
       return true;
@@ -444,6 +452,11 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       if (errors.length) return { ok: false, errors, locked: errors.some((e) => e.startsWith('Books are locked')) };
 
       const state = get();
+      // Another tab saved this same document after we loaded it: never overwrite it with our stale copy.
+      if (state.id && changedElsewhereSince(DB_PREFIX + KEYS.invoices, loadedAt)) {
+        const stored = localDb.invoices.getById(state.id);
+        if (stored && stored.updated_at !== state.updated_at) return { ok: false, errors: [STALE_COPY_MESSAGE] };
+      }
       // A hand-typed number that skips ahead leaves holes in the series: remember them for the hint.
       const typedNumber = state.invoice_number.trim();
       const gap = typedNumber ? localDb.invoices.checkNumber(typedNumber, state.id || undefined).gap : null;
@@ -462,6 +475,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
 
       try {
         const saved = localDb.invoices.save(record);
+        loadedAt = Date.now();
         cancelDraftSave();
         removeRaw(SINGLETON_KEYS.draft);
         set({ ...saved, dirty: false });

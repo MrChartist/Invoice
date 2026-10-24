@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { registerServiceWorker } from './lib/pwa';
 import { runMigrations } from './lib/migrations';
+import { initCrossTab } from './lib/cross-tab';
 import './fonts.css';
 import './index.css';
 
@@ -10,6 +11,8 @@ import './index.css';
 const migration = runMigrations();
 if (migration.status === 'failed') console.error('Data migration failed; using the previous data shape.', migration);
 else if (migration.status === 'newer') console.warn('This data was saved by a newer version of the app.', migration);
+
+initCrossTab();
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
