@@ -35,10 +35,12 @@ const TABS = [
   { id: 'pnl', label: 'Profit & loss' },
   { id: 'bs', label: 'Balance sheet' },
   { id: 'cf', label: 'Cash flow' },
+  { id: 'proj', label: 'Projects' },
+  { id: 'budget', label: 'Budgets' },
   { id: 'coa', label: 'Chart of accounts' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
-const LEDGER_TABS = new Set<TabId>(['vch', 'ledger', 'tb', 'bs', 'cf', 'coa']);
+const LEDGER_TABS = new Set<TabId>(['vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
 
 export function Books() {
   const [params, setParams] = useSearchParams();

@@ -13,8 +13,10 @@ import { LedgerTab } from './LedgerTab';
 import { BalanceSheetTab } from './BalanceSheetTab';
 import { CashFlowTab } from './CashFlowTab';
 import { VoucherEditor } from './VoucherEditor';
+import { ProjectsTab } from '../planning/ProjectsTab';
+import { BudgetsTab } from '../planning/BudgetsTab';
 
-export type LedgerTabId = 'coa' | 'vch' | 'tb' | 'ledger' | 'bs' | 'cf';
+export type LedgerTabId = 'coa' | 'vch' | 'tb' | 'ledger' | 'bs' | 'cf' | 'proj' | 'budget';
 
 export interface LedgerPanelProps {
   tab: LedgerTabId;
@@ -54,6 +56,8 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
         <BalanceSheetTab ledger={ledger} asOf={asOf} assets={input.assets} today={today} onChanged={changed} onOpenAccount={(id) => onOpenAccount(id)} notify={notify} />
       )}
       {tab === 'cf' && <CashFlowTab ledger={ledger} period={period} />}
+      {tab === 'proj' && <ProjectsTab ledger={ledger} period={period} notify={notify} />}
+      {tab === 'budget' && <BudgetsTab ledger={ledger} notify={notify} />}
       {editing && (
         <VoucherEditor
           accounts={ledger.accounts}

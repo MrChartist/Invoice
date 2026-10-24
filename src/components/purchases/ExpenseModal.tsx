@@ -6,6 +6,8 @@ import { computePurchaseTotals, expenseLine, paymentsDb, purchasesDb, PAYMENT_ME
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 import { BillableFields } from './BillableFields';
+import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
+import { useCostCentres } from '../cost-centres/useCostCentres';
 import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
@@ -50,6 +52,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
   const [paidNow, setPaidNow] = useState(true);
   const [method, setMethod] = useState('UPI');
   const [notes, setNotes] = useState(expense?.notes ?? '');
+  const [costCentre, setCostCentre] = useState<string | undefined>(expense?.cost_centre_id);
+  const centres = useCostCentres();
   const [billable, setBillable] = useState<BillableValue>({
     billable_to_client_id: expense?.billable_to_client_id,
     markup_percent: expense?.markup_percent,
@@ -92,6 +96,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         amount_paid: expense?.amount_paid ?? 0,
         notes: notes.trim() || undefined,
         ...billablePatch(billable),
+        cost_centre_id: costCentre,
       });
       if (!expense && paidNow) paymentsDb.record(saved.id, { amount: saved.total, date, method });
       onSaved(expense ? 'Expense updated' : `Expense of ${formatCurrency(saved.total)} added`);
@@ -192,6 +197,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
           )}
         </div>
       )}
+
+      <CostCentreSelect id="exp-cost-centre" label="Cost centre / project" centres={centres} value={costCentre} onChange={setCostCentre} />
 
       <div className={controls.field}>
         <label className={controls.label} htmlFor="exp-notes">Notes</label>

@@ -7,6 +7,8 @@ import type { BillSeed } from '../../lib/purchase-orders';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 import { BillableFields } from './BillableFields';
+import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
+import { useCostCentres } from '../cost-centres/useCostCentres';
 import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
@@ -57,6 +59,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
   const [notes, setNotes] = useState(init?.notes ?? '');
   const poId = purchase?.po_id ?? seed?.po_id;
+  const [costCentre, setCostCentre] = useState<string | undefined>(purchase?.cost_centre_id);
+  const centres = useCostCentres();
   // Advanced GST: reverse charge, imports, ITC reversal, Sec 17(5) blocked credit.
   const [rcm, setRcm] = useState(purchase?.reverse_charge ?? false);
   const [importType, setImportType] = useState<ImportType | ''>(purchase?.import_type ?? '');
@@ -128,6 +132,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         amount_paid: purchase?.amount_paid ?? 0,
         notes: notes.trim() || undefined,
         ...billablePatch(billable),
+        cost_centre_id: costCentre,
       });
       onSaved(purchase ? 'Bill updated' : `Bill ${billNumber.trim()} saved`);
       onClose();
@@ -196,6 +201,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           </select>
         </div>
       </div>
+      <CostCentreSelect id="bill-cost-centre" label="Cost centre / project" centres={centres} value={costCentre} onChange={setCostCentre} />
 
       <h3 className={styles.sectionTitle}>Line items</h3>
       <LineItemsEditor lines={lines} onChange={setLines} />

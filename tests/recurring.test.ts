@@ -207,3 +207,15 @@ test('monthlyValue normalises quarterly to a monthly figure', () => {
   const s = schedule({ start_date: '2025-01-01', frequency: 'quarterly' });
   assert.equal(R.monthlyValue(s), 333.33);
 });
+
+test('cost centre (6.16): the template keeps it and every generated invoice carries it', () => {
+  const draft = makeDraft({ settings: localDb.settings.get(), sender: null });
+  draft.items = [{ id: 'i1', name: 'Retainer', type: 'Service', quantity: 1, rate: 1000, tax_rate: 0, amount: 1000, cost_centre_id: 'app' }];
+  draft.cost_centre_id = 'web';
+  const t = R.templateFromInvoice(draft);
+  assert.equal(t.cost_centre_id, 'web');
+  const s = R.createSchedule({ name: 'R', template: t, frequency: 'monthly', due_in_days: 10, mode: 'issue', start_date: '2025-06-05' });
+  const inv = R.buildInvoiceFromSchedule(s, '2025-06-05', { invoiceNumber: 'INV/1' });
+  assert.equal(inv.cost_centre_id, 'web');
+  assert.equal(inv.items[0].cost_centre_id, 'app');
+});

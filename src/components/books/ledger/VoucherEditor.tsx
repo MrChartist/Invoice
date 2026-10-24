@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import {
   GROUPS,
+  groupOf,
   MANUAL_VOUCHER_TYPES,
   VOUCHER_TYPE_LABELS,
   loadVouchers,
@@ -15,6 +16,8 @@ import {
   type ManualVoucherType,
 } from '../../../lib/ledger';
 import { money } from './format';
+import { CostCentreSelect } from '../../cost-centres/CostCentreSelect';
+import { useCostCentres } from '../../cost-centres/useCostCentres';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
@@ -23,6 +26,8 @@ interface Row {
   key: number;
   account_id: string;
   party: string;
+  /** Cost centre (6.16), only kept on income / expense lines. */
+  cc?: string;
   dr: string;
   cr: string;
 }
@@ -50,15 +55,27 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
   const [narration, setNarration] = useState(voucher?.narration ?? '');
   const [rows, setRows] = useState<Row[]>(() =>
     voucher
-      ? voucher.lines.map((l) => ({ key: ++seq, account_id: l.account_id, party: l.party ?? '', dr: toText(l.dr), cr: toText(l.cr) }))
+      ? voucher.lines.map((l) => ({ key: ++seq, account_id: l.account_id, party: l.party ?? '', cc: l.cost_centre_id, dr: toText(l.dr), cr: toText(l.cr) }))
       : [blank(), blank()],
   );
   const [error, setError] = useState('');
   const byId = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+  const centres = useCostCentres();
+  const isPnl = (id: string) => {
+    const a = byId.get(id);
+    const n = a ? groupOf(a.group).nature : undefined;
+    return n === 'income' || n === 'expense';
+  };
 
   const lines = rows
     .filter((r) => r.account_id || r.dr || r.cr)
-    .map((r) => ({ account_id: r.account_id, dr: rupeesToPaise(r.dr), cr: rupeesToPaise(r.cr), ...(r.party.trim() ? { party: r.party.trim() } : {}) }));
+    .map((r) => ({
+      account_id: r.account_id,
+      dr: rupeesToPaise(r.dr),
+      cr: rupeesToPaise(r.cr),
+      ...(r.party.trim() ? { party: r.party.trim() } : {}),
+      ...(r.cc && isPnl(r.account_id) ? { cost_centre_id: r.cc } : {}),
+    }));
   const dr = lines.reduce((s, l) => s + l.dr, 0);
   const cr = lines.reduce((s, l) => s + l.cr, 0);
   const preview = useMemo(() => (voucher && voucher.type === type ? voucher.number : nextVoucherNumber(loadVouchers(), type, date || defaultDate)), [voucher, type, date, defaultDate]);
@@ -133,7 +150,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
         <div className={styles.editorLines} role="group" aria-label="Voucher lines">
           <div className={styles.editorHead} aria-hidden="true">
             <span>Account</span>
-            <span>Party (debtors / creditors)</span>
+            <span>{centres.length ? 'Party / cost centre' : 'Party (debtors / creditors)'}</span>
             <span>Debit ₹</span>
             <span>Credit ₹</span>
             <span />
@@ -156,7 +173,11 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
                     ) : null;
                   })}
                 </select>
-                <input aria-label={`Line ${i + 1} party`} className={controls.input} value={r.party} disabled={!needsParty} placeholder={needsParty ? 'Party name' : '—'} onChange={(e) => patch(r.key, { party: e.target.value })} />
+                {!needsParty && centres.length > 0 && isPnl(r.account_id) ? (
+                  <CostCentreSelect id={`${uid}-cc-${r.key}`} ariaLabel={`Line ${i + 1} cost centre`} centres={centres} value={r.cc} onChange={(v) => patch(r.key, { cc: v })} />
+                ) : (
+                  <input aria-label={`Line ${i + 1} party`} className={controls.input} value={r.party} disabled={!needsParty} placeholder={needsParty ? 'Party name' : '—'} onChange={(e) => patch(r.key, { party: e.target.value })} />
+                )}
                 <input aria-label={`Line ${i + 1} debit`} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.dr} placeholder="0.00" onChange={(e) => patch(r.key, { dr: e.target.value, ...(e.target.value ? { cr: '' } : {}) })} />
                 <input aria-label={`Line ${i + 1} credit`} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.cr} placeholder="0.00" onChange={(e) => patch(r.key, { cr: e.target.value, ...(e.target.value ? { dr: '' } : {}) })} />
                 <button type="button" className={controls.btnIcon} aria-label={`Remove line ${i + 1}`} disabled={rows.length <= 2} onClick={() => setRows((list) => list.filter((x) => x.key !== r.key))}>

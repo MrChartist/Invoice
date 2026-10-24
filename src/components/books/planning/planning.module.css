@@ -1,0 +1,73 @@
+/* Projects (cost centres) and Budgets tabs of the Books page. Tokens only — no raw colours. */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.controls > * {
+  min-width: 140px;
+}
+
+.fav {
+  color: var(--profit);
+  font-weight: 700;
+}
+
+.adv {
+  color: var(--loss);
+  font-weight: 700;
+}
+
+.inactive {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.child {
+  padding-left: 1.25rem;
+}
+
+.sticky {
+  position: sticky;
+  left: 0;
+  background-color: var(--card);
+  z-index: 1;
+}
+
+.months {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.actionsBar {
+  composes: actions;
+  margin-top: 0.875rem;
+}
+
+.formStack {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .months {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .controls > * {
+    flex: 1 1 140px;
+  }
+}

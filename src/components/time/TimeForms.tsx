@@ -4,6 +4,9 @@ import type { MileageEntry, TimeEntry, TimePrefs } from '../../types/time';
 import { formatMinutes, mileageDb, parseDuration, timeDb } from '../../lib/timesheets';
 import { todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
+import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
+import { useCostCentres } from '../cost-centres/useCostCentres';
+import { matchCostCentre } from '../../lib/cost-centres';
 import controls from '../../styles/controls.module.css';
 import styles from './time.module.css';
 
@@ -53,6 +56,8 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
   const [duration, setDuration] = useState(entry ? `${Math.floor(entry.minutes / 60)}:${String(Math.round(entry.minutes % 60)).padStart(2, '0')}` : '');
   const [rate, setRate] = useState(entry?.hourly_rate ?? prefs.default_rate);
   const [billable, setBillable] = useState(entry?.billable ?? true);
+  const centres = useCostCentres();
+  const [costCentre, setCostCentre] = useState<string | undefined>(entry?.cost_centre_id ?? matchCostCentre(entry?.project, centres));
   const [error, setError] = useState('');
 
   const submit = () => {
@@ -70,6 +75,7 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
       minutes,
       hourly_rate: Math.max(Number(rate) || 0, 0),
       billable,
+      cost_centre_id: costCentre,
     });
     onSaved(entry ? 'Time entry updated' : `${formatMinutes(minutes)} logged`);
     onClose();
@@ -87,6 +93,19 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
           <input id="te-project" className={controls.input} value={project} onChange={(e) => setProject(e.target.value)} />
         </div>
       </div>
+      <CostCentreSelect
+        id="te-cost-centre"
+        label="Cost centre"
+        centres={centres}
+        value={costCentre}
+        onChange={(v) => {
+          setCostCentre(v);
+          // Picking a project fills an empty project label with its name.
+          const c = centres.find((x) => x.id === v);
+          if (c?.kind === 'project' && !project.trim()) setProject(c.name);
+        }}
+        hint="Billed lines carry it to the invoice for the project P&L."
+      />
       <div className={controls.field}>
         <label className={controls.label} htmlFor="te-desc">Description</label>
         <input id="te-desc" className={controls.input} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Research report" />
@@ -147,6 +166,8 @@ function MileageForm({ trip, clients, prefs, onClose, onSaved }: {
   const [purpose, setPurpose] = useState(trip?.purpose ?? '');
   const [km, setKm] = useState(trip?.km ?? 0);
   const [rate, setRate] = useState(trip?.rate_per_km ?? prefs.mileage_rate);
+  const centres = useCostCentres();
+  const [costCentre, setCostCentre] = useState<string | undefined>(trip?.cost_centre_id);
   const [error, setError] = useState('');
 
   const submit = () => {
@@ -163,6 +184,7 @@ function MileageForm({ trip, clients, prefs, onClose, onSaved }: {
       purpose: purpose.trim(),
       km,
       rate_per_km: Math.max(Number(rate) || 0, 0),
+      cost_centre_id: costCentre,
     });
     onSaved(trip ? 'Trip updated' : `${km} km logged`);
     onClose();
@@ -194,6 +216,7 @@ function MileageForm({ trip, clients, prefs, onClose, onSaved }: {
         <label className={controls.label} htmlFor="mi-purpose">Purpose</label>
         <input id="mi-purpose" className={controls.input} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Site visit" />
       </div>
+      <CostCentreSelect id="mi-cost-centre" label="Cost centre" centres={centres} value={costCentre} onChange={setCostCentre} />
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="mi-km">Distance (km)</label>

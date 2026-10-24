@@ -1,5 +1,7 @@
 # Time tracking, billable expenses & mileage (roadmap 6.13 / 6.14)
 
+> Cost centres (6.16): time entries and trips carry an optional `cost_centre_id` (a picker appears once a cost centre exists); billing copies it, or a `project` label matching an active cost centre's name, onto the invoice line. See `cost-centres-budgets.md`.
+
 For freelancers and consultants who bill by the hour: track time (running timer or manual entries), log client
 trips, mark expenses / purchase bills as re-billable, then turn everything unbilled for a client into a **new draft
 invoice** in one step. Fully local, no new dependencies.

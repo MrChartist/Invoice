@@ -8,6 +8,8 @@ import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { UNITS, GST_SLABS, type InvoiceItem } from '../../types/invoice';
 import { cn, formatCurrency } from '../../lib/utils';
 import { lineKeyAction } from './line-keys';
+import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
+import { useCostCentres } from '../cost-centres/useCostCentres';
 import controls from '../../styles/controls.module.css';
 import styles from './ItemsTable.module.css';
 
@@ -30,6 +32,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
     [catalog, currency],
   );
   const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});
+  const centres = useCostCentres();
   const showTax = gstMode !== 'NONE';
   const priced = docType !== 'DELIVERY_CHALLAN';
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -123,6 +126,17 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   <NumberInput className={styles.cessInput} value={item.cess_per_unit ?? 0} onChange={(n) => updateItem(item.id, 'cess_per_unit', n)} placeholder="0" aria-label={`Item ${index + 1} cess per unit`} />
                 </div>
               ) : null}
+              {priced && (
+                <CostCentreSelect
+                  id={`line-cc-${item.id}`}
+                  className={cn(controls.ghost, styles.desc)}
+                  centres={centres}
+                  value={item.cost_centre_id}
+                  onChange={(v) => updateItem(item.id, 'cost_centre_id', v ?? '')}
+                  emptyLabel="Cost centre: same as document"
+                  ariaLabel={`Item ${index + 1} cost centre`}
+                />
+              )}
             </div>
 
             <div className={styles.cell} data-label="HSN / SAC">
