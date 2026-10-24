@@ -452,13 +452,16 @@ try {
 
   await step('batch item bought with an expiry is sold FEFO; serial lookup finds the bill', async () => {
     const before = await readJson(page, 'invoices', [], (v) => v.length > 0);
+    // Earlier steps own rows in these tables (e.g. a bill with an attachment): keep them and put them back.
+    const prevPurchases = await readJson(page, 'purchases', null);
+    const prevStock = await readJson(page, 'stock_items', null);
     const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
     await writeJson(page, 'stock_items', [
       item('e2e-syr', 'Cough Syrup', { hsn: '3004', track_batches: true }),
       item('e2e-ph', 'Phone X', { hsn: '8517', track_serials: true, warranty_months: 12 }),
     ]);
     const line = (id, name, hsn, quantity, extra) => ({ id, name, hsn, quantity, rate: 50, tax_rate: 12, ...extra });
-    await writeJson(page, 'purchases', [{
+    await writeJson(page, 'purchases', [...(prevPurchases ?? []), {
       id: 'e2e-bill', kind: 'PURCHASE', vendor_name: 'E2E Pharma', bill_number: 'EP/77', date: '2026-04-02', category: 'Purchases',
       lines: [
         line('b1', 'Cough Syrup', '3004', 10, { batch_no: 'LATE', expiry_date: '2030-12-31' }),
@@ -490,8 +493,8 @@ try {
     check(/EP\/77/.test(text) && /E2E Pharma/.test(text) && /In stock/.test(text), 'serial lookup shows the purchase bill, vendor and stock state');
 
     await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== sold?.id));
-    await writeJson(page, 'stock_items', null);
-    await writeJson(page, 'purchases', null);
+    await writeJson(page, 'stock_items', prevStock);
+    await writeJson(page, 'purchases', prevPurchases);
   });
 
   let backupPath = '';
