@@ -9,6 +9,7 @@ import { normalizePurchase as booksNormalize } from '../src/lib/books.ts';
 import { normalizePurchase as exportNormalize } from '../src/lib/export-shared.ts';
 import { normalizePurchase as gstNormalize } from '../src/lib/gst-reports.ts';
 import { collectEvents } from '../src/lib/inventory.ts';
+import { bookBills } from '../src/lib/gstr2b.ts';
 import { readPurchase } from '../src/lib/purchase-normalize.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
 import { gstinChecksumChar } from '../src/lib/gstin.ts';
@@ -138,4 +139,15 @@ test('a legacy lump-tax row splits the same way in GST reports, books and export
   const rateOnly = { id: 'old3', vendor_name: 'Old Co', date: '2026-04-12', place_of_supply: '27', tax_rate: 18, total: 1180 };
   const r = exportNormalize(rateOnly)!;
   assert.equal(r.taxable + r.tax, 1180);
+});
+
+test('GSTR-2B matcher reads the real purchase shape (and skips drafts)', () => {
+  const [b] = bookBills([bill, { ...bill, id: 'p2', status: 'draft' }], '27');
+  assert.equal(bookBills([bill, { ...bill, id: 'p2', status: 'draft' }], '27').length, 1);
+  assert.equal(b.number, 'AS/22');
+  assert.equal(b.gstin, '27AAPFU0939F1ZV');
+  assert.equal(b.date, '2026-04-12');
+  assert.equal(b.taxable, 1000);
+  assert.equal(b.tax, 180);
+  assert.equal(b.in4a5, true);
 });

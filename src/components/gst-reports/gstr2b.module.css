@@ -1,0 +1,104 @@
+/* GSTR-2B match tab. Shared surfaces/controls come from src/styles. */
+
+.drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 1rem 1.125rem;
+  border: 1.5px dashed var(--input-border);
+  border-radius: var(--radius-md);
+  background: var(--card-inner);
+}
+
+.dropOn {
+  composes: drop;
+  border-color: var(--ring);
+  background: var(--brand-soft);
+}
+
+.dropText {
+  flex: 1 1 18rem;
+  min-width: 0;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-base);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1.25rem;
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+}
+
+.meta strong { color: var(--foreground); }
+
+.warn {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  color: var(--warning);
+  font-size: var(--text-base);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.chip {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.chip:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.chipOn {
+  composes: chip;
+  border-color: var(--ring);
+  color: var(--brand-text);
+  background: var(--brand-soft);
+}
+
+.badge {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  border: 1px solid currentColor;
+}
+
+.matched { composes: badge; color: var(--profit); background: color-mix(in srgb, var(--profit) 10%, transparent); }
+.mismatch { composes: badge; color: var(--warning); background: color-mix(in srgb, var(--warning) 10%, transparent); }
+.missing_in_books { composes: badge; color: var(--info); background: color-mix(in srgb, var(--info) 10%, transparent); }
+.not_in_2b { composes: badge; color: var(--loss); background: color-mix(in srgb, var(--loss) 10%, transparent); }
+.itc_unavailable { composes: badge; color: var(--muted-foreground); background: var(--muted); }
+
+.sub {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.actionSelect {
+  min-width: 7.5rem;
+  min-height: 36px;
+}
+
+.effect td:last-child,
+.effect th:last-child { font-weight: 700; }

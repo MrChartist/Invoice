@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
@@ -33,7 +33,10 @@ import { Gstr3bView } from '../components/gst-reports/Gstr3bView';
 import { PeriodPicker } from '../components/gst-reports/PeriodPicker';
 import { ReconBanner } from '../components/gst-reports/ReconBanner';
 import { ComplianceView } from '../components/gst-reports/ComplianceView';
+// GSTR-2B matcher (+ its xlsx/zip reader) loads only when the tab is opened.
+const Gstr2bView = lazy(() => import('../components/gst-reports/Gstr2bView'));
 import { checkGstin } from '../lib/gstin';
+import { parseCsv } from '../lib/csv';
 import type { HsnRow } from '../lib/gst-reports';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
@@ -42,7 +45,7 @@ import local from '../components/gst-reports/gst-reports.module.css';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'gstr3b';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'gstr3b' | 'gstr2b';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -56,6 +59,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'hsn', label: 'HSN' },
   { id: 'docs', label: 'Documents' },
   { id: 'gstr3b', label: 'GSTR-3B' },
+  { id: 'gstr2b', label: '2B match' },
   { id: 'compliance', label: 'Compliance' },
 ];
 
@@ -319,10 +323,27 @@ export function GstReports() {
         );
       case 'gstr3b':
         return <Gstr3bView report={g3} />;
+      case 'gstr2b':
+        return (
+          <Suspense fallback={<p className={controls.hint}>Loading…</p>}>
+            <Gstr2bView period={period} gstin={gstin} filerStateCode={filerStateCode} notify={notify} />
+          </Suspense>
+        );
       case 'compliance':
         return <ComplianceView invoices={invoices} purchases={purchases} gstin={gstin} stateCode={filerStateCode} turnover={lastFyTurnover} notify={notify} />;
       default:
         return null;
+    }
+  };
+
+  // Same rows as the CSV, as an Excel workbook (writer loaded on demand).
+  const downloadSectionXlsx = async () => {
+    try {
+      const { downloadXlsx, csvRowsToCells } = await import('../lib/xlsx');
+      const rows = csvRowsToCells(parseCsv(sectionCsv(g1, tab as SectionId), { delimiter: ',' }));
+      await downloadXlsx(`${fileBase}_${tab}.xlsx`, [{ name: TABS.find((x) => x.id === tab)?.label ?? tab, rows }]);
+    } catch {
+      notify('Could not build the Excel file', 'error');
     }
   };
 
@@ -438,6 +459,12 @@ export function GstReports() {
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>
                 <Download size={14} aria-hidden /> Download CSV
+              </button>
+            )}
+            {isCsvTab && (
+              <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
+                onClick={() => void downloadSectionXlsx()}>
+                <Download size={14} aria-hidden /> Download .xlsx
               </button>
             )}
           </div>

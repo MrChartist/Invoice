@@ -61,7 +61,12 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **GST reports**: GSTR-1 (B2B, B2CL by date-keyed threshold, B2CS, CDNR/CDNUR with C/D notes classified by the
   original invoice, EXP with shipping-bill fields, nil, HSN summary split B2B/B2C with the 4/6-digit rule, documents
   issued) as offline-tool JSON and section CSVs; GSTR-3B (3.1, 3.2, 4 incl. imports, RCM and 4B(1)/4B(2) reversals, 5)
-  as JSON, CSV and a printable summary; aggregate-turnover support.
+  as JSON, CSV and a printable summary; aggregate-turnover support. Section CSVs are also offered as .xlsx.
+- **GSTR-2B / IMS matcher**: load the portal's GSTR-2B (JSON or Excel) locally; documents are matched to purchase
+  bills on supplier GSTIN + normalised bill number with value / tax / date tolerances and classified as matched,
+  value mismatch, in 2B only, in books only (ITC at risk, Sec 16(2)(aa)) or ITC not available. An IMS worksheet
+  (Accept / Reject / Pending per document) exports as CSV or .xlsx, missing bills can be created from 2B lines, and
+  GSTR-3B Table 4A(5) from the books is compared with the 2B-restricted figure (the 3B report is not changed).
 - **Compliance calendar**: GSTR-1 / IFF / GSTR-3B / GSTR-9 due dates for monthly or QRMP filers, filed tracking,
   Sec 50 interest and late-fee estimates, reminders in the notification bell.
 
@@ -115,7 +120,10 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - Books are derived from documents; there is no chart of accounts or manual journal yet.
 - RCM and import bills are carried in supplier balances including tax; Books/Tally do not post RCM payable separately.
 - Exchange gain/loss on foreign receipts is not computed.
-- `.xlsx` import is not supported (CSV only).
+- `.xlsx` is read and written by a built-in, dependency-free reader/writer (first sheet for imports). Legacy `.xls`,
+  `.ods`, password-protected and ZIP64 workbooks are not supported; save them as `.xlsx` or CSV.
+- The GSTR-2B matcher reads B2B/B2BA/CDNR/CDNRA from the Excel download and additionally ISD / IMPG / IMPGSEZ from
+  the JSON; supplier credit notes are not recorded in purchases, so they show as "in 2B only".
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
 
 ---
