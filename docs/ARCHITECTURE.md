@@ -40,6 +40,15 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
 | `export_prefs` | exports | last-used export options |
 | `notif_state` | notifications | read / snoozed / dismissed notice ids |
 
+## Schema versions & migrations
+
+`mrchartist_inv_schema_version` holds the last migration applied. `runMigrations()` (`src/lib/migrations.ts`) runs
+in `main.tsx` before the first render: a fresh install is stamped with the latest version, existing data runs each
+newer migration in order, a throwing migration rolls every key back and leaves the version unchanged, and data from
+a newer app version is never touched. Restores reload the page, so restored data is migrated the same way.
+To change a stored shape, append a `Migration` (next version number, idempotent, additive, never rewrites an
+invoice's `sender` snapshot) and cover it in `tests/migrations.test.ts`.
+
 ## Integration
 Feature modules are **self-contained**: they export a page/component and (optionally) a pure
 `lib` API. The lead wires routes, navigation and cross-links in the shared shell
