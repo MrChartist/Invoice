@@ -34,6 +34,7 @@ import {
   type AuditInput,
 } from './audit';
 import { clientLogged, settingsLogged } from './audit-events';
+import { releaseAttachments, releaseDropped } from './attachments';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -390,6 +391,8 @@ export const localDb = {
         invoices.push(toSave);
       }
       setTable(KEYS.invoices, invoices);
+      // Files this document no longer lists (6.12) are deleted unless another record uses them.
+      if (stored) releaseDropped(stored.attachments, toSave.attachments);
 
       logSafe(() => (stored ? invoiceUpdated(stored, toSave, overridden ? OVERRIDE_NOTE : '') : invoiceCreated(toSave)));
 
@@ -412,6 +415,7 @@ export const localDb = {
       const mine = payments.filter((t) => t.invoice_id === id).length;
       setTable(KEYS.invoices, all.filter((i) => i.id !== id));
       setTable(KEYS.transactions, payments.filter((t) => t.invoice_id !== id));
+      if (stored?.attachments?.length) releaseAttachments(stored.attachments.map((a) => a.id));
       if (stored) logSafe(() => invoiceDeleted(stored, mine, overridden ? OVERRIDE_NOTE : ''));
     },
 

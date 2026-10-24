@@ -307,3 +307,12 @@
     min-width: 200px;
   }
 }
+
+.attachRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

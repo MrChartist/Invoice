@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Package, Pencil, Percent, Plus, Search, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
+import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EmptyState } from '../ui/EmptyState';
 import { NumberInput } from '../ui/NumberInput';
@@ -31,6 +33,7 @@ const toDraft = (i: InvoiceItem): CatalogDraft => ({
   unit: i.unit || 'NOS',
   rate: i.rate ?? 0,
   tax_rate: typeof i.tax_rate === 'number' ? i.tax_rate : 18,
+  custom_fields: i.custom_fields,
 });
 
 const ROUND_LABELS: Record<RoundTo, string> = {
@@ -65,7 +68,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
 
   const save = () => {
     if (!draft) return;
-    const result = saveCatalogItem(draft);
+    const result = saveCatalogItem({ ...draft, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
     if (!result.ok) return setError(result.error);
     notify(draft.id ? `${result.item.name} updated` : `${result.item.name} added`);
     setDraft(null);
@@ -287,6 +290,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                 </select>
               </label>
             </div>
+            <CustomFieldInputs scope="item" idPrefix="catalog" value={draft.custom_fields} onChange={(custom_fields) => setDraft({ ...draft, custom_fields })} />
           </form>
         )}
       </Modal>

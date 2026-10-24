@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
+import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
+import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { GstinInput } from '../ui/GstinInput';
 import { INDIAN_STATES, resolveStateCode, stateByCode } from '../../lib/india-states';
 import { checkGstin } from '../../lib/gstin';
@@ -78,6 +80,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         pan: pan || undefined,
         tan: tan || undefined,
         late_fee,
+        custom_fields: cleanValueMap(form.custom_fields, customFieldsDb.all()),
         updated_at: new Date().toISOString(),
       };
       const id = localDb.clients.upsert({ ...payload, id: client?.id });
@@ -214,6 +217,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
             "Add late fee" button in Receivables that creates a new draft invoice for you to review.
           </span>
         </fieldset>
+        <CustomFieldInputs scope="party" idPrefix="client" value={form.custom_fields} onChange={(v) => set('custom_fields', v)} />
         <label className={controls.field}>
           <span className={controls.label}>Private notes</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder="Never printed on documents" />

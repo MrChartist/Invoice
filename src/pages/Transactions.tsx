@@ -210,6 +210,8 @@ export function Transactions() {
         amount_paid: 0,
         balance_due: inv.total,
         late_fee_for: undefined,
+        // Files stay with the original document (6.12); custom field values are copied like any other field.
+        attachments: undefined,
         created_at: undefined,
         updated_at: undefined,
         // A copy is a fresh document: it fulfils no sales order and is not closed.

@@ -251,6 +251,8 @@ export function buildConvertedDraft(
     recurring_id: undefined,
     recurring_date: undefined,
     late_fee_for: undefined,
+    // Attachments belong to the source document (its signed copy, its receipts), not the new one.
+    attachments: undefined,
     created_at: undefined,
     updated_at: undefined,
     order_closed_on: undefined,
@@ -436,6 +438,7 @@ export function buildCreditNote(
 
   const base: InvoiceRecord = {
     ...invoice,
+    attachments: undefined, // never copied from the original (6.12)
     id: ctx.id,
     invoice_number: ctx.invoice_number,
     doc_type: 'CREDIT_NOTE',
@@ -531,6 +534,7 @@ export function buildDebitNote(
   }));
   return recompute({
     ...invoice,
+    attachments: undefined, // never copied from the original (6.12)
     id: ctx.id,
     doc_type: 'DEBIT_NOTE',
     invoice_number: ctx.invoice_number,

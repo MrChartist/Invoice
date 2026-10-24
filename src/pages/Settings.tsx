@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Check, Copy, Database, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
+import { Building2, Check, Copy, Database, ListPlus, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -22,13 +22,15 @@ import surface from '../styles/surface.module.css';
 import styles from '../components/settings/Settings.module.css';
 
 // The activity log is only needed on its own tab, so it stays out of the Settings chunk.
+const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomFieldsPanel').then((m) => ({ default: m.CustomFieldsPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
 
-type Tab = 'business' | 'items' | 'defaults' | 'data' | 'activity' | 'security';
+type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: 'business', label: 'Business profiles', icon: Building2 },
   { id: 'items', label: 'Items & rates', icon: Package },
+  { id: 'fields', label: 'Custom fields', icon: ListPlus },
   { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
   { id: 'data', label: 'Data & backup', icon: Database },
   { id: 'activity', label: 'Activity', icon: ScrollText },
@@ -227,6 +229,11 @@ export function Settings() {
       )}
 
       {tab === 'items' && <CatalogPanel notify={notify} />}
+      {tab === 'fields' && (
+        <Suspense fallback={null}>
+          <CustomFieldsPanel notify={notify} />
+        </Suspense>
+      )}
       {tab === 'defaults' && (
         <>
           <DefaultsPanel settings={settings} onChange={patchSettings} />

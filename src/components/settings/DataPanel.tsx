@@ -1,6 +1,5 @@
 import { reloadAfterFlush, storageBackend } from '../../lib/storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { AlertTriangle, DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Info, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
@@ -15,6 +14,8 @@ import {
   restoreBackup,
   saveSafetySnapshot,
   wipeAppData,
+  attachmentRestoreNote,
+  MAX_BACKUP_BYTES,
   type BackupSummary,
   type SafetySnapshot,
 } from '../../lib/backup';
@@ -22,6 +23,7 @@ import { forgetDeviceData } from '../../lib/auto-backup';
 import { ImportWizard } from '../import/ImportWizard';
 import { SampleDataCard } from '../demo/SampleDataCard';
 import { assessStorage, formatChars, measureStorage } from '../../lib/storage-health';
+import { cleanupUnusedAttachments } from '../../lib/attachments';
 import { isIosSafari, isStandalone, requestPersistentStorage } from '../../lib/pwa';
 import { localDb } from '../../lib/localDb';
 import { downloadText } from '../../lib/download';
@@ -110,7 +112,7 @@ export function DataPanel({ notify }: Props) {
   const onFile = async (file?: File) => {
     if (!file) return;
     try {
-      if (file.size > MAX_IMPORT_BYTES) throw new Error('This file is larger than 25 MB — not a file this app wrote.');
+      if (file.size > MAX_BACKUP_BYTES) throw new Error('This file is larger than 200 MB — not a file this app wrote.');
       const { data, summary } = parseBackup(await file.text());
       setPending({ data, summary, fileName: file.name });
     } catch (err) {
@@ -165,6 +167,31 @@ export function DataPanel({ notify }: Props) {
                 </li>
               ))}
             </ul>
+          )}
+          {health.attachments.count > 0 && (
+            <div className={styles.attachRow}>
+              <span className={surface.sectionNote}>
+                Attached files: {health.attachments.count} ({formatChars(health.attachments.chars)})
+                {health.attachments.unused > 0 && ` · ${health.attachments.unused} unused (${formatChars(health.attachments.unusedChars)})`}
+              </span>
+              {health.attachments.unused > 0 && (
+                <button
+                  type="button"
+                  className={`${controls.btnOutline} ${controls.btnSm}`}
+                  onClick={() => {
+                    try {
+                      const r = cleanupUnusedAttachments();
+                      notify(`Removed ${r.removed} unused file${r.removed === 1 ? '' : 's'} (${formatChars(r.chars)})`);
+                    } catch (err) {
+                      notify((err as Error).message, 'error');
+                    }
+                    setVersion((v) => v + 1);
+                  }}
+                >
+                  <Trash2 size={14} /> Clean up unused files
+                </button>
+              )}
+            </div>
           )}
           {health.biggest.length > 0 && (
             <p className={surface.sectionNote}>
@@ -320,6 +347,7 @@ export function DataPanel({ notify }: Props) {
         <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
           <strong style={{ color: 'var(--foreground)' }}>{pending?.fileName}</strong> contains {pending?.summary.invoices} invoice
           {pending?.summary.invoices === 1 ? '' : 's'} and {pending?.summary.clients} client{pending?.summary.clients === 1 ? '' : 's'}.
+          {' '}{attachmentRestoreNote(pending?.summary)}{' '}
           Everything currently on this device will be replaced by this backup (your PIN is kept). Download a backup first if you are unsure.
         </p>
       </Modal>

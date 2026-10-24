@@ -118,6 +118,7 @@ export function buildLateFeeInvoice(
 ): InvoiceRecord {
   const rec: InvoiceRecord = {
     ...original,
+    attachments: undefined, // the original's files stay with it (6.12)
     id: ctx.id,
     invoice_number: ctx.invoice_number,
     doc_type: original.doc_type === 'TAX_INVOICE' ? 'TAX_INVOICE' : 'INVOICE',

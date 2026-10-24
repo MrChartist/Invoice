@@ -15,6 +15,8 @@ import { TemplatePicker } from '../components/creator/TemplatePicker';
 import { CreatorHeader } from '../components/creator/CreatorHeader';
 import { DocumentMetaCard } from '../components/creator/DocumentMetaCard';
 import { MobileSaveBar } from '../components/creator/MobileSaveBar';
+import { CustomFieldsCard } from '../components/creator/CustomFieldsCard';
+import { AttachmentsPanel } from '../components/attachments/AttachmentsPanel';
 import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKeys';
 import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
@@ -51,7 +53,7 @@ export function InvoiceCreator() {
   const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),
+    useShallow((st) => pick(st, ['attachments', 'currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'patch', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),
   );
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -256,6 +258,20 @@ export function InvoiceCreator() {
                 <span className={controls.label}>Terms &amp; conditions</span>
                 <textarea className={controls.textarea} rows={3} value={s.terms} onChange={(e) => s.setTerms(e.target.value)} />
               </label>
+            </div>
+          </section>
+
+          <CustomFieldsCard />
+
+          <section className={surface.card}>
+            <div className={surface.cardHead}>Internal attachments</div>
+            <div className={surface.cardBody}>
+              <AttachmentsPanel
+                value={s.attachments}
+                onChange={(next) => s.patch({ attachments: next.length ? next : undefined })}
+                label="Attachments"
+                hint="Signed copies, purchase orders, delivery proofs — photos or PDFs. Kept on this device and in backups; never printed or shared with the client."
+              />
             </div>
           </section>
         </fieldset>

@@ -7,6 +7,7 @@ import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
 import { buildUpiUrl, isTaxed } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
+import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
 
 interface Props {
   invoice: InvoiceRecord;
@@ -62,6 +63,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           {c.gstin && <> · GSTIN {c.gstin}</>}
         </div>
       )}
+      <CustomFieldsBlock invoice={invoice} compact />
       <hr className={styles.rcRule} />
 
       <div className={styles.rcItems}>
@@ -73,6 +75,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
                 {i + 1}. {line.name || '—'}
                 {col.hsn && line.hsn && <span className={styles.rcSmall}> [{line.hsn}]</span>}
               </div>
+              <ItemCustomLine values={src?.custom_values} />
               <div className={styles.rcRow}>
                 <span>
                   {formatQuantity(line.quantity)}

@@ -1,4 +1,4 @@
-import { Banknote, Pencil, Trash2 } from 'lucide-react';
+import { Banknote, Paperclip, Pencil, Trash2 } from 'lucide-react';
 import type { PurchaseRecord } from '../../types/purchases';
 import { balanceOf, deriveStatus } from '../../lib/purchases';
 import { cn, formatCurrency, formatDate } from '../../lib/utils';
@@ -43,6 +43,11 @@ export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: Purchas
                   <div className={tabStyles.name}>
                     <span>{p.vendor_name || '—'}</span>
                     <span className={styles.kindTag}>{p.kind === 'EXPENSE' ? 'Expense' : 'Bill'}</span>
+                    {p.attachments?.length ? (
+                      <span className={styles.kindTag} title={`${p.attachments.length} attached file${p.attachments.length === 1 ? '' : 's'}`} aria-label={`${p.attachments.length} attached file${p.attachments.length === 1 ? '' : 's'}`}>
+                        <Paperclip size={11} aria-hidden="true" /> {p.attachments.length}
+                      </span>
+                    ) : null}
                   </div>
                   {p.bill_number && <div className={tabStyles.sub}>{p.bill_number}</div>}
                 </td>

@@ -1,6 +1,10 @@
 /**
  * Backup / restore of everything the app keeps in localStorage.
  *
+ * Attachments (6.12) are one `mrchartist_inv_att_<id>` key per file, so they ride along too;
+ * on restore each file is re-checked by content (damaged / disallowed ones are left out) and
+ * references to files the backup lacks are reported, not refused (see attachments.ts).
+ *
  * Self-contained: the `mrchartist_inv_assets` table (logo / signature images that
  * invoice snapshots reference since schema v3) is an ordinary app key, so it rides
  * along, and a file whose references do not resolve is refused. Older backups with
@@ -18,6 +22,8 @@ import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
 import { ASSET_TABLE, SNAPSHOT_TABLES, parseAssets, referencedAssets } from './assets';
+import { checkBackupAttachments } from './attachments';
+import { CUSTOM_FIELDS_TABLE } from './custom-fields';
 import { localDayOf } from './dates';
 import { AUDIT_TABLE, audit } from './audit';
 import type { AuditEntry } from '../types/audit';
@@ -66,6 +72,29 @@ export interface BackupSummary {
   invoices: number;
   clients: number;
   keys: number;
+  /** Attachment files (6.12) in the backup. */
+  attachments?: number;
+  /** Files records refer to but the backup does not contain (restored as "file missing"). */
+  missingAttachments?: number;
+  /** Damaged or disallowed attachment files left out of the restore. */
+  droppedAttachments?: number;
+}
+
+/**
+ * Largest backup file the restore screen reads. Higher than the CSV import cap because a backup
+ * carries attachments (6.12): receipt photos and PDFs travel inside it as base64.
+ */
+export const MAX_BACKUP_BYTES = 200 * 1024 * 1024;
+
+/** Extra sentence(s) for the restore confirmation about attachment files ('' when there are none). */
+export function attachmentRestoreNote(summary: BackupSummary | undefined | null): string {
+  if (!summary) return '';
+  const plural = (n: number) => `${n} attached file${n === 1 ? '' : 's'}`;
+  const parts: string[] = [];
+  if (summary.attachments) parts.push(`It also carries ${plural(summary.attachments)}.`);
+  if (summary.missingAttachments) parts.push(`${plural(summary.missingAttachments)} referred to by its records ${summary.missingAttachments === 1 ? 'is' : 'are'} not in this file and will show as missing.`);
+  if (summary.droppedAttachments) parts.push(`${plural(summary.droppedAttachments)} could not be read and will be left out.`);
+  return parts.join(' ');
 }
 
 export function buildBackup(now: Date = new Date()): BackupFile {
@@ -198,6 +227,8 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
     throw new Error('No invoice data found in this file.');
   }
   validateBackupData(data);
+  // Attachment files are checked by content; bad ones are left out, dangling references reported.
+  const files = checkBackupAttachments(data);
 
   return {
     data,
@@ -205,6 +236,9 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
       invoices: countRows(data[`${DB_PREFIX}invoices`]),
       clients: countRows(data[`${DB_PREFIX}clients`]),
       keys: Object.keys(data).length,
+      ...(files.files ? { attachments: files.files } : {}),
+      ...(files.missing ? { missingAttachments: files.missing } : {}),
+      ...(files.dropped ? { droppedAttachments: files.dropped } : {}),
     },
   };
 }
@@ -221,11 +255,13 @@ const RECORD_TABLES = [
   'purchase_orders',
   // Cost centres & budgets (6.16 / 6.17)
   'cost_centres', 'budgets',
+  // Custom field definitions (6.23)
+  CUSTOM_FIELDS_TABLE,
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
-  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', ASSET_TABLE,
+  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', ASSET_TABLE, CUSTOM_FIELDS_TABLE,
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

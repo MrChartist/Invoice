@@ -12,6 +12,8 @@ import { useCostCentres } from '../cost-centres/useCostCentres';
 import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
+import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
+import type { AttachmentRef } from '../../types/attachments';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -76,6 +78,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     markup_percent: purchase?.markup_percent,
     pure_agent: purchase?.pure_agent,
   });
+  const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
   const [error, setError] = useState('');
 
   const vendor = vendors.find((v) => v.id === vendorId);
@@ -133,6 +136,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         notes: notes.trim() || undefined,
         ...billablePatch(billable),
         cost_centre_id: costCentre,
+        attachments: attachments.length ? attachments : undefined,
       });
       onSaved(purchase ? 'Bill updated' : `Bill ${billNumber.trim()} saved`);
       onClose();
@@ -297,6 +301,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       </div>
 
       <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
+
+      <AttachmentsPanel value={attachments} onChange={setAttachments} label="Receipts & attachments" />
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>

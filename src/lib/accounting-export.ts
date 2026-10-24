@@ -38,6 +38,7 @@ import {
   type ExportSource,
 } from './export-shared';
 import { generateTallyExport, type TallyOptions } from './tally-xml';
+import { registerCells, registerColumns } from './custom-fields';
 import { csvCell as baseCsvCell, safeText } from './csv';
 
 export * from './export-shared';
@@ -167,6 +168,8 @@ const placeOfSupply = (code: string) => (code ? `${code}-${stateNameOf(code)}` :
 
 export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}): CsvTable {
   const df = opts.dateFormat ?? 'iso';
+  // Custom fields (6.23): one trailing column per label used on these documents (none → no columns).
+  const extra = registerColumns(invoices);
   const rows = invoices.map((inv): Cell[] => {
     const a = invoiceAmounts(inv);
     const s = sign(inv);
@@ -195,6 +198,7 @@ export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}):
       clean(inv.status),
       csvCurrency(inv),
       fmtDate(isoDate(inv.due_date), df),
+      ...registerCells(inv, extra).map((v) => clean(v)),
     ];
   });
   return table(
@@ -203,6 +207,7 @@ export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}):
       'Date', 'Voucher No', 'Document Type', 'Party Name', 'Party GSTIN', 'Place of Supply',
       'Reverse Charge', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax', 'Cess', 'TCS', 'Other Charges',
       'Round Off', 'Invoice Total', 'Amount Received', 'Balance Due', 'Status', 'Currency', 'Due Date',
+      ...extra,
     ],
     rows,
   );

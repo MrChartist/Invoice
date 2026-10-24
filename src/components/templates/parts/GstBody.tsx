@@ -9,6 +9,8 @@ import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
 import { buildUpiUrl, isTaxed } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
+import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
+import { ItemCustomLine } from './CustomFieldsBlock';
 
 interface Props {
   invoice: InvoiceRecord;
@@ -95,6 +97,9 @@ export function GstBody({ invoice, sender, totals }: Props) {
           <Cell label="Buyer's Ref / PO">{invoice.po_number || '—'}</Cell>
           {show.place && <Cell label="Place of supply">{place || '—'}</Cell>}
           <Cell label="Reverse charge">{invoice.reverse_charge ? 'Yes' : 'No'}</Cell>
+          {printableValues(invoice.custom_values).map((v) => (
+            <Cell key={v.id} label={v.label}>{formatCustomValue(v, (d) => date(d))}</Cell>
+          ))}
         </div>
       </div>
 
@@ -158,6 +163,7 @@ export function GstBody({ invoice, sender, totals }: Props) {
                 <td>
                   <div className={styles.itemName}>{line.name || '—'}</div>
                   {src?.description && <div className={styles.itemDesc}>{src.description}</div>}
+                  <ItemCustomLine values={src?.custom_values} />
                 </td>
                 {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
                 <td className={cn(styles.right, styles.num)}>{formatQuantity(line.quantity)}</td>

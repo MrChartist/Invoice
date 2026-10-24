@@ -11,6 +11,7 @@ import type { GstMode, InvoiceItem } from '../types/invoice';
 import { calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { assertUnlocked, type LockAction } from './period-lock';
+import { releaseAttachments, releaseDropped } from './attachments';
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -314,6 +315,8 @@ function writeBill(input: Omit<PurchaseRecord, 'id'> & { id?: string }): Purchas
     updated_at: now(),
   };
   setTable(PURCHASES_TABLE, existing ? rows.map((r) => (r.id === record.id ? record : r)) : [...rows, record]);
+  // Receipts this bill no longer lists (6.12) are deleted unless another record uses them.
+  if (existing) releaseDropped(existing.attachments, record.attachments);
   return record;
 }
 
@@ -348,6 +351,7 @@ export const purchasesDb = {
     if (bill) assertBillUnlocked(bill, 'delete');
     setTable(PURCHASES_TABLE, purchasesDb.all().filter((p) => p.id !== id));
     setTable(PAYMENTS_TABLE, paymentsDb.all().filter((p) => p.purchase_id !== id));
+    if (bill?.attachments?.length) releaseAttachments(bill.attachments.map((a) => a.id));
   },
 };
 

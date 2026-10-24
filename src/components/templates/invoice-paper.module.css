@@ -1104,3 +1104,51 @@
   border-top: 1px dashed currentColor;
   border-top-color: color-mix(in srgb, currentColor 25%, transparent);
 }
+
+/* ── Extra details: printable custom fields (6.23) ────────────── */
+.extra {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--tpl-accent);
+  background: var(--tpl-soft);
+  border-radius: 4px;
+}
+
+.extraCompact {
+  margin: 6px 0;
+}
+
+.extraGrid {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 16px;
+}
+
+.extraCompact .extraGrid {
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+
+.extraItem {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  min-width: 0;
+}
+
+.extraItem dt {
+  color: var(--tpl-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.extraItem dt::after {
+  content: ':';
+}
+
+.extraItem dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

@@ -111,3 +111,8 @@ the shared `assets` table (`sharedImageChars`) and invoices that reference it (`
 that plus persistence, iOS-Safari-outside-Home-Screen and backup age into findings (`ok`/`warn`/`critical`) shown in
 Settings → Data. Folder backups are read back after writing (`isIntactBackup`); a file that does not reopen intact is
 reported as a failed backup and the "last backup" time is not advanced.
+
+Attachment files (6.12, one `mrchartist_inv_att_<id>` key each) are reported as a single "attachments" entry with
+their count, size and how many no record uses any more; Settings → Data offers **Clean up unused files**
+(`docs/features/attachments-custom-fields.md`). The restore pickers accept backups up to 200 MB (`MAX_BACKUP_BYTES`)
+because receipts travel inside the file.

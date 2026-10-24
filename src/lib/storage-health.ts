@@ -10,6 +10,7 @@
 
 import { DB_PREFIX, collectAppData, storageBackend } from './storage';
 import { ASSET_TABLE, isAssetRef } from './assets';
+import { ATTACHMENT_KEY_PREFIX, referencedAttachmentIds } from './attachments';
 
 export const LOCAL_QUOTA_CHARS = 5 * 1024 * 1024;
 /**
@@ -36,6 +37,11 @@ export interface StorageInput {
   sharedImageChars?: number;
   /** Invoices whose snapshot points at a shared image instead of carrying a copy. */
   invoicesSharingImages?: number;
+  /** Attachment files (6.12): how many are stored, and the ones no record uses any more. */
+  attachmentCount?: number;
+  attachmentChars?: number;
+  unusedAttachments?: number;
+  unusedAttachmentChars?: number;
   persisted: boolean | null;
   iosSafari: boolean;
   standalone: boolean;
@@ -59,6 +65,8 @@ export interface StorageHealth {
   quotaChars: number;
   biggest: { name: string; chars: number }[];
   findings: HealthFinding[];
+  /** Attachment files (6.12) on this device. */
+  attachments: { count: number; chars: number; unused: number; unusedChars: number };
 }
 
 export function formatChars(n: number): string {
@@ -93,6 +101,14 @@ export function assessStorage(input: StorageInput): StorageHealth {
     });
   }
 
+  if ((input.unusedAttachments ?? 0) > 0) {
+    const n = input.unusedAttachments ?? 0;
+    findings.push({
+      id: 'attachments-unused', level: pct >= 75 ? 'warn' : 'ok', title: `${n} attached file${n === 1 ? ' is' : 's are'} no longer used`,
+      detail: `${formatChars(input.unusedAttachmentChars ?? 0)} of receipts / PDFs belong to no bill, expense or invoice any more (a cancelled form or a removed attachment). Use "Clean up unused files" to free the space.`,
+    });
+  }
+
   if (input.iosSafari && !input.standalone) {
     findings.push({
       id: 'safari', level: 'critical', title: 'Safari can delete this data',
@@ -122,22 +138,45 @@ export function assessStorage(input: StorageInput): StorageHealth {
     .map((t) => ({ name: t.key.startsWith(DB_PREFIX) ? t.key.slice(DB_PREFIX.length) : t.key, chars: t.chars }));
 
   const level = findings.reduce<HealthLevel>((l, f) => (rank[f.level] > rank[l] ? f.level : l), 'ok');
-  return { level, pct, usedChars: input.usedChars, quotaChars: quota, biggest, findings };
+  const attachments = {
+    count: input.attachmentCount ?? 0,
+    chars: input.attachmentChars ?? 0,
+    unused: input.unusedAttachments ?? 0,
+    unusedChars: input.unusedAttachmentChars ?? 0,
+  };
+  return { level, pct, usedChars: input.usedChars, quotaChars: quota, biggest, findings, attachments };
 }
 
 /** Gather the storage side of the input (sync, from the same store the app reads). */
 export function measureStorage(): Pick<
   StorageInput,
-  'usedChars' | 'quotaChars' | 'tables' | 'embeddedImageChars' | 'invoicesWithImages' | 'sharedImageChars' | 'invoicesSharingImages'
+  | 'usedChars' | 'quotaChars' | 'tables' | 'embeddedImageChars' | 'invoicesWithImages' | 'sharedImageChars' | 'invoicesSharingImages'
+  | 'attachmentCount' | 'attachmentChars' | 'unusedAttachments' | 'unusedAttachmentChars'
 > {
   const data = collectAppData();
   let usedChars = 0;
   const tables: StorageInput['tables'] = [];
+  // Attachment files are one key each: report them as a single "attachments" entry.
+  const used = referencedAttachmentIds((k) => data[k]);
+  let attachmentCount = 0;
+  let attachmentChars = 0;
+  let unusedAttachments = 0;
+  let unusedAttachmentChars = 0;
   for (const [key, value] of Object.entries(data)) {
     const chars = key.length + value.length;
     usedChars += chars;
+    if (key.startsWith(ATTACHMENT_KEY_PREFIX)) {
+      attachmentCount++;
+      attachmentChars += chars;
+      if (!used.has(key.slice(ATTACHMENT_KEY_PREFIX.length))) {
+        unusedAttachments++;
+        unusedAttachmentChars += chars;
+      }
+      continue;
+    }
     tables.push({ key, chars });
   }
+  if (attachmentCount) tables.push({ key: `${DB_PREFIX}attachments`, chars: attachmentChars });
   let embeddedImageChars = 0;
   let invoicesWithImages = 0;
   let invoicesSharingImages = 0;
@@ -159,5 +198,8 @@ export function measureStorage(): Pick<
   const assetsRaw = data[DB_PREFIX + ASSET_TABLE];
   const sharedImageChars = assetsRaw ? assetsRaw.length : 0;
   const quotaChars = storageBackend() === 'idb' ? IDB_QUOTA_CHARS : LOCAL_QUOTA_CHARS;
-  return { usedChars, quotaChars, tables, embeddedImageChars, invoicesWithImages, sharedImageChars, invoicesSharingImages };
+  return {
+    usedChars, quotaChars, tables, embeddedImageChars, invoicesWithImages, sharedImageChars, invoicesSharingImages,
+    attachmentCount, attachmentChars, unusedAttachments, unusedAttachmentChars,
+  };
 }
