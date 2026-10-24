@@ -558,6 +558,9 @@ function buildDocIssue(all: InvoiceRecord[]): DocIssueRow[] {
   const buckets = new Map<string, Bucket>();
   for (const rec of all) {
     if (!TAX_DOC_TYPES.has(rec.doc_type)) continue;
+    // A draft was never issued. Left out of the range, it is counted as a gap (cancelled) when it sits
+    // between issued numbers, and does not stretch the "to" number when it is the latest one.
+    if (rec.status === 'Draft') continue;
     const s = parseSeries(rec.invoice_number);
     if (!s) continue;
     const docType = rec.doc_type === 'CREDIT_NOTE' ? 'Credit Note' : 'Invoices for outward supply';
@@ -565,8 +568,7 @@ function buildDocIssue(all: InvoiceRecord[]): DocIssueRow[] {
     const b = buckets.get(key) ?? { docType, prefix: s.prefix, width: s.width, nums: new Set<number>(), cancelled: new Set<number>() };
     b.nums.add(s.n);
     b.width = Math.max(b.width, s.width);
-    // A draft consumed a number but was never issued — treated like a cancelled one.
-    if (rec.status === 'Cancelled' || rec.status === 'Draft') b.cancelled.add(s.n);
+    if (rec.status === 'Cancelled') b.cancelled.add(s.n);
     buckets.set(key, b);
   }
   const rows: DocIssueRow[] = [];
