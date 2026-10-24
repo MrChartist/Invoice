@@ -251,7 +251,7 @@ export function Transactions() {
     notify(`${r.paid.length} marked paid (${formatCurrency(r.total)})${skipped}`, r.paid.length ? 'success' : 'info');
   };
 
-  const exportCsv = (list: InvoiceRecord[] = rows) => {
+  const ledgerRows = (list: InvoiceRecord[]) => {
     const header = ['Number', 'Type', 'Date', 'Due date', 'Client', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total', 'Paid', 'Balance', 'Status'];
     const body = list.map((i) => [
       i.invoice_number,
@@ -269,8 +269,22 @@ export function Transactions() {
       i.balance_due,
       effectiveStatus(i, now),
     ]);
-    downloadText(`invoice-ledger-${todayInput()}.csv`, toCsv([header, ...body]), 'text/csv');
+    return [header, ...body];
+  };
+
+  const exportCsv = (list: InvoiceRecord[] = rows) => {
+    downloadText(`invoice-ledger-${todayInput()}.csv`, toCsv(ledgerRows(list)), 'text/csv');
     notify(`Exported ${list.length} row${list.length === 1 ? '' : 's'}`);
+  };
+
+  const exportXlsx = async (list: InvoiceRecord[] = rows) => {
+    try {
+      const { downloadXlsx } = await import('../lib/xlsx');
+      await downloadXlsx(`invoice-ledger-${todayInput()}.xlsx`, [{ name: 'Invoices', rows: ledgerRows(list) }]);
+      notify(`Exported ${list.length} row${list.length === 1 ? '' : 's'}`);
+    } catch {
+      notify('Could not build the Excel file', 'error');
+    }
   };
 
   return (
@@ -282,6 +296,9 @@ export function Transactions() {
           <>
             <button type="button" className={controls.btnOutline} onClick={() => exportCsv()} disabled={rows.length === 0}>
               <Download size={16} /> Export CSV
+            </button>
+            <button type="button" className={controls.btnOutline} onClick={() => void exportXlsx()} disabled={rows.length === 0}>
+              <Download size={16} /> Export .xlsx
             </button>
             <Link to="/invoice" className={controls.btnPrimary}>
               <FilePlus2 size={16} /> New invoice

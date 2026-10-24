@@ -71,7 +71,7 @@ export function ChooseFileStep({ state, dispatch, onLoadFile, onLoadText }: Prop
         <p className={ctl.hint}>
           {table
             ? `${table.rows.length.toLocaleString('en-IN')} data rows · ${table.headers.length} columns · ${delimiterLabel}-separated`
-            : 'CSV, TSV or TXT exported from Excel, Vyapar, Zoho Books, Tally or Busy. Excel .xlsx: use Save As → CSV UTF-8.'}
+            : 'CSV, TSV or TXT exported from Excel, Vyapar, Zoho Books, Tally or Busy. Excel .xlsx works too (first sheet).'}
         </p>
         <div className={styles.dropActions}>
           <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} onClick={() => fileRef.current?.click()}>
@@ -84,7 +84,7 @@ export function ChooseFileStep({ state, dispatch, onLoadFile, onLoadText }: Prop
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values"
+          accept=".csv,.tsv,.txt,.xlsx,.xlsm,text/csv,text/plain,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className={styles.srOnly}
           aria-label="Choose a CSV file"
           onChange={(e) => {
