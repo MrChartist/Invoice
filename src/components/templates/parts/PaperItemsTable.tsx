@@ -3,6 +3,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord } from '../../../types/invoice';
 import type { TemplateTableStyle } from '../registry';
 import { usePaper } from '../paper-context';
+import { trackingText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { ItemCustomLine } from './CustomFieldsBlock';
 
@@ -25,7 +26,7 @@ const STYLE_CLASS: Record<TemplateTableStyle, string | undefined> = {
  * a GST invoice shows everything a tax invoice must.
  */
 export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps) {
-  const { t, money, col } = usePaper();
+  const { t, money, col, show } = usePaper();
   const lines = totals.lines;
   const symbol = currencySymbol(invoice.currency);
   const taxed = invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
@@ -68,6 +69,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
                 <div className={styles.itemName}>{line.name || '—'}</div>
                 {source?.description && <div className={styles.itemDesc}>{source.description}</div>}
                 <ItemCustomLine values={source?.custom_values} />
+                {show.tracking && trackingText(source) && <div className={styles.itemDesc}>{trackingText(source)}</div>}
               </td>
               {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
               <td className={cn(styles.right, styles.num)}>

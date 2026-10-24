@@ -261,11 +261,14 @@ const RECORD_TABLES = [
   'cheques',
   // Bank accounts (multi-account BRS)
   'bank_accounts',
+  // Inventory: stock items and moves, godowns + stock transfers (6.10)
+  'stock_items', 'stock_moves', 'godowns', 'stock_transfers',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
   'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', 'cheques', 'bank_accounts', ASSET_TABLE, CUSTOM_FIELDS_TABLE,
+  'stock_items', 'godowns', 'stock_transfers',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

@@ -150,6 +150,18 @@ export interface InvoiceItem {
   custom_fields?: Record<string, string>;
   /** Additive (6.23), invoice lines only: snapshot of item custom fields (label + value + print flag). */
   custom_values?: CustomFieldValue[];
+  /* ── Stock tracking (6.6 / 6.10 / 6.11) — all optional, absent on untracked lines ── */
+  /** Additive (6.6): batch / lot the goods on this line come from (stock items with `track_batches`). */
+  batch_no?: string;
+  /** Additive (6.6): snapshot of that batch's expiry and manufacturing dates (YYYY-MM-DD), for printing. */
+  batch_expiry?: string;
+  batch_mfg?: string;
+  /** Additive (6.11): serial / IMEI numbers on this line (stock items with `track_serials`); count = quantity. */
+  serials?: string[];
+  /** Additive (6.11): warranty given on this sale, in months (snapshot of the stock item's warranty). */
+  warranty_months?: number;
+  /** Additive (6.10): godown the goods leave from (credit notes: return to). Absent = the default godown. */
+  godown_id?: string;
 }
 
 export interface Client {

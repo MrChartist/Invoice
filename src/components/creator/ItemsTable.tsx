@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, Copy, Library, Plus, Trash2 } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { Typeahead } from '../ui/Typeahead';
@@ -10,6 +10,8 @@ import { cn, formatCurrency } from '../../lib/utils';
 import { lineKeyAction } from './line-keys';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
+import { LineTracking } from './LineTracking';
+import { editorStockContext } from '../../lib/stock-tracking';
 import controls from '../../styles/controls.module.css';
 import styles from './ItemsTable.module.css';
 
@@ -19,6 +21,17 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const gstMode = useInvoiceStore((s) => s.gst_mode);
   const currency = useInvoiceStore((s) => s.currency);
   const docType = useInvoiceStore((s) => s.doc_type);
+  const docId = useInvoiceStore((s) => s.id);
+  const issueDate = useInvoiceStore((s) => s.issue_date);
+  const docStatus = useInvoiceStore((s) => s.status);
+  // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
+  // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
+  const [stockTick, setStockTick] = useState(0);
+  const stockCtx = useMemo(
+    () => editorStockContext({ id: docId, doc_type: docType, issue_date: issueDate, status: docStatus }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [docId, docType, issueDate, docStatus, stockTick],
+  );
   const { addItem, updateItem, duplicateItem, moveItem, removeItem, applyCatalogItem } = useInvoiceStore.getState();
   // Catalogue snapshot, refreshed whenever an item name gains focus.
   const [catalog, setCatalog] = useState<InvoiceItem[]>([]);
@@ -96,7 +109,10 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   data-field="name"
                   value={item.name}
                   onChange={(name) => updateItem(item.id, 'name', name)}
-                  onFocus={() => setCatalog(localDb.items.getAll())}
+                  onFocus={() => {
+                    setCatalog(localDb.items.getAll());
+                    setStockTick((t) => t + 1);
+                  }}
                   getSuggestions={itemSuggestions}
                   onPick={(c) => applyCatalogItem(item.id, c)}
                   placeholder={`Item ${index + 1}`}
@@ -119,6 +135,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   {item.custom_values.map((v) => `${v.label}: ${v.value}`).join(' · ')}
                 </div>
               ) : null}
+              {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
                 <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>
                   + Add cess

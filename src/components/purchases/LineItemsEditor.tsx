@@ -1,4 +1,6 @@
+import { Fragment } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { BillLineTracking, type BillStockContext } from './BillLineTracking';
 import type { PurchaseLine } from '../../types/purchases';
 import { GST_SLABS } from '../../types/invoice';
 import { blankPurchaseLine as blankLine } from '../../lib/purchases';
@@ -12,10 +14,19 @@ import styles from './purchases.module.css';
 export interface LineItemsEditorProps {
   lines: PurchaseLine[];
   onChange: (lines: PurchaseLine[]) => void;
+  /** Bills only: batch / serial / godown fields for tracked stock items (6.6 / 6.10 / 6.11). */
+  stock?: BillStockContext;
+}
+
+/** True when a bill line is a tracked stock item and needs the extra batch / serial / godown row. */
+function needsTracking(line: PurchaseLine, ctx: BillStockContext | undefined): boolean {
+  if (!ctx || !line.name.trim()) return false;
+  const item = ctx.find(line.name, line.hsn);
+  return !!item && (!!item.track_batches || !!item.track_serials || ctx.godowns.length > 1);
 }
 
 /** Editable bill lines: item, HSN/SAC, qty, rate, GST%. */
-export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
+export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps) {
   const patch = (id: string, change: Partial<PurchaseLine>) =>
     onChange(lines.map((l) => (l.id === id ? { ...l, ...change } : l)));
 
@@ -36,7 +47,8 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
           </thead>
           <tbody>
             {lines.map((l, i) => (
-              <tr key={l.id}>
+              <Fragment key={l.id}>
+              <tr>
                 <td data-label="Item">
                   <input
                     className={controls.ghost}
@@ -99,6 +111,14 @@ export function LineItemsEditor({ lines, onChange }: LineItemsEditorProps) {
                   </button>
                 </td>
               </tr>
+              {stock && needsTracking(l, stock) && (
+                <tr className={styles.trackRow}>
+                  <td colSpan={7}>
+                    <BillLineTracking line={l} index={i} ctx={stock} onPatch={(change) => patch(l.id, change)} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

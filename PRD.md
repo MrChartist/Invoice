@@ -138,6 +138,12 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **Bank reconciliation (BRS)**: CSV statement import with auto-detected HDFC, ICICI, SBI, Axis and Kotak layouts,
   scored match suggestions you confirm, printable BRS.
 - **Inventory**: FIFO and weighted-average costing, stock positions, shortage warnings while drafting an invoice.
+  Opt-in per item: **batches** with MFG / expiry / MRP on bills, FEFO batch pre-selected on sales, expired batches
+  need confirmation, expiry alerts (bell + Inventory, window configurable, default 30 days), stock by batch;
+  **serial / IMEI numbers** (one per unit on bills, picked from stock on sales, never sold twice, returned by a credit
+  note that names them) with warranty months and a serial lookup (bill, vendor, invoice, client, warranty status).
+  **Godowns** appear once a second godown exists: godown per bill / invoice line, stock per godown, stock transfer
+  vouchers `STR/FY25-26/0001` (period lock + audit, no books posting). Costing stays company-wide.
 - **Controls**: audit trail of every change with a tamper-evident hash chain and exportable head hash; "lock books up
   to" period lock enforced in the data layer with PIN-guarded, audited overrides.
 

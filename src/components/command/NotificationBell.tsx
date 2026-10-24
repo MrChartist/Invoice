@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { subscribeStorageChanges } from '../../lib/storage';
+import { getTable, subscribeStorageChanges } from '../../lib/storage';
 import {
   dismiss,
   loadNotifState,
@@ -29,6 +29,31 @@ export interface NotificationBellProps {
   className?: string;
 }
 
+/**
+ * Batch expiry alerts (6.6) need the stock engine: load that provider lazily, and only once some
+ * stock item tracks batches, so simple users never download it.
+ */
+let expiryAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureExpiryAlerts(onReady: () => void): void {
+  if (expiryAlerts !== 'off') return;
+  try {
+    const items = getTable<{ track_stock?: boolean; track_batches?: boolean }>('stock_items');
+    if (!items.some((i) => i.track_stock && i.track_batches)) return;
+  } catch {
+    return;
+  }
+  expiryAlerts = 'loading';
+  import('../../lib/stock-alerts')
+    .then((m) => {
+      m.registerExpiryAlerts();
+      expiryAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      expiryAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -49,6 +74,13 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     } catch {
       setItems([]);
     }
+    ensureExpiryAlerts(() => {
+      try {
+        setItems(loadVisibleNotifications(new Date()));
+      } catch {
+        /* keep what is shown */
+      }
+    });
   }, []);
 
   useEffect(() => {

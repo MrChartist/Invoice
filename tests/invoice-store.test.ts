@@ -63,3 +63,17 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
   }
   assert.ok(RECORD_KEYS.every((k) => computed.has(k) || k in sample), 'add new persisted fields to this sample');
 });
+
+test('stock-tracking line fields survive load → edit → save; untracked lines gain none (6.6 / 6.10 / 6.11)', () => {
+  const tracked = {
+    id: 'l1', name: 'Phone X', type: 'product', quantity: 2, rate: 100, amount: 200, order_line_id: 'so-l1',
+    batch_no: 'B7', batch_expiry: '2027-12-31', batch_mfg: '2026-01-01', serials: ['IMEI1', 'IMEI2'], warranty_months: 12, godown_id: 'g2',
+  };
+  const r = normalizeRecord({ ...legacy, gst_mode: 'IGST', items: [tracked, { id: 'l2', name: 'Plain', quantity: 1, rate: 5, amount: 5 }] });
+  for (const k of Object.keys(tracked) as (keyof typeof tracked)[]) {
+    assert.deepEqual((r.items[0] as unknown as Record<string, unknown>)[k], tracked[k], `line field ${k} survives`);
+  }
+  for (const k of ['batch_no', 'batch_expiry', 'batch_mfg', 'serials', 'warranty_months', 'godown_id']) {
+    assert.ok(!(k in r.items[1]), `untracked line has no ${k}`);
+  }
+});

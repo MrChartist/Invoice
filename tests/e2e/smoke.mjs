@@ -450,6 +450,53 @@ try {
     await writeJson(page, 'doc_links', []);
   });
 
+  await step('batch item bought with an expiry is sold FEFO; serial lookup finds the bill', async () => {
+    const before = await readJson(page, 'invoices', [], (v) => v.length > 0);
+    // Earlier steps own rows in these tables (e.g. a bill with an attachment): keep them and put them back.
+    const prevPurchases = await readJson(page, 'purchases', null);
+    const prevStock = await readJson(page, 'stock_items', null);
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [
+      item('e2e-syr', 'Cough Syrup', { hsn: '3004', track_batches: true }),
+      item('e2e-ph', 'Phone X', { hsn: '8517', track_serials: true, warranty_months: 12 }),
+    ]);
+    const line = (id, name, hsn, quantity, extra) => ({ id, name, hsn, quantity, rate: 50, tax_rate: 12, ...extra });
+    await writeJson(page, 'purchases', [...(prevPurchases ?? []), {
+      id: 'e2e-bill', kind: 'PURCHASE', vendor_name: 'E2E Pharma', bill_number: 'EP/77', date: '2026-04-02', category: 'Purchases',
+      lines: [
+        line('b1', 'Cough Syrup', '3004', 10, { batch_no: 'LATE', expiry_date: '2030-12-31' }),
+        line('b2', 'Cough Syrup', '3004', 5, { batch_no: 'SOON', expiry_date: '2029-06-30' }),
+        line('b3', 'Phone X', '8517', 2, { serials: ['IMEI-E2E-1', 'IMEI-E2E-2'] }),
+      ],
+      taxable: 850, cgst: 51, sgst: 51, igst: 0, itc_eligible: true, total: 952, amount_paid: 0,
+    }]);
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Client name').fill('Ravi Medicals');
+    await page.getByLabel('Item 1 name').fill('Cough Syrup');
+    await page.getByLabel('Item 1 HSN or SAC').fill('3004');
+    await page.getByLabel('Item 1 quantity').fill('2');
+    await page.getByLabel('Item 1 rate').fill('80');
+    const batch = page.getByLabel('Item 1 batch');
+    await page.waitForFunction(() => document.querySelector('[aria-label="Item 1 batch"]')?.value === 'SOON', null, { timeout: 5000 }).catch(() => {});
+    check((await batch.inputValue()) === 'SOON', `the batch that expires first is pre-selected (${await batch.inputValue()})`);
+    await page.keyboard.press('Control+s');
+    await page.getByText(/saved/i).first().waitFor();
+    const sold = (await readJson(page, 'invoices', [], (v) => v.length > before.length)).find((i) => i.client?.name === 'Ravi Medicals');
+    check(sold?.items?.[0]?.batch_no === 'SOON' && sold.items[0].batch_expiry === '2029-06-30',
+      `the invoice line carries the FEFO batch (${sold?.items?.[0]?.batch_no}, exp ${sold?.items?.[0]?.batch_expiry})`);
+
+    await page.goto(srv.origin + '/inventory?tab=serials');
+    await page.getByLabel('Serial / IMEI number').fill('imei-e2e-2');
+    const card = page.getByRole('article', { name: 'Serial IMEI-E2E-2' });
+    await card.waitFor();
+    const text = await card.innerText();
+    check(/EP\/77/.test(text) && /E2E Pharma/.test(text) && /In stock/.test(text), 'serial lookup shows the purchase bill, vendor and stock state');
+
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== sold?.id));
+    await writeJson(page, 'stock_items', prevStock);
+    await writeJson(page, 'purchases', prevPurchases);
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');

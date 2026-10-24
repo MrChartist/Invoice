@@ -41,6 +41,18 @@ export interface PurchaseLine {
   item_id?: string;
   /** Additive: the purchase-order line this bill line receives (set by "Convert to bill"). */
   po_line_id?: string;
+  /* ── Stock tracking (6.6 / 6.10 / 6.11) — additive, only set for tracked stock items ── */
+  /** Batch / lot number received on this line. */
+  batch_no?: string;
+  /** Manufacturing and expiry dates of the batch, yyyy-mm-dd. */
+  mfg_date?: string;
+  expiry_date?: string;
+  /** Printed MRP of the batch (informational). */
+  mrp?: number;
+  /** Serial / IMEI numbers received; count equals `quantity`. */
+  serials?: string[];
+  /** Godown the goods are received into (absent = the default godown). */
+  godown_id?: string;
 }
 
 /** A supplier bill or a direct expense. Persisted in table `purchases`. */

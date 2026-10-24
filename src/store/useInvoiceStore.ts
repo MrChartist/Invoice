@@ -84,6 +84,10 @@ export interface InvoiceState extends InvoiceRecord {
   addItem: () => void;
   updateItem: (id: string, field: keyof InvoiceItem, value: string | number) => void;
   applyCatalogItem: (id: string, source: Partial<InvoiceItem>) => void;
+  /** Merge fields into a line; a field set to `undefined` is removed (batch / serial / godown pickers). */
+  patchItem: (id: string, patch: Partial<InvoiceItem>) => void;
+  /** Replace one line by several (FEFO split across batches). */
+  replaceItem: (id: string, lines: InvoiceItem[]) => void;
   duplicateItem: (id: string) => void;
   moveItem: (id: string, direction: -1 | 1) => void;
   removeItem: (id: string) => void;
@@ -391,11 +395,29 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         return next;
       }),
 
+    patchItem: (id, patch) =>
+      mapItems(id, (item) => {
+        const next = { ...item, ...patch } as InvoiceItem & Record<string, unknown>;
+        for (const k of Object.keys(patch)) if (next[k] === undefined) delete next[k];
+        next.amount = round2(num(next.quantity) * num(next.rate));
+        return next;
+      }),
+
+    replaceItem: (id, lines) => {
+      const items = get().items;
+      const idx = items.findIndex((i) => i.id === id);
+      if (idx < 0 || lines.length === 0) return;
+      apply({ items: [...items.slice(0, idx), ...lines, ...items.slice(idx + 1)] });
+    },
+
     duplicateItem: (id) => {
       const items = get().items;
       const idx = items.findIndex((i) => i.id === id);
       if (idx < 0) return;
-      const copy = { ...items[idx], id: generateId() };
+      // A serial / IMEI can only be on one line: the copy starts without them.
+      const { serials: _serials, ...rest } = items[idx];
+      void _serials;
+      const copy = { ...rest, id: generateId() };
       apply({ items: [...items.slice(0, idx + 1), copy, ...items.slice(idx + 1)] });
     },
 
