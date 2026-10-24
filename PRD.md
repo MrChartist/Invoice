@@ -35,9 +35,14 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 ## 3. Key Feature Modules
 
 ### 3.1 Sales & Document Management
-- **Document types**: Tax Invoice / Invoice, Quotation, Proforma, Delivery Challan, Credit Note and Debit Note.
-- **Conversions**: Quotation → Proforma → Invoice ⇄ Delivery Challan (the original is kept and linked). Credit and
-  debit notes are raised against issued invoices and linked to them.
+- **Document types**: Tax Invoice / Invoice, Quotation, Sales Order, Proforma, Delivery Challan, Credit Note and Debit Note.
+- **Conversions**: Quotation → Sales Order / Proforma → Invoice ⇄ Delivery Challan (the original is kept and linked).
+  Credit and debit notes are raised against issued invoices and linked to them.
+- **Sales orders** (`SO/FY25-26/0001`): a non-tax order document (never revenue, GST, books, receivables or stock).
+  It converts **partially** into challans and invoices — each conversion pre-fills only the quantity still pending — and
+  shows ordered / delivered / invoiced per line with status Open / Partly fulfilled / Fulfilled / Closed.
+- **Purchase orders** (`PO/FY25-26/0001`, Expenses → Purchase orders): vendor, lines, expected date, printable PO;
+  "Convert to bill" pre-fills the bill with what is still to be received; status Open / Partly received / Received / Closed.
 - **Quotation outcomes**: Accepted / Declined recorded by the user; Expired and Converted derived automatically.
 - **Series numbering**: Indian financial-year series (`INV/FY25-26/0001`, resets 1 April; own series per document
   type, e.g. `CRN/`, `DBN/`), per-profile prefixes, Rule 46 duplicate refusal, a gap warning at save time and a

@@ -290,6 +290,42 @@ try {
     check(await page.getByText(/JV\/FY\d{2}-\d{2}\/0001/).first().isVisible(), 'drill-down opens the capital ledger with the voucher');
   });
 
+  await step('sales order converts its pending quantity; purchase orders tab opens', async () => {
+    const soId = await page.evaluate(() => {
+      const rows = JSON.parse(localStorage.getItem('mrchartist_inv_invoices'));
+      const so = {
+        ...rows[0],
+        id: 'e2e-so',
+        doc_type: 'SALES_ORDER',
+        invoice_number: 'SO/FY26-27/0001',
+        status: 'Sent',
+        amount_paid: 0,
+        items: rows[0].items.map((i) => ({ ...i, id: 'e2e-so-line', quantity: 3 })),
+      };
+      localStorage.setItem('mrchartist_inv_invoices', JSON.stringify([...rows, so]));
+      return so.id;
+    });
+    await page.goto(srv.origin + '/invoice/' + soId);
+    await page.getByRole('region', { name: 'Order fulfilment' }).getByText('Open', { exact: true }).waitFor();
+    await page.getByRole('button', { name: /^Convert/ }).click();
+    await page.getByRole('menuitem', { name: /Convert to Delivery Challan/ }).click();
+    await page.waitForURL((u) => u.pathname.startsWith('/invoice/') && !u.pathname.endsWith(soId));
+    const dc = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).find((i) => i.doc_type === 'DELIVERY_CHALLAN'));
+    check(dc?.sales_order_id === soId && dc.items.length === 1 && dc.items[0].quantity === 3 && dc.items[0].order_line_id === 'e2e-so-line',
+      `challan ${dc?.invoice_number} carries the order's pending quantity (${dc?.items?.[0]?.quantity})`);
+    await page.goto(srv.origin + '/transactions?type=SALES_ORDER');
+    await page.locator('td').getByText('Partly fulfilled').first().waitFor();
+    check(true, 'the order list shows the sales order as Partly fulfilled');
+    await page.goto(srv.origin + '/expenses?tab=orders');
+    await page.getByText('No purchase orders yet').waitFor();
+    check(true, 'Expenses → Purchase orders tab loads');
+    await page.evaluate((ids) => {
+      const rows = JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).filter((i) => !ids.includes(i.id));
+      localStorage.setItem('mrchartist_inv_invoices', JSON.stringify(rows));
+      localStorage.setItem('mrchartist_inv_doc_links', '[]');
+    }, [soId, dc?.id]);
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');

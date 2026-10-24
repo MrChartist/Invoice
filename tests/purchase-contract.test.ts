@@ -192,3 +192,25 @@ test('billable-expense fields (6.14) are read by timesheets and ignored by the r
   assert.deepEqual(unbilledExpenses([billable, bill], liveInvoiceIds([])).map((p) => p.id), ['p3']);
   assert.equal(unbilledExpenses([billable], liveInvoiceIds([{ id: 'inv-gone', status: 'Sent' }])).length, 0);
 });
+
+test('every reader accepts a bill converted from a purchase order (po_id + po_line_id) unchanged', () => {
+  const fromPo: PurchaseRecord = {
+    ...bill,
+    id: 'p3',
+    po_id: 'po1',
+    lines: bill.lines.map((l) => ({ ...l, po_line_id: 'pl1' })),
+  };
+  assert.equal(booksNormalize(fromPo as never)!.total, 1180);
+  assert.equal(exportNormalize(fromPo)!.taxable, 1000);
+  assert.equal(gstNormalize(fromPo, '27')!.cgst, 90);
+  assert.equal(readPurchase(fromPo)!.taxable, 1000);
+  assert.equal(bookBills([fromPo], '27')[0].tax, 180);
+  const events = collectEvents({
+    items: [{ id: 's1', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }] as never,
+    moves: [],
+    invoices: [],
+    purchases: [fromPo] as never,
+  });
+  assert.equal(events.get('s1')?.[0].qty, 10);
+  // The PO itself is a separate table (purchase_orders) that no report reads: it never posts.
+});

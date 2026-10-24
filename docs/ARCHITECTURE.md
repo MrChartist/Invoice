@@ -34,6 +34,7 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
 | `einvoice_meta` | einvoice | defined by that module |
 | `design_prefs` | templates-studio | defined by that module |
 | `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}` |
+| `purchase_orders` | purchases (POs) | `PurchaseOrder` (`src/types/purchases.ts`); received qty derived from bills with `po_id` (`src/lib/purchase-orders.ts`) |
 | `audit_log` | audit | `AuditEntry` (`src/types/audit.ts`) — written by `localDb` mutations, capped at 5,000 rows |
 | `bank_statements` | reconcile | imported statement lines + match state (`docs/features/reconcile-reports.md`) |
 | `book_opening` | books | opening cash/bank balances |

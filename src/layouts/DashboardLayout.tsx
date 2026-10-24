@@ -217,6 +217,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     () => [
       { id: 'new-invoice', title: 'New invoice', keywords: ['create', 'bill', 'sale'], run: () => navigate('/invoice') },
       { id: 'new-quotation', title: 'New quotation', keywords: ['estimate', 'quote'], run: () => navigate('/invoice?type=QUOTATION') },
+      { id: 'new-sales-order', title: 'New sales order', keywords: ['order', 'so', 'booking'], run: () => navigate('/invoice?type=SALES_ORDER') },
+      { id: 'sales-orders', title: 'Open sales orders', keywords: ['order', 'pending', 'backorder'], run: () => navigate('/transactions?type=SALES_ORDER') },
+      { id: 'purchase-orders', title: 'Purchase orders', keywords: ['po', 'order', 'vendor', 'supplier'], run: () => navigate('/expenses?tab=orders') },
       { id: 'add-client', title: 'Add client', keywords: ['customer', 'party'], run: () => navigate('/clients?new=1') },
       { id: 'add-expense', title: 'Add expense or purchase bill', keywords: ['bill', 'vendor'], run: () => navigate('/expenses') },
       { id: 'record-payment', title: 'Record a payment', keywords: ['receipt', 'received'], run: () => navigate('/transactions?filter=unpaid&pay=1') },
