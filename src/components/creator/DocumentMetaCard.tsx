@@ -4,6 +4,8 @@ import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { ForexFields } from './ForexFields';
+import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
+import { useCostCentres } from '../cost-centres/useCostCentres';
 import { localDb } from '../../lib/localDb';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
 import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
@@ -24,7 +26,7 @@ interface Props {
 /** "1 · Document": type, number (with the GST Rule 46 uniqueness/gap check), dates, currency, status. */
 export function DocumentMetaCard({ editing, saveTick }: Props) {
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
+    useShallow((st) => pick(st, ['cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
   );
 
   const nextNumber = useMemo(
@@ -41,6 +43,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
     [typedNumber, s.id, saveTick],
   );
   const numberTaken = numberCheck && !numberCheck.ok ? numberCheck.clash : undefined;
+  const centres = useCostCentres();
 
   return (
     <section className={surface.card}>
@@ -136,6 +139,14 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
           <input type="checkbox" checked={s.reverse_charge} onChange={(e) => s.setReverseCharge(e.target.checked)} />
           Tax is payable on reverse charge
         </label>
+        <CostCentreSelect
+          id="doc-cost-centre"
+          label="Cost centre / project"
+          centres={centres}
+          value={s.cost_centre_id}
+          onChange={(v) => s.patch({ cost_centre_id: v })}
+          hint="Books the income to this project, department or branch. A line can override it."
+        />
         <ForexFields />
       </div>
     </section>

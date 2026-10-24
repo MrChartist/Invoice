@@ -11,6 +11,8 @@ import { loadVouchers } from './vouchers';
 
 export * from './accounts';
 export * from './assets';
+export * from './budgets';
+export * from './cost-centre-pnl';
 export * from './postings';
 export * from './reports';
 export * from './vouchers';

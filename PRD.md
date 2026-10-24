@@ -102,6 +102,11 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   statement. Books are derived from documents and payments: every invoice, note, receipt, bill and supplier payment
   posts automatically (computed on the fly, never stored twice), and manual vouchers cover capital, loans, drawings,
   GST payments and other adjustments (`docs/features/ledger.md`).
+- **Cost centres / projects & budgets** (Books → Projects / Budgets): tag invoices (or single lines), bills, expenses,
+  voucher lines, time and mileage with a project, department or branch; a Project P&L shows income, direct costs,
+  margin and net per cost centre plus Unallocated, tying to the P&L. Budgets per Indian FY and income / expense
+  account (optionally per cost centre), annual-spread or monthly, with month / quarter / YTD budget vs actual,
+  favourable / adverse variance, CSV / .xlsx, and "copy last year's actuals ± x%" (`docs/features/cost-centres-budgets.md`).
 - **Bank reconciliation (BRS)**: CSV statement import with auto-detected HDFC, ICICI, SBI, Axis and Kotak layouts,
   scored match suggestions you confirm, printable BRS.
 - **Inventory**: FIFO and weighted-average costing, stock positions, shortage warnings while drafting an invoice.
@@ -154,6 +159,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   the JSON; supplier credit notes are not recorded in purchases, so they show as "in 2B only".
 - Pure-agent reimbursements are billed as 0% lines but the underlying expense still shows in Books / P&L as a cost
   (and the reimbursement as income); the Rule 33 conditions are the user's call — verify with your CA.
+- Cost-centre allocations are not included in the Tally XML or accounting CSVs; one cost centre per line (no
+  percentage splits), one level of grouping.
 - Editing or removing lines on a bill-from-time invoice does not unlink the entries; only deleting or cancelling the
   invoice frees them.
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.

@@ -51,6 +51,11 @@ reports, Books and Tally (`invoiceAmounts`, `books.normalizePurchase` → `readP
 A voucher that does not balance or names an unknown account is left out and listed in `ledger.warnings` (shown on
 the Vouchers tab).
 
+## Cost centres (6.16)
+Every posting line can carry `cost_centre` (from the document, bill or manual voucher line; an invoice's lines with
+their own centre split the Sales credit by taxable value). The Project P&L and Budgets tabs read it; the statements
+above ignore it. See `docs/features/cost-centres-budgets.md`.
+
 ## Statements
 - **Trial balance** for the period: opening, debit, credit, closing per account. Income/expense accounts restart each
   1 April; earlier years' profit is carried in Reserves & surplus.

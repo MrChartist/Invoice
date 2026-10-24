@@ -126,6 +126,8 @@ export interface InvoiceItem {
   discount_percent?: number;
   /** Gross line amount = quantity × rate (kept for legacy records). */
   amount: number;
+  /** Additive (6.16): cost centre for this line, overriding the document's `cost_centre_id`. */
+  cost_centre_id?: string;
   created_at?: string;
   /**
    * Additive: id of the Sales Order line this line fulfils (set when a challan / invoice is converted from a
@@ -321,4 +323,9 @@ export interface InvoiceRecord {
   sales_order_id?: string;
   /** Additive (sales orders): local day (YYYY-MM-DD) the user closed a partly fulfilled order. */
   order_closed_on?: string;
+  /**
+   * Additive (roadmap 6.16): `cost_centres` row id (project / department / branch) the document's
+   * income is booked to. Lines may override it with their own `cost_centre_id`.
+   */
+  cost_centre_id?: string;
 }

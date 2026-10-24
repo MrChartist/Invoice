@@ -472,6 +472,63 @@ try {
     check(entries.length === 1 && entries[0].invoiced_in === inv.id, `time entry linked to the invoice (${entries.length})`);
   });
 
+  await step('cost centres: create a project, tag an invoice and an expense, see the project P&L', async () => {
+    await page.goto(srv.origin + '/books?tab=proj');
+    await page.getByRole('button', { name: 'Add cost centre' }).first().click();
+    const dlg = page.getByRole('dialog', { name: 'New cost centre' });
+    await dlg.getByLabel('Name').fill('Website revamp');
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const centres = await readJson(page, 'cost_centres', [], (v) => v.length === 1);
+    check(centres.length === 1 && centres[0].kind === 'project', `cost centre stored (${centres.length})`);
+
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('#doc-cost-centre').selectOption({ label: 'Website revamp · Project' });
+    await page.getByLabel('Client name').fill('Acme Buyers');
+    await page.getByLabel('Item 1 name').fill('Design sprint');
+    await page.getByLabel('Item 1 quantity').fill('1');
+    await page.getByLabel('Item 1 rate').fill('10000');
+    await page.keyboard.press('Control+s');
+    await page.getByText(/saved/i).first().waitFor();
+    const invs = await readJson(page, 'invoices', [], (v) => v.some((i) => i.cost_centre_id));
+    check(invs.some((i) => i.cost_centre_id === centres[0].id), 'invoice carries the cost centre');
+
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Quick expense/ }).click();
+    const exp = page.getByRole('dialog');
+    await exp.locator('#exp-cat').selectOption('Software & subscriptions');
+    await exp.getByLabel('Amount (₹)').fill('2500');
+    await exp.locator('#exp-cost-centre').selectOption({ label: 'Website revamp · Project' });
+    await exp.getByRole('button', { name: 'Add expense' }).click();
+    await exp.waitFor({ state: 'detached' });
+    const bills = await readJson(page, 'purchases', [], (v) => v.some((p) => p.cost_centre_id));
+    check(bills.some((p) => p.cost_centre_id === centres[0].id), 'expense carries the cost centre');
+
+    await page.goto(srv.origin + '/books?tab=proj');
+    const table = page.getByTestId('project-pnl');
+    await table.waitFor();
+    check(await table.getByRole('columnheader', { name: 'Website revamp' }).isVisible(), 'project column in the project P&L');
+    check(await page.getByText('Ties to the P&L').isVisible(), 'project P&L ties to the overall P&L');
+    // Software is an indirect expense: margin 10,000, net 10,000 − 2,500.
+    const net = await table.getByRole('row', { name: /^Net profit/ }).first().textContent();
+    check(/^Net profit \/ \(loss\)7,500\.00/.test(net ?? ''), `project net = 10,000 − 2,500 (${net})`);
+
+    await page.getByRole('tab', { name: 'Budgets' }).click();
+    await page.getByRole('button', { name: 'Add budget line' }).click();
+    const bud = page.getByRole('dialog', { name: 'New budget line' });
+    await bud.locator('#bud-acct').selectOption('sales');
+    await bud.getByLabel('Annual budget (₹)').fill('120000');
+    await bud.getByRole('button', { name: 'Save budget' }).click();
+    await bud.waitFor({ state: 'detached' });
+    const budgets = await readJson(page, 'budgets', [], (v) => v.length === 1);
+    check(budgets.length === 1 && budgets[0].months.every((m) => m === 1000000), `budget spread evenly in paise (${budgets[0]?.months?.[0]})`);
+    await page.getByRole('button', { name: 'Full year' }).click();
+    const rep = page.getByTestId('budget-report');
+    await rep.waitFor();
+    const row = await rep.getByRole('row', { name: /Sales/ }).first().textContent();
+    check(/1,20,000\.00/.test(row ?? '') && /10,000\.00/.test(row ?? ''), `budget vs actual row (${row})`);
+  });
+
   await step('an existing localStorage user moves to IndexedDB on first load', async () => {
     // A device last used by a pre-4.x build: data in localStorage, schema v1, logo inline in the snapshot.
     const logo = `data:image/png;base64,${LOGO_PNG}`;

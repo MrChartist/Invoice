@@ -15,7 +15,10 @@ export type AuditEntity =
   /** Double-entry ledger (6.1): manual vouchers, user accounts, fixed-asset register. */
   | 'voucher'
   | 'account'
-  | 'fixed_asset';
+  | 'fixed_asset'
+  /** Cost centres / projects (6.16) and budgets (6.17). */
+  | 'cost_centre'
+  | 'budget';
 
 export type AuditAction =
   | 'create'
@@ -92,6 +95,8 @@ export const AUDIT_ENTITIES: AuditEntity[] = [
   'voucher',
   'account',
   'fixed_asset',
+  'cost_centre',
+  'budget',
 ];
 
 export const AUDIT_ACTIONS: AuditAction[] = [
@@ -140,4 +145,6 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   voucher: 'Vouchers',
   account: 'Chart of accounts',
   fixed_asset: 'Fixed assets',
+  cost_centre: 'Cost centres',
+  budget: 'Budgets',
 };

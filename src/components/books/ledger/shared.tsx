@@ -1,4 +1,4 @@
-import { Download, Info, Printer } from 'lucide-react';
+import { Download, FileSpreadsheet, Info, Printer } from 'lucide-react';
 import { downloadCsv } from '../download';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
@@ -6,7 +6,13 @@ import styles from './ledger.module.css';
 import { CA_NOTE } from './format';
 
 /** Toolbar with the "verify with your CA" badge, Print and CSV buttons. Hidden when printing. */
-export function StatementToolbar({ csv, filename, children }: { csv?: () => string; filename: string; children?: React.ReactNode }) {
+export function StatementToolbar({ csv, xlsx, filename, children }: {
+  csv?: () => string;
+  /** Optional Excel export (the dependency-free writer is loaded on click). */
+  xlsx?: () => void;
+  filename: string;
+  children?: React.ReactNode;
+}) {
   return (
     <div className={`${books.toolbar} no-print`}>
       <div className={books.toolbarGroup}>
@@ -22,6 +28,11 @@ export function StatementToolbar({ csv, filename, children }: { csv?: () => stri
         {csv && (
           <button type="button" className={controls.btnOutline} onClick={() => downloadCsv(filename, csv())}>
             <Download size={16} /> Export CSV
+          </button>
+        )}
+        {xlsx && (
+          <button type="button" className={controls.btnOutline} onClick={xlsx}>
+            <FileSpreadsheet size={16} /> Export Excel
           </button>
         )}
       </div>

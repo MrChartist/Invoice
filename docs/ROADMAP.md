@@ -174,8 +174,8 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.13 | ✅ **Time tracking & billable hours** → invoice lines (`/time`, `src/lib/timesheets.ts`, `docs/features/time-expenses.md`) | FreshBooks, Zoho, Invoice Ninja | M |
 | 6.14 | ✅ **Billable expenses & mileage** with markup and pure-agent (Rule 33) reimbursements | FreshBooks, Invoice Ninja | S–M |
 | 6.15 | ✅ **Optional automatic late-fee line** per client terms (new draft invoice, never edits the original; `receivables.md`) | FreshBooks, Invoice Ninja | S |
-| 6.16 | **Cost centres / projects** with project P&L | Tally, Busy, QBO, Xero, Zoho | M |
-| 6.17 | **Budgets vs actual** | Tally, Zoho, Xero, QBO | S–M |
+| 6.16 | ✅ **Cost centres / projects** with project P&L (Books → Projects; `docs/features/cost-centres-budgets.md`) | Tally, Busy, QBO, Xero, Zoho | M |
+| 6.17 | ✅ **Budgets vs actual** (Books → Budgets: monthly per FY / account / cost centre, copy from last year's actuals) | Tally, Zoho, Xero, QBO | S–M |
 | 6.18 | **Cash-flow forecast** 30/90/180 days from open items, recurring and collection lag | Xero | M |
 | 6.19 | **Exchange gain/loss** (realised + period-end revaluation) | Zoho, Tally, Xero | S–M |
 | 6.20 | **Separate companies** on one device (isolated data sets + switcher) | Tally, Busy, Vyapar | M |

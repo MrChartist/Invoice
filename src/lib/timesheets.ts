@@ -21,6 +21,7 @@ import { resolveStateCode } from './india-states';
 import { localDb } from './localDb';
 import { purchasesDb } from './purchases';
 import { blankClient, makeDraft, senderStateCode } from '../store/invoice-defaults';
+import { hoistCostCentre, loadCostCentres, matchCostCentre, type CostCentre } from './cost-centres';
 
 export const TIME_TABLE = 'time_entries';
 export const MILEAGE_TABLE = 'mileage';
@@ -225,11 +226,12 @@ function line(partial: Omit<InvoiceItem, 'id' | 'amount' | 'type'> & { type?: st
  * Time → invoice lines, one per project + description + rate. Each entry is rounded to the billing
  * step first, then the group is printed as hours to 2 dp (unit HRS) with the SAC from preferences.
  */
-export function timeLines(entries: TimeEntry[], prefs: TimePrefs): InvoiceItem[] {
+export function timeLines(entries: TimeEntry[], prefs: TimePrefs, centres: readonly CostCentre[] = []): InvoiceItem[] {
   const groups = new Map<string, TimeEntry[]>();
+  const ccOf = (e: TimeEntry) => e.cost_centre_id || matchCostCentre(e.project, centres) || '';
   for (const e of entries) {
     if (!e.billable) continue;
-    const key = [(e.project ?? '').trim().toLowerCase(), (e.description ?? '').trim().toLowerCase(), num(e.hourly_rate)].join('|');
+    const key = [(e.project ?? '').trim().toLowerCase(), (e.description ?? '').trim().toLowerCase(), num(e.hourly_rate), ccOf(e)].join('|');
     groups.set(key, [...(groups.get(key) ?? []), e]);
   }
   const out: InvoiceItem[] = [];
@@ -248,6 +250,7 @@ export function timeLines(entries: TimeEntry[], prefs: TimePrefs): InvoiceItem[]
       quantity: hours,
       rate: num(first.hourly_rate),
       tax_rate: num(prefs.gst_rate),
+      ...(ccOf(first) ? { cost_centre_id: ccOf(first) } : {}),
     }));
   }
   return out;
@@ -265,6 +268,7 @@ export const rebillCost = (p: PurchaseRecord): number => round2(p.itc_eligible ?
  *  - Pure agent: the actual amount paid, no markup, GST 0%, with the Rule 33 note.
  */
 export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
+  const cc = p.cost_centre_id ? { cost_centre_id: p.cost_centre_id } : {};
   const label = [p.category || 'Expense', p.vendor_name].filter(Boolean).join(': ') + (p.bill_number ? ` (#${p.bill_number})` : '');
   if (p.pure_agent) {
     return line({
@@ -274,6 +278,7 @@ export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
       quantity: 1,
       rate: round2(num(p.total)),
       tax_rate: 0,
+      ...cc,
     });
   }
   const markup = Math.max(num(p.markup_percent), 0);
@@ -285,15 +290,20 @@ export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
     quantity: 1,
     rate: round2(rebillCost(p) * (1 + markup / 100)),
     tax_rate: num(prefs.gst_rate),
+    ...cc,
   });
 }
 
 /** Trips → one mileage line per rate (unit KM), taxed like the main supply. */
 export function mileageLines(trips: MileageEntry[], prefs: TimePrefs): InvoiceItem[] {
-  const byRate = new Map<number, MileageEntry[]>();
-  for (const t of trips) byRate.set(num(t.rate_per_km), [...(byRate.get(num(t.rate_per_km)) ?? []), t]);
+  // One line per rate × cost centre.
+  const byRate = new Map<string, MileageEntry[]>();
+  const keyOf = (t: MileageEntry) => `${num(t.rate_per_km)}|${t.cost_centre_id ?? ''}`;
+  for (const t of trips) byRate.set(keyOf(t), [...(byRate.get(keyOf(t)) ?? []), t]);
   const out: InvoiceItem[] = [];
-  for (const [rate, group] of byRate) {
+  for (const group of byRate.values()) {
+    const rate = num(group[0].rate_per_km);
+    const cc = group[0].cost_centre_id;
     const km = round2(group.reduce((s, t) => s + Math.max(num(t.km), 0), 0));
     if (km <= 0) continue;
     out.push(line({
@@ -304,6 +314,7 @@ export function mileageLines(trips: MileageEntry[], prefs: TimePrefs): InvoiceIt
       quantity: km,
       rate,
       tax_rate: num(prefs.gst_rate),
+      ...(cc ? { cost_centre_id: cc } : {}),
     }));
   }
   return out;
@@ -315,8 +326,8 @@ export interface BillSelection {
   mileage: MileageEntry[];
 }
 
-export const buildBillLines = (sel: BillSelection, prefs: TimePrefs): InvoiceItem[] => [
-  ...timeLines(sel.time, prefs),
+export const buildBillLines = (sel: BillSelection, prefs: TimePrefs, centres: readonly CostCentre[] = []): InvoiceItem[] => [
+  ...timeLines(sel.time, prefs, centres),
   ...sel.expenses.map((p) => expenseLine(p, prefs)),
   ...mileageLines(sel.mileage, prefs),
 ];
@@ -446,14 +457,16 @@ export class NothingToBillError extends Error {
  * The client comes from the CRM (falling back to the name snapshot on the entries).
  */
 export function billUnbilled(key: string, sel: BillSelection, prefs = readTimePrefs()): InvoiceRecord {
-  const items = buildBillLines(sel, prefs);
-  if (!items.length) throw new NothingToBillError();
+  const lines = buildBillLines(sel, prefs, loadCostCentres());
+  if (!lines.length) throw new NothingToBillError();
+  // One shared cost centre becomes the document's; mixed ones stay as line overrides.
+  const { costCentreId, items } = hoistCostCentre(lines);
   const name = sel.time[0]?.client_name ?? sel.mileage[0]?.client_name ?? '';
   const client: Client = localDb.clients.getById(key) ?? { ...blankClient(), name };
   const settings = localDb.settings.get();
   const sender = localDb.settings.activeProfile() ?? null;
   const base = makeDraft({ settings, sender, docType: 'INVOICE', templateId: localDb.template.get() });
-  const draft = buildBillDraft({ ...base, id: generateId() }, client, items, sender);
+  const draft = buildBillDraft({ ...base, id: generateId(), ...(costCentreId ? { cost_centre_id: costCentreId } : {}) }, client, items, sender);
   draft.invoice_number = localDb.invoices.nextNumber(draft.issue_date, draft.doc_type, sender?.invoicePrefix || undefined);
   const saved = localDb.invoices.save(draft);
   timeDb.markInvoiced(sel.time.map((e) => e.id), saved.id);

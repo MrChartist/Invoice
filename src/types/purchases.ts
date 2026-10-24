@@ -92,6 +92,8 @@ export interface PurchaseRecord {
   rebilled_in?: string;
   /** Additive: the purchase order (table `purchase_orders`) this bill was converted from. */
   po_id?: string;
+  /** Additive (6.16): `cost_centres` row id this bill / expense is charged to (project P&L, budgets). */
+  cost_centre_id?: string;
 }
 
 /** One line of a purchase order. Same shape as a bill line, minus the stock link. */

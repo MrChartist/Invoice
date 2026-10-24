@@ -89,6 +89,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `accounts` | ledger | user-added `Account` rows (`src/lib/ledger/accounts.ts`); default accounts are constants, never stored |
 | `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`) |
 | `fixed_assets` | ledger | `FixedAsset` register rows (`src/lib/ledger/assets.ts`) |
+| `cost_centres` | cost centres (6.16) | `CostCentre` master (`src/lib/cost-centres.ts`); documents point at it via optional `cost_centre_id` (`docs/features/cost-centres-budgets.md`) |
+| `budgets` | budgets (6.17) | `Budget` rows: FY × account × optional cost centre, 12 monthly amounts in paise (`src/lib/ledger/budgets.ts`) |
 | `assets` | storage (`src/lib/assets.ts`) | `{id, data}`: logo / signature data URLs stored once, keyed by content hash (schema v3) |
 
 ### Snapshot images by reference (schema v3)
