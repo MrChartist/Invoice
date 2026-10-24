@@ -264,6 +264,21 @@ test('TDS 10% on taxable: invoice total unchanged, customer pays 10,800, nothing
   assert.equal(bs.equity.capitalAndOther, 0);
 });
 
+test('Tally: the settling receipt posts Dr TDS Receivable so the party ledger closes', () => {
+  const inv = mk({ tds: { rate: 10 } }); // total 11,800, TDS 1,000, cash due 10,800
+  localDb.payments.record({ invoiceId: inv.id, amount: 5000, method: 'UPI', date: '2026-04-20' });
+  localDb.payments.record({ invoiceId: inv.id, amount: 5800, method: 'UPI', date: '2026-04-25' });
+  const m = tally([reload(inv.id)]);
+  const receipts = m.vouchers.filter((v) => v.type === 'Receipt');
+  assert.equal(receipts.length, 2);
+  assert.equal(posted(receipts[0], 'TDS Receivable'), 0, 'part payment carries no TDS');
+  assert.equal(posted(receipts[1], 'TDS Receivable'), -100000);
+  const party = receipts[0].party;
+  const partyNet = m.vouchers.reduce((sum, v) => sum + posted(v, party), 0);
+  assert.equal(partyNet, 0, 'sale + receipts + TDS close the party ledger');
+  for (const v of m.vouchers) assert.equal(voucherImbalance(v), 0);
+});
+
 test('TDS on invoice total (not taxable): 10% of 11,800 = 1,180', () => {
   const inv = mk({ tds: { rate: 10, onTaxable: false } });
   assert.equal(inv.tds_amount, 1180);

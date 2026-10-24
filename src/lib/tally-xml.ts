@@ -17,7 +17,7 @@
  * Voucher shapes:
  *   Sales        Dr Party | Cr Sales, Cr Output CGST/SGST/IGST, Cr charges, ± Round Off
  *   Credit Note  Cr Party | Dr Sales, Dr Output taxes, ... (mirror of Sales)
- *   Receipt      Dr Bank/Cash | Cr Party (bill allocation "Agst Ref" the invoice)
+ *   Receipt      Dr Bank/Cash [+ Dr TDS Receivable on the settling receipt] | Cr Party (bill allocation "Agst Ref" the invoice)
  *   Purchase     Cr Party | Dr Purchases, Dr Input CGST/SGST/IGST, ± Round Off
  *
  * Any difference between the invoice's stored total and the sum of its
@@ -129,6 +129,8 @@ export interface TallyOptions {
   outputCess?: string;
   /** TCS collected from the customer (a liability, never income). */
   tcsLedger?: string;
+  /** TDS the customer withheld (an asset claimed against your income tax). */
+  tdsLedger?: string;
   inputCgst?: string;
   inputSgst?: string;
   inputIgst?: string;
@@ -147,6 +149,7 @@ export const DEFAULT_LEDGER_NAMES = {
   outputGst: 'Output GST',
   outputCess: 'Output Cess',
   tcsLedger: 'TCS Payable',
+  tdsLedger: 'TDS Receivable',
   inputCgst: 'Input CGST',
   inputSgst: 'Input SGST',
   inputIgst: 'Input IGST',
@@ -177,6 +180,7 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
     outputGst: n(o.outputGst, DEFAULT_LEDGER_NAMES.outputGst),
     outputCess: n(o.outputCess, DEFAULT_LEDGER_NAMES.outputCess),
     tcsLedger: n(o.tcsLedger, DEFAULT_LEDGER_NAMES.tcsLedger),
+    tdsLedger: n(o.tdsLedger, DEFAULT_LEDGER_NAMES.tdsLedger),
     inputCgst: n(o.inputCgst, DEFAULT_LEDGER_NAMES.inputCgst),
     inputSgst: n(o.inputSgst, DEFAULT_LEDGER_NAMES.inputSgst),
     inputIgst: n(o.inputIgst, DEFAULT_LEDGER_NAMES.inputIgst),
@@ -419,7 +423,18 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       seqOf.set(p, n);
     }
     const paidRows = new Map<string, number>();
-    for (const p of allSorted) paidRows.set(p.invoice_id, (paidRows.get(p.invoice_id) ?? 0) + toPaise(p.amount));
+    // TDS the customer withheld is settled on the receipt that clears the cash due (total - TDS):
+    // Dr TDS Receivable / Cr Party, so the party ledger closes in Tally.
+    const tdsOn = new Map<Payment, number>();
+    for (const p of allSorted) {
+      const before = paidRows.get(p.invoice_id) ?? 0;
+      const after = before + toPaise(p.amount);
+      paidRows.set(p.invoice_id, after);
+      const inv = byId.get(p.invoice_id)!;
+      const tds = Math.min(Math.max(toPaise(inv.tds_amount ?? 0), 0), toPaise(inv.total));
+      const cashDue = toPaise(inv.total) - tds;
+      if (tds > 0 && before < cashDue && after >= cashDue) tdsOn.set(p, tds);
+    }
 
     for (const p of filterPayments(source.payments, sales, o.range)) {
       const inv = byId.get(p.invoice_id)!;
@@ -432,7 +447,12 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const invNo = clean(inv.invoice_number) || String(inv.id);
       const entries: TallyEntry[] = [];
       push(entries, bank, 'Dr', paise);
-      push(entries, party, 'Cr', paise, { name: invNo, type: 'Agst Ref' });
+      const tds = tdsOn.get(p) ?? 0;
+      if (tds > 0) {
+        std(o.tdsLedger, 'Current Assets');
+        push(entries, o.tdsLedger, 'Dr', tds);
+      }
+      push(entries, party, 'Cr', paise + tds, { name: invNo, type: 'Agst Ref' });
       vouchers.push({
         type: 'Receipt',
         date: isoDate(p.date),
@@ -440,7 +460,12 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         party,
         partyGstin: '',
         stateName: '',
-        narration: [clean(p.method), clean(p.reference) && `Ref ${clean(p.reference)}`, `Against ${invNo}`]
+        narration: [
+          clean(p.method),
+          clean(p.reference) && `Ref ${clean(p.reference)}`,
+          `Against ${invNo}`,
+          tds > 0 && `TDS ${fixed2(tds / 100)} withheld${clean(inv.tds_section) ? ` u/s ${clean(inv.tds_section)}` : ''}`,
+        ]
           .filter(Boolean)
           .join(' | '),
         reference: clean(p.reference),
