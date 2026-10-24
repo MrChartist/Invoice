@@ -48,6 +48,7 @@ money (`toPaise`, `fixed2`), `ExportSource`, `voucherKindOf`, `invoiceAmounts`, 
 - Two files: **Masters** (`All Masters`: ledgers, units, stock items) then **Vouchers** (`Vouchers`); a Combined single file is also offered.
 - Drafts (unless opted in), cancelled, quotations, proforma and delivery challans are excluded. Output is sorted and deterministic.
 - Re-importing the same period creates duplicates in Tally; the UI says so.
+- Batch / godown allocations (roadmap 6.6 / 6.10) and stock transfer vouchers are **not exported**: Tally needs godown and batch-enabled stock-item masters for `BATCHALLOCATIONS.LIST` / `GODOWNNAME`, so inventory lines land in Tally's main location without batches (see `docs/features/inventory.md`).
 
 ### CSV datasets (headers are the contract)
 

@@ -371,6 +371,7 @@ export function DesignPanel({
             <Check checked={design.show_terms} onChange={(v) => set({ show_terms: v })}>Terms</Check>
             <Check checked={design.show_amount_in_words} onChange={(v) => set({ show_amount_in_words: v })}>Amount in words</Check>
             <Check checked={design.show_place_of_supply} onChange={(v) => set({ show_place_of_supply: v })}>Place of supply</Check>
+            <Check checked={design.show_tracking} onChange={(v) => set({ show_tracking: v })}>Batch, expiry &amp; serial numbers</Check>
           </div>
         </Section>
 

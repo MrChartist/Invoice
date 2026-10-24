@@ -107,6 +107,18 @@
 .colAmt { width: 16%; }
 .colAct { width: 44px; }
 
+/* Tracked stock lines (6.6 / 6.10 / 6.11): batch, dates, serials and godown under the line. */
+.lines tr.trackRow td {
+  background: var(--card-inner);
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+.trackGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem 0.75rem;
+}
+.trackWide { grid-column: 1 / -1; }
+
 /* ── Totals ──────────────────────────────────────────────────── */
 .totals {
   margin-left: auto;

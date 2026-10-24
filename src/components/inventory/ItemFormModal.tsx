@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { UNITS, GST_SLABS } from '../../types/invoice';
 import { num } from '../../lib/invoice-calc';
 import type { StockItem } from '../../lib/inventory';
+import { duplicateSerials, parseSerials } from '../../lib/stock-tracking';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
@@ -21,6 +22,7 @@ interface Draft {
   name: string; sku: string; hsn: string; unit: string; track_stock: boolean;
   opening_qty: string; opening_rate: string; reorder_level: string;
   sale_rate: string; tax_rate: string; location: string;
+  track_batches: boolean; track_serials: boolean; warranty_months: string; opening_serials: string;
 }
 
 function toDraft(i: StockItem): Draft {
@@ -29,6 +31,8 @@ function toDraft(i: StockItem): Draft {
     opening_qty: String(i.opening_qty || ''), opening_rate: String(i.opening_rate || ''),
     reorder_level: String(i.reorder_level || ''), sale_rate: i.sale_rate ? String(i.sale_rate) : '',
     tax_rate: i.tax_rate !== undefined ? String(i.tax_rate) : '', location: i.location ?? '',
+    track_batches: !!i.track_batches, track_serials: !!i.track_serials,
+    warranty_months: i.warranty_months ? String(i.warranty_months) : '', opening_serials: (i.opening_serials ?? []).join('\n'),
   };
 }
 
@@ -49,7 +53,13 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const nameError = !name ? 'Item name is required.' : dup ? 'A stock item with this name already exists.' : '';
   const negative = [d.opening_qty, d.opening_rate, d.reorder_level, d.sale_rate].some((v) => num(v) < 0);
   const taxBad = d.tax_rate !== '' && (num(d.tax_rate) < 0 || num(d.tax_rate) > 100);
-  const valid = !nameError && !negative && !taxBad;
+  const openingSerials = d.track_stock && d.track_serials ? parseSerials(d.opening_serials) : [];
+  const dupSerials = duplicateSerials(openingSerials);
+  const serialError = !d.track_stock || !d.track_serials ? ''
+    : dupSerials.length ? `Serial ${dupSerials[0]} is listed twice.`
+    : openingSerials.length && openingSerials.length !== num(d.opening_qty) ? `List one serial per opening unit (${openingSerials.length} listed, opening qty ${num(d.opening_qty)}).`
+    : '';
+  const valid = !nameError && !negative && !taxBad && !serialError && num(d.warranty_months) >= 0;
 
   const submit = () => {
     setTouched(true);
@@ -67,6 +77,11 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate),
       tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate),
       location: d.location.trim() || undefined,
+      // Opt-in tracking: stored only when on, so simple items keep their exact shape.
+      track_batches: d.track_stock && d.track_batches ? true : undefined,
+      track_serials: d.track_stock && d.track_serials ? true : undefined,
+      warranty_months: d.track_stock && d.track_serials && num(d.warranty_months) > 0 ? Math.round(num(d.warranty_months)) : undefined,
+      opening_serials: openingSerials.length ? openingSerials : undefined,
     });
   };
 
@@ -164,6 +179,34 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
                 <input id={`${uid}-rl`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={d.reorder_level} onChange={(e) => set('reorder_level', e.target.value)} />
               </div>
             </div>
+          </>
+        )}
+        {d.track_stock && (
+          <>
+            <p className={styles.sectionLabel}>Tracking (optional)</p>
+            <label className={controls.check}>
+              <input type="checkbox" checked={d.track_batches} onChange={(e) => set('track_batches', e.target.checked)} />
+              Track batches with MFG / expiry dates (medicines, food, cosmetics) — sales pick the batch that expires first
+            </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={d.track_serials} onChange={(e) => set('track_serials', e.target.checked)} />
+              Track serial / IMEI numbers (one per unit) and warranty
+            </label>
+            {d.track_serials && (
+              <div className={controls.row}>
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor={`${uid}-wm`}>Warranty (months)</label>
+                  <input id={`${uid}-wm`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="numeric" value={d.warranty_months} onChange={(e) => set('warranty_months', e.target.value.replace(/[^0-9]/g, ''))} placeholder="0 = none" />
+                </div>
+                {num(d.opening_qty) > 0 && (
+                  <div className={controls.field}>
+                    <label className={controls.label} htmlFor={`${uid}-os`}>Opening serials (one per line)</label>
+                    <textarea id={`${uid}-os`} className={controls.textarea} rows={3} value={d.opening_serials} onChange={(e) => set('opening_serials', e.target.value)} aria-invalid={touched && !!serialError} />
+                  </div>
+                )}
+              </div>
+            )}
+            {touched && serialError && <span className={controls.error} role="alert">{serialError}</span>}
           </>
         )}
         {touched && negative && <span className={controls.error} role="alert">Quantities and rates cannot be negative.</span>}

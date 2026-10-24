@@ -6,14 +6,14 @@ Tally/Vyapar-style stock. Stock is **derived on read** from opening balance + ma
 - **Nav label / icon**: `Inventory` / `Boxes` (lucide-react)
 - **Page**: `src/pages/Inventory.tsx` (named export `Inventory`)
 - **Tables** (via `getTable`/`setTable`): `stock_items`, `stock_moves`. Read-only: `invoices`, `purchases` (defensive; see below).
-- **Extra key**: `mrchartist_inv_inventory_settings` = `{ method: 'WEIGHTED_AVG'|'FIFO', includeChallans: boolean }`. Not in `KEYS`; the lead should include it in backup if backup does not already sweep every `DB_PREFIX` key (`collectAppData` does).
+- **Extra key**: `mrchartist_inv_inventory_settings` = `{ method: 'WEIGHTED_AVG'|'FIFO', includeChallans: boolean, expiryAlertDays?: number, defaultGodown?: string }`. Not in `KEYS`; the lead should include it in backup if backup does not already sweep every `DB_PREFIX` key (`collectAppData` does).
 
 ## Rules implemented
 
 - INVOICE / TAX_INVOICE reduce stock; CREDIT_NOTE returns stock; QUOTATION / PROFORMA never touch stock; DELIVERY_CHALLAN reduces stock only when the "Delivery challans reduce stock" toggle is on. Draft and Cancelled documents are excluded.
 - Lines match a stock item by name (case-insensitive); if both sides carry an HSN they must agree. Only `track_stock` items participate.
 - Purchases: any row in the `purchases` table with `lines` (or `items`) of `{name, hsn, quantity, rate}`; date from `bill_date | date | issue_date | invoice_date`; Draft/Cancelled skipped. Field names are read defensively because `src/types/purchases.ts` did not exist in this worktree. If the real `PurchaseRecord` differs, adjust `PurchaseLike` / `PurchaseLineLike` and `purchaseDate` in `src/lib/inventory.ts`.
-- Same-day ordering: opening, then receipts, then issues.
+- Same-day ordering: opening, then receipts, then issues, then sales returns (a same-day credit note follows the sale it reverses).
 - Costing: weighted average (default) or FIFO, switchable on the page. COGS is costed at issue time; returns re-enter at the last issue unit cost; negative stock is valued at the last known cost and (FIFO) is covered by the next receipt.
 
 ## Exported symbols (`src/lib/inventory.ts`)
@@ -74,3 +74,87 @@ Dashboard badge: `lowStockCount()` -> link to `/inventory`.
 - Deleting a stock item removes its manual moves only; invoice history is untouched.
 - CSV cells starting with `= + - @` are prefixed with `'` to prevent spreadsheet formula injection.
 - Page uses `surface.module.css` classes for stat tiles/page head because `StatCard` / `PageHeader` / `NumberInput` do not exist in this worktree's `components/ui`.
+- When "Delivery challans reduce stock" is on, goods leave once per sale: an invoice converted from a live challan (or a
+  challan converted from a live invoice) does not move stock again (`StockInputs.links`, read from `doc_links`).
+
+## Batches, godowns and serials (roadmap 6.6 / 6.10 / 6.11)
+
+Everything is **opt-in** and **derived on read** — no balance is stored. `src/lib/stock-tracking.ts` runs over the
+same events as costing (`collectEvents`, now carrying `godown`, `batch`, `mfg`, `expiry`, `mrp`, `serials`, document
+number and party) plus stock transfers. `computeStock` (costing) never sees transfers, so **costing stays
+company-wide**: one weighted-average / FIFO cost per item across all godowns and batches.
+
+### Switching it on
+
+| Feature | Turn on | What appears |
+|---|---|---|
+| Batches + expiry | Item form → "Track batches with MFG / expiry dates" (`StockItem.track_batches`) | Batch / MFG / expiry / MRP fields on bill lines of that item; batch picker on invoice / challan lines; Inventory → *Batches & expiry* tab, expiry banner, bell alerts, expiry-window setting |
+| Serials / IMEI | Item form → "Track serial / IMEI numbers" (`track_serials`, `warranty_months`, `opening_serials`) | Serial list (one per line, count = qty) on bill lines; serial picker on sales lines; *Serial lookup* tab |
+| Godowns | Inventory → *Godowns* → add a second godown (table `godowns`; "Main" is implicit) | Godown picker on bill lines, sales lines and adjustments; *Godowns* (stock per godown) and *Transfers* tabs; default-godown setting |
+
+A simple user (no tracked items, one godown) sees no new field anywhere; the editor's picker context is `null`.
+
+### Data (all additive)
+
+- `PurchaseLine`: `batch_no`, `mfg_date`, `expiry_date`, `mrp`, `serials[]`, `godown_id` (`src/types/purchases.ts`,
+  read by `readPurchaseLines`; guarded by `tests/purchase-contract.test.ts`).
+- `InvoiceItem`: `batch_no`, `batch_expiry` / `batch_mfg` (snapshot for printing), `serials[]`, `warranty_months`
+  (snapshot of the item's warranty at sale), `godown_id` — normalised in `normalizeItem` (absent on untracked lines).
+- `StockMove` (adjustments): `godown_id`, `batch_no`, `mfg_date`, `expiry_date`, `serials[]`.
+- `godowns` (`Godown`), `stock_transfers` (`StockTransfer`, `src/types/stock.ts`). Both are in backup
+  `RECORD_TABLES` / `ID_TABLES` (with `stock_items`; `stock_moves` is shape-checked without the id rule).
+- Lines without a `godown_id` belong to **Main**. Opening stock is in Main and unbatched (record opening batches as an
+  "Add stock" adjustment with a batch). When several godowns exist, new tracked lines are saved with the default godown.
+
+### Batches (6.6)
+
+- `batchOptions(tracking, day, godown?)` lists batches with stock in **FEFO** order (earliest expiry, then no expiry,
+  then oldest receipt); expired batches are flagged and listed last. A batch's MFG / expiry / MRP come from its first
+  receipt. Unbatched stock is kept in an `''` bucket and is never suggested.
+- Editor: a new line of a batch item pre-selects the FEFO batch (`fefoBatch`); the user can pick another. If the
+  quantity exceeds the batch, "Split across batches (FEFO)" (`splitLineByFefo`) splits the line, one batch per line.
+- Issuing (not drafts): a batch is required when batches are in stock; an **expired batch blocks the save until the
+  user confirms** "Sell anyway"; a batch running short is a warning (`docTrackingIssues`).
+- Expiry alerts: `expiringBatches(tracking, today, days)`; bell notices from `expiryNotices` (one critical for expired
+  stock, one warning for the window), registered lazily by `src/lib/stock-alerts.ts` only when an item tracks
+  batches, so the stock engine never loads in the shell. Window = Inventory setting `expiryAlertDays` (default 30).
+- Printing: templates print a small sub-line under the item ("Batch B12 · Mfg 01/2026 · Exp 06/2027",
+  "S/N: … · Warranty 12 months") with the existing description style; Design Studio → "Batch, expiry & serial
+  numbers" (`show_tracking`, default on) hides it.
+
+### Godowns (6.10)
+
+- `godownsDb` (`src/lib/godowns.ts`): add / rename (unique names) / delete (refused while anything uses it).
+- Stock per godown: `ItemTracking.byGodown`, `godownSummary`.
+- **Stock transfer voucher** (`transfersDb`): `STR/FY<yy-yy>/<seq>` per Indian FY of its date (highest issued + 1, so
+  a deleted number is never reused); lines of item × qty (+ batch / serials). Create / edit / delete go through
+  `assertUnlocked` (period lock, PIN override) and are written to the audit log (`entity: 'stock_transfer'`).
+  `transferIssues` refuses moving more than the source godown holds on that date, a missing batch, or serials that are
+  not in the source godown.
+- A transfer moves **quantity only**: no value, GST, Books voucher or ledger posting (tested in
+  `tests/integration/stock-tracking.test.ts`).
+
+### Serials / IMEI and warranty (6.11)
+
+- Bill lines list one serial per unit (paste or scan, one per line); a serial already in stock is refused
+  (`billTrackingIssues`). Sales lines pick from in-stock serials (in the line's godown); the quantity follows the count.
+- A serial is in stock after its last receipt / return and out after its last sale. Issuing refuses a serial that is
+  not in stock (`sold on INV/…`), was never received, is in another godown, or appears twice.
+- **Returns**: a credit note that lists the serial puts it back in stock. "Raise credit note" copies the invoice
+  line's serials; a partial credit keeps the first N (edit the credit note to choose others). A credit note can only
+  name serials that are currently sold.
+- Warranty: `warranty_months` is snapshotted on the sale line; valid until the day before the same date N months later
+  (`warrantyUntil('2026-05-10', 12) = '2027-05-09'`).
+- Lookup (Inventory → *Serial lookup*, `/inventory?tab=serials&serial=…`): purchase bill + vendor, sale invoice +
+  client, return, current godown and warranty status (`lookupSerial`).
+
+### Limitations
+
+- Checks run in the editor's issue path and the bill / transfer forms; importers, recurring runs and the API-less
+  data layer do not re-validate serials or batches. Recurring templates drop serials and batches (each occurrence is a
+  new sale), so auto-issued recurring invoices of batch items reduce the unbatched bucket.
+- Bill lines still match stock items by name + HSN (`PurchaseLine.item_id` is not set).
+- **Tally XML does not export batch or godown allocations** (`BATCHALLOCATIONS.LIST` / `GODOWNNAME` need godown and
+  batch-enabled stock-item masters we do not export); Tally books everything to its main location. Stock transfers are
+  not exported (they would be Stock Journal vouchers).
+- Godown pickers on purchase-order lines are not offered (a PO is not a stock document).

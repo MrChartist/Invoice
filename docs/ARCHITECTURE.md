@@ -78,7 +78,10 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `recurring` | recurring | defined by that module |
 | `reminders` | reminders-share | defined by that module |
 | `doc_links` | documents | defined by that module |
-| `stock_moves` | inventory | defined by that module |
+| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials` |
+| `stock_moves` | inventory | `StockMove` (manual adjustments), additive `godown_id` / `batch_no` / `mfg_date` / `expiry_date` / `serials` |
+| `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed) |
+| `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger |
 | `einvoice_meta` | einvoice | defined by that module |
 | `design_prefs` | templates-studio | defined by that module |
 | `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}` |

@@ -23,8 +23,11 @@ import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
 import { localDb } from '../lib/localDb';
 import { lockState } from '../lib/period-lock';
+import { editorStockContext, liveDocTrackingIssues } from '../lib/stock-tracking';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { getJson, SINGLETON_KEYS } from '../lib/storage';
 import { cn } from '../lib/utils';
+import { num } from '../lib/invoice-calc';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
@@ -66,6 +69,8 @@ export function InvoiceCreator() {
   const [saveTick, setSaveTick] = useState(0);
   const [lockTick, setLockTick] = useState(0);
   const [savedToast, setSavedToast] = useState<{ message: string; gapHint: string } | null>(null);
+  // Selling an expired batch is blocked until the user confirms it (6.6).
+  const [expiredAsk, setExpiredAsk] = useState<{ andNew: boolean; lines: string[] } | null>(null);
 
   const profiles = useMemo(() => localDb.settings.get().profiles.filter((p) => p.companyName.trim()), []);
   const editing = Boolean(s.id);
@@ -109,7 +114,37 @@ export function InvoiceCreator() {
   }, [profiles, id]);
 
   const save = useCallback(
-    (asDraft = false, andNew = false) => {
+    (asDraft = false, andNew = false, expiredOk = false) => {
+      // Batch / serial / godown checks (6.6 / 6.10 / 6.11) — only when issuing; drafts never move stock.
+      if (!asDraft) {
+        const st = useInvoiceStore.getState();
+        const ctx = editorStockContext({ id: st.id, doc_type: st.doc_type, issue_date: st.issue_date });
+        if (ctx?.multi) {
+          for (const it of st.items) {
+            if (!it.godown_id && it.name.trim() && ctx.find(it.name, it.hsn)) st.patchItem(it.id, { godown_id: ctx.defaultGodown });
+          }
+        }
+        if (ctx) {
+          const now = useInvoiceStore.getState();
+          const issues = liveDocTrackingIssues({
+            id: now.id || undefined,
+            doc_type: now.doc_type,
+            status: now.status === 'Draft' ? 'Sent' : now.status,
+            issue_date: now.issue_date,
+            items: now.items.filter((i) => i.name.trim() || num(i.rate) > 0),
+          });
+          if (issues.errors.length) {
+            setErrors(issues.errors);
+            window.scrollTo?.({ top: 0 });
+            notify(issues.errors[0], 'error');
+            return;
+          }
+          if (issues.expired.length && !expiredOk) {
+            setExpiredAsk({ andNew, lines: issues.expired });
+            return;
+          }
+        }
+      }
       const result = useInvoiceStore.getState().saveInvoice({ asDraft });
       if (!result.ok) {
         setErrors(result.errors);
@@ -340,6 +375,20 @@ export function InvoiceCreator() {
         <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
       </Suspense>
       {toastNode}
+      <ConfirmDialog
+        open={!!expiredAsk}
+        destructive
+        title="Sell an expired batch?"
+        message={`${expiredAsk?.lines.join(' ') ?? ''} Selling expired goods is usually not allowed — pick another batch unless you are sure.`}
+        confirmLabel="Sell anyway"
+        cancelLabel="Pick another batch"
+        onClose={() => setExpiredAsk(null)}
+        onConfirm={() => {
+          const ask = expiredAsk;
+          setExpiredAsk(null);
+          if (ask) save(false, ask.andNew, true);
+        }}
+      />
       {savedToast && (
         <Suspense fallback={null}>
         <SavedToast

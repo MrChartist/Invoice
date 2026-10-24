@@ -1,0 +1,237 @@
+import { useMemo, useState } from 'react';
+import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
+import { Modal } from '../ui/Modal';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { cn, formatDate, todayInput } from '../../lib/utils';
+import { num } from '../../lib/invoice-calc';
+import { generateId } from '../../lib/storage';
+import { godownName, transfersDb, validateTransferShape } from '../../lib/godowns';
+import { isPeriodLockedError } from '../../lib/period-lock';
+import {
+  batchOptions, blankTransferLine, computeTracking, serialsInStock, transferIssues, type TrackingMap,
+} from '../../lib/stock-tracking';
+import type { StockInputs, StockItem } from '../../lib/inventory';
+import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine } from '../../types/stock';
+import { SerialPicker } from './SerialPicker';
+import surface from '../../styles/surface.module.css';
+import controls from '../../styles/controls.module.css';
+import styles from './inventory.module.css';
+
+/** Stock transfer vouchers between godowns (6.10): list, create, delete. */
+export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onError }: {
+  transfers: StockTransfer[];
+  godowns: Godown[];
+  items: StockItem[];
+  /** Live stock inputs (transfers included), for availability checks. */
+  inputs: StockInputs;
+  onChanged: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<StockTransfer | null>(null);
+  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const sorted = useMemo(() => [...transfers].sort((a, b) => b.date.localeCompare(a.date) || b.transfer_number.localeCompare(a.transfer_number)), [transfers]);
+
+  return (
+    <>
+      <div className={styles.lookupHead} style={{ padding: '0 0 0.75rem', justifyContent: 'space-between' }}>
+        <span className={styles.muted}>Moves quantity between godowns. No value, GST or books entry.</span>
+        <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} onClick={() => setCreating(true)}>
+          <Plus size={14} aria-hidden="true" /> New transfer
+        </button>
+      </div>
+      <table className={surface.table}>
+        <thead>
+          <tr><th>Number</th><th>Date</th><th>From → To</th><th>Items</th><th><span className={surface.srOnly}>Actions</span></th></tr>
+        </thead>
+        <tbody>
+          {sorted.map((t) => (
+            <tr key={t.id}>
+              <td className={styles.mono}>{t.transfer_number}</td>
+              <td>{formatDate(t.date)}</td>
+              <td>{godownName(godowns, t.from_godown)} → {godownName(godowns, t.to_godown)}</td>
+              <td>
+                {t.lines.map((l) => `${byId.get(l.item_id)?.name ?? 'Deleted item'} × ${l.qty}${l.batch_no ? ` (${l.batch_no})` : ''}`).join(', ')}
+              </td>
+              <td>
+                <button type="button" className={controls.btnDanger} aria-label={`Delete ${t.transfer_number}`} onClick={() => setDeleting(t)}>
+                  <Trash2 size={16} />
+                </button>
+              </td>
+            </tr>
+          ))}
+          {sorted.length === 0 && <tr><td colSpan={5} className={styles.muted}>No transfers yet.</td></tr>}
+        </tbody>
+      </table>
+
+      {creating && (
+        <TransferModal
+          godowns={godowns}
+          items={items.filter((i) => i.track_stock)}
+          inputs={inputs}
+          onClose={() => setCreating(false)}
+          onSaved={(t) => {
+            setCreating(false);
+            onChanged(`Transfer ${t.transfer_number} saved`);
+          }}
+        />
+      )}
+      <ConfirmDialog
+        open={!!deleting}
+        destructive
+        title="Delete transfer?"
+        message={`${deleting?.transfer_number ?? ''} will be removed and the stock goes back to ${deleting ? godownName(godowns, deleting.from_godown) : ''}. The number is not reused.`}
+        confirmLabel="Delete"
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (!deleting) return;
+          try {
+            transfersDb.remove(deleting.id);
+            onChanged(`Transfer ${deleting.transfer_number} deleted`);
+          } catch (err) {
+            onError(isPeriodLockedError(err) ? (err as Error).message : 'Could not delete the transfer.');
+          }
+        }}
+      />
+    </>
+  );
+}
+
+function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
+  godowns: Godown[];
+  items: StockItem[];
+  inputs: StockInputs;
+  onClose: () => void;
+  onSaved: (t: StockTransfer) => void;
+}) {
+  const [date, setDate] = useState(todayInput());
+  const [from, setFrom] = useState(MAIN_GODOWN_ID);
+  const [to, setTo] = useState(godowns.find((g) => g.id !== MAIN_GODOWN_ID)?.id ?? '');
+  const [lines, setLines] = useState<StockTransferLine[]>([blankTransferLine(generateId())]);
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const tracking: TrackingMap = useMemo(() => computeTracking({ ...inputs, asOf: date || undefined }), [inputs, date]);
+  const sortedItems = useMemo(() => [...items].sort((a, b) => a.name.localeCompare(b.name)), [items]);
+
+  const patch = (id: string, change: Partial<StockTransferLine>) =>
+    setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...change } : l)));
+
+  const submit = () => {
+    const draft = { id: '', date, from_godown: from, to_godown: to, lines: lines.filter((l) => l.item_id) };
+    const err = validateTransferShape(draft) || transferIssues(draft, inputs)[0] || '';
+    if (err) return setError(err);
+    try {
+      onSaved(transfersDb.save({ date, from_godown: from, to_godown: to, lines: draft.lines, notes: notes.trim() || undefined }));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title="New stock transfer"
+      subtitle={`Number ${transfersDb.nextNumber(date)} (Indian FY of the date)`}
+      footer={
+        <>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
+          <button type="button" className={controls.btnPrimary} onClick={submit}>
+            <ArrowLeftRight size={16} aria-hidden="true" /> Save transfer
+          </button>
+        </>
+      }
+    >
+      <form className={styles.form} onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
+        <div className={controls.row3}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="tr-date">Date</label>
+            <input id="tr-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="tr-from">From godown</label>
+            <select id="tr-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>
+              {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="tr-to">To godown</label>
+            <select id="tr-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)}>
+              <option value="">Choose…</option>
+              {godowns.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {lines.map((l, i) => {
+          const item = items.find((x) => x.id === l.item_id);
+          const t = item ? tracking.get(item.id) : undefined;
+          const available = t ? (t.byGodown[from] ?? 0) : 0;
+          return (
+            <div key={l.id} className={styles.serialBox}>
+              <div className={styles.lineRow}>
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor={`tr-item-${l.id}`}>Item {i + 1}</label>
+                  <select
+                    id={`tr-item-${l.id}`}
+                    className={controls.select}
+                    value={l.item_id}
+                    onChange={(e) => patch(l.id, { item_id: e.target.value, batch_no: undefined, serials: undefined })}
+                  >
+                    <option value="">Choose item…</option>
+                    {sortedItems.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                  </select>
+                  {item && <span className={controls.hint}>{available} {item.unit} in the source godown</span>}
+                </div>
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor={`tr-qty-${l.id}`}>Quantity</label>
+                  <input
+                    id={`tr-qty-${l.id}`}
+                    className={`${controls.input} ${controls.inputNumeric}`}
+                    inputMode="decimal"
+                    value={item?.track_serials ? String((l.serials ?? []).length) : String(l.qty || '')}
+                    readOnly={!!item?.track_serials}
+                    onChange={(e) => patch(l.id, { qty: num(e.target.value) })}
+                  />
+                </div>
+                {item?.track_batches ? (
+                  <div className={controls.field}>
+                    <label className={controls.label} htmlFor={`tr-batch-${l.id}`}>Batch</label>
+                    <select id={`tr-batch-${l.id}`} className={controls.select} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })}>
+                      <option value="">Choose…</option>
+                      {batchOptions(t, date, from).map((b) => (
+                        <option key={b.batch} value={b.batch}>{b.batch}{b.expiry ? ` · exp ${b.expiry}` : ''} · {b.qty}{b.expired ? ' · EXPIRED' : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : <span />}
+                <button type="button" className={controls.btnDanger} aria-label={`Remove line ${i + 1}`} disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}>
+                  <Trash2 size={15} />
+                </button>
+              </div>
+              {item?.track_serials && (
+                <SerialPicker
+                  label={`Serials for item ${i + 1}`}
+                  options={serialsInStock(t, from)}
+                  value={l.serials ?? []}
+                  onChange={(next) => patch(l.id, { serials: next.length ? next : undefined, qty: next.length })}
+                />
+              )}
+            </div>
+          );
+        })}
+        <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setLines((ls) => [...ls, blankTransferLine(generateId())])}>
+          <Plus size={14} aria-hidden="true" /> Add line
+        </button>
+
+        <div className={controls.field}>
+          <label className={controls.label} htmlFor="tr-notes">Notes</label>
+          <input id="tr-notes" className={controls.input} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Vehicle no., reason…" />
+        </div>
+        {error && <p className={controls.error} role="alert">{error}</p>}
+        <button type="submit" hidden />
+      </form>
+    </Modal>
+  );
+}

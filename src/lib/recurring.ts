@@ -338,7 +338,13 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
     template_id: inv.template_id,
     client: { ...inv.client },
     sender: inv.sender ? { ...inv.sender } : null,
-    items: inv.items.filter((i) => i.name?.trim() || num(i.rate) > 0).map((i) => ({ ...i })),
+    // Serials and batches belong to one sale: every occurrence picks its own (6.6 / 6.11).
+    items: inv.items
+      .filter((i) => i.name?.trim() || num(i.rate) > 0)
+      .map(({ serials: _s, batch_no: _b, batch_expiry: _e, batch_mfg: _m, ...i }) => {
+        void [_s, _b, _e, _m];
+        return { ...i };
+      }),
     gst_mode: inv.gst_mode,
     place_of_supply: inv.place_of_supply,
     reverse_charge: inv.reverse_charge,

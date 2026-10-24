@@ -17,11 +17,12 @@ import { round2, num } from './invoice-calc';
 import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from './storage';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv } from './csv';
+import { MAIN_GODOWN_ID, type StockTransfer } from '../types/stock';
 
 /* ── Types ───────────────────────────────────────────────────── */
 
 export type CostingMethod = 'WEIGHTED_AVG' | 'FIFO';
-export type MoveKind = 'opening' | 'sale' | 'purchase' | 'adjustment' | 'return';
+export type MoveKind = 'opening' | 'sale' | 'purchase' | 'adjustment' | 'return' | 'transfer';
 export type StockStatus = 'untracked' | 'negative' | 'out' | 'low' | 'ok';
 
 export interface StockItem {
@@ -39,6 +40,15 @@ export interface StockItem {
   tax_rate?: number;
   location?: string;
   created_at?: string;
+  /* ── Opt-in tracking (6.6 / 6.11); absent = off ── */
+  /** Batch / expiry tracking: purchase lines capture batch + MFG / expiry, sales pick a batch (FEFO). */
+  track_batches?: boolean;
+  /** Serial / IMEI tracking: purchase lines list one serial per unit, sales pick in-stock serials. */
+  track_serials?: boolean;
+  /** Warranty given on a sale, in months (serial-tracked items; 0 / absent = none). */
+  warranty_months?: number;
+  /** Serials of the opening quantity (serial-tracked items). */
+  opening_serials?: string[];
 }
 
 export interface StockMove {
@@ -54,6 +64,14 @@ export interface StockMove {
   ref_type?: string;
   ref_id?: string;
   note?: string;
+  /** Additive (6.10): godown of the move (absent = Main). */
+  godown_id?: string;
+  /** Additive (6.6): batch added / removed, with its dates for an addition. */
+  batch_no?: string;
+  mfg_date?: string;
+  expiry_date?: string;
+  /** Additive (6.11): serials added / removed; count equals |qty|. */
+  serials?: string[];
 }
 
 /** Minimal, defensive view of a purchase bill (the purchases module owns the real type). */
@@ -86,8 +104,13 @@ export interface InventorySettings {
   method: CostingMethod;
   /** Delivery challans reduce stock when true (default false). */
   includeChallans: boolean;
+  /** Batches expiring within this many days raise an alert (6.6; default 30). */
+  expiryAlertDays?: number;
+  /** Godown new purchase / sale lines default to (6.10; absent = Main). */
+  defaultGodown?: string;
 }
 
+export const DEFAULT_EXPIRY_ALERT_DAYS = 30;
 export const DEFAULT_SETTINGS: InventorySettings = { method: 'WEIGHTED_AVG', includeChallans: false };
 
 export interface LedgerRow {
@@ -148,6 +171,14 @@ export interface StockInputs {
   asOf?: string;
   /** Skip this invoice (used to ask "what if I edit it"). */
   excludeInvoiceId?: string;
+  /** Stock transfer vouchers (6.10). Read only when `includeTransfers` is set: they never change value. */
+  transfers?: StockTransfer[];
+  includeTransfers?: boolean;
+  /**
+   * `doc_links` rows. When challans move stock, an invoice converted FROM a challan does not move it
+   * again (the goods left on the challan).
+   */
+  links?: { from_id: string; to_id: string; relation: string }[];
 }
 
 const EPS = 1e-9;
@@ -186,9 +217,9 @@ export function buildItemIndex(items: StockItem[]): ItemIndex {
 
 /* ── Events ──────────────────────────────────────────────────── */
 
-interface StockEvent {
+export interface StockEvent {
   date: string;
-  /** Same-day ordering: opening, stock-in, stock-out. */
+  /** Same-day ordering: opening, stock-in, stock-out, then sales returns. */
   rank: number;
   seq: number;
   kind: MoveKind;
@@ -199,6 +230,19 @@ interface StockEvent {
   particulars: string;
   refType?: string;
   refId?: string;
+  /* Tracking dimensions (6.6 / 6.10 / 6.11). Costing ignores them. */
+  /** Godown id (always set; Main when the source names none). */
+  godown: string;
+  batch?: string;
+  mfg?: string;
+  expiry?: string;
+  mrp?: number;
+  serials?: string[];
+  /** Document number and party, for serial lookup. */
+  refNumber?: string;
+  party?: string;
+  /** Warranty months given on a sale line. */
+  warrantyMonths?: number;
 }
 
 function dayOf(d: unknown): string {
@@ -207,6 +251,8 @@ function dayOf(d: unknown): string {
 
 function rankFor(kind: MoveKind, qty: number): number {
   if (kind === 'opening') return 0;
+  // A sales return follows the sale it reverses, even on the same day (serials come back in stock).
+  if (kind === 'return') return 3;
   return qty >= 0 ? 1 : 2;
 }
 
@@ -214,7 +260,7 @@ function netRate(line: Pick<InvoiceItem, 'rate' | 'discount_percent'>): number {
   return num(line.rate) * (1 - Math.min(Math.max(num(line.discount_percent), 0), 100) / 100);
 }
 
-function invoiceEffect(
+export function invoiceEffect(
   doc: string | undefined,
   status: string | undefined,
   includeChallans: boolean,
@@ -229,13 +275,26 @@ function invoiceEffect(
 /** Collect every stock event for every tracked item. Pure; inputs untouched. */
 export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
   const { items, moves, invoices, purchases = [], includeChallans = false, asOf, excludeInvoiceId } = input;
+  // When challans move stock, goods leave once per sale: an invoice made from a live challan, or a
+  // challan made from a live invoice, does not move them a second time.
+  const fromChallan = new Set<string>();
+  if (includeChallans && input.links?.length) {
+    const live = new Map(
+      invoices.filter((d) => d?.id && invoiceEffect(d.doc_type, d.status, true) === 'out').map((d) => [d.id as string, d.doc_type]),
+    );
+    for (const l of input.links) {
+      if (l.relation !== 'converted' || !live.has(l.from_id) || !live.has(l.to_id)) continue;
+      const fromIsChallan = live.get(l.from_id) === 'DELIVERY_CHALLAN';
+      if (fromIsChallan !== (live.get(l.to_id) === 'DELIVERY_CHALLAN')) fromChallan.add(l.to_id);
+    }
+  }
   const out = new Map<string, StockEvent[]>();
   const index = buildItemIndex(items.filter((i) => i.track_stock));
   let seq = 0;
-  const push = (itemId: string, ev: Omit<StockEvent, 'seq' | 'rank'>) => {
+  const push = (itemId: string, ev: Omit<StockEvent, 'seq' | 'rank' | 'godown'> & { godown?: string }) => {
     if (asOf && ev.date > asOf) return;
     const list = out.get(itemId) ?? [];
-    list.push({ ...ev, rank: rankFor(ev.kind, ev.qty), seq: seq++ });
+    list.push({ ...ev, godown: ev.godown || MAIN_GODOWN_ID, rank: rankFor(ev.kind, ev.qty), seq: seq++ });
     out.set(itemId, list);
   };
 
@@ -249,6 +308,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
         qty: num(it.opening_qty),
         rate: num(it.opening_rate),
         particulars: 'Opening balance',
+        serials: cleanSerials(it.opening_serials),
       });
     }
   }
@@ -274,11 +334,17 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
       particulars: label,
       refType: m.ref_type ?? 'move',
       refId: m.ref_id ?? m.id,
+      godown: m.godown_id,
+      batch: m.batch_no || undefined,
+      mfg: m.mfg_date || undefined,
+      expiry: m.expiry_date || undefined,
+      serials: cleanSerials(m.serials),
     });
   }
 
   for (const inv of invoices) {
     if (!inv || (excludeInvoiceId && inv.id === excludeInvoiceId)) continue;
+    if (inv.id && fromChallan.has(inv.id)) continue;
     const effect = invoiceEffect(inv.doc_type, inv.status, includeChallans);
     if (!effect) continue;
     const date = dayOf(inv.issue_date);
@@ -287,6 +353,16 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
       const it = index.find(line.name, line.hsn);
       const q = num(line.quantity);
       if (!it || q <= 0) continue;
+      const dims = {
+        godown: line.godown_id,
+        batch: line.batch_no || undefined,
+        expiry: line.batch_expiry || undefined,
+        mfg: line.batch_mfg || undefined,
+        serials: cleanSerials(line.serials),
+        refNumber: inv.invoice_number ?? '',
+        party: inv.client?.name ?? '',
+        warrantyMonths: num(line.warranty_months) || undefined,
+      };
       if (effect === 'out') {
         push(it.id, {
           date,
@@ -296,6 +372,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
           particulars: `${inv.doc_type === 'DELIVERY_CHALLAN' ? 'Challan' : 'Sale'} — ${inv.invoice_number ?? ''}${clientName}`,
           refType: 'invoice',
           refId: inv.id,
+          ...dims,
         });
       } else {
         push(it.id, {
@@ -306,6 +383,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
           particulars: `Sales return — ${inv.invoice_number ?? ''}${clientName}`,
           refType: 'invoice',
           refId: inv.id,
+          ...dims,
         });
       }
     }
@@ -328,7 +406,32 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
         particulars: `Purchase — ${bill.number}${bill.partyName ? ` · ${bill.partyName}` : ''}`,
         refType: 'purchase',
         refId: bill.id || undefined,
+        godown: line.godownId,
+        batch: line.batchNo || undefined,
+        mfg: line.mfgDate || undefined,
+        expiry: line.expiryDate || undefined,
+        mrp: line.mrp || undefined,
+        serials: line.serials.length ? line.serials : undefined,
+        refNumber: bill.number,
+        party: bill.partyName,
       });
+    }
+  }
+
+  if (input.includeTransfers) {
+    for (const t of input.transfers ?? []) {
+      const date = dayOf(t.date);
+      for (const l of t.lines ?? []) {
+        const it = byId.get(l.item_id);
+        const q = num(l.qty);
+        if (!it || !it.track_stock || q <= 0 || !t.from_godown || !t.to_godown || t.from_godown === t.to_godown) continue;
+        const base = {
+          date, kind: 'transfer' as const, refType: 'transfer', refId: t.id, refNumber: t.transfer_number,
+          batch: l.batch_no || undefined, serials: cleanSerials(l.serials),
+        };
+        push(it.id, { ...base, qty: -q, godown: t.from_godown, particulars: `Transfer out — ${t.transfer_number}` });
+        push(it.id, { ...base, qty: q, godown: t.to_godown, particulars: `Transfer in — ${t.transfer_number}` });
+      }
     }
   }
 
@@ -336,6 +439,13 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     list.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.rank - b.rank || a.seq - b.seq));
   }
   return out;
+}
+
+/** Trimmed, non-empty serials, or undefined when there are none. */
+export function cleanSerials(list: unknown): string[] | undefined {
+  if (!Array.isArray(list)) return undefined;
+  const out = list.map((x) => String(x ?? '').trim()).filter(Boolean);
+  return out.length ? out : undefined;
 }
 
 /* ── Costing engines ─────────────────────────────────────────── */
@@ -449,6 +559,8 @@ function runItem(item: StockItem, events: StockEvent[], method: CostingMethod): 
   let lastIssueUnit: number | undefined;
 
   events.forEach((ev, i) => {
+    // Transfers move stock between godowns: company-wide quantity and value are unchanged.
+    if (ev.kind === 'transfer') return;
     const q = Math.abs(ev.qty);
     let rate: number;
     let amount: number;
@@ -747,9 +859,12 @@ const SETTINGS_KEY = `${DB_PREFIX}inventory_settings`;
 
 export function loadSettings(): InventorySettings {
   const s = getJson<Partial<InventorySettings>>(SETTINGS_KEY, {});
+  const days = num(s.expiryAlertDays);
   return {
     method: s.method === 'FIFO' ? 'FIFO' : 'WEIGHTED_AVG',
     includeChallans: !!s.includeChallans,
+    ...(days > 0 ? { expiryAlertDays: Math.min(Math.round(days), 3650) } : {}),
+    ...(s.defaultGodown ? { defaultGodown: String(s.defaultGodown) } : {}),
   };
 }
 
@@ -787,7 +902,7 @@ export function blankStockItem(partial: Partial<StockItem> = {}): StockItem {
   };
 }
 
-function liveInputs(): StockInputs {
+export function liveInputs(): StockInputs {
   const settings = loadSettings();
   return {
     items: stockDb.items(),
@@ -796,6 +911,7 @@ function liveInputs(): StockInputs {
     purchases: getTable<PurchaseLike>('purchases'),
     method: settings.method,
     includeChallans: settings.includeChallans,
+    links: getTable<{ from_id: string; to_id: string; relation: string }>('doc_links'),
   };
 }
 

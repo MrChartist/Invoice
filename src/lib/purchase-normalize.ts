@@ -228,6 +228,14 @@ export interface PurchaseLineCore {
   quantity: number;
   /** Unit cost after the line discount, before tax. */
   unitCost: number;
+  /* Stock tracking (6.6 / 6.10 / 6.11); '' / [] when the line carries none. */
+  batchNo: string;
+  /** yyyy-mm-dd or ''. */
+  mfgDate: string;
+  expiryDate: string;
+  mrp: number;
+  serials: string[];
+  godownId: string;
 }
 
 /** The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. */
@@ -246,6 +254,12 @@ export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
       hsn: pickStr(line, ['hsn']),
       quantity,
       unitCost: rate,
+      batchNo: pickStr(line, ['batch_no', 'batch']),
+      mfgDate: isoDay(pickStr(line, ['mfg_date'])),
+      expiryDate: isoDay(pickStr(line, ['expiry_date', 'expiry'])),
+      mrp: Math.max(num(line.mrp), 0),
+      serials: Array.isArray(line.serials) ? line.serials.map((x) => str(x)).filter(Boolean) : [],
+      godownId: pickStr(line, ['godown_id']),
     });
   }
   return out;

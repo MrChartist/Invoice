@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowDownToLine, BookOpen, Boxes, Download, Edit3, PackagePlus, Plus,
-  Search, SlidersHorizontal, Trash2, TrendingDown,
+  Search, SlidersHorizontal, Trash2, TrendingDown, Warehouse,
 } from 'lucide-react';
 import { cn, formatMoney, formatDate, todayInput, addDaysInput } from '../lib/utils';
 import { localDb } from '../lib/localDb';
@@ -20,11 +21,20 @@ import { ItemFormModal } from '../components/inventory/ItemFormModal';
 import { AdjustModal } from '../components/inventory/AdjustModal';
 import { LedgerModal } from '../components/inventory/LedgerModal';
 import { StockChip } from '../components/inventory/StockChip';
+import { BatchesTab } from '../components/inventory/BatchesTab';
+import { GodownsModal } from '../components/inventory/GodownsModal';
+import { TransfersTab } from '../components/inventory/TransfersTab';
+import { SerialLookup } from '../components/inventory/SerialLookup';
+import { DEFAULT_EXPIRY_ALERT_DAYS } from '../lib/inventory';
+import { expiringBatches, godownSummary, liveTrackingInputs, computeTracking } from '../lib/stock-tracking';
+import { godownsDb } from '../lib/godowns';
+import { MAIN_GODOWN_ID } from '../types/stock';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
 
-type Tab = 'summary' | 'movement' | 'dead' | 'margin';
+type Tab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials';
+const TABS: Tab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials'];
 type Filter = 'all' | 'low' | 'out' | 'negative' | 'untracked';
 
 function download(filename: string, csv: string) {
@@ -42,7 +52,12 @@ function download(filename: string, csv: string) {
 export function Inventory() {
   const [version, setVersion] = useState(0);
   const [settings, setSettings] = useState<InventorySettings>(() => loadSettings());
-  const [tab, setTab] = useState<Tab>('summary');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab') as Tab | null;
+    return t && TABS.includes(t) ? t : 'summary';
+  });
+  const [godownsOpen, setGodownsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<{ item: StockItem; isNew: boolean } | null>(null);
@@ -66,6 +81,28 @@ export function Inventory() {
   const positions = useMemo(() => loadPositions({ method: settings.method, includeChallans: settings.includeChallans }), [version, settings]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const totals = useMemo(() => summarize(positions), [positions]);
+  // Batches / godowns / serials (6.6 / 6.10 / 6.11): all derived, all opt-in.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const trackInputs = useMemo(() => ({ ...liveTrackingInputs(), includeChallans: settings.includeChallans }), [version, settings]);
+  const godowns = useMemo(() => godownsDb.list(), [version]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+  const tracking = useMemo(() => computeTracking(trackInputs), [trackInputs]);
+  const transfers = useMemo(() => trackInputs.transfers ?? [], [trackInputs]);
+  const multi = godowns.length > 1;
+  const showBatches = positions.some((p) => p.item.track_stock && p.item.track_batches);
+  const showSerials = positions.some((p) => p.item.track_stock && p.item.track_serials);
+  const expiryDays = settings.expiryAlertDays ?? DEFAULT_EXPIRY_ALERT_DAYS;
+  const today = todayInput();
+  const expiring = useMemo(() => (showBatches ? expiringBatches(tracking, today, expiryDays) : []), [showBatches, tracking, today, expiryDays]);
+  const godownRows = useMemo(() => (multi ? godownSummary(tracking) : []), [multi, tracking]);
+  const transfersUse = useMemo(() => new Set(transfers.flatMap((t) => [t.from_godown, t.to_godown])), [transfers]);
+  const tabs = ([
+    ['summary', 'Stock summary'], ['movement', 'Movement'], ['dead', 'Dead stock'], ['margin', 'Margin'],
+    ...(showBatches ? [['batches', 'Batches & expiry']] : []),
+    ...(multi ? [['godowns', 'Godowns'], ['transfers', 'Transfers']] : []),
+    ...(showSerials ? [['serials', 'Serial lookup']] : []),
+  ] as [Tab, string][]);
+  const activeTab: Tab = tabs.some(([k]) => k === tab) ? tab : 'summary';
 
   const guard = (fn: () => void, okMsg: string) => {
     try {
@@ -180,6 +217,31 @@ export function Inventory() {
             <input type="checkbox" checked={settings.includeChallans} onChange={(e) => updateSettings({ ...settings, includeChallans: e.target.checked })} />
             Delivery challans reduce stock
           </label>
+          {showBatches && (
+            <label className="inline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className={controls.label}>Expiry alert (days)</span>
+              <input
+                type="number" min={1} max={3650} className={cn(controls.input, controls.inputNumeric)} style={{ width: '5.5rem' }}
+                value={expiryDays} aria-label="Expiry alert window in days"
+                onChange={(e) => updateSettings({ ...settings, expiryAlertDays: Math.min(3650, Math.max(1, Math.round(Number(e.target.value) || DEFAULT_EXPIRY_ALERT_DAYS))) })}
+              />
+            </label>
+          )}
+          {multi && (
+            <label className="inline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className={controls.label}>Default godown</span>
+              <select
+                className={cn(controls.select, styles.methodSelect)} value={godowns.some((g) => g.id === settings.defaultGodown) ? settings.defaultGodown : MAIN_GODOWN_ID}
+                aria-label="Default godown for new bill and invoice lines"
+                onChange={(e) => updateSettings({ ...settings, defaultGodown: e.target.value === MAIN_GODOWN_ID ? undefined : e.target.value })}
+              >
+                {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </label>
+          )}
+          <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setGodownsOpen(true)}>
+            <Warehouse size={14} aria-hidden="true" /> Godowns{multi ? ` (${godowns.length})` : ''}
+          </button>
           {catalogueMissing.length > 0 && (
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={importCatalogue}>
               <ArrowDownToLine size={14} /> Import {catalogueMissing.length} from catalogue
@@ -189,13 +251,13 @@ export function Inventory() {
 
         <div className={styles.toolbar}>
           <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Inventory reports">
-            {([['summary', 'Stock summary'], ['movement', 'Movement'], ['dead', 'Dead stock'], ['margin', 'Margin']] as const).map(([k, label]) => (
-              <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(k)}>
+            {tabs.map(([k, label]) => (
+              <button key={k} type="button" role="tab" aria-selected={activeTab === k} className={activeTab === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(k)}>
                 {label}
               </button>
             ))}
           </div>
-          {tab === 'summary' && (
+          {activeTab === 'summary' && (
             <>
               <div className={styles.search}>
                 <Search size={16} className={styles.searchIcon} aria-hidden />
@@ -213,13 +275,13 @@ export function Inventory() {
               </select>
             </>
           )}
-          {tab === 'movement' && (
+          {activeTab === 'movement' && (
             <div className={styles.dateRange}>
               <div className={controls.field}><label className={controls.label} htmlFor="inv-from">From</label><input id="inv-from" type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
               <div className={controls.field}><label className={controls.label} htmlFor="inv-to">To</label><input id="inv-to" type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </div>
           )}
-          {tab === 'dead' && (
+          {activeTab === 'dead' && (
             <label className={controls.field} style={{ maxWidth: 180 }}>
               <span className={controls.label}>No movement for (days)</span>
               <input type="number" min={1} className={cn(controls.input, controls.inputNumeric)} value={deadDays} onChange={(e) => setDeadDays(Math.max(1, Number(e.target.value) || 1))} />
@@ -227,7 +289,17 @@ export function Inventory() {
           )}
         </div>
 
-        {negatives.length > 0 && tab === 'summary' && (
+        {expiring.length > 0 && activeTab === 'summary' && (
+          <div className={styles.warnings} role="alert">
+            <strong><AlertTriangle size={14} style={{ verticalAlign: '-2px' }} /> Expiry</strong>
+            <span>
+              {expiring.filter((r) => r.daysLeft < 0).length} batch(es) expired and {expiring.filter((r) => r.daysLeft >= 0).length} expiring within {expiryDays} days.{' '}
+              <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setTab('batches')}>Review batches</button>
+            </span>
+          </div>
+        )}
+
+        {negatives.length > 0 && activeTab === 'summary' && (
           <div className={styles.warnings} role="alert">
             <strong><AlertTriangle size={14} style={{ verticalAlign: '-2px' }} /> Negative stock</strong>
             <span>
@@ -252,7 +324,7 @@ export function Inventory() {
           />
         ) : (
           <div className={surface.tableWrap}>
-            {tab === 'summary' && (
+            {activeTab === 'summary' && (
               <table className={surface.table}>
                 <thead>
                   <tr>
@@ -285,7 +357,7 @@ export function Inventory() {
               </table>
             )}
 
-            {tab === 'movement' && (
+            {activeTab === 'movement' && (
               <table className={surface.table}>
                 <thead>
                   <tr>
@@ -309,7 +381,7 @@ export function Inventory() {
               </table>
             )}
 
-            {tab === 'dead' && (
+            {activeTab === 'dead' && (
               <table className={surface.table}>
                 <thead>
                   <tr><th>Item</th><th className={surface.numeric}>Qty</th><th className={surface.numeric}>Value locked</th><th>Last movement</th><th className={surface.numeric}>Days idle</th></tr>
@@ -329,7 +401,50 @@ export function Inventory() {
               </table>
             )}
 
-            {tab === 'margin' && (
+            {activeTab === 'batches' && (
+              <BatchesTab tracking={tracking} today={today} days={expiryDays} godowns={godowns} onDownload={download} />
+            )}
+
+            {activeTab === 'godowns' && (
+              <table className={surface.table}>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    {godowns.map((g) => <th key={g.id} className={surface.numeric}>{g.name}</th>)}
+                    <th className={surface.numeric}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {godownRows.map((r) => (
+                    <tr key={r.item.id}>
+                      <td>{r.item.name}</td>
+                      {godowns.map((g) => (
+                        <td key={g.id} className={cn(surface.numeric, (r.byGodown[g.id] ?? 0) < 0 && styles.negative)}>{r.byGodown[g.id] ?? 0}</td>
+                      ))}
+                      <td className={surface.numeric}><strong>{r.total} {r.item.unit}</strong></td>
+                    </tr>
+                  ))}
+                  {godownRows.length === 0 && <tr><td colSpan={godowns.length + 2} className={styles.itemMeta}>No tracked items.</td></tr>}
+                </tbody>
+              </table>
+            )}
+
+            {activeTab === 'transfers' && (
+              <TransfersTab
+                transfers={transfers}
+                godowns={godowns}
+                items={positions.map((p) => p.item)}
+                inputs={trackInputs}
+                onChanged={(m) => { refresh(); notify(m); }}
+                onError={(m) => notify(m, 'error')}
+              />
+            )}
+
+            {activeTab === 'serials' && (
+              <SerialLookup tracking={tracking} today={today} godowns={godowns} initialQuery={searchParams.get('serial') ?? ''} />
+            )}
+
+            {activeTab === 'margin' && (
               <table className={surface.table}>
                 <thead>
                   <tr><th>Item</th><th className={surface.numeric}>Sold</th><th className={surface.numeric}>Avg sale</th><th className={surface.numeric}>Avg cost</th><th className={surface.numeric}>Margin / unit</th><th className={surface.numeric}>Margin %</th><th className={surface.numeric}>Total margin</th></tr>
@@ -368,6 +483,9 @@ export function Inventory() {
       <AdjustModal
         open={!!adjustPos}
         position={adjustPos}
+        tracking={adjustPos ? tracking.get(adjustPos.item.id) : undefined}
+        godowns={godowns}
+        defaultGodown={settings.defaultGodown}
         onClose={() => setAdjustId(null)}
         onSave={(move: StockMove) => {
           guard(() => stockDb.addMove(move), 'Stock adjusted');
@@ -380,6 +498,14 @@ export function Inventory() {
         onClose={() => setLedgerId(null)}
         onDeleteMove={(id) => guard(() => stockDb.deleteMove(id), 'Adjustment removed')}
         onDownload={download}
+      />
+      <GodownsModal
+        open={godownsOpen}
+        godowns={godowns}
+        tracking={tracking}
+        transfersUse={transfersUse}
+        onClose={() => setGodownsOpen(false)}
+        onChanged={(m) => { refresh(); notify(m); }}
       />
       <ConfirmDialog
         open={!!deleting}

@@ -7,7 +7,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isTaxed } from '../paper-helpers';
+import { buildUpiUrl, isTaxed, trackingText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
 import { ItemCustomLine } from './CustomFieldsBlock';
@@ -164,6 +164,7 @@ export function GstBody({ invoice, sender, totals }: Props) {
                   <div className={styles.itemName}>{line.name || '—'}</div>
                   {src?.description && <div className={styles.itemDesc}>{src.description}</div>}
                   <ItemCustomLine values={src?.custom_values} />
+                  {show.tracking && trackingText(src) && <div className={styles.itemDesc}>{trackingText(src)}</div>}
                 </td>
                 {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
                 <td className={cn(styles.right, styles.num)}>{formatQuantity(line.quantity)}</td>

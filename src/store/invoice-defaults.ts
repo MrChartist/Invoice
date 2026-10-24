@@ -166,6 +166,13 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
     ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
     ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
+    // Stock tracking (6.6 / 6.10 / 6.11): absent on untracked lines so their snapshots never change.
+    ...(item.batch_no ? { batch_no: String(item.batch_no) } : {}),
+    ...(item.batch_expiry ? { batch_expiry: String(item.batch_expiry).slice(0, 10) } : {}),
+    ...(item.batch_mfg ? { batch_mfg: String(item.batch_mfg).slice(0, 10) } : {}),
+    ...(Array.isArray(item.serials) && item.serials.length ? { serials: item.serials.map(String) } : {}),
+    ...(num(item.warranty_months) > 0 ? { warranty_months: num(item.warranty_months) } : {}),
+    ...(item.godown_id ? { godown_id: String(item.godown_id) } : {}),
   };
 }
 

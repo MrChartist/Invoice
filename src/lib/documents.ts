@@ -425,7 +425,13 @@ export function buildCreditNote(
       continue;
     }
     // Same id as the original line: that is how cumulative credit is tracked.
-    picked.push({ ...line.item, quantity: qty, amount: round2(qty * num(line.item.rate)) });
+    picked.push({
+      ...line.item,
+      quantity: qty,
+      amount: round2(qty * num(line.item.rate)),
+      // A partial credit returns only as many serials as units (the first ones; edit the note to choose others).
+      ...(line.item.serials?.length ? { serials: line.item.serials.slice(0, Math.floor(qty)) } : {}),
+    });
   }
   if (picked.length === 0 && errors.length === 0) {
     errors.push('Enter a quantity to credit on at least one line.');

@@ -54,6 +54,8 @@ export interface DesignPrefs {
   show_terms: boolean;
   show_amount_in_words: boolean;
   show_place_of_supply: boolean;
+  /** Batch / expiry / serial / warranty sub-line under tracked stock lines (6.6 / 6.11). */
+  show_tracking: boolean;
   /** 'none' | 'auto-status' | any other text = custom watermark. */
   watermark: string;
   paper: PaperKind;
@@ -121,6 +123,7 @@ export const DEFAULT_DESIGN: DesignPrefs = {
   show_terms: true,
   show_amount_in_words: true,
   show_place_of_supply: true,
+  show_tracking: true,
   watermark: WATERMARK_NONE,
   paper: 'A4',
   density: 'comfortable',
@@ -192,6 +195,7 @@ export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIG
     show_terms: bool(src.show_terms, base.show_terms),
     show_amount_in_words: bool(src.show_amount_in_words, base.show_amount_in_words),
     show_place_of_supply: bool(src.show_place_of_supply, base.show_place_of_supply),
+    show_tracking: bool(src.show_tracking, base.show_tracking),
     watermark: watermarkRaw === '' ? WATERMARK_NONE : watermarkRaw,
     paper: pick(src.paper, PAPER_KINDS, base.paper),
     density: pick(src.density, DENSITIES, base.density),

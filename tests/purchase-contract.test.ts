@@ -11,7 +11,7 @@ import { normalizePurchase as gstNormalize } from '../src/lib/gst-reports.ts';
 import { collectEvents } from '../src/lib/inventory.ts';
 import { bookBills } from '../src/lib/gstr2b.ts';
 import { buildGstr9 } from '../src/lib/gstr9.ts';
-import { readPurchase } from '../src/lib/purchase-normalize.ts';
+import { readPurchase, readPurchaseLines } from '../src/lib/purchase-normalize.ts';
 import { expenseLine, rebillCost, unbilledExpenses, liveInvoiceIds } from '../src/lib/timesheets.ts';
 import { DEFAULT_TIME_PREFS } from '../src/types/time.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
@@ -126,6 +126,35 @@ test('inventory brings purchase lines in as stock-in', () => {
   const list = events.get('s1') ?? [];
   assert.equal(list.length, 1);
   assert.equal(list[0].qty, 10);
+});
+
+test('stock tracking reads batch, MFG / expiry, MRP, serials and godown from bill lines (6.6 / 6.10 / 6.11)', () => {
+  const tracked: PurchaseRecord = {
+    ...bill,
+    id: 'p-track',
+    lines: [{
+      id: 'l1', name: 'Paper ream', hsn: '4802', unit: 'NOS', quantity: 2, rate: 100, tax_rate: 18,
+      batch_no: 'B7', mfg_date: '2026-01-01', expiry_date: '2027-12-31', mrp: 150, serials: ['S1', 'S2'], godown_id: 'g2',
+    }],
+  };
+  const line = readPurchaseLines(tracked)[0];
+  assert.deepEqual(
+    [line.batchNo, line.mfgDate, line.expiryDate, line.mrp, line.serials, line.godownId],
+    ['B7', '2026-01-01', '2027-12-31', 150, ['S1', 'S2'], 'g2'],
+  );
+  const ev = collectEvents({
+    items: [{ id: 's1', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, track_batches: true, track_serials: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }],
+    moves: [],
+    invoices: [],
+    purchases: [tracked],
+  }).get('s1')![0];
+  assert.deepEqual([ev.batch, ev.expiry, ev.mfg, ev.mrp, ev.serials, ev.godown, ev.refNumber, ev.party], ['B7', '2027-12-31', '2026-01-01', 150, ['S1', 'S2'], 'g2', 'AS/22', 'Acme Supplies']);
+  // Lines without tracking read as untracked, Main godown; the money readers ignore the new fields.
+  const plain = readPurchaseLines(bill)[0];
+  assert.deepEqual([plain.batchNo, plain.serials, plain.godownId], ['', [], '']);
+  assert.equal(booksNormalize(tracked as never)!.total, 1180);
+  assert.equal(exportNormalize(tracked)!.taxable, 1000);
+  assert.equal(gstNormalize(tracked, '27')!.cgst, 90);
 });
 
 test('a legacy lump-tax row splits the same way in GST reports, books and exports', () => {

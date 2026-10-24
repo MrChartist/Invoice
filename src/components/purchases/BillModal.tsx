@@ -14,6 +14,11 @@ import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
 import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
 import type { AttachmentRef } from '../../types/attachments';
+import type { BillStockContext } from './BillLineTracking';
+import { buildItemIndex, loadSettings, stockDb } from '../../lib/inventory';
+import { billTrackingIssues, liveTrackingInputs } from '../../lib/stock-tracking';
+import { godownsDb } from '../../lib/godowns';
+import { MAIN_GODOWN_ID } from '../../types/stock';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -80,6 +85,20 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
   const [error, setError] = useState('');
+  // Batch / serial / godown fields appear only for items that opted in, or once a second godown exists.
+  const [stock] = useState<BillStockContext | undefined>(() => {
+    try {
+      const items = stockDb.items().filter((i) => i.track_stock);
+      const godowns = godownsDb.list();
+      if (godowns.length < 2 && !items.some((i) => i.track_batches || i.track_serials)) return undefined;
+      const index = buildItemIndex(items);
+      const settings = loadSettings();
+      const def = godowns.some((g) => g.id === settings.defaultGodown) ? (settings.defaultGodown as string) : MAIN_GODOWN_ID;
+      return { find: (name, hsn) => index.find(name, hsn), godowns, defaultGodown: def };
+    } catch {
+      return undefined;
+    }
+  });
 
   const vendor = vendors.find((v) => v.id === vendorId);
   // Imports always carry IGST (customs IGST for goods, reverse-charge IGST for services); '96' = other country.
@@ -105,6 +124,16 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     if (purchase && totals.total < purchase.amount_paid) {
       return setError(`Total cannot drop below the ${formatCurrency(purchase.amount_paid)} already paid.`);
     }
+    let saveLines = real;
+    if (stock) {
+      const live = liveTrackingInputs();
+      const issues = billTrackingIssues(real, { ...live, purchases: (live.purchases ?? []).filter((p) => p.id !== purchase?.id) });
+      if (issues.length) return setError(issues[0]);
+      // Tracked lines left on the godown picker's default are stored with it.
+      if (stock.godowns.length > 1) {
+        saveLines = real.map((l) => (!l.godown_id && stock.find(l.name, l.hsn) ? { ...l, godown_id: stock.defaultGodown } : l));
+      }
+    }
     try {
       purchasesDb.save({
         ...purchase,
@@ -118,7 +147,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         due_date: dueDate || undefined,
         place_of_supply: pos || undefined,
         category,
-        lines: real,
+        lines: saveLines,
         taxable: totals.taxable,
         cgst: totals.cgst,
         sgst: totals.sgst,
@@ -208,7 +237,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       <CostCentreSelect id="bill-cost-centre" label="Cost centre / project" centres={centres} value={costCentre} onChange={setCostCentre} />
 
       <h3 className={styles.sectionTitle}>Line items</h3>
-      <LineItemsEditor lines={lines} onChange={setLines} />
+      <LineItemsEditor lines={lines} onChange={setLines} stock={stock} />
 
       <div className={styles.totals} aria-live="polite">
         <div className={styles.totalRow}><span>Taxable value</span><span>{formatCurrency(totals.taxable)}</span></div>

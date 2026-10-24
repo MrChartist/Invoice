@@ -164,12 +164,12 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.3 | ✅ **Full balance sheet**: fixed assets & depreciation (IT Act WDV blocks), loans, capital/drawings, GST ledgers (Schedule III vertical format) | Tally, Zoho | M |
 | 6.4 | ✅ **Cash-flow statement** (indirect, AS 3) | Vyapar, Refrens, Zoho, Xero | S–M |
 | 6.5 | ✅ **Sales orders & purchase orders** with pending quantities → invoice / challan / bill (`src/lib/sales-orders.ts`, `src/lib/purchase-orders.ts`) | Refrens, Odoo, myBillBook, Vyapar, Zoho | M |
-| 6.6 | **Batch / expiry / MFG** on stock with FEFO and expiry alerts | Vyapar, myBillBook, Busy, Marg | M |
+| 6.6 | ✅ **Batch / expiry / MFG** on stock with FEFO and expiry alerts (`src/lib/stock-tracking.ts`, `docs/features/inventory.md`) | Vyapar, myBillBook, Busy, Marg | M |
 | 6.7 | **Barcode** scan (BarcodeDetector + keyboard wedge) and Code128/EAN-13 label sheets | Vyapar, myBillBook, Marg | M |
 | 6.8 | **POS quick bill**: walk-in, split cash/UPI tender, 80 mm auto-print, day-end Z report | Vyapar, myBillBook, Marg, Swipe | M |
 | 6.9 | **Price levels & schemes** (wholesale/retail/party rates, qty slabs, buy-X-get-Y) | Tally, Marg, Vyapar | M |
-| 6.10 | **Multi-godown** stock with transfer vouchers | Vyapar, Busy, myBillBook | M |
-| 6.11 | **Serial numbers / IMEI / warranty** lookup | Busy, myBillBook | M |
+| 6.10 | ✅ **Multi-godown** stock with transfer vouchers (`STR/FY25-26/0001`, `src/lib/godowns.ts`) | Vyapar, Busy, myBillBook | M |
+| 6.11 | ✅ **Serial numbers / IMEI / warranty** lookup (Inventory → Serial lookup) | Busy, myBillBook | M |
 | 6.12 | ✅ **Attachments**: receipt photos / PDFs on bills, expenses, invoices (IndexedDB, one key per file, stored once by content, in backups; `src/lib/attachments.ts`, `docs/features/attachments-custom-fields.md`) | Zoho, Xero, Invoice Ninja | M |
 | 6.13 | ✅ **Time tracking & billable hours** → invoice lines (`/time`, `src/lib/timesheets.ts`, `docs/features/time-expenses.md`) | FreshBooks, Zoho, Invoice Ninja | M |
 | 6.14 | ✅ **Billable expenses & mileage** with markup and pure-agent (Rule 33) reimbursements | FreshBooks, Invoice Ninja | S–M |
