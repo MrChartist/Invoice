@@ -126,6 +126,12 @@ test('parseBackup refuses damaged record tables, bad settings and newer versions
   assert.throws(() => parseBackup(file({ mrchartist_inv_invoices: '[{"id":"a"},' })), /"invoices" table .* damaged/);
   assert.throws(() => parseBackup(file({ mrchartist_inv_clients: '[{"name":"no id"}]' })), /Row 1 of the "clients"/);
   assert.throws(() => parseBackup(file({ mrchartist_inv_audit_log: '[1,2]' })), /"audit_log"/);
+  // Ledger tables (6.1–6.3) are validated too and carried whole.
+  assert.throws(() => parseBackup(file({ ...ok, mrchartist_inv_vouchers: '[{"type":"JOURNAL"}]' })), /Row 1 of the "vouchers"/);
+  assert.throws(() => parseBackup(file({ ...ok, mrchartist_inv_accounts: '{}' })), /"accounts" table .* not a list/);
+  assert.throws(() => parseBackup(file({ ...ok, mrchartist_inv_fixed_assets: '[1]' })), /"fixed_assets"/);
+  const ledger = { ...ok, mrchartist_inv_vouchers: '[{"id":"v1","type":"JOURNAL","lines":[]}]', mrchartist_inv_accounts: '[{"id":"u1"}]', mrchartist_inv_fixed_assets: '[{"id":"f1"}]' };
+  assert.equal(parseBackup(file(ledger)).data.mrchartist_inv_vouchers, ledger.mrchartist_inv_vouchers);
   assert.throws(() => parseBackup(file({ mrchartist_inv_settings: '[]' })), /settings/);
   assert.throws(() => parseBackup(file(ok, 2)), /newer version/);
   assert.throws(

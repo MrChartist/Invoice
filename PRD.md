@@ -77,8 +77,12 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **Purchases & payables**: vendor bills and expenses, ITC tracking, RCM, imports (Bill of Entry), ITC reversal reasons,
   Sec 17(5) blocked credit, period-locked; MSME (Udyam) vendors with 45/15-day limits, Sec 43B(h) disallowance and
   MSMED interest.
-- **Books**: Day Book, Cash Book, Bank Book, Profit & Loss (accrual and cash basis), indicative balance sheet. Books
-  are derived from documents and payments (no manual journal vouchers yet — see roadmap Phase 6).
+- **Books**: Day Book, Cash Book, Bank Book, Profit & Loss (accrual and cash basis), plus a double-entry ledger:
+  Schedule III chart of accounts, journal / contra / payment / receipt vouchers, trial balance, ledger drill-down,
+  Schedule III balance sheet with a fixed-asset register (Income-tax Act WDV depreciation) and an AS 3 cash-flow
+  statement. Books are derived from documents and payments: every invoice, note, receipt, bill and supplier payment
+  posts automatically (computed on the fly, never stored twice), and manual vouchers cover capital, loans, drawings,
+  GST payments and other adjustments (`docs/features/ledger.md`).
 - **Bank reconciliation (BRS)**: CSV statement import with auto-detected HDFC, ICICI, SBI, Axis and Kotak layouts,
   scored match suggestions you confirm, printable BRS.
 - **Inventory**: FIFO and weighted-average costing, stock positions, shortage warnings while drafting an invoice.
@@ -117,9 +121,11 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   verified against the current offline tools are marked in the code. Verify with your CA.
 - No direct portal / IRP / bank / payment-gateway connection (by design: no server).
 - Bank reconciliation treats bank as a single account.
-- Books are derived from documents; there is no chart of accounts or manual journal yet.
-- RCM and import bills are carried in supplier balances including tax; Books/Tally do not post RCM payable separately.
-- Exchange gain/loss on foreign receipts is not computed.
+- The ledger does not value closing stock, book realised/unrealised exchange differences, or handle fixed-asset
+  disposals automatically — post them with a journal voucher.
+- RCM and import bills: the ledger credits the tax to "GST payable — reverse charge" / "IGST payable on imports";
+  the purchases module and Tally export still carry the bill total (including that tax) as the supplier balance.
+- Exchange gain/loss on foreign receipts is not computed (roadmap 6.19).
 - `.xlsx` is read and written by a built-in, dependency-free reader/writer (first sheet for imports). Legacy `.xls`,
   `.ods`, password-protected and ZIP64 workbooks are not supported; save them as `.xlsx` or CSV.
 - The GSTR-2B matcher reads B2B/B2BA/CDNR/CDNRA from the Excel download and additionally ISD / IMPG / IMPGSEZ from

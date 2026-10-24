@@ -214,3 +214,65 @@ export const QRMP_3B_CATEGORY_Y: readonly string[] = ['01', '02', '03', '04', '0
 export const QRMP_TURNOVER_LIMIT = 5e7;
 
 // Interest / late-fee rates and caps are date-keyed in `gst-penalties.ts` (loaded only by the GST page).
+
+// ── Income-tax Act depreciation (Sec 32, Rule 5 / New Appendix I): WDV block rates ──
+
+/** Blocks of assets the fixed-asset register offers. Rates are % of written-down value. */
+export type DepreciationBlock =
+  | 'BUILDING_RESIDENTIAL'
+  | 'BUILDING_OTHER'
+  | 'BUILDING_TEMPORARY'
+  | 'FURNITURE'
+  | 'PLANT_MACHINERY'
+  | 'MOTOR_CAR'
+  | 'MOTOR_VEHICLE_HIRE'
+  | 'COMPUTER'
+  | 'BOOKS_PROFESSIONAL'
+  | 'INTANGIBLE'
+  | 'ENERGY_SAVING';
+
+export const DEPRECIATION_BLOCK_LABELS: Record<DepreciationBlock, string> = {
+  BUILDING_RESIDENTIAL: 'Building — mainly residential',
+  BUILDING_OTHER: 'Building — office, factory, shop',
+  BUILDING_TEMPORARY: 'Building — temporary structure',
+  FURNITURE: 'Furniture & fittings',
+  PLANT_MACHINERY: 'Plant & machinery (general)',
+  MOTOR_CAR: 'Motor car (not for hire)',
+  MOTOR_VEHICLE_HIRE: 'Motor vehicle used in a hire business',
+  COMPUTER: 'Computers & software',
+  BOOKS_PROFESSIONAL: 'Books (profession)',
+  INTANGIBLE: 'Intangibles (patents, licences, trademarks; not goodwill)',
+  ENERGY_SAVING: 'Energy-saving / pollution-control devices',
+};
+
+/**
+ * WDV rates (%) by block, keyed by the first day of the FY they apply to. From FY 2017-18 the
+ * highest rate is 40% (Rule 5 as amended). Goodwill is not depreciable from FY 2020-21 (Finance
+ * Act 2021), so it has no block here. Working-paper values — verify with your CA.
+ */
+export const DEPRECIATION_RATE_RULES: readonly Versioned<Record<DepreciationBlock, number>>[] = [
+  {
+    from: '2003-04-01',
+    value: {
+      BUILDING_RESIDENTIAL: 5, BUILDING_OTHER: 10, BUILDING_TEMPORARY: 100, FURNITURE: 10, PLANT_MACHINERY: 15,
+      MOTOR_CAR: 15, MOTOR_VEHICLE_HIRE: 30, COMPUTER: 60, BOOKS_PROFESSIONAL: 60, INTANGIBLE: 25, ENERGY_SAVING: 80,
+    },
+    source: 'IT Rules, New Appendix I (AY 2004-05 onwards)',
+  },
+  {
+    from: '2017-04-01',
+    value: {
+      BUILDING_RESIDENTIAL: 5, BUILDING_OTHER: 10, BUILDING_TEMPORARY: 40, FURNITURE: 10, PLANT_MACHINERY: 15,
+      MOTOR_CAR: 15, MOTOR_VEHICLE_HIRE: 30, COMPUTER: 40, BOOKS_PROFESSIONAL: 40, INTANGIBLE: 25, ENERGY_SAVING: 40,
+    },
+    source: 'IT Rules, New Appendix I as amended (40% cap from AY 2018-19)',
+  },
+];
+
+/** An asset put to use for fewer than this many days in the FY gets half the rate that year (Sec 32(1), 2nd proviso). */
+export const DEPRECIATION_HALF_RATE_DAYS = 180;
+
+/** WDV rate (%) for a block in the FY that contains `date`. */
+export function depreciationRate(block: DepreciationBlock, date?: string): number {
+  return ruleAt(DEPRECIATION_RATE_RULES, date)[block] ?? 0;
+}

@@ -261,15 +261,16 @@ function isLive(inv: InvoiceRecord): boolean {
   return inv.status !== 'Draft' && inv.status !== 'Cancelled';
 }
 
-function isSale(inv: InvoiceRecord): boolean {
+/** Sales-side document that posts (invoice / tax invoice / debit note, not Draft or Cancelled). Shared with the ledger. */
+export function isSale(inv: InvoiceRecord): boolean {
   return isLive(inv) && SALES_TYPES.has(inv.doc_type ?? 'INVOICE');
 }
 
-function isCreditNote(inv: InvoiceRecord): boolean {
+export function isCreditNote(inv: InvoiceRecord): boolean {
   return isLive(inv) && inv.doc_type === 'CREDIT_NOTE';
 }
 
-function partyOfInvoice(inv: InvoiceRecord): string {
+export function partyOfInvoice(inv: InvoiceRecord): string {
   return str(inv.client?.company) || str(inv.client?.name) || 'Cash sale';
 }
 

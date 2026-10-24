@@ -151,3 +151,17 @@ test('GSTR-2B matcher reads the real purchase shape (and skips drafts)', () => {
   assert.equal(b.tax, 180);
   assert.equal(b.in4a5, true);
 });
+
+test('the double-entry ledger posts the real purchase shape (and legacy rows like books)', async () => {
+  const { buildLedger, A } = await import('../src/lib/ledger/index.ts');
+  const { EMPTY_BOOKS } = await import('../src/lib/books.ts');
+  const legacy = { id: 'old1', vendor_name: 'Old Co', vendor_gstin: '27AAPFU0939F1ZV', bill_number: 'L1', date: '2026-04-12', place_of_supply: '27', taxable: 1000, tax_amount: 180, total: 1180 };
+  const led = buildLedger({ ...EMPTY_BOOKS, purchases: [bill as never, legacy], userAccounts: [], manual: [], assets: [], today: '2026-04-30' });
+  assert.deepEqual(led.warnings, []);
+  for (const id of ['pur:p1', 'pur:old1']) {
+    const v = led.vouchers.find((x) => x.id === id)!;
+    assert.ok(v, `${id} missing`);
+    const amt = (acc: string) => v.lines.filter((l) => l.account === acc).reduce((s, l) => s + l.dr - l.cr, 0);
+    assert.deepEqual([amt(A.purchases), amt(A.inCgst), amt(A.inSgst), amt(A.creditors)], [100000, 9000, 9000, -118000], id);
+  }
+});

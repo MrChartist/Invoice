@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   buildVouchers,
@@ -18,18 +18,27 @@ import { PeriodBar } from '../components/books/PeriodBar';
 import { DayBookTab } from '../components/books/DayBookTab';
 import { CashBankTab } from '../components/books/CashBankTab';
 import { ProfitLossTab } from '../components/books/ProfitLossTab';
-import { BalanceSheetTab } from '../components/books/BalanceSheetTab';
 import { OpeningBalanceModal } from '../components/books/OpeningBalanceModal';
+import type { LedgerTabId } from '../components/books/ledger/LedgerPanel';
 import surface from '../styles/surface.module.css';
 import styles from './Books.module.css';
+
+// The double-entry tabs (6.1–6.4) live in their own lazy chunk with the ledger engine.
+const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'));
 
 const TABS = [
   { id: 'day', label: 'Day book' },
   { id: 'cash', label: 'Cash & bank' },
+  { id: 'vch', label: 'Vouchers' },
+  { id: 'ledger', label: 'Ledger' },
+  { id: 'tb', label: 'Trial balance' },
   { id: 'pnl', label: 'Profit & loss' },
   { id: 'bs', label: 'Balance sheet' },
+  { id: 'cf', label: 'Cash flow' },
+  { id: 'coa', label: 'Chart of accounts' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
+const LEDGER_TABS = new Set<TabId>(['vch', 'ledger', 'tb', 'bs', 'cf', 'coa']);
 
 export function Books() {
   const [params, setParams] = useSearchParams();
@@ -59,6 +68,19 @@ export function Books() {
     (id: TabId) => {
       const next = new URLSearchParams(params);
       next.set('tab', id);
+      setParams(next, { replace: true });
+    },
+    [params, setParams],
+  );
+
+  /** Drill-down: open an account (optionally one party of a control account) in the Ledger tab. */
+  const openAccount = useCallback(
+    (id: string, party?: string) => {
+      const next = new URLSearchParams(params);
+      next.set('tab', 'ledger');
+      next.set('acct', id);
+      if (party) next.set('party', party);
+      else next.delete('party');
       setParams(next, { replace: true });
     },
     [params, setParams],
@@ -94,9 +116,10 @@ export function Books() {
     <div className={surface.page}>
       <PageHeader
         title="Books"
-        subtitle="Day book, cash & bank, profit & loss and balance sheet — built from your invoices, receipts and purchases."
+        subtitle="Double-entry books built from your invoices, receipts and purchases, plus your own vouchers — ledgers, trial balance, P&L, balance sheet and cash flow."
       />
 
+      <div className="no-print">
       <PeriodBar
         preset={preset}
         period={period}
@@ -105,8 +128,9 @@ export function Books() {
           setPeriod(range);
         }}
       />
+      </div>
 
-      <div className={styles.tabs} role="tablist" aria-label="Books reports">
+      <div className={`${styles.tabs} no-print`} role="tablist" aria-label="Books reports">
         {TABS.map((t, i) => (
           <button
             key={t.id}
@@ -145,7 +169,20 @@ export function Books() {
           />
         )}
         {tab === 'pnl' && <ProfitLossTab data={data} period={period} />}
-        {tab === 'bs' && <BalanceSheetTab data={data} asOf={asOf} />}
+        {LEDGER_TABS.has(tab) && (
+          <Suspense fallback={<p className={styles.loading} role="status">Loading the ledger…</p>}>
+            <LedgerPanel
+              tab={tab as LedgerTabId}
+              data={data}
+              period={period}
+              asOf={asOf}
+              account={params.get('acct') ?? 'bank'}
+              party={params.get('party') ?? ''}
+              onOpenAccount={openAccount}
+              notify={notify}
+            />
+          </Suspense>
+        )}
       </div>
 
       <OpeningBalanceModal

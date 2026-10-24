@@ -1,0 +1,234 @@
+/**
+ * Manual vouchers (Phase 6.1): journal, contra, payment and receipt entries the user types,
+ * stored in table `vouchers`. Every amount is an integer number of PAISE so a voucher can
+ * only ever balance exactly.
+ *
+ * Numbering: one series per type per Indian FY — `JV/FY25-26/0001`, `CV/…`, `PV/…`, `RV/…`
+ * (same shape as invoice numbers). Writes respect the period lock (src/lib/period-lock.ts)
+ * and are written to the audit log.
+ */
+
+import { audit } from '../audit';
+import { isoDay } from '../dates';
+import { round2 } from '../invoice-calc';
+import { buildInvoiceNumber, getIndianFY, highestSequence } from '../invoice-number';
+import { assertUnlocked } from '../period-lock';
+import { generateId, getTable, setTable } from '../storage';
+import { formatMoney } from '../utils';
+import { chartOf, loadUserAccounts, type Account } from './accounts';
+
+export const VOUCHERS_TABLE = 'vouchers';
+
+export type ManualVoucherType = 'JOURNAL' | 'CONTRA' | 'PAYMENT' | 'RECEIPT';
+
+export const MANUAL_VOUCHER_TYPES: readonly ManualVoucherType[] = ['JOURNAL', 'CONTRA', 'PAYMENT', 'RECEIPT'];
+
+export const VOUCHER_TYPE_LABELS: Record<ManualVoucherType, string> = {
+  JOURNAL: 'Journal',
+  CONTRA: 'Contra',
+  PAYMENT: 'Payment',
+  RECEIPT: 'Receipt',
+};
+
+export const VOUCHER_PREFIX: Record<ManualVoucherType, string> = {
+  JOURNAL: 'JV',
+  CONTRA: 'CV',
+  PAYMENT: 'PV',
+  RECEIPT: 'RV',
+};
+
+export interface ManualVoucherLine {
+  account_id: string;
+  /** Integer paise; exactly one of dr / cr is > 0. */
+  dr: number;
+  cr: number;
+  /** Party name for the debtors / creditors control accounts (sub-ledger). */
+  party?: string;
+}
+
+export interface ManualVoucher {
+  id: string;
+  type: ManualVoucherType;
+  number: string;
+  /** Local day, YYYY-MM-DD. */
+  date: string;
+  narration: string;
+  lines: ManualVoucherLine[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export type ManualVoucherInput = Omit<ManualVoucher, 'id' | 'created_at' | 'updated_at' | 'number'> & {
+  id?: string;
+  number?: string;
+};
+
+const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+
+/** Rupees (as typed) → integer paise. */
+export function rupeesToPaise(value: unknown): number {
+  const n = typeof value === 'number' ? value : parseFloat(String(value ?? '').replace(/,/g, ''));
+  if (!Number.isFinite(n)) return 0;
+  const r = round2(Math.abs(n));
+  const text = String(r);
+  return text.includes('e') ? Math.round(r * 100) : Math.round(Number(`${text}e2`));
+}
+
+export function paiseToRupees(p: number): number {
+  return Math.round(p) / 100;
+}
+
+export function voucherTotals(lines: readonly ManualVoucherLine[]): { dr: number; cr: number; diff: number } {
+  let dr = 0;
+  let cr = 0;
+  for (const l of lines) {
+    dr += isInt(l.dr) ? l.dr : 0;
+    cr += isInt(l.cr) ? l.cr : 0;
+  }
+  return { dr, cr, diff: dr - cr };
+}
+
+/** Problems with a voucher (empty list = it may be saved). */
+export function validateVoucher(v: ManualVoucherInput, chart: readonly Account[]): string[] {
+  const errors: string[] = [];
+  const byId = new Map(chart.map((a) => [a.id, a]));
+  if (!MANUAL_VOUCHER_TYPES.includes(v.type)) errors.push('Choose a voucher type.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date ?? '') || isoDay(v.date) !== v.date) errors.push('Choose the voucher date.');
+  const lines = Array.isArray(v.lines) ? v.lines : [];
+  if (lines.length < 2) errors.push('A voucher needs at least two lines (one debit, one credit).');
+  lines.forEach((l, i) => {
+    const n = i + 1;
+    if (!byId.has(l.account_id)) errors.push(`Line ${n}: choose an account.`);
+    if (!isInt(l.dr) || !isInt(l.cr)) errors.push(`Line ${n}: amounts must be positive.`);
+    else if ((l.dr > 0) === (l.cr > 0)) errors.push(`Line ${n}: enter either a debit or a credit amount.`);
+  });
+  const t = voucherTotals(lines);
+  if (t.dr === 0) errors.push('The voucher has no amount.');
+  else if (t.diff !== 0) errors.push(`Debits and credits differ by ${formatMoney(Math.abs(t.diff) / 100)}.`);
+  const isCashBank = (l: ManualVoucherLine) => byId.get(l.account_id)?.group === 'CASH_BANK';
+  if (!errors.length) {
+    if (v.type === 'CONTRA' && !lines.every(isCashBank)) errors.push('A contra voucher moves money between cash and bank accounts only.');
+    if (v.type === 'PAYMENT' && !lines.some((l) => l.cr > 0 && isCashBank(l))) errors.push('A payment voucher must credit a cash or bank account.');
+    if (v.type === 'RECEIPT' && !lines.some((l) => l.dr > 0 && isCashBank(l))) errors.push('A receipt voucher must debit a cash or bank account.');
+  }
+  return errors;
+}
+
+/** Next number in the type's series for the FY of `date`. */
+export function nextVoucherNumber(existing: readonly Pick<ManualVoucher, 'number'>[], type: ManualVoucherType, date: string): string {
+  const prefix = VOUCHER_PREFIX[type];
+  const fy = getIndianFY(date).label;
+  return buildInvoiceNumber(prefix, fy, highestSequence(existing.map((v) => v.number), prefix, fy) + 1);
+}
+
+/** Tolerant read of stored rows; malformed ones are skipped (the ledger warns about unbalanced ones). */
+export function normalizeVouchers(rows: unknown[]): ManualVoucher[] {
+  const out: ManualVoucher[] = [];
+  for (const r of rows) {
+    if (!r || typeof r !== 'object') continue;
+    const o = r as Record<string, unknown>;
+    const type = o.type as ManualVoucherType;
+    const date = isoDay(o.date);
+    if (typeof o.id !== 'string' || !MANUAL_VOUCHER_TYPES.includes(type) || !date || !Array.isArray(o.lines)) continue;
+    const lines: ManualVoucherLine[] = [];
+    for (const l of o.lines as unknown[]) {
+      if (!l || typeof l !== 'object') continue;
+      const x = l as Record<string, unknown>;
+      lines.push({
+        account_id: typeof x.account_id === 'string' ? x.account_id : '',
+        dr: isInt(x.dr) ? x.dr : 0,
+        cr: isInt(x.cr) ? x.cr : 0,
+        ...(typeof x.party === 'string' && x.party.trim() ? { party: x.party.trim() } : {}),
+      });
+    }
+    out.push({
+      id: o.id,
+      type,
+      number: typeof o.number === 'string' ? o.number : '',
+      date,
+      narration: typeof o.narration === 'string' ? o.narration : '',
+      lines,
+      created_at: typeof o.created_at === 'string' ? o.created_at : '',
+      ...(typeof o.updated_at === 'string' ? { updated_at: o.updated_at } : {}),
+    });
+  }
+  return out;
+}
+
+export function loadVouchers(): ManualVoucher[] {
+  return normalizeVouchers(getTable<unknown>(VOUCHERS_TABLE));
+}
+
+export class VoucherError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VoucherError';
+  }
+}
+
+function cleanLines(lines: readonly ManualVoucherLine[]): ManualVoucherLine[] {
+  return lines.map((l) => ({
+    account_id: l.account_id,
+    dr: l.dr,
+    cr: l.cr,
+    ...(l.party && l.party.trim() ? { party: l.party.trim() } : {}),
+  }));
+}
+
+/**
+ * Create or update a manual voucher. Throws VoucherError on invalid input or a duplicate
+ * number, and PeriodLockedError when the (old or new) date is inside the period lock.
+ */
+export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[] = chartOf(loadUserAccounts())): ManualVoucher {
+  const errors = validateVoucher(input, chart);
+  if (errors.length) throw new VoucherError(errors[0]);
+  const all = loadVouchers();
+  const prev = input.id ? all.find((v) => v.id === input.id) : undefined;
+  const others = all.filter((v) => v.id !== prev?.id);
+
+  const number = (input.number ?? '').trim() || (prev && prev.type === input.type ? prev.number : nextVoucherNumber(others, input.type, input.date));
+  if (others.some((v) => v.number.toLowerCase() === number.toLowerCase())) throw new VoucherError(`Voucher number ${number} is already used.`);
+
+  const id = prev?.id ?? generateId();
+  if (prev) assertUnlocked({ id, issue_date: prev.date, invoice_number: prev.number }, 'edit');
+  const lock = assertUnlocked({ id, issue_date: input.date, invoice_number: number }, prev ? 'edit' : 'create');
+
+  const now = new Date().toISOString();
+  const row: ManualVoucher = {
+    id,
+    type: input.type,
+    number,
+    date: input.date,
+    narration: (input.narration ?? '').trim(),
+    lines: cleanLines(input.lines),
+    created_at: prev?.created_at ?? now,
+    ...(prev ? { updated_at: now } : {}),
+  };
+  setTable(VOUCHERS_TABLE, prev ? all.map((v) => (v.id === id ? row : v)) : [...all, row]);
+  const amount = formatMoney(voucherTotals(row.lines).dr / 100);
+  audit.record({
+    entity: 'voucher',
+    entity_id: id,
+    action: prev ? 'update' : 'create',
+    doc_number: number,
+    summary: `${prev ? 'Edited' : 'Recorded'} ${VOUCHER_TYPE_LABELS[row.type].toLowerCase()} voucher ${number} dated ${row.date} for ₹${amount}${lock === 'overridden' ? ' (period lock overridden)' : ''}`,
+    ...(prev && prev.date !== row.date ? { changes: [{ field: 'Date', from: prev.date, to: row.date }] } : {}),
+  });
+  return row;
+}
+
+/** Delete a manual voucher (period lock applies). */
+export function deleteVoucher(id: string): void {
+  const all = loadVouchers();
+  const row = all.find((v) => v.id === id);
+  if (!row) return;
+  const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
+  setTable(VOUCHERS_TABLE, all.filter((v) => v.id !== id));
+  audit.record({
+    entity: 'voucher',
+    entity_id: id,
+    action: 'delete',
+    doc_number: row.number,
+    summary: `Deleted ${VOUCHER_TYPE_LABELS[row.type].toLowerCase()} voucher ${row.number} dated ${row.date} (₹${formatMoney(voucherTotals(row.lines).dr / 100)})${lock === 'overridden' ? ' (period lock overridden)' : ''}`,
+  });
+}

@@ -206,9 +206,14 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
 const RECORD_TABLES = [
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases',
   'purchase_payments', 'recurring', 'doc_links', 'audit_log', 'gstr2b_actions',
+  // Double-entry ledger (6.1–6.3)
+  'accounts', 'vouchers', 'fixed_assets',
 ];
 /** Core tables whose rows must also carry an `id`. */
-const ID_TABLES = new Set(['invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments']);
+const ID_TABLES = new Set([
+  'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
+  'accounts', 'vouchers', 'fixed_assets',
+]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
