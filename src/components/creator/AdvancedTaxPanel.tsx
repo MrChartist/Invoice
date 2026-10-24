@@ -1,4 +1,5 @@
 import { useInvoiceStore } from '../../store/useInvoiceStore';
+import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from '../../lib/utils';
 import {
@@ -23,7 +24,7 @@ const ROUND_LABELS: Record<RoundMode, string> = {
  */
 export function AdvancedTaxPanel() {
   const s = useInvoiceStore(
-    useShallow((st) => ({ currency: st.currency, issue_date: st.issue_date, lut_date: st.lut_date, lut_number: st.lut_number, price_includes_tax: st.price_includes_tax, round_mode: st.round_mode, round_off_enabled: st.round_off_enabled, setLut: st.setLut, setPriceIncludesTax: st.setPriceIncludesTax, setRoundMode: st.setRoundMode, setSupplyType: st.setSupplyType, setTcs: st.setTcs, setTds: st.setTds, supply_type: st.supply_type, tcs_base: st.tcs_base, tcs_enabled: st.tcs_enabled, tcs_label: st.tcs_label, tcs_rate: st.tcs_rate, tds_enabled: st.tds_enabled, tds_on_taxable: st.tds_on_taxable, tds_rate: st.tds_rate, tds_section: st.tds_section, totals: st.totals })),
+    useShallow((st) => pick(st, ['currency', 'issue_date', 'lut_date', 'lut_number', 'price_includes_tax', 'round_mode', 'round_off_enabled', 'setLut', 'setPriceIncludesTax', 'setRoundMode', 'setSupplyType', 'setTcs', 'setTds', 'supply_type', 'tcs_base', 'tcs_enabled', 'tcs_label', 'tcs_rate', 'tds_enabled', 'tds_on_taxable', 'tds_rate', 'tds_section', 'totals'])),
   );
   const money = (n: number) => formatCurrency(n, s.currency);
   const roundMode: RoundMode = s.round_mode ?? (s.round_off_enabled ? 'nearest' : 'none');

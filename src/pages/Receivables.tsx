@@ -19,6 +19,8 @@ import { useToast } from '../components/ui/useToast';
 import { AgingStack, CollectionsChart, ShareBar, AgeChip } from '../components/receivables/Charts';
 import { StatementViewer } from '../components/receivables/StatementViewer';
 import { downloadTextFile } from '../components/receivables/exportUtils';
+import { VirtualGap } from '../components/ui/VirtualGap';
+import { useVirtualRows } from '../hooks/useVirtualRows';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
@@ -216,6 +218,20 @@ function AgingTab({ report, currency, fmt, onStatement }: {
   const top = topDebtors(report, 5);
   const m = (n: number) => (n ? formatMoney(n, currency) : '—');
 
+  // Long party lists mount only the rows in view; an expanded party's bill row is measured with it.
+  const partyKeys = useMemo(() => report.parties.map((p) => p.key), [report.parties]);
+  const virtual = useVirtualRows(partyKeys, { estimate: 49 });
+  // aria-rowindex must count the expanded detail rows above each party (header row is 1).
+  const ariaIndex = useMemo(() => {
+    const out: number[] = [];
+    let next = 2;
+    for (const p of report.parties) {
+      out.push(next);
+      next += open.has(p.key) && p.bills.length > 0 ? 2 : 1;
+    }
+    return { rows: out, total: next };
+  }, [report.parties, open]);
+
   return (
     <div className={styles.stack}>
       <div className={surface.card}>
@@ -246,23 +262,27 @@ function AgingTab({ report, currency, fmt, onStatement }: {
       <div className={surface.card}>
         <div className={surface.cardHead}><h2 className={styles.h2}>Party-wise outstanding</h2></div>
         <div className={surface.tableWrap}>
-          <table className={`${surface.table} ${styles.agingTable}`}>
+          <table className={`${surface.table} ${styles.agingTable}`} aria-rowcount={virtual.enabled ? ariaIndex.total : undefined}>
             <caption className={surface.srOnly}>Outstanding by party and age. Expand a row to see its bills.</caption>
             <thead>
-              <tr>
+              <tr aria-rowindex={virtual.enabled ? 1 : undefined}>
                 <th scope="col">Party</th>
                 {AGING_BUCKETS.map((b) => <th key={b} scope="col" className={surface.numeric}>{b}</th>)}
                 <th scope="col" className={surface.numeric}>Credits</th>
                 <th scope="col" className={surface.numeric}>Net</th>
               </tr>
             </thead>
-            <tbody>
-              {report.parties.map((p) => {
+            <tbody {...virtual.bodyProps}>
+              {virtual.slots.map((slot) => {
+                if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={8} />;
+                const p = report.parties[slot.index];
                 const expanded = open.has(p.key);
                 const canExpand = p.bills.length > 0;
+                const vrow = virtual.rowProps(slot.index);
+                const rowIndex = virtual.enabled ? ariaIndex.rows[slot.index] : undefined;
                 return (
                   <Fragment key={p.key}>
-                    <tr>
+                    <tr {...vrow} aria-rowindex={rowIndex}>
                       <th scope="row" className={styles.partyCell}>
                         {canExpand ? (
                           <button type="button" className={styles.expand} aria-expanded={expanded} onClick={() => toggle(p.key)}>
@@ -276,43 +296,9 @@ function AgingTab({ report, currency, fmt, onStatement }: {
                       <td className={`${surface.numeric} ${p.net < 0 ? styles.credit : ''}`}><strong>{formatMoney(p.net, currency)}</strong></td>
                     </tr>
                     {expanded && (
-                      <tr className={styles.billsRow}>
+                      <tr className={styles.billsRow} data-vindex={vrow['data-vindex']} aria-rowindex={rowIndex === undefined ? undefined : rowIndex + 1}>
                         <td colSpan={8}>
-                          <table className={styles.bills}>
-                            <thead>
-                              <tr><th scope="col">Bill</th><th scope="col">Issued</th><th scope="col">Due</th>
-                                <th scope="col" className={surface.numeric}>Total</th>
-                                <th scope="col" className={surface.numeric}>Paid</th>
-                                <th scope="col" className={surface.numeric}>Outstanding</th>
-                                <th scope="col">Age</th></tr>
-                            </thead>
-                            <tbody>
-                              {p.bills.map((b) => (
-                                <tr key={b.invoiceId}>
-                                  <td className={surface.mono}>{b.number}</td>
-                                  <td>{formatDate(b.issueDate)}</td>
-                                  <td>{formatDate(b.dueDate)}</td>
-                                  <td className={surface.numeric}>{formatMoney(b.total, currency)}</td>
-                                  <td className={surface.numeric}>{m(b.paid)}</td>
-                                  <td className={surface.numeric}><strong>{formatMoney(b.outstanding, currency)}</strong></td>
-                                  <td>
-                                    <AgeChip bucket={b.bucket}>
-                                      {b.daysOverdue > 0 ? `${b.daysOverdue} days overdue` : 'Not due'}
-                                    </AgeChip>
-                                  </td>
-                                </tr>
-                              ))}
-                              {(p.creditNotes > 0 || p.advances > 0) && (
-                                <tr>
-                                  <td colSpan={7} className={surface.statHint}>
-                                    Less unadjusted credits: {p.creditNotes > 0 && `credit notes ${formatMoney(p.creditNotes, currency)}`}
-                                    {p.creditNotes > 0 && p.advances > 0 && ', '}
-                                    {p.advances > 0 && `advances ${formatMoney(p.advances, currency)}`}
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                          <BillsTable party={p} currency={currency} />
                         </td>
                       </tr>
                     )}
@@ -321,7 +307,7 @@ function AgingTab({ report, currency, fmt, onStatement }: {
               })}
             </tbody>
             <tfoot>
-              <tr className={styles.totalRow}>
+              <tr className={styles.totalRow} aria-rowindex={virtual.enabled ? ariaIndex.total : undefined}>
                 <th scope="row">Total</th>
                 {AGING_BUCKETS.map((b) => <td key={b} className={surface.numeric}>{m(report.totals.buckets[b])}</td>)}
                 <td className={surface.numeric}>{m(report.totals.creditNotes + report.totals.advances)}</td>
@@ -332,6 +318,55 @@ function AgingTab({ report, currency, fmt, onStatement }: {
         </div>
       </div>
     </div>
+  );
+}
+
+/** One party's open bills (inside its expanded aging row); long lists are windowed too. */
+function BillsTable({ party: p, currency }: { party: PartyReceivable; currency: string }) {
+  const m = (n: number) => (n ? formatMoney(n, currency) : '—');
+  const billKeys = useMemo(() => p.bills.map((b) => b.invoiceId), [p.bills]);
+  const virtual = useVirtualRows(billKeys, { estimate: 45 });
+  const hasCredits = p.creditNotes > 0 || p.advances > 0;
+  return (
+    <table className={styles.bills} aria-rowcount={virtual.ariaRowCount(hasCredits ? 2 : 1)}>
+      <thead>
+        <tr aria-rowindex={virtual.enabled ? 1 : undefined}><th scope="col">Bill</th><th scope="col">Issued</th><th scope="col">Due</th>
+          <th scope="col" className={surface.numeric}>Total</th>
+          <th scope="col" className={surface.numeric}>Paid</th>
+          <th scope="col" className={surface.numeric}>Outstanding</th>
+          <th scope="col">Age</th></tr>
+      </thead>
+      <tbody {...virtual.bodyProps}>
+        {virtual.slots.map((slot) => {
+          if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={7} />;
+          const b = p.bills[slot.index];
+          return (
+            <tr key={b.invoiceId} {...virtual.rowProps(slot.index)}>
+              <td className={surface.mono}>{b.number}</td>
+              <td>{formatDate(b.issueDate)}</td>
+              <td>{formatDate(b.dueDate)}</td>
+              <td className={surface.numeric}>{formatMoney(b.total, currency)}</td>
+              <td className={surface.numeric}>{m(b.paid)}</td>
+              <td className={surface.numeric}><strong>{formatMoney(b.outstanding, currency)}</strong></td>
+              <td>
+                <AgeChip bucket={b.bucket}>
+                  {b.daysOverdue > 0 ? `${b.daysOverdue} days overdue` : 'Not due'}
+                </AgeChip>
+              </td>
+            </tr>
+          );
+        })}
+        {hasCredits && (
+          <tr aria-rowindex={virtual.enabled ? p.bills.length + 2 : undefined}>
+            <td colSpan={7} className={surface.statHint}>
+              Less unadjusted credits: {p.creditNotes > 0 && `credit notes ${formatMoney(p.creditNotes, currency)}`}
+              {p.creditNotes > 0 && p.advances > 0 && ', '}
+              {p.advances > 0 && `advances ${formatMoney(p.advances, currency)}`}
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
   );
 }
 
@@ -353,6 +388,9 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
 
   const ledger = useMemo(() => buildLedger(party, from, to), [party, from, to]);
+  const entryKeys = useMemo(() => ledger.entries.map((e, i) => `${e.ref}-${i}`), [ledger.entries]);
+  // Header and opening-balance rows come first; the closing row follows in the footer.
+  const virtual = useVirtualRows(entryKeys, { estimate: 49, rowIndexOffset: 2 });
   const client = data.clients.find((c) => (party.clientId && c.id === party.clientId)
     || c.name?.trim().toLowerCase() === party.name.trim().toLowerCase());
   const text = useMemo(() => buildStatementText({ sender, party, ledger, currency }), [sender, party, ledger, currency]);
@@ -446,23 +484,26 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
         </div>
 
         <div className={surface.tableWrap}>
-          <table className={surface.table}>
+          <table className={surface.table} aria-rowcount={virtual.ariaRowCount(3)}>
             <caption className={surface.srOnly}>Ledger for {party.name}</caption>
             <thead>
-              <tr>
+              <tr aria-rowindex={virtual.enabled ? 1 : undefined}>
                 <th scope="col">Date</th><th scope="col">Voucher</th><th scope="col">Particulars</th>
                 <th scope="col" className={surface.numeric}>Debit</th>
                 <th scope="col" className={surface.numeric}>Credit</th>
                 <th scope="col" className={surface.numeric}>Balance</th>
               </tr>
             </thead>
-            <tbody>
-              <tr className={styles.openingRow}>
+            <tbody {...virtual.bodyProps}>
+              <tr className={styles.openingRow} aria-rowindex={virtual.enabled ? 2 : undefined}>
                 <td>{from ? formatDate(from) : '—'}</td><td /><td><em>Opening balance</em></td><td /><td />
                 <td className={surface.numeric}>{drcr(ledger.opening, currency)}</td>
               </tr>
-              {ledger.entries.map((e, i) => (
-                <tr key={`${e.ref}-${i}`}>
+              {virtual.slots.map((slot) => {
+                if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={6} />;
+                const e = ledger.entries[slot.index];
+                return (
+                <tr key={entryKeys[slot.index]} {...virtual.rowProps(slot.index)}>
                   <td>{formatDate(e.date)}</td>
                   <td className={surface.mono}>{e.ref}</td>
                   <td>{e.particulars}</td>
@@ -470,13 +511,14 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
                   <td className={surface.numeric}>{e.credit ? formatMoney(e.credit, currency) : ''}</td>
                   <td className={surface.numeric}>{drcr(e.balance, currency)}</td>
                 </tr>
-              ))}
+                );
+              })}
               {ledger.entries.length === 0 && (
                 <tr><td colSpan={6} className={surface.statHint}>No transactions in this period.</td></tr>
               )}
             </tbody>
             <tfoot>
-              <tr className={styles.totalRow}>
+              <tr className={styles.totalRow} aria-rowindex={virtual.enabled ? ledger.entries.length + 3 : undefined}>
                 <th scope="row" colSpan={3}>Closing balance</th>
                 <td className={surface.numeric}>{formatMoney(ledger.totalDebit, currency)}</td>
                 <td className={surface.numeric}>{formatMoney(ledger.totalCredit, currency)}</td>

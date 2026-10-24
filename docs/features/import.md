@@ -17,7 +17,9 @@ No dedicated route: the wizard is a modal. Suggested entry points (lead wires th
 | `src/lib/csv.ts` | RFC-4180 reader/writer. `parseCsv`, `parseCsvDetailed`, `parseTable` (finds header row, pads ragged rows), `detectDelimiter` (`, ; \t \|`), `unwrapExcelText` (`="0123"`), `writeCsv`. BOM/CRLF/CR/embedded newlines handled. |
 | `src/lib/import-mapping.ts` | `IMPORT_SCHEMAS` (field + synonyms per kind), `guessMapping(kind, headers, sampleRows, presetId?)` -> `{mapping, confidence, presetId}`, `IMPORT_PRESETS` (generic, vyapar, zoho, tally, busy), `detectPreset`, `missingRequired`, `invoiceAmountMapped`, `templateRows`, `templateFileName`. |
 | `src/lib/importers.ts` | `parseNumber`, `parseDate`, `resolveStateText`, `buildPreview`, `dryRunReport`, `applyImport` (chunked, async), `createLocalSink`, `errorRowsCsv`, `reportErrorsCsv`. |
-| `src/components/import/ImportWizard.tsx` (+ `.module.css`) | 4-step modal. |
+| `src/components/import/ImportWizard.tsx` (+ `.module.css`) | 4-step modal shell: footer, step list, file loading and the import run. |
+| `src/components/import/wizard-state.ts` | Pure reducer holding all wizard state (tested in `tests/import-wizard-state.test.ts`). |
+| `src/components/import/steps/*.tsx` | `ChooseFileStep`, `MapColumnsStep`, `ReviewStep` (+ row editor), `ImportStep`. |
 | `tests/csv.test.ts`, `tests/importers.test.ts` | 41 tests incl. messy real-world fixtures. |
 
 ## Component

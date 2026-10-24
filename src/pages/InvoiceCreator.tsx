@@ -1,28 +1,28 @@
-import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
+import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
+import { pick } from '../store/pick';
 import { useShallow } from 'zustand/react/shallow';
 import { PageHeader } from '../components/ui/PageHeader';
-import { StatusBadge } from '../components/ui/StatusBadge';
 import { useToast } from '../components/ui/useToast';
 import { ItemsTable } from '../components/creator/ItemsTable';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
-import { ForexFields } from '../components/creator/ForexFields';
 import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
 import { StockWarnings } from '../components/creator/StockWarnings';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
-import { isSaveShortcut } from '../components/creator/line-keys';
+import { CreatorHeader } from '../components/creator/CreatorHeader';
+import { DocumentMetaCard } from '../components/creator/DocumentMetaCard';
+import { MobileSaveBar } from '../components/creator/MobileSaveBar';
+import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKeys';
+import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
-import { ClientSearchModal } from '../components/modals/ClientSearchModal';
-import { ItemSearchModal } from '../components/modals/ItemSearchModal';
 import { localDb } from '../lib/localDb';
 import { lockState } from '../lib/period-lock';
 import { getJson, SINGLETON_KEYS } from '../lib/storage';
-import { STATUS_OPTIONS } from '../lib/invoice-status';
-import { addDaysInput, CURRENCIES, formatCurrency, cn } from '../lib/utils';
-import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord, type InvoiceStatus } from '../types/invoice';
+import { cn } from '../lib/utils';
+import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
@@ -36,13 +36,14 @@ const DocumentActions = lazy(() =>
   import('../components/creator/DocumentActions').then((m) => ({ default: m.DocumentActions })),
 );
 
+// The pickers start closed: they load right after the editor renders, off the first-paint path.
+const ClientSearchModal = lazy(() => import('../components/modals/ClientSearchModal').then((m) => ({ default: m.ClientSearchModal })));
+const ItemSearchModal = lazy(() => import('../components/modals/ItemSearchModal').then((m) => ({ default: m.ItemSearchModal })));
+
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
   import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
 );
-
-const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
-const DUE_PRESETS = [0, 7, 15, 30, 45];
 
 export function InvoiceCreator() {
   const { id } = useParams<{ id: string }>();
@@ -50,7 +51,7 @@ export function InvoiceCreator() {
   const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
   const s = useInvoiceStore(
-    useShallow((st) => ({ currency: st.currency, dirty: st.dirty, doc_type: st.doc_type, due_date: st.due_date, id: st.id, invoice_number: st.invoice_number, issue_date: st.issue_date, items: st.items, notes: st.notes, patch: st.patch, po_number: st.po_number, reverse_charge: st.reverse_charge, sender: st.sender, setCurrency: st.setCurrency, setDates: st.setDates, setDocType: st.setDocType, setInvoiceNumber: st.setInvoiceNumber, setNotes: st.setNotes, setReverseCharge: st.setReverseCharge, setStatus: st.setStatus, setTerms: st.setTerms, status: st.status, terms: st.terms, total: st.total })),
+    useShallow((st) => pick(st, ['currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),
   );
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -65,11 +66,7 @@ export function InvoiceCreator() {
 
   const profiles = useMemo(() => localDb.settings.get().profiles.filter((p) => p.companyName.trim()), []);
   const editing = Boolean(s.id);
-  const nextNumber = useMemo(
-    () => (s.invoice_number ? '' : localDb.invoices.nextNumber(s.issue_date, s.doc_type, s.sender?.invoicePrefix || undefined)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [s.invoice_number, s.issue_date, s.doc_type, s.sender?.invoicePrefix, s.id],
-  );
+  const openPreview = useCallback(() => setPreviewOpen(true), []);
 
   // The stored copy decides whether the document is frozen (the edited date must not unlock itself).
   const stored = useMemo(
@@ -80,15 +77,6 @@ export function InvoiceCreator() {
   const storedLock = stored ? lockState(stored) : 'open';
   const readOnly = storedLock === 'locked';
   const dateLocked = storedLock === 'open' && lockState({ id: s.id, issue_date: s.issue_date }) === 'locked';
-
-  // GST Rule 46: live uniqueness check of a hand-typed number (deferred so typing stays snappy).
-  const typedNumber = useDeferredValue(s.invoice_number);
-  const numberCheck = useMemo(
-    () => (typedNumber.trim() ? localDb.invoices.checkNumber(typedNumber, s.id || undefined) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [typedNumber, s.id, saveTick],
-  );
-  const numberTaken = numberCheck && !numberCheck.ok ? numberCheck.clash : undefined;
 
   // Decide what the editor shows when the route changes.
   useEffect(() => {
@@ -149,63 +137,15 @@ export function InvoiceCreator() {
     [id, navigate, notify],
   );
 
-  // Ctrl/⌘+S saves, Ctrl/⌘+P previews.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      const key = e.key.toLowerCase();
-      if (isSaveShortcut(e)) {
-        e.preventDefault();
-        save();
-      } else if (key === 's') {
-        e.preventDefault();
-        save();
-      } else if (key === 'p') {
-        e.preventDefault();
-        setPreviewOpen(true);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [save]);
-
   // Warn before a refresh/tab close would drop edits to a saved document (new documents autosave as drafts).
-  useEffect(() => {
-    if (!(s.dirty && s.id)) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [s.dirty, s.id]);
-
-  // Lift toasts above the fixed mobile save bar so they never cover Save.
-  useEffect(() => {
-    const mq = window.matchMedia?.('(max-width: 900px)');
-    if (!mq) return;
-    const apply = () => document.documentElement.style.setProperty('--bottom-bar-h', mq.matches ? '4.25rem' : '0px');
-    apply();
-    mq.addEventListener('change', apply);
-    return () => {
-      mq.removeEventListener('change', apply);
-      document.documentElement.style.removeProperty('--bottom-bar-h');
-    };
-  }, []);
+  useUnsavedChangesWarning(Boolean(s.dirty && s.id));
+  useBottomBarInset();
 
   // Easy exit: drafts autosave, so leaving never loses work. Esc closes when no field or dialog is active.
   const exitCreator = useCallback(() => navigate(id ? '/transactions' : '/'), [id, navigate]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.closest('input, textarea, select, [contenteditable]') || t.closest('[role="dialog"]'))) return;
-      if (document.querySelector('[role="dialog"]')) return;
-      exitCreator();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [exitCreator]);
+  const saveIssued = useCallback(() => save(), [save]);
+  // Ctrl/⌘+S saves, Ctrl/⌘+P previews, Esc leaves.
+  useCreatorKeys({ onSave: saveIssued, onPreview: openPreview, onExit: exitCreator });
 
   const startNew = (docType?: DocumentType) => {
     useInvoiceStore.getState().newDraft(docType);
@@ -229,38 +169,18 @@ export function InvoiceCreator() {
 
   return (
     <div className={cn(surface.page, styles.page)}>
-      <PageHeader
-        title={
-          <>
-            {editing ? `Edit ${label.toLowerCase()}` : `New ${label.toLowerCase()}`}
-            {s.invoice_number && <span className={styles.number}>{s.invoice_number}</span>}
-            {editing && <StatusBadge status={s.status} />}
-          </>
-        }
-        subtitle={s.dirty ? 'Unsaved changes — autosaved as a draft on this device' : editing ? 'All changes saved' : 'Fill in the details, then save.'}
-        actions={
-          <>
-            {editing && (
-              <button type="button" className={controls.btnOutline} onClick={() => startNew()}>
-                <FilePlus2 size={16} /> New
-              </button>
-            )}
-            <button type="button" className={controls.btnOutline} onClick={() => setPreviewOpen(true)}>
-              <Eye size={16} /> Preview
-            </button>
-            {!editing && (
-              <button type="button" className={controls.btnOutline} onClick={() => save(true)} disabled={readOnly}>
-                Save draft
-              </button>
-            )}
-            <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly} title={readOnly ? 'Locked — unlock with your PIN to edit' : 'Save and issue — counts in reports; use Save draft to keep it out (Ctrl+S)'}>
-              <Save size={16} /> Save
-            </button>
-            <button type="button" className={controls.btnOutline} onClick={exitCreator} title="Close (Esc) — drafts are kept" aria-label="Close">
-              <X size={16} /> Close
-            </button>
-          </>
-        }
+      <CreatorHeader
+        label={label}
+        editing={editing}
+        invoiceNumber={s.invoice_number}
+        status={s.status}
+        dirty={s.dirty}
+        readOnly={readOnly}
+        onNew={() => startNew()}
+        onPreview={openPreview}
+        onSaveDraft={() => save(true)}
+        onSave={() => save()}
+        onClose={exitCreator}
       />
 
       {hasDraft && (
@@ -305,102 +225,7 @@ export function InvoiceCreator() {
       <div className={styles.layout}>
         <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
           <legend className={surface.srOnly}>{readOnly ? 'Document (locked, read-only)' : 'Document'}</legend>
-          <section className={surface.card}>
-            <div className={surface.cardHead}>1 · Document</div>
-            <div className={surface.cardBody}>
-              <div className={controls.row3}>
-                <label className={controls.field}>
-                  <span className={controls.label}>Type</span>
-                  <select className={controls.select} value={s.doc_type} onChange={(e) => s.setDocType(e.target.value as DocumentType)} disabled={editing && Boolean(s.invoice_number)}>
-                    {DOC_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {DOCUMENT_LABELS[t]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={controls.field}>
-                  <span className={controls.label}>Number</span>
-                  <input
-                    className={`${controls.input} ${controls.inputMono}`}
-                    style={{ textTransform: 'none' }}
-                    value={s.invoice_number}
-                    onChange={(e) => s.setInvoiceNumber(e.target.value)}
-                    placeholder={nextNumber || 'Auto'}
-                    aria-invalid={numberTaken ? true : undefined}
-                    aria-describedby="number-hint"
-                  />
-                  <span id="number-hint" aria-live="polite">
-                    {numberTaken ? (
-                      <span className={cn(styles.numberHint, styles.numberBad)}>
-                        <AlertTriangle size={13} aria-hidden="true" />
-                        <span>
-                          Already used by {numberTaken.invoice_number}
-                          {numberTaken.client?.name ? ` (${numberTaken.client.name})` : ''}. Every document needs its own number (GST Rule 46).
-                        </span>
-                      </span>
-                    ) : numberCheck?.gap ? (
-                      <span className={cn(styles.numberHint, styles.numberGap)}>
-                        <AlertTriangle size={13} aria-hidden="true" />
-                        <span>
-                          This skips {numberCheck.gap.missingNumbers.slice(0, 3).join(', ')}
-                          {numberCheck.gap.missingCount > 3 ? ` and ${numberCheck.gap.missingCount - 3} more` : ''}. Allowed, but a gap in the series may need explaining at filing.
-                        </span>
-                      </span>
-                    ) : !editing ? (
-                      <span className={controls.hint}>Leave blank to number automatically.</span>
-                    ) : null}
-                  </span>
-                </label>
-                <label className={controls.field}>
-                  <span className={controls.label}>PO / reference no.</span>
-                  <input className={controls.input} value={s.po_number ?? ''} onChange={(e) => s.patch({ po_number: e.target.value })} placeholder="Optional" />
-                </label>
-              </div>
-              <div className={controls.row3}>
-                <label className={controls.field}>
-                  <span className={controls.label}>Issue date</span>
-                  <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, s.due_date)} />
-                </label>
-                <div className={controls.field}>
-                  <label className={controls.label} htmlFor="due-date">Due date</label>
-                  <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
-                  <div className={styles.chips}>
-                    {DUE_PRESETS.map((d) => (
-                      <button key={d} type="button" aria-label={d === 0 ? 'Due on receipt' : `Due in ${d} days`} className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>
-                        {d === 0 ? 'Now' : `${d}d`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className={styles.pair}>
-                  <label className={controls.field}>
-                    <span className={controls.label}>Currency</span>
-                    <select className={controls.select} value={s.currency} onChange={(e) => s.setCurrency(e.target.value)}>
-                      {CURRENCIES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.symbol} {c.code}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={controls.field}>
-                    <span className={controls.label}>Status</span>
-                    <select className={controls.select} value={s.status === 'Overdue' ? 'Sent' : s.status} onChange={(e) => s.setStatus(e.target.value as InvoiceStatus)}>
-                      {STATUS_OPTIONS.map((o) => (
-                        <option key={o}>{o}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
-              <label className={controls.check}>
-                <input type="checkbox" checked={s.reverse_charge} onChange={(e) => s.setReverseCharge(e.target.checked)} />
-                Tax is payable on reverse charge
-              </label>
-              <ForexFields />
-            </div>
-          </section>
+          <DocumentMetaCard editing={editing} saveTick={saveTick} />
 
           <section className={surface.card}>
             <div className={surface.cardHead}>2 · Parties</div>
@@ -485,26 +310,17 @@ export function InvoiceCreator() {
         </aside>
       </div>
 
-      <div className={cn(styles.mobileBar, 'no-print')}>
-        <div>
-          <span>Total</span>
-          <strong>{formatCurrency(s.total, s.currency)}</strong>
-        </div>
-        <button type="button" className={controls.btnOutline} onClick={() => setPreviewOpen(true)} aria-label="Preview">
-          <Eye size={16} />
-        </button>
-        <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly}>
-          <Save size={16} /> Save
-        </button>
-      </div>
+      <MobileSaveBar total={s.total} currency={s.currency} readOnly={readOnly} onPreview={openPreview} onSave={() => save()} />
 
       {previewOpen && (
         <Suspense fallback={null}>
           <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
         </Suspense>
       )}
-      <ClientSearchModal isOpen={clientsOpen} onClose={() => setClientsOpen(false)} />
-      <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
+      <Suspense fallback={null}>
+        <ClientSearchModal isOpen={clientsOpen} onClose={() => setClientsOpen(false)} />
+        <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
+      </Suspense>
       {toastNode}
       {savedToast && (
         <Suspense fallback={null}>

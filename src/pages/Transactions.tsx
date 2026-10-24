@@ -24,6 +24,8 @@ import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { Modal } from '../components/ui/Modal';
+import { VirtualGap } from '../components/ui/VirtualGap';
+import { useVirtualRows } from '../hooks/useVirtualRows';
 
 import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId } from '../lib/localDb';
@@ -139,6 +141,10 @@ export function Transactions() {
       );
     return sortInvoices(list, sort.key, sort.dir);
   }, [invoices, query, filter, docType, from, to, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Long lists mount only the rows in view (see useVirtualRows); 100 rows or fewer render as before.
+  const rowKeys = useMemo(() => rows.map((r) => r.id), [rows]);
+  const virtual = useVirtualRows(rowKeys, { estimate: 66 });
 
   const docTypes = useMemo(() => [...new Set(invoices.map((i) => i.doc_type))], [invoices]);
   const visibleSelected = rows.filter((r) => selected.has(r.id));
@@ -383,9 +389,9 @@ export function Transactions() {
           <EmptyState icon={Search} title="No matches" text="Try a different search or filter." />
         ) : (
           <div className={surface.tableWrap}>
-            <table className={cn(surface.table, styles.ledger)}>
+            <table className={cn(surface.table, styles.ledger)} aria-rowcount={virtual.ariaRowCount(1)}>
               <thead>
-                <tr>
+                <tr aria-rowindex={virtual.enabled ? 1 : undefined}>
                   <th className={styles.cCheck}>
                     <input
                       type="checkbox"
@@ -403,14 +409,16 @@ export function Transactions() {
                   <th aria-label="Actions" />
                 </tr>
               </thead>
-              <tbody>
-                {rows.map((inv) => {
+              <tbody {...virtual.bodyProps}>
+                {virtual.slots.map((slot) => {
+                  if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={8} />;
+                  const inv = rows[slot.index];
                   const status = effectiveStatus(inv, now);
                   const canPay = isRevenueDoc(inv) && (inv.balance_due ?? inv.total) > 0;
                   const locked = isLocked(inv); // period lock: read-only, no edit / delete / payment
                   const lockedTitle = 'Locked period — open the document to view or unlock it';
                   return (
-                    <tr key={inv.id} aria-selected={selected.has(inv.id)}>
+                    <tr key={inv.id} aria-selected={selected.has(inv.id)} {...virtual.rowProps(slot.index)}>
                       <td className={styles.cCheck}>
                         <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={`Select ${inv.invoice_number}`} />
                       </td>
