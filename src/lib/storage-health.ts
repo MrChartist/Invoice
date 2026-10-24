@@ -1,15 +1,23 @@
 /**
  * Storage health: how close the device is to losing data or failing to save.
  *
- * `assessStorage` is pure (unit-tested); `measureStorage` gathers the inputs from
- * localStorage. localStorage is capped at roughly 5 million characters per origin in
- * mainstream browsers and is NOT counted by `navigator.storage.estimate()`, so usage is
- * measured directly.
+ * `assessStorage` is pure (unit-tested); `measureStorage` gathers the inputs from the
+ * storage layer (the IndexedDB-backed cache or localStorage, whichever holds the data).
+ * Usage is measured directly from the app's keys. localStorage is capped at roughly 5 million
+ * characters per origin and is NOT counted by `navigator.storage.estimate()`; with the
+ * IndexedDB backend the cap is the browser's (much larger) IndexedDB quota.
  */
 
-import { DB_PREFIX, collectAppData } from './storage';
+import { DB_PREFIX, collectAppData, storageBackend } from './storage';
+import { ASSET_TABLE, isAssetRef } from './assets';
 
 export const LOCAL_QUOTA_CHARS = 5 * 1024 * 1024;
+/**
+ * Nominal room when the tables live in IndexedDB (Phase 4.2) and the browser gives no estimate.
+ * Real IndexedDB quotas are far larger (a share of the disk); Settings refines this with
+ * `navigator.storage.estimate()`.
+ */
+export const IDB_QUOTA_CHARS = 50 * 1024 * 1024;
 const DAY = 86_400_000;
 
 export interface StorageInput {
@@ -18,9 +26,16 @@ export interface StorageInput {
   quotaChars?: number;
   /** Largest app tables, any order. */
   tables: { key: string; chars: number }[];
-  /** Characters spent on logo / signature images copied into invoice snapshots. */
+  /**
+   * Characters spent on logo / signature images still copied INTO invoice snapshots
+   * (pre-v3 data; since v3 snapshots hold an `asset:` reference and the image is stored once).
+   */
   embeddedImageChars: number;
   invoicesWithImages: number;
+  /** Characters of the shared asset table (each distinct image stored once). */
+  sharedImageChars?: number;
+  /** Invoices whose snapshot points at a shared image instead of carrying a copy. */
+  invoicesSharingImages?: number;
   persisted: boolean | null;
   iosSafari: boolean;
   standalone: boolean;
@@ -47,6 +62,7 @@ export interface StorageHealth {
 }
 
 export function formatChars(n: number): string {
+  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(n / 1024))} KB`;
 }
@@ -61,12 +77,12 @@ export function assessStorage(input: StorageInput): StorageHealth {
   if (pct >= 90) {
     findings.push({
       id: 'full', level: 'critical', title: 'Storage is almost full',
-      detail: `${pct}% of this browser's ~5 MB is used. New invoices may fail to save. Download a backup now, then delete old data or large logos.`,
+      detail: `${pct}% of the ~${formatChars(quota)} this browser allows is used. New invoices may fail to save. Download a backup now, then delete old data or large logos.`,
     });
   } else if (pct >= 75) {
     findings.push({
       id: 'filling', level: 'warn', title: 'Storage is filling up',
-      detail: `${pct}% of this browser's ~5 MB is used. Download a backup and keep an eye on large logos.`,
+      detail: `${pct}% of the ~${formatChars(quota)} this browser allows is used. Download a backup and keep an eye on large logos.`,
     });
   }
 
@@ -109,8 +125,11 @@ export function assessStorage(input: StorageInput): StorageHealth {
   return { level, pct, usedChars: input.usedChars, quotaChars: quota, biggest, findings };
 }
 
-/** Gather the localStorage side of the input (sync). */
-export function measureStorage(): Pick<StorageInput, 'usedChars' | 'tables' | 'embeddedImageChars' | 'invoicesWithImages'> {
+/** Gather the storage side of the input (sync, from the same store the app reads). */
+export function measureStorage(): Pick<
+  StorageInput,
+  'usedChars' | 'quotaChars' | 'tables' | 'embeddedImageChars' | 'invoicesWithImages' | 'sharedImageChars' | 'invoicesSharingImages'
+> {
   const data = collectAppData();
   let usedChars = 0;
   const tables: StorageInput['tables'] = [];
@@ -121,20 +140,24 @@ export function measureStorage(): Pick<StorageInput, 'usedChars' | 'tables' | 'e
   }
   let embeddedImageChars = 0;
   let invoicesWithImages = 0;
+  let invoicesSharingImages = 0;
   try {
     const invoices = JSON.parse(data[`${DB_PREFIX}invoices`] ?? '[]') as { sender?: { logo?: unknown; signature?: unknown } }[];
     for (const inv of Array.isArray(invoices) ? invoices : []) {
-      const size = [inv?.sender?.logo, inv?.sender?.signature].reduce<number>(
-        (s, v) => s + (typeof v === 'string' && v.startsWith('data:') ? v.length : 0),
-        0,
-      );
+      const images = [inv?.sender?.logo, inv?.sender?.signature];
+      const size = images.reduce<number>((s, v) => s + (typeof v === 'string' && v.startsWith('data:') ? v.length : 0), 0);
       if (size > 0) {
         embeddedImageChars += size;
         invoicesWithImages++;
+      } else if (images.some(isAssetRef)) {
+        invoicesSharingImages++;
       }
     }
   } catch {
     /* unreadable table: nothing to attribute */
   }
-  return { usedChars, tables, embeddedImageChars, invoicesWithImages };
+  const assetsRaw = data[DB_PREFIX + ASSET_TABLE];
+  const sharedImageChars = assetsRaw ? assetsRaw.length : 0;
+  const quotaChars = storageBackend() === 'idb' ? IDB_QUOTA_CHARS : LOCAL_QUOTA_CHARS;
+  return { usedChars, quotaChars, tables, embeddedImageChars, invoicesWithImages, sharedImageChars, invoicesSharingImages };
 }

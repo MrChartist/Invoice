@@ -6,16 +6,89 @@
  *
  * Journey: first-run account → dashboard → new invoice (client + line) → save → appears in the
  * list with the FY number → preview opens with focus inside → backup download → restore that
- * backup (with undo copy) → data still there. Fails on any page error or CSP violation.
+ * backup (with undo copy) → data still there → a pre-4.x localStorage user is moved to IndexedDB.
+ * Data tables live in IndexedDB (read/written here like a second tab would). Fails on any page
+ * error or CSP violation.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { crc32, deflateSync } from 'node:zlib';
 import { DIST, isCsp, isFontNoise, loadPlaywright, serve, watch } from '../../scripts/lib/harness.mjs';
 
 if (!existsSync(join(DIST, 'index.html'))) {
   console.error('dist/ missing - run `npm run build` first');
   process.exit(2);
 }
+
+/** A valid 24x24 orange PNG (built here, no fixture file) used as the business logo. */
+const LOGO_PNG = (() => {
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const w = 24;
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(w, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8); // 8-bit RGB
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => [240, 120, 20]).flat())]);
+  const idat = deflateSync(Buffer.concat(Array.from({ length: w }, () => row)));
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]).toString('base64');
+})();
+
+/*
+ * The app keeps its data tables in IndexedDB (Phase 4.2) behind an in-memory cache. These helpers
+ * read and write that store directly, the way a second tab would: a write is announced on the
+ * app's BroadcastChannel so open tabs refresh their cache. Reads poll until `ok(value)` holds,
+ * because the app commits its writes a moment after the screen updates.
+ */
+async function idbGet(p, key) {
+  return p.evaluate((k) => new Promise((resolve, reject) => {
+    const open = indexedDB.open('mrchartist_inv_kv');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const req = db.transaction('data', 'readonly').objectStore('data').get(k);
+      req.onsuccess = () => { db.close(); resolve(req.result ?? null); };
+      req.onerror = () => { db.close(); reject(req.error); };
+    };
+  }), key);
+}
+async function idbPut(p, key, value) {
+  await p.evaluate(([k, v]) => new Promise((resolve, reject) => {
+    const open = indexedDB.open('mrchartist_inv_kv');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('data', 'readwrite');
+      if (v === null) tx.objectStore('data').delete(k);
+      else tx.objectStore('data').put(v, k);
+      tx.oncomplete = () => {
+        db.close();
+        const ch = new BroadcastChannel('mrchartist_inv_sync');
+        ch.postMessage({ keys: [k] });
+        ch.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    };
+  }), [key, value]);
+}
+async function readJson(p, name, fallback, ok = () => true, timeout = 5000) {
+  const until = Date.now() + timeout;
+  for (;;) {
+    const raw = await idbGet(p, `mrchartist_inv_${name}`);
+    const value = raw === null ? fallback : JSON.parse(raw);
+    if (ok(value) || Date.now() > until) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+const writeJson = (p, name, value) => idbPut(p, `mrchartist_inv_${name}`, value === null ? null : JSON.stringify(value));
 
 const failures = [];
 const check = (ok, msg) => {
@@ -74,9 +147,12 @@ try {
     await page.getByLabel('UPI ID').fill('e2e@okhdfcbank');
     await page.getByRole('button', { name: /Next/ }).click();
     await page.getByRole('dialog', { name: /Logo/ }).waitFor();
+    // A real logo, so later steps can prove the image stored by reference still renders.
+    await page.getByLabel('Upload logo image').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(LOGO_PNG, 'base64') });
+    await page.getByRole('dialog', { name: /Logo/ }).locator('img[src^="data:image/"]').first().waitFor();
     await page.getByRole('button', { name: /Finish/ }).click();
     await page.waitForURL(/\/invoice/);
-    const s = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_settings') || '{}'));
+    const s = await readJson(page, 'settings', {}, (v) => v.onboarded === true);
     const p = s.profiles?.find((x) => x.id === s.activeProfileId) ?? {};
     check(s.onboarded === true && p.companyName === 'E2E Trader' && p.stateCode === '27' && p.upiId === 'e2e@okhdfcbank',
       `wizard saves the profile (${p.companyName}, state ${p.stateCode}, ${p.upiId}) and opens the editor`);
@@ -90,11 +166,17 @@ try {
     await page.getByLabel('Item 1 rate').fill('1500');
     await page.keyboard.press('Control+s');
     await page.getByText(/saved/i).first().waitFor();
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]'));
+    const stored = await readJson(page, 'invoices', [], (v) => v.length === 1);
     check(stored.length === 1, `one invoice stored (${stored.length})`);
     check(/^INV\/FY\d{2}-\d{2}\/0001$/.test(stored[0]?.invoice_number ?? ''), `Indian-FY number (${stored[0]?.invoice_number})`);
     check(stored[0]?.status === 'Sent', `Save issues the document (${stored[0]?.status})`);
     check(Math.abs((stored[0]?.total ?? 0) - 3540) < 0.01, `total with 18% GST = 3540 (${stored[0]?.total})`);
+    const assets = await readJson(page, 'assets', []);
+    const lsData = await page.evaluate(() => Object.keys(localStorage).filter((k) => /^mrchartist_inv_(invoices|settings|clients|assets)$/.test(k)));
+    const marker = await page.evaluate(() => localStorage.getItem('mrchartist_inv_storage_backend'));
+    check(lsData.length === 0 && marker === 'idb', `data tables live in IndexedDB, not localStorage (marker ${marker}, ${lsData.length} stray keys)`);
+    check(/^asset:/.test(stored[0]?.sender?.logo ?? '') && assets.length === 1 && assets[0].data.startsWith('data:image/'),
+      `the snapshot stores the logo by reference (${String(stored[0]?.sender?.logo).slice(0, 24)}, ${assets.length} asset)`);
   });
 
   await step('typeahead fills client and item from what was saved', async () => {
@@ -117,7 +199,7 @@ try {
     const lines = await page.locator('[data-line]').count();
     check(lines === 1, `Enter on a suggestion does not add a line (${lines})`);
     // Leave without saving this second draft.
-    await page.evaluate(() => localStorage.removeItem('mrchartist_inv_draft'));
+    await writeJson(page, 'draft', null);
   });
 
   await step('invoice list and preview', async () => {
@@ -129,6 +211,8 @@ try {
     await dialog.waitFor();
     const focusInside = await page.evaluate(() => !!document.activeElement?.closest('[aria-label="Document preview"]'));
     check(focusInside, 'preview moves focus into the dialog');
+    const logoSrc = await dialog.locator('img[src^="data:image/"]').count();
+    check(logoSrc > 0, 'the preview renders the logo resolved from its reference');
 
     // Download PDF produces a real PDF file.
     await dialog.getByRole('button', { name: /^Share/ }).click();
@@ -168,7 +252,7 @@ try {
     await dialog.getByRole('button', { name: /^Share/ }).click();
     const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Client copy/ }).click()]);
     const html = readFileSync(await dl.path(), 'utf8');
-    check(/\.html$/.test(dl.suggestedFilename()) && !/<script/i.test(html) && html.includes('Acme Buyers') && /href="upi:\/\/pay\?pa=e2e@okhdfcbank/.test(html),
+    check(/\.html$/.test(dl.suggestedFilename()) && !/<script/i.test(html) && html.includes('Acme Buyers') && /href="upi:\/\/pay\?pa=e2e@okhdfcbank/.test(html) && /src="data:image\//.test(html) && !html.includes('asset:'),
       `client copy: ${dl.suggestedFilename()}, ${Math.round(html.length / 1024)} KB, no scripts, pay link present`);
     // It renders on its own, offline, under its own strict CSP.
     const viewer = await context.newPage();
@@ -186,11 +270,9 @@ try {
     await page.getByText('Acme Buyers').first().waitFor();
     const tab2 = await context.newPage();
     await tab2.goto(srv.origin + '/clients');
-    await tab2.evaluate(() => {
-      const rows = JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]');
-      rows[0].notes = 'changed in tab 2';
-      localStorage.setItem('mrchartist_inv_invoices', JSON.stringify(rows));
-    });
+    const rows = await readJson(tab2, 'invoices', []);
+    rows[0].notes = 'changed in tab 2';
+    await writeJson(tab2, 'invoices', rows);
     await page.getByText('Updated in another tab').waitFor();
     check(true, 'first tab is told about the change made in the second tab');
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
@@ -228,20 +310,20 @@ try {
     await page.getByRole('button', { name: 'Mark paid' }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Mark paid' }).click();
     await page.getByText(/1 marked paid/).waitFor();
-    const paid = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices'))[0]);
+    const paid = (await readJson(page, 'invoices', [], (v) => v[0]?.status === 'Paid'))[0];
     check(paid.status === 'Paid' && paid.balance_due === 0, `bulk mark paid settles the invoice (${paid.status}, balance ${paid.balance_due})`);
 
     await page.getByRole('button', { name: /^Delete INV/ }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
     await page.getByRole('button', { name: 'Undo' }).click();
     await page.waitForTimeout(6500);
-    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).length);
+    const after = (await readJson(page, 'invoices', [])).length;
     check(after === 1, `Undo keeps the deleted invoice (${after} stored after the undo window)`);
     await page.getByText('Acme Buyers').first().waitFor();
   });
 
   await step('raise a debit note from the invoice', async () => {
-    const id = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices'))[0].id);
+    const id = (await readJson(page, 'invoices', []))[0].id;
     await page.goto(srv.origin + '/invoice/' + id);
     await page.getByRole('button', { name: /^Convert/ }).click();
     await page.getByRole('menuitem', { name: 'Create debit note' }).click();
@@ -251,14 +333,11 @@ try {
     await dlg.getByLabel('Line 1 rate').fill('200');
     await dlg.getByRole('button', { name: 'Create draft' }).click();
     await page.waitForURL((u) => u.pathname.startsWith('/invoice/') && !u.pathname.endsWith(id));
-    const dn = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).find((i) => i.doc_type === 'DEBIT_NOTE'));
+    const dn = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'DEBIT_NOTE'))).find((i) => i.doc_type === 'DEBIT_NOTE');
     check(!!dn && /^DBN\/FY\d{2}-\d{2}\/0001$/.test(dn.invoice_number) && Math.abs(dn.total - 236) < 0.01,
       `debit note ${dn?.invoice_number} for ${dn?.total} opens in the editor`);
     // Keep later steps about the original invoice simple.
-    await page.evaluate((dnId) => {
-      const rows = JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).filter((i) => i.id !== dnId);
-      localStorage.setItem('mrchartist_inv_invoices', JSON.stringify(rows));
-    }, dn.id);
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== dn.id));
   });
 
   await step('double-entry books: journal voucher, trial balance, balance sheet, cash flow', async () => {
@@ -272,7 +351,7 @@ try {
     await dlg.getByText('Balanced').waitFor();
     await dlg.getByRole('button', { name: 'Save voucher' }).click();
     await dlg.waitFor({ state: 'detached' });
-    const vouchers = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_vouchers') || '[]'));
+    const vouchers = await readJson(page, 'vouchers', [], (v) => v.length === 1);
     check(vouchers.length === 1 && /^JV\/FY\d{2}-\d{2}\/0001$/.test(vouchers[0].number) && vouchers[0].lines[0].dr === 5000000,
       `journal voucher stored in paise with an FY number (${vouchers[0]?.number})`);
     await page.getByRole('tab', { name: 'Trial balance' }).click();
@@ -304,15 +383,15 @@ try {
   });
 
   await step('restore the backup', async () => {
-    await page.evaluate(() => localStorage.setItem('mrchartist_inv_invoices', '[]'));
+    await writeJson(page, 'invoices', []);
     await page.reload();
     await page.locator('input[type=file][accept*="json"]').first().setInputFiles(backupPath);
     await page.getByRole('button', { name: 'Restore', exact: true }).click();
     await page.waitForEvent('load', { timeout: 15000 });
     await page.waitForTimeout(500);
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]'));
+    const stored = await readJson(page, 'invoices', [], (v) => v.length === 1);
     check(stored.length === 1, `restored invoice is back (${stored.length})`);
-    const version = await page.evaluate(() => localStorage.getItem('mrchartist_inv_schema_version'));
+    const version = await readJson(page, 'schema_version', null);
     check(Number(version) >= 1, `schema version stamped (${version})`);
     await page.goto(srv.origin + '/settings?tab=data');
     await page.getByRole('button', { name: /Undo last restore/ }).waitFor();
@@ -324,7 +403,7 @@ try {
     await page.getByRole('button', { name: /^Delete INV/ }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
     await page.waitForTimeout(6500);
-    const left = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]').length);
+    const left = (await readJson(page, 'invoices', [], (v) => v.length === 0)).length;
     check(left === 0, `the delete is committed after the undo window (${left} left)`);
   });
 
@@ -353,12 +432,44 @@ try {
     await page.getByRole('button', { name: /^Bill$/ }).first().click();
     await page.getByRole('button', { name: 'Create draft invoice' }).click();
     await page.waitForURL(/\/invoice\/.+/);
-    const inv = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]')[0]);
+    const inv = (await readJson(page, 'invoices', [], (v) => v.length > 0))[0];
     const item = inv?.items?.[0] ?? {};
     check(inv?.status === 'Draft' && item.quantity === 1.5 && item.unit === 'HRS' && item.hsn === '998311',
       `bill-from-time draft: ${inv?.status}, ${item.quantity} ${item.unit}, SAC ${item.hsn}`);
-    const entries = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_time_entries') || '[]'));
+    const entries = await readJson(page, 'time_entries', [], (v) => v.some((e) => e.invoiced_in));
     check(entries.length === 1 && entries[0].invoiced_in === inv.id, `time entry linked to the invoice (${entries.length})`);
+  });
+
+  await step('an existing localStorage user moves to IndexedDB on first load', async () => {
+    // A device last used by a pre-4.x build: data in localStorage, schema v1, logo inline in the snapshot.
+    const logo = `data:image/png;base64,${LOGO_PNG}`;
+    const legacy = {
+      mrchartist_inv_schema_version: '1',
+      mrchartist_inv_settings: JSON.stringify({ profiles: [{ id: 'p1', companyName: 'Legacy Co', logo }], activeProfileId: 'p1', onboarded: true }),
+      mrchartist_inv_invoices: JSON.stringify([{ id: 'old-1', invoice_number: 'INV/FY24-25/0001', sender: { id: 'p1', companyName: 'Legacy Co', logo }, items: [], total: 100 }]),
+      mrchartist_inv_clients: JSON.stringify([{ id: 'c1', name: 'Old Client' }]),
+    };
+    const ctx = await browser.newContext({ serviceWorkers: 'block' });
+    await ctx.addInitScript((data) => {
+      if (sessionStorage.getItem('seeded')) return; // seed once per tab, before the app runs
+      sessionStorage.setItem('seeded', '1');
+      for (const [k, v] of Object.entries(data)) localStorage.setItem(k, v);
+    }, legacy);
+    const p2 = await ctx.newPage();
+    watch(p2, errors);
+    await p2.goto(srv.origin + '/');
+    const inv = await readJson(p2, 'invoices', [], (v) => v.length === 1 && /^asset:/.test(v[0].sender?.logo ?? ''));
+    const assets = await readJson(p2, 'assets', []);
+    const clients = await readJson(p2, 'clients', []);
+    const left = await p2.evaluate(() => Object.keys(localStorage).filter((k) => /^mrchartist_inv_(invoices|clients|settings|schema_version)$/.test(k)));
+    check(inv.length === 1 && clients.length === 1 && left.length === 0,
+      `localStorage tables copied to IndexedDB and the copy removed (${inv.length} invoice, ${clients.length} client, ${left.length} left behind)`);
+    check(/^asset:/.test(inv[0]?.sender?.logo ?? '') && assets.length === 1 && assets[0].data === logo,
+      'the v2 migration ran on the moved data: the inline logo is now one shared asset');
+    await p2.reload();
+    const again = await readJson(p2, 'invoices', []);
+    check(again.length === 1 && again[0].id === 'old-1', 'after a reload the data is served from IndexedDB');
+    await ctx.close();
   });
 } catch {
   /* already reported */

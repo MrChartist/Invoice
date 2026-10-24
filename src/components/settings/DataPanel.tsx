@@ -1,3 +1,4 @@
+import { reloadAfterFlush, storageBackend } from '../../lib/storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { AlertTriangle, DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Info, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
@@ -48,12 +49,17 @@ export function DataPanel({ notify }: Props) {
   const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
   const [safety, setSafety] = useState<SafetySnapshot | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
+  const [browserQuota, setBrowserQuota] = useState<number | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
     getSafetySnapshot().then((snap) => alive && setSafety(snap));
-    requestPersistentStorage().then((st) => alive && setPersisted(st.supported ? st.persisted : null));
+    requestPersistentStorage().then((st) => {
+      if (!alive) return;
+      setPersisted(st.supported ? st.persisted : null);
+      setBrowserQuota(st.quota);
+    });
     return () => {
       alive = false;
     };
@@ -63,13 +69,15 @@ export function DataPanel({ notify }: Props) {
     () =>
       assessStorage({
         ...measureStorage(),
+        // IndexedDB backend: the browser's own estimate (bytes; strings take up to 2 bytes a character).
+        ...(storageBackend() === 'idb' && browserQuota ? { quotaChars: Math.floor(browserQuota / 2) } : {}),
         persisted,
         iosSafari: isIosSafari(),
         standalone: isStandalone(),
         lastBackupIso: getLastBackup(),
         now: new Date(),
       }),
-    [version, persisted], // eslint-disable-line react-hooks/exhaustive-deps
+    [version, persisted, browserQuota], // eslint-disable-line react-hooks/exhaustive-deps
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const catalog = useMemo<InvoiceItem[]>(() => localDb.items.getAll(), [version]);
@@ -119,7 +127,7 @@ export function DataPanel({ notify }: Props) {
     try {
       restoreBackup(pending.data);
       notify('Backup restored — reloading…');
-      setTimeout(() => window.location.reload(), 700);
+      setTimeout(reloadAfterFlush, 700);
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -134,7 +142,7 @@ export function DataPanel({ notify }: Props) {
             <HardDrive size={16} /> Storage on this device
           </span>
           <span className={surface.mono}>
-            {formatChars(health.usedChars)} of ~5 MB
+            {formatChars(health.usedChars)} of ~{formatChars(health.quotaChars)}
           </span>
         </div>
         <div className={surface.cardBody}>
@@ -326,7 +334,7 @@ export function DataPanel({ notify }: Props) {
         onConfirm={async () => {
           await forgetDeviceData();
           wipeAppData();
-          window.location.reload();
+          reloadAfterFlush();
         }}
         onClose={() => setWipeOpen(false)}
       />
@@ -343,7 +351,7 @@ export function DataPanel({ notify }: Props) {
             restoreBackup(safety.data);
             await clearSafetySnapshot();
             notify('Previous data put back — reloading…');
-            setTimeout(() => window.location.reload(), 700);
+            setTimeout(reloadAfterFlush, 700);
           } catch (err) {
             notify((err as Error).message, 'error');
           }

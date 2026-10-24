@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { readTimer, TIMER_EVENT, TIMER_KEY, type TimerState } from '../lib/timer';
+import { subscribeStorageChanges } from '../lib/storage';
 
 /**
  * Live view of the running timer: re-reads it when this tab or another tab changes it, and ticks
@@ -18,7 +19,12 @@ export function useTimer(): { timer: TimerState | null; now: number } {
     };
     window.addEventListener(TIMER_EVENT, sync);
     window.addEventListener('storage', onStorage);
+    // IndexedDB backend: other tabs' changes arrive through the storage layer, not `storage` events.
+    const unsubscribe = subscribeStorageChanges((key) => {
+      if (key === TIMER_KEY) sync();
+    });
     return () => {
+      unsubscribe();
       window.removeEventListener(TIMER_EVENT, sync);
       window.removeEventListener('storage', onStorage);
     };

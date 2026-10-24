@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { subscribeStorageChanges } from '../../lib/storage';
 import {
   dismiss,
   loadNotifState,
@@ -56,7 +57,9 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     const timer = setInterval(refresh, pollMs);
     window.addEventListener('focus', refresh);
     window.addEventListener('storage', refresh);
+    const unsubscribe = subscribeStorageChanges(refresh);
     return () => {
+      unsubscribe();
       clearInterval(timer);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('storage', refresh);

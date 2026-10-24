@@ -1,7 +1,39 @@
 # Architecture & module contract
 
 Mr. Chartist Invoice is a **local-first, serverless** React 19 + TypeScript + Vite SPA.
-Everything lives in `localStorage` behind `src/lib/storage.ts`.
+Everything lives in the browser behind `src/lib/storage.ts`: data tables in IndexedDB behind a synchronous
+in-memory cache (localStorage when IndexedDB is unavailable), device-local keys in localStorage.
+
+## Storage layer (Phase 4.2)
+- **Backends.** `initStorage()` runs in `main.tsx` before the first render and before any data is read. It
+  opens the app's single IndexedDB database (`mrchartist_inv_kv`, store `data`; the older `kv` store keeps the
+  folder handle / backup key / safety snapshot) through one shared connection (`src/lib/idb-kv.ts`) and loads
+  every `mrchartist_inv_*` data key into a `Map`. `readRaw/writeRaw/removeRaw/getTable/setTable/getJson/setJson`
+  keep their synchronous signatures and serve that map. Without IndexedDB (Node tests, some private modes, or
+  before the first successful move) the same functions talk to localStorage exactly as before.
+- **Keys.** Every key name is unchanged; values are the same JSON strings. Device-local keys (`DEVICE_LOCAL_KEYS`
+  in `storage.ts`: PIN credential, lockout guard, idle timeout, session, `last_backup`, `storage_backend`) and the
+  non-prefixed `theme` always stay in localStorage. Modules must not touch `localStorage` directly for app data.
+- **Write-through.** A write updates the map at once and is queued; the queue commits in one IndexedDB
+  transaction on the next task, and immediately on `pagehide` / `visibilitychange: hidden`. Paths that reload
+  right after a bulk change (restore, erase, forgot-PIN reset, sample data) call `reloadAfterFlush()`.
+- **Failures.** localStorage writes still throw `StorageWriteError` synchronously. An IndexedDB commit that fails
+  keeps the change in memory, sets `storageFailure()` (the layout shows a long-lived error toast) and is retried
+  with the next write; while the failure is a quota error, writes that would grow a key throw
+  `StorageWriteError(quotaExceeded)` synchronously, so the screens show their usual "storage is full" message.
+- **One-time move.** Until `mrchartist_inv_storage_backend = 'idb'` is set, localStorage is the truth: all its data
+  keys are written to IndexedDB in one transaction with a `__meta__` marker, read back and compared, and only then
+  is the marker set and the localStorage copy removed. Any failure or timeout leaves localStorage untouched and the
+  session on localStorage; the next boot retries. After the move, a data key found in localStorage (an outdated tab
+  still running old code) is imported only if IndexedDB lacks it, otherwise dropped. If IndexedDB cannot be opened
+  on a device whose data has moved, the app shows "Your data could not be opened" instead of starting empty.
+- **Cross-tab.** IndexedDB fires no `storage` events, so after each commit the tab posts the changed keys on the
+  `mrchartist_inv_sync` BroadcastChannel; other tabs re-read those keys into their map (unless they hold an unsaved
+  write for the key) and `cross-tab.ts` shows "Updated in another tab" as before.
+- **Readers.** Backup (`collectAppData`), restore, wipe, migrations and storage health all go through the same
+  functions, so they read the cache. Storage health uses the browser's IndexedDB quota estimate instead of ~5 MB.
+- **Rule for new code.** No module evaluated before `initStorage()` (i.e. statically imported by `main.tsx` /
+  `App.tsx`) may read storage at module level; read inside functions, effects or lazily loaded modules.
 
 ## Ground rules (every module)
 1. No backend, no network calls, no analytics. No new runtime dependencies.
@@ -18,7 +50,7 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
    (`npm test`, Node ≥ 22, no browser APIs in tested modules).
 7. Indian FY numbering (`INV/FY25-26/0001`) is fixed — do not change it.
 
-## Tables (localStorage `mrchartist_inv_<table>`)
+## Tables (`mrchartist_inv_<table>`, IndexedDB-backed cache or localStorage)
 | table | owner module | shape |
 |---|---|---|
 | `invoices` | core | `InvoiceRecord` (`src/types/invoice.ts`) |
@@ -47,6 +79,18 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
 | `accounts` | ledger | user-added `Account` rows (`src/lib/ledger/accounts.ts`); default accounts are constants, never stored |
 | `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`) |
 | `fixed_assets` | ledger | `FixedAsset` register rows (`src/lib/ledger/assets.ts`) |
+| `assets` | storage (`src/lib/assets.ts`) | `{id, data}`: logo / signature data URLs stored once, keyed by content hash (schema v3) |
+
+### Snapshot images by reference (schema v3)
+Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the
+image lives once in `assets`. `setTable('invoices' | 'recurring')` interns inline images (assets written first, so a
+reference never dangles) and `getTable` resolves references back to the identical data URL, so every reader —
+templates, preview, PDF, client copy, e-invoice print — receives exactly what was saved (Critical Rule 3). Code that
+reads these tables must go through `getTable` (or `localDb`), never `JSON.parse(readRaw(...))`. The id is a
+synchronous content hash (length + two 32-bit passes) because `setTable` is synchronous (`crypto.subtle` is
+async-only); interning compares full content and suffixes `~n` on a collision, so a reference cannot resolve to
+the wrong image. A reference with no asset resolves to `''` (no image). Profiles in `settings` keep their own
+inline image. Unreferenced assets (after deleting invoices) are not pruned yet.
 
 ## Schema versions & migrations
 
@@ -54,8 +98,14 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
 in `main.tsx` before the first render: a fresh install is stamped with the latest version, existing data runs each
 newer migration in order, a throwing migration rolls every key back and leaves the version unchanged, and data from
 a newer app version is never touched. Restores reload the page, so restored data is migrated the same way.
-To change a stored shape, append a `Migration` (next version number, idempotent, additive, never rewrites an
-invoice's `sender` snapshot) and cover it in `tests/migrations.test.ts`.
+To change a stored shape, append a `Migration` (next version number, idempotent, additive, never changes what an
+invoice's `sender` snapshot renders) and cover it in `tests/migrations.test.ts`.
+
+| version | migration |
+|---|---|
+| 1 | flat settings → multi-profile shape |
+| 2 | audit log: seal pre-chain rows with a `chain_start` anchor (4.5) |
+| 3 | inline snapshot logos / signatures (`invoices`, `recurring`) → `assets` table + `asset:<id>` references, deduplicated by content. Raw-JSON based, idempotent, leaves unresolvable references and unreadable tables untouched; rolls back with the rest of the run on failure (`tests/assets.test.ts`). |
 
 ## Integration
 Feature modules are **self-contained**: they export a page/component and (optionally) a pure

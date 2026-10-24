@@ -30,6 +30,7 @@ import {
 import { Logo } from '../components/brand/Logo';
 import { Avatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/useToast';
+import { storageFailure, subscribeStorageFailure } from '../lib/storage';
 import type { PaletteAction } from '../components/command/CommandPalette';
 import { NotificationBell } from '../components/command/NotificationBell';
 import { InstallPrompt } from '../components/pwa/InstallPrompt';
@@ -187,6 +188,16 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
       opener?.focus();
     };
   }, [drawerActive]);
+
+  // A save that the screen accepted but IndexedDB refused (e.g. disk full): say so, loudly and for long.
+  useEffect(
+    () =>
+      subscribeStorageFailure(() => {
+        const failure = storageFailure();
+        if (failure) notify(`Not saved: ${failure.message}`, 'error', { duration: 60_000 });
+      }),
+    [notify],
+  );
 
   // Recurring schedules create their due invoices once per session start / tab focus.
   const { generated, dismiss, message } = useRecurringRunner();

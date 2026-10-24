@@ -25,7 +25,9 @@
   Expenses, Receivables, Books, GstReports, Exports, Inventory, Recurring). Design Studio lives in
   `src/components/design/`. Every page except Dashboard and Login is `React.lazy` in `src/App.tsx`; the editor chunk is prefetched on idle.
 - `src/store/useInvoiceStore.ts` — Zustand store (current invoice + actions).
-- `src/lib/localDb.ts` — localStorage data layer + Indian-FY invoice numbering.
+- `src/lib/localDb.ts` — data layer (over `src/lib/storage.ts`) + Indian-FY invoice numbering.
+- `src/lib/storage.ts` — sync key/value API; data tables live in IndexedDB behind an in-memory cache loaded by
+  `initStorage()` in `main.tsx` (localStorage fallback). See `docs/ARCHITECTURE.md` → Storage layer.
 - `src/lib/auth.ts` — local PIN gate (PBKDF2-hashed, lockout, idle lock; `login`/`verifyPin` are async).
 - `src/lib/stats.ts` — dashboard maths; `isRevenueDoc` is the single definition of "revenue".
 - `src/lib/utils.ts` — `cn`, `formatCurrency`, `formatDate`, `amountInWords` (Indian system).
@@ -34,9 +36,13 @@
   (`accent`, `fontFamily`); optional `design` prop applies Design Studio prefs (`src/lib/design-prefs.ts`).
 - `src/components/{preview,modals,layout,ui}/` — preview/export, search modals, shell, primitives.
 
-## localStorage keys (do not rename — breaks existing users' data)
+## Storage keys (do not rename — breaks existing users' data)
+Same names whether a key lives in IndexedDB (data tables, via the storage cache) or localStorage (device-local
+keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` directly for app data.
 - `mrchartist_inv_*` (via `DB_PREFIX`): `clients`, `items_catalog`, `invoices`, `transactions`, plus the
-  feature tables listed in `docs/ARCHITECTURE.md` (`vendors`, `purchases`, `recurring`, `doc_links`, `stock_moves` …).
+  feature tables listed in `docs/ARCHITECTURE.md` (`vendors`, `purchases`, `recurring`, `doc_links`, `stock_moves`,
+  `assets` …). Since schema v3 invoice/recurring sender snapshots hold `asset:<id>` for logo/signature; `getTable`
+  resolves them, so read those tables through `getTable`/`localDb`, never raw JSON.
   Backup collects every `mrchartist_inv_*` key except device-local ones (PIN session, lockout, idle timer).
 - `mrchartist_inv_settings` — multi-profile sender identities (array).
 - `mrchartist_inv_template` — selected template id.
@@ -44,7 +50,7 @@
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express
-   or a server DB. Everything runs in the browser; data lives in `localStorage`.
+   or a server DB. Everything runs in the browser; data lives in IndexedDB/localStorage via `src/lib/storage.ts`.
 2. **No TailwindCSS.** Vanilla CSS + CSS Modules only. Use CSS variables, not raw hex, in components.
 3. **Invoice snapshotting.** On save, the invoice embeds a snapshot of the selected sender
    profile. The preview must read from `invoice.sender` first (fall back to global settings only

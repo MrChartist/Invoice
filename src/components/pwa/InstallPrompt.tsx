@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Share, X } from 'lucide-react';
 import { useInstallPrompt } from '../../lib/pwa';
+import { readRaw, writeRaw } from '../../lib/storage';
 import controls from '../../styles/controls.module.css';
 import styles from './Pwa.module.css';
 
@@ -8,7 +9,7 @@ const DISMISS_KEY = 'mrchartist_inv_install_dismissed';
 
 function wasDismissed(): boolean {
   try {
-    return localStorage.getItem(DISMISS_KEY) === '1';
+    return readRaw(DISMISS_KEY) === '1';
   } catch {
     return false;
   }
@@ -55,7 +56,7 @@ export function InstallPrompt({ variant = 'banner' }: InstallPromptProps) {
   const dismiss = () => {
     setDismissed(true);
     try {
-      localStorage.setItem(DISMISS_KEY, '1');
+      writeRaw(DISMISS_KEY, '1');
     } catch {
       /* session-only dismissal is fine */
     }

@@ -1,5 +1,10 @@
 /**
- * Cross-tab awareness. Every write already re-reads localStorage, so two tabs cannot
+ * Cross-tab awareness. Two signals feed it: the browser's `storage` event (localStorage
+ * backend, and device-local keys) and `subscribeStorageChanges` from storage.ts, which
+ * reports keys another tab committed to IndexedDB (announced over a BroadcastChannel,
+ * because IndexedDB fires no events across tabs) after this tab's cache was refreshed.
+ *
+ * Every write already re-reads the store, so two tabs cannot
  * interleave inside one mutation; the risks are an open editor saving a stale copy over
  * another tab's newer save, and screens showing data that changed elsewhere.
  *
@@ -8,8 +13,7 @@
  * does not nag the other.
  */
 
-import { DB_PREFIX } from './storage';
-import { DEVICE_LOCAL_KEYS } from './auth';
+import { DB_PREFIX, DEVICE_LOCAL_KEYS, subscribeStorageChanges } from './storage';
 
 /** Keys that change often without being shared data (autosave draft, PIN session, bookkeeping). */
 const IGNORED = new Set([
@@ -49,10 +53,11 @@ export function subscribeExternal(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-/** Install the `storage` listener once (call at boot). */
+/** Install the listeners once (call at boot, after initStorage). */
 export function initCrossTab(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
+  subscribeStorageChanges((key) => noteExternalChange(key));
   window.addEventListener('storage', (e) => {
     if (e.storageArea && typeof localStorage !== 'undefined' && e.storageArea !== localStorage) return;
     noteExternalChange(e.key);

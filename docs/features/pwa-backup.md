@@ -91,15 +91,23 @@ The module captures `beforeinstallprompt` on import, so import it early (main.ts
 
 - `parseBackup` / `validateBackupData` refuse a file before anything is written when a record table
   (`invoices`, `clients`, `items_catalog`, `transactions`, `vendors`, `purchases`, `purchase_payments`, `recurring`,
-  `doc_links`, `audit_log`) is not a JSON array of objects (core tables need an `id`), settings are not an object,
-  or the file / `schema_version` is newer than this app.
+  `doc_links`, `audit_log`, `assets`) is not a JSON array of objects (core tables and `assets` need an `id`), settings
+  are not an object, the file / `schema_version` is newer than this app, or an invoice / recurring snapshot refers to
+  an `asset:<id>` image the file does not contain.
+- Backups stay self-contained: the `assets` table (snapshot logos / signatures since schema v3) is an ordinary
+  `mrchartist_inv_*` key and rides along. An older backup with inline images restores as is, renders the same, and
+  the v3 migration moves its images into `assets` on the reload after the restore.
+- Backups read the in-memory cache (`collectAppData`), so they contain exactly what the app shows; a restore,
+  erase or forgot-PIN reset commits to IndexedDB (`reloadAfterFlush`) before the page reloads.
 - Before a restore or an erase, `saveSafetySnapshot(reason)` copies every app key into IndexedDB (`safety-snapshot`,
-  outside the localStorage quota). Settings → Data shows **Undo last restore / erase** while that copy exists.
+  in the `kv` store, separate from the data tables). Settings → Data shows **Undo last restore / erase** while that copy exists.
 
 ## Storage health
 
-`src/lib/storage-health.ts`: `measureStorage()` counts app keys in localStorage (not covered by
-`navigator.storage.estimate()`) and the logo/signature images copied into invoice snapshots; `assessStorage()` turns
+`src/lib/storage-health.ts`: `measureStorage()` counts app keys through the storage layer (the IndexedDB-backed
+cache since 4.2, else localStorage, which `navigator.storage.estimate()` does not cover); the quota is ~5 MB on
+localStorage and the browser's IndexedDB estimate otherwise (Settings → Data), the logo/signature images still copied inline into invoice snapshots (pre-v3 data),
+the shared `assets` table (`sharedImageChars`) and invoices that reference it (`invoicesSharingImages`); `assessStorage()` turns
 that plus persistence, iOS-Safari-outside-Home-Screen and backup age into findings (`ok`/`warn`/`critical`) shown in
 Settings → Data. Folder backups are read back after writing (`isIntactBackup`); a file that does not reopen intact is
 reported as a failed backup and the "last backup" time is not advanced.
