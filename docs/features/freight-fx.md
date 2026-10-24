@@ -64,7 +64,8 @@ Working papers — verify with your CA before filing or importing.
 
 ## Not done / limits
 
-- Realised exchange gain/loss: receipts are booked at the invoice rate. Post the difference in Tally / books by hand.
+- Realised exchange gain/loss (6.19): enter the realised rate on the receipt and the ledger posts the difference to 4930
+  (`docs/features/cash-planning.md`). The Tally export still books receipts at the invoice rate.
 - Sales reports (`src/lib/sales-reports.ts`) and the TDS register stay INR-only, as before. Foreign documents are counted as excluded.
 - There is no per-date rate table, so the rate is typed per invoice. The country code for `ExpDtls.CntCode` is still entered in the e-Invoice modal.
 - Charges cannot be marked tax-inclusive. A credit note still never credits charges (see `docs/qa/logic.md`).

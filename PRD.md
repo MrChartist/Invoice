@@ -51,6 +51,14 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   catalogue items, command palette (Ctrl+K), first-run setup wizard.
 - **Ship-to / consignee address**, taxable freight option (Sec 15), foreign-currency documents with an exchange rate.
 - **Recurring invoices** with schedules, generated in the background.
+- **Credit control**: per-client credit limit and credit days; the editor warns (never blocks) when outstanding + the
+  new invoice exceeds the limit, a bill is older than the credit period, or the client's cheques bounced.
+- **Cheque register** (`/cheques`): cheques received / issued with deposit, clearing (records the payment), bounce
+  (reverses it) and cancel; post-dated cheque reminders in the notification bell; cheque printing on CTS-2010 leaves
+  with mm offsets, amount in Indian-system words and A/C Payee crossing.
+- **Cash planning**: 30/90/180-day cash-flow forecast (weekly, from open invoices shifted by each client's payment
+  delay, bills, cheques, recurring schedules); realised exchange gain/loss on foreign receipts and a period-end
+  revaluation report; party and item profitability.
 - **Time & billable costs** (`/time`): a running timer (start / pause / stop, survives reloads, header pill), weekly
   timesheet grid, manual entries, mileage log, per-entry rounding (6/10/15/30 min, nearest or up), CSV / .xlsx export.
   "Bill" turns a client's unbilled hours (unit HRS, SAC 998311 by default), re-billable expenses (cost + markup, or a
@@ -156,11 +164,16 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   verified against the current offline tools are marked in the code. Verify with your CA.
 - No direct portal / IRP / bank / payment-gateway connection (by design: no server).
 - Bank reconciliation treats bank as a single account.
-- The ledger does not value closing stock, book realised/unrealised exchange differences, or handle fixed-asset
-  disposals automatically — post them with a journal voucher.
+- The ledger does not value closing stock or handle fixed-asset disposals automatically — post them with a journal
+  voucher. Realised exchange differences are posted automatically when a receipt carries its realised rate;
+  unrealised (period-end revaluation) differences are reported only — post the reversing journal if your CA wants it.
 - RCM and import bills: the ledger credits the tax to "GST payable — reverse charge" / "IGST payable on imports";
   the purchases module and Tally export still carry the bill total (including that tax) as the supplier balance.
-- Exchange gain/loss on foreign receipts is not computed (roadmap 6.19).
+- Exchange gain/loss is computed only for receipts where the realised rate is entered (no automatic FX rates — no
+  server). GST always uses the invoice-date rate; exchange differences never change GST figures.
+- Cheques link to a single invoice / bill; clearing does not auto-record against foreign-currency invoices. The
+  cash-flow forecast is an estimate from due dates, payment history, bills, cheques and schedules (taxes, loans and
+  salaries only when entered as bills).
 - `.xlsx` is read and written by a built-in, dependency-free reader/writer (first sheet for imports). Legacy `.xls`,
   `.ods`, password-protected and ZIP64 workbooks are not supported; save them as `.xlsx` or CSV.
 - The GSTR-2B matcher reads B2B/B2BA/CDNR/CDNRA from the Excel download and additionally ISD / IMPG / IMPGSEZ from

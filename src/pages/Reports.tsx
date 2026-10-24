@@ -21,7 +21,6 @@ import {
   concentration,
   expenseReport,
   paymentModes,
-  profitByItem,
   salesByCustomer,
   salesDocs,
   taxByRate,
@@ -33,7 +32,9 @@ import { StatCard } from '../components/ui/StatCard';
 import { PeriodBar } from '../components/books/PeriodBar';
 import { CrossChecks, type CrossCheck } from '../components/reports/CrossChecks';
 import { CustomersTab, ItemsTab, MonthlyTab, TopCustomersTab } from '../components/reports/SalesTabs';
-import { ExpensesTab, PaymentsTab, ProfitTab, TaxTab } from '../components/reports/MoneyTabs';
+import { ExpensesTab, PaymentsTab, TaxTab } from '../components/reports/MoneyTabs';
+import { ItemProfitTab, PartyProfitTab } from '../components/reports/ProfitabilityTabs';
+import { itemProfitability, partyProfitability } from '../lib/profitability';
 import surface from '../styles/surface.module.css';
 import report from '../components/reports/reports.module.css';
 import styles from './Reports.module.css';
@@ -47,6 +48,7 @@ const TABS = [
   { id: 'payments', label: 'Payment modes' },
   { id: 'expenses', label: 'Expenses' },
   { id: 'profit', label: 'Item profit' },
+  { id: 'party', label: 'Party profit' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -86,7 +88,12 @@ export function Reports() {
   const taxRep = useMemo(() => taxByRate(docs, period), [docs, period]);
   const modes = useMemo(() => paymentModes(books.transactions, invoices, period), [books.transactions, invoices, period]);
   const expenses = useMemo(() => expenseReport(books.purchases, books.vendors, period), [books, period]);
-  const profit = useMemo(() => profitByItem(docs, positions, period), [docs, positions, period]);
+  const profitInput = useMemo(
+    () => ({ invoices, purchases: books.purchases, vendors: books.vendors, positions, clients: localDb.clients.getAll() }),
+    [invoices, books, positions],
+  );
+  const itemProfit = useMemo(() => itemProfitability(profitInput, period), [profitInput, period]);
+  const partyProfit = useMemo(() => partyProfitability(profitInput, period), [profitInput, period]);
 
   /* Cross-checks: the same period through Dashboard maths and Books (rupee documents only). */
   const checks: CrossCheck[] = useMemo(() => {
@@ -199,7 +206,8 @@ export function Reports() {
         {tab === 'tax' && <TaxTab rep={taxRep} period={period} />}
         {tab === 'payments' && <PaymentsTab rep={modes} period={period} />}
         {tab === 'expenses' && <ExpensesTab rep={expenses} period={period} />}
-        {tab === 'profit' && <ProfitTab rep={profit} period={period} hasStock={positions.some((p) => p.item.track_stock)} />}
+        {tab === 'profit' && <ItemProfitTab rep={itemProfit} period={period} />}
+        {tab === 'party' && <PartyProfitTab rep={partyProfit} period={period} />}
       </div>
 
       <CrossChecks checks={checks} />

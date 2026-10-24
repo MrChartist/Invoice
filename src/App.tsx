@@ -25,6 +25,7 @@ const Exports = lazy(() => import('./pages/Exports').then((m) => ({ default: m.E
 const Inventory = lazy(() => import('./pages/Inventory').then((m) => ({ default: m.Inventory })));
 const Recurring = lazy(() => import('./pages/Recurring').then((m) => ({ default: m.Recurring })));
 const Time = lazy(() => import('./pages/Time').then((m) => ({ default: m.Time })));
+const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.Cheques })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -69,6 +70,7 @@ function App() {
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/books" element={<Books />} />
                 <Route path="/reconcile" element={<Reconcile />} />
+                <Route path="/cheques" element={<Cheques />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/gst-reports" element={<GstReports />} />
                 <Route path="/exports" element={<Exports />} />

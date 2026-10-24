@@ -20,6 +20,7 @@
 
 import { round2, num, untaxedCharges } from './invoice-calc';
 import { inrRecord, inrValue } from './fx';
+import { receiptInr } from './fx-gain';
 import { getTable, setTable, generateId } from './storage';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
@@ -417,8 +418,9 @@ export function buildVouchers(data: BooksData): Voucher[] {
   for (const t of data.transactions) {
     const date = toIsoDate(t.date);
     const inv = invById.get(t.invoice_id);
-    // A receipt against a foreign-currency invoice is booked at that invoice's rate.
-    const amount = round2(Math.abs(inrValue(num(t.amount), inv)));
+    // A receipt against a foreign-currency invoice is booked at the rupees actually realised
+    // (its `realised_rate`), else at the invoice's rate — the same figure the ledger's bank gets.
+    const amount = round2(receiptInr(t, inv));
     if (!date || amount === 0) continue;
     out.push({
       id: `rcpt:${t.id}`,

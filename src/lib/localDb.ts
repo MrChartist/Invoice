@@ -397,7 +397,11 @@ export const localDb = {
       logSafe(() => (stored ? invoiceUpdated(stored, toSave, overridden ? OVERRIDE_NOTE : '') : invoiceCreated(toSave)));
 
       // Grow the local CRM / catalogue from real usage.
-      if (toSave.client?.name?.trim()) localDb.clients.upsert(toSave.client);
+      if (toSave.client?.name?.trim()) {
+        // Credit terms (6.25) live on the client master only: an old snapshot must never reset them.
+        const { credit_limit: _limit, credit_days: _days, ...snapshot } = toSave.client;
+        localDb.clients.upsert(snapshot);
+      }
       localDb.items.upsertMany(
         (toSave.items ?? [])
           .filter((item) => item.name?.trim())
@@ -478,7 +482,7 @@ export const localDb = {
       ),
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
-    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string }): Payment => {
+    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number }): Payment => {
       const amount = round2(Number(input.amount) || 0);
       // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
       if (!(amount > 0)) throw new Error('Enter a payment amount above zero.');
@@ -494,6 +498,11 @@ export const localDb = {
         date: input.date || localDayOf(new Date()),
       };
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
+      // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
+      const realised = Number(input.realisedRate);
+      if (realised > 0 && Number.isFinite(realised) && (target?.currency || 'INR').toUpperCase() !== 'INR') {
+        payment.realised_rate = realised;
+      }
       const overridden = target ? assertUnlocked(target, 'pay') === 'overridden' : false;
       const before = getTable<Payment>(KEYS.transactions);
       setTable(KEYS.transactions, [...before, payment]);
@@ -510,6 +519,39 @@ export const localDb = {
         return overridden ? { ...row, summary: row.summary + OVERRIDE_NOTE } : row;
       });
       return payment;
+    },
+
+    /**
+     * Set (or clear, with 0 / undefined) the realised exchange rate of a receipt on a foreign-currency
+     * invoice (6.19). Changes the ledger's bank and FX figures, so it respects the period lock.
+     */
+    setRealisedRate: (paymentId: string, rate: number | undefined): Payment | undefined => {
+      const rows = getTable<Payment>(KEYS.transactions);
+      const idx = rows.findIndex((t) => t.id === paymentId);
+      if (idx < 0) return undefined;
+      const row = rows[idx];
+      const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
+      if (!target || (target.currency || 'INR').toUpperCase() === 'INR') throw new Error('Only receipts on foreign-currency invoices carry a realised rate.');
+      const value = Number(rate);
+      const next: Payment = { ...row };
+      if (value > 0 && Number.isFinite(value)) next.realised_rate = value;
+      else delete next.realised_rate;
+      if (next.realised_rate === row.realised_rate) return row;
+      // Locked by the receipt's own date (the bank entry it changes) and the invoice's.
+      const overridden =
+        assertUnlocked({ id: target.id, issue_date: row.date, invoice_number: target.invoice_number }, 'edit') === 'overridden' ||
+        assertUnlocked(target, 'edit') === 'overridden';
+      rows[idx] = next;
+      setTable(KEYS.transactions, rows);
+      logSafe(() => ({
+        entity: 'payment',
+        entity_id: row.id,
+        action: 'update',
+        parent_id: target.id,
+        doc_number: target.invoice_number,
+        summary: `Realised rate on a ${target.currency} receipt against ${target.invoice_number} ${next.realised_rate ? `set to ₹${next.realised_rate}` : 'cleared'}${overridden ? OVERRIDE_NOTE : ''}`,
+      }));
+      return next;
     },
 
     remove: (paymentId: string) => {

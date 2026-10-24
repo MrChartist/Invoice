@@ -95,6 +95,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `compliance` | compliance (GST) | `FiledReturn` marks: GST return filed per form / period / GSTIN (`docs/features/compliance.md`) |
 | `accounts` | ledger | user-added `Account` rows (`src/lib/ledger/accounts.ts`); default accounts are constants, never stored |
 | `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`) |
+| `cheques` | cheques (6.26) | `Cheque` (`src/types/cheques.ts`) — received / issued cheques, lifecycle, linked payment ids (`docs/features/cash-planning.md`) |
+| `cheque_print` | cheques (6.26) | cheque print layout + mm offsets (object, `src/lib/cheque-print.ts`) |
 | `fixed_assets` | ledger | `FixedAsset` register rows (`src/lib/ledger/assets.ts`) |
 | `cost_centres` | cost centres (6.16) | `CostCentre` master (`src/lib/cost-centres.ts`); documents point at it via optional `cost_centre_id` (`docs/features/cost-centres-budgets.md`) |
 | `budgets` | budgets (6.17) | `Budget` rows: FY × account × optional cost centre, 12 monthly amounts in paise (`src/lib/ledger/budgets.ts`) |

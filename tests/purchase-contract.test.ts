@@ -248,3 +248,20 @@ test('attachments (6.12) are carried on the record and ignored by every report r
   // The attachments module is the one reader of the field.
   assert.deepEqual([...attachmentIdsIn([withFiles, bill])], ['f1']);
 });
+
+test('cash-flow forecast (6.18) reads the real purchase shape: open balance at the due date', async () => {
+  const { buildForecast } = await import('../src/lib/cash-forecast.ts');
+  const open: PurchaseRecord = { ...bill, id: 'p4', due_date: '2026-04-30', amount_paid: 180 };
+  const legacy = { id: 'old2', vendor_name: 'Old Co', bill_number: 'L2', date: '2026-04-20', taxable: 500, tax_amount: 90, total: 590, paid_amount: 90 };
+  const f = buildForecast({ today: '2026-04-15', horizon: 30, opening: 0, invoices: [], payments: [], purchases: [open, legacy, { ...open, id: 'void', status: 'cancelled' }] });
+  assert.deepEqual(f.items.map((i) => [i.ref, i.date, i.amount]), [['L2', '2026-04-20', 500], ['AS/22', '2026-04-30', 1000]]);
+});
+
+test('profitability (6.25) costs sales from the real purchase lines and billable expenses', async () => {
+  const { buildCoster, partyProfitability } = await import('../src/lib/profitability.ts');
+  const c = buildCoster([bill]);
+  assert.deepEqual(c.cost({ name: 'Paper ream', hsn: '4802', quantity: 3 }, { id: 's', date: '2026-05-01' }), { cost: 300, source: 'purchases' });
+  const billable: PurchaseRecord = { ...bill, id: 'p5', kind: 'EXPENSE', billable_to_client_id: 'c1' };
+  const rep = partyProfitability({ invoices: [], purchases: [billable], clients: [{ id: 'c1', name: 'Acme', email: '', address: '', city: '', zip: '' }] }, { start: '2026-04-01', end: '2027-03-31' });
+  assert.equal(rep.rows[0].expenses, 1000);
+});

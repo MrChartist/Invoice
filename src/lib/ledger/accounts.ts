@@ -149,6 +149,7 @@ export const A = {
   roundOff: 'round_off',
   otherIncome: 'other_income',
   interestIncome: 'interest_income',
+  fxGain: 'fx_gain',
   purchases: 'purchases',
   directExp: 'direct_exp',
   freightIn: 'freight_in',
@@ -218,6 +219,8 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   def(A.roundOff, '4900', 'Round off', 'OTHER_INCOME'),
   def(A.otherIncome, '4910', 'Other income', 'OTHER_INCOME'),
   def(A.interestIncome, '4920', 'Interest received', 'OTHER_INCOME'),
+  // Realised exchange differences (6.19): credit = gain, debit = loss (net shown under other income).
+  def(A.fxGain, '4930', 'Foreign exchange gain / loss', 'OTHER_INCOME'),
   def(A.purchases, '5000', 'Purchases', 'PURCHASES'),
   def(A.directExp, '5100', 'Direct expenses', 'DIRECT_EXPENSES'),
   def(A.freightIn, '5110', 'Freight inward', 'DIRECT_EXPENSES'),

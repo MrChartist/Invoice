@@ -25,6 +25,9 @@ import styles from './Books.module.css';
 
 // The double-entry tabs (6.1–6.4) live in their own lazy chunk with the ledger engine.
 const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'));
+// Cash-flow forecast (6.18) and exchange gain/loss (6.19): their own small lazy chunks.
+const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'));
+const FxTab = lazy(() => import('../components/books/planning/FxTab'));
 
 const TABS = [
   { id: 'day', label: 'Day book' },
@@ -38,6 +41,8 @@ const TABS = [
   { id: 'proj', label: 'Projects' },
   { id: 'budget', label: 'Budgets' },
   { id: 'coa', label: 'Chart of accounts' },
+  { id: 'fcst', label: 'Forecast' },
+  { id: 'fx', label: 'FX gain/loss' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 const LEDGER_TABS = new Set<TabId>(['vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
@@ -171,6 +176,15 @@ export function Books() {
           />
         )}
         {tab === 'pnl' && <ProfitLossTab data={data} period={period} />}
+        {(tab === 'fcst' || tab === 'fx') && (
+          <Suspense fallback={<p className={styles.loading} role="status">Loading…</p>}>
+            {tab === 'fcst' ? (
+              <ForecastTab data={data} />
+            ) : (
+              <FxTab data={data} period={period} onChanged={() => setData(loadBooksData())} notify={(m) => notify(m)} />
+            )}
+          </Suspense>
+        )}
         {LEDGER_TABS.has(tab) && (
           <Suspense fallback={<p className={styles.loading} role="status">Loading the ledger…</p>}>
             <LedgerPanel

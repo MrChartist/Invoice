@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Banknote,
   BarChart3,
   BookOpen,
   Boxes,
@@ -87,6 +88,7 @@ const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
     items: [
       { label: 'Books', path: '/books', icon: BookOpen },
       { label: 'Reconcile', path: '/reconcile', icon: Landmark },
+      { label: 'Cheques', path: '/cheques', icon: Banknote },
       { label: 'Reports', path: '/reports', icon: BarChart3 },
       { label: 'GST reports', path: '/gst-reports', icon: FileSpreadsheet },
       { label: 'Exports', path: '/exports', icon: FileDown },

@@ -10,6 +10,7 @@ import { ItemsTable } from '../components/creator/ItemsTable';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
 import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
 import { StockWarnings } from '../components/creator/StockWarnings';
+import { CreditWarning } from '../components/creator/CreditWarning';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
 import { CreatorHeader } from '../components/creator/CreatorHeader';
@@ -234,6 +235,7 @@ export function InvoiceCreator() {
             <div className={surface.cardBody}>
               <PartiesSection profiles={profiles} onSearchClients={() => setClientsOpen(true)} />
             </div>
+            <CreditWarning />
           </section>
 
           <section className={surface.card}>

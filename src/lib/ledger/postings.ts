@@ -12,7 +12,9 @@
  *                       Cr Output CGST/SGST/IGST/GST, Cr Output cess, Cr TCS payable, ± Round off
  *   Credit note         the exact mirror, Sales side debited to "Sales returns"
  *   Receipt             Dr Cash/Bank | Cr Debtors; the receipt that clears the cash due also
- *                       books the customer's TDS: Dr TDS receivable | Cr Debtors
+ *                       books the customer's TDS: Dr TDS receivable | Cr Debtors. A foreign
+ *                       receipt with a realised rate: Dr Bank at the realised rupees, Cr Debtors
+ *                       at the invoice rate, difference to "Foreign exchange gain / loss" (6.19).
  *   Purchase / expense  Dr Purchases or the expense account (cost = taxable, + GST when ITC is
  *                       not available), Dr Input CGST/SGST/IGST (ITC) | Cr Creditors (party).
  *                       Reverse charge and import of services: the GST is credited to
@@ -23,8 +25,9 @@
  *   Opening (Books)     Dr Cash/Bank | Cr Opening balance difference — sized so the ledger's
  *                       cash/bank balance from that day equals the Books cash/bank book.
  *   Fixed assets        Dr asset | Cr paid-from account; yearly Dr Depreciation | Cr Accumulated depreciation.
- * Foreign-currency documents post in rupees at their `exchange_rate`; receipts at the
- * invoice's rate (no realised exchange difference yet — roadmap 6.19).
+ * Foreign-currency documents post in rupees at their `exchange_rate`; receipts clear the debtor
+ * at the invoice's rate and, when the receipt carries a `realised_rate`, the exchange difference
+ * goes to the FX gain/loss account (`fx-gain.ts`).
  *
  * Pure: no storage. Working papers — verify with your CA.
  */
@@ -35,6 +38,7 @@ import { allocateProportionally, calcInputFromRecord, calculateInvoice, num } fr
 import { invoiceAmounts, toPaise } from '../export-shared';
 import { fxNarration, inrValue } from '../fx';
 import { readPurchase } from '../purchase-normalize';
+import { realisedFx } from '../fx-gain';
 import { A, EXPENSE_CATEGORY_ACCOUNTS, chartOf, groupOf, type Account } from './accounts';
 import { VOUCHER_TYPE_LABELS, type ManualVoucher } from './vouchers';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
@@ -247,9 +251,14 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
   if (!date || amount === 0) return null;
   const party = inv ? partyOfInvoice(inv) : 'Unknown customer';
   const cashAcc = accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
-  const l = new Lines().dr(cashAcc, amount);
+  // Realised exchange difference (6.19): the bank gets the realised rupees, the debtor is
+  // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
+  const fx = realisedFx(t, inv);
+  const received = fx ? Math.abs(toPaise(fx.realisedInr)) : amount;
+  const l = new Lines().dr(cashAcc, received);
   if (tds > 0) l.dr(A.tdsReceivable, tds);
   l.cr(A.debtors, amount + tds, party);
+  if (fx) l.cr(A.fxGain, received - amount);
   const invNo = inv?.invoice_number || 'invoice';
   return {
     id: `rcpt:${t.id}`,
@@ -263,6 +272,7 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
       str(t.method),
       tds > 0 && `TDS ${(tds / 100).toFixed(2)} withheld${str(inv?.tds_section) ? ` u/s ${str(inv?.tds_section)}` : ''}`,
       inv ? fxNarration(num(t.amount), inv) : '',
+      fx && `realised @ ₹${fx.realisedRate} (exchange ${fx.gain >= 0 ? 'gain' : 'loss'} ${Math.abs(fx.gain).toFixed(2)})`,
     ]
       .filter(Boolean)
       .join(' · '),

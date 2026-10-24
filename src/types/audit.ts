@@ -18,7 +18,9 @@ export type AuditEntity =
   | 'fixed_asset'
   /** Cost centres / projects (6.16) and budgets (6.17). */
   | 'cost_centre'
-  | 'budget';
+  | 'budget'
+  /** Cheque register (6.26). */
+  | 'cheque';
 
 export type AuditAction =
   | 'create'
@@ -97,6 +99,7 @@ export const AUDIT_ENTITIES: AuditEntity[] = [
   'fixed_asset',
   'cost_centre',
   'budget',
+  'cheque',
 ];
 
 export const AUDIT_ACTIONS: AuditAction[] = [
@@ -147,4 +150,5 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   fixed_asset: 'Fixed assets',
   cost_centre: 'Cost centres',
   budget: 'Budgets',
+  cheque: 'Cheques',
 };
