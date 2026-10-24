@@ -48,8 +48,11 @@ export function Gstr3bView({ report: b }: { report: Gstr3bReport }) {
     table, label, igst: x.igst, cgst: x.cgst, sgst: x.sgst,
   });
   const t4: Row[] = [
+    h('4A(1)', 'ITC available: import of goods', b.itc.importGoods),
+    h('4A(2)', 'ITC available: import of services', b.itc.importServices),
     h('4A(3)', 'ITC available: inward supplies liable to reverse charge', b.itc.availableRcm),
     h('4A(5)', 'ITC available: all other ITC', b.itc.availableOther),
+    h('4B(1)', 'ITC reversed: rules 38, 42, 43 and section 17(5)', b.itc.reversedRules),
     h('4B(2)', 'ITC reversed: others', b.itc.reversedOther),
     h('4C', 'Net ITC available (A - B)', b.itc.net),
     h('4D(2)', 'Ineligible ITC: others', b.itc.ineligible),
@@ -84,7 +87,7 @@ export function Gstr3bView({ report: b }: { report: Gstr3bReport }) {
       {block('6.1 Payment of tax and ITC set-off', t61, '')}
       <ul className={styles.notes}>
         <li>Set-off order: IGST credit pays IGST, then CGST, then SGST; CGST and SGST credit pay their own head first, then IGST (never each other). Reverse-charge tax is payable in cash.</li>
-        <li>ITC is taken only from purchase bills in the period that are not marked ITC-ineligible ({b.purchasesConsidered} bill{b.purchasesConsidered === 1 ? '' : 's'} read). Imports, ISD, rule 42/43 reversals and cess are not modelled.</li>
+        <li>ITC is taken from purchase bills in the period ({b.purchasesConsidered} bill{b.purchasesConsidered === 1 ? '' : 's'} read). Imports, reverse charge, reversals and Sec 17(5) blocked credit follow the flags on each bill; ISD and cess on purchases are not modelled. Verify with your CA.</li>
         {b.outwardRcmTaxable !== 0 && (
           <li>Outward supplies of {b.outwardRcmTaxable.toFixed(2)} where the recipient pays tax under reverse charge are in GSTR-1 (B2B, RC = Y) but excluded from 3.1.</li>
         )}

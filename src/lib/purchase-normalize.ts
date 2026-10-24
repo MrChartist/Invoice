@@ -85,6 +85,10 @@ export interface PurchaseCore {
   itcEligible: boolean;
   reverseCharge: boolean;
   itcReversed: number;
+  /** Upper-cased reversal reason (RULE_42 / RULE_43 / RULE_37 / SEC_17_5 / OTHER) or ''. */
+  itcReversalReason: string;
+  /** 'GOODS' / 'SERVICES' for imports, '' for domestic bills. */
+  importType: '' | 'GOODS' | 'SERVICES';
   paid: number;
   /** Lower-cased raw status ('' when the row has none). */
   status: string;
@@ -99,6 +103,11 @@ const TAX_KEYS = ['tax_amount', 'gst_amount', 'total_tax', 'gst', 'tax'] as cons
 const TOTAL_KEYS = ['total', 'grand_total', 'total_amount', 'amount'] as const;
 const NUMBER_KEYS = ['bill_number', 'purchase_number', 'vendor_invoice_number', 'supplier_invoice_number', 'invoice_number', 'number', 'reference'] as const;
 const SPLIT_KEYS = ['cgst', 'cgst_amount', 'sgst', 'sgst_amount', 'igst', 'igst_amount'] as const;
+
+function readImportType(v: string): '' | 'GOODS' | 'SERVICES' {
+  const t = v.toUpperCase();
+  return t === 'GOODS' || t === 'SERVICES' ? t : '';
+}
 
 /**
  * Read one purchases row. Returns null for things that are not bills at all
@@ -166,6 +175,8 @@ export function readPurchase(raw: unknown, vendors: readonly unknown[] = []): Pu
     itcEligible,
     reverseCharge: r.reverse_charge === true || r.rcm === true,
     itcReversed: round2(Math.max(pickNum(r, ['itc_reversed', 'itc_reversal']) ?? 0, 0)),
+    itcReversalReason: pickStr(r, ['itc_reversal_reason']).toUpperCase(),
+    importType: readImportType(pickStr(r, ['import_type'])),
     paid: round2(Math.abs(pickNum(r, ['amount_paid', 'paid_amount']) ?? 0)),
     status: pickStr(r, ['status']).toLowerCase(),
     notes: pickStr(r, ['notes', 'narration']),

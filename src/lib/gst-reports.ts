@@ -286,8 +286,12 @@ export interface Gstr3bReport {
   interStateUnreg: { pos: string; taxable: number; igst: number }[];
   /** 4 */
   itc: {
+    importGoods: ItcHeads; // 4A(1)
+    importServices: ItcHeads; // 4A(2)
     availableRcm: ItcHeads; // 4A(3)
     availableOther: ItcHeads; // 4A(5)
+    /** Rules 38, 42 & 43 and Sec 17(5) — permanent reversals. */
+    reversedRules: ItcHeads; // 4B(1)
     reversedOther: ItcHeads; // 4B(2)
     net: ItcHeads; // 4C
     ineligible: ItcHeads; // 4D(2)
@@ -789,6 +793,9 @@ export interface NormalizedPurchase {
   sgst: number;
   /** ITC reversed against this bill (amount, spread pro-rata over the heads). */
   itcReversed: number;
+  /** RULE_42 / RULE_43 / RULE_37 / SEC_17_5 / OTHER, or ''. */
+  itcReversalReason: string;
+  importType: '' | 'GOODS' | 'SERVICES';
 }
 
 /**
@@ -821,8 +828,13 @@ export function normalizePurchase(raw: unknown, filerStateCode: string): Normali
     cgst: round2(cgst),
     sgst: round2(sgst),
     itcReversed: c.itcReversed,
+    itcReversalReason: c.itcReversalReason,
+    importType: c.importType,
   };
 }
+
+/** Reversal reasons reported in 3B 4B(1) (permanent); everything else goes to 4B(2). */
+const RULE_REVERSALS = new Set(['RULE_38', 'RULE_42', 'RULE_43', 'SEC_17_5']);
 
 /* ───────────────────────── GSTR-3B ───────────────────────── */
 
@@ -925,6 +937,9 @@ export function buildGstr3b(
   }
 
   const rcm = zeroRow();
+  const impGoods = zeroHeads();
+  const impServices = zeroHeads();
+  const reversedRules = zeroHeads();
   const availRcm = zeroHeads();
   const availOther = zeroHeads();
   const reversed = zeroHeads();
@@ -939,32 +954,41 @@ export function buildGstr3b(
 
   for (const p of purchases) {
     const tax = round2(p.igst + p.cgst + p.sgst);
-    if (p.reverseCharge) {
+    // Sec 17(5) blocked credit: shown in 4A (as GSTR-2B auto-fills it) and reversed in full in 4B(1).
+    const blocked = !p.itcEligible && p.itcReversalReason === 'SEC_17_5';
+    const claim = (bucket: ItcHeads) => {
+      if (p.itcEligible || blocked) add(bucket, p);
+      if (blocked) add(reversedRules, p);
+      else if (!p.itcEligible) add(ineligible, p);
+    };
+    if (p.importType === 'GOODS') {
+      // IGST paid at customs on the Bill of Entry: no 3.1 liability, ITC in 4A(1).
+      if (tax > 0) claim(impGoods);
+    } else if (p.importType === 'SERVICES') {
+      // Import of services is always reverse charge: liability in 3.1(d), ITC in 4A(2).
       rcm.taxable = round2(rcm.taxable + p.taxable);
       add(rcm, p);
-      if (p.itcEligible) add(availRcm, p);
-      else add(ineligible, p);
+      claim(impServices);
+    } else if (p.reverseCharge) {
+      rcm.taxable = round2(rcm.taxable + p.taxable);
+      add(rcm, p);
+      claim(availRcm);
     } else if (tax === 0) {
       const inter = p.supplierState && filerStateCode ? p.supplierState !== filerStateCode : false;
       if (inter) inwardExempt.inter = round2(inwardExempt.inter + p.taxable);
       else inwardExempt.intra = round2(inwardExempt.intra + p.taxable);
-    } else if (p.itcEligible) {
-      add(availOther, p);
     } else {
-      add(ineligible, p);
+      claim(availOther);
     }
     if (p.itcReversed > 0 && tax > 0 && p.itcEligible) {
       const ratio = Math.min(p.itcReversed, tax) / tax;
-      add(reversed, { igst: p.igst * ratio, cgst: p.cgst * ratio, sgst: p.sgst * ratio });
+      add(RULE_REVERSALS.has(p.itcReversalReason) ? reversedRules : reversed, { igst: p.igst * ratio, cgst: p.cgst * ratio, sgst: p.sgst * ratio });
     }
   }
 
-  const net: ItcHeads = {
-    igst: Math.max(round2(availRcm.igst + availOther.igst - reversed.igst), 0),
-    cgst: Math.max(round2(availRcm.cgst + availOther.cgst - reversed.cgst), 0),
-    sgst: Math.max(round2(availRcm.sgst + availOther.sgst - reversed.sgst), 0),
-    cess: 0,
-  };
+  const netHead = (k: 'igst' | 'cgst' | 'sgst') =>
+    Math.max(round2(impGoods[k] + impServices[k] + availRcm[k] + availOther[k] - reversedRules[k] - reversed[k]), 0);
+  const net: ItcHeads = { igst: netHead('igst'), cgst: netHead('cgst'), sgst: netHead('sgst'), cess: 0 };
 
   const liab = {
     igst: round2(taxable.igst + zero.igst),
@@ -984,7 +1008,16 @@ export function buildGstr3b(
   return {
     outward: { taxable, zeroRated: zero, nilExempt: nil, inwardRcm: rcm, nonGst },
     interStateUnreg: [...unregInter.values()].sort((a, b) => a.pos.localeCompare(b.pos)),
-    itc: { availableRcm: availRcm, availableOther: availOther, reversedOther: reversed, net, ineligible },
+    itc: {
+      importGoods: impGoods,
+      importServices: impServices,
+      availableRcm: availRcm,
+      availableOther: availOther,
+      reversedRules,
+      reversedOther: reversed,
+      net,
+      ineligible,
+    },
     inwardExempt,
     payment,
     unadjustedCredit: unadjusted,
@@ -1019,7 +1052,7 @@ export function buildGstReport(
     if (!inPeriod(p.date, opts.period)) continue;
     purchases.push(p);
     const claimed = p.itcEligible && p.igst + p.cgst + p.sgst > 0;
-    if (claimed && !p.reverseCharge && !checkGstin(p.supplierGstin).valid) {
+    if (claimed && !p.reverseCharge && !p.importType && !checkGstin(p.supplierGstin).valid) {
       issues.push({
         id: `ITC_NO_GSTIN:${p.id}`,
         severity: p.supplierGstin ? 'error' : 'warning',

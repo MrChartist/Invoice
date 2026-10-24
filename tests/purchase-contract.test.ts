@@ -9,6 +9,7 @@ import { normalizePurchase as booksNormalize } from '../src/lib/books.ts';
 import { normalizePurchase as exportNormalize } from '../src/lib/export-shared.ts';
 import { normalizePurchase as gstNormalize } from '../src/lib/gst-reports.ts';
 import { collectEvents } from '../src/lib/inventory.ts';
+import { readPurchase } from '../src/lib/purchase-normalize.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
 import { gstinChecksumChar } from '../src/lib/gstin.ts';
 
@@ -68,6 +69,38 @@ test('gst-reports reads the real purchase shape and ITC flag', () => {
   assert.equal(n!.supplierGstin, '27AAPFU0939F1ZV');
   const blocked = gstNormalize({ ...bill, itc_eligible: false }, '27');
   assert.equal(blocked!.itcEligible, false);
+});
+
+test('every reader understands the GST-completeness fields (RCM, import, reversal, 17(5))', () => {
+  const full: PurchaseRecord = {
+    ...bill,
+    id: 'p2',
+    reverse_charge: true,
+    import_type: 'GOODS',
+    boe_number: '7654321',
+    boe_date: '2026-04-10',
+    port_code: 'INNSA1',
+    itc_reversed: 18,
+    itc_reversal_reason: 'RULE_42',
+  };
+  const core = readPurchase(full)!;
+  assert.equal(core.reverseCharge, true);
+  assert.equal(core.importType, 'GOODS');
+  assert.equal(core.itcReversed, 18);
+  assert.equal(core.itcReversalReason, 'RULE_42');
+  const g = gstNormalize(full, '27')!;
+  assert.equal(g.reverseCharge, true);
+  assert.equal(g.importType, 'GOODS');
+  assert.equal(g.itcReversalReason, 'RULE_42');
+  const blocked = gstNormalize({ ...bill, itc_eligible: false, itc_reversal_reason: 'SEC_17_5' }, '27')!;
+  assert.equal(blocked.itcEligible, false);
+  assert.equal(blocked.itcReversalReason, 'SEC_17_5');
+  // Books and exports keep reading the same money figures regardless of the new flags.
+  assert.equal(booksNormalize(full as never)!.total, 1180);
+  assert.equal(exportNormalize(full)!.taxable, 1000);
+  // Legacy rows without the fields read as domestic, forward charge, no reversal.
+  const legacy = readPurchase(bill)!;
+  assert.deepEqual([legacy.reverseCharge, legacy.importType, legacy.itcReversed, legacy.itcReversalReason], [false, '', 0, '']);
 });
 
 test('inventory brings purchase lines in as stock-in', () => {
