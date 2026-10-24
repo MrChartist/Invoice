@@ -644,6 +644,8 @@ export interface EditorStockContext {
   day: string;
   outgoing: boolean;
   incoming: boolean;
+  /** New or draft document: new batch lines may be pre-filled with the FEFO batch (issued ones are left alone). */
+  autoFefo: boolean;
 }
 
 /**
@@ -651,7 +653,7 @@ export interface EditorStockContext {
  * there is nothing to pick (no item tracks batches / serials and only one godown exists), or the
  * document type never moves stock.
  */
-export function editorStockContext(doc: { id?: string; doc_type: string; issue_date: string }): EditorStockContext | null {
+export function editorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string }): EditorStockContext | null {
   const outgoing = doc.doc_type === 'INVOICE' || doc.doc_type === 'TAX_INVOICE' || doc.doc_type === 'DELIVERY_CHALLAN';
   const incoming = doc.doc_type === 'CREDIT_NOTE';
   if (!outgoing && !incoming) return null;
@@ -672,6 +674,7 @@ export function editorStockContext(doc: { id?: string; doc_type: string; issue_d
       day: doc.issue_date,
       outgoing,
       incoming,
+      autoFefo: outgoing && (!doc.id || doc.status === 'Draft'),
     };
   } catch {
     return null;

@@ -29,10 +29,10 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
 
   // New outgoing line of a batch item: pre-select the batch that expires first (FEFO), once.
   useEffect(() => {
-    if (autoFilled.current || !fefo || item.batch_no || num(item.quantity) <= 0) return;
+    if (autoFilled.current || !ctx.autoFefo || !fefo || item.batch_no || num(item.quantity) <= 0) return;
     autoFilled.current = true;
     patchItem(item.id, withBatch(item, fefo));
-  }, [fefo, item, patchItem]);
+  }, [ctx.autoFefo, fefo, item, patchItem]);
 
   if (!stock || (!stock.track_batches && !stock.track_serials && !ctx.multi)) return null;
   const n = index + 1;

@@ -23,13 +23,14 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const docType = useInvoiceStore((s) => s.doc_type);
   const docId = useInvoiceStore((s) => s.id);
   const issueDate = useInvoiceStore((s) => s.issue_date);
+  const docStatus = useInvoiceStore((s) => s.status);
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
   // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
   const [stockTick, setStockTick] = useState(0);
   const stockCtx = useMemo(
-    () => editorStockContext({ id: docId, doc_type: docType, issue_date: issueDate }),
+    () => editorStockContext({ id: docId, doc_type: docType, issue_date: issueDate, status: docStatus }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [docId, docType, issueDate, stockTick],
+    [docId, docType, issueDate, docStatus, stockTick],
   );
   const { addItem, updateItem, duplicateItem, moveItem, removeItem, applyCatalogItem } = useInvoiceStore.getState();
   // Catalogue snapshot, refreshed whenever an item name gains focus.
