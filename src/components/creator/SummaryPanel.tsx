@@ -1,5 +1,6 @@
 import { NumberInput } from '../ui/NumberInput';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
+import { useShallow } from 'zustand/react/shallow';
 import { amountInWords } from '../../lib/amount-in-words';
 import { cn, currencySymbol, formatCurrency } from '../../lib/utils';
 import type { GstMode } from '../../types/invoice';
@@ -23,7 +24,9 @@ function Row({ label, children, tone, strong }: { label: React.ReactNode; childr
 }
 
 export function SummaryPanel() {
-  const s = useInvoiceStore();
+  const s = useInvoiceStore(
+    useShallow((st) => ({ amount_paid: st.amount_paid, currency: st.currency, discount_rate: st.discount_rate, discount_type: st.discount_type, doc_type: st.doc_type, gst_mode: st.gst_mode, other_charges: st.other_charges, round_off_enabled: st.round_off_enabled, setAmountPaid: st.setAmountPaid, setDiscount: st.setDiscount, setGstMode: st.setGstMode, setOtherCharges: st.setOtherCharges, setRoundOff: st.setRoundOff, setShipping: st.setShipping, shipping: st.shipping, tcs_label: st.tcs_label, tds_section: st.tds_section, totals: st.totals })),
+  );
   const t = s.totals;
   const cur = s.currency;
   const sym = currencySymbol(cur);

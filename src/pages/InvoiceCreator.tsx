@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useS
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
+import { useShallow } from 'zustand/react/shallow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { useToast } from '../components/ui/useToast';
@@ -47,7 +48,9 @@ export function InvoiceCreator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
-  const s = useInvoiceStore();
+  const s = useInvoiceStore(
+    useShallow((st) => ({ currency: st.currency, dirty: st.dirty, doc_type: st.doc_type, due_date: st.due_date, id: st.id, invoice_number: st.invoice_number, issue_date: st.issue_date, items: st.items, notes: st.notes, patch: st.patch, po_number: st.po_number, reverse_charge: st.reverse_charge, sender: st.sender, setCurrency: st.setCurrency, setDates: st.setDates, setDocType: st.setDocType, setInvoiceNumber: st.setInvoiceNumber, setNotes: st.setNotes, setReverseCharge: st.setReverseCharge, setStatus: st.setStatus, setTerms: st.setTerms, status: st.status, terms: st.terms, total: st.total })),
+  );
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);

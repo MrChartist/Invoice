@@ -21,7 +21,12 @@ interface InvoicePreviewModalProps {
 }
 
 /** Full-screen, scale-to-fit A4 preview with print and multi-page PDF export. */
-export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
+export const InvoicePreviewModal = (props: InvoicePreviewModalProps) =>
+  // Mount the body (and its whole-store subscription) only while open, so typing in the
+  // editor does not re-render a closed preview.
+  props.isOpen ? <PreviewBody {...props} /> : null;
+
+const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   const invoice = useInvoiceStore();
   const paperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
