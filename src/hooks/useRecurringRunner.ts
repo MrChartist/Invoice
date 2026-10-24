@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { recurringToastMessage, runDueSchedules } from '../lib/recurring';
+import { recurringToastMessage } from '../lib/recurring-message';
 import { todayInput } from '../lib/utils';
 import type { InvoiceRecord } from '../types/invoice';
 
@@ -7,6 +7,8 @@ const LOCK_NAME = 'mrchartist-recurring-runner';
 
 /** One run, serialised across tabs when the Web Locks API exists. */
 async function runOnce(): Promise<InvoiceRecord[]> {
+  // Loaded on demand: the schedule engine is not needed for first paint.
+  const { runDueSchedules } = await import('../lib/recurring');
   const run = () => {
     try {
       return runDueSchedules(todayInput()).generated;

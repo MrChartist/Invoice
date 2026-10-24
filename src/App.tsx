@@ -3,13 +3,15 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { NotFound } from './components/layout/NotFound';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Dashboard } from './pages/Dashboard';
-import { InvoiceCreator } from './pages/InvoiceCreator';
 import { LoginPage } from './pages/LoginPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { IdleLock } from './components/security/IdleLock';
 import { isAuthenticated, onRemoteLock } from './lib/auth';
 
 // Heavier report/ledger pages load on first visit so the editor opens fast.
+// The editor is code-split too, then prefetched once the first screen is idle (see App).
+const loadCreator = () => import('./pages/InvoiceCreator');
+const InvoiceCreator = lazy(() => loadCreator().then((m) => ({ default: m.InvoiceCreator })));
 const Transactions = lazy(() => import('./pages/Transactions').then((m) => ({ default: m.Transactions })));
 const Clients = lazy(() => import('./pages/Clients').then((m) => ({ default: m.Clients })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
@@ -36,6 +38,15 @@ function App() {
   const [authed, setAuthed] = useState(isAuthenticated());
   // Locking in one tab locks them all.
   useEffect(() => onRemoteLock(() => setAuthed(false)), []);
+  // Warm the editor chunk after first paint so "New invoice" still opens instantly.
+  useEffect(() => {
+    if (!authed) return;
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    const t = idle ? idle(() => void loadCreator()) : window.setTimeout(() => void loadCreator(), 1500);
+    return () => {
+      if (!idle) window.clearTimeout(t);
+    };
+  }, [authed]);
 
   return (
     <ErrorBoundary>

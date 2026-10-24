@@ -23,7 +23,7 @@
 - `index.html` → `src/main.tsx` → `src/App.tsx` (PIN gate + React Router shell).
 - `src/pages/` — one file per route (Dashboard, InvoiceCreator, Transactions, Clients, Settings, LoginPage,
   Expenses, Receivables, Books, GstReports, Exports, Inventory, Recurring). Design Studio lives in
-  `src/components/design/`. Heavy pages are `React.lazy` in `src/App.tsx`.
+  `src/components/design/`. Every page except Dashboard and Login is `React.lazy` in `src/App.tsx`; the editor chunk is prefetched on idle.
 - `src/store/useInvoiceStore.ts` — Zustand store (current invoice + actions).
 - `src/lib/localDb.ts` — localStorage data layer + Indian-FY invoice numbering.
 - `src/lib/auth.ts` — local PIN gate (PBKDF2-hashed, lockout, idle lock; `login`/`verifyPin` are async).
