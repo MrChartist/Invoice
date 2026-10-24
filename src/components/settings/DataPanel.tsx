@@ -317,8 +317,9 @@ export function DataPanel({ notify }: Props) {
         open={wipeOpen}
         destructive
         title="Erase all data?"
-        message="This cannot be undone. Download a backup first if there is anything you may need."
+        message="Every invoice, client, payment and setting on this device will be deleted (your PIN is kept). An undo copy is kept in this browser, but download a backup first if there is anything you may need."
         confirmLabel="Erase everything"
+        requireText="ERASE"
         onConfirm={async () => {
           await saveSafetySnapshot('wipe');
           wipeAppData();

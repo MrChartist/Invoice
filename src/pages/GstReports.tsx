@@ -8,6 +8,7 @@ import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
 import { stateByCode } from '../lib/india-states';
 import { readLinks } from '../lib/documents';
+import { seriesGaps } from '../lib/invoice-number';
 import {
   buildGstReport,
   periodForDate,
@@ -21,6 +22,7 @@ import {
   buildGstr1Json,
   buildSummaryHtml,
   gstr3bCsv,
+  buildGstr3bJson,
   nilLabel,
   sectionCsv,
   type SectionId,
@@ -129,6 +131,19 @@ export function GstReports() {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin) ?? localDb.settings.activeProfile();
     return checkGstin(gstin || prof?.companyGstin || '').stateCode ?? prof?.stateCode ?? '';
   }, [profiles, gstin]);
+  // Rule 46 series gaps across the whole FY of the selected period (issued tax documents only).
+  const fyLabel = `${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}`;
+  const gaps = useMemo(
+    () =>
+      seriesGaps(
+        invoices
+          .filter((i) => i && i.status !== 'Draft' && ['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE'].includes(i.doc_type))
+          .map((i) => i.invoice_number),
+        fyLabel,
+      ),
+    [invoices, fyLabel],
+  );
+
   const report = useMemo(() => {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin);
     return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover });
@@ -268,6 +283,7 @@ export function GstReports() {
       }
       case 'docs':
         return (
+          <>
           <DataTable
             caption="Documents issued"
             emptyText="No numbered tax documents in this period."
@@ -283,6 +299,23 @@ export function GstReports() {
               { key: 'n', label: 'Net issued', numeric: true, render: (r) => r.netIssued, total: (r) => r.netIssued, totalFormat: String },
             ]}
           />
+          <h3 className={local.tbHeading}>Series gaps — FY{fyLabel} (whole year)</h3>
+          {gaps.length === 0 ? (
+            <p className={controls.hint}>No missing numbers in any series this financial year.</p>
+          ) : (
+            <ul className={local.gapList}>
+              {gaps.map((g) => (
+                <li key={`${g.prefix}${g.fy}`}>
+                  <strong className={surface.mono}>{g.prefix}/FY{g.fy}</strong>: {g.missingCount} unused number{g.missingCount === 1 ? '' : 's'} up to {String(g.highest).padStart(4, '0')} —{' '}
+                  <span className={surface.mono}>{g.missingNumbers.slice(0, 12).join(', ')}{g.missingCount > 12 ? ' …' : ''}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className={controls.hint}>
+            Rule 46 expects a consecutive series. Report unused numbers as cancelled in Table 13, or explain them to your CA.
+          </p>
+          </>
         );
       case 'gstr3b':
         return <Gstr3bView report={g3} />;
@@ -318,6 +351,10 @@ export function GstReports() {
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData}
             onClick={() => download(`GSTR3B_${gstin || 'all'}_${g1.fp}.csv`, 'text/csv', gstr3bCsv(g3))}>
             <FileSpreadsheet size={16} aria-hidden /> GSTR-3B CSV
+          </button>
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={!gstin ? 'Add a GSTIN in Settings to export GSTR-3B JSON' : 'Working paper — check against the GST offline tool and your CA'}
+            onClick={() => download(`GSTR3B_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildGstr3bJson(g3, gstin, g1.fp), null, 2))}>
+            <FileJson size={16} aria-hidden /> GSTR-3B JSON
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData} onClick={printSummary}>
             <Printer size={16} aria-hidden /> Print summary

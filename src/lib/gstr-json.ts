@@ -361,6 +361,59 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
   ];
 }
 
+/**
+ * GSTR-3B in the portal's JSON section layout (3.1 sup_details, 3.2 inter_sup, 4 itc_elg,
+ * 5 inward_sup). Table 6.1 (payment) is computed by the portal and left out. A working paper:
+ * the key names follow the GSTN JSON and must be checked against the current offline tool —
+ * verify with your CA before uploading.
+ */
+export function buildGstr3bJson(b: Gstr3bReport, gstin: string, retPeriod: string): Record<string, unknown> {
+  const r = (n: number) => round2(n ?? 0);
+  const tax = (t: { taxable?: number; igst: number; cgst: number; sgst: number; cess: number }, withTxval = true) => ({
+    ...(withTxval ? { txval: r(t.taxable ?? 0) } : {}),
+    iamt: r(t.igst),
+    camt: r(t.cgst),
+    samt: r(t.sgst),
+    csamt: r(t.cess),
+  });
+  const itc = (ty: string, h: { igst: number; cgst: number; sgst: number; cess: number }) => ({ ty, ...tax(h, false) });
+  const zero = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
+  return {
+    gstin,
+    ret_period: retPeriod,
+    sup_details: {
+      osup_det: tax(b.outward.taxable),
+      osup_zero: { txval: r(b.outward.zeroRated.taxable), iamt: r(b.outward.zeroRated.igst), csamt: r(b.outward.zeroRated.cess) },
+      osup_nil_exmp: { txval: r(b.outward.nilExempt.inter + b.outward.nilExempt.intra) },
+      isup_rev: tax(b.outward.inwardRcm),
+      osup_nongst: { txval: r(b.outward.nonGst) },
+    },
+    inter_sup: {
+      unreg_details: b.interStateUnreg.map((u) => ({ pos: u.pos, txval: r(u.taxable), iamt: r(u.igst) })),
+      comp_details: [],
+      uin_details: [],
+    },
+    itc_elg: {
+      itc_avl: [
+        itc('IMPG', b.itc.importGoods),
+        itc('IMPS', b.itc.importServices),
+        itc('ISRC', b.itc.availableRcm),
+        itc('ISD', zero),
+        itc('OTH', b.itc.availableOther),
+      ],
+      itc_rev: [itc('RUL', b.itc.reversedRules), itc('OTH', b.itc.reversedOther)],
+      itc_net: tax(b.itc.net, false),
+      itc_inelg: [itc('RUL', zero), itc('OTH', b.itc.ineligible)],
+    },
+    inward_sup: {
+      isup_details: [
+        { ty: 'GST', inter: r(b.inwardExempt.inter), intra: r(b.inwardExempt.intra) },
+        { ty: 'NONGST', inter: 0, intra: 0 },
+      ],
+    },
+  };
+}
+
 export function gstr3bCsv(b: Gstr3bReport): string {
   return toCsv(gstr3bRows(b));
 }
