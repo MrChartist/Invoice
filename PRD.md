@@ -116,8 +116,11 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   AES-GCM-256 encrypted with a stored non-extractable key, read back after writing), passphrase-encrypted exports,
   storage-health panel.
 - **Security**: PIN lock (PBKDF2-SHA-256, 600k iterations, lockout, idle lock, locks every tab), strict CSP via
-  headers and a build-time meta tag. A 4–6 digit PIN is a lock screen, not encryption of the stored data.
-- **Erase all data**: requires typing `ERASE`; also clears the undo copy, backup key and backup-folder link.
+  headers and a build-time meta tag. A 4–6 digit PIN is a lock screen, not encryption of the stored data; use vault
+  mode for that.
+- **Vault mode** (optional): the whole store encrypted at rest with AES-256 under a passphrase-wrapped key, unlocked
+  at start-up; a lost passphrase means lost data (no recovery by design).
+- **Erase all data**: requires typing `ERASE`; also clears the undo copy, backup key, backup-folder link and vault.
 
 ---
 

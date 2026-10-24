@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { ChangePinModal } from './ChangePinModal';
 import { EncryptedBackup } from './EncryptedBackup';
+import { VaultPanel } from './VaultPanel';
 import { IDLE_CHOICES, getIdleTimeout, logout, setIdleTimeout } from '../../lib/auth';
 import { daysSinceBackup, getLastBackup } from '../../lib/backup';
 import controls from '../../styles/controls.module.css';
@@ -20,7 +21,7 @@ function idleLabel(minutes: number): string {
   return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
 }
 
-/** Settings → Security: PIN, auto-lock, and encrypted backups. */
+/** Settings → Security: PIN, auto-lock, vault mode and encrypted backups. */
 export function SecurityPanel({ notify, onLock }: Props) {
   const [pinOpen, setPinOpen] = useState(false);
   const [idle, setIdle] = useState(getIdleTimeout);
@@ -94,6 +95,8 @@ export function SecurityPanel({ notify, onLock }: Props) {
           </div>
         </div>
       </section>
+
+      <VaultPanel notify={notify} />
 
       <section className={surface.card}>
         <div className={surface.cardHead}>

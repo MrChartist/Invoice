@@ -86,6 +86,32 @@ also prepend the CSP (minus `frame-ancestors`, which only works as a header) as 
 host that ignores those files still enforces it. Older backups encrypted at 310k iterations still open (the
 iteration count travels in the envelope).
 
+## Vault mode (roadmap 5.8)
+
+Optional, Settings → Security → **Vault mode**. Protects the stored data itself, unlike the PIN.
+
+- **Keys.** A random AES-GCM-256 data key encrypts every value the app keeps in IndexedDB. It is wrapped with AES-KW
+  under a key derived from the passphrase (PBKDF2-SHA-256, 600,000 iterations, random salt); only the wrapped key,
+  salt and iteration count are stored (`__vault__` record). In memory the data key is a non-extractable `CryptoKey`.
+  Changing the passphrase re-wraps the same data key, so the data is not re-encrypted.
+- **Values.** Sealed one by one as `mcv1:<iv>:<ciphertext>` with a fresh 96-bit IV and the storage key name as
+  AES-GCM additional data, so a ciphertext copied onto another key fails to open. A value that fails to decrypt is
+  reported on the unlock screen and left untouched; everything else opens.
+- **Boot.** With a vault on the device, an unlock screen appears before the app (and before the PIN screen); nothing
+  reads the store until the passphrase has decrypted it. "Lock vault now" reloads the page, dropping the key.
+- **What else is covered.** The restore undo copy (IndexedDB `kv` store) is sealed with the same key. Device-local
+  keys that stay in localStorage (PIN hash, lockout, idle timer, session, last-backup time, backend marker) and the
+  theme are not data and are not encrypted. Exported backups are whatever you choose (use an encrypted export);
+  the panel warns when automatic folder backups are unencrypted.
+- **Multiple tabs.** Turning the vault on or off is broadcast and other tabs reload. Before each write a tab checks
+  that the vault record it unlocked is still the current one; if not, it refuses to write and asks for a reload.
+  Each tab asks for the passphrase separately.
+- **No recovery.** A lost passphrase means the data cannot be decrypted. The unlock screen's "Forgot the passphrase?"
+  erases everything this app stored on the device (typed `ERASE`), after which a backup can be restored.
+- **Limits.** Not a defence against malware or someone using the unlocked app; data is decrypted in memory while the
+  tab is open. Passphrase attempts are not rate-limited beyond the cost of PBKDF2 (an attacker with a copy of the
+  data can guess offline, so use a long passphrase; the minimum is 10 characters). Needs IndexedDB and a secure page.
+
 ## Review fixes (Phase 4)
 
 - **CI actions pinned to commit SHAs** (`.github/workflows/ci.yml`, tag in a trailing comment), kept current by

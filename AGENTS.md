@@ -96,7 +96,7 @@ build-time config must use Vite's `VITE_` prefix.
 - `PurchaseLine.item_id` is not set by the bill form yet, so inventory matches purchases by name + HSN.
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.
-- A 4-6 digit PIN is a lock screen, not encryption of the stored data.
+- A 4-6 digit PIN is a lock screen, not encryption of the stored data; optional vault mode (`src/lib/vault.ts`) encrypts the IndexedDB store at rest. Never write the `__vault__` record or sealed (`mcv1:`) values outside `storage.ts`.
 - `.xlsx` is handled by our own minimal reader/writer (`src/lib/zip.ts` + `src/lib/xlsx.ts`, native
   `DecompressionStream`/`CompressionStream`): no `.xls`/`.ods`/encrypted/ZIP64 workbooks, no styles beyond a bold
   header row on export. Imports read the first non-empty sheet. Keep it out of the shell (dynamic import).

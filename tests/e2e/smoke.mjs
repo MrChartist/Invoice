@@ -503,6 +503,38 @@ try {
     check(again.length === 1 && again[0].id === 'old-1', 'after a reload the data is served from IndexedDB');
     await ctx.close();
   });
+
+  await step('vault mode: encrypt at rest, unlock after reload, turn off', async () => {
+    const PASS = 'e2e vault passphrase';
+    await page.goto(srv.origin + '/settings?tab=security');
+    await page.getByRole('button', { name: 'Turn on vault mode' }).click();
+    await page.locator('#vault-pass').fill(PASS);
+    await page.locator('#vault-pass2').fill(PASS);
+    await page.getByLabel(/lost passphrase means lost data/).check();
+    await page.getByRole('button', { name: 'Encrypt my data' }).click();
+    await page.getByText('Vault mode is on', { exact: false }).first().waitFor({ timeout: 20000 });
+    const sealed = await idbGet(page, 'mrchartist_inv_clients');
+    check(typeof sealed === 'string' && sealed.startsWith('mcv1:') && !sealed.includes('Acme'),
+      `client table is encrypted in IndexedDB (${String(sealed).slice(0, 12)}…)`);
+
+    await page.reload();
+    await page.getByRole('heading', { name: 'Unlock your vault' }).waitFor();
+    await page.getByLabel('Vault passphrase').fill('not the passphrase');
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await page.getByRole('alert').getByText('Wrong passphrase').waitFor({ timeout: 20000 });
+    check(true, 'a wrong passphrase is refused');
+    await page.getByLabel('Vault passphrase').fill(PASS);
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await page.getByRole('button', { name: 'Turn off' }).waitFor({ timeout: 20000 });
+    check(true, 'the right passphrase opens the app');
+
+    await page.getByRole('button', { name: 'Turn off' }).click();
+    await page.locator('#vault-current').fill(PASS);
+    await page.getByRole('button', { name: 'Turn off vault mode' }).click();
+    await page.getByText('Vault mode is off', { exact: false }).first().waitFor({ timeout: 20000 });
+    const clients = await readJson(page, 'clients', []);
+    check(clients.some((c) => c.name === 'Acme Buyers'), 'turning it off writes the data back readable');
+  });
 } catch {
   /* already reported */
 } finally {

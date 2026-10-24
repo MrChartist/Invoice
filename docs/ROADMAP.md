@@ -142,7 +142,7 @@ Larger features, each of which can ship on its own once Phases 1–4 are done.
 | 5.5 | **POS / thermal quick-bill mode**: one-screen counter billing, walk-in customer, 80 mm auto-print, change calculator | M | Reuses `thermal80` / ReceiptBody |
 | 5.6 | **Barcode/SKU**: `BarcodeDetector` camera scan with typed fallback, Code128 labels | M | Pairs with 5.5 |
 | 5.7 | **Multi-device via a shared folder**: encrypted store + per-device change log written to a Drive/Dropbox/iCloud folder (File System Access API); merge by UUID + `updated_at`, show conflicts to the user. The cloud client moves the files, so the app makes no network calls | L | Needs 0.6, 4.2 |
-| 5.8 | **Optional "vault mode"**: whole store encrypted at rest with a passphrase-wrapped key (clear warning: a lost passphrase means lost data) | L | Needs 4.2 |
+| 5.8 | ✅ **Optional "vault mode"**: whole store encrypted at rest with a passphrase-wrapped key (clear warning: a lost passphrase means lost data) (`src/lib/vault.ts`, `docs/features/security.md`) | L | Needs 4.2 |
 | 5.9 | Composition / Bill of Supply, amendments (B2BA/CDNRA), e-commerce Sec 52/9(5) | M each | On demand |
 
 ### Not planned (conflicts with the hard rules)

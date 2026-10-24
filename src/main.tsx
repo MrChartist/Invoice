@@ -1,5 +1,5 @@
 import React from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root } from 'react-dom/client';
 import App from './App';
 import { registerServiceWorker } from './lib/pwa';
 import { runMigrations } from './lib/migrations';
@@ -8,14 +8,7 @@ import { initStorage } from './lib/storage';
 import './fonts.css';
 import './index.css';
 
-// Load the data into the IndexedDB-backed cache (moving it out of localStorage on first run)
-// before anything renders; until then the page shows only its background. Typically a few ms.
-void initStorage().then((init) => {
-  if (init.backend === 'unavailable') {
-    void import('./boot-unavailable').then((m) => m.showUnavailable(init.reason));
-    return;
-  }
-
+function start(root: Root): void {
   // Bring stored data up to the current schema before anything reads it.
   const migration = runMigrations();
   if (migration.status === 'failed') console.error('Data migration failed; using the previous data shape.', migration);
@@ -23,7 +16,7 @@ void initStorage().then((init) => {
 
   initCrossTab();
 
-  createRoot(document.getElementById('root')!).render(
+  root.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>,
@@ -31,4 +24,22 @@ void initStorage().then((init) => {
 
   // Production only: caches the app shell so the tool works fully offline.
   void registerServiceWorker();
+}
+
+// Load the data into the IndexedDB-backed cache (moving it out of localStorage on first run)
+// before anything renders; until then the page shows only its background. Typically a few ms.
+void initStorage().then((init) => {
+  if (init.backend === 'unavailable') {
+    void import('./boot-unavailable').then((m) => m.showUnavailable(init.reason));
+    return;
+  }
+  const root = createRoot(document.getElementById('root')!);
+  if (init.backend === 'locked') {
+    // Vault mode: nothing may read the store until the passphrase has decrypted it.
+    void import('./components/vault/VaultUnlock').then(({ VaultUnlock }) => {
+      root.render(<VaultUnlock onUnlocked={() => start(root)} />);
+    });
+    return;
+  }
+  start(root);
 });

@@ -32,6 +32,15 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   write for the key) and `cross-tab.ts` shows "Updated in another tab" as before.
 - **Readers.** Backup (`collectAppData`), restore, wipe, migrations and storage health all go through the same
   functions, so they read the cache. Storage health uses the browser's IndexedDB quota estimate instead of ~5 MB.
+- **Vault mode (5.8).** Optional encryption at rest (`src/lib/vault.ts`). Every value in the `data` store is sealed
+  (`mcv1:<iv>:<ct>`, AES-GCM-256, the key name as additional data) with a random data key; that key is wrapped
+  (AES-KW) under a PBKDF2-SHA-256 (600k) passphrase key and stored as the `__vault__` record next to the data.
+  With a record present `initStorage()` returns `locked`, `main.tsx` shows `VaultUnlock`, and `unlockStorage()`
+  decrypts everything into the same map; the synchronous API is unchanged. Flushes seal values after checking
+  the record's id (a tab whose vault was removed or re-created elsewhere refuses to write and is told to
+  reload); enable / disable re-write the whole store in one transaction (verified by read-back) and broadcast
+  `{ vault: 'changed' }` so other tabs reload. Unsealed values found while unlocking are accepted and re-sealed.
+  The restore undo copy in the `kv` store is sealed too; Erase / Forgot-PIN drop the vault (`forgetVault`).
 - **Rule for new code.** No module evaluated before `initStorage()` (i.e. statically imported by `main.tsx` /
   `App.tsx`) may read storage at module level; read inside functions, effects or lazily loaded modules.
 

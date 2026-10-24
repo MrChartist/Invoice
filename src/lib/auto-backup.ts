@@ -11,7 +11,7 @@ import { backupFilename, buildBackup, buildEncryptedBackupWithKey } from './back
 import { deriveEncryptionKey, type StoredEncryptionKey } from './crypto';
 import { downloadText } from './download';
 import { idbClear, idbDel, idbGet, idbSet } from './idb-kv';
-import { DB_PREFIX, readRaw, removeRaw, writeRaw } from './storage';
+import { DB_PREFIX, forgetVault, readRaw, removeRaw, writeRaw } from './storage';
 
 export type BackupFrequency = 'daily' | 'weekly' | 'on-close';
 
@@ -228,6 +228,7 @@ export async function setBackupPassphrase(passphrase: string): Promise<{ ok: tru
 export async function forgetDeviceData(): Promise<void> {
   await idbClear();
   cachedKey = null;
+  await forgetVault(); // vault mode: the next boot starts fresh instead of asking for a passphrase
 }
 
 export async function clearBackupPassphrase(): Promise<void> {

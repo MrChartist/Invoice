@@ -13,7 +13,7 @@
  * unrelated site data.
  */
 
-import { DB_PREFIX, collectAppData, readRaw, removeRaw, writeRaw } from './storage';
+import { DB_PREFIX, collectAppData, readRaw, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
@@ -291,6 +291,14 @@ export interface SafetySnapshot {
   data: Record<string, string>;
 }
 
+/** As stored: in vault mode the data is one sealed JSON string instead of a plain object. */
+interface StoredSnapshot {
+  at: string;
+  reason: SafetySnapshot['reason'];
+  data?: Record<string, string>;
+  sealed?: string;
+}
+
 /**
  * Keep a copy of everything on this device in IndexedDB (separate from the
  * localStorage quota) so a restore or wipe can be undone. Resolves false if the
@@ -300,12 +308,28 @@ export async function saveSafetySnapshot(reason: SafetySnapshot['reason'], now: 
   const data = collectAppData();
   for (const key of LOCAL_ONLY) delete data[key];
   if (Object.keys(data).length === 0) return true; // nothing to protect
-  return idbSet(SAFETY_KEY, { at: now.toISOString(), reason, data } satisfies SafetySnapshot);
+  const at = now.toISOString();
+  // Vault mode: the undo copy must not sit in IndexedDB readable.
+  const record: StoredSnapshot = vaultEnabled()
+    ? { at, reason, sealed: await vaultSeal(SAFETY_KEY, JSON.stringify(data)) }
+    : { at, reason, data };
+  return idbSet(SAFETY_KEY, record);
 }
 
 export async function getSafetySnapshot(): Promise<SafetySnapshot | null> {
-  const s = await idbGet<SafetySnapshot>(SAFETY_KEY);
-  return s && typeof s.at === 'string' && isPlainObject(s.data) ? s : null;
+  const s = await idbGet<StoredSnapshot>(SAFETY_KEY);
+  if (!s || typeof s.at !== 'string') return null;
+  if (typeof s.sealed === 'string') {
+    const text = await vaultUnseal(SAFETY_KEY, s.sealed);
+    if (text === null) return null;
+    try {
+      const data: unknown = JSON.parse(text);
+      return isPlainObject(data) ? { at: s.at, reason: s.reason, data: data as Record<string, string> } : null;
+    } catch {
+      return null;
+    }
+  }
+  return isPlainObject(s.data) ? { at: s.at, reason: s.reason, data: s.data } : null;
 }
 
 export async function clearSafetySnapshot(): Promise<void> {
