@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, Copy, Library, Plus, Trash2 } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
+import { Typeahead } from '../ui/Typeahead';
+import { localDb } from '../../lib/localDb';
+import { suggest } from '../../lib/suggest';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
-import { UNITS, GST_SLABS } from '../../types/invoice';
+import { UNITS, GST_SLABS, type InvoiceItem } from '../../types/invoice';
 import { cn, formatCurrency } from '../../lib/utils';
 import { lineKeyAction } from './line-keys';
 import controls from '../../styles/controls.module.css';
@@ -14,7 +17,18 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const gstMode = useInvoiceStore((s) => s.gst_mode);
   const currency = useInvoiceStore((s) => s.currency);
   const docType = useInvoiceStore((s) => s.doc_type);
-  const { addItem, updateItem, duplicateItem, moveItem, removeItem } = useInvoiceStore.getState();
+  const { addItem, updateItem, duplicateItem, moveItem, removeItem, applyCatalogItem } = useInvoiceStore.getState();
+  // Catalogue snapshot, refreshed whenever an item name gains focus.
+  const [catalog, setCatalog] = useState<InvoiceItem[]>([]);
+  const itemSuggestions = useCallback(
+    (q: string) =>
+      suggest(q, catalog, {
+        label: (i) => i.name,
+        extra: (i) => [i.hsn],
+        sub: (i) => [i.hsn && `HSN ${i.hsn}`, formatCurrency(i.rate, currency)].filter(Boolean).join(' · '),
+      }),
+    [catalog, currency],
+  );
   const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});
   const showTax = gstMode !== 'NONE';
   const priced = docType !== 'DELIVERY_CHALLAN';
@@ -73,11 +87,14 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
           <div key={item.id} data-line={item.id} className={cn(styles.row, styles.body)} onKeyDown={(e) => onRowKeyDown(e, item.id, index)}>
             <div className={cn(styles.cell, styles.cName)} data-label="Item / service">
               <div className={styles.nameWrap}>
-                <input
+                <Typeahead
                   className={controls.ghost}
                   data-field="name"
                   value={item.name}
-                  onChange={(e) => updateItem(item.id, 'name', e.target.value)}
+                  onChange={(name) => updateItem(item.id, 'name', name)}
+                  onFocus={() => setCatalog(localDb.items.getAll())}
+                  getSuggestions={itemSuggestions}
+                  onPick={(c) => applyCatalogItem(item.id, c)}
                   placeholder={`Item ${index + 1}`}
                   aria-label={`Item ${index + 1} name`}
                 />

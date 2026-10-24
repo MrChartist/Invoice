@@ -81,6 +81,27 @@ try {
     check(Math.abs((stored[0]?.total ?? 0) - 3540) < 0.01, `total with 18% GST = 3540 (${stored[0]?.total})`);
   });
 
+  await step('typeahead fills client and item from what was saved', async () => {
+    await page.goto(srv.origin + '/invoice');
+    const name = page.getByLabel('Client name');
+    await name.fill('');
+    await name.pressSequentially('acm');
+    await page.getByRole('option', { name: /Acme Buyers/ }).waitFor();
+    await name.press('Enter');
+    check((await name.inputValue()) === 'Acme Buyers', `Enter picks the client suggestion (${await name.inputValue()})`);
+    const item = page.getByLabel('Item 1 name');
+    await item.pressSequentially('cons');
+    await page.getByRole('option', { name: /Consulting/ }).waitFor();
+    await item.press('ArrowDown');
+    await item.press('Enter');
+    const rate = await page.getByLabel('Item 1 rate').inputValue();
+    check((await item.inputValue()) === 'Consulting' && /1,?500/.test(rate), `item suggestion fills the catalogue rate (${rate})`);
+    const lines = await page.locator('[data-line]').count();
+    check(lines === 1, `Enter on a suggestion does not add a line (${lines})`);
+    // Leave without saving this second draft.
+    await page.evaluate(() => localStorage.removeItem('mrchartist_inv_draft'));
+  });
+
   await step('invoice list and preview', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByText('Acme Buyers').first().waitFor();

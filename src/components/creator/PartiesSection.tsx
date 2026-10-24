@@ -1,9 +1,14 @@
+import { useCallback, useState } from 'react';
 import { AlertTriangle, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { GstinInput } from '../ui/GstinInput';
+import { Typeahead } from '../ui/Typeahead';
+import { localDb } from '../../lib/localDb';
+import { suggest } from '../../lib/suggest';
+import { clientToParty } from '../../store/invoice-defaults';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { INDIAN_STATES, formatPlaceOfSupply, stateByCode } from '../../lib/india-states';
-import type { SenderProfile } from '../../types/invoice';
+import type { Client, SenderProfile } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './PartiesSection.module.css';
 
@@ -18,6 +23,17 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
   const placeOfSupply = useInvoiceStore((s) => s.place_of_supply);
   const gstMode = useInvoiceStore((s) => s.gst_mode);
   const { setSender, setClient, setPlaceOfSupply } = useInvoiceStore.getState();
+  // Directory snapshot, refreshed whenever the name field gains focus.
+  const [directory, setDirectory] = useState<Client[]>([]);
+  const clientSuggestions = useCallback(
+    (q: string) =>
+      suggest(q, directory, {
+        label: (c) => c.name,
+        extra: (c) => [c.company, c.gstin, c.city],
+        sub: (c) => [c.city, c.gstin].filter(Boolean).join(' · '),
+      }),
+    [directory],
+  );
 
   const missingSender = !sender?.companyName?.trim();
 
@@ -83,7 +99,16 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
         </div>
 
         <div className={styles.form}>
-          <input className={controls.input} value={client.name} onChange={(e) => setClient({ name: e.target.value })} placeholder="Client name *" aria-label="Client name" />
+          <Typeahead
+            className={controls.input}
+            value={client.name}
+            onChange={(name) => setClient({ name })}
+            onFocus={() => setDirectory(localDb.clients.getAll())}
+            getSuggestions={clientSuggestions}
+            onPick={(c) => setClient(clientToParty(c))}
+            placeholder="Client name *"
+            aria-label="Client name"
+          />
           <input className={controls.input} value={client.company ?? ''} onChange={(e) => setClient({ company: e.target.value })} placeholder="Company (optional)" aria-label="Company" />
           <textarea className={controls.textarea} rows={2} value={client.address} onChange={(e) => setClient({ address: e.target.value })} placeholder="Billing address" aria-label="Billing address" />
           <div className={controls.row}>

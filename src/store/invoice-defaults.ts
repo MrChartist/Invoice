@@ -248,3 +248,19 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     updated_at: r.updated_at,
   };
 }
+
+/** The client fields an invoice copies from a directory entry (shared by the picker and the typeahead). */
+export function clientToParty(c: Partial<Client>): Partial<Client> {
+  return {
+    name: c.name ?? '',
+    company: c.company ?? '',
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+    address: c.address ?? '',
+    city: c.city ?? '',
+    state: c.state ?? '',
+    state_code: c.state_code ?? '',
+    zip: c.zip ?? '',
+    gstin: c.gstin ?? '',
+  };
+}

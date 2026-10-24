@@ -5,6 +5,7 @@ import { Modal } from '../ui/Modal';
 import { Avatar } from '../ui/Avatar';
 import { localDb } from '../../lib/localDb';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
+import { clientToParty } from '../../store/invoice-defaults';
 import type { Client } from '../../types/invoice';
 import styles from './PickerList.module.css';
 
@@ -34,18 +35,7 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
   }, [clients, query]);
 
   const pick = (c: Client) => {
-    setClient({
-      name: c.name ?? '',
-      company: c.company ?? '',
-      email: c.email ?? '',
-      phone: c.phone ?? '',
-      address: c.address ?? '',
-      city: c.city ?? '',
-      state: c.state ?? '',
-      state_code: c.state_code ?? '',
-      zip: c.zip ?? '',
-      gstin: c.gstin ?? '',
-    });
+    setClient(clientToParty(c));
     onClose();
   };
 
