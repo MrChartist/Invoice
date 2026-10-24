@@ -159,10 +159,10 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 
 | # | Item | Competitors | Effort |
 |---|------|-------------|--------|
-| 6.1 | **Double-entry core**: chart of accounts (Schedule III groups), journal / contra / payment / receipt vouchers; documents auto-post | Tally, Busy, Zoho, Xero, QBO | L |
-| 6.2 | **Trial balance + ledger drill-down** | all accounting tools | S (after 6.1) |
-| 6.3 | **Full balance sheet**: fixed assets & depreciation (IT Act WDV blocks), loans, capital/drawings, GST ledgers | Tally, Zoho | M |
-| 6.4 | **Cash-flow statement** (indirect, AS 3 / Ind AS 7) | Vyapar, Refrens, Zoho, Xero | S–M |
+| 6.1 | ✅ **Double-entry core**: chart of accounts (Schedule III groups), journal / contra / payment / receipt vouchers; documents auto-post — `src/lib/ledger/`, `docs/features/ledger.md` | Tally, Busy, Zoho, Xero, QBO | L |
+| 6.2 | ✅ **Trial balance + ledger drill-down** | all accounting tools | S (after 6.1) |
+| 6.3 | ✅ **Full balance sheet**: fixed assets & depreciation (IT Act WDV blocks), loans, capital/drawings, GST ledgers (Schedule III vertical format) | Tally, Zoho | M |
+| 6.4 | ✅ **Cash-flow statement** (indirect, AS 3) | Vyapar, Refrens, Zoho, Xero | S–M |
 | 6.5 | **Sales orders & purchase orders** with pending quantities → invoice / challan / bill | Refrens, Odoo, myBillBook, Vyapar, Zoho | M |
 | 6.6 | **Batch / expiry / MFG** on stock with FEFO and expiry alerts | Vyapar, myBillBook, Busy, Marg | M |
 | 6.7 | **Barcode** scan (BarcodeDetector + keyboard wedge) and Code128/EAN-13 label sheets | Vyapar, myBillBook, Marg | M |

@@ -261,6 +261,35 @@ try {
     }, dn.id);
   });
 
+  await step('double-entry books: journal voucher, trial balance, balance sheet, cash flow', async () => {
+    await page.goto(srv.origin + '/books?tab=vch');
+    await page.getByRole('button', { name: 'New voucher' }).click();
+    const dlg = page.getByRole('dialog', { name: 'New voucher' });
+    await dlg.getByLabel('Line 1 account').selectOption('bank');
+    await dlg.getByLabel('Line 1 debit').fill('50000');
+    await dlg.getByLabel('Line 2 account').selectOption('capital');
+    await dlg.getByLabel('Line 2 credit').fill('50000');
+    await dlg.getByText('Balanced').waitFor();
+    await dlg.getByRole('button', { name: 'Save voucher' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const vouchers = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_vouchers') || '[]'));
+    check(vouchers.length === 1 && /^JV\/FY\d{2}-\d{2}\/0001$/.test(vouchers[0].number) && vouchers[0].lines[0].dr === 5000000,
+      `journal voucher stored in paise with an FY number (${vouchers[0]?.number})`);
+    await page.getByRole('tab', { name: 'Trial balance' }).click();
+    await page.getByText('Debits = credits').waitFor();
+    check(true, 'trial balance agrees');
+    await page.getByRole('tab', { name: 'Balance sheet' }).click();
+    await page.getByText('Assets = liabilities + equity').waitFor();
+    check(true, 'Schedule III balance sheet ties');
+    await page.getByRole('tab', { name: 'Cash flow' }).click();
+    await page.getByText('Reconciles to cash & bank').waitFor();
+    check(true, 'cash-flow statement reconciles');
+    await page.getByRole('tab', { name: 'Trial balance' }).click();
+    await page.getByRole('button', { name: 'Capital account' }).click();
+    await page.getByRole('tab', { name: 'Ledger', selected: true }).waitFor();
+    check(await page.getByText(/JV\/FY\d{2}-\d{2}\/0001/).first().isVisible(), 'drill-down opens the capital ledger with the voucher');
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');
