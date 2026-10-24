@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: proposal · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -15,7 +15,7 @@ statutory values. Outputs stay labelled as working papers ("verify with your CA"
 
 ---
 
-## Phase 0: Correctness hotfixes (v3.1.x) · ~1–2 weeks
+## Phase 0: Correctness hotfixes (v3.1.x) · ✅ done
 
 Bugs in the current code that produce wrong numbers or wrong data. Fix these before adding features.
 
@@ -34,9 +34,14 @@ Bugs in the current code that produce wrong numbers or wrong data. Fix these bef
 
 **Exit criteria:** regression tests for each fix under `tests/`; typecheck/lint/test/build pass.
 
+**Outcome:** all items shipped with tests. Two turned out narrower than first reported: 0.2 (plain Save is
+deliberately "issue" — drafts are excluded from every report, so only the button wording changed) and 0.5 (picking
+a vendor already set the place of supply; only the GSTIN-only vendor case was missing). 0.7 now leaves drafts out
+of the document-issued range instead of counting a trailing draft as cancelled.
+
 ---
 
-## Phase 1: Engineering foundations (v3.2) · ~3–4 weeks
+## Phase 1: Engineering foundations (v3.2) · ✅ done
 
 Phases 3–5 change stored data, so this phase builds the groundwork they rely on: migrations, safety nets and tests.
 
@@ -52,6 +57,11 @@ Phases 3–5 change stored data, so this phase builds the groundwork they rely o
 | 1.8 | **Cross-tab safety**: `storage` listener + `BroadcastChannel` refresh, `navigator.locks` around writes | Two open tabs currently overwrite each other's whole tables | S–M | — |
 | 1.9 | **Security hardening**: PBKDF2 600k with re-hash on unlock, optional alphanumeric passcode; CSP `<meta>` in `index.html` for hosts that ignore `_headers`; generate the three header files from one source | Current OWASP guidance; header copies drift today | S | — |
 | 1.10 | **Storage-health panel**: real usage vs quota, persisted status, Safari "install to Home Screen" warning, read back each backup to confirm it is valid | Users get warned before data is lost | S | — |
+
+**Outcome:** all ten shipped. Bonus: `src/` already compiled under full `strict`, so 4.6 is done too. 1.6 found a
+real bug while consolidating — legacy lump-tax bills were posted entirely as Input IGST in Tally; one shared
+`splitLumpTax` now serves GST reports, books and exports. CI runs a Playwright journey (account → invoice →
+preview → second tab → backup → restore/undo) plus the offline checks against the production build.
 
 ---
 
@@ -101,7 +111,7 @@ the quota after about 80 invoices (about 3,000 without a logo). This is a major 
 | 4.3 | **Virtualise long tables** (Transactions, Receivables): long tasks of 235–280 ms at 300 invoices today | M | — |
 | 4.4 | **Split large components**: `ImportWizard` (835 lines, 24 `useState`), `InvoiceCreator` → reducer + step components | M | 1.5 |
 | 4.5 | **Tamper-evident audit log**: hash-chained rows; restore adds a marker row instead of replacing the log; no silent drop when storage is full | M | 4.2 |
-| 4.6 | Full `strict` mode on | M | 1.7 |
+| 4.6 | ✅ Full `strict` mode on (done in Phase 1) | — | 1.7 |
 
 ---
 
