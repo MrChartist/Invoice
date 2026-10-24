@@ -11,6 +11,7 @@ import {
   LateFeeError,
   buildLateFeeInvoice,
   buildLateFeeItem,
+  principalTaxRate,
   computeClientLateFee,
   createLateFeeInvoice,
   describeClientLateFee,
@@ -75,20 +76,20 @@ test('flat: fixed fee once unpaid beyond the grace period; paid in grace = no fe
   assert.deepEqual([paidLate.eligible, paidLate.amount], [true, 500]);
 });
 
-test('the line and the new invoice: one line, tax 0 %, total = fee, original untouched', () => {
+test('the line and the new invoice: one line at the principal rate, original untouched', () => {
   const orig = createViaStore({ date: '2025-06-01', due: '2025-06-30', lines: [{ qty: 10, rate: 1000 }] });
   const before = JSON.stringify(reload(orig.id));
   const q = computeClientLateFee(base, pct, '2025-07-15');
   const item = buildLateFeeItem(q, pct, orig)!;
   assert.equal(item.rate, 58.19);
-  assert.equal(item.tax_rate, 0);
+  assert.equal(item.tax_rate, 18, 'Sec 15(2)(d): the fee takes the principal supply rate');
   assert.match(item.name, new RegExp(orig.invoice_number.replace(/\//g, '\\/')));
   const rec = buildLateFeeInvoice(orig, item, { id: 'lf1', invoice_number: 'INV/FY25-26/0099', today: '2025-07-15', dueDays: 7 });
   assert.equal(rec.id, 'lf1');
   assert.equal(rec.status, 'Draft');
   assert.equal(rec.due_date, '2025-07-22');
   assert.equal(rec.items.length, 1);
-  assert.equal(rec.total, 58);
+  assert.equal(rec.total, 69);
   assert.equal(rec.taxable_value, 58.19);
   assert.equal(rec.late_fee_for, orig.id);
   assert.equal(rec.amount_paid, 0);
@@ -110,7 +111,7 @@ test('createLateFeeInvoice: uses the client master terms, saves a NEW draft, ref
     assert.notEqual(saved.id, orig.id);
     assert.equal(saved.issue_date, '2025-07-15');
     assert.equal(saved.status, 'Draft');
-    assert.equal(saved.total, 500);
+    assert.equal(saved.total, 590, "₹500 fee + 18 % GST (principal rate)");
     assert.equal(saved.client.name, orig.client.name);
     assert.ok(saved.invoice_number && saved.invoice_number !== orig.invoice_number);
     assert.equal(localDb.invoices.getAll().length, count + 1);
@@ -129,4 +130,12 @@ test('createLateFeeInvoice respects the period lock', () => {
   const count = localDb.invoices.getAll().length;
   assert.throws(() => createLateFeeInvoice(reload(orig.id), new Date(2025, 6, 15)), /lock/i);
   assert.equal(localDb.invoices.getAll().length, count);
+});
+
+test('principalTaxRate: the rate carrying the largest taxable value', () => {
+  const line = (quantity: number, rate: number, tax_rate: number) => ({ id: 'x', name: 'x', type: 'service' as const, quantity, rate, tax_rate, amount: quantity * rate });
+  assert.equal(principalTaxRate([line(1, 100, 5), line(2, 400, 18), line(1, 700, 12)]), 18);
+  assert.equal(principalTaxRate([line(1, 500, 5), line(1, 500, 12)]), 12, 'a tie takes the higher rate');
+  assert.equal(principalTaxRate([]), 0);
+  assert.equal(principalTaxRate(undefined), 0);
 });

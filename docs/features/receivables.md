@@ -165,9 +165,10 @@ Maths (`src/lib/late-fee.ts`, reusing `computeInterest` from `src/lib/interest.t
   settled invoice stops on the day it was cleared. Principal is total − TDS.
 - `flat`: the fixed amount once the bill was unpaid for at least one day after `due date + grace days` (paid within
   grace: no fee; paid late: fee).
-- The line is tax 0 % by default, like the interest line. Under Sec 15(2)(d) CGST Act interest / late fee for delayed
-  payment is generally part of the value of supply, so your CA may want the principal supply's rate on it: edit the
-  draft before issuing. Whether a fee can be charged depends on the agreement with the customer.
+- Under Sec 15(2)(d) CGST Act interest / late fee for delayed payment is part of the value of supply, so the line takes
+  the principal supply's GST rate (`principalTaxRate`: the rate carrying the largest taxable value on the original;
+  export / LUT zero-rating carries over with the copied supply type). It is a draft: verify with your CA and edit
+  before issuing. Whether a fee can be charged depends on the agreement with the customer.
 - Terms come from the client master (matched by id, else name + GSTIN), falling back to the client snapshot on the
   invoice.
 - Period lock: when today falls inside the locked period the action refuses with the lock message (the save would also

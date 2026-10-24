@@ -13,9 +13,10 @@
  *  - `flat`: a fixed ₹ amount (`rate`) once the invoice has been unpaid for at least one day
  *    beyond `due date + graceDays` (the same engine decides that).
  *
- * The line is tax 0 % by default, as for the interest line: under Sec 15(2)(d) CGST Act,
- * interest / late fee for delayed payment is generally part of the value of the supply, so
- * your CA may want the principal supply's rate on it — edit the draft before issuing.
+ * Under Sec 15(2)(d) CGST Act, interest / late fee for delayed payment is part of the value of
+ * the supply, so the line takes the principal supply's GST rate (the rate carrying the largest
+ * taxable value on the original; zero-rating / LUT carries over with the copied supply type).
+ * It is a draft — verify with your CA and edit the rate before issuing if needed.
  * Whether a fee can be charged at all depends on the agreement with the customer.
  */
 
@@ -69,8 +70,22 @@ export function computeClientLateFee(input: InterestInput, fee: ClientLateFee, a
   return { eligible: true, amount, interest };
 }
 
+/** GST rate carrying the largest taxable value on `items` (0 when there are none). */
+export function principalTaxRate(items: readonly InvoiceItem[] | undefined): number {
+  const byRate = new Map<number, number>();
+  for (const it of items ?? []) {
+    const rate = num(it.tax_rate);
+    const value = Math.abs(num(it.quantity) * num(it.rate));
+    byRate.set(rate, (byRate.get(rate) ?? 0) + value);
+  }
+  let best = 0;
+  let bestValue = -1;
+  for (const [rate, value] of byRate) if (value > bestValue || (value === bestValue && rate > best)) [best, bestValue] = [rate, value];
+  return best;
+}
+
 /** The one line on the late-fee invoice. */
-export function buildLateFeeItem(quote: LateFeeQuote, fee: ClientLateFee, original: Pick<InvoiceRecord, 'invoice_number' | 'due_date'>): InvoiceItem | null {
+export function buildLateFeeItem(quote: LateFeeQuote, fee: ClientLateFee, original: Pick<InvoiceRecord, 'invoice_number' | 'due_date'> & { items?: InvoiceItem[] }): InvoiceItem | null {
   if (!quote.eligible || !(quote.amount > 0)) return null;
   const i = quote.interest;
   const period = i.accrues_from && i.accrued_to ? ` for ${i.accrues_from} to ${i.accrued_to}` : '';
@@ -87,7 +102,7 @@ export function buildLateFeeItem(quote: LateFeeQuote, fee: ClientLateFee, origin
     unit: 'NOS',
     quantity: 1,
     rate: quote.amount,
-    tax_rate: 0,
+    tax_rate: principalTaxRate(original.items),
     amount: quote.amount,
   };
 }
