@@ -1,9 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import type { Plugin } from 'vite'
+import { CSP_META } from './scripts/security-headers.mjs'
+
+/**
+ * Production builds also carry the CSP as a <meta> tag, so hosts that ignore _headers /
+ * netlify.toml / vercel.json (GitHub Pages, a plain static server) still get it. Build only:
+ * the dev server injects inline scripts that `script-src 'self'` would block.
+ */
+function cspMeta(): Plugin {
+  return {
+    name: 'csp-meta',
+    apply: 'build',
+    transformIndexHtml: () => [
+      { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP_META }, injectTo: 'head-prepend' },
+    ],
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cspMeta()],
   build: {
     target: 'es2022',
     rolldownOptions: {

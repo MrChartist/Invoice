@@ -6,7 +6,7 @@ No network, no dependencies — only WebCrypto (`crypto.subtle`).
 ## Files
 | file | role |
 |---|---|
-| `src/lib/crypto.ts` | PBKDF2-SHA-256 (310k iter) PIN hashing, constant-time compare, AES-GCM-256 string encryption (envelope `{v,kdf,iter,salt,iv,ct}`, header bound as AAD), base64 helpers |
+| `src/lib/crypto.ts` | PBKDF2-SHA-256 (600k iter; older 310k PIN records are re-hashed on the next correct unlock) PIN hashing, constant-time compare, AES-GCM-256 string encryption (envelope `{v,kdf,iter,salt,iv,ct}`, header bound as AAD), base64 helpers |
 | `src/lib/auth.ts` | credential record, session, lockout, `changePin`, idle timeout, `resetAllData` |
 | `src/lib/backup.ts` | `buildEncryptedBackup`, `decryptBackup`, `isEncryptedBackup`, `markBackupDone`, `getLastBackup`, `daysSinceBackup` |
 | `src/pages/LoginPage.tsx` | login / register (with confirm + strength hint) / lockout countdown / forgot-PIN wipe |
@@ -67,7 +67,7 @@ There is no server, so the only recovery is erasing the device: `resetAllData(ph
 ## Encrypted backup file format
 ```json
 { "app": "mrchartist-invoice", "encrypted": true, "version": 1, "exportedAt": "...",
-  "envelope": { "v": 1, "kdf": "PBKDF2-SHA256", "iter": 310000, "salt": "b64", "iv": "b64", "ct": "b64" } }
+  "envelope": { "v": 1, "kdf": "PBKDF2-SHA256", "iter": 600000, "salt": "b64", "iv": "b64", "ct": "b64" } }
 ```
 `ct` decrypts to the normal `BackupFile` JSON. Filename: `mrchartist-invoice-backup-YYYY-MM-DD.encrypted.json`. A wrong passphrase or any modification fails the GCM tag: "Wrong passphrase, or the file has been modified."
 
@@ -76,3 +76,12 @@ A 4-6 digit PIN has ~13-20 bits of entropy. The hash + lockout stops casual snoo
 
 ## Tests
 `tests/crypto.test.ts`, `tests/auth.test.ts` (injected clock + in-memory storage), `tests/backup.test.ts` (existing cases kept, encrypted cases added).
+
+## HTTP headers & CSP
+
+`scripts/security-headers.mjs` is the single source for the CSP and security/caching headers.
+`node scripts/gen-headers.mjs` regenerates `public/_headers`, the `[[headers]]` blocks of `netlify.toml` and the
+`headers` array of `vercel.json`; `tests/security-headers.test.ts` fails if any of them drifts. Production builds
+also prepend the CSP (minus `frame-ancestors`, which only works as a header) as a `<meta>` tag in `index.html`, so a
+host that ignores those files still enforces it. Older backups encrypted at 310k iterations still open (the
+iteration count travels in the envelope).

@@ -165,3 +165,17 @@ test('pinStrength flags trivial PINs but accepts good ones', () => {
   assert.equal(auth.pinStrength('703519').level, 'strong');
   assert.equal(auth.pinStrength('12').level, 'weak');
 });
+
+test('a PIN hashed with fewer iterations is re-hashed at the current count on unlock', async () => {
+  const { hashPin, PBKDF2_ITERATIONS } = await import('../src/lib/crypto.ts');
+  const old = await hashPin('482916', 310_000);
+  localStorage.setItem('mrchartist_inv_auth', JSON.stringify({ name: 'Old', createdAt: '2025-01-01', v: 2, ...old }));
+  const r = await auth.checkPinWithGuard('482916');
+  assert.equal(r.ok, true);
+  const rec = JSON.parse(localStorage.getItem('mrchartist_inv_auth')!);
+  assert.equal(rec.iter, PBKDF2_ITERATIONS);
+  assert.notEqual(rec.hash, old.hash);
+  assert.equal(rec.name, 'Old');
+  assert.equal((await auth.checkPinWithGuard('482916')).ok, true, 'the new hash still verifies');
+  assert.equal((await auth.checkPinWithGuard('000000')).ok, false);
+});

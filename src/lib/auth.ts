@@ -15,7 +15,7 @@
  */
 
 import { DB_PREFIX, SINGLETON_KEYS, readRaw, removeRaw, writeRaw } from './storage';
-import { constantTimeEqualStrings, hashPin, verifyPinHash, type PinHash } from './crypto';
+import { constantTimeEqualStrings, hashPin, PBKDF2_ITERATIONS, verifyPinHash, type PinHash } from './crypto';
 
 export const AUTH_KEY = SINGLETON_KEYS.auth;
 export const GUARD_KEY = `${DB_PREFIX}auth_guard`;
@@ -224,7 +224,7 @@ async function checkPin(rec: StoredRecord, pin: string): Promise<boolean> {
   return typeof rec.pin === 'string' && constantTimeEqualStrings(rec.pin, pin);
 }
 
-/** Replaces a legacy plaintext record with a hashed one. */
+/** Replaces a legacy plaintext (or weaker-hashed) record with one hashed at the current iteration count. */
 async function upgradeRecord(rec: StoredRecord, pin: string): Promise<void> {
   const hashed = await hashPin(pin);
   writeRecord({ name: rec.name, createdAt: rec.createdAt, v: 2, ...hashed });
@@ -245,7 +245,9 @@ export async function checkPinWithGuard(pin: string, now: number = Date.now()): 
 
   if (await checkPin(rec, pin)) {
     writeGuard({ ...FRESH_GUARD });
-    if (!rec.hash) {
+    // Legacy plaintext, or a hash made with fewer iterations than today's default: re-hash now
+    // that the PIN is known.
+    if (!rec.hash || (rec.iter ?? 0) < PBKDF2_ITERATIONS) {
       try {
         await upgradeRecord(rec, pin);
       } catch {

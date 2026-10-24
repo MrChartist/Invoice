@@ -103,7 +103,7 @@ npm run dev        # http://localhost:5173
 | `npm run check:size` | Bundle-size budget used in CI |
 | `npm run verify:offline` | Checks the built app and precache list for offline use |
 
-**Deploying:** serve `dist/` from any static host. The host must return `index.html` for unknown paths (deep links such as `/invoice/abc`) and serve `sw.js` from the site root. Ready-made headers and rewrites are included for Netlify (`netlify.toml`), Vercel (`vercel.json`) and Cloudflare Pages (`public/_headers`). Please read the [licence](#licence) before hosting it for other people.
+**Deploying:** serve `dist/` from any static host. The host must return `index.html` for unknown paths (deep links such as `/invoice/abc`) and serve `sw.js` from the site root. Ready-made headers and rewrites are included for Netlify (`netlify.toml`), Vercel (`vercel.json`) and Cloudflare Pages (`public/_headers`), all generated from `scripts/security-headers.mjs` (`node scripts/gen-headers.mjs`); the build also embeds the CSP as a `<meta>` tag for hosts that ignore those files. Please read the [licence](#licence) before hosting it for other people.
 
 ## First run
 

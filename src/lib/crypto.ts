@@ -14,7 +14,8 @@
  * use an encrypted backup (with a real passphrase) for anything sensitive.
  */
 
-export const PBKDF2_ITERATIONS = 310_000;
+/** OWASP 2023 guidance for PBKDF2-HMAC-SHA256. Older records (310k) are re-hashed on the next unlock. */
+export const PBKDF2_ITERATIONS = 600_000;
 export const MIN_ITERATIONS = 210_000;
 /** Upper bound accepted when reading an envelope, so a doctored file cannot hang the tab. */
 const MAX_ITERATIONS = 5_000_000;
