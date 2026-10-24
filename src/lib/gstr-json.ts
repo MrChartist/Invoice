@@ -111,7 +111,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
     out.cdnr = [...groupBy(r.cdnr, (x) => x.ctin)].map(([ctin, notes]) => ({
       ctin,
       nt: notes.map((n) => ({
-        ntty: 'C',
+        ntty: n.noteType,
         nt_num: n.number,
         nt_dt: toGstnDate(n.date),
         val: round2(n.value),
@@ -126,7 +126,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
   if (r.cdnur.length) {
     out.cdnur = r.cdnur.map((n: CdnRow) => ({
       typ: n.unregType ?? 'B2CL',
-      ntty: 'C',
+      ntty: n.noteType,
       nt_num: n.number,
       nt_dt: toGstnDate(n.date),
       val: round2(n.value),
@@ -183,7 +183,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
   }
 
   if (r.docIssue.length) {
-    const codes: Record<string, number> = { 'Invoices for outward supply': 1, 'Credit Note': 5 };
+    const codes: Record<string, number> = { 'Invoices for outward supply': 1, 'Debit Note': 4, 'Credit Note': 5 };
     const byType = groupBy(r.docIssue, (x) => x.docType);
     out.doc_issue = {
       doc_det: [...byType].sort((a, b) => (codes[a[0]] ?? 1) - (codes[b[0]] ?? 1)).map(([docType, rows]) => ({

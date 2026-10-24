@@ -123,7 +123,7 @@ export interface Ledger {
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
-const REVENUE_TYPES: DocumentType[] = ['INVOICE', 'TAX_INVOICE'];
+const REVENUE_TYPES: DocumentType[] = ['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE'];
 
 /** Documents that move the sales ledger: live invoices and credit notes. */
 export function isLedgerDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {

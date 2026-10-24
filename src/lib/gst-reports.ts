@@ -184,7 +184,8 @@ export interface ExportRow extends DocRow {
 }
 
 export interface CdnRow extends DocRow {
-  noteType: 'C';
+  /** C = credit note (reduces liability), D = debit note (adds to it). */
+  noteType: 'C' | 'D';
   /** CDNUR only. */
   unregType?: 'B2CL' | 'EXPWP' | 'EXPWOP';
 }
@@ -314,6 +315,8 @@ export interface BuildOptions {
   gstin?: string;
   /** Fallback state code of the filer when an invoice has no sender snapshot. */
   filerStateCode?: string;
+  /** `doc_links` rows: a note linked to its original invoice is classified by that invoice. */
+  links?: readonly { from_id: string; to_id: string; relation: string }[];
 }
 
 /* ───────────────────────── Prepared documents ───────────────────────── */
@@ -336,6 +339,7 @@ export interface PDoc {
   rec: InvoiceRecord;
   sign: 1 | -1;
   isNote: boolean;
+  noteType: 'C' | 'D';
   number: string;
   date: string;
   pos: string;
@@ -352,7 +356,7 @@ export interface PDoc {
   lines: PLine[];
 }
 
-const TAX_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE']);
+const TAX_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE']);
 
 const UQC: Record<string, string> = {
   NOS: 'NOS', PCS: 'PCS', KG: 'KGS', KGS: 'KGS', LTR: 'LTR', MTR: 'MTR', SQF: 'SQF', SET: 'SET', BOX: 'BOX',
@@ -390,7 +394,8 @@ function effectiveMode(mode: GstMode | undefined, from: string, pos: string): Gs
 }
 
 function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): PDoc {
-  const isNote = rec.doc_type === 'CREDIT_NOTE';
+  const isNote = rec.doc_type === 'CREDIT_NOTE' || rec.doc_type === 'DEBIT_NOTE';
+  const noteType: 'C' | 'D' = rec.doc_type === 'DEBIT_NOTE' ? 'D' : 'C';
   const sender = rec.sender;
   const senderGstin = (sender?.companyGstin ?? opts.gstin ?? '').trim().toUpperCase();
   const from = filerState(senderGstin, sender?.stateCode ?? opts.filerStateCode);
@@ -487,8 +492,10 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
 
   return {
     rec,
-    sign: isNote ? -1 : 1,
+    // A credit note reduces liability; a debit note adds to it like an invoice.
+    sign: noteType === 'C' && isNote ? -1 : 1,
     isNote,
+    noteType,
     number: rec.invoice_number,
     date: String(rec.issue_date).slice(0, 10),
     pos,
@@ -563,7 +570,7 @@ function buildDocIssue(all: InvoiceRecord[]): DocIssueRow[] {
     if (rec.status === 'Draft') continue;
     const s = parseSeries(rec.invoice_number);
     if (!s) continue;
-    const docType = rec.doc_type === 'CREDIT_NOTE' ? 'Credit Note' : 'Invoices for outward supply';
+    const docType = rec.doc_type === 'CREDIT_NOTE' ? 'Credit Note' : rec.doc_type === 'DEBIT_NOTE' ? 'Debit Note' : 'Invoices for outward supply';
     const key = `${docType}|${s.prefix}`;
     const b = buckets.get(key) ?? { docType, prefix: s.prefix, width: s.width, nums: new Set<number>(), cancelled: new Set<number>() };
     b.nums.add(s.n);
@@ -647,6 +654,19 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   const nilKey = (d: PDoc): NilSupplyType =>
     d.supply === 'INTER' ? (d.registered ? 'INTRB2B' : 'INTRB2C') : d.registered ? 'INTRAB2B' : 'INTRAB2C';
 
+  // A note follows the invoice it amends: B2CL only if that invoice was B2CL (its value and date
+  // decide), so a small credit against a large invoice is reported in CDNUR, not netted into B2CS.
+  const byId = new Map((invoices ?? []).map((r) => [r.id, r]));
+  const originalOf = (d: PDoc): InvoiceRecord | undefined => {
+    const link = opts.links?.find((l) => l.to_id === d.rec.id && (l.relation === 'credit_note' || l.relation === 'debit_note'));
+    return link ? byId.get(link.from_id) : undefined;
+  };
+  const largeB2c = (d: PDoc): boolean => {
+    const orig = d.isNote ? originalOf(d) : undefined;
+    if (orig) return (Number(orig.total) || 0) > b2clThreshold(String(orig.issue_date).slice(0, 10));
+    return d.value > b2clThreshold(d.date);
+  };
+
   for (const d of docs) {
     const items = rateRows(d.lines);
     const row = docRow(d, items);
@@ -654,16 +674,16 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
 
     // ── Section routing (taxable lines only; nil lines go to table 8) ──
     if (d.isExport) {
-      if (d.isNote) cdnur.push({ ...row, noteType: 'C', unregType: row.igst > 0 ? 'EXPWP' : 'EXPWOP' });
+      if (d.isNote) cdnur.push({ ...row, noteType: d.noteType, unregType: row.igst > 0 ? 'EXPWP' : 'EXPWOP' });
       else exp.push({ ...row, expType: row.igst > 0 ? 'WPAY' : 'WOPAY' });
     } else if (d.registered) {
       if (items.length > 0) {
-        if (d.isNote) cdnr.push({ ...row, noteType: 'C' });
+        if (d.isNote) cdnr.push({ ...row, noteType: d.noteType });
         else b2b.push(row);
       }
-    } else if (d.supply === 'INTER' && d.value > b2clThreshold(d.date)) {
+    } else if (d.supply === 'INTER' && largeB2c(d)) {
       if (items.length > 0) {
-        if (d.isNote) cdnur.push({ ...row, noteType: 'C', unregType: 'B2CL' });
+        if (d.isNote) cdnur.push({ ...row, noteType: d.noteType, unregType: 'B2CL' });
         else b2cl.push(row);
       }
       if (!d.isNote) {

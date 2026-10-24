@@ -18,6 +18,7 @@ import {
 import { stringifyEway, type EwayTransMode } from '../../lib/eway';
 import { preflightEInvoice, preflightEway } from '../../lib/einvoice-validate';
 import { localDb } from '../../lib/localDb';
+import { readLinks } from '../../lib/documents';
 
 export interface EInvoiceModalProps {
   invoice: InvoiceRecord;
@@ -83,15 +84,20 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
     () => getEInvoiceMeta(invoice.id) ?? { invoice_id: invoice.id },
   );
   const [supplyType, setSupplyType] = useState<'' | EInvoiceSupplyType>('');
-  const [precNo, setPrecNo] = useState('');
-  const [precDate, setPrecDate] = useState('');
+  // A note linked to its original invoice pre-fills the preceding-document details.
+  const original = useMemo(() => {
+    const link = readLinks().find((l) => l.to_id === invoice.id && (l.relation === 'credit_note' || l.relation === 'debit_note'));
+    return link ? localDb.invoices.getById(link.from_id) : undefined;
+  }, [invoice.id]);
+  const [precNo, setPrecNo] = useState(original?.invoice_number ?? '');
+  const [precDate, setPrecDate] = useState(original?.issue_date?.slice(0, 10) ?? '');
   const [countryCode, setCountryCode] = useState('');
   const [portCode, setPortCode] = useState('');
   const [dirty, setDirty] = useState(false);
 
   const fallbackSender = useMemo(() => (invoice.sender ? null : localDb.settings.activeProfile()), [invoice.sender]);
   const isExport = (invoice.place_of_supply ?? '') === '99';
-  const isNote = invoice.doc_type === 'CREDIT_NOTE';
+  const isNote = invoice.doc_type === 'CREDIT_NOTE' || invoice.doc_type === 'DEBIT_NOTE';
 
   const patch = (p: Partial<EInvoiceMeta>) => {
     setMeta((m) => ({ ...m, ...p }));

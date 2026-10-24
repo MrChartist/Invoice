@@ -287,6 +287,7 @@ export function sanitiseFileStem(s: string): string {
 export function eInvoiceDocType(record: Pick<InvoiceRecord, 'doc_type'>, override?: EInvoiceDocType) {
   if (override) return override;
   if (record.doc_type === 'CREDIT_NOTE') return 'CRN' as const;
+  if (record.doc_type === 'DEBIT_NOTE') return 'DBN' as const;
   if (record.doc_type === 'INVOICE' || record.doc_type === 'TAX_INVOICE') return 'INV' as const;
   return null;
 }

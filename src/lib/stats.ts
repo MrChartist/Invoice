@@ -8,10 +8,10 @@ import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { daysOverdue } from './utils';
 
-/** Only real, issued tax documents count as revenue — not quotes, challans or drafts. */
+/** Only real, issued tax documents count as revenue — not quotes, challans or drafts. A debit note bills extra. */
 export function isRevenueDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {
   const type = inv.doc_type ?? 'INVOICE';
-  if (type !== 'INVOICE' && type !== 'TAX_INVOICE') return false;
+  if (type !== 'INVOICE' && type !== 'TAX_INVOICE' && type !== 'DEBIT_NOTE') return false;
   return inv.status !== 'Draft' && inv.status !== 'Cancelled';
 }
 

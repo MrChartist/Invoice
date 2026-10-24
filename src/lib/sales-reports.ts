@@ -83,7 +83,7 @@ export interface SalesDoc {
   lines: SalesLine[];
 }
 
-const SALES_TYPES = new Set(['INVOICE', 'TAX_INVOICE']);
+const SALES_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE']);
 const isLive = (i: InvoiceRecord) => i.status !== 'Draft' && i.status !== 'Cancelled';
 export const isSaleDoc = (i: InvoiceRecord) => isLive(i) && SALES_TYPES.has(i.doc_type ?? 'INVOICE');
 export const isCreditNoteDoc = (i: InvoiceRecord) => isLive(i) && i.doc_type === 'CREDIT_NOTE';

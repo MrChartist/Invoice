@@ -231,14 +231,14 @@ test('createCreditNote persists, numbers CRN series and enforces caps', () => {
   assert.equal(docs.getDocumentChain('p1').length, 3);
 });
 
-test('debit note is an INVOICE referencing the original', () => {
+test('debit note is a DEBIT_NOTE referencing the original', () => {
   const inv = make();
   const d = docs.buildDebitNote(
     inv,
     { reason: 'Rate difference', lines: [{ name: 'Rate revision', quantity: 1, rate: 500, tax_rate: 18 }] },
     { id: 'd1', invoice_number: 'INV/FY25-26/0002', today: '2025-07-01', dueDays: 7 },
   );
-  assert.equal(d.doc_type, 'TAX_INVOICE');
+  assert.equal(d.doc_type, 'DEBIT_NOTE');
   assert.equal(d.po_number, inv.invoice_number);
   assert.equal(d.total, 590);
   assert.equal(d.due_date, '2025-07-08');

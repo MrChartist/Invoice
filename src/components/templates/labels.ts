@@ -108,6 +108,7 @@ export const DOC_TITLE_HI: Record<DocumentType, string> = {
   QUOTATION: 'कोटेशन',
   PROFORMA: 'प्रोफार्मा चालान',
   CREDIT_NOTE: 'क्रेडिट नोट',
+  DEBIT_NOTE: 'डेबिट नोट',
   DELIVERY_CHALLAN: 'डिलीवरी चालान',
 };
 

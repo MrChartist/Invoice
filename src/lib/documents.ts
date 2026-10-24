@@ -72,6 +72,7 @@ const TRANSITIONS: Record<DocumentType, DocumentType[]> = {
   DELIVERY_CHALLAN: [...SALES_INVOICE_TARGETS],
   // Credit notes are only ever raised from an invoice via createCreditNote.
   CREDIT_NOTE: [],
+  DEBIT_NOTE: [],
 };
 
 export interface ConversionOption {
@@ -429,7 +430,7 @@ export function createCreditNote(invoice: InvoiceRecord, input: CreditInput): In
   return saved;
 }
 
-/* ── Debit notes (modelled as INVOICE) ─────────────────────────── */
+/* ── Debit notes (own DEBIT_NOTE type and DBN series, linked to the invoice) ─── */
 
 export interface DebitLine {
   name: string;
@@ -465,6 +466,7 @@ export function buildDebitNote(
   return recompute({
     ...invoice,
     id: ctx.id,
+    doc_type: 'DEBIT_NOTE',
     invoice_number: ctx.invoice_number,
     issue_date: ctx.today,
     due_date: addDays(ctx.today, ctx.dueDays),
@@ -493,7 +495,7 @@ export function createDebitNote(
   const today = localIsoDate();
   const rec = buildDebitNote(invoice, input, {
     id: generateId(),
-    invoice_number: localDb.invoices.nextNumber(today, invoice.doc_type, invoice.sender?.invoicePrefix || undefined),
+    invoice_number: localDb.invoices.nextNumber(today, 'DEBIT_NOTE'),
     today,
     dueDays: num(localDb.settings.get().defaultDueDays, 14),
   });
@@ -516,7 +518,7 @@ export function effectiveOutstanding(
   allInvoices: InvoiceRecord[],
 ): number {
   if (invoice.status === 'Cancelled') return 0;
-  if (!isInvoiceType(invoice.doc_type)) return 0;
+  if (!isInvoiceType(invoice.doc_type) && invoice.doc_type !== 'DEBIT_NOTE') return 0;
   const credit = totalCredited(invoice.id, links, allInvoices);
   // TDS the customer withholds is never collectable from them (it is settled with the tax office).
   return Math.max(

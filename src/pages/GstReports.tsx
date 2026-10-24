@@ -7,6 +7,7 @@ import { getTable } from '../lib/storage';
 import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
 import { stateByCode } from '../lib/india-states';
+import { readLinks } from '../lib/documents';
 import {
   buildGstReport,
   periodForDate,
@@ -117,7 +118,7 @@ export function GstReports() {
 
   const report = useMemo(() => {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin);
-    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode });
+    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks() });
   }, [invoices, purchases, profiles, period, gstin]);
 
   const { gstr1: g1, gstr3b: g3, issues } = report;

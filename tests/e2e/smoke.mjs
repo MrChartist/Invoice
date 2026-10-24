@@ -110,6 +110,8 @@ try {
     await page.getByRole('option', { name: /Consulting/ }).waitFor();
     await item.press('ArrowDown');
     await item.press('Enter');
+    // The catalogue fill is a state update: wait for it rather than reading too early.
+    await page.waitForFunction(() => (document.querySelector('[aria-label="Item 1 rate"]')?.value ?? '') !== '', null, { timeout: 5000 }).catch(() => {});
     const rate = await page.getByLabel('Item 1 rate').inputValue();
     check((await item.inputValue()) === 'Consulting' && /1,?500/.test(rate), `item suggestion fills the catalogue rate (${rate})`);
     const lines = await page.locator('[data-line]').count();
@@ -236,6 +238,27 @@ try {
     const after = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).length);
     check(after === 1, `Undo keeps the deleted invoice (${after} stored after the undo window)`);
     await page.getByText('Acme Buyers').first().waitFor();
+  });
+
+  await step('raise a debit note from the invoice', async () => {
+    const id = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices'))[0].id);
+    await page.goto(srv.origin + '/invoice/' + id);
+    await page.getByRole('button', { name: /^Convert/ }).click();
+    await page.getByRole('menuitem', { name: 'Create debit note' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Create debit note' });
+    await dlg.getByLabel('Reason *').fill('Rate revision');
+    await dlg.getByLabel('Line 1 description').fill('Rate difference');
+    await dlg.getByLabel('Line 1 rate').fill('200');
+    await dlg.getByRole('button', { name: 'Create draft' }).click();
+    await page.waitForURL((u) => u.pathname.startsWith('/invoice/') && !u.pathname.endsWith(id));
+    const dn = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).find((i) => i.doc_type === 'DEBIT_NOTE'));
+    check(!!dn && /^DBN\/FY\d{2}-\d{2}\/0001$/.test(dn.invoice_number) && Math.abs(dn.total - 236) < 0.01,
+      `debit note ${dn?.invoice_number} for ${dn?.total} opens in the editor`);
+    // Keep later steps about the original invoice simple.
+    await page.evaluate((dnId) => {
+      const rows = JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).filter((i) => i.id !== dnId);
+      localStorage.setItem('mrchartist_inv_invoices', JSON.stringify(rows));
+    }, dn.id);
   });
 
   let backupPath = '';

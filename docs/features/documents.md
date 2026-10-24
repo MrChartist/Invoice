@@ -76,3 +76,12 @@ Template note: the `Credit Note` template should render `po_number` / `notes` (t
   the e-Way dialog overrides it.
 - `normalizeRecord` and the store's `RECORD_KEYS` must both carry every persisted field;
   `tests/invoice-store.test.ts` fails if loading → saving would drop one.
+
+## Debit notes
+
+`DEBIT_NOTE` is its own document type with the `DBN/FY<yy-yy>/<seq>` series. Convert → **Create debit note** on an
+issued invoice (`createDebitNote`) links it (`doc_links` relation `debit_note`). It counts as revenue and as a
+receivable, posts like a sale in Books / Tally, is reported in GSTR-1 as CDNR / CDNUR with `ntty: "D"` (document
+type 4 in the doc-issue table), and is e-invoiced as `DBN` with the original invoice pre-filled as the preceding
+document. Credit and debit notes linked to an invoice are classified by that invoice: a note against a B2CL
+invoice goes to CDNUR (B2CL) whatever its own value.

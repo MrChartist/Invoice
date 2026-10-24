@@ -15,6 +15,7 @@ export type DocumentType =
   | 'QUOTATION'
   | 'PROFORMA'
   | 'CREDIT_NOTE'
+  | 'DEBIT_NOTE'
   | 'DELIVERY_CHALLAN';
 
 export type InvoiceStatus =
@@ -64,6 +65,7 @@ export const DOCUMENT_LABELS: Record<DocumentType, string> = {
   QUOTATION: 'Quotation',
   PROFORMA: 'Proforma Invoice',
   CREDIT_NOTE: 'Credit Note',
+  DEBIT_NOTE: 'Debit Note',
   DELIVERY_CHALLAN: 'Delivery Challan',
 };
 
@@ -74,6 +76,7 @@ export const DOCUMENT_CODES: Record<DocumentType, string> = {
   QUOTATION: 'QTN',
   PROFORMA: 'PRO',
   CREDIT_NOTE: 'CRN',
+  DEBIT_NOTE: 'DBN',
   DELIVERY_CHALLAN: 'DCH',
 };
 

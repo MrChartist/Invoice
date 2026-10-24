@@ -13,10 +13,12 @@ export interface ConvertMenuProps {
   onCreated?: (record: InvoiceRecord) => void;
   /** When provided, a "Create credit note" entry is shown for issued invoices. */
   onRequestCreditNote?: () => void;
+  /** When provided, a "Create debit note" entry is shown next to it. */
+  onRequestDebitNote?: () => void;
 }
 
 /** Dropdown of valid document conversions for one document. */
-export function ConvertMenu({ invoice, onCreated, onRequestCreditNote }: ConvertMenuProps) {
+export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequestDebitNote }: ConvertMenuProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -104,6 +106,20 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote }: Convert
                 <FileMinus2 size={16} aria-hidden="true" />
                 Create credit note
               </button>
+              {onRequestDebitNote && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.menuItem}
+                  onClick={() => {
+                    setOpen(false);
+                    onRequestDebitNote();
+                  }}
+                >
+                  <FilePlus2 size={16} aria-hidden="true" />
+                  Create debit note
+                </button>
+              )}
             </>
           )}
           {options.length > 0 && (

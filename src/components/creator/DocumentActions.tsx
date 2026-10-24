@@ -6,6 +6,7 @@ import { quoteState, quoteTone } from '../../lib/quote-status';
 import { getTable } from '../../lib/storage';
 import { ConvertMenu } from '../documents/ConvertMenu';
 import { CreditNoteModal } from '../documents/CreditNoteModal';
+import { DebitNoteModal } from '../documents/DebitNoteModal';
 import { CancelDialog } from '../documents/CancelDialog';
 import { DocumentTimeline } from '../documents/DocumentTimeline';
 import { ShareMenu } from '../share';
@@ -35,6 +36,7 @@ export function DocumentActions({
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
   const [creditOpen, setCreditOpen] = useState(false);
+  const [debitOpen, setDebitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [saved, setSaved] = useState<InvoiceRecord | undefined>(() => localDb.invoices.getById(invoiceId));
 
@@ -71,7 +73,7 @@ export function DocumentActions({
         <span data-share-anchor>
           <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.status === 'Paid'} />
         </span>
-        <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} />
+        <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} onRequestDebitNote={canCredit ? () => setDebitOpen(true) : undefined} />
         <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />
         <EInvoiceButton invoice={saved} />
         <button
@@ -134,6 +136,17 @@ export function DocumentActions({
           navigate(`/invoice/${rec.id}`);
         }}
       />
+      {debitOpen && (
+        <DebitNoteModal
+          invoice={saved}
+          open
+          onClose={() => setDebitOpen(false)}
+          onCreated={(rec) => {
+            setDebitOpen(false);
+            navigate(`/invoice/${rec.id}`);
+          }}
+        />
+      )}
       <CancelDialog invoice={saved} open={cancelOpen} onClose={() => setCancelOpen(false)} onDone={reloadEditor} />
     </div>
   );

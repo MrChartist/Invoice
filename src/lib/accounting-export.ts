@@ -157,7 +157,7 @@ const table = (id: DatasetId, headers: string[], rows: Cell[][]): CsvTable => ({
 });
 
 const docLabel = (inv: InvoiceRecord) =>
-  voucherKindOf(inv, true) === 'CREDIT_NOTE' ? 'Credit Note' : inv.doc_type === 'TAX_INVOICE' ? 'Tax Invoice' : 'Invoice';
+  voucherKindOf(inv, true) === 'CREDIT_NOTE' ? 'Credit Note' : inv.doc_type === 'DEBIT_NOTE' ? 'Debit Note' : inv.doc_type === 'TAX_INVOICE' ? 'Tax Invoice' : 'Invoice';
 const sign = (inv: InvoiceRecord) => (voucherKindOf(inv, true) === 'CREDIT_NOTE' ? -1 : 1);
 const gstTreatment = (gstin: string) => (clean(gstin).length === 15 ? 'business_gst' : 'consumer');
 const placeOfSupply = (code: string) => (code ? `${code}-${stateNameOf(code)}` : '');
