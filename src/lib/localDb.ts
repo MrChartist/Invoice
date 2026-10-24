@@ -345,7 +345,12 @@ export const localDb = {
         toSave.id = invoice.id || generateId();
         toSave.created_at = now;
         if (!toSave.invoice_number) {
-          toSave.invoice_number = localDb.invoices.nextNumber(toSave.issue_date, toSave.doc_type);
+          // The snapshotted sender profile's prefix wins, as in the editor (`saveInvoice`).
+          toSave.invoice_number = localDb.invoices.nextNumber(
+            toSave.issue_date,
+            toSave.doc_type,
+            toSave.sender?.invoicePrefix || undefined,
+          );
         }
       }
 

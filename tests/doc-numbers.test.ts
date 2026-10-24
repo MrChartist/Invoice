@@ -151,3 +151,13 @@ test('gap listing is capped but the count stays exact', () => {
   assert.equal(gap?.missingCount, 9997);
   assert.ok((gap?.missing.length ?? 0) <= 25);
 });
+
+test('a document saved without a number (e.g. Duplicate) uses its sender profile prefix', () => {
+  const base = createViaStore({ date: '2026-04-10', lines: line });
+  const sender = { ...base.sender!, invoicePrefix: 'MRC' };
+  const saved = localDb.invoices.save({ ...base, id: 'dup-1', invoice_number: '', sender, created_at: undefined });
+  assert.match(saved.invoice_number, /^MRC\/FY26-27\/\d{4}$/);
+  // Non-invoice types keep their own document code.
+  const q = localDb.invoices.save({ ...base, id: 'dup-2', doc_type: 'QUOTATION', invoice_number: '', sender, created_at: undefined });
+  assert.ok(!q.invoice_number.startsWith('MRC/'));
+});

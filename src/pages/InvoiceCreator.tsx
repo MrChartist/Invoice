@@ -249,7 +249,7 @@ export function InvoiceCreator() {
                 Save draft
               </button>
             )}
-            <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly} title={readOnly ? 'Locked — unlock with your PIN to edit' : 'Save (Ctrl+S)'}>
+            <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly} title={readOnly ? 'Locked — unlock with your PIN to edit' : 'Save and issue — counts in reports; use Save draft to keep it out (Ctrl+S)'}>
               <Save size={16} /> Save
             </button>
             <button type="button" className={controls.btnOutline} onClick={exitCreator} title="Close (Esc) — drafts are kept" aria-label="Close">
