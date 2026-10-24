@@ -85,6 +85,20 @@ export class FakeIDB {
     return req;
   }
 
+  deleteDatabase(name: string): FakeRequest & { onblocked?: (() => void) | null } {
+    const req = new FakeRequest() as FakeRequest & { onblocked?: (() => void) | null };
+    setTimeout(() => {
+      const open = [...this.conns].some((c) => c.data === this.dbs.get(name));
+      if (open) {
+        req.onblocked?.();
+        return;
+      }
+      this.dbs.delete(name);
+      req.onsuccess?.({});
+    }, 0);
+    return req;
+  }
+
   /** Called by transactions. */
   run(tx: FakeTx): void {
     setTimeout(() => {

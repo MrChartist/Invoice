@@ -125,6 +125,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   mode for that.
 - **Vault mode** (optional): the whole store encrypted at rest with AES-256 under a passphrase-wrapped key, unlocked
   at start-up; a lost passphrase means lost data (no recovery by design).
+- **Separate companies**: several businesses on one device, each with its own data, numbering, settings, backups
+  and vault; switch from the sidebar. The PIN is shared; erase/backup/restore act on the open company.
 - **Erase all data**: requires typing `ERASE`; also clears the undo copy, backup key, backup-folder link and vault.
 
 ---

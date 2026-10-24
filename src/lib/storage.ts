@@ -20,6 +20,7 @@
 
 import { ASSET_TABLE, SNAPSHOT_TABLES, decodeRows, encodeRows, parseAssets, serializeAssets, type AssetIndex } from './assets';
 import { DATA_STORE, idbAvailable, idbClear, idbTx, resetIdbConnection } from './idb-kv';
+import { COMPANY_REGISTRY_KEY, DEFAULT_COMPANY_ID, activeCompanyId } from './company-registry';
 import {
   VAULT_KEY,
   VaultError,
@@ -63,6 +64,7 @@ export const DEVICE_LOCAL_KEYS: readonly string[] = [
   `${DB_PREFIX}session`,
   `${DB_PREFIX}last_backup`,
   STORAGE_BACKEND_KEY,
+  COMPANY_REGISTRY_KEY,
 ];
 const DEVICE_LOCAL = new Set(DEVICE_LOCAL_KEYS);
 
@@ -300,7 +302,9 @@ function installIdbListeners(): void {
   }
   if (typeof BroadcastChannel !== 'undefined') {
     try {
-      channel = new BroadcastChannel(SYNC_CHANNEL);
+      // Per company, so tabs on another company's data are not told about keys they do not hold.
+      const company = activeCompanyId();
+      channel = new BroadcastChannel(company === DEFAULT_COMPANY_ID ? SYNC_CHANNEL : `${SYNC_CHANNEL}__${company}`);
       channel.onmessage = (e: MessageEvent) => {
         const msg = e.data as { keys?: unknown; vault?: unknown } | null;
         if (msg?.vault === 'changed') {
@@ -377,7 +381,8 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
 
   try {
     const lsData = new Map<string, string>();
-    if (ls) {
+    // localStorage copies (pre-4.2 data, stale tabs) belong to the main company only.
+    if (ls && activeCompanyId() === DEFAULT_COMPANY_ID) {
       for (let i = 0; i < ls.length; i++) {
         const k = ls.key(i);
         if (k && !isLocalOnlyKey(k)) {

@@ -178,7 +178,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.17 | ✅ **Budgets vs actual** (Books → Budgets: monthly per FY / account / cost centre, copy from last year's actuals) | Tally, Zoho, Xero, QBO | S–M |
 | 6.18 | **Cash-flow forecast** 30/90/180 days from open items, recurring and collection lag | Xero | M |
 | 6.19 | **Exchange gain/loss** (realised + period-end revaluation) | Zoho, Tally, Xero | S–M |
-| 6.20 | **Separate companies** on one device (isolated data sets + switcher) | Tally, Busy, Vyapar | M |
+| 6.20 | ✅ **Separate companies** on one device (isolated data sets + switcher) (`src/lib/companies.ts`: one IndexedDB database per company) | Tally, Busy, Vyapar | M |
 | 6.21 | **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) | Vyapar, myBillBook, Zoho | M |
 | 6.22 | ✅ **.xlsx import/export without a dependency** (native `DecompressionStream` + a hand-written XML tokenizer, `src/lib/xlsx.ts`); ZIP writer `src/lib/zip.ts` ready for a ZIP of PDFs (not wired yet) | most | M |
 | 6.23 | **Custom fields** on documents, items, parties, printable | Tally (UDF), Zoho, Vyapar | S–M |

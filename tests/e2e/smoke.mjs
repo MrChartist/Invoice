@@ -592,6 +592,31 @@ try {
     const clients = await readJson(page, 'clients', []);
     check(clients.some((c) => c.name === 'Acme Buyers'), 'turning it off writes the data back readable');
   });
+
+  await step('separate companies: create, switch, data stays apart, switch back, delete', async () => {
+    await page.goto(srv.origin + '/settings?tab=data');
+    await page.getByLabel('New company').fill('E2E Second Co');
+    await page.getByRole('button', { name: 'Add company' }).click();
+    await page.getByRole('listitem').filter({ hasText: 'E2E Second Co' }).getByRole('button', { name: 'Switch' }).click();
+    await page.waitForLoadState('load');
+    await page.locator('#company-switch').waitFor({ timeout: 15000 });
+    check(await page.locator('#company-switch').inputValue() !== 'default', 'reloaded into the new company; the sidebar switcher appears');
+    await page.goto(srv.origin + '/clients');
+    await page.waitForTimeout(500);
+    check(await page.getByText('Acme Buyers').count() === 0, 'the new company does not see the main company’s clients');
+    await page.locator('#company-switch').selectOption('default');
+    await page.waitForLoadState('load');
+    await page.goto(srv.origin + '/clients');
+    await page.getByText('Acme Buyers').first().waitFor({ timeout: 15000 });
+    check(true, 'switching back shows the main company’s data');
+    await page.goto(srv.origin + '/settings?tab=data');
+    await page.getByRole('listitem').filter({ hasText: 'E2E Second Co' }).getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('dialog').getByRole('textbox').fill('E2E Second Co');
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete company' }).click();
+    await page.getByText('"E2E Second Co" deleted.').first().waitFor({ timeout: 15000 });
+    const dbs = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name));
+    check(!dbs.some((n) => n?.startsWith('mrchartist_inv_kv__')), `the company database is removed (${dbs.join(', ')})`);
+  });
 } catch {
   /* already reported */
 } finally {

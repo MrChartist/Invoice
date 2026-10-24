@@ -1,5 +1,6 @@
 /**
- * The app's one IndexedDB database (`mrchartist_inv_kv`), opened once per tab.
+ * The app's IndexedDB database (`mrchartist_inv_kv`, or `mrchartist_inv_kv__<id>` for an extra company,
+ * see company-registry.ts), opened once per tab.
  *
  *  - `kv`   (v1): small structured-clone values that cannot live in localStorage
  *               (folder handle, backup key, safety snapshot). `idbGet/idbSet/idbDel/idbClear`.
@@ -11,7 +12,9 @@
  * set/del/clear -> false. Data-store helpers reject so storage.ts can react.
  */
 
-const DB_NAME = 'mrchartist_inv_kv';
+import { activeCompanyId, companyDbName } from './company-registry';
+
+
 // v3 (vault mode, 5.8): no schema change. The bump makes tabs still running an older build lose their
 // connection (versionchange) and fail to reopen (VersionError), so they cannot write into a vault store.
 const DB_VERSION = 3;
@@ -38,7 +41,8 @@ export function openDb(): Promise<IDBDatabase> {
     }
     let req: IDBOpenDBRequest;
     try {
-      req = indexedDB.open(DB_NAME, DB_VERSION);
+      // One database per company (6.20); the main company keeps `mrchartist_inv_kv`.
+      req = indexedDB.open(companyDbName(activeCompanyId()), DB_VERSION);
     } catch (err) {
       reject(err as Error);
       return;

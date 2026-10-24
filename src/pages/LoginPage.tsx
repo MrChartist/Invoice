@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck, TimerReset, User, WifiOff } from 'lucide-react';
 import { forgetDeviceData } from '../lib/auto-backup';
+import { eraseOtherCompanies, readRegistry } from '../lib/companies';
 import { Logo } from '../components/brand/Logo';
 import {
   RESET_PHRASE,
@@ -107,9 +108,11 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    const companies = readRegistry(); // the reset clears the registry
     if (!resetAllData(phrase)) return setError('The confirmation phrase does not match.');
     // Also drop the undo copy, backup key and folder link kept in IndexedDB (security: no way back to the old data).
     await forgetDeviceData();
+    await eraseOtherCompanies(companies); // other companies' databases on this device (6.20)
     // Fresh start: commit the erase of the data tables to IndexedDB, then reload so every module re-reads empty storage.
     reloadAfterFlush();
   };

@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from '../components/brand/Logo';
+import { CompanySwitcher } from '../components/companies/CompanySwitcher';
 import { Avatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/useToast';
 import { storageFailure, subscribeStorageFailure } from '../lib/storage';
@@ -297,6 +298,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         <Link to="/" className={styles.brand} aria-label="Mr. Chartist Invoice home">
           <Logo height={40} />
         </Link>
+        <CompanySwitcher />
 
         <nav className={styles.nav} aria-label="Primary">
           {NAV_GROUPS.map((group, gi) => (

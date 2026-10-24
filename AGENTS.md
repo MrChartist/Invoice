@@ -47,6 +47,8 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
 - `mrchartist_inv_settings` — multi-profile sender identities (array).
 - `mrchartist_inv_template` — selected template id.
 - `mrchartist_inv_auth` — hashed PIN credential (legacy plaintext is migrated on first unlock). `theme` — light/dark.
+- `mrchartist_inv_companies` — device-local company registry (6.20); each company is its own IndexedDB database
+  (`mrchartist_inv_kv`, `mrchartist_inv_kv__<id>`) with the same keys inside.
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express

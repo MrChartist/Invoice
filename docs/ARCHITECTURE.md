@@ -32,6 +32,13 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   write for the key) and `cross-tab.ts` shows "Updated in another tab" as before.
 - **Readers.** Backup (`collectAppData`), restore, wipe, migrations and storage health all go through the same
   functions, so they read the cache. Storage health uses the browser's IndexedDB quota estimate instead of ~5 MB.
+- **Companies (6.20).** Each company is its own IndexedDB database with the same keys inside: the main company is
+  `mrchartist_inv_kv`, others `mrchartist_inv_kv__<id>`. The device-local registry `mrchartist_inv_companies`
+  (localStorage, never in a backup) lists them and the active one; `idb-kv.ts` opens the active company's
+  database, the sync BroadcastChannel is per company, and switching flushes and reloads. Backups, restore, erase,
+  vault mode, the folder-backup link and the undo copy are therefore per company with no extra code. localStorage
+  copies (pre-4.2 data, stale tabs) are only ever imported into the main company. Forgot-PIN reset deletes every
+  company's database (`eraseOtherCompanies`); Erase clears the open company only.
 - **Vault mode (5.8).** Optional encryption at rest (`src/lib/vault.ts`). Every value in the `data` store is sealed
   (`mcv1:<iv>:<ct>`, AES-GCM-256, the key name as additional data) with a random data key; that key is wrapped
   (AES-KW) under a PBKDF2-SHA-256 (600k) passphrase key and stored as the `__vault__` record next to the data.

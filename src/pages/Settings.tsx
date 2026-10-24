@@ -11,6 +11,7 @@ import { CatalogPanel } from '../components/settings/CatalogPanel';
 import { LateFeeSettings } from '../components/interest';
 import { DataPanel } from '../components/settings/DataPanel';
 import { SecurityPanel } from '../components/security/SecurityPanel';
+import { CompaniesPanel } from '../components/companies/CompaniesPanel';
 import { AutoBackupPanel } from '../components/pwa/AutoBackupPanel';
 import { blankProfile, localDb, type AppSettings } from '../lib/localDb';
 import { checkGstin } from '../lib/gstin';
@@ -239,6 +240,7 @@ export function Settings() {
         <>
           <DataPanel notify={notify} />
           <AutoBackupPanel onNotify={notify} />
+          <CompaniesPanel notify={notify} />
         </>
       )}
       {tab === 'activity' && (
