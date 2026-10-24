@@ -321,6 +321,57 @@ export interface PendingReminder {
   daysToDue: number;
   count: number;
   lastSentAt: string | null;
+  /** Who to chase first, 0–100 (see `reminderPriority`). The list is sorted by this. */
+  priority: number;
+  priorityLevel: PriorityLevel;
+  /** Plain-language reasons behind the score, biggest first. */
+  priorityReasons: string[];
+}
+
+export type PriorityLevel = 'high' | 'medium' | 'low';
+
+export interface PriorityInput {
+  daysToDue: number;
+  /** Balance in ₹ (foreign documents converted at their exchange rate when known). */
+  balanceInr: number;
+  /** Other overdue invoices of the same client. */
+  otherOverdue: number;
+  /** Reminders already sent for this invoice. */
+  remindersSent: number;
+}
+
+/**
+ * Explainable chase-first score, 0–100:
+ *  - days overdue: up to 50 (linear to 90 days; not-yet-due bills score 0–5),
+ *  - balance in ₹: up to 30 (₹1,000 → 0, ₹10k → 10, ₹1 lakh → 20, ₹10 lakh+ → 30),
+ *  - the client's other overdue bills: 5 each, up to 10,
+ *  - reminders already ignored: 5 each, up to 10.
+ */
+export function reminderPriority(p: PriorityInput): { score: number; level: PriorityLevel; reasons: string[] } {
+  const parts: Array<[number, string]> = [];
+  const overdue = Math.max(0, -p.daysToDue);
+  if (overdue > 0) parts.push([Math.min(50, (overdue * 50) / 90), `${overdue} day${overdue === 1 ? '' : 's'} overdue`]);
+  else parts.push([Math.max(0, 5 - p.daysToDue), p.daysToDue === 0 ? 'due today' : `due in ${p.daysToDue} day${p.daysToDue === 1 ? '' : 's'}`]);
+  const amount = Math.max(0, p.balanceInr);
+  const amountPts = amount > 0 ? Math.min(30, Math.max(0, (Math.log10(amount) - 3) * 10)) : 0;
+  if (amountPts > 0) parts.push([amountPts, `₹${Math.round(amount).toLocaleString('en-IN')} outstanding`]);
+  if (p.otherOverdue > 0) parts.push([Math.min(10, p.otherOverdue * 5), `${p.otherOverdue} other overdue bill${p.otherOverdue === 1 ? '' : 's'}`]);
+  if (p.remindersSent > 0) parts.push([Math.min(10, p.remindersSent * 5), `${p.remindersSent} reminder${p.remindersSent === 1 ? '' : 's'} without payment`]);
+  const score = Math.round(Math.min(100, parts.reduce((t, [n]) => t + n, 0)));
+  const level: PriorityLevel = score >= 50 ? 'high' : score >= 25 ? 'medium' : 'low';
+  return { score, level, reasons: parts.filter(([n]) => n > 0).sort((a, b) => b[0] - a[0]).map(([, r]) => r) };
+}
+
+function clientKey(inv: InvoiceRecord): string {
+  const c = inv.client;
+  return (c?.gstin || c?.name || '').trim().toUpperCase();
+}
+
+function balanceInr(inv: InvoiceRecord): number {
+  const bal = Number(inv.balance_due) || 0;
+  const cur = (inv.currency || 'INR').toUpperCase();
+  const fx = Number(inv.exchange_rate);
+  return cur !== 'INR' && fx > 0 ? bal * fx : bal;
 }
 
 export interface PendingOptions {
@@ -337,12 +388,14 @@ export function pendingReminders(
   log: ReminderRecord[] = [],
   opts: PendingOptions = {},
 ): PendingReminder[] {
-  const out: PendingReminder[] = [];
+  const out: Omit<PendingReminder, 'priority' | 'priorityLevel' | 'priorityReasons'>[] = [];
+  const overdueByClient = new Map<string, number>();
   for (const invoice of invoices) {
     if (!COLLECTIBLE.has(invoice.doc_type)) continue;
     if (invoice.status === 'Paid' || invoice.status === 'Cancelled' || invoice.status === 'Draft') continue;
     if (!(invoice.balance_due > 0)) continue;
     const daysToDue = daysUntil(invoice.due_date, today);
+    if (daysToDue < 0) overdueByClient.set(clientKey(invoice), (overdueByClient.get(clientKey(invoice)) ?? 0) + 1);
     const stage = stageForDays(daysToDue);
     if (!stage) continue;
     if (isSnoozed(log, invoice.id, today)) continue;
@@ -361,5 +414,17 @@ export function pendingReminders(
       lastSentAt: last?.sent_at ?? null,
     });
   }
-  return out.sort((a, b) => a.daysToDue - b.daysToDue);
+  return out
+    .map((r) => {
+      const key = clientKey(r.invoice);
+      const own = r.daysToDue < 0 ? 1 : 0;
+      const pr = reminderPriority({
+        daysToDue: r.daysToDue,
+        balanceInr: balanceInr(r.invoice),
+        otherOverdue: key ? Math.max(0, (overdueByClient.get(key) ?? 0) - own) : 0,
+        remindersSent: r.count,
+      });
+      return { ...r, priority: pr.score, priorityLevel: pr.level, priorityReasons: pr.reasons };
+    })
+    .sort((a, b) => b.priority - a.priority || a.daysToDue - b.daysToDue);
 }

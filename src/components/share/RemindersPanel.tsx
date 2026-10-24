@@ -7,6 +7,7 @@ import {
   STAGE_LABELS,
   pendingReminders,
   type PendingReminder,
+  type PriorityLevel,
   type ReminderStage,
 } from '../../lib/reminders';
 import surface from '../../styles/surface.module.css';
@@ -31,6 +32,12 @@ function stageClass(stage: ReminderStage): string {
   return styles.stageLate;
 }
 
+function priorityClass(level: PriorityLevel): string {
+  if (level === 'high') return styles.stageLate;
+  if (level === 'medium') return styles.stageDue;
+  return styles.stageUpcoming;
+}
+
 function whenText(p: PendingReminder): string {
   if (p.daysToDue > 0) return `Due in ${p.daysToDue} day${p.daysToDue === 1 ? '' : 's'}`;
   if (p.daysToDue === 0) return 'Due today';
@@ -38,7 +45,7 @@ function whenText(p: PendingReminder): string {
   return `${n} day${n === 1 ? '' : 's'} overdue`;
 }
 
-/** Card listing invoices that deserve a payment nudge today, one click to compose. */
+/** Card listing invoices that deserve a payment nudge today, highest chase priority first. */
 export function RemindersPanel({ invoices, limit = 5, today, className }: RemindersPanelProps) {
   const { log, reload } = useReminderLog();
   const [active, setActive] = useState<InvoiceRecord | null>(null);
@@ -83,6 +90,12 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
               <div className={styles.panelMain}>
                 <span className={styles.panelClient}>{p.invoice.client?.name || 'Client'}</span>
                 <span className={styles.panelMeta}>
+                  <span
+                    className={cn(surface.badge, priorityClass(p.priorityLevel))}
+                    title={`Priority ${p.priority}/100: ${p.priorityReasons.join(', ')}`}
+                  >
+                    {p.priorityLevel === 'high' ? 'High' : p.priorityLevel === 'medium' ? 'Medium' : 'Low'} priority
+                  </span>
                   <span>{p.invoice.invoice_number}</span>
                   <span>{whenText(p)}</span>
                   <span>

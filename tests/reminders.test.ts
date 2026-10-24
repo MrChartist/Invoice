@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   stageForDays, daysUntil, buildReminder, pendingReminders, lastReminder, reminderCount,
-  makeLogEntry, makeSnooze, isSnoozed, termsMentionInterest, fillTemplate, suggestStage,
+  makeLogEntry, makeSnooze, reminderPriority, isSnoozed, termsMentionInterest, fillTemplate, suggestStage,
 } from '../src/lib/reminders.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
@@ -129,4 +129,34 @@ test('final notice states accrued interest only when the invoice terms mention i
   // other stages never carry the line
   const firm = buildReminder(terms, 'overdue_firm', 'en', TODAY, { interestAccrued: 10 });
   assert.ok(!/interest/i.test(firm.body));
+});
+
+test('reminderPriority: explainable 0-100 score and levels', () => {
+  const base = { daysToDue: 0, balanceInr: 0, otherOverdue: 0, remindersSent: 0 };
+  assert.equal(reminderPriority({ ...base, daysToDue: 3 }).score, 2);
+  assert.equal(reminderPriority({ ...base, daysToDue: -90 }).score, 50);
+  assert.equal(reminderPriority({ ...base, daysToDue: -400 }).score, 50, 'days are capped');
+  assert.equal(reminderPriority({ ...base, daysToDue: 3, balanceInr: 100000 }).score, 22);
+  assert.equal(reminderPriority({ ...base, daysToDue: 3, balanceInr: 5e8 }).score, 32, 'amount capped at 30');
+  const top = reminderPriority({ daysToDue: -120, balanceInr: 2e6, otherOverdue: 4, remindersSent: 3 });
+  assert.equal(top.score, 100);
+  assert.equal(top.level, 'high');
+  assert.deepEqual(top.reasons, ['120 days overdue', '₹20,00,000 outstanding', '4 other overdue bills', '3 reminders without payment']);
+  assert.equal(reminderPriority({ ...base, daysToDue: -30, balanceInr: 10000 }).level, 'medium');
+  assert.equal(reminderPriority({ ...base, daysToDue: 2, balanceInr: 500 }).level, 'low');
+});
+
+test('pendingReminders: a large, older, repeat-overdue bill outranks a small newer one', () => {
+  const list = [
+    inv({ id: 'small', due_date: '2026-09-30', balance_due: 2000, client: { name: 'Ravi' } as never }),
+    inv({ id: 'big', due_date: '2026-09-20', balance_due: 300000, client: { name: 'Asha' } as never }),
+    inv({ id: 'asha2', due_date: '2026-09-25', balance_due: 1000, client: { name: 'asha' } as never }),
+    inv({ id: 'usd', due_date: '2026-10-09', balance_due: 5000, currency: 'USD', exchange_rate: 83 }),
+  ];
+  const res = pendingReminders(list, TODAY, []);
+  assert.equal(res[0].invoice.id, 'big');
+  assert.ok(res[0].priorityReasons.includes('1 other overdue bill'), res[0].priorityReasons.join('|'));
+  const usd = res.find((r) => r.invoice.id === 'usd')!;
+  assert.ok(usd.priorityReasons.includes('₹4,15,000 outstanding'), 'foreign balance converted at the exchange rate');
+  assert.ok(res.every((r, i) => i === 0 || res[i - 1].priority >= r.priority), 'sorted by priority');
 });

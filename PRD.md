@@ -49,7 +49,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **Sharing**: the PDF itself through the OS share sheet (WhatsApp, mail), a self-contained "client copy" web page with
   a Pay-with-UPI button, WhatsApp / e-mail / SMS text with UPI links.
 - **Reminders**: stage-based templates (upcoming, due today, polite / firm / final overdue, thank-you) in English and
-  Hinglish with UPI payment links; a reminder log.
+  Hinglish with UPI payment links; a reminder log; "Payments to chase" ranked by an explainable priority score (days
+  overdue, amount, the client's other overdue bills, ignored reminders).
 
 ### 3.2 GST & Compliance Engine
 - **Intra- vs inter-state tax**: automatic CGST + SGST vs IGST from place of supply and GSTIN state code.

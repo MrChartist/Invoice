@@ -43,7 +43,7 @@ Boundaries: upcoming = 1 to 3 days before due, due_today = 0, polite = 1 to 7 da
 `buildReminder(invoice, stage, 'en'|'hinglish', today)` returns `{subject, body}` using `{client} {number} {amount} {balance} {due} {days} {upi} {business} {phone}`.
 The final notice mentions late-payment charges only when `termsMentionInterest` finds interest/late fee/penalty wording in the invoice's own terms or notes; no legal claims are invented.
 Log helpers: `remindersFor`, `reminderCount`, `lastReminder`, `snoozedUntil`, `isSnoozed`, `makeLogEntry`, `makeSnooze`.
-`pendingReminders(invoices, today, log, {cooldownDays})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with balance, in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted most overdue first.
+`pendingReminders(invoices, today, log, {cooldownDays})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with balance, in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted by chase priority (`reminderPriority`, 0–100, ties most overdue first): days overdue up to 50 (linear to 90 days; not-yet-due 0–5), balance in ₹ up to 30 (log scale, ₹1,000 → 0, ₹10 lakh+ → 30; foreign documents converted at their exchange rate), the client's other overdue bills 5 each up to 10 (client matched by GSTIN, else name), reminders already sent 5 each up to 10. Level: high ≥ 50, medium ≥ 25, else low; the Dashboard card shows the level with the reasons as a tooltip.
 
 ## Components
 
