@@ -1,68 +1,126 @@
 # Product Requirements & Architecture Document (PRD)
 
 **Project Name:** Mr. Chartist Invoice
-**Version:** 3.1.0 (Full Accounting & GST Edition)
-**Status:** Production-Ready ✅
+**Version:** 3.1.0+ (Full Accounting & GST Edition — roadmap phases 0–3 complete, see `docs/ROADMAP.md`)
+**Status:** Stable for daily use. GST, e-Invoice, e-Way and Tally outputs are **working papers** — verify with your CA before filing.
 **Official Site:** [https://mrchartist.com](https://mrchartist.com)
 
 ---
 
 ## 1. Product Overview
 
-Mr. Chartist Invoice is a professional, institutional-grade, zero-dependency, local-first web application designed for financial consultants, Indian traders, businesses, and freelancers to generate pixel-perfect, GST-compliant invoices and manage everyday business accounts without relying on a backend server or recurring SaaS subscription.
+Mr. Chartist Invoice is a professional, local-first web application for financial consultants, Indian traders,
+businesses and freelancers to issue GST-compliant invoices and keep everyday business accounts — with no backend
+server, no account, and no subscription. It runs entirely in the browser and works offline as an installable app.
 
 ---
 
 ## 2. Core Pillars
 
-1. **Absolute Data Privacy & Security**: 100% of data lives locally on the user's device (`localStorage` / IndexedDB). Zero telemetry, zero cloud databases, and zero tracking.
-2. **Institutional Aesthetics**: 26 handcrafted templates with a dedicated Design Studio, supporting A4, A5, and 80mm thermal paper sizes with crisp typography and UPI QR codes.
-3. **Historical Integrity (Snapshotting)**: Editing a business profile or bank details today never alters invoices generated in the past.
-4. **Complete Offline-First PWA**: Self-hosted fonts, offline service worker precaching, and direct-to-folder disk backups via Chrome/Edge File System Access API.
-5. **Full GST & Accounting Workflow**: CGST/SGST/IGST, cess, TCS, TDS, GSTR-1 / GSTR-3B working papers, BRS (Bank Reconciliation), Day Book, Cash & Bank Book, P&L, Inventory, and Tally Prime XML export.
+1. **Data privacy**: 100% of data lives on the user's device (`localStorage` / IndexedDB). No telemetry, no cloud
+   database, no tracking, no third-party requests (fonts are self-hosted; a strict CSP blocks remote origins).
+2. **Professional documents**: 26 templates plus a Design Studio, A4 / A5 / 80 mm thermal paper, UPI QR codes, and a
+   bilingual (English + Hindi) layout.
+3. **Historical integrity (snapshotting)**: each saved document embeds the sender profile it was issued with, so
+   editing your business details or bank account never alters past invoices.
+4. **Offline-first PWA**: precached app shell, folder backups (Chrome/Edge File System Access API), works with no
+   network.
+5. **GST & accounting workflow**: CGST/SGST/IGST, cess, TCS, TDS, RCM, exports/SEZ/LUT, GSTR-1/3B working papers,
+   books, BRS, inventory, Tally XML.
+6. **No backend, minimal open-source dependencies** (React, Zustand, React Router, jsPDF, html-to-image,
+   qrcode.react, lucide-react, clsx, uuid).
 
 ---
 
 ## 3. Key Feature Modules
 
 ### 3.1 Sales & Document Management
-- **Document Types**: Tax Invoices, Quotations, Proforma Invoices, Credit Notes, and Delivery Challans with one-click conversion between types.
-- **Series Numbering**: Indian Financial Year auto-incrementing series (`INV/FY25-26/0001`, resets 1 April) with Rule 46 duplicate series validation and gap detection.
-- **Tally-Style Fast Entry**: Enter to add lines, Ctrl/⌘+Enter to save, and instant keyboard shortcuts.
-- **WhatsApp & Email Reminders**: Scored payment reminder templates in English and Hinglish with UPI payment links.
+- **Document types**: Tax Invoice / Invoice, Quotation, Proforma, Delivery Challan, Credit Note and Debit Note.
+- **Conversions**: Quotation → Proforma → Invoice ⇄ Delivery Challan (the original is kept and linked). Credit and
+  debit notes are raised against issued invoices and linked to them.
+- **Quotation outcomes**: Accepted / Declined recorded by the user; Expired and Converted derived automatically.
+- **Series numbering**: Indian financial-year series (`INV/FY25-26/0001`, resets 1 April; own series per document
+  type, e.g. `CRN/`, `DBN/`), per-profile prefixes, Rule 46 duplicate refusal, a gap warning at save time and a
+  whole-year series-gap list on the GST Documents tab.
+- **Fast entry**: Tally-style keys (Enter adds a line, Ctrl/⌘+Enter or Ctrl+S saves), inline type-ahead for clients and
+  catalogue items, command palette (Ctrl+K), first-run setup wizard.
+- **Ship-to / consignee address**, taxable freight option (Sec 15), foreign-currency documents with an exchange rate.
+- **Recurring invoices** with schedules, generated in the background.
+- **Sharing**: the PDF itself through the OS share sheet (WhatsApp, mail), a self-contained "client copy" web page with
+  a Pay-with-UPI button, WhatsApp / e-mail / SMS text with UPI links.
+- **Reminders**: stage-based templates (upcoming, due today, polite / firm / final overdue, thank-you) in English and
+  Hinglish with UPI payment links; a reminder log.
 
 ### 3.2 GST & Compliance Engine
-- **Intra-state vs. Inter-state Tax**: Automatic CGST + SGST vs. IGST split based on place of supply and client GSTIN state code.
-- **Advanced Tax Handling**: Cess, TCS, TDS, reverse charge, SEZ/Export/LUT supply classifications, and exact Indian paise rounding.
-- **e-Invoice & e-Way**: Signed IRN, Ack No, and e-Invoice QR code embedding on printouts with offline JSON generator.
-- **GST Reports**: GSTR-1 & GSTR-3B offline tool-compatible JSON and CSV generation with aggregate turnover support.
+- **Intra- vs inter-state tax**: automatic CGST + SGST vs IGST from place of supply and GSTIN state code.
+- **Advanced tax**: cess, TCS, TDS (date-keyed section rates), reverse charge, SEZ / export / LUT / deemed export,
+  exact paise rounding. Statutory values that change over time live in `src/lib/tax-rules.ts`, keyed by effective date.
+- **e-Invoice & e-Way**: offline IRP v1.1 e-Invoice JSON (INV / CRN / DBN, preceding-document details filled from the
+  linked invoice, export details) and e-Way Bill JSON generators, with pre-flight validation. The IRN, Ack No and signed
+  QR returned by the IRP are entered back and printed on every template. (The app does not call the IRP.)
+- **GST reports**: GSTR-1 (B2B, B2CL by date-keyed threshold, B2CS, CDNR/CDNUR with C/D notes classified by the
+  original invoice, EXP with shipping-bill fields, nil, HSN summary split B2B/B2C with the 4/6-digit rule, documents
+  issued) as offline-tool JSON and section CSVs; GSTR-3B (3.1, 3.2, 4 incl. imports, RCM and 4B(1)/4B(2) reversals, 5)
+  as JSON, CSV and a printable summary; aggregate-turnover support.
+- **Compliance calendar**: GSTR-1 / IFF / GSTR-3B / GSTR-9 due dates for monthly or QRMP filers, filed tracking,
+  Sec 50 interest and late-fee estimates, reminders in the notification bell.
 
 ### 3.3 Accounts, Books & Banking
-- **Receivables Ledger**: Aging analysis (0-30, 31-60, 61-90, 90+ days), Days Sales Outstanding (DSO), and printable client statements.
-- **Purchases & Payables**: Vendor bill recording, expense categorization, and Input Tax Credit (ITC) tracking.
-- **Books of Accounts**: Day Book, Cash Book, Bank Book, Profit & Loss (accrual and cash basis), and indicative balance sheets.
-- **Bank Reconciliation (BRS)**: Import CSV statements from major Indian banks (HDFC, ICICI, SBI, Axis, Kotak), scored match suggestions, and printable BRS reports.
-- **Inventory Management**: FIFO and Weighted-Average costing methods, real-time stock positions, and shortage alerts during invoice drafting.
+- **Receivables**: party ledgers, aging by days overdue (Not due, 1–30, 31–60, 61–90, 90+), DSO, printable statements,
+  payment receipts (`RCPT/FY/…`) with amount in words, bulk mark-paid, TDS receivable register with 26AS/AIS CSV
+  matching and Form 16A tracking.
+- **Purchases & payables**: vendor bills and expenses, ITC tracking, RCM, imports (Bill of Entry), ITC reversal reasons,
+  Sec 17(5) blocked credit, period-locked; MSME (Udyam) vendors with 45/15-day limits, Sec 43B(h) disallowance and
+  MSMED interest.
+- **Books**: Day Book, Cash Book, Bank Book, Profit & Loss (accrual and cash basis), indicative balance sheet. Books
+  are derived from documents and payments (no manual journal vouchers yet — see roadmap Phase 6).
+- **Bank reconciliation (BRS)**: CSV statement import with auto-detected HDFC, ICICI, SBI, Axis and Kotak layouts,
+  scored match suggestions you confirm, printable BRS.
+- **Inventory**: FIFO and weighted-average costing, stock positions, shortage warnings while drafting an invoice.
+- **Controls**: audit trail of every change with a tamper-evident hash chain and exportable head hash; "lock books up
+  to" period lock enforced in the data layer with PIN-guarded, audited overrides.
 
 ### 3.4 Data Portability & Accountant Handoff
-- **Tally Prime XML Export**: Direct XML import vouchers for Tally Prime.
-- **CSV Registers**: Zoho Books, Vyapar, and Busy-compatible CSV registers.
-- **Backup & Encryption**: One-click JSON export/import, Chrome/Edge folder sync, and AES-GCM passphrase encryption.
-- **Total Local Data Erasure**: Double-confirmed factory data wipe directly in Settings.
+- **Tally Prime XML**: sales, credit notes, receipts (with TDS receivable), purchases, freight and export conversions.
+- **CSV registers**: generic sales / purchase / receipt registers that import into Zoho Books, Vyapar or Busy with
+  column mapping; CSV import wizard for clients, items and invoices.
+- **Backup & encryption**: JSON export/import with validation and an undo copy, automatic folder backups (optionally
+  AES-GCM-256 encrypted with a stored non-extractable key, read back after writing), passphrase-encrypted exports,
+  storage-health panel.
+- **Security**: PIN lock (PBKDF2-SHA-256, 600k iterations, lockout, idle lock, locks every tab), strict CSP via
+  headers and a build-time meta tag. A 4–6 digit PIN is a lock screen, not encryption of the stored data.
+- **Erase all data**: requires typing `ERASE`; also clears the undo copy, backup key and backup-folder link.
 
 ---
 
 ## 4. Technical Architecture
 
-- **Frontend Core**: React 19 + TypeScript 6 + Vite 8 (Rolldown bundler).
-- **State Management**: Zustand (single source of truth in `src/store/useInvoiceStore.ts`).
-- **Styling**: Vanilla CSS + CSS Modules (`*.module.css`) with tokens in `src/index.css`. Zero Tailwind dependencies.
-- **PDF Stack**: `html-to-image` + `jspdf` (multi-page, client-side, JPEG-compressed).
-- **QR Code**: `qrcode.react` (offline vector rendering).
-- **Icons**: `lucide-react`.
+- **Frontend**: React 19 + TypeScript 6 (strict) + Vite 8 (Rolldown bundler); every page except Dashboard and Login is
+  code-split.
+- **State**: Zustand (`src/store/useInvoiceStore.ts`) for the editor; storage layer in `src/lib/storage.ts` with
+  versioned migrations (`src/lib/migrations.ts`).
+- **Styling**: vanilla CSS + CSS Modules with tokens in `src/index.css`. No Tailwind.
+- **PDF**: `html-to-image` + `jspdf` (multi-page, client-side). **QR**: `qrcode.react`. **Icons**: `lucide-react`.
+- **Quality**: node:test unit and integration tests, Playwright end-to-end journey and offline/service-worker checks in
+  CI, bundle-size budgets.
 
 ---
 
-## 5. Non-Commercial Licensing
+## 5. Known Limitations
 
-Released under the **Mr. Chartist Non-Commercial Source License**. Free for individuals and businesses to use internally; commercial resale, white-labeling, or hosting as a paid commercial SaaS product is strictly prohibited.
+- GST, e-Invoice, e-Way Bill and Tally outputs are working papers, not portal-validated; JSON key layouts that are not
+  verified against the current offline tools are marked in the code. Verify with your CA.
+- No direct portal / IRP / bank / payment-gateway connection (by design: no server).
+- Bank reconciliation treats bank as a single account.
+- Books are derived from documents; there is no chart of accounts or manual journal yet.
+- RCM and import bills are carried in supplier balances including tax; Books/Tally do not post RCM payable separately.
+- Exchange gain/loss on foreign receipts is not computed.
+- `.xlsx` import is not supported (CSV only).
+- Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
+
+---
+
+## 6. Non-Commercial Licensing
+
+Released under the **Mr. Chartist Non-Commercial Source License**. Free for individuals and businesses to use
+internally; commercial resale, white-labeling, or hosting as a paid commercial SaaS product is strictly prohibited.

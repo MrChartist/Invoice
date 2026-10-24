@@ -152,6 +152,54 @@ Larger features, each of which can ship on its own once Phases 1–4 are done.
 
 ---
 
+## Phase 6: Competitive parity — "all the powers" (v5.x) · from the Oct 2026 competitor survey
+
+Surveyed Tally Prime, Zoho Books/Invoice, Vyapar, myBillBook, Busy, Marg, Refrens, Khatabook, Swipe, GimBooks, Giddh,
+QuickBooks, Xero, FreshBooks, Wave, Invoice Ninja, Odoo and Sage. Our GST engine, templates, offline design and
+backups already match or beat the Indian SME tools; the gaps below all work **without a server**.
+
+| # | Item | Competitors | Effort |
+|---|------|-------------|--------|
+| 6.1 | **Double-entry core**: chart of accounts (Schedule III groups), journal / contra / payment / receipt vouchers; documents auto-post | Tally, Busy, Zoho, Xero, QBO | L |
+| 6.2 | **Trial balance + ledger drill-down** | all accounting tools | S (after 6.1) |
+| 6.3 | **Full balance sheet**: fixed assets & depreciation (IT Act WDV blocks), loans, capital/drawings, GST ledgers | Tally, Zoho | M |
+| 6.4 | **Cash-flow statement** (indirect, AS 3 / Ind AS 7) | Vyapar, Refrens, Zoho, Xero | S–M |
+| 6.5 | **Sales orders & purchase orders** with pending quantities → invoice / challan / bill | Refrens, Odoo, myBillBook, Vyapar, Zoho | M |
+| 6.6 | **Batch / expiry / MFG** on stock with FEFO and expiry alerts | Vyapar, myBillBook, Busy, Marg | M |
+| 6.7 | **Barcode** scan (BarcodeDetector + keyboard wedge) and Code128/EAN-13 label sheets | Vyapar, myBillBook, Marg | M |
+| 6.8 | **POS quick bill**: walk-in, split cash/UPI tender, 80 mm auto-print, day-end Z report | Vyapar, myBillBook, Marg, Swipe | M |
+| 6.9 | **Price levels & schemes** (wholesale/retail/party rates, qty slabs, buy-X-get-Y) | Tally, Marg, Vyapar | M |
+| 6.10 | **Multi-godown** stock with transfer vouchers | Vyapar, Busy, myBillBook | M |
+| 6.11 | **Serial numbers / IMEI / warranty** lookup | Busy, myBillBook | M |
+| 6.12 | **Attachments**: receipt photos / PDFs on bills, expenses, invoices (IndexedDB, in backups) | Zoho, Xero, Invoice Ninja | M |
+| 6.13 | **Time tracking & billable hours** → invoice lines | FreshBooks, Zoho, Invoice Ninja | M |
+| 6.14 | **Billable expenses & mileage** with markup | FreshBooks, Invoice Ninja | S–M |
+| 6.15 | **Optional automatic late-fee line** per client terms | FreshBooks, Invoice Ninja | S |
+| 6.16 | **Cost centres / projects** with project P&L | Tally, Busy, QBO, Xero, Zoho | M |
+| 6.17 | **Budgets vs actual** | Tally, Zoho, Xero, QBO | S–M |
+| 6.18 | **Cash-flow forecast** 30/90/180 days from open items, recurring and collection lag | Xero | M |
+| 6.19 | **Exchange gain/loss** (realised + period-end revaluation) | Zoho, Tally, Xero | S–M |
+| 6.20 | **Separate companies** on one device (isolated data sets + switcher) | Tally, Busy, Vyapar | M |
+| 6.21 | **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) | Vyapar, myBillBook, Zoho | M |
+| 6.22 | **.xlsx import/export without a dependency** (native `DecompressionStream` + DOMParser); unlocks ZIP of PDFs | most | M |
+| 6.23 | **Custom fields** on documents, items, parties, printable | Tally (UDF), Zoho, Vyapar | S–M |
+| 6.24 | **Bulk e-Invoice / e-Way JSON** and bulk IRN response import | Zoho, Tally | S |
+| 6.25 | **Party/item profitability, credit limits at billing** | Vyapar, Zoho | S–M |
+| 6.26 | **Cheque register & PDC reminders**, cheque printing | Tally, Busy | S–M |
+
+Already planned in Phase 5 and confirmed by the survey: GSTR-2B/IMS matcher (5.1), GSTR-9 (5.2), advances/Table 11
+(5.3), Hindi/regional UI (5.4), POS (5.5 → 6.8), barcode (5.6 → 6.7), folder sync (5.7), vault mode (5.8),
+composition / Bill of Supply (5.9).
+
+**Will not build (needs a server)** — live bank feeds, payment gateway/auto-charge, online client portal, direct IRP /
+GSP filing and 2B auto-fetch, cloud sync, cloud OCR, automatic FX rates, app-sent SMS/e-mail, online store. Offline
+alternatives: statement CSV/XLSX import, UPI deep links + UTR matching, client-copy HTML, offline-tool JSON in/out,
+encrypted folder sync, attachments with manual entry, typed or CSV-imported RBI/FBIL rates, `wa.me`/`mailto:` + Web
+Share, static catalogue HTML.
+
+**Recommended order:** 6.1–6.4 (unlock 6.16, 6.17, 6.19) → 5.1 + 6.22 → 6.5 → 6.12 → 6.6–6.9 (retail) → 6.13–6.15
+(freelancers); 6.20/6.21/5.4 in parallel.
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |
