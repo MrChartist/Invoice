@@ -9,6 +9,7 @@ import {
   vaultEnabled,
 } from '../../lib/storage';
 import { hasBackupEncryption, getConfig } from '../../lib/auto-backup';
+import '../../lib/backup'; // registers the undo-copy hook for vault switches
 import { MIN_PASSPHRASE } from '../../lib/vault';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';

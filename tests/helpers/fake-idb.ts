@@ -102,42 +102,49 @@ export class FakeIDB {
       const copies = new Map<string, Map<string, unknown>>();
       for (const n of tx.names) copies.set(n, new Map(d.stores.get(n)));
       const corrupt = !write && this.corruptRead;
-      for (const op of tx.ops) {
-        const s = copies.get(op.store)!;
-        const sortedKeys = () => [...s.keys()].sort();
-        switch (op.kind) {
-          case 'get':
-            op.req.result = structuredClone(s.get(String(op.key)));
-            break;
-          case 'put':
-            s.set(String(op.key), structuredClone(op.value));
-            op.req.result = op.key;
-            break;
-          case 'delete':
-            s.delete(String(op.key));
-            break;
-          case 'clear':
-            s.clear();
-            break;
-          case 'getAllKeys':
-            op.req.result = sortedKeys();
-            break;
-          case 'getAll': {
-            const vals = sortedKeys().map((k) => structuredClone(s.get(k)));
-            if (corrupt) {
-              const i = vals.findIndex((v) => typeof v === 'string');
-              if (i >= 0) {
-                vals[i] = `${vals[i] as string}!`;
-                this.corruptRead = false; // consumed only once a value was actually flipped
+      // Requests queued from an onsuccess callback run in the same transaction (like IndexedDB).
+      let done = 0;
+      while (done < tx.ops.length && !tx.aborted) {
+        const round = tx.ops.slice(done);
+        done = tx.ops.length;
+        for (const op of round) {
+          const s = copies.get(op.store)!;
+          const sortedKeys = () => [...s.keys()].sort();
+          switch (op.kind) {
+            case 'get':
+              op.req.result = structuredClone(s.get(String(op.key)));
+              break;
+            case 'put':
+              s.set(String(op.key), structuredClone(op.value));
+              op.req.result = op.key;
+              break;
+            case 'delete':
+              s.delete(String(op.key));
+              break;
+            case 'clear':
+              s.clear();
+              break;
+            case 'getAllKeys':
+              op.req.result = sortedKeys();
+              break;
+            case 'getAll': {
+              const vals = sortedKeys().map((k) => structuredClone(s.get(k)));
+              if (corrupt) {
+                const i = vals.findIndex((v) => typeof v === 'string');
+                if (i >= 0) {
+                  vals[i] = `${vals[i] as string}!`;
+                  this.corruptRead = false; // consumed only once a value was actually flipped
+                }
               }
+              op.req.result = vals;
+              break;
             }
-            op.req.result = vals;
-            break;
           }
         }
+        for (const op of round) op.req.onsuccess?.({});
       }
+      if (tx.aborted) return; // abort() already reported; nothing is committed
       if (write) for (const [n, m] of copies) d.stores.set(n, m);
-      for (const op of tx.ops) op.req.onsuccess?.({});
       tx.oncomplete?.({});
     }, 0);
   }
@@ -211,7 +218,9 @@ class FakeTx {
     /* requests run on the next macrotask anyway */
   }
   abort() {
+    if (this.aborted) return;
     this.aborted = true;
+    this.error = err('AbortError');
     this.onabort?.({});
   }
 }

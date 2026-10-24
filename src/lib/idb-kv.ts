@@ -12,7 +12,9 @@
  */
 
 const DB_NAME = 'mrchartist_inv_kv';
-const DB_VERSION = 2;
+// v3 (vault mode, 5.8): no schema change. The bump makes tabs still running an older build lose their
+// connection (versionchange) and fail to reopen (VersionError), so they cannot write into a vault store.
+const DB_VERSION = 3;
 export const KV_STORE = 'kv';
 export const DATA_STORE = 'data';
 const FAILED = 'IndexedDB failed';
@@ -67,8 +69,17 @@ export function openDb(): Promise<IDBDatabase> {
   return p;
 }
 
-/** Run one transaction on `store`; resolves with what `fn` returns once the transaction has committed. */
-export async function idbTx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => T): Promise<T> {
+/**
+ * Run one transaction on `store`; resolves with what `fn` returns once the transaction has committed.
+ * `fn` may queue more requests from a request's `onsuccess` (and abort the transaction there); pass
+ * `{ commit: false }` then, so the transaction is not committed before those callbacks run.
+ */
+export async function idbTx<T>(
+  store: string,
+  mode: IDBTransactionMode,
+  fn: (s: IDBObjectStore, tx: IDBTransaction) => T,
+  opts: { commit?: boolean } = {},
+): Promise<T> {
   const db = await openDb();
   return new Promise<T>((resolve, reject) => {
     let tx: IDBTransaction;
@@ -82,7 +93,7 @@ export async function idbTx<T>(store: string, mode: IDBTransactionMode, fn: (s: 
     }
     let out: T;
     try {
-      out = fn(tx.objectStore(store));
+      out = fn(tx.objectStore(store), tx);
     } catch (err) {
       try {
         tx.abort();
@@ -96,7 +107,7 @@ export async function idbTx<T>(store: string, mode: IDBTransactionMode, fn: (s: 
     tx.onerror = () => reject(tx.error ?? new Error(FAILED));
     tx.onabort = () => reject(tx.error ?? new Error(FAILED));
     // Send it now rather than at the end of the task (matters during pagehide).
-    (tx as IDBTransaction & { commit?: () => void }).commit?.();
+    if (opts.commit !== false) (tx as IDBTransaction & { commit?: () => void }).commit?.();
   });
 }
 

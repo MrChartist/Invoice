@@ -13,7 +13,7 @@
  * unrelated site data.
  */
 
-import { DB_PREFIX, collectAppData, readRaw, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
+import { DB_PREFIX, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
@@ -308,13 +308,26 @@ export async function saveSafetySnapshot(reason: SafetySnapshot['reason'], now: 
   const data = collectAppData();
   for (const key of LOCAL_ONLY) delete data[key];
   if (Object.keys(data).length === 0) return true; // nothing to protect
-  const at = now.toISOString();
+  return storeSnapshot({ at: now.toISOString(), reason, data });
+}
+
+async function storeSnapshot(snap: SafetySnapshot): Promise<boolean> {
   // Vault mode: the undo copy must not sit in IndexedDB readable.
   const record: StoredSnapshot = vaultEnabled()
-    ? { at, reason, sealed: await vaultSeal(SAFETY_KEY, JSON.stringify(data)) }
-    : { at, reason, data };
+    ? { at: snap.at, reason: snap.reason, sealed: await vaultSeal(SAFETY_KEY, JSON.stringify(snap.data)) }
+    : { at: snap.at, reason: snap.reason, data: snap.data };
   return idbSet(SAFETY_KEY, record);
 }
+
+// Carry the undo copy across a vault on/off switch: one saved before vault mode is sealed once the
+// vault is on (it would otherwise stay readable); a sealed one is written back readable when the
+// vault is turned off (it could not be opened any more).
+registerVaultTransition({
+  before: () => getSafetySnapshot(),
+  after: async (snap) => {
+    if (snap) await storeSnapshot(snap as SafetySnapshot);
+  },
+});
 
 export async function getSafetySnapshot(): Promise<SafetySnapshot | null> {
   const s = await idbGet<StoredSnapshot>(SAFETY_KEY);

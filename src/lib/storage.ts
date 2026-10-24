@@ -3,8 +3,8 @@
  *
  *  - `local`: plain localStorage (Node tests, browsers without IndexedDB, and every
  *    boot until `initStorage()` succeeds).
- *  - `idb` (Phase 4.2): `initStorage()` (awaited in main.tsx before the app module is
- *    loaded) reads every `mrchartist_inv_*` data key from IndexedDB into an in-memory
+ *  - `idb` (Phase 4.2): `initStorage()` (awaited in main.tsx before the first render and before
+ *    anything reads data; modules imported by main.tsx must not read storage at load time) reads every `mrchartist_inv_*` data key from IndexedDB into an in-memory
  *    map. `readRaw/writeRaw/removeRaw` (and so `getTable/setTable`) stay synchronous and
  *    serve that map; writes go through to IndexedDB in batches (next task, plus a flush
  *    on `pagehide` / hidden). Other tabs are told over a BroadcastChannel and refresh.
@@ -108,7 +108,45 @@ let listenersInstalled = false;
 let vaultKey: CryptoKey | null = null;
 let vaultId: string | null = null;
 /** Boot found a vault: the sealed data waits here until `unlockStorage(passphrase)`. */
-let locked: { record: VaultRecord; data: Map<string, string>; lsData: Map<string, string> } | null = null;
+let locked: { lsKeys: string[] } | null = null;
+/** Keys left untouched by the last unlock (could not be decrypted, or were not encrypted). */
+let skippedKeys: string[] = [];
+/** Set once a write was refused because another tab changed vault mode: no further writes until reload. */
+let vaultConflict: StorageWriteError | null = null;
+
+class VaultConflictError extends Error {}
+
+/**
+ * One readwrite transaction on the data store that first reads the vault record and aborts unless
+ * its id is `expect` (null = "no vault"). The check and the writes are atomic, so a write can never
+ * land in a store whose vault mode another tab has just changed.
+ */
+async function guardedWrite(expect: string | null, write: (s: IDBObjectStore) => void): Promise<void> {
+  let conflict = false;
+  try {
+    await idbTx(
+      DATA_STORE,
+      'readwrite',
+      (s, tx) => {
+        const r = s.get(VAULT_KEY);
+        r.onsuccess = () => {
+          const rec: unknown = r.result;
+          const id = rec === undefined ? null : isVaultRecord(rec) ? rec.id : '';
+          if (id !== expect) {
+            conflict = true;
+            tx.abort();
+            return;
+          }
+          write(s);
+        };
+      },
+      { commit: false },
+    );
+  } catch (err) {
+    if (conflict) throw new VaultConflictError('Vault mode was changed in another tab.');
+    throw err;
+  }
+}
 
 export const SYNC_CHANNEL = 'mrchartist_inv_sync';
 const META_KEY = '__meta__';
@@ -166,19 +204,13 @@ export async function flushStorage(): Promise<void> {
   if (backend !== 'idb' || pending.size === 0) return;
   const batch = [...pending];
   const key = vaultKey;
+  const expect = vaultId;
   const run = (async () => {
-    let values: (string | null)[] = batch.map(([, v]) => v);
-    if (key) {
-      // Never write sealed values into a store whose vault was removed or re-created by another tab:
-      // they could not be read back. That tab's broadcast reloads this one.
-      const [rec] = await idbTx(DATA_STORE, 'readonly', (s) => [s.get(VAULT_KEY)] as const);
-      const current: unknown = rec.result;
-      if (!isVaultRecord(current) || current.id !== vaultId) {
-        throw new StorageWriteError('Vault mode was changed in another tab. Reload this tab to continue.', false);
-      }
-      values = await Promise.all(batch.map(([k, v]) => (v === null ? null : seal(key, k, v))));
-    }
-    await idbTx(DATA_STORE, 'readwrite', (s) => {
+    const values: (string | null)[] = key
+      ? await Promise.all(batch.map(([k, v]) => (v === null ? null : seal(key, k, v))))
+      : batch.map(([, v]) => v);
+    // Sealed values only into this tab's vault; readable ones only into a store with no vault.
+    await guardedWrite(expect, (s) => {
       batch.forEach(([k], i) => {
         const v = values[i];
         if (v === null) s.delete(k);
@@ -195,7 +227,15 @@ export async function flushStorage(): Promise<void> {
         /* other tabs see it on their next load */
       }
     },
-    (err: unknown) => setFlushError(toWriteError(err)),
+    (err: unknown) => {
+      if (err instanceof VaultConflictError) {
+        vaultConflict = new StorageWriteError(
+          'Vault mode was changed in another tab, so changes in this tab can no longer be saved. Reload this tab.',
+          false,
+        );
+        setFlushError(vaultConflict);
+      } else setFlushError(toWriteError(err));
+    },
   );
   flushing = run;
   try {
@@ -205,9 +245,16 @@ export async function flushStorage(): Promise<void> {
   }
 }
 
-/** Flush, then reload: for restore / erase / reset paths that reload straight away. */
+/**
+ * Flush, then reload: for restore / erase / reset paths that reload straight away. If the flush
+ * failed, ask first — a reload would drop the unsaved changes.
+ */
 export function reloadAfterFlush(): void {
-  void flushStorage().finally(() => window.location.reload());
+  void flushStorage().finally(() => {
+    const err = flushError;
+    if (err && !window.confirm(`${err.message}\n\nSome changes are not saved. Reload anyway and lose them?`)) return;
+    window.location.reload();
+  });
 }
 
 async function onRemoteChange(keys: unknown[]): Promise<void> {
@@ -223,7 +270,7 @@ async function onRemoteChange(keys: unknown[]): Promise<void> {
     reqs.map(async (r, i): Promise<string | null | undefined> => {
       const v: unknown = r.result;
       if (typeof v !== 'string') return null;
-      if (!isSealed(v)) return v;
+      if (!isSealed(v)) return vaultKey ? undefined : v; // a vault store holds only sealed values
       if (!vaultKey) return undefined; // sealed by a vault this tab has not unlocked: its broadcast reloads us
       try {
         return await unseal(vaultKey, wanted[i], v);
@@ -300,7 +347,7 @@ export type StorageInit =
   /** Plain localStorage: IndexedDB is missing or failed, and the data is still in localStorage. */
   | { backend: 'local'; reason: string }
   /** This device's data lives in IndexedDB, which cannot be opened now: do not start on an empty store. */
-  | { backend: 'unavailable'; reason: string }
+  | { backend: 'unavailable'; reason: string; vaultDamaged?: boolean }
   /** Vault mode: the data is encrypted; call `unlockStorage(passphrase)` before anything reads it. */
   | { backend: 'locked' };
 
@@ -341,8 +388,13 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
     }
     const stored = await withTimeout(readAllData(), timeout);
     if (stored.vault !== undefined) {
-      if (!isVaultRecord(stored.vault)) return { backend: 'unavailable', reason: 'The vault record on this device is damaged.' };
-      locked = { record: stored.vault, data: stored.data, lsData };
+      if (!isVaultRecord(stored.vault)) {
+        return { backend: 'unavailable', reason: 'The vault record on this device is damaged.', vaultDamaged: true };
+      }
+      // The data is read again at unlock time (another tab may change it meanwhile); listen for a
+      // vault change elsewhere so the unlock screen reloads.
+      locked = { lsKeys: [...lsData.keys()] };
+      installIdbListeners();
       return { backend: 'locked' };
     }
     const lsIsTruth = marked ? !stored.meta : lsData.size > 0 || !stored.meta;
@@ -353,7 +405,8 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
     const dels = [...stored.data.keys()].filter((k) => !target.has(k));
     if (!stored.meta || puts.length > 0 || dels.length > 0) {
       await withTimeout(
-        idbTx(DATA_STORE, 'readwrite', (s) => {
+        // Guarded: if another tab turned vault mode on meanwhile, nothing readable is written.
+        guardedWrite(null, (s) => {
           for (const k of dels) s.delete(k);
           for (const [k, v] of puts) s.put(v, k);
           s.put(Date.now(), META_KEY); // marker: a verified copy was made (value = when)
@@ -382,60 +435,86 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
 }
 
 /**
- * Vault mode: decrypt the data found by `initStorage()` (which returned `locked`) into the
- * cache and switch to the IndexedDB backend. Throws VaultError('wrong-passphrase').
- * Values that are not sealed (written by a tab without the key) are taken as they are and
- * sealed on the next flush; values that fail to decrypt are left untouched in IndexedDB and
- * reported in `unreadable`.
+ * Vault mode: decrypt the store into the cache and switch to the IndexedDB backend (after
+ * `initStorage()` returned `locked`). The store and the vault record are read afresh here, so a tab
+ * that sat on the unlock screen while another tab worked opens the current data. Throws
+ * VaultError('wrong-passphrase'). Values that fail to decrypt, and values that are not encrypted at
+ * all (nothing legitimate writes those into a vault store), are left untouched and reported.
  */
 export async function unlockStorage(passphrase: string): Promise<{ unreadable: string[] }> {
   if (!locked) throw new VaultError('Nothing is locked.', 'bad-record');
-  const { record, data, lsData } = locked;
-  const key = await unwrapDek(record, passphrase);
+  const fresh = await readAllData();
   const unreadable: string[] = [];
   const plain = new Map<string, string>();
-  const reseal: string[] = [];
-  await Promise.all(
-    [...data].map(async ([k, v]) => {
-      if (!isSealed(v)) {
-        plain.set(k, v);
-        reseal.push(k);
-        return;
-      }
-      try {
-        plain.set(k, await unseal(key, k, v));
-      } catch {
-        unreadable.push(k);
-      }
-    }),
-  );
-  locked = null;
-  cache.clear();
-  for (const [k, v] of plain) cache.set(k, v);
-  for (const k of reseal) pending.set(k, plain.get(k)!);
-  // A stale tab's localStorage copy: imported only where the vault has nothing (as in initStorage).
-  const ls = store();
-  for (const [k, v] of lsData) {
-    if (!cache.has(k) && !unreadable.includes(k)) {
-      cache.set(k, v);
-      pending.set(k, v);
+  let key: CryptoKey | null = null;
+  let id: string | null = null;
+  if (fresh.vault !== undefined) {
+    if (!isVaultRecord(fresh.vault)) throw new VaultError('The vault record on this device is damaged.', 'bad-record');
+    key = await unwrapDek(fresh.vault, passphrase);
+    id = fresh.vault.id;
+    const k = key;
+    await Promise.all(
+      [...fresh.data].map(async ([name, v]) => {
+        if (!isSealed(v)) {
+          unreadable.push(name);
+          return;
+        }
+        try {
+          plain.set(name, await unseal(k, name, v));
+        } catch {
+          unreadable.push(name);
+        }
+      }),
+    );
+  } else {
+    // Vault mode was turned off in another tab meanwhile: the store is readable as it is.
+    for (const [name, v] of fresh.data) {
+      if (isSealed(v)) unreadable.push(name);
+      else plain.set(name, v);
     }
+  }
+  // A stale tab's localStorage copy is dropped, not imported: it could be planted plaintext.
+  const ls = store();
+  for (const k of locked.lsKeys) {
     try {
       ls?.removeItem(k);
     } catch {
       /* ignored from now on */
     }
   }
+  locked = null;
+  cache.clear();
+  pending.clear();
+  for (const [k, v] of plain) cache.set(k, v);
   vaultKey = key;
-  vaultId = record.id;
+  vaultId = id;
+  skippedKeys = unreadable.sort();
   backend = 'idb';
   installIdbListeners();
-  if (pending.size > 0) scheduleFlush();
-  return { unreadable: unreadable.sort() };
+  return { unreadable: [...skippedKeys] };
 }
 
 export function vaultEnabled(): boolean {
   return vaultKey !== null;
+}
+
+/**
+ * Things kept outside the data store that must follow a vault switch (the restore undo copy in the
+ * `kv` store, registered by backup.ts): `before` reads them with the old key, `after` re-stores them
+ * under the new mode.
+ */
+export interface VaultTransitionHook {
+  before: () => Promise<unknown>;
+  after: (state: unknown) => Promise<void>;
+}
+const transitionHooks: VaultTransitionHook[] = [];
+export function registerVaultTransition(hook: VaultTransitionHook): void {
+  transitionHooks.push(hook);
+}
+async function aroundVaultSwitch(change: () => Promise<void>): Promise<void> {
+  const states = await Promise.all(transitionHooks.map((h) => h.before().catch(() => undefined)));
+  await change();
+  await Promise.all(transitionHooks.map((h, i) => h.after(states[i]).catch(() => undefined)));
 }
 
 function announceVaultChange(): void {
@@ -475,10 +554,10 @@ export async function enableVault(passphrase: string): Promise<void> {
   if (backend !== 'idb') throw new VaultError('Vault mode needs this browser’s database (IndexedDB), which is not in use.', 'bad-record');
   if (vaultKey) throw new VaultError('Vault mode is already on.', 'bad-record');
   const { record, key } = await createVault(passphrase);
-  await exclusive(async () => {
+  await aroundVaultSwitch(() => exclusive(async () => {
     const snapshot = [...cache];
     const sealed = await Promise.all(snapshot.map(async ([k, v]) => [k, await seal(key, k, v)] as const));
-    await idbTx(DATA_STORE, 'readwrite', (s) => {
+    await guardedWrite(null, (s) => {
       for (const [k, v] of sealed) s.put(v, k);
       s.put(record, VAULT_KEY);
     });
@@ -491,7 +570,7 @@ export async function enableVault(passphrase: string): Promise<void> {
     }
     if (!ok) {
       // Put the readable copy back before reporting.
-      await idbTx(DATA_STORE, 'readwrite', (s) => {
+      await guardedWrite(record.id, (s) => {
         for (const [k, v] of snapshot) s.put(v, k);
         s.delete(VAULT_KEY);
       });
@@ -499,7 +578,7 @@ export async function enableVault(passphrase: string): Promise<void> {
     }
     vaultKey = key;
     vaultId = record.id;
-  });
+  }));
   announceVaultChange();
 }
 
@@ -508,16 +587,21 @@ export async function disableVault(passphrase: string): Promise<void> {
   if (!vaultKey) throw new VaultError('Vault mode is not on.', 'bad-record');
   const record = await readVaultRecord();
   if (!record) throw new VaultError('The vault record is missing.', 'bad-record');
+  if (record.id !== vaultId) throw new VaultError('Vault mode was changed in another tab. Reload this tab.', 'bad-record');
   await unwrapDek(record, passphrase); // wrong passphrase -> throws, nothing changes
-  await exclusive(async () => {
+  await aroundVaultSwitch(() => exclusive(async () => {
     const snapshot = [...cache];
-    await idbTx(DATA_STORE, 'readwrite', (s) => {
+    await guardedWrite(record.id, (s) => {
       for (const [k, v] of snapshot) s.put(v, k);
       s.delete(VAULT_KEY);
     });
+    const check = await readAllData();
+    const ok = check.vault === undefined && snapshot.every(([k, v]) => check.data.get(k) === v);
+    if (!ok) throw new VaultError('The readable copy could not be verified. Reload and try again.', 'decrypt-failed');
     vaultKey = null;
     vaultId = null;
-  });
+    skippedKeys = [];
+  }));
   announceVaultChange();
 }
 
@@ -526,8 +610,9 @@ export async function changeVaultPassphrase(current: string, next: string): Prom
   if (!vaultKey) throw new VaultError('Vault mode is not on.', 'bad-record');
   const record = await readVaultRecord();
   if (!record) throw new VaultError('The vault record is missing.', 'bad-record');
+  if (record.id !== vaultId) throw new VaultError('Vault mode was changed in another tab. Reload this tab.', 'bad-record');
   const updated = await rewrapVault(record, current, next);
-  await idbTx(DATA_STORE, 'readwrite', (s) => {
+  await guardedWrite(record.id, (s) => {
     s.put(updated, VAULT_KEY);
   });
 }
@@ -553,12 +638,15 @@ export async function vaultUnseal(name: string, value: string): Promise<string |
  * passphrase to an empty store.
  */
 export async function forgetVault(): Promise<void> {
-  if (!vaultKey && !locked) return;
+  if (!vaultKey && !locked && skippedKeys.length === 0) return;
+  const orphans = skippedKeys;
   vaultKey = null;
   vaultId = null;
+  skippedKeys = [];
   try {
     await idbTx(DATA_STORE, 'readwrite', (s) => {
       s.delete(VAULT_KEY);
+      for (const k of orphans) s.delete(k); // values the wipe cannot see (never decrypted)
     });
   } catch {
     /* the wipe still removes the data */
@@ -590,6 +678,8 @@ export function resetStorageBackend(): void {
   vaultKey = null;
   vaultId = null;
   locked = null;
+  skippedKeys = [];
+  vaultConflict = null;
   backend = 'local';
   cache.clear();
   pending.clear();
@@ -624,6 +714,7 @@ export function readRaw(fullKey: string): string | null {
 
 export function writeRaw(fullKey: string, value: string): void {
   if (inCache(fullKey)) {
+    if (vaultConflict) throw vaultConflict;
     // While IndexedDB refuses writes for lack of space, refuse anything that grows the data so
     // the UI shows its usual "storage is full" error; shrinking writes go through and retry.
     if (flushError?.quotaExceeded && value.length > (cache.get(fullKey)?.length ?? 0)) throw flushError;

@@ -67,8 +67,14 @@ export function isVaultRecord(v: unknown): v is VaultRecord {
     r.iter >= MIN_ITERATIONS &&
     r.iter <= MAX_ITERATIONS &&
     typeof r.salt === 'string' &&
+    r.salt.length >= 12 &&
+    r.salt.length <= 128 &&
     typeof r.wrapped === 'string' &&
-    typeof r.id === 'string'
+    r.wrapped.length >= 16 &&
+    r.wrapped.length <= 256 &&
+    typeof r.id === 'string' &&
+    r.id.length > 0 &&
+    r.id.length <= 64
   );
 }
 
@@ -103,9 +109,17 @@ async function wrapDek(dek: CryptoKey, passphrase: string, iter: number): Promis
 /** Unwrap the DEK. `extractable` only for a re-wrap (passphrase change); the session key is not. */
 export async function unwrapDek(record: VaultRecord, passphrase: string, extractable = false): Promise<CryptoKey> {
   if (!isVaultRecord(record)) throw new VaultError('The vault record is damaged.', 'bad-record');
-  const kek = await deriveKek(passphrase, base64ToBytes(record.salt), record.iter);
+  let salt: Uint8Array<ArrayBuffer>;
+  let wrapped: Uint8Array<ArrayBuffer>;
   try {
-    return await subtle().unwrapKey('raw', base64ToBytes(record.wrapped), kek, 'AES-KW', { name: 'AES-GCM', length: 256 }, extractable, [
+    salt = base64ToBytes(record.salt);
+    wrapped = base64ToBytes(record.wrapped);
+  } catch {
+    throw new VaultError('The vault record is damaged.', 'bad-record');
+  }
+  const kek = await deriveKek(passphrase, salt, record.iter);
+  try {
+    return await subtle().unwrapKey('raw', wrapped, kek, 'AES-KW', { name: 'AES-GCM', length: 256 }, extractable, [
       'encrypt',
       'decrypt',
     ]);

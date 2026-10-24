@@ -30,7 +30,7 @@ function start(root: Root): void {
 // before anything renders; until then the page shows only its background. Typically a few ms.
 void initStorage().then((init) => {
   if (init.backend === 'unavailable') {
-    void import('./boot-unavailable').then((m) => m.showUnavailable(init.reason));
+    void import('./boot-unavailable').then((m) => m.showUnavailable(init.reason, { vaultDamaged: init.vaultDamaged }));
     return;
   }
   const root = createRoot(document.getElementById('root')!);

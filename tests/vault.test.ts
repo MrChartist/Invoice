@@ -93,7 +93,7 @@ test('enable: nothing readable left in IndexedDB; reboot is locked until the pas
   assert.equal(getTable<{ id: string }>('invoices')[0].id, 'i1');
 });
 
-test('writes after unlock are sealed; plaintext written by a keyless tab is taken and re-sealed', async () => {
+test('writes after unlock are sealed; plaintext planted in a vault store is refused, not loaded', async () => {
   await seeded();
   await enableVault(PASS);
   setTable('vendors', [{ id: 'v1', name: 'Hidden Vendor' }]);
@@ -101,12 +101,12 @@ test('writes after unlock are sealed; plaintext written by a keyless tab is take
   assert.ok(isSealed(idbData().get(K('vendors')) as string));
   assert.ok(!rawValues().some((v) => v.includes('Hidden Vendor')));
 
-  idbData().set(K('items_catalog'), JSON.stringify([{ id: 'x', name: 'Plain Item' }])); // e.g. a tab without the key
+  // Someone with access to the browser profile plants readable data (e.g. their own bank details).
+  idbData().set(K('items_catalog'), JSON.stringify([{ id: 'x', name: 'Planted Item' }]));
   assert.equal((await reboot()).backend, 'locked');
-  await unlockStorage(PASS);
-  assert.equal(getTable<{ name: string }>('items_catalog')[0].name, 'Plain Item');
-  await flushStorage();
-  assert.ok(isSealed(idbData().get(K('items_catalog')) as string), 're-sealed on the next flush');
+  const res = await unlockStorage(PASS);
+  assert.deepEqual(res.unreadable, [K('items_catalog')]);
+  assert.deepEqual(getTable('items_catalog'), [], 'unencrypted values are not trusted');
 });
 
 test('a tampered value is reported, not fatal, and left in place', async () => {
@@ -119,6 +119,66 @@ test('a tampered value is reported, not fatal, and left in place', async () => {
   assert.deepEqual(res.unreadable, [K('clients')]);
   assert.equal(getTable<{ id: string }>('invoices')[0].id, 'i1', 'the rest opens');
   assert.ok(idbData().has(K('clients')), 'the damaged value is not deleted');
+  await forgetVault(); // Erase: the wipe cannot see a value that never decrypted, forgetVault removes it
+  wipeAppData();
+  await flushStorage();
+  assert.equal(rawValues().length, 0, 'nothing sealed is left behind for the next boot');
+});
+
+test('unlock reads the store afresh: a tab left on the unlock screen sees later changes', async () => {
+  await seeded();
+  await enableVault(PASS);
+  assert.equal((await reboot()).backend, 'locked'); // tab B sits on the unlock screen…
+  // …while tab A (same data key) saves a new client and changes the passphrase.
+  const rec = idbData().get(VAULT_KEY) as Parameters<typeof unwrapDek>[0];
+  const dek = await unwrapDek(rec, PASS);
+  idbData().set(K('clients'), await seal(dek, K('clients'), JSON.stringify([{ id: 'c1' }, { id: 'c2', name: 'Added in A' }])));
+  idbData().set(VAULT_KEY, await rewrapVault(rec, PASS, 'changed in tab A'));
+  await assert.rejects(unlockStorage(PASS), /Wrong passphrase/, 'the old passphrase no longer opens it');
+  await unlockStorage('changed in tab A');
+  assert.deepEqual(getTable<{ id: string }>('clients').map((c) => c.id), ['c1', 'c2'], 'not the boot-time snapshot');
+});
+
+test('vault turned off elsewhere while this tab was locked: it opens the readable store', async () => {
+  await seeded();
+  await enableVault(PASS);
+  await reboot();
+  idbData().delete(VAULT_KEY);
+  idbData().set(K('clients'), JSON.stringify([{ id: 'c9', name: 'Readable' }]));
+  idbData().delete(K('invoices'));
+  await unlockStorage('anything at all');
+  assert.equal(vaultEnabled(), false);
+  assert.equal(getTable<{ id: string }>('clients')[0].id, 'c9');
+});
+
+test('a tab without the key refuses to write into a store that has a vault (no plaintext leak)', async () => {
+  await seeded();
+  const { record } = await createVault(PASS);
+  idbData().set(VAULT_KEY, record); // another tab turned vault mode on
+  writeRaw(K('vendors'), JSON.stringify([{ id: 'v1', name: 'Plain From B' }]));
+  await flushStorage();
+  assert.match(storageFailure()?.message ?? '', /changed in another tab/);
+  assert.ok(!idbData().has(K('vendors')), 'nothing readable written into the vault store');
+  assert.throws(() => writeRaw(K('vendors'), '[]'), /changed in another tab/, 'further writes are refused until reload');
+});
+
+test('the undo copy follows vault transitions (sealed on enable, readable again on disable)', async () => {
+  await seeded();
+  assert.equal(await saveSafetySnapshot('restore'), true);
+  const kv = () => fakeIdb.store(DB, KV_STORE).get('safety-snapshot') as { data?: unknown; sealed?: string };
+  assert.ok(kv().data, 'readable before vault mode');
+  await enableVault(PASS);
+  assert.equal(kv().data, undefined);
+  assert.ok(kv().sealed && !kv().sealed!.includes('Acme'), 'sealed once the vault is on');
+  await disableVault(PASS);
+  assert.ok(kv().data && kv().sealed === undefined, 'readable again after turning it off');
+  assert.ok((await getSafetySnapshot())?.data[K('clients')]?.includes('Acme'));
+});
+
+test('a damaged vault record is reported as damaged, not as a wrong passphrase', async () => {
+  const { record } = await createVault(PASS);
+  await assert.rejects(unwrapDek({ ...record, salt: '!!!!not base64!!!!' }, PASS), (e: unknown) => e instanceof VaultError && e.code === 'bad-record');
+  await assert.rejects(unwrapDek({ ...record, id: '' }, PASS), (e: unknown) => e instanceof VaultError && e.code === 'bad-record');
 });
 
 test('change passphrase: only the record changes; disable writes everything back readable', async () => {

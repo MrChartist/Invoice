@@ -149,7 +149,13 @@ try {
     writeFileSync(join(v3, 'precache-manifest.json'), JSON.stringify(m3));
     srv.setDist(v3);
     await page.evaluate(async () => { try { await (await navigator.serviceWorker.getRegistration()).update(); } catch { /* install rejected */ } });
-    await page.waitForTimeout(1500);
+    // Wait for the failed install to finish (and drop its half-filled cache) rather than a fixed
+    // delay: precaching 160+ files can take longer than a second or two on a busy machine.
+    await page.waitForTimeout(300);
+    await until(page, async () => {
+      const r = await navigator.serviceWorker.getRegistration();
+      return !r.installing && !(await caches.keys()).includes('mci-shell-v3broken0000');
+    }, 20000).catch(() => {});
     const st = await page.evaluate(async () => {
       const r = await navigator.serviceWorker.getRegistration();
       return { active: !!r.active, waiting: !!r.waiting, caches: (await caches.keys()).filter((k) => k.startsWith('mci-shell-')) };

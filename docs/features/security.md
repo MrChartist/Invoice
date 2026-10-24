@@ -99,15 +99,25 @@ Optional, Settings → Security → **Vault mode**. Protects the stored data its
   reported on the unlock screen and left untouched; everything else opens.
 - **Boot.** With a vault on the device, an unlock screen appears before the app (and before the PIN screen); nothing
   reads the store until the passphrase has decrypted it. "Lock vault now" reloads the page, dropping the key.
-- **What else is covered.** The restore undo copy (IndexedDB `kv` store) is sealed with the same key. Device-local
+- **What else is covered.** The restore undo copy (IndexedDB `kv` store) is sealed with the same key, including one
+  saved before the vault was turned on (and it is written back readable when the vault is turned off). Device-local
   keys that stay in localStorage (PIN hash, lockout, idle timer, session, last-backup time, backend marker) and the
   theme are not data and are not encrypted. Exported backups are whatever you choose (use an encrypted export);
   the panel warns when automatic folder backups are unencrypted.
-- **Multiple tabs.** Turning the vault on or off is broadcast and other tabs reload. Before each write a tab checks
-  that the vault record it unlocked is still the current one; if not, it refuses to write and asks for a reload.
-  Each tab asks for the passphrase separately.
+- **Multiple tabs.** Every write to the store runs in one IndexedDB transaction that first reads the vault record and
+  aborts unless it is the one this tab expects (its unlocked vault, or no vault at all). So a tab can never write
+  sealed values into a store whose vault was removed or re-created elsewhere, nor readable values into a vault store.
+  A refused write stops further writes in that tab with a "reload this tab" message; reload paths ask before
+  dropping unsaved changes. Turning the vault on or off is also broadcast so other tabs reload, a tab waiting on the
+  unlock screen reads the store and the vault record afresh when unlocked, and the IndexedDB schema version was
+  bumped to 3 so tabs still running an older build lose their connection instead of writing. Each tab asks for the
+  passphrase separately.
+- **Untrusted values.** A vault store holds only sealed values: anything readable found there (or a stale
+  localStorage copy) is not loaded, so readable data planted in the browser profile cannot slip into invoices.
+  Values that do not decrypt are reported and left untouched; Erase removes them too.
 - **No recovery.** A lost passphrase means the data cannot be decrypted. The unlock screen's "Forgot the passphrase?"
-  erases everything this app stored on the device (typed `ERASE`), after which a backup can be restored.
+  erases everything this app stored on the device (typed `ERASE`), after which a backup can be restored. A damaged
+  vault record shows "Your data could not be opened" with the same erase option.
 - **Limits.** Not a defence against malware or someone using the unlocked app; data is decrypted in memory while the
   tab is open. Passphrase attempts are not rate-limited beyond the cost of PBKDF2 (an attacker with a copy of the
   data can guess offline, so use a long passphrase; the minimum is 10 characters). Needs IndexedDB and a secure page.

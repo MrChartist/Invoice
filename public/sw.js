@@ -52,7 +52,9 @@ async function precacheManifest(shell, assets) {
   const res = await fetch('/precache-manifest.json', { cache: 'no-store' });
   if (!res.ok) throw new ManifestMissing('precache manifest ' + res.status);
   const manifest = await res.json();
-  await Promise.all(
+  // allSettled, not all: every fetch/put must have finished before a failed install deletes the
+  // half-filled shell cache, or a straggling put could leave it behind.
+  const results = await Promise.allSettled(
     manifest.files.map(async (url) => {
       const r = await fetch(new Request(url, { cache: 'reload' }));
       if (!r.ok) throw new Error('precache ' + url + ' ' + r.status);
@@ -62,6 +64,8 @@ async function precacheManifest(shell, assets) {
       else await shell.put(url, r);
     }),
   );
+  const failed = results.find((r) => r.status === 'rejected');
+  if (failed) throw failed.reason;
 }
 
 self.addEventListener('install', (event) => {
