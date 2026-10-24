@@ -141,6 +141,8 @@ function codeNum(code?: string): number {
 export function ewayDocType(doc: InvoiceRecord['doc_type']): EwayBill['docType'] {
   if (doc === 'DELIVERY_CHALLAN') return 'CHL';
   if (doc === 'CREDIT_NOTE') return 'CNT';
+  // A Bill of Supply (composition dealer / exempt goods) moves goods too: NIC document type BIL.
+  if (doc === 'BILL_OF_SUPPLY') return 'BIL';
   return 'INV';
 }
 

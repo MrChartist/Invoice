@@ -7,6 +7,7 @@ import { changedElsewhereSince } from '../lib/cross-tab';
 import {
   calculateInvoice,
   deriveGstMode,
+  effectiveGstMode,
   EMPTY_TOTALS,
   isIgstZeroRated,
   num,
@@ -114,6 +115,7 @@ export const RECORD_KEYS = [
   'sales_order_id', 'order_closed_on',
   'cost_centre_id',
   'custom_values', 'attachments',
+  'exempt_kind', 'amends',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -139,7 +141,7 @@ function wholeRecord(rec: InvoiceRecord): InvoiceRecord {
   return out as unknown as InvoiceRecord;
 }
 
-function freshDraft(docType: DocumentType = 'INVOICE'): InvoiceRecord {
+function freshDraft(docType?: DocumentType): InvoiceRecord {
   return makeDraft({
     settings: localDb.settings.get(),
     sender: localDb.settings.activeProfile(),
@@ -147,6 +149,8 @@ function freshDraft(docType: DocumentType = 'INVOICE'): InvoiceRecord {
     templateId: localDb.template.get(),
   });
 }
+
+const isCompositionSender = (sender: SenderProfile | null | undefined) => sender?.gst_scheme === 'composition';
 
 /**
  * Re-pick CGST+SGST vs IGST after the sender or place of supply changes.
@@ -245,18 +249,41 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
 
     setSender: (sender) => {
       const place_of_supply = get().place_of_supply || senderStateCode(sender);
+      // A composition dealer cannot issue tax invoices: an unsaved invoice switches to a Bill of Supply.
+      const toBos = isCompositionSender(sender) && !get().id && (get().doc_type === 'INVOICE' || get().doc_type === 'TAX_INVOICE');
       apply({
         sender,
         place_of_supply,
         terms: get().terms || sender.defaultTerms || '',
-        gst_mode: refineGstMode(get().gst_mode, sender, place_of_supply),
+        gst_mode: toBos || get().doc_type === 'BILL_OF_SUPPLY' ? 'NONE' : refineGstMode(get().gst_mode, sender, place_of_supply),
+        ...(toBos ? { doc_type: 'BILL_OF_SUPPLY' as DocumentType, reverse_charge: false } : {}),
       });
     },
 
     setDates: (issue, due) => apply({ issue_date: issue, due_date: due }),
 
     setStatus: (status) => apply({ status }),
-    setDocType: (doc_type) => apply({ doc_type }),
+    setDocType: (doc_type) => {
+      const prev = get().doc_type;
+      if (doc_type === 'BILL_OF_SUPPLY') {
+        // No tax on a Bill of Supply (Rule 49); reverse charge does not arise either.
+        apply({ doc_type, gst_mode: 'NONE', reverse_charge: false });
+      } else if (prev === 'BILL_OF_SUPPLY' && get().gst_mode === 'NONE' && !isCompositionSender(get().sender)) {
+        // Leaving a Bill of Supply on a regular profile: pick the split back up from the states.
+        const sender = get().sender;
+        apply({
+          doc_type,
+          gst_mode: deriveGstMode({
+            senderStateCode: senderStateCode(sender),
+            placeOfSupply: get().place_of_supply,
+            senderHasGstin: Boolean(sender?.companyGstin?.trim()),
+            taxEnabled: true,
+          }),
+        });
+      } else {
+        apply({ doc_type });
+      }
+    },
     setTemplate: (template_id) => {
       localDb.template.set(template_id);
       apply({ template_id });
@@ -390,7 +417,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       const s = get();
       const totals = calculateInvoice({
         items: s.items,
-        gst_mode: s.gst_mode,
+        gst_mode: effectiveGstMode(s.doc_type, s.gst_mode),
         discount_type: s.discount_type,
         discount_rate: s.discount_rate,
         tax_rate: s.tax_rate,

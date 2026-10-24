@@ -78,7 +78,7 @@ export interface AppSettings {
    * GST return filing frequency for the compliance calendar (`compliance.ts`).
    * Additive field — absent means monthly.
    */
-  gst_filing_frequency?: 'monthly' | 'qrmp';
+  gst_filing_frequency?: 'monthly' | 'qrmp' | 'composition';
 }
 
 export const DEFAULT_TERMS =
@@ -165,7 +165,10 @@ function readSettings(): AppSettings {
     roundOff: Boolean(stored.roundOff ?? base.roundOff),
     onboarded: Boolean(stored.onboarded ?? Boolean(profiles[0]?.companyName)),
     lock_until: normalizeLockDate(stored.lock_until) || undefined,
-    gst_filing_frequency: stored.gst_filing_frequency === 'qrmp' ? 'qrmp' : stored.gst_filing_frequency === 'monthly' ? 'monthly' : undefined,
+    gst_filing_frequency:
+      stored.gst_filing_frequency === 'qrmp' || stored.gst_filing_frequency === 'monthly' || stored.gst_filing_frequency === 'composition'
+        ? stored.gst_filing_frequency
+        : undefined,
   };
 }
 

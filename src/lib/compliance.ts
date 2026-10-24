@@ -11,11 +11,12 @@
  * Filed marks live in the `compliance` table (`mrchartist_inv_compliance`).
  */
 
-import { QRMP_3B_CATEGORY_Y, returnDueDays } from './tax-rules';
+import { QRMP_3B_CATEGORY_Y, compositionDueDays, returnDueDays } from './tax-rules';
 import { getTable, setTable } from './storage';
 
-export type FilerFrequency = 'monthly' | 'qrmp';
-export type ReturnForm = 'GSTR1' | 'IFF' | 'PMT06' | 'GSTR3B' | 'GSTR9';
+/** `composition` (5.9): CMP-08 every quarter and GSTR-4 every year instead of GSTR-1 / 3B / 9. */
+export type FilerFrequency = 'monthly' | 'qrmp' | 'composition';
+export type ReturnForm = 'GSTR1' | 'IFF' | 'PMT06' | 'GSTR3B' | 'GSTR9' | 'CMP08' | 'GSTR4';
 
 export interface ReturnDue {
   /** `${form}:${periodKey}` */
@@ -38,6 +39,8 @@ export const FORM_LABELS: Record<ReturnForm, string> = {
   PMT06: 'PMT-06 payment',
   GSTR3B: 'GSTR-3B',
   GSTR9: 'GSTR-9',
+  CMP08: 'CMP-08',
+  GSTR4: 'GSTR-4',
 };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -72,6 +75,7 @@ export function returnsForMonth(y: number, m: number, frequency: FilerFrequency,
   const key = `${y}-${pad(m)}`;
   const label = `${MONTHS[m - 1]} ${y}`;
   const out: ReturnDue[] = [];
+  if (frequency === 'composition') return compositionReturnsForMonth(y, m);
   // QRMP exists only from the rule set that defines a quarterly day (1 Jan 2021).
   const qrmp = frequency === 'qrmp' && rules.gstr1Qrmp > 0;
 
@@ -95,6 +99,24 @@ export function returnsForMonth(y: number, m: number, frequency: FilerFrequency,
   if (m === 3) {
     const fyStart = y - 1;
     out.push(mk('GSTR9', `FY${fyStart}`, fyLabel(fyStart), `${fyStart}-04-01`, to, `${y}-${returnDueDays(`${fyStart}-04-01`).gstr9}`));
+  }
+  return out;
+}
+
+/** Composition dealer: CMP-08 for the quarter ending in month `m`, and GSTR-4 after March (Rule 62). */
+function compositionReturnsForMonth(y: number, m: number): ReturnDue[] {
+  if (m % 3 !== 0) return [];
+  const out: ReturnDue[] = [];
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  const fyStart = m >= 4 ? y : y - 1;
+  const q = Math.floor(((m - 4 + 12) % 12) / 3) + 1;
+  const qFrom = `${y}-${pad(m - 2)}-01`;
+  const qLabel = `Q${q} ${fyLabel(fyStart)} (${MONTHS[m - 3].slice(0, 3)}-${MONTHS[m - 1].slice(0, 3)})`;
+  out.push(mk('CMP08', `${fyStart}-Q${q}`, qLabel, qFrom, day(y, m, 31), day(ny, nm, compositionDueDays(qFrom).cmp08)));
+  if (m === 3) {
+    const from = `${fyStart}-04-01`;
+    out.push(mk('GSTR4', `FY${fyStart}`, fyLabel(fyStart), from, day(y, 3, 31), `${y}-${compositionDueDays(from).gstr4}`));
   }
   return out;
 }

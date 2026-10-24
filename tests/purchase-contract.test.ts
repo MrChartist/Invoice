@@ -265,3 +265,17 @@ test('profitability (6.25) costs sales from the real purchase lines and billable
   const rep = partyProfitability({ invoices: [], purchases: [billable], clients: [{ id: 'c1', name: 'Acme', email: '', address: '', city: '', zip: '' }] }, { start: '2026-04-01', end: '2027-03-31' });
   assert.equal(rep.rows[0].expenses, 1000);
 });
+
+test('composition returns (CMP-08 / GSTR-4) read the real purchase shape: RCM taxed, ordinary ITC never claimed', async () => {
+  const { buildCmp08, buildGstr4 } = await import('../src/lib/composition-returns.ts');
+  const q = { kind: 'quarter' as const, fyStart: 2026, quarter: 1 as const };
+  const plain = buildCmp08([], [bill], q, { filerStateCode: '27' });
+  assert.equal(plain.counts.purchases, 1);
+  assert.equal(plain.itcNotClaimable, 180);
+  assert.equal(plain.payable.total, 0);
+  const rcm = buildCmp08([], [{ ...bill, reverse_charge: true }], q, { filerStateCode: '27' });
+  assert.deepEqual(rcm.rcm, { value: 1000, igst: 0, cgst: 90, sgst: 90, cess: 0 });
+  assert.equal(rcm.itcNotClaimable, 0);
+  const g4 = buildGstr4([], [bill, { ...bill, id: 'd', status: 'Draft' }], 2026, { filerStateCode: '27' });
+  assert.equal(g4.inward.registered.value, 1000);
+});

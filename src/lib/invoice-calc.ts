@@ -262,7 +262,14 @@ export function calcInputFromRecord(
     tds_on_taxable: rec.tds_on_taxable,
     charges_taxable: !!rec.charges_taxable,
     ...over,
+    // A Bill of Supply never charges GST (Rule 49), whatever mode an import or conversion left behind.
+    ...(rec.doc_type === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as GstMode } : {}),
   };
+}
+
+/** The GST mode a document is calculated with: a Bill of Supply is always untaxed. */
+export function effectiveGstMode(docType: InvoiceRecord['doc_type'] | undefined, mode: GstMode): GstMode {
+  return docType === 'BILL_OF_SUPPLY' ? 'NONE' : mode;
 }
 
 /** True when any line carries cess — UIs show a cess column only then. */

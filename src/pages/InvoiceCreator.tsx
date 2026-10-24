@@ -15,6 +15,7 @@ import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
 import { CreatorHeader } from '../components/creator/CreatorHeader';
 import { DocumentMetaCard } from '../components/creator/DocumentMetaCard';
+import { SupplyNotice } from '../components/creator/SupplyNotice';
 import { MobileSaveBar } from '../components/creator/MobileSaveBar';
 import { CustomFieldsCard } from '../components/creator/CustomFieldsCard';
 import { AttachmentsPanel } from '../components/attachments/AttachmentsPanel';
@@ -229,6 +230,7 @@ export function InvoiceCreator() {
         <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
           <legend className={surface.srOnly}>{readOnly ? 'Document (locked, read-only)' : 'Document'}</legend>
           <DocumentMetaCard editing={editing} saveTick={saveTick} />
+          <SupplyNotice />
 
           <section className={surface.card}>
             <div className={surface.cardHead}>2 · Parties</div>

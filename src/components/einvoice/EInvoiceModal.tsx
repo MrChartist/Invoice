@@ -78,7 +78,10 @@ export function EInvoiceModal({ invoice, open, onClose }: EInvoiceModalProps) {
 function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClose: () => void }) {
   const { notify, toastNode } = useToast();
   const tabsId = useId();
-  const [tab, setTab] = useState<Tab>('einvoice');
+  // A Bill of Supply is outside e-invoicing: only the e-Way Bill and portal tabs apply.
+  const bos = invoice.doc_type === 'BILL_OF_SUPPLY';
+  const tabs = bos ? TABS.filter((t) => t.id !== 'einvoice') : TABS;
+  const [tab, setTab] = useState<Tab>(bos ? 'eway' : 'einvoice');
   const [now] = useState(() => new Date());
   const [meta, setMeta] = useState<EInvoiceMeta>(
     () => getEInvoiceMeta(invoice.id) ?? { invoice_id: invoice.id },
@@ -200,7 +203,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
       <div className={styles.stack}>
         <div className={styles.tabs} role="tablist" aria-label="e-Invoice sections">
           <div className={controls.segment}>
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t.id}
                 type="button"

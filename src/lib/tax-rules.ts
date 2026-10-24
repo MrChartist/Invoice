@@ -213,6 +213,63 @@ export const QRMP_3B_CATEGORY_Y: readonly string[] = ['01', '02', '03', '04', '0
 /** QRMP is open to registrations with preceding-FY aggregate turnover up to this amount (₹). */
 export const QRMP_TURNOVER_LIMIT = 5e7;
 
+// ── Composition levy (Sec 10 CGST Act; Rule 7 CGST Rules) ────────────────────
+
+/** Composition taxpayer kinds. Kept as a plain union here so this module stays type-only for `types/invoice`. */
+export type CompositionKind = 'manufacturer' | 'trader' | 'restaurant' | 'service';
+
+/**
+ * Composition rate (% of turnover, CGST + SGST together; half each) by category, keyed by the first day
+ * it applies. `null` = the option did not exist yet. Working-paper values — verify with your CA:
+ *  - 1 Jul 2017 (Rule 7 as notified): manufacturers 2%, traders 1%, restaurants 5%.
+ *  - 1 Jan 2018 (Notification 3/2018-CT amending Rule 7): manufacturers 1%; traders 1% of the
+ *    turnover of TAXABLE supplies only (exempt goods left out of the base); restaurants 5%.
+ *  - 1 Apr 2019 (Notification 2/2019-CT(R), Sec 10(2A) after the CGST (Amendment) Act 2018): service
+ *    providers / mixed suppliers 6% (3% + 3%).
+ */
+export const COMPOSITION_RATE_RULES: readonly Versioned<Record<CompositionKind, number | null>>[] = [
+  { from: '2017-07-01', value: { manufacturer: 2, trader: 1, restaurant: 5, service: null }, source: 'Rule 7 CGST Rules (as notified)' },
+  { from: '2018-01-01', value: { manufacturer: 1, trader: 1, restaurant: 5, service: null }, source: 'Rule 7 as amended by Notification 3/2018-CT' },
+  { from: '2019-04-01', value: { manufacturer: 1, trader: 1, restaurant: 5, service: 6 }, source: 'Notification 2/2019-CT(R) (Sec 10(2A), 3% + 3%)' },
+];
+
+/** Composition rate (%) for `kind` on `date`; null when that option did not exist on that day. */
+export function compositionRate(kind: CompositionKind | undefined, date?: string): number | null {
+  return ruleAt(COMPOSITION_RATE_RULES, date)[kind ?? 'trader'] ?? null;
+}
+
+/** From this rule on a composition TRADER pays only on taxable supplies (exempt goods are left out of the base). */
+export const COMPOSITION_TRADER_TAXABLE_ONLY_FROM = '2018-01-01';
+
+/**
+ * Turnover limits for the composition option (preceding-FY aggregate turnover, ₹). Shown as guidance only:
+ * the app does not track eligibility. Special-category states have the lower goods limit.
+ */
+export const COMPOSITION_LIMIT_RULES: readonly Versioned<{ goods: number; goodsSpecial: number; services: number | null }>[] = [
+  { from: '2017-07-01', value: { goods: 7.5e6, goodsSpecial: 5e6, services: null }, source: 'Sec 10(1) as enacted' },
+  { from: '2017-10-13', value: { goods: 1e7, goodsSpecial: 7.5e6, services: null }, source: 'Notification 46/2017-CT' },
+  { from: '2019-04-01', value: { goods: 1.5e7, goodsSpecial: 7.5e6, services: 5e6 }, source: 'Notification 14/2019-CT; Notification 2/2019-CT(R)' },
+];
+
+export function compositionLimits(date?: string) {
+  return ruleAt(COMPOSITION_LIMIT_RULES, date);
+}
+
+/**
+ * Composition return due dates. CMP-08 (quarterly statement-cum-challan): this day of the month after the
+ * quarter (Rule 62(1)(i)). GSTR-4 (annual from FY 2019-20): `MM-DD` in the calendar year the FY ends in —
+ * 30 April under Rule 62(1)(ii); 30 June from FY 2024-25 (Notification 12/2024-CT). Keyed by the first day of
+ * the period. Ad-hoc extensions are not tracked — verify with your CA.
+ */
+export const COMPOSITION_DUE_RULES: readonly Versioned<{ cmp08: number; gstr4: string }>[] = [
+  { from: '2019-04-01', value: { cmp08: 18, gstr4: '04-30' }, source: 'Rule 62 as amended by Notification 20/2019-CT' },
+  { from: '2024-04-01', value: { cmp08: 18, gstr4: '06-30' }, source: 'Notification 12/2024-CT (GSTR-4 by 30 June)' },
+];
+
+export function compositionDueDays(periodStart?: string) {
+  return ruleAt(COMPOSITION_DUE_RULES, periodStart);
+}
+
 // Interest / late-fee rates and caps are date-keyed in `gst-penalties.ts` (loaded only by the GST page).
 
 // ── Income-tax Act depreciation (Sec 32, Rule 5 / New Appendix I): WDV block rates ──

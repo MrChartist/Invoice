@@ -33,7 +33,8 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   );
   const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});
   const centres = useCostCentres();
-  const showTax = gstMode !== 'NONE';
+  // A Bill of Supply charges no GST: the rate / cess columns are hidden (Rule 49).
+  const showTax = gstMode !== 'NONE' && docType !== 'BILL_OF_SUPPLY';
   const priced = docType !== 'DELIVERY_CHALLAN';
   const wrapRef = useRef<HTMLDivElement>(null);
   // Where focus should land after the next render (a new line, or a line that just moved).

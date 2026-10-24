@@ -235,7 +235,7 @@ export function computeInterest(
   config: LateFeeConfig,
   asOf: string | Date = new Date(),
 ): InterestResult {
-  if (inv.doc_type !== 'INVOICE' && inv.doc_type !== 'TAX_INVOICE') return empty('not_invoice');
+  if (inv.doc_type !== 'INVOICE' && inv.doc_type !== 'TAX_INVOICE' && inv.doc_type !== 'BILL_OF_SUPPLY') return empty('not_invoice');
   if (inv.status === 'Draft' || inv.status === 'Cancelled') return empty('draft_or_cancelled');
   const principal = round2(Math.max(num(inv.total) - num(inv.tds_amount), 0));
   if (!config.enabled) return empty('disabled', principal);

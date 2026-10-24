@@ -50,6 +50,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     shipping_bill_no: 'SB123', shipping_bill_date: '2026-04-12', port_code: 'INNSA1', late_fee_for: 'orig-1', sales_order_id: 'so1', order_closed_on: '2026-04-15', cost_centre_id: 'cc-1',
     custom_values: [{ id: 'f1', label: 'Vehicle no.', type: 'text', value: 'MH12AB1234', print: true }],
     attachments: [{ id: 'a1', name: 'po.pdf', mime: 'application/pdf', size: 10, added_at: '2026-04-10T00:00:00Z' }],
+    exempt_kind: 'NIL',
+    amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;

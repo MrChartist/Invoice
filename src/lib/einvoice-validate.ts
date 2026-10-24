@@ -123,7 +123,7 @@ export function validateEInvoice(
   // ── Source document ──
   if (record) {
     if (!eInvoiceDocType(record)) {
-      out.push(issue('error', 'DOC_TYPE', 'Document', `${record.doc_type.replace('_', ' ').toLowerCase()} documents are not reported to the IRP. Only tax invoices and credit/debit notes are.`));
+      out.push(issue('error', 'DOC_TYPE', 'Document', `${record.doc_type.replace(/_/g, ' ').toLowerCase()} documents are not reported to the IRP. Only tax invoices and credit/debit notes are.`));
     }
     if (record.status === 'Cancelled') {
       out.push(issue('error', 'CANCELLED', 'Document', 'This invoice is cancelled.'));

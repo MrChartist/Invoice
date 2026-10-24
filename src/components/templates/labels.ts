@@ -113,6 +113,7 @@ export const DOC_TITLE_HI: Record<DocumentType, string> = {
   DEBIT_NOTE: 'डेबिट नोट',
   DELIVERY_CHALLAN: 'डिलीवरी चालान',
   SALES_ORDER: 'बिक्री आदेश',
+  BILL_OF_SUPPLY: 'आपूर्ति का बिल',
 };
 
 export type Labeller = (key: LabelKey) => ReactNode;

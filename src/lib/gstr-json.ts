@@ -12,6 +12,9 @@ import { round2 } from './invoice-calc';
 import { toGstnDate } from './gst-reports';
 import { csvCell, toCsv as sharedToCsv } from './csv';
 import type {
+  AmendCdnRow,
+  AmendDocRow,
+  B2csaRow,
   CdnRow,
   DocRow,
   Gstr1Report,
@@ -72,6 +75,17 @@ const hsnRows = (rows: HsnRow[]) =>
     csamt: round2(h.cess ?? 0),
     rt: h.rate,
   }));
+
+/**
+ * Amendment sections — ASSUMPTION, change here only. Key names follow the GST offline tool as best known
+ * (b2ba / b2cla / cdnra / cdnura / b2csa with `oinum`/`oidt`, `ont_num`/`ont_dt`, `omon`); they are NOT
+ * verified against the current tool's schema. Import into the offline tool, let it validate, and verify
+ * with your CA before filing.
+ */
+export const AMEND_JSON_LAYOUT = {
+  b2ba: 'b2ba', b2cla: 'b2cla', cdnra: 'cdnra', cdnura: 'cdnura', b2csa: 'b2csa',
+  origInvNum: 'oinum', origInvDate: 'oidt', origNoteNum: 'ont_num', origNoteDate: 'ont_dt', origMonth: 'omon',
+} as const;
 
 export interface Gstr1JsonOptions {
   /** Preceding-FY aggregate turnover (GSTN `gt`). Not derivable from this app alone — enter it yourself. */
@@ -205,6 +219,78 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
     out.hsn = block;
   }
 
+  const am = r.amendments;
+  if (am) {
+    const L = AMEND_JSON_LAYOUT;
+    const orig = (x: AmendDocRow) => ({ [L.origInvNum]: x.origNumber, [L.origInvDate]: toGstnDate(x.origDate) });
+    const origNote = (x: AmendDocRow) => ({ [L.origNoteNum]: x.origNumber, [L.origNoteDate]: toGstnDate(x.origDate) });
+    if (am.b2ba.length) {
+      out[L.b2ba] = [...groupBy(am.b2ba, (x) => x.ctin)].map(([ctin, invs]) => ({
+        ctin,
+        inv: invs.map((i) => ({
+          ...orig(i),
+          inum: i.number,
+          idt: toGstnDate(i.date),
+          val: round2(i.value),
+          pos: i.pos,
+          rchrg: i.rchrg,
+          inv_typ: i.invTyp ?? 'R',
+          itms: itms(i.items),
+        })),
+      }));
+    }
+    if (am.b2cla.length) {
+      out[L.b2cla] = [...groupBy(am.b2cla, (x) => x.pos)].map(([pos, invs]) => ({
+        pos,
+        inv: invs.map((i) => ({ ...orig(i), inum: i.number, idt: toGstnDate(i.date), val: round2(i.value), itms: itms(i.items) })),
+      }));
+    }
+    if (am.cdnra.length) {
+      out[L.cdnra] = [...groupBy(am.cdnra, (x) => x.ctin)].map(([ctin, notes]) => ({
+        ctin,
+        nt: notes.map((n: AmendCdnRow) => ({
+          ...origNote(n),
+          ntty: n.noteType,
+          nt_num: n.number,
+          nt_dt: toGstnDate(n.date),
+          val: round2(n.value),
+          pos: n.pos,
+          rchrg: n.rchrg,
+          inv_typ: 'R',
+          itms: itms(n.items),
+        })),
+      }));
+    }
+    if (am.cdnura.length) {
+      out[L.cdnura] = am.cdnura.map((n) => ({
+        ...origNote(n),
+        typ: n.unregType ?? 'B2CL',
+        ntty: n.noteType,
+        nt_num: n.number,
+        nt_dt: toGstnDate(n.date),
+        val: round2(n.value),
+        pos: n.pos,
+        itms: itms(n.items),
+      }));
+    }
+    if (am.b2csa.length) {
+      out[L.b2csa] = [...groupBy(am.b2csa, (x: B2csaRow) => `${x.omon}|${x.pos}|${x.supply}`)].map(([, rows]) => ({
+        [L.origMonth]: rows[0].omon,
+        sply_ty: rows[0].supply,
+        pos: rows[0].pos,
+        typ: 'OE',
+        itms: rows.map((x) => {
+          const it: Record<string, number> = { rt: x.rate, txval: round2(x.txval) };
+          if (x.igst) it.iamt = round2(x.igst);
+          if (x.cgst) it.camt = round2(x.cgst);
+          if (x.sgst) it.samt = round2(x.sgst);
+          it.csamt = round2(x.cess ?? 0);
+          return it;
+        }),
+      }));
+    }
+  }
+
   if (r.docIssue.length) {
     const codes: Record<string, number> = { 'Invoices for outward supply': 1, 'Debit Note': 4, 'Credit Note': 5 };
     const byType = groupBy(r.docIssue, (x) => x.docType);
@@ -238,7 +324,7 @@ export function toCsv(rows: CsvCell[][]): string {
   return sharedToCsv(rows) + '\r\n';
 }
 
-export type SectionId = 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs';
+export type SectionId = 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'amend';
 
 export const SECTION_LABELS: Record<SectionId, string> = {
   b2b: 'B2B',
@@ -250,6 +336,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   nil: 'Nil / Exempt',
   hsn: 'HSN summary',
   docs: 'Documents issued',
+  amend: 'Amendments',
 };
 
 const docRows = (rows: DocRow[], head: CsvCell[], extra: (r: DocRow) => CsvCell[] = () => []): CsvCell[][] => {
@@ -307,6 +394,25 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
         ...(r.hsnB2b ?? []).map((h) => ['B2B', ...cells(h)]),
         ...(r.hsnB2c ?? []).map((h) => ['B2C', ...cells(h)]),
       ]);
+    }
+    case 'amend': {
+      const am = r.amendments;
+      const out: CsvCell[][] = [['Table', 'GSTIN/UIN', 'Receiver', 'Original no', 'Original date', 'Original period', 'Revised no', 'Revised date', 'Value', 'Place of supply', 'Note type', ...tail]];
+      const push = (table: string, rows: AmendDocRow[]) => {
+        for (const d of rows) {
+          for (const it of d.items) {
+            out.push([table, d.ctin, d.partyName, d.origNumber, d.origDate, d.origPeriod, d.number, d.date, d.value, d.pos, (d as AmendCdnRow).noteType ?? '', it.rate, it.txval, it.igst, it.cgst, it.sgst, it.cess]);
+          }
+        }
+      };
+      if (am) {
+        push('B2BA', am.b2ba);
+        push('B2CLA', am.b2cla);
+        push('CDNRA', am.cdnra);
+        push('CDNURA', am.cdnura);
+        for (const x of am.b2csa) out.push(['B2CSA', '', `${x.supply === 'INTRA' ? 'Intra' : 'Inter'}-state, original month ${x.omon}`, '', '', x.omon, '', '', '', x.pos, '', x.rate, x.txval, x.igst, x.cgst, x.sgst, x.cess]);
+      }
+      return toCsv(out);
     }
     case 'docs':
       return toCsv([
@@ -471,7 +577,7 @@ ${tr(['6.1 Tax payable before ITC', '', p.liability.igst, p.liability.cgst, p.li
 ${tr(['6.1 Payable in cash', '', p.cash.igst, p.cash.cgst, p.cash.sgst], true)}
 ${tr(['ITC carried forward', '', p.itcCarry.igst, p.itcCarry.cgst, p.itcCarry.sgst])}
 </tbody></table>
-<div class="w"><strong>Verify with your CA before filing.</strong> This is a working paper generated offline from your invoices; it is not a filed return, does not compute interest or late fee, and does not support cess, composition, ISD, imports or amendments.</div>
+<div class="w"><strong>Verify with your CA before filing.</strong> This is a working paper generated offline from your invoices; it is not a filed return, does not compute interest or late fee, and does not cover composition returns (see CMP-08 / GSTR-4), ISD, imports or export amendments. Amendment tables (B2BA, B2CLA, CDNRA, CDNURA, B2CSA) follow the offline-tool layout as best known.</div>
 </body></html>`;
 }
 

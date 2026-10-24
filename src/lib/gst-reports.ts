@@ -21,6 +21,13 @@
  *    (highest) rate under the principal line's HSN, with no quantity.
  *  - Foreign-currency documents are reported in INR at their `exchange_rate` (src/lib/fx.ts);
  *    one without a rate is flagged (FX_RATE_MISSING) and reported at face value.
+ *  - Bills of Supply (5.9) from a regular taxpayer carry no tax: their lines go to Table 8 in the column
+ *    of `exempt_kind` (default exempt) and to GSTR-3B 3.1(c) (3.1(e) for non-GST); the BOS series is
+ *    listed under "Invoices for outward supply" in Table 13. Documents whose sender snapshot is a
+ *    composition profile are left out entirely: composition dealers file CMP-08 / GSTR-4 instead.
+ *  - Amendments (5.9): a document with `amends.original` is reported AS FILED in its own period (the
+ *    original never changes) and, in the period of `amends.amended_on`, in B2BA / B2CLA / CDNRA / CDNURA
+ *    (or as revised B2CSA rows); GSTR-3B of that period takes the difference (revised − original).
  */
 
 import type { InvoiceRecord, GstMode } from '../types/invoice';
@@ -254,9 +261,39 @@ export interface Gstr1Report {
   /** Minimum HSN/SAC digits applied in the reconciliation (from the preceding-FY turnover). */
   hsnMinDigits: number;
   docIssue: DocIssueRow[];
+  /** Additive (5.9): amendments of documents reported in an earlier, filed period (made in this period). */
+  amendments?: Gstr1Amendments;
   /** Totals across every outward table (net of credit notes). */
   totals: { taxable: number; igst: number; cgst: number; sgst: number; value: number; cess?: number };
-  counts: { included: number; drafts: number; cancelled: number; notTaxDocs: number };
+  counts: { included: number; drafts: number; cancelled: number; notTaxDocs: number; composition?: number };
+}
+
+/** An amended document row: the revised values plus the number / date it was originally reported with. */
+export interface AmendDocRow extends DocRow {
+  origNumber: string;
+  /** ISO date of the original. */
+  origDate: string;
+  /** Return period (MMYYYY) the original was reported in. */
+  origPeriod: string;
+  reason?: string;
+}
+
+export interface AmendCdnRow extends AmendDocRow {
+  noteType: 'C' | 'D';
+  unregType?: 'B2CL' | 'EXPWP' | 'EXPWOP';
+}
+
+/** Revised B2CS row for an earlier month (`omon` = MMYYYY of that month): REPLACES what was filed for it. */
+export interface B2csaRow extends B2csRow {
+  omon: string;
+}
+
+export interface Gstr1Amendments {
+  b2ba: AmendDocRow[];
+  b2cla: AmendDocRow[];
+  cdnra: AmendCdnRow[];
+  cdnura: AmendCdnRow[];
+  b2csa: B2csaRow[];
 }
 
 export interface ItcHeads {
@@ -378,9 +415,26 @@ export interface PDoc {
   senderGstin: string;
   value: number;
   lines: PLine[];
+  /** Additive: Table 8 column for an untaxed Bill of Supply (absent for other documents: nil-rated). */
+  exemptKind?: 'NIL' | 'EXEMPT' | 'NON_GST';
 }
 
-const TAX_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE']);
+/** Documents GSTR-1 reports. A Bill of Supply (5.9) is a tax document with no tax: Table 8 + Table 13. */
+const TAX_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
+
+/** The sender snapshot is a composition profile: no GSTR-1 / 3B (CMP-08 / GSTR-4 instead). */
+export function isCompositionDoc(rec: Pick<InvoiceRecord, 'sender'>): boolean {
+  return rec?.sender?.gst_scheme === 'composition';
+}
+
+/**
+ * The document as it was reported in its own period: the frozen `amends.original` when the document was
+ * amended later (keeping its id so links still resolve), else the record itself.
+ */
+export function asFiled(rec: InvoiceRecord): InvoiceRecord {
+  const o = rec?.amends?.original;
+  return o ? ({ ...(o as InvoiceRecord), id: rec.id, amends: undefined } as InvoiceRecord) : rec;
+}
 
 const UQC: Record<string, string> = {
   NOS: 'NOS', PCS: 'PCS', KG: 'KGS', KGS: 'KGS', LTR: 'LTR', MTR: 'MTR', SQF: 'SQF', SET: 'SET', BOX: 'BOX',
@@ -526,6 +580,10 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     push('warning', 'NO_FILER_GSTIN', 'tax is charged but the sender profile has no GSTIN.', '/settings', 'Open settings');
   }
   if (!rec.invoice_number) push('warning', 'NO_NUMBER', 'document has no number.');
+  const bos = rec.doc_type === 'BILL_OF_SUPPLY';
+  if (bos && calc.lines.some((l) => l.nominal_rate > 0 && l.taxable !== 0)) {
+    push('warning', 'BOS_TAXED_LINES', 'Bill of Supply has lines with a GST rate; no tax was charged, so they are reported as exempt in Table 8. Use a tax invoice for taxable supplies (Rule 46).');
+  }
 
   return {
     rec,
@@ -546,6 +604,7 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     senderGstin,
     value,
     lines,
+    ...(bos ? { exemptKind: rec.exempt_kind ?? 'EXEMPT' } : {}),
   };
 }
 
@@ -619,6 +678,8 @@ function buildDocIssue(all: InvoiceRecord[]): DocIssueRow[] {
     if (rec.status === 'Draft') continue;
     const s = parseSeries(rec.invoice_number);
     if (!s) continue;
+    // Bills of Supply are listed under "Invoices for outward supply" as their own (BOS) series — Table 13 has
+    // no separate document type for them (verify with your CA).
     const docType = rec.doc_type === 'CREDIT_NOTE' ? 'Credit Note' : rec.doc_type === 'DEBIT_NOTE' ? 'Debit Note' : 'Invoices for outward supply';
     const key = `${docType}|${s.prefix}`;
     const b = buckets.get(key) ?? { docType, prefix: s.prefix, width: s.width, nums: new Set<number>(), cancelled: new Set<number>() };
@@ -679,21 +740,32 @@ const sortHsn = (map: Map<string, HsnRow>) => [...map.values()].sort((a, b) => a
 export interface PreparedGstr1 {
   docs: PDoc[];
   gstr1: Gstr1Report;
+  /**
+   * Additive (5.9): GSTR-3B effect of the amendments made in this period — each amended document's revised
+   * version, and its original with the sign flipped (so 3B takes the difference).
+   */
+  amendDeltas?: PDoc[];
 }
 
 export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues: ReconIssue[] = []): PreparedGstr1 {
   const wantGstin = (opts.gstin ?? '').trim().toUpperCase();
-  const counts = { included: 0, drafts: 0, cancelled: 0, notTaxDocs: 0 };
-  const inScope = (invoices ?? []).filter((r) => {
-    if (!r || !inPeriod(r.issue_date, opts.period)) return false;
+  const counts = { included: 0, drafts: 0, cancelled: 0, notTaxDocs: 0, composition: 0 };
+  const sameFiler = (r: InvoiceRecord) => {
     const sg = (r.sender?.companyGstin ?? '').trim().toUpperCase();
     return !(wantGstin && sg && sg !== wantGstin);
-  });
+  };
+  // Every document is reported here as it was FILED in its own period (an amended one by its frozen original).
+  const filed = (invoices ?? []).filter(Boolean).map(asFiled);
+  const inScope = filed.filter((r) => inPeriod(r.issue_date, opts.period) && sameFiler(r));
 
   const docs: PDoc[] = [];
   for (const rec of inScope) {
     if (!TAX_DOC_TYPES.has(rec.doc_type)) {
       counts.notTaxDocs++;
+      continue;
+    }
+    if (isCompositionDoc(rec)) {
+      counts.composition++;
       continue;
     }
     if (rec.status === 'Draft') {
@@ -725,7 +797,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
 
   // A note follows the invoice it amends: B2CL only if that invoice was B2CL (its value and date
   // decide), so a small credit against a large invoice is reported in CDNUR, not netted into B2CS.
-  const byId = new Map((invoices ?? []).map((r) => [r.id, r]));
+  const byId = new Map(filed.map((r) => [r.id, r]));
   const originalOf = (d: PDoc): InvoiceRecord | undefined => {
     const link = opts.links?.find((l) => l.to_id === d.rec.id && (l.relation === 'credit_note' || l.relation === 'debit_note'));
     return link ? byId.get(link.from_id) : undefined;
@@ -790,9 +862,10 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
       if (isNil && !d.zeroRated) {
         const k = nilKey(d);
         const n = nilMap.get(k) ?? { type: k, nil: 0, exempt: 0, nonGst: 0 };
-        // No GSTIN on the sender means the supply is outside GST altogether.
-        if (d.senderGstin) n.nil = round2(n.nil + d.sign * l.taxable);
-        else n.nonGst = round2(n.nonGst + d.sign * l.taxable);
+        // No GSTIN on the sender means the supply is outside GST altogether; a Bill of Supply names its column.
+        if (!d.senderGstin || d.exemptKind === 'NON_GST') n.nonGst = round2(n.nonGst + d.sign * l.taxable);
+        else if (d.exemptKind === 'EXEMPT') n.exempt = round2(n.exempt + d.sign * l.taxable);
+        else n.nil = round2(n.nil + d.sign * l.taxable);
         nilMap.set(k, n);
       }
 
@@ -827,12 +900,133 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     hsnB2c: sortHsn(hsnB2cMap),
     hsnSplit: hsnTableSplit(periodRange(opts.period).from),
     hsnMinDigits: hsnMinDigits(opts.turnover ?? 0, periodRange(opts.period).to),
-    docIssue: buildDocIssue(inScope),
+    docIssue: buildDocIssue(inScope.filter((r) => !isCompositionDoc(r))),
     // `cess` only appears when there is some, so reports without cess keep their exact shape.
     totals: totals.cess === 0 ? { taxable: totals.taxable, igst: totals.igst, cgst: totals.cgst, sgst: totals.sgst, value: totals.value } : totals,
-    counts,
+    // `composition` only appears when some were left out, so existing report shapes stay exact.
+    counts: counts.composition ? counts : { included: counts.included, drafts: counts.drafts, cancelled: counts.cancelled, notTaxDocs: counts.notTaxDocs },
   };
-  return { docs, gstr1 };
+
+  const amend = buildAmendments(invoices ?? [], opts, issues, sameFiler, largeB2c);
+  if (amend.count > 0) gstr1.amendments = amend.tables;
+  return { docs, gstr1, ...(amend.deltas.length ? { amendDeltas: amend.deltas } : {}) };
+}
+
+/* ───────────────────────── Amendments (5.9) ───────────────────────── */
+
+/**
+ * GSTR-1 amendment tables for the amendments MADE in `opts.period` (by `amends.amended_on`):
+ *  - revised version registered → B2BA (invoice / BOS) or CDNRA (note);
+ *  - unregistered, inter-state above the B2CL threshold → B2CLA, or CDNURA for a note;
+ *  - other B2C → B2CSA: the original month's B2CS rows recomputed with every amendment made up to the end
+ *    of this period (GSTN replaces the filed row with the revised one);
+ *  - exports: EXPA is not generated (flagged).
+ * A cancelled or draft revised version is not reported (flagged). Key layouts follow the offline tool as
+ * best known — not verified against the current schema; verify with your CA.
+ */
+function buildAmendments(
+  invoices: InvoiceRecord[],
+  opts: BuildOptions,
+  issues: ReconIssue[],
+  sameFiler: (r: InvoiceRecord) => boolean,
+  largeB2c: (d: PDoc) => boolean,
+): { count: number; tables: Gstr1Amendments; deltas: PDoc[] } {
+  const tables: Gstr1Amendments = { b2ba: [], b2cla: [], cdnra: [], cdnura: [], b2csa: [] };
+  const deltas: PDoc[] = [];
+  const periodEnd = periodRange(opts.period).to;
+  const amended = invoices.filter(
+    (r) => r?.amends && inPeriod(r.amends.amended_on, opts.period) && TAX_DOC_TYPES.has(r.doc_type) && !isCompositionDoc(r) && sameFiler(r),
+  );
+  const isB2cs = (d: PDoc) => !d.isExport && !d.registered && !(d.supply === 'INTER' && largeB2c(d));
+  const section = (d: PDoc) => (d.isExport ? 'EXP' : d.registered ? 'B2B' : isB2cs(d) ? 'B2CS' : 'B2CL');
+  const omons = new Set<string>();
+  let count = 0;
+
+  for (const rec of amended) {
+    const a = rec.amends!;
+    const label = rec.invoice_number || rec.id;
+    const flag = (severity: Severity, code: string, message: string) =>
+      issues.push({ id: `${code}:${rec.id}`, severity, code, message: `${label}: ${message}`, invoiceId: rec.id, invoiceNumber: rec.invoice_number, link: `/invoice/${rec.id}`, linkLabel: 'Open document' });
+    if (rec.status === 'Draft' || rec.status === 'Cancelled') {
+      flag('warning', 'AMEND_NOT_LIVE', `amended version is ${rec.status.toLowerCase()}, so no amendment is reported. A filed document cannot be withdrawn by amendment — raise a credit note instead.`);
+      continue;
+    }
+    if (inPeriod(a.original_date, opts.period)) {
+      flag('warning', 'AMEND_SAME_PERIOD', 'is amended in the same period it was issued in. An amendment is only needed once the original return is filed — here it is reported both as filed and as amended.');
+    }
+    const cur = prepare(rec, opts, issues);
+    const orig = a.original ? prepare(asFiled(rec), opts, []) : null;
+    if (!orig) flag('warning', 'AMEND_NO_ORIGINAL', 'the copy of the original as filed is missing; only the revised values are reported and GSTR-3B is not adjusted.');
+    const base = docRow(cur, rateRows(cur.lines));
+    const row: AmendDocRow = {
+      ...base,
+      origNumber: a.original_number,
+      origDate: a.original_date,
+      origPeriod: a.period || periodFp(periodForDate('month', a.original_date)),
+      ...(a.reason ? { reason: a.reason } : {}),
+    };
+    count++;
+    if (orig && section(orig) !== section(cur)) {
+      flag('info', 'AMEND_SECTION_CHANGED', `originally reported in ${section(orig)}, now ${section(cur)}. Check with your CA how the portal expects this move to be reported.`);
+    }
+    if (cur.isExport) {
+      flag('warning', 'AMEND_EXPORT', 'export amendments (EXPA / CDNURA for exports) are not generated — amend this one on the portal.');
+    } else if (cur.registered) {
+      if (cur.isNote) tables.cdnra.push({ ...row, noteType: cur.noteType });
+      else tables.b2ba.push(row);
+    } else if (!isB2cs(cur)) {
+      if (cur.isNote) tables.cdnura.push({ ...row, noteType: cur.noteType, unregType: 'B2CL' });
+      else tables.b2cla.push(row);
+    }
+    if (isB2cs(cur) || (orig && isB2cs(orig))) omons.add(a.original_date.slice(0, 7));
+
+    deltas.push(cur);
+    if (orig) deltas.push({ ...orig, sign: (orig.sign === 1 ? -1 : 1) as 1 | -1 });
+  }
+
+  // B2CSA: revised B2CS rows of each original month touched by an amendment of this period.
+  for (const ym of omons) {
+    const month = periodForDate('month', `${ym}-01`);
+    const touched = new Set<string>();
+    const revised = new Map<string, B2csaRow>();
+    const omon = periodFp(month);
+    for (const r of invoices) {
+      if (!r || !TAX_DOC_TYPES.has(r.doc_type) || isCompositionDoc(r) || !sameFiler(r)) continue;
+      const asFiledRec = asFiled(r);
+      if (!inPeriod(asFiledRec.issue_date, month)) continue;
+      const amendedByNow = !!r.amends && r.amends.amended_on.slice(0, 10) <= periodEnd;
+      const version = amendedByNow ? r : asFiledRec;
+      if (version.status === 'Draft' || version.status === 'Cancelled') continue;
+      const d = prepare(version, opts, []);
+      const thisPeriod = !!r.amends && inPeriod(r.amends.amended_on, opts.period);
+      if (thisPeriod) {
+        // Keys of both versions are revised (a supply that left B2CS revises its old row down to zero).
+        const keyOf = (pd: PDoc, l: PLine) => `${pd.supply}|${pd.pos}|${l.rate}`;
+        const o = prepare(asFiledRec, opts, []);
+        if (isB2cs(o)) for (const l of o.lines) if (!isNilLine(l)) touched.add(keyOf(o, l));
+        if (isB2cs(d)) for (const l of d.lines) if (!isNilLine(l)) touched.add(keyOf(d, l));
+      }
+      if (!isB2cs(d)) continue;
+      for (const l of d.lines) {
+        if (isNilLine(l)) continue;
+        const key = `${d.supply}|${d.pos}|${l.rate}`;
+        const row = revised.get(key) ?? { omon, supply: d.supply, pos: d.pos, rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+        addLine(row, l, d.sign);
+        revised.set(key, row);
+      }
+    }
+    for (const key of touched) {
+      const [supply, pos, rate] = key.split('|');
+      tables.b2csa.push(revised.get(key) ?? { omon, supply: supply as 'INTRA' | 'INTER', pos, rate: Number(rate), txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+    }
+  }
+  const byDate = <T extends { date: string; number: string }>(x: T, y: T) => x.date.localeCompare(y.date) || x.number.localeCompare(y.number);
+  tables.b2ba.sort(byDate);
+  tables.b2cla.sort(byDate);
+  tables.cdnra.sort(byDate);
+  tables.cdnura.sort(byDate);
+  tables.b2csa.sort((x, y) => x.omon.localeCompare(y.omon) || x.pos.localeCompare(y.pos) || x.rate - y.rate);
+  return { count, tables, deltas };
 }
 
 /* ───────────────────────── Purchases (defensive) ───────────────────────── */
@@ -976,7 +1170,7 @@ export function buildGstr3b(
         continue;
       }
       if (isNilLine(l)) {
-        if (!d.senderGstin) nonGst = round2(nonGst + s * l.taxable);
+        if (!d.senderGstin || d.exemptKind === 'NON_GST') nonGst = round2(nonGst + s * l.taxable);
         else if (d.supply === 'INTER') nil.inter = round2(nil.inter + s * l.taxable);
         else nil.intra = round2(nil.intra + s * l.taxable);
         continue;
@@ -1093,7 +1287,7 @@ export function buildGstReport(
   opts: BuildOptions,
 ): GstReport {
   const issues: ReconIssue[] = [];
-  const { docs, gstr1 } = buildGstr1(invoices, opts, issues);
+  const { docs, gstr1, amendDeltas } = buildGstr1(invoices, opts, issues);
 
   // Filer state: explicit GSTIN, else first included document's sender, else fallback.
   const filerSt =
@@ -1137,6 +1331,9 @@ export function buildGstReport(
   if (c.drafts > 0) {
     issues.push({ id: 'DRAFTS', severity: 'info', code: 'DRAFTS', message: `${c.drafts} draft document(s) in this period were excluded. Send or finalise them if they are real sales.`, link: '/transactions', linkLabel: 'Open ledger' });
   }
+  if (c.composition) {
+    issues.push({ id: 'COMPOSITION_DOCS', severity: 'info', code: 'COMPOSITION_DOCS', message: `${c.composition} document(s) issued under a composition profile are left out: composition dealers file CMP-08 and GSTR-4, not GSTR-1 / GSTR-3B.`, link: '/gst-reports?tab=composition', linkLabel: 'Open composition returns' });
+  }
   if (c.cancelled > 0) {
     issues.push({ id: 'CANCELLED', severity: 'info', code: 'CANCELLED', message: `${c.cancelled} cancelled document(s) are excluded from tax tables and counted in the document summary.` });
   }
@@ -1155,5 +1352,6 @@ export function buildGstReport(
 
   const order: Record<Severity, number> = { error: 0, warning: 1, info: 2 };
   issues.sort((a, b) => order[a.severity] - order[b.severity]);
-  return { gstr1, gstr3b: buildGstr3b(docs, purchases, opts, filerSt), issues };
+  // Amendments made in this period change this period's 3B by their difference (revised − original).
+  return { gstr1, gstr3b: buildGstr3b(amendDeltas ? [...docs, ...amendDeltas] : docs, purchases, opts, filerSt), issues };
 }

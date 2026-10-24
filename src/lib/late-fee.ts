@@ -107,6 +107,11 @@ export function buildLateFeeItem(quote: LateFeeQuote, fee: ClientLateFee, origin
   };
 }
 
+/** A late fee goes on the same kind of sales bill as the original (a Bill of Supply stays untaxed). */
+function lateFeeDocType(t: InvoiceRecord['doc_type']): InvoiceRecord['doc_type'] {
+  return t === 'TAX_INVOICE' || t === 'BILL_OF_SUPPLY' ? t : 'INVOICE';
+}
+
 /**
  * Pure: a new draft invoice (own id, number and date) to the same client and sender as the
  * original, carrying only the late-fee line. The original is not touched.
@@ -121,7 +126,7 @@ export function buildLateFeeInvoice(
     attachments: undefined, // the original's files stay with it (6.12)
     id: ctx.id,
     invoice_number: ctx.invoice_number,
-    doc_type: original.doc_type === 'TAX_INVOICE' ? 'TAX_INVOICE' : 'INVOICE',
+    doc_type: lateFeeDocType(original.doc_type),
     issue_date: ctx.today,
     due_date: shiftDay(ctx.today, Math.max(0, Math.round(ctx.dueDays))),
     status: 'Draft',
@@ -148,6 +153,7 @@ export function buildLateFeeInvoice(
     created_at: undefined,
     updated_at: undefined,
     late_fee_for: original.id,
+    amends: undefined,
   };
   const t = calculateInvoice(calcInputFromRecord(rec));
   return {
@@ -219,7 +225,7 @@ export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new D
   const today = isoDay(asOf);
   const lockUntil = getLockUntil();
   if (isDateLocked(today, lockUntil)) throw new LateFeeError(lockMessage(lockUntil, 'create', today));
-  const docType = original.doc_type === 'TAX_INVOICE' ? 'TAX_INVOICE' : 'INVOICE';
+  const docType = lateFeeDocType(original.doc_type);
   const rec = buildLateFeeInvoice(original, item, {
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, docType, original.sender?.invoicePrefix || undefined),

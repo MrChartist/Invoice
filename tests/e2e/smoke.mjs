@@ -490,6 +490,43 @@ try {
     check(left === 0, `the delete is committed after the undo window (${left} left)`);
   });
 
+  await step('composition profile issues a Bill of Supply with the Rule 49 declaration', async () => {
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('GST scheme').selectOption('composition');
+    await page.getByLabel('Composition category').selectOption('trader');
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    const s = await readJson(page, 'settings', {}, (v) => v.profiles?.some((p) => p.gst_scheme === 'composition'));
+    check(s.profiles?.find((p) => p.id === s.activeProfileId)?.gst_scheme === 'composition', 'profile switched to the composition scheme');
+
+    await page.goto(srv.origin + '/invoice');
+    const type = await page.getByRole('combobox', { name: /^Type/ }).first().inputValue();
+    check(type === 'BILL_OF_SUPPLY', `a composition profile opens a Bill of Supply (${type})`);
+    await page.getByLabel('Client name').fill('Corner Shop');
+    await page.getByLabel('Item 1 name').fill('Biscuits');
+    await page.getByLabel('Item 1 quantity').fill('10');
+    await page.getByLabel('Item 1 rate').fill('100');
+    check((await page.getByLabel('Item 1 GST rate').count()) === 0, 'no GST rate column on a Bill of Supply');
+    await page.keyboard.press('Control+s');
+    await page.getByText(/saved/i).first().waitFor();
+    const bos = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'BILL_OF_SUPPLY'))).find((i) => i.doc_type === 'BILL_OF_SUPPLY');
+    check(!!bos && /^BOS\/FY\d{2}-\d{2}\/0001$/.test(bos.invoice_number) && bos.tax_amount === 0 && Math.abs(bos.total - 1000) < 0.01 && bos.sender?.gst_scheme === 'composition',
+      `bill of supply ${bos?.invoice_number}: total ${bos?.total}, tax ${bos?.tax_amount}, scheme snapshotted (${bos?.sender?.gst_scheme})`);
+
+    await page.getByRole('button', { name: /Preview/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.waitFor();
+    const declared = await dialog.getByText('Composition taxable person, not eligible to collect tax on supplies').count();
+    const titled = await dialog.getByText('Bill of Supply').count();
+    check(declared > 0 && titled > 0, `preview shows the title and the composition declaration (${titled} / ${declared})`);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+
+    // Back to a regular profile and no documents, as the later steps expect.
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bos?.id));
+    const fresh = await readJson(page, 'settings', {});
+    await writeJson(page, 'settings', { ...fresh, profiles: fresh.profiles.map((p) => ({ ...p, gst_scheme: 'regular' })) });
+  });
+
   await step('time tracking: timer pill, manual entry, bill to a draft invoice', async () => {
     await page.goto(srv.origin + '/time');
     await page.locator('#tm-client').selectOption({ label: 'Acme Buyers' });

@@ -256,7 +256,7 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-const SALES_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE']);
+const SALES_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
 
 function isLive(inv: InvoiceRecord): boolean {
   return inv.status !== 'Draft' && inv.status !== 'Cancelled';

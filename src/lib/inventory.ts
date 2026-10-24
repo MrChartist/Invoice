@@ -220,7 +220,7 @@ function invoiceEffect(
   includeChallans: boolean,
 ): 'out' | 'in' | null {
   if (status === 'Draft' || status === 'Cancelled') return null;
-  if (doc === 'INVOICE' || doc === 'TAX_INVOICE' || doc === undefined) return 'out';
+  if (doc === 'INVOICE' || doc === 'TAX_INVOICE' || doc === 'BILL_OF_SUPPLY' || doc === undefined) return 'out';
   if (doc === 'CREDIT_NOTE') return 'in';
   if (doc === 'DELIVERY_CHALLAN') return includeChallans ? 'out' : null;
   return null; // QUOTATION / PROFORMA / SALES_ORDER never touch stock

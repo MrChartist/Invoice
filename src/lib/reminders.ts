@@ -379,7 +379,7 @@ export interface PendingOptions {
   cooldownDays?: number;
 }
 
-const COLLECTIBLE = new Set(['INVOICE', 'TAX_INVOICE', 'PROFORMA']);
+const COLLECTIBLE = new Set(['INVOICE', 'TAX_INVOICE', 'PROFORMA', 'BILL_OF_SUPPLY']);
 
 /** Unpaid, sent invoices that deserve a nudge today, most overdue first. */
 export function pendingReminders(
