@@ -39,6 +39,7 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
 | `book_opening` | books | opening cash/bank balances |
 | `export_prefs` | exports | last-used export options |
 | `notif_state` | notifications | read / snoozed / dismissed notice ids |
+| `tds_certificates` | receivables (TDS) | Form 16A received flag per deductor × quarter (`TdsCertificate`, `src/lib/tds-register.ts`) |
 
 ## Integration
 Feature modules are **self-contained**: they export a page/component and (optionally) a pure

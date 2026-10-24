@@ -1,11 +1,12 @@
 # Receivables (party ledger and outstanding reports)
 
 Tally-style sales ledger per party, bill-wise outstanding, aging, collections, DSO, and a printable client statement.
-Read-only on `invoices`, `transactions` (payments) and `clients`. It writes nothing.
+Read-only on `invoices`, `transactions` (payments) and `clients`. The only thing it writes is the
+Form 16A flags of the TDS tab (`tds_certificates`).
 
-- **Route:** `/receivables` (optional query: `?tab=aging|statements|collections&party=<client id or "name:<lowercased name>">`)
+- **Route:** `/receivables` (optional query: `?tab=aging|statements|collections|tds&party=<client id or "name:<lowercased name>">`)
 - **Nav label / icon:** `Receivables` / `Scale` (alternatives: `HandCoins`, `BookOpenCheck`)
-- **Tables used:** `invoices`, `transactions`, `clients` (read only). No new tables.
+- **Tables used:** `invoices`, `transactions`, `clients` (read only); `tds_certificates` (TDS tab, read/write).
 
 ## Wiring the lead must add
 
@@ -62,11 +63,74 @@ Optional cross-links:
   - **Aging:** stacked bar, top debtors, and a party × bucket table whose rows expand to show bills.
   - **Statements:** party and date range with presets (This FY, Last FY, Last 90 days, All time), ledger table, Copy text, Email (`mailto:`), Print/PDF.
   - **Collections:** SVG billed-vs-received chart and a month table.
+  - **TDS:** the TDS receivable register (see below). `src/components/receivables/TdsTab.tsx` is `React.lazy`
+    inside the page, so it and the 26AS parser load only when the tab is opened.
 - `src/components/receivables/StatementDocument.tsx` is the A4 white paper. It takes `{sender, party, client?, ledger, currency?}` and forwards a ref.
 - `src/components/receivables/StatementViewer.tsx` is the full-screen preview with Print, CSV and PDF. It takes `{open, onClose, onError?, ...StatementDocumentProps}`. Printing hides `#root` through a `statement-printing` body class.
 - `exportUtils.ts` has `exportNodeToPdf` (dynamic import of `html-to-image` and `jspdf`, sliced into A4 pages), `downloadTextFile` and `safeFilename`.
 - `Charts.tsx` has `AgingStack`, `AgeChip`, `ShareBar` and `CollectionsChart`.
 - The sender profile comes from `localDb.settings.activeProfile()`, not from a per-invoice snapshot, because a statement spans many invoices.
+
+## TDS receivable register (`src/lib/tds-register.ts`, tested in `tests/tds-register.test.ts`)
+
+Customers deduct TDS from what they pay. Invoices already carry `tds_enabled / tds_section / tds_rate /
+tds_amount`; `buildReceivables` treats the withheld TDS as settled and Tally export posts it to TDS Receivable.
+The register answers "how much TDS should I see in 26AS, from whom, for which quarter, and do I have the Form 16A?".
+
+**Client master:** `Client.pan?` (AAAAA9999A, `isValidPan`) and `Client.tan?` (AAAA99999A, `isValidTan` in
+`src/lib/validators.ts`), both optional and additive. Edited in `ClientFormModal` (PAN can be filled from the
+GSTIN in one click), shown under the GSTIN on the Clients page and searchable. `/clients?edit=<id>` opens a
+client's editor (the TDS tab's "Add TAN" link). They are **not** added to `InvoiceRecord`; the register reads
+the live client master by id and falls back to the invoice's client snapshot. No migration is needed.
+
+| Export | Purpose |
+| --- | --- |
+| `tdsPeriodOf(day)`, `periodKey`, `fyLabel`, `quarterLabel`, `quarterRange`, `form16aDueDate` | Indian FY quarter maths on `YYYY-MM-DD` strings (never `new Date(str)`). Q1 Apr–Jun … Q4 Jan–Mar; 31 Mar is FY Q4, 1 Apr is the next FY's Q1. Form 16A due 15 Aug / 15 Nov / 15 Feb / 15 Jun. |
+| `tdsInvoiceLines(input)` | One line per live INR invoice (`INVOICE`/`TAX_INVOICE`, not Draft/Cancelled, not credit notes) with `tds_amount > 0`, bucketed by issue date, with party key (same `partyKeyOf` as receivables), PAN/TAN, section and a `settled` flag. |
+| `buildTdsRegister(input, {today?, fy?})` | Rows per quarter × deductor × section: invoice count, taxable, total, **TDS expected** (all TDS invoices), **TDS settled** (invoices paid in full: status Paid, or payments + TDS ≥ total), **pending**, and **Form 16A status** (`received` / `awaited` / `overdue` after the due date). Also quarter blocks with totals and certificate counts, overall totals and the FYs present. |
+| `setCertificate(rows, change)`, `certKey`, `certificateStatus`, `TDS_CERT_TABLE` | Form 16A flag per deductor × quarter. Unticking removes the row. |
+| `parseTdsCsv(text, mapping?)`, `guessTdsMapping(headers)`, `TDS_CSV_FIELDS`, `sectionCode`, `normalizeTan`, `normalizeDeductorName` | 26AS / AIS CSV reader. |
+| `reconcileTds(credits, input, {tolerance?, fys?})` | Matched / only-in-26AS / only-in-books. |
+| `tdsRegisterCsv(register)`, `tdsReconCsv(recon)` | CSV downloads through the shared formula-safe `toCsv`, each ending with the "verify with your CA" line. |
+
+**`tds_certificates` table** (`mrchartist_inv_tds_certificates`, picked up by backup automatically):
+`{ id: "<party key>|<fy>-Q<n>", party_key, party_name, fy, quarter, received, received_on?, certificate_no?, updated_at }`.
+
+### 26AS / AIS CSV assumptions
+- The user downloads Form 26AS Part I or the AIS TDS section and saves/exports it as a **flat CSV** (one row per
+  credit). The TRACES text file with nested deductor summary rows is not parsed as such.
+- Parsed with `src/lib/csv.ts` (`parseTable`): BOM, `,` `;` tab `|` delimiters, title rows above the header and
+  Excel `="…"` cells are tolerated. Columns are matched by name with `scoreHeader` from `import-mapping.ts`,
+  each column used once, best score first. Recognised spellings include "Name of Deductor", "Deductor Name",
+  "Information Source", "TAN of Deductor", "Section" / "Section Description", "Transaction Date",
+  "Date of Payment/Credit", "Amount Paid/Credited", "Amount Paid or Credited", "Tax Deducted", "TDS Deducted",
+  "TDS Amount" — "Tax Deducted" wins over "TDS Deposited" when both exist.
+- Required: a transaction date and a TDS amount, plus a deductor name **or** TAN. Amount paid and section are
+  optional. AIS-style "ACME LTD (MUMA12345B)" yields both name and TAN.
+- Dates via `importers.parseDate` (day-first: `10-May-2025`, `10/05/2025`, `2025-05-10`, `15 Feb 2026` …);
+  amounts via `importers.parseNumber` (Indian grouping, `₹`, brackets). Zero-TDS rows are skipped and counted;
+  "Total" rows are ignored; unreadable rows are listed with their line number.
+- Section text like "194J - Fees for professional services" is reduced to the code (`194J`).
+- The uploaded file is processed in memory and not stored.
+
+### Matching rules
+1. A credit is attributed to a client by TAN (client master or invoice snapshot), else by normalised name
+   (case, punctuation, "M/s", "Pvt", "Ltd", "Limited", "LLP"… ignored; client name and company both tried).
+2. Same deductor + same quarter: one credit ↔ one invoice whose TDS is within the tolerance (default ₹1 per entry,
+   since 26AS rounds to the rupee). Same section preferred, then the smallest gap, then the closest base amount.
+3. Same deductor + quarter, the leftovers on both sides agree in total (within tolerance × entries) → one
+   "quarter total" match (a deductor that books several invoices in one entry).
+4. Same deductor, **neighbouring** quarter (including across 31 Mar / 1 Apr), line-level → match flagged
+   "other quarter" (TDS deducted on payment rather than on the invoice).
+5. Everything else is **only in 26AS** (flagged when the deductor is not a known client) or **only in books**
+   (limited to the FYs the file covers).
+
+### Not done / limits
+- Bucketing is by invoice date; customers who deduct on payment show up via the neighbouring-quarter rule only.
+- Partly paid invoices count as pending in full (no pro-rata TDS on part payments).
+- Credit notes do not reduce TDS expected. Non-INR invoices are excluded.
+- No manual pairing of unmatched lines, and reconciliation results are not saved.
+- Working papers only, not validated against TRACES — verify with your CA.
 
 ## Notes
 - No network calls, no new dependencies. All colours use theme tokens. The statement paper keeps its own neutral palette, like the invoice paper.

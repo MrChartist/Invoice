@@ -26,10 +26,12 @@ export function Clients() {
   const [importOpen, setImportOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // `/clients?new=1` (from the command palette) opens the add dialog directly.
+  // `/clients?new=1` (from the command palette) opens the add dialog directly;
+  // `/clients?edit=<id>` (from the TDS register) opens that client's editor.
   useEffect(() => {
-    if (searchParams.get('new') === '1') {
-      setEditing(null);
+    const editId = searchParams.get('edit');
+    if (searchParams.get('new') === '1' || editId) {
+      setEditing(editId ? localDb.clients.getById(editId) ?? null : null);
       setFormOpen(true);
       setSearchParams({}, { replace: true });
     }
@@ -62,7 +64,7 @@ export function Clients() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q
-      ? clients.filter((c) => [c.name, c.company, c.email, c.phone, c.city, c.gstin].some((f) => f?.toLowerCase().includes(q)))
+      ? clients.filter((c) => [c.name, c.company, c.email, c.phone, c.city, c.gstin, c.pan, c.tan].some((f) => f?.toLowerCase().includes(q)))
       : clients;
     return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [clients, query]);
@@ -101,7 +103,7 @@ export function Clients() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, company, city or GSTIN"
+              placeholder="Search name, company, city, GSTIN or PAN"
               aria-label="Search clients"
             />
           </label>
@@ -128,7 +130,7 @@ export function Clients() {
                   <th>Client</th>
                   <th>Contact</th>
                   <th>Location</th>
-                  <th>GSTIN</th>
+                  <th>GSTIN / PAN</th>
                   <th className={surface.numeric}>Billed</th>
                   <th aria-label="Actions" />
                 </tr>
@@ -173,7 +175,12 @@ export function Clients() {
                           <span className={styles.sub}>—</span>
                         )}
                       </td>
-                      <td className={`${surface.mono} ${styles.cGst}`} data-empty={!c.gstin ? 'true' : undefined}>{c.gstin || <span className={styles.sub}>—</span>}</td>
+                      <td className={`${surface.mono} ${styles.cGst}`} data-empty={!c.gstin && !c.pan && !c.tan ? 'true' : undefined}>
+                        {c.gstin || (!c.pan && !c.tan && <span className={styles.sub}>—</span>)}
+                        {(c.pan || c.tan) && (
+                          <div className={styles.sub}>{[c.pan && `PAN ${c.pan}`, c.tan && `TAN ${c.tan}`].filter(Boolean).join(' · ')}</div>
+                        )}
+                      </td>
                       <td className={`${surface.numeric} ${styles.cBilled}`}>
                         {b ? (
                           <>

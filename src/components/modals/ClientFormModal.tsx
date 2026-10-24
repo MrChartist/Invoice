@@ -4,6 +4,7 @@ import { GstinInput } from '../ui/GstinInput';
 import { INDIAN_STATES, resolveStateCode, stateByCode } from '../../lib/india-states';
 import { checkGstin } from '../../lib/gstin';
 import { localDb } from '../../lib/localDb';
+import { isValidPan, isValidTan } from '../../lib/validators';
 import type { Client } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 
@@ -42,6 +43,10 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
 
   const set = <K extends keyof Client>(key: K, value: Client[K]) => setForm((f) => ({ ...f, [key]: value }));
 
+  // Characters 3–12 of a GSTIN are the holder's PAN.
+  const gstinPan = (form.gstin ?? '').trim().toUpperCase().slice(2, 12);
+  const panFromGstin = checkGstin(form.gstin ?? '').valid && isValidPan(gstinPan) ? gstinPan : '';
+
   const setStateCode = (code: string) =>
     setForm((f) => ({ ...f, state_code: code, state: stateByCode(code)?.name ?? f.state }));
 
@@ -50,6 +55,10 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     if (!form.name.trim()) return setError('Client name is required.');
     if (form.gstin && !checkGstin(form.gstin).valid) return setError('Fix the GSTIN or clear it before saving.');
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) return setError('That email address does not look right.');
+    const pan = (form.pan ?? '').trim().toUpperCase();
+    const tan = (form.tan ?? '').trim().toUpperCase();
+    if (pan && !isValidPan(pan)) return setError('PAN should look like AAAAA9999A (five letters, four digits, one letter).');
+    if (tan && !isValidTan(tan)) return setError('TAN should look like AAAA99999A (four letters, five digits, one letter).');
     try {
       const state_code = resolveStateCode({ code: form.state_code, gstin: form.gstin, name: form.state });
       const payload: Client = {
@@ -58,6 +67,9 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         email: form.email.trim(),
         state_code,
         state: stateByCode(state_code)?.name ?? form.state,
+        // Optional: keep the keys (as undefined) so clearing a value overwrites the stored one.
+        pan: pan || undefined,
+        tan: tan || undefined,
         updated_at: new Date().toISOString(),
       };
       const id = localDb.clients.upsert({ ...payload, id: client?.id });
@@ -143,6 +155,28 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           </label>
           <GstinInput id="client-gstin" value={form.gstin ?? ''} onChange={(v) => set('gstin', v)} onStateCode={setStateCode} />
           <span className={controls.hint}>The state is picked from the GSTIN and decides CGST + SGST vs IGST on invoices.</span>
+        </div>
+        <div className={controls.row}>
+          <label className={controls.field}>
+            <span className={controls.label}>PAN (optional)</span>
+            <input className={`${controls.input} ${controls.inputMono}`} value={form.pan ?? ''} maxLength={10} autoCapitalize="characters" spellCheck={false}
+              onChange={(e) => set('pan', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} placeholder="AAAAA9999A"
+              aria-invalid={(!!form.pan && !isValidPan(form.pan)) || undefined} />
+            {!form.pan && panFromGstin ? (
+              <button type="button" className={controls.btnGhost} style={{ alignSelf: 'flex-start' }} onClick={() => set('pan', panFromGstin)}>
+                Use {panFromGstin} from the GSTIN
+              </button>
+            ) : (
+              <span className={controls.hint}>Printed on Form 16A / 26AS against TDS they deduct.</span>
+            )}
+          </label>
+          <label className={controls.field}>
+            <span className={controls.label}>TAN (optional)</span>
+            <input className={`${controls.input} ${controls.inputMono}`} value={form.tan ?? ''} maxLength={10} autoCapitalize="characters" spellCheck={false}
+              onChange={(e) => set('tan', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} placeholder="AAAA99999A"
+              aria-invalid={(!!form.tan && !isValidTan(form.tan)) || undefined} />
+            <span className={controls.hint}>Their TDS account number — matches your 26AS / AIS to this client.</span>
+          </label>
         </div>
         <label className={controls.field}>
           <span className={controls.label}>Private notes</span>
