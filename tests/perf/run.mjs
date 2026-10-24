@@ -17,6 +17,9 @@ import { DIST, isCsp, loadPlaywright, seedAuth, serve, watch } from '../../scrip
 if (!existsSync(join(DIST, 'index.html'))) { console.error('run `npm run build` first'); process.exit(2); }
 
 const KEY_P95_BUDGET_MS = Number(process.env.KEY_P95_BUDGET_MS ?? 50);
+// PERF_ONLY=tables,typing runs a subset (load, transitions, memory, tables, typing, csp).
+const ONLY = process.env.PERF_ONLY ? process.env.PERF_ONLY.split(',').map((x) => x.trim()) : null;
+const want = (section) => !ONLY || ONLY.includes(section);
 const out = {};
 const problems = [];
 const { chromium } = await loadPlaywright();
@@ -32,6 +35,7 @@ const OBSERVERS = `
   try { new PerformanceObserver(l => { const e = l.getEntries().at(-1); window.__m.lcp = e.startTime; }).observe({ type: 'largest-contentful-paint', buffered: true }); } catch {}
 `;
 
+const ONBOARDED_SETTINGS = JSON.stringify({ profiles: [{ id: 'p1', companyName: 'QA Co', companyEmail: 'qa@example.com', companyAddress: 'Mumbai' }], activeProfileId: 'p1', onboarded: true, defaultCurrency: 'INR', defaultTaxRate: 18, invoicePrefix: '', defaultDueDays: 14, defaultTerms: '', defaultNotes: '', roundOff: false });
 const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
 const pct = (a, p) => [...a].sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(a.length * p))];
 
@@ -59,6 +63,8 @@ async function newPage(opts = {}) {
   await seedAuth(ctx, opts.store || {});
   await ctx.route(/fonts\.(googleapis|gstatic)\.com|api\.dicebear\.com/, (r) => r.abort());
   await ctx.addInitScript(OBSERVERS);
+  // unlocked: skip the PIN screen (session flag) so the route itself is measured, not the login page
+  if (opts.unlocked) await ctx.addInitScript(() => { try { sessionStorage.setItem('mrchartist_inv_session', '1'); } catch { /* ignore */ } });
   const page = await ctx.newPage();
   if (process.env.THROTTLE) { // THROTTLE=1: ~Fast 4G (40 ms RTT, 1.6 Mbit/s down) + 4x CPU slowdown
     const cdp = await ctx.newCDPSession(page);
@@ -75,8 +81,8 @@ const metrics = (page) => page.evaluate(() => ({ ...window.__m, cls: +window.__m
 
 try {
   // 1. Load metrics (cold, 3 runs each, median) ───────────────────────────
-  out.load = {};
-  for (const route of ['/', '/invoice']) {
+  if (want('load')) out.load = {};
+  for (const route of want('load') ? ['/', '/invoice'] : []) {
     const runs = [];
     for (let i = 0; i < 3; i++) {
       const { ctx, page } = await newPage();
@@ -90,7 +96,7 @@ try {
   }
 
   // 2. Route transitions (SPA) ─────────────────────────────────────────────
-  {
+  if (want('transitions')) {
     const { ctx, page } = await newPage();
     await page.goto(srv.origin + '/');
     await page.waitForSelector('#root > *');
@@ -108,7 +114,7 @@ try {
   }
 
   // 3. Memory + load with 300 invoices ─────────────────────────────────────
-  {
+  if (want('memory')) {
     const store = { mrchartist_inv_invoices: JSON.stringify(makeInvoices(300)) };
     out.memory300 = {};
     for (const route of ['/', '/transactions', '/clients']) {
@@ -129,8 +135,60 @@ try {
     await ctx.close();
   }
 
+  // 3b. Long tables: render, scroll, sort with 300 / 1000 invoices ─────────
+  if (want('tables')) {
+    out.tables = {};
+    const frame = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0))));
+    for (const n of [300, 1000]) {
+      // ~n/3 parties so the receivables party table is long too
+      const invs = makeInvoices(n).map((inv, i) => ({ ...inv, client: { ...inv.client, id: `c${i % Math.ceil(n / 3)}`, name: `Client ${i % Math.ceil(n / 3)}` } }));
+      const store = { mrchartist_inv_invoices: JSON.stringify(invs), mrchartist_inv_settings: ONBOARDED_SETTINGS };
+      for (const [route, ready] of [['/transactions', 'table tbody tr'], ['/receivables', 'table tbody tr']]) {
+        const runs = [];
+        for (let r = 0; r < 3; r++) {
+          const { ctx, page, errors } = await newPage({ store, unlocked: true });
+          await page.goto(srv.origin + route);
+          await page.waitForSelector(ready);
+          await page.waitForTimeout(600);
+          const load = await metrics(page);
+          const domRows = await page.locator('table tbody tr').count();
+          // scroll the page's scroll container (main#main) to the bottom in steps, collecting long tasks
+          await page.evaluate(() => { window.__m.longTasks.length = 0; });
+          const t0 = await page.evaluate(() => performance.now());
+          for (let s = 0; s < 20; s++) {
+            await page.evaluate(() => { const m = document.getElementById('main'); m.scrollTop += m.clientHeight; });
+            await frame(page);
+          }
+          const scrollMs = Math.round((await page.evaluate(() => performance.now())) - t0);
+          const scrollLong = await page.evaluate(() => [...window.__m.longTasks]);
+          let sortMs = null;
+          if (route === '/transactions') {
+            await page.evaluate(() => { document.getElementById('main').scrollTop = 0; });
+            await frame(page);
+            const t1 = await page.evaluate(() => performance.now());
+            await page.getByRole('button', { name: /^Client/ }).click();
+            await frame(page);
+            sortMs = Math.round((await page.evaluate(() => performance.now())) - t1);
+          }
+          runs.push({ longTasks: load.longTasks, maxLong: Math.max(0, ...load.longTasks), domRows, scrollMs, scrollMaxLong: Math.max(0, ...scrollLong), sortMs, pageErrors: errors.filter((e) => e.kind === 'pageerror').length });
+          await ctx.close();
+        }
+        out.tables[`${route}@${n}`] = {
+          maxLongTaskMs: median(runs.map((x) => x.maxLong)),
+          longTasks: runs[1].longTasks,
+          domRows: runs[0].domRows,
+          scroll20ScreensMs: median(runs.map((x) => x.scrollMs)),
+          scrollMaxLongTaskMs: median(runs.map((x) => x.scrollMaxLong)),
+          sortClickMs: route === '/transactions' ? median(runs.map((x) => x.sortMs)) : undefined,
+          pageErrors: runs.reduce((s, x) => s + x.pageErrors, 0),
+        };
+        if (out.tables[`${route}@${n}`].pageErrors) problems.push(`page errors on ${route}@${n}`);
+      }
+    }
+  }
+
   // 4. Keystroke latency, 20 line items ────────────────────────────────────
-  {
+  if (want('typing')) {
     const { ctx, page } = await newPage();
     await page.goto(srv.origin + '/invoice');
     await page.waitForSelector('input[placeholder="Description"]');
@@ -165,7 +223,7 @@ try {
   }
 
   // 5. CSP sweep ───────────────────────────────────────────────────────────
-  {
+  if (want('csp')) {
     const profile = { id: 'p1', companyName: 'QA Co', companyTagline: '', companyEmail: 'qa@example.com', companyPhone: '', companyAddress: 'Mumbai', companyGstin: '', companyWebsite: '', bankName: 'Bank', accountName: 'QA Co', accountNumber: '1234567890', ifsc: 'ABCD0000001', upiId: 'qa@upi' };
     const settings = JSON.stringify({ profiles: [profile], activeProfileId: 'p1', onboarded: true, defaultCurrency: 'INR', defaultTaxRate: 18, invoicePrefix: '', defaultDueDays: 14, defaultTerms: '', defaultNotes: '', roundOff: false });
     const { ctx, page, errors } = await newPage({ sw: true, store: { mrchartist_inv_settings: settings } });
