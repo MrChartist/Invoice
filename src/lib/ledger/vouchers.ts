@@ -44,6 +44,8 @@ export interface ManualVoucherLine {
   cr: number;
   /** Party name for the debtors / creditors control accounts (sub-ledger). */
   party?: string;
+  /** Additive (6.16): `cost_centres` row id — meaningful on income / expense lines. */
+  cost_centre_id?: string;
 }
 
 export interface ManualVoucher {
@@ -139,6 +141,7 @@ export function normalizeVouchers(rows: unknown[]): ManualVoucher[] {
         dr: isInt(x.dr) ? x.dr : 0,
         cr: isInt(x.cr) ? x.cr : 0,
         ...(typeof x.party === 'string' && x.party.trim() ? { party: x.party.trim() } : {}),
+        ...(typeof x.cost_centre_id === 'string' && x.cost_centre_id ? { cost_centre_id: x.cost_centre_id } : {}),
       });
     }
     out.push({
@@ -172,6 +175,7 @@ function cleanLines(lines: readonly ManualVoucherLine[]): ManualVoucherLine[] {
     dr: l.dr,
     cr: l.cr,
     ...(l.party && l.party.trim() ? { party: l.party.trim() } : {}),
+    ...(l.cost_centre_id ? { cost_centre_id: l.cost_centre_id } : {}),
   }));
 }
 

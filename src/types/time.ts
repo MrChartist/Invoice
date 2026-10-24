@@ -21,6 +21,11 @@ export interface TimeEntry {
   hourly_rate: number;
   billable: boolean;
   /**
+   * Additive (6.16): `cost_centres` row id. Billing copies it onto the invoice line; when absent, a
+   * `project` text that matches an active cost centre's name (case-insensitive) is used instead.
+   */
+  cost_centre_id?: string;
+  /**
    * Id of the invoice this entry was billed on. The entry is "billed" only while that invoice
    * still exists and is not cancelled — deleting the invoice frees the entry again.
    */
@@ -44,6 +49,8 @@ export interface MileageEntry {
   rate_per_km: number;
   /** Same derived-billing rule as `TimeEntry.invoiced_in`. */
   invoiced_in?: string;
+  /** Additive (6.16): `cost_centres` row id, copied onto the mileage line when billed. */
+  cost_centre_id?: string;
   created_at?: string;
   updated_at?: string;
 }

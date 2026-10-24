@@ -31,7 +31,7 @@
 
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import { isCreditNote, isSale, normalizePurchase, partyOfInvoice, accountForMethod, toIsoDate, type BooksData } from '../books';
-import { allocateProportionally, num } from '../invoice-calc';
+import { allocateProportionally, calcInputFromRecord, calculateInvoice, num } from '../invoice-calc';
 import { invoiceAmounts, toPaise } from '../export-shared';
 import { fxNarration, inrValue } from '../fx';
 import { readPurchase } from '../purchase-normalize';
@@ -46,6 +46,12 @@ export interface PostingLine {
   cr: number;
   /** Party sub-ledger (debtors / creditors control accounts). */
   party?: string;
+  /**
+   * Cost centre id (6.16), copied from the source document / bill / voucher line. Every line of
+   * an automatic voucher carries its document's centre; reports only read it on income and
+   * expense accounts. Absent = unallocated.
+   */
+  cost_centre?: string;
 }
 
 export type LedgerVoucherKind =
@@ -97,19 +103,25 @@ export interface Ledger {
 
 class Lines {
   readonly lines: PostingLine[] = [];
+  /** `costCentre`: the source document's centre, stamped on every line unless a line names its own. */
+  private readonly costCentre?: string;
+  constructor(costCentre?: string) {
+    this.costCentre = costCentre;
+  }
   /** Debit `paise` (a negative amount becomes a credit). */
-  dr(account: string, paise: number, party?: string): this {
-    return this.add(account, paise, party, true);
+  dr(account: string, paise: number, party?: string, costCentre?: string): this {
+    return this.add(account, paise, party, true, costCentre);
   }
-  cr(account: string, paise: number, party?: string): this {
-    return this.add(account, paise, party, false);
+  cr(account: string, paise: number, party?: string, costCentre?: string): this {
+    return this.add(account, paise, party, false, costCentre);
   }
-  private add(account: string, paise: number, party: string | undefined, debit: boolean): this {
+  private add(account: string, paise: number, party: string | undefined, debit: boolean, costCentre?: string): this {
     const p = Math.round(paise);
     if (p === 0) return this;
     const isDr = p > 0 ? debit : !debit;
     const amt = Math.abs(p);
-    this.lines.push({ account, dr: isDr ? amt : 0, cr: isDr ? 0 : amt, ...(party ? { party } : {}) });
+    const cc = costCentre ?? this.costCentre;
+    this.lines.push({ account, dr: isDr ? amt : 0, cr: isDr ? 0 : amt, ...(party ? { party } : {}), ...(cc ? { cost_centre: cc } : {}) });
     return this;
   }
   /** Signed imbalance: debits − credits. */
@@ -146,6 +158,27 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
+/**
+ * Split an invoice's items amount (paise, >= 0) over cost centres: each line goes to its own
+ * `cost_centre_id`, else the document's. Shares follow each line's taxable value (exact to the
+ * paisa — the largest share absorbs rounding). One entry when every line shares a centre.
+ */
+export function itemsByCostCentre(inv: InvoiceRecord, itemsPaise: number): Array<[string | undefined, number]> {
+  const doc = str(inv.cost_centre_id) || undefined;
+  const items = Array.isArray(inv.items) ? inv.items : [];
+  const ccOf = (i: (typeof items)[number]) => str(i?.cost_centre_id) || doc;
+  const centres = new Set(items.map(ccOf));
+  if (centres.size <= 1 || itemsPaise <= 0) return [[centres.size === 1 ? [...centres][0] : doc, itemsPaise]];
+  const calc = calculateInvoice(calcInputFromRecord(inv));
+  const taxableById = new Map(calc.lines.map((l) => [l.id, Math.abs(l.taxable)]));
+  const weights = items.map((i) => taxableById.get(i.id) ?? 0);
+  if (!weights.some((w) => w > 0)) return [[doc, itemsPaise]];
+  const shares = allocateProportionally(weights, itemsPaise / 100).map((x) => toPaise(x));
+  const out = new Map<string | undefined, number>();
+  items.forEach((i, k) => out.set(ccOf(i), (out.get(ccOf(i)) ?? 0) + shares[k]));
+  return [...out.entries()].filter(([, p]) => p !== 0);
+}
+
 /* ── Sales side ────────────────────────────────────────────────── */
 
 function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
@@ -158,12 +191,12 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
   if (total === 0) return null;
   const party = partyOfInvoice(inv);
   const debitNote = inv.doc_type === 'DEBIT_NOTE';
-  const l = new Lines();
+  const l = new Lines(str(inv.cost_centre_id) || undefined);
   // Sales: Dr party / Cr everything else. A credit note is the mirror image.
   const side = sale ? 1 : -1;
   l.dr(A.debtors, side * total, party);
   const items = Math.abs(toPaise(a.chargesTaxed ? a.taxable - a.charges : a.taxable));
-  l.cr(sale ? A.sales : A.salesReturns, side * items);
+  for (const [cc, p] of itemsByCostCentre(inv, items)) l.cr(sale ? A.sales : A.salesReturns, side * p, undefined, cc);
   l.cr(A.freightOut, side * Math.abs(toPaise(a.charges)));
   l.cr(A.outCgst, side * Math.abs(toPaise(a.cgst)));
   l.cr(A.outSgst, side * Math.abs(toPaise(a.sgst)));
@@ -265,7 +298,7 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
   const igst = gst - cgst - sgst;
   const party = n.party;
   const expAcc = expenseAccountFor(n.isExpense, n.category, chart);
-  const l = new Lines();
+  const l = new Lines(str(raw.cost_centre_id) || undefined);
   l.dr(expAcc, n.itcEligible ? taxable : taxable + gst);
   if (n.itcEligible) {
     l.dr(A.inCgst, cgst);
@@ -381,7 +414,13 @@ export function manualToLedger(v: ManualVoucher): LedgerVoucher {
     number: v.number,
     party: parties[0] ?? '',
     narration: v.narration,
-    lines: v.lines.map((l) => ({ account: l.account_id, dr: l.dr, cr: l.cr, ...(l.party ? { party: l.party } : {}) })),
+    lines: v.lines.map((l) => ({
+      account: l.account_id,
+      dr: l.dr,
+      cr: l.cr,
+      ...(l.party ? { party: l.party } : {}),
+      ...(l.cost_centre_id ? { cost_centre: l.cost_centre_id } : {}),
+    })),
     manualId: v.id,
   };
 }

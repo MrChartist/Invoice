@@ -219,11 +219,13 @@ const RECORD_TABLES = [
   'time_entries', 'mileage',
   // Purchase orders (6.5)
   'purchase_orders',
+  // Cost centres & budgets (6.16 / 6.17)
+  'cost_centres', 'budgets',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
-  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', ASSET_TABLE,
+  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', ASSET_TABLE,
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

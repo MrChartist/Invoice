@@ -214,3 +214,21 @@ test('every reader accepts a bill converted from a purchase order (po_id + po_li
   assert.equal(events.get('s1')?.[0].qty, 10);
   // The PO itself is a separate table (purchase_orders) that no report reads: it never posts.
 });
+
+test('cost centre (6.16): the ledger, project P&L and budgets read cost_centre_id; other readers ignore it', async () => {
+  const { buildLedger, costCentrePnl, monthlyActuals, A } = await import('../src/lib/ledger/index.ts');
+  const { EMPTY_BOOKS } = await import('../src/lib/books.ts');
+  const tagged: PurchaseRecord = { ...bill, id: 'p4', cost_centre_id: 'cc1' };
+  // Report readers see the same money with or without the cost centre.
+  assert.equal(booksNormalize(tagged as never)!.total, 1180);
+  assert.equal(exportNormalize(tagged)!.taxable, 1000);
+  assert.equal(gstNormalize(tagged, '27')!.cgst, 90);
+  const led = buildLedger({ ...EMPTY_BOOKS, purchases: [tagged as never, bill as never], userAccounts: [], manual: [], assets: [], today: '2026-04-30' });
+  const v = led.vouchers.find((x) => x.id === 'pur:p4')!;
+  assert.ok(v.lines.every((l) => l.cost_centre === 'cc1'));
+  const pnl = costCentrePnl(led, { start: '2026-04-01', end: '2027-03-31' }, [{ id: 'cc1', name: 'Site A', kind: 'project', active: true, created_at: '' }]);
+  assert.equal(pnl.totals.cc1.directCosts, 100000);
+  assert.equal(pnl.totals[''].directCosts, 100000);
+  assert.equal(monthlyActuals(led, 2026).get(`${A.purchases}|cc1`)![0], 100000);
+  assert.equal(expenseLine(tagged, DEFAULT_TIME_PREFS).cost_centre_id, 'cc1');
+});

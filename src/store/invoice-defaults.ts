@@ -162,6 +162,7 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(num(item.cess_per_unit) > 0 ? { cess_per_unit: num(item.cess_per_unit) } : {}),
     amount: num(item.amount, quantity * rate),
     ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
+    ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
   };
 }
 
@@ -257,6 +258,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(typeof r.late_fee_for === 'string' && r.late_fee_for ? { late_fee_for: r.late_fee_for } : {}),
     ...(r.sales_order_id ? { sales_order_id: String(r.sales_order_id) } : {}),
     ...(r.order_closed_on ? { order_closed_on: String(r.order_closed_on).slice(0, 10) } : {}),
+    ...(typeof r.cost_centre_id === 'string' && r.cost_centre_id ? { cost_centre_id: r.cost_centre_id } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,
