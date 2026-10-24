@@ -10,6 +10,7 @@ import { normalizePurchase as exportNormalize } from '../src/lib/export-shared.t
 import { normalizePurchase as gstNormalize } from '../src/lib/gst-reports.ts';
 import { collectEvents } from '../src/lib/inventory.ts';
 import { bookBills } from '../src/lib/gstr2b.ts';
+import { buildGstr9 } from '../src/lib/gstr9.ts';
 import { readPurchase } from '../src/lib/purchase-normalize.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
 import { gstinChecksumChar } from '../src/lib/gstin.ts';
@@ -102,6 +103,15 @@ test('every reader understands the GST-completeness fields (RCM, import, reversa
   // Legacy rows without the fields read as domestic, forward charge, no reversal.
   const legacy = readPurchase(bill)!;
   assert.deepEqual([legacy.reverseCharge, legacy.importType, legacy.itcReversed, legacy.itcReversalReason], [false, '', 0, '']);
+});
+
+test('gstr9 reads the real purchase shape (Table 6B, 7, 18)', () => {
+  const g = buildGstr9([], [bill, { ...bill, id: 'p3', itc_reversed: 18, itc_reversal_reason: 'RULE_42' }], { fyStart: 2026, filerStateCode: '27' });
+  const b6 = g.table6.find((r) => r.id === '6B(i)')!;
+  assert.deepEqual([b6.cgst, b6.sgst, b6.igst], [180, 180, 0]);
+  assert.equal(g.table7.find((r) => r.id === '7C')!.cgst, 9);
+  const h = g.table18.find((r) => r.hsn === '4802')!;
+  assert.deepEqual([h.qty, h.taxable, h.cgst, h.rate], [20, 2000, 180, 18]);
 });
 
 test('inventory brings purchase lines in as stock-in', () => {

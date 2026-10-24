@@ -109,7 +109,7 @@ export const RECORD_KEYS = [
   'supply_type', 'lut_number', 'lut_date', 'price_includes_tax', 'round_mode', 'tcs_enabled', 'tcs_rate',
   'tcs_base', 'tcs_label', 'tds_enabled', 'tds_section', 'tds_rate', 'tds_on_taxable', 'cess_amount',
   'tcs_amount', 'tds_amount', 'created_at', 'updated_at', 'quote_status', 'ship_to',
-  'charges_taxable', 'exchange_rate', 'shipping_bill_no', 'shipping_bill_date', 'port_code',
+  'charges_taxable', 'exchange_rate', 'shipping_bill_no', 'shipping_bill_date', 'port_code', 'late_fee_for',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

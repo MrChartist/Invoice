@@ -1,11 +1,12 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { mailtoLink } from '../lib/share';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ChevronRight, Clock, Copy, Download, FileText, Mail, Percent, Scale, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
+import { createLateFeeInvoice, describeClientLateFee, lateFeeRuleFor, type ClientLateFee } from '../lib/late-fee';
 import {
   AGING_BUCKETS, agingCsv, buildLedger, buildReceivables, buildStatementText, computeDso,
   currenciesIn, debtorShare, monthlyCollections, overallEfficiency, topDebtors,
@@ -78,6 +79,31 @@ export function Receivables() {
   const efficiency = overallEfficiency(months);
   const fmt = (n: number) => formatCurrency(n, currency);
 
+  // Per-client late-fee terms (roadmap 6.15): overdue bills of such clients get "Add late fee",
+  // which creates a NEW draft invoice; the overdue one is never edited.
+  const navigate = useNavigate();
+  const lateFeeRules = useMemo(() => {
+    const raised = new Set(data.invoices.filter((i) => i.late_fee_for && i.status !== 'Cancelled').map((i) => i.late_fee_for));
+    const m = new Map<string, ClientLateFee>();
+    for (const inv of data.invoices) {
+      if (raised.has(inv.id)) continue;
+      const rule = lateFeeRuleFor(inv, data.clients);
+      if (rule) m.set(inv.id, rule);
+    }
+    return m;
+  }, [data]);
+  const addLateFee = (invoiceId: string) => {
+    const inv = data.invoices.find((i) => i.id === invoiceId);
+    if (!inv) return;
+    try {
+      const saved = createLateFeeInvoice(inv);
+      notify(`Late-fee draft ${saved.invoice_number} created — review it before sending`);
+      navigate(`/invoice/${saved.id}`);
+    } catch (err) {
+      notify((err as Error).message || 'Could not create the late-fee invoice', 'error');
+    }
+  };
+
   if (report.parties.length === 0) {
     return (
       <div className={surface.page}>
@@ -141,7 +167,7 @@ export function Receivables() {
       </div>
 
       <div role="tabpanel" id={`rcv-panel-${tab}`} aria-labelledby={`rcv-tab-${tab}`}>
-        {tab === 'aging' && <AgingTab report={report} currency={currency} fmt={fmt}
+        {tab === 'aging' && <AgingTab report={report} currency={currency} fmt={fmt} lateFeeRules={lateFeeRules} onLateFee={addLateFee}
           onStatement={(p) => { const n = new URLSearchParams(params); n.set('tab', 'statements'); n.set('party', p.key); setParams(n, { replace: true }); }} />}
         {tab === 'statements' && <StatementsTab report={report} data={data} currency={currency} now={now}
           partyKey={params.get('party') ?? ''} onPick={(k) => { const n = new URLSearchParams(params); n.set('party', k); setParams(n, { replace: true }); }}
@@ -207,11 +233,13 @@ function Stat({ label, value, hint, icon, tone }: {
 
 /* ── Aging ────────────────────────────────────────────────────── */
 
-function AgingTab({ report, currency, fmt, onStatement }: {
+function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee }: {
   report: ReturnType<typeof buildReceivables>;
   currency: string;
   fmt: (n: number) => string;
   onStatement: (p: PartyReceivable) => void;
+  lateFeeRules: Map<string, ClientLateFee>;
+  onLateFee: (invoiceId: string) => void;
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
@@ -298,7 +326,7 @@ function AgingTab({ report, currency, fmt, onStatement }: {
                     {expanded && (
                       <tr className={styles.billsRow} data-vindex={vrow['data-vindex']} aria-rowindex={rowIndex === undefined ? undefined : rowIndex + 1}>
                         <td colSpan={8}>
-                          <BillsTable party={p} currency={currency} />
+                          <BillsTable party={p} currency={currency} lateFeeRules={lateFeeRules} onLateFee={onLateFee} />
                         </td>
                       </tr>
                     )}
@@ -322,7 +350,12 @@ function AgingTab({ report, currency, fmt, onStatement }: {
 }
 
 /** One party's open bills (inside its expanded aging row); long lists are windowed too. */
-function BillsTable({ party: p, currency }: { party: PartyReceivable; currency: string }) {
+function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
+  party: PartyReceivable;
+  currency: string;
+  lateFeeRules: Map<string, ClientLateFee>;
+  onLateFee: (invoiceId: string) => void;
+}) {
   const m = (n: number) => (n ? formatMoney(n, currency) : '—');
   const billKeys = useMemo(() => p.bills.map((b) => b.invoiceId), [p.bills]);
   const virtual = useVirtualRows(billKeys, { estimate: 45 });
@@ -352,6 +385,13 @@ function BillsTable({ party: p, currency }: { party: PartyReceivable; currency: 
                 <AgeChip bucket={b.bucket}>
                   {b.daysOverdue > 0 ? `${b.daysOverdue} days overdue` : 'Not due'}
                 </AgeChip>
+                {b.daysOverdue > 0 && lateFeeRules.has(b.invoiceId) && (
+                  <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`}
+                    title={`Creates a new draft invoice: ${describeClientLateFee(lateFeeRules.get(b.invoiceId)!)}`}
+                    aria-label={`Add late fee on ${b.number}`} onClick={() => onLateFee(b.invoiceId)}>
+                    <Percent size={14} aria-hidden="true" /> Add late fee
+                  </button>
+                )}
               </td>
             </tr>
           );

@@ -2,7 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
-import { Download, FileJson, FileSpreadsheet, Printer, ShieldAlert } from 'lucide-react';
+import { CalendarRange, Download, FileJson, FileSpreadsheet, Files, Printer, ShieldAlert } from 'lucide-react';
 import { getTable } from '../lib/storage';
 import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
@@ -13,6 +13,7 @@ import {
   buildGstReport,
   periodForDate,
   periodLabel,
+  periodRange,
   type CdnRow,
   type DocRow,
   type ExportRow,
@@ -44,6 +45,10 @@ import styles from './GstReports.module.css';
 import local from '../components/gst-reports/gst-reports.module.css';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
+
+// Annual GSTR-9 working paper (5.2) and bulk e-Invoice / e-Way + IRP response import (6.24): loaded on open.
+const Gstr9Modal = lazy(() => import('../components/gst-reports/Gstr9Modal'));
+const BulkEInvoiceModal = lazy(() => import('../components/einvoice/BulkEInvoiceModal'));
 
 type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'gstr3b' | 'gstr2b';
 
@@ -131,6 +136,7 @@ export function GstReports() {
   };
 
   const lastFyTurnover = Number(turnover.gt) || 0;
+  const [annualOpen, setAnnualOpen] = useState<'' | 'gstr9' | 'bulk'>('');
   const filerStateCode = useMemo(() => {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin) ?? localDb.settings.activeProfile();
     return checkGstin(gstin || prof?.companyGstin || '').stateCode ?? prof?.stateCode ?? '';
@@ -380,9 +386,25 @@ export function GstReports() {
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData} onClick={printSummary}>
             <Printer size={16} aria-hidden /> Print summary
           </button>
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('gstr9')} title="Annual return working paper from the 12 monthly GSTR-1 / 3B papers">
+            <CalendarRange size={16} aria-hidden /> GSTR-9
+          </button>
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('bulk')} title="One e-Invoice / e-Way JSON for many invoices, and IRP response import">
+            <Files size={16} aria-hidden /> Bulk e-Invoice
+          </button>
           </>
         }
       />
+
+      {annualOpen && (
+        <Suspense fallback={null}>
+          <Gstr9Modal open={annualOpen === 'gstr9'} onClose={() => setAnnualOpen('')} fyStart={period.fyStart} fyOptions={fyOptions}
+            gstin={gstin} filerStateCode={filerStateCode} storedTurnover={{ gt: lastFyTurnover, curGt: Number(turnover.curGt) || 0 }}
+            filerName={profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin)?.companyName} />
+          <BulkEInvoiceModal open={annualOpen === 'bulk'} onClose={() => setAnnualOpen('')}
+            from={periodRange(period).from} to={periodRange(period).to} periodLabel={label} />
+        </Suspense>
+      )}
 
       <section className={`${surface.card} ${styles.filters}`} aria-label="Report filters">
         <PeriodPicker value={period} onChange={setPeriod} fyOptions={fyOptions} />

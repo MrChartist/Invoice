@@ -205,7 +205,7 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
 /** Tables whose rows are records; a restore refuses a file where one of them is malformed. */
 const RECORD_TABLES = [
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases',
-  'purchase_payments', 'recurring', 'doc_links', 'audit_log', 'gstr2b_actions',
+  'purchase_payments', 'recurring', 'doc_links', 'audit_log', 'gstr2b_actions', 'einvoice_meta',
   // Double-entry ledger (6.1–6.3)
   'accounts', 'vouchers', 'fixed_assets',
 ];

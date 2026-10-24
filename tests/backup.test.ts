@@ -132,6 +132,9 @@ test('parseBackup refuses damaged record tables, bad settings and newer versions
   assert.throws(() => parseBackup(file({ ...ok, mrchartist_inv_fixed_assets: '[1]' })), /"fixed_assets"/);
   const ledger = { ...ok, mrchartist_inv_vouchers: '[{"id":"v1","type":"JOURNAL","lines":[]}]', mrchartist_inv_accounts: '[{"id":"u1"}]', mrchartist_inv_fixed_assets: '[{"id":"f1"}]' };
   assert.equal(parseBackup(file(ledger)).data.mrchartist_inv_vouchers, ledger.mrchartist_inv_vouchers);
+  // IRN / Ack rows written by the bulk IRP import (6.24) are validated too.
+  assert.throws(() => parseBackup(file({ mrchartist_inv_einvoice_meta: '{"invoice_id":"a"}' })), /"einvoice_meta" table .* not a list/);
+  assert.equal(parseBackup(file({ ...ok, mrchartist_inv_einvoice_meta: '[{"invoice_id":"a","irn":"x"}]' })).data.mrchartist_inv_einvoice_meta, '[{"invoice_id":"a","irn":"x"}]');
   assert.throws(() => parseBackup(file({ mrchartist_inv_settings: '[]' })), /settings/);
   assert.throws(() => parseBackup(file(ok, 2)), /newer version/);
   assert.throws(

@@ -5,6 +5,7 @@ import { INDIAN_STATES, resolveStateCode, stateByCode } from '../../lib/india-st
 import { checkGstin } from '../../lib/gstin';
 import { localDb } from '../../lib/localDb';
 import { isValidPan, isValidTan } from '../../lib/validators';
+import { MAX_FLAT_FEE, sanitizeClientLateFee, type ClientLateFeeMode } from '../../lib/late-fee-rule';
 import type { Client } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 
@@ -33,11 +34,15 @@ export interface ClientFormModalProps {
 export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormModalProps) {
   const [form, setForm] = useState<Client>(BLANK);
   const [error, setError] = useState('');
+  // Late-fee terms are edited as text so a half-typed number is not coerced on every keystroke.
+  const [fee, setFee] = useState<{ mode: '' | ClientLateFeeMode; rate: string; grace: string }>({ mode: '', rate: '', grace: '' });
 
   useEffect(() => {
     if (open) {
       setForm({ ...BLANK, ...(client ?? {}) });
       setError('');
+      const f = client?.late_fee;
+      setFee(f ? { mode: f.mode, rate: String(f.rate), grace: String(f.graceDays) } : { mode: '', rate: '', grace: '' });
     }
   }, [open, client]);
 
@@ -59,6 +64,8 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     const tan = (form.tan ?? '').trim().toUpperCase();
     if (pan && !isValidPan(pan)) return setError('PAN should look like AAAAA9999A (five letters, four digits, one letter).');
     if (tan && !isValidTan(tan)) return setError('TAN should look like AAAA99999A (four letters, five digits, one letter).');
+    const late_fee = fee.mode ? sanitizeClientLateFee({ mode: fee.mode, rate: fee.rate, graceDays: fee.grace }) : undefined;
+    if (fee.mode && !late_fee) return setError('Enter a late-fee rate above zero, or choose "No late fee".');
     try {
       const state_code = resolveStateCode({ code: form.state_code, gstin: form.gstin, name: form.state });
       const payload: Client = {
@@ -70,6 +77,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         // Optional: keep the keys (as undefined) so clearing a value overwrites the stored one.
         pan: pan || undefined,
         tan: tan || undefined,
+        late_fee,
         updated_at: new Date().toISOString(),
       };
       const id = localDb.clients.upsert({ ...payload, id: client?.id });
@@ -178,6 +186,34 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
             <span className={controls.hint}>Their TDS account number — matches your 26AS / AIS to this client.</span>
           </label>
         </div>
+        <fieldset className={controls.field} style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className={controls.label}>Late-payment terms (optional)</legend>
+          <div className={controls.row3}>
+            <label className={controls.field}>
+              <span className={controls.label}>Late fee</span>
+              <select className={controls.select} value={fee.mode} onChange={(e) => setFee((f) => ({ ...f, mode: e.target.value as '' | ClientLateFeeMode }))}>
+                <option value="">No late fee</option>
+                <option value="percent_pa">Interest, % per year</option>
+                <option value="flat">Flat fee, ₹</option>
+              </select>
+            </label>
+            <label className={controls.field}>
+              <span className={controls.label}>{fee.mode === 'flat' ? 'Fee (₹)' : 'Rate (% p.a.)'}</span>
+              <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" disabled={!fee.mode} value={fee.rate}
+                max={fee.mode === 'flat' ? MAX_FLAT_FEE : 100}
+                onChange={(e) => setFee((f) => ({ ...f, rate: e.target.value.replace(/[^0-9.]/g, '') }))} placeholder={fee.mode === 'flat' ? '500' : '18'} />
+            </label>
+            <label className={controls.field}>
+              <span className={controls.label}>Grace days</span>
+              <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="numeric" disabled={!fee.mode} value={fee.grace}
+                onChange={(e) => setFee((f) => ({ ...f, grace: e.target.value.replace(/\D/g, '') }))} placeholder="0" />
+            </label>
+          </div>
+          <span className={controls.hint}>
+            Use the rate in your agreement with this client. Nothing is added automatically: an overdue invoice gets an
+            "Add late fee" button in Receivables that creates a new draft invoice for you to review.
+          </span>
+        </fieldset>
         <label className={controls.field}>
           <span className={controls.label}>Private notes</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder="Never printed on documents" />

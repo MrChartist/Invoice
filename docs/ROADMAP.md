@@ -136,7 +136,7 @@ Larger features, each of which can ship on its own once Phases 1–4 are done.
 | # | Item | Effort | Notes |
 |---|------|--------|-------|
 | 5.1 | ✅ **GSTR-2B import & matcher**: user loads the portal JSON/Excel locally; match on GSTIN + bill no. + value; IMS Accept/Reject/Pending worksheet; 4A(5) books-vs-2B comparison (`docs/features/gstr2b.md`) | L | Needs 3.2 |
-| 5.2 | **GSTR-9 annual working paper** from 12 months of GSTR-1/3B + HSN, compared against books | M | Needs 3.1, 3.2 |
+| 5.2 | ✅ **GSTR-9 annual working paper** from 12 months of GSTR-1/3B + HSN, compared against books (`docs/features/gstr9.md`; 8A typed in from GSTR-2B, since the 5.1 matcher does not keep the 2B file) | M | Needs 3.1, 3.2 |
 | 5.3 | **Advances / receipt vouchers / Table 11** (tax on service advances, adjusted against the later invoice) | L | Needs 3.1 |
 | 5.4 | **Hindi-first i18n**: string extraction, amount in words in Hindi, self-hosted Noto Sans Devanagari subset in the precache (fixes PDFs that vary by device today); then Marathi/Tamil/Gujarati | L | |
 | 5.5 | **POS / thermal quick-bill mode**: one-screen counter billing, walk-in customer, 80 mm auto-print, change calculator | M | Reuses `thermal80` / ReceiptBody |
@@ -173,7 +173,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.12 | **Attachments**: receipt photos / PDFs on bills, expenses, invoices (IndexedDB, in backups) | Zoho, Xero, Invoice Ninja | M |
 | 6.13 | **Time tracking & billable hours** → invoice lines | FreshBooks, Zoho, Invoice Ninja | M |
 | 6.14 | **Billable expenses & mileage** with markup | FreshBooks, Invoice Ninja | S–M |
-| 6.15 | **Optional automatic late-fee line** per client terms | FreshBooks, Invoice Ninja | S |
+| 6.15 | ✅ **Optional automatic late-fee line** per client terms (new draft invoice, never edits the original; `receivables.md`) | FreshBooks, Invoice Ninja | S |
 | 6.16 | **Cost centres / projects** with project P&L | Tally, Busy, QBO, Xero, Zoho | M |
 | 6.17 | **Budgets vs actual** | Tally, Zoho, Xero, QBO | S–M |
 | 6.18 | **Cash-flow forecast** 30/90/180 days from open items, recurring and collection lag | Xero | M |
@@ -182,7 +182,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.21 | **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) | Vyapar, myBillBook, Zoho | M |
 | 6.22 | ✅ **.xlsx import/export without a dependency** (native `DecompressionStream` + a hand-written XML tokenizer, `src/lib/xlsx.ts`); ZIP writer `src/lib/zip.ts` ready for a ZIP of PDFs (not wired yet) | most | M |
 | 6.23 | **Custom fields** on documents, items, parties, printable | Tally (UDF), Zoho, Vyapar | S–M |
-| 6.24 | **Bulk e-Invoice / e-Way JSON** and bulk IRN response import | Zoho, Tally | S |
+| 6.24 | ✅ **Bulk e-Invoice / e-Way JSON** and bulk IRN response import (`einvoice.md`) | Zoho, Tally | S |
 | 6.25 | **Party/item profitability, credit limits at billing** | Vyapar, Zoho | S–M |
 | 6.26 | **Cheque register & PDC reminders**, cheque printing | Tally, Busy | S–M |
 

@@ -57,7 +57,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   exact paise rounding. Statutory values that change over time live in `src/lib/tax-rules.ts`, keyed by effective date.
 - **e-Invoice & e-Way**: offline IRP v1.1 e-Invoice JSON (INV / CRN / DBN, preceding-document details filled from the
   linked invoice, export details) and e-Way Bill JSON generators, with pre-flight validation. The IRN, Ack No and signed
-  QR returned by the IRP are entered back and printed on every template. (The app does not call the IRP.)
+  QR returned by the IRP are entered back and printed on every template. Bulk: one IRP / e-Way JSON for many invoices
+  (each preflighted, blocked ones listed with reasons) and bulk import of the IRP response file (JSON or CSV) into the
+  saved IRN / Ack / QR. (The app does not call the IRP.)
 - **GST reports**: GSTR-1 (B2B, B2CL by date-keyed threshold, B2CS, CDNR/CDNUR with C/D notes classified by the
   original invoice, EXP with shipping-bill fields, nil, HSN summary split B2B/B2C with the 4/6-digit rule, documents
   issued) as offline-tool JSON and section CSVs; GSTR-3B (3.1, 3.2, 4 incl. imports, RCM and 4B(1)/4B(2) reversals, 5)
@@ -67,10 +69,16 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   value mismatch, in 2B only, in books only (ITC at risk, Sec 16(2)(aa)) or ITC not available. An IMS worksheet
   (Accept / Reject / Pending per document) exports as CSV or .xlsx, missing bills can be created from 2B lines, and
   GSTR-3B Table 4A(5) from the books is compared with the 2B-restricted figure (the 3B report is not changed).
+- **GSTR-9 working paper**: annual Tables 4-9, 17 and 18 from the 12 monthly GSTR-1 / 3B papers and purchase bills
+  (6B inputs / services split, 6C/6D RCM, imports, Table 7 reversals by rule, Table 9 set-off with credit carried
+  forward), differences GSTR-1 vs 3B vs books, the ₹2 crore optional-filing note; JSON working paper, CSV and print.
+  Advances, amendments (Pt V) and 8A (GSTR-2B) are not computed.
 - **Compliance calendar**: GSTR-1 / IFF / GSTR-3B / GSTR-9 due dates for monthly or QRMP filers, filed tracking,
   Sec 50 interest and late-fee estimates, reminders in the notification bell.
 
 ### 3.3 Accounts, Books & Banking
+- **Late fee per client** (optional): % p.a. or flat ₹ with grace days on the client; "Add late fee" on an overdue
+  bill creates a new draft invoice with one line (interest engine maths, period lock respected, original untouched).
 - **Receivables**: party ledgers, aging by days overdue (Not due, 1–30, 31–60, 61–90, 90+), DSO, printable statements,
   payment receipts (`RCPT/FY/…`) with amount in words, bulk mark-paid, TDS receivable register with 26AS/AIS CSV
   matching and Form 16A tracking.
