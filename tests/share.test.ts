@@ -90,3 +90,19 @@ test('upiLink rejects invalid VPA and omits bad amounts', () => {
   assert.ok(!upiLink({ pa: 'a.b@upi', amount: NaN })!.includes('am='));
   assert.equal(isValidUpiId('9876543210@ybl'), true);
 });
+
+test('shareFile: shares when supported, reports cancel / blocked / unsupported', async () => {
+  const { shareFile, canShareFiles } = await import('../src/lib/share.ts');
+  const file = new File(['%PDF'], 'INV.pdf', { type: 'application/pdf' });
+  const shared: unknown[] = [];
+  const nav = (impl: () => Promise<void>, can = true) => ({ canShare: () => can, share: async (d: unknown) => { shared.push(d); return impl(); } });
+  assert.equal(await shareFile(file, { title: 'T' }, nav(async () => {})), 'shared');
+  assert.equal((shared[0] as { files: File[] }).files[0], file);
+  const fail = (name: string) => async () => { const e = new Error(name); e.name = name; throw e; };
+  assert.equal(await shareFile(file, {}, nav(fail('AbortError'))), 'cancelled');
+  assert.equal(await shareFile(file, {}, nav(fail('NotAllowedError'))), 'blocked');
+  assert.equal(await shareFile(file, {}, nav(fail('TypeError'))), 'failed');
+  assert.equal(await shareFile(file, {}, nav(async () => {}, false)), 'unsupported');
+  assert.equal(await shareFile(file, {}, {}), 'unsupported');
+  assert.equal(canShareFiles(file, undefined), false);
+});

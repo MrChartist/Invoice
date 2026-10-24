@@ -90,8 +90,34 @@ try {
     await dialog.waitFor();
     const focusInside = await page.evaluate(() => !!document.activeElement?.closest('[aria-label="Document preview"]'));
     check(focusInside, 'preview moves focus into the dialog');
+
+    // Download PDF produces a real PDF file.
+    await dialog.getByRole('button', { name: /^Share/ }).click();
+    const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+    const head = readFileSync(await pdf.path()).subarray(0, 5).toString();
+    check(head === '%PDF-' && /\.pdf$/.test(pdf.suggestedFilename()), `Download PDF gives a PDF (${pdf.suggestedFilename()})`);
     await page.keyboard.press('Escape');
     await dialog.waitFor({ state: 'detached' });
+  });
+
+  await step('share the PDF file through the OS share sheet', async () => {
+    // Stand in for a phone's share sheet: capture what the app hands over.
+    await page.evaluate(() => {
+      Object.assign(navigator, {
+        canShare: (d) => !!d.files?.length,
+        share: async (d) => {
+          window.__shared = { name: d.files[0].name, type: d.files[0].type, size: d.files[0].size, title: d.title };
+        },
+      });
+    });
+    await page.getByRole('button', { name: /preview|view/i }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.getByRole('button', { name: /^Share/ }).click();
+    await page.getByRole('menuitem', { name: /Share PDF/ }).click();
+    await page.waitForFunction(() => !!window.__shared, null, { timeout: 20000 });
+    const shared = await page.evaluate(() => window.__shared);
+    check(shared.type === 'application/pdf' && shared.size > 1000 && /\.pdf$/.test(shared.name), `Share PDF hands a PDF file to the share sheet (${shared.name}, ${shared.size} bytes)`);
+    await page.keyboard.press('Escape');
   });
 
   await step('change in a second tab', async () => {

@@ -11,5 +11,17 @@ export function downloadText(filename: string, content: string, mime = 'text/pla
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Save a Blob (PDF, ZIP …) as a file. */
+export function downloadBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** CSV helpers live in csv.ts (one implementation, formula-injection guard included). */
 export { csvCell, toCsv } from './csv';

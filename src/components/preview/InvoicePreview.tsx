@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Loader2, Palette, Printer, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2, Palette, Printer, Share2, X } from 'lucide-react';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb, blankProfile } from '../../lib/localDb';
 import { TEMPLATES, templateById } from '../templates/registry';
@@ -10,6 +10,8 @@ import { ShareMenu } from '../share';
 import { pageSlices, paperSize, resolve as resolveDesign } from '../../lib/design-prefs';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
 import { cn } from '../../lib/utils';
+import { downloadBlob } from '../../lib/download';
+import { canShareFiles, invoiceSummaryText, shareFile } from '../../lib/share';
 import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
@@ -32,6 +34,8 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   const stageRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  /** A built PDF waiting for a fresh tap when the browser refused the first share attempt. */
+  const [readyToShare, setReadyToShare] = useState<File | null>(null);
   const [paperHeight, setPaperHeight] = useState(1123);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -108,39 +112,77 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   const meta = templateById(invoice.template_id);
   const step = (dir: -1 | 1) => invoice.setTemplate(TEMPLATES[(idx + dir + TEMPLATES.length) % TEMPLATES.length].id);
 
+  const pdfFilename = () => {
+    const safe = (invoice.invoice_number || 'draft').replace(/[\\/:*?"<>|]+/g, '-');
+    return `${DOCUMENT_LABELS[invoice.doc_type].replace(/\s+/g, '_')}_${safe}.pdf`;
+  };
+
+  /** Render the paper to a PDF Blob (null if the preview is not mounted). Throws on failure. */
+  const buildPdf = async (): Promise<Blob | null> => {
+    if (!paperRef.current) return null;
+    // Loaded on demand — the PDF stack is ~200 KB gzipped and most sessions never export.
+    const [{ toJpeg }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
+    const node = paperRef.current;
+    const height = Math.max(node.offsetHeight, PAPER_H);
+    const dataUrl = await toJpeg(node, {
+      quality: 0.92,
+      pixelRatio: 2.5,
+      cacheBust: true,
+      width: PAPER_W,
+      height,
+      backgroundColor: '#ffffff',
+      style: { transform: 'none', transformOrigin: 'top left' },
+    });
+
+    // Thermal rolls are one tall page; sheet formats are sliced page by page.
+    const slices = pageSlices(height, design);
+    const pageWmm = size.mm.width;
+    const imgHmm = (height / PAPER_W) * pageWmm;
+    const pageHmm = size.autoHeight ? imgHmm : size.mm.height;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
+    slices.forEach((_, page) => {
+      if (page > 0) pdf.addPage([pageWmm, pageHmm], 'portrait');
+      pdf.addImage(dataUrl, 'JPEG', 0, -page * pageHmm, pageWmm, imgHmm, undefined, 'FAST');
+    });
+    return pdf.output('blob');
+  };
+
   const handleExportPDF = async () => {
-    if (!paperRef.current || busy) return;
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
-      // Loaded on demand — the PDF stack is ~200 KB gzipped and most sessions never export.
-      const [{ toJpeg }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
-      const node = paperRef.current;
-      const height = Math.max(node.offsetHeight, PAPER_H);
-      const dataUrl = await toJpeg(node, {
-        quality: 0.92,
-        pixelRatio: 2.5,
-        cacheBust: true,
-        width: PAPER_W,
-        height,
-        backgroundColor: '#ffffff',
-        style: { transform: 'none', transformOrigin: 'top left' },
-      });
-
-      // Thermal rolls are one tall page; sheet formats are sliced page by page.
-      const slices = pageSlices(height, design);
-      const pageWmm = size.mm.width;
-      const imgHmm = (height / PAPER_W) * pageWmm;
-      const pageHmm = size.autoHeight ? imgHmm : size.mm.height;
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
-      slices.forEach((_, page) => {
-        if (page > 0) pdf.addPage([pageWmm, pageHmm], 'portrait');
-        pdf.addImage(dataUrl, 'JPEG', 0, -page * pageHmm, pageWmm, imgHmm, undefined, 'FAST');
-      });
-      const safe = (invoice.invoice_number || 'draft').replace(/[\\/:*?"<>|]+/g, '-');
-      pdf.save(`${DOCUMENT_LABELS[invoice.doc_type].replace(/\s+/g, '_')}_${safe}.pdf`);
+      const blob = await buildPdf();
+      if (blob) downloadBlob(pdfFilename(), blob);
     } catch (err) {
       console.error('PDF export failed', err);
+      setError('Could not create the PDF. Try Print → Save as PDF instead.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Share the PDF itself (e.g. into a WhatsApp chat); browsers without file sharing get a download. */
+  const shareReady = async (file: File) => {
+    const result = await shareFile(file, {
+      title: `${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number}`.trim(),
+      text: invoiceSummaryText(invoice as unknown as InvoiceRecord),
+    });
+    if (result === 'blocked') return setReadyToShare(file);
+    setReadyToShare(null);
+    if (result === 'unsupported' || result === 'failed') downloadBlob(file.name, file);
+  };
+
+  const handleSharePDF = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const blob = await buildPdf();
+      if (!blob) return;
+      await shareReady(new File([blob], pdfFilename(), { type: 'application/pdf' }));
+    } catch (err) {
+      console.error('PDF share failed', err);
       setError('Could not create the PDF. Try Print → Save as PDF instead.');
     } finally {
       setBusy(false);
@@ -178,7 +220,12 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
             <Palette size={18} />
           </Link>
           {invoice.id && (
-            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} />
+            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} onSharePdf={canShareFiles() ? handleSharePDF : undefined} />
+          )}
+          {readyToShare && (
+            <button type="button" className={controls.btnPrimary} onClick={() => shareReady(readyToShare)}>
+              <Share2 size={16} /> Share PDF now
+            </button>
           )}
           <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
             <Printer size={16} /> <span className={styles.hideSm}>Print</span>

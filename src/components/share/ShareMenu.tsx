@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Copy,
   Download,
+  FileText,
   Link2,
   Mail,
   MessageCircle,
@@ -22,12 +23,14 @@ import { ReminderModal } from './ReminderModal';
 export interface ShareMenuProps {
   invoice: InvoiceRecord;
   onDownloadPdf?: () => void;
+  /** Share the PDF file through the OS share sheet (only passed where the browser supports it). */
+  onSharePdf?: () => void;
   /** Hide the "Payment reminder" entry (e.g. for quotations). */
   hideReminder?: boolean;
   className?: string;
 }
 
-export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: ShareMenuProps) {
+export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, hideReminder, className }: ShareMenuProps) {
   const [open, setOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -96,6 +99,15 @@ export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: S
 
       {open && (
         <div className={styles.menu} role="menu" id={menuId} aria-label="Share invoice">
+          {onSharePdf && (
+            <>
+              <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onSharePdf)}>
+                <FileText size={16} className={styles.menuIcon} /> Share PDF…
+                <span className={styles.menuHint}>WhatsApp, Mail…</span>
+              </button>
+              <div className={styles.menuSep} role="separator" />
+            </>
+          )}
           <button
             type="button"
             role="menuitem"

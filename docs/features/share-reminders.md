@@ -69,3 +69,11 @@ import { ShareMenu } from '../components/share';
 4. Thank-you on payment: after recording a payment that clears the balance, open `<ReminderModal invoice={inv} open onClose=... />` (its default stage is `thank_you` when paid).
 
 No routes, no new dependencies, no edits to shared core files.
+
+## Sharing the PDF itself
+
+Where the browser can hand files to other apps (Android Chrome, iOS/macOS Safari, Edge), the preview's Share menu
+offers **Share PDF…**: the PDF is built in the browser and passed to the OS share sheet (`shareFile` in
+`src/lib/share.ts`, Web Share Level 2), so it lands in a WhatsApp chat or mail as an attachment. If the browser
+refuses because building the PDF outlasted the tap (`blocked`), a **Share PDF now** button finishes it with one more
+tap; browsers without file sharing get a normal download.
