@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pencil, Plus, Search, Store, Trash2 } from 'lucide-react';
-import type { PurchaseRecord, Vendor } from '../../types/purchases';
+import type { MsmeCategory, PurchaseRecord, Vendor } from '../../types/purchases';
 import { INDIAN_STATES, stateByCode } from '../../lib/india-states';
 import { searchVendors, validateVendor, vendorBalances, vendorsDb } from '../../lib/vendors';
 import { formatCurrency } from '../../lib/utils';
@@ -73,7 +73,11 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
                         <Avatar name={v.name} size={28} square />
                         <div>
                           <div>{v.name}</div>
-                          {(v.phone || v.email) && <div className={tabStyles.sub}>{v.phone || v.email}</div>}
+                          {(v.phone || v.email || v.msme_category) && (
+                            <div className={tabStyles.sub}>
+                              {[v.msme_category && `MSME · ${v.msme_category.toLowerCase()}`, v.phone || v.email].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -185,6 +189,22 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
         <div className={controls.field}>
           <label className={controls.label} htmlFor="v-email">Email</label>
           <input id="v-email" type="email" className={controls.input} value={draft.email ?? ''} onChange={(e) => set({ email: e.target.value })} />
+        </div>
+      </div>
+      <div className={controls.row}>
+        <div className={controls.field}>
+          <label className={controls.label} htmlFor="v-msme">MSME category</label>
+          <select id="v-msme" className={controls.select} value={draft.msme_category ?? ''} onChange={(e) => set({ msme_category: (e.target.value || undefined) as MsmeCategory | undefined })}>
+            <option value="">Not MSME / unknown</option>
+            <option value="MICRO">Micro</option>
+            <option value="SMALL">Small</option>
+            <option value="MEDIUM">Medium</option>
+          </select>
+          <span className={controls.hint}>Micro and small suppliers must be paid within 45 days (Sec 43B(h)).</span>
+        </div>
+        <div className={controls.field}>
+          <label className={controls.label} htmlFor="v-udyam">Udyam number</label>
+          <input id="v-udyam" className={controls.input} placeholder="UDYAM-MH-01-0000001" value={draft.msme_udyam ?? ''} onChange={(e) => set({ msme_udyam: e.target.value })} />
         </div>
       </div>
       <div className={controls.field}>

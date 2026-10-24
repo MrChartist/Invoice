@@ -10,6 +10,7 @@ import { ExpenseModal } from '../components/purchases/ExpenseModal';
 import { PurchasePaymentModal } from '../components/purchases/PurchasePaymentModal';
 import { PurchasesTable } from '../components/purchases/PurchasesTable';
 import { VendorsTab } from '../components/purchases/VendorsTab';
+import { MsmeCard } from '../components/purchases/MsmeCard';
 import {
   PURCHASE_STATUSES,
   categorySummary,
@@ -139,6 +140,8 @@ export function Expenses() {
           hint={topCategory ? `${formatCurrency(topCategory.total)} this month` : 'Nothing logged this month'}
         />
       </div>
+
+      <MsmeCard purchases={purchases} vendors={vendors} payments={payments} today={today} />
 
       <div className={styles.tabs}>
         <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Section">

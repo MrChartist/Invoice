@@ -15,7 +15,13 @@ export interface Vendor {
   address?: string;
   notes?: string;
   created_at?: string;
+  /** Udyam registration number, `UDYAM-XX-00-0000000` (MSMED Act). */
+  msme_udyam?: string;
+  /** Udyam category. Micro and Small suppliers drive the Sec 43B(h) / MSMED Sec 15 tracker. */
+  msme_category?: MsmeCategory;
 }
+
+export type MsmeCategory = 'MICRO' | 'SMALL' | 'MEDIUM';
 
 export type PurchaseKind = 'PURCHASE' | 'EXPENSE';
 

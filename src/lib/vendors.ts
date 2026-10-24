@@ -6,11 +6,12 @@ import { resolveStateCode } from './india-states';
 import { balanceOf } from './purchases';
 import { round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
+import { normalizeUdyam, validateUdyam } from './msme';
 
 export const VENDORS_TABLE = 'vendors';
 
 /** Returns an error message for an invalid vendor draft, or ''. GSTIN is optional (unregistered suppliers). */
-export function validateVendor(v: Pick<Vendor, 'name' | 'gstin' | 'email'>): string {
+export function validateVendor(v: Pick<Vendor, 'name' | 'gstin' | 'email'> & Partial<Pick<Vendor, 'msme_udyam'>>): string {
   if (!v.name?.trim()) return 'Vendor name is required.';
   const gstin = (v.gstin ?? '').trim();
   if (gstin) {
@@ -18,7 +19,7 @@ export function validateVendor(v: Pick<Vendor, 'name' | 'gstin' | 'email'>): str
     if (!check.valid) return check.message ?? 'GSTIN is invalid.';
   }
   if (v.email?.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email.trim())) return 'Email address looks invalid.';
-  return '';
+  return validateUdyam(v.msme_udyam);
 }
 
 export interface VendorBalance {
@@ -67,6 +68,8 @@ export const vendorsDb = {
       name: input.name.trim(),
       gstin: gstin || undefined,
       state_code: resolveStateCode({ code: input.state_code, gstin }) || undefined,
+      msme_udyam: normalizeUdyam(input.msme_udyam) || undefined,
+      msme_category: input.msme_category || undefined,
       created_at: existing?.created_at ?? new Date().toISOString(),
     };
     setTable(VENDORS_TABLE, existing ? rows.map((v) => (v.id === vendor.id ? vendor : v)) : [...rows, vendor]);

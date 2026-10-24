@@ -105,3 +105,27 @@ export function tcsPresets(date?: string): TcsPreset[] {
 
 /** 0 doubles as exempt/nil-rated. 40% is the GST 2.0 demerit slab (from 22 Sep 2025). */
 export const GST_SLABS = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28, 40] as const;
+
+// ── MSME: MSMED Act Sec 15/16 and Income-tax Sec 43B(h) ──────────────────────
+
+/** Payment limits under MSMED Act Sec 15, in days from acceptance (the bill date is used). */
+export const MSME_PAYMENT_DAYS = { agreed: 45, noAgreement: 15 } as const;
+
+/** Sec 43B(h) covers sums due to micro and small enterprises from FY 2023-24 (Finance Act 2023). */
+export const MSME_43BH_FROM = '2023-04-01';
+
+/**
+ * RBI Bank Rate (% p.a.). MSMED Act Sec 16 interest is three times this, compounded
+ * monthly. Dated by RBI policy announcement — append new rates, never edit old ones.
+ */
+export const RBI_BANK_RATE_RULES: readonly Versioned<number>[] = [
+  { from: '2022-12-07', value: 6.5, source: 'RBI policy, Dec 2022' },
+  { from: '2023-02-08', value: 6.75, source: 'RBI policy, Feb 2023' },
+  { from: '2025-02-07', value: 6.5, source: 'RBI policy, Feb 2025' },
+  { from: '2025-04-09', value: 6.25, source: 'RBI policy, Apr 2025' },
+  { from: '2025-06-06', value: 5.75, source: 'RBI policy, Jun 2025' },
+];
+
+export function rbiBankRate(date?: string): number {
+  return ruleAt(RBI_BANK_RATE_RULES, date);
+}
