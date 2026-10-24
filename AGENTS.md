@@ -68,6 +68,8 @@ npm run preview  # preview the production build
 npm run typecheck# tsc -b (no emit)
 npm run lint     # eslint .   (lint:fix to auto-fix)
 npm test         # node:test on tests/**  (zero extra deps; needs Node >= 22)
+npm run test:coverage # same, with a coverage table for src/
+npm run test:e2e # Playwright smoke against dist/ (run `npm run build` first)
 ```
 
 ## Environment

@@ -36,8 +36,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      - name: Test (with coverage report)
+        run: npm run test:coverage
 
       - name: Build (tsc + vite + precache manifest)
         run: npm run build
@@ -52,6 +52,26 @@ jobs:
           path: dist
           retention-days: 14
           if-no-files-found: error
+
+  e2e:
+    name: E2E smoke · Offline (production build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Build
+        run: npm run build
+      - name: E2E smoke (account → invoice → preview → backup → restore)
+        run: npm run test:e2e
+      - name: Offline / service worker
+        run: npm run verify:offline
 
   audit:
     name: Dependency audit (non-blocking)

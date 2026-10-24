@@ -2,7 +2,7 @@
   "name": "mrchartist-invoice",
   "private": true,
   "version": "3.1.0",
-  "description": "Free, open-source, offline-first invoicing and light accounting for Indian businesses — GST-ready, private by design.",
+  "description": "Free, open-source, offline-first invoicing and light accounting for Indian businesses \u2014 GST-ready, private by design.",
   "author": "Rohit Singh <mrchartist@zohomail.in>",
   "homepage": "https://mrchartist.com",
   "type": "module",
@@ -16,7 +16,9 @@
     "test": "node --experimental-strip-types --import ./tests/hooks/register.mjs --test \"tests/**/*.test.ts\"",
     "preview": "vite preview",
     "check:size": "node scripts/check-bundle-size.mjs",
-    "verify:offline": "node scripts/verify-offline.mjs"
+    "verify:offline": "node scripts/verify-offline.mjs",
+    "test:e2e": "node tests/e2e/smoke.mjs",
+    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test-coverage-include=\"src/**\" --import ./tests/hooks/register.mjs --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -40,6 +42,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "playwright": "1.63.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10"
