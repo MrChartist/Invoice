@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import { PURCHASE_CATEGORIES } from '../../types/purchases';
-import { INDIAN_STATES } from '../../lib/india-states';
+import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
@@ -114,7 +114,9 @@ function BillForm({ purchase, vendors, onVendorCreated, businessState, onSaved, 
         onCreated={onVendorCreated}
         onSelect={(v) => {
           setVendorId(v?.id ?? '');
-          if (v?.state_code) setPos(v.state_code);
+          // Vendor's state drives IGST vs CGST+SGST; older vendors may only carry a GSTIN.
+          const vendorState = v ? resolveStateCode({ code: v.state_code, gstin: v.gstin }) : '';
+          if (vendorState) setPos(vendorState);
           if (v) setItc(!!v.gstin);
         }}
       />
