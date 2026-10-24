@@ -84,6 +84,10 @@ interface AuditEntry {
   *"Books are locked up to 30 Sep 2026. INV/… is dated 15 Aug 2026, so it cannot be edited. Unlock it with your PIN
   in the editor, or move the lock date in Settings → Defaults."*
   `store.saveInvoice()` returns `{ ok: false, locked: true, errors }` instead of throwing.
+* **Purchases** (`src/lib/purchases.ts`): `purchasesDb.save` / `remove` refuse a bill or expense whose **bill date**
+  is frozen (or an edit that moves one into the lock), so ITC already claimed cannot change. Supplier payments
+  (`paymentsDb.record` / `remove`) are locked by the **payment's own date** — paying an old bill in an open month
+  is allowed.
 * **Override** (only way past it): `grantOverride(pin, { scope: invoiceId | SETTINGS_OVERRIDE })` verifies the PIN with
   `auth.verifyPin` (counts toward the lockout), then opens a **10-minute, in-memory, single-document** window.
   Grant → `override` audit row; every change made under it is tagged "(period-lock override)".

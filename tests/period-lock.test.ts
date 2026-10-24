@@ -253,3 +253,28 @@ test('partitionByLock splits rows', () => {
   assert.equal(locked.length, 1);
   assert.equal(open.length, 2);
 });
+
+test('bills dated inside the locked period cannot be created, edited or deleted; payments lock by their own date', async () => {
+  const { purchasesDb, paymentsDb } = await import('../src/lib/purchases.ts');
+  const bill = (over: Record<string, unknown> = {}) => ({
+    kind: 'PURCHASE' as const, vendor_name: 'Paper Co', bill_number: 'B-1', date: '2026-04-10',
+    lines: [], taxable: 1000, cgst: 90, sgst: 90, igst: 0, itc_eligible: true, total: 1180, amount_paid: 0, ...over,
+  });
+  const open = purchasesDb.save(bill());
+  const later = purchasesDb.save(bill({ bill_number: 'B-2', date: '2026-05-10' }));
+  const pay = paymentsDb.record(open.id, { amount: 100, date: '2026-04-20', method: 'UPI' });
+  setLock('2026-04-30');
+
+  assert.throws(() => purchasesDb.save(bill({ bill_number: 'B-3' })), PeriodLockedError);
+  assert.throws(() => purchasesDb.save({ ...open, total: 2000 }), PeriodLockedError);
+  assert.throws(() => purchasesDb.save({ ...later, date: '2026-04-15' }), PeriodLockedError, 'cannot move a bill into the lock');
+  assert.throws(() => purchasesDb.remove(open.id), PeriodLockedError);
+  assert.throws(() => paymentsDb.remove(pay.id), PeriodLockedError);
+  assert.throws(() => paymentsDb.record(open.id, { amount: 50, date: '2026-04-25', method: 'UPI' }), PeriodLockedError);
+
+  // Paying an old bill in an open month is ordinary and allowed; the roll-up bypasses the bill lock.
+  paymentsDb.record(open.id, { amount: 50, date: '2026-05-02', method: 'UPI' });
+  assert.equal(purchasesDb.get(open.id)?.amount_paid, 150);
+  purchasesDb.save({ ...later, total: 1300 });
+  assert.equal(purchasesDb.get(later.id)?.total, 1300);
+});

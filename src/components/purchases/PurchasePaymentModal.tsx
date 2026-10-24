@@ -57,7 +57,11 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   };
 
   const removePayment = (id: string) => {
-    paymentsDb.remove(id);
+    try {
+      paymentsDb.remove(id);
+    } catch (err) {
+      return setError((err as Error).message);
+    }
     const updated = purchasesDb.get(purchaseId);
     setAmount(updated ? balanceOf(updated) : 0);
     setVersion((v) => v + 1);

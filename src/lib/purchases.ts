@@ -10,6 +10,7 @@ import type { PurchaseLine, PurchaseRecord } from '../types/purchases';
 import type { GstMode, InvoiceItem } from '../types/invoice';
 import { calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
+import { assertUnlocked, type LockAction } from './period-lock';
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -272,28 +273,52 @@ export function validatePayment(purchase: PurchaseRecord, amount: number, date: 
 
 const now = () => new Date().toISOString();
 
+/**
+ * Period lock for bills: a bill dated inside the locked period (a filed GST month)
+ * cannot be created, edited or deleted, because that would change ITC already
+ * claimed. Throws `PeriodLockedError`.
+ */
+function assertBillUnlocked(bill: Pick<PurchaseRecord, 'id' | 'date' | 'bill_number'>, action: LockAction) {
+  assertUnlocked({ id: bill.id, issue_date: bill.date, invoice_number: bill.bill_number || undefined }, action);
+}
+
+/** Supplier payments are locked by their own date (paying an old bill in an open month is fine). */
+function assertPaymentUnlocked(date: string, action: LockAction) {
+  assertUnlocked({ issue_date: date }, action);
+}
+
+/** Write a bill without the lock check (payment roll-ups only touch `amount_paid`). */
+function writeBill(input: Omit<PurchaseRecord, 'id'> & { id?: string }): PurchaseRecord {
+  const rows = purchasesDb.all();
+  const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
+  const record: PurchaseRecord = {
+    ...existing,
+    ...input,
+    id: existing?.id ?? input.id ?? generateId(),
+    amount_paid: round2(num(input.amount_paid)),
+    created_at: existing?.created_at ?? now(),
+    updated_at: now(),
+  };
+  setTable(PURCHASES_TABLE, existing ? rows.map((r) => (r.id === record.id ? record : r)) : [...rows, record]);
+  return record;
+}
+
 export const purchasesDb = {
   all: (): PurchaseRecord[] => getTable<PurchaseRecord>(PURCHASES_TABLE),
   get: (id: string): PurchaseRecord | undefined => purchasesDb.all().find((p) => p.id === id),
 
-  /** Insert or update (matched by id). Totals must already be computed. */
+  /** Insert or update (matched by id). Totals must already be computed. Respects the period lock. */
   save(input: Omit<PurchaseRecord, 'id'> & { id?: string }): PurchaseRecord {
-    const rows = purchasesDb.all();
-    const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
-    const record: PurchaseRecord = {
-      ...existing,
-      ...input,
-      id: existing?.id ?? input.id ?? generateId(),
-      amount_paid: round2(num(input.amount_paid)),
-      created_at: existing?.created_at ?? now(),
-      updated_at: now(),
-    };
-    setTable(PURCHASES_TABLE, existing ? rows.map((r) => (r.id === record.id ? record : r)) : [...rows, record]);
-    return record;
+    const existing = input.id ? purchasesDb.get(input.id) : undefined;
+    if (existing) assertBillUnlocked(existing, 'edit');
+    assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
+    return writeBill(input);
   },
 
   /** Remove a bill together with its payment history. */
   remove(id: string): void {
+    const bill = purchasesDb.get(id);
+    if (bill) assertBillUnlocked(bill, 'delete');
     setTable(PURCHASES_TABLE, purchasesDb.all().filter((p) => p.id !== id));
     setTable(PAYMENTS_TABLE, paymentsDb.all().filter((p) => p.purchase_id !== id));
   },
@@ -311,12 +336,13 @@ export const paymentsDb = {
     const amount = round2(num(p.amount));
     const problem = validatePayment(bill, amount, p.date);
     if (problem) throw new Error(problem);
+    assertPaymentUnlocked(p.date, 'pay');
     const payment: PurchasePayment = {
       id: generateId(), purchase_id: purchaseId, amount, date: p.date,
       method: p.method, reference: p.reference?.trim() || undefined, created_at: now(),
     };
     setTable(PAYMENTS_TABLE, [...paymentsDb.all(), payment]);
-    purchasesDb.save({ ...bill, amount_paid: round2(num(bill.amount_paid) + amount) });
+    writeBill({ ...bill, amount_paid: round2(num(bill.amount_paid) + amount) });
     return payment;
   },
 
@@ -324,8 +350,9 @@ export const paymentsDb = {
     const all = paymentsDb.all();
     const target = all.find((p) => p.id === paymentId);
     if (!target) return;
+    assertPaymentUnlocked(target.date, 'unpay');
     setTable(PAYMENTS_TABLE, all.filter((p) => p.id !== paymentId));
     const bill = purchasesDb.get(target.purchase_id);
-    if (bill) purchasesDb.save({ ...bill, amount_paid: Math.max(round2(num(bill.amount_paid) - target.amount), 0) });
+    if (bill) writeBill({ ...bill, amount_paid: Math.max(round2(num(bill.amount_paid) - target.amount), 0) });
   },
 };
