@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -65,7 +65,7 @@ preview → second tab → backup → restore/undo) plus the offline checks agai
 
 ---
 
-## Phase 2: Getting paid & daily UX (v3.3) · ~4–6 weeks
+## Phase 2: Getting paid & daily UX (v3.3) · ✅ done
 
 The upgrades users notice most, measured against Zoho, Vyapar, Refrens and myBillBook.
 
@@ -79,6 +79,12 @@ The upgrades users notice most, measured against Zoho, Vyapar, Refrens and myBil
 | 2.6 | **Quotation lifecycle** (Sent/Accepted/Declined/Expired via `valid_until`) + **ship-to / consignee address** (already accepted by `eway.ts`) | Tracks quotes through to conversion; correct e-way data | S–M |
 | 2.7 | **Mobile**: bottom tab bar (Home · New · Invoices · Clients · More), fit-to-width preview with pinch zoom | Usable day to day on a phone; preview is 30% scale today | S |
 | 2.8 | **"Client copy" HTML file**: self-contained invoice + UPI QR + tappable `upi://` button + print stylesheet | A client portal with no server; fixes `upi://` links that can't be tapped in messages | M |
+
+**Outcome:** all eight shipped, each covered by the Playwright journey (wizard → typeahead → share PDF → client copy
+→ receipt → bulk paid → undo). Left out on purpose: a ZIP of PDFs (each PDF must be rendered on screen and a ZIP
+needs a dependency) and "save typed client" (saving an invoice already adds the client). Found and fixed on the way:
+`normalizeRecord` dropped fields it did not list, so reopening and saving a document could lose them — a test now
+guards every persisted field.
 
 ---
 

@@ -9,9 +9,10 @@ import { TemplateEngine } from '../templates/TemplateEngine';
 import { ShareMenu } from '../share';
 import { pageSlices, paperSize, resolve as resolveDesign } from '../../lib/design-prefs';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
-import { cn } from '../../lib/utils';
+import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { downloadBlob } from '../../lib/download';
-import { canShareFiles, invoiceSummaryText, shareFile } from '../../lib/share';
+import { canShareFiles, invoiceSummaryText, invoiceUpiLink, shareFile } from '../../lib/share';
+import { buildClientCopyHtml } from '../../lib/client-copy';
 import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
@@ -165,6 +166,57 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
     }
   };
 
+  /**
+   * Client copy: the rendered page as one static HTML file with a pay panel. QR canvases are
+   * frozen into images and the app's stylesheet rules are inlined so it opens anywhere offline.
+   */
+  const handleClientCopy = async () => {
+    const node = paperRef.current;
+    if (!node) return;
+    const clone = node.cloneNode(true) as HTMLElement;
+    const live = Array.from(node.querySelectorAll('canvas'));
+    let qrDataUrl: string | undefined;
+    Array.from(clone.querySelectorAll('canvas')).forEach((c, i) => {
+      try {
+        const url = live[i]?.toDataURL('image/png');
+        if (!url) return;
+        qrDataUrl ??= url;
+        const img = document.createElement('img');
+        img.src = url;
+        img.width = live[i].width;
+        img.height = live[i].height;
+        img.style.cssText = live[i].style.cssText;
+        img.alt = 'QR code';
+        c.replaceWith(img);
+      } catch {
+        c.remove();
+      }
+    });
+    const css = Array.from(document.styleSheets)
+      .map((sheet) => {
+        try {
+          return Array.from(sheet.cssRules).map((r) => r.cssText).join('\n');
+        } catch {
+          return '';
+        }
+      })
+      .join('\n');
+    const rec = invoice as unknown as InvoiceRecord;
+    const due = Number(rec.balance_due) > 0 ? rec.balance_due : 0;
+    const html = buildClientCopyHtml({
+      title: `${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number}`.trim(),
+      paperHtml: clone.outerHTML,
+      css,
+      business: rec.sender?.companyName ?? '',
+      pay: due > 0 && rec.doc_type !== 'QUOTATION' ? { amountText: formatCurrency(due, rec.currency), upiLink: invoiceUpiLink(rec), upiId: rec.sender?.upiId, qrDataUrl } : null,
+      generatedOn: formatDate(new Date()),
+    });
+    const name = pdfFilename().replace(/\.pdf$/, '.html');
+    const file = new File([html], name, { type: 'text/html' });
+    const result = canShareFiles(file) ? await shareFile(file, { title: name }) : 'unsupported';
+    if (result === 'unsupported' || result === 'failed' || result === 'blocked') downloadBlob(name, file);
+  };
+
   /** Share the PDF itself (e.g. into a WhatsApp chat); browsers without file sharing get a download. */
   const shareReady = async (file: File) => {
     const result = await shareFile(file, {
@@ -235,7 +287,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
             <Palette size={18} />
           </Link>
           {invoice.id && (
-            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} onSharePdf={canShareFiles() ? handleSharePDF : undefined} />
+            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} onSharePdf={canShareFiles() ? handleSharePDF : undefined} onClientCopy={handleClientCopy} />
           )}
           {readyToShare && (
             <button type="button" className={controls.btnPrimary} onClick={() => shareReady(readyToShare)}>

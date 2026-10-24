@@ -157,6 +157,28 @@ try {
     await page.keyboard.press('Escape');
   });
 
+  await step('client copy is a static web page with a pay button', async () => {
+    // The earlier step stubbed navigator.share; drop it so this one downloads.
+    await page.evaluate(() => { delete navigator.share; delete navigator.canShare; });
+    await page.reload();
+    await page.getByRole('button', { name: /preview|view/i }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.getByRole('button', { name: /^Share/ }).click();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Client copy/ }).click()]);
+    const html = readFileSync(await dl.path(), 'utf8');
+    check(/\.html$/.test(dl.suggestedFilename()) && !/<script/i.test(html) && html.includes('Acme Buyers') && /href="upi:\/\/pay\?pa=e2e@okhdfcbank/.test(html),
+      `client copy: ${dl.suggestedFilename()}, ${Math.round(html.length / 1024)} KB, no scripts, pay link present`);
+    // It renders on its own, offline, under its own strict CSP.
+    const viewer = await context.newPage();
+    const errs = [];
+    viewer.on('pageerror', (e) => errs.push(String(e)));
+    await viewer.setContent(html);
+    const shown = await viewer.locator('text=Pay with UPI').count();
+    check(shown === 1 && errs.length === 0, 'client copy opens standalone with the Pay with UPI button');
+    await viewer.close();
+    await page.keyboard.press('Escape');
+  });
+
   await step('change in a second tab', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByText('Acme Buyers').first().waitFor();

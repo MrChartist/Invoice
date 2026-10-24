@@ -77,3 +77,12 @@ offers **Share PDF…**: the PDF is built in the browser and passed to the OS sh
 `src/lib/share.ts`, Web Share Level 2), so it lands in a WhatsApp chat or mail as an attachment. If the browser
 refuses because building the PDF outlasted the tap (`blocked`), a **Share PDF now** button finishes it with one more
 tap; browsers without file sharing get a normal download.
+
+## Client copy (web page)
+
+Share → **Client copy (web page)** turns the rendered preview into one static HTML file (`buildClientCopyHtml` in
+`src/lib/client-copy.ts`): the page markup is cloned, QR canvases are frozen into PNG images, the app's stylesheet
+rules are inlined, and an on-screen pay panel adds the amount due, a tappable **Pay with UPI** (`upi://`) button,
+the UPI ID and QR. It carries its own `default-src 'none'` CSP, no scripts (`sanitizePaper` strips any), and opens
+offline in any browser; printing hides the pay panel. Shared as a file where supported, otherwise downloaded.
+Fonts fall back to the system font outside the app.

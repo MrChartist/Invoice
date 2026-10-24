@@ -5,6 +5,7 @@ import {
   Copy,
   Download,
   FileText,
+  Globe,
   Link2,
   Mail,
   MessageCircle,
@@ -25,12 +26,14 @@ export interface ShareMenuProps {
   onDownloadPdf?: () => void;
   /** Share the PDF file through the OS share sheet (only passed where the browser supports it). */
   onSharePdf?: () => void;
+  /** Send a self-contained HTML copy with a pay button (the preview supplies it). */
+  onClientCopy?: () => void;
   /** Hide the "Payment reminder" entry (e.g. for quotations). */
   hideReminder?: boolean;
   className?: string;
 }
 
-export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, hideReminder, className }: ShareMenuProps) {
+export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onClientCopy, hideReminder, className }: ShareMenuProps) {
   const [open, setOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -147,6 +150,12 @@ export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, hideReminder, cl
             <Link2 size={16} className={styles.menuIcon} /> Copy payment link
             {!payLink && <span className={styles.menuHint}>no UPI</span>}
           </button>
+          {onClientCopy && (
+            <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onClientCopy)}>
+              <Globe size={16} className={styles.menuIcon} /> Client copy (web page)
+              <span className={styles.menuHint}>opens anywhere</span>
+            </button>
+          )}
           {onDownloadPdf && (
             <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onDownloadPdf)}>
               <Download size={16} className={styles.menuIcon} /> Download PDF
