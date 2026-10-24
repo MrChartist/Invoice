@@ -86,3 +86,12 @@ The module captures `beforeinstallprompt` on import, so import it early (main.ts
 `npx tsc -b`, `npm run lint` (0 errors), `npm test` (34 pass), `npm run build` pass. Playwright smoke against
 `vite preview`: SW registered, page became controlled, shell/assets/fonts cached, and with the context offline
 `/invoice/abc` loaded the React shell (200, root mounted).
+
+## Restore safety
+
+- `parseBackup` / `validateBackupData` refuse a file before anything is written when a record table
+  (`invoices`, `clients`, `items_catalog`, `transactions`, `vendors`, `purchases`, `purchase_payments`, `recurring`,
+  `doc_links`, `audit_log`) is not a JSON array of objects (core tables need an `id`), settings are not an object,
+  or the file / `schema_version` is newer than this app.
+- Before a restore or an erase, `saveSafetySnapshot(reason)` copies every app key into IndexedDB (`safety-snapshot`,
+  outside the localStorage quota). Settings → Data shows **Undo last restore / erase** while that copy exists.

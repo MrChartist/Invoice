@@ -3,6 +3,7 @@ import { Download, FileLock2, Info, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import {
   restoreBackup,
+  saveSafetySnapshot,
   backupFilename,
   buildEncryptedBackup,
   decryptBackup,
@@ -97,8 +98,10 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
     }
   };
 
-  const restore = () => {
+  const restore = async () => {
     if (!summary) return;
+    // Undo copy for Settings → Data → "Undo last restore".
+    await saveSafetySnapshot('restore');
     try {
       restoreBackup(summary.data);
       notify('Backup restored — reloading…');

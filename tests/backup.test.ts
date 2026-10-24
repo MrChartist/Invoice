@@ -116,3 +116,22 @@ test('encrypted backup: parseBackup flags it, tampering is detected, plaintext i
   await assert.rejects(decryptBackup('{"a":1}', 'x'), /not an encrypted/);
   assert.match(backupFilename(new Date('2026-04-01T00:00:00Z'), true), /2026-04-01\.encrypted\.json$/);
 });
+
+test('parseBackup refuses damaged record tables, bad settings and newer versions', async () => {
+  const { LATEST_SCHEMA_VERSION } = await import('../src/lib/migrations.ts');
+  const file = (data: Record<string, string>, version = 1) => JSON.stringify({ app: 'mrchartist-invoice', version, exportedAt: '', data });
+  const ok = { mrchartist_inv_invoices: '[{"id":"a"}]', mrchartist_inv_settings: '{"profiles":[]}' };
+  assert.equal(parseBackup(file(ok)).summary.invoices, 1);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_invoices: '{"id":"a"}' })), /"invoices" table .* not a list/);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_invoices: '[{"id":"a"},' })), /"invoices" table .* damaged/);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_clients: '[{"name":"no id"}]' })), /Row 1 of the "clients"/);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_audit_log: '[1,2]' })), /"audit_log"/);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_settings: '[]' })), /settings/);
+  assert.throws(() => parseBackup(file(ok, 2)), /newer version/);
+  assert.throws(
+    () => parseBackup(file({ ...ok, mrchartist_inv_schema_version: String(LATEST_SCHEMA_VERSION + 1) })),
+    /newer version/,
+  );
+  // Unknown and loosely-shaped keys still pass through untouched.
+  assert.equal(parseBackup(file({ ...ok, mrchartist_inv_template: 'modern' })).data.mrchartist_inv_template, 'modern');
+});

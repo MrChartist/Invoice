@@ -7,7 +7,9 @@
  * unrelated site data.
  */
 
-import { DB_PREFIX, collectAppData, readRaw, writeRaw } from './storage';
+import { DB_PREFIX, collectAppData, readRaw, removeRaw, writeRaw } from './storage';
+import { idbDel, idbGet, idbSet } from './idb-kv';
+import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
 import { localDayOf } from './dates';
 import { audit } from './audit';
@@ -175,6 +177,10 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
   if (root.app === BACKUP_APP_ID && root.encrypted === true) throw new EncryptedBackupError();
   const source = (root.app === BACKUP_APP_ID && root.data && typeof root.data === 'object' ? root.data : root) as Record<string, unknown>;
 
+  if (root.app === BACKUP_APP_ID && typeof root.version === 'number' && root.version > 1) {
+    throw new Error('This backup was made by a newer version of the app. Update the app, then restore it.');
+  }
+
   const data: Record<string, string> = {};
   for (const [key, value] of Object.entries(source)) {
     if (!key.startsWith(DB_PREFIX) || LOCAL_ONLY.has(key)) continue;
@@ -183,6 +189,7 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
   if (Object.keys(data).length === 0) {
     throw new Error('No invoice data found in this file.');
   }
+  validateBackupData(data);
 
   return {
     data,
@@ -192,6 +199,89 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
       keys: Object.keys(data).length,
     },
   };
+}
+
+/** Tables whose rows are records; a restore refuses a file where one of them is malformed. */
+const RECORD_TABLES = [
+  'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases',
+  'purchase_payments', 'recurring', 'doc_links', 'audit_log',
+];
+/** Core tables whose rows must also carry an `id`. */
+const ID_TABLES = new Set(['invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments']);
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * Shape check before anything is written: record tables must be JSON arrays of objects
+ * (core tables with ids), settings an object, and the schema version not newer than this
+ * app understands. Throws a readable Error naming the bad table.
+ */
+export function validateBackupData(data: Record<string, string>): void {
+  const version = data[SCHEMA_VERSION_KEY];
+  if (version !== undefined) {
+    const n = Number(version);
+    if (!Number.isInteger(n) || n < 0) throw new Error('This backup has an invalid schema version.');
+    if (n > LATEST_SCHEMA_VERSION) {
+      throw new Error('This backup was made by a newer version of the app. Update the app, then restore it.');
+    }
+  }
+  for (const table of RECORD_TABLES) {
+    const raw = data[DB_PREFIX + table];
+    if (raw === undefined) continue;
+    let rows: unknown;
+    try {
+      rows = JSON.parse(raw);
+    } catch {
+      throw new Error(`The "${table}" table in this backup is damaged (not valid JSON).`);
+    }
+    if (!Array.isArray(rows)) throw new Error(`The "${table}" table in this backup is not a list.`);
+    const needsId = ID_TABLES.has(table);
+    // Older versions wrote numeric ids, so a number is fine; a missing id is not.
+    const hasId = (r: Record<string, unknown>) => (typeof r.id === 'string' && r.id !== '') || typeof r.id === 'number';
+    const bad = rows.findIndex((r) => !isPlainObject(r) || (needsId && !hasId(r)));
+    if (bad >= 0) throw new Error(`Row ${bad + 1} of the "${table}" table in this backup is damaged.`);
+  }
+  const settings = data[`${DB_PREFIX}settings`];
+  if (settings !== undefined) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(settings);
+    } catch {
+      parsed = null;
+    }
+    if (!isPlainObject(parsed)) throw new Error('The settings in this backup are damaged.');
+  }
+}
+
+/* ── Safety snapshot (taken before a restore or wipe) ──────────── */
+
+const SAFETY_KEY = 'safety-snapshot';
+
+export interface SafetySnapshot {
+  at: string;
+  reason: 'restore' | 'wipe';
+  data: Record<string, string>;
+}
+
+/**
+ * Keep a copy of everything on this device in IndexedDB (separate from the
+ * localStorage quota) so a restore or wipe can be undone. Resolves false if the
+ * browser cannot store it; callers decide whether to continue.
+ */
+export async function saveSafetySnapshot(reason: SafetySnapshot['reason'], now: Date = new Date()): Promise<boolean> {
+  const data = collectAppData();
+  for (const key of LOCAL_ONLY) delete data[key];
+  if (Object.keys(data).length === 0) return true; // nothing to protect
+  return idbSet(SAFETY_KEY, { at: now.toISOString(), reason, data } satisfies SafetySnapshot);
+}
+
+export async function getSafetySnapshot(): Promise<SafetySnapshot | null> {
+  const s = await idbGet<SafetySnapshot>(SAFETY_KEY);
+  return s && typeof s.at === 'string' && isPlainObject(s.data) ? s : null;
+}
+
+export async function clearSafetySnapshot(): Promise<void> {
+  await idbDel(SAFETY_KEY);
 }
 
 /** Writes validated backup keys into storage. Throws StorageWriteError if the quota is hit. */
@@ -208,7 +298,7 @@ export function applyBackup(data: Record<string, string>): void {
   } catch (err) {
     for (const [key, before] of written.reverse()) {
       try {
-        if (before === null) localStorage.removeItem(key);
+        if (before === null) removeRaw(key);
         else writeRaw(key, before);
       } catch {
         /* best effort: the original error is what the user needs to see */
@@ -253,6 +343,6 @@ export function restoreBackup(data: Record<string, string>): void {
 /** Removes every app-owned key except this device's PIN / lock settings. */
 export function wipeAppData(): void {
   for (const key of Object.keys(collectAppData())) {
-    if (!LOCAL_ONLY.has(key)) localStorage.removeItem(key);
+    if (!LOCAL_ONLY.has(key)) removeRaw(key);
   }
 }

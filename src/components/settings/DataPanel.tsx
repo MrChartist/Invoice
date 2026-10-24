@@ -1,8 +1,20 @@
-import { useMemo, useRef, useState } from 'react';
-import { DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Package, Trash2, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
-import { backupFilename, restoreBackup, buildBackup, markBackupDone, parseBackup, wipeAppData, type BackupSummary } from '../../lib/backup';
+import {
+  backupFilename,
+  buildBackup,
+  clearSafetySnapshot,
+  getSafetySnapshot,
+  markBackupDone,
+  parseBackup,
+  restoreBackup,
+  saveSafetySnapshot,
+  wipeAppData,
+  type BackupSummary,
+  type SafetySnapshot,
+} from '../../lib/backup';
 import { ImportWizard } from '../import/ImportWizard';
 import { SampleDataCard } from '../demo/SampleDataCard';
 import { appDataSize } from '../../lib/storage';
@@ -33,6 +45,16 @@ export function DataPanel({ notify }: Props) {
   const [pending, setPending] = useState<PendingRestore | null>(null);
   const [wipeOpen, setWipeOpen] = useState(false);
   const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
+  const [safety, setSafety] = useState<SafetySnapshot | null>(null);
+  const [undoOpen, setUndoOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getSafetySnapshot().then((snap) => alive && setSafety(snap));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const used = useMemo(() => appDataSize(), [version]);
@@ -76,8 +98,10 @@ export function DataPanel({ notify }: Props) {
     }
   };
 
-  const restore = () => {
+  const restore = async () => {
     if (!pending) return;
+    // Keep what is on the device now, so the restore can be undone from this panel.
+    if (!(await saveSafetySnapshot('restore'))) notify('Could not keep an undo copy in this browser; restoring anyway.', 'info');
     try {
       restoreBackup(pending.data);
       notify('Backup restored — reloading…');
@@ -132,6 +156,17 @@ export function DataPanel({ notify }: Props) {
             </button>
           </div>
           <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+          {safety && (
+            <div className={styles.actionGrid}>
+              <button type="button" className={styles.action} onClick={() => setUndoOpen(true)}>
+                <strong><RotateCcw size={16} /> Undo last {safety.reason === 'wipe' ? 'erase' : 'restore'}</strong>
+                <span>
+                  A copy of your data was kept on {new Date(safety.at).toLocaleString('en-IN')}, just before it was
+                  replaced. Put it back if the restore was a mistake.
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -251,11 +286,32 @@ export function DataPanel({ notify }: Props) {
         title="Erase all data?"
         message="This cannot be undone. Download a backup first if there is anything you may need."
         confirmLabel="Erase everything"
-        onConfirm={() => {
+        onConfirm={async () => {
+          await saveSafetySnapshot('wipe');
           wipeAppData();
           window.location.reload();
         }}
         onClose={() => setWipeOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={undoOpen}
+        destructive
+        title={`Undo the last ${safety?.reason === 'wipe' ? 'erase' : 'restore'}?`}
+        message={`Everything on this device will be replaced by the copy taken on ${safety ? new Date(safety.at).toLocaleString('en-IN') : ''}. Your PIN is kept.`}
+        confirmLabel="Put it back"
+        onConfirm={async () => {
+          if (!safety) return;
+          try {
+            restoreBackup(safety.data);
+            await clearSafetySnapshot();
+            notify('Previous data put back — reloading…');
+            setTimeout(() => window.location.reload(), 700);
+          } catch (err) {
+            notify((err as Error).message, 'error');
+          }
+        }}
+        onClose={() => setUndoOpen(false)}
       />
     </div>
   );
