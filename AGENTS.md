@@ -91,4 +91,6 @@ build-time config must use Vite's `VITE_` prefix.
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.
 - A 4-6 digit PIN is a lock screen, not encryption of the stored data.
-- `.xlsx` import is not supported (would need a dependency); CSV only.
+- `.xlsx` is handled by our own minimal reader/writer (`src/lib/zip.ts` + `src/lib/xlsx.ts`, native
+  `DecompressionStream`/`CompressionStream`): no `.xls`/`.ods`/encrypted/ZIP64 workbooks, no styles beyond a bold
+  header row on export. Imports read the first non-empty sheet. Keep it out of the shell (dynamic import).

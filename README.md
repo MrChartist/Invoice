@@ -125,7 +125,7 @@ Please read this section before you rely on the app for real records.
 - **Bank reconciliation** treats the bank as a single account.
 - **Foreign-currency documents** are excluded from INR totals, not converted.
 - **The balance sheet is indicative only.** Fixed assets, loans and GST remittances are not tracked.
-- **`.xlsx` files are not read directly** (that would need a dependency). Export to CSV first.
+- **Excel**: `.xlsx` is read (first sheet) and written by a small built-in reader/writer — no dependency. Old `.xls`, `.ods` and password-protected workbooks are not supported; save them as `.xlsx` or CSV.
 - **Aggregate turnover** for the GSTR-1 JSON is entered by you in the GST reports screen. Verify it with your CA.
 
 ## Architecture

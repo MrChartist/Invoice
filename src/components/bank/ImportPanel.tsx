@@ -49,14 +49,17 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
       return;
     }
     try {
-      const content = await file.text();
+      // Excel statements: first sheet → CSV text (dates come back as YYYY-MM-DD); parser loaded on demand.
+      const content = /\.(xlsx|xlsm)$/i.test(file.name)
+        ? await (await import('../../lib/xlsx')).xlsxToCsv(await file.arrayBuffer())
+        : await file.text();
       setFileName(file.name);
       setText(content);
       setForced(null);
       setRemap(false);
       setBankLabel('');
-    } catch {
-      setReadError('Could not read that file.');
+    } catch (err) {
+      setReadError(err instanceof Error && err.name === 'ZipError' ? err.message : 'Could not read that file.');
     }
   };
 
@@ -99,19 +102,19 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
           <span className={styles.dropIcon} aria-hidden="true"><FileUp size={24} /></span>
           <h3 className={styles.dropTitle}>Import a bank statement</h3>
           <p className={styles.muted} style={{ maxWidth: 460 }}>
-            Download the statement as <strong>CSV</strong> from your net banking (HDFC, ICICI, SBI, Axis, Kotak and most others work) and drop it here.
+            Download the statement as <strong>CSV</strong> or <strong>Excel (.xlsx)</strong> from your net banking (HDFC, ICICI, SBI, Axis, Kotak and most others work) and drop it here.
             Nothing leaves your device.
           </p>
           <input
             ref={fileRef}
             id={inputId}
             type="file"
-            accept=".csv,.txt,text/csv,text/plain"
+            accept=".csv,.txt,.xlsx,.xlsm,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className={surface.srOnly}
             onChange={(e) => void load(e.target.files?.[0])}
           />
           <label htmlFor={inputId} className={controls.btnPrimary} style={{ cursor: 'pointer' }}>
-            <Upload size={16} /> Choose CSV file
+            <Upload size={16} /> Choose CSV / Excel file
           </label>
           {readError && <div className={controls.error} role="alert">{readError}</div>}
           {onCancel && <button type="button" className={controls.btnGhost} onClick={onCancel}>Cancel</button>}

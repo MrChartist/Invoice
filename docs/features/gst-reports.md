@@ -4,7 +4,7 @@ Offline working papers for GST filing, built from `invoices` (and, defensively, 
 
 - Route: `/gst-reports`
 - Nav label: `GST reports`, icon `FileSpreadsheet` (alt `Landmark`) from lucide-react
-- Tables read (read-only): `invoices`, `purchases` (may be empty or absent), `doc_links`. Tables written: `compliance` (filed marks, Compliance tab, see `compliance.md`).
+- Tables read (read-only): `invoices`, `purchases` (may be empty or absent), `doc_links`. Tables written: `compliance` (filed marks, Compliance tab, see `compliance.md`), `gstr2b_actions` (IMS decisions, 2B match tab, see `gstr2b.md`).
 - Persisted fields added: settings `gst_filing_frequency?: 'monthly' | 'qrmp'` (Compliance tab; additive, absent = monthly).
 
 ## Files
@@ -14,7 +14,7 @@ Offline working papers for GST filing, built from `invoices` (and, defensively, 
 | `src/lib/gst-reports.ts` | Pure logic: periods, GSTR-1 sections, GSTR-3B, set-off, purchase normaliser, reconciliation issues |
 | `src/lib/gstr-json.ts` | GSTN offline-tool style JSON, CSV per section, GSTR-3B CSV, printable HTML summary |
 | `src/pages/GstReports.tsx` (+ `.module.css`) | Page (default and named export `GstReports`) |
-| `src/components/gst-reports/` | `DataTable`, `ReconBanner`, `PeriodPicker`, `Gstr3bView`, `ComplianceView`, `gst-reports.module.css` |
+| `src/components/gst-reports/` | `DataTable`, `ReconBanner`, `PeriodPicker`, `Gstr3bView`, `ComplianceView`, `Gstr2bView` (lazy, "2B match" tab — see `gstr2b.md`), `gst-reports.module.css` |
 | `tests/gst-reports.test.ts` | Main suite with hand-computed fixtures |
 | `tests/hsn-split.test.ts` | HSN Table 12 B2B/B2C split, JSON/CSV layout, 4/6-digit rule |
 

@@ -96,8 +96,8 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
   const loadFile = useCallback(
     async (file: File | undefined) => {
       if (!file) return;
-      if (/\.(xlsx|xlsm|xls|ods|numbers)$/i.test(file.name)) {
-        dispatch({ type: 'loadFailed', message: 'Excel workbooks cannot be read directly. In Excel choose File → Save As → "CSV UTF-8 (Comma delimited)" and pick that file.' });
+      if (/\.(xls|ods|numbers)$/i.test(file.name)) {
+        dispatch({ type: 'loadFailed', message: 'This spreadsheet format cannot be read directly. Save it as Excel .xlsx or "CSV UTF-8 (Comma delimited)" and pick that file.' });
         return;
       }
       if (file.size > MAX_BYTES) {
@@ -105,6 +105,16 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
         return;
       }
       try {
+        if (/\.(xlsx|xlsm)$/i.test(file.name)) {
+          // .xlsx → first sheet as CSV text; the parser is loaded only when needed.
+          const { xlsxToCsv } = await import('../../lib/xlsx');
+          try {
+            loadText(await xlsxToCsv(await file.arrayBuffer()), file.name);
+          } catch (err) {
+            dispatch({ type: 'loadFailed', message: err instanceof Error ? err.message : 'Could not read that workbook.' });
+          }
+          return;
+        }
         loadText(await file.text(), file.name);
       } catch {
         dispatch({ type: 'loadFailed', message: 'Could not read that file.' });
