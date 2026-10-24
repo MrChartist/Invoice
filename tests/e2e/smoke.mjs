@@ -327,6 +327,39 @@ try {
     const left = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]').length);
     check(left === 0, `the delete is committed after the undo window (${left} left)`);
   });
+
+  await step('time tracking: timer pill, manual entry, bill to a draft invoice', async () => {
+    await page.goto(srv.origin + '/time');
+    await page.locator('#tm-client').selectOption({ label: 'Acme Buyers' });
+    await page.getByRole('button', { name: /Start timer/ }).click();
+    const pill = page.getByRole('link', { name: /Timer running for Acme Buyers/ }).first();
+    await pill.waitFor();
+    await page.reload();
+    await pill.waitFor();
+    check(true, 'timer pill shows in the header and survives a reload');
+    await page.getByRole('button', { name: /Stop & log/ }).click();
+    await page.getByRole('button', { name: /Start timer/ }).waitFor();
+    check(await pill.count() === 0, 'pill disappears once the timer stops');
+
+    await page.getByRole('button', { name: /Add time/ }).click();
+    await page.locator('#te-client').selectOption({ label: 'Acme Buyers' });
+    await page.getByLabel('Description').fill('Strategy call');
+    await page.getByLabel('Time (h:mm)').fill('1:30');
+    await page.getByLabel('Rate / hour').fill('1000');
+    await page.getByRole('button', { name: 'Add entry' }).click();
+    await page.getByText('Strategy call').first().waitFor();
+
+    await page.getByRole('tab', { name: 'Unbilled' }).click();
+    await page.getByRole('button', { name: /^Bill$/ }).first().click();
+    await page.getByRole('button', { name: 'Create draft invoice' }).click();
+    await page.waitForURL(/\/invoice\/.+/);
+    const inv = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]')[0]);
+    const item = inv?.items?.[0] ?? {};
+    check(inv?.status === 'Draft' && item.quantity === 1.5 && item.unit === 'HRS' && item.hsn === '998311',
+      `bill-from-time draft: ${inv?.status}, ${item.quantity} ${item.unit}, SAC ${item.hsn}`);
+    const entries = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_time_entries') || '[]'));
+    check(entries.length === 1 && entries[0].invoiced_in === inv.id, `time entry linked to the invoice (${entries.length})`);
+  });
 } catch {
   /* already reported */
 } finally {

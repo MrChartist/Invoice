@@ -5,6 +5,8 @@ import { GST_SLABS } from '../../types/invoice';
 import { computePurchaseTotals, expenseLine, paymentsDb, purchasesDb, PAYMENT_METHODS } from '../../lib/purchases';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
+import { BillableFields } from './BillableFields';
+import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
@@ -48,6 +50,11 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
   const [paidNow, setPaidNow] = useState(true);
   const [method, setMethod] = useState('UPI');
   const [notes, setNotes] = useState(expense?.notes ?? '');
+  const [billable, setBillable] = useState<BillableValue>({
+    billable_to_client_id: expense?.billable_to_client_id,
+    markup_percent: expense?.markup_percent,
+    pure_agent: expense?.pure_agent,
+  });
   const [error, setError] = useState('');
 
   const vendor = vendors.find((v) => v.id === vendorId);
@@ -84,6 +91,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         total: totals.total,
         amount_paid: expense?.amount_paid ?? 0,
         notes: notes.trim() || undefined,
+        ...billablePatch(billable),
       });
       if (!expense && paidNow) paymentsDb.record(saved.id, { amount: saved.total, date, method });
       onSaved(expense ? 'Expense updated' : `Expense of ${formatCurrency(saved.total)} added`);
@@ -189,6 +197,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         <label className={controls.label} htmlFor="exp-notes">Notes</label>
         <textarea id="exp-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+
+      <BillableFields idPrefix="exp" value={billable} onChange={setBillable} rebilledIn={expense?.rebilled_in} />
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>

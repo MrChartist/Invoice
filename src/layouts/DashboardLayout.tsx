@@ -22,6 +22,7 @@ import {
   Search,
   Settings,
   Sun,
+  Timer,
   Users,
   X,
   type LucideIcon,
@@ -36,6 +37,7 @@ import { UpdateToast } from '../components/pwa/UpdateToast';
 import { BackupNudge } from '../components/pwa/BackupNudge';
 import { CrossTabNotice } from '../components/pwa/CrossTabNotice';
 import { AutoBackupRunner } from '../components/pwa/AutoBackupRunner';
+import { TimerPill } from '../components/time/TimerPill';
 import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
 import { cn } from '../lib/utils';
@@ -67,6 +69,7 @@ const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
       { label: 'Invoices', path: '/transactions', icon: FileText, match: (p) => p.startsWith('/transactions') || /^\/invoice\/.+/.test(p) },
       { label: 'Clients', path: '/clients', icon: Users },
       { label: 'Recurring', path: '/recurring', icon: Repeat },
+      { label: 'Time', path: '/time', icon: Timer },
       { label: 'Receivables', path: '/receivables', icon: Scale },
     ],
   },
@@ -261,6 +264,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           <Logo height={30} product={false} />
         </Link>
         <div className={styles.topActions}>
+          <TimerPill />
           <button type="button" className={styles.iconBtn} aria-label="Search" onClick={() => openPalette()}>
             <Search size={18} />
           </button>
@@ -344,6 +348,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <kbd>{formatCombo('mod+k')}</kbd>
           </button>
           <div className={styles.utilActions}>
+            <TimerPill />
             <button type="button" className={styles.iconBtn} onClick={() => openHelp()} aria-label="Help and about" title="Help & about">
               <HelpCircle size={18} />
             </button>

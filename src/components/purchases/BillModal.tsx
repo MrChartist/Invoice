@@ -5,6 +5,8 @@ import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
+import { BillableFields } from './BillableFields';
+import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
 import controls from '../../styles/controls.module.css';
@@ -60,6 +62,11 @@ function BillForm({ purchase, vendors, onVendorCreated, businessState, onSaved, 
   const [blocked, setBlocked] = useState(wasBlocked);
   const [reversed, setReversed] = useState(wasBlocked ? 0 : purchase?.itc_reversed ?? 0);
   const [reason, setReason] = useState<ItcReversalReason>(wasBlocked ? 'RULE_42' : purchase?.itc_reversal_reason ?? 'RULE_42');
+  const [billable, setBillable] = useState<BillableValue>({
+    billable_to_client_id: purchase?.billable_to_client_id,
+    markup_percent: purchase?.markup_percent,
+    pure_agent: purchase?.pure_agent,
+  });
   const [error, setError] = useState('');
 
   const vendor = vendors.find((v) => v.id === vendorId);
@@ -114,6 +121,7 @@ function BillForm({ purchase, vendors, onVendorCreated, businessState, onSaved, 
         total: totals.total,
         amount_paid: purchase?.amount_paid ?? 0,
         notes: notes.trim() || undefined,
+        ...billablePatch(billable),
       });
       onSaved(purchase ? 'Bill updated' : `Bill ${billNumber.trim()} saved`);
       onClose();
@@ -275,6 +283,8 @@ function BillForm({ purchase, vendors, onVendorCreated, businessState, onSaved, 
         <label className={controls.label} htmlFor="bill-notes">Notes</label>
         <textarea id="bill-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+
+      <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>

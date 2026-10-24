@@ -46,6 +46,11 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   catalogue items, command palette (Ctrl+K), first-run setup wizard.
 - **Ship-to / consignee address**, taxable freight option (Sec 15), foreign-currency documents with an exchange rate.
 - **Recurring invoices** with schedules, generated in the background.
+- **Time & billable costs** (`/time`): a running timer (start / pause / stop, survives reloads, header pill), weekly
+  timesheet grid, manual entries, mileage log, per-entry rounding (6/10/15/30 min, nearest or up), CSV / .xlsx export.
+  "Bill" turns a client's unbilled hours (unit HRS, SAC 998311 by default), re-billable expenses (cost + markup, or a
+  0% Rule 33 pure-agent reimbursement) and trips into a new draft invoice; deleting or cancelling that invoice frees
+  them again.
 - **Sharing**: the PDF itself through the OS share sheet (WhatsApp, mail), a self-contained "client copy" web page with
   a Pay-with-UPI button, WhatsApp / e-mail / SMS text with UPI links.
 - **Reminders**: stage-based templates (upcoming, due today, polite / firm / final overdue, thank-you) in English and
@@ -139,6 +144,10 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   `.ods`, password-protected and ZIP64 workbooks are not supported; save them as `.xlsx` or CSV.
 - The GSTR-2B matcher reads B2B/B2BA/CDNR/CDNRA from the Excel download and additionally ISD / IMPG / IMPGSEZ from
   the JSON; supplier credit notes are not recorded in purchases, so they show as "in 2B only".
+- Pure-agent reimbursements are billed as 0% lines but the underlying expense still shows in Books / P&L as a cost
+  (and the reimbursement as income); the Rule 33 conditions are the user's call — verify with your CA.
+- Editing or removing lines on a bill-from-time invoice does not unlink the entries; only deleting or cancelling the
+  invoice frees them.
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
 
 ---

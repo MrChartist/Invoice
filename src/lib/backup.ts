@@ -208,11 +208,13 @@ const RECORD_TABLES = [
   'purchase_payments', 'recurring', 'doc_links', 'audit_log', 'gstr2b_actions', 'einvoice_meta',
   // Double-entry ledger (6.1–6.3)
   'accounts', 'vouchers', 'fixed_assets',
+  // Time & billable costs (6.13 / 6.14)
+  'time_entries', 'mileage',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
-  'accounts', 'vouchers', 'fixed_assets',
+  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

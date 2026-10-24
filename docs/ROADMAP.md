@@ -171,8 +171,8 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.10 | **Multi-godown** stock with transfer vouchers | Vyapar, Busy, myBillBook | M |
 | 6.11 | **Serial numbers / IMEI / warranty** lookup | Busy, myBillBook | M |
 | 6.12 | **Attachments**: receipt photos / PDFs on bills, expenses, invoices (IndexedDB, in backups) | Zoho, Xero, Invoice Ninja | M |
-| 6.13 | **Time tracking & billable hours** → invoice lines | FreshBooks, Zoho, Invoice Ninja | M |
-| 6.14 | **Billable expenses & mileage** with markup | FreshBooks, Invoice Ninja | S–M |
+| 6.13 | ✅ **Time tracking & billable hours** → invoice lines (`/time`, `src/lib/timesheets.ts`, `docs/features/time-expenses.md`) | FreshBooks, Zoho, Invoice Ninja | M |
+| 6.14 | ✅ **Billable expenses & mileage** with markup and pure-agent (Rule 33) reimbursements | FreshBooks, Invoice Ninja | S–M |
 | 6.15 | ✅ **Optional automatic late-fee line** per client terms (new draft invoice, never edits the original; `receivables.md`) | FreshBooks, Invoice Ninja | S |
 | 6.16 | **Cost centres / projects** with project P&L | Tally, Busy, QBO, Xero, Zoho | M |
 | 6.17 | **Budgets vs actual** | Tally, Zoho, Xero, QBO | S–M |
