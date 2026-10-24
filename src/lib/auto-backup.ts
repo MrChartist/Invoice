@@ -7,6 +7,7 @@
  * fail-soft: it returns a status object and never throws.
  */
 
+import { requireAccess } from './access';
 import { backupFilename, buildBackup, buildEncryptedBackupWithKey } from './backup';
 import { deriveEncryptionKey, type StoredEncryptionKey } from './crypto';
 import { downloadText } from './download';
@@ -312,6 +313,9 @@ export type BackupResult =
 /** Manual fallback: normal browser download (encrypted when a key is stored). Counts as a backup. */
 export async function downloadBackupNow(now: Date = new Date()): Promise<BackupResult> {
   try {
+    // Local roles (6.21): handing someone a full copy of the books is owner-only. Automatic folder
+    // backups the owner set up keep running whoever is signed in (they go to the owner's folder).
+    requireAccess('data.backup');
     const { filename, text } = await backupPayload(now, await getBackupKey());
     downloadText(filename, text, 'application/json');
     recordBackup(now);

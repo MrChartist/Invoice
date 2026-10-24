@@ -60,6 +60,9 @@ export const STORAGE_BACKEND_KEY = `${DB_PREFIX}storage_backend`;
 export const DEVICE_LOCAL_KEYS: readonly string[] = [
   SINGLETON_KEYS.auth,
   `${DB_PREFIX}auth_guard`,
+  /** Extra local users (6.21: clerk / viewer PIN hashes) and their per-user lockout counters. */
+  `${DB_PREFIX}auth_users`,
+  `${DB_PREFIX}auth_guard_users`,
   `${DB_PREFIX}idle_min`,
   `${DB_PREFIX}session`,
   `${DB_PREFIX}last_backup`,

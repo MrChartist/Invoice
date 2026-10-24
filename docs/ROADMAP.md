@@ -179,7 +179,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.18 | ✅ **Cash-flow forecast** 30/90/180 days from open items, recurring and collection lag (Books → Forecast, `src/lib/cash-forecast.ts`, `docs/features/cash-planning.md`) | Xero | M |
 | 6.19 | ✅ **Exchange gain/loss** (realised on receipts, posted to ledger 4930; period-end revaluation report; `src/lib/fx-gain.ts`) | Zoho, Tally, Xero | S–M |
 | 6.20 | ✅ **Separate companies** on one device (isolated data sets + switcher) (`src/lib/companies.ts`: one IndexedDB database per company) | Tally, Busy, Vyapar | M |
-| 6.21 | **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) | Vyapar, myBillBook, Zoho | M |
+| 6.21 | ✅ **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) — `src/lib/access.ts`, `src/lib/users.ts`, `docs/features/security.md` § Local user roles | Vyapar, myBillBook, Zoho | M |
 | 6.22 | ✅ **.xlsx import/export without a dependency** (native `DecompressionStream` + a hand-written XML tokenizer, `src/lib/xlsx.ts`); ZIP writer `src/lib/zip.ts` ready for a ZIP of PDFs (not wired yet) | most | M |
 | 6.23 | ✅ **Custom fields** on documents, items, parties, printable (Settings → Custom fields; invoices snapshot label + value; `src/lib/custom-fields.ts`) | Tally (UDF), Zoho, Vyapar | S–M |
 | 6.24 | ✅ **Bulk e-Invoice / e-Way JSON** and bulk IRN response import (`einvoice.md`) | Zoho, Tally | S |

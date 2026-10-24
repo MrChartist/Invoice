@@ -28,7 +28,8 @@ import { VirtualGap } from '../components/ui/VirtualGap';
 import { useVirtualRows } from '../hooks/useVirtualRows';
 
 import { PaymentModal } from '../components/modals/PaymentModal';
-import { localDb, generateId } from '../lib/localDb';
+import { localDb, generateId, isIssued } from '../lib/localDb';
+import { useCan } from '../hooks/useCan';
 import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { quoteState, quoteTone } from '../lib/quote-status';
@@ -86,6 +87,9 @@ export function Transactions() {
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
   const [params] = useSearchParams();
+  // Local roles (6.21): a viewer only views / prints / exports; a clerk cannot delete issued documents.
+  const { can } = useCan();
+  const mayDelete = (inv: InvoiceRecord) => can(isIssued(inv) ? 'doc.deleteIssued' : 'doc.deleteDraft');
   const [filter, setFilter] = useState<Filter>(() => {
     const f = params.get('filter') as Filter | null;
     return f && FILTERS.some((x) => x.id === f) ? f : 'all';
@@ -328,9 +332,11 @@ export function Transactions() {
             <button type="button" className={controls.btnOutline} onClick={() => void exportXlsx()} disabled={rows.length === 0}>
               <Download size={16} /> Export .xlsx
             </button>
-            <Link to="/invoice" className={controls.btnPrimary}>
-              <FilePlus2 size={16} /> New invoice
-            </Link>
+            {can('doc.create') && (
+              <Link to="/invoice" className={controls.btnPrimary}>
+                <FilePlus2 size={16} /> New invoice
+              </Link>
+            )}
           </>
         }
       />
@@ -401,26 +407,36 @@ export function Transactions() {
         {visibleSelected.length > 0 && (
           <div className={styles.bulkBar} role="region" aria-label="Bulk actions">
             <strong>{visibleSelected.length} selected</strong>
-            <button
-              type="button"
-              className={controls.btnOutline}
-              disabled={!visibleSelected.some(canMarkPaid)}
-              onClick={() => setBulkPay({ method: 'Bank Transfer', date: todayInput() })}
-            >
-              <CheckCheck size={16} /> Mark paid
-            </button>
+            {can('payment.record') && (
+              <button
+                type="button"
+                className={controls.btnOutline}
+                disabled={!visibleSelected.some(canMarkPaid)}
+                onClick={() => setBulkPay({ method: 'Bank Transfer', date: todayInput() })}
+              >
+                <CheckCheck size={16} /> Mark paid
+              </button>
+            )}
             <button type="button" className={controls.btnOutline} onClick={() => exportCsv(visibleSelected)}>
               <Download size={16} /> Export CSV
             </button>
-            <button
-              type="button"
-              className={controls.btnDanger}
-              disabled={visibleSelected.some(isLocked)}
-              title={visibleSelected.some(isLocked) ? 'Some selected documents are in a locked period' : undefined}
-              onClick={() => setDeleting(visibleSelected)}
-            >
-              <Trash2 size={16} /> Delete
-            </button>
+            {visibleSelected.some(mayDelete) && (
+              <button
+                type="button"
+                className={controls.btnDanger}
+                disabled={visibleSelected.some(isLocked) || !visibleSelected.every(mayDelete)}
+                title={
+                  visibleSelected.some(isLocked)
+                    ? 'Some selected documents are in a locked period'
+                    : !visibleSelected.every(mayDelete)
+                      ? 'Only the owner can delete issued documents'
+                      : undefined
+                }
+                onClick={() => setDeleting(visibleSelected)}
+              >
+                <Trash2 size={16} /> Delete
+              </button>
+            )}
             <button type="button" className={controls.btnGhost} onClick={() => setSelected(new Set())} aria-label="Clear selection">
               <X size={16} />
             </button>
@@ -433,9 +449,11 @@ export function Transactions() {
             title="Nothing issued yet"
             text="Invoices, quotations and credit notes you save will be listed here, with payment tracking."
             action={
-              <Link to="/invoice" className={controls.btnPrimary}>
-                <FilePlus2 size={16} /> Create an invoice
-              </Link>
+              can('doc.create') ? (
+                <Link to="/invoice" className={controls.btnPrimary}>
+                  <FilePlus2 size={16} /> Create an invoice
+                </Link>
+              ) : undefined
             }
           />
         ) : rows.length === 0 ? (
@@ -515,7 +533,7 @@ export function Transactions() {
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
-                          {canPay && (
+                          {canPay && can('payment.record') && (
                             <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} disabled={locked} title={locked ? lockedTitle : 'Record payment'} aria-label={`Record payment for ${inv.invoice_number}`}>
                               <Banknote size={16} />
                             </button>
@@ -523,15 +541,21 @@ export function Transactions() {
                           <button type="button" className={controls.btnIcon} onClick={() => handlePreview(inv)} title="Preview / PDF" aria-label={`Preview ${inv.invoice_number}`}>
                             <Eye size={16} />
                           </button>
-                          <button type="button" className={controls.btnIcon} onClick={() => navigate(`/invoice/${inv.id}`)} disabled={locked} title={locked ? lockedTitle : 'Edit'} aria-label={`Edit ${inv.invoice_number}`}>
-                            <Pencil size={16} />
-                          </button>
-                          <button type="button" className={controls.btnIcon} onClick={() => handleDuplicate(inv)} title="Duplicate" aria-label={`Duplicate ${inv.invoice_number}`}>
-                            <Copy size={16} />
-                          </button>
-                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting([inv])} disabled={locked} title={locked ? lockedTitle : 'Delete'} aria-label={`Delete ${inv.invoice_number}`}>
-                            <Trash2 size={16} />
-                          </button>
+                          {can('doc.edit') && (
+                            <button type="button" className={controls.btnIcon} onClick={() => navigate(`/invoice/${inv.id}`)} disabled={locked} title={locked ? lockedTitle : 'Edit'} aria-label={`Edit ${inv.invoice_number}`}>
+                              <Pencil size={16} />
+                            </button>
+                          )}
+                          {can('doc.create') && (
+                            <button type="button" className={controls.btnIcon} onClick={() => handleDuplicate(inv)} title="Duplicate" aria-label={`Duplicate ${inv.invoice_number}`}>
+                              <Copy size={16} />
+                            </button>
+                          )}
+                          {mayDelete(inv) && (
+                            <button type="button" className={controls.btnDanger} onClick={() => setDeleting([inv])} disabled={locked} title={locked ? lockedTitle : 'Delete'} aria-label={`Delete ${inv.invoice_number}`}>
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

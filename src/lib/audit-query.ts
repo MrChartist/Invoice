@@ -33,7 +33,7 @@ export function filterAudit(entries: AuditEntry[], f: AuditFilter): AuditEntry[]
     if (f.from && day < f.from) return false;
     if (f.to && day > f.to) return false;
     if (q) {
-      const hay = [e.summary, e.doc_number, e.entity_id, ...(e.changes ?? []).flatMap((c) => [c.field, c.from, c.to])]
+      const hay = [e.summary, e.doc_number, e.entity_id, e.by, ...(e.changes ?? []).flatMap((c) => [c.field, c.from, c.to])]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
@@ -44,12 +44,14 @@ export function filterAudit(entries: AuditEntry[], f: AuditFilter): AuditEntry[]
 }
 
 export function auditToCsv(entries: AuditEntry[]): string {
-  const header = ['When', 'Entity', 'Action', 'Document', 'Summary', 'Field', 'From', 'To'];
+  // 'By' (6.21) is appended last so existing column positions do not move.
+  const header = ['When', 'Entity', 'Action', 'Document', 'Summary', 'Field', 'From', 'To', 'By'];
   const rows: unknown[][] = [header];
   for (const e of entries) {
     const base = [e.at, e.entity, AUDIT_ACTION_LABELS[e.action] ?? e.action, e.doc_number ?? ''];
-    if (!e.changes?.length) rows.push([...base, e.summary, '', '', '']);
-    else e.changes.forEach((c, i) => rows.push([...base, i === 0 ? e.summary : '', c.field, c.from ?? '', c.to ?? '']));
+    const by = e.by ?? '';
+    if (!e.changes?.length) rows.push([...base, e.summary, '', '', '', by]);
+    else e.changes.forEach((c, i) => rows.push([...base, i === 0 ? e.summary : '', c.field, c.from ?? '', c.to ?? '', by]));
   }
   return toCsv(rows);
 }

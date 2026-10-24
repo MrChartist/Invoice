@@ -5,23 +5,34 @@
  * Storage layout (the `mrchartist_inv_auth` key is unchanged for existing users):
  *   mrchartist_inv_auth        credential record  {name, createdAt, v:2, kdf, iter, salt, hash}
  *                              (legacy: {name, pin, createdAt} — upgraded on first successful unlock)
- *   mrchartist_inv_auth_guard  failed-attempt counter + lockout deadline
+ *   mrchartist_inv_auth_guard  failed-attempt counter + lockout deadline (the owner's)
+ *   mrchartist_inv_auth_users  extra local users (6.21): [{id, name, role, createdAt, v:2, kdf, iter, salt, hash}]
+ *   mrchartist_inv_auth_guard_users  per-user lockout counters for those users {id: GuardState}
  *   mrchartist_inv_idle_min    auto-lock timeout in minutes (0 = never)
- *   sessionStorage             the "unlocked" flag — cleared on tab close and by logout()
+ *   sessionStorage             who unlocked this tab: '1' = the owner (also what older builds wrote),
+ *                              'u:<id>' = another local user — cleared on tab close and by logout()
  *
- * logout() now only LOCKS the app (clears the session). It no longer deletes the
- * credential, which previously let anyone with access to the browser re-register
- * a new PIN simply by logging out.
+ * Roles (6.21): the account in `mrchartist_inv_auth` is the OWNER. The owner may add clerks and
+ * viewers with their own PINs (users.ts, loaded with Settings). This is convenience access control
+ * on a shared device, not security — see access.ts.
+ *
+ * logout() only LOCKS the app (clears the session). It never deletes the credential, which
+ * previously let anyone with access to the browser re-register a new PIN simply by logging out.
  */
 
 import { DB_PREFIX, DEVICE_LOCAL_KEYS, SINGLETON_KEYS, collectAppData, readRaw, removeRaw, writeRaw } from './storage';
 import { constantTimeEqualStrings, hashPin, PBKDF2_ITERATIONS, verifyPinHash, type PinHash } from './crypto';
+import { setActorProvider, type Actor, type Role } from './access';
 
 export const AUTH_KEY = SINGLETON_KEYS.auth;
 export const GUARD_KEY = `${DB_PREFIX}auth_guard`;
 export const IDLE_KEY = `${DB_PREFIX}idle_min`;
 export const SESSION_KEY = `${DB_PREFIX}session`;
+export const USERS_KEY = `${DB_PREFIX}auth_users`;
+export const USER_GUARDS_KEY = `${DB_PREFIX}auth_guard_users`;
 export const IDLE_CHANGED_EVENT = 'mrchartist:idle-changed';
+/** Id of the owner (the account in `mrchartist_inv_auth`). */
+export const OWNER_ID = 'owner';
 
 /** Keys that describe THIS device's state and must never travel in a backup (defined in storage.ts). */
 export { DEVICE_LOCAL_KEYS };
@@ -62,13 +73,89 @@ function readRecord(): StoredRecord | null {
   }
 }
 
-function writeRecord(rec: StoredRecord): void {
-  writeRaw(AUTH_KEY, JSON.stringify(rec));
+/** Writes the owner record with a fresh hash, keeping any additive fields already on it. */
+function writeOwnerHash(base: StoredRecord, hashed: PinHash): void {
+  const next: StoredRecord = { ...base, v: 2, ...hashed };
+  delete next.pin;
+  writeRaw(AUTH_KEY, JSON.stringify(next));
 }
 
-/* ── session (unlocked flag) ──────────────────────────────────── */
+/* ── extra local users (6.21) ─────────────────────────────────── */
 
-let memorySession = false;
+/** A clerk / viewer. The owner lives in `mrchartist_inv_auth` and is never in this list. */
+export interface StoredUser extends PinHash {
+  id: string;
+  name: string;
+  role: Exclude<Role, 'owner'>;
+  createdAt: string;
+  v: 2;
+}
+
+/** What the login screen and Settings may see about a user (never secrets). */
+export interface UserSummary {
+  id: string;
+  name: string;
+  role: Role;
+  createdAt: string;
+}
+
+/** @internal Valid extra users, as stored. Used by users.ts. */
+export function readUsers(): StoredUser[] {
+  try {
+    const raw = readRaw(USERS_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw) as unknown;
+    if (!Array.isArray(list)) return [];
+    const out: StoredUser[] = [];
+    const seen = new Set<string>([OWNER_ID]);
+    for (const u of list as Array<Partial<StoredUser> | null>) {
+      if (!u || typeof u.id !== 'string' || !u.id || seen.has(u.id)) continue;
+      if (typeof u.name !== 'string' || !u.name.trim()) continue;
+      if (!u.hash || !u.salt || !u.iter || !u.kdf) continue;
+      seen.add(u.id);
+      // Anything but 'clerk' reads as the least privileged role (an "owner" here is never honoured).
+      out.push({ ...(u as StoredUser), role: u.role === 'clerk' ? 'clerk' : 'viewer' });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** @internal */
+export function writeUsers(list: StoredUser[]): void {
+  if (list.length === 0) removeRaw(USERS_KEY);
+  else writeRaw(USERS_KEY, JSON.stringify(list));
+}
+
+/** Owner first, then the other users in the order they were added. Empty before the first account exists. */
+export function listUsers(): UserSummary[] {
+  const owner = readRecord();
+  if (!owner) return [];
+  return [
+    { id: OWNER_ID, name: owner.name, role: 'owner', createdAt: owner.createdAt },
+    ...readUsers().map((u) => ({ id: u.id, name: u.name, role: u.role, createdAt: u.createdAt })),
+  ];
+}
+
+/** Lower-case, single-spaced, trimmed — how user names are compared. */
+export const nameKey = (name: string): string => name.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** Case- and spacing-insensitive lookup, for a login screen where the name is typed. */
+export function findUserByName(name: string): UserSummary | null {
+  const key = nameKey(name);
+  if (!key) return null;
+  return listUsers().find((u) => nameKey(u.name) === key) ?? null;
+}
+
+function findUser(id: string): UserSummary | null {
+  return listUsers().find((u) => u.id === id) ?? null;
+}
+
+/* ── session (who unlocked this tab) ──────────────────────────── */
+
+/** The unlocked user's id for this page load (backs up sessionStorage when it is unavailable). */
+let memorySession: string | null = null;
 
 function sessionStore(): Storage | null {
   try {
@@ -78,17 +165,18 @@ function sessionStore(): Storage | null {
   }
 }
 
-function startSession(): void {
-  memorySession = true;
+function startSession(userId: string = OWNER_ID): void {
+  memorySession = userId;
   try {
-    sessionStore()?.setItem(SESSION_KEY, '1');
+    // '1' for the owner keeps sessions written by older builds (and by this one) interchangeable.
+    sessionStore()?.setItem(SESSION_KEY, userId === OWNER_ID ? '1' : `u:${userId}`);
   } catch {
     /* in-memory flag still holds for this page load */
   }
 }
 
 function endSession(): void {
-  memorySession = false;
+  memorySession = null;
   try {
     sessionStore()?.removeItem(SESSION_KEY);
   } catch {
@@ -96,18 +184,38 @@ function endSession(): void {
   }
 }
 
-/** True when a credential exists AND this tab has been unlocked. */
-export function isAuthenticated(): boolean {
-  if (!readRecord()) return false;
-  if (memorySession) return true;
+function sessionUserId(): string | null {
+  if (memorySession) return memorySession;
   try {
-    return sessionStore()?.getItem(SESSION_KEY) === '1';
+    const raw = sessionStore()?.getItem(SESSION_KEY);
+    if (raw === '1') return OWNER_ID;
+    if (raw && raw.startsWith('u:') && raw.length > 2) return raw.slice(2);
   } catch {
-    return false;
+    /* ignore */
   }
+  return null;
 }
 
-/** The account holder (name only — secrets are never returned). Available while locked, for the login screen. */
+/**
+ * The user signed in to this tab, or null. The session holds only the user id; the name and role
+ * are read from the user list each time, so a role change or removal applies at once.
+ */
+export function getCurrentUser(): Actor | null {
+  const id = sessionUserId();
+  if (!id) return null;
+  const u = findUser(id);
+  return u ? { id: u.id, name: u.name, role: u.role } : null;
+}
+
+// The data layer asks access.ts who is acting; this is the answer.
+setActorProvider(getCurrentUser);
+
+/** True when a credential exists AND this tab has been unlocked by a user that still exists. */
+export function isAuthenticated(): boolean {
+  return getCurrentUser() !== null;
+}
+
+/** The account holder / owner (name only — secrets are never returned). Available while locked, for the login screen. */
 export function getUser(): AuthUser | null {
   const rec = readRecord();
   return rec ? { name: rec.name, createdAt: rec.createdAt } : null;
@@ -144,7 +252,7 @@ export function pinStrength(pin: string): { level: PinStrength; warning?: string
   return { level: pin.length >= 6 ? 'strong' : 'ok' };
 }
 
-/* ── lockout (persisted, exponential) ─────────────────────────── */
+/* ── lockout (persisted, exponential, per user) ───────────────── */
 
 export interface GuardState {
   /** Consecutive failures since the last success or lockout. */
@@ -170,38 +278,72 @@ export function registerFailure(state: GuardState, now: number): GuardState {
   return { ...state, fails };
 }
 
-function readGuard(): GuardState {
+function parseGuard(g: Partial<GuardState> | null | undefined): GuardState {
+  if (!g || typeof g !== 'object') return { ...FRESH_GUARD };
+  return {
+    fails: Number.isFinite(g.fails) ? Math.max(0, g.fails as number) : 0,
+    level: Number.isFinite(g.level) ? Math.max(0, g.level as number) : 0,
+    lockedUntil: Number.isFinite(g.lockedUntil) ? (g.lockedUntil as number) : 0,
+  };
+}
+
+const isFresh = (g: GuardState) => g.fails === 0 && g.level === 0 && g.lockedUntil === 0;
+
+function readUserGuards(): Record<string, GuardState> {
+  try {
+    const raw = readRaw(USER_GUARDS_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, Partial<GuardState>> | null) : {};
+    if (!map || typeof map !== 'object' || Array.isArray(map)) return {};
+    return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, parseGuard(v)]));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Lockout is counted PER USER: the owner keeps the original `auth_guard` key, other users share
+ * one map. So a clerk mistyping cannot lock the owner out (nor the reverse).
+ */
+function readGuard(userId: string = OWNER_ID): GuardState {
+  if (userId !== OWNER_ID) return readUserGuards()[userId] ?? { ...FRESH_GUARD };
   try {
     const raw = readRaw(GUARD_KEY);
-    if (!raw) return { ...FRESH_GUARD };
-    const g = JSON.parse(raw) as Partial<GuardState>;
-    return {
-      fails: Number.isFinite(g.fails) ? Math.max(0, g.fails as number) : 0,
-      level: Number.isFinite(g.level) ? Math.max(0, g.level as number) : 0,
-      lockedUntil: Number.isFinite(g.lockedUntil) ? (g.lockedUntil as number) : 0,
-    };
+    return raw ? parseGuard(JSON.parse(raw) as Partial<GuardState>) : { ...FRESH_GUARD };
   } catch {
     return { ...FRESH_GUARD };
   }
 }
 
-function writeGuard(state: GuardState): void {
+function writeGuard(state: GuardState, userId: string = OWNER_ID): void {
   try {
-    if (state.fails === 0 && state.level === 0 && state.lockedUntil === 0) removeRaw(GUARD_KEY);
+    if (userId !== OWNER_ID) {
+      const map = readUserGuards();
+      if (isFresh(state)) delete map[userId];
+      else map[userId] = state;
+      if (Object.keys(map).length) writeRaw(USER_GUARDS_KEY, JSON.stringify(map));
+      else removeRaw(USER_GUARDS_KEY);
+      return;
+    }
+    if (isFresh(state)) removeRaw(GUARD_KEY);
     else writeRaw(GUARD_KEY, JSON.stringify(state));
   } catch {
     /* storage unavailable — the in-page attempt still fails */
   }
 }
 
-/** Milliseconds left on the current lockout (0 when attempts are allowed). */
-export function getLockoutRemaining(now: number = Date.now()): number {
-  const { lockedUntil } = readGuard();
+/** @internal Clears a user's lockout (used when the owner resets that user's PIN or removes them). */
+export function clearGuard(userId: string): void {
+  writeGuard({ ...FRESH_GUARD }, userId);
+}
+
+/** Milliseconds left on `userId`'s current lockout (the owner's by default; 0 when attempts are allowed). */
+export function getLockoutRemaining(now: number = Date.now(), userId: string = OWNER_ID): number {
+  const { lockedUntil } = readGuard(userId);
   return Math.max(0, lockedUntil - now);
 }
 
-export function getAttemptsLeft(): number {
-  return Math.max(0, MAX_FREE_ATTEMPTS - readGuard().fails);
+export function getAttemptsLeft(userId: string = OWNER_ID): number {
+  return Math.max(0, MAX_FREE_ATTEMPTS - readGuard(userId).fails);
 }
 
 /* ── verification ─────────────────────────────────────────────── */
@@ -216,45 +358,60 @@ export interface UnlockResult {
   attemptsLeft: number;
 }
 
-async function checkPin(rec: StoredRecord, pin: string): Promise<boolean> {
+type Credential = { kind: 'owner'; rec: StoredRecord } | { kind: 'user'; user: StoredUser };
+
+function credentialFor(userId: string): Credential | null {
+  const rec = readRecord();
+  if (!rec) return null;
+  if (userId === OWNER_ID) return { kind: 'owner', rec };
+  const user = readUsers().find((u) => u.id === userId);
+  return user ? { kind: 'user', user } : null;
+}
+
+async function checkPin(cred: Credential, pin: string): Promise<boolean> {
+  const rec: Partial<PinHash> & { pin?: string } = cred.kind === 'owner' ? cred.rec : cred.user;
   if (rec.hash && rec.salt && rec.iter && rec.kdf) {
     return verifyPinHash(pin, { kdf: rec.kdf, iter: rec.iter, salt: rec.salt, hash: rec.hash });
   }
-  // Legacy plaintext record.
+  // Legacy plaintext owner record.
   return typeof rec.pin === 'string' && constantTimeEqualStrings(rec.pin, pin);
 }
 
-/** Replaces a legacy plaintext (or weaker-hashed) record with one hashed at the current iteration count. */
-async function upgradeRecord(rec: StoredRecord, pin: string): Promise<void> {
-  const hashed = await hashPin(pin);
-  writeRecord({ name: rec.name, createdAt: rec.createdAt, v: 2, ...hashed });
+/** Writes a new hash for the credential (owner record or one user). */
+function storeHash(cred: Credential, hashed: PinHash): void {
+  if (cred.kind === 'owner') {
+    writeOwnerHash(readRecord() ?? cred.rec, hashed);
+    return;
+  }
+  writeUsers(readUsers().map((u) => (u.id === cred.user.id ? { ...u, v: 2, ...hashed } : u)));
 }
 
 /**
- * Verifies a PIN with lockout accounting. A correct PIN resets the counter and
- * transparently upgrades a legacy plaintext record to a hashed one.
+ * Verifies `userId`'s PIN (the owner by default) with that user's lockout accounting. A correct
+ * PIN resets the counter and transparently upgrades a legacy plaintext record to a hashed one.
  * Does NOT start a session — see {@link unlock}.
  */
-export async function checkPinWithGuard(pin: string, now: number = Date.now()): Promise<UnlockResult> {
-  const rec = readRecord();
-  const guard = readGuard();
+export async function checkPinWithGuard(pin: string, now: number = Date.now(), userId: string = OWNER_ID): Promise<UnlockResult> {
+  const cred = credentialFor(userId);
+  const guard = readGuard(userId);
   if (guard.lockedUntil > now) {
     return { ok: false, locked: true, retryInMs: guard.lockedUntil - now, attemptsLeft: 0 };
   }
-  if (!rec) return { ok: false, locked: false, retryInMs: 0, attemptsLeft: MAX_FREE_ATTEMPTS };
+  if (!cred) return { ok: false, locked: false, retryInMs: 0, attemptsLeft: MAX_FREE_ATTEMPTS };
 
   // Count the attempt as a failure BEFORE the slow hash: attempts racing in parallel (other tabs)
   // each see the previous failure, so they cannot slip past the lockout. Success undoes it.
   const next = registerFailure(guard, now);
-  writeGuard(next);
+  writeGuard(next, userId);
 
-  if (await checkPin(rec, pin)) {
-    writeGuard({ ...FRESH_GUARD });
+  if (await checkPin(cred, pin)) {
+    writeGuard({ ...FRESH_GUARD }, userId);
     // Legacy plaintext, or a hash made with fewer iterations than today's default: re-hash now
     // that the PIN is known.
+    const rec = cred.kind === 'owner' ? cred.rec : cred.user;
     if (!rec.hash || (rec.iter ?? 0) < PBKDF2_ITERATIONS) {
       try {
-        await upgradeRecord(rec, pin);
+        storeHash(cred, await hashPin(pin));
       } catch {
         /* keep the legacy record; it will be upgraded next time */
       }
@@ -266,34 +423,40 @@ export async function checkPinWithGuard(pin: string, now: number = Date.now()): 
   return { ok: false, locked: retryInMs > 0, retryInMs, attemptsLeft: retryInMs > 0 ? 0 : MAX_FREE_ATTEMPTS - next.fails };
 }
 
-/** Verify the PIN and, if correct, start the session. This is what the login form calls. */
-export async function unlock(pin: string, now: number = Date.now()): Promise<UnlockResult> {
-  const result = await checkPinWithGuard(pin, now);
-  if (result.ok) startSession();
+/** Verify `userId`'s PIN (the owner by default) and, if correct, start that user's session. This is what the login form calls. */
+export async function unlock(pin: string, now: number = Date.now(), userId: string = OWNER_ID): Promise<UnlockResult> {
+  const result = await checkPinWithGuard(pin, now, userId);
+  if (result.ok) startSession(userId);
   return result;
 }
 
-/** Verify PIN for the existing user (counts toward lockout; does not start a session). */
+/**
+ * Verify the PIN of whoever is signed in to this tab (the owner when nobody is). Counts toward
+ * that user's lockout; does not start a session.
+ */
 export async function verifyPin(pin: string, now: number = Date.now()): Promise<boolean> {
-  return (await checkPinWithGuard(pin, now)).ok;
+  return (await checkPinWithGuard(pin, now, getCurrentUser()?.id ?? OWNER_ID)).ok;
 }
 
 /**
- * Register the first user and start a session. If an account already exists this
- * behaves like {@link unlock} (the name is ignored) — it can never overwrite an
+ * Register the first user (the owner) and start a session. If an account already exists this
+ * behaves like {@link unlock} for the owner (the name is ignored) — it can never overwrite an
  * existing PIN. Returns false on invalid input or a wrong PIN.
  */
 export async function login(name: string, pin: string): Promise<boolean> {
   if (readRecord()) return (await unlock(pin)).ok;
   if (!name.trim() || !isValidPinFormat(pin)) return false;
   const hashed = await hashPin(pin);
-  writeRecord({ name: name.trim(), createdAt: new Date().toISOString(), v: 2, ...hashed });
+  writeRaw(AUTH_KEY, JSON.stringify({ name: name.trim(), createdAt: new Date().toISOString(), v: 2, ...hashed }));
   writeGuard({ ...FRESH_GUARD });
-  startSession();
+  // A fresh owner never inherits users (or their lockouts) left behind by an earlier account.
+  removeRaw(USERS_KEY);
+  removeRaw(USER_GUARDS_KEY);
+  startSession(OWNER_ID);
   return true;
 }
 
-/** Lock the app. Data and the PIN are kept. */
+/** Lock the app. Data and the PINs are kept. */
 const LOCK_CHANNEL = 'mrchartist-inv-lock';
 
 /** Lock this tab and tell every other open tab of the app to lock too. */
@@ -325,17 +488,17 @@ export type ChangePinResult =
   | { ok: true }
   | { ok: false; reason: 'locked' | 'wrong-pin' | 'invalid-format' | 'same-pin' | 'no-account'; retryInMs?: number };
 
-/** Change the PIN after verifying the old one (counts toward lockout). */
+/** Change the signed-in user's own PIN (the owner's when nobody is) after verifying the old one (counts toward lockout). */
 export async function changePin(oldPin: string, newPin: string, now: number = Date.now()): Promise<ChangePinResult> {
-  const rec = readRecord();
-  if (!rec) return { ok: false, reason: 'no-account' };
+  const userId = getCurrentUser()?.id ?? OWNER_ID;
+  const cred = credentialFor(userId);
+  if (!cred) return { ok: false, reason: 'no-account' };
   if (!isValidPinFormat(newPin)) return { ok: false, reason: 'invalid-format' };
   if (oldPin === newPin) return { ok: false, reason: 'same-pin' };
-  const check = await checkPinWithGuard(oldPin, now);
+  const check = await checkPinWithGuard(oldPin, now, userId);
   if (check.locked) return { ok: false, reason: 'locked', retryInMs: check.retryInMs };
   if (!check.ok) return { ok: false, reason: 'wrong-pin' };
-  const hashed = await hashPin(newPin);
-  writeRecord({ name: rec.name, createdAt: rec.createdAt, v: 2, ...hashed });
+  storeHash(cred, await hashPin(newPin));
   return { ok: true };
 }
 

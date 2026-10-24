@@ -157,6 +157,11 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **Security**: PIN lock (PBKDF2-SHA-256, 600k iterations, lockout, idle lock, locks every tab), strict CSP via
   headers and a build-time meta tag. A 4–6 digit PIN is a lock screen, not encryption of the stored data; use vault
   mode for that.
+- **Local user roles** (shared device): the first account is the Owner, who can add Clerks (create / edit documents,
+  payments, purchases, expenses; cannot delete issued documents, change settings, restore / erase / download full
+  backups or override the period lock) and Viewers (read-only: view, print / PDF, export reports), each with their
+  own PBKDF2-hashed PIN and lockout. The audit log records who made each change. Convenience access control, not
+  security: anyone with the device and browser developer tools can bypass it (`docs/features/security.md`).
 - **Vault mode** (optional): the whole store encrypted at rest with AES-256 under a passphrase-wrapped key, unlocked
   at start-up; a lost passphrase means lost data (no recovery by design).
 - **Separate companies**: several businesses on one device, each with its own data, numbering, settings, backups
@@ -195,6 +200,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - Cheques link to a single invoice / bill; clearing does not auto-record against foreign-currency invoices. The
   cash-flow forecast is an estimate from due dates, payment history, bills, cheques and schedules (taxes, loans and
   salaries only when entered as bills).
+- Local user roles are convenience access control on one browser, not security; a viewer's secondary controls on
+  some screens (e.g. Inventory, Books) are refused by the data layer for documents, payments, purchases, vouchers,
+  clients and vendors, but not hidden everywhere.
 - `.xlsx` is read and written by a built-in, dependency-free reader/writer (first sheet for imports). Legacy `.xls`,
   `.ods`, password-protected and ZIP64 workbooks are not supported; save them as `.xlsx` or CSV.
 - The GSTR-2B matcher reads B2B/B2BA/CDNR/CDNRA from the Excel download and additionally ISD / IMPG / IMPGSEZ from

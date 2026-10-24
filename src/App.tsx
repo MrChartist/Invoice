@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { LoginPage } from './pages/LoginPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { IdleLock } from './components/security/IdleLock';
+import { RequireAccess } from './components/security/RequireAccess';
 import { isAuthenticated, onRemoteLock } from './lib/auth';
 
 // Heavier report/ledger pages load on first visit so the editor opens fast.
@@ -59,22 +60,23 @@ function App() {
             <Routes>
               <Route element={<DashboardLayout onLogout={() => setAuthed(false)} />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/invoice" element={<InvoiceCreator />} />
-                <Route path="/invoice/:id" element={<InvoiceCreator />} />
+                <Route path="/invoice" element={<RequireAccess action="doc.create" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
+                <Route path="/invoice/:id" element={<RequireAccess action="doc.edit" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/clients" element={<Clients />} />
-                <Route path="/recurring" element={<Recurring />} />
-                <Route path="/time" element={<Time />} />
+                <Route path="/recurring" element={<RequireAccess action="books.edit"><Recurring /></RequireAccess>} />
+                <Route path="/time" element={<RequireAccess action="books.edit"><Time /></RequireAccess>} />
                 <Route path="/receivables" element={<Receivables />} />
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/books" element={<Books />} />
-                <Route path="/reconcile" element={<Reconcile />} />
-                <Route path="/cheques" element={<Cheques />} />
+                <Route path="/reconcile" element={<RequireAccess action="books.edit"><Reconcile /></RequireAccess>} />
+                <Route path="/cheques" element={<RequireAccess action="books.edit"><Cheques /></RequireAccess>} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/gst-reports" element={<GstReports />} />
                 <Route path="/exports" element={<Exports />} />
-                <Route path="/design" element={<DesignStudio />} />
+                <Route path="/design" element={<RequireAccess action="settings.manage"><DesignStudio /></RequireAccess>} />
+                {/* Settings opens for every role and shows each role only the tabs it may use (6.21). */}
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<NotFound />} />
               </Route>

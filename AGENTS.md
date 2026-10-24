@@ -46,7 +46,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   Backup collects every `mrchartist_inv_*` key except device-local ones (PIN session, lockout, idle timer).
 - `mrchartist_inv_settings` — multi-profile sender identities (array).
 - `mrchartist_inv_template` — selected template id.
-- `mrchartist_inv_auth` — hashed PIN credential (legacy plaintext is migrated on first unlock). `theme` — light/dark.
+- `mrchartist_inv_auth` — hashed PIN credential of the Owner (legacy plaintext is migrated on first unlock). `theme` — light/dark.
+- `mrchartist_inv_auth_users` / `mrchartist_inv_auth_guard_users` — local clerk/viewer users (hashed PINs) and their
+  lockouts (6.21). Device-local, never in backups. Role checks: `can()` / `requireAccess()` in `src/lib/access.ts`
+  (convenience access control, not security); new destructive data-layer calls should call `requireAccess`.
 - `mrchartist_inv_companies` — device-local company registry (6.20); each company is its own IndexedDB database
   (`mrchartist_inv_kv`, `mrchartist_inv_kv__<id>`) with the same keys inside.
 

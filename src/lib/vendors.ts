@@ -1,5 +1,6 @@
 /** Vendor (supplier) master — table `vendors`. */
 
+import { requireAccess } from './access';
 import type { PurchaseRecord, Vendor } from '../types/purchases';
 import { checkGstin } from './gstin';
 import { resolveStateCode } from './india-states';
@@ -77,5 +78,8 @@ export const vendorsDb = {
   },
 
   /** Deleting a vendor keeps its bills (they carry vendor_name / GSTIN snapshots). */
-  remove: (id: string): void => setTable(VENDORS_TABLE, vendorsDb.all().filter((v) => v.id !== id)),
+  remove: (id: string): void => {
+    requireAccess('master.edit');
+    setTable(VENDORS_TABLE, vendorsDb.all().filter((v) => v.id !== id));
+  },
 };

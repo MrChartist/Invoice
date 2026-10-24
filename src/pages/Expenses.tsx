@@ -14,6 +14,7 @@ import { VendorsTab } from '../components/purchases/VendorsTab';
 import { MsmeCard } from '../components/purchases/MsmeCard';
 import type { BillSeed } from '../lib/purchase-orders';
 import { getTable } from '../lib/storage';
+import { can } from '../lib/access';
 import type { PurchaseOrder } from '../types/purchases';
 import {
   PURCHASE_STATUSES,
@@ -130,12 +131,17 @@ export function Expenses() {
             <button type="button" className={controls.btnOutline} onClick={exportCsv} disabled={tab !== 'bills' || rows.length === 0}>
               <Download size={16} /> Export CSV
             </button>
-            <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
-              <Zap size={16} /> Quick expense
-            </button>
-            <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
-              <FilePlus2 size={16} /> Add bill
-            </button>
+            {/* Local roles (6.21): a viewer cannot record bills; the data layer refuses it too. */}
+            {can('books.edit') && (
+              <>
+                <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
+                  <Zap size={16} /> Quick expense
+                </button>
+                <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
+                  <FilePlus2 size={16} /> Add bill
+                </button>
+              </>
+            )}
           </>
         }
       />

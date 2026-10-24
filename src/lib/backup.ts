@@ -21,6 +21,7 @@ import { DB_PREFIX, collectAppData, readRaw, registerVaultTransition, removeRaw,
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
+import { requireAccess } from './access';
 import { ASSET_TABLE, SNAPSHOT_TABLES, parseAssets, referencedAssets } from './assets';
 import { checkBackupAttachments } from './attachments';
 import { CUSTOM_FIELDS_TABLE } from './custom-fields';
@@ -416,6 +417,7 @@ function logInfo(raw: string | null | undefined): { head: string | null; rows: n
  * the marker continues it. `replaced` is passed by `restoreBackup`, which wipes before writing.
  */
 export function applyBackup(data: Record<string, string>, replaced?: { head: string | null; rows: number }): void {
+  requireAccess('data.restore');
   const prior = replaced ?? (AUDIT_KEY in data ? logInfo(readRaw(AUDIT_KEY)) : undefined);
   // All-or-nothing: if the browser refuses a write half-way (quota), put back what was
   // there before so a failed restore can never leave a mix of old and new tables.
@@ -459,13 +461,15 @@ export function applyBackup(data: Record<string, string>, replaced?: { head: str
  * never touched. Prefer this over `applyBackup` when "replace my data" is meant.
  */
 export function restoreBackup(data: Record<string, string>): void {
+  // Local roles (6.21): restoring replaces everything, so it is owner-only — checked before anything is touched.
+  requireAccess('data.restore');
   const snapshot = collectAppData();
   for (const key of LOCAL_ONLY) delete snapshot[key];
   try {
-    wipeAppData();
+    wipeTables();
     applyBackup(data, logInfo(snapshot[AUDIT_KEY]));
   } catch (err) {
-    wipeAppData();
+    wipeTables();
     for (const [key, value] of Object.entries(snapshot)) {
       try {
         writeRaw(key, value);
@@ -477,9 +481,14 @@ export function restoreBackup(data: Record<string, string>): void {
   }
 }
 
-/** Removes every app-owned key except this device's PIN / lock settings. */
-export function wipeAppData(): void {
+function wipeTables(): void {
   for (const key of Object.keys(collectAppData())) {
     if (!LOCAL_ONLY.has(key)) removeRaw(key);
   }
+}
+
+/** Removes every app-owned key except this device's PIN / lock settings. Owner only (6.21). */
+export function wipeAppData(): void {
+  requireAccess('data.erase');
+  wipeTables();
 }

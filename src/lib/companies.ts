@@ -12,6 +12,7 @@ import {
   type CompanyRegistry,
 } from './company-registry';
 import { generateId, reloadAfterFlush, storageBackend } from './storage';
+import { requireAccess } from './access';
 
 export type { CompanyEntry, CompanyRegistry };
 export { activeCompanyId, readRegistry } from './company-registry';
@@ -29,6 +30,8 @@ function cleanName(name: string): string {
 }
 
 export function createCompany(name: string, now: Date = new Date()): CompanyEntry {
+  // Local roles (6.21): only the owner adds, renames or deletes companies; every role may switch.
+  requireAccess('settings.manage');
   if (!companiesSupported()) throw new Error('Separate companies need this browser’s database (IndexedDB).');
   const reg = readRegistry();
   const n = cleanName(name);
@@ -39,6 +42,7 @@ export function createCompany(name: string, now: Date = new Date()): CompanyEntr
 }
 
 export function renameCompany(id: string, name: string): void {
+  requireAccess('settings.manage');
   const reg = readRegistry();
   const n = cleanName(name);
   if (reg.list.some((c) => c.id !== id && c.name.toLowerCase() === n.toLowerCase())) throw new Error('A company with this name already exists.');
@@ -58,6 +62,7 @@ export function switchCompany(id: string): void {
  * browser refused (e.g. another tab still has it open: close that tab and try again).
  */
 export async function deleteCompany(id: string): Promise<boolean> {
+  requireAccess('settings.manage');
   const reg = readRegistry();
   if (id === DEFAULT_COMPANY_ID) throw new Error('The main company cannot be deleted; erase its data instead.');
   if (id === reg.active) throw new Error('Switch to another company first.');

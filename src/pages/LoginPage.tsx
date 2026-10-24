@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck, TimerReset, User, WifiOff } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck, TimerReset, User, Users, WifiOff } from 'lucide-react';
 import { forgetDeviceData } from '../lib/auto-backup';
 import { eraseOtherCompanies, readRegistry } from '../lib/companies';
 import { Logo } from '../components/brand/Logo';
 import {
+  OWNER_ID,
   RESET_PHRASE,
   getAttemptsLeft,
   getLockoutRemaining,
   getUser,
   isResetPhrase,
   isValidPinFormat,
+  listUsers,
   login,
   pinStrength,
   resetAllData,
   unlock,
 } from '../lib/auth';
+import { ROLE_LABELS } from '../lib/access';
 import { reloadAfterFlush } from '../lib/storage';
 import controls from '../styles/controls.module.css';
 import styles from './LoginPage.module.css';
@@ -36,6 +39,11 @@ const digitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, 6);
 
 export function LoginPage({ onSuccess }: LoginPageProps) {
   const existingUser = getUser();
+  // Local roles (6.21): with more than one user on this device, pick who is signing in.
+  const users = listUsers();
+  const [userId, setUserId] = useState(OWNER_ID);
+  const selected = users.find((u) => u.id === userId) ?? users[0];
+  const isOwner = !selected || selected.id === OWNER_ID;
   const [mode, setMode] = useState<Mode>(existingUser ? 'login' : 'register');
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
@@ -46,16 +54,24 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
   const [phrase, setPhrase] = useState('');
   const [lockedMs, setLockedMs] = useState(() => getLockoutRemaining());
 
+  // Lockout is per user: switching user shows that user's own countdown.
+  const pickUser = (id: string) => {
+    setUserId(id);
+    setPin('');
+    setError('');
+    setLockedMs(getLockoutRemaining(Date.now(), id));
+  };
+
   // Tick the lockout countdown (persisted deadline, so a reload keeps it).
   useEffect(() => {
     if (lockedMs <= 0) return;
     const id = window.setInterval(() => {
-      const left = getLockoutRemaining();
+      const left = getLockoutRemaining(Date.now(), userId);
       setLockedMs(left);
       if (left <= 0) setError('');
     }, 500);
     return () => window.clearInterval(id);
-  }, [lockedMs > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lockedMs > 0, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const locked = lockedMs > 0;
   const strength = mode === 'register' && pin.length >= 4 ? pinStrength(pin) : null;
@@ -81,7 +97,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
         if (await login(name, pin)) onSuccess();
         else setError('Could not create the account. Please try again.');
       } else {
-        const result = await unlock(pin);
+        const result = await unlock(pin, undefined, selected?.id ?? OWNER_ID);
         if (result.ok) return onSuccess();
         setPin('');
         if (result.locked) {
@@ -138,7 +154,22 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
       <main className={styles.formSide}>
         <div className={styles.card}>
-          {mode === 'forgot' ? (
+          {mode === 'forgot' && !isOwner ? (
+            <div className={styles.form}>
+              <div>
+                <h2 className={styles.title}>Forgot your PIN?</h2>
+                <p className={styles.subtitle}>
+                  Ask the owner{users[0]?.name ? ` (${users[0].name})` : ''} to set a new PIN for {selected?.name ?? 'you'} in Settings → Security → Users.
+                  Nothing is erased.
+                </p>
+              </div>
+              <div className={styles.links}>
+                <button type="button" className={styles.linkBtn} onClick={() => switchMode('login')}>
+                  Go back
+                </button>
+              </div>
+            </div>
+          ) : mode === 'forgot' ? (
             <form className={styles.form} onSubmit={handleReset} noValidate>
               <div>
                 <h2 className={styles.title}>Forgot your PIN?</h2>
@@ -187,7 +218,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
             <form className={styles.form} onSubmit={handleSubmit} noValidate>
               <div>
                 <h2 className={styles.title}>
-                  {mode === 'register' ? 'Create your account' : existingUser?.name ? `Welcome back, ${existingUser.name}` : 'Welcome back'}
+                  {mode === 'register' ? 'Create your account' : selected?.name ? `Welcome back, ${selected.name}` : 'Welcome back'}
                 </h2>
                 <p className={styles.subtitle}>
                   {mode === 'register'
@@ -195,6 +226,27 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                     : 'Enter your PIN to unlock.'}
                 </p>
               </div>
+
+              {mode === 'login' && users.length > 1 && (
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor="login-user">User</label>
+                  <div className={styles.inputWrap}>
+                    <Users size={16} className={styles.inputIcon} />
+                    <select
+                      id="login-user"
+                      className={`${controls.select} ${styles.withIcon}`}
+                      value={selected?.id ?? OWNER_ID}
+                      onChange={(e) => pickUser(e.target.value)}
+                    >
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({ROLE_LABELS[u.role]})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {mode === 'register' && (
                 <div className={controls.field}>
@@ -291,10 +343,10 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                 </div>
               )}
               {!locked && error && <div className={styles.noticeError} role="alert">{error}</div>}
-              {mode === 'login' && !locked && !error && getAttemptsLeft() < 5 && (
+              {mode === 'login' && !locked && !error && getAttemptsLeft(selected?.id) < 5 && (
                 <div className={styles.noticeWarn}>
                   <AlertTriangle size={16} />
-                  <span>{getAttemptsLeft()} attempts left before a temporary lock.</span>
+                  <span>{getAttemptsLeft(selected?.id)} attempts left before a temporary lock.</span>
                 </div>
               )}
 

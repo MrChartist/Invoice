@@ -16,6 +16,7 @@
 
 import type { AuditAction, AuditChange, AuditEntry } from '../types/audit';
 import type { Client, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
+import { currentActor } from './access';
 import { round2 } from './invoice-calc';
 import { sha256 } from './sha256';
 import { generateId, getTable, setTable } from './storage';
@@ -318,6 +319,8 @@ export const audit = {
   /** Append one chained row. Never throws; returns the row, or null if it could not be built. */
   record(input: AuditInput): AuditEntry | null {
     try {
+      // Who did it (6.21): an explicit `by` wins, else whoever is signed in to this tab.
+      const by = input.by ?? currentActor()?.name;
       const rows = readAll();
       const entry = append(rows, {
         at: input.at,
@@ -329,6 +332,7 @@ export const audit = {
         ...(input.doc_number ? { doc_number: input.doc_number } : {}),
         ...(input.parent_id ? { parent_id: input.parent_id } : {}),
         ...(input.seal ? { seal: input.seal } : {}),
+        ...(by ? { by } : {}),
       });
       writeCapped(rows);
       return entry;

@@ -23,7 +23,8 @@ import { shouldShowWizard } from '../lib/onboarding';
 import { getTable } from '../lib/storage';
 import { pendingReminders, type ReminderRecord } from '../lib/reminders';
 import type { CreditLink } from '../lib/stats';
-import { getUser } from '../lib/auth';
+import { getCurrentUser, getUser } from '../lib/auth';
+import { useCan } from '../hooks/useCan';
 import { getIndianFY } from '../lib/invoice-number';
 import { effectiveStatus } from '../lib/invoice-status';
 import { attentionList, compactInr, foreignWithoutRate, isRevenueDoc, monthlyBilled, summarize } from '../lib/stats';
@@ -43,10 +44,14 @@ const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').th
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
 
 export function Dashboard() {
-  const user = getUser();
+  const user = getCurrentUser() ?? getUser();
   const navigate = useNavigate();
+  // Local roles (6.21): set-up and creation prompts only for roles that may act on them.
+  const { can } = useCan();
   // Brand-new account: walk through the essentials once (existing users never see it).
-  const [wizardOpen, setWizardOpen] = useState(() => shouldShowWizard(localDb.settings.get(), localDb.invoices.getAll().length));
+  const [wizardOpen, setWizardOpen] = useState(
+    () => can('settings.manage') && shouldShowWizard(localDb.settings.get(), localDb.invoices.getAll().length),
+  );
   const [{ invoices, clientCount, profileReady, links }] = useState(() => {
     const settings = localDb.settings.get();
     const profile = localDb.settings.activeProfile();
@@ -99,7 +104,7 @@ export function Dashboard() {
     { done: clientCount > 0, label: 'Add your first client', to: '/clients' },
     { done: invoices.length > 0, label: 'Create your first invoice', to: '/invoice' },
   ];
-  const showChecklist = checklist.some((c) => !c.done);
+  const showChecklist = can('settings.manage') && checklist.some((c) => !c.done);
 
   return (
     <div className={surface.page}>
@@ -107,9 +112,11 @@ export function Dashboard() {
         title={`${greeting(now.getHours())}, ${user?.name?.split(' ')[0] || 'there'}`}
         subtitle={`Financial year FY${fy.label} · ${now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`}
         actions={
-          <Link to="/invoice" className={controls.btnPrimary}>
-            <FilePlus2 size={16} /> New invoice
-          </Link>
+          can('doc.create') ? (
+            <Link to="/invoice" className={controls.btnPrimary}>
+              <FilePlus2 size={16} /> New invoice
+            </Link>
+          ) : undefined
         }
       />
 
@@ -246,9 +253,11 @@ export function Dashboard() {
             title="No invoices yet"
             text="Create your first GST-ready invoice in under a minute. It is saved only on this device."
             action={
-              <Link to="/invoice" className={controls.btnPrimary}>
-                <FilePlus2 size={16} /> Create an invoice
-              </Link>
+              can('doc.create') ? (
+                <Link to="/invoice" className={controls.btnPrimary}>
+                  <FilePlus2 size={16} /> Create an invoice
+                </Link>
+              ) : undefined
             }
           />
         ) : (

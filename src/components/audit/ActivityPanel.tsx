@@ -28,7 +28,10 @@ function Row({ e, open, onToggle }: { e: AuditEntry; open: boolean; onToggle: ()
   return (
     <>
       <tr>
-        <td className={styles.when}>{formatWhen(e.at)}</td>
+        <td className={styles.when}>
+          {formatWhen(e.at)}
+          {e.by && <div>by {e.by}</div>}
+        </td>
         <td>
           <span className={`${styles.tag} ${TAG[toneOf(e.action)]}`}>{AUDIT_ACTION_LABELS[e.action]}</span>
         </td>
@@ -185,7 +188,7 @@ export function ActivityPanel() {
                 <div key={e.id} className={styles.card}>
                   <div>
                     <span className={`${styles.tag} ${TAG[toneOf(e.action)]}`}>{AUDIT_ACTION_LABELS[e.action]}</span>{' '}
-                    <span className={styles.when}>{formatWhen(e.at)}</span>
+                    <span className={styles.when}>{formatWhen(e.at)}{e.by ? ` · by ${e.by}` : ''}</span>
                   </div>
                   <div>{e.summary}</div>
                   <AuditChanges changes={e.changes} />

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { can } from '../lib/access';
 import { recurringToastMessage } from '../lib/recurring-message';
 import { todayInput } from '../lib/utils';
 import type { InvoiceRecord } from '../types/invoice';
@@ -7,6 +8,8 @@ const LOCK_NAME = 'mrchartist-recurring-runner';
 
 /** One run, serialised across tabs when the Web Locks API exists. */
 async function runOnce(): Promise<InvoiceRecord[]> {
+  // A viewer's session never creates documents (6.21); the next owner / clerk session catches up.
+  if (!can('doc.create')) return [];
   // Loaded on demand: the schedule engine is not needed for first paint.
   const { runDueSchedules } = await import('../lib/recurring');
   const run = () => {

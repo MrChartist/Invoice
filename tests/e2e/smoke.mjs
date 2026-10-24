@@ -732,6 +732,44 @@ try {
     check(true, 'forecast, FX gain/loss and party-profit screens render');
   });
 
+  await step('local roles: the owner adds a viewer, who sees a read-only app, then the owner signs back in', async () => {
+    await page.goto(srv.origin + '/settings?tab=security');
+    await page.getByText('Users on this device').waitFor();
+    await page.locator('#user-name').fill('E2E Viewer');
+    await page.locator('#user-role').selectOption('viewer');
+    await page.locator('#user-pin').fill('135790');
+    await page.getByRole('button', { name: 'Add user' }).click();
+    await page.getByText('E2E Viewer added as viewer').waitFor({ timeout: 15000 });
+    const users = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_auth_users') || '[]'));
+    check(users.length === 1 && users[0].role === 'viewer' && !JSON.stringify(users).includes('135790'), 'viewer stored device-locally with a hashed PIN');
+
+    await page.getByRole('button', { name: 'Lock app' }).click();
+    await page.locator('#login-user').selectOption({ label: 'E2E Viewer (Viewer)' });
+    await page.locator('#login-pin').fill('135790');
+    await page.getByText('Viewer · shared device').waitFor({ timeout: 15000 });
+    check(await page.getByRole('link', { name: 'New invoice' }).count() === 0, 'viewer: no "New invoice" in the navigation or dashboard');
+
+    await page.goto(srv.origin + '/transactions');
+    await page.getByText('Acme Buyers').first().waitFor();
+    check(await page.getByRole('button', { name: /^Delete INV/ }).count() === 0 && await page.getByRole('button', { name: /^Preview INV/ }).count() > 0,
+      'viewer: invoices can be previewed but not deleted');
+
+    await page.goto(srv.origin + '/invoice');
+    await page.getByText('cannot create documents', { exact: false }).waitFor();
+    check(page.url().endsWith('/transactions'), 'viewer: the editor route redirects with a message');
+
+    await page.goto(srv.origin + '/settings?tab=security');
+    await page.getByText('Your role: Viewer').waitFor();
+    check(await page.getByText('Users on this device').count() === 0 && await page.getByRole('button', { name: 'Turn on vault mode' }).count() === 0
+      && await page.getByRole('tab', { name: /Data & backup/ }).count() === 0, 'viewer: no users, vault or data/backup settings');
+
+    await page.getByRole('button', { name: 'Lock app' }).click();
+    await page.locator('#login-user').selectOption({ label: 'E2E Trader (Owner)' });
+    await page.locator('#login-pin').fill('482916');
+    await page.getByText('Stored on this device').waitFor({ timeout: 15000 });
+    check(await page.getByRole('link', { name: 'New invoice' }).count() > 0, 'owner signed back in with full access');
+  });
+
   await step('an existing localStorage user moves to IndexedDB on first load', async () => {
     // A device last used by a pre-4.x build: data in localStorage, schema v1, logo inline in the snapshot.
     const logo = `data:image/png;base64,${LOGO_PNG}`;
