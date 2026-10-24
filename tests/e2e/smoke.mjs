@@ -174,6 +174,25 @@ try {
     await tab2.close();
   });
 
+  await step('bulk mark paid, then delete with undo', async () => {
+    await page.goto(srv.origin + '/transactions');
+    await page.getByLabel('Select INV/FY', { exact: false }).first().check();
+    await page.getByText('1 selected').waitFor();
+    await page.getByRole('button', { name: 'Mark paid' }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Mark paid' }).click();
+    await page.getByText(/1 marked paid/).waitFor();
+    const paid = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices'))[0]);
+    check(paid.status === 'Paid' && paid.balance_due === 0, `bulk mark paid settles the invoice (${paid.status}, balance ${paid.balance_due})`);
+
+    await page.getByRole('button', { name: /^Delete INV/ }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await page.waitForTimeout(6500);
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices')).length);
+    check(after === 1, `Undo keeps the deleted invoice (${after} stored after the undo window)`);
+    await page.getByText('Acme Buyers').first().waitFor();
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');
@@ -201,6 +220,15 @@ try {
     await page.goto(srv.origin + '/settings?tab=data');
     await page.getByRole('button', { name: /Undo last restore/ }).waitFor();
     check(true, 'an undo copy of the replaced data is offered');
+  });
+
+  await step('delete without undo really deletes', async () => {
+    await page.goto(srv.origin + '/transactions');
+    await page.getByRole('button', { name: /^Delete INV/ }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await page.waitForTimeout(6500);
+    const left = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_invoices') || '[]').length);
+    check(left === 0, `the delete is committed after the undo window (${left} left)`);
   });
 } catch {
   /* already reported */

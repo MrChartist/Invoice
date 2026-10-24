@@ -1,7 +1,10 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  ArrowDown,
+  ArrowUp,
   Banknote,
+  CheckCheck,
   Copy,
   Download,
   Eye,
@@ -11,6 +14,7 @@ import {
   Pencil,
   Search,
   Trash2,
+  X,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
@@ -19,18 +23,20 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { Modal } from '../components/ui/Modal';
 
 import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId } from '../lib/localDb';
 import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
+import { bulkMarkPaid, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
 import { effectiveStatus } from '../lib/invoice-status';
 import { getTable } from '../lib/storage';
 import type { CreditLink } from '../lib/stats';
 import { isRevenueDoc, summarize } from '../lib/stats';
 import { downloadText, toCsv } from '../lib/download';
 import { addDaysInput, cn, formatCurrency, formatDate, todayInput } from '../lib/utils';
-import { DOCUMENT_LABELS, type InvoiceRecord } from '../types/invoice';
+import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
@@ -88,7 +94,20 @@ export function Transactions() {
     const open = localDb.invoices.getAll().filter((i) => matchesFilter(i, 'unpaid', today) && !isLocked(i));
     return open.length === 1 ? open[0] : null;
   });
-  const [deleting, setDeleting] = useState<InvoiceRecord | null>(null);
+  const [deleting, setDeleting] = useState<InvoiceRecord[] | null>(null);
+  const [docType, setDocType] = useState<DocumentType | ''>('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkPay, setBulkPay] = useState<{ method: string; date: string } | null>(null);
+  // Deletes wait a few seconds behind an Undo toast before they touch storage.
+  const [pendingDelete, setPendingDelete] = useState<Set<string>>(() => new Set());
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pendingRef = useRef<Set<string>>(pendingDelete);
+  useEffect(() => {
+    pendingRef.current = pendingDelete;
+  }, [pendingDelete]);
 
   const reload = () => setVersion((v) => v + 1);
 
@@ -104,17 +123,41 @@ export function Transactions() {
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return invoices
+    const list = invoices
+      .filter((inv) => !pendingDelete.has(inv.id))
       .filter((inv) => matchesFilter(inv, filter, now))
+      .filter((inv) => matchesListFilter(inv, { docType, from, to }))
       .filter(
         (inv) =>
           !q ||
           [inv.invoice_number, inv.client?.name, inv.client?.company, inv.client?.gstin].some((f) =>
             f?.toLowerCase().includes(q),
           ),
-      )
-      .sort((a, b) => (b.issue_date || '').localeCompare(a.issue_date || '') || (b.created_at || '').localeCompare(a.created_at || ''));
-  }, [invoices, query, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+      );
+    return sortInvoices(list, sort.key, sort.dir);
+  }, [invoices, query, filter, docType, from, to, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const docTypes = useMemo(() => [...new Set(invoices.map((i) => i.doc_type))], [invoices]);
+  const visibleSelected = rows.filter((r) => selected.has(r.id));
+  const allSelected = rows.length > 0 && visibleSelected.length === rows.length;
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const sortBy = (key: SortKey) =>
+    setSort((prev) => ({ key, dir: prev.key === key ? (prev.dir === 'asc' ? 'desc' : 'asc') : key === 'client' || key === 'number' ? 'asc' : 'desc' }));
+  const ariaSort = (key: SortKey) => (sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+  const sortHead = (k: SortKey, label: string, numeric = false) => (
+    <th className={numeric ? surface.numeric : undefined} aria-sort={ariaSort(k)}>
+      <button type="button" className={styles.sortBtn} onClick={() => sortBy(k)}>
+        {label}
+        {sort.key === k && (sort.dir === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />)}
+      </button>
+    </th>
+  );
 
   const counts = useMemo(
     () => Object.fromEntries(FILTERS.map((f) => [f.id, invoices.filter((i) => matchesFilter(i, f.id, now)).length])) as Record<Filter, number>,
@@ -149,19 +192,59 @@ export function Transactions() {
     }
   };
 
-  const handleDelete = (inv: InvoiceRecord) => {
-    try {
-      localDb.invoices.remove(inv.id);
-      reload();
-      notify(`${inv.invoice_number} deleted`);
-    } catch (err) {
-      notify((err as Error).message, 'error');
+  /** Actually remove whatever is waiting; errors (e.g. a lock set meanwhile) are reported, the rest still go. */
+  const flushDeletes = (ids: Set<string>) => {
+    clearTimeout(deleteTimer.current);
+    const failed: string[] = [];
+    for (const id of ids) {
+      try {
+        localDb.invoices.remove(id);
+      } catch (err) {
+        failed.push((err as Error).message);
+      }
     }
+    setPendingDelete(new Set());
+    reload();
+    if (failed.length) notify(failed[0], 'error');
   };
 
-  const exportCsv = () => {
+  // Leaving the page commits any delete still waiting for its Undo window.
+  useEffect(() => () => {
+    if (pendingRef.current.size) flushDeletes(pendingRef.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDelete = (docs: InvoiceRecord[]) => {
+    const ids = new Set([...pendingDelete, ...docs.map((d) => d.id)]);
+    clearTimeout(deleteTimer.current);
+    setPendingDelete(ids);
+    setSelected(new Set());
+    deleteTimer.current = setTimeout(() => flushDeletes(ids), 6000);
+    const label = docs.length === 1 ? docs[0].invoice_number : `${docs.length} documents`;
+    notify(`${label} deleted`, 'success', {
+      duration: 6000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(deleteTimer.current);
+          setPendingDelete(new Set());
+        },
+      },
+    });
+  };
+
+  const runBulkPay = () => {
+    if (!bulkPay) return;
+    const r = bulkMarkPaid(visibleSelected.map((i) => i.id), bulkPay);
+    setBulkPay(null);
+    setSelected(new Set());
+    reload();
+    const skipped = r.skipped.length ? ` · ${r.skipped.length} skipped (${r.skipped[0].number}: ${r.skipped[0].reason})` : '';
+    notify(`${r.paid.length} marked paid (${formatCurrency(r.total)})${skipped}`, r.paid.length ? 'success' : 'info');
+  };
+
+  const exportCsv = (list: InvoiceRecord[] = rows) => {
     const header = ['Number', 'Type', 'Date', 'Due date', 'Client', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total', 'Paid', 'Balance', 'Status'];
-    const body = rows.map((i) => [
+    const body = list.map((i) => [
       i.invoice_number,
       DOCUMENT_LABELS[i.doc_type] ?? 'Invoice',
       i.issue_date,
@@ -178,7 +261,7 @@ export function Transactions() {
       effectiveStatus(i, now),
     ]);
     downloadText(`invoice-ledger-${todayInput()}.csv`, toCsv([header, ...body]), 'text/csv');
-    notify(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`);
+    notify(`Exported ${list.length} row${list.length === 1 ? '' : 's'}`);
   };
 
   return (
@@ -188,7 +271,7 @@ export function Transactions() {
         subtitle="Every document you have issued, with payment status."
         actions={
           <>
-            <button type="button" className={controls.btnOutline} onClick={exportCsv} disabled={rows.length === 0}>
+            <button type="button" className={controls.btnOutline} onClick={() => exportCsv()} disabled={rows.length === 0}>
               <Download size={16} /> Export CSV
             </button>
             <Link to="/invoice" className={controls.btnPrimary}>
@@ -231,6 +314,57 @@ export function Transactions() {
           </div>
         </div>
 
+        <div className={styles.filters}>
+          <select className={controls.select} aria-label="Document type" value={docType} onChange={(e) => setDocType(e.target.value as DocumentType | '')}>
+            <option value="">All types</option>
+            {docTypes.map((t) => (
+              <option key={t} value={t}>{DOCUMENT_LABELS[t] ?? t}</option>
+            ))}
+          </select>
+          <label className={styles.range}>
+            <span>From</span>
+            <input type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
+          </label>
+          <label className={styles.range}>
+            <span>To</span>
+            <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
+          </label>
+          {(docType || from || to) && (
+            <button type="button" className={controls.btnGhost} onClick={() => { setDocType(''); setFrom(''); setTo(''); }}>
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        {visibleSelected.length > 0 && (
+          <div className={styles.bulkBar} role="region" aria-label="Bulk actions">
+            <strong>{visibleSelected.length} selected</strong>
+            <button
+              type="button"
+              className={controls.btnOutline}
+              disabled={!visibleSelected.some(canMarkPaid)}
+              onClick={() => setBulkPay({ method: 'Bank Transfer', date: todayInput() })}
+            >
+              <CheckCheck size={16} /> Mark paid
+            </button>
+            <button type="button" className={controls.btnOutline} onClick={() => exportCsv(visibleSelected)}>
+              <Download size={16} /> Export CSV
+            </button>
+            <button
+              type="button"
+              className={controls.btnDanger}
+              disabled={visibleSelected.some(isLocked)}
+              title={visibleSelected.some(isLocked) ? 'Some selected documents are in a locked period' : undefined}
+              onClick={() => setDeleting(visibleSelected)}
+            >
+              <Trash2 size={16} /> Delete
+            </button>
+            <button type="button" className={controls.btnGhost} onClick={() => setSelected(new Set())} aria-label="Clear selection">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {invoices.length === 0 ? (
           <EmptyState
             icon={FileText}
@@ -249,12 +383,20 @@ export function Transactions() {
             <table className={cn(surface.table, styles.ledger)}>
               <thead>
                 <tr>
-                  <th>Document</th>
-                  <th>Client</th>
-                  <th>Date</th>
+                  <th className={styles.cCheck}>
+                    <input
+                      type="checkbox"
+                      aria-label={allSelected ? 'Clear selection' : 'Select all shown'}
+                      checked={allSelected}
+                      onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))}
+                    />
+                  </th>
+                  {sortHead('number', 'Document')}
+                  {sortHead('client', 'Client')}
+                  {sortHead('date', 'Date')}
                   <th>Status</th>
-                  <th className={surface.numeric}>Total</th>
-                  <th className={surface.numeric}>Balance</th>
+                  {sortHead('total', 'Total', true)}
+                  {sortHead('balance', 'Balance', true)}
                   <th aria-label="Actions" />
                 </tr>
               </thead>
@@ -265,7 +407,10 @@ export function Transactions() {
                   const locked = isLocked(inv); // period lock: read-only, no edit / delete / payment
                   const lockedTitle = 'Locked period — open the document to view or unlock it';
                   return (
-                    <tr key={inv.id}>
+                    <tr key={inv.id} aria-selected={selected.has(inv.id)}>
+                      <td className={styles.cCheck}>
+                        <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={`Select ${inv.invoice_number}`} />
+                      </td>
                       <td className={styles.cDoc}>
                         <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
                           {inv.invoice_number}
@@ -308,7 +453,7 @@ export function Transactions() {
                           <button type="button" className={controls.btnIcon} onClick={() => handleDuplicate(inv)} title="Duplicate" aria-label={`Duplicate ${inv.invoice_number}`}>
                             <Copy size={16} />
                           </button>
-                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting(inv)} disabled={locked} title={locked ? lockedTitle : 'Delete'} aria-label={`Delete ${inv.invoice_number}`}>
+                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting([inv])} disabled={locked} title={locked ? lockedTitle : 'Delete'} aria-label={`Delete ${inv.invoice_number}`}>
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -338,12 +483,40 @@ export function Transactions() {
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this document?"
-        message={`${deleting?.invoice_number ?? ''} and its payment history will be permanently removed from this device. Export a backup first if you may need it.`}
+        title={deleting && deleting.length > 1 ? `Delete ${deleting.length} documents?` : 'Delete this document?'}
+        message={`${deleting && deleting.length > 1 ? 'They' : deleting?.[0]?.invoice_number ?? ''} and their payment history will be removed from this device. You can undo for a few seconds.`}
         confirmLabel="Delete"
         onConfirm={() => deleting && handleDelete(deleting)}
         onClose={() => setDeleting(null)}
       />
+      <Modal
+        open={!!bulkPay}
+        onClose={() => setBulkPay(null)}
+        size="sm"
+        title={`Mark ${visibleSelected.filter(canMarkPaid).length} as paid`}
+        subtitle={`Records the full balance of each (${formatCurrency(visibleSelected.filter(canMarkPaid).reduce((s, i) => s + (Number(i.balance_due ?? i.total) || 0), 0))}).`}
+        footer={
+          <>
+            <button type="button" className={controls.btnOutline} onClick={() => setBulkPay(null)}>Cancel</button>
+            <button type="button" className={controls.btnPrimary} onClick={runBulkPay}>Mark paid</button>
+          </>
+        }
+      >
+        {bulkPay && (
+          <div className={controls.row}>
+            <label className={controls.field}>
+              <span className={controls.label}>Received on</span>
+              <input type="date" className={controls.input} value={bulkPay.date} onChange={(e) => setBulkPay({ ...bulkPay, date: e.target.value })} />
+            </label>
+            <label className={controls.field}>
+              <span className={controls.label}>Method</span>
+              <select className={controls.select} value={bulkPay.method} onChange={(e) => setBulkPay({ ...bulkPay, method: e.target.value })}>
+                {['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Card'].map((m) => <option key={m}>{m}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+      </Modal>
       {toastNode}
     </div>
   );
