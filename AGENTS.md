@@ -85,6 +85,8 @@ build-time config must use Vite's `VITE_` prefix.
   `gst-reports`, `books` and `export-shared` only adapt the result to their own field names.
 - Statutory values that change over time (B2CL threshold, GST slabs, TDS/TCS presets) live in
   `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones.
+  Exception: GST interest / late-fee tables live in `src/lib/gst-penalties.ts` (same date-keyed shape) so they
+  stay out of the early-loading notifications chunk.
 - `PurchaseLine.item_id` is not set by the bill form yet, so inventory matches purchases by name + HSN.
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.

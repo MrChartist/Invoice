@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -88,7 +88,7 @@ guards every persisted field.
 
 ---
 
-## Phase 3: GST & accounting depth (v3.4) · ~6–8 weeks
+## Phase 3: GST & accounting depth (v3.4) · ✅ done
 
 Turns the GST working papers into something a CA can rely on. Every data change goes through the Phase 1 migration runner.
 
@@ -102,6 +102,14 @@ Turns the GST working papers into something a CA can rely on. Every data change 
 | 3.6 | **Compliance calendar**: GSTR-1/IFF/3B/9 due dates (monthly or QRMP), filed status, Sec 50 interest and late-fee estimate, through the existing notifications | S–M | 0.1 |
 | 3.7 | **TDS receivable register**: client PAN/TAN, quarter × section summary, 26AS/AIS CSV matcher, Tally journal | M | 0.8 |
 | 3.8 | **MSME 43B(h) tracker**: Udyam number/category on vendors, 15/45-day overdue flags, year-end disallowance, MSMED interest | M | 3.2 |
+
+**Outcome:** 3.1 was built in the main session; 3.2–3.8 by four parallel agents in separate git worktrees, then merged
+and verified together (725 unit tests, Playwright journey, bundle budgets). Assumptions to confirm with a CA are
+listed in each feature doc — notably: the RBI bank-rate table for MSMED interest, the 43B(h) "paid within the same FY"
+reading, the GSTR-1 HSN B2B/B2C JSON keys (`HSN_JSON_LAYOUT` in `gstr-json.ts`) and split start (Jan 2025),
+QRMP/late-fee notification values, and freight being taxed at the highest line rate. Known gaps: cess on purchase
+bills, 4D(1), RCM/import postings in Books and Tally, exchange gain/loss on receipts, Sec 50(3) interest.
+The total (precache) bundle budget was raised 650 → 760 kB gz; initial and entry budgets are unchanged.
 
 ---
 
