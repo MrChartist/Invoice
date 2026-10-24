@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ChevronRight, Clock, Copy, Download, FileText, Mail, Percent, Scale, Wallet,
@@ -22,11 +22,15 @@ import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
 
-type Tab = 'aging' | 'statements' | 'collections';
+// The TDS register, its 26AS parser and Form 16A tracking load only when opened.
+const TdsTab = lazy(() => import('../components/receivables/TdsTab'));
+
+type Tab = 'aging' | 'statements' | 'collections' | 'tds';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'aging', label: 'Aging' },
   { id: 'statements', label: 'Statements' },
   { id: 'collections', label: 'Collections' },
+  { id: 'tds', label: 'TDS' },
 ];
 
 /** 1 April of the Indian financial year containing `d`. */
@@ -170,6 +174,11 @@ export function Receivables() {
               </table>
             </div>
           </div>
+        )}
+        {tab === 'tds' && (
+          <Suspense fallback={<div className={surface.card}><p className={styles.note}>Loading TDS register…</p></div>}>
+            <TdsTab data={data} notify={notify} />
+          </Suspense>
         )}
       </div>
       {toastNode}

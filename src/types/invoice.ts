@@ -141,6 +141,10 @@ export interface Client {
   /** Two-digit GST state code — authoritative for the CGST/SGST vs IGST split. */
   state_code?: string;
   notes?: string;
+  /** Income-tax PAN (AAAAA9999A). Used by the TDS register to identify the deductor. */
+  pan?: string;
+  /** TAN of the client as a TDS deductor (AAAA99999A) — the key 26AS / AIS reports use. */
+  tan?: string;
   created_at?: string;
   updated_at?: string;
 }
