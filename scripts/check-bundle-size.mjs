@@ -19,7 +19,10 @@ const env = (k, d) => Number(process.env[k] ?? d);
 
 const BUDGET_INITIAL = env('BUDGET_INITIAL_GZ_KB', 185);
 const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 650);
+// Raised from 650 in Phase 3 (TDS register, compliance, purchases, FX): all of it is lazily loaded
+// per page, so first paint (the initial budget above) is unchanged; this is the one-time offline
+// precache download.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 760);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 const initial = [...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1]);
