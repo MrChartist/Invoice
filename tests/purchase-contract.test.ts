@@ -1,7 +1,7 @@
 /**
- * Contract test: four report modules read the `purchases` table through their
- * own tolerant normalisers. They must all understand the real PurchaseRecord
- * shape that the purchases module writes (src/types/purchases.ts).
+ * Contract test: the report modules read the `purchases` table through the shared
+ * `readPurchase` / `splitLumpTax` and their own thin adapters. They must all understand
+ * the real PurchaseRecord shape (src/types/purchases.ts) and split legacy rows alike.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,6 +10,7 @@ import { normalizePurchase as exportNormalize } from '../src/lib/export-shared.t
 import { normalizePurchase as gstNormalize } from '../src/lib/gst-reports.ts';
 import { collectEvents } from '../src/lib/inventory.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
+import { gstinChecksumChar } from '../src/lib/gstin.ts';
 
 const bill: PurchaseRecord = {
   id: 'p1',
@@ -79,4 +80,29 @@ test('inventory brings purchase lines in as stock-in', () => {
   const list = events.get('s1') ?? [];
   assert.equal(list.length, 1);
   assert.equal(list[0].qty, 10);
+});
+
+test('a legacy lump-tax row splits the same way in GST reports, books and exports', () => {
+  // Intra-state supplier (27) buying in 27: CGST + SGST, never all IGST.
+  const intra = { id: 'old1', vendor_name: 'Old Co', vendor_gstin: '27AAPFU0939F1ZV', bill_number: 'L1', date: '2026-04-12', place_of_supply: '27', taxable: 1000, tax_amount: 180, total: 1180 };
+  const g = gstNormalize(intra, '27')!;
+  const b = booksNormalize(intra as never)!;
+  const e = exportNormalize(intra)!;
+  for (const [name, n] of [['gst', g], ['books', b], ['export', e]] as const) {
+    assert.deepEqual([n.cgst, n.sgst, n.igst], [90, 90, 0], `${name} split`);
+  }
+  assert.equal(e.tax, 180);
+  assert.equal(b.gst, 180);
+
+  // Inter-state supplier (07) billing into 27: all IGST everywhere.
+  const delhi = '07AAPFU0939F1Z' + gstinChecksumChar('07AAPFU0939F1Z');
+  const inter = { ...intra, id: 'old2', vendor_gstin: delhi };
+  assert.equal(gstNormalize(inter, '27')!.igst, 180);
+  assert.equal(booksNormalize(inter as never)!.igst, 180);
+  assert.equal(exportNormalize(inter)!.igst, 180);
+
+  // Rate only (no tax figure): tax derived from the rate and taken out of the total.
+  const rateOnly = { id: 'old3', vendor_name: 'Old Co', date: '2026-04-12', place_of_supply: '27', tax_rate: 18, total: 1180 };
+  const r = exportNormalize(rateOnly)!;
+  assert.equal(r.taxable + r.tax, 1180);
 });

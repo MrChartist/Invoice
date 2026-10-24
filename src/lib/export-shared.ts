@@ -10,7 +10,7 @@ import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
 import { resolveStateCode, stateByCode } from './india-states';
 import { isoDay } from './dates';
-import { isVoidStatus, readPurchase } from './purchase-normalize';
+import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 
 /* ── Dates ────────────────────────────────────────────────────── */
 
@@ -226,6 +226,9 @@ export function normalizePurchase(raw: unknown, vendors: unknown[] = []): Normal
   const c = readPurchase(r, vendors);
   const date = c?.date || isoDate(r.created_at);
   if (!c || !date || !c.partyName || !c.total) return null;
+  // A legacy row with only a lump tax: split it like GST reports do (the bill's place of supply
+  // stands for the buyer's state), so Tally / registers never post it all as IGST.
+  const heads = splitLumpTax(c, r, c.placeOfSupply);
   return {
     id: c.id,
     number: c.number,
@@ -237,13 +240,13 @@ export function normalizePurchase(raw: unknown, vendors: unknown[] = []): Normal
       gstin: c.partyGstin,
       name: '',
     }),
-    taxable: c.taxable,
-    cgst: c.cgst,
-    sgst: c.sgst,
-    igst: c.igst,
-    tax: c.tax,
+    taxable: heads.taxable,
+    cgst: heads.cgst,
+    sgst: heads.sgst,
+    igst: heads.igst,
+    tax: heads.tax,
     total: c.total,
-    roundOff: c.roundOff,
+    roundOff: round2(c.total - heads.taxable - heads.tax),
     status: clean(r.status),
     notes: c.notes,
     itcEligible: c.itcEligible,

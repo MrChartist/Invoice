@@ -22,7 +22,7 @@ import { round2, num } from './invoice-calc';
 import { getTable, setTable, generateId } from './storage';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
-import { isVoidStatus, readPurchase } from './purchase-normalize';
+import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 
 /* ════════════════════════════════════════════════════════════════
@@ -330,6 +330,8 @@ export function normalizePurchase(
   // One shared reader for the purchases table (see purchase-normalize.ts).
   const c = readPurchase(raw, vendors);
   if (!c || isVoidStatus(c.status)) return null;
+  // Same split as GST reports / exports for legacy rows that carry only a lump tax or a rate.
+  const heads = splitLumpTax(c, raw, c.placeOfSupply);
   return {
     id: c.id || `${c.date}-${c.total}`,
     number: c.number,
@@ -337,11 +339,11 @@ export function normalizePurchase(
     party: c.partyName || 'Unknown vendor',
     category: c.category,
     isExpense: c.isExpense,
-    taxable: c.taxable,
-    gst: c.tax,
-    cgst: c.cgst,
-    sgst: c.sgst,
-    igst: c.igst,
+    taxable: heads.taxable,
+    gst: heads.tax,
+    cgst: heads.cgst,
+    sgst: heads.sgst,
+    igst: heads.igst,
     total: c.total,
     itcEligible: c.itcEligible,
     paidOnRow: c.paid,

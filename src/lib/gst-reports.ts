@@ -23,7 +23,7 @@ import type { InvoiceRecord, GstMode } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, num, round2 } from './invoice-calc';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
-import { isVoidStatus, pickNum, readPurchase } from './purchase-normalize';
+import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import { b2clThreshold, b2clThresholdLabel } from './tax-rules';
 
 /* ───────────────────────── Period ───────────────────────── */
@@ -782,30 +782,10 @@ export interface NormalizedPurchase {
 export function normalizePurchase(raw: unknown, filerStateCode: string): NormalizedPurchase | null {
   const c = readPurchase(raw);
   if (!c || isVoidStatus(c.status)) return null;
-  const o = raw as Record<string, unknown>;
   const supState =
     checkGstin(c.partyGstin).stateCode ?? stateByCode(c.vendorStateCode || c.placeOfSupply)?.code ?? '';
 
-  let { igst, cgst, sgst } = c;
-  let taxable = c.taxable;
-  if (!c.hasSplit) {
-    let tax = c.taxField;
-    if (tax === undefined) {
-      const rate = pickNum(o, ['tax_rate', 'gst_rate']);
-      if (rate !== undefined) tax = round2((taxable * rate) / 100);
-    }
-    tax = tax ?? 0;
-    const inter = supState && filerStateCode ? supState !== filerStateCode : false;
-    if (inter) igst = round2(tax);
-    else {
-      sgst = round2(tax / 2);
-      cgst = round2(tax - sgst);
-    }
-    // A lump tax_amount was not available to the taxable fallback inside readPurchase.
-    if (c.taxField === undefined && pickNum(o, ['taxable', 'taxable_value', 'taxable_amount', 'subtotal']) === undefined) {
-      taxable = round2(Math.max(c.total - tax, 0));
-    }
-  }
+  const { igst, cgst, sgst, taxable } = splitLumpTax(c, raw, filerStateCode, supState);
 
   return {
     id: c.id || `${c.date}:${c.number}`,

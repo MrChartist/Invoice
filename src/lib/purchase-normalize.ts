@@ -15,6 +15,7 @@
 import type { PurchaseRecord } from '../types/purchases';
 import { num, round2 } from './invoice-calc';
 import { isoDay } from './dates';
+import { checkGstin } from './gstin';
 
 type Rec = Record<string, unknown>;
 
@@ -169,6 +170,44 @@ export function readPurchase(raw: unknown, vendors: readonly unknown[] = []): Pu
     status: pickStr(r, ['status']).toLowerCase(),
     notes: pickStr(r, ['notes', 'narration']),
   };
+}
+
+/**
+ * GST heads for a row that carries only a lump tax figure (or just a rate) and no
+ * cgst/sgst/igst split — older or imported data. The lump is split by supplier state vs
+ * the buyer's (filer's) state: different → IGST, same or unknown → CGST + SGST.
+ * Rows with an explicit split are returned unchanged. Shared by GST reports and the
+ * accounting / Tally exports so every module splits a legacy row the same way.
+ */
+export function splitLumpTax(
+  c: PurchaseCore,
+  raw: unknown,
+  filerStateCode: string,
+  supplierStateCode: string = checkGstin(c.partyGstin).stateCode ?? c.vendorStateCode,
+): { taxable: number; igst: number; cgst: number; sgst: number; tax: number } {
+  if (c.hasSplit) return { taxable: c.taxable, igst: c.igst, cgst: c.cgst, sgst: c.sgst, tax: c.tax };
+  const o = asRec(raw);
+  let tax = c.taxField;
+  if (tax === undefined) {
+    const rate = pickNum(o, ['tax_rate', 'gst_rate']);
+    if (rate !== undefined) tax = round2((c.taxable * rate) / 100);
+  }
+  tax = round2(tax ?? 0);
+  let igst = 0;
+  let cgst = 0;
+  let sgst = 0;
+  const inter = supplierStateCode && filerStateCode ? supplierStateCode !== filerStateCode : false;
+  if (inter) igst = tax;
+  else {
+    sgst = round2(tax / 2);
+    cgst = round2(tax - sgst);
+  }
+  let taxable = c.taxable;
+  // A lump tax that readPurchase could not see (rate only) was not taken out of the total.
+  if (c.taxField === undefined && pickNum(o, ['taxable', 'taxable_value', 'taxable_amount', 'subtotal']) === undefined) {
+    taxable = round2(Math.max(c.total - tax, 0));
+  }
+  return { taxable: round2(taxable), igst, cgst, sgst, tax };
 }
 
 /** One stock-relevant line of a bill. */

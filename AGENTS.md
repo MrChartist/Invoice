@@ -81,8 +81,8 @@ build-time config must use Vite's `VITE_` prefix.
   `no-explicit-any` stays a warning).
 - `react-hooks/set-state-in-effect` kept as a warning — the app's correct localStorage-hydration
   pattern triggers it; rewriting needs care.
-- Purchases are read through the shared `readPurchase` (`purchase-normalize.ts`), but `gst-reports`, `books`
-  and `export-shared` still wrap it in their own shapes; finishing the move to `PurchaseRecord` removes that.
+- Purchases are read through the shared `readPurchase` + `splitLumpTax` (`purchase-normalize.ts`);
+  `gst-reports`, `books` and `export-shared` only adapt the result to their own field names.
 - Statutory values that change over time (B2CL threshold, GST slabs, TDS/TCS presets) live in
   `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones.
 - `PurchaseLine.item_id` is not set by the bill form yet, so inventory matches purchases by name + HSN.
