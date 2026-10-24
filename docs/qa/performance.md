@@ -302,3 +302,14 @@ How the windowing behaves:
 
 Not changed: the remaining ~100 ms task on `/transactions` is reading and parsing the invoice table plus the
 route chunk; caching the parsed table in the store (section 2) is the next step.
+
+## Component split (Roadmap 4.4, 2026-10-24)
+
+Pure refactor of `ImportWizard` and `InvoiceCreator`. Typing latency, `/invoice` with 20 lines
+(`PERF_ONLY=typing node tests/perf/run.mjs`, the section now unlocks the session and uses the current
+"Item N name" labels), 5 alternating runs each against a build of the previous commit: median of run medians
+20.4 ms before / 17.5 ms after, p95 31.9 / 28.0 ms — within run-to-run noise (single runs range 17-24 ms), so no
+regression. `DocumentMetaCard` subscribes to its own store slice, so typing in a line no longer re-renders the
+document fields. Bundle: initial JS 182.1 -> 181.6 kB gz, entry 85.0 -> 84.6 kB gz (the split itself cost
+~0.25 kB; recovered with `store/pick.ts` for the long `useShallow` selectors and by loading the closed
+client/item picker modals as lazy chunks right after the editor renders).

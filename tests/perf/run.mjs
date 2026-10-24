@@ -189,11 +189,11 @@ try {
 
   // 4. Keystroke latency, 20 line items ────────────────────────────────────
   if (want('typing')) {
-    const { ctx, page } = await newPage();
+    const { ctx, page } = await newPage({ unlocked: true, store: { mrchartist_inv_settings: ONBOARDED_SETTINGS } });
     await page.goto(srv.origin + '/invoice');
-    await page.waitForSelector('input[placeholder="Description"]');
-    const add = page.getByRole('button', { name: /add item/i });
-    while ((await page.locator('input[placeholder="Description"]').count()) < 20) await add.click();
+    await page.waitForSelector('input[aria-label^="Item "][aria-label$=" name"]');
+    const add = page.getByRole('button', { name: /add (item|line)/i });
+    while ((await page.locator('input[aria-label^="Item "][aria-label$=" name"]').count()) < 20) await add.click();
     await page.evaluate(() => {
       window.__keys = [];
       document.addEventListener('keydown', () => {
@@ -202,13 +202,13 @@ try {
         requestAnimationFrame(() => setTimeout(() => window.__keys.push(performance.now() - t0), 0));
       }, true);
     });
-    const field = page.locator('input[placeholder="Description"]').nth(19);
+    const field = page.locator('input[aria-label^="Item "][aria-label$=" name"]').nth(19);
     await field.click();
     const text = 'Consulting services for the quarter ending March';
     for (const ch of text) { await page.keyboard.type(ch); await page.waitForTimeout(40); }
     await page.waitForTimeout(200);
     const keys = await page.evaluate(() => window.__keys);
-    out.typing = { items: await page.locator('input[placeholder="Description"]').count(), keys: keys.length, medianMs: +median(keys).toFixed(1), p95Ms: +pct(keys, 0.95).toFixed(1), maxMs: +Math.max(...keys).toFixed(1), valueOk: (await field.inputValue()) === text };
+    out.typing = { items: await page.locator('input[aria-label^="Item "][aria-label$=" name"]').count(), keys: keys.length, medianMs: +median(keys).toFixed(1), p95Ms: +pct(keys, 0.95).toFixed(1), maxMs: +Math.max(...keys).toFixed(1), valueOk: (await field.inputValue()) === text };
     if (out.typing.p95Ms > KEY_P95_BUDGET_MS) problems.push(`keystroke p95 ${out.typing.p95Ms}ms > ${KEY_P95_BUDGET_MS}ms`);
     // CPU slowdown x4 approximates a mid-range phone
     const cdp = await ctx.newCDPSession(page);
