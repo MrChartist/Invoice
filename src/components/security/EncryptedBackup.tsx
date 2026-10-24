@@ -1,3 +1,4 @@
+import { reloadAfterFlush } from '../../lib/storage';
 import { useRef, useState } from 'react';
 import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { Download, FileLock2, Info, Upload } from 'lucide-react';
@@ -107,7 +108,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
     try {
       restoreBackup(summary.data);
       notify('Backup restored — reloading…');
-      setTimeout(() => window.location.reload(), 700);
+      setTimeout(reloadAfterFlush, 700);
     } catch (err) {
       notify((err as Error).message, 'error');
     }

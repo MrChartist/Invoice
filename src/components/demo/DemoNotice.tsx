@@ -1,3 +1,4 @@
+import { reloadAfterFlush } from '../../lib/storage';
 import { useState } from 'react';
 import { FlaskConical } from 'lucide-react';
 import { demoStatus, removeDemoData } from '../../lib/demo-data';
@@ -19,7 +20,7 @@ export function DemoNotice({ compact, onRemoved }: { compact?: boolean; onRemove
     removeDemoData();
     setStatus(demoStatus());
     if (onRemoved) onRemoved();
-    else window.location.reload();
+    else reloadAfterFlush();
   };
 
   if (compact) {

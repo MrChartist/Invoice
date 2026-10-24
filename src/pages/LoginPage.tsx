@@ -14,6 +14,7 @@ import {
   resetAllData,
   unlock,
 } from '../lib/auth';
+import { reloadAfterFlush } from '../lib/storage';
 import controls from '../styles/controls.module.css';
 import styles from './LoginPage.module.css';
 
@@ -109,8 +110,8 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
     if (!resetAllData(phrase)) return setError('The confirmation phrase does not match.');
     // Also drop the undo copy, backup key and folder link kept in IndexedDB (security: no way back to the old data).
     await forgetDeviceData();
-    // Fresh start: reload so every module re-reads empty storage.
-    window.location.reload();
+    // Fresh start: commit the erase of the data tables to IndexedDB, then reload so every module re-reads empty storage.
+    reloadAfterFlush();
   };
 
   return (

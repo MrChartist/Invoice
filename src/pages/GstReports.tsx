@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { CalendarRange, Download, FileJson, FileSpreadsheet, Files, Printer, ShieldAlert } from 'lucide-react';
-import { getTable } from '../lib/storage';
+import { getTable, readRaw, writeRaw } from '../lib/storage';
 import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
 import { stateByCode } from '../lib/india-states';
@@ -120,7 +120,7 @@ export function GstReports() {
   // Aggregate turnover for the JSON header — entered by the filer, remembered on this device.
   const [turnover, setTurnover] = useState<{ gt: string; curGt: string }>(() => {
     try {
-      const v = JSON.parse(localStorage.getItem(TURNOVER_KEY) || '{}');
+      const v = JSON.parse(readRaw(TURNOVER_KEY) || '{}');
       return { gt: String(v.gt ?? ''), curGt: String(v.curGt ?? '') };
     } catch {
       return { gt: '', curGt: '' };
@@ -129,7 +129,7 @@ export function GstReports() {
   const patchTurnover = (next: { gt: string; curGt: string }) => {
     setTurnover(next);
     try {
-      localStorage.setItem(TURNOVER_KEY, JSON.stringify(next));
+      writeRaw(TURNOVER_KEY, JSON.stringify(next));
     } catch {
       /* storage unavailable — value stays for this session */
     }

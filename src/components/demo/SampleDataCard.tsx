@@ -1,3 +1,4 @@
+import { reloadAfterFlush } from '../../lib/storage';
 import { useState } from 'react';
 import { FlaskConical, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -11,7 +12,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-const reload = () => setTimeout(() => window.location.reload(), 700);
+const reload = () => setTimeout(reloadAfterFlush, 700);
 
 /** "Try with sample data" / "Remove sample data", both behind a confirmation. */
 export function SampleDataCard({ notify, onChanged }: Props) {

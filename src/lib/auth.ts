@@ -14,7 +14,7 @@
  * a new PIN simply by logging out.
  */
 
-import { DB_PREFIX, SINGLETON_KEYS, readRaw, removeRaw, writeRaw } from './storage';
+import { DB_PREFIX, DEVICE_LOCAL_KEYS, SINGLETON_KEYS, collectAppData, readRaw, removeRaw, writeRaw } from './storage';
 import { constantTimeEqualStrings, hashPin, PBKDF2_ITERATIONS, verifyPinHash, type PinHash } from './crypto';
 
 export const AUTH_KEY = SINGLETON_KEYS.auth;
@@ -23,8 +23,8 @@ export const IDLE_KEY = `${DB_PREFIX}idle_min`;
 export const SESSION_KEY = `${DB_PREFIX}session`;
 export const IDLE_CHANGED_EVENT = 'mrchartist:idle-changed';
 
-/** Keys that describe THIS device's security state and must never travel in a backup. */
-export const DEVICE_LOCAL_KEYS: readonly string[] = [AUTH_KEY, GUARD_KEY, IDLE_KEY, SESSION_KEY, `${DB_PREFIX}last_backup`];
+/** Keys that describe THIS device's state and must never travel in a backup (defined in storage.ts). */
+export { DEVICE_LOCAL_KEYS };
 
 export const RESET_PHRASE = 'DELETE ALL MY DATA';
 export const MAX_FREE_ATTEMPTS = 5;
@@ -380,6 +380,8 @@ export function resetAllData(confirmation: string): boolean {
   if (!isResetPhrase(confirmation)) return false;
   endSession();
   try {
+    // Data tables (the IndexedDB-backed cache, or localStorage); the caller flushes before reloading.
+    for (const k of Object.keys(collectAppData())) removeRaw(k);
     if (typeof localStorage !== 'undefined') {
       const keys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
