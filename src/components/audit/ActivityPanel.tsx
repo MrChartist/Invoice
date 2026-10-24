@@ -14,6 +14,7 @@ import {
   type AuditEntry,
 } from '../../types/audit';
 import { AuditChanges } from './AuditChanges';
+import { AuditIntegrity } from './AuditIntegrity';
 import { formatWhen, toneOf } from './audit-format';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -95,6 +96,8 @@ export function ActivityPanel() {
           Every change to documents, payments, clients and settings is recorded on this device — like Tally&apos;s edit log.
           Contact and bank details are noted as &ldquo;changed&rdquo;, never copied.
         </p>
+
+        <AuditIntegrity />
 
         <div className={styles.toolbar}>
           <label className={`${controls.field} ${styles.searchField}`}>
@@ -197,7 +200,7 @@ export function ActivityPanel() {
             )}
           </>
         )}
-        <p className={styles.limit}>The newest {AUDIT_MAX_ROWS.toLocaleString('en-IN')} entries are kept; older ones roll off. Included in backups.</p>
+        <p className={styles.limit}>Up to {AUDIT_MAX_ROWS.toLocaleString('en-IN')} entries are kept; when the limit (or the browser&apos;s storage) is reached the oldest roll off and an &ldquo;Older entries removed&rdquo; entry records it. Included in backups.</p>
       </div>
     </section>
   );

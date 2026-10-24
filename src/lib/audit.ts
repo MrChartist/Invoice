@@ -17,6 +17,7 @@
 import type { AuditAction, AuditChange, AuditEntry } from '../types/audit';
 import type { Client, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
 import { round2 } from './invoice-calc';
+import { sha256 } from './sha256';
 import { generateId, getTable, setTable } from './storage';
 import { formatCurrency } from './utils';
 
@@ -25,7 +26,7 @@ export const AUDIT_MAX_ROWS = 5000;
 /** Text fields are excerpted to this many characters in a diff. */
 const EXCERPT = 60;
 
-export type AuditInput = Omit<AuditEntry, 'id' | 'at'> & { at?: string };
+export type AuditInput = Omit<AuditEntry, 'id' | 'at' | 'prev' | 'hash'> & { at?: string };
 
 /* ── Diff helpers (pure) ───────────────────────────────────────── */
 
@@ -215,6 +216,84 @@ export function summarizeChanges(changes: AuditChange[], max = 3): string {
   return shown.join('; ') + (more > 0 ? `; +${more} more` : '');
 }
 
+/* ── Hash chain (4.5) ──────────────────────────────────────────── */
+/*
+ * Each row stores `prev` (the previous row's hash) and `hash` = SHA-256(canonical(row without `hash`)).
+ * Rows written before 4.5 carry neither; a run of them is sealed by the `chain_start` anchor that follows
+ * it (count + digest). Older rows the app removes itself (row cap / storage full) are recorded by a
+ * `truncate` anchor. Verification lives in `audit-chain.ts` (lazy; not on the data path).
+ */
+
+/** `prev` of the very first chained row. */
+export const AUDIT_GENESIS = '0'.repeat(64);
+/** Passing the row cap trims the log to this many rows in one go (plus one `truncate` anchor). */
+const CAP_KEEP = AUDIT_MAX_ROWS - 500;
+
+/** Canonical serialisation: JSON with object keys sorted and `undefined` members left out. */
+export function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+  if (v && typeof v === 'object') {
+    const o = v as Loose;
+    const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(o[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v ?? null);
+}
+
+/** SHA-256 over every field of the row except `hash` itself (`prev` included). */
+export const rowHash = (e: AuditEntry): string => sha256(canonical({ ...e, hash: undefined }));
+/** Digest that seals a run of unchained (legacy) rows inside an anchor. */
+export const legacyDigest = (rows: AuditEntry[]): string => sha256(canonical(rows));
+
+type RowInput = Omit<AuditEntry, 'id' | 'at' | 'prev' | 'hash'> & { at?: string };
+
+/** Push `r` onto `rows`, linked to the current last row. */
+function link(rows: AuditEntry[], r: Omit<AuditEntry, 'prev' | 'hash'>): AuditEntry {
+  const row: AuditEntry = { ...r, prev: rows.length ? (rows[rows.length - 1].hash ?? AUDIT_GENESIS) : AUDIT_GENESIS };
+  row.hash = rowHash(row);
+  rows.push(row);
+  return row;
+}
+
+/** If the log ends in unchained rows, append a `chain_start` anchor sealing them (mutates). */
+function sealTail(rows: AuditEntry[], at: string): boolean {
+  let run = 0;
+  while (run < rows.length && !rows[rows.length - 1 - run].hash) run++;
+  if (!run) return false;
+  const legacy = rows.splice(rows.length - run, run);
+  // Linked to the last chained row before the run (or genesis), then placed after the rows it seals.
+  const anchor = link(rows, {
+    id: generateId(), at, entity: 'system', entity_id: AUDIT_TABLE, action: 'chain_start',
+    summary: `Integrity chain started; ${run} earlier entr${run === 1 ? 'y' : 'ies'} sealed as they were`,
+    seal: { legacy: { count: run, digest: legacyDigest(legacy) } },
+  });
+  rows.splice(rows.length - 1, 1, ...legacy, anchor);
+  return true;
+}
+
+function append(rows: AuditEntry[], input: RowInput): AuditEntry {
+  const at = input.at ?? new Date().toISOString();
+  sealTail(rows, at);
+  return link(rows, { ...input, id: generateId(), at });
+}
+
+/** Keep the newest `keep` rows and append a `truncate` anchor saying what went and why. */
+function trim(rows: AuditEntry[], keep: number, reason: 'storage' | 'cap'): AuditEntry[] {
+  const kept = rows.slice(rows.length - keep);
+  let lead = 0;
+  while (lead < kept.length && !kept[lead].hash) lead++;
+  const dropped = rows.length - kept.length;
+  append(kept, {
+    entity: 'system', entity_id: AUDIT_TABLE, action: 'truncate',
+    summary: `Older entries removed (${reason === 'storage' ? 'storage full' : `${AUDIT_MAX_ROWS.toLocaleString('en-IN')}-entry limit`}): ${dropped} dropped`,
+    seal: {
+      reason, dropped, cut: kept[lead]?.prev ?? AUDIT_GENESIS,
+      ...(lead ? { legacy: { count: lead, digest: legacyDigest(kept.slice(0, lead)) } } : {}),
+    },
+  });
+  return kept;
+}
+
 /* ── Store ─────────────────────────────────────────────────────── */
 
 function readAll(): AuditEntry[] {
@@ -222,13 +301,13 @@ function readAll(): AuditEntry[] {
 }
 
 function writeCapped(rows: AuditEntry[]): void {
-  const capped = rows.length > AUDIT_MAX_ROWS ? rows.slice(rows.length - AUDIT_MAX_ROWS) : rows;
+  const capped = rows.length > AUDIT_MAX_ROWS ? trim(rows, CAP_KEEP, 'cap') : rows;
   try {
     setTable(AUDIT_TABLE, capped);
   } catch {
-    // Quota: shed the oldest half once and retry. If that fails too, give up silently.
+    // Quota: shed the oldest half once (recorded by a `truncate` anchor) and retry. If that fails too, give up silently.
     try {
-      setTable(AUDIT_TABLE, capped.slice(Math.floor(capped.length / 2)));
+      setTable(AUDIT_TABLE, trim(capped, Math.floor(capped.length / 2), 'storage'));
     } catch {
       /* the user's save matters more than its log row */
     }
@@ -236,12 +315,12 @@ function writeCapped(rows: AuditEntry[]): void {
 }
 
 export const audit = {
-  /** Append one row. Never throws; returns the row, or null if it could not be written. */
+  /** Append one chained row. Never throws; returns the row, or null if it could not be built. */
   record(input: AuditInput): AuditEntry | null {
     try {
-      const entry: AuditEntry = {
-        id: generateId(),
-        at: input.at ?? new Date().toISOString(),
+      const rows = readAll();
+      const entry = append(rows, {
+        at: input.at,
         entity: input.entity,
         entity_id: input.entity_id,
         action: input.action,
@@ -249,14 +328,32 @@ export const audit = {
         ...(input.changes && input.changes.length ? { changes: input.changes } : {}),
         ...(input.doc_number ? { doc_number: input.doc_number } : {}),
         ...(input.parent_id ? { parent_id: input.parent_id } : {}),
-      };
-      const rows = readAll();
-      rows.push(entry);
+        ...(input.seal ? { seal: input.seal } : {}),
+      });
       writeCapped(rows);
       return entry;
     } catch {
       return null;
     }
+  },
+
+  /** Seal unchained (pre-4.5) rows at the end of the log with a `chain_start` anchor. False when there were none. */
+  sealLegacy(): boolean {
+    const rows = readAll();
+    if (!sealTail(rows, new Date().toISOString())) return false;
+    setTable(AUDIT_TABLE, rows);
+    return true;
+  },
+
+  /** Hash of the newest row. Noted down outside the app, it makes a later rewrite of the log detectable. */
+  head(): string | null {
+    const rows = readAll();
+    return rows.length ? (rows[rows.length - 1].hash ?? null) : null;
+  },
+
+  /** Oldest → newest, exactly as stored (what verification works on). */
+  rows(): AuditEntry[] {
+    return readAll();
   },
 
   /** Newest first. */

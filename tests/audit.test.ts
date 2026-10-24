@@ -6,6 +6,7 @@ import { clientMH, createViaStore, installSettings, reload } from './helpers/wor
 import { localDb } from '../src/lib/localDb.ts';
 import { AUDIT_MAX_ROWS, AUDIT_TABLE, audit, diffClient, diffInvoice } from '../src/lib/audit.ts';
 import { auditToCsv, filterAudit } from '../src/lib/audit-query.ts';
+import { verifyAuditChain } from '../src/lib/audit-chain.ts';
 import { getTable, setTable } from '../src/lib/storage.ts';
 import type { AuditEntry } from '../src/types/audit.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
@@ -133,7 +134,7 @@ test('clients and settings are logged; sensitive profile fields are flagged, nev
   assert.match(defaults.summary, /Due in \(days\) 14 → 30/);
 });
 
-test('the log is capped at the newest rows', () => {
+test('the log is capped: passing the limit trims to 4,500 rows in one go and records it', () => {
   const seed: AuditEntry[] = Array.from({ length: AUDIT_MAX_ROWS }, (_, n) => ({
     id: `s${n}`, at: new Date(2025, 0, 1, 0, 0, n).toISOString(), entity: 'system', entity_id: 'x', action: 'update', summary: `row ${n}`,
   }));
@@ -141,10 +142,15 @@ test('the log is capped at the newest rows', () => {
   audit.record({ entity: 'system', entity_id: 'x', action: 'update', summary: 'newest' });
   audit.record({ entity: 'system', entity_id: 'x', action: 'update', summary: 'newest 2' });
   const all = getTable<AuditEntry>(AUDIT_TABLE);
-  assert.equal(all.length, AUDIT_MAX_ROWS);
-  assert.equal(all[0].summary, 'row 2', 'the two oldest rows were dropped');
+  assert.ok(all.length <= AUDIT_MAX_ROWS);
+  assert.equal(all.length, AUDIT_MAX_ROWS - 500 + 2, '4,500 kept + the truncate anchor + the next row');
+  assert.equal(all[all.length - 2].action, 'truncate');
+  assert.match(all[all.length - 2].summary, /5,000-entry limit/);
   assert.equal(all[all.length - 1].summary, 'newest 2');
   assert.equal(audit.all()[0].summary, 'newest 2', 'all() is newest first');
+  const report = verifyAuditChain(all);
+  assert.equal(report.ok, true, report.broken?.message);
+  assert.equal(report.trimmed?.reason, 'cap');
 });
 
 test('a throwing logger can never break a save', () => {
