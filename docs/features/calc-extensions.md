@@ -3,7 +3,7 @@
 All fields are optional and additive; absent = legacy behaviour (golden tests in `tests/invoice-calc.test.ts` and `tests/invoice-store.test.ts`).
 
 ## Order of operations
-gross -> line discount -> invoice discount (on tax-inclusive net when `price_includes_tax`) -> taxable -> GST + cess -> + shipping/other -> + TCS -> round (`round_mode`) = **total** (invoice value). TDS never changes `total`: `payable = total - tds_amount`, `balance_due = payable - amount_paid`.
+gross -> line discount -> invoice discount (on tax-inclusive net when `price_includes_tax`) -> taxable -> GST + cess -> + shipping/other (taxed at the highest line rate when `charges_taxable`, see `freight-fx.md`) -> + TCS -> round (`round_mode`) = **total** (invoice value). TDS never changes `total`: `payable = total - tds_amount`, `balance_due = payable - amount_paid`.
 
 ## Fields
 - Item: `cess_rate` (% of taxable), `cess_per_unit` (fixed per qty). Cess is a single bucket (not split CGST/SGST), zero when GST mode is NONE.

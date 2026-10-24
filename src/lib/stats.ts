@@ -7,6 +7,7 @@ import type { InvoiceRecord } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { daysOverdue } from './utils';
+import { docCurrency, hasInrValue, inrRecord, missingFxRate } from './fx';
 
 /** Only real, issued tax documents count as revenue — not quotes, challans or drafts. A debit note bills extra. */
 export function isRevenueDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {
@@ -40,11 +41,24 @@ export interface Summary {
   overdueCount: number;
 }
 
-/** Documents in one currency (all of them when `currency` is omitted). Amounts in different currencies must never be added together. */
+/**
+ * Documents in one currency (all of them when `currency` is omitted). Amounts in different
+ * currencies must never be added together. For 'INR', foreign-currency documents that carry an
+ * `exchange_rate` are included, converted to rupees (see `src/lib/fx.ts`); those without a rate
+ * are left out (count them with `foreignWithoutRate`).
+ */
 export function inCurrency(invoices: InvoiceRecord[], currency?: string): InvoiceRecord[] {
   if (!currency) return invoices;
   const want = currency.toUpperCase();
-  return invoices.filter((i) => (i.currency || 'INR').toUpperCase() === want);
+  if (want === 'INR') return invoices.filter(hasInrValue).map((i) => inrRecord(i));
+  return invoices.filter((i) => docCurrency(i) === want);
+}
+
+/** Revenue documents / credit notes in a foreign currency with no exchange rate — left out of rupee totals. */
+export function foreignWithoutRate(invoices: InvoiceRecord[]): number {
+  return invoices.filter(
+    (i) => missingFxRate(i) && (isRevenueDoc(i) || (i.doc_type === 'CREDIT_NOTE' && i.status !== 'Draft' && i.status !== 'Cancelled')),
+  ).length;
 }
 
 /**

@@ -71,6 +71,9 @@ export interface RecurringTemplate {
   tds_section?: string;
   tds_rate?: number;
   tds_on_taxable?: boolean;
+  /** Additive: freight / other charges are taxed (roadmap 3.3). The exchange rate is NOT kept:
+      each occurrence needs the rate of its own date. */
+  charges_taxable?: boolean;
 }
 
 export interface RecurringHistoryEntry {
@@ -359,6 +362,7 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
     tds_section: inv.tds_section,
     tds_rate: inv.tds_rate,
     tds_on_taxable: inv.tds_on_taxable,
+    ...(inv.charges_taxable ? { charges_taxable: true } : {}),
   };
 }
 

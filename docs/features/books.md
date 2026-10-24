@@ -16,7 +16,8 @@ Tally-style books built read-only from invoices, payments received and (if prese
 
 ## Accounting rules
 - Sales = `INVOICE`/`TAX_INVOICE` that are not Draft/Cancelled; credit notes = `CREDIT_NOTE`. Quotations, proformas and challans are ignored.
-- Income = **taxable value** of sales less credit notes. GST on sales is a liability, never income.
+- Income = **taxable value** of sales less credit notes. GST on sales is a liability, never income. Taxed freight sits inside the taxable value; untaxed charges and round-off are added.
+- Foreign-currency invoices and their receipts are booked in rupees at the invoice's `exchange_rate` (`src/lib/fx.ts`); without a rate, at face value. No realised exchange gain/loss.
 - Purchase cost = taxable + GST only when the bill is **not ITC-eligible**; eligible GST is ITC (asset), excluded from expenses.
 - Purchases (`kind`/`type` not containing "EXPENSE") are direct costs -> gross profit; rows whose `kind`/`type`/`doc_type` contains `EXPENSE` are indirect -> net profit.
 - Accrual: invoice/bill dates. Cash basis: receipts/payments apportioned by `taxable/total` (receipt) and `cost/total` (payment); credit notes reduce income on issue date either way.

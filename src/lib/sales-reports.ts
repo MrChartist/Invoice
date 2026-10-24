@@ -23,6 +23,8 @@ import {
   calculateInvoice,
   num,
   round2,
+  taxLinesOf,
+  untaxedCharges,
   type CalcLine,
 } from './invoice-calc';
 import { isoDay, localDayOf } from './dates';
@@ -110,7 +112,7 @@ function amountsOf(inv: InvoiceRecord) {
   const tcs = Math.abs(num(inv.tcs_amount));
   const hasTaxable = Number.isFinite(num(inv.taxable_value, NaN));
   const taxable = hasTaxable ? Math.abs(num(inv.taxable_value)) : Math.max(total - tax, 0);
-  const charges = num(inv.shipping) + num(inv.other_charges);
+  const charges = untaxedCharges(inv); // taxed charges already sit inside taxable_value
   const income = hasTaxable ? round2(taxable + charges + num(inv.round_off)) : round2(Math.max(total - tax - cess - tcs, 0));
   return { total: round2(total), taxable: round2(taxable), tax: round2(tax), cess: round2(cess), income };
 }
@@ -136,7 +138,7 @@ function linesOf(inv: InvoiceRecord, sign: 1 | -1, amounts: ReturnType<typeof am
   let lines: SalesLine[] = [];
   try {
     const calc = calculateInvoice(calcInputFromRecord(inv, { amount_paid: 0 }));
-    lines = calc.lines.map((l) => toSalesLine(l, sign));
+    lines = taxLinesOf(calc).map((l) => toSalesLine(l, sign));
   } catch {
     lines = [];
   }

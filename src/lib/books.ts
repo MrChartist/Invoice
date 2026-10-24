@@ -18,7 +18,8 @@
  *      Expense    Cr party        Payment      Dr party
  */
 
-import { round2, num } from './invoice-calc';
+import { round2, num, untaxedCharges } from './invoice-calc';
+import { inrRecord, inrValue } from './fx';
 import { getTable, setTable, generateId } from './storage';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
@@ -272,8 +273,12 @@ function partyOfInvoice(inv: InvoiceRecord): string {
   return str(inv.client?.company) || str(inv.client?.name) || 'Cash sale';
 }
 
-/** Taxable / GST / total of an invoice-like row, tolerant of legacy rows. */
-function invoiceAmounts(inv: InvoiceRecord) {
+/**
+ * Taxable / GST / total of an invoice-like row, tolerant of legacy rows. In rupees: a foreign-currency
+ * document is booked at its exchange rate (`src/lib/fx.ts`); one without a rate stays at face value.
+ */
+function invoiceAmounts(source: InvoiceRecord) {
+  const inv = inrRecord(source);
   const total = Math.abs(num(inv.total));
   const tax = Math.abs(num(inv.tax_amount));
   const hasTaxable = Number.isFinite(num(inv.taxable_value, NaN));
@@ -285,7 +290,8 @@ function invoiceAmounts(inv: InvoiceRecord) {
   // bills the full total) and the Books disagree by exactly those amounts.
   const cess = Math.abs(num(inv.cess_amount));
   const tcs = Math.abs(num(inv.tcs_amount));
-  const charges = num(inv.shipping) + num(inv.other_charges);
+  // Taxed charges (`charges_taxable`) already sit inside taxable_value.
+  const charges = untaxedCharges(inv);
   // Legacy rows with no taxable_value: whatever is left after the taxes is the income.
   const income = hasTaxable
     ? round2(taxable + charges + num(inv.round_off))
@@ -409,9 +415,10 @@ export function buildVouchers(data: BooksData): Voucher[] {
 
   for (const t of data.transactions) {
     const date = toIsoDate(t.date);
-    const amount = round2(Math.abs(num(t.amount)));
-    if (!date || amount === 0) continue;
     const inv = invById.get(t.invoice_id);
+    // A receipt against a foreign-currency invoice is booked at that invoice's rate.
+    const amount = round2(Math.abs(inrValue(num(t.amount), inv)));
+    if (!date || amount === 0) continue;
     out.push({
       id: `rcpt:${t.id}`,
       date,
@@ -658,9 +665,9 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
   if (basis === 'cash') {
     for (const t of data.transactions) {
       const date = toIsoDate(t.date);
-      const paid = round2(Math.abs(num(t.amount)));
-      if (!date || paid === 0) continue;
       const inv = invById.get(t.invoice_id);
+      const paid = round2(Math.abs(inrValue(num(t.amount), inv)));
+      if (!date || paid === 0) continue;
       let amount = paid;
       if (inv) {
         if (!isSale(inv)) continue; // receipts only count against sales invoices
@@ -934,9 +941,10 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   // cancelled. That money then shows up as a customer advance instead of vanishing
   // into the balancing figure.
   let receipts = 0;
+  const invById = new Map(data.invoices.map((i) => [i.id, i]));
   for (const t of data.transactions) {
     if (!upTo(toIsoDate(t.date))) continue;
-    receipts += Math.abs(num(t.amount));
+    receipts += Math.abs(inrValue(num(t.amount), invById.get(t.invoice_id)));
   }
 
   const purchases = data.purchases

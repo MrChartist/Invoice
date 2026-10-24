@@ -17,10 +17,15 @@
  *  - Cess is carried through per rate row / HSN row / 3B; it is paid in cash (no ITC set-off).
  *  - Supply type drives placement: EXPORT_* -> exp (WPAY/WOPAY); SEZ_* -> b2b with inv_typ
  *    SEWP/SEWOP; both are zero-rated (3B 3.1(b)) and keep their nominal rate in the rate rows.
+ *  - Taxable freight / other charges (`charges_taxable`) are one more line at the principal
+ *    (highest) rate under the principal line's HSN, with no quantity.
+ *  - Foreign-currency documents are reported in INR at their `exchange_rate` (src/lib/fx.ts);
+ *    one without a rate is flagged (FX_RATE_MISSING) and reported at face value.
  */
 
 import type { InvoiceRecord, GstMode } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, num, round2 } from './invoice-calc';
+import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
 import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
@@ -181,6 +186,10 @@ export interface B2csRow {
 
 export interface ExportRow extends DocRow {
   expType: 'WPAY' | 'WOPAY';
+  /** Additive: shipping bill port code, number and date (ISO), from the invoice. */
+  sbpcode?: string;
+  sbnum?: string;
+  sbdt?: string;
 }
 
 export interface CdnRow extends DocRow {
@@ -449,13 +458,18 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
         : 'place of supply is missing and could not be inferred; assumed the filer state.',
     );
   }
-  if (rec.currency && rec.currency !== 'INR') {
-    push('warning', 'FOREIGN_CCY', `amounts are in ${rec.currency}; GST returns need INR values. Reported as-is.`);
+  if (missingFxRate(rec)) {
+    push('error', 'FX_RATE_MISSING', `amounts are in ${docCurrency(rec)} but the invoice has no exchange rate; GST returns need INR values. Reported at face value — add the CBIC / shipping-bill rate on the invoice.`);
+  }
+  if (isExport && !isNote && (st === 'EXPORT_LUT' || st === 'EXPORT_WITH_PAYMENT') && !(rec.shipping_bill_no && rec.shipping_bill_date && rec.port_code)) {
+    push('info', 'EXP_SHIPPING_BILL', 'export of goods without shipping-bill details (port code, number, date); add them on the invoice or amend the EXP entry once the shipping bill is filed.');
   }
 
   const mode = effectiveMode(rec.gst_mode, from, pos);
   // Full record in: supply type, tax-inclusive pricing, cess, TCS and round mode all change the split.
-  const calc = calculateInvoice(calcInputFromRecord(rec, { gst_mode: mode, amount_paid: 0 }));
+  const docCalc = calculateInvoice(calcInputFromRecord(rec, { gst_mode: mode, amount_paid: 0 }));
+  // Every figure below is in rupees (foreign documents at their exchange rate).
+  const calc = inrTotals(docCalc, rec);
 
   const supply: 'INTRA' | 'INTER' =
     mode === 'CGST_SGST' ? 'INTRA' : mode === 'IGST' ? 'INTER' : from && pos && from !== pos ? 'INTER' : 'INTRA';
@@ -477,12 +491,12 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   }
 
   const recorded = num(rec.total, NaN);
-  const value = Number.isFinite(recorded) && recorded > 0 ? round2(recorded) : calc.total;
-  if (Number.isFinite(recorded) && Math.abs(recorded - calc.total) > 1.01) {
-    push('warning', 'TOTAL_MISMATCH', `stored total ${recorded} differs from recomputed ${calc.total}; the report uses the recomputed tax split.`);
+  const value = Number.isFinite(recorded) && recorded > 0 ? inrValue(round2(recorded), rec) : calc.total;
+  if (Number.isFinite(recorded) && Math.abs(recorded - docCalc.total) > 1.01) {
+    push('warning', 'TOTAL_MISMATCH', `stored total ${recorded} differs from recomputed ${docCalc.total}; the report uses the recomputed tax split.`);
   }
 
-  const lines: PLine[] = calc.lines.map((l) => ({
+  const toPLine = (l: (typeof calc.lines)[number]): PLine => ({
     // Zero-rated supplies keep the slab they were priced at (GSTR-1 reports txval against it).
     rate: mode === 'NONE' ? 0 : zeroRated ? l.nominal_rate : l.tax_rate,
     hsn: l.hsn,
@@ -495,7 +509,10 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     sgst: l.sgst,
     cess: l.cess,
     lineTotal: l.total,
-  }));
+  });
+  const lines: PLine[] = calc.lines.map(toPLine);
+  // Taxable freight / other charges: part of the principal supply's value, so no quantity of its own.
+  if (calc.charges_line) lines.push({ ...toPLine(calc.charges_line), qty: 0 });
 
   if (lines.some((l) => l.taxable > 0 && !l.hsn)) {
     push('warning', 'HSN_MISSING', 'one or more line items have no HSN/SAC code (mandatory in the HSN summary).');
@@ -549,6 +566,18 @@ function rateRows(lines: PLine[]): RateRow[] {
     map.set(l.rate, r);
   }
   return [...map.values()].sort((a, b) => a.rate - b.rate);
+}
+
+/** GSTR-1 EXP shipping-bill fields from the invoice (only those that are set). */
+function shippingBillOf(rec: InvoiceRecord): Pick<ExportRow, 'sbpcode' | 'sbnum' | 'sbdt'> {
+  const out: Pick<ExportRow, 'sbpcode' | 'sbnum' | 'sbdt'> = {};
+  const port = String(rec.port_code ?? '').trim().toUpperCase();
+  const no = String(rec.shipping_bill_no ?? '').trim();
+  const dt = String(rec.shipping_bill_date ?? '').slice(0, 10);
+  if (port) out.sbpcode = port;
+  if (no) out.sbnum = no;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dt)) out.sbdt = dt;
+  return out;
 }
 
 function docRow(d: PDoc, items: RateRow[]): DocRow {
@@ -703,7 +732,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   };
   const largeB2c = (d: PDoc): boolean => {
     const orig = d.isNote ? originalOf(d) : undefined;
-    if (orig) return (Number(orig.total) || 0) > b2clThreshold(String(orig.issue_date).slice(0, 10));
+    if (orig) return inrValue(Number(orig.total) || 0, orig) > b2clThreshold(String(orig.issue_date).slice(0, 10));
     return d.value > b2clThreshold(d.date);
   };
 
@@ -715,7 +744,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     // ── Section routing (taxable lines only; nil lines go to table 8) ──
     if (d.isExport) {
       if (d.isNote) cdnur.push({ ...row, noteType: d.noteType, unregType: row.igst > 0 ? 'EXPWP' : 'EXPWOP' });
-      else exp.push({ ...row, expType: row.igst > 0 ? 'WPAY' : 'WOPAY' });
+      else exp.push({ ...row, expType: row.igst > 0 ? 'WPAY' : 'WOPAY', ...shippingBillOf(d.rec) });
     } else if (d.registered) {
       if (items.length > 0) {
         if (d.isNote) cdnr.push({ ...row, noteType: d.noteType });

@@ -36,10 +36,10 @@ checks them first, and records what the portals return. **The app never calls a 
 
 - Supply type is automatic: `B2B`, or `EXPWP`/`EXPWOP` when place of supply is `99` (IGST present or not). SEZ and deemed export are chosen in the modal.
 - Doc type: Tax Invoice / Invoice -> `INV`, Credit Note -> `CRN`. Quotations, proformas and challans are blocked (the IRP does not take them). Debit notes (`DBN`) can be forced through `options.docType`.
-- All discounts (line + allocated invoice discount) go into the item `Discount`, so `AssAmt = TotAmt - Discount`. Shipping + other charges go to `ValDtls.OthChrg` (untaxed, matching the app's calc order).
+- All discounts (line + allocated invoice discount) go into the item `Discount`, so `AssAmt = TotAmt - Discount`. Untaxed shipping + other charges go to `ValDtls.OthChrg`; with `charges_taxable` they are one more taxable item at the principal rate/HSN instead, so AssVal and the tax totals reconcile (see `freight-fx.md`). Foreign-currency invoices are converted to INR at `exchange_rate` (`FX_RATE_MISSING` error without one).
 - Hence `GstRt` is the combined rate (18, not 9+9). `IgstOnIntra = Y` is set when IGST is charged though seller state equals place of supply.
 - Seller city and PIN are not stored separately in the sender profile: PIN is read from the address text (last 6-digit number) and the city from the last address part that is not a PIN or state. Overrides exist in `options.seller`. Buyer city/PIN use `client.city` / `client.zip`.
-- Export: buyer `Gstin = URP`, `Stcd = Pos = 96`, `Pin = 999999`, plus `ExpDtls` (`ForCur`, `CntCode`, port, shipping bill).
+- Export: buyer `Gstin = URP`, `Stcd = Pos = 96`, `Pin = 999999`, plus `ExpDtls` (`ForCur`, `CntCode`, port, shipping bill; port / shipping bill default from the invoice's `port_code` / `shipping_bill_no` / `shipping_bill_date`).
 - e-Way: services (SAC `99...`) are left out; services-only blocks. Value above Rs 50,000 is the mandatory threshold; at or below it a warning says so. A vehicle number or a transporter GSTIN is required for bulk upload.
 
 ## Doc number length (verified)

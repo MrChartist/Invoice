@@ -92,7 +92,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
   const [precNo, setPrecNo] = useState(original?.invoice_number ?? '');
   const [precDate, setPrecDate] = useState(original?.issue_date?.slice(0, 10) ?? '');
   const [countryCode, setCountryCode] = useState('');
-  const [portCode, setPortCode] = useState('');
+  const [portCode, setPortCode] = useState(invoice.port_code ?? '');
   const [dirty, setDirty] = useState(false);
 
   const fallbackSender = useMemo(() => (invoice.sender ? null : localDb.settings.activeProfile()), [invoice.sender]);

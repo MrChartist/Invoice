@@ -23,10 +23,17 @@
  * Any difference between the invoice's stored total and the sum of its
  * component amounts (rounding, legacy rows) is posted to the Round Off ledger,
  * so a voucher can never be rejected by Tally as "Debit and Credit totals differ".
+ *
+ * Taxable freight (`charges_taxable`): the charges go to the charges ledger and their
+ * GST into the same output-tax ledgers; Sales gets only the items' taxable value.
+ * Foreign-currency documents are posted in rupees at the invoice's exchange rate
+ * (receipts too — realised exchange gain/loss is not computed; post it in Tally).
+ * Working papers: verify with your CA before importing.
  */
 
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
+import { fxNarration, inrTotals, inrValue } from './fx';
 import {
   clean,
   emptySource,
@@ -285,8 +292,9 @@ function lineItems(inv: InvoiceRecord): TallyInventoryLine[] {
   const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
   if (!items.length) return [];
   try {
-    const calc = calculateInvoice(
-      calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 }),
+    const calc = inrTotals(
+      calculateInvoice(calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 })),
+      inv,
     );
     return calc.lines
       .filter((l) => clean(l.name))
@@ -372,7 +380,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     push(entries, party, credit ? 'Cr' : 'Dr', total, { name: number, type: 'New Ref' });
     const taxable = inventory.length
       ? inventory.reduce((s, l) => s + l.paise, 0)
-      : Math.abs(toPaise(a.taxable));
+      : Math.abs(toPaise(a.chargesTaxed ? round2(a.taxable - a.charges) : a.taxable));
     push(entries, salesLedger, credit ? 'Dr' : 'Cr', taxable);
     taxLedgers(inv, absA, credit, entries);
     push(entries, o.otherChargesLedger, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.charges)));
@@ -401,7 +409,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       party,
       partyGstin: clean(inv.client?.gstin).toUpperCase(),
       stateName: stateNameOf(invoiceStateCode(inv)),
-      narration: clean(inv.po_number) ? `PO: ${clean(inv.po_number)}` : '',
+      narration: [clean(inv.po_number) && `PO: ${clean(inv.po_number)}`, fxNarration(num(inv.total), inv)].filter(Boolean).join(' | '),
       reference: clean(inv.po_number),
       entries,
       inventory,
@@ -431,9 +439,10 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const after = before + toPaise(p.amount);
       paidRows.set(p.invoice_id, after);
       const inv = byId.get(p.invoice_id)!;
+      // Settlement is tracked in the document's currency; the TDS is posted in rupees.
       const tds = Math.min(Math.max(toPaise(inv.tds_amount ?? 0), 0), toPaise(inv.total));
       const cashDue = toPaise(inv.total) - tds;
-      if (tds > 0 && before < cashDue && after >= cashDue) tdsOn.set(p, tds);
+      if (tds > 0 && before < cashDue && after >= cashDue) tdsOn.set(p, toPaise(inrValue(tds / 100, inv)));
     }
 
     for (const p of filterPayments(source.payments, sales, o.range)) {
@@ -443,7 +452,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const isCash = /^\s*cash\s*$/i.test(String(p.method ?? ''));
       const bank = isCash ? o.cashLedger : o.bankLedger;
       std(bank, isCash ? 'Cash-in-Hand' : 'Bank Accounts');
-      const paise = toPaise(p.amount);
+      const paise = toPaise(inrValue(num(p.amount), inv));
       const invNo = clean(inv.invoice_number) || String(inv.id);
       const entries: TallyEntry[] = [];
       push(entries, bank, 'Dr', paise);
@@ -465,6 +474,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
           clean(p.reference) && `Ref ${clean(p.reference)}`,
           `Against ${invNo}`,
           tds > 0 && `TDS ${fixed2(tds / 100)} withheld${clean(inv.tds_section) ? ` u/s ${clean(inv.tds_section)}` : ''}`,
+          fxNarration(num(p.amount), inv),
         ]
           .filter(Boolean)
           .join(' | '),

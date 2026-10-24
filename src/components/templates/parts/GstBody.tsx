@@ -208,13 +208,13 @@ export function GstBody({ invoice, sender, totals }: Props) {
           )}
           {totals.shipping > 0 && (
             <tr className={styles.gLedger}>
-              <td colSpan={spanBefore} className={styles.right}>Shipping</td>
+              <td colSpan={spanBefore} className={styles.right}>Shipping{totals.charges_line ? ' (taxable)' : ''}</td>
               <td className={cn(styles.right, styles.num)}>{money(totals.shipping, cur)}</td>
             </tr>
           )}
           {totals.other_charges !== 0 && (
             <tr className={styles.gLedger}>
-              <td colSpan={spanBefore} className={styles.right}>Other charges</td>
+              <td colSpan={spanBefore} className={styles.right}>Other charges{totals.charges_line ? ' (taxable)' : ''}</td>
               <td className={cn(styles.right, styles.num)}>{money(totals.other_charges, cur)}</td>
             </tr>
           )}

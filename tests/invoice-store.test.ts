@@ -46,7 +46,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     notes: 'n', terms: 't', po_number: 'PO1', recurring_id: 'r1', recurring_date: '2026-04-10', supply_type: 'B2B', lut_number: 'L',
     lut_date: '2026-01-01', price_includes_tax: true, round_mode: 'up', tcs_enabled: true, tcs_rate: 1, tcs_base: 'taxable',
     tcs_label: 'TCS x', tds_enabled: true, tds_section: '194C-1', tds_rate: 1, tds_on_taxable: false, quote_status: 'Declined',
-    ship_to: { name: 'WH', address: 'A', city: 'C', zip: '400001', state_code: '27' }, created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
+    ship_to: { name: 'WH', address: 'A', city: 'C', zip: '400001', state_code: '27' }, charges_taxable: true, exchange_rate: 83.25,
+    shipping_bill_no: 'SB123', shipping_bill_date: '2026-04-12', port_code: 'INNSA1', created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

@@ -10,7 +10,8 @@
  */
 
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
-import { calcInputFromRecord, calculateInvoice, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, round2, type CalcLine } from './invoice-calc';
+import { docCurrency, inrTotals, missingFxRate } from './fx';
 import { stateByCode, stateByName } from './india-states';
 import { getTable, setTable } from './storage';
 
@@ -308,7 +309,12 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   const client = record.client ?? ({} as InvoiceRecord['client']);
 
   // Full record in: supply type, tax-inclusive pricing, cess, TCS and round mode all change ValDtls.
-  const calc = calculateInvoice(calcInputFromRecord(record));
+  // The IRP takes rupees only: a foreign-currency invoice is converted at its exchange rate
+  // (ExpDtls.ForCur then names the original currency).
+  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record)), record);
+  if (missingFxRate(record)) {
+    assumptions.push(issue('error', 'FX_RATE_MISSING', 'Currency', `Amounts are in ${docCurrency(record)} but the invoice has no exchange rate. The IRP needs INR values — add the CBIC / shipping-bill rate on the invoice.`));
+  }
 
   // ── Seller ──
   const sellerGstin = clean(sender?.companyGstin).toUpperCase();
@@ -442,10 +448,14 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
       TotItemVal: round2(l.taxable + l.cgst + l.sgst + l.igst + l.cess),
     };
   });
+  // Taxable freight / other charges travel as their own item (ValDtls.OthChrg is outside AssVal and
+  // carries no tax), under the principal line's HSN and rate, so AssVal and the tax totals reconcile.
+  if (calc.charges_line) items.push(chargesItem(calc.charges_line, items.length + 1, noTax));
 
   const intra = !!sellerStcd && pos === sellerStcd;
   // The IRP has no TCS field: it travels in "other charges" so TotInvVal still reconciles.
-  const othChrg = round2(calc.shipping + calc.other_charges + calc.tcs_amount);
+  // Untaxed freight / other charges ride there too; taxed ones are an item above.
+  const othChrg = round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount);
   const valDtls: EInvValDtls = {
     AssVal: calc.taxable_value,
     CgstVal: calc.cgst_amount,
@@ -487,16 +497,41 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   if (isExport) {
     const exp: EInvExpDtls = {};
     const e = options.export;
-    if (e?.shipBillNo) exp.ShipBNo = e.shipBillNo;
-    if (e?.shipBillDate) exp.ShipBDt = toNicDate(e.shipBillDate);
-    if (e?.portCode) exp.Port = e.portCode.toUpperCase();
+    // Shipping-bill details saved on the invoice apply unless the caller overrides them.
+    const shipBillNo = clean(e?.shipBillNo) || clean(record.shipping_bill_no);
+    const shipBillDate = clean(e?.shipBillDate) || clean(record.shipping_bill_date);
+    const portCode = clean(e?.portCode) || clean(record.port_code);
+    if (shipBillNo) exp.ShipBNo = shipBillNo;
+    if (shipBillDate) exp.ShipBDt = toNicDate(shipBillDate);
+    if (portCode) exp.Port = portCode.toUpperCase();
     if (e?.refundClaim !== undefined) exp.RefClm = e.refundClaim ? 'Y' : 'N';
-    if (record.currency && record.currency !== 'INR') exp.ForCur = record.currency;
+    if (docCurrency(record) !== 'INR') exp.ForCur = docCurrency(record);
     if (e?.countryCode) exp.CntCode = e.countryCode.toUpperCase();
     if (Object.keys(exp).length) payload.ExpDtls = exp;
   }
 
   return { payload, assumptions };
+}
+
+/** The taxable charges line as an e-Invoice item (Qty 1, unit OTH). */
+function chargesItem(l: CalcLine, slNo: number, noTax: boolean): EInvItem {
+  return {
+    SlNo: String(slNo),
+    PrdDesc: l.name,
+    IsServc: isServiceHsn(l.hsn) ? 'Y' : 'N',
+    HsnCd: l.hsn,
+    Qty: 1,
+    Unit: 'OTH',
+    UnitPrice: l.taxable,
+    TotAmt: l.taxable,
+    Discount: 0,
+    AssAmt: l.taxable,
+    GstRt: noTax ? 0 : l.tax_rate,
+    IgstAmt: l.igst,
+    CgstAmt: l.cgst,
+    SgstAmt: l.sgst,
+    TotItemVal: round2(l.taxable + l.cgst + l.sgst + l.igst),
+  };
 }
 
 /** Bulk upload wrapper — the IRP offline/bulk tool takes an array of invoices. */

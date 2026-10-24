@@ -196,13 +196,13 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
         )}
         {totals.shipping > 0 && (
           <div className={styles.totalRow}>
-            <span>{t('shipping')}</span>
+            <span>{t('shipping')}{totals.charges_line ? ` (${t('taxable')})` : ''}</span>
             <span>{money(totals.shipping, cur)}</span>
           </div>
         )}
         {totals.other_charges !== 0 && (
           <div className={styles.totalRow}>
-            <span>{t('other')}</span>
+            <span>{t('other')}{totals.charges_line ? ` (${t('taxable')})` : ''}</span>
             <span>{money(totals.other_charges, cur)}</span>
           </div>
         )}

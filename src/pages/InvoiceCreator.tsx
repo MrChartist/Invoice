@@ -8,6 +8,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { useToast } from '../components/ui/useToast';
 import { ItemsTable } from '../components/creator/ItemsTable';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
+import { ForexFields } from '../components/creator/ForexFields';
 import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
 import { StockWarnings } from '../components/creator/StockWarnings';
 import { PartiesSection } from '../components/creator/PartiesSection';
@@ -397,6 +398,7 @@ export function InvoiceCreator() {
                 <input type="checkbox" checked={s.reverse_charge} onChange={(e) => s.setReverseCharge(e.target.checked)} />
                 Tax is payable on reverse charge
               </label>
+              <ForexFields />
             </div>
           </section>
 
