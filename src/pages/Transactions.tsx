@@ -190,6 +190,7 @@ export function Transactions() {
         due_date: addDaysInput(localDb.settings.get().defaultDueDays, issue),
         amount_paid: 0,
         balance_due: inv.total,
+        late_fee_for: undefined,
         created_at: undefined,
         updated_at: undefined,
       };

@@ -144,3 +144,34 @@ balance left after that payment (net of TDS), and `receiptHtml` renders a script
 window under the CSP (a blocked pop-up saves it as HTML instead). Each payment in the payment dialog has a Receipt
 button; a payment that clears the balance shows **Paid in full** with Receipt and **Send thank-you** (the existing
 `thank_you` reminder template). The reference field is labelled by method (UTR for bank/UPI, cheque number …).
+
+## Late-fee line per client (roadmap 6.15)
+
+Optional and off unless a client has terms. **Clients → edit client → Late-payment terms**: none, *Interest, % per
+year* (`percent_pa`) or *Flat fee, ₹* (`flat`), plus grace days. Stored additively on the client as
+`late_fee?: { mode: 'percent_pa' | 'flat'; rate: number; graceDays: number }` (sanitised by
+`src/lib/late-fee-rule.ts`: % capped at 100, flat at ₹10 lakh, grace 0-365; a zero rate is no rule).
+
+In **Receivables → Aging**, an overdue bill of such a client shows **Add late fee**. It creates a **new draft
+invoice** (today's date, next number in the original's series and profile prefix, same client / sender / place of
+supply / currency, the default due days) with one line, and opens it in the editor for review. The overdue invoice is
+never edited; the new one carries `late_fee_for: <original id>` (additive `InvoiceRecord` field, cleared on duplicate,
+conversion and notes), and the button disappears once a non-cancelled late-fee invoice exists for that bill.
+
+Maths (`src/lib/late-fee.ts`, reusing `computeInterest` from `src/lib/interest.ts`):
+
+- `percent_pa`: simple interest at the rate on a 365-day year on the unpaid balance, from the day after
+  `due date + grace days` to today; part-payments and linked credit notes reduce the balance from their date; a
+  settled invoice stops on the day it was cleared. Principal is total − TDS.
+- `flat`: the fixed amount once the bill was unpaid for at least one day after `due date + grace days` (paid within
+  grace: no fee; paid late: fee).
+- The line is tax 0 % by default, like the interest line. Under Sec 15(2)(d) CGST Act interest / late fee for delayed
+  payment is generally part of the value of supply, so your CA may want the principal supply's rate on it: edit the
+  draft before issuing. Whether a fee can be charged depends on the agreement with the customer.
+- Terms come from the client master (matched by id, else name + GSTIN), falling back to the client snapshot on the
+  invoice.
+- Period lock: when today falls inside the locked period the action refuses with the lock message (the save would also
+  refuse it). Drafts, cancelled documents, quotations and invoices not yet past the grace period get no fee.
+
+Tests: `tests/late-fee.test.ts`. The older Settings-level interest estimate (`late-fee-irn-demo.md` §2) is unchanged and
+separate: it informs reminders; this rule creates the invoice line.

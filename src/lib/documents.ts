@@ -194,6 +194,7 @@ export function buildConvertedDraft(
     // A derived document is not itself the recurring occurrence it was copied from.
     recurring_id: undefined,
     recurring_date: undefined,
+    late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
   };
@@ -389,6 +390,7 @@ export function buildCreditNote(
     notes: `Credit note against ${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number} dated ${invoice.issue_date}. Reason: ${input.reason.trim()}.`,
     recurring_id: undefined,
     recurring_date: undefined,
+    late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
   };
@@ -483,6 +485,7 @@ export function buildDebitNote(
     notes: `Debit note against ${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number} dated ${invoice.issue_date}. Reason: ${input.reason.trim()}.`,
     recurring_id: undefined,
     recurring_date: undefined,
+    late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
   });

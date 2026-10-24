@@ -145,6 +145,12 @@ export interface Client {
   pan?: string;
   /** TAN of the client as a TDS deductor (AAAA99999A) — the key 26AS / AIS reports use. */
   tan?: string;
+  /**
+   * Additive (roadmap 6.15): this client's late-payment terms. `percent_pa` = simple interest
+   * % a year on the overdue balance; `flat` = a fixed ₹ fee. Only used when the user clicks
+   * "Add late fee" on an overdue invoice (a NEW invoice is created; see src/lib/late-fee.ts).
+   */
+  late_fee?: { mode: 'percent_pa' | 'flat'; rate: number; graceDays: number };
   created_at?: string;
   updated_at?: string;
 }
@@ -301,4 +307,6 @@ export interface InvoiceRecord {
   shipping_bill_no?: string;
   shipping_bill_date?: string;
   port_code?: string;
+  /** Additive (roadmap 6.15): id of the overdue invoice this late-fee invoice was raised on. */
+  late_fee_for?: string;
 }
