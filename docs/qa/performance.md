@@ -320,3 +320,13 @@ client/item picker modals as lazy chunks right after the editor renders).
 `doc.html()` / `addSvgAsImage()`, which the app never calls (html-to-image rasterises pages). `vite.config.ts`
 aliases them to `src/lib/stubs/jspdf-optional.ts` (throws if ever reached). Total JS 736.9 → 633.3 kB gz,
 precache 155 → 152 files; initial JS unchanged (154.7 kB). PDF download/share verified by the e2e journey.
+
+## Shell trim + total budget (Phase 6)
+
+Backup actions (`auto-backup.ts` → `backup.ts`, encryption, folder writing) load on demand: the shell imports only
+`auto-backup-schedule.ts` (nudge timing and config), `AutoBackupRunner` imports the runner at its first run, and the
+Forgot-PIN erase imports its helpers when used. Initial JS 172.5 → 168.5 kB gz (entry 65.7 → 61.7). Lazy-loading the
+reminder composer was tried and reverted: it shares `useReminderLog` with the Dashboard card, so rolldown created an
+entry ↔ chunk import cycle for a ~3 kB gain. `check-bundle-size.mjs` now de-duplicates the initial list (Vite emits
+the entry twice when a cycle exists). The total (offline precache) budget is 900 kB; the 185 kB initial budget is
+unchanged.

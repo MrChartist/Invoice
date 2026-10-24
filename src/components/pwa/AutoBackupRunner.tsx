@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { runDueBackup } from '../../lib/auto-backup';
 import { requestPersistentStorage } from '../../lib/pwa';
 
 /**
@@ -11,8 +10,9 @@ import { requestPersistentStorage } from '../../lib/pwa';
  */
 export function AutoBackupRunner() {
   useEffect(() => {
+    // Loaded on first run (5 s after start), not with the shell.
     const run = () => {
-      void runDueBackup().catch(() => undefined);
+      void import('../../lib/auto-backup').then((m) => m.runDueBackup()).catch(() => undefined);
     };
     const first = setTimeout(run, 5000);
     const hourly = setInterval(run, 60 * 60 * 1000);

@@ -1,16 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert, X } from 'lucide-react';
-import {
-  downloadBackupNow,
-  getLastBackup,
-  getSnooze,
-  hasBackupWorthyData,
-  runAutoBackup,
-  shouldNudge,
-  snoozeNudge,
-  getFolderHandle,
-  type BackupResult,
-} from '../../lib/auto-backup';
+import { getLastBackup, getSnooze, hasBackupWorthyData, shouldNudge, snoozeNudge } from '../../lib/auto-backup-schedule';
+// The backup builder / folder writer loads only when the user acts on the nudge.
+import type { BackupResult } from '../../lib/auto-backup';
 import controls from '../../styles/controls.module.css';
 import styles from './Pwa.module.css';
 
@@ -51,6 +43,7 @@ export function BackupNudge({ onResult }: BackupNudgeProps) {
     setBusy(true);
     // Prefer the connected folder; otherwise (or if it fails) fall back to a plain download.
     let result: BackupResult | null = null;
+    const { getFolderHandle, runAutoBackup, downloadBackupNow } = await import('../../lib/auto-backup');
     if (await getFolderHandle()) result = await runAutoBackup({ interactive: true });
     if (!result || !result.ok) result = await downloadBackupNow();
     setBusy(false);

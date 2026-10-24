@@ -21,11 +21,15 @@ const BUDGET_INITIAL = env('BUDGET_INITIAL_GZ_KB', 185);
 const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // Raised from 650 in Phase 3 (TDS register, compliance, purchases, FX): all of it is lazily loaded
 // per page, so first paint (the initial budget above) is unchanged; this is the one-time offline
-// precache download.
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 760);
+// precache download. Raised again to 900 in Phase 6 (ledger, orders, inventory tracking, cheques,
+// cost centres, composition, companies, vault…): every feature is a lazy page/tab chunk, and the
+// shell was trimmed at the same time (backup actions, Forgot-PIN erase loaded on demand), so first
+// paint stays under the unchanged 185 kB initial budget.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 900);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
-const initial = [...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1]);
+// De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.
+const initial = [...new Set([...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1]))];
 const entry = html.match(/<script[^>]+src="\/(assets\/[^"]+\.js)"/)?.[1];
 const all = readdirSync(join(dist, 'assets')).filter((f) => f.endsWith('.js'));
 

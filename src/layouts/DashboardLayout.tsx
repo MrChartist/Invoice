@@ -45,7 +45,6 @@ import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
 import { cn } from '../lib/utils';
 import { getUser, logout } from '../lib/auth';
-import { downloadBackupNow } from '../lib/auto-backup';
 import { useTheme } from '../hooks/useTheme';
 import styles from './DashboardLayout.module.css';
 
@@ -248,6 +247,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         keywords: ['export', 'save'],
         run: async () => {
           // Same path as Settings → Automatic backups, so a stored backup passphrase is honoured.
+          const { downloadBackupNow } = await import('../lib/auto-backup');
           const r = await downloadBackupNow();
           notify(r.ok ? 'Backup downloaded' : r.message, r.ok ? 'success' : 'error');
         },
