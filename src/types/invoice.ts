@@ -8,6 +8,8 @@
  */
 
 import { tdsSections, tcsPresets, type TdsSection, type TcsPreset } from '../lib/tax-rules';
+import type { AttachmentRef } from './attachments';
+import type { CustomFieldValue } from './custom-fields';
 
 export type DocumentType =
   | 'INVOICE'
@@ -134,6 +136,13 @@ export interface InvoiceItem {
    * sales order, carried along SO → challan → invoice). Read with the record's `sales_order_id`.
    */
   order_line_id?: string;
+  /**
+   * Additive (6.23), catalogue rows only: item custom-field values keyed by field id. Picking the
+   * item onto an invoice copies the values (with their labels) into `custom_values`.
+   */
+  custom_fields?: Record<string, string>;
+  /** Additive (6.23), invoice lines only: snapshot of item custom fields (label + value + print flag). */
+  custom_values?: CustomFieldValue[];
 }
 
 export interface Client {
@@ -161,6 +170,8 @@ export interface Client {
    * "Add late fee" on an overdue invoice (a NEW invoice is created; see src/lib/late-fee.ts).
    */
   late_fee?: { mode: 'percent_pa' | 'flat'; rate: number; graceDays: number };
+  /** Additive (6.23): party custom-field values keyed by field id. */
+  custom_fields?: Record<string, string>;
   created_at?: string;
   updated_at?: string;
 }
@@ -328,4 +339,14 @@ export interface InvoiceRecord {
    * income is booked to. Lines may override it with their own `cost_centre_id`.
    */
   cost_centre_id?: string;
+  /**
+   * Additive (6.23): document custom fields, snapshotted with their label and print flag so a
+   * later rename / delete of the field never changes what this document prints.
+   */
+  custom_values?: CustomFieldValue[];
+  /**
+   * Additive (6.12): internal files (receipts, signed copies). Never printed, and not copied when
+   * the document is duplicated or converted.
+   */
+  attachments?: AttachmentRef[];
 }

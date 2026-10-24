@@ -223,6 +223,32 @@ try {
     await dialog.waitFor({ state: 'detached' });
   });
 
+  await step('custom field: define a printable field and see it in the preview', async () => {
+    await page.goto(srv.origin + '/settings?tab=fields');
+    await page.locator('#cf-label').fill('Vehicle no.');
+    await page.getByLabel('Print on invoices').check();
+    await page.getByRole('button', { name: 'Add field' }).click();
+    await page.getByRole('list', { name: 'Custom fields' }).getByText('Vehicle no.').waitFor();
+    const defs = await readJson(page, 'custom_fields', [], (v) => v.length === 1);
+    check(defs.length === 1 && defs[0].print === true && defs[0].applies_to === 'document', `field definition stored (${defs[0]?.label})`);
+    const id = (await readJson(page, 'invoices', []))[0].id;
+    await page.goto(srv.origin + '/invoice/' + id);
+    await page.getByLabel(/^Vehicle no\./).fill('MH12AB1234');
+    await page.keyboard.press('Control+s');
+    const inv = (await readJson(page, 'invoices', [], (v) => v[0]?.custom_values?.length === 1))[0];
+    check(inv.custom_values?.[0]?.label === 'Vehicle no.' && inv.custom_values[0].value === 'MH12AB1234',
+      `the invoice snapshots label + value (${inv.custom_values?.[0]?.label}: ${inv.custom_values?.[0]?.value})`);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.waitFor();
+    const block = dialog.locator('[data-custom-fields]').first();
+    await block.waitFor();
+    const text = await block.innerText();
+    check(text.includes('Vehicle no.') && text.includes('MH12AB1234'), `the preview prints the custom field (${text.replace(/\s+/g, ' ').trim()})`);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+  });
+
   await step('share the PDF file through the OS share sheet', async () => {
     // Stand in for a phone's share sheet: capture what the app hands over.
     await page.evaluate(() => {
@@ -340,6 +366,29 @@ try {
     await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== dn.id));
   });
 
+  await step('attach a receipt photo to an expense; it is still there after a reload', async () => {
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Quick expense/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Quick add expense' });
+    await dlg.locator('#exp-amt').fill('1200');
+    await dlg.getByLabel(/attach a photo or PDF/).setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: Buffer.from(LOGO_PNG, 'base64') });
+    await dlg.locator('li img[src^="data:image/"]').first().waitFor();
+    await dlg.getByRole('button', { name: 'Add expense' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const rows = await readJson(page, 'purchases', [], (v) => v.some((p) => p.attachments?.length === 1));
+    const ref = rows.find((p) => p.attachments?.length)?.attachments?.[0];
+    const stored = ref ? await idbGet(page, `mrchartist_inv_att_${ref.id}`) : null;
+    check(!!ref && ref.mime.startsWith('image/') && typeof stored === 'string' && JSON.parse(stored).data.startsWith('data:image/'),
+      `expense references the receipt, stored once in IndexedDB (${ref?.name}, ${ref?.size} bytes)`);
+    await page.reload();
+    await page.getByRole('button', { name: /^Edit Rent/ }).first().click();
+    const edit = page.getByRole('dialog', { name: 'Edit expense' });
+    await edit.locator('li img[src^="data:image/"]').first().waitFor();
+    check(await edit.getByText(ref?.name ?? 'receipt').count() > 0, 'after a reload the expense still shows its receipt');
+    await page.keyboard.press('Escape');
+    await edit.waitFor({ state: 'detached' });
+  });
+
   await step('double-entry books: journal voucher, trial balance, balance sheet, cash flow', async () => {
     await page.goto(srv.origin + '/books?tab=vch');
     await page.getByRole('button', { name: 'New voucher' }).click();
@@ -423,6 +472,8 @@ try {
     await page.waitForTimeout(500);
     const stored = await readJson(page, 'invoices', [], (v) => v.length === 1);
     check(stored.length === 1, `restored invoice is back (${stored.length})`);
+    const ref = (await readJson(page, 'purchases', [])).find((p) => p.attachments?.length)?.attachments?.[0];
+    check(!!ref && typeof (await idbGet(page, `mrchartist_inv_att_${ref.id}`)) === 'string', 'the receipt file came back with the restore');
     const version = await readJson(page, 'schema_version', null);
     check(Number(version) >= 1, `schema version stamped (${version})`);
     await page.goto(srv.origin + '/settings?tab=data');

@@ -4,6 +4,7 @@ import type { InvoiceRecord } from '../../../types/invoice';
 import type { TemplateTableStyle } from '../registry';
 import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
+import { ItemCustomLine } from './CustomFieldsBlock';
 
 interface ItemsTableProps {
   invoice: InvoiceRecord;
@@ -66,6 +67,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
               <td>
                 <div className={styles.itemName}>{line.name || '—'}</div>
                 {source?.description && <div className={styles.itemDesc}>{source.description}</div>}
+                <ItemCustomLine values={source?.custom_values} />
               </td>
               {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
               <td className={cn(styles.right, styles.num)}>

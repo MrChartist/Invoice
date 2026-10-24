@@ -10,6 +10,8 @@ import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { NumberInput } from '../ui/NumberInput';
+import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
+import type { AttachmentRef } from '../../types/attachments';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -59,6 +61,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
     markup_percent: expense?.markup_percent,
     pure_agent: expense?.pure_agent,
   });
+  const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? []);
   const [error, setError] = useState('');
 
   const vendor = vendors.find((v) => v.id === vendorId);
@@ -97,6 +100,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         notes: notes.trim() || undefined,
         ...billablePatch(billable),
         cost_centre_id: costCentre,
+        attachments: attachments.length ? attachments : undefined,
       });
       if (!expense && paidNow) paymentsDb.record(saved.id, { amount: saved.total, date, method });
       onSaved(expense ? 'Expense updated' : `Expense of ${formatCurrency(saved.total)} added`);
@@ -206,6 +210,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
       </div>
 
       <BillableFields idPrefix="exp" value={billable} onChange={setBillable} rebilledIn={expense?.rebilled_in} />
+
+      <AttachmentsPanel value={attachments} onChange={setAttachments} label="Receipts & attachments" />
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>

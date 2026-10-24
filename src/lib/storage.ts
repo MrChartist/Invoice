@@ -747,6 +747,25 @@ export function removeRaw(fullKey: string): void {
   }
 }
 
+/** Every app data key starting with `fullPrefix` (e.g. one per stored attachment), in no particular order. */
+export function listKeys(fullPrefix: string): string[] {
+  if (backend === 'idb' && !isLocalOnlyKey(fullPrefix)) {
+    return [...cache.keys()].filter((k) => k.startsWith(fullPrefix));
+  }
+  const out: string[] = [];
+  const s = store();
+  if (!s) return out;
+  try {
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k && k.startsWith(fullPrefix)) out.push(k);
+    }
+  } catch {
+    /* unreadable: nothing listed */
+  }
+  return out;
+}
+
 /** Parsed asset table, re-parsed only when the stored text changes. */
 let assetCache: { raw: string | null; idx: AssetIndex } | null = null;
 

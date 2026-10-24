@@ -16,6 +16,7 @@ import {
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
 import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoice-defaults';
+import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import type {
   Client,
   DiscountType,
@@ -112,6 +113,7 @@ export const RECORD_KEYS = [
   'charges_taxable', 'exchange_rate', 'shipping_bill_no', 'shipping_bill_date', 'port_code', 'late_fee_for',
   'sales_order_id', 'order_closed_on',
   'cost_centre_id',
+  'custom_values', 'attachments',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -218,7 +220,17 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     patch: apply,
 
     setClient: (clientData) => {
-      const client = { ...get().client, ...clientData };
+      // A picked client brings its party custom-field values (6.23): they replace the previous
+      // client's in the document snapshot; the map itself never lives on the invoice's client copy.
+      const { custom_fields: partyMap, ...rest } = clientData;
+      const client = { ...get().client, ...rest };
+      delete client.custom_fields;
+      const partyPatch: Partial<InvoiceRecord> = {};
+      if (partyMap !== undefined) {
+        const own = readValues(get().custom_values).filter((v) => v.scope !== 'party');
+        const merged = mergePartyValues(own, partyMap, customFieldsDb.all());
+        partyPatch.custom_values = merged.length ? merged : undefined;
+      }
       // A client's GSTIN/state decides the place of supply, which decides the split.
       const place_of_supply =
         resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state }) ||
@@ -227,6 +239,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         client,
         place_of_supply,
         gst_mode: refineGstMode(get().gst_mode, get().sender, place_of_supply),
+        ...partyPatch,
       });
     },
 
@@ -343,6 +356,10 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
           rate: num(source.rate, item.rate),
           tax_rate: typeof source.tax_rate === 'number' ? source.tax_rate : item.tax_rate,
         };
+        // Item custom fields (6.23) flow onto the line with today's labels.
+        const values = snapshotFromMap(source.custom_fields, customFieldsDb.all(), 'item');
+        if (values.length) next.custom_values = values;
+        else delete next.custom_values;
         next.amount = round2(num(next.quantity) * num(next.rate));
         return next;
       }),
@@ -478,6 +495,18 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       const record = toRecord(state);
       // Drop the empty trailing row users leave behind.
       record.items = record.items.filter((i) => i.name.trim() || num(i.rate) > 0);
+      // Custom fields (6.23): normalise values; a first save records today's labels, later saves keep theirs.
+      const defs = customFieldsDb.all();
+      const isNew = !state.id;
+      record.custom_values = finalizeValues(record.custom_values, defs, isNew);
+      record.items = record.items.map((i) => {
+        const values = finalizeValues(i.custom_values, defs, isNew);
+        if (values) return { ...i, custom_values: values };
+        if (!i.custom_values) return i;
+        const rest = { ...i };
+        delete rest.custom_values;
+        return rest;
+      });
       if (!record.invoice_number) {
         // The sender profile's own prefix wins (the creator page previews it); else the global one.
         record.invoice_number = localDb.invoices.nextNumber(

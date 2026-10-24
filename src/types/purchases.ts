@@ -1,3 +1,5 @@
+import type { AttachmentRef } from './attachments';
+
 /**
  * Shared shapes for the purchase / expense side of the books.
  * Several feature modules (purchases, GST reports, inventory, books) read the
@@ -19,6 +21,8 @@ export interface Vendor {
   msme_udyam?: string;
   /** Udyam category. Micro and Small suppliers drive the Sec 43B(h) / MSMED Sec 15 tracker. */
   msme_category?: MsmeCategory;
+  /** Additive (6.23): party custom-field values keyed by field id. */
+  custom_fields?: Record<string, string>;
 }
 
 export type MsmeCategory = 'MICRO' | 'SMALL' | 'MEDIUM';
@@ -94,6 +98,8 @@ export interface PurchaseRecord {
   po_id?: string;
   /** Additive (6.16): `cost_centres` row id this bill / expense is charged to (project P&L, budgets). */
   cost_centre_id?: string;
+  /** Additive (6.12): receipt photos / PDFs (see src/lib/attachments.ts). Ignored by every report. */
+  attachments?: AttachmentRef[];
 }
 
 /** One line of a purchase order. Same shape as a bill line, minus the stock link. */

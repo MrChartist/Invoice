@@ -47,7 +47,10 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     lut_date: '2026-01-01', price_includes_tax: true, round_mode: 'up', tcs_enabled: true, tcs_rate: 1, tcs_base: 'taxable',
     tcs_label: 'TCS x', tds_enabled: true, tds_section: '194C-1', tds_rate: 1, tds_on_taxable: false, quote_status: 'Declined',
     ship_to: { name: 'WH', address: 'A', city: 'C', zip: '400001', state_code: '27' }, charges_taxable: true, exchange_rate: 83.25,
-    shipping_bill_no: 'SB123', shipping_bill_date: '2026-04-12', port_code: 'INNSA1', late_fee_for: 'orig-1', sales_order_id: 'so1', order_closed_on: '2026-04-15', cost_centre_id: 'cc-1', created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
+    shipping_bill_no: 'SB123', shipping_bill_date: '2026-04-12', port_code: 'INNSA1', late_fee_for: 'orig-1', sales_order_id: 'so1', order_closed_on: '2026-04-15', cost_centre_id: 'cc-1',
+    custom_values: [{ id: 'f1', label: 'Vehicle no.', type: 'text', value: 'MH12AB1234', print: true }],
+    attachments: [{ id: 'a1', name: 'po.pdf', mime: 'application/pdf', size: 10, added_at: '2026-04-10T00:00:00Z' }],
+    created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

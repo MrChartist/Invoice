@@ -113,6 +113,11 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 placeholder="Description (optional)"
                 aria-label={`Item ${index + 1} description`}
               />
+              {item.custom_values?.length ? (
+                <div className={styles.customLine} title="Item details from the catalogue">
+                  {item.custom_values.map((v) => `${v.label}: ${v.value}`).join(' · ')}
+                </div>
+              ) : null}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
                 <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>
                   + Add cess

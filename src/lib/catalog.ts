@@ -19,6 +19,8 @@ export interface CatalogDraft {
   unit: string;
   rate: number;
   tax_rate: number;
+  /** Item custom-field values (6.23), already cleaned; undefined clears them. */
+  custom_fields?: Record<string, string>;
 }
 
 export type CatalogError = { field: 'name' | 'rate' | 'hsn' | 'tax_rate'; message: string };
@@ -56,6 +58,7 @@ export function applyCatalogDraft(
     unit: draft.unit,
     rate: round2(draft.rate),
     tax_rate: draft.tax_rate,
+    ...('custom_fields' in draft ? { custom_fields: draft.custom_fields } : {}),
   };
   const idx = draft.id ? items.findIndex((i) => i.id === draft.id) : -1;
   if (idx >= 0) {

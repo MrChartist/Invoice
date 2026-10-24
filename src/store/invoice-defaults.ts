@@ -10,6 +10,8 @@ import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput, todayInput } from '../lib/utils';
+import { readValues } from '../lib/custom-fields';
+import { readRefs } from '../lib/attachments';
 import type { AppSettings } from '../lib/localDb';
 import type {
   Client,
@@ -163,6 +165,7 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     amount: num(item.amount, quantity * rate),
     ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
     ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
+    ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
   };
 }
 
@@ -259,6 +262,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.sales_order_id ? { sales_order_id: String(r.sales_order_id) } : {}),
     ...(r.order_closed_on ? { order_closed_on: String(r.order_closed_on).slice(0, 10) } : {}),
     ...(typeof r.cost_centre_id === 'string' && r.cost_centre_id ? { cost_centre_id: r.cost_centre_id } : {}),
+    ...(readValues(r.custom_values).length ? { custom_values: readValues(r.custom_values) } : {}),
+    ...(readRefs(r.attachments).length ? { attachments: readRefs(r.attachments) } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -278,5 +283,8 @@ export function clientToParty(c: Partial<Client>): Partial<Client> {
     state_code: c.state_code ?? '',
     zip: c.zip ?? '',
     gstin: c.gstin ?? '',
+    // Party custom-field values (6.23): the store copies them into the document snapshot and
+    // never keeps this map on the invoice's client copy.
+    custom_fields: c.custom_fields ?? {},
   };
 }

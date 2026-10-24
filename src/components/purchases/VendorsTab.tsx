@@ -9,6 +9,8 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EmptyState } from '../ui/EmptyState';
 import { GstinInput } from '../ui/GstinInput';
 import { Modal } from '../ui/Modal';
+import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
+import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -146,7 +148,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
     const problem = validateVendor(draft);
     if (problem) return setError(problem);
     try {
-      const saved = vendorsDb.save({ ...draft, id: vendor?.id });
+      const saved = vendorsDb.save({ ...draft, id: vendor?.id, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
       onSaved(vendor ? `${saved.name} updated` : `${saved.name} added`);
       onClose();
     } catch (err) {
@@ -215,6 +217,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
         <label className={controls.label} htmlFor="v-notes">Notes</label>
         <textarea id="v-notes" className={controls.textarea} value={draft.notes ?? ''} onChange={(e) => set({ notes: e.target.value })} />
       </div>
+      <CustomFieldInputs scope="party" idPrefix="vendor" value={draft.custom_fields} onChange={(custom_fields) => set({ custom_fields })} />
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
         <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>

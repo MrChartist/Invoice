@@ -56,6 +56,12 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   "Bill" turns a client's unbilled hours (unit HRS, SAC 998311 by default), re-billable expenses (cost + markup, or a
   0% Rule 33 pure-agent reimbursement) and trips into a new draft invoice; deleting or cancelling that invoice frees
   them again.
+- **Attachments**: receipt photos and PDFs on purchase bills, expenses and invoices (photos downscaled, PDFs up to
+  3 MB, type checked by magic bytes), stored once on the device and carried in backups; never printed. Unused files are
+  cleaned up on delete or from the storage-health panel.
+- **Custom fields**: user-defined text / number / date fields on documents, items and clients / vendors, optionally
+  printed in a "Details" box (and under item lines). Saved invoices keep the labels they were saved with; the sales
+  register CSV gains a column per field used.
 - **Sharing**: the PDF itself through the OS share sheet (WhatsApp, mail), a self-contained "client copy" web page with
   a Pay-with-UPI button, WhatsApp / e-mail / SMS text with UPI links.
 - **Reminders**: stage-based templates (upcoming, due today, polite / firm / final overdue, thank-you) in English and
@@ -163,6 +169,10 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   percentage splits), one level of grouping.
 - Editing or removing lines on a bill-from-time invoice does not unlink the entries; only deleting or cancelling the
   invoice frees them.
+- Attachments live in browser storage like everything else: a few hundred receipts make backups large (base64 JSON);
+  without IndexedDB (localStorage fallback) only a handful fit. Duplicated / converted documents do not copy them.
+- Custom fields are not available on purchase bills / expenses or recurring templates and are not part of the GSTR,
+  e-Invoice or Tally outputs.
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
 
 ---

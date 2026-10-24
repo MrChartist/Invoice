@@ -1,0 +1,148 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  background: var(--card);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.count {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--brand-text);
+  background: var(--brand-soft);
+  border-radius: var(--radius-full);
+  padding: 0 0.45rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem;
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+  min-width: 0;
+}
+
+.thumbBtn {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--background);
+  cursor: zoom-in;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.thumbBtn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--brand-text);
+  background: var(--brand-soft);
+  border-radius: var(--radius-xs);
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.missing {
+  font-size: var(--text-xs);
+  color: var(--destructive);
+}
+
+.preview {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.preview img {
+  max-width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.previewClose {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  background: var(--card);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--destructive);
+}

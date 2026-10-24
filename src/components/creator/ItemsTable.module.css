@@ -271,3 +271,11 @@
   border-color: var(--brand);
   box-shadow: 0 0 0 2px var(--primary-glow);
 }
+
+/* Item custom fields (6.23) copied from the catalogue. */
+.customLine {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  padding: 0 0.5rem;
+  overflow-wrap: anywhere;
+}

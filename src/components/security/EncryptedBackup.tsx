@@ -1,6 +1,5 @@
 import { reloadAfterFlush } from '../../lib/storage';
 import { useRef, useState } from 'react';
-import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { Download, FileLock2, Info, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import {
@@ -12,6 +11,8 @@ import {
   isEncryptedBackup,
   markBackupDone,
   parseBackup,
+  attachmentRestoreNote,
+  MAX_BACKUP_BYTES,
   type BackupSummary,
 } from '../../lib/backup';
 import { downloadText } from '../../lib/download';
@@ -71,7 +72,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
   const onFile = async (file?: File) => {
     if (!file) return;
     try {
-      if (file.size > MAX_IMPORT_BYTES) throw new Error('This file is larger than 25 MB — not a file this app wrote.');
+      if (file.size > MAX_BACKUP_BYTES) throw new Error('This file is larger than 200 MB — not a file this app wrote.');
       const text = await file.text();
       if (isEncryptedBackup(text)) {
         setPending({ text, fileName: file.name });
@@ -185,7 +186,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
         ) : (
           <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
             Contains {summary?.summary.invoices} invoice{summary?.summary.invoices === 1 ? '' : 's'} and {summary?.summary.clients}{' '}
-            client{summary?.summary.clients === 1 ? '' : 's'}. Everything currently on this device will be replaced by this backup (your PIN is kept).
+            client{summary?.summary.clients === 1 ? '' : 's'}. {attachmentRestoreNote(summary?.summary)} Everything currently on this device will be replaced by this backup (your PIN is kept).
           </p>
         )}
       </Modal>

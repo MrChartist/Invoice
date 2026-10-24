@@ -232,3 +232,19 @@ test('cost centre (6.16): the ledger, project P&L and budgets read cost_centre_i
   assert.equal(monthlyActuals(led, 2026).get(`${A.purchases}|cc1`)![0], 100000);
   assert.equal(expenseLine(tagged, DEFAULT_TIME_PREFS).cost_centre_id, 'cc1');
 });
+
+test('attachments (6.12) are carried on the record and ignored by every report reader', async () => {
+  const { attachmentIdsIn } = await import('../src/lib/attachments.ts');
+  const withFiles: PurchaseRecord = {
+    ...bill,
+    id: 'p4',
+    attachments: [{ id: 'f1', name: 'bill.pdf', mime: 'application/pdf', size: 1200, added_at: '2026-04-12T10:00:00Z' }],
+  };
+  assert.equal(booksNormalize(withFiles as never)?.total, 1180);
+  assert.equal(exportNormalize(withFiles)?.taxable, 1000);
+  assert.equal(gstNormalize(withFiles, '27')?.cgst, 90);
+  assert.equal(readPurchase(withFiles)?.taxable, 1000);
+  assert.deepEqual(bookBills([withFiles], '27')[0]?.taxable, bookBills([bill], '27')[0]?.taxable);
+  // The attachments module is the one reader of the field.
+  assert.deepEqual([...attachmentIdsIn([withFiles, bill])], ['f1']);
+});

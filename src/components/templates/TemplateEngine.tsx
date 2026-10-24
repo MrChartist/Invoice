@@ -4,6 +4,7 @@ import { templateById } from './registry';
 import { PaperContext, buildPaperConfig } from './paper-context';
 import { PaperHeader, StatementStrip } from './parts/PaperHeader';
 import { PartyPanel } from './parts/PartyPanel';
+import { CustomFieldsBlock } from './parts/CustomFieldsBlock';
 import { PaperItemsTable } from './parts/PaperItemsTable';
 import { NotesBlock, PaymentBlock, TaxSummary, TotalsBlock } from './parts/FooterBlocks';
 import { GstBody } from './parts/GstBody';
@@ -84,6 +85,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <StatementStrip invoice={invoice} due={cfg.currency(totals.balance_due, invoice.currency)} />
         )}
         <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
+        <CustomFieldsBlock invoice={invoice} />
         <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />
         <TaxSummary invoice={invoice} totals={totals} />
 

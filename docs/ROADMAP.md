@@ -170,7 +170,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.9 | **Price levels & schemes** (wholesale/retail/party rates, qty slabs, buy-X-get-Y) | Tally, Marg, Vyapar | M |
 | 6.10 | **Multi-godown** stock with transfer vouchers | Vyapar, Busy, myBillBook | M |
 | 6.11 | **Serial numbers / IMEI / warranty** lookup | Busy, myBillBook | M |
-| 6.12 | **Attachments**: receipt photos / PDFs on bills, expenses, invoices (IndexedDB, in backups) | Zoho, Xero, Invoice Ninja | M |
+| 6.12 | ✅ **Attachments**: receipt photos / PDFs on bills, expenses, invoices (IndexedDB, one key per file, stored once by content, in backups; `src/lib/attachments.ts`, `docs/features/attachments-custom-fields.md`) | Zoho, Xero, Invoice Ninja | M |
 | 6.13 | ✅ **Time tracking & billable hours** → invoice lines (`/time`, `src/lib/timesheets.ts`, `docs/features/time-expenses.md`) | FreshBooks, Zoho, Invoice Ninja | M |
 | 6.14 | ✅ **Billable expenses & mileage** with markup and pure-agent (Rule 33) reimbursements | FreshBooks, Invoice Ninja | S–M |
 | 6.15 | ✅ **Optional automatic late-fee line** per client terms (new draft invoice, never edits the original; `receivables.md`) | FreshBooks, Invoice Ninja | S |
@@ -181,7 +181,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.20 | **Separate companies** on one device (isolated data sets + switcher) | Tally, Busy, Vyapar | M |
 | 6.21 | **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) | Vyapar, myBillBook, Zoho | M |
 | 6.22 | ✅ **.xlsx import/export without a dependency** (native `DecompressionStream` + a hand-written XML tokenizer, `src/lib/xlsx.ts`); ZIP writer `src/lib/zip.ts` ready for a ZIP of PDFs (not wired yet) | most | M |
-| 6.23 | **Custom fields** on documents, items, parties, printable | Tally (UDF), Zoho, Vyapar | S–M |
+| 6.23 | ✅ **Custom fields** on documents, items, parties, printable (Settings → Custom fields; invoices snapshot label + value; `src/lib/custom-fields.ts`) | Tally (UDF), Zoho, Vyapar | S–M |
 | 6.24 | ✅ **Bulk e-Invoice / e-Way JSON** and bulk IRN response import (`einvoice.md`) | Zoho, Tally | S |
 | 6.25 | **Party/item profitability, credit limits at billing** | Vyapar, Zoho | S–M |
 | 6.26 | **Cheque register & PDC reminders**, cheque printing | Tally, Busy | S–M |
