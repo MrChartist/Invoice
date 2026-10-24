@@ -75,12 +75,14 @@ No runtime secrets or environment variables are required (see `.env.example`). A
 build-time config must use Vite's `VITE_` prefix.
 
 ## Known tech debt
-- `tsconfig` does not enable `strict`; dynamic localStorage JSON uses `any` (ESLint `no-explicit-any`
-  is a warning, not an error).
+- `tsconfig` does not enable `strict` (there are no `any` annotations left in `src/`; ESLint
+  `no-explicit-any` stays a warning).
 - `react-hooks/set-state-in-effect` kept as a warning — the app's correct localStorage-hydration
   pattern triggers it; rewriting needs care.
-- Several report modules (`books`, `inventory`, `gst-reports`, `export-shared`) each carry their own
-  tolerant purchase normaliser; consolidating onto `PurchaseRecord` would remove the duplication.
+- Purchases are read through the shared `readPurchase` (`purchase-normalize.ts`), but `gst-reports`, `books`
+  and `export-shared` still wrap it in their own shapes; finishing the move to `PurchaseRecord` removes that.
+- Statutory values that change over time (B2CL threshold, GST slabs, TDS/TCS presets) live in
+  `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones.
 - `PurchaseLine.item_id` is not set by the bill form yet, so inventory matches purchases by name + HSN.
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.
