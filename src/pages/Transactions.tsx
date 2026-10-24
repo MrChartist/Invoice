@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Banknote,
   Copy,
@@ -75,9 +75,19 @@ export function Transactions() {
 
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<Filter>(() => {
+    const f = params.get('filter') as Filter | null;
+    return f && FILTERS.some((x) => x.id === f) ? f : 'all';
+  });
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [payFor, setPayFor] = useState<InvoiceRecord | null>(null);
+  // "Record a payment" from the command palette (?pay=1): with a single unpaid document, open it directly.
+  const [payFor, setPayFor] = useState<InvoiceRecord | null>(() => {
+    if (params.get('pay') !== '1') return null;
+    const today = new Date();
+    const open = localDb.invoices.getAll().filter((i) => matchesFilter(i, 'unpaid', today) && !isLocked(i));
+    return open.length === 1 ? open[0] : null;
+  });
   const [deleting, setDeleting] = useState<InvoiceRecord | null>(null);
 
   const reload = () => setVersion((v) => v + 1);

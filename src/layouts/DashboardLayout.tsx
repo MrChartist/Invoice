@@ -39,8 +39,7 @@ import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
 import { cn } from '../lib/utils';
 import { getUser, logout } from '../lib/auth';
-import { backupFilename, buildBackup, markBackupDone } from '../lib/backup';
-import { downloadText } from '../lib/download';
+import { downloadBackupNow } from '../lib/auto-backup';
 import { useTheme } from '../hooks/useTheme';
 import styles from './DashboardLayout.module.css';
 
@@ -201,7 +200,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
       { id: 'new-quotation', title: 'New quotation', keywords: ['estimate', 'quote'], run: () => navigate('/invoice?type=QUOTATION') },
       { id: 'add-client', title: 'Add client', keywords: ['customer', 'party'], run: () => navigate('/clients?new=1') },
       { id: 'add-expense', title: 'Add expense or purchase bill', keywords: ['bill', 'vendor'], run: () => navigate('/expenses') },
-      { id: 'record-payment', title: 'Record a payment', keywords: ['receipt', 'received'], run: () => navigate('/transactions') },
+      { id: 'record-payment', title: 'Record a payment', keywords: ['receipt', 'received'], run: () => navigate('/transactions?filter=unpaid&pay=1') },
       { id: 'gst', title: 'Open GST reports', keywords: ['gstr', 'return'], run: () => navigate('/gst-reports') },
       { id: 'brs', title: 'Bank reconciliation statement', keywords: ['bank', 'brs', 'reconcile', 'statement'], run: () => navigate('/reconcile?tab=brs') },
       { id: 'top-customers', title: 'Top customers report', keywords: ['sales', 'customers', 'concentration'], run: () => navigate('/reports?tab=top') },
@@ -211,10 +210,10 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         id: 'backup',
         title: 'Download backup',
         keywords: ['export', 'save'],
-        run: () => {
-          downloadText(backupFilename(), JSON.stringify(buildBackup(), null, 2), 'application/json');
-          markBackupDone();
-          notify('Backup downloaded');
+        run: async () => {
+          // Same path as Settings → Automatic backups, so a stored backup passphrase is honoured.
+          const r = await downloadBackupNow();
+          notify(r.ok ? 'Backup downloaded' : r.message, r.ok ? 'success' : 'error');
         },
       },
       { id: 'lock', title: 'Lock app', run: handleLock },

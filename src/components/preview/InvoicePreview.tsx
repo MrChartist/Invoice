@@ -10,6 +10,7 @@ import { ShareMenu } from '../share';
 import { pageSlices, paperSize, resolve as resolveDesign } from '../../lib/design-prefs';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
 import { cn } from '../../lib/utils';
+import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
 
@@ -24,6 +25,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
   const invoice = useInvoiceStore();
   const paperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [paperHeight, setPaperHeight] = useState(1123);
   const [busy, setBusy] = useState(false);
@@ -65,8 +67,25 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
   useEffect(() => {
     if (!isOpen) return;
     setError('');
+    // Modal dialog: move focus inside, keep Tab inside, give focus back on close.
+    const opener = document.activeElement as HTMLElement | null;
+    const focusables = () => Array.from(overlayRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
+    focusables()[0]?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') return onClose();
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const inside = overlayRef.current?.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -74,6 +93,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [isOpen, onClose]);
 
@@ -123,7 +143,7 @@ export const InvoicePreviewModal = ({ isOpen, onClose }: InvoicePreviewModalProp
   };
 
   return createPortal(
-    <div className={cn(styles.overlay, 'print-host')} role="dialog" aria-modal="true" aria-label="Document preview">
+    <div ref={overlayRef} className={cn(styles.overlay, 'print-host')} role="dialog" aria-modal="true" aria-label="Document preview">
       <div className={cn(styles.toolbar, 'no-print')}>
         <div className={styles.templatePicker}>
           <button type="button" className={controls.btnIcon} onClick={() => step(-1)} aria-label="Previous template">

@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import styles from './Modal.module.css';
 
-const FOCUSABLE =
+export const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Tracks the last control focused outside a dialog, so closing returns focus to whatever opened it. */
