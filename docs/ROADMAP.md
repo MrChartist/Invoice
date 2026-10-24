@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.8, 5.9 ✅; 5.3–5.7 in progress) · Phase 6 (most ✅; 6.7–6.9, 6.21 in progress) · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
