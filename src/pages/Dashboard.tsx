@@ -26,7 +26,7 @@ import type { CreditLink } from '../lib/stats';
 import { getUser } from '../lib/auth';
 import { getIndianFY } from '../lib/invoice-number';
 import { effectiveStatus } from '../lib/invoice-status';
-import { attentionList, compactInr, isRevenueDoc, monthlyBilled, summarize } from '../lib/stats';
+import { attentionList, compactInr, foreignWithoutRate, isRevenueDoc, monthlyBilled, summarize } from '../lib/stats';
 import { daysOverdue, formatCurrency, formatDate } from '../lib/utils';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
@@ -80,6 +80,8 @@ export function Dashboard() {
   const fy = getIndianFY();
   const summary = summarize(invoices, now, links, 'INR');
   const months = monthlyBilled(invoices, 6, now, 'INR');
+  // Foreign-currency documents count in rupees at their exchange rate; without a rate they are left out.
+  const noRate = foreignWithoutRate(invoices);
   // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
   const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders')).map((p) => p.invoice.id));
   const attention = attentionList(invoices, 50, now)
@@ -150,7 +152,7 @@ export function Dashboard() {
       )}
 
       <div className={surface.statGrid}>
-        <StatCard label="Billed" value={formatCurrency(summary.billed)} hint={`${summary.count} issued invoice${summary.count === 1 ? '' : 's'}`} icon={Receipt} />
+        <StatCard label="Billed" value={formatCurrency(summary.billed)} hint={`${summary.count} issued invoice${summary.count === 1 ? '' : 's'}${noRate ? ` · ${noRate} foreign-currency without an exchange rate left out` : ''}`} icon={Receipt} />
         <StatCard label="Received" value={formatCurrency(summary.received)} hint={`${collectedPct}% collected`} icon={Banknote} tone="profit" />
         <StatCard label="Outstanding" value={formatCurrency(summary.outstanding)} hint="Yet to be paid" icon={Hourglass} tone="warning" />
         <StatCard

@@ -286,4 +286,19 @@ export interface InvoiceRecord {
   quote_status?: QuoteStatus;
   /** Additive: ship-to / consignee address (printed and used for the e-Way bill). */
   ship_to?: ShipTo;
+  /**
+   * Additive: shipping + other charges are part of the taxable value (CGST Act s.15(2)(c)),
+   * taxed at the highest GST rate on the document. Absent/false = untaxed (legacy behaviour).
+   */
+  charges_taxable?: boolean;
+  /**
+   * Additive: rupees per ONE unit of `currency` (e.g. 83.25 for USD) — the CBIC-notified /
+   * shipping-bill rate. Only meaningful when currency is not INR; GST returns, e-Invoice,
+   * Books, Tally and rupee dashboards convert with it (see `src/lib/fx.ts`).
+   */
+  exchange_rate?: number;
+  /** Additive (exports): shipping bill / bill of export number, date (YYYY-MM-DD) and 6-char port code. */
+  shipping_bill_no?: string;
+  shipping_bill_date?: string;
+  port_code?: string;
 }

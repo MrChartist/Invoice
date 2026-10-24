@@ -7,6 +7,7 @@
 
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, pctOf, round2 } from './invoice-calc';
+import { inrTotals } from './fx';
 import { stateByCode, stateByName } from './india-states';
 import {
   extractPin,
@@ -149,7 +150,8 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const client = record.client ?? ({} as InvoiceRecord['client']);
   const t = options.transport ?? {};
 
-  const calc = calculateInvoice(calcInputFromRecord(record));
+  // The portal takes rupees: a foreign-currency invoice is converted at its exchange rate.
+  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record)), record);
 
   const sellerGstin = (sender?.companyGstin ?? '').trim().toUpperCase();
   const gstinStateFrom = sellerGstin.slice(0, 2);
@@ -180,7 +182,9 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const goods = calc.lines.filter((l) => !isServiceHsn(l.hsn));
   const skippedServiceLines = calc.lines.length - goods.length;
   const allGoods = skippedServiceLines === 0;
-  const sum = (pick: (l: (typeof goods)[number]) => number) => round2(goods.reduce((s, l) => s + pick(l), 0));
+  // Taxable freight is part of the goods' value: its taxable amount and GST join the totals.
+  const valued = allGoods && calc.charges_line ? [...goods, calc.charges_line] : goods;
+  const sum = (pick: (l: (typeof goods)[number]) => number) => round2(valued.reduce((s, l) => s + pick(l), 0));
   const noTax = record.gst_mode === 'NONE';
   const taxable = sum((l) => l.taxable);
   const cgst = sum((l) => l.cgst);
@@ -191,7 +195,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const advolOf = (l: (typeof goods)[number]) => pctOf(l.taxable, l.cess_rate);
   const cessAdvol = sum(advolOf);
   const cessFixed = sum((l) => round2(l.cess - advolOf(l)));
-  const other = allGoods ? round2(calc.shipping + calc.other_charges + calc.tcs_amount) : 0;
+  const other = allGoods ? round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount) : 0;
   const totInv = allGoods
     ? calc.total
     : round2(taxable + cgst + sgst + igst + cessAdvol + cessFixed);

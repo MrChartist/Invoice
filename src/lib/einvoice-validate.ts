@@ -10,6 +10,7 @@ import type { InvoiceRecord } from '../types/invoice';
 import { checkGstin } from './gstin';
 import { stateByCode } from './india-states';
 import { round2 } from './invoice-calc';
+import { inrValue } from './fx';
 import {
   DOC_NO_REGEX,
   UQC_CODES,
@@ -143,7 +144,9 @@ export function validateEInvoice(
         out.push(issue('warning', 'ITEM_UNIT_GUESS', `Item ${i + 1}`, `Item ${i + 1}: unit "${raw.unit}" has no standard UQC and is sent as OTH.`));
       }
     }
-    const stored = Number(record.total);
+    // TotInvVal is in rupees; a foreign-currency total is compared at the invoice's exchange rate.
+    const raw = Number(record.total);
+    const stored = Number.isFinite(raw) ? inrValue(raw, record) : NaN;
     if (Number.isFinite(stored) && !near(stored, payload.ValDtls.TotInvVal)) {
       out.push(issue('warning', 'STORED_TOTAL', 'Totals', `Saved invoice total (₹${stored}) differs from the recalculated total (₹${payload.ValDtls.TotInvVal}). Open and re-save the invoice.`));
     }

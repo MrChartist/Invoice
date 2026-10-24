@@ -91,6 +91,7 @@ test('export with payment of IGST: URP buyer, state 96, ExpDtls', () => {
     gst_mode: 'IGST',
     place_of_supply: '99',
     currency: 'USD',
+    exchange_rate: 83.25,
     client: { name: 'Globex', email: '', address: '1 Main St', city: 'Austin', zip: '', gstin: '', state: 'Other Country (Export)' },
   });
   const { payload } = buildEInvoice(rec, {
@@ -110,6 +111,9 @@ test('export with payment of IGST: URP buyer, state 96, ExpDtls', () => {
   });
   const r = preflightEInvoice(rec, { now: NOW, export: { countryCode: 'US' } });
   assert.deepEqual(r.errors, [], JSON.stringify(r.errors));
+  // Without an exchange rate the IRP cannot get INR values.
+  const noRate = preflightEInvoice({ ...rec, exchange_rate: undefined }, { now: NOW, export: { countryCode: 'US' } });
+  assert.ok(noRate.errors.some((e) => e.code === 'FX_RATE_MISSING'));
 });
 
 test('export without payment: no IGST', () => {

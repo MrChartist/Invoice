@@ -7,7 +7,8 @@
  */
 
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
-import { num, round2 } from './invoice-calc';
+import { chargesAreTaxed, num, round2 } from './invoice-calc';
+import { inrRecord } from './fx';
 import { resolveStateCode, stateByCode } from './india-states';
 import { isoDay } from './dates';
 import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
@@ -125,19 +126,29 @@ export interface InvoiceAmounts {
   /** Tax with no CGST/SGST/IGST split (legacy "SINGLE" mode). */
   otherTax: number;
   tax: number;
-  /** shipping + other charges (untaxed). */
+  /** shipping + other charges, taxed or not. */
   charges: number;
+  /**
+   * The charges were taxed (`charges_taxable`): they are INSIDE `taxable` and their GST is inside
+   * cgst/sgst/igst. A ledger posts them to the freight ledger and `taxable - charges` to Sales.
+   */
+  chargesTaxed: boolean;
   /** GST cess (kept out of `tax`, which is CGST+SGST+IGST). */
   cess: number;
   /** TCS collected on the invoice: a liability to the government, not income. */
   tcs: number;
   total: number;
-  /** total - (taxable + tax + charges + cess + tcs): rounding plus any legacy inconsistency. Signed. */
+  /** total - (taxable + tax + untaxed charges + cess + tcs): rounding plus any legacy inconsistency. Signed. */
   roundOff: number;
 }
 
-/** Read an invoice's money tolerantly (legacy rows may lack computed fields). */
-export function invoiceAmounts(inv: InvoiceRecord): InvoiceAmounts {
+/**
+ * Read an invoice's money tolerantly (legacy rows may lack computed fields). Always in rupees:
+ * a foreign-currency document is converted at its exchange rate (`src/lib/fx.ts`); one without
+ * a rate stays at face value.
+ */
+export function invoiceAmounts(source: InvoiceRecord): InvoiceAmounts {
+  const inv = inrRecord(source);
   let taxable = round2(num(inv.taxable_value));
   if (!taxable && num(inv.subtotal) > 0) taxable = round2(num(inv.subtotal) - num(inv.discount_amount));
   const cgst = round2(num(inv.cgst_amount));
@@ -145,12 +156,15 @@ export function invoiceAmounts(inv: InvoiceRecord): InvoiceAmounts {
   const igst = round2(num(inv.igst_amount));
   const tax = round2(Math.max(num(inv.tax_amount), cgst + sgst + igst));
   const otherTax = round2(Math.max(0, tax - cgst - sgst - igst));
-  const charges = round2(num(inv.shipping) + num(inv.other_charges));
+  const chargesTaxed = chargesAreTaxed(source);
+  const charges = chargesTaxed
+    ? round2(Math.max(num(inv.shipping), 0) + num(inv.other_charges))
+    : round2(num(inv.shipping) + num(inv.other_charges));
   const cess = round2(num(inv.cess_amount));
   const tcs = round2(num(inv.tcs_amount));
-  const parts = round2(taxable + tax + charges + cess + tcs);
+  const parts = round2(taxable + tax + (chargesTaxed ? 0 : charges) + cess + tcs);
   const total = round2(num(inv.total) !== 0 ? num(inv.total) : parts + num(inv.round_off));
-  return { taxable, cgst, sgst, igst, otherTax, tax, charges, cess, tcs, total, roundOff: round2(total - parts) };
+  return { taxable, cgst, sgst, igst, otherTax, tax, charges, chargesTaxed, cess, tcs, total, roundOff: round2(total - parts) };
 }
 
 export function invoiceStateCode(inv: InvoiceRecord): string {

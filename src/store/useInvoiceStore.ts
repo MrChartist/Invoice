@@ -109,6 +109,7 @@ export const RECORD_KEYS = [
   'supply_type', 'lut_number', 'lut_date', 'price_includes_tax', 'round_mode', 'tcs_enabled', 'tcs_rate',
   'tcs_base', 'tcs_label', 'tds_enabled', 'tds_section', 'tds_rate', 'tds_on_taxable', 'cess_amount',
   'tcs_amount', 'tds_amount', 'created_at', 'updated_at', 'quote_status', 'ship_to',
+  'charges_taxable', 'exchange_rate', 'shipping_bill_no', 'shipping_bill_date', 'port_code',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -120,6 +121,17 @@ void recordKeysComplete;
 function toRecord(state: InvoiceState): InvoiceRecord {
   const out: Record<string, unknown> = {};
   for (const k of RECORD_KEYS) out[k] = state[k];
+  return out as unknown as InvoiceRecord;
+}
+
+/**
+ * A whole document for `set()`: every persisted key is present (undefined when the record lacks it),
+ * so loading a record can never inherit an optional field (charges_taxable, exchange_rate, ship_to …)
+ * from the document that was open before — zustand's `set` merges.
+ */
+function wholeRecord(rec: InvoiceRecord): InvoiceRecord {
+  const out: Record<string, unknown> = {};
+  for (const k of RECORD_KEYS) out[k] = rec[k];
   return out as unknown as InvoiceRecord;
 }
 
@@ -376,6 +388,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         tds_enabled: s.tds_enabled,
         tds_rate: s.tds_rate,
         tds_on_taxable: s.tds_on_taxable,
+        charges_taxable: s.charges_taxable,
       });
       set({
         totals,
@@ -434,7 +447,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     newDraft: (docType) => {
       cancelDraftSave();
       removeRaw(SINGLETON_KEYS.draft);
-      set({ ...freshDraft(docType), totals: EMPTY_TOTALS, dirty: false });
+      set({ ...wholeRecord(freshDraft(docType)), totals: EMPTY_TOTALS, dirty: false });
       get().recalculate();
     },
 
@@ -442,7 +455,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       const found = localDb.invoices.getById(id);
       if (!found) return false;
       loadedAt = Date.now();
-      set({ ...normalizeRecord(found, localDb.template.get()), dirty: false });
+      set({ ...wholeRecord(normalizeRecord(found, localDb.template.get())), dirty: false });
       get().recalculate();
       return true;
     },
@@ -489,7 +502,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     restoreDraft: () => {
       const saved = getJson<InvoiceRecord | null>(SINGLETON_KEYS.draft, null);
       if (!saved || saved.id) return false;
-      set({ ...normalizeRecord(saved, localDb.template.get()), dirty: true });
+      set({ ...wholeRecord(normalizeRecord(saved, localDb.template.get())), dirty: true });
       get().recalculate();
       return true;
     },

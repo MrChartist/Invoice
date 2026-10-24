@@ -72,7 +72,7 @@ Dates / locale / escaping
 - Credit notes never credit shipping / other charges (`shipping: 0` by design), so a full credit of an invoice with freight leaves the freight uncredited.
 - Deleting an invoice removes its payments but leaves its credit notes, `doc_links`, e-Invoice meta and reminders; an orphaned credit note keeps reducing the party's balance.
 - `notifications`, `reminders`, the UPI link and `PaymentModal` use `balance_due`, which ignores credit notes (stats / receivables do net them) — can chase or accept more than is owed.
-- No FX: books / GST / exports sum foreign-currency documents as rupees (GST reports warn `FOREIGN_CCY`); only the dashboard gained a currency filter.
+- FX (fixed, roadmap 3.4): documents with an `exchange_rate` are converted to INR everywhere (`src/lib/fx.ts`); without a rate, GST reports flag `FX_RATE_MISSING` and Books/Tally still book face value. Realised exchange gain/loss is not computed.
 - Per-line CGST/SGST split can leave invoice-level CGST and SGST differing by a few paise (odd paisa goes to SGST); GSTN has not been seen to reject it.
 - Tally: no TDS journal (the TDS stays open on the party ledger), no purchase payment vouchers.
 - Balance sheet shows TDS awaiting credit inside receivables (no separate asset line); receivables ledger efficiency counts the TDS credit as "received".

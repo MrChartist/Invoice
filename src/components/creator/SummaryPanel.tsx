@@ -25,7 +25,7 @@ function Row({ label, children, tone, strong }: { label: React.ReactNode; childr
 
 export function SummaryPanel() {
   const s = useInvoiceStore(
-    useShallow((st) => ({ amount_paid: st.amount_paid, currency: st.currency, discount_rate: st.discount_rate, discount_type: st.discount_type, doc_type: st.doc_type, gst_mode: st.gst_mode, other_charges: st.other_charges, round_off_enabled: st.round_off_enabled, setAmountPaid: st.setAmountPaid, setDiscount: st.setDiscount, setGstMode: st.setGstMode, setOtherCharges: st.setOtherCharges, setRoundOff: st.setRoundOff, setShipping: st.setShipping, shipping: st.shipping, tcs_label: st.tcs_label, tds_section: st.tds_section, totals: st.totals })),
+    useShallow((st) => ({ amount_paid: st.amount_paid, charges_taxable: st.charges_taxable, patch: st.patch, currency: st.currency, discount_rate: st.discount_rate, discount_type: st.discount_type, doc_type: st.doc_type, gst_mode: st.gst_mode, other_charges: st.other_charges, round_off_enabled: st.round_off_enabled, setAmountPaid: st.setAmountPaid, setDiscount: st.setDiscount, setGstMode: st.setGstMode, setOtherCharges: st.setOtherCharges, setRoundOff: st.setRoundOff, setShipping: st.setShipping, shipping: st.shipping, tcs_label: st.tcs_label, tds_section: st.tds_section, totals: st.totals })),
   );
   const t = s.totals;
   const cur = s.currency;
@@ -99,6 +99,13 @@ export function SummaryPanel() {
         <span>Other charges</span>
         <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.other_charges} onChange={s.setOtherCharges} placeholder="0.00" aria-label="Other charges" />
       </div>
+      {!challan && (s.shipping !== 0 || s.other_charges !== 0 || s.charges_taxable) && (
+        <label className={cn(controls.check, styles.checkRow)} title="CGST Act s.15(2)(c): freight, packing and other charges billed by you are part of the value of supply. Taxed at the highest GST rate on this document.">
+          <input type="checkbox" checked={Boolean(s.charges_taxable)} onChange={(e) => s.patch({ charges_taxable: e.target.checked || undefined })} />
+          Charge GST on shipping &amp; other charges
+          {t.charges_line && <span className={styles.roundVal}>@ {t.charges_line.tax_rate}%</span>}
+        </label>
+      )}
 
       <label className={cn(controls.check, styles.checkRow)}>
         <input type="checkbox" checked={s.round_off_enabled} onChange={(e) => s.setRoundOff(e.target.checked)} />

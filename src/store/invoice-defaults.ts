@@ -247,6 +247,12 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
 
     ...(r.quote_status === 'Accepted' || r.quote_status === 'Declined' ? { quote_status: r.quote_status } : {}),
     ...(r.ship_to && typeof r.ship_to === 'object' ? { ship_to: { ...(r.ship_to as ShipTo) } } : {}),
+    // Additive fields stay absent on legacy rows so their snapshots never change.
+    ...(r.charges_taxable ? { charges_taxable: true } : {}),
+    ...(num(r.exchange_rate) > 0 ? { exchange_rate: num(r.exchange_rate) } : {}),
+    ...(r.shipping_bill_no ? { shipping_bill_no: String(r.shipping_bill_no) } : {}),
+    ...(r.shipping_bill_date ? { shipping_bill_date: String(r.shipping_bill_date).slice(0, 10) } : {}),
+    ...(r.port_code ? { port_code: String(r.port_code).toUpperCase() } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

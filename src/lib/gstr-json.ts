@@ -142,6 +142,10 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
         inum: i.number,
         idt: toGstnDate(i.date),
         val: round2(i.value),
+        // Shipping bill details are optional at filing time; sent only when the invoice has them.
+        ...(i.sbpcode ? { sbpcode: i.sbpcode } : {}),
+        ...(i.sbnum ? { sbnum: i.sbnum } : {}),
+        ...(i.sbdt ? { sbdt: toGstnDate(i.sbdt) } : {}),
         itms: i.items.map((it) => {
           const row: Record<string, number> = { txval: round2(it.txval), rt: it.rate };
           if (it.igst) row.iamt = round2(it.igst);
@@ -259,9 +263,10 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
       );
     case 'exp':
       return toCsv(
-        docRows(r.exp, ['GSTIN/UIN', 'Receiver', 'Invoice no', 'Invoice date', 'Invoice value', 'Place of supply', 'Reverse charge', 'Export type', ...tail], (d) => [
-          (d as typeof r.exp[number]).expType,
-        ]),
+        docRows(r.exp, ['GSTIN/UIN', 'Receiver', 'Invoice no', 'Invoice date', 'Invoice value', 'Place of supply', 'Reverse charge', 'Export type', 'Port code', 'Shipping bill no', 'Shipping bill date', ...tail], (d) => {
+          const x = d as typeof r.exp[number];
+          return [x.expType, x.sbpcode ?? '', x.sbnum ?? '', x.sbdt ?? ''];
+        }),
       );
     case 'b2cs':
       return toCsv([

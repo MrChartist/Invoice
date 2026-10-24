@@ -98,8 +98,8 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
       {igst && <Row label={invoice.gst_mode === 'SINGLE' ? 'Tax' : 'IGST'} value={money(totals.tax_amount, cur)} />}
       {totals.cess_amount > 0 && <Row label="Cess" value={money(totals.cess_amount, cur)} />}
       {totals.tcs_amount > 0 && <Row label={invoice.tcs_label || 'TCS'} value={money(totals.tcs_amount, cur)} />}
-      {totals.shipping > 0 && <Row label="Shipping" value={money(totals.shipping, cur)} />}
-      {totals.other_charges !== 0 && <Row label="Other charges" value={money(totals.other_charges, cur)} />}
+      {totals.shipping > 0 && <Row label={totals.charges_line ? 'Shipping (taxable)' : 'Shipping'} value={money(totals.shipping, cur)} />}
+      {totals.other_charges !== 0 && <Row label={totals.charges_line ? 'Other charges (taxable)' : 'Other charges'} value={money(totals.other_charges, cur)} />}
       {totals.round_off !== 0 && <Row label="Round off" value={money(totals.round_off, cur)} />}
       <hr className={styles.rcRule} />
       <div className={cn(styles.rcRow, styles.rcGrand)}>

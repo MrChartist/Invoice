@@ -205,3 +205,29 @@ test('combined: cess + TCS + TDS + part payment', () => {
   assert.equal(t.payable, 13814);
   assert.equal(t.balance_due, 9814);
 });
+
+/* ── Taxable freight / other charges (roadmap 3.3) ─────────────────── */
+test('charges_taxable: charges taxed at the highest line rate, IGST; legacy result unchanged without the flag', () => {
+  const items = [item({ id: 'a', quantity: 1, rate: 1000, tax_rate: 12 }), item({ id: 'b', quantity: 1, rate: 100, tax_rate: 28, cess_rate: 12 })];
+  const legacy = calculateInvoice(input(items, { shipping: 200 }));
+  assert.equal(legacy.charges_line, null);
+  assert.equal(legacy.total, 1000 + 120 + 100 + 28 + 12 + 200);
+  const t = calculateInvoice(input(items, { shipping: 200, charges_taxable: true }));
+  assert.equal(t.charges_line?.tax_rate, 28);
+  assert.equal(t.charges_line?.igst, 56);
+  assert.equal(t.cess_amount, 12, 'no cess on charges');
+  assert.equal(t.taxable_value, 1300);
+  assert.equal(t.total, legacy.total + 56);
+});
+
+test('charges_taxable: net charge of zero or less stays untaxed; no-tax mode taxes nothing', () => {
+  const items = [item({ quantity: 1, rate: 1000, tax_rate: 18 })];
+  const neg = calculateInvoice(input(items, { shipping: 50, other_charges: -80, charges_taxable: true }));
+  assert.equal(neg.charges_line, null);
+  assert.equal(neg.total, 1000 + 180 - 30);
+  const none = calculateInvoice(input(items, { gst_mode: 'NONE', shipping: 100, charges_taxable: true }));
+  assert.equal(none.charges_line?.tax, 0);
+  assert.equal(none.total, 1100);
+  const empty = calculateInvoice(input([], { tax_rate: 5, shipping: 100, charges_taxable: true }));
+  assert.equal(empty.charges_line?.tax_rate, 5, 'no lines: the document fallback rate');
+});
