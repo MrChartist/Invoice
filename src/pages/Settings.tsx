@@ -13,6 +13,7 @@ import { DataPanel } from '../components/settings/DataPanel';
 import { SecurityPanel } from '../components/security/SecurityPanel';
 import { CompaniesPanel } from '../components/companies/CompaniesPanel';
 import { AutoBackupPanel } from '../components/pwa/AutoBackupPanel';
+import { can as canDo, type AccessAction } from '../lib/access';
 import { blankProfile, localDb, type AppSettings } from '../lib/localDb';
 import { checkGstin } from '../lib/gstin';
 import { isValidIfsc, isValidPan, isValidUpi } from '../lib/validators';
@@ -27,14 +28,15 @@ const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').the
 
 type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
-const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
-  { id: 'business', label: 'Business profiles', icon: Building2 },
-  { id: 'items', label: 'Items & rates', icon: Package },
-  { id: 'fields', label: 'Custom fields', icon: ListPlus },
-  { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
-  { id: 'data', label: 'Data & backup', icon: Database },
-  { id: 'activity', label: 'Activity', icon: ScrollText },
-  { id: 'security', label: 'Security', icon: ShieldCheck },
+/** `need`: local roles (6.21) — a clerk or viewer sees only the tabs their role may use. */
+const ALL_TABS: { id: Tab; label: string; icon: typeof Building2; need: AccessAction }[] = [
+  { id: 'business', label: 'Business profiles', icon: Building2, need: 'settings.manage' },
+  { id: 'items', label: 'Items & rates', icon: Package, need: 'master.edit' },
+  { id: 'fields', label: 'Custom fields', icon: ListPlus, need: 'settings.manage' },
+  { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal, need: 'settings.manage' },
+  { id: 'data', label: 'Data & backup', icon: Database, need: 'data.restore' },
+  { id: 'activity', label: 'Activity', icon: ScrollText, need: 'view' },
+  { id: 'security', label: 'Security', icon: ShieldCheck, need: 'view' },
 ];
 
 /** The first problem that should block saving, or '' when the profile is fine. */
@@ -50,9 +52,11 @@ function profileProblem(p: SenderProfile): string {
 export function Settings() {
   const { notify, toastNode } = useToast();
   const [params] = useSearchParams();
+  // The signed-in user only changes at the PIN screen, which unmounts this page.
+  const [TABS] = useState(() => ALL_TABS.filter((t) => canDo(t.need)));
   const [tab, setTab] = useState<Tab>(() => {
     const t = params.get('tab');
-    return TABS.some((x) => x.id === t) ? (t as Tab) : 'business';
+    return TABS.some((x) => x.id === t) ? (t as Tab) : TABS[0].id;
   });
   const [settings, setSettings] = useState<AppSettings>(() => localDb.settings.get());
   const [editingId, setEditingId] = useState(() => localDb.settings.get().activeProfileId);
@@ -149,7 +153,14 @@ export function Settings() {
 
   return (
     <div className={surface.page}>
-      <PageHeader title="Settings" subtitle="Your business details, payment info and defaults. Saved only on this device." />
+      <PageHeader
+        title="Settings"
+        subtitle={
+          canDo('settings.manage')
+            ? 'Your business details, payment info and defaults. Saved only on this device.'
+            : 'Business settings, backups and users are managed by the owner.'
+        }
+      />
 
       <div className={controls.segment} role="tablist" aria-label="Settings sections" style={{ alignSelf: 'flex-start', maxWidth: '100%', flexWrap: 'wrap' }} onKeyDown={onTabKey}>
         {TABS.map(({ id, label, icon: Icon }) => (

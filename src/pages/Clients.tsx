@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { ClientFormModal } from '../components/modals/ClientFormModal';
 import { localDb } from '../lib/localDb';
+import { can } from '../lib/access';
 import { isRevenueDoc } from '../lib/stats';
 import { formatCurrency } from '../lib/utils';
 import type { Client } from '../types/invoice';
@@ -18,6 +19,8 @@ import styles from './Clients.module.css';
 
 export function Clients() {
   const { notify, toastNode } = useToast();
+  // Local roles (6.21): a viewer can look clients up but not change them.
+  const edit = can('master.edit');
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Client | null>(null);
@@ -30,12 +33,12 @@ export function Clients() {
   // `/clients?edit=<id>` (from the TDS register) opens that client's editor.
   useEffect(() => {
     const editId = searchParams.get('edit');
-    if (searchParams.get('new') === '1' || editId) {
+    if (edit && (searchParams.get('new') === '1' || editId)) {
       setEditing(editId ? localDb.clients.getById(editId) ?? null : null);
       setFormOpen(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, edit]);
 
   useEffect(() => {
     const refresh = () => setVersion((v) => v + 1);
@@ -84,14 +87,16 @@ export function Clients() {
         title="Clients"
         subtitle={`${clients.length} saved · clients are also added automatically when you save an invoice`}
         actions={
-          <>
-            <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
-              <FileUp size={16} /> Import
-            </button>
-            <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-              <Plus size={16} /> Add client
-            </button>
-          </>
+          edit ? (
+            <>
+              <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
+                <FileUp size={16} /> Import
+              </button>
+              <button type="button" className={controls.btnPrimary} onClick={openAdd}>
+                <Plus size={16} /> Add client
+              </button>
+            </>
+          ) : undefined
         }
       />
 
@@ -115,9 +120,11 @@ export function Clients() {
             title="No clients yet"
             text="Add a client once and pick them in a click on every future invoice."
             action={
-              <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-                <Plus size={16} /> Add your first client
-              </button>
+              edit ? (
+                <button type="button" className={controls.btnPrimary} onClick={openAdd}>
+                  <Plus size={16} /> Add your first client
+                </button>
+              ) : undefined
             }
           />
         ) : filtered.length === 0 ? (
@@ -198,12 +205,16 @@ export function Clients() {
                           <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={`Statement for ${c.name}`} title="Account statement">
                             <Scale size={16} />
                           </Link>
-                          <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`} title="Edit">
-                            <Pencil size={16} />
-                          </button>
-                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting(c)} aria-label={`Delete ${c.name}`} title="Delete">
-                            <Trash2 size={16} />
-                          </button>
+                          {edit && (
+                            <>
+                              <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`} title="Edit">
+                                <Pencil size={16} />
+                              </button>
+                              <button type="button" className={controls.btnDanger} onClick={() => setDeleting(c)} aria-label={`Delete ${c.name}`} title="Delete">
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

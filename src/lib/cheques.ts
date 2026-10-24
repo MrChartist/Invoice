@@ -20,6 +20,7 @@
 
 import type { Cheque, ChequeDirection, ChequeStatus } from '../types/cheques';
 import type { Payment } from '../types/invoice';
+import { requireAccess } from './access';
 import { audit } from './audit';
 import { toCsv } from './csv';
 import { isoDay } from './dates';
@@ -138,6 +139,7 @@ export class ChequeError extends Error {
 
 /** Add or edit a cheque's details. Money-relevant fields are frozen once a payment was recorded from it. */
 export function saveCheque(input: ChequeInput, now: Date = new Date()): Cheque {
+  requireAccess('books.edit'); // local roles (6.21)
   const rows = loadCheques();
   const errors = validateCheque(input, rows);
   if (errors.length) throw new ChequeError(errors[0]);
@@ -169,6 +171,7 @@ export function saveCheque(input: ChequeInput, now: Date = new Date()): Cheque {
 
 /** Delete a cheque that has no payment recorded from it. */
 export function deleteCheque(id: string): void {
+  requireAccess('books.edit');
   const rows = loadCheques();
   const c = rows.find((r) => r.id === id);
   if (!c) return;
@@ -194,6 +197,7 @@ export interface TransitionResult {
 
 /** Move a cheque along its lifecycle, recording / reversing the linked payment. */
 export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionOptions): TransitionResult {
+  requireAccess('books.edit');
   const rows = loadCheques();
   const idx = rows.findIndex((c) => c.id === id);
   if (idx < 0) throw new ChequeError('Cheque not found.');

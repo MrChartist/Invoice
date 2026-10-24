@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, LockOpen } from 'lucide-react';
 import { PinConfirmModal } from '../audit/PinConfirmModal';
+import { can } from '../../lib/access';
 import {
   getLockUntil,
   grantOverride,
@@ -74,6 +75,8 @@ export function LockBanner({ docId, docNumber, issueDate, onChange }: LockBanner
   }
 
   const isNew = !docId;
+  // Local roles (6.21): only the owner may unlock a period or open lock settings.
+  const owner = can('period.override');
   return (
     <>
       <div className={styles.lockBanner} role="alert">
@@ -87,14 +90,18 @@ export function LockBanner({ docId, docNumber, issueDate, onChange }: LockBanner
           </span>
         </div>
         <div className={styles.lockActions}>
-          {!isNew && (
+          {!isNew && owner && (
             <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setPinOpen(true)}>
               <LockOpen size={14} /> Unlock with PIN
             </button>
           )}
-          <Link to="/settings?tab=defaults" className={`${controls.btnGhost} ${controls.btnSm}`}>
-            Lock settings
-          </Link>
+          {owner ? (
+            <Link to="/settings?tab=defaults" className={`${controls.btnGhost} ${controls.btnSm}`}>
+              Lock settings
+            </Link>
+          ) : (
+            <span className={controls.hint}>Only the owner can unlock it.</span>
+          )}
         </div>
       </div>
       <PinConfirmModal

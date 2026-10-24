@@ -6,6 +6,7 @@
  * through `round2` so totals always re-sum to the paisa.
  */
 
+import { requireAccess } from './access';
 import type { PurchaseLine, PurchaseRecord } from '../types/purchases';
 import type { GstMode, InvoiceItem } from '../types/invoice';
 import { calculateInvoice, num, round2 } from './invoice-calc';
@@ -328,6 +329,7 @@ export const purchasesDb = {
 
   /** Insert or update (matched by id). Totals must already be computed. Respects the period lock. */
   save(input: Omit<PurchaseRecord, 'id'> & { id?: string }): PurchaseRecord {
+    requireAccess('books.edit');
     const existing = input.id ? purchasesDb.get(input.id) : undefined;
     if (existing) assertBillUnlocked(existing, 'edit');
     assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
@@ -349,6 +351,7 @@ export const purchasesDb = {
 
   /** Remove a bill together with its payment history. */
   remove(id: string): void {
+    requireAccess('books.edit');
     const bill = purchasesDb.get(id);
     if (bill) assertBillUnlocked(bill, 'delete');
     setTable(PURCHASES_TABLE, purchasesDb.all().filter((p) => p.id !== id));
@@ -364,6 +367,7 @@ export const paymentsDb = {
 
   /** Append a payment and roll it into the bill's `amount_paid`. Throws on invalid input. */
   record(purchaseId: string, p: { amount: number; date: string; method: string; reference?: string; bankAccountId?: string }): PurchasePayment {
+    requireAccess('books.edit');
     const bill = purchasesDb.get(purchaseId);
     if (!bill) throw new Error('Bill not found.');
     const amount = round2(num(p.amount));
@@ -384,6 +388,7 @@ export const paymentsDb = {
     const all = paymentsDb.all();
     const target = all.find((p) => p.id === paymentId);
     if (!target) return;
+    requireAccess('books.edit');
     assertPaymentUnlocked(target.date, 'unpay');
     setTable(PAYMENTS_TABLE, all.filter((p) => p.id !== paymentId));
     const bill = purchasesDb.get(target.purchase_id);

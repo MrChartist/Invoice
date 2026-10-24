@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { KeyRound, Lock, ShieldCheck } from 'lucide-react';
+import { Info, KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { ChangePinModal } from './ChangePinModal';
 import { EncryptedBackup } from './EncryptedBackup';
 import { VaultPanel } from './VaultPanel';
+import { UsersPanel } from './UsersPanel';
+import { ROLE_HINTS, ROLE_LABELS } from '../../lib/access';
+import { useCan } from '../../hooks/useCan';
 import { IDLE_CHOICES, getIdleTimeout, logout, setIdleTimeout } from '../../lib/auth';
 import { daysSinceBackup, getLastBackup } from '../../lib/backup';
 import controls from '../../styles/controls.module.css';
@@ -21,10 +24,15 @@ function idleLabel(minutes: number): string {
   return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
 }
 
-/** Settings → Security: PIN, auto-lock, vault mode and encrypted backups. */
+/**
+ * Settings → Security: PIN, auto-lock, users, vault mode and encrypted backups. A clerk or viewer
+ * (6.21) sees only their own PIN, "Lock now" and what their role allows.
+ */
 export function SecurityPanel({ notify, onLock }: Props) {
   const [pinOpen, setPinOpen] = useState(false);
   const [idle, setIdle] = useState(getIdleTimeout);
+  const { can, role, actor } = useCan();
+  const manage = can('security.manage');
 
   const last = getLastBackup();
   const days = daysSinceBackup();
@@ -40,7 +48,7 @@ export function SecurityPanel({ notify, onLock }: Props) {
         <div className={surface.cardBody}>
           <div className={styles.rowBetween}>
             <div className={styles.rowText}>
-              <strong>PIN</strong>
+              <strong>{manage ? 'PIN' : `Your PIN${actor ? ` (${actor.name})` : ''}`}</strong>
               <span>Stored only as a salted PBKDF2 hash. Five wrong attempts trigger a temporary lock that doubles each time.</span>
             </div>
             <button type="button" className={controls.btnOutline} onClick={() => setPinOpen(true)}>
@@ -48,6 +56,8 @@ export function SecurityPanel({ notify, onLock }: Props) {
             </button>
           </div>
 
+          {manage && (
+          <>
           <hr className={styles.divider} />
 
           <div className={styles.rowBetween}>
@@ -73,6 +83,8 @@ export function SecurityPanel({ notify, onLock }: Props) {
               </select>
             </div>
           </div>
+          </>
+          )}
 
           <hr className={styles.divider} />
 
@@ -96,8 +108,31 @@ export function SecurityPanel({ notify, onLock }: Props) {
         </div>
       </section>
 
-      <VaultPanel notify={notify} />
+      {!manage && (
+        <section className={surface.card}>
+          <div className={surface.cardHead}>
+            <span className={surface.cardHeadIcon}>
+              <ShieldCheck size={16} /> Your role: {ROLE_LABELS[role]}
+            </span>
+          </div>
+          <div className={surface.cardBody}>
+            <p className={surface.sectionNote}>{ROLE_HINTS[role]}</p>
+            <div className={styles.note} role="note">
+              <Info size={16} aria-hidden="true" />
+              <span>
+                The owner manages users, PINs, vault mode and backups. Roles are a convenience on a shared device, not security.
+                Forgot your PIN? The owner can set a new one.
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
+      {manage && <UsersPanel notify={notify} />}
+
+      {manage && <VaultPanel notify={notify} />}
+
+      {can('data.backup') && (
       <section className={surface.card}>
         <div className={surface.cardHead}>
           <span className={surface.cardHeadIcon}>
@@ -115,6 +150,7 @@ export function SecurityPanel({ notify, onLock }: Props) {
           <EncryptedBackup notify={notify} />
         </div>
       </section>
+      )}
 
       <ChangePinModal open={pinOpen} onClose={() => setPinOpen(false)} onChanged={() => notify('PIN changed')} />
     </div>

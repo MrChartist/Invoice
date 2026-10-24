@@ -12,7 +12,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   keep their synchronous signatures and serve that map. Without IndexedDB (Node tests, some private modes, or
   before the first successful move) the same functions talk to localStorage exactly as before.
 - **Keys.** Every key name is unchanged; values are the same JSON strings. Device-local keys (`DEVICE_LOCAL_KEYS`
-  in `storage.ts`: PIN credential, lockout guard, idle timeout, session, `last_backup`, `storage_backend`) and the
+  in `storage.ts`: PIN credential, lockout guard, local users `auth_users` + their lockouts `auth_guard_users` (6.21),
+  idle timeout, session, `last_backup`, `storage_backend`) and the
   non-prefixed `theme` always stay in localStorage. Modules must not touch `localStorage` directly for app data.
 - **Write-through.** A write updates the map at once and is queued; the queue commits in one IndexedDB
   transaction on the next task, and immediately on `pagehide` / `visibilitychange: hidden`. Paths that reload

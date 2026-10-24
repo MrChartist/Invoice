@@ -17,6 +17,7 @@ import type {
 } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { localDayOf } from './dates';
+import { requireAccess } from './access';
 import {
   DuplicateNumberError,
   findNumberClash,
@@ -83,6 +84,11 @@ export interface AppSettings {
 
 export const DEFAULT_TERMS =
   'Payment due within 14 days of the invoice date. Please quote the invoice number with your payment.';
+
+/** A document counts as issued once it has left Draft (6.21: only the owner may delete one). */
+export function isIssued(inv: Pick<InvoiceRecord, 'status'>): boolean {
+  return inv.status !== 'Draft';
+}
 
 export function blankProfile(): SenderProfile {
   return {
@@ -255,6 +261,7 @@ export const localDb = {
       return id;
     },
     remove: (id: string) => {
+      requireAccess('master.edit');
       const all = getTable<Client>(KEYS.clients);
       const gone = all.find((c) => c.id === id);
       setTable(KEYS.clients, all.filter((c) => c.id !== id));
@@ -349,6 +356,8 @@ export const localDb = {
       const invoices = getTable<InvoiceRecord>(KEYS.invoices);
       const idx = invoices.findIndex((i) => i.id === invoice.id);
       const stored = idx >= 0 ? invoices[idx] : undefined;
+      // Local roles (6.21): a viewer cannot write documents.
+      requireAccess(stored ? 'doc.edit' : 'doc.create');
       const now = new Date().toISOString();
       const toSave: InvoiceRecord = { ...invoice, updated_at: now };
 
@@ -417,6 +426,8 @@ export const localDb = {
     remove: (id: string) => {
       const all = getTable<InvoiceRecord>(KEYS.invoices);
       const stored = all.find((i) => i.id === id);
+      // Local roles (6.21): only the owner deletes an issued document; a clerk may delete drafts.
+      if (stored) requireAccess(isIssued(stored) ? 'doc.deleteIssued' : 'doc.deleteDraft');
       const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
       const payments = getTable<Payment>(KEYS.transactions);
       const mine = payments.filter((t) => t.invoice_id === id).length;
@@ -430,6 +441,7 @@ export const localDb = {
       const invoices = getTable<InvoiceRecord>(KEYS.invoices);
       const idx = invoices.findIndex((i) => i.id === id);
       if (idx < 0) return;
+      requireAccess('doc.edit');
       const before = invoices[idx];
       const action: LockAction =
         status === 'Cancelled' && before.status !== 'Cancelled'
@@ -486,6 +498,7 @@ export const localDb = {
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
     record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string }): Payment => {
+      requireAccess('payment.record');
       const amount = round2(Number(input.amount) || 0);
       // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
       if (!(amount > 0)) throw new Error('Enter a payment amount above zero.');
@@ -563,6 +576,7 @@ export const localDb = {
       const rows = getTable<Payment>(KEYS.transactions);
       const row = rows.find((t) => t.id === paymentId);
       if (!row) return;
+      requireAccess('payment.record');
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
       const overridden = target ? assertUnlocked(target, 'unpay') === 'overridden' : false;
       setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));

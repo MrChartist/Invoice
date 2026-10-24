@@ -10,7 +10,8 @@ No network, no dependencies — only WebCrypto (`crypto.subtle`).
 | `src/lib/auth.ts` | credential record, session, lockout, `changePin`, idle timeout, `resetAllData` |
 | `src/lib/backup.ts` | `buildEncryptedBackup`, `decryptBackup`, `isEncryptedBackup`, `markBackupDone`, `getLastBackup`, `daysSinceBackup` |
 | `src/pages/LoginPage.tsx` | login / register (with confirm + strength hint) / lockout countdown / forgot-PIN wipe |
-| `src/components/security/` | `SecurityPanel`, `ChangePinModal`, `EncryptedBackup`, `IdleLock` |
+| `src/components/security/` | `SecurityPanel`, `ChangePinModal`, `EncryptedBackup`, `IdleLock`, `UsersPanel`, `RequireAccess` |
+| `src/lib/access.ts`, `src/lib/users.ts` | local user roles (6.21) — see § Local user roles |
 
 ## Behaviour changes the lead must know
 1. **`login` and `verifyPin` are now async** (hashing is async). `isAuthenticated()`, `getUser()` and `logout()` stay synchronous with the same signatures.
@@ -121,6 +122,96 @@ Optional, Settings → Security → **Vault mode**. Protects the stored data its
 - **Limits.** Not a defence against malware or someone using the unlocked app; data is decrypted in memory while the
   tab is open. Passphrase attempts are not rate-limited beyond the cost of PBKDF2 (an attacker with a copy of the
   data can guess offline, so use a long passphrase; the minimum is 10 characters). Needs IndexedDB and a secure page.
+
+## Local user roles (roadmap 6.21)
+
+**Convenience access control on a shared device, not security.** Everything runs in one browser profile: anyone
+with the device and the browser's developer tools can read or change the stored data, or skip these checks. Roles
+stop a colleague from deleting an issued invoice or erasing the books by mistake. Real protection is vault mode
+(the data is encrypted at rest) and a separate operating-system account per person. The UI says so in Settings →
+Security.
+
+### Roles
+| action (`AccessAction`) | owner | clerk | viewer |
+|---|---|---|---|
+| `view` — screens, print / download a document PDF | ✓ | ✓ | ✓ |
+| `report.export` — CSV / Excel / GST working papers | ✓ | ✓ | ✓ |
+| `doc.create`, `doc.edit` — new / edit / convert / cancel documents | ✓ | ✓ | |
+| `doc.deleteDraft` — delete a Draft | ✓ | ✓ | |
+| `doc.deleteIssued` — delete anything that left Draft | ✓ | | |
+| `payment.record` — record / remove payments, bulk mark paid | ✓ | ✓ | |
+| `master.edit` — clients, items, vendors | ✓ | ✓ | |
+| `books.edit` — purchases, expenses, vouchers, cheques, recurring, time, reconcile | ✓ | ✓ | |
+| `settings.manage` — business profiles, custom fields, defaults, lock date, Design studio, add / rename / delete companies | ✓ | | |
+| `security.manage` — users, idle timeout, vault mode | ✓ | | |
+| `data.backup` — download a full backup, encrypted export | ✓ | | |
+| `data.restore`, `data.erase` | ✓ | | |
+| `period.override` — unlock a locked document / move the lock date earlier | ✓ | | |
+
+Decisions: a clerk cannot download full backups (a backup is every table, so it is an owner decision); automatic
+folder backups the owner set up keep running whoever is signed in, because they go to the owner's folder. There is
+exactly one owner (the account in `mrchartist_inv_auth`); added users are clerks or viewers and the owner can switch
+them. A clerk may delete purchases / expenses / vouchers they can edit (only issued *sales* documents are protected).
+Users are device-wide (the PIN screen comes before any company is opened): every role may switch between companies
+(6.20), only the owner creates, renames or deletes them.
+
+### Files
+| file | role |
+|---|---|
+| `src/lib/access.ts` | role matrix (`roleCan`), `can(action)`, `requireAccess(action)` → `AccessDeniedError` (`code: 'ACCESS_DENIED'`), labels. Imports nothing, so the data layer can use it without cycles. |
+| `src/lib/auth.ts` | users list, per-user PIN check and lockout, session → current user (`getCurrentUser`), registers the actor for `access.ts` |
+| `src/lib/users.ts` | owner-only `addUser`, `setUserRole`, `resetUserPin`, `removeUser` (audited; loaded with the Settings chunk) |
+| `src/hooks/useCan.ts` | `useCan()` → `{ can, role, actor }` for screens |
+| `src/components/security/RequireAccess.tsx` | route guard: redirects with a message shown as a toast by `DashboardLayout` |
+| `src/components/security/UsersPanel.tsx` | Settings → Security → Users on this device |
+
+### Storage and migration
+- `mrchartist_inv_auth` keeps its name and shape: it is the **owner**. Legacy `{name, pin}` and older hashes still
+  unlock and are upgraded exactly as before; additive fields on the record are preserved on re-hash / PIN change.
+- New device-local keys (in `DEVICE_LOCAL_KEYS`, so never exported, imported, wiped by Erase, or encrypted by vault
+  mode): `mrchartist_inv_auth_users` — `[{id, name, role: 'clerk'|'viewer', createdAt, v: 2, kdf, iter, salt, hash}]`
+  (PBKDF2-SHA-256 at the same 600k iterations as the owner); `mrchartist_inv_auth_guard_users` — `{userId: GuardState}`.
+  A stored role other than `clerk` reads as `viewer`; an "owner" in that list is never honoured.
+- Session (`sessionStorage`): `'1'` = owner (what older builds wrote, so an open tab stays signed in after the
+  upgrade), `'u:<id>'` = another user. Only the id is stored; name and role are read from the users list each time,
+  so a role change applies at once and a removed user is signed out on the next check.
+- With no session (single-user installs before the PIN screen, boot code, tests) every check passes, as before.
+- Registering a fresh owner (after Forgot PIN) clears any users left behind. The owner's Forgot PIN still erases
+  everything (users included); a clerk / viewer who forgets their PIN is pointed to the owner, who resets it in
+  Settings → Security (this also lifts that user's lockout). Nothing is erased.
+
+### Login
+With more than one user a **User** picker appears (owner selected by default), then the PIN. **Lockout is per user**
+(same 5 attempts → 30 s doubling to 1 h): the owner keeps `auth_guard`, others live in `auth_guard_users`, so a
+clerk mistyping cannot lock the owner out. Idle lock and the all-tab lock are unchanged (locking ends whoever's
+session it is).
+
+### Enforcement
+- **Screens:** navigation (New invoice, Recurring, Time, Reconcile, Cheques, Design studio), the mobile "New" tab, command
+  palette actions, Dashboard / Transactions / Receivables / Clients / Expenses create buttons, Transactions Edit /
+  Duplicate / Record payment / Delete (issued only for the owner; bulk Delete needs every selected row deletable),
+  Settings tabs (clerk: Items, Activity, Security; viewer: Activity, Security), the period-lock "Unlock with PIN"
+  banner button, the backup nudge, the setup wizard and checklist.
+- **Routes:** `/invoice` (`doc.create`) and `/invoice/:id` (`doc.edit`) send a viewer to `/transactions` (preview /
+  PDF live there); `/recurring`, `/time`, `/reconcile`, `/cheques` need `books.edit`; `/design` needs `settings.manage`.
+- **Data layer** (so the command palette or a missed button cannot get round it): `localDb.invoices.save / setStatus
+  / remove` (issued vs draft), `localDb.payments.record / remove`, `localDb.clients.remove`, `purchasesDb.save /
+  remove`, purchase `paymentsDb.record / remove`, `saveVoucher` / `deleteVoucher`, `saveCheque` / `deleteCheque` / `transitionCheque`, `vendorsDb.remove`,
+  `createCompany` / `renameCompany` / `deleteCompany`,
+  `restoreBackup`, `applyBackup`, `wipeAppData`, `downloadBackupNow`, `grantOverride` (period lock; also verifies the
+  signed-in user's PIN). The viewer's recurring runner does not generate invoices.
+
+### Audit
+`AuditEntry.by` (additive) holds the signed-in user's name, set by `audit.record` from `currentActor()`. It is part
+of the hashed row, so the chain verifies and rewriting who did something breaks it; older rows simply have no `by`.
+Shown in Settings → Activity, the document timeline and the CSV export (new last column `By`). Adding / removing a
+user, changing a role and resetting a PIN are logged (never the PIN).
+
+### Known gaps
+Some secondary controls (e.g. on Inventory and Books tabs) are still visible to a viewer; the data-layer guards above
+refuse the writes that matter, others (stock adjustments, catalogue edits) are not guarded. Settings saves are hidden
+from non-owners but not refused in `localDb.settings.save` (setup and GST-frequency flows call it). Tests:
+`tests/roles.test.ts`, e2e step "local roles" in `tests/e2e/smoke.mjs`.
 
 ## Review fixes (Phase 4)
 

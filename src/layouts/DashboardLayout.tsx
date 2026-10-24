@@ -44,7 +44,10 @@ import { TimerPill } from '../components/time/TimerPill';
 import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
 import { cn } from '../lib/utils';
-import { getUser, logout } from '../lib/auth';
+import { getCurrentUser, getUser, logout } from '../lib/auth';
+import { ROLE_LABELS, type AccessAction } from '../lib/access';
+import { useCan } from '../hooks/useCan';
+import type { DeniedState } from '../components/security/RequireAccess';
 import { useTheme } from '../hooks/useTheme';
 import styles from './DashboardLayout.module.css';
 
@@ -60,6 +63,8 @@ interface NavEntry {
   end?: boolean;
   /** Overrides route matching, e.g. editing an existing invoice belongs under "Invoices". */
   match?: (pathname: string) => boolean;
+  /** Local roles (6.21): hidden unless the signed-in user may do this. */
+  need?: AccessAction;
 }
 
 const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
@@ -67,11 +72,11 @@ const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
   {
     title: 'Sales',
     items: [
-      { label: 'New invoice', path: '/invoice', icon: FilePlus2, end: true },
+      { label: 'New invoice', path: '/invoice', icon: FilePlus2, end: true, need: 'doc.create' },
       { label: 'Invoices', path: '/transactions', icon: FileText, match: (p) => p.startsWith('/transactions') || /^\/invoice\/.+/.test(p) },
       { label: 'Clients', path: '/clients', icon: Users },
-      { label: 'Recurring', path: '/recurring', icon: Repeat },
-      { label: 'Time', path: '/time', icon: Timer },
+      { label: 'Recurring', path: '/recurring', icon: Repeat, need: 'books.edit' },
+      { label: 'Time', path: '/time', icon: Timer, need: 'books.edit' },
       { label: 'Receivables', path: '/receivables', icon: Scale },
     ],
   },
@@ -86,8 +91,8 @@ const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
     title: 'Accounts & GST',
     items: [
       { label: 'Books', path: '/books', icon: BookOpen },
-      { label: 'Reconcile', path: '/reconcile', icon: Landmark },
-      { label: 'Cheques', path: '/cheques', icon: Banknote },
+      { label: 'Reconcile', path: '/reconcile', icon: Landmark, need: 'books.edit' },
+      { label: 'Cheques', path: '/cheques', icon: Banknote, need: 'books.edit' },
       { label: 'Reports', path: '/reports', icon: BarChart3 },
       { label: 'GST reports', path: '/gst-reports', icon: FileSpreadsheet },
       { label: 'Exports', path: '/exports', icon: FileDown },
@@ -95,7 +100,7 @@ const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
   },
   {
     title: 'Setup',
-    items: [{ label: 'Design studio', path: '/design', icon: Palette }],
+    items: [{ label: 'Design studio', path: '/design', icon: Palette, need: 'settings.manage' }],
   },
 ];
 
@@ -107,7 +112,15 @@ const NAV_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), SETTINGS_ENTRY];
 export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const user = getUser();
+  // Local roles (6.21): the signed-in user (owner, clerk or viewer); the owner record for older sessions.
+  const current = getCurrentUser();
+  const user = current ?? getUser();
+  const { can, role } = useCan();
+  const navGroups = useMemo(
+    () => NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !i.need || can(i.need)) })).filter((g) => g.items.length > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [role],
+  );
   const { theme, toggle } = useTheme();
   const { notify, toastNode } = useToast();
   const [helpOpen, setHelpOpen] = useState(false);
@@ -201,6 +214,14 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     [notify],
   );
 
+  // A route refused for this role (RequireAccess) says why.
+  const denied = (location.state as DeniedState | null)?.denied;
+  useEffect(() => {
+    if (!denied) return;
+    notify(denied, 'error');
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [denied]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Recurring schedules create their due invoices once per session start / tab focus.
   const { generated, dismiss, message } = useRecurringRunner();
   useEffect(() => {
@@ -227,17 +248,17 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   });
 
   const actions = useMemo<PaletteAction[]>(
-    () => [
-      { id: 'new-invoice', title: 'New invoice', keywords: ['create', 'bill', 'sale'], run: () => navigate('/invoice') },
-      { id: 'new-quotation', title: 'New quotation', keywords: ['estimate', 'quote'], run: () => navigate('/invoice?type=QUOTATION') },
-      { id: 'new-sales-order', title: 'New sales order', keywords: ['order', 'so', 'booking'], run: () => navigate('/invoice?type=SALES_ORDER') },
+    () => ([
+      { id: 'new-invoice', title: 'New invoice', keywords: ['create', 'bill', 'sale'], run: () => navigate('/invoice'), need: 'doc.create' },
+      { id: 'new-quotation', title: 'New quotation', keywords: ['estimate', 'quote'], run: () => navigate('/invoice?type=QUOTATION'), need: 'doc.create' },
+      { id: 'new-sales-order', title: 'New sales order', keywords: ['order', 'so', 'booking'], run: () => navigate('/invoice?type=SALES_ORDER'), need: 'doc.create' },
       { id: 'sales-orders', title: 'Open sales orders', keywords: ['order', 'pending', 'backorder'], run: () => navigate('/transactions?type=SALES_ORDER') },
       { id: 'purchase-orders', title: 'Purchase orders', keywords: ['po', 'order', 'vendor', 'supplier'], run: () => navigate('/expenses?tab=orders') },
-      { id: 'add-client', title: 'Add client', keywords: ['customer', 'party'], run: () => navigate('/clients?new=1') },
-      { id: 'add-expense', title: 'Add expense or purchase bill', keywords: ['bill', 'vendor'], run: () => navigate('/expenses') },
-      { id: 'record-payment', title: 'Record a payment', keywords: ['receipt', 'received'], run: () => navigate('/transactions?filter=unpaid&pay=1') },
+      { id: 'add-client', title: 'Add client', keywords: ['customer', 'party'], run: () => navigate('/clients?new=1'), need: 'master.edit' },
+      { id: 'add-expense', title: 'Add expense or purchase bill', keywords: ['bill', 'vendor'], run: () => navigate('/expenses'), need: 'books.edit' },
+      { id: 'record-payment', title: 'Record a payment', keywords: ['receipt', 'received'], run: () => navigate('/transactions?filter=unpaid&pay=1'), need: 'payment.record' },
       { id: 'gst', title: 'Open GST reports', keywords: ['gstr', 'return'], run: () => navigate('/gst-reports') },
-      { id: 'brs', title: 'Bank reconciliation statement', keywords: ['bank', 'brs', 'reconcile', 'statement'], run: () => navigate('/reconcile?tab=brs') },
+      { id: 'brs', title: 'Bank reconciliation statement', keywords: ['bank', 'brs', 'reconcile', 'statement'], run: () => navigate('/reconcile?tab=brs'), need: 'books.edit' },
       { id: 'top-customers', title: 'Top customers report', keywords: ['sales', 'customers', 'concentration'], run: () => navigate('/reports?tab=top') },
       { id: 'settings', title: 'Go to Settings', run: () => navigate('/settings') },
       { id: 'theme', title: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', keywords: ['dark', 'light', 'theme'], run: toggle },
@@ -245,6 +266,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         id: 'backup',
         title: 'Download backup',
         keywords: ['export', 'save'],
+        need: 'data.backup',
         run: async () => {
           // Same path as Settings → Automatic backups, so a stored backup passphrase is honoured.
           const { downloadBackupNow } = await import('../lib/auto-backup');
@@ -253,9 +275,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         },
       },
       { id: 'lock', title: 'Lock app', run: handleLock },
-    ],
+    ] as Array<PaletteAction & { need?: AccessAction }>)
+      // Local roles (6.21): the palette offers only what this role may do.
+      .filter((a) => !a.need || can(a.need))
+      .map(({ need: _need, ...a }) => a),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [navigate, theme],
+    [navigate, theme, role],
   );
 
   const themeLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
@@ -303,7 +328,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         <CompanySwitcher />
 
         <nav className={styles.nav} aria-label="Primary">
-          {NAV_GROUPS.map((group, gi) => (
+          {navGroups.map((group, gi) => (
             <div key={group.title ?? gi} className={styles.group}>
               {group.title && <div className={styles.groupTitle}>{group.title}</div>}
               {group.items.map((item) => (
@@ -349,7 +374,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <Avatar name={user?.name || 'User'} size={34} />
             <div className={styles.userMeta}>
               <span className={styles.userName}>{user?.name || 'User'}</span>
-              <span className={styles.userSub}>Stored on this device</span>
+              <span className={styles.userSub}>
+                {!current || current.role === 'owner' ? 'Stored on this device' : `${ROLE_LABELS[current.role]} · shared device`}
+              </span>
             </div>
             <button type="button" className={styles.iconBtn} onClick={handleLock} aria-label="Lock app" title="Lock app">
               <Lock size={16} />
@@ -381,7 +408,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         </div>
         <div className={styles.content} key={`${location.pathname.startsWith('/invoice') ? 'invoice' : location.pathname}#${refreshKey}`}>
           <CrossTabNotice onRefresh={() => setRefreshKey((k) => k + 1)} />
-          <BackupNudge onResult={(r) => notify(r.ok ? `Backup saved (${r.filename})` : r.message, r.ok ? 'success' : 'error')} />
+          {can('data.backup') && <BackupNudge onResult={(r) => notify(r.ok ? `Backup saved (${r.filename})` : r.message, r.ok ? 'success' : 'error')} />}
           <Outlet />
         </div>
       </main>
@@ -396,10 +423,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <FileText size={20} aria-hidden="true" />
             <span>Invoices</span>
           </NavLink>
-          <Link to="/invoice" className={cn(styles.tab, styles.tabNew)} aria-label="New invoice">
-            <FilePlus2 size={22} aria-hidden="true" />
-            <span>New</span>
-          </Link>
+          {can('doc.create') && (
+            <Link to="/invoice" className={cn(styles.tab, styles.tabNew)} aria-label="New invoice">
+              <FilePlus2 size={22} aria-hidden="true" />
+              <span>New</span>
+            </Link>
+          )}
           <NavLink to="/clients" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
             <Users size={20} aria-hidden="true" />
             <span>Clients</span>
@@ -420,7 +449,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           <CommandPalette
             open={paletteOpen}
             onClose={() => setPaletteOpen(false)}
-            navItems={NAV_ITEMS.map((n) => ({ label: n.label, to: n.path, icon: n.icon }))}
+            navItems={NAV_ITEMS.filter((n) => !n.need || can(n.need)).map((n) => ({ label: n.label, to: n.path, icon: n.icon }))}
             actions={actions}
             onNavigate={navigate}
           />

@@ -6,6 +6,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
+import { can } from '../lib/access';
 import { createLateFeeInvoice, describeClientLateFee, lateFeeRuleFor, type ClientLateFee } from '../lib/late-fee';
 import {
   AGING_BUCKETS, agingCsv, buildLedger, buildReceivables, buildStatementText, computeDso,
@@ -113,7 +114,7 @@ export function Receivables() {
             icon={Scale}
             title="Nothing to reconcile yet"
             text="Issue an invoice to a client and record payments against it. Outstanding balances, aging and client statements appear here automatically."
-            action={<Link to="/invoice" className={`${controls.btn} ${controls.btnPrimary}`}>Create invoice</Link>}
+            action={can('doc.create') ? <Link to="/invoice" className={`${controls.btn} ${controls.btnPrimary}`}>Create invoice</Link> : undefined}
           />
         </div>
       </div>

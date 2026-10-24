@@ -63,6 +63,11 @@ export interface AuditEntry {
   /** Owning document id for rows that hang off one (payments). */
   parent_id?: string;
   /**
+   * Name of the local user signed in when the change was made (6.21). Covered by `hash`.
+   * Absent on older rows, on rows written before anyone signed in, and on integrity anchors.
+   */
+  by?: string;
+  /**
    * Tamper evidence (4.5). `prev` is the previous row's `hash` (or `AUDIT_GENESIS` for the first row);
    * `hash` is SHA-256 over the canonical form of every other field of this row, `prev` included.
    * Absent on rows written before 4.5 (the legacy segment).

@@ -217,7 +217,7 @@ test('filterAudit by entity, action, date range and text; CSV export escapes and
 
   const csv = auditToCsv(entries);
   const lines = csv.split('\r\n');
-  assert.equal(lines[0], 'When,Entity,Action,Document,Summary,Field,From,To');
+  assert.equal(lines[0], 'When,Entity,Action,Document,Summary,Field,From,To,By');
   assert.ok(lines[1].includes('Total'));
   assert.ok(!lines.some((l) => /(^|,)=HYPERLINK/.test(l)), 'formula injection is neutralised');
 });
