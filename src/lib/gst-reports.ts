@@ -24,6 +24,7 @@ import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, nu
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
 import { isVoidStatus, pickNum, readPurchase } from './purchase-normalize';
+import { b2clThreshold, b2clThresholdLabel } from './tax-rules';
 
 /* ───────────────────────── Period ───────────────────────── */
 
@@ -120,6 +121,7 @@ export function toGstnDate(iso: string): string {
 
 /* ───────────────────────── Types ───────────────────────── */
 
+/** @deprecated B2CL threshold is date-dependent — use `b2clThreshold(date)` from `tax-rules`. Kept for the pre-Aug-2024 value. */
 export const B2CL_THRESHOLD = 250000;
 
 export type Severity = 'error' | 'warning' | 'info';
@@ -657,7 +659,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
         if (d.isNote) cdnr.push({ ...row, noteType: 'C' });
         else b2b.push(row);
       }
-    } else if (d.supply === 'INTER' && d.value > B2CL_THRESHOLD) {
+    } else if (d.supply === 'INTER' && d.value > b2clThreshold(d.date)) {
       if (items.length > 0) {
         if (d.isNote) cdnur.push({ ...row, noteType: 'C', unregType: 'B2CL' });
         else b2cl.push(row);
@@ -667,7 +669,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
           id: `B2CL_REVIEW:${d.rec.id}`,
           severity: 'warning',
           code: 'B2CL_REVIEW',
-          message: `${label}: inter-state sale of ${d.value.toFixed(2)} to an unregistered buyer (above ₹2.5 lakh) is reported as B2CL. If the buyer has a GSTIN, add it so this moves to B2B.`,
+          message: `${label}: inter-state sale of ${d.value.toFixed(2)} to an unregistered buyer (above ${b2clThresholdLabel(d.date)}) is reported as B2CL. If the buyer has a GSTIN, add it so this moves to B2B.`,
           invoiceId: d.rec.id,
           invoiceNumber: d.number,
           link: '/clients',

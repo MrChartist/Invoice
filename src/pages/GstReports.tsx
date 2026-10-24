@@ -163,7 +163,7 @@ export function GstReports() {
       case 'b2b':
         return <DataTable columns={docCols()} rows={g1.b2b} rowKey={(r) => r.invoiceId} caption="B2B invoices" emptyText="No invoices to registered businesses in this period." />;
       case 'b2cl':
-        return <DataTable columns={docCols()} rows={g1.b2cl} rowKey={(r) => r.invoiceId} caption="B2CL invoices" emptyText="No inter-state invoices above ₹2.5 lakh to unregistered buyers." />;
+        return <DataTable columns={docCols()} rows={g1.b2cl} rowKey={(r) => r.invoiceId} caption="B2CL invoices" emptyText="No large inter-state invoices to unregistered buyers." />;
       case 'cdnr':
         return <DataTable columns={docCols(true)} rows={g1.cdnr} rowKey={(r) => r.invoiceId} caption="Credit notes to registered persons" emptyText="No credit notes to registered persons." />;
       case 'cdnur': {
@@ -326,7 +326,7 @@ export function GstReports() {
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
         <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
         <span>
-          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; composition, ISD, imports, e-commerce (TCS), amendments and interest/late fee are not handled. B2CL threshold is ₹2.5 lakh. JSON follows the GST offline-tool layout but is not schema-validated against the portal.
+          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; composition, ISD, imports, e-commerce (TCS), amendments and interest/late fee are not handled. B2CL threshold is ₹1 lakh for invoices from 1 Aug 2024 (₹2.5 lakh before). JSON follows the GST offline-tool layout but is not schema-validated against the portal.
         </span>
       </div>
 

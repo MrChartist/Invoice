@@ -7,6 +7,8 @@
  * them would orphan every existing user's data.
  */
 
+import { tdsSections, tcsPresets, type TdsSection, type TcsPreset } from '../lib/tax-rules';
+
 export type DocumentType =
   | 'INVOICE'
   | 'TAX_INVOICE'
@@ -79,8 +81,8 @@ export const UNITS = [
   'NOS', 'PCS', 'HRS', 'DAY', 'MONTH', 'SET', 'KG', 'LTR', 'MTR', 'SQF', 'BOX', 'LOT',
 ] as const;
 
-/** GST slabs used in India. 0 doubles as exempt/nil-rated for this tool. */
-export const GST_SLABS = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28] as const;
+/** GST slabs used in India (see `src/lib/tax-rules.ts`). */
+export { GST_SLABS } from '../lib/tax-rules';
 
 export const SUPPLY_TYPE_LABELS: Record<SupplyType, string> = {
   B2B: 'B2B (regular)',
@@ -92,25 +94,9 @@ export const SUPPLY_TYPE_LABELS: Record<SupplyType, string> = {
   DEEMED_EXPORT: 'Deemed export',
 };
 
-/** Common TDS sections a customer may deduct from a payment. */
-export const TDS_SECTIONS: { section: string; label: string; rate: number }[] = [
-  { section: '194C-1', label: '194C Contractor (individual/HUF) 1%', rate: 1 },
-  { section: '194C-2', label: '194C Contractor (others) 2%', rate: 2 },
-  { section: '194H', label: '194H Commission / brokerage 5%', rate: 5 },
-  { section: '194I-A', label: '194I Rent (plant/machinery) 2%', rate: 2 },
-  { section: '194I-B', label: '194I Rent (land/building) 10%', rate: 10 },
-  { section: '194J-T', label: '194J Technical services 2%', rate: 2 },
-  { section: '194J', label: '194J Professional fees 10%', rate: 10 },
-  { section: '194Q', label: '194Q Purchase of goods 0.1%', rate: 0.1 },
-  { section: 'CUSTOM', label: 'Custom rate', rate: 0 },
-];
-
-/** Common TCS rates. */
-export const TCS_PRESETS: { label: string; rate: number }[] = [
-  { label: '206C(1H) sale of goods 0.1%', rate: 0.1 },
-  { label: '206C(1H) no PAN 1%', rate: 1 },
-  { label: '206C(1G) overseas remittance 20%', rate: 20 },
-];
+/** TDS sections / TCS presets in force today. Use `tdsSections(date)` / `tcsPresets(date)` for a document date. */
+export const TDS_SECTIONS: TdsSection[] = tdsSections();
+export const TCS_PRESETS: TcsPreset[] = tcsPresets();
 
 export interface InvoiceItem {
   id: string;

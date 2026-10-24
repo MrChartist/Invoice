@@ -2,11 +2,10 @@ import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency } from '../../lib/utils';
 import {
   SUPPLY_TYPE_LABELS,
-  TCS_PRESETS,
-  TDS_SECTIONS,
   type RoundMode,
   type SupplyType,
 } from '../../types/invoice';
+import { tcsPresets, tdsSections } from '../../lib/tax-rules';
 import styles from './AdvancedTaxPanel.module.css';
 
 const ROUND_LABELS: Record<RoundMode, string> = {
@@ -26,6 +25,8 @@ export function AdvancedTaxPanel() {
   const money = (n: number) => formatCurrency(n, s.currency);
   const roundMode: RoundMode = s.round_mode ?? (s.round_off_enabled ? 'nearest' : 'none');
   const t = s.totals;
+  const TCS_PRESETS = tcsPresets(s.issue_date);
+  const TDS_SECTIONS = tdsSections(s.issue_date);
   const active =
     s.tcs_enabled || s.tds_enabled || s.price_includes_tax || (s.supply_type ?? 'B2B') !== 'B2B';
 

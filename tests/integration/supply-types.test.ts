@@ -115,7 +115,22 @@ test('inter-state B2B: IGST only, b2b section, 3B IGST head', () => {
   assertCrossModule(inv, 'inter');
 });
 
-test('B2C placement: B2CL above 2.5 lakh inter-state, otherwise B2CS (intra and inter)', () => {
+test('B2CL threshold follows the issue date: ₹1 lakh from Aug 2024, ₹2.5 lakh before', () => {
+  const retailKA = { ...clientRetail, id: 'r-ka', name: 'Retail KA', state_code: '29' };
+  // 100 x 1,000 = 1,00,000 + 18% = 1,18,000: above ₹1L, below ₹2.5L
+  const now = mk({ client: retailKA, lines: [{ qty: 100, rate: 1000, tax: 18 }] });
+  assert.equal(now.total, 118000);
+  const rn = gst(now);
+  assert.equal(rn.gstr1.b2cl.length, 1);
+  assert.equal(rn.gstr1.b2cs.length, 0);
+
+  const old = mk({ client: retailKA, date: '2024-07-15', lines: [{ qty: 100, rate: 1000, tax: 18 }] });
+  const ro = buildGstReport([old], [], { period: { kind: 'month', fyStart: 2024, month: 7 }, gstin: SELLER_GSTIN });
+  assert.equal(ro.gstr1.b2cl.length, 0);
+  assert.equal(ro.gstr1.b2cs.length, 1);
+});
+
+test('B2C placement: B2CL above the threshold inter-state, otherwise B2CS (intra and inter)', () => {
   const retailKA = { ...clientRetail, id: 'r-ka', name: 'Retail KA', state_code: '29' };
   // 250 x 1,000 = 250,000 + 18% = 295,000 > 2,50,000, unregistered, inter-state -> B2CL
   const big = mk({ client: retailKA, lines: [{ qty: 250, rate: 1000, tax: 18 }] });

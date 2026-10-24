@@ -8,6 +8,7 @@
 
 import type { Client, InvoiceItem, InvoiceRecord, SenderProfile } from '../types/invoice';
 import { checkGstin } from './gstin';
+import { GST_SLABS } from './tax-rules';
 import { INDIAN_STATES, stateByCode } from './india-states';
 import { calculateInvoice, deriveGstMode, round2 } from './invoice-calc';
 import { writeCsv } from './csv';
@@ -516,7 +517,7 @@ function buildItemRecord(row: string[], ctx: RowCtx): CatalogDraft | null {
   const tax = readNumber(ctx, 'items', c('tax_rate'), 'tax_rate', { min: 0, max: 100 });
   if (tax !== undefined) {
     rec.tax_rate = tax;
-    if (![0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28].includes(tax)) {
+    if (!GST_SLAB_LIST.includes(tax)) {
       warn(ctx, 'tax_rate', `GST ${tax}% is not a standard slab`);
     }
   }
@@ -544,7 +545,7 @@ function findItem(items: InvoiceItem[], name: string, hsn: string): InvoiceItem 
    Invoices
    ══════════════════════════════════════════════════════════════ */
 
-const GST_SLAB_LIST = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28];
+const GST_SLAB_LIST: readonly number[] = GST_SLABS;
 
 function snapSlab(rate: number): number {
   for (const s of GST_SLAB_LIST) if (Math.abs(s - rate) <= 0.15) return s;
