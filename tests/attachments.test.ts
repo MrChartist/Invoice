@@ -27,7 +27,8 @@ import {
   validateUpload,
   bytesToBase64,
 } from '../src/lib/attachments.ts';
-import { DB_PREFIX, SINGLETON_KEYS, flushStorage, initStorage, resetStorageBackend, setJson } from '../src/lib/storage.ts';
+import { DB_PREFIX, SINGLETON_KEYS, enableVault, flushStorage, initStorage, resetStorageBackend, setJson } from '../src/lib/storage.ts';
+import { isSealed } from '../src/lib/vault.ts';
 import { DATA_STORE, resetIdbConnection } from '../src/lib/idb-kv.ts';
 import { buildBackup, parseBackup, restoreBackup, wipeAppData, attachmentRestoreNote } from '../src/lib/backup.ts';
 import { RESET_PHRASE, resetAllData } from '../src/lib/auth.ts';
@@ -302,6 +303,26 @@ test('with the IndexedDB cache, files are listed from the cache and committed as
     cleanupUnusedAttachments();
     await flushStorage();
     assert.equal(stored().has(attachmentKey(ref.id)), false);
+  } finally {
+    resetStorageBackend();
+    resetIdbConnection();
+    uninstallFakeIdb();
+  }
+});
+
+test('vault mode (5.8) seals each attachment file like any other data key', async () => {
+  resetIdbConnection();
+  fakeIdb.reset();
+  installFakeIdb();
+  try {
+    await initStorage({ timeoutMs: 500 });
+    await enableVault('correct horse battery staple');
+    const src = PDF(300);
+    const ref = putAttachment({ bytes: src, name: 'secret.pdf' });
+    await flushStorage();
+    const raw = fakeIdb.store('mrchartist_inv_kv', DATA_STORE).get(attachmentKey(ref.id));
+    assert.ok(typeof raw === 'string' && isSealed(raw), 'stored sealed');
+    assert.deepEqual([...attachmentBytes(ref.id)!.bytes], [...src], 'readable through the unlocked cache');
   } finally {
     resetStorageBackend();
     resetIdbConnection();
