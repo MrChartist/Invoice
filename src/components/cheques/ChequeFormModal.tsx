@@ -72,7 +72,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
   const options = useMemo(() => {
     if (received) {
       return invoices
-        .filter((i) => ['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE'].includes(i.doc_type ?? 'INVOICE') && i.status !== 'Draft' && i.status !== 'Cancelled')
+        .filter((i) => ['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY'].includes(i.doc_type ?? 'INVOICE') && i.status !== 'Draft' && i.status !== 'Cancelled')
         .filter((i) => (i.currency || 'INR').toUpperCase() === 'INR' && ((i.balance_due ?? 0) > 0 || i.id === cheque?.invoice_id))
         .filter((i) => !party || norm(i.client?.name) === party || norm(i.client?.company) === party || (client?.id && i.client?.id === client.id) || i.id === cheque?.invoice_id)
         .map((i) => ({ id: i.id, label: `${i.invoice_number} · ${i.client?.name ?? ''} · balance ₹${formatMoney(i.balance_due ?? 0)}` }));

@@ -97,7 +97,7 @@ export interface ForecastInput {
   skipOverdueAfter?: number;
 }
 
-const RECEIVABLE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE']);
+const RECEIVABLE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase();
 const DAY = 86400000;
 const utc = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));

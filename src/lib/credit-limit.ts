@@ -25,7 +25,7 @@ import { mulRound2, num, round2 } from './invoice-calc';
 import { isoDay } from './dates';
 
 /** Document types the limit applies to (what creates a receivable). */
-const CREDIT_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE']);
+const CREDIT_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
 
 export interface CreditDraft {
   id?: string;
