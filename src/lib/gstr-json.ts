@@ -17,6 +17,7 @@ import type {
   Gstr1Report,
   Gstr3bReport,
   GstReport,
+  HsnRow,
   RateRow,
 } from './gst-reports';
 
@@ -44,6 +45,33 @@ function groupBy<T>(rows: T[], key: (r: T) => string): Map<string, T[]> {
   }
   return m;
 }
+
+/**
+ * Table 12 layout in the JSON — ASSUMPTION, change here only.
+ *
+ * From the return period where Table 12 is split (`hsnTableSplit` in tax-rules, Jan 2025), the
+ * split rows are written under `hsn.hsn_b2b` / `hsn.hsn_b2c` (believed to be the offline tool's
+ * keys, not verified against the live schema). `legacy: true` also keeps the combined `hsn.data`
+ * array alongside so an older reader still finds it; set it to false once the offline tool is
+ * confirmed to reject or double-count it. Earlier periods always get `hsn.data` only.
+ */
+export const HSN_JSON_LAYOUT = { b2bKey: 'hsn_b2b', b2cKey: 'hsn_b2c', legacy: true } as const;
+
+const hsnRows = (rows: HsnRow[]) =>
+  rows.map((h, idx) => ({
+    num: idx + 1,
+    hsn_sc: h.hsn,
+    desc: h.description.slice(0, 30),
+    uqc: h.uqc,
+    qty: round2(h.qty),
+    val: round2(h.value),
+    txval: round2(h.taxable),
+    iamt: round2(h.igst),
+    camt: round2(h.cgst),
+    samt: round2(h.sgst),
+    csamt: round2(h.cess ?? 0),
+    rt: h.rate,
+  }));
 
 export interface Gstr1JsonOptions {
   /** Preceding-FY aggregate turnover (GSTN `gt`). Not derivable from this app alone — enter it yourself. */
@@ -164,22 +192,13 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
   }
 
   if (r.hsn.length) {
-    out.hsn = {
-      data: r.hsn.map((h, idx) => ({
-        num: idx + 1,
-        hsn_sc: h.hsn,
-        desc: h.description.slice(0, 30),
-        uqc: h.uqc,
-        qty: round2(h.qty),
-        val: round2(h.value),
-        txval: round2(h.taxable),
-        iamt: round2(h.igst),
-        camt: round2(h.cgst),
-        samt: round2(h.sgst),
-        csamt: round2(h.cess ?? 0),
-        rt: h.rate,
-      })),
-    };
+    const block: Record<string, unknown> = {};
+    if (HSN_JSON_LAYOUT.legacy || !r.hsnSplit) block.data = hsnRows(r.hsn);
+    if (r.hsnSplit) {
+      block[HSN_JSON_LAYOUT.b2bKey] = hsnRows(r.hsnB2b ?? []);
+      block[HSN_JSON_LAYOUT.b2cKey] = hsnRows(r.hsnB2c ?? []);
+    }
+    out.hsn = block;
   }
 
   if (r.docIssue.length) {
@@ -273,11 +292,17 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
         ['Description', 'Nil rated', 'Exempted', 'Non-GST'],
         ...r.nil.map((n) => [nilLabel(n.type), n.nil, n.exempt, n.nonGst]),
       ]);
-    case 'hsn':
+    case 'hsn': {
+      const head = ['HSN/SAC', 'Description', 'UQC', 'Total quantity', 'Total value', 'Taxable value', 'Rate %', 'IGST', 'CGST', 'SGST', 'Cess'];
+      const cells = (h: HsnRow) => [h.hsn, h.description, h.uqc, h.qty, h.value, h.taxable, h.rate, h.igst, h.cgst, h.sgst, h.cess];
+      if (!r.hsnSplit) return toCsv([head, ...r.hsn.map(cells)]);
+      // Split periods: one file, a leading Table column (B2B / B2C) as on the portal's two tabs.
       return toCsv([
-        ['HSN/SAC', 'Description', 'UQC', 'Total quantity', 'Total value', 'Taxable value', 'Rate %', 'IGST', 'CGST', 'SGST', 'Cess'],
-        ...r.hsn.map((h) => [h.hsn, h.description, h.uqc, h.qty, h.value, h.taxable, h.rate, h.igst, h.cgst, h.sgst, h.cess]),
+        ['Table', ...head],
+        ...(r.hsnB2b ?? []).map((h) => ['B2B', ...cells(h)]),
+        ...(r.hsnB2c ?? []).map((h) => ['B2C', ...cells(h)]),
       ]);
+    }
     case 'docs':
       return toCsv([
         ['Document type', 'Series', 'From', 'To', 'Total issued', 'Cancelled', 'Net issued'],

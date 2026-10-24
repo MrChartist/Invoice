@@ -40,6 +40,7 @@ Everything lives in `localStorage` behind `src/lib/storage.ts`.
 | `export_prefs` | exports | last-used export options |
 | `notif_state` | notifications | read / snoozed / dismissed notice ids |
 | `tds_certificates` | receivables (TDS) | Form 16A received flag per deductor × quarter (`TdsCertificate`, `src/lib/tds-register.ts`) |
+| `compliance` | compliance (GST) | `FiledReturn` marks: GST return filed per form / period / GSTIN (`docs/features/compliance.md`) |
 
 ## Schema versions & migrations
 
