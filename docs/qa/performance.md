@@ -313,3 +313,10 @@ regression. `DocumentMetaCard` subscribes to its own store slice, so typing in a
 document fields. Bundle: initial JS 182.1 -> 181.6 kB gz, entry 85.0 -> 84.6 kB gz (the split itself cost
 ~0.25 kB; recovered with `store/pick.ts` for the long `useShallow` selectors and by loading the closed
 client/item picker modals as lazy chunks right after the editor renders).
+
+## jsPDF optional imports stubbed (Phase 6)
+
+`html2canvas`, `canvg` (+ core-js) and `dompurify` are jsPDF's optional dynamic imports, used only by
+`doc.html()` / `addSvgAsImage()`, which the app never calls (html-to-image rasterises pages). `vite.config.ts`
+aliases them to `src/lib/stubs/jspdf-optional.ts` (throws if ever reached). Total JS 736.9 → 633.3 kB gz,
+precache 155 → 152 files; initial JS unchanged (154.7 kB). PDF download/share verified by the e2e journey.
