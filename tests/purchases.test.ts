@@ -90,6 +90,8 @@ test('vendors: validation, save, balances', () => {
   assert.match(V.validateVendor({ name: '' }), /required/);
   assert.notEqual(V.validateVendor({ name: 'X', gstin: '27AAAAA0000A1Z4' }), '');
   assert.equal(V.validateVendor({ name: 'X' }), '');
+  assert.match(V.validateVendor({ name: 'X', msme_udyam: 'UDYAM-12' }), /Udyam/);
+  assert.equal(V.validateVendor({ name: 'X', msme_udyam: 'UDYAM-KA-03-0012345' }), '');
   const v = V.vendorsDb.save({ name: ' Acme ' });
   assert.equal(V.vendorsDb.get(v.id)!.name, 'Acme');
   const rows = [{ ...bill({ vendor_id: v.id }), id: 'z' } as PR];
