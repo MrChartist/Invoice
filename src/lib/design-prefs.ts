@@ -420,7 +420,7 @@ export interface Stamp {
 export function stampFor(watermark: string, status: string, docType: string): Stamp | null {
   if (!watermark || watermark === WATERMARK_NONE) return null;
   if (watermark !== WATERMARK_AUTO) return { label: watermark.toUpperCase(), tone: 'custom' };
-  const billable = docType !== 'QUOTATION' && docType !== 'DELIVERY_CHALLAN';
+  const billable = docType !== 'QUOTATION' && docType !== 'DELIVERY_CHALLAN' && docType !== 'SALES_ORDER';
   if (status === 'Cancelled') return { label: 'CANCELLED', tone: 'cancelled' };
   if (status === 'Draft') return { label: 'DRAFT', tone: 'draft' };
   if (status === 'Paid' && billable) return { label: 'PAID', tone: 'paid' };

@@ -16,7 +16,8 @@ export type DocumentType =
   | 'PROFORMA'
   | 'CREDIT_NOTE'
   | 'DEBIT_NOTE'
-  | 'DELIVERY_CHALLAN';
+  | 'DELIVERY_CHALLAN'
+  | 'SALES_ORDER';
 
 export type InvoiceStatus =
   | 'Draft'
@@ -67,6 +68,7 @@ export const DOCUMENT_LABELS: Record<DocumentType, string> = {
   CREDIT_NOTE: 'Credit Note',
   DEBIT_NOTE: 'Debit Note',
   DELIVERY_CHALLAN: 'Delivery Challan',
+  SALES_ORDER: 'Sales Order',
 };
 
 /** Short code used inside the document number, e.g. INV / QTN / CRN. */
@@ -78,6 +80,7 @@ export const DOCUMENT_CODES: Record<DocumentType, string> = {
   CREDIT_NOTE: 'CRN',
   DEBIT_NOTE: 'DBN',
   DELIVERY_CHALLAN: 'DCH',
+  SALES_ORDER: 'SO',
 };
 
 export const UNITS = [
@@ -124,6 +127,11 @@ export interface InvoiceItem {
   /** Gross line amount = quantity × rate (kept for legacy records). */
   amount: number;
   created_at?: string;
+  /**
+   * Additive: id of the Sales Order line this line fulfils (set when a challan / invoice is converted from a
+   * sales order, carried along SO → challan → invoice). Read with the record's `sales_order_id`.
+   */
+  order_line_id?: string;
 }
 
 export interface Client {
@@ -309,4 +317,8 @@ export interface InvoiceRecord {
   port_code?: string;
   /** Additive (roadmap 6.15): id of the overdue invoice this late-fee invoice was raised on. */
   late_fee_for?: string;
+  /** Additive: the Sales Order a challan / invoice was converted from (see `src/lib/sales-orders.ts`). */
+  sales_order_id?: string;
+  /** Additive (sales orders): local day (YYYY-MM-DD) the user closed a partly fulfilled order. */
+  order_closed_on?: string;
 }

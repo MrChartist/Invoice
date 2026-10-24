@@ -123,7 +123,7 @@ export function PartyPanel({ invoice, plain, skipDates }: PartyPanelProps) {
         {!skipDates && (
           <>
             <MetaRow label={isQuote ? t('quoteDate') : t('issueDate')} value={date(invoice.issue_date)} />
-            <MetaRow label={isQuote ? t('validUntil') : t('dueDate')} value={date(invoice.due_date)} />
+            <MetaRow label={isQuote ? t('validUntil') : invoice.doc_type === 'SALES_ORDER' ? t('deliveryBy') : t('dueDate')} value={date(invoice.due_date)} />
           </>
         )}
         <MetaRow label={t('poRef')} value={invoice.po_number || undefined} />

@@ -85,3 +85,38 @@ receivable, posts like a sale in Books / Tally, is reported in GSTR-1 as CDNR / 
 type 4 in the doc-issue table), and is e-invoiced as `DBN` with the original invoice pre-filled as the preceding
 document. Credit and debit notes linked to an invoice are classified by that invoice: a note against a B2CL
 invoice goes to CDNUR (B2CL) whatever its own value.
+
+## Sales orders (Roadmap 6.5)
+
+`SALES_ORDER` is its own document type with the `SO/FY<yy-yy>/<seq>` series (Indian FY). It is a confirmed customer
+order, **not a tax document**: every classifier uses an allow-list of tax types, so it is excluded from revenue
+(`stats.isRevenueDoc`), receivables (`isLedgerDoc`), Books (`SALES_TYPES`), sales reports, GSTR-1/3B
+(`TAX_DOC_TYPES`, doc-issue table), stock (`inventory.invoiceEffect` → null), Tally/accounting exports
+(`voucherKindOf` → null), e-Invoice (`eInvoiceDocType` → null), e-Way (preflight error), reminders, recurring
+schedules, the PAID/OVERDUE stamp and the client-copy UPI button. It only appears in listings.
+
+- Created from the editor's Type select (`/invoice?type=SALES_ORDER`, palette "New sales order") or Convert →
+  "Convert to Sales Order" on a quotation (marks the quotation Accepted / Converted). The due date prints as
+  **Delivery by**.
+- Transition matrix: `QUOTATION → SALES_ORDER`; `SALES_ORDER → DELIVERY_CHALLAN | TAX_INVOICE | INVOICE`.
+- **Partial conversion**: `convertDocument(so, target)` pre-fills only the pending quantity — challans take
+  ordered − delivered, invoices ordered − invoiced; fully covered lines are left off. The new document gets
+  `sales_order_id = so.id` and each line `order_line_id = <SO line id>` (both additive; carried along when that
+  challan is later converted to an invoice). A `converted` doc_link is added as for any conversion. On a partial
+  conversion an AMOUNT discount is re-expressed as the equivalent percent; shipping / other charges ride only on the
+  first challan and the first invoice.
+- **Fulfilment is derived** (`src/lib/sales-orders.ts`, pure): `buildOrderIndex(invoices, links)` /
+  `orderFulfilment(so, invoices, links)` → per line ordered / delivered / invoiced / pending, and a state.
+  Invoiced = live INVOICE/TAX_INVOICE lines; delivered = live challans not made from an invoice + invoices not made
+  from a challan (so SO → challan → invoice counts the goods once each). Drafts count, cancelled documents and credit
+  notes do not. Deliver goods on a challan *and then invoice that challan* (Convert on the challan); invoicing the
+  same goods directly from the order as well would count the delivery twice (pending never goes below zero).
+- **State**: Draft / Open / Partly fulfilled / Fulfilled (every line delivered and invoiced) / Closed / Cancelled.
+  `order_closed_on` (local YYYY-MM-DD, additive) is set by **Close order** on a part-fulfilled order
+  (`localDb.invoices.setOrderClosed(id, day | undefined)`, period-lock checked, audited); a closed order offers no
+  conversions until reopened.
+- UI: `OrderFulfilment` (lazy, `src/components/documents/OrderFulfilment.tsx`) in the saved document's actions shows
+  the per-line table, the linked documents and Close / Reopen. The invoice list (`/transactions?type=SALES_ORDER`)
+  shows the order state as the badge and, when filtered to sales orders, an order-status filter. "Duplicate" on the
+  list strips the order stamps so a copy never counts as fulfilment.
+- Tests: `tests/integration/orders.test.ts`, `tests/documents.test.ts`.

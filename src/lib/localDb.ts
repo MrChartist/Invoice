@@ -444,6 +444,22 @@ export const localDb = {
       setTable(KEYS.invoices, invoices);
       logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
     },
+
+    /** Close a sales order on `closedOn` (YYYY-MM-DD), or reopen it with `undefined`. Respects the period lock; audited. */
+    setOrderClosed: (id: string, closedOn: string | undefined) => {
+      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+      const idx = invoices.findIndex((i) => i.id === id);
+      if (idx < 0) return;
+      const before = invoices[idx];
+      if (before.doc_type !== 'SALES_ORDER' || (before.order_closed_on || undefined) === closedOn) return;
+      const overridden = assertUnlocked(before, 'edit') === 'overridden';
+      const next: InvoiceRecord = { ...before, updated_at: new Date().toISOString() };
+      if (closedOn) next.order_closed_on = closedOn;
+      else delete next.order_closed_on;
+      invoices[idx] = next;
+      setTable(KEYS.invoices, invoices);
+      logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
+    },
   },
 
   payments: {

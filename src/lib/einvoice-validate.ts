@@ -320,8 +320,8 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
   const out: PreflightIssue[] = [];
   const now = opts.now ?? new Date();
 
-  if (record && (record.doc_type === 'QUOTATION' || record.doc_type === 'PROFORMA')) {
-    out.push(issue('error', 'EWB_DOC_TYPE', 'Document', 'Quotations and proforma invoices do not need an e-Way Bill.'));
+  if (record && (record.doc_type === 'QUOTATION' || record.doc_type === 'PROFORMA' || record.doc_type === 'SALES_ORDER')) {
+    out.push(issue('error', 'EWB_DOC_TYPE', 'Document', 'Quotations, proforma invoices and sales orders do not need an e-Way Bill.'));
   }
 
   const sg = checkGstin(bill.fromGstin);
