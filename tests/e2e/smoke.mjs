@@ -10,12 +10,34 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { crc32, deflateSync } from 'node:zlib';
 import { DIST, isCsp, isFontNoise, loadPlaywright, serve, watch } from '../../scripts/lib/harness.mjs';
 
 if (!existsSync(join(DIST, 'index.html'))) {
   console.error('dist/ missing - run `npm run build` first');
   process.exit(2);
 }
+
+/** A valid 24x24 orange PNG (built here, no fixture file) used as the business logo. */
+const LOGO_PNG = (() => {
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const w = 24;
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(w, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8); // 8-bit RGB
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => [240, 120, 20]).flat())]);
+  const idat = deflateSync(Buffer.concat(Array.from({ length: w }, () => row)));
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]).toString('base64');
+})();
 
 const failures = [];
 const check = (ok, msg) => {
@@ -74,6 +96,9 @@ try {
     await page.getByLabel('UPI ID').fill('e2e@okhdfcbank');
     await page.getByRole('button', { name: /Next/ }).click();
     await page.getByRole('dialog', { name: /Logo/ }).waitFor();
+    // A real logo, so later steps can prove the image stored by reference still renders.
+    await page.getByLabel('Upload logo image').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(LOGO_PNG, 'base64') });
+    await page.getByRole('dialog', { name: /Logo/ }).locator('img[src^="data:image/"]').first().waitFor();
     await page.getByRole('button', { name: /Finish/ }).click();
     await page.waitForURL(/\/invoice/);
     const s = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_settings') || '{}'));
@@ -95,6 +120,9 @@ try {
     check(/^INV\/FY\d{2}-\d{2}\/0001$/.test(stored[0]?.invoice_number ?? ''), `Indian-FY number (${stored[0]?.invoice_number})`);
     check(stored[0]?.status === 'Sent', `Save issues the document (${stored[0]?.status})`);
     check(Math.abs((stored[0]?.total ?? 0) - 3540) < 0.01, `total with 18% GST = 3540 (${stored[0]?.total})`);
+    const assets = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_assets') || '[]'));
+    check(/^asset:/.test(stored[0]?.sender?.logo ?? '') && assets.length === 1 && assets[0].data.startsWith('data:image/'),
+      `the snapshot stores the logo by reference (${String(stored[0]?.sender?.logo).slice(0, 24)}, ${assets.length} asset)`);
   });
 
   await step('typeahead fills client and item from what was saved', async () => {
@@ -129,6 +157,8 @@ try {
     await dialog.waitFor();
     const focusInside = await page.evaluate(() => !!document.activeElement?.closest('[aria-label="Document preview"]'));
     check(focusInside, 'preview moves focus into the dialog');
+    const logoSrc = await dialog.locator('img[src^="data:image/"]').count();
+    check(logoSrc > 0, 'the preview renders the logo resolved from its reference');
 
     // Download PDF produces a real PDF file.
     await dialog.getByRole('button', { name: /^Share/ }).click();
@@ -168,7 +198,7 @@ try {
     await dialog.getByRole('button', { name: /^Share/ }).click();
     const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Client copy/ }).click()]);
     const html = readFileSync(await dl.path(), 'utf8');
-    check(/\.html$/.test(dl.suggestedFilename()) && !/<script/i.test(html) && html.includes('Acme Buyers') && /href="upi:\/\/pay\?pa=e2e@okhdfcbank/.test(html),
+    check(/\.html$/.test(dl.suggestedFilename()) && !/<script/i.test(html) && html.includes('Acme Buyers') && /href="upi:\/\/pay\?pa=e2e@okhdfcbank/.test(html) && /src="data:image\//.test(html) && !html.includes('asset:'),
       `client copy: ${dl.suggestedFilename()}, ${Math.round(html.length / 1024)} KB, no scripts, pay link present`);
     // It renders on its own, offline, under its own strict CSP.
     const viewer = await context.newPage();

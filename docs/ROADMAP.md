@@ -120,7 +120,7 @@ the quota after about 80 invoices (about 3,000 without a logo). This is a major 
 
 | # | Item | Effort | Depends on |
 |---|------|--------|-----------|
-| 4.1 | **Logo/signature assets stored by reference**: snapshot holds a content hash, the asset lives once in an asset table, backups embed it. Historical invoices still render the same (Critical Rule 3) | M | 1.1, 1.3 |
+| 4.1 | ✅ **Logo/signature assets stored by reference**: snapshot holds a content hash, the asset lives once in an asset table, backups embed it. Historical invoices still render the same (Critical Rule 3) | M | 1.1, 1.3 |
 | 4.2 | **Move tables to IndexedDB** behind a synchronous in-memory cache; one-time migration from localStorage with rollback; shared connection in `idb-kv.ts`. **Keep every `mrchartist_inv_*` table name** | L | 1.1, 1.2, 1.3, 1.8 |
 | 4.3 | ✅ **Virtualise long tables** (Transactions, Receivables): long tasks of 235–280 ms at 300 invoices before; windowing + cached `Intl` formatters, numbers in `docs/qa/performance.md` | M | — |
 | 4.4 | ✅ **Split large components**: `ImportWizard` (835 lines, 24 `useState`) → `wizard-state.ts` reducer + four step components; `InvoiceCreator` (527 → ~340 lines) → `CreatorHeader`, `DocumentMetaCard`, `MobileSaveBar`, `useCreatorKeys` | M | 1.5 |

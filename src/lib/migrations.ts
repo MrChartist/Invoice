@@ -8,14 +8,16 @@
  *
  * Rules for a migration:
  *  - Additive and idempotent: running it twice must be harmless.
- *  - Never rename `mrchartist_inv_*` keys (AGENTS.md) and never rewrite an
- *    invoice's `sender` snapshot (Critical Rule 3).
+ *  - Never rename `mrchartist_inv_*` keys (AGENTS.md) and never change what an
+ *    invoice's `sender` snapshot renders (Critical Rule 3). Changing how it is
+ *    stored is allowed when reads give back the identical value (v3).
  *  - Throw to abort: every key is put back as it was and the version stays put,
  *    so the app keeps reading the old shape through its tolerant readers.
  */
 
 import { audit } from './audit';
 import { DB_PREFIX, SINGLETON_KEYS, collectAppData, getJson, readRaw, removeRaw, setJson, writeRaw } from './storage';
+import { ASSET_TABLE, SNAPSHOT_TABLES, encodeRows, parseAssets, serializeAssets } from './assets';
 
 export const SCHEMA_VERSION_KEY = `${DB_PREFIX}schema_version`;
 
@@ -61,6 +63,35 @@ export const MIGRATIONS: Migration[] = [
       } catch {
         /* storage full: never block the boot over this; the next audit.record seals (and trims) instead */
       }
+    },
+  },
+  {
+    version: 3,
+    name: 'snapshot images by reference',
+    // Inline data URLs in invoice / recurring sender snapshots move into the asset table
+    // (deduplicated by content); the snapshot keeps `asset:<id>`, which getTable resolves
+    // back to the identical data URL. Works on the raw JSON so an unresolvable reference
+    // is left exactly as it was. Idempotent: a second run finds no inline image to move.
+    up: () => {
+      const assetsKey = DB_PREFIX + ASSET_TABLE;
+      const idx = parseAssets(readRaw(assetsKey));
+      const updates: [string, string][] = [];
+      for (const table of SNAPSHOT_TABLES) {
+        const raw = readRaw(DB_PREFIX + table);
+        if (!raw) continue;
+        let rows: unknown;
+        try {
+          rows = JSON.parse(raw);
+        } catch {
+          continue; // unreadable table: leave it to the tolerant readers
+        }
+        if (!Array.isArray(rows)) continue;
+        const encoded = encodeRows(rows, idx);
+        if (encoded.rows.some((r, i) => r !== rows[i])) updates.push([DB_PREFIX + table, JSON.stringify(encoded.rows)]);
+      }
+      if (updates.length === 0) return;
+      writeRaw(assetsKey, serializeAssets(idx)); // assets first: a reference never dangles
+      for (const [key, value] of updates) writeRaw(key, value);
     },
   },
 ];

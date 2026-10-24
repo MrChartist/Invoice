@@ -1,6 +1,12 @@
 /**
  * Backup / restore of everything the app keeps in localStorage.
  *
+ * Self-contained: the `mrchartist_inv_assets` table (logo / signature images that
+ * invoice snapshots reference since schema v3) is an ordinary app key, so it rides
+ * along, and a file whose references do not resolve is refused. Older backups with
+ * inline images restore as they are and are moved to references by the v3 migration
+ * on the reload that follows.
+ *
  * Exports carry only `mrchartist_inv_*` keys and never the PIN session. Imports
  * accept the same keys (and the older flat `{key: value}` file) and refuse
  * anything outside that namespace, so a doctored file cannot overwrite
@@ -11,6 +17,7 @@ import { DB_PREFIX, collectAppData, readRaw, removeRaw, writeRaw } from './stora
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
+import { ASSET_TABLE, SNAPSHOT_TABLES, parseAssets, referencedAssets } from './assets';
 import { localDayOf } from './dates';
 import { AUDIT_TABLE, audit } from './audit';
 import type { AuditEntry } from '../types/audit';
@@ -205,14 +212,14 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
 /** Tables whose rows are records; a restore refuses a file where one of them is malformed. */
 const RECORD_TABLES = [
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases',
-  'purchase_payments', 'recurring', 'doc_links', 'audit_log', 'gstr2b_actions', 'einvoice_meta',
+  'purchase_payments', 'recurring', 'doc_links', 'audit_log', 'gstr2b_actions', 'einvoice_meta', ASSET_TABLE,
   // Double-entry ledger (6.1–6.3)
   'accounts', 'vouchers', 'fixed_assets',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
-  'accounts', 'vouchers', 'fixed_assets',
+  'accounts', 'vouchers', 'fixed_assets', ASSET_TABLE,
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -246,6 +253,17 @@ export function validateBackupData(data: Record<string, string>): void {
     const hasId = (r: Record<string, unknown>) => (typeof r.id === 'string' && r.id !== '') || typeof r.id === 'number';
     const bad = rows.findIndex((r) => !isPlainObject(r) || (needsId && !hasId(r)));
     if (bad >= 0) throw new Error(`Row ${bad + 1} of the "${table}" table in this backup is damaged.`);
+  }
+  // Backups are self-contained: every logo/signature reference must resolve inside the file.
+  const refs = new Set<string>();
+  for (const table of SNAPSHOT_TABLES) {
+    const raw = data[DB_PREFIX + table];
+    if (raw !== undefined) referencedAssets(JSON.parse(raw) as unknown[], refs);
+  }
+  if (refs.size > 0) {
+    const assets = parseAssets(data[DB_PREFIX + ASSET_TABLE]);
+    const missing = [...refs].filter((id) => !assets.byId.has(id)).length;
+    if (missing > 0) throw new Error(`This backup is missing ${missing} logo/signature image${missing === 1 ? '' : 's'} its invoices refer to.`);
   }
   const settings = data[`${DB_PREFIX}settings`];
   if (settings !== undefined) {

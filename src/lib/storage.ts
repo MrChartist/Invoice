@@ -8,6 +8,8 @@
  * module tolerates.
  */
 
+import { ASSET_TABLE, SNAPSHOT_TABLES, decodeRows, encodeRows, parseAssets, serializeAssets, type AssetIndex } from './assets';
+
 export const DB_PREFIX = 'mrchartist_inv_';
 
 export const KEYS = {
@@ -85,19 +87,49 @@ export function removeRaw(fullKey: string): void {
   }
 }
 
+/** Parsed asset table, re-parsed only when the stored text changes. */
+let assetCache: { raw: string | null; idx: AssetIndex } | null = null;
+
+function assetIndex(): AssetIndex {
+  const raw = readRaw(DB_PREFIX + ASSET_TABLE);
+  if (!assetCache || assetCache.raw !== raw) assetCache = { raw, idx: parseAssets(raw) };
+  return assetCache.idx;
+}
+
 export function getTable<T>(name: string): T[] {
   const raw = readRaw(DB_PREFIX + name);
   if (!raw) return [];
+  let rows: T[];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    rows = parsed as T[];
   } catch {
     return [];
   }
+  // Snapshot images are stored by reference (assets.ts); readers always get the data URL back.
+  return SNAPSHOT_TABLES.has(name) ? decodeRows(rows, assetIndex()) : rows;
 }
 
 export function setTable<T>(name: string, rows: T[]): void {
-  writeRaw(DB_PREFIX + name, JSON.stringify(rows));
+  if (!SNAPSHOT_TABLES.has(name)) {
+    writeRaw(DB_PREFIX + name, JSON.stringify(rows));
+    return;
+  }
+  const idx = assetIndex();
+  const encoded = encodeRows(rows, idx);
+  if (encoded.added) {
+    const raw = serializeAssets(idx);
+    try {
+      // The asset goes in first so a stored reference can never dangle.
+      writeRaw(DB_PREFIX + ASSET_TABLE, raw);
+      assetCache = { raw, idx };
+    } catch (err) {
+      assetCache = null; // idx holds an asset that was not stored
+      throw err;
+    }
+  }
+  writeRaw(DB_PREFIX + name, JSON.stringify(encoded.rows));
 }
 
 export function getJson<T>(fullKey: string, fallback: T): T {

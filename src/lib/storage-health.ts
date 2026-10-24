@@ -8,6 +8,7 @@
  */
 
 import { DB_PREFIX, collectAppData } from './storage';
+import { ASSET_TABLE, isAssetRef } from './assets';
 
 export const LOCAL_QUOTA_CHARS = 5 * 1024 * 1024;
 const DAY = 86_400_000;
@@ -18,9 +19,16 @@ export interface StorageInput {
   quotaChars?: number;
   /** Largest app tables, any order. */
   tables: { key: string; chars: number }[];
-  /** Characters spent on logo / signature images copied into invoice snapshots. */
+  /**
+   * Characters spent on logo / signature images still copied INTO invoice snapshots
+   * (pre-v3 data; since v3 snapshots hold an `asset:` reference and the image is stored once).
+   */
   embeddedImageChars: number;
   invoicesWithImages: number;
+  /** Characters of the shared asset table (each distinct image stored once). */
+  sharedImageChars?: number;
+  /** Invoices whose snapshot points at a shared image instead of carrying a copy. */
+  invoicesSharingImages?: number;
   persisted: boolean | null;
   iosSafari: boolean;
   standalone: boolean;
@@ -109,8 +117,11 @@ export function assessStorage(input: StorageInput): StorageHealth {
   return { level, pct, usedChars: input.usedChars, quotaChars: quota, biggest, findings };
 }
 
-/** Gather the localStorage side of the input (sync). */
-export function measureStorage(): Pick<StorageInput, 'usedChars' | 'tables' | 'embeddedImageChars' | 'invoicesWithImages'> {
+/** Gather the storage side of the input (sync, from the same store the app reads). */
+export function measureStorage(): Pick<
+  StorageInput,
+  'usedChars' | 'tables' | 'embeddedImageChars' | 'invoicesWithImages' | 'sharedImageChars' | 'invoicesSharingImages'
+> {
   const data = collectAppData();
   let usedChars = 0;
   const tables: StorageInput['tables'] = [];
@@ -121,20 +132,23 @@ export function measureStorage(): Pick<StorageInput, 'usedChars' | 'tables' | 'e
   }
   let embeddedImageChars = 0;
   let invoicesWithImages = 0;
+  let invoicesSharingImages = 0;
   try {
     const invoices = JSON.parse(data[`${DB_PREFIX}invoices`] ?? '[]') as { sender?: { logo?: unknown; signature?: unknown } }[];
     for (const inv of Array.isArray(invoices) ? invoices : []) {
-      const size = [inv?.sender?.logo, inv?.sender?.signature].reduce<number>(
-        (s, v) => s + (typeof v === 'string' && v.startsWith('data:') ? v.length : 0),
-        0,
-      );
+      const images = [inv?.sender?.logo, inv?.sender?.signature];
+      const size = images.reduce<number>((s, v) => s + (typeof v === 'string' && v.startsWith('data:') ? v.length : 0), 0);
       if (size > 0) {
         embeddedImageChars += size;
         invoicesWithImages++;
+      } else if (images.some(isAssetRef)) {
+        invoicesSharingImages++;
       }
     }
   } catch {
     /* unreadable table: nothing to attribute */
   }
-  return { usedChars, tables, embeddedImageChars, invoicesWithImages };
+  const assetsRaw = data[DB_PREFIX + ASSET_TABLE];
+  const sharedImageChars = assetsRaw ? assetsRaw.length : 0;
+  return { usedChars, tables, embeddedImageChars, invoicesWithImages, sharedImageChars, invoicesSharingImages };
 }

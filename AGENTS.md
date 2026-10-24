@@ -36,7 +36,9 @@
 
 ## localStorage keys (do not rename — breaks existing users' data)
 - `mrchartist_inv_*` (via `DB_PREFIX`): `clients`, `items_catalog`, `invoices`, `transactions`, plus the
-  feature tables listed in `docs/ARCHITECTURE.md` (`vendors`, `purchases`, `recurring`, `doc_links`, `stock_moves` …).
+  feature tables listed in `docs/ARCHITECTURE.md` (`vendors`, `purchases`, `recurring`, `doc_links`, `stock_moves`,
+  `assets` …). Since schema v3 invoice/recurring sender snapshots hold `asset:<id>` for logo/signature; `getTable`
+  resolves them, so read those tables through `getTable`/`localDb`, never raw JSON.
   Backup collects every `mrchartist_inv_*` key except device-local ones (PIN session, lockout, idle timer).
 - `mrchartist_inv_settings` — multi-profile sender identities (array).
 - `mrchartist_inv_template` — selected template id.
