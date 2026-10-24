@@ -6,6 +6,7 @@ import { blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib
 import type { BillSeed } from '../../lib/purchase-orders';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
+import { localDb } from '../../lib/localDb';
 import { BillableFields } from './BillableFields';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
@@ -60,6 +61,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [lines, setLines] = useState(init?.lines?.length ? init.lines : [blankPurchaseLine()]);
   const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
   const [notes, setNotes] = useState(init?.notes ?? '');
+  const compositionProfile = useMemo(() => localDb.settings.activeProfile()?.gst_scheme === 'composition', []);
   const poId = purchase?.po_id ?? seed?.po_id;
   const [costCentre, setCostCentre] = useState<string | undefined>(purchase?.cost_centre_id);
   const centres = useCostCentres();
@@ -227,6 +229,12 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         <input type="checkbox" checked={itc} onChange={(e) => setItc(e.target.checked)} />
         Claim input tax credit on this bill
       </label>
+      {compositionProfile && (
+        <p className={controls.hint} style={{ margin: 0 }}>
+          The active profile is under the composition scheme: input tax credit is not available (Sec 10(4)). The flag is kept for your records only;
+          composition returns never claim it. Reverse-charge bills are still taxed in CMP-08.
+        </p>
+      )}
       <details className={styles.advanced} open={advancedSet}>
         <summary>Advanced GST: reverse charge, import, ITC reversal</summary>
         <div className={styles.advancedBody}>

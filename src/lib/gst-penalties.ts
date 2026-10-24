@@ -125,6 +125,8 @@ export function estimateFor(
 ): ReturnEstimate {
   const days = lateDays(r.due, o.filedOn);
   if (!days || r.optional) return { days: r.optional ? 0 : days, lateFee: 0, interest: 0 };
+  // Composition returns: their late-fee / interest tables are not modelled (shown as days late only).
+  if (r.form === 'CMP08' || r.form === 'GSTR4') return { days, lateFee: 0, interest: 0 };
   if (r.form === 'GSTR9') {
     return { days, lateFee: gstr9LateFee(r.due, o.filedOn, +r.from.slice(0, 4), o.turnover), interest: 0 };
   }

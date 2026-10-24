@@ -50,7 +50,7 @@ interface LinkLike {
 
 type Doc = Pick<InvoiceRecord, 'id' | 'doc_type' | 'status' | 'items' | 'sales_order_id'>;
 
-const isInvoice = (t: string | undefined) => t === 'INVOICE' || t === 'TAX_INVOICE';
+const isInvoice = (t: string | undefined) => t === 'INVOICE' || t === 'TAX_INVOICE' || t === 'BILL_OF_SUPPLY';
 
 /** Per order line: delivered / invoiced quantity, plus which documents touched it. */
 interface Tally {

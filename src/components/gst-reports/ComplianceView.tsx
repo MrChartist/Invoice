@@ -56,7 +56,9 @@ interface Row {
 
 export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover, notify }: ComplianceViewProps) {
   const today = todayIso();
-  const [frequency, setFrequency] = useState<FilerFrequency>(() => localDb.settings.get().gst_filing_frequency ?? 'monthly');
+  const [frequency, setFrequency] = useState<FilerFrequency>(
+    () => localDb.settings.get().gst_filing_frequency ?? (localDb.settings.activeProfile()?.gst_scheme === 'composition' ? 'composition' : 'monthly'),
+  );
   const [filedRows, setFiledRows] = useState<FiledReturn[]>(loadFiled);
 
   const since = useMemo(() => {
@@ -64,7 +66,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
     for (const i of invoices) {
       const d = String(i?.issue_date ?? '').slice(0, 10);
       const g = (i?.sender?.companyGstin ?? '').trim().toUpperCase();
-      if ((i?.doc_type === 'INVOICE' || i?.doc_type === 'TAX_INVOICE') && i.status !== 'Draft' && i.status !== 'Cancelled' && d && (!gstin || !g || g === gstin) && (!s || d < s)) s = d;
+      if ((i?.doc_type === 'INVOICE' || i?.doc_type === 'TAX_INVOICE' || i?.doc_type === 'BILL_OF_SUPPLY') && i.status !== 'Draft' && i.status !== 'Cancelled' && d && (!gstin || !g || g === gstin) && (!s || d < s)) s = d;
     }
     return s;
   }, [invoices, gstin]);
@@ -121,6 +123,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
           <select className={controls.select} value={frequency} onChange={(e) => changeFrequency(e.target.value as FilerFrequency)}>
             <option value="monthly">Monthly (GSTR-1 by 11th, GSTR-3B by 20th)</option>
             <option value="qrmp">Quarterly — QRMP (GSTR-1 by 13th, GSTR-3B by {qrmp3bDay(stateCode, today)}th)</option>
+            <option value="composition">Composition (CMP-08 by 18th after each quarter, GSTR-4 yearly)</option>
           </select>
         </label>
         <p className={controls.hint} style={{ margin: 0 }}>

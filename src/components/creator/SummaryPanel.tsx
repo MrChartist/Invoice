@@ -67,7 +67,8 @@ export function SummaryPanel() {
         {money(t.taxable_value)}
       </Row>
 
-      {!challan && (
+      {s.doc_type === 'BILL_OF_SUPPLY' && <Row label="GST" tone="muted">Not charged (Bill of Supply)</Row>}
+      {!challan && s.doc_type !== 'BILL_OF_SUPPLY' && (
         <div className={styles.inputRow}>
           <span>GST treatment</span>
           <select className={cn(controls.select, styles.gstSelect)} value={s.gst_mode} onChange={(e) => s.setGstMode(e.target.value as GstMode)} aria-label="GST treatment">

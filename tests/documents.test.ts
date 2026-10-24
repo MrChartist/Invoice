@@ -69,8 +69,9 @@ const ctx = { id: 'cn1', invoice_number: 'CRN/FY25-26/0001', today: '2025-07-01'
 test('transition matrix', () => {
   const t = (d: InvoiceRecord['doc_type']) =>
     docs.allowedConversions({ doc_type: d, status: 'Draft' }).map((o) => o.target);
-  assert.deepEqual(t('QUOTATION'), ['SALES_ORDER', 'PROFORMA', 'TAX_INVOICE', 'INVOICE', 'DELIVERY_CHALLAN']);
-  assert.deepEqual(t('SALES_ORDER'), ['DELIVERY_CHALLAN', 'TAX_INVOICE', 'INVOICE']);
+  assert.deepEqual(t('QUOTATION'), ['SALES_ORDER', 'PROFORMA', 'TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY', 'DELIVERY_CHALLAN']);
+  assert.deepEqual(t('SALES_ORDER'), ['DELIVERY_CHALLAN', 'TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY']);
+  assert.deepEqual(t('BILL_OF_SUPPLY'), ['DELIVERY_CHALLAN']);
   assert.deepEqual(docs.allowedConversions({ doc_type: 'SALES_ORDER', status: 'Sent', order_closed_on: '2025-07-01' }), []);
   assert.ok(!t('PROFORMA').includes('PROFORMA'));
   assert.deepEqual(t('CREDIT_NOTE'), []);

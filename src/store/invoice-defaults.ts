@@ -14,6 +14,7 @@ import { readValues } from '../lib/custom-fields';
 import { readRefs } from '../lib/attachments';
 import type { AppSettings } from '../lib/localDb';
 import type {
+  AmendmentInfo,
   Client,
   DocumentType,
   InvoiceItem,
@@ -72,7 +73,10 @@ export function makeDraft(opts: DraftOptions): InvoiceRecord {
   const issue = todayInput();
   const homeState = senderStateCode(sender);
   const taxRate = num(settings.defaultTaxRate);
-  const gst_mode = deriveGstMode({
+  // Composition dealers issue Bills of Supply (no tax) by default.
+  const composition = sender?.gst_scheme === 'composition';
+  const docType: DocumentType = opts.docType ?? (composition ? 'BILL_OF_SUPPLY' : 'INVOICE');
+  const gst_mode = docType === 'BILL_OF_SUPPLY' ? 'NONE' : deriveGstMode({
     senderStateCode: homeState,
     placeOfSupply: homeState,
     senderHasGstin: Boolean(sender?.companyGstin?.trim()),
@@ -82,7 +86,7 @@ export function makeDraft(opts: DraftOptions): InvoiceRecord {
   return {
     id: '',
     invoice_number: '',
-    doc_type: opts.docType ?? 'INVOICE',
+    doc_type: docType,
     issue_date: issue,
     due_date: addDaysInput(num(settings.defaultDueDays, 14), issue),
     status: 'Draft',
@@ -166,6 +170,24 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
     ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
     ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
+  };
+}
+
+/** A stored amendment marker, or undefined when it is missing or unusable. */
+function normalizeAmends(raw: unknown): AmendmentInfo | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const a = raw as Partial<AmendmentInfo>;
+  const original_number = String(a.original_number ?? '').trim();
+  const original_date = String(a.original_date ?? '').slice(0, 10);
+  const amended_on = String(a.amended_on ?? '').slice(0, 10);
+  if (!original_number || !/^\d{4}-\d{2}-\d{2}$/.test(original_date) || !/^\d{4}-\d{2}-\d{2}$/.test(amended_on)) return undefined;
+  return {
+    original_number,
+    original_date,
+    period: String(a.period ?? ''),
+    amended_on,
+    ...(a.reason ? { reason: String(a.reason) } : {}),
+    ...(a.original && typeof a.original === 'object' ? { original: a.original } : {}),
   };
 }
 
@@ -264,6 +286,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(typeof r.cost_centre_id === 'string' && r.cost_centre_id ? { cost_centre_id: r.cost_centre_id } : {}),
     ...(readValues(r.custom_values).length ? { custom_values: readValues(r.custom_values) } : {}),
     ...(readRefs(r.attachments).length ? { attachments: readRefs(r.attachments) } : {}),
+    ...(r.exempt_kind === 'NIL' || r.exempt_kind === 'EXEMPT' || r.exempt_kind === 'NON_GST' ? { exempt_kind: r.exempt_kind } : {}),
+    ...(normalizeAmends(r.amends) ? { amends: normalizeAmends(r.amends) } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

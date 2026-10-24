@@ -111,7 +111,7 @@ function outstanding(inv: InvoiceRecord): number {
 }
 
 const isReceivable = (inv: InvoiceRecord) =>
-  (inv.doc_type === 'INVOICE' || inv.doc_type === 'TAX_INVOICE' || !inv.doc_type) &&
+  (inv.doc_type === 'INVOICE' || inv.doc_type === 'TAX_INVOICE' || inv.doc_type === 'BILL_OF_SUPPLY' || !inv.doc_type) &&
   inv.status !== 'Cancelled';
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -289,11 +289,11 @@ export const gstReturnsProvider: NotificationProvider = (ctx) => {
   let since = '';
   for (const i of ctx.invoices) {
     const d = String(i.issue_date ?? '').slice(0, 10);
-    if ((i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE') && i.status !== 'Draft' && i.status !== 'Cancelled' && d && (!since || d < since)) since = d;
+    if ((i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE' || i.doc_type === 'BILL_OF_SUPPLY') && i.status !== 'Draft' && i.status !== 'Cancelled' && d && (!since || d < since)) since = d;
   }
   if (!since) return [];
   const { overdue, soon } = pendingReturns(
-    { frequency: ctx.gstFrequency ?? 'monthly', stateCode: ctx.profile?.stateCode || gstin.slice(0, 2), today: todayIso(ctx.now), since },
+    { frequency: ctx.gstFrequency ?? (ctx.profile?.gst_scheme === 'composition' ? 'composition' : 'monthly'), stateCode: ctx.profile?.stateCode || gstin.slice(0, 2), today: todayIso(ctx.now), since },
     ctx.gstFiled ?? [],
     gstin,
   );

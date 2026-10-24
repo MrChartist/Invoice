@@ -16,7 +16,9 @@
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { localDb } from './localDb';
-import { isPeriodLockedError } from './period-lock';
+import { getLockUntil, isPeriodLockedError } from './period-lock';
+import { amendmentCheck, buildAmendment, canAmend } from './amendments';
+import { loadFiled } from './compliance';
 import { orderConversionBlocked, orderFulfilment, pendingQuantities } from './sales-orders';
 import {
   DOCUMENT_LABELS,
@@ -64,7 +66,7 @@ export const CREDIT_REASONS = [
 
 /* ── Transition matrix ─────────────────────────────────────────── */
 
-const SALES_INVOICE_TARGETS: DocumentType[] = ['TAX_INVOICE', 'INVOICE'];
+const SALES_INVOICE_TARGETS: DocumentType[] = ['TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY'];
 
 const TRANSITIONS: Record<DocumentType, DocumentType[]> = {
   QUOTATION: ['SALES_ORDER', 'PROFORMA', ...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
@@ -73,6 +75,7 @@ const TRANSITIONS: Record<DocumentType, DocumentType[]> = {
   PROFORMA: [...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
   INVOICE: ['DELIVERY_CHALLAN'],
   TAX_INVOICE: ['DELIVERY_CHALLAN'],
+  BILL_OF_SUPPLY: ['DELIVERY_CHALLAN'],
   DELIVERY_CHALLAN: [...SALES_INVOICE_TARGETS],
   // Credit notes are only ever raised from an invoice via createCreditNote.
   CREDIT_NOTE: [],
@@ -84,8 +87,9 @@ export interface ConversionOption {
   label: string;
 }
 
+/** A sales bill: invoice, tax invoice or Bill of Supply (credit / debit notes and receivables treat them alike). */
 export function isInvoiceType(t: DocumentType): boolean {
-  return t === 'INVOICE' || t === 'TAX_INVOICE';
+  return t === 'INVOICE' || t === 'TAX_INVOICE' || t === 'BILL_OF_SUPPLY';
 }
 
 /** Conversions allowed for a document. Cancelled documents cannot be converted. */
@@ -256,6 +260,9 @@ export function buildConvertedDraft(
     created_at: undefined,
     updated_at: undefined,
     order_closed_on: undefined,
+    // An amendment marker belongs to the one document that was amended — never to a copy.
+    amends: undefined,
+    ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
   };
   return recompute(draft);
@@ -460,6 +467,7 @@ export function buildCreditNote(
     late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
+    amends: undefined,
   };
   const rec = recompute(base);
   // A credit note is not receivable; it reduces the original's balance.
@@ -556,6 +564,7 @@ export function buildDebitNote(
     late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
+    amends: undefined,
   });
 }
 
@@ -657,6 +666,23 @@ export function reinstateDocument(invoice: InvoiceRecord): InvoiceRecord {
   const saved = localDb.invoices.save({ ...fresh, status: restoredStatus(fresh, link?.prev_status) });
   if (link) setTable(DOC_LINKS_TABLE, links.filter((l) => l.id !== link.id));
   return saved;
+}
+
+/* ── Amendments (GSTR-1 B2BA / CDNRA …, see amendments.ts) ─────────── */
+
+/**
+ * Marks a saved document as amended: freezes a copy of it as reported (so its original period's GSTR-1
+ * never changes) and stamps today as the amendment date. The user then edits and saves as usual. The
+ * period lock applies (a locked document must be unlocked with the PIN first).
+ */
+export function startAmendment(invoice: InvoiceRecord, reason = ''): InvoiceRecord {
+  const fresh = localDb.invoices.getById(invoice.id) ?? invoice;
+  if (!canAmend(fresh)) {
+    throw new DocumentError('Only issued tax invoices and credit / debit notes of a regular GST profile can be amended in GSTR-1.');
+  }
+  const check = amendmentCheck(fresh, { filed: loadFiled(), lockUntil: getLockUntil() });
+  const amends = buildAmendment(fresh, localIsoDate(), { period: fresh.amends?.period || check.period, reason });
+  return localDb.invoices.save({ ...fresh, amends });
 }
 
 /* ── Chain ─────────────────────────────────────────────────────── */

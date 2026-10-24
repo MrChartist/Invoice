@@ -143,7 +143,7 @@ Larger features, each of which can ship on its own once Phases 1–4 are done.
 | 5.6 | **Barcode/SKU**: `BarcodeDetector` camera scan with typed fallback, Code128 labels | M | Pairs with 5.5 |
 | 5.7 | **Multi-device via a shared folder**: encrypted store + per-device change log written to a Drive/Dropbox/iCloud folder (File System Access API); merge by UUID + `updated_at`, show conflicts to the user. The cloud client moves the files, so the app makes no network calls | L | Needs 0.6, 4.2 |
 | 5.8 | ✅ **Optional "vault mode"**: whole store encrypted at rest with a passphrase-wrapped key (clear warning: a lost passphrase means lost data) (`src/lib/vault.ts`, `docs/features/security.md`) | L | Needs 4.2 |
-| 5.9 | Composition / Bill of Supply, amendments (B2BA/CDNRA), e-commerce Sec 52/9(5) | M each | On demand |
+| 5.9 | ✅ **Composition / Bill of Supply** (BOS series, Rule 49 declaration on every template, CMP-08 / GSTR-4 papers, Table 8 / 13 for regular-taxpayer BOS) and **amendments** (B2BA / B2CLA / CDNRA / CDNURA / B2CSA; original period unchanged) (`docs/features/composition-amendments.md`). Not covered: e-commerce Sec 52 / 9(5), export amendments (EXPA), GSTR-9 Pt V, CMP-08 interest / late fee | M each | — |
 
 ### Not planned (conflicts with the hard rules)
 - WebRTC device pairing, payment-gateway links, direct cloud APIs and GSP/IRP portal filing all need network calls or

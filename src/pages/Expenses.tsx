@@ -28,6 +28,7 @@ import {
   type PurchaseFilter,
 } from '../lib/purchases';
 import { businessContext } from '../lib/purchases-context';
+import { localDb } from '../lib/localDb';
 import { vendorsDb } from '../lib/vendors';
 import { downloadText, toCsv } from '../lib/download';
 import { formatCurrency, todayInput } from '../lib/utils';
@@ -81,6 +82,8 @@ export function Expenses() {
   const payables = payablesOutstanding(purchases);
   const paidThisMonth = paidInMonth(payments, month);
   const itc = itcTotals(purchases, month);
+  // A composition dealer cannot claim ITC (Sec 10(4)): the GST on bills is a cost. The data stays as entered.
+  const composition = useMemo(() => localDb.settings.activeProfile()?.gst_scheme === 'composition', []);
   const topCategory = categorySummary(purchases.filter((p) => p.date.startsWith(month)))[0];
 
   const openEdit = (p: PurchaseRecord) => {
@@ -141,11 +144,11 @@ export function Expenses() {
         <StatCard label="Payables" value={formatCurrency(payables)} icon={Wallet} tone={payables > 0 ? 'warning' : 'default'} hint="Owed to vendors" />
         <StatCard label="Paid this month" value={formatCurrency(paidThisMonth)} icon={Landmark} tone="profit" />
         <StatCard
-          label="ITC available"
+          label={composition ? 'GST on bills (no ITC)' : 'ITC available'}
           value={formatCurrency(itc.total)}
           icon={PiggyBank}
-          tone="brand"
-          hint={itc.ineligible > 0 ? `${formatCurrency(itc.ineligible)} not claimed` : 'This month'}
+          tone={composition ? 'default' : 'brand'}
+          hint={composition ? 'Composition scheme: not claimable' : itc.ineligible > 0 ? `${formatCurrency(itc.ineligible)} not claimed` : 'This month'}
         />
         <StatCard
           label="Top category"

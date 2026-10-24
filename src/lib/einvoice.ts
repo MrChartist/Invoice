@@ -286,6 +286,8 @@ export function sanitiseFileStem(s: string): string {
 
 /** The document types the IRP accepts. Quotes, proformas and challans are not e-invoiceable. */
 export function eInvoiceDocType(record: Pick<InvoiceRecord, 'doc_type'>, override?: EInvoiceDocType) {
+  // A Bill of Supply is outside e-invoicing (Rule 48(4) covers tax invoices and notes only), even with an override.
+  if (record.doc_type === 'BILL_OF_SUPPLY') return null;
   if (override) return override;
   if (record.doc_type === 'CREDIT_NOTE') return 'CRN' as const;
   if (record.doc_type === 'DEBIT_NOTE') return 'DBN' as const;

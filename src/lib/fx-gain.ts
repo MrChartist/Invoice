@@ -163,7 +163,7 @@ export interface Revaluation {
   totals: { bookInr: number; closingInr: number; unrealised: number; missingRate: number };
 }
 
-const SALE_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE']);
+const SALE_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
 
 /**
  * Restate open foreign-currency receivables at `closingRates` (₹ per unit, by currency code) as on

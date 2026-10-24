@@ -159,7 +159,7 @@ const table = (id: DatasetId, headers: string[], rows: Cell[][]): CsvTable => ({
 });
 
 const docLabel = (inv: InvoiceRecord) =>
-  voucherKindOf(inv, true) === 'CREDIT_NOTE' ? 'Credit Note' : inv.doc_type === 'DEBIT_NOTE' ? 'Debit Note' : inv.doc_type === 'TAX_INVOICE' ? 'Tax Invoice' : 'Invoice';
+  voucherKindOf(inv, true) === 'CREDIT_NOTE' ? 'Credit Note' : inv.doc_type === 'DEBIT_NOTE' ? 'Debit Note' : inv.doc_type === 'TAX_INVOICE' ? 'Tax Invoice' : inv.doc_type === 'BILL_OF_SUPPLY' ? 'Bill of Supply' : 'Invoice';
 /** Amounts are in rupees whenever the document has a rupee value; otherwise at face value in its own currency. */
 const csvCurrency = (inv: InvoiceRecord) => (hasInrValue(inv) ? 'INR' : clean(inv.currency) || 'INR');
 const sign = (inv: InvoiceRecord) => (voucherKindOf(inv, true) === 'CREDIT_NOTE' ? -1 : 1);

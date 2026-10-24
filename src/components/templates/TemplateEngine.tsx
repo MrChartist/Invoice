@@ -11,6 +11,8 @@ import { GstBody } from './parts/GstBody';
 import { ReceiptBody } from './parts/ReceiptBody';
 import { StatusStamp } from './parts/StatusStamp';
 import { IrnBlock } from './parts/IrnBlock';
+import { SupplyDeclaration } from './parts/SupplyDeclaration';
+import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
 import type { EInvoiceMeta } from '../../lib/einvoice';
 import { cn } from '../../lib/utils';
@@ -70,6 +72,9 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
     ? { 'data-paper': design.paper.toLowerCase(), 'data-density': design.density }
     : undefined;
 
+  // Read from the document's own sender snapshot first (Critical Rule 3), like the rest of the paper.
+  const declaration = supplyDeclaration(invoice, invoice.sender ?? sender);
+
   const irn = buildIrnPrint(einvoiceMeta === undefined ? resolveEInvoiceMeta(invoice.id) : einvoiceMeta);
 
   const showInitials = (layout === 'corporate' || layout === 'centered') && sender.companyName;
@@ -122,6 +127,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         <div className={styles.inner}>
           {body}
           {irn && <IrnBlock model={irn} />}
+          {declaration && <SupplyDeclaration text={declaration} />}
         </div>
       </div>
     </PaperContext.Provider>

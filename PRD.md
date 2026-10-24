@@ -35,7 +35,12 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 ## 3. Key Feature Modules
 
 ### 3.1 Sales & Document Management
-- **Document types**: Tax Invoice / Invoice, Quotation, Sales Order, Proforma, Delivery Challan, Credit Note and Debit Note.
+- **Document types**: Tax Invoice / Invoice, Bill of Supply, Quotation, Sales Order, Proforma, Delivery Challan, Credit Note and Debit Note.
+- **Composition scheme & Bill of Supply** (`BOS/FY25-26/0001`): a profile can be set to the composition scheme
+  (manufacturer / trader / restaurant / Sec 10(2A) service provider); its documents open as a Bill of Supply with no
+  tax and print "Composition taxable person, not eligible to collect tax on supplies" on every template. Regular
+  taxpayers use a Bill of Supply for exempt / nil-rated / non-GST supplies. Non-blocking warnings for a tax invoice by a
+  composition dealer and for inter-state supplies of goods.
 - **Conversions**: Quotation → Sales Order / Proforma → Invoice ⇄ Delivery Challan (the original is kept and linked).
   Credit and debit notes are raised against issued invoices and linked to them.
 - **Sales orders** (`SO/FY25-26/0001`): a non-tax order document (never revenue, GST, books, receivables or stock).
@@ -89,6 +94,14 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   original invoice, EXP with shipping-bill fields, nil, HSN summary split B2B/B2C with the 4/6-digit rule, documents
   issued) as offline-tool JSON and section CSVs; GSTR-3B (3.1, 3.2, 4 incl. imports, RCM and 4B(1)/4B(2) reversals, 5)
   as JSON, CSV and a printable summary; aggregate-turnover support. Section CSVs are also offered as .xlsx.
+  Bills of Supply go to Table 8 / 3B 3.1(c)-(e) and Table 13.
+- **Amendments**: "Amend (reported in a filed return)" freezes the document as filed; its own period's GSTR-1 never
+  changes and the edit is reported in the month it is made in (B2BA / B2CLA / CDNRA / CDNURA / revised B2CSA, JSON +
+  CSV) with 3B taking the difference. Whether an edit needs to be an amendment comes from the filed marks and the
+  period lock.
+- **Composition returns**: quarterly CMP-08 (turnover × date-keyed composition rate, CGST/SGST split, reverse-charge
+  purchases and imports of services) and annual GSTR-4 (inward 4A-4D, CMP-08 summary, outward by rate) working
+  papers; GSTR-1 / 3B screens explain they do not apply; ITC is shown as not claimable.
 - **GSTR-2B / IMS matcher**: load the portal's GSTR-2B (JSON or Excel) locally; documents are matched to purchase
   bills on supplier GSTIN + normalised bill number with value / tax / date tolerances and classified as matched,
   value mismatch, in 2B only, in books only (ITC at risk, Sec 16(2)(aa)) or ITC not available. An IMS worksheet
@@ -98,7 +111,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   (6B inputs / services split, 6C/6D RCM, imports, Table 7 reversals by rule, Table 9 set-off with credit carried
   forward), differences GSTR-1 vs 3B vs books, the ₹2 crore optional-filing note; JSON working paper, CSV and print.
   Advances, amendments (Pt V) and 8A (GSTR-2B) are not computed.
-- **Compliance calendar**: GSTR-1 / IFF / GSTR-3B / GSTR-9 due dates for monthly or QRMP filers, filed tracking,
+- **Compliance calendar**: GSTR-1 / IFF / GSTR-3B / GSTR-9 due dates for monthly or QRMP filers (CMP-08 / GSTR-4
+  for composition dealers), filed tracking,
   Sec 50 interest and late-fee estimates, reminders in the notification bell.
 
 ### 3.3 Accounts, Books & Banking
@@ -190,6 +204,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - Custom fields are not available on purchase bills / expenses or recurring templates and are not part of the GSTR,
   e-Invoice or Tally outputs.
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
+- Composition / amendments (5.9): e-commerce Sec 52 / 9(5), export amendments (EXPA), GSTR-9 Part V, CMP-08 / GSTR-4
+  interest and late fees and composition eligibility checks are not built; re-amending keeps only the first original.
 
 ---
 

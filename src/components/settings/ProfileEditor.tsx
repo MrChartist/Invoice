@@ -5,7 +5,9 @@ import { INDIAN_STATES } from '../../lib/india-states';
 import { imageToDataUrl } from '../../lib/image';
 import { panFromGstin } from '../../lib/gstin';
 import { isValidIfsc, isValidPan, isValidUpi } from '../../lib/validators';
-import type { SenderProfile } from '../../types/invoice';
+import { COMPOSITION_CATEGORY_LABELS, COMPOSITION_DECLARATION } from '../../lib/bill-of-supply';
+import { compositionRate, todayIso } from '../../lib/tax-rules';
+import type { CompositionCategory, GstScheme, SenderProfile } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './Settings.module.css';
 
@@ -164,6 +166,38 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
           </label>
         </div>
         <p className={controls.hint}>Leave GSTIN empty if you are not GST-registered — tax lines are then hidden from your invoices. Your state decides CGST + SGST vs IGST.</p>
+        <div className={controls.row}>
+          <label className={controls.field}>
+            <span className={controls.label}>GST scheme</span>
+            <select
+              className={controls.select}
+              value={profile.gst_scheme ?? 'regular'}
+              onChange={(e) => {
+                const gst_scheme = e.target.value as GstScheme;
+                onChange(gst_scheme === 'composition' ? { gst_scheme, composition_category: profile.composition_category ?? 'trader' } : { gst_scheme });
+              }}
+            >
+              <option value="regular">Regular (tax invoices, GSTR-1 / 3B)</option>
+              <option value="composition">Composition scheme (bills of supply, CMP-08 / GSTR-4)</option>
+            </select>
+          </label>
+          {profile.gst_scheme === 'composition' && (
+            <label className={controls.field}>
+              <span className={controls.label}>Composition category</span>
+              <select className={controls.select} value={profile.composition_category ?? 'trader'} onChange={(e) => onChange({ composition_category: e.target.value as CompositionCategory })}>
+                {(Object.keys(COMPOSITION_CATEGORY_LABELS) as CompositionCategory[]).map((k) => (
+                  <option key={k} value={k}>{COMPOSITION_CATEGORY_LABELS[k]}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {profile.gst_scheme === 'composition' && (
+          <p className={controls.hint}>
+            Rate today: {compositionRate(profile.composition_category ?? 'trader', todayIso()) ?? '—'}% of turnover (half CGST, half SGST), paid quarterly in CMP-08.
+            New documents open as a Bill of Supply with no tax, printed with “{COMPOSITION_DECLARATION}”. Documents already issued keep the scheme they were saved with. Working paper — verify with your CA.
+          </p>
+        )}
       </fieldset>
 
       <fieldset className={styles.group}>

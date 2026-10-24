@@ -14,6 +14,8 @@ import {
   periodForDate,
   periodLabel,
   periodRange,
+  type AmendCdnRow,
+  type AmendDocRow,
   type CdnRow,
   type DocRow,
   type ExportRow,
@@ -36,6 +38,8 @@ import { ReconBanner } from '../components/gst-reports/ReconBanner';
 import { ComplianceView } from '../components/gst-reports/ComplianceView';
 // GSTR-2B matcher (+ its xlsx/zip reader) loads only when the tab is opened.
 const Gstr2bView = lazy(() => import('../components/gst-reports/Gstr2bView'));
+// Composition returns (CMP-08 / GSTR-4, roadmap 5.9): loaded when the tab is opened.
+const CompositionView = lazy(() => import('../components/gst-reports/CompositionView'));
 import { checkGstin } from '../lib/gstin';
 import { parseCsv } from '../lib/csv';
 import type { HsnRow } from '../lib/gst-reports';
@@ -50,7 +54,7 @@ const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 const Gstr9Modal = lazy(() => import('../components/gst-reports/Gstr9Modal'));
 const BulkEInvoiceModal = lazy(() => import('../components/einvoice/BulkEInvoiceModal'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'gstr3b' | 'gstr2b';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'hsn' | 'docs' | 'amend' | 'gstr3b' | 'gstr2b' | 'composition';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -63,9 +67,11 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'nil', label: 'Nil / Exempt' },
   { id: 'hsn', label: 'HSN' },
   { id: 'docs', label: 'Documents' },
+  { id: 'amend', label: 'Amendments' },
   { id: 'gstr3b', label: 'GSTR-3B' },
   { id: 'gstr2b', label: '2B match' },
   { id: 'compliance', label: 'Compliance' },
+  { id: 'composition', label: 'Composition (CMP-08 / GSTR-4)' },
 ];
 
 function download(name: string, mime: string, text: string) {
@@ -113,9 +119,16 @@ export function GstReports() {
   });
   const [gstin, setGstin] = useState<string>(() => gstins[0] ?? '');
   const [params] = useSearchParams();
+  // A composition profile files CMP-08 / GSTR-4, not GSTR-1 / 3B (Sec 10; Rule 62).
+  const compositionProfile = useMemo(() => {
+    const prof = gstin ? profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin) : localDb.settings.activeProfile();
+    return prof?.gst_scheme === 'composition' ? prof : null;
+  }, [profiles, gstin]);
   const [tab, setTab] = useState<TabId>(() => {
     const t = params.get('tab');
-    return TABS.some((x) => x.id === t) ? (t as TabId) : 'overview';
+    if (TABS.some((x) => x.id === t)) return t as TabId;
+    const prof = gstins[0] ? profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstins[0]) : localDb.settings.activeProfile();
+    return prof?.gst_scheme === 'composition' ? 'composition' : 'overview';
   });
   // Aggregate turnover for the JSON header — entered by the filer, remembered on this device.
   const [turnover, setTurnover] = useState<{ gt: string; curGt: string }>(() => {
@@ -147,7 +160,7 @@ export function GstReports() {
     () =>
       seriesGaps(
         invoices
-          .filter((i) => i && i.status !== 'Draft' && ['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE'].includes(i.doc_type))
+          .filter((i) => i && i.status !== 'Draft' && ['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY'].includes(i.doc_type))
           .map((i) => i.invoice_number),
         fyLabel,
       ),
@@ -162,11 +175,14 @@ export function GstReports() {
   const { gstr1: g1, gstr3b: g3, issues } = report;
   const label = periodLabel(period);
   const fileBase = `GSTR1_${gstin || 'all'}_${g1.fp}`;
-  const hasData = g1.counts.included > 0;
+  const am = g1.amendments;
+  const amendCount = am ? am.b2ba.length + am.b2cla.length + am.cdnra.length + am.cdnura.length + am.b2csa.length : 0;
+  const hasData = g1.counts.included > 0 || amendCount > 0;
 
   const counts: Partial<Record<TabId, number>> = {
     b2b: g1.b2b.length, b2cl: g1.b2cl.length, b2cs: g1.b2cs.length, cdnr: g1.cdnr.length,
     cdnur: g1.cdnur.length, exp: g1.exp.length, nil: g1.nil.length, hsn: g1.hsn.length, docs: g1.docIssue.length,
+    amend: amendCount,
   };
 
   const printSummary = () => {
@@ -327,6 +343,53 @@ export function GstReports() {
           </p>
           </>
         );
+      case 'amend': {
+        const amendCols = <T extends AmendDocRow>(isNote = false): Column<T>[] => [
+          { key: 'orig', label: isNote ? 'Original note' : 'Original invoice', render: (r) => <span className={surface.mono}>{r.origNumber} · {formatDate(r.origDate)}</span> },
+          { key: 'op', label: 'Filed in', render: (r) => `${r.origPeriod.slice(0, 2)}/${r.origPeriod.slice(2)}` },
+          ...docCols<T>(isNote),
+        ];
+        const empty = 'None in this period.';
+        return (
+          <>
+            <p className={controls.hint} style={{ margin: 0 }}>
+              Documents already reported in a filed return and amended in {label} (Amend on the document). The original stays in its own period&apos;s GSTR-1 unchanged;
+              GSTR-3B of this period includes the difference. B2CSA rows are the revised totals of the original month. Export amendments are not generated. Verify with your CA.
+            </p>
+            <h3 className={local.tbHeading}>B2BA — amended B2B invoices</h3>
+            <DataTable columns={amendCols()} rows={am?.b2ba ?? []} rowKey={(r) => r.invoiceId} caption="B2BA" emptyText={empty} />
+            <h3 className={local.tbHeading}>B2CLA — amended B2C (large) invoices</h3>
+            <DataTable columns={amendCols()} rows={am?.b2cla ?? []} rowKey={(r) => r.invoiceId} caption="B2CLA" emptyText={empty} />
+            <h3 className={local.tbHeading}>CDNRA — amended credit / debit notes (registered)</h3>
+            <DataTable columns={amendCols<AmendCdnRow>(true)} rows={am?.cdnra ?? []} rowKey={(r) => r.invoiceId} caption="CDNRA" emptyText={empty} />
+            <h3 className={local.tbHeading}>CDNURA — amended credit / debit notes (unregistered)</h3>
+            <DataTable columns={amendCols<AmendCdnRow>(true)} rows={am?.cdnura ?? []} rowKey={(r) => r.invoiceId} caption="CDNURA" emptyText={empty} />
+            <h3 className={local.tbHeading}>B2CSA — revised B2C (others) rows</h3>
+            <DataTable
+              caption="B2CSA"
+              emptyText={empty}
+              rows={am?.b2csa ?? []}
+              rowKey={(r) => `${r.omon}${r.supply}${r.pos}${r.rate}`}
+              columns={[
+                { key: 'm', label: 'Original month', render: (r) => `${r.omon.slice(0, 2)}/${r.omon.slice(2)}` },
+                { key: 'sply', label: 'Supply', render: (r) => (r.supply === 'INTRA' ? 'Intra-state' : 'Inter-state') },
+                { key: 'pos', label: 'Place of supply', render: (r) => pos(r.pos) },
+                { key: 'rate', label: 'Rate %', numeric: true, render: (r) => r.rate },
+                { key: 'tx', label: 'Taxable (revised)', numeric: true, render: (r) => <Money value={r.txval} /> },
+                { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} /> },
+                { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} /> },
+                { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} /> },
+              ]}
+            />
+          </>
+        );
+      }
+      case 'composition':
+        return (
+          <Suspense fallback={<p className={controls.hint}>Loading…</p>}>
+            <CompositionView invoices={invoices} purchases={purchases} period={period} gstin={gstin} filerStateCode={filerStateCode} category={compositionProfile?.composition_category} />
+          </Suspense>
+        );
       case 'gstr3b':
         return <Gstr3bView report={g3} />;
       case 'gstr2b':
@@ -353,7 +416,7 @@ export function GstReports() {
     }
   };
 
-  const csvTabs: SectionId[] = ['b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'hsn', 'docs'];
+  const csvTabs: SectionId[] = ['b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'hsn', 'docs', 'amend'];
   const isCsvTab = (csvTabs as string[]).includes(tab);
 
   const t = g1.totals;
@@ -440,9 +503,20 @@ export function GstReports() {
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
         <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
         <span>
-          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; composition, ISD, imports, e-commerce (TCS), amendments are not handled; interest and late fee are estimates on the Compliance tab. B2CL threshold is ₹1 lakh for invoices from 1 Aug 2024 (₹2.5 lakh before). JSON follows the GST offline-tool layout but is not schema-validated against the portal.
+          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; amended documents stay as filed in their own period and appear in the Amendments tab of the period they were amended in (export amendments are not generated); composition profiles use the CMP-08 / GSTR-4 tab; ISD, imports and e-commerce (TCS) are not handled; interest and late fee are estimates on the Compliance tab. B2CL threshold is ₹1 lakh for invoices from 1 Aug 2024 (₹2.5 lakh before). JSON follows the GST offline-tool layout but is not schema-validated against the portal.
         </span>
       </div>
+
+      {compositionProfile && (
+        <div className={`${surface.card} ${local.disclaimer}`} role="note" data-composition-banner>
+          <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
+          <span>
+            <strong>{compositionProfile.companyName || 'This profile'} is under the composition scheme.</strong> GSTR-1 and GSTR-3B do not apply to composition dealers —
+            they file a quarterly CMP-08 and an annual GSTR-4 instead (see the Composition tab). Documents issued under the composition profile are left out of the
+            GSTR-1 / 3B tables below. Input tax credit is not available to a composition dealer.
+          </span>
+        </div>
+      )}
 
       <ReconBanner issues={issues} />
 

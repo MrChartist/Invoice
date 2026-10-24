@@ -19,6 +19,8 @@ Storage-backed: `convertDocument(source, target)`, `createCreditNote(invoice, {l
 Constants/types: `CREDIT_REASONS`, `DocLink`, `DocRelation`, `DocumentError`, `ChainNode`.
 Storage-backed functions throw `DocumentError` (validation) or `StorageWriteError` (quota).
 
+Bill of Supply (5.9): a target wherever TAX_INVOICE / INVOICE is (quotation, proforma, sales order, challan) and BILL_OF_SUPPLY -> DELIVERY_CHALLAN; `isInvoiceType` includes it, so credit / debit notes can be raised against it (untaxed). `startAmendment(invoice, reason)` marks a saved document as a GSTR-1 amendment (see `composition-amendments.md`); conversions, notes and late fees never copy `amends`.
+
 Transition matrix: QUOTATION -> PROFORMA | TAX_INVOICE | INVOICE | DELIVERY_CHALLAN; PROFORMA -> TAX_INVOICE | INVOICE | DELIVERY_CHALLAN; INVOICE/TAX_INVOICE -> DELIVERY_CHALLAN; DELIVERY_CHALLAN -> TAX_INVOICE | INVOICE; CREDIT_NOTE -> none; Cancelled -> none. Credit notes are raised via the modal (invoices that are not Draft/Cancelled).
 
 Behaviour notes:

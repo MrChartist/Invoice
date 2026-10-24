@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, Lock, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Ban, FileClock, Lock, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { quoteState, quoteTone } from '../../lib/quote-status';
 import { getTable } from '../../lib/storage';
@@ -16,11 +16,13 @@ import { OverdueInterest } from '../interest';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
 import { isLocked } from '../../lib/period-lock';
+import { canAmend } from '../../lib/amendments';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './DocumentActions.module.css';
 
 const OrderFulfilment = lazy(() => import('../documents/OrderFulfilment').then((m) => ({ default: m.OrderFulfilment })));
+const AmendDialog = lazy(() => import('../documents/AmendDialog').then((m) => ({ default: m.AmendDialog })));
 const ActivityTimeline = lazy(() => import('../audit/ActivityTimeline').then((m) => ({ default: m.ActivityTimeline })));
 
 /** Everything you can do with an already-saved document, in one place. */
@@ -39,6 +41,7 @@ export function DocumentActions({
   const [creditOpen, setCreditOpen] = useState(false);
   const [debitOpen, setDebitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [amendOpen, setAmendOpen] = useState(false);
   const [saved, setSaved] = useState<InvoiceRecord | undefined>(() => localDb.invoices.getById(invoiceId));
 
   // Re-read the stored row whenever the editor saves or an action changes it.
@@ -65,7 +68,7 @@ export function DocumentActions({
   };
 
   const cancelled = saved.status === 'Cancelled';
-  const canCredit = saved.doc_type === 'INVOICE' || saved.doc_type === 'TAX_INVOICE';
+  const canCredit = saved.doc_type === 'INVOICE' || saved.doc_type === 'TAX_INVOICE' || saved.doc_type === 'BILL_OF_SUPPLY';
   const locked = isLocked(saved);
   const isOrder = saved.doc_type === 'SALES_ORDER';
 
@@ -77,7 +80,8 @@ export function DocumentActions({
         </span>
         <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} onRequestDebitNote={canCredit ? () => setDebitOpen(true) : undefined} />
         {!isOrder && <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />}
-        {!isOrder && <EInvoiceButton invoice={saved} />}
+        {/* A Bill of Supply is never e-invoiced; it can still need an e-Way Bill (document type BIL). */}
+        {!isOrder && <EInvoiceButton invoice={saved} label={saved.doc_type === 'BILL_OF_SUPPLY' ? 'e-Way Bill' : undefined} />}
         <button
           type="button"
           className={`${controls.btnOutline} ${controls.btnSm}`}
@@ -87,6 +91,16 @@ export function DocumentActions({
         >
           {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? 'Reinstate' : 'Cancel document'}
         </button>
+        {canAmend(saved) && (
+          <button
+            type="button"
+            className={`${controls.btnOutline} ${controls.btnSm}`}
+            onClick={() => setAmendOpen(true)}
+            title="Change a document already reported in a filed GSTR-1: reported as B2BA / CDNRA in this month's return"
+          >
+            <FileClock size={16} /> Amend (reported in a filed return)
+          </button>
+        )}
       </div>
 
       {saved.doc_type === 'QUOTATION' && (() => {
@@ -156,6 +170,11 @@ export function DocumentActions({
         />
       )}
       <CancelDialog invoice={saved} open={cancelOpen} onClose={() => setCancelOpen(false)} onDone={reloadEditor} />
+      {amendOpen && (
+        <Suspense fallback={null}>
+          <AmendDialog invoice={saved} open onClose={() => setAmendOpen(false)} onDone={reloadEditor} />
+        </Suspense>
+      )}
     </div>
   );
 }

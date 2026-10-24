@@ -19,7 +19,12 @@ export type DocumentType =
   | 'CREDIT_NOTE'
   | 'DEBIT_NOTE'
   | 'DELIVERY_CHALLAN'
-  | 'SALES_ORDER';
+  | 'SALES_ORDER'
+  /**
+   * Rule 49 Bill of Supply (own BOS series): no tax is charged. Issued by composition dealers for every
+   * outward supply and by regular taxpayers for wholly exempt / nil-rated / non-GST supplies.
+   */
+  | 'BILL_OF_SUPPLY';
 
 export type InvoiceStatus =
   | 'Draft'
@@ -71,6 +76,7 @@ export const DOCUMENT_LABELS: Record<DocumentType, string> = {
   DEBIT_NOTE: 'Debit Note',
   DELIVERY_CHALLAN: 'Delivery Challan',
   SALES_ORDER: 'Sales Order',
+  BILL_OF_SUPPLY: 'Bill of Supply',
 };
 
 /** Short code used inside the document number, e.g. INV / QTN / CRN. */
@@ -83,6 +89,7 @@ export const DOCUMENT_CODES: Record<DocumentType, string> = {
   DEBIT_NOTE: 'DBN',
   DELIVERY_CHALLAN: 'DCH',
   SALES_ORDER: 'SO',
+  BILL_OF_SUPPLY: 'BOS',
 };
 
 export const UNITS = [
@@ -212,6 +219,44 @@ export interface SenderProfile {
   invoicePrefix?: string;
   /** Default terms text pre-filled on new invoices. */
   defaultTerms?: string;
+  /**
+   * Additive (roadmap 5.9): GST registration type. Absent = 'regular'. A composition profile issues
+   * Bills of Supply (no tax) and files CMP-08 / GSTR-4 instead of GSTR-1 / 3B. Snapshotted with the profile.
+   */
+  gst_scheme?: GstScheme;
+  /** Additive: what kind of composition taxpayer — decides the rate (`compositionRate` in tax-rules). */
+  composition_category?: CompositionCategory;
+}
+
+/** GST registration type of a sender profile. */
+export type GstScheme = 'regular' | 'composition';
+
+/**
+ * Composition categories: Sec 10(1) manufacturer / trader / restaurant service, and the
+ * Sec 10(2A) option for service providers (Notification 2/2019-CT(R)).
+ */
+export type CompositionCategory = 'manufacturer' | 'trader' | 'restaurant' | 'service';
+
+/** Column of GSTR-1 Table 8 a Bill of Supply from a regular taxpayer is reported in. */
+export type ExemptKind = 'NIL' | 'EXEMPT' | 'NON_GST';
+
+/**
+ * Additive (roadmap 5.9): a document already reported in a filed GSTR-1 that was edited afterwards.
+ * `original` is the document exactly as it was when the amendment started (it stays in the GSTR-1 of
+ * its own period); the edited record is reported in the period of `amended_on` (B2BA / B2CLA / B2CSA /
+ * CDNRA / CDNURA). See `src/lib/amendments.ts`.
+ */
+export interface AmendmentInfo {
+  /** Number and date (YYYY-MM-DD) of the document as originally reported. */
+  original_number: string;
+  original_date: string;
+  /** GSTN return period (MMYYYY, last month covered) the original was reported in. */
+  period: string;
+  /** Local day the amendment was made: the return period it is reported in. */
+  amended_on: string;
+  reason?: string;
+  /** The document as filed (sender trimmed to its GST identity; no nested amendment). */
+  original?: Omit<InvoiceRecord, 'amends'>;
 }
 
 export interface Payment {
@@ -365,4 +410,8 @@ export interface InvoiceRecord {
    * the document is duplicated or converted.
    */
   attachments?: AttachmentRef[];
+  /** Additive (5.9): Bill of Supply from a regular taxpayer — GSTR-1 Table 8 column (absent = EXEMPT). */
+  exempt_kind?: ExemptKind;
+  /** Additive (5.9): set when a document reported in a filed return is amended (never copied). */
+  amends?: AmendmentInfo;
 }
