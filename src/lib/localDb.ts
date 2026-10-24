@@ -266,20 +266,31 @@ export const localDb = {
      * value it already has and only gains the ones it was missing — used when learning from a
      * saved invoice, so a one-off price on one invoice never silently rewrites the default rate.
      */
-    upsert: (item: Partial<InvoiceItem> & { name: string }, opts: { fillOnly?: boolean } = {}) => {
+    upsert: (item: Partial<InvoiceItem> & { name: string }, opts: { fillOnly?: boolean } = {}) =>
+      localDb.items.upsertMany([item], opts),
+    /** `upsert` for several items with one read and (only if something changed) one write. */
+    upsertMany: (incoming: (Partial<InvoiceItem> & { name: string })[], opts: { fillOnly?: boolean } = {}) => {
       const items = getTable<InvoiceItem>(KEYS.items);
-      const name = item.name.trim().toLowerCase();
-      if (!name) return;
-      const idx = items.findIndex((i) => i.name?.trim().toLowerCase() === name);
-      if (idx >= 0) {
-        // A line typed without an HSN / unit must not erase the catalogue's.
-        items[idx] = opts.fillOnly
-          ? { ...keepFilled(item), ...keepFilled(items[idx]) } as InvoiceItem
-          : { ...items[idx], ...keepFilled(item) };
-      } else {
-        items.push({ ...(item as InvoiceItem), id: generateId() });
+      let changed = false;
+      for (const item of incoming) {
+        const name = item.name.trim().toLowerCase();
+        if (!name) continue;
+        const idx = items.findIndex((i) => i.name?.trim().toLowerCase() === name);
+        if (idx >= 0) {
+          // A line typed without an HSN / unit must not erase the catalogue's.
+          const next = opts.fillOnly
+            ? { ...keepFilled(item), ...keepFilled(items[idx]) } as InvoiceItem
+            : { ...items[idx], ...keepFilled(item) };
+          if (JSON.stringify(next) !== JSON.stringify(items[idx])) {
+            items[idx] = next;
+            changed = true;
+          }
+        } else {
+          items.push({ ...(item as InvoiceItem), id: generateId() });
+          changed = true;
+        }
       }
-      setTable(KEYS.items, items);
+      if (changed) setTable(KEYS.items, items);
     },
     remove: (id: string) =>
       setTable(KEYS.items, getTable<InvoiceItem>(KEYS.items).filter((i) => i.id !== id)),
@@ -378,21 +389,12 @@ export const localDb = {
 
       // Grow the local CRM / catalogue from real usage.
       if (toSave.client?.name?.trim()) localDb.clients.upsert(toSave.client);
-      for (const item of toSave.items ?? []) {
-        if (item.name?.trim()) {
-          localDb.items.upsert(
-            {
-              name: item.name,
-              type: item.type,
-              rate: item.rate,
-              hsn: item.hsn,
-              unit: item.unit,
-              tax_rate: item.tax_rate,
-            },
-            { fillOnly: true },
-          );
-        }
-      }
+      localDb.items.upsertMany(
+        (toSave.items ?? [])
+          .filter((item) => item.name?.trim())
+          .map((item) => ({ name: item.name, type: item.type, rate: item.rate, hsn: item.hsn, unit: item.unit, tax_rate: item.tax_rate })),
+        { fillOnly: true },
+      );
       return toSave;
     },
 
