@@ -82,7 +82,7 @@ test('sales orders get their own SO/FY series and convert from a quotation', () 
   assert.equal(createViaStore({ docType: 'SALES_ORDER', date: '2027-04-01', lines: [{ qty: 1, rate: 1 }] }).invoice_number, 'SO/FY27-28/0001');
 });
 
-test('a sales order is never revenue, GST, books, receivable or stock', () => {
+test('a sales order is never revenue, GST, books, receivable or stock', async () => {
   const so = makeOrder();
   assert.equal(so.status, 'Sent');
   assert.equal(so.total, 3540); // 3,000 + 18%
@@ -103,6 +103,9 @@ test('a sales order is never revenue, GST, books, receivable or stock', () => {
   const data = loadBooksData();
   assert.equal(profitAndLoss(data, { start: '2026-04-01', end: '2027-03-31' }, 'accrual').sales, 0);
   assert.equal(buildVouchers(data).length, 0);
+  const { buildLedger } = await import('../../src/lib/ledger/index.ts');
+  const led = buildLedger({ ...data, userAccounts: [], manual: [], assets: [], today: '2026-06-30' });
+  assert.equal(led.vouchers.length, 0, 'the double-entry ledger never posts a sales order');
 
   const rep = buildGstReport(all(), [], { period: { kind: 'month', fyStart: 2026, month: 5 }, gstin: SELLER_GSTIN });
   assert.equal(rep.gstr1.b2b.length, 0);
