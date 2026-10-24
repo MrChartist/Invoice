@@ -57,16 +57,32 @@ try {
     check(true, 'account created and app unlocked');
   });
 
+  await step('first-run setup wizard', async () => {
+    const wizard = page.getByRole('dialog', { name: 'Your business' });
+    await wizard.waitFor();
+    await page.getByRole('button', { name: /Next/ }).click();
+    await page.getByText('Add the name to print on your invoices.').waitFor();
+    check(true, 'wizard refuses to continue without a business name');
+    await page.getByLabel('Name on invoices *').fill('E2E Trader');
+    await page.getByLabel('City').fill('Pune');
+    await page.getByRole('button', { name: /Next/ }).click();
+    await page.getByRole('dialog', { name: 'GST registration' }).waitFor();
+    await page.getByRole('radio', { name: 'I have a GSTIN' }).click();
+    await page.getByLabel('GSTIN', { exact: true }).fill('27AAPFU0939F1ZV');
+    await page.getByRole('button', { name: /Next/ }).click();
+    await page.getByRole('dialog', { name: 'How clients pay you' }).waitFor();
+    await page.getByLabel('UPI ID').fill('e2e@okhdfcbank');
+    await page.getByRole('button', { name: /Next/ }).click();
+    await page.getByRole('dialog', { name: /Logo/ }).waitFor();
+    await page.getByRole('button', { name: /Finish/ }).click();
+    await page.waitForURL(/\/invoice/);
+    const s = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_settings') || '{}'));
+    const p = s.profiles?.find((x) => x.id === s.activeProfileId) ?? {};
+    check(s.onboarded === true && p.companyName === 'E2E Trader' && p.stateCode === '27' && p.upiId === 'e2e@okhdfcbank',
+      `wizard saves the profile (${p.companyName}, state ${p.stateCode}, ${p.upiId}) and opens the editor`);
+  });
+
   await step('create and save an invoice', async () => {
-    // A sender profile, as the user would enter it in Settings → Profiles.
-    await page.evaluate(() => {
-      const profile = {
-        id: 'p1', companyName: 'E2E Trader', companyAddress: 'Pune', companyGstin: '27AAAAA0000A1Z5', stateCode: '27',
-        companyEmail: '', companyPhone: '', companyTagline: '', companyWebsite: '', invoicePrefix: '',
-      };
-      const s = JSON.parse(localStorage.getItem('mrchartist_inv_settings') || '{}');
-      localStorage.setItem('mrchartist_inv_settings', JSON.stringify({ ...s, profiles: [profile], activeProfileId: 'p1', onboarded: true }));
-    });
     await page.goto(srv.origin + '/invoice');
     await page.getByLabel('Client name').fill('Acme Buyers');
     await page.getByLabel('Item 1 name').fill('Consulting');

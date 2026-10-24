@@ -15,7 +15,7 @@ interface Props {
   onError: (message: string) => void;
 }
 
-function ImageSlot({
+export function ImageSlot({
   label,
   hint,
   value,

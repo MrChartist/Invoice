@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -19,6 +19,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { RemindersPanel } from '../components/share';
 import { localDb } from '../lib/localDb';
+import { shouldShowWizard } from '../lib/onboarding';
 import { getTable } from '../lib/storage';
 import { pendingReminders, type ReminderRecord } from '../lib/reminders';
 import type { CreditLink } from '../lib/stats';
@@ -38,10 +39,14 @@ function greeting(hour: number): string {
 }
 
 // Pulls in the whole sample-data builder, so it loads after first paint.
+const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').then((m) => ({ default: m.SetupWizard })));
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
 
 export function Dashboard() {
   const user = getUser();
+  const navigate = useNavigate();
+  // Brand-new account: walk through the essentials once (existing users never see it).
+  const [wizardOpen, setWizardOpen] = useState(() => shouldShowWizard(localDb.settings.get(), localDb.invoices.getAll().length));
   const [{ invoices, clientCount, profileReady, links }] = useState(() => {
     const settings = localDb.settings.get();
     const profile = localDb.settings.activeProfile();
@@ -109,6 +114,18 @@ export function Dashboard() {
       <Suspense fallback={null}>
         <DemoNotice />
       </Suspense>
+
+      {wizardOpen && (
+        <Suspense fallback={null}>
+          <SetupWizard
+            open
+            onClose={(finished) => {
+              setWizardOpen(false);
+              if (finished) navigate('/invoice');
+            }}
+          />
+        </Suspense>
+      )}
 
       {showChecklist && (
         <section className={styles.checklist} aria-label="Getting started">
