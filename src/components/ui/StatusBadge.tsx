@@ -12,8 +12,9 @@ const TONE_CLASS: Record<string, string> = {
   cancelled: styles.badgeCancelled,
 };
 
-export function StatusBadge({ status, className }: { status: InvoiceStatus; className?: string }) {
+/** Invoice status badge; pass `tone` for other labels (e.g. a quotation's Accepted / Expired). */
+export function StatusBadge({ status, tone, className }: { status: InvoiceStatus | string; tone?: string; className?: string }) {
   return (
-    <span className={cn(styles.badge, TONE_CLASS[statusTone(status)], className)}>{status}</span>
+    <span className={cn(styles.badge, TONE_CLASS[tone ?? statusTone(status as InvoiceStatus)], className)}>{status}</span>
   );
 }

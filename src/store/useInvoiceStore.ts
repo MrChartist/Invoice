@@ -100,7 +100,7 @@ export interface InvoiceState extends InvoiceRecord {
  * Every persisted field of `InvoiceRecord`. The compile-time check below fails when a field is
  * added to the record type but not here — otherwise the editor would silently drop it on save.
  */
-const RECORD_KEYS = [
+export const RECORD_KEYS = [
   'id', 'invoice_number', 'doc_type', 'issue_date', 'due_date', 'status', 'currency', 'template_id',
   'client', 'sender', 'items', 'gst_mode', 'place_of_supply', 'reverse_charge', 'discount_type',
   'discount_rate', 'tax_rate', 'shipping', 'other_charges', 'round_off_enabled', 'amount_paid', 'notes',
@@ -108,7 +108,7 @@ const RECORD_KEYS = [
   'cgst_amount', 'sgst_amount', 'igst_amount', 'tax_amount', 'round_off', 'total', 'balance_due',
   'supply_type', 'lut_number', 'lut_date', 'price_includes_tax', 'round_mode', 'tcs_enabled', 'tcs_rate',
   'tcs_base', 'tcs_label', 'tds_enabled', 'tds_section', 'tds_rate', 'tds_on_taxable', 'cess_amount',
-  'tcs_amount', 'tds_amount', 'created_at', 'updated_at',
+  'tcs_amount', 'tds_amount', 'created_at', 'updated_at', 'quote_status', 'ship_to',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

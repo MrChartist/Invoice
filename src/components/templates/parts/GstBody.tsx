@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { cn, currencySymbol, formatQuantity } from '../../../lib/utils';
 import { amountInWords } from '../../../lib/amount-in-words';
-import { formatPlaceOfSupply } from '../../../lib/india-states';
+import { formatPlaceOfSupply, stateByCode } from '../../../lib/india-states';
 import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
@@ -33,6 +33,7 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
 export function GstBody({ invoice, sender, totals }: Props) {
   const { money, currency, date, col, show, footerText, headerNote } = usePaper();
   const c = invoice.client;
+  const ship = invoice.ship_to && (invoice.ship_to.address || invoice.ship_to.name) ? invoice.ship_to : null;
   const cur = invoice.currency;
   const symbol = currencySymbol(cur);
   const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
@@ -112,6 +113,18 @@ export function GstBody({ invoice, sender, totals }: Props) {
           </div>
         </div>
         <div className={styles.gCell}>
+          {ship && (
+            <div style={{ marginBottom: 8 }}>
+              <div className={styles.gLabel}>Consignee (Ship to)</div>
+              {ship.name && <div className={styles.gName} style={{ fontSize: 13 }}>{ship.name}</div>}
+              <div className={styles.meta}>
+                {(ship.address ?? '').split('\n').filter(Boolean).map((l, i) => <span key={i}>{l}<br /></span>)}
+                {[ship.city, ship.zip].filter(Boolean).join(' ')}
+                {ship.state_code && <><br />{stateByCode(ship.state_code)?.name}</>}
+                {ship.gstin && <><br /><b>GSTIN/UIN:</b> {ship.gstin}</>}
+              </div>
+            </div>
+          )}
           <div className={styles.gLabel}>Currency</div>
           <div className={styles.gValue}>{cur}</div>
           {invoice.balance_due > 0 && invoice.amount_paid > 0 && (

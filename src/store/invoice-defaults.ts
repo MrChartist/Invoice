@@ -17,6 +17,7 @@ import type {
   InvoiceItem,
   InvoiceRecord,
   SenderProfile,
+  ShipTo,
 } from '../types/invoice';
 
 export function blankClient(): Client {
@@ -243,6 +244,9 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     cess_amount: num(r.cess_amount),
     tcs_amount: num(r.tcs_amount),
     tds_amount: num(r.tds_amount),
+
+    ...(r.quote_status === 'Accepted' || r.quote_status === 'Declined' ? { quote_status: r.quote_status } : {}),
+    ...(r.ship_to && typeof r.ship_to === 'object' ? { ship_to: { ...(r.ship_to as ShipTo) } } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

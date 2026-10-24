@@ -64,3 +64,15 @@ Receivables / stats: replace `inv.balance_due` with `effectiveOutstanding(inv, r
 Backup: add `doc_links` to the backup table list (`src/lib/backup.ts`) so links round-trip.
 
 Template note: the `Credit Note` template should render `po_number` / `notes` (they hold the original number/date reference).
+
+## Quotation outcome and ship-to
+
+- `quote_status` (`Accepted` | `Declined`, additive) is set from the editor's **Quotation** row
+  (`localDb.invoices.setQuoteStatus`, period-lock checked, audited). `quoteState()` in `src/lib/quote-status.ts`
+  derives what the list shows: Draft, Sent, Accepted, Declined, **Expired** (past the quote's "valid until" =
+  `due_date`) or **Converted** (a `converted` link exists). Converting a quotation marks it Accepted.
+- `ship_to` (additive `{name, address, city, state_code, zip, gstin}`) comes from "Ship to a different address" in
+  the editor, prints as **Ship to** (Consignee on the GST layout), and is the e-Way bill's delivery address unless
+  the e-Way dialog overrides it.
+- `normalizeRecord` and the store's `RECORD_KEYS` must both carry every persisted field;
+  `tests/invoice-store.test.ts` fails if loading → saving would drop one.

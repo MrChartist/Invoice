@@ -167,9 +167,14 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const toGstinState = /^\d{2}/.test(buyerGstin) ? buyerGstin.slice(0, 2) : '';
   const clientState = stateByCode(client.state_code)?.code ?? stateByName(client.state)?.code ?? '';
   const toState = isExport ? '99' : toGstinState || clientState || (record.place_of_supply ?? '');
-  const toAddr = splitAddress(options.shipTo?.addr1 ?? client.address ?? '');
-  const actTo = options.shipTo?.stateCode ?? (isExport ? '99' : clientState || toState);
-  const shipDiffers = !!(options.shipTo || options.shipFrom);
+  // A ship-to address saved on the invoice applies unless the caller overrides it.
+  const savedShip = record.ship_to && (record.ship_to.address || record.ship_to.state_code)
+    ? { addr1: record.ship_to.address, place: record.ship_to.city, pin: record.ship_to.zip, stateCode: record.ship_to.state_code }
+    : undefined;
+  const shipTo = options.shipTo ?? savedShip;
+  const toAddr = splitAddress(shipTo?.addr1 ?? client.address ?? '');
+  const actTo = shipTo?.stateCode ?? (isExport ? '99' : clientState || toState);
+  const shipDiffers = !!(shipTo || options.shipFrom);
 
   // Goods only — e-Way Bills do not apply to services.
   const goods = calc.lines.filter((l) => !isServiceHsn(l.hsn));
@@ -231,8 +236,8 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
     toTrdName: (client.company || client.name || '').trim(),
     toAddr1: toAddr.addr1,
     toAddr2: toAddr.addr2,
-    toPlace: (options.shipTo?.place ?? client.city ?? '').trim(),
-    toPincode: isExport ? 999999 : pinOf(options.shipTo?.pin) || pinOf(client.zip) || extractPin(client.address),
+    toPlace: (shipTo?.place ?? client.city ?? '').trim(),
+    toPincode: isExport ? 999999 : pinOf(shipTo?.pin) || pinOf(client.zip) || extractPin(client.address),
     actToStateCode: codeNum(actTo),
     toStateCode: codeNum(toState),
     totalValue: taxable,

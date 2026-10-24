@@ -425,6 +425,19 @@ export const localDb = {
       setTable(KEYS.invoices, invoices);
       logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
     },
+
+    /** Record (or clear) the client's answer to a quotation. Respects the period lock; audited. */
+    setQuoteStatus: (id: string, quoteStatus: InvoiceRecord['quote_status']) => {
+      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+      const idx = invoices.findIndex((i) => i.id === id);
+      if (idx < 0) return;
+      const before = invoices[idx];
+      if (before.doc_type !== 'QUOTATION' || before.quote_status === quoteStatus) return;
+      const overridden = assertUnlocked(before, 'edit') === 'overridden';
+      invoices[idx] = { ...before, quote_status: quoteStatus, updated_at: new Date().toISOString() };
+      setTable(KEYS.invoices, invoices);
+      logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
+    },
   },
 
   payments: {

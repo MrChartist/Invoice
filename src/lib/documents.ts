@@ -223,13 +223,13 @@ export function convertDocument(source: InvoiceRecord, target: DocumentType): In
   addLink({ from_id: source.id, to_id: saved.id, relation: 'converted' });
 
   const nextStatus = statusAfterConversion(source);
-  if (nextStatus !== source.status) {
-    try {
-      localDb.invoices.setStatus(source.id, nextStatus);
-    } catch (err) {
-      // A source document inside a locked period keeps its status; the conversion itself still stands.
-      if (!isPeriodLockedError(err)) throw err;
-    }
+  // Converting a quotation means the client said yes.
+  try {
+    if (nextStatus !== source.status) localDb.invoices.setStatus(source.id, nextStatus);
+    if (source.doc_type === 'QUOTATION' && !source.quote_status) localDb.invoices.setQuoteStatus(source.id, 'Accepted');
+  } catch (err) {
+    // A source document inside a locked period keeps its status; the conversion itself still stands.
+    if (!isPeriodLockedError(err)) throw err;
   }
   return saved;
 }

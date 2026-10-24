@@ -1,6 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, Lock, RotateCcw } from 'lucide-react';
+import { Ban, Lock, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { StatusBadge } from '../ui/StatusBadge';
+import { quoteState, quoteTone } from '../../lib/quote-status';
+import { getTable } from '../../lib/storage';
 import { ConvertMenu } from '../documents/ConvertMenu';
 import { CreditNoteModal } from '../documents/CreditNoteModal';
 import { CancelDialog } from '../documents/CancelDialog';
@@ -81,6 +84,35 @@ export function DocumentActions({
           {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? 'Reinstate' : 'Cancel document'}
         </button>
       </div>
+
+      {saved.doc_type === 'QUOTATION' && (() => {
+        const q = quoteState(saved, getTable<{ from_id: string; relation: string }>('doc_links'));
+        const setOutcome = (outcome: 'Accepted' | 'Declined' | undefined) => {
+          try {
+            localDb.invoices.setQuoteStatus(saved.id, outcome);
+            reloadEditor();
+          } catch (err) {
+            window.alert((err as Error).message);
+          }
+        };
+        return (
+          <div className={styles.row} role="group" aria-label="Quotation outcome">
+            <span>Quotation:</span> <StatusBadge status={q} tone={quoteTone(q)} />
+            {q !== 'Converted' && (
+              <>
+                <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Accepted'}
+                  onClick={() => setOutcome(saved.quote_status === 'Accepted' ? undefined : 'Accepted')}>
+                  <ThumbsUp size={15} /> Accepted
+                </button>
+                <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Declined'}
+                  onClick={() => setOutcome(saved.quote_status === 'Declined' ? undefined : 'Declined')}>
+                  <ThumbsDown size={15} /> Declined
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       <OverdueInterest invoice={saved} onAddLine={addInterestLine} />
 

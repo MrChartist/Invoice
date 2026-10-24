@@ -183,6 +183,19 @@ export interface Payment {
   date: string;
 }
 
+/** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */
+export type QuoteStatus = 'Accepted' | 'Declined';
+
+/** Consignee / delivery address when goods go somewhere other than the billing address. */
+export interface ShipTo {
+  name?: string;
+  address?: string;
+  city?: string;
+  state_code?: string;
+  zip?: string;
+  gstin?: string;
+}
+
 /** Everything that makes up one document. Also the persisted localStorage row. */
 export interface InvoiceRecord {
   id: string;
@@ -262,4 +275,8 @@ export interface InvoiceRecord {
 
   created_at?: string;
   updated_at?: string;
+  /** Additive: the client's answer to a quotation. */
+  quote_status?: QuoteStatus;
+  /** Additive: ship-to / consignee address (printed and used for the e-Way bill). */
+  ship_to?: ShipTo;
 }

@@ -1097,3 +1097,10 @@
 .irnCompact .irnText { width: 100%; }
 .paper[data-paper='a5'] .irnText { font-size: 8.5px; }
 .paper[data-paper='a5'] .irnMono { font-size: 8px; }
+
+.shipTo {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed currentColor;
+  border-top-color: color-mix(in srgb, currentColor 25%, transparent);
+}

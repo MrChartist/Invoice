@@ -5,6 +5,7 @@ import styles from './invoice-paper.module.css';
 /** English label text — identical to what the original four layouts printed. */
 const EN = {
   billTo: 'Bill to',
+  shipTo: 'Ship to',
   preparedFor: 'Prepared for',
   issueDate: 'Issue date',
   quoteDate: 'Quote date',
@@ -55,6 +56,7 @@ export type LabelKey = keyof typeof EN;
 /** Hindi second line for the bilingual layout. */
 const HI: Record<LabelKey, string> = {
   billTo: 'बिल प्राप्तकर्ता',
+  shipTo: 'माल भेजने का पता',
   preparedFor: 'प्रस्तुत',
   issueDate: 'जारी तिथि',
   quoteDate: 'कोटेशन तिथि',

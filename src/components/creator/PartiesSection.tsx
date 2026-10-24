@@ -21,6 +21,9 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
   const sender = useInvoiceStore((s) => s.sender);
   const client = useInvoiceStore((s) => s.client);
   const placeOfSupply = useInvoiceStore((s) => s.place_of_supply);
+  const shipTo = useInvoiceStore((s) => s.ship_to);
+  const patch = useInvoiceStore((s) => s.patch);
+  const setShip = (p: Partial<NonNullable<typeof shipTo>>) => patch({ ship_to: { ...shipTo, ...p } });
   const gstMode = useInvoiceStore((s) => s.gst_mode);
   const { setSender, setClient, setPlaceOfSupply } = useInvoiceStore.getState();
   // Directory snapshot, refreshed whenever the name field gains focus.
@@ -134,6 +137,34 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             <input className={controls.input} type="email" value={client.email} onChange={(e) => setClient({ email: e.target.value })} placeholder="Email" aria-label="Client email" />
             <input className={controls.input} type="tel" value={client.phone ?? ''} onChange={(e) => setClient({ phone: e.target.value })} placeholder="Phone" aria-label="Client phone" />
           </div>
+          <label className={styles.shipToggle}>
+            <input
+              type="checkbox"
+              checked={!!shipTo}
+              onChange={(e) => patch({ ship_to: e.target.checked ? { name: client.name, state_code: client.state_code } : undefined })}
+            />
+            Ship to a different address
+          </label>
+          {shipTo && (
+            <fieldset className={styles.shipFields}>
+              <legend className={controls.label}>Ship to / consignee</legend>
+              <input className={controls.input} value={shipTo.name ?? ''} onChange={(e) => setShip({ name: e.target.value })} placeholder="Consignee name" aria-label="Ship-to name" />
+              <textarea className={controls.textarea} rows={2} value={shipTo.address ?? ''} onChange={(e) => setShip({ address: e.target.value })} placeholder="Delivery address" aria-label="Ship-to address" />
+              <div className={controls.row}>
+                <input className={controls.input} value={shipTo.city ?? ''} onChange={(e) => setShip({ city: e.target.value })} placeholder="City" aria-label="Ship-to city" />
+                <input className={controls.input} inputMode="numeric" maxLength={6} value={shipTo.zip ?? ''} onChange={(e) => setShip({ zip: e.target.value.replace(/\D/g, '') })} placeholder="PIN" aria-label="Ship-to PIN code" />
+              </div>
+              <select className={controls.select} value={shipTo.state_code ?? ''} onChange={(e) => setShip({ state_code: e.target.value })} aria-label="Ship-to state">
+                <option value="">State</option>
+                {INDIAN_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.code} — {s.name}
+                  </option>
+                ))}
+              </select>
+              <GstinInput value={shipTo.gstin ?? ''} onChange={(v) => setShip({ gstin: v })} placeholder="Consignee GSTIN (optional)" />
+            </fieldset>
+          )}
         </div>
       </div>
 

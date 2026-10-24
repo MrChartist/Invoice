@@ -29,6 +29,7 @@ import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId } from '../lib/localDb';
 import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
+import { quoteState, quoteTone } from '../lib/quote-status';
 import { bulkMarkPaid, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
 import { effectiveStatus } from '../lib/invoice-status';
 import { getTable } from '../lib/storage';
@@ -119,7 +120,9 @@ export function Transactions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const invoices = useMemo(() => localDb.invoices.getAll(), [version]);
   const now = new Date();
-  const summary = useMemo(() => summarize(invoices, now, getTable<CreditLink>('doc_links'), 'INR'), [invoices]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const links = useMemo(() => getTable<CreditLink & { relation: string }>('doc_links'), [version]);
+  const summary = useMemo(() => summarize(invoices, now, links, 'INR'), [invoices, links]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -431,7 +434,14 @@ export function Transactions() {
                         </div>
                       </td>
                       <td className={styles.cStatus}>
-                        <StatusBadge status={status} />
+                        {inv.doc_type === 'QUOTATION' ? (
+                          (() => {
+                            const q = quoteState(inv, links, now);
+                            return <StatusBadge status={q} tone={quoteTone(q)} />;
+                          })()
+                        ) : (
+                          <StatusBadge status={status} />
+                        )}
                       </td>
                       <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
                       <td className={cn(surface.numeric, styles.cBal)}>
