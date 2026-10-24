@@ -229,6 +229,43 @@
   background: var(--loss);
 }
 
+.health {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.health li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.health strong {
+  display: block;
+  color: var(--foreground);
+}
+
+.health span {
+  color: var(--muted-foreground);
+}
+
+.healthWarn {
+  color: var(--warning);
+}
+
+.healthCritical {
+  color: var(--destructive);
+}
+
+.healthOk {
+  color: var(--muted-foreground);
+}
+
 .danger {
   border-color: color-mix(in srgb, var(--destructive) 40%, var(--border));
 }

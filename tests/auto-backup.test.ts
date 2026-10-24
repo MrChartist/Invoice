@@ -124,3 +124,12 @@ test('backupPayload: a stored passphrase-derived key writes a file the normal pa
   assert.match(plain.filename, /\d\.json$/);
   assert.ok(plain.text.includes('Acme'));
 });
+
+test('isIntactBackup: only an exact, parseable copy of our backup counts', async () => {
+  const { isIntactBackup } = await import('../src/lib/auto-backup.ts');
+  const text = JSON.stringify({ app: 'mrchartist-invoice', version: 1, data: {} });
+  assert.equal(isIntactBackup(text, text), true);
+  assert.equal(isIntactBackup(text.slice(0, -5), text), false, 'truncated');
+  assert.equal(isIntactBackup('{"app":"other"}', '{"app":"other"}'), false);
+  assert.equal(isIntactBackup('', ''), false);
+});

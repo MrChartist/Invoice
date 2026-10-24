@@ -231,11 +231,23 @@ export async function backupPayload(now: Date, key: StoredEncryptionKey | null =
   return { filename: backupFilename(now), text: JSON.stringify(buildBackup(now), null, 2) };
 }
 
+/** True when `readBack` is exactly what was written and parses as one of our backups. */
+export function isIntactBackup(readBack: string, written: string): boolean {
+  if (readBack !== written) return false;
+  try {
+    const parsed = JSON.parse(readBack) as { app?: unknown } | null;
+    return parsed?.app === 'mrchartist-invoice';
+  } catch {
+    return false;
+  }
+}
+
 /* ── File System Access plumbing ───────────────────────────────── */
 
 type PermState = 'granted' | 'denied' | 'prompt';
 interface FsFileHandle {
   createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
+  getFile?(): Promise<{ text(): Promise<string> }>;
 }
 export interface FsDirHandle {
   kind: 'directory';
@@ -275,7 +287,15 @@ export async function disconnectFolder(): Promise<void> {
 }
 
 export type BackupResult =
-  | { ok: true; filename: string; method: 'folder' | 'download'; deleted: string[]; folder?: string }
+  | {
+      ok: true;
+      filename: string;
+      method: 'folder' | 'download';
+      deleted: string[];
+      folder?: string;
+      /** Folder backups are read back after writing: true = the file reopened intact. */
+      verified?: boolean;
+    }
   | { ok: false; reason: 'unsupported' | 'no-folder' | 'permission' | 'error'; message: string };
 
 /** Manual fallback: normal browser download (encrypted when a key is stored). Counts as a backup. */
@@ -318,6 +338,18 @@ export async function runAutoBackup(opts: { interactive?: boolean; now?: Date } 
     const writable = await file.createWritable();
     await writable.write(text);
     await writable.close();
+
+    // Read the file back: a backup that cannot be reopened is not a backup.
+    let verified: boolean | undefined;
+    try {
+      const back = await (await dir.getFileHandle(filename)).getFile?.();
+      if (back) verified = isIntactBackup(await back.text(), text);
+    } catch {
+      verified = false;
+    }
+    if (verified === false) {
+      return { ok: false, reason: 'error', message: 'The backup file could not be read back from the folder. Try again or pick another folder.' };
+    }
     recordBackup(now);
 
     // Rotation is best effort: a failure here must not turn a good backup into an error.
@@ -336,7 +368,7 @@ export async function runAutoBackup(opts: { interactive?: boolean; now?: Date } 
     } catch {
       /* ignore */
     }
-    return { ok: true, filename, method: 'folder', deleted, folder: dir.name };
+    return { ok: true, filename, method: 'folder', deleted, folder: dir.name, verified };
   } catch (err) {
     return { ok: false, reason: 'error', message: (err as Error)?.message || 'Could not write the backup.' };
   }

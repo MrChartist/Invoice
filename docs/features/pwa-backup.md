@@ -95,3 +95,11 @@ The module captures `beforeinstallprompt` on import, so import it early (main.ts
   or the file / `schema_version` is newer than this app.
 - Before a restore or an erase, `saveSafetySnapshot(reason)` copies every app key into IndexedDB (`safety-snapshot`,
   outside the localStorage quota). Settings → Data shows **Undo last restore / erase** while that copy exists.
+
+## Storage health
+
+`src/lib/storage-health.ts`: `measureStorage()` counts app keys in localStorage (not covered by
+`navigator.storage.estimate()`) and the logo/signature images copied into invoice snapshots; `assessStorage()` turns
+that plus persistence, iOS-Safari-outside-Home-Screen and backup age into findings (`ok`/`warn`/`critical`) shown in
+Settings → Data. Folder backups are read back after writing (`isIntactBackup`); a file that does not reopen intact is
+reported as a failed backup and the "last backup" time is not advanced.

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Info, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
 import {
   backupFilename,
   buildBackup,
   clearSafetySnapshot,
+  getLastBackup,
   getSafetySnapshot,
   markBackupDone,
   parseBackup,
@@ -17,7 +18,8 @@ import {
 } from '../../lib/backup';
 import { ImportWizard } from '../import/ImportWizard';
 import { SampleDataCard } from '../demo/SampleDataCard';
-import { appDataSize } from '../../lib/storage';
+import { assessStorage, formatChars, measureStorage } from '../../lib/storage-health';
+import { isIosSafari, isStandalone, requestPersistentStorage } from '../../lib/pwa';
 import { localDb } from '../../lib/localDb';
 import { downloadText } from '../../lib/download';
 import { formatCurrency } from '../../lib/utils';
@@ -25,9 +27,6 @@ import type { InvoiceItem } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
-
-// localStorage is ~5 MB in every mainstream browser.
-const QUOTA_BYTES = 5 * 1024 * 1024;
 
 interface Props {
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
@@ -46,21 +45,33 @@ export function DataPanel({ notify }: Props) {
   const [wipeOpen, setWipeOpen] = useState(false);
   const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
   const [safety, setSafety] = useState<SafetySnapshot | null>(null);
+  const [persisted, setPersisted] = useState<boolean | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
     getSafetySnapshot().then((snap) => alive && setSafety(snap));
+    requestPersistentStorage().then((st) => alive && setPersisted(st.supported ? st.persisted : null));
     return () => {
       alive = false;
     };
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const used = useMemo(() => appDataSize(), [version]);
+  const health = useMemo(
+    () =>
+      assessStorage({
+        ...measureStorage(),
+        persisted,
+        iosSafari: isIosSafari(),
+        standalone: isStandalone(),
+        lastBackupIso: getLastBackup(),
+        now: new Date(),
+      }),
+    [version, persisted], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const catalog = useMemo<InvoiceItem[]>(() => localDb.items.getAll(), [version]);
-  const pct = Math.min(100, Math.round((used / QUOTA_BYTES) * 100));
+  const pct = health.pct;
 
   const exportBackup = () => {
     downloadText(backupFilename(), JSON.stringify(buildBackup(), null, 2), 'application/json');
@@ -120,13 +131,35 @@ export function DataPanel({ notify }: Props) {
             <HardDrive size={16} /> Storage on this device
           </span>
           <span className={surface.mono}>
-            {(used / 1024).toFixed(0)} KB of ~5 MB
+            {formatChars(health.usedChars)} of ~5 MB
           </span>
         </div>
         <div className={surface.cardBody}>
           <div className={styles.meter} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Browser storage used">
             <div className={`${styles.meterFill} ${pct > 80 ? styles.meterWarn : ''}`} style={{ width: `${Math.max(pct, 1)}%` }} />
           </div>
+          {health.findings.length > 0 && (
+            <ul className={styles.health} aria-label="Storage health">
+              {health.findings.map((f) => (
+                <li key={f.id}>
+                  {f.level === 'ok' ? (
+                    <Info size={16} className={styles.healthOk} aria-hidden="true" />
+                  ) : (
+                    <AlertTriangle size={16} className={f.level === 'critical' ? styles.healthCritical : styles.healthWarn} aria-hidden="true" />
+                  )}
+                  <div>
+                    <strong>{f.title}</strong>
+                    <span>{f.detail}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {health.biggest.length > 0 && (
+            <p className={surface.sectionNote}>
+              Largest: {health.biggest.map((t) => `${t.name.replace(/_/g, ' ')} ${formatChars(t.chars)}`).join(' · ')}
+            </p>
+          )}
           <p className={surface.sectionNote}>
             Everything lives in this browser only. Clearing site data, switching browser or using a private window
             will lose it — download a backup regularly.
