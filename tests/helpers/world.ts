@@ -122,7 +122,7 @@ export interface InvSpec {
   supply?: SupplyType;
   inclusive?: boolean;
   tcs?: { rate: number; base?: 'taxable' | 'total' };
-  tds?: { rate: number; onTaxable?: boolean };
+  tds?: { rate: number; onTaxable?: boolean; section?: string };
   reverseCharge?: boolean;
   pos?: string;
   asDraft?: boolean;
@@ -169,7 +169,7 @@ export function createViaStore(spec: InvSpec): InvoiceRecord {
   if (spec.supply) st().setSupplyType(spec.supply);
   if (spec.inclusive) st().setPriceIncludesTax(true);
   if (spec.tcs) st().setTcs({ enabled: true, rate: spec.tcs.rate, base: spec.tcs.base ?? 'total' });
-  if (spec.tds) st().setTds({ enabled: true, rate: spec.tds.rate, onTaxable: spec.tds.onTaxable ?? true });
+  if (spec.tds) st().setTds({ enabled: true, rate: spec.tds.rate, onTaxable: spec.tds.onTaxable ?? true, ...(spec.tds.section ? { section: spec.tds.section } : {}) });
   if (spec.reverseCharge) st().setReverseCharge(true);
 
   const result = st().saveInvoice({ asDraft: spec.asDraft });
