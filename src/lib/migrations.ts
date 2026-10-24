@@ -14,6 +14,7 @@
  *    so the app keeps reading the old shape through its tolerant readers.
  */
 
+import { audit } from './audit';
 import { DB_PREFIX, SINGLETON_KEYS, collectAppData, getJson, readRaw, removeRaw, setJson, writeRaw } from './storage';
 
 export const SCHEMA_VERSION_KEY = `${DB_PREFIX}schema_version`;
@@ -45,6 +46,21 @@ export const MIGRATIONS: Migration[] = [
         activeProfileId: profile.id,
         onboarded: raw.onboarded ?? Boolean(profile.companyName),
       });
+    },
+  },
+  {
+    version: 2,
+    name: 'audit_log: seal pre-chain rows with a chain-start anchor',
+    // 4.5 hash-chains the audit log. Rows written before it stay exactly as they were; one
+    // `chain_start` anchor after them records their count + digest, so later edits to them show up
+    // in verification. Idempotent: a log that already ends in a chained row is left alone.
+    // (`audit.record` does the same lazily, so skipping this migration would still be safe.)
+    up: () => {
+      try {
+        audit.sealLegacy();
+      } catch {
+        /* storage full: never block the boot over this; the next audit.record seals (and trims) instead */
+      }
     },
   },
 ];

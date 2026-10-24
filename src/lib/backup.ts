@@ -12,7 +12,8 @@ import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
 import { localDayOf } from './dates';
-import { audit } from './audit';
+import { AUDIT_TABLE, audit } from './audit';
+import type { AuditEntry } from '../types/audit';
 import {
   CryptoError,
   decryptString,
@@ -284,8 +285,29 @@ export async function clearSafetySnapshot(): Promise<void> {
   await idbDel(SAFETY_KEY);
 }
 
-/** Writes validated backup keys into storage. Throws StorageWriteError if the quota is hit. */
-export function applyBackup(data: Record<string, string>): void {
+const AUDIT_KEY = DB_PREFIX + AUDIT_TABLE;
+
+/** Chain head + row count of a stored / backed-up audit log (raw JSON). */
+function logInfo(raw: string | null | undefined): { head: string | null; rows: number } {
+  try {
+    const rows = raw ? (JSON.parse(raw) as AuditEntry[]) : [];
+    if (!Array.isArray(rows) || !rows.length) return { head: null, rows: 0 };
+    return { head: rows[rows.length - 1]?.hash ?? null, rows: rows.length };
+  } catch {
+    return { head: null, rows: 0 };
+  }
+}
+
+/**
+ * Writes validated backup keys into storage. Throws StorageWriteError if the quota is hit.
+ *
+ * Audit log: a backup that carries one brings its own chain (which still verifies on its own); a
+ * `restore` marker is then appended to it, linked to the backup's head, recording that head and the
+ * head + size of the log it replaced. A backup without a log leaves this device's log in place and
+ * the marker continues it. `replaced` is passed by `restoreBackup`, which wipes before writing.
+ */
+export function applyBackup(data: Record<string, string>, replaced?: { head: string | null; rows: number }): void {
+  const prior = replaced ?? (AUDIT_KEY in data ? logInfo(readRaw(AUDIT_KEY)) : undefined);
   // All-or-nothing: if the browser refuses a write half-way (quota), put back what was
   // there before so a failed restore can never leave a mix of old and new tables.
   const written: Array<[string, string | null]> = [];
@@ -307,11 +329,17 @@ export function applyBackup(data: Record<string, string>): void {
     throw err;
   }
   // Restoring replaces whatever was there; that is allowed even over a locked period, but never silent.
+  const restored = logInfo(data[AUDIT_KEY]);
   audit.record({
     entity: 'system',
     entity_id: 'backup',
     action: 'restore',
     summary: `Data restored from a backup (${Object.keys(data).length} data keys)`,
+    seal: {
+      restored_head: restored.head,
+      restored_rows: restored.rows,
+      ...(prior ? { replaced_head: prior.head, replaced_rows: prior.rows } : {}),
+    },
   });
 }
 
@@ -326,7 +354,7 @@ export function restoreBackup(data: Record<string, string>): void {
   for (const key of LOCAL_ONLY) delete snapshot[key];
   try {
     wipeAppData();
-    applyBackup(data);
+    applyBackup(data, logInfo(snapshot[AUDIT_KEY]));
   } catch (err) {
     wipeAppData();
     for (const [key, value] of Object.entries(snapshot)) {

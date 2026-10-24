@@ -25,7 +25,10 @@ export type AuditAction =
   | 'unlock'
   | 'override'
   | 'restore'
-  | 'import';
+  | 'import'
+  /** Integrity anchors (4.5): written by the app itself, never by a user action. */
+  | 'chain_start'
+  | 'truncate';
 
 export interface AuditChange {
   field: string;
@@ -48,6 +51,29 @@ export interface AuditEntry {
   doc_number?: string;
   /** Owning document id for rows that hang off one (payments). */
   parent_id?: string;
+  /**
+   * Tamper evidence (4.5). `prev` is the previous row's `hash` (or `AUDIT_GENESIS` for the first row);
+   * `hash` is SHA-256 over the canonical form of every other field of this row, `prev` included.
+   * Absent on rows written before 4.5 (the legacy segment).
+   */
+  prev?: string;
+  hash?: string;
+  /** Extra facts carried by anchor rows (`chain_start`, `truncate`, `restore`). Covered by `hash`. */
+  seal?: AuditSeal;
+}
+
+export interface AuditSeal {
+  /** Unchained rows immediately before this anchor (chain_start) or at the start of the log (truncate). */
+  legacy?: { count: number; digest: string };
+  /** truncate: why older rows were removed, how many, and the `prev` of the first chained row kept. */
+  reason?: 'storage' | 'cap';
+  dropped?: number;
+  cut?: string;
+  /** restore: chain head + row count of the backup's own log, and of the log it replaced. */
+  restored_head?: string | null;
+  restored_rows?: number;
+  replaced_head?: string | null;
+  replaced_rows?: number;
 }
 
 export const AUDIT_ENTITIES: AuditEntity[] = [
@@ -74,6 +100,8 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   'override',
   'restore',
   'import',
+  'chain_start',
+  'truncate',
 ];
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -89,6 +117,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   override: 'Lock overridden',
   restore: 'Restored',
   import: 'Imported',
+  chain_start: 'Chain started',
+  truncate: 'Older entries removed',
 };
 
 export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {

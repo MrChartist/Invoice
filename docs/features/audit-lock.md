@@ -33,8 +33,8 @@ Also in this wave: Tally-style keyboard entry in the editor (see the last sectio
 
 ## 2. Audit trail
 
-Table **`audit_log`** (`mrchartist_inv_audit_log`, part of backups). Rows oldest → newest; capped at the
-newest **5,000** (`AUDIT_MAX_ROWS`).
+Table **`audit_log`** (`mrchartist_inv_audit_log`, part of backups). Rows oldest → newest; capped at
+**5,000** (`AUDIT_MAX_ROWS`; past it the oldest are trimmed to 4,500 and a `truncate` anchor records it, §2a).
 
 ```ts
 interface AuditEntry {
@@ -47,6 +47,8 @@ interface AuditEntry {
   changes?: { field: string; from: string|null; to: string|null }[];   // display strings, money formatted
   doc_number?: string;                          // invoice / payment rows
   parent_id?: string;                           // payments → owning invoice id
+  prev?: string; hash?: string;                 // hash chain (4.5), see §2a
+  seal?: AuditSeal;                             // anchor facts (chain_start / truncate / restore)
 }
 ```
 
@@ -55,7 +57,8 @@ interface AuditEntry {
   create/update/delete, defaults, `lock` / `unlock`). Anything that goes through `localDb` — documents
   module, recurring, store, other agents' code — is logged without changing.
 * **Other writers**: importers (`createLocalSink().invoices`) log one `import` row; `applyBackup` /
-  `restoreBackup` log one `restore` row (restore replaces everything and is allowed even over a locked period).
+  `restoreBackup` log one `restore` marker (restore replaces everything and is allowed even over a locked period;
+  the marker records the backup's chain head and the head of the log it replaced, §2a).
   `audit.record(input)` is public for modules that write tables directly (purchases, etc.).
 * **Diffs**: `diffInvoice` (status, number, dates, client, GSTIN, items value, discount, shipping, charges, GST,
   TCS/TDS, total, received, supply fields, notes/terms excerpts, line count, per-line name/qty/rate/disc/GST/HSN —
@@ -64,12 +67,70 @@ interface AuditEntry {
 * **Privacy**: email, phone, address, bank details, UPI, logo, signature are recorded as
   `(hidden) → (changed)` only; notes/terms are excerpted to 60 characters; no full snapshots.
 * **Never breaks a save**: `audit.record` swallows every error and returns `null`; a quota error sheds the
-  oldest half once and retries; `localDb` additionally wraps row construction (`logSafe`). Tests cover a throwing
+  oldest half once (recorded by a `truncate` anchor) and retries; `localDb` additionally wraps row construction (`logSafe`). Tests cover a throwing
   logger and a full quota on the log table.
-* **Read side**: `audit.all()` (newest first), `audit.forInvoice(id)` (own rows + its payments),
+* **Read side**: `audit.all()` (newest first), `audit.rows()` (stored order), `audit.head()`, `audit.forInvoice(id)` (own rows + its payments),
   `filterAudit(entries, {entity, action, from, to, q})`, `auditToCsv(entries)` (formula-injection safe).
 * **UI**: `ActivityPanel` (lazy-loaded Settings tab: search, area, action, date range, expandable diffs, CSV,
   mobile cards) and `ActivityTimeline` (`invoiceId`, `refreshKey?`) in the editor's *Document actions*.
+
+## 2a. Tamper evidence (hash chain, roadmap 4.5)
+
+**What it gives you.** Every row carries `prev` (the previous row's `hash`) and `hash` =
+SHA-256 of the row's **canonical form**. Editing, deleting or reordering rows *inside the app's data* breaks
+the chain, and Settings → Activity → **Verify integrity** says where and how. **What it does not give you:**
+anyone with full access to the device can rewrite the whole log and recompute every hash. That is why the
+panel shows the **chain head** (hash of the newest row) with *Copy* / *Export* (a small `.txt`): note it down or
+send it to your CA. Pasting that hash into *Check a hash you noted* later makes a rewrite, or removal of newer
+rows, detectable. It is tamper-*evident*, not tamper-*proof*.
+
+* **Hash**: `src/lib/sha256.ts`, a ~60-line synchronous pure-JS SHA-256 (FIPS 180-4; round constants derived
+  from primes at first use). Synchronous because `audit.record` runs inside sync `localDb` code, and WebCrypto
+  `subtle.digest` is async-only. Tested against the NIST vectors (`""`, `abc`, the 448-bit message, one million
+  `a`) and against `node:crypto` on UTF-8 text and every padding boundary.
+* **Canonical form** (`canonical` in `audit.ts`): JSON with object keys sorted (recursively), `undefined`
+  members left out, arrays in order. `hash = sha256(canonical(row without its hash field))`, so `prev`, `seal`
+  and any future field are covered. The first chained row has `prev = AUDIT_GENESIS` (64 zeros).
+* **Anchor rows** (`entity: 'system'`, `entity_id: 'audit_log'`, written by the app, chained like every row):
+  * `chain_start`: seals a run of **unchained rows** right before it, as `seal.legacy = {count, digest}` with
+    `digest = sha256(canonical(rows))`. Its `prev` is the last chained row before the run (or genesis). Written
+    by the first `audit.record` after upgrading, and eagerly by **migration 2** (`audit.sealLegacy()`,
+    idempotent: a log that already ends in a chained row is untouched; quota errors never block the boot). Also
+    covers rows a stale tab running an older version might append later.
+  * `truncate`: written when the app itself removes the oldest rows. **Row cap**: going past 5,000 trims to
+    the newest 4,500 in one go (`reason: 'cap'`, so not every write after the cap adds an anchor).
+    **Storage full**: the quota path still sheds the oldest half and retries (`reason: 'storage'`).
+    `seal = {reason, dropped, cut, legacy?}` where `cut` is the `prev` of the first chained row kept and
+    `legacy` re-seals any unchained rows still at the front.
+  * `restore`: see below.
+* **Verification** (`verifyAuditChain(rows, {notedHead?})` in `src/lib/audit-chain.ts`, lazy) returns
+  `{ok, total, chained, legacy, head, trimmed?, restores, noted?, broken?: {index, reason, message}}`:
+  1. `hash` ≠ recomputed → **edited** (at that row).
+  2. `prev` ≠ previous chained row's hash → **reordered** if it points at another row that is present,
+     else **deleted** (a row before it is missing). An edit whose hash was recomputed shows up here, on the
+     next row.
+  3. First chained row: `prev` must be genesis or the newest `truncate` anchor's `cut`; otherwise
+     **truncated** ("older entries were removed without the app recording it"). With a matching anchor the
+     report carries `trimmed` and the UI says "older entries were removed (storage full / size limit)", not
+     "tampered".
+  4. An unchained run is fine only when sealed: by the `chain_start` right after it (count + digest), or, for a
+     leading run, by the newest `truncate` anchor. Otherwise **edited** / **deleted** (row added, altered or its
+     seal stripped). A log with no chained rows at all (not started yet) verifies as legacy.
+  5. `notedHead`: present → `{status:'present', index, newer}`; matches a restore marker's `replaced_head`
+     → `'replaced'` (not a failure); otherwise **truncated** ("entries after it were removed or the log was
+     rewritten").
+* **Restore** (`applyBackup` / `restoreBackup`): the log is no longer silently swapped.
+  * A backup that **contains** an `audit_log` brings its own chain; it verifies exactly as it did on the
+    device that made it (its own genesis / `truncate` / `chain_start` rules). A `restore` marker is then
+    appended, linked to the backup's head (`prev = restored head`), with
+    `seal = {restored_head, restored_rows, replaced_head, replaced_rows}` — the head and size of the log the
+    restore replaced. The replaced rows themselves are not kept in the log (they are in the pre-restore safety
+    snapshot in IndexedDB, and their head is in the marker, so a copy you exported earlier can be matched).
+  * A backup **without** a log (rare; partial files via `applyBackup`) keeps the device's log; the marker
+    continues that chain with `restored_head: null` and no `replaced_*`.
+  * A pre-4.5 backup's unchained log gets a `chain_start` before the marker.
+* **Cost**: one SHA-256 of a ~300-byte row per write (microseconds); verifying 5,000 rows is a few tens of ms
+  and only runs on demand. Adds ~1 kB gz to the data path (`sha256.ts` + canonical/link code).
 
 ## 3. Period lock
 
@@ -128,8 +189,15 @@ interface AuditEntry {
 
 ## Limits
 
-* The log is per device, not tamper-proof (a user with devtools can edit `localStorage`); it is an honest edit
-  log, not an immutable ledger. The PIN lock is likewise a speed bump, not encryption (see AGENTS.md).
+* The log is per device and tamper-**evident**, not tamper-proof: a user with devtools can rewrite all of
+  `localStorage`, hashes included. Only a head hash kept *outside* the device (exported / given to a CA) makes
+  such a rewrite detectable, and only for rows up to that head. Removing the *newest* rows, or removing the
+  oldest rows together with a forged `truncate` anchor, cannot be seen from the device's data alone. The PIN
+  lock is likewise a speed bump, not encryption (see AGENTS.md).
+* Two tabs writing at the same instant: the last write wins and the other row is lost (as before); the chain
+  stays consistent because each write re-reads the table.
+* A restore keeps the backup's log plus a marker; the replaced device log survives only as its head hash in
+  the marker (and in the safety snapshot).
 * Only localDb-mediated changes are logged individually; direct table writers (purchases, inventory, recurring
   schedule edits, importers' per-row writes) are not, unless they call `audit.record`.
 * Payments are locked by the **document's** date, not the receipt date.

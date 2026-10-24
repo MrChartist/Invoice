@@ -124,7 +124,7 @@ the quota after about 80 invoices (about 3,000 without a logo). This is a major 
 | 4.2 | **Move tables to IndexedDB** behind a synchronous in-memory cache; one-time migration from localStorage with rollback; shared connection in `idb-kv.ts`. **Keep every `mrchartist_inv_*` table name** | L | 1.1, 1.2, 1.3, 1.8 |
 | 4.3 | **Virtualise long tables** (Transactions, Receivables): long tasks of 235–280 ms at 300 invoices today | M | — |
 | 4.4 | **Split large components**: `ImportWizard` (835 lines, 24 `useState`), `InvoiceCreator` → reducer + step components | M | 1.5 |
-| 4.5 | **Tamper-evident audit log**: hash-chained rows; restore adds a marker row instead of replacing the log; no silent drop when storage is full | M | 4.2 |
+| 4.5 | ✅ **Tamper-evident audit log**: hash-chained rows; restore adds a marker row instead of replacing the log; no silent drop when storage is full | M | 4.2 |
 | 4.6 | ✅ Full `strict` mode on (done in Phase 1) | — | 1.7 |
 
 ---
