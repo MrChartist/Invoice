@@ -90,3 +90,37 @@ test('describeAge', () => {
   assert.equal(describeAge(ago(H), NOW), '1 hour ago');
   assert.equal(describeAge(ago(3 * D), NOW), '3 days ago');
 });
+
+test('isBackupFile / rotation also cover encrypted backups', () => {
+  assert.equal(isBackupFile('mrchartist-invoice-backup-2026-10-07.encrypted.json'), true);
+  assert.equal(isBackupFile('mrchartist-invoice-backup-2026-10-07.encrypted (2).json'), true);
+  const names = [
+    'mrchartist-invoice-backup-2026-10-01.json',
+    'mrchartist-invoice-backup-2026-10-05.encrypted.json',
+    'mrchartist-invoice-backup-2026-10-07.encrypted.json',
+  ];
+  assert.deepEqual(filesToDelete(names, 2), ['mrchartist-invoice-backup-2026-10-01.json']);
+});
+
+test('backupPayload: a stored passphrase-derived key writes a file the normal passphrase restore opens', async () => {
+  const shim = await import('./helpers/shim.ts');
+  shim.resetStorage();
+  localStorage.setItem('mrchartist_inv_clients', JSON.stringify([{ id: 'c1', name: 'Acme' }]));
+  const { backupPayload } = await import('../src/lib/auto-backup.ts');
+  const { deriveEncryptionKey } = await import('../src/lib/crypto.ts');
+  const { decryptBackup, isEncryptedBackup } = await import('../src/lib/backup.ts');
+
+  const key = await deriveEncryptionKey('correct horse battery');
+  assert.equal(key.key.extractable, false);
+  const enc = await backupPayload(NOW, key);
+  assert.match(enc.filename, /\.encrypted\.json$/);
+  assert.ok(isEncryptedBackup(enc.text));
+  assert.ok(!enc.text.includes('Acme'));
+  const restored = await decryptBackup(enc.text, 'correct horse battery');
+  assert.ok(restored.data.mrchartist_inv_clients.includes('Acme'));
+  await assert.rejects(decryptBackup(enc.text, 'wrong passphrase'));
+
+  const plain = await backupPayload(NOW, null);
+  assert.match(plain.filename, /\d\.json$/);
+  assert.ok(plain.text.includes('Acme'));
+});

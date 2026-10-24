@@ -151,6 +151,33 @@ export async function encryptString(
   return { v: 1, kdf: KDF_NAME, iter, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) };
 }
 
+/**
+ * A passphrase-derived AES key that can encrypt without the passphrase being typed
+ * again (scheduled backups). `key` is non-extractable and encrypt-only, so it can be
+ * kept in IndexedDB; files it produces are ordinary envelopes that `decryptString`
+ * opens with the original passphrase on any device.
+ */
+export interface StoredEncryptionKey {
+  key: CryptoKey;
+  salt: string;
+  iter: number;
+}
+
+export async function deriveEncryptionKey(passphrase: string, iter: number = PBKDF2_ITERATIONS): Promise<StoredEncryptionKey> {
+  if (!passphrase) throw new CryptoError('A passphrase is required.', 'bad-envelope');
+  if (iter < MIN_ITERATIONS) throw new CryptoError('Too few PBKDF2 iterations.', 'bad-envelope');
+  const salt = randomBytes(SALT_BYTES);
+  const key = await aesKey(passphrase, salt, iter, 'encrypt');
+  return { key, salt: bytesToBase64(salt), iter };
+}
+
+/** Encrypt with a stored key; a fresh IV per call, the key's salt and iterations in the header. */
+export async function encryptWithKey(plaintext: string, stored: StoredEncryptionKey): Promise<CipherEnvelope> {
+  const iv = randomBytes(IV_BYTES);
+  const ct = await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: aad(stored.iter) }, stored.key, encoder.encode(plaintext));
+  return { v: 1, kdf: KDF_NAME, iter: stored.iter, salt: stored.salt, iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) };
+}
+
 export function isCipherEnvelope(value: unknown): value is CipherEnvelope {
   if (!value || typeof value !== 'object') return false;
   const e = value as Record<string, unknown>;

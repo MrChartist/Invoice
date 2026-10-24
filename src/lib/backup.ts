@@ -11,7 +11,15 @@ import { DB_PREFIX, collectAppData, readRaw, writeRaw } from './storage';
 import { DEVICE_LOCAL_KEYS } from './auth';
 import { localDayOf } from './dates';
 import { audit } from './audit';
-import { CryptoError, decryptString, encryptString, isCipherEnvelope, type CipherEnvelope } from './crypto';
+import {
+  CryptoError,
+  decryptString,
+  encryptString,
+  encryptWithKey,
+  isCipherEnvelope,
+  type CipherEnvelope,
+  type StoredEncryptionKey,
+} from './crypto';
 
 export const BACKUP_APP_ID = 'mrchartist-invoice';
 
@@ -91,6 +99,18 @@ export async function buildEncryptedBackup(passphrase: string, now: Date = new D
     version: 1,
     exportedAt: now.toISOString(),
     envelope: await encryptString(plain, passphrase),
+  };
+  return JSON.stringify(file, null, 2);
+}
+
+/** Same file format as `buildEncryptedBackup`, encrypted with a stored passphrase-derived key. */
+export async function buildEncryptedBackupWithKey(stored: StoredEncryptionKey, now: Date = new Date()): Promise<string> {
+  const file: EncryptedBackupFile = {
+    app: BACKUP_APP_ID,
+    encrypted: true,
+    version: 1,
+    exportedAt: now.toISOString(),
+    envelope: await encryptWithKey(JSON.stringify(buildBackup(now)), stored),
   };
   return JSON.stringify(file, null, 2);
 }

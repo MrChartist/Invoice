@@ -7,7 +7,8 @@
  * fail-soft: it returns a status object and never throws.
  */
 
-import { backupFilename, buildBackup } from './backup';
+import { backupFilename, buildBackup, buildEncryptedBackupWithKey } from './backup';
+import { deriveEncryptionKey, type StoredEncryptionKey } from './crypto';
 import { downloadText } from './download';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { DB_PREFIX, readRaw, removeRaw, writeRaw } from './storage';
@@ -25,6 +26,8 @@ export const LAST_BACKUP_KEY = `${DB_PREFIX}last_backup`;
 export const CONFIG_KEY = `${DB_PREFIX}auto_backup`;
 export const SNOOZE_KEY = `${DB_PREFIX}backup_snooze`;
 export const HANDLE_KEY = 'backup-dir-handle';
+/** IndexedDB entry holding the non-extractable backup encryption key. */
+export const ENC_KEY = 'backup-enc-key';
 
 export const NUDGE_AFTER_DAYS = 7;
 export const SNOOZE_DAYS = 3;
@@ -95,7 +98,7 @@ export function describeAge(iso: string | null | undefined, now: Date): string {
   return `${d} day${d === 1 ? '' : 's'} ago`;
 }
 
-const FILE_RE = /^mrchartist-invoice-backup-(\d{4}-\d{2}-\d{2})(?: \(\d+\))?\.json$/;
+const FILE_RE = /^mrchartist-invoice-backup-(\d{4}-\d{2}-\d{2})(?:\.encrypted)?(?: \(\d+\))?\.json$/;
 
 /** Only files we wrote ourselves are ever rotated away. */
 export function isBackupFile(name: string): boolean {
@@ -180,6 +183,54 @@ export function hasBackupWorthyData(): boolean {
   return false;
 }
 
+/* ── Encryption (opt-in) ───────────────────────────────────────── */
+
+let cachedKey: StoredEncryptionKey | null | undefined;
+
+function isStoredKey(v: unknown): v is StoredEncryptionKey {
+  const k = v as StoredEncryptionKey | null;
+  return !!k && typeof k === 'object' && typeof k.salt === 'string' && Number.isInteger(k.iter) && !!k.key;
+}
+
+/** The stored backup key, or null when scheduled backups are written as plain JSON. */
+export async function getBackupKey(): Promise<StoredEncryptionKey | null> {
+  if (cachedKey !== undefined) return cachedKey;
+  const v = await idbGet<StoredEncryptionKey>(ENC_KEY);
+  cachedKey = isStoredKey(v) ? v : null;
+  return cachedKey;
+}
+
+export async function hasBackupEncryption(): Promise<boolean> {
+  return (await getBackupKey()) !== null;
+}
+
+/**
+ * Turn on encrypted backups. The passphrase itself is never stored: a key derived from it
+ * (non-extractable, encrypt-only) is kept in IndexedDB. Restoring a file needs the passphrase.
+ */
+export async function setBackupPassphrase(passphrase: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (passphrase.length < 8) return { ok: false, message: 'Use a passphrase of at least 8 characters.' };
+  try {
+    const stored = await deriveEncryptionKey(passphrase);
+    if (!(await idbSet(ENC_KEY, stored))) return { ok: false, message: 'This browser could not store the encryption key.' };
+    cachedKey = stored;
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: (err as Error)?.message || 'Could not set up encryption.' };
+  }
+}
+
+export async function clearBackupPassphrase(): Promise<void> {
+  await idbDel(ENC_KEY);
+  cachedKey = null;
+}
+
+/** File name and text for a backup, encrypted when a key is stored. */
+export async function backupPayload(now: Date, key: StoredEncryptionKey | null = null): Promise<{ filename: string; text: string }> {
+  if (key) return { filename: backupFilename(now, true), text: await buildEncryptedBackupWithKey(key, now) };
+  return { filename: backupFilename(now), text: JSON.stringify(buildBackup(now), null, 2) };
+}
+
 /* ── File System Access plumbing ───────────────────────────────── */
 
 type PermState = 'granted' | 'denied' | 'prompt';
@@ -227,11 +278,11 @@ export type BackupResult =
   | { ok: true; filename: string; method: 'folder' | 'download'; deleted: string[]; folder?: string }
   | { ok: false; reason: 'unsupported' | 'no-folder' | 'permission' | 'error'; message: string };
 
-/** Manual fallback: normal browser download. Counts as a backup. */
-export function downloadBackupNow(now: Date = new Date()): BackupResult {
+/** Manual fallback: normal browser download (encrypted when a key is stored). Counts as a backup. */
+export async function downloadBackupNow(now: Date = new Date()): Promise<BackupResult> {
   try {
-    const filename = backupFilename(now);
-    downloadText(filename, JSON.stringify(buildBackup(now), null, 2), 'application/json');
+    const { filename, text } = await backupPayload(now, await getBackupKey());
+    downloadText(filename, text, 'application/json');
     recordBackup(now);
     return { ok: true, filename, method: 'download', deleted: [] };
   } catch (err) {
@@ -262,10 +313,10 @@ export async function runAutoBackup(opts: { interactive?: boolean; now?: Date } 
       return { ok: false, reason: 'permission', message: 'Folder access expired. Click Back up now to re-allow it.' };
     }
 
-    const filename = backupFilename(now);
+    const { filename, text } = await backupPayload(now, await getBackupKey());
     const file = await dir.getFileHandle(filename, { create: true });
     const writable = await file.createWritable();
-    await writable.write(JSON.stringify(buildBackup(now), null, 2));
+    await writable.write(text);
     await writable.close();
     recordBackup(now);
 

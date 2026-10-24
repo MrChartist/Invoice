@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, FolderOpen, HardDrive, Play, Unplug } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, FolderOpen, HardDrive, Lock, Play, Unplug } from 'lucide-react';
 import {
   RETENTION_OPTIONS,
   chooseBackupFolder,
+  clearBackupPassphrase,
   describeAge,
   disconnectFolder,
   downloadBackupNow,
   getConfig,
   getFolderHandle,
   getLastBackup,
+  hasBackupEncryption,
   isFolderBackupSupported,
   runAutoBackup,
   saveConfig,
+  setBackupPassphrase,
   type AutoBackupConfig,
   type BackupFrequency,
   type BackupResult,
@@ -44,10 +47,14 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
   const [busy, setBusy] = useState(false);
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [encrypted, setEncrypted] = useState<boolean | null>(null);
+  const [pass, setPass] = useState('');
+  const [pass2, setPass2] = useState('');
 
   useEffect(() => {
     let alive = true;
     getFolderHandle().then((h) => alive && setFolder(h?.name ?? null));
+    hasBackupEncryption().then((on) => alive && setEncrypted(on));
     requestPersistentStorage().then((s) => alive && setStorage(s));
     return () => {
       alive = false;
@@ -92,9 +99,28 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
 
   const runNow = async () => {
     setBusy(true);
-    const r = folder ? await runAutoBackup({ interactive: true }) : downloadBackupNow();
+    const r = folder ? await runAutoBackup({ interactive: true }) : await downloadBackupNow();
     setBusy(false);
     report(r);
+  };
+
+  const enableEncryption = async () => {
+    if (pass !== pass2) return setError('The two passphrases do not match.');
+    setBusy(true);
+    const r = await setBackupPassphrase(pass);
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    setPass('');
+    setPass2('');
+    setError(null);
+    setEncrypted(true);
+    onNotify?.('Backups will be encrypted. Keep the passphrase safe: it is needed to restore them.', 'success');
+  };
+
+  const disableEncryption = async () => {
+    await clearBackupPassphrase();
+    setEncrypted(false);
+    onNotify?.('Backups will be saved unencrypted', 'info');
   };
 
   const disconnect = async () => {
@@ -206,12 +232,65 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
           </>
         )}
 
+        {encrypted !== null && (
+          <div className={controls.field}>
+            <span className={controls.label}>
+              <Lock size={13} aria-hidden="true" /> Encryption
+            </span>
+            {encrypted ? (
+              <>
+                <p className={controls.hint}>
+                  Backups are encrypted (AES-256). Restore them from Settings → Data with your passphrase — it is not
+                  stored anywhere, so a lost passphrase means the files cannot be opened.
+                </p>
+                <div className={styles.buttons}>
+                  <button type="button" className={controls.btnGhost} onClick={disableEncryption}>
+                    Stop encrypting
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className={controls.hint}>
+                  Backups are plain JSON with your bank, GSTIN and client details. If the folder syncs to the cloud
+                  (Google Drive, Dropbox, iCloud), set a passphrase so those copies are encrypted.
+                </p>
+                <div className={controls.row}>
+                  <input
+                    type="password"
+                    className={controls.input}
+                    aria-label="Backup passphrase"
+                    placeholder="Passphrase (8+ characters)"
+                    autoComplete="new-password"
+                    value={pass}
+                    onChange={(e) => setPass(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    className={controls.input}
+                    aria-label="Repeat backup passphrase"
+                    placeholder="Repeat passphrase"
+                    autoComplete="new-password"
+                    value={pass2}
+                    onChange={(e) => setPass2(e.target.value)}
+                  />
+                </div>
+                <div className={styles.buttons}>
+                  <button type="button" className={controls.btnOutline} onClick={enableEncryption} disabled={busy || pass.length < 8}>
+                    <Lock size={15} aria-hidden="true" /> Encrypt backups
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div className={styles.buttons}>
           <button type="button" className={controls.btnPrimary} onClick={runNow} disabled={busy}>
             <Play size={15} aria-hidden="true" /> {busy ? 'Backing up...' : 'Back up now'}
           </button>
           {folder && (
-            <button type="button" className={controls.btnOutline} onClick={() => report(downloadBackupNow())}>
+            <button type="button" className={controls.btnOutline} onClick={async () => report(await downloadBackupNow())}>
               <Download size={15} aria-hidden="true" /> Download a copy
             </button>
           )}

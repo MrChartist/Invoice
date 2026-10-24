@@ -50,7 +50,12 @@ The module captures `beforeinstallprompt` on import, so import it early (main.ts
   `filesToDelete(names, keep)`, `isBackupFile`, `parseConfig`, `describeAge`.
 - Storage: `getConfig/saveConfig`, `getLastBackup/recordBackup`, `snoozeNudge/getSnooze`, `hasBackupWorthyData`.
 - Actions (never throw, return `BackupResult`): `chooseBackupFolder`, `disconnectFolder`, `getFolderHandle`,
-  `runAutoBackup({interactive})`, `runDueBackup()`, `downloadBackupNow()` (Safari/Firefox fallback), `isFolderBackupSupported()`.
+  `runAutoBackup({interactive})`, `runDueBackup()`, `downloadBackupNow()` (async; Safari/Firefox fallback), `isFolderBackupSupported()`.
+- **Encryption (opt-in):** `setBackupPassphrase(pass)` derives an AES-GCM key (PBKDF2, random salt) and stores it in
+  IndexedDB (`backup-enc-key`) as a **non-extractable, encrypt-only** `CryptoKey` — the passphrase is never stored.
+  While a key exists, folder and download backups are written as `mrchartist-invoice-backup-YYYY-MM-DD.encrypted.json`
+  in the same format as a manual encrypted export, so Settings → Data restores them with the passphrase on any device.
+  `clearBackupPassphrase()` goes back to plain JSON.
 - Keys (all `mrchartist_inv_*`, so they ride along in JSON backups): `mrchartist_inv_last_backup` (ISO),
   `mrchartist_inv_auto_backup` (`{enabled, frequency: daily|weekly|on-close, retention}`), `mrchartist_inv_backup_snooze`.
   Also `mrchartist_inv_install_dismissed` (InstallPrompt). The folder handle is in IndexedDB, not localStorage.

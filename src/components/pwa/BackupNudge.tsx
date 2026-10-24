@@ -52,7 +52,7 @@ export function BackupNudge({ onResult }: BackupNudgeProps) {
     // Prefer the connected folder; otherwise (or if it fails) fall back to a plain download.
     let result: BackupResult | null = null;
     if (await getFolderHandle()) result = await runAutoBackup({ interactive: true });
-    if (!result || !result.ok) result = downloadBackupNow();
+    if (!result || !result.ok) result = await downloadBackupNow();
     setBusy(false);
     onResult?.(result);
     if (result.ok) setShow(false);
