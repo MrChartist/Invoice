@@ -95,64 +95,31 @@ export interface InvoiceState extends InvoiceRecord {
   reset: () => void;
 }
 
-/** Field list used to serialise the store back to a persistable record. */
+/**
+ * Every persisted field of `InvoiceRecord`. The compile-time check below fails when a field is
+ * added to the record type but not here — otherwise the editor would silently drop it on save.
+ */
+const RECORD_KEYS = [
+  'id', 'invoice_number', 'doc_type', 'issue_date', 'due_date', 'status', 'currency', 'template_id',
+  'client', 'sender', 'items', 'gst_mode', 'place_of_supply', 'reverse_charge', 'discount_type',
+  'discount_rate', 'tax_rate', 'shipping', 'other_charges', 'round_off_enabled', 'amount_paid', 'notes',
+  'terms', 'po_number', 'recurring_id', 'recurring_date', 'subtotal', 'discount_amount', 'taxable_value',
+  'cgst_amount', 'sgst_amount', 'igst_amount', 'tax_amount', 'round_off', 'total', 'balance_due',
+  'supply_type', 'lut_number', 'lut_date', 'price_includes_tax', 'round_mode', 'tcs_enabled', 'tcs_rate',
+  'tcs_base', 'tcs_label', 'tds_enabled', 'tds_section', 'tds_rate', 'tds_on_taxable', 'cess_amount',
+  'tcs_amount', 'tds_amount', 'created_at', 'updated_at',
+] as const satisfies readonly (keyof InvoiceRecord)[];
+
+type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
+// If this line errors, add the named field(s) to RECORD_KEYS.
+const recordKeysComplete: [UnlistedRecordKey] extends [never] ? true : UnlistedRecordKey = true;
+void recordKeysComplete;
+
+/** Serialise the store back to a persistable record (store-only fields and actions are left out). */
 function toRecord(state: InvoiceState): InvoiceRecord {
-  return {
-    id: state.id,
-    invoice_number: state.invoice_number,
-    doc_type: state.doc_type,
-    issue_date: state.issue_date,
-    due_date: state.due_date,
-    status: state.status,
-    currency: state.currency,
-    template_id: state.template_id,
-    client: state.client,
-    sender: state.sender,
-    items: state.items,
-    gst_mode: state.gst_mode,
-    place_of_supply: state.place_of_supply,
-    reverse_charge: state.reverse_charge,
-    discount_type: state.discount_type,
-    discount_rate: state.discount_rate,
-    tax_rate: state.tax_rate,
-    shipping: state.shipping,
-    other_charges: state.other_charges,
-    round_off_enabled: state.round_off_enabled,
-    amount_paid: state.amount_paid,
-    notes: state.notes,
-    terms: state.terms,
-    po_number: state.po_number,
-    recurring_id: state.recurring_id,
-    recurring_date: state.recurring_date,
-    subtotal: state.subtotal,
-    discount_amount: state.discount_amount,
-    taxable_value: state.taxable_value,
-    cgst_amount: state.cgst_amount,
-    sgst_amount: state.sgst_amount,
-    igst_amount: state.igst_amount,
-    tax_amount: state.tax_amount,
-    round_off: state.round_off,
-    total: state.total,
-    balance_due: state.balance_due,
-    supply_type: state.supply_type,
-    lut_number: state.lut_number,
-    lut_date: state.lut_date,
-    price_includes_tax: state.price_includes_tax,
-    round_mode: state.round_mode,
-    tcs_enabled: state.tcs_enabled,
-    tcs_rate: state.tcs_rate,
-    tcs_base: state.tcs_base,
-    tcs_label: state.tcs_label,
-    tds_enabled: state.tds_enabled,
-    tds_section: state.tds_section,
-    tds_rate: state.tds_rate,
-    tds_on_taxable: state.tds_on_taxable,
-    cess_amount: state.cess_amount,
-    tcs_amount: state.tcs_amount,
-    tds_amount: state.tds_amount,
-    created_at: state.created_at,
-    updated_at: state.updated_at,
-  };
+  const out: Record<string, unknown> = {};
+  for (const k of RECORD_KEYS) out[k] = state[k];
+  return out as unknown as InvoiceRecord;
 }
 
 function freshDraft(docType: DocumentType = 'INVOICE'): InvoiceRecord {
