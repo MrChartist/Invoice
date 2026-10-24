@@ -11,7 +11,7 @@ import { checkGstin } from './gstin';
 import { GST_SLABS } from './tax-rules';
 import { INDIAN_STATES, stateByCode } from './india-states';
 import { calculateInvoice, deriveGstMode, round2 } from './invoice-calc';
-import { writeCsv } from './csv';
+import { toCsv } from './csv';
 import { fieldsFor, type ColumnMapping, type ImportKind } from './import-mapping';
 import { KEYS, generateId, getTable, setTable } from './storage';
 import { audit } from './audit';
@@ -1237,13 +1237,11 @@ export function errorRowsCsv(table: ImportTable, preview: ImportPreview, firstDa
       out.push([i + firstDataLine, ...(table.rows[i] ?? []), errs.join(' | ')]);
     }
   }
-  return writeCsv(out, { bom: true });
+  // Echoes untrusted cells back into a spreadsheet: use the formula-guarded writer.
+  return '\uFEFF' + toCsv(out);
 }
 
 /** CSV rows for the report of an actual apply (errors from the engine + the sink). */
 export function reportErrorsCsv(report: ImportReport): string {
-  return writeCsv(
-    [['Source row', 'Record', 'Problem'], ...report.errors.map((e) => [e.line, e.label, e.message])],
-    { bom: true },
-  );
+  return '\uFEFF' + toCsv([['Source row', 'Record', 'Problem'], ...report.errors.map((e) => [e.line, e.label, e.message])]);
 }

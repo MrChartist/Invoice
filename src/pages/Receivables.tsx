@@ -1,4 +1,5 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { mailtoLink } from '../lib/share';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ChevronRight, Clock, Copy, Download, FileText, Mail, Percent, Scale, Wallet,
@@ -427,7 +428,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
             </button>
             {client?.email && (
               <a className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
-                href={`mailto:${client.email}?subject=${encodeURIComponent(`Statement of account – ${sender?.companyName ?? ''}`)}&body=${encodeURIComponent(text)}`}>
+                href={mailtoLink({ to: client.email, subject: `Statement of account – ${sender?.companyName ?? ''}`, body: text })}>
                 <Mail size={14} /> Email
               </a>
             )}

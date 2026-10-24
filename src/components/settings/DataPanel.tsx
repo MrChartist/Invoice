@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { AlertTriangle, DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Info, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
@@ -16,6 +17,7 @@ import {
   type BackupSummary,
   type SafetySnapshot,
 } from '../../lib/backup';
+import { forgetDeviceData } from '../../lib/auto-backup';
 import { ImportWizard } from '../import/ImportWizard';
 import { SampleDataCard } from '../demo/SampleDataCard';
 import { assessStorage, formatChars, measureStorage } from '../../lib/storage-health';
@@ -100,6 +102,7 @@ export function DataPanel({ notify }: Props) {
   const onFile = async (file?: File) => {
     if (!file) return;
     try {
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('This file is larger than 25 MB — not a file this app wrote.');
       const { data, summary } = parseBackup(await file.text());
       setPending({ data, summary, fileName: file.name });
     } catch (err) {
@@ -317,11 +320,11 @@ export function DataPanel({ notify }: Props) {
         open={wipeOpen}
         destructive
         title="Erase all data?"
-        message="Every invoice, client, payment and setting on this device will be deleted (your PIN is kept). An undo copy is kept in this browser, but download a backup first if there is anything you may need."
+        message="Every invoice, client, payment and setting on this device will be permanently deleted, together with the restore undo copy, the backup encryption key and the backup-folder link (your PIN is kept). This cannot be undone — download a backup first if there is anything you may need."
         confirmLabel="Erase everything"
         requireText="ERASE"
         onConfirm={async () => {
-          await saveSafetySnapshot('wipe');
+          await forgetDeviceData();
           wipeAppData();
           window.location.reload();
         }}

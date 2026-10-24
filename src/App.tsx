@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { NotFound } from './components/layout/NotFound';
 import { DashboardLayout } from './layouts/DashboardLayout';
@@ -7,7 +7,7 @@ import { InvoiceCreator } from './pages/InvoiceCreator';
 import { LoginPage } from './pages/LoginPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { IdleLock } from './components/security/IdleLock';
-import { isAuthenticated } from './lib/auth';
+import { isAuthenticated, onRemoteLock } from './lib/auth';
 
 // Heavier report/ledger pages load on first visit so the editor opens fast.
 const Transactions = lazy(() => import('./pages/Transactions').then((m) => ({ default: m.Transactions })));
@@ -34,6 +34,8 @@ function PageFallback() {
 
 function App() {
   const [authed, setAuthed] = useState(isAuthenticated());
+  // Locking in one tab locks them all.
+  useEffect(() => onRemoteLock(() => setAuthed(false)), []);
 
   return (
     <ErrorBoundary>

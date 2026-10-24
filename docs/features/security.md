@@ -85,3 +85,16 @@ A 4-6 digit PIN has ~13-20 bits of entropy. The hash + lockout stops casual snoo
 also prepend the CSP (minus `frame-ancestors`, which only works as a header) as a `<meta>` tag in `index.html`, so a
 host that ignores those files still enforces it. Older backups encrypted at 310k iterations still open (the
 iteration count travels in the envelope).
+
+## Review fixes (Phase 4)
+
+- **Erase / Forgot-PIN reset forget IndexedDB too** (`forgetDeviceData` in `auto-backup.ts`): the restore undo copy,
+  the backup encryption key and the backup-folder handle are cleared, and Erase keeps no undo copy, so a new PIN holder
+  cannot "undo" the owner's data back or write over the owner's backup folder. Erase needs `ERASE` typed.
+- **PIN lockout counts the attempt before the slow hash**, so attempts racing from several tabs cannot each slip past.
+- **Lock applies to every tab** (`BroadcastChannel` from `logout`, honoured by `onRemoteLock` in `App.tsx`).
+- **Printed UPI QR codes and statement QR** are built through the validating `upiLink`, and the statement email uses
+  `mailtoLink`, so a doctored VPA or e-mail (e.g. `a@b.com?bcc=…`) from an imported or restored file is refused.
+- **Import error CSVs** use the formula-guarded `toCsv`; file reads (backups, 26AS) are capped at 25 MB.
+- **Payments are atomic**: if the invoice update fails (quota), the payment row is rolled back.
+- **Service worker** only caches SPA routes as the app shell, never a real `.html` file such as `/offline.html`.

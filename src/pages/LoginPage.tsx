@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck, TimerReset, User, WifiOff } from 'lucide-react';
+import { forgetDeviceData } from '../lib/auto-backup';
 import { Logo } from '../components/brand/Logo';
 import {
   RESET_PHRASE,
@@ -103,9 +104,11 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin, mode]);
 
-  const handleReset = (e: React.FormEvent) => {
+  const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetAllData(phrase)) return setError('The confirmation phrase does not match.');
+    // Also drop the undo copy, backup key and folder link kept in IndexedDB (security: no way back to the old data).
+    await forgetDeviceData();
     // Fresh start: reload so every module re-reads empty storage.
     window.location.reload();
   };

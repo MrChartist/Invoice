@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { Download, FileLock2, Info, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import {
@@ -69,6 +70,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
   const onFile = async (file?: File) => {
     if (!file) return;
     try {
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('This file is larger than 25 MB — not a file this app wrote.');
       const text = await file.text();
       if (isEncryptedBackup(text)) {
         setPending({ text, fileName: file.name });

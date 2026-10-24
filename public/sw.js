@@ -131,7 +131,9 @@ async function handleNavigation(request) {
   const cached = await shell.match(SHELL_URL);
   const network = fetch(request).then(async (res) => {
     const type = res.headers.get('content-type') || '';
-    if (res.ok && type.includes('text/html')) await safePut(shell, SHELL_URL, res.clone());
+    // Only an SPA route (no file extension) is the app shell; /offline.html etc. must never replace it.
+    const isSpaRoute = !/\.[a-z0-9]+$/i.test(new URL(request.url).pathname);
+    if (res.ok && isSpaRoute && type.includes('text/html')) await safePut(shell, SHELL_URL, res.clone());
     return res;
   });
   try {

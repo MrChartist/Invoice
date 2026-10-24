@@ -218,6 +218,9 @@ function quoteCell(value: unknown, delimiter: string): string {
   return s;
 }
 
+/** Upper bound for any file the app reads (backups, statements, 26AS): larger files only hang the tab. */
+export const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
+
 export function writeCsv(rows: unknown[][], options: WriteOptions = {}): string {
   const delimiter = options.delimiter ?? ',';
   const eol = options.eol ?? '\r\n';

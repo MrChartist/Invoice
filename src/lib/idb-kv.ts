@@ -63,3 +63,13 @@ export async function idbDel(key: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Remove every entry (undo snapshot, backup key, folder handle). Used by Erase and Forgot-PIN reset. */
+export async function idbClear(): Promise<boolean> {
+  try {
+    await run('readwrite', (s) => s.clear());
+    return true;
+  } catch {
+    return false;
+  }
+}

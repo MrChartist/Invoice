@@ -243,6 +243,11 @@ export async function checkPinWithGuard(pin: string, now: number = Date.now()): 
   }
   if (!rec) return { ok: false, locked: false, retryInMs: 0, attemptsLeft: MAX_FREE_ATTEMPTS };
 
+  // Count the attempt as a failure BEFORE the slow hash: attempts racing in parallel (other tabs)
+  // each see the previous failure, so they cannot slip past the lockout. Success undoes it.
+  const next = registerFailure(guard, now);
+  writeGuard(next);
+
   if (await checkPin(rec, pin)) {
     writeGuard({ ...FRESH_GUARD });
     // Legacy plaintext, or a hash made with fewer iterations than today's default: re-hash now
@@ -257,8 +262,6 @@ export async function checkPinWithGuard(pin: string, now: number = Date.now()): 
     return { ok: true, locked: false, retryInMs: 0, attemptsLeft: MAX_FREE_ATTEMPTS };
   }
 
-  const next = registerFailure(guard, now);
-  writeGuard(next);
   const retryInMs = Math.max(0, next.lockedUntil - now);
   return { ok: false, locked: retryInMs > 0, retryInMs, attemptsLeft: retryInMs > 0 ? 0 : MAX_FREE_ATTEMPTS - next.fails };
 }
@@ -291,8 +294,31 @@ export async function login(name: string, pin: string): Promise<boolean> {
 }
 
 /** Lock the app. Data and the PIN are kept. */
+const LOCK_CHANNEL = 'mrchartist-inv-lock';
+
+/** Lock this tab and tell every other open tab of the app to lock too. */
 export function logout(): void {
   endSession();
+  try {
+    const ch = new BroadcastChannel(LOCK_CHANNEL);
+    ch.postMessage('lock');
+    ch.close();
+  } catch {
+    /* no BroadcastChannel (old browser / tests): only this tab locks */
+  }
+}
+
+/** Call `onLock` when another tab locks the app (manual lock or idle lock). Returns an unsubscribe. */
+export function onRemoteLock(onLock: () => void): () => void {
+  if (typeof BroadcastChannel === 'undefined') return () => {};
+  const ch = new BroadcastChannel(LOCK_CHANNEL);
+  ch.onmessage = (e) => {
+    if (e.data === 'lock') {
+      endSession();
+      onLock();
+    }
+  };
+  return () => ch.close();
 }
 
 export type ChangePinResult =

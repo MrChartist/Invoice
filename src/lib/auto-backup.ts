@@ -10,7 +10,7 @@
 import { backupFilename, buildBackup, buildEncryptedBackupWithKey } from './backup';
 import { deriveEncryptionKey, type StoredEncryptionKey } from './crypto';
 import { downloadText } from './download';
-import { idbDel, idbGet, idbSet } from './idb-kv';
+import { idbClear, idbDel, idbGet, idbSet } from './idb-kv';
 import { DB_PREFIX, readRaw, removeRaw, writeRaw } from './storage';
 
 export type BackupFrequency = 'daily' | 'weekly' | 'on-close';
@@ -218,6 +218,16 @@ export async function setBackupPassphrase(passphrase: string): Promise<{ ok: tru
   } catch (err) {
     return { ok: false, message: (err as Error)?.message || 'Could not set up encryption.' };
   }
+}
+
+/**
+ * Forget everything this device keeps outside localStorage: the restore undo copy, the backup
+ * encryption key and the backup-folder handle. Erase and the Forgot-PIN reset call it so a new
+ * PIN holder can neither "undo" the owner's data back nor write over the owner's backup folder.
+ */
+export async function forgetDeviceData(): Promise<void> {
+  await idbClear();
+  cachedKey = null;
 }
 
 export async function clearBackupPassphrase(): Promise<void> {

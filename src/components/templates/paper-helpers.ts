@@ -1,10 +1,11 @@
 import type { CalcTotals } from '../../lib/invoice-calc';
 import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
+import { upiLink } from '../../lib/share';
 
+/** Printed UPI QR. Built by the validating `upiLink`, so a malformed or doctored VPA never reaches a QR. */
 export function buildUpiUrl(sender: SenderProfile): string {
   if (!sender.upiId) return '';
-  const payee = encodeURIComponent(sender.accountName || sender.companyName);
-  return `upi://pay?pa=${sender.upiId}&pn=${payee}&cu=INR`;
+  return upiLink({ pa: sender.upiId, pn: sender.accountName || sender.companyName }) ?? '';
 }
 
 /**

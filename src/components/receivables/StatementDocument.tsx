@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { upiLink } from '../../lib/share';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Client, SenderProfile } from '../../types/invoice';
 import type { Ledger, PartyReceivable } from '../../lib/receivables';
@@ -18,8 +19,7 @@ export interface StatementDocumentProps {
 
 function buildUpiUrl(sender: SenderProfile | null, amount: number): string {
   if (!sender?.upiId) return '';
-  const payee = encodeURIComponent(sender.accountName || sender.companyName);
-  return `upi://pay?pa=${sender.upiId}&pn=${payee}&cu=INR${amount > 0 ? `&am=${amount.toFixed(2)}` : ''}`;
+  return upiLink({ pa: sender.upiId, pn: sender.accountName || sender.companyName, amount: amount > 0 ? amount : undefined }) ?? '';
 }
 
 /** Signed balance as "1,234.00 Dr" / "1,234.00 Cr". */

@@ -4,6 +4,7 @@
  * of this (or the CSV / import-mapping code it pulls in) touches the main bundle.
  */
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { Link } from 'react-router-dom';
 import {
   BadgeCheck, CheckCircle2, Download, FileSearch, FileWarning, Landmark, Receipt, Upload, X,
@@ -244,6 +245,7 @@ function Reconcile({ data, notify }: TdsTabProps) {
     e.target.value = '';
     if (!file) return;
     try {
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('This file is larger than 25 MB. Export only the TDS part of 26AS / AIS.');
       const result = parseTdsCsv(await file.text());
       setFileName(file.name);
       setParsed(result);

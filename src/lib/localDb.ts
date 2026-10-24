@@ -475,10 +475,16 @@ export const localDb = {
       };
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
       const overridden = target ? assertUnlocked(target, 'pay') === 'overridden' : false;
-      const rows = getTable<Payment>(KEYS.transactions);
-      rows.push(payment);
-      setTable(KEYS.transactions, rows);
-      syncPaymentState(input.invoiceId, payment.amount);
+      const before = getTable<Payment>(KEYS.transactions);
+      setTable(KEYS.transactions, [...before, payment]);
+      try {
+        syncPaymentState(input.invoiceId, payment.amount);
+      } catch (err) {
+        // Keep ledger and invoice consistent: a payment row whose invoice update failed (quota)
+        // would be recorded again on retry.
+        setTable(KEYS.transactions, before);
+        throw err;
+      }
       logSafe(() => {
         const row = paymentLogged('payment_add', payment, target);
         return overridden ? { ...row, summary: row.summary + OVERRIDE_NOTE } : row;
@@ -493,7 +499,12 @@ export const localDb = {
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
       const overridden = target ? assertUnlocked(target, 'unpay') === 'overridden' : false;
       setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));
-      syncPaymentState(row.invoice_id, -row.amount);
+      try {
+        syncPaymentState(row.invoice_id, -row.amount);
+      } catch (err) {
+        setTable(KEYS.transactions, rows);
+        throw err;
+      }
       logSafe(() => {
         const entry = paymentLogged('payment_remove', row, target);
         return overridden ? { ...entry, summary: entry.summary + OVERRIDE_NOTE } : entry;
