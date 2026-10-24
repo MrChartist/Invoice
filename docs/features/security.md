@@ -88,6 +88,8 @@ iteration count travels in the envelope).
 
 ## Review fixes (Phase 4)
 
+- **CI actions pinned to commit SHAs** (`.github/workflows/ci.yml`, tag in a trailing comment), kept current by
+  `.github/dependabot.yml` (GitHub Actions only, monthly), so a moved tag cannot change what CI runs.
 - **Erase / Forgot-PIN reset forget IndexedDB too** (`forgetDeviceData` in `auto-backup.ts`): the restore undo copy,
   the backup encryption key and the backup-folder handle are cleared, and Erase keeps no undo copy, so a new PIN holder
   cannot "undo" the owner's data back or write over the owner's backup folder. Erase needs `ERASE` typed.
