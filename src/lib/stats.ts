@@ -10,7 +10,9 @@ import { daysOverdue } from './utils';
 import { docCurrency, hasInrValue, inrRecord, missingFxRate } from './fx';
 import { receivableBalance, receivableTotal } from './rcm';
 import { amountDue, isLiveCreditNote, linkedCredits, type CreditMap } from './amount-due';
-import { isFinancialNote } from './financial-note';
+
+/** R2-A2: a financial credit note (inline check: `financial-note.ts` stays out of the first-paint bundle). */
+const isFinancialNote = (inv: Pick<InvoiceRecord, 'doc_type' | 'note_kind'>) => inv.doc_type === 'CREDIT_NOTE' && inv.note_kind === 'financial';
 
 /** Only real, issued sales documents count as revenue — not quotes, challans or drafts. A debit note bills extra; a Bill of Supply is revenue with no output tax. */
 export function isRevenueDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {
