@@ -699,6 +699,8 @@ test('R2-C2 deferrals read the real purchase shape (prepaid expense source lines
   assert.equal(lump[0].amount, 1000, 'a bill without lines defers its taxable value');
   assert.equal(expenseAccountOf({ ...bill, kind: 'EXPENSE', category: 'Rent' }, []), 'rent');
   assert.equal(expenseAccountOf(bill, []), 'purchases');
+});
+
 test('R2-B5 back-to-back reader (backorders, cancel warning) reads bills against PO lines', async () => {
   const { backorderRows, openLinkedPos } = await import('../src/lib/back-to-back.ts');
   const po = {
