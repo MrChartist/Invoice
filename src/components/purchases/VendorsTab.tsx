@@ -15,6 +15,10 @@ import { useT } from '../../i18n';
 import { purT } from '../../i18n/areas/purchases';
 import { wireT } from '../../i18n/areas/wiring';
 import { isValidIfsc } from '../../lib/validators';
+import { cleanVendorTds, deducteeTypeFromPan, vendorTdsProblem } from '../../lib/tds-payables';
+import { DEDUCTEE_TYPES, TDS_PAYABLE_SECTIONS, type DeducteeType } from '../../lib/tds-rules';
+import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { tdsT } from '../../i18n/areas/tds';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -153,6 +157,8 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
     const problem = validateVendor(draft);
     if (problem) return setError(problem);
     if (draft.bank_ifsc?.trim() && !isValidIfsc(draft.bank_ifsc.trim().toUpperCase())) return setError(wireT('ifscInvalid'));
+    const tdsProblem = vendorTdsProblem(draft);
+    if (tdsProblem) return setError(tdsProblem);
     try {
       const bank = {
         bank_account_no: draft.bank_account_no?.replace(/\s+/g, '') || undefined,
@@ -160,7 +166,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
         bank_name: draft.bank_name?.trim() || undefined,
         beneficiary_name: draft.beneficiary_name?.trim() || undefined,
       };
-      const saved = vendorsDb.save({ ...draft, ...bank, id: vendor?.id, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
+      const saved = vendorsDb.save({ ...draft, ...bank, ...cleanVendorTds(draft), id: vendor?.id, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
       onSaved(vendor ? purT('updated', { name: saved.name }) : purT('added', { name: saved.name }));
       onClose();
     } catch (err) {
@@ -243,6 +249,64 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
             <input id="v-bank-ben" className={controls.input} value={draft.beneficiary_name ?? ''} onChange={(e) => set({ beneficiary_name: e.target.value })} />
           </div>
         </div>
+      </fieldset>
+      <fieldset className={tabStyles.bankSet} data-vendor-tds>
+        <legend className={controls.label}>{o7T('vTdsLegend')}</legend>
+        <div className={controls.row}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-pan">{tdsT('pan')}</label>
+            <input id="v-pan" className={`${controls.input} ${controls.inputMono}`} maxLength={10} autoComplete="off" placeholder="ABCDE1234F" value={draft.pan ?? ''} onChange={(e) => set({ pan: e.target.value.toUpperCase() })} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-deductee">{o7T('vDeductee')}</label>
+            <select id="v-deductee" className={controls.select} value={draft.deductee_type ?? ''} onChange={(e) => set({ deductee_type: (e.target.value || undefined) as DeducteeType | undefined })}>
+              <option value="">{o7T('vDeducteeAuto', { type: deducteeTypeFromPan(draft.pan) ? o7T(`dt${deducteeTypeFromPan(draft.pan)}` as 'dtOTHER') : '—' })}</option>
+              {DEDUCTEE_TYPES.map((t) => <option key={t} value={t}>{o7T(`dt${t}` as 'dtOTHER')}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className={controls.row}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-tds-sec">{o7T('vSection')}</label>
+            <select id="v-tds-sec" className={controls.select} value={draft.tds_section ?? ''} onChange={(e) => set({ tds_section: e.target.value || undefined })}>
+              <option value="">{tdsT('noTds')}</option>
+              {TDS_PAYABLE_SECTIONS.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
+            </select>
+          </div>
+          <div className={controls.field}>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!draft.tds_non_filer} onChange={(e) => set({ tds_non_filer: e.target.checked })} /> {tdsT('nonFiler')}
+            </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!draft.non_resident} onChange={(e) => set({ non_resident: e.target.checked })} /> {o7T('vNonResident')}
+            </label>
+          </div>
+        </div>
+        <div className={controls.row}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-cert">{tdsT('lowerCert')}</label>
+            <input id="v-cert" className={`${controls.input} ${controls.inputMono}`} autoComplete="off" value={draft.tds_lower_cert ?? ''} onChange={(e) => set({ tds_lower_cert: e.target.value })} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-cert-rate">{tdsT('lowerRate')}</label>
+            <input id="v-cert-rate" type="number" min={0} max={100} step="0.01" className={controls.input} value={draft.tds_lower_rate ?? ''} onChange={(e) => set({ tds_lower_rate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </div>
+        </div>
+        <div className={controls.row}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-cert-limit">{o7T('vCertLimit')}</label>
+            <input id="v-cert-limit" type="number" min={0} step="0.01" className={controls.input} value={draft.tds_lower_limit ?? ''} onChange={(e) => set({ tds_lower_limit: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-cert-from">{o7T('vCertFrom')}</label>
+            <input id="v-cert-from" type="date" className={controls.input} value={draft.tds_lower_from ?? ''} onChange={(e) => set({ tds_lower_from: e.target.value || undefined })} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-cert-to">{o7T('vCertTo')}</label>
+            <input id="v-cert-to" type="date" className={controls.input} value={draft.tds_lower_to ?? ''} onChange={(e) => set({ tds_lower_to: e.target.value || undefined })} />
+          </div>
+        </div>
+        <span className={controls.hint}>{o7T('vTdsHint')}</span>
       </fieldset>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="v-addr">{purT('address')}</label>

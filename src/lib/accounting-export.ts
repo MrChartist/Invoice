@@ -282,6 +282,7 @@ export function purchaseRegister(source: ExportSource, opts: CsvOptions = {}): C
     money(p.sgst),
     money(round2(p.tax - p.cgst - p.sgst)),
     money(p.tax),
+    money(p.cess),
     money(p.roundOff),
     money(p.total),
     p.status,
@@ -291,7 +292,7 @@ export function purchaseRegister(source: ExportSource, opts: CsvOptions = {}): C
     'purchase_register',
     [
       'Date', 'Bill No', 'Vendor Name', 'Vendor GSTIN', 'Place of Supply', 'Taxable Value',
-      'CGST', 'SGST', 'IGST', 'Total Tax', 'Round Off', 'Bill Total', 'Status', 'Notes',
+      'CGST', 'SGST', 'IGST', 'Total Tax', 'Cess', 'Round Off', 'Bill Total', 'Status', 'Notes',
     ],
     rows,
   );

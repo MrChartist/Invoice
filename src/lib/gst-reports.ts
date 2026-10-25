@@ -436,6 +436,12 @@ export interface Gstr3bReport {
     reversedOther: ItcHeads; // 4B(2)
     net: ItcHeads; // 4C
     ineligible: ItcHeads; // 4D(2)
+    /**
+     * Additive (7O, 7.91): 4C before the floor at zero — present only when a head is negative (reversals in
+     * 4B(2) / supplier notes exceed the period's ITC). `net` stays floored so the set-off never uses a
+     * negative credit; the 3B tab shows this figure and flags it for the CA.
+     */
+    netSigned?: ItcHeads;
   };
   /** 5 — inward supplies from composition / exempt / nil suppliers (value). */
   inwardExempt: { inter: number; intra: number };
@@ -1637,9 +1643,11 @@ export function buildGstr3b(
     }
   }
 
-  const netHead = (k: 'igst' | 'cgst' | 'sgst' | 'cess') =>
-    Math.max(round2(impGoods[k] + impServices[k] + availRcm[k] + availOther[k] - reversedRules[k] - reversed[k]), 0);
-  const net: ItcHeads = { igst: netHead('igst'), cgst: netHead('cgst'), sgst: netHead('sgst'), cess: netHead('cess') };
+  const signedHead = (k: 'igst' | 'cgst' | 'sgst' | 'cess') =>
+    round2(impGoods[k] + impServices[k] + availRcm[k] + availOther[k] - reversedRules[k] - reversed[k]);
+  const netSigned: ItcHeads = { igst: signedHead('igst'), cgst: signedHead('cgst'), sgst: signedHead('sgst'), cess: signedHead('cess') };
+  const net: ItcHeads = { igst: Math.max(netSigned.igst, 0), cgst: Math.max(netSigned.cgst, 0), sgst: Math.max(netSigned.sgst, 0), cess: Math.max(netSigned.cess, 0) };
+  const negativeNet = netSigned.igst < 0 || netSigned.cgst < 0 || netSigned.sgst < 0 || netSigned.cess < 0;
 
   const liab = {
     igst: round2(taxable.igst + zero.igst),
@@ -1674,6 +1682,7 @@ export function buildGstr3b(
       reversedOther: reversed,
       net,
       ineligible,
+      ...(negativeNet ? { netSigned } : {}),
     },
     inwardExempt,
     payment,

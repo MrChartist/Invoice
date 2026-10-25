@@ -5,12 +5,14 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { AlertTriangle, BookCheck, Plus, Trash2 } from 'lucide-react';
 import type { Gstr3bReport, ReportPeriod } from '../../lib/gst-reports';
-import { periodLabel } from '../../lib/gst-reports';
+import { periodLabel, periodRange } from '../../lib/gst-reports';
 import {
   GST_HEADS,
   GST_HEAD_LABELS,
+  carryForwardFor,
   cashLedgerBalance,
   challanFromPlan,
+  creditLedgerBalance,
   deleteSetOff,
   loadGstChallans,
   loadSetOffs,
@@ -33,6 +35,7 @@ import styles from './gst-setoff.module.css';
 import { useT } from '../../i18n';
 import { soT } from '../../i18n/areas/gst-setoff';
 import { ChallanList } from './ChallanList';
+import { o7T } from '../../i18n/areas/gst-tds-7o';
 
 const SetOffDialog = lazy(() => import('./SetOffDialog'));
 
@@ -65,15 +68,19 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
   const [confirmDel, setConfirmDel] = useState(false);
   const [challanSeed, setChallanSeed] = useState<{ amounts: ChallanAmounts; periodKey: string } | null>(null);
 
-  const plan = useMemo(
-    () => planSetOff(report, { period, due: due.form === 'GSTR3B' ? due.due : '', paidOn: effectivePaidOn, turnover, includeInterest: withInterest, includeLateFee: withFee }),
-    [report, period, due, effectivePaidOn, turnover, withInterest, withFee],
-  );
+  const [withCarry, setWithCarry] = useState(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `version` re-reads the tables after a change
   const challans = useMemo(() => loadGstChallans(), [version]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const setoffs = useMemo(() => loadSetOffs(), [version]);
+  // 7O (7.91): unutilised ITC of the last posted set-off joins this period's credit.
+  const carry = useMemo(() => carryForwardFor(setoffs, periodRange(period).from, gstin), [setoffs, period, gstin]);
+  const plan = useMemo(
+    () => planSetOff(report, { period, due: due.form === 'GSTR3B' ? due.due : '', paidOn: effectivePaidOn, turnover, includeInterest: withInterest, includeLateFee: withFee, ...(withCarry ? { openingItc: carry.heads } : {}) }),
+    [report, period, due, effectivePaidOn, turnover, withInterest, withFee, withCarry, carry],
+  );
   const record = setOffFor(setoffs, plan.periodKey, gstin);
+  const credit = creditLedgerBalance(setoffs, gstin);
   const status = periodPaymentStatus(plan, challans, setoffs, gstin);
   const balance = cashLedgerBalance(challans, setoffs);
   const balanceForPeriod = cashLedgerBalance(challans, setoffs.filter((r) => r !== record));
@@ -87,6 +94,7 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
     h,
     liability: plan.liability[h],
     rc: plan.rcLiability[h],
+    opening: plan.itcOpening?.[h] ?? 0,
     itc: plan.itcAvailable[h],
     used: plan.itcUsed[h],
     carry: plan.itcCarry[h],
@@ -139,6 +147,9 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
               <label className={controls.check}>
                 <input type="checkbox" checked={withFee} onChange={(e) => setWithFee(e.target.checked)} /> {soT('inclLateFee')}
               </label>
+              <label className={controls.check}>
+                <input type="checkbox" checked={withCarry} onChange={(e) => setWithCarry(e.target.checked)} /> {o7T('inclCarry')}
+              </label>
             </div>
             {due.due && <span className={styles.muted}>{soT('dueOn', { form: due.form === 'PMT06' ? 'PMT-06' : 'GSTR-3B', date: formatDate(due.due) })}</span>}
           </div>
@@ -149,15 +160,28 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
             <Stat label={soT('statDeposited')} value={m(status.deposited)} hint={soT('statDepositedHint', { n: challans.filter((c) => c.period_key === plan.periodKey && c.deposited_on).length, pending: status.pendingChallans })} />
             <Stat label={soT('statBalance')} value={m(sumHeads(balance))} hint={soT('statBalanceHint')} />
             <Stat label={soT('statShortfall')} value={m(sumHeads(status.shortfall))} hint={soT('statShortfallHint')} />
+            <Stat label={o7T('statCredit')} value={m(sumHeads(credit))} hint={o7T('statCreditHint')} />
             <Stat label={soT('statPosted')} value={record ? '✓' : '—'} hint={record ? soT('statPostedYes', { number: record.voucher_number, date: formatDate(record.date) }) : soT('statPostedNo')} />
           </div>
 
           {plan.daysLate > 0 && <div className={styles.warn} role="status"><AlertTriangle size={16} aria-hidden /> {soT('wDaysLate', { days: plan.daysLate })}</div>}
-          {plan.warnings.filter((w) => w !== 'NOT_A_3B_PERIOD').map((w) => (
+          {plan.warnings.filter((w) => w !== 'NOT_A_3B_PERIOD' && w !== 'NEGATIVE_NET_ITC').map((w) => (
             <div key={w} className={styles.warn} role="status">
               <AlertTriangle size={16} aria-hidden /> {soT(`w${w}` as 'wRULE_86B')}
             </div>
           ))}
+          {plan.itcNegative && (
+            <div className={styles.warn} role="status" data-negative-itc>
+              <AlertTriangle size={16} aria-hidden /> {o7T('wNegativeItc', { amount: m(sumHeads(plan.itcNegative)) })}
+            </div>
+          )}
+          {withCarry && carry.fromKey && (
+            <p className={styles.muted} data-itc-carry>
+              {o7T('carryFrom', { period: carry.fromKey, amount: m(sumHeads(carry.heads)) })}
+              {carry.notes.includes('CARRY_GAP') && ` ${o7T('carryGap')}`}
+              {carry.notes.includes('CARRY_UNKNOWN') && ` ${o7T('carryUnknown')}`}
+            </p>
+          )}
 
           <div className={styles.scroll}>
             <table className={styles.grid} aria-label={soT('capHeads')}>
@@ -166,6 +190,7 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
                   <th scope="col">{soT('colHead')}</th>
                   <th scope="col">{soT('colLiability')}</th>
                   <th scope="col">{soT('colRcm')}</th>
+                  <th scope="col">{o7T('colOpening')}</th>
                   <th scope="col">{soT('colItc')}</th>
                   <th scope="col">{soT('colItcUsed')}</th>
                   <th scope="col">{soT('colCarry')}</th>
@@ -182,7 +207,8 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
                     <th scope="row">{GST_HEAD_LABELS[r.h]}</th>
                     <td>{m(r.liability)}</td>
                     <td>{m(r.rc)}</td>
-                    <td>{m(r.itc)}</td>
+                    <td>{m(r.opening)}</td>
+                    <td className={r.itc < 0 ? styles.bad : undefined}>{m(r.itc)}</td>
                     <td>{m(r.used)}</td>
                     <td>{m(r.carry)}</td>
                     <td>{m(r.cash)}</td>
@@ -196,7 +222,7 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
               <tfoot>
                 <tr>
                   <td>{soT('chTotal')}</td>
-                  {(['liability', 'rc', 'itc', 'used', 'carry', 'cash', 'interest', 'fee', 'total', 'balance'] as const).map((k) => (
+                  {(['liability', 'rc', 'opening', 'itc', 'used', 'carry', 'cash', 'interest', 'fee', 'total', 'balance'] as const).map((k) => (
                     <td key={k}>{m(Math.round(sum(k) * 100) / 100)}</td>
                   ))}
                 </tr>

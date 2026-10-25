@@ -27,7 +27,7 @@ const TABS: readonly { id: string; key: TdsKey }[] = [
 
 function loadData(): TdsData {
   return {
-    rows: tdsDeductions({ purchases: purchasesDb.all(), payments: paymentsDb.all(), manual: loadManualDeductions(), vendors: vendorsDb.all() }),
+    rows: tdsDeductions({ purchases: purchasesDb.all(), payments: paymentsDb.all(), manual: loadManualDeductions(), vendors: vendorsDb.all(), returns: getTable('purchase_returns') }),
     tcs: tcsCollections(getTable<InvoiceRecord>('invoices')),
     challans: loadChallans(),
     marks: loadReturnMarks(),

@@ -89,3 +89,6 @@ reports. Everything GST-related is a **working paper — verify with your CA**.
   on our debit note date without waiting for the supplier's credit note.
 - Reason codes 01–07 (the GSTR-1 / Tally list) — confirm the list in current use.
 - RCM / import returns: reversal of the self-assessed liability together with the ITC.
+- 7O (7.93 / 7.94): GSTR-9 (Tables 6 / 9) and the Compliance tab's late-fee / interest base now net supplier notes; a
+  note on a bill with TDS at booking reverses the TDS pro rata (`tds_reversed`, Dr TDS payable instead of the
+  supplier) — treatment of TDS already deposited is for the CA. Supplier notes still carry no cess field.

@@ -12,8 +12,8 @@
  *  - `booksReturnEffects` — what a note changes in the indicative Books P&L / balance sheet.
  *
  * Working papers — verify with your CA. In particular: the month in which ITC is reduced (we use
- * the note's date) and the treatment of a note that turns a head negative (the 3B tab clamps 4C at
- * zero; the portal asks for the excess in 4B(2)).
+ * the note's date) and the treatment of a note that turns a head negative (7O: the 3B tab shows a
+ * negative 4C as it is and the set-off uses ITC carried forward first; the portal may ask for it in 4B(2)).
  */
 
 import type { PurchaseReturn } from '../types/purchases';
@@ -37,9 +37,14 @@ export function noteSelfTax(n: Pick<PurchaseReturn, 'reverse_charge' | 'import_t
   return n.reverse_charge || n.import_type ? noteTax(n) : 0;
 }
 
-/** What the note takes off the supplier's account: its total less self-assessed GST. */
+/** TDS the note takes back from the TDS payable (7O, 7.94; the bill had TDS deducted at booking), >= 0. */
+export function noteTdsReversed(n: Pick<PurchaseReturn, 'tds_reversed'>): number {
+  return round2(Math.max(num(n.tds_reversed), 0));
+}
+
+/** What the note takes off the supplier's account: its total less self-assessed GST, less TDS reversed (7O). */
 export function noteSupplierAmount(n: PurchaseReturn): number {
-  return round2(Math.max(num(n.total) - noteSelfTax(n), 0));
+  return round2(Math.max(num(n.total) - noteSelfTax(n) - noteTdsReversed(n), 0));
 }
 
 /** The note's ITC (input tax it reverses): its GST when the bill claimed ITC, else 0. */
@@ -140,6 +145,8 @@ export interface BooksReturnEffect {
   itc: number;
   /** Self-assessed GST reversed (reverse charge / imports). */
   selfTax: number;
+  /** Additive (7O): TDS payable reversed with the note (bill with TDS at booking). */
+  tds: number;
   /** Cost credited back: taxable + GST that was not claimed as ITC. */
   cost: number;
   isExpense: boolean;
@@ -159,6 +166,7 @@ export function booksReturnEffects(notes: readonly PurchaseReturn[] | undefined)
       payable: noteSupplierAmount(n),
       itc,
       selfTax: noteSelfTax(n),
+      tds: noteTdsReversed(n),
       cost: round2(Math.max(num(n.taxable), 0) + (n.itc_eligible ? 0 : tax)),
       isExpense: n.bill_kind === 'EXPENSE',
       category: str(n.category) || (n.bill_kind === 'EXPENSE' ? 'Other expenses' : 'Purchases'),

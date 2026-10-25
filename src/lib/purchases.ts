@@ -181,25 +181,29 @@ export interface ItcTotals {
   cgst: number;
   sgst: number;
   igst: number;
+  /** Additive (7O, 7.90): compensation cess credit on eligible bills (`cess_amount`) — offsets output cess only. */
+  cess: number;
+  /** CGST + SGST + IGST + cess credit (what GSTR-3B 4A / 4C add up). */
   total: number;
-  /** GST paid on bills not claimed as ITC. */
+  /** GST (and cess) paid on bills not claimed as ITC. */
   ineligible: number;
 }
 
 /** Input tax credit from bills (optionally only one yyyy-mm month). */
 export function itcTotals(purchases: PurchaseRecord[], month?: string): ItcTotals {
-  const out: ItcTotals = { cgst: 0, sgst: 0, igst: 0, total: 0, ineligible: 0 };
+  const out: ItcTotals = { cgst: 0, sgst: 0, igst: 0, cess: 0, total: 0, ineligible: 0 };
   for (const p of purchases) {
     if (month && monthKey(p.date) !== month) continue;
     if (p.itc_eligible) {
       out.cgst = round2(out.cgst + num(p.cgst));
       out.sgst = round2(out.sgst + num(p.sgst));
       out.igst = round2(out.igst + num(p.igst));
+      out.cess = round2(out.cess + Math.max(num(p.cess_amount), 0));
     } else {
-      out.ineligible = round2(out.ineligible + sumTax(p));
+      out.ineligible = round2(out.ineligible + sumTax(p) + Math.max(num(p.cess_amount), 0));
     }
   }
-  out.total = round2(out.cgst + out.sgst + out.igst);
+  out.total = round2(out.cgst + out.sgst + out.igst + out.cess);
   return out;
 }
 

@@ -266,6 +266,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   gst_setoffs: 'books.edit',
   gst_challans: 'books.edit',
   hsn_master: 'master.edit',
+  // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
+  rcm_documents: 'books.edit',
   // business extras (WP-9)
   pos_returns: 'doc.create',
   branches: 'master.edit',

@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { ReportPeriod } from '../../lib/gst-reports';
 import { reconMonthly } from '../../lib/gst-recon-monthly';
-import { gstSummary, loadBooksData } from '../../lib/books';
+import { gstSummary, itcWithCess, loadBooksData } from '../../lib/books';
 import { advanceTaxEvents } from '../../lib/advance-tax';
 import { readLinks } from '../../lib/documents';
 import { getTable } from '../../lib/storage';
@@ -39,7 +39,7 @@ export function ReconMonthly({ period, gstin, filerStateCode }: ReconMonthlyProp
       upTo: todayIso(),
       books: (from, to) => {
         const g = gstSummary(books, { start: from, end: to });
-        return { tax: g.outputTotal + (g.outputCess ?? 0), itc: g.itc };
+        return { tax: g.outputTotal + (g.outputCess ?? 0), itc: itcWithCess(g) };
       },
     });
   }, [period.fyStart, gstin, filerStateCode]);

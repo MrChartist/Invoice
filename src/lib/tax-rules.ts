@@ -106,7 +106,12 @@ export const TDS_SECTION_RULES: readonly Versioned<TdsSection[]>[] = [
 ];
 
 export function tdsSections(date?: string): TdsSection[] {
-  return ruleAt(TDS_SECTION_RULES, date);
+  const base = ruleAt(TDS_SECTION_RULES, date);
+  // 7O: sections inserted by later Finance Acts (194-O / 194R / 194S), each with its own dated history.
+  const extra = TDS_EXTRA_SECTION_RULES.map((x) => ruleAt(x.versions, date)).filter((v): v is TdsSection => !!v);
+  if (!extra.length) return base;
+  const i = base.findIndex((x) => x.section === 'CUSTOM');
+  return i < 0 ? [...base, ...extra] : [...base.slice(0, i), ...extra, ...base.slice(i)];
 }
 
 // ── TCS presets ──────────────────────────────────────────────────────────────
@@ -510,4 +515,41 @@ export function rule86b(periodStart?: string): { monthlyTaxable: number; cashPct
 export const ITC04_RULES: readonly Versioned<{ limit: number; above: 'Q' | 'H'; upTo: 'Q' | 'A'; dueDay: number }>[] = [
   { from: '2017-07-01', value: { limit: 0, above: 'Q', upTo: 'Q', dueDay: 25 }, source: 'Rule 45(3): quarterly' },
   { from: '2021-04-01', value: { limit: 5e7, above: 'H', upTo: 'A', dueDay: 25 }, source: 'Rule 45(3) amended by Notification 35/2021-CT (FY 2021-22 on) — verify' },
+];
+
+// ── TDS sections inserted by later Finance Acts (7O, 7.97) ───────────────────
+/**
+ * One dated history per section (null = not in force), merged into `tdsSections(date)` before "Custom rate".
+ * Append new versions at the end of a history — never edit an old one. All UNVERIFIED working-paper values
+ * (verify with your CA):
+ *  - 194-O (e-commerce operator on the gross sale of an e-commerce participant): 1% from 1 Oct 2020 (Finance
+ *    Act 2020), 0.75% while the 25% cut ran (to 31 Mar 2021), 0.1% from 1 Oct 2024 (Finance (No. 2) Act 2024).
+ *    The ₹5 lakh exemption for individual / HUF participants and the 5% no-PAN rate are not modelled.
+ *  - 194R (benefit / perquisite of a business or profession): 10% from 1 Jul 2022 (Finance Act 2022).
+ *  - 194S (transfer of a virtual digital asset): 1% from 1 Jul 2022 (Finance Act 2022).
+ */
+export const TDS_EXTRA_SECTION_RULES: readonly { section: string; versions: readonly Versioned<TdsSection | null>[] }[] = [
+  {
+    section: '194O',
+    versions: [
+      { from: '2017-07-01', value: null },
+      { from: '2020-10-01', value: { section: '194O', label: '194-O E-commerce operator 0.75%', rate: 0.75 }, source: 'Finance Act 2020 (Sec 194-O) with the 25% cut to 31 Mar 2021 — verify' },
+      { from: '2021-04-01', value: { section: '194O', label: '194-O E-commerce operator 1%', rate: 1 }, source: 'Sec 194-O — verify' },
+      { from: '2024-10-01', value: { section: '194O', label: '194-O E-commerce operator 0.1%', rate: 0.1 }, source: 'Finance (No. 2) Act 2024 — verify' },
+    ],
+  },
+  {
+    section: '194R',
+    versions: [
+      { from: '2017-07-01', value: null },
+      { from: '2022-07-01', value: { section: '194R', label: '194R Business perquisite / benefit 10%', rate: 10 }, source: 'Finance Act 2022 (Sec 194R) — verify' },
+    ],
+  },
+  {
+    section: '194S',
+    versions: [
+      { from: '2017-07-01', value: null },
+      { from: '2022-07-01', value: { section: '194S', label: '194S Virtual digital asset 1%', rate: 1 }, source: 'Finance Act 2022 (Sec 194S) — verify' },
+    ],
+  },
 ];

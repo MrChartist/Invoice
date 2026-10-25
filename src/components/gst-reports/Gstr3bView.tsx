@@ -7,6 +7,7 @@ import { plural } from '../../i18n/areas/plural';
 import { gstT } from '../../i18n/areas/gst';
 import { formatMoney } from '../../lib/utils';
 import surface from '../../styles/surface.module.css';
+import { o7T } from '../../i18n/areas/gst-tds-7o';
 
 interface Row {
   table: string;
@@ -63,7 +64,8 @@ export function Gstr3bView({ report: b, onOpenSetOff }: { report: Gstr3bReport; 
     h('4A(5)', 'ITC available: all other ITC', b.itc.availableOther),
     h('4B(1)', 'ITC reversed: rules 38, 42, 43 and section 17(5)', b.itc.reversedRules),
     h('4B(2)', 'ITC reversed: others', b.itc.reversedOther),
-    h('4C', 'Net ITC available (A - B)', b.itc.net),
+    // 7O (7.91): a negative 4C (reversals above the period's ITC) is shown as it is, not floored at zero.
+    h('4C', 'Net ITC available (A - B)', b.itc.netSigned ?? b.itc.net),
     h('4D(2)', 'Ineligible ITC: others', b.itc.ineligible),
   ];
   const t5: Row[] = [
@@ -123,6 +125,16 @@ export function Gstr3bView({ report: b, onOpenSetOff }: { report: Gstr3bReport; 
         )}
         {(b.unadjustedCredit.igst > 0 || b.unadjustedCredit.cgst > 0 || b.unadjustedCredit.sgst > 0) && (
           <li>{gvT('n3bExcessCredit', { igst: b.unadjustedCredit.igst, cgst: b.unadjustedCredit.cgst, sgst: b.unadjustedCredit.sgst })}</li>
+        )}
+        {b.itc.netSigned && (
+          <li data-3b-negative-itc>
+            {o7T('n3bNegative', {
+              igst: Math.min(b.itc.netSigned.igst, 0).toFixed(2),
+              cgst: Math.min(b.itc.netSigned.cgst, 0).toFixed(2),
+              sgst: Math.min(b.itc.netSigned.sgst, 0).toFixed(2),
+              cess: Math.min(b.itc.netSigned.cess, 0).toFixed(2),
+            })}
+          </li>
         )}
         <li>{gvT('n3bNoInterest')}</li>
       </ul>

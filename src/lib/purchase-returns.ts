@@ -15,6 +15,9 @@
  *    account (the supplier owes us). Deleting the note undoes it.
  *  - Ledger (postings-returns.ts): Dr Creditors | Cr Purchase returns (or the bill's expense
  *    account) + Cr Input CGST / SGST / IGST.
+ *  - TDS (7O, 7.94): on a bill with TDS deducted at booking the note carries `tds_reversed`
+ *    (`tdsReversalForReturn`): Dr TDS payable instead of the supplier for that part; the TDS register
+ *    nets it from the bill's deduction.
  *  - Stock (events-returns.ts): goods leave on the note date.
  *  - GST (purchase-returns-gst.ts): ITC reduced in the note's period (3B), CDNR matching in 2B.
  *
@@ -33,6 +36,7 @@ import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { noteSupplierAmount } from './purchase-returns-gst';
 import { balanceOf, purchasesDb } from './purchases';
 import { generateId, getTable, setTable } from './storage';
+import { tdsReversalForReturn } from './tds-payables';
 
 export const PURCHASE_RETURNS_TABLE = 'purchase_returns';
 export const DN_PREFIX = 'DN';
@@ -290,7 +294,10 @@ export const purchaseReturnsDb = {
     if (problem) throw new PurchaseReturnError(problem);
     const number = purchaseReturnsDb.nextNumber(draft.date);
     assertUnlocked({ issue_date: isoDay(draft.date), invoice_number: number }, 'create');
-    const draftRecord = noteRecordFrom(draft, bill, number, 0);
+    const draftRecord0 = noteRecordFrom(draft, bill, number, 0);
+    // 7O (7.94): a return on a bill with TDS deducted at booking takes the TDS on the returned value back.
+    const tdsRev = bill ? tdsReversalForReturn(bill, draftRecord0.taxable, notesForBill(all, bill.id).reduce((t, x) => t + num(x.tds_reversed), 0)) : 0;
+    const draftRecord: PurchaseReturn = tdsRev > 0 ? { ...draftRecord0, tds_reversed: tdsRev, ...(bill?.tds_section ? { tds_section: bill.tds_section } : {}) } : draftRecord0;
     const adjusted = bill ? round2(Math.min(noteSupplierAmount(draftRecord), balanceOf(bill))) : 0;
     const record: PurchaseReturn = { ...draftRecord, adjusted_amount: Math.max(adjusted, 0) };
     setTable(PURCHASE_RETURNS_TABLE, [...all, record]);

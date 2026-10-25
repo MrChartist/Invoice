@@ -26,7 +26,7 @@ import { receiptInr } from './fx-gain';
 import { getTable, setTable, generateId } from './storage';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
-import { isVoidStatus, readPurchase, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
+import { isVoidStatus, readPurchase, selfAssessedCessOf, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
 import type { PurchaseReturn, VendorPayment } from '../types/purchases';
@@ -354,6 +354,12 @@ export interface NormPurchase {
   payable: number;
   /** Additive: TDS deducted when the bill was booked (owed to the government). */
   tds: number;
+  /**
+   * Additive (7O, 7.90): compensation cess on the bill (outside `gst`) and the part of it we pay
+   * ourselves (reverse charge / imports — never owed to the supplier). Optional for older callers.
+   */
+  cess?: number;
+  selfCess?: number;
   itcEligible: boolean;
   /** Paid amount recorded on the row itself (fallback when no payment rows). */
   paidOnRow: number;
@@ -384,6 +390,7 @@ export function normalizePurchase(
     selfTax: selfAssessedTaxOf(c),
     payable: supplierPayableOf(c),
     tds: c.tdsOnBill,
+    ...(c.cess > 0 ? { cess: c.cess, selfCess: selfAssessedCessOf(c) } : {}),
     itcEligible: c.itcEligible,
     paidOnRow: c.paid,
   };
@@ -394,13 +401,19 @@ function isCustomsIgst(raw: RawPurchase): boolean {
   return String((raw as { import_type?: unknown })?.import_type ?? '').toUpperCase() === 'GOODS';
 }
 
-/** Cost part of a purchase: taxable + GST that cannot be claimed as ITC. */
+/** Cost part of a purchase: taxable + GST (and cess, 7O) that cannot be claimed as ITC. */
 export function purchaseCost(p: NormPurchase): number {
-  return round2(p.taxable + (p.itcEligible ? 0 : p.gst));
+  return round2(p.taxable + (p.itcEligible ? 0 : p.gst + (p.cess ?? 0)));
 }
 
+/** GST input credit of a bill (CGST + SGST + IGST; cess is `purchaseItcCess` — it offsets output cess only). */
 export function purchaseItc(p: NormPurchase): number {
   return p.itcEligible ? p.gst : 0;
+}
+
+/** 7O (7.90): cess input credit of a bill (Sec 11(2) Compensation Cess Act: pays cess only). */
+export function purchaseItcCess(p: NormPurchase): number {
+  return p.itcEligible ? round2(p.cess ?? 0) : 0;
 }
 
 function categoryOf(p: NormPurchase): string {
@@ -984,6 +997,19 @@ export interface GstSummary {
   netPayable: number;
   /** Additive: cess on sales less cess on credit notes. Payable in cash — ITC cannot offset it. */
   outputCess?: number;
+  /**
+   * Additive (7O, 7.90): cess credit on eligible purchase bills (GSTR-3B 4A cess), reverse-charge cess
+   * we pay ourselves (3.1(d) cess) and output cess + reverse-charge cess − cess credit. Cess credit
+   * offsets cess only, so it is kept out of `itc` / `netPayable`. Working paper — verify with your CA.
+   */
+  itcCess?: number;
+  rcmCess?: number;
+  netCessPayable?: number;
+}
+
+/** ITC including cess credit — the figure GSTR-3B 4C / GSTR-9 Table 6 / 9C Table 12 compare with. */
+export function itcWithCess(g: Pick<GstSummary, 'itc' | 'itcCess'>): number {
+  return round2(g.itc + (g.itcCess ?? 0));
 }
 
 export function gstSummary(data: BooksData, period: Period): GstSummary {
@@ -1007,12 +1033,16 @@ export function gstSummary(data: BooksData, period: Period): GstSummary {
   let itc = 0;
   let blocked = 0;
   let rcm = 0;
+  let itcCess = 0;
+  let rcmCess = 0;
   for (const raw of data.purchases) {
     const p = normalizePurchase(raw, data.vendors);
     if (!p || !inPeriod(p.date, period)) continue;
     itc = round2(itc + purchaseItc(p));
+    itcCess = round2(itcCess + purchaseItcCess(p));
     blocked = round2(blocked + (p.itcEligible ? 0 : p.gst));
     if (p.selfTax && !isCustomsIgst(raw)) rcm = round2(rcm + p.selfTax);
+    if (p.selfCess && !isCustomsIgst(raw)) rcmCess = round2(rcmCess + p.selfCess);
   }
   const outputTotal = round2(cgst + sgst + igst);
   return {
@@ -1025,6 +1055,9 @@ export function gstSummary(data: BooksData, period: Period): GstSummary {
     rcmPayable: rcm,
     netPayable: round2(outputTotal + rcm - itc),
     outputCess: cess,
+    itcCess,
+    rcmCess,
+    netCessPayable: round2(cess + rcmCess - itcCess),
   };
 }
 
@@ -1105,20 +1138,23 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   let selfTax = 0;
   for (const p of purchases) {
     purchTotal += p.payable;
-    selfTax += p.selfTax;
-    itc += purchaseItc(p);
+    selfTax += p.selfTax + (p.selfCess ?? 0);
+    itc += purchaseItc(p) + purchaseItcCess(p);
   }
-  // WP-3: purchase returns / supplier notes reduce what we owe, the ITC and any self-assessed GST.
+  // WP-3: purchase returns / supplier notes reduce what we owe, the ITC and any self-assessed GST
+  // (7O: and the TDS payable when the bill had TDS at booking).
+  let tdsReturned = 0;
   for (const r of booksReturnEffects(data.purchaseReturns)) {
     if (!upTo(r.date)) continue;
     purchTotal -= r.payable;
     selfTax -= r.selfTax;
     itc -= r.itc;
+    tdsReturned += r.tds ?? 0;
   }
   // Same rule on the payables side: cash that left the bank always reduces payables.
   let paid = 0;
   // TDS we deducted (on bills and on payments) is owed to the government, not the supplier.
-  let tdsDeducted = 0;
+  let tdsDeducted = -tdsReturned;
   for (const p of purchases) tdsDeducted += p.tds;
   for (const pp of data.purchasePayments) {
     if (!upTo(toIsoDate(pp.date))) continue;

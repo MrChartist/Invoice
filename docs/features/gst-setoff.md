@@ -10,6 +10,7 @@ filed or paid from the app, and the GST portal's own set-off screen and PMT-06 a
 | UI | GST reports page (`/gst-reports`), new lazy tabs: **Set-off & payment** (`SetOffPanel` + `SetOffDialog` + `ChallanList`), **Purchase HSN** (`PurchaseHsnView`), **1 vs 3B vs Books** (`ReconMonthly`), **HSN master** (`HsnMasterPanel`), **GSTR-9C** (`Gstr9cView`) — all in `src/components/gst-reports/`, styles `gst-setoff.module.css`. The GSTR-3B tab shows a "Liability to be paid in cash" card with a link to the set-off tab. Purchase bill form: "Compensation cess on the bill (₹)" under the advanced section. |
 | Lib | `src/lib/gst-setoff.ts` (plan, journal, challans, cash ledger), `src/lib/hsn-master.ts`, `src/lib/hsn-purchase-register.ts`, `src/lib/gst-recon-monthly.ts`, `src/lib/gstr9c.ts`; narrow edits in `gst-reports.ts`, `purchase-normalize.ts`, `gstr9.ts`, `einvoice.ts`, `ledger/postings.ts` (one line), `tax-rules.ts` (appended) |
 | Strings | `src/i18n/areas/gst-setoff.ts` (`soT`, English + Hindi); tab names in `areas/gst.ts`; 3B card in `areas/gst-views.ts`; cess field in `areas/purchases.ts` |
+| 7O | `src/lib/rcm-self-invoice.ts`, `src/lib/iff.ts`, `RcmDocsPanel.tsx`; strings `src/i18n/areas/gst-tds-7o.ts` (`o7T`); tests `tests/gst-tds-7o.test.ts` + a 7O row in `tests/purchase-contract.test.ts` |
 | Tests | `tests/gst-setoff.test.ts` (order, plan, journal, challans, cash ledger, purchase cess in 3B), `tests/gst-depth.test.ts` (HSN master, purchase register, monthly recon, e-Invoice details, 9C), WP-6 row in `tests/purchase-contract.test.ts` |
 
 ## Data (additive only)
@@ -76,9 +77,59 @@ minor heads apart and moves money between heads only through PMT-09; this is a w
 `cess_amount` on the bill is read by `readPurchase` (`cess`) and `normalizePurchase` (GST reports). GSTR-3B: cess in
 4A (and 4B for reversals pro rata), 4C net cess, 3.1(d) cess for reverse-charge bills, set-off cess credit against
 output cess only (`payment.cess` = cash part). GSTR-9 Table 6 / 7 carry it; Table 9 shows cess credit used month by
-month. Ledger: Dr Input cess (2353) when ITC is claimed, else the expense / purchase account. Readers that ignore cess
-(Books summary, accounting / Tally exports) see it inside `roundOff` exactly as before, so they still balance — see
-open items.
+month. Ledger: Dr Input cess (2353) when ITC is claimed, else the expense / purchase account. (7O, 7.90) closed the remaining readers: Books `gstSummary` adds `itcCess` / `rcmCess` / `netCessPayable` (cess credit is
+kept out of `itc` / `netPayable` because it pays cess only; `itcWithCess(g)` is the figure 3B 4C, GSTR-9 Table 6 and 9C
+Table 12 compare with), `purchaseCost` adds cess that is not claimed, the balance sheet nets cess credit; `itcTotals`
+has `cess` (inside `total`); the accounting purchase register has a "Cess" column and `roundOff` no longer contains
+cess; Tally posts it to an **Input Cess** ledger (Duties & Taxes, Cess) or into the purchase ledger when ITC is
+blocked. **Reverse-charge cess** (and customs cess on imported goods) is self-assessed: `selfAssessedCessOf` takes it
+out of `supplierPayable`, and the ledger / Tally credit it to GST payable — reverse charge (2310) / IGST payable on
+imports (2311) with the GST, so the set-off journal's Dr 2310 (which includes 3.1(d) cess) clears it.
+
+## ITC carry-forward and negative net ITC (7O, 7.91)
+
+- A posted set-off stores `itc_carry` (unutilised ITC by head after the period), plus `itc_opening` / `itc_negative`
+  when used. `carryForwardFor(setoffs, from, gstin)` returns the carry of the latest set-off posted for an earlier
+  period of the same GSTIN, with notes `CARRY_GAP` (a period in between was not posted) and `CARRY_UNKNOWN` (that
+  set-off was posted before 7O — re-post it). `creditLedgerBalance(setoffs, gstin, asOf?)` is the "Credit ledger
+  (carried)" stat on the tab.
+- `planSetOff(..., { openingItc })` (the tab passes the carry; a checkbox turns it off): credit = 4C (signed) +
+  opening, and the date-keyed order is re-run on it (`computeSetOff`); without an opening and with a non-negative 4C
+  the plan is exactly the 3B's own Table 6.1. The plan carries `itcOpening` and the "ITC brought forward" column.
+- **Negative 4C**: `buildGstr3b` keeps `itc.net` floored at zero (the set-off never uses a negative credit) and adds
+  `itc.netSigned` when a head is below zero (reversals in 4B / supplier notes above the period's credit). The 3B
+  view shows the signed figure in 4C with a note. In the plan, a head still negative after the carry-in is
+  `itcNegative`: added to the cash tax (warning `NEGATIVE_NET_ITC`) and the journal debits that input ledger (it
+  carries a credit balance from the reversal) against the cash ledger. GSTR-9 Table 9 subtracts it from the credit
+  carried between months. **Flag for the CA** (portal practice: added to the liability — Circular 170/02/2022-GST as
+  understood).
+
+## RCM self-invoice and payment voucher (7O, 7.92)
+
+`src/lib/rcm-self-invoice.ts`, table `rcm_documents` (backups, `TABLE_ACTIONS` books.edit, edit log), tab "RCM
+self-invoice" (`RcmDocsPanel`, lazy). `rcmBills` lists domestic reverse-charge bills (unregistered suppliers by
+default; registered ones for payment vouchers) with the documents issued and the self-invoice due date
+(`selfInvoiceDueDate`: `RCM_SELF_INVOICE_DAYS_RULES` in `gst-penalties.ts` — 30 days from receipt from 1 Nov 2024,
+Rule 47A; no limit before). Self-invoice `RCM/FY<yy-yy>/<seq>`: one bill, or a **consolidated** invoice for one month
+(every bill of that month); lines from the bill lines with the bill's heads spread by value (cess included). Payment
+voucher `RPV/FY<yy-yy>/<seq>`: amount ≤ what the supplier is still owed (less earlier vouchers); tax pro rata.
+Numbers via `nextSeriesNumberFor` + `recordSeries` (never re-issued after a delete), at most 16 characters (Rule 46),
+unique; period lock and audit (`gst`). Printable script-free HTML ("Tax payable on reverse charge: Yes", rule
+citation, amount of tax in words). Nothing posts to the ledger — the tax is booked with the bill.
+
+## Supplier notes in GSTR-9 and the compliance estimates (7O, 7.93)
+
+`buildGstr9(..., { purchaseNotes })` passes the notes to every monthly build (3B 4A / 4C and Table 9 follow) and
+reduces Table 6B–6F (and 8 for notes on bills whose ITC was not claimed) in the bucket of the bill the note is against
+(capital / services share of that bill), so 6J stays nil. Gstr9Modal and Gstr9cView pass `books.purchaseReturns`; the
+Compliance tab passes `purchase_returns` to its 3B builds for the late-fee / interest base.
+
+## IFF working paper (7O, 7.98)
+
+`src/lib/iff.ts`: `isIffMonth` (months 1–2 of an FY quarter), `iffCheck` (B2B + CDNR taxable value vs
+`IFF_LIMIT_RULES` ₹50 lakh from 1 Jan 2021; `NOT_IFF_MONTH`, `OVER_LIMIT`, `EMPTY`), `buildIffJson` (the GSTR-1 JSON's
+`b2b` / `cdnr` / `b2ba` / `cdnra` only, no turnover). "IFF JSON" button on the GST page header in months 1–2. Layout
+not verified against the offline tool.
 
 ## HSN master, purchase register, reconciliation, e-Invoice, GSTR-9C
 
@@ -113,6 +164,12 @@ default rate now fills invoice / bill lines when an HSN is typed (`src/lib/hsn-d
 
 ## Statutory values to verify with a CA
 
+- 7O: `RCM_SELF_INVOICE_DAYS_RULES` (30 days from 1 Nov 2024, Rule 47A / Notification 20/2024-CT as understood); the
+  consolidated monthly self-invoice route (offered as a convenience — confirm it applies); Rule 46 16-character limit
+  applied to the self-invoice and payment-voucher series; `IFF_LIMIT_RULES` (₹50 lakh a month from 1 Jan 2021) and the
+  IFF JSON layout; treatment of a negative 4C (Circular 170/02/2022-GST as understood); customs cess credited to the
+  "IGST payable on imports" ledger with the customs IGST.
+
 - `GST_SETOFF_RULES`: the three dates and the reading of Sec 49(5) / 49A / Rule 88A (in particular the pre-Feb-2019
   "own head first" practice and the 1 Feb – 28 Mar 2019 "CGST then SGST" window).
 - `RULE_86B_RULES`: ₹50 lakh a month, 1% in cash, from 1 Jan 2021 (Notification 94/2020-CT); exceptions not modelled.
@@ -127,12 +184,13 @@ default rate now fills invoice / bill lines when an HSN is typed (`src/lib/hsn-d
 
 ## Open items
 
-- Cess on purchase bills is not yet in Books' `gstSummary` ITC, the accounting / Tally exports (it sits in round-off
-  there) or `purchases.ts` `itcTotals`; reverse-charge cess is not split out of the supplier's payable.
-- Interest / late fee are estimates on the filing date typed on the tab; ITC carried forward between months is not
-  fed back into the next month's set-off plan (3B uses the month's own 4C, like GSTR-3B itself).
+- (7O closed: purchase cess in Books / itcTotals / exports / Tally, RCM cess out of the supplier payable, ITC
+  carry-forward, negative 4C, RCM self-invoice + Rule 52 series, IFF JSON, supplier notes in GSTR-9.)
+- Interest / late fee are estimates on the filing date typed on the tab. The carry-forward is the app's view of the
+  credit ledger: credit used outside the app, or periods never posted, are not known to it.
 - Electronic cash ledger is tracked by major head only; PMT-09 transfers and refunds (RFD-01) are not modelled.
-- RCM self-invoice / Rule 52 payment voucher series, ISD, IFF JSON, EXPA, consolidated e-Way — not in this package.
+- ISD, EXPA, consolidated e-Way — not built. Supplier notes carry no cess field (cess on a returned cess bill is not
+  reversed). The GSTR-3B JSON still writes the floored 4C. The accounting `gst_summary` export has no cess column.
 - GSTR-9C: supplier notes (WP-3) are not separated in Table 12; rate-wise Table 9 and Table 14 (expense-wise ITC)
   are not generated.
 - HSN master defaults are not yet applied automatically in the invoice / bill line editors (`resolveGstRate` is ready

@@ -62,6 +62,8 @@ import { num, round2 } from './invoice-calc';
 import { ecoReporting } from './tax-rules';
 import { readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv, type CsvCell } from './gstr-json';
+import type { PurchaseReturn } from '../types/purchases';
+import { isLiveNote, noteTax } from './purchase-returns-gst';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -166,6 +168,12 @@ export interface Gstr9Options {
   /** Additive (WP-8): units master + stock items, passed to each monthly build so Table 17 matches GSTR-1's HSN summary. */
   units?: BuildOptions['units'];
   items?: BuildOptions['items'];
+  /**
+   * Additive (7O, 7.93): `purchase_returns` rows. Each month's GSTR-3B then nets supplier notes (so Table 6A
+   * and Table 9 follow the 3B), and Table 6B–6F / 8 are reduced by the notes of the FY in the bucket of
+   * the bill they are against. Working paper — verify with your CA.
+   */
+  purchaseNotes?: readonly PurchaseReturn[];
 }
 
 export interface Gstr9Report {
@@ -290,6 +298,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       advances: opts.advances,
       units: opts.units,
       items: opts.items,
+      ...(opts.purchaseNotes ? { purchaseNotes: opts.purchaseNotes } : {}),
     });
     return { period, label: periodLabel(period), gstr1: rep.gstr1, gstr3b: rep.gstr3b };
   });
@@ -513,6 +522,36 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     }
   }
 
+  // 7O (7.93): supplier notes (purchase returns / credit notes received) of the FY reduce the ITC availed,
+  // in the bucket of the bill they are against (snapshot flags on the note; capital / services share of the bill).
+  let notesNetted = 0;
+  if (opts.purchaseNotes?.length) {
+    const billsById = new Map<string, unknown>();
+    for (const raw of rawPurchases ?? []) {
+      const id = asRec(raw).id;
+      if (typeof id === 'string') billsById.set(id, raw);
+    }
+    for (const n of opts.purchaseNotes) {
+      if (!isLiveNote(n) || !inFy(n.date, fyStart) || !(noteTax(n) > 0)) continue;
+      notesNetted++;
+      const heads: Gstr9Heads = { taxable: 0, igst: num(n.igst), cgst: num(n.cgst), sgst: num(n.sgst), cess: 0 };
+      if (!n.itc_eligible) {
+        addTo(t8F, heads, -1);
+        continue;
+      }
+      const bill = n.purchase_id ? billsById.get(n.purchase_id) : undefined;
+      if (n.import_type === 'GOODS') addTo(b6.E, heads, -1);
+      else if (n.import_type === 'SERVICES') addTo(b6.F, heads, -1);
+      else if (n.reverse_charge) addTo(checkGstin(String(n.vendor_gstin ?? '')).valid ? b6.D : b6.C, heads, -1);
+      else if (bill && (asRec(bill).capital_goods === true || asRec(bill).is_capital_goods === true)) addTo(b6.capital, heads, -1);
+      else {
+        const share = bill ? servicesShare(bill, String(n.category ?? '')) : SERVICE_CATEGORIES.has(String(n.category ?? '').trim().toLowerCase()) ? 1 : 0;
+        if (share > 0) addTo(b6.services, heads, -share);
+        if (share < 1) addTo(b6.inputs, heads, -(1 - share));
+      }
+    }
+  }
+
   const t6B = sumHeads(b6.inputs, b6.capital, b6.services);
   const t6G = zero();
   const t6H = zero();
@@ -602,7 +641,8 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
   let cessItc = 0;
   for (const m of months) {
     const p = m.gstr3b.payment;
-    const net = m.gstr3b.itc.net;
+    // 7O: a negative 4C (notes / reversals above the month's ITC) eats into the credit carried from earlier months.
+    const net = m.gstr3b.itc.netSigned ?? m.gstr3b.itc.net;
     const so = computeSetOff(
       p.liability,
       { igst: net.igst + carry.igst, cgst: net.cgst + carry.cgst, sgst: net.sgst + carry.sgst },
@@ -712,6 +752,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     'Advances (4F) are the net of GSTR-1 Table 11A and 11B for the year. Amendments made in the year are in 4K/4L and 5J/5K (revised − original); Part V (amendments of this year’s supplies made next year), ISD, TRAN credit and 8C/8E are not modelled and shown as 0.',
     'Table 9 re-runs the monthly set-off carrying unused ITC into the next month; a month whose credit notes exceed its sales is not carried back.',
     'Books compare tax heads only and do not filter by GSTIN.',
+    ...(notesNetted ? [`${notesNetted} supplier note(s) (purchase returns / credit notes received) are netted: in each month's 3B (Table 6A, Table 9) and in Table 6B–6F / 8 in the bucket of the bill they are against. Verify with your CA.`] : []),
   ];
 
   return {

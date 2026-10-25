@@ -21,13 +21,13 @@ import { audit } from './audit';
 import { returnsForMonth, type FilerFrequency } from './compliance';
 import { isoDay } from './dates';
 import { gstInterest, lateDays, returnLateFee } from './gst-penalties';
-import { periodRange, type Gstr3bReport, type ReportPeriod } from './gst-reports';
+import { computeSetOff, periodRange, type Gstr3bReport, type ReportPeriod } from './gst-reports';
 import { num, round2 } from './invoice-calc';
 import { A, ACCOUNTS_TABLE, DEFAULT_ACCOUNTS, chartOf, loadUserAccounts, type Account } from './ledger/accounts';
 import { deleteVoucher, loadVouchers, rupeesToPaise, saveVoucher, type ManualVoucherLine } from './ledger/vouchers';
 import { isCashOrBankLedger } from './bank-ledgers';
 import { generateId, getTable, setTable } from './storage';
-import { rule86b } from './tax-rules';
+import { gstSetOffOrder, rule86b } from './tax-rules';
 
 export const GST_SETOFFS_TABLE = 'gst_setoffs';
 export const GST_CHALLANS_TABLE = 'gst_challans';
@@ -98,8 +98,15 @@ export interface SetOffPlan {
   liability: Heads;
   /** Reverse-charge tax (3.1(d)): cash only. */
   rcLiability: Heads;
-  /** Net ITC (4C). */
+  /** Net ITC (4C) of the period plus the credit carried in (`itcOpening`); a head may be negative (7O). */
   itcAvailable: Heads;
+  /** Additive (7O, 7.91): unutilised ITC carried in from the last posted set-off (`carryForwardFor`). */
+  itcOpening?: Heads;
+  /**
+   * Additive (7O, 7.91): credit still negative after the carry-in (4C below zero — reversals exceed the
+   * credit): paid in cash and restored to the input ledger by the journal. Flag for your CA.
+   */
+  itcNegative?: Heads;
   /** ITC consumed per CREDIT head (what leaves each input ledger). */
   itcUsed: Heads;
   /** The utilisation matrix [credit head][liability head], as in Table 6.1. */
@@ -121,7 +128,7 @@ export interface SetOffPlan {
   due: string;
   paidOn: string;
   daysLate: number;
-  /** Codes: RULE_86B, UNADJUSTED_CREDIT, NOT_A_3B_PERIOD, NOTHING_TO_SET_OFF. */
+  /** Codes: RULE_86B, UNADJUSTED_CREDIT, NOT_A_3B_PERIOD, NOTHING_TO_SET_OFF, NEGATIVE_NET_ITC (7O). */
   warnings: string[];
 }
 
@@ -137,6 +144,11 @@ export interface PlanOptions {
   nil?: boolean;
   includeInterest?: boolean;
   includeLateFee?: boolean;
+  /**
+   * Additive (7O, 7.91): ITC carried in by head from the previous posted set-off (`carryForwardFor`). It joins
+   * the period's 4C before the utilisation order is applied. Omit (or zeros) = the period's own 4C only.
+   */
+  openingItc?: Partial<Heads>;
 }
 
 /** Cess figures out of a 3B payment (older reports carry only `cess` = the cash figure). */
@@ -154,14 +166,33 @@ export function planSetOff(g3: Gstr3bReport, o: PlanOptions): SetOffPlan {
   const cess = cessParts(p);
   const liability: Heads = { ...p.liability, cess: cess.liability };
   const rcLiability: Heads = { ...p.rcLiability, cess: cess.rc };
-  const u = p.itcUsed;
+  // 7O (7.91): carry-in + a negative 4C. Credit = 4C (signed) + opening; the order is re-run on it.
+  const signed = g3.itc.netSigned ?? g3.itc.net;
+  const opening: Heads = cleanHeads(o.openingItc ?? {});
+  const available: Heads = addHeads({ igst: signed.igst, cgst: signed.cgst, sgst: signed.sgst, cess: signed.cess }, opening);
+  const recompute = sumHeads(opening) !== 0 || !!g3.itc.netSigned;
+  let u = p.itcUsed;
+  let cash3: { igst: number; cgst: number; sgst: number } = p.cash;
+  let carry3: { igst: number; cgst: number; sgst: number } = p.itcCarry;
+  const negative = zeroHeads();
+  if (recompute) {
+    const credit = { igst: Math.max(available.igst, 0), cgst: Math.max(available.cgst, 0), sgst: Math.max(available.sgst, 0) };
+    const r = computeSetOff(p.liability, credit, p.rcLiability, gstSetOffOrder(from));
+    u = r.itcUsed;
+    cash3 = r.cash;
+    carry3 = r.itcCarry;
+    const usableCess = Math.max(available.cess, 0);
+    cess.used = round2(Math.min(cess.liability, usableCess));
+    cess.carry = round2(usableCess - cess.used);
+    for (const k of GST_HEADS) negative[k] = round2(Math.max(-available[k], 0));
+  }
   const itcUsed: Heads = {
     igst: round2(u.igst.igst + u.igst.cgst + u.igst.sgst),
     cgst: round2(u.cgst.cgst + u.cgst.igst),
     sgst: round2(u.sgst.sgst + u.sgst.igst),
     cess: round2(cess.used),
   };
-  const cashTax: Heads = { ...p.cash, cess: round2(cess.liability - cess.used + cess.rc) };
+  const cashTax: Heads = addHeads({ ...cash3, cess: round2(cess.liability - cess.used + cess.rc) }, negative);
   const due = isoDay(o.due);
   const paidOn = isoDay(o.paidOn) || due;
   const daysLate = due && paidOn ? lateDays(due, paidOn) : 0;
@@ -187,6 +218,7 @@ export function planSetOff(g3: Gstr3bReport, o: PlanOptions): SetOffPlan {
   }
   const ua = g3.unadjustedCredit;
   if (ua.igst > 0 || ua.cgst > 0 || ua.sgst > 0) warnings.push('UNADJUSTED_CREDIT');
+  if (sumHeads(negative) > 0) warnings.push('NEGATIVE_NET_ITC');
   const totalCash = addHeads(cashTax, interest, lateFee);
   if (!anyLiability && sumHeads(totalCash) === 0) warnings.push('NOTHING_TO_SET_OFF');
   return {
@@ -195,10 +227,12 @@ export function planSetOff(g3: Gstr3bReport, o: PlanOptions): SetOffPlan {
     to,
     liability,
     rcLiability,
-    itcAvailable: { igst: g3.itc.net.igst, cgst: g3.itc.net.cgst, sgst: g3.itc.net.sgst, cess: g3.itc.net.cess },
+    itcAvailable: recompute ? available : { igst: g3.itc.net.igst, cgst: g3.itc.net.cgst, sgst: g3.itc.net.sgst, cess: g3.itc.net.cess },
+    ...(sumHeads(opening) !== 0 ? { itcOpening: opening } : {}),
+    ...(sumHeads(negative) > 0 ? { itcNegative: negative } : {}),
     itcUsed,
     itcMatrix: { igst: { ...u.igst }, cgst: { ...u.cgst }, sgst: { ...u.sgst }, cess: { cess: round2(cess.used) } },
-    itcCarry: { ...p.itcCarry, cess: cess.carry },
+    itcCarry: { ...carry3, cess: cess.carry },
     cashTax,
     interest,
     lateFee,
@@ -271,6 +305,8 @@ export function setOffVoucherLines(plan: SetOffPlan, ledgers: { interest: string
   };
   for (const h of GST_HEADS) D(OUTPUT_ACCOUNT[h], plan.liability[h]);
   D(A.rcmPayable, sumHeads(plan.rcLiability));
+  // 7O: credit below zero (reversals exceed ITC) is paid in cash and clears the input ledger's credit balance.
+  for (const h of GST_HEADS) D(INPUT_ACCOUNT[h], plan.itcNegative?.[h] ?? 0);
   D(ledgers.interest, sumHeads(plan.interest));
   D(ledgers.lateFee, sumHeads(plan.lateFee));
   let itc = 0;
@@ -303,6 +339,14 @@ export interface GstSetOffRecord {
   cash_tax: Heads;
   interest: Heads;
   late_fee: Heads;
+  /**
+   * Additive (7O, 7.91): unutilised ITC by head after this set-off — the next period's opening credit
+   * (electronic credit ledger as this app sees it). Absent on set-offs posted before 7O.
+   */
+  itc_carry?: Heads;
+  /** Additive (7O): credit carried in when this set-off was posted, and any negative credit paid in cash. */
+  itc_opening?: Heads;
+  itc_negative?: Heads;
   created_at: string;
   updated_at?: string;
 }
@@ -343,6 +387,9 @@ export function normalizeSetOffs(rows: unknown[]): GstSetOffRecord[] {
       cash_tax: cleanHeads(o.cash_tax),
       interest: cleanHeads(o.interest),
       late_fee: cleanHeads(o.late_fee),
+      ...(o.itc_carry && typeof o.itc_carry === 'object' ? { itc_carry: cleanHeads(o.itc_carry) } : {}),
+      ...(o.itc_opening && typeof o.itc_opening === 'object' ? { itc_opening: cleanHeads(o.itc_opening) } : {}),
+      ...(o.itc_negative && typeof o.itc_negative === 'object' ? { itc_negative: cleanHeads(o.itc_negative) } : {}),
       created_at: s(o.created_at),
       ...(s(o.updated_at) ? { updated_at: s(o.updated_at) } : {}),
     });
@@ -409,6 +456,9 @@ export function postSetOff(plan: SetOffPlan, o: { date: string; gstin?: string; 
     cash_tax: plan.cashTax,
     interest: plan.interest,
     late_fee: plan.lateFee,
+    itc_carry: plan.itcCarry,
+    ...(plan.itcOpening ? { itc_opening: plan.itcOpening } : {}),
+    ...(plan.itcNegative ? { itc_negative: plan.itcNegative } : {}),
     created_at: prev?.created_at ?? now,
     ...(prev ? { updated_at: now } : {}),
   };
@@ -655,6 +705,58 @@ export function deleteGstChallan(id: string): void {
   if (row.voucher_id && loadVouchers().some((v) => v.id === row.voucher_id)) deleteVoucher(row.voucher_id);
   setTable(GST_CHALLANS_TABLE, all.filter((c) => c.id !== id));
   audit.record({ entity: 'gst', entity_id: id, action: 'delete', doc_number: row.cpin, summary: `Deleted GST challan CPIN ${row.cpin} (${money(challanTotal(row))})` });
+}
+
+/* ── ITC carry-forward / electronic credit ledger (7O, 7.91) ───── */
+
+export interface CarryForward {
+  /** Credit carried in by head (zeros when nothing is known). */
+  heads: Heads;
+  /** The set-off it comes from, if any. */
+  fromKey: string;
+  fromTo: string;
+  /**
+   * Notes: CARRY_GAP (the last posted set-off does not end the day before this period — a period in between
+   * was not posted, so its own ITC is not in the figure), CARRY_UNKNOWN (that set-off was posted before 7O and
+   * stored no carry: re-post it to carry its credit forward).
+   */
+  notes: string[];
+}
+
+const dayBefore = (day: string): string => {
+  const [y, m, d] = day.split('-').map(Number);
+  const t = new Date(y, m - 1, d - 1);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+};
+
+/**
+ * Unutilised ITC by head from the latest set-off posted for an earlier period of the same GSTIN — the opening
+ * credit of the period starting `from`. Working paper: the portal's electronic credit ledger is what counts.
+ */
+export function carryForwardFor(setoffs: readonly GstSetOffRecord[], from: string, gstin = ''): CarryForward {
+  const g = gstin.trim().toUpperCase();
+  const prev = setoffs
+    .filter((r) => r.gstin === g && r.to && r.to < from)
+    .sort((a, b) => b.to.localeCompare(a.to))[0];
+  if (!prev) return { heads: zeroHeads(), fromKey: '', fromTo: '', notes: [] };
+  const notes: string[] = [];
+  if (prev.to !== dayBefore(from)) notes.push('CARRY_GAP');
+  if (!prev.itc_carry) notes.push('CARRY_UNKNOWN');
+  const heads = zeroHeads();
+  for (const h of GST_HEADS) heads[h] = round2(Math.max(prev.itc_carry?.[h] ?? 0, 0));
+  return { heads, fromKey: prev.period_key, fromTo: prev.to, notes };
+}
+
+/**
+ * Electronic credit ledger balance by head as of `asOf` (default: everything): the carry of the latest
+ * set-off posted on or before that day for the GSTIN. A working view, not the portal ledger.
+ */
+export function creditLedgerBalance(setoffs: readonly GstSetOffRecord[], gstin = '', asOf?: string): Heads {
+  const g = gstin.trim().toUpperCase();
+  const last = setoffs
+    .filter((r) => r.gstin === g && (!asOf || r.date <= asOf))
+    .sort((a, b) => b.to.localeCompare(a.to) || b.date.localeCompare(a.date))[0];
+  return last?.itc_carry ? { ...last.itc_carry } : zeroHeads();
 }
 
 /* ── Electronic cash ledger & status ───────────────────────────── */

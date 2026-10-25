@@ -522,3 +522,23 @@ test('WP-8 readers (item_id / unit_factor on bill lines, stock query, reorder wi
   assert.deepEqual(gstNormalize(landed, '27'), gstNormalize(bill, '27'));
   assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [landed] }).get('s')?.[0]?.rate, 110);
 });
+
+test('7O readers (RCM self-invoice / payment voucher, TDS reversal on returns, cess in exports) read the real bill shape', async () => {
+  const { rcmBills, linesOfBill, buildSelfInvoice } = await import('../src/lib/rcm-self-invoice.ts');
+  const { tdsReversalForReturn } = await import('../src/lib/tds-payables.ts');
+  const { selfAssessedCessOf } = await import('../src/lib/purchase-normalize.ts');
+  // Reverse charge from an unregistered supplier, with cess, typed lines and a lump split.
+  const rcm: PurchaseRecord = { ...bill, id: 'rc', vendor_gstin: undefined, reverse_charge: true, cess_amount: 20, total: 1200 };
+  const rows = rcmBills([rcm, bill, { ...rcm, id: 'dr', status: 'Draft' } as never], []);
+  assert.deepEqual(rows.map((r) => r.id), ['rc']);
+  assert.equal(rows[0].supplierPayable, 1000, 'GST 180 and cess 20 are ours to pay');
+  const lines = linesOfBill(rcm);
+  assert.deepEqual(lines.map((l) => [l.hsn, l.quantity, l.taxable, l.cgst, l.sgst, l.cess]), [['4802', 10, 1000, 90, 90, 20]]);
+  const doc = buildSelfInvoice({ date: '2026-04-30', number: 'RCM/FY26-27/0001', recipient: { name: 'Us' }, bills: [rcm] });
+  assert.equal(doc.total, 1200);
+  assert.equal(selfAssessedCessOf(readPurchase(rcm)!), 20);
+  // TDS fields on the real shape.
+  assert.equal(tdsReversalForReturn({ ...bill, tds_section: '194C-2', tds_amount: 20, tds_base: 1000 }, 500), 10);
+  assert.equal(exportNormalize({ ...bill, cess_amount: 30, total: 1210 })!.roundOff, 0);
+});
+

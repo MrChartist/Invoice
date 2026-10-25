@@ -15,7 +15,7 @@ import { inrRecord } from './fx';
 import { rcmTaxOf, supplierView } from './rcm';
 import { resolveStateCode, stateByCode } from './india-states';
 import { isoDay } from './dates';
-import { isVoidStatus, readPurchase, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
+import { isVoidStatus, readPurchase, selfAssessedCessOf, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 
 /* ── Dates ────────────────────────────────────────────────────── */
 
@@ -245,7 +245,12 @@ export interface NormalPurchase {
   igst: number;
   tax: number;
   total: number;
+  /** total − taxable − tax − cess (7O: cess no longer lands here). Signed. */
   roundOff: number;
+  /** Additive (7O, 7.90): compensation cess on the bill (`cess_amount`), outside `tax`; 0 when none. */
+  cess: number;
+  /** Additive (7O): the part of `cess` we pay ourselves (reverse charge → RCM payable; imported goods → customs). */
+  selfCess: number;
   status: string;
   notes: string;
   /** Additive: false when the GST on this bill is NOT claimed as input credit. */
@@ -293,12 +298,14 @@ export function normalizePurchase(raw: unknown, vendors: unknown[] = []): Normal
     igst: heads.igst,
     tax: heads.tax,
     total: c.total,
-    roundOff: round2(c.total - heads.taxable - heads.tax),
+    roundOff: round2(c.total - heads.taxable - heads.tax - c.cess),
+    cess: c.cess,
+    selfCess: selfAssessedCessOf(c),
     status: clean(r.status),
     notes: c.notes,
     itcEligible: c.itcEligible,
     selfTax: selfAssessedTaxOf(c),
-    selfTaxKind: selfAssessedTaxOf(c) > 0 ? (c.importType === 'GOODS' ? 'CUSTOMS' : 'RCM') : '',
+    selfTaxKind: selfAssessedTaxOf(c) + selfAssessedCessOf(c) > 0 ? (c.importType === 'GOODS' ? 'CUSTOMS' : 'RCM') : '',
     payable: supplierPayableOf(c),
     tds: c.tdsOnBill,
     tdsSection: c.tdsSection,

@@ -336,6 +336,8 @@ const RECORD_TABLES = [
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
   'gst_setoffs', 'gst_challans', 'hsn_master',
+  // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
+  'rcm_documents',
   // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
   'year_end',
   // Inventory masters (WP-8): stock groups, stock categories, units of measure
@@ -358,6 +360,7 @@ const ID_TABLES = new Set([
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
   'gst_setoffs', 'gst_challans', 'hsn_master',
+  'rcm_documents',
   'year_end',
   'stock_groups', 'stock_categories', 'units',
 ]);

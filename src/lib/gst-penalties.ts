@@ -165,3 +165,21 @@ export function estimateFor(
   const interest = r.form === 'GSTR3B' ? gstInterest(o.cashTax ?? 0, r.due, o.filedOn, r.from) : 0;
   return { days, lateFee, interest };
 }
+
+/* ── RCM self-invoice time limit (7O, 7.92) ───────────────────────── */
+
+/**
+ * Days after receipt of the supply within which the recipient issues the self-invoice for a reverse-charge
+ * supply from an unregistered supplier (Sec 31(3)(f)). `null` = no time limit in the rules (the invoice was
+ * expected on receipt). UNVERIFIED working-paper values — verify with your CA:
+ *  - from 1 Nov 2024: 30 days (Rule 47A, inserted by Notification 20/2024-CT as understood).
+ * Append new versions; never edit an old one.
+ */
+export const RCM_SELF_INVOICE_DAYS_RULES: readonly Versioned<number | null>[] = [
+  { from: '2017-07-01', value: null, source: 'Sec 31(3)(f): no separate time limit in the rules' },
+  { from: '2024-11-01', value: 30, source: 'Rule 47A (Notification 20/2024-CT) — verify' },
+];
+
+export function rcmSelfInvoiceDays(receivedOn?: string): number | null {
+  return ruleAt(RCM_SELF_INVOICE_DAYS_RULES, receivedOn);
+}
