@@ -1,4 +1,5 @@
 import { formatMoney } from '../../../lib/utils';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
 
 /** Paise → grouped rupees. */
 export const money = (paise: number) => formatMoney(paise / 100);
@@ -9,5 +10,5 @@ export function drCr(paise: number): string {
   return `${formatMoney(Math.abs(paise) / 100)} ${paise > 0 ? 'Dr' : 'Cr'}`;
 }
 
-export const CA_NOTE =
-  'Working paper built from the documents and vouchers in this app. Verify with your CA before filing or relying on it.';
+/** "Working paper … verify with your CA" line printed under each statement title. */
+export const caNote = (): string => ledgerT('caNote');

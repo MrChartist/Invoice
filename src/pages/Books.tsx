@@ -22,6 +22,8 @@ import { OpeningBalanceModal } from '../components/books/OpeningBalanceModal';
 import type { LedgerTabId } from '../components/books/ledger/LedgerPanel';
 import surface from '../styles/surface.module.css';
 import styles from './Books.module.css';
+import { useT } from '../i18n';
+import { booksT } from '../i18n/areas/books';
 
 // The double-entry tabs (6.1–6.4) live in their own lazy chunk with the ledger engine.
 const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'));
@@ -30,24 +32,25 @@ const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'
 const FxTab = lazy(() => import('../components/books/planning/FxTab'));
 
 const TABS = [
-  { id: 'day', label: 'Day book' },
-  { id: 'cash', label: 'Cash & bank' },
-  { id: 'vch', label: 'Vouchers' },
-  { id: 'ledger', label: 'Ledger' },
-  { id: 'tb', label: 'Trial balance' },
-  { id: 'pnl', label: 'Profit & loss' },
-  { id: 'bs', label: 'Balance sheet' },
-  { id: 'cf', label: 'Cash flow' },
-  { id: 'proj', label: 'Projects' },
-  { id: 'budget', label: 'Budgets' },
-  { id: 'coa', label: 'Chart of accounts' },
-  { id: 'fcst', label: 'Forecast' },
-  { id: 'fx', label: 'FX gain/loss' },
+  { id: 'day', label: 'tabDay' },
+  { id: 'cash', label: 'tabCash' },
+  { id: 'vch', label: 'tabVch' },
+  { id: 'ledger', label: 'tabLedger' },
+  { id: 'tb', label: 'tabTb' },
+  { id: 'pnl', label: 'tabPnl' },
+  { id: 'bs', label: 'tabBs' },
+  { id: 'cf', label: 'tabCf' },
+  { id: 'proj', label: 'tabProj' },
+  { id: 'budget', label: 'tabBudget' },
+  { id: 'coa', label: 'tabCoa' },
+  { id: 'fcst', label: 'tabFcst' },
+  { id: 'fx', label: 'tabFx' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 const LEDGER_TABS = new Set<TabId>(['vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
 
 export function Books() {
+  useT();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get('tab');
   const tab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : 'day';
@@ -113,17 +116,17 @@ export function Books() {
       saveOpening('bank', values.bank.amount, values.bank.as_of);
       setData(loadBooksData());
       setOpeningOpen(false);
-      notify('Opening balances saved');
+      notify(booksT('openingSaved'));
     } catch (err) {
-      notify(err instanceof StorageWriteError ? err.message : 'Could not save opening balances', 'error');
+      notify(err instanceof StorageWriteError ? err.message : booksT('openingSaveFailed'), 'error');
     }
   };
 
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Books"
-        subtitle="Double-entry books built from your invoices, receipts and purchases, plus your own vouchers — ledgers, trial balance, P&L, balance sheet and cash flow."
+        title={booksT('title')}
+        subtitle={booksT('subtitle')}
       />
 
       <div className="no-print">
@@ -137,7 +140,7 @@ export function Books() {
       />
       </div>
 
-      <div className={`${styles.tabs} no-print`} role="tablist" aria-label="Books reports">
+      <div className={`${styles.tabs} no-print`} role="tablist" aria-label={booksT('tablist')}>
         {TABS.map((t, i) => (
           <button
             key={t.id}
@@ -154,7 +157,7 @@ export function Books() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {t.label}
+            {booksT(t.label)}
           </button>
         ))}
       </div>
@@ -177,7 +180,7 @@ export function Books() {
         )}
         {tab === 'pnl' && <ProfitLossTab data={data} period={period} />}
         {(tab === 'fcst' || tab === 'fx') && (
-          <Suspense fallback={<p className={styles.loading} role="status">Loading…</p>}>
+          <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>
             {tab === 'fcst' ? (
               <ForecastTab data={data} />
             ) : (
@@ -186,7 +189,7 @@ export function Books() {
           </Suspense>
         )}
         {LEDGER_TABS.has(tab) && (
-          <Suspense fallback={<p className={styles.loading} role="status">Loading the ledger…</p>}>
+          <Suspense fallback={<p className={styles.loading} role="status">{booksT('loadingLedger')}</p>}>
             <LedgerPanel
               tab={tab as LedgerTabId}
               data={data}

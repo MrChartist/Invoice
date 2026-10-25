@@ -5,6 +5,8 @@ import { DEPRECIATION_BLOCK_LABELS, depreciationRate, type DepreciationBlock } f
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { useT } from '../../../i18n';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
 
 interface Props {
   accounts: Account[];
@@ -18,6 +20,7 @@ const BLOCKS = Object.keys(DEPRECIATION_BLOCK_LABELS) as DepreciationBlock[];
 const PAY_GROUPS = new Set(['CASH_BANK', 'TRADE_PAYABLES', 'LOANS_LT', 'LOANS_ST', 'CAPITAL']);
 
 export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: Props) {
+  useT();
   const uid = useId();
   const [form, setForm] = useState({
     name: asset?.name ?? '',
@@ -50,23 +53,23 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
       open
       onClose={onClose}
       size="lg"
-      title={asset ? `Edit ${asset.name}` : 'Add a fixed asset'}
-      subtitle="Depreciation uses Income-tax Act WDV block rates; half the rate in the first year if used for fewer than 180 days. Verify with your CA."
+      title={asset ? ledgerT('editAsset', { name: asset.name }) : ledgerT('addFixedAsset')}
+      subtitle={ledgerT('assetSubtitle')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="button" className={controls.btnPrimary} onClick={save}>Save asset</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{ledgerT('cancel')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={save}>{ledgerT('saveAsset')}</button>
         </>
       }
     >
       <div className={books.stack}>
         <div className={styles.formGrid}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-name`}>Asset</label>
-            <input id={`${uid}-name`} className={controls.input} value={form.name} placeholder="e.g. Laptop" onChange={(e) => set({ name: e.target.value })} />
+            <label className={controls.label} htmlFor={`${uid}-name`}>{ledgerT('asset')}</label>
+            <input id={`${uid}-name`} className={controls.input} value={form.name} placeholder={ledgerT('assetPh')} onChange={(e) => set({ name: e.target.value })} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-block`}>Block (rate)</label>
+            <label className={controls.label} htmlFor={`${uid}-block`}>{ledgerT('blockRate')}</label>
             <select
               id={`${uid}-block`}
               className={controls.select}
@@ -82,7 +85,7 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
             </select>
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-acct`}>Asset account</label>
+            <label className={controls.label} htmlFor={`${uid}-acct`}>{ledgerT('assetAccount')}</label>
             <select id={`${uid}-acct`} className={controls.select} value={form.account_id} onChange={(e) => set({ account_id: e.target.value })}>
               {fixedAccounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
@@ -90,21 +93,21 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
             </select>
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-cost`}>Cost ₹ (excl. GST credit)</label>
+            <label className={controls.label} htmlFor={`${uid}-cost`}>{ledgerT('costExcl')}</label>
             <input id={`${uid}-cost`} className={`${controls.input} ${books.numInput}`} inputMode="decimal" type="number" step="0.01" value={form.cost} onChange={(e) => set({ cost: e.target.value })} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-bought`}>Bought on</label>
+            <label className={controls.label} htmlFor={`${uid}-bought`}>{ledgerT('boughtOn')}</label>
             <input id={`${uid}-bought`} type="date" className={controls.input} value={form.acquired_on} onChange={(e) => set({ acquired_on: e.target.value })} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-use`}>Put to use on</label>
+            <label className={controls.label} htmlFor={`${uid}-use`}>{ledgerT('putToUseOn')}</label>
             <input id={`${uid}-use`} type="date" className={controls.input} value={form.put_to_use} onChange={(e) => set({ put_to_use: e.target.value })} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-paid`}>Paid from</label>
+            <label className={controls.label} htmlFor={`${uid}-paid`}>{ledgerT('paidFrom')}</label>
             <select id={`${uid}-paid`} className={controls.select} value={form.paid_from} onChange={(e) => set({ paid_from: e.target.value })}>
-              <option value="">Already in the books (no entry)</option>
+              <option value="">{ledgerT('alreadyInBooks')}</option>
               {payAccounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
               ))}
@@ -112,14 +115,13 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
           </div>
           {form.paid_from === 'creditors' && (
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-party`}>Supplier</label>
+              <label className={controls.label} htmlFor={`${uid}-party`}>{ledgerT('supplier')}</label>
               <input id={`${uid}-party`} className={controls.input} value={form.party} onChange={(e) => set({ party: e.target.value })} />
             </div>
           )}
         </div>
         <p className={controls.hint}>
-          Do not also enter this purchase as a bill — a bill posts to Purchases / expenses. GST credit on capital goods can be recorded with a
-          journal (Dr Input IGST/CGST/SGST, Cr the supplier).
+          {ledgerT('assetHint')}
         </p>
         {error && <div className={controls.error} role="alert">{error}</div>}
       </div>

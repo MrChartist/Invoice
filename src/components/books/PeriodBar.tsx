@@ -1,6 +1,5 @@
 import { useId } from 'react';
 import {
-  PERIOD_PRESET_LABELS,
   periodForPreset,
   type Period,
   type PeriodPreset,
@@ -9,6 +8,8 @@ import { formatDate } from '../../lib/utils';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './books.module.css';
+import { useT } from '../../i18n';
+import { booksT, presetLabel } from '../../i18n/areas/books';
 
 export interface PeriodBarProps {
   preset: PeriodPreset;
@@ -19,6 +20,7 @@ export interface PeriodBarProps {
 const PRESETS: PeriodPreset[] = ['this_month', 'last_month', 'this_quarter', 'this_fy', 'last_fy', 'custom'];
 
 export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
+  useT();
   const startId = useId();
   const endId = useId();
 
@@ -28,7 +30,7 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
 
   return (
     <div className={`${surface.card} ${styles.periodBar}`}>
-      <div className={styles.presets} role="group" aria-label="Period">
+      <div className={styles.presets} role="group" aria-label={booksT('period')}>
         {PRESETS.map((p) => (
           <button
             key={p}
@@ -37,14 +39,14 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
             aria-pressed={preset === p}
             onClick={() => pick(p)}
           >
-            {PERIOD_PRESET_LABELS[p]}
+            {presetLabel(p)}
           </button>
         ))}
       </div>
       {preset === 'custom' && (
         <div className={styles.dateRow}>
           <div className={`${controls.field} ${styles.dateField}`}>
-            <label className={controls.label} htmlFor={startId}>From</label>
+            <label className={controls.label} htmlFor={startId}>{booksT('from')}</label>
             <input
               id={startId}
               type="date"
@@ -55,7 +57,7 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
             />
           </div>
           <div className={`${controls.field} ${styles.dateField}`}>
-            <label className={controls.label} htmlFor={endId}>To</label>
+            <label className={controls.label} htmlFor={endId}>{booksT('to')}</label>
             <input
               id={endId}
               type="date"

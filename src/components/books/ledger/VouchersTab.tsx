@@ -15,6 +15,9 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { useT } from '../../../i18n';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
+import { voucherTypeLabel } from '../../../i18n/areas/books';
 
 type Source = 'all' | 'manual' | 'auto';
 
@@ -29,6 +32,7 @@ interface Props {
 const total = (v: LedgerVoucher) => v.lines.reduce((s, l) => s + l.dr, 0);
 
 export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }: Props) {
+  useT();
   const [source, setSource] = useState<Source>('all');
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<ManualVoucher | null | 'new'>(null);
@@ -55,7 +59,7 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
     if (!deleting) return;
     try {
       deleteVoucher(deleting.id);
-      notify(`Voucher ${deleting.number} deleted`);
+      notify(ledgerT('voucherDeleted', { number: deleting.number }));
       onChanged();
     } catch (err) {
       notify((err as Error).message, 'error');
@@ -66,41 +70,41 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
   return (
     <div className={books.stack}>
       <StatementToolbar csv={csv} filename={`vouchers-${period.start}_to_${period.end}.csv`}>
-        <div className={books.presets} role="group" aria-label="Filter vouchers">
+        <div className={books.presets} role="group" aria-label={ledgerT('filterVouchers')}>
           {(['all', 'manual', 'auto'] as Source[]).map((s) => (
             <button key={s} type="button" className={source === s ? books.chipActive : books.chip} aria-pressed={source === s} onClick={() => setSource(s)}>
-              {s === 'all' ? 'All' : s === 'manual' ? 'Manual' : 'From documents'}
+              {s === 'all' ? ledgerT('all') : s === 'manual' ? ledgerT('manual') : ledgerT('fromDocs')}
             </button>
           ))}
         </div>
         <button type="button" className={controls.btnPrimary} onClick={() => setEditing('new')}>
-          <FilePlus2 size={16} /> New voucher
+          <FilePlus2 size={16} /> {ledgerT('newVoucher')}
         </button>
       </StatementToolbar>
-      <PrintTitle title="Vouchers" sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
+      <PrintTitle title={ledgerT('vouchersTitle')} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
 
       {ledger.warnings.length > 0 && (
         <div className={books.noticeWarn} role="note">
-          <span>{ledger.warnings.slice(0, 3).join(' ')}{ledger.warnings.length > 3 ? ` (+${ledger.warnings.length - 3} more)` : ''}</span>
+          <span>{ledger.warnings.slice(0, 3).join(' ')}{ledger.warnings.length > 3 ? ` ${ledgerT('more', { n: ledger.warnings.length - 3 })}` : ''}</span>
         </div>
       )}
 
       <div className={surface.card}>
         {list.length === 0 ? (
-          <EmptyState icon={NotebookPen} title="No vouchers in this period" text="Invoices, receipts, bills and payments post here automatically. Record journals, contras, payments and receipts with “New voucher”." />
+          <EmptyState icon={NotebookPen} title={ledgerT('noVouchersTitle')} text={ledgerT('noVouchersText')} />
         ) : (
           <div className={`${surface.tableWrap} ${styles.wrap}`}>
             <table className={surface.table}>
-              <caption className={surface.srOnly}>Vouchers</caption>
+              <caption className={surface.srOnly}>{ledgerT('vouchersTitle')}</caption>
               <thead>
                 <tr>
-                  <th scope="col"><span className={surface.srOnly}>Expand</span></th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Vch no.</th>
-                  <th scope="col">Party / narration</th>
-                  <th scope="col" className={surface.numeric}>Amount</th>
-                  <th scope="col" className="no-print"><span className={surface.srOnly}>Actions</span></th>
+                  <th scope="col"><span className={surface.srOnly}>{ledgerT('expand')}</span></th>
+                  <th scope="col">{ledgerT('colDate')}</th>
+                  <th scope="col">{ledgerT('colType')}</th>
+                  <th scope="col">{ledgerT('colVchNo')}</th>
+                  <th scope="col">{ledgerT('colPartyNarration')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colAmount')}</th>
+                  <th scope="col" className="no-print"><span className={surface.srOnly}>{ledgerT('actions')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -110,14 +114,14 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
                     <Fragment key={v.id}>
                       <tr>
                         <td>
-                          <button type="button" className={controls.btnIcon} aria-expanded={isOpen} aria-label={`${isOpen ? 'Hide' : 'Show'} lines of ${v.number || v.kind}`} onClick={() => setOpen(isOpen ? null : v.id)}>
+                          <button type="button" className={controls.btnIcon} aria-expanded={isOpen} aria-label={ledgerT(isOpen ? 'hideLines' : 'showLines', { name: v.number || voucherTypeLabel(v.kind) })} onClick={() => setOpen(isOpen ? null : v.id)}>
                             {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                           </button>
                         </td>
                         <td>{formatDate(v.date)}</td>
-                        <td><span className={v.source === 'manual' ? styles.badgeManual : styles.badge}>{v.kind}</span></td>
+                        <td><span className={v.source === 'manual' ? styles.badgeManual : styles.badge}>{voucherTypeLabel(v.kind)}</span></td>
                         <td>
-                          {v.link ? <Link className={books.link} to={v.link}>{v.number || 'Open'}</Link> : <span className={surface.mono}>{v.number || '—'}</span>}
+                          {v.link ? <Link className={books.link} to={v.link}>{v.number || ledgerT('open')}</Link> : <span className={surface.mono}>{v.number || '—'}</span>}
                         </td>
                         <td>
                           {v.party && <div>{v.party}</div>}
@@ -127,10 +131,10 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
                         <td className="no-print">
                           {v.source === 'manual' && (
                             <div className={books.toolbarGroup}>
-                              <button type="button" className={controls.btnIcon} aria-label={`Edit ${v.number}`} onClick={() => setEditing(manualById(v.manualId))}>
+                              <button type="button" className={controls.btnIcon} aria-label={ledgerT('editName', { name: v.number })} onClick={() => setEditing(manualById(v.manualId))}>
                                 <Pencil size={16} />
                               </button>
-                              <button type="button" className={controls.btnIcon} aria-label={`Delete ${v.number}`} onClick={() => setDeleting(manualById(v.manualId))}>
+                              <button type="button" className={controls.btnIcon} aria-label={ledgerT('deleteName', { name: v.number })} onClick={() => setDeleting(manualById(v.manualId))}>
                                 <Trash2 size={16} />
                               </button>
                             </div>
@@ -146,7 +150,7 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
                                 <li key={i} className={styles.subLine}>
                                   <span>
                                     <button type="button" className={styles.rowButton} onClick={() => onOpenAccount(l.account, l.party)}>
-                                      {l.dr ? '' : 'To '}{ledger.byId.get(l.account)?.name ?? l.account}
+                                      {l.dr ? '' : ledgerT('toPrefix')}{ledger.byId.get(l.account)?.name ?? l.account}
                                     </button>
                                     {l.party ? <span className={books.muted}> · {l.party}</span> : null}
                                   </span>
@@ -175,16 +179,16 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
           onClose={() => setEditing(null)}
           onSaved={(v) => {
             setEditing(null);
-            notify(`Voucher ${v.number} saved`);
+            notify(ledgerT('voucherSaved', { number: v.number }));
             onChanged();
           }}
         />
       )}
       <ConfirmDialog
         open={!!deleting}
-        title={`Delete voucher ${deleting?.number ?? ''}?`}
-        message="The entry is removed from every ledger and statement. This is recorded in the activity log."
-        confirmLabel="Delete voucher"
+        title={ledgerT('deleteVoucherTitle', { number: deleting?.number ?? '' })}
+        message={ledgerT('deleteVoucherMsg')}
+        confirmLabel={ledgerT('deleteVoucher')}
         destructive
         onConfirm={confirmDelete}
         onClose={() => setDeleting(null)}

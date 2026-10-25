@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { sortRows, type SortDir } from '../../lib/sales-reports';
 import surface from '../../styles/surface.module.css';
 import styles from './reports.module.css';
+import { useT } from '../../i18n';
+import { repT } from '../../i18n/areas/reports';
 
 export interface Column<T> {
   id: string;
@@ -31,6 +33,7 @@ export interface SortableTableProps<T> {
  * and the first click on a numeric column sorts high-to-low (what people want from a report).
  */
 export function SortableTable<T>({ caption, rows, columns, rowKey, initialSort, empty }: SortableTableProps<T>) {
+  useT();
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(initialSort ?? null);
 
   const sorted = useMemo(() => {
@@ -82,7 +85,7 @@ export function SortableTable<T>({ caption, rows, columns, rowKey, initialSort, 
             <tr>
               {columns.map((c, i) => (
                 <td key={c.id} className={c.numeric ? `${surface.numeric} ${styles.totalCell}` : styles.totalCell}>
-                  {c.total ?? (i === 0 ? 'Total' : '')}
+                  {c.total ?? (i === 0 ? repT('total') : '')}
                 </td>
               ))}
             </tr>

@@ -1,6 +1,8 @@
 import type { TrendPoint } from '../../lib/books';
 import { formatMoney } from '../../lib/utils';
 import styles from './books.module.css';
+import { useT } from '../../i18n';
+import { booksT } from '../../i18n/areas/books';
 
 const W = 640;
 const H = 240;
@@ -20,6 +22,7 @@ function compact(n: number): string {
  * Handles negative months by drawing from a shared zero baseline.
  */
 export function TrendChart({ points }: { points: TrendPoint[] }) {
+  useT();
   if (points.length === 0) return null;
 
   const values = points.flatMap((p) => [p.income, p.expenses, p.profit, 0]);
@@ -38,16 +41,16 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
     .map((p, i) => `${i === 0 ? 'M' : 'L'}${(PAD.left + slot * i + slot / 2).toFixed(1)},${y(p.profit).toFixed(1)}`)
     .join(' ');
 
-  const summary = `Monthly income, expenses and net profit. ${points
-    .map((p) => `${p.label}: income ${formatMoney(p.income)}, expenses ${formatMoney(p.expenses)}, profit ${formatMoney(p.profit)}`)
-    .join('. ')}`;
+  const point = (p: TrendPoint) =>
+    booksT('trendPoint', { month: p.label, income: formatMoney(p.income), expenses: formatMoney(p.expenses), profit: formatMoney(p.profit) });
+  const summary = `${booksT('trendSummary')} ${points.map(point).join('. ')}`;
 
   return (
     <div>
       <div className={styles.legend} aria-hidden="true">
-        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchIncome}`} />Income</span>
-        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchExpense}`} />Expenses</span>
-        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchProfit}`} />Net profit</span>
+        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchIncome}`} />{booksT('income')}</span>
+        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchExpense}`} />{booksT('expenses')}</span>
+        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchProfit}`} />{booksT('netProfit')}</span>
       </div>
       <div className={styles.chartWrap}>
         <svg className={styles.chart} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary}>
@@ -79,7 +82,7 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
                 <text className={styles.axisText} x={cx} y={H - 10} textAnchor="middle">
                   {p.label}
                 </text>
-                <title>{`${p.label}: income ${formatMoney(p.income)}, expenses ${formatMoney(p.expenses)}, profit ${formatMoney(p.profit)}`}</title>
+                <title>{point(p)}</title>
               </g>
             );
           })}

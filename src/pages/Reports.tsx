@@ -40,23 +40,27 @@ import { itemProfitability, partyProfitability } from '../lib/profitability';
 import surface from '../styles/surface.module.css';
 import report from '../components/reports/reports.module.css';
 import styles from './Reports.module.css';
+import { useT } from '../i18n';
+import { repT } from '../i18n/areas/reports';
+import { plural } from '../i18n/areas/plural';
 
 const TABS = [
-  { id: 'customers', label: 'By customer' },
-  { id: 'items', label: 'By item' },
-  { id: 'monthly', label: 'By month' },
-  { id: 'top', label: 'Top customers' },
-  { id: 'tax', label: 'Tax by rate' },
-  { id: 'payments', label: 'Payment modes' },
-  { id: 'expenses', label: 'Expenses' },
-  { id: 'profit', label: 'Item profit' },
-  { id: 'party', label: 'Party profit' },
+  { id: 'customers', label: 'tabCustomers' },
+  { id: 'items', label: 'tabItems' },
+  { id: 'monthly', label: 'tabMonthly' },
+  { id: 'top', label: 'tabTop' },
+  { id: 'tax', label: 'tabTax' },
+  { id: 'payments', label: 'tabPayments' },
+  { id: 'expenses', label: 'tabExpenses' },
+  { id: 'profit', label: 'tabProfit' },
+  { id: 'party', label: 'tabParty' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
 const inr = (v: string | undefined) => (v || 'INR').toUpperCase() === 'INR';
 
 export function Reports() {
+  const { lang } = useT();
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
   const tab: TabId = TABS.some((t) => t.id === requested) ? (requested as TabId) : 'customers';
@@ -112,13 +116,14 @@ export function Reports() {
     const vouchers = buildVouchers(inrBooks);
     const received = round2(cashBook(vouchers, [], 'cash', period).totalReceipts + cashBook(vouchers, [], 'bank', period).totalReceipts);
     return [
-      { label: 'Billed (incl. GST, net of credit notes)', report: customers.totals.total, other: dash.billed, source: 'Dashboard' },
-      { label: 'Income (excl. GST)', report: customers.totals.income, other: pl.income, source: 'Books P&L' },
-      { label: 'GST collected', report: round2(taxRep.totals.cgst + taxRep.totals.sgst + taxRep.totals.igst), other: gst.outputTotal, source: 'Books GST' },
-      { label: 'Money received', report: modes.total, other: received, source: 'Books cash & bank' },
-      { label: 'Purchases & expenses', report: expenses.totals.cost, other: pl.totalExpenses, source: 'Books P&L' },
+      { label: repT('ccBilled'), report: customers.totals.total, other: dash.billed, source: repT('srcDashboard') },
+      { label: repT('ccIncome'), report: customers.totals.income, other: pl.income, source: repT('srcPl') },
+      { label: repT('ccGst'), report: round2(taxRep.totals.cgst + taxRep.totals.sgst + taxRep.totals.igst), other: gst.outputTotal, source: repT('srcGst') },
+      { label: repT('ccReceived'), report: modes.total, other: received, source: repT('srcCash') },
+      { label: repT('ccPurchases'), report: expenses.totals.cost, other: pl.totalExpenses, source: repT('srcPl') },
     ];
-  }, [invoices, books, period, customers, taxRep, modes, expenses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `lang` re-labels the rows
+  }, [invoices, books, period, customers, taxRep, modes, expenses, lang]);
 
   const selectTab = (id: TabId) => {
     const next = new URLSearchParams(params);
@@ -143,8 +148,8 @@ export function Reports() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Sales & purchase reports"
-        subtitle="Who buys what, when, and how they pay — reconciled to your Dashboard and Books."
+        title={repT('title')}
+        subtitle={repT('subtitle')}
       />
 
       <PeriodBar
@@ -157,28 +162,26 @@ export function Reports() {
       />
 
       <div className={surface.statGrid}>
-        <StatCard label="Net sales" icon={IndianRupee} value={`₹${formatMoney(t.taxable)}`} hint="excl. GST, net of credit notes" />
-        <StatCard label="Billed" icon={ReceiptText} value={`₹${formatMoney(t.total)}`} hint={`${t.count} invoice${t.count === 1 ? '' : 's'}${t.creditNotes ? ` · ${t.creditNotes} credit note${t.creditNotes === 1 ? '' : 's'}` : ''}`} />
-        <StatCard label="Received" icon={Wallet} tone="profit" value={`₹${formatMoney(modes.total)}`} hint={`${modes.count} receipt${modes.count === 1 ? '' : 's'}`} />
+        <StatCard label={repT('statNetSales')} icon={IndianRupee} value={`₹${formatMoney(t.taxable)}`} hint={repT('statNetSalesHint')} />
+        <StatCard label={repT('statBilled')} icon={ReceiptText} value={`₹${formatMoney(t.total)}`} hint={`${plural(repT, 'invoicesOne', 'invoicesMany', t.count)}${t.creditNotes ? ` · ${plural(repT, 'creditNotesOne', 'creditNotesMany', t.creditNotes)}` : ''}`} />
+        <StatCard label={repT('statReceived')} icon={Wallet} tone="profit" value={`₹${formatMoney(modes.total)}`} hint={plural(repT, 'receiptsOne', 'receiptsMany', modes.count)} />
         <StatCard
-          label="Top-3 customer share"
+          label={repT('statTop3')}
           icon={Percent}
           tone={conc.level === 'high' ? 'loss' : conc.level === 'moderate' ? 'warning' : 'default'}
           value={conc.customers ? `${conc.top3Share.toFixed(1)}%` : '—'}
-          hint={conc.customers ? `${conc.customers} customer${conc.customers === 1 ? '' : 's'}` : 'no sales yet'}
+          hint={conc.customers ? plural(repT, 'customersOne', 'customersMany', conc.customers) : repT('noSalesYet')}
         />
       </div>
 
       {excludedForeign > 0 && (
         <div className={report.noticeWarn} role="note">
           <AlertTriangle size={16} className={report.noticeIcon} aria-hidden="true" />
-          <span>
-            {excludedForeign} document{excludedForeign === 1 ? ' is' : 's are'} in a foreign currency and left out — amounts in different currencies are never added together. See the invoice list for those.
-          </span>
+          <span>{plural(repT, 'foreignOne', 'foreignMany', excludedForeign)}</span>
         </div>
       )}
 
-      <div className={styles.tabs} role="tablist" aria-label="Reports">
+      <div className={styles.tabs} role="tablist" aria-label={repT('tablist')}>
         {TABS.map((x, i) => (
           <button
             key={x.id}
@@ -195,7 +198,7 @@ export function Reports() {
             onClick={() => selectTab(x.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {x.label}
+            {repT(x.label)}
           </button>
         ))}
       </div>
