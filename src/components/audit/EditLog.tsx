@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { History } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { audit } from '../../lib/audit';
+import { visibleAudit } from '../../lib/audit-query';
 import { AUDIT_ACTION_LABELS } from '../../types/audit';
 import { useT } from '../../i18n';
 import { migT } from '../../i18n/areas/migration';
@@ -25,7 +26,7 @@ export interface EditLogProps {
 
 export function EditLog({ open, recordId, name, onClose }: EditLogProps) {
   useT();
-  const rows = useMemo(() => (open ? audit.forRecord(recordId) : []), [open, recordId]);
+  const rows = useMemo(() => (open ? visibleAudit(audit.forRecord(recordId)) : []), [open, recordId]);
   return (
     <Modal open={open} onClose={onClose} size="lg" title={<><History size={18} aria-hidden="true" /> {migT('editLogTitle', { name: name || recordId })}</>}>
       {rows.length === 0 ? (

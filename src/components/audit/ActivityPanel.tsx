@@ -3,7 +3,8 @@ import { Download, History, ScrollText } from 'lucide-react';
 import { AUDIT_MAX_ROWS, audit } from '../../lib/audit';
 import { useT } from '../../i18n';
 import { migT } from '../../i18n/areas/migration';
-import { auditToCsv, filterAudit, type AuditFilter } from '../../lib/audit-query';
+import { auditToCsv, filterAudit, isPayrollAudit, visibleAudit, type AuditFilter } from '../../lib/audit-query';
+import { can } from '../../lib/access';
 import { downloadText } from '../../lib/download';
 import { localDayOf } from '../../lib/dates';
 import {
@@ -75,10 +76,13 @@ export function ActivityPanel() {
   const [q, setQ] = useState('');
   const [limit, setLimit] = useState(PAGE);
   const [open, setOpen] = useState<string | null>(null);
+  // The signed-in user only changes at the PIN screen, which unmounts Settings.
+  const [payrollOk] = useState(() => can('payroll.view'));
 
   const all = useMemo(() => {
     void version;
-    const base = archived || record ? audit.fullRows().slice().reverse() : audit.all();
+    // Review H1: payroll / employee rows only for roles with payroll.view.
+    const base = visibleAudit(archived || record ? audit.fullRows().slice().reverse() : audit.all());
     return record ? base.filter((e) => e.entity_id === record || e.parent_id === record) : base;
   }, [version, archived, record]);
   const archivedRows = useMemo(() => audit.archivedCount(), [version]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,7 +138,7 @@ export function ActivityPanel() {
             <span className={controls.label}>Area</span>
             <select className={controls.select} value={entity} onChange={(e) => setEntity(e.target.value as AuditEntity | 'all')}>
               <option value="all">Everything</option>
-              {AUDIT_ENTITIES.map((x) => (
+              {AUDIT_ENTITIES.filter((x) => payrollOk || !isPayrollAudit({ entity: x })).map((x) => (
                 <option key={x} value={x}>
                   {AUDIT_ENTITY_LABELS[x]}
                 </option>

@@ -19,6 +19,7 @@ import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 import { assertRemovable, liveRemovalIssues } from './stock-timeline';
+import { isVoidStatus } from './purchase-normalize';
 import { descendantIds, treeRows, type TreeRow } from './stock-groups';
 
 export const GODOWNS_TABLE = 'godowns';
@@ -91,6 +92,33 @@ export function validateTransferShape(t: Pick<StockTransfer, 'date' | 'from_godo
 /* ── Storage ──────────────────────────────────────────────────── */
 
 const now = () => new Date().toISOString();
+
+/**
+ * Review M2: the live Sec 25(4) tax invoice / purchase bill raised for a transfer (`branch_transfer_id`),
+ * if any. A cancelled invoice no longer counts; a bill counts while it exists and is not void.
+ */
+type PairInvoice = { branch_transfer_id?: string; status?: string; invoice_number?: string };
+type PairBill = { branch_transfer_id?: string; status?: unknown; bill_number?: string };
+
+export function transferPairOf(
+  transferId: string,
+  data: { invoices?: readonly PairInvoice[]; purchases?: readonly PairBill[] } = {},
+): { invoice?: string; bill?: string } | null {
+  if (!transferId) return null;
+  const inv = (data.invoices ?? getTable<PairInvoice>('invoices')).find((i) => i?.branch_transfer_id === transferId && i.status !== 'Cancelled');
+  const bill = (data.purchases ?? getTable<PairBill>('purchases')).find(
+    (b) => b?.branch_transfer_id === transferId && !isVoidStatus(b.status),
+  );
+  if (!inv && !bill) return null;
+  return { ...(inv ? { invoice: inv.invoice_number || 'invoice' } : {}), ...(bill ? { bill: bill.bill_number || 'bill' } : {}) };
+}
+
+function assertNoTransferPair(t: Pick<StockTransfer, 'id' | 'transfer_number'>, what: 'edit' | 'delete'): void {
+  const pair = transferPairOf(t.id);
+  if (!pair) return;
+  const docs = [pair.invoice && `tax invoice ${pair.invoice}`, pair.bill && `purchase bill ${pair.bill}`].filter(Boolean).join(' and ');
+  throw new Error(`Stock transfer ${t.transfer_number} has a branch-transfer ${docs} (Sec 25(4)). Cancel the invoice and delete the bill before you ${what} the transfer.`);
+}
 
 const lockSubject = (t: Pick<StockTransfer, 'id' | 'date' | 'transfer_number'>) => ({
   id: t.id,
@@ -235,6 +263,7 @@ export const transfersDb = {
     if (shape) throw new Error(shape);
     const rows = transfersDb.all();
     const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
+    if (existing) assertNoTransferPair(existing, 'edit');
     if (existing) assertUnlocked(lockSubject(existing), 'edit');
     const asked = (input.transfer_number ?? '').trim();
     // An edit that moves the date into another FY takes a number from that FY's series (as advances do).
@@ -274,6 +303,7 @@ export const transfersDb = {
   remove(id: string, opts: { confirmStock?: boolean } = {}): void {
     const t = transfersDb.get(id);
     if (!t) return;
+    assertNoTransferPair(t, 'delete');
     assertUnlocked(lockSubject(t), 'delete');
     assertRemovable(liveRemovalIssues({ refType: 'transfer', refId: id }), opts.confirmStock);
     setTable(TRANSFERS_TABLE, transfersDb.all().filter((r) => r.id !== id));

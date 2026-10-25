@@ -302,6 +302,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}gst_pmt09`]: 'date',
   [`${DB_PREFIX}gst_refunds`]: (r) => str(r.filed_on) || str(r.period_to) || undefined,
   [`${DB_PREFIX}isd_documents`]: 'date',
+  // Review L2: RCM self-invoices / payment vouchers (7O) post to the ledger on their date.
+  [`${DB_PREFIX}rcm_documents`]: 'date',
   [`${DB_PREFIX}payroll_runs`]: 'date',
   [`${DB_PREFIX}payroll_payments`]: 'date',
   [`${DB_PREFIX}actuarial_valuations`]: 'date',
@@ -847,7 +849,7 @@ function safeParse(s: string): unknown {
 }
 
 /** Numbered documents: table → number / date fields. Two devices can issue the same serial in each. */
-const NUMBERED: Record<string, { num: string; date: string }> = {
+const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = {
   [INVOICES_KEY]: { num: 'invoice_number', date: 'issue_date' },
   [`${DB_PREFIX}advances`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}vouchers`]: { num: 'number', date: 'date' },
@@ -872,9 +874,24 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}employee_loans`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}fnf_settlements`]: { num: 'number', date: 'pay_month' },
   [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
+  // Review L2: RCM self-invoices (RCM/…) and payment vouchers (RPV/…) are two series in one table.
+  [`${DB_PREFIX}rcm_documents`]: { num: 'number', date: 'date', scope: 'kind' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };
+
+/**
+ * The key two rows of `table` collide on: the normalised document number, within the row's series
+ * (`scope` field) when the table holds several. '' when the table is not numbered or the row has no number.
+ */
+export function docNumberKey(table: string, row: unknown): string {
+  const f = own(NUMBERED, table);
+  if (!f || !row || typeof row !== 'object') return '';
+  const r = row as Record<string, unknown>;
+  const k = typeof r[f.num] === 'string' ? numberKey(r[f.num] as string) : '';
+  if (!k || !f.scope) return k;
+  return `${String(r[f.scope] ?? '')}|${k}`;
+}
 
 /** Duplicate document numbers (two devices issuing the same serial): listed, never renumbered. */
 function flagDuplicates(ctx: MergeCtx): void {
@@ -884,7 +901,7 @@ function flagDuplicates(ctx: MergeCtx): void {
     if (w?.mode !== 'rows') continue;
     const groups = new Map<string, string[]>();
     for (const id of w.ids) {
-      const k = numberKey((w.rows.get(id) as Record<string, string> | undefined)?.[f.num]);
+      const k = docNumberKey(table, w.rows.get(id));
       if (!k) continue;
       const g = groups.get(k);
       if (g) g.push(id);

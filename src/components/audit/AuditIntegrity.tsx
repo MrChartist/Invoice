@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Copy, Download, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { audit } from '../../lib/audit';
+import { can } from '../../lib/access';
+import { isPayrollAudit } from '../../lib/audit-query';
+import { AUDIT_ENTITY_LABELS } from '../../types/audit';
 import { describeChain, verifyAuditChain, type ChainReport } from '../../lib/audit-chain';
 import { downloadText } from '../../lib/download';
 import { localDayOf } from '../../lib/dates';
@@ -108,7 +111,7 @@ export function AuditIntegrity() {
             <div>{describeChain(report)}</div>
             {brokenRow && (
               <div className={styles.tMeta}>
-                Entry {report.broken!.index + 1}: {formatWhen(brokenRow.at)} &middot; {brokenRow.summary}
+                Entry {report.broken!.index + 1}: {formatWhen(brokenRow.at)} &middot; {isPayrollAudit(brokenRow) && !can('payroll.view') ? AUDIT_ENTITY_LABELS[brokenRow.entity] : brokenRow.summary}
               </div>
             )}
             {report.noted?.status === 'present' && (
