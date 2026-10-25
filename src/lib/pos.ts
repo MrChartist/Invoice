@@ -30,6 +30,7 @@ import {
 } from './stock-tracking';
 import { toCsv } from './csv';
 import { formatCurrency, formatDate } from './utils';
+import { EXCHANGE_NOTE, applyExchange, openExchange, zReturns, type PosReturn, type ZReturns } from './pos-returns';
 
 export const POS_DAY_CLOSE_TABLE = 'pos_day_close';
 export const WALK_IN_NAME = 'Walk-in customer';
@@ -224,6 +225,8 @@ export interface PosSaveInput {
   expiredOk?: boolean;
   /** A walk-in must pay in full; a saved client may leave a balance on account. */
   allowCredit?: boolean;
+  /** Exchange (WP-9): an open `pos_returns` exchange whose credit pays part of this bill. */
+  exchangeReturnId?: string;
 }
 
 export interface PosSaveResult {
@@ -252,7 +255,10 @@ export function posIssues(rec: InvoiceRecord, summary: TenderSummary, allowCredi
 export function savePosBill(input: PosSaveInput): PosSaveResult {
   const ctx = editorStockContext({ doc_type: input.record.doc_type, issue_date: input.record.issue_date });
   let rec: InvoiceRecord = withTotals({ ...input.record, items: applyStockRules(input.record.items, ctx), status: 'Sent' });
-  const summary = tenderSummary(rec.total, input.tenders);
+  const exchange = input.exchangeReturnId ? openExchange(input.exchangeReturnId) : undefined;
+  if (input.exchangeReturnId && !exchange) return { ok: false, errors: ['This exchange credit was already used.'] };
+  const credit = exchange ? Math.min(exchange.amount, rec.total) : 0;
+  const summary = tenderSummary(round2(rec.total - credit), input.tenders);
   const errors = posIssues(rec, summary, !!input.allowCredit);
   if (errors.length) return { ok: false, errors, summary };
 
@@ -286,6 +292,10 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
   }
   const payments: Payment[] = [];
   try {
+    if (exchange) {
+      const x = applyExchange(exchange.id, saved);
+      if (x.payment) payments.push(x.payment);
+    }
     for (const p of summary.payments) {
       payments.push(
         localDb.payments.record({
@@ -334,6 +344,12 @@ export interface ZReport {
   received: number;
   /** Left on account (saved customers). */
   credit: number;
+  /** Returns of the day (credit notes raised from the POS return screen) and their refunds (WP-9). */
+  returns: ZReturns;
+  /** Exchange credit used to pay the day's bills (not new money: left out of the tenders). */
+  exchangeIn: number;
+  /** Net sales less the day's returns. */
+  netAfterReturns: number;
 }
 
 const methodKey = (m: string): keyof ZReport['tenders'] => {
@@ -341,8 +357,11 @@ const methodKey = (m: string): keyof ZReport['tenders'] => {
   return k === 'cash' ? 'cash' : k === 'upi' ? 'upi' : k === 'card' ? 'card' : 'other';
 };
 
-/** Day-end totals of the POS bills dated `day`, and the money taken for them that day. */
-export function zReport(day: string, invoices: readonly InvoiceRecord[], payments: readonly Payment[]): ZReport {
+/**
+ * Day-end totals of the POS bills dated `day`, the money taken for them that day, and the day's
+ * returns (`pos_returns` rows) with their refunds by tender.
+ */
+export function zReport(day: string, invoices: readonly InvoiceRecord[], payments: readonly Payment[], returns: readonly PosReturn[] = []): ZReport {
   const mine = invoices.filter((i) => i.pos && i.issue_date === day);
   const live = mine.filter((i) => i.status !== 'Cancelled').sort((a, b) => a.invoice_number.localeCompare(b.invoice_number, undefined, { numeric: true }));
   const ids = new Set(live.map((i) => i.id));
@@ -357,6 +376,9 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
     tenders: { cash: 0, upi: 0, card: 0, other: 0 },
     received: 0,
     credit: 0,
+    returns: zReturns(day, returns, invoices),
+    exchangeIn: 0,
+    netAfterReturns: 0,
   };
   const lines: CalcLine[] = [];
   for (const inv of live) {
@@ -374,11 +396,17 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
   r.taxByRate = buildSlabs(lines);
   for (const p of payments) {
     if (!ids.has(p.invoice_id) || p.date !== day) continue;
+    if ((p.note || '').startsWith(EXCHANGE_NOTE)) {
+      r.exchangeIn += num(p.amount);
+      continue;
+    }
     r.tenders[methodKey(p.method)] += num(p.amount);
   }
   for (const k of Object.keys(r.tenders) as (keyof ZReport['tenders'])[]) r.tenders[k] = round2(r.tenders[k]);
   for (const k of ['gross', 'discounts', 'taxable', 'tax', 'cess', 'roundOff', 'net'] as const) r[k] = round2(r[k]);
   r.received = round2(r.tenders.cash + r.tenders.upi + r.tenders.card + r.tenders.other);
+  r.exchangeIn = round2(r.exchangeIn);
+  r.netAfterReturns = round2(r.net - r.returns.value);
   r.credit = round2(live.reduce((s, i) => s + Math.max(num(i.balance_due), 0), 0));
   return r;
 }
@@ -390,7 +418,7 @@ export interface PosDayClose {
   /** YYYY-MM-DD */
   day: string;
   opening_float: number;
-  /** opening float + cash taken (net of change). */
+  /** opening float + cash taken (net of change) − cash refunded. */
   expected_cash: number;
   counted_cash: number;
   /** counted − expected (negative = short). */
@@ -400,13 +428,15 @@ export interface PosDayClose {
   cash: number;
   upi: number;
   card: number;
+  /** Additive (WP-9): cash handed back on returns that day. */
+  cash_refunds?: number;
   note?: string;
   closed_at: string;
 }
 
 /** Drawer maths for a Z report. */
-export function drawerCount(z: Pick<ZReport, 'tenders'>, openingFloat: number, counted: number): { expected: number; difference: number } {
-  const expected = round2(Math.max(num(openingFloat), 0) + z.tenders.cash);
+export function drawerCount(z: Pick<ZReport, 'tenders'> & { returns?: Pick<ZReturns, 'refunds'> }, openingFloat: number, counted: number): { expected: number; difference: number } {
+  const expected = round2(Math.max(num(openingFloat), 0) + z.tenders.cash - num(z.returns?.refunds.cash));
   return { expected, difference: round2(num(counted) - expected) };
 }
 
@@ -431,6 +461,7 @@ export const dayCloseDb = {
       cash: z.tenders.cash,
       upi: z.tenders.upi,
       card: z.tenders.card,
+      ...(z.returns?.refunds.cash ? { cash_refunds: z.returns.refunds.cash } : {}),
       ...(note?.trim() ? { note: note.trim() } : {}),
       closed_at: new Date().toISOString(),
     };
@@ -474,6 +505,20 @@ export function zReportCsv(z: ZReport, close?: PosDayClose): string {
     ['Received', z.received],
     ['On account', z.credit],
   ];
+  if (z.returns?.count) {
+    rows.push(
+      [],
+      ['Returns', z.returns.count],
+      ['Credit notes', z.returns.numbers.join(' ')],
+      ['Returns value', z.returns.value],
+      ['Refund cash', z.returns.refunds.cash],
+      ['Refund UPI', z.returns.refunds.upi],
+      ['Refund card', z.returns.refunds.card],
+      ['Exchanged on new bills', z.returns.exchanged],
+      ['Kept on account', z.returns.onAccount],
+      ['Net sales after returns', z.netAfterReturns],
+    );
+  }
   if (close) {
     rows.push([], ['Opening float', close.opening_float], ['Expected cash', close.expected_cash], ['Counted cash', close.counted_cash], ['Difference', close.difference]);
     if (close.note) rows.push(['Note', close.note]);
@@ -532,7 +577,19 @@ ${row('Card', m(z.tenders.card))}
 ${z.tenders.other ? row('Other', m(z.tenders.other)) : ''}
 ${row('Received', m(z.received), true)}
 ${z.credit ? row('On account', m(z.credit)) : ''}
+${z.exchangeIn ? row('Exchange credit used', m(z.exchangeIn)) : ''}
 </table>
+${z.returns?.count ? `<h2>Returns</h2>
+<table>
+${row('Returns', String(z.returns.count))}
+${row('Credit notes', m(z.returns.value))}
+${z.returns.refunds.cash ? row('Refund cash', m(-z.returns.refunds.cash)) : ''}
+${z.returns.refunds.upi ? row('Refund UPI', m(-z.returns.refunds.upi)) : ''}
+${z.returns.refunds.card ? row('Refund card', m(-z.returns.refunds.card)) : ''}
+${z.returns.exchanged ? row('Exchanged', m(z.returns.exchanged)) : ''}
+${z.returns.onAccount ? row('On account', m(z.returns.onAccount)) : ''}
+${row('Net after returns', m(z.netAfterReturns), true)}
+</table>` : ''}
 ${c ? `<h2>Cash drawer</h2>
 <table>
 ${row('Opening float', m(c.opening_float))}

@@ -234,6 +234,13 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   vendor_payments: 'books.edit',
   // Number high-water marks: written alongside a payment / transfer / PO / advance save (integrity review).
   series_counters: 'books.edit',
+  // business extras (WP-9)
+  pos_returns: 'doc.create',
+  branches: 'master.edit',
+  amc_contracts: 'master.edit',
+  loyalty_adjustments: 'master.edit',
+  // approvals: a clerk's save files a request (doc.create); deciding needs doc.approve (approvals.ts)
+  approvals: 'doc.create',
 };
 
 let systemDepth = 0;

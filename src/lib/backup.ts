@@ -318,6 +318,8 @@ const RECORD_TABLES = [
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   // Series high-water marks: STR / PO / ADV / RFV / RCPT numbers are never reused (integrity review)
   'series_counters',
+  // Business extras (WP-9): POS returns, approvals, branches, loyalty, AMC contracts
+  'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -327,6 +329,7 @@ const ID_TABLES = new Set([
   'price_levels', 'schemes', 'pos_day_close',
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   'price_levels', 'schemes', 'pos_day_close', 'series_counters',
+  'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

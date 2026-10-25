@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Keyboard, Minus, Plus, Printer, ReceiptText, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
+import { Keyboard, Minus, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { NumberInput } from '../components/ui/NumberInput';
@@ -32,9 +32,13 @@ import styles from '../components/pos/pos.module.css';
 import { useT } from '../i18n';
 import { docLabel as docName } from '../i18n/labels';
 import { posT } from '../i18n/areas/pos';
+import { returnsT } from '../i18n/areas/extras';
 import { areaNodes } from '../i18n/areas/nodes';
 
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
+// WP-9: return / exchange screen and the exchange-credit banner (own files, loaded on demand).
+const PosReturnModal = lazy(() => import('../components/pos-returns/PosReturnModal').then((m) => ({ default: m.PosReturnModal })));
+const ExchangeCredit = lazy(() => import('../components/pos-returns/ExchangeCredit').then((m) => ({ default: m.ExchangeCredit })));
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 
 interface Party {
@@ -90,6 +94,8 @@ export function Pos() {
   const [autoPrint, setAutoPrint] = useState(true);
   const [zOpen, setZOpen] = useState(false);
   const [lastBill, setLastBill] = useState<InvoiceRecord | null>(null);
+  const [retOpen, setRetOpen] = useState(false);
+  const [exchange, setExchange] = useState<{ id: string; amount: number; number: string } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const settings = useMemo(() => localDb.settings.get(), []);
@@ -109,7 +115,10 @@ export function Pos() {
     })),
     [tender, upiRef, bankId],
   );
-  const summary = tenderSummary(record.total, tenders);
+  // An exchange credit (WP-9) pays part of the bill; the tenders cover the rest.
+  const credit = exchange ? Math.min(exchange.amount, record.total) : 0;
+  const payable = round2(record.total - credit);
+  const summary = tenderSummary(payable, tenders);
 
   /* ── Lines ─────────────────────────────────────────────────── */
 
@@ -211,7 +220,7 @@ export function Pos() {
   /* ── Tender ────────────────────────────────────────────────── */
 
   const fill = (m: TenderMethod) => {
-    setTender((t) => ({ ...t, [m]: fillRest(record.total, (Object.keys(t) as TenderMethod[]).map((k) => ({ method: k, amount: t[k] })), m) }));
+    setTender((t) => ({ ...t, [m]: fillRest(payable, (Object.keys(t) as TenderMethod[]).map((k) => ({ method: k, amount: t[k] })), m) }));
     setTimeout(() => (document.getElementById(`pos-${m}`) as HTMLInputElement | null)?.select(), 0);
   };
 
@@ -234,7 +243,7 @@ export function Pos() {
       setErrors([posT('errEmpty')]);
       return;
     }
-    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client });
+    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client, exchangeReturnId: exchange?.id });
     if (res.expired?.length) {
       setExpiredAsk(res.expired);
       return;
@@ -248,6 +257,7 @@ export function Pos() {
     const change = res.summary?.change ?? 0;
     notify(posT('saved', { doc: docName(res.record.doc_type), number: res.record.invoice_number }) + (change > 0 ? posT('change', { amount: formatCurrency(change) }) : ''));
     setLastBill(res.record);
+    setExchange(null);
     if (autoPrint) setPrinting(res.record);
     reset();
   };
@@ -299,6 +309,9 @@ export function Pos() {
                 <Printer size={16} /> {posT('reprint', { number: lastBill.invoice_number })}
               </button>
             )}
+            <button type="button" className={controls.btnOutline} onClick={() => setRetOpen(true)}>
+              <RotateCcw size={16} /> {returnsT('title')}
+            </button>
             <button type="button" className={controls.btnOutline} onClick={() => setZOpen(true)}>
               <ReceiptText size={16} /> {posT('zReport')}
             </button>
@@ -461,6 +474,11 @@ export function Pos() {
               {(record.cess_amount ?? 0) > 0 && <div><span>{posT('cess')}</span><span>{formatCurrency(record.cess_amount ?? 0)}</span></div>}
               {record.round_off !== 0 && <div><span>{posT('roundOff')}</span><span>{formatCurrency(record.round_off)}</span></div>}
               <div className={styles.grand}><span>{posT('total')}</span><span data-pos-total>{formatCurrency(record.total)}</span></div>
+              {exchange && (
+                <Suspense fallback={null}>
+                  <ExchangeCredit number={exchange.number} amount={exchange.amount} used={credit} onDrop={() => setExchange(null)} />
+                </Suspense>
+              )}
             </div>
           </section>
 
@@ -532,6 +550,16 @@ export function Pos() {
       {zOpen && (
         <Suspense fallback={null}>
           <ZReportModal open={zOpen} onClose={() => setZOpen(false)} notify={notify} />
+        </Suspense>
+      )}
+      {retOpen && (
+        <Suspense fallback={null}>
+          <PosReturnModal
+            open={retOpen}
+            onClose={() => setRetOpen(false)}
+            notify={notify}
+            onExchange={(r) => setExchange({ id: r.id, amount: r.amount, number: r.credit_note_number })}
+          />
         </Suspense>
       )}
       {printing && (
