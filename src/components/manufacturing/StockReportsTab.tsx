@@ -5,22 +5,28 @@ import { computeStock } from '../../lib/inventory';
 import { computeTracking } from '../../lib/stock-tracking';
 import { getIndianFY } from '../../lib/invoice-number';
 import {
-  AGE_LABELS, batchAgeing, monthVouchers, monthlyMovement, movementAnalysis, negativeStockReport, stockAgeing,
+  AGE_BUCKETS, ageBucketBounds, batchAgeing, groupWiseSummary, monthVouchers, monthlyMovement, movementAnalysis,
+  negativeStockReport, parseAgeSlabs, stockAgeing,
 } from '../../lib/stock-reports';
+import { stockGroupsDb } from '../../lib/stock-groups';
 import { mfgT } from '../../i18n/areas/manufacturing';
 import { money, qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
 
-type Report = 'summary' | 'movement' | 'ageing' | 'negative';
+type Report = 'summary' | 'groups' | 'movement' | 'ageing' | 'negative';
+
+/** Translated bucket labels for the slabs ("0–30 days", …, "Over 180 days"). */
+const ageLabels = (buckets: readonly number[]) =>
+  ageBucketBounds(buckets).map((b) => (b.to === null ? mfgT('ageOver', { n: b.from - 1 }) : mfgT('ageRange', { from: b.from, to: b.to })));
 
 /** Stock Summary drill-down, Movement Analysis, Stock Ageing, Negative stock exceptions. */
 export function StockReportsTab({ ctx }: { ctx: MfgContext }) {
   const [report, setReport] = useState<Report>('summary');
   const positions = useMemo(() => computeStock(ctx.inputs).filter((p) => p.item.track_stock), [ctx.inputs]);
   const today = todayInput();
-  const reports: [Report, string][] = [['summary', mfgT('rSummary')], ['movement', mfgT('rMovement')], ['ageing', mfgT('rAgeing')], ['negative', mfgT('rNegative')]];
+  const reports: [Report, string][] = [['summary', mfgT('rSummary')], ['groups', mfgT('rGroups')], ['movement', mfgT('rMovement')], ['ageing', mfgT('rAgeing')], ['negative', mfgT('rNegative')]];
   return (
     <>
       <div className={cn(controls.segment, styles.tabs)} role="tablist" aria-label={mfgT('tabReports')}>
@@ -29,6 +35,7 @@ export function StockReportsTab({ ctx }: { ctx: MfgContext }) {
         ))}
       </div>
       {report === 'summary' && <SummaryDrill positions={positions} today={today} />}
+      {report === 'groups' && <GroupSummary positions={positions} today={today} />}
       {report === 'movement' && <Movement positions={positions} today={today} />}
       {report === 'ageing' && <Ageing positions={positions} today={today} ctx={ctx} />}
       {report === 'negative' && <Negative positions={positions} />}
@@ -157,14 +164,60 @@ function Movement({ positions, today }: { positions: Positions; today: string })
   );
 }
 
+/** Group-wise Stock Summary (WP-8): the stock-group tree with opening / inward / outward / closing. */
+function GroupSummary({ positions, today }: { positions: Positions; today: string }) {
+  const [from, setFrom] = useState(`${getIndianFY(today).startYear}-04-01`);
+  const [to, setTo] = useState(today);
+  const rows = useMemo(() => groupWiseSummary(positions, stockGroupsDb.all(), from, to), [positions, from, to]);
+  const q = (n: number | null, unit: string | null) => (n === null ? '' : `${qtyText(n)}${unit ? ` ${unit}` : ''}`);
+  const pad = (d: number) => ({ paddingLeft: `${d * 1.25}rem` });
+  return (
+    <>
+      <div className={styles.bar} style={{ justifyContent: 'flex-start' }}>
+        <label className={styles.muted}>{mfgT('from')} <input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className={styles.muted}>{mfgT('to')} <input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
+      </div>
+      {rows.length === 0 ? <p className={styles.muted}>{mfgT('noData')}</p> : (
+        <div className={surface.tableWrap}>
+          <table className={surface.table}>
+            <thead><tr><th>{mfgT('item')}</th><th className={styles.num}>{mfgT('opening')}</th><th className={styles.num}>{mfgT('inward')}</th><th className={styles.num}>{mfgT('outward')}</th><th className={styles.num}>{mfgT('closing')}</th><th className={styles.num}>{mfgT('value')}</th></tr></thead>
+            <tbody>
+              {rows.map((r) => {
+                const strong = r.kind === 'group';
+                const cell = (v: string) => (strong ? <strong>{v}</strong> : v);
+                return (
+                  <tr key={`${r.kind}:${r.id}`}>
+                    <td style={pad(r.depth)}>{cell(r.kind === 'group' && !r.id ? mfgT('noGroup') : r.name)}</td>
+                    <td className={styles.num}>{cell(q(r.openingQty, r.unit))}</td>
+                    <td className={styles.num}>{cell(r.inQty ? q(r.inQty, r.unit) : '')}</td>
+                    <td className={styles.num}>{cell(r.outQty ? q(r.outQty, r.unit) : '')}</td>
+                    <td className={cn(styles.num, (r.closingQty ?? 0) < 0 && styles.loss)}>{cell(q(r.closingQty, r.unit))}</td>
+                    <td className={styles.num}>{cell(money(r.closingValue))}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
 function Ageing({ positions, today, ctx }: { positions: Positions; today: string; ctx: MfgContext }) {
   const [byBatch, setByBatch] = useState(false);
-  const rows = useMemo(() => stockAgeing(positions, today), [positions, today]);
-  const batches = useMemo(() => (byBatch ? batchAgeing(computeTracking(ctx.inputs), today) : []), [byBatch, ctx.inputs, today]);
+  const [slabText, setSlabText] = useState(AGE_BUCKETS.join(', '));
+  const slabs = useMemo(() => parseAgeSlabs(slabText), [slabText]);
+  const labels = ageLabels(slabs);
+  const rows = useMemo(() => stockAgeing(positions, today, slabs), [positions, today, slabs]);
+  const batches = useMemo(() => (byBatch ? batchAgeing(computeTracking(ctx.inputs), today, slabs) : []), [byBatch, ctx.inputs, today, slabs]);
   const anyBatch = ctx.items.some((i) => i.track_batches);
   return (
     <>
-      {anyBatch && <label className={controls.check} style={{ marginBottom: '0.75rem' }}><input type="checkbox" checked={byBatch} onChange={(e) => setByBatch(e.target.checked)} /> {mfgT('byBatch')}</label>}
+      <div className={styles.bar} style={{ justifyContent: 'flex-start' }}>
+        <label className={styles.muted}>{mfgT('ageSlabs')} <input className={controls.input} style={{ width: '12rem' }} value={slabText} onChange={(e) => setSlabText(e.target.value)} onBlur={() => setSlabText(slabs.join(', '))} /></label>
+        {anyBatch && <label className={controls.check}><input type="checkbox" checked={byBatch} onChange={(e) => setByBatch(e.target.checked)} /> {mfgT('byBatch')}</label>}
+      </div>
       {byBatch ? (
         <div className={surface.tableWrap}>
           <table className={surface.table}>
@@ -179,7 +232,7 @@ function Ageing({ positions, today, ctx }: { positions: Positions; today: string
       ) : (
         <div className={surface.tableWrap}>
           <table className={surface.table}>
-            <thead><tr><th>{mfgT('item')}</th>{AGE_LABELS.map((l) => <th key={l} className={styles.num}>{l}</th>)}<th className={styles.num}>{mfgT('total')}</th></tr></thead>
+            <thead><tr><th>{mfgT('item')}</th>{labels.map((l) => <th key={l} className={styles.num}>{l}</th>)}<th className={styles.num}>{mfgT('total')}</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.position.item.id}>
@@ -188,7 +241,7 @@ function Ageing({ positions, today, ctx }: { positions: Positions; today: string
                   <td className={styles.num}>{qtyText(r.position.qty)}<div className={styles.muted}>{money(r.position.value)}</div></td>
                 </tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={AGE_LABELS.length + 2} className={styles.muted}>{mfgT('noData')}</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={labels.length + 2} className={styles.muted}>{mfgT('noData')}</td></tr>}
             </tbody>
           </table>
         </div>

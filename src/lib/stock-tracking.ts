@@ -23,6 +23,7 @@ import {
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
 import { getTable } from './storage';
+import { lineFactor } from './units';
 import { creditNoteReturnsGoods } from './credit-restock';
 import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList } from './godowns';
 import { batchDelta, dayWindow, eventLabel, firstShortAfter, godownDelta, serialDelta } from './stock-timeline';
@@ -248,10 +249,12 @@ export function fefoAllocate(
 
 /** Invoice lines for a FEFO split of `line` (first keeps its id; quantities follow the batches). */
 export function splitLineByFefo(line: InvoiceItem, t: ItemTracking | undefined, day: string, newId: () => string): InvoiceItem[] {
-  const { lines, short } = fefoAllocate(t, day, num(line.quantity), line.godown_id || undefined);
+  // Batches hold base units; a line typed in an alternate unit (WP-8) is split back into its own unit.
+  const f = lineFactor(line);
+  const { lines, short } = fefoAllocate(t, day, num(line.quantity) * f, line.godown_id || undefined);
   if (lines.length === 0) return [line];
-  const out = lines.map((b, i) => withBatch({ ...line, id: i === 0 ? line.id : newId(), quantity: b.qty }, b));
-  if (short > EPS) out[out.length - 1] = { ...out[out.length - 1], quantity: roundQty(out[out.length - 1].quantity + short) };
+  const out = lines.map((b, i) => withBatch({ ...line, id: i === 0 ? line.id : newId(), quantity: roundQty(b.qty / f) }, b));
+  if (short > EPS) out[out.length - 1] = { ...out[out.length - 1], quantity: roundQty(out[out.length - 1].quantity + short / f) };
   return out.map((l) => ({ ...l, amount: round2(num(l.quantity) * num(l.rate)) }));
 }
 
@@ -363,7 +366,7 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
 
   for (const line of doc.items ?? []) {
     const item = index.find(line.name, line.hsn);
-    const q = num(line.quantity);
+    const q = num(line.quantity) * lineFactor(line); // base units (WP-8 alternate units)
     if (!item || q <= 0) continue;
     const t = tracking.get(item.id);
     const godown = line.godown_id || MAIN_GODOWN_ID;

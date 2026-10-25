@@ -305,6 +305,17 @@ Details: `docs/features/manufacturing.md`.
 | 7.35 | ✅ **Month-wise GSTR-1 vs GSTR-3B vs Books** reconciliation and a **GSTR-9C working paper** (Tables 5 / 7 / 9 / 12 with adjustments) (`gst-recon-monthly.ts`, `gstr9c.ts`) | Reconciliation of Returns | done |
 | 7.36 | ⏳ WP-6 follow-ups: HSN-master defaults in the line editors, cess in Books `gstSummary` / accounting + Tally exports, ITC carry-forward into the next month's plan, PMT-09 / refunds, RCM self-invoice + Rule 52 voucher series, IFF JSON, EXPA, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 | — | open |
 
+### Inventory masters & analysis (WP-8)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.40 | ✅ **Stock groups (nested) + stock categories**, **units master** (UQC, decimal places, compound units), **alternate units on lines** (2 BOX → 24 NOS in stock, `unit_factor` snapshot) on the invoice editor and bill / PO / GRN lines, **group-wise Stock Summary**, `PurchaseLine.item_id` set by the bill form's item picker — `docs/features/inventory-masters.md` | P1-10 | done |
+| 7.41 | ✅ **Sales Order Outstanding** (pending delivery / invoice by party · item · due date, overdue days) on Inventory → Order outstanding; reorder "pending PO" counts goods received on GRNs before the bill | P1-12 | done |
+| 7.42 | ✅ Configurable **ageing slabs** with Hindi bucket labels (Stock reports → Ageing) | P1-11 | done |
+| 7.43 | ✅ **Godown hierarchy** (godown inside a godown, stock rolled up), **standard cost / selling price lists** with effective dates, **Stock Query** (stock by godown / batch, last purchase / sale rates, pending orders, prices), **landed cost** on a bill (freight etc. spread to the goods' stock cost, memo only); stock-item delete blocked while BOMs / stock vouchers use it | P2 | done |
+| 7.44 | ⏳ Units master UQC wired into GSTR-1 HSN / e-Invoice / e-Way unit mapping; alternate units on POS lines and stock journals; price lists feeding the editor's rate; group-wise reorder / ageing filters | P1-10, P2 | open |
+
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

@@ -343,3 +343,12 @@
   font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
+
+/* WP-8: base-unit reading under a line typed in an alternate unit ("= 24 NOS"). */
+.unitHint {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--muted-foreground);
+  margin-top: 0.15rem;
+  white-space: nowrap;
+}

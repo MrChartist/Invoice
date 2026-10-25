@@ -185,6 +185,8 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(item.price_basis ? { price_basis: String(item.price_basis) } : {}),
     ...(item.scheme_id ? { scheme_id: String(item.scheme_id) } : {}),
     ...(item.free_of ? { free_of: String(item.free_of) } : {}),
+    // Alternate unit (WP-8): only on lines typed in one, so base-unit lines keep their exact shape.
+    ...(num(item.unit_factor) > 0 && num(item.unit_factor) !== 1 ? { unit_factor: num(item.unit_factor) } : {}),
   };
 }
 

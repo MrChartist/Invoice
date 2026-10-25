@@ -1,6 +1,10 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { UNITS, GST_SLABS } from '../../types/invoice';
+import { GST_SLABS } from '../../types/invoice';
+import { cleanAltUnits, compoundUnits, unitSymbols, unitsDb, validateAltUnits } from '../../lib/units';
+import { stockCategoriesDb, stockGroupsDb, treeRows } from '../../lib/stock-groups';
+import { cleanPriceList, validatePriceList } from '../../lib/stock-query';
+import { MastersFields, type MastersDraft } from './ItemMastersFields';
 import { num } from '../../lib/invoice-calc';
 import { hsnCompatible, type StockItem } from '../../lib/inventory';
 import { duplicateSerials, parseSerials } from '../../lib/stock-tracking';
@@ -25,6 +29,8 @@ interface Draft {
   opening_qty: string; opening_rate: string; reorder_level: string;
   sale_rate: string; tax_rate: string; location: string;
   track_batches: boolean; track_serials: boolean; warranty_months: string; opening_serials: string;
+  /** WP-8 masters: group / category, alternate units, price lists. */
+  masters: MastersDraft;
 }
 
 function toDraft(i: StockItem): Draft {
@@ -35,6 +41,12 @@ function toDraft(i: StockItem): Draft {
     tax_rate: i.tax_rate !== undefined ? String(i.tax_rate) : '', location: i.location ?? '',
     track_batches: !!i.track_batches, track_serials: !!i.track_serials,
     warranty_months: i.warranty_months ? String(i.warranty_months) : '', opening_serials: (i.opening_serials ?? []).join('\n'),
+    masters: {
+      group_id: i.group_id ?? '', category_id: i.category_id ?? '',
+      alt: (i.alt_units ?? []).map((a) => ({ unit: a.unit, factor: String(a.factor) })),
+      costs: (i.standard_costs ?? []).map((e) => ({ from: e.from, rate: String(e.rate) })),
+      prices: (i.selling_prices ?? []).map((e) => ({ from: e.from, rate: String(e.rate) })),
+    },
   };
 }
 
@@ -62,7 +74,15 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
     : dupSerials.length ? invT('errSerialTwice', { serial: dupSerials[0] })
     : openingSerials.length && openingSerials.length !== num(d.opening_qty) ? invT('errOpeningSerials', { listed: openingSerials.length, qty: num(d.opening_qty) })
     : '';
-  const valid = !nameError && !negative && !taxBad && !serialError && num(d.warranty_months) >= 0;
+  // WP-8 masters: lists read once per form; alternate units never apply to serial-tracked items.
+  const masters = useMemo(() => {
+    const stored = unitsDb.stored();
+    return { units: unitSymbols(stored, item.unit), compounds: compoundUnits(stored), groups: treeRows(stockGroupsDb.all()), categories: treeRows(stockCategoriesDb.all()) };
+  }, [item.unit]);
+  const serialItem = d.track_stock && d.track_serials;
+  const altList = serialItem ? [] : d.masters.alt.map((a) => ({ unit: a.unit, factor: num(a.factor) }));
+  const mastersError = validateAltUnits(altList, d.unit) || validatePriceList(d.masters.costs) || validatePriceList(d.masters.prices);
+  const valid = !nameError && !negative && !taxBad && !serialError && !mastersError && num(d.warranty_months) >= 0;
 
   const submit = () => {
     setTouched(true);
@@ -86,6 +106,12 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       track_serials: d.track_stock && d.track_serials ? true : undefined,
       warranty_months: d.track_stock && d.track_serials && num(d.warranty_months) > 0 ? Math.round(num(d.warranty_months)) : undefined,
       opening_serials: openingSerials.length ? openingSerials : undefined,
+      // WP-8 masters: stored only when set, so plain items keep their exact shape.
+      group_id: d.masters.group_id || undefined,
+      category_id: d.masters.category_id || undefined,
+      alt_units: d.track_stock ? cleanAltUnits(altList, d.unit) : undefined,
+      standard_costs: cleanPriceList(d.masters.costs.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
+      selling_prices: cleanPriceList(d.masters.prices.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
     });
   };
 
@@ -145,7 +171,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-unit`}>{invT('unit')}</label>
             <select id={`${uid}-unit`} className={controls.select} value={d.unit} onChange={(e) => set('unit', e.target.value)}>
-              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              {masters.units.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
         </div>
@@ -223,6 +249,18 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
             {touched && serialError && <span className={controls.error} role="alert">{serialError}</span>}
           </>
         )}
+        <MastersFields
+          draft={d.masters}
+          onChange={(m) => set('masters', m)}
+          baseUnit={d.unit}
+          trackStock={d.track_stock}
+          serialItem={serialItem}
+          units={masters.units}
+          compounds={masters.compounds}
+          groups={masters.groups}
+          categories={masters.categories}
+        />
+        {touched && mastersError && <span className={controls.error} role="alert">{mastersError}</span>}
         {touched && negative && <span className={controls.error} role="alert">{invT('errNegative')}</span>}
         <button type="submit" hidden />
       </form>

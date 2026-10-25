@@ -127,6 +127,8 @@ export function billSeedFromGrn(grn: ReceiptNote, purchases: readonly PurchaseRe
       tax_rate: num(l.line.tax_rate),
       grn_line_id: l.line.id,
       ...(l.line.po_line_id ? { po_line_id: l.line.po_line_id } : {}),
+      ...(l.line.item_id ? { item_id: l.line.item_id } : {}),
+      ...(l.line.unit_factor ? { unit_factor: l.line.unit_factor } : {}),
       ...(l.line.godown_id ? { godown_id: l.line.godown_id } : {}),
       ...(l.line.batch_no ? { batch_no: l.line.batch_no } : {}),
       ...(l.line.mfg_date ? { mfg_date: l.line.mfg_date } : {}),
@@ -158,6 +160,8 @@ export function rejectionLinesFromGrn(grn: ReceiptNote, purchases: readonly Purc
       grn_line_id: l.line.id,
       ...(l.line.godown_id ? { godown_id: l.line.godown_id } : {}),
       ...(l.line.batch_no ? { batch_no: l.line.batch_no } : {}),
+      ...(l.line.item_id ? { item_id: l.line.item_id } : {}),
+      ...(l.line.unit_factor ? { unit_factor: l.line.unit_factor } : {}),
     }));
 }
 
@@ -220,6 +224,8 @@ export function goodsReceivedNotBilled(notes: readonly ReceiptNote[], purchases:
 
 export interface PoOutstandingRow {
   poId: string;
+  /** Additive (WP-8): the PO line, so readers can reach its HSN / item / unit factor. */
+  lineId: string;
   number: string;
   date: string;
   expected: string;
@@ -267,7 +273,7 @@ export function purchaseOrderOutstanding(orders: readonly PurchaseOrder[], purch
       if (pending <= EPS) continue;
       const expected = po.expected_date ?? '';
       rows.push({
-        poId: po.id, number: po.po_number, date: po.date, expected, vendor: po.vendor_name, item: l.name, unit: l.unit ?? '',
+        poId: po.id, lineId: l.id, number: po.po_number, date: po.date, expected, vendor: po.vendor_name, item: l.name, unit: l.unit ?? '',
         ordered, received: got, pending, value: round2(pending * num(l.rate)),
         overdueDays: expected && expected < asOf ? daysBetween(expected, asOf) : 0,
       });

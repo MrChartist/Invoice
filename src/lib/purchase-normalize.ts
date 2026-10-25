@@ -16,6 +16,7 @@ import type { PurchaseRecord } from '../types/purchases';
 import { num, round2 } from './invoice-calc';
 import { isoDay } from './dates';
 import { checkGstin } from './gstin';
+import { allocateLandedCost } from './landed-cost';
 
 type Rec = Record<string, unknown>;
 
@@ -316,6 +317,12 @@ export interface PurchaseLineCore {
   /** Additive (WP-6): GST rate % of the line (`tax_rate` / `gst_rate`), 0 when absent; unit (`unit`) or ''. */
   taxRate: number;
   unit: string;
+  /** Additive (WP-8): the stock item picked on the line (`item_id`), or '' (older lines match by name + HSN). */
+  itemId: string;
+  /** Additive (WP-8): base units per one unit of the line (`unit_factor`, alternate units); 1 when absent. */
+  unitFactor: number;
+  /** Additive (WP-8): landed cost per line unit from the bill's `landed_costs` (stock cost only; 0 = none). */
+  landedUnit: number;
 }
 
 /** The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. */
@@ -343,7 +350,14 @@ export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
       grnLineId: pickStr(line, ['grn_line_id']),
       taxRate: Math.max(pickNum(line, ['tax_rate', 'gst_rate']) ?? 0, 0),
       unit: pickStr(line, ['unit', 'uqc']),
+      itemId: pickStr(line, ['item_id']),
+      unitFactor: num(line.unit_factor) > 0 ? num(line.unit_factor) : 1,
+      landedUnit: 0,
     });
+  }
+  if (Array.isArray(r.landed_costs) && r.landed_costs.length) {
+    const extra = allocateLandedCost(out, r.landed_costs, r.landed_basis === 'qty' ? 'qty' : 'value');
+    out.forEach((l, i) => { l.landedUnit = extra[i]; });
   }
   return out;
 }

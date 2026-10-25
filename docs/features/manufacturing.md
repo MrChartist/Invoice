@@ -105,7 +105,10 @@ A WIP / stock-in-hand posting arrives with the closing-stock work in `docs/GAP_A
 
 - Job work out / in (Tally job work vouchers, material sent / received, ITC-04) — not built.
 - Serial-tracked items cannot be consumed or produced by vouchers (use stock adjustments).
-- Ageing bucket labels come from the lib in English.
-- Deleting a stock item does not yet check BOMs / vouchers that use it (their lines for that item are then ignored);
-  godown deletion does check them (`godownReferences`).
+- ~~Ageing bucket labels come from the lib in English~~ — WP-8: labels are translated on screen and the slabs are
+  configurable (`parseAgeSlabs`, `ageBucketBounds`).
+- ~~Deleting a stock item does not check BOMs / vouchers~~ — WP-8: `stockDb.deleteItem` refuses while a BOM,
+  manufacturing / stock journal or physical stock count names the item (`src/lib/item-references.ts`).
+- Reorder "pending PO" now also counts goods received on receipt notes (GRN) before the bill (WP-8,
+  `pendingPoQty(…, receiptNotes)`), with alternate-unit PO lines converted to base units.
 - No production plan / material requirement report yet; no "kit" sale that consumes components automatically.

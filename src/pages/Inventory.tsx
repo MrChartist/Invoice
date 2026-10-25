@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowDownToLine, BookOpen, Boxes, Download, Edit3, PackagePlus, Plus,
+  AlertTriangle, ArrowDownToLine, BookOpen, Boxes, Download, Edit3, FolderTree, PackagePlus, Plus, Ruler,
   Search, SlidersHorizontal, Trash2, TrendingDown, Warehouse,
 } from 'lucide-react';
 import { cn, formatMoney, formatDate, todayInput, addDaysInput } from '../lib/utils';
@@ -27,16 +27,25 @@ import { TransfersTab } from '../components/inventory/TransfersTab';
 import { SerialLookup } from '../components/inventory/SerialLookup';
 import { DEFAULT_EXPIRY_ALERT_DAYS } from '../lib/inventory';
 import { expiringBatches, godownSummary, liveTrackingInputs, computeTracking } from '../lib/stock-tracking';
-import { godownsDb } from '../lib/godowns';
+import { godownsDb, rollUpGodowns } from '../lib/godowns';
 import { MAIN_GODOWN_ID } from '../types/stock';
 import { useT } from '../i18n';
 import { invT } from '../i18n/areas/inventory';
+import { imT } from '../i18n/areas/inventory-masters';
+import { itemsUnder, stockCategoriesDb, stockGroupsDb, treeRows } from '../lib/stock-groups';
+import { compoundText } from '../lib/units';
+
+// WP-8 masters & analysis: loaded only when opened.
+const StockGroupsModal = lazy(() => import('../components/inventory/StockGroupsModal').then((m) => ({ default: m.StockGroupsModal })));
+const UnitsModal = lazy(() => import('../components/inventory/UnitsModal').then((m) => ({ default: m.UnitsModal })));
+const StockQueryTab = lazy(() => import('../components/inventory/StockQueryTab').then((m) => ({ default: m.StockQueryTab })));
+const OrdersOutstandingTab = lazy(() => import('../components/inventory/OrdersOutstandingTab').then((m) => ({ default: m.OrdersOutstandingTab })));
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
 
-type Tab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials';
-const TABS: Tab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials'];
+type Tab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders';
+const TABS: Tab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders'];
 type Filter = 'all' | 'low' | 'out' | 'negative' | 'untracked';
 
 function download(filename: string, csv: string) {
@@ -61,6 +70,9 @@ export function Inventory() {
     return t && TABS.includes(t) ? t : 'summary';
   });
   const [godownsOpen, setGodownsOpen] = useState(false);
+  const [mastersOpen, setMastersOpen] = useState<'' | 'groups' | 'units'>('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<{ item: StockItem; isNew: boolean } | null>(null);
@@ -92,6 +104,8 @@ export function Inventory() {
   const tracking = useMemo(() => computeTracking(trackInputs), [trackInputs]);
   const transfers = useMemo(() => trackInputs.transfers ?? [], [trackInputs]);
   const multi = godowns.length > 1;
+  // WP-8: a godown with sub-godowns shows their stock too (the Total column is unchanged).
+  const parentGodowns = useMemo(() => new Set(godowns.map((g) => g.parent_id).filter((x): x is string => !!x)), [godowns]);
   const showBatches = positions.some((p) => p.item.track_stock && p.item.track_batches);
   const showSerials = positions.some((p) => p.item.track_stock && p.item.track_serials);
   const expiryDays = settings.expiryAlertDays ?? DEFAULT_EXPIRY_ALERT_DAYS;
@@ -104,7 +118,13 @@ export function Inventory() {
     ...(showBatches ? [['batches', invT('tabBatches')]] : []),
     ...(multi ? [['godowns', invT('tabGodowns')], ['transfers', invT('tabTransfers')]] : []),
     ...(showSerials ? [['serials', invT('tabSerials')]] : []),
+    ['query', imT('tabQuery')], ['orders', imT('tabOrders')],
   ] as [Tab, string][]);
+  // Stock groups / categories (WP-8): filters appear once any exist.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const groupList = useMemo(() => stockGroupsDb.all(), [version]);
+  const categoryList = useMemo(() => stockCategoriesDb.all(), [version]);
+  /* eslint-enable react-hooks/exhaustive-deps */
   const activeTab: Tab = tabs.some(([k]) => k === tab) ? tab : 'summary';
 
   const guard = (fn: () => void, okMsg: string) => {
@@ -131,8 +151,12 @@ export function Inventory() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const inGroup = groupFilter ? new Set(itemsUnder(groupFilter === '-' ? '' : groupFilter, groupList, positions.map((p) => p.item), 'group').map((i) => i.id)) : null;
+    const inCategory = categoryFilter ? new Set(itemsUnder(categoryFilter === '-' ? '' : categoryFilter, categoryList, positions.map((p) => p.item), 'category').map((i) => i.id)) : null;
     return positions
       .filter((p) => {
+        if (inGroup && !inGroup.has(p.item.id)) return false;
+        if (inCategory && !inCategory.has(p.item.id)) return false;
         if (filter === 'low' && !(p.isLow && !p.isNegative)) return false;
         if (filter === 'out' && p.status !== 'out') return false;
         if (filter === 'negative' && !p.isNegative) return false;
@@ -141,7 +165,7 @@ export function Inventory() {
         return [p.item.name, p.item.sku, p.item.hsn, p.item.location].some((v) => (v ?? '').toLowerCase().includes(q));
       })
       .sort((a, b) => a.item.name.localeCompare(b.item.name));
-  }, [positions, query, filter]);
+  }, [positions, query, filter, groupFilter, categoryFilter, groupList, categoryList]);
 
   const catalogueMissing = useMemo(() => {
     const have = new Set(positions.map((p) => p.item.name.trim().toLowerCase()));
@@ -250,6 +274,12 @@ export function Inventory() {
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setGodownsOpen(true)}>
             <Warehouse size={14} aria-hidden="true" /> {invT('godowns')}{multi ? ` (${godowns.length})` : ''}
           </button>
+          <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setMastersOpen('groups')}>
+            <FolderTree size={14} aria-hidden="true" /> {imT('groupsBtn')}
+          </button>
+          <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setMastersOpen('units')}>
+            <Ruler size={14} aria-hidden="true" /> {imT('unitsBtn')}
+          </button>
           {catalogueMissing.length > 0 && (
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={importCatalogue}>
               <ArrowDownToLine size={14} /> {invT('importFromCatalogueN', { n: catalogueMissing.length })}
@@ -281,6 +311,20 @@ export function Inventory() {
                 <option value="negative">{invT('st.negative')}</option>
                 <option value="untracked">{invT('st.untracked')}</option>
               </select>
+              {groupList.length > 0 && (
+                <select className={cn(controls.select, styles.methodSelect)} value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} aria-label={imT('groupFilter')}>
+                  <option value="">{imT('allGroups')}</option>
+                  {treeRows(groupList).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
+                  <option value="-">{imT('primary')}</option>
+                </select>
+              )}
+              {categoryList.length > 0 && (
+                <select className={cn(controls.select, styles.methodSelect)} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label={imT('categoryFilter')}>
+                  <option value="">{imT('allCategories')}</option>
+                  {treeRows(categoryList).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
+                  <option value="-">{imT('notCategorised')}</option>
+                </select>
+              )}
             </>
           )}
           {activeTab === 'movement' && (
@@ -346,7 +390,10 @@ export function Inventory() {
                   {filtered.map((p) => (
                     <tr key={p.item.id}>
                       <td>{nameCell(p)}</td>
-                      <td className={cn(surface.numeric, p.isNegative && styles.negative)}>{p.item.track_stock ? `${p.qty} ${p.item.unit}` : '—'}</td>
+                      <td className={cn(surface.numeric, p.isNegative && styles.negative)}>
+                        {p.item.track_stock ? `${p.qty} ${p.item.unit}` : '—'}
+                        {p.item.track_stock && p.item.alt_units?.length ? <span className={styles.itemMeta} style={{ display: 'block' }}>{compoundText(p.qty, p.item)}</span> : null}
+                      </td>
                       <td className={surface.numeric}>{p.item.track_stock ? formatMoney(p.avgCost) : '—'}</td>
                       <td className={cn(surface.numeric, p.value < 0 && styles.negative)}>{p.item.track_stock ? formatMoney(p.value) : '—'}</td>
                       <td className={surface.numeric}>{p.item.track_stock && p.item.reorder_level ? p.item.reorder_level : '—'}</td>
@@ -418,12 +465,12 @@ export function Inventory() {
                 <thead>
                   <tr>
                     <th>{invT('thItem')}</th>
-                    {godowns.map((g) => <th key={g.id} className={surface.numeric}>{g.name}</th>)}
+                    {godowns.map((g) => <th key={g.id} className={surface.numeric}>{g.name}{parentGodowns.has(g.id) ? ` ${imT('inclSub')}` : ''}</th>)}
                     <th className={surface.numeric}>{invT('thTotal')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {godownRows.map((r) => (
+                  {godownRows.map((r) => ({ ...r, byGodown: parentGodowns.size ? rollUpGodowns(r.byGodown, godowns) : r.byGodown })).map((r) => (
                     <tr key={r.item.id}>
                       <td>{r.item.name}</td>
                       {godowns.map((g) => (
@@ -446,6 +493,13 @@ export function Inventory() {
                 onChanged={(m) => { refresh(); notify(m); }}
                 onError={(m) => notify(m, 'error')}
               />
+            )}
+
+            {(activeTab === 'query' || activeTab === 'orders') && (
+              <Suspense fallback={null}>
+                {activeTab === 'query' && <StockQueryTab items={positions.map((p) => p.item)} version={version} today={today} initialId={searchParams.get('item') ?? undefined} />}
+                {activeTab === 'orders' && <OrdersOutstandingTab version={version} today={today} />}
+              </Suspense>
             )}
 
             {activeTab === 'serials' && (
@@ -515,6 +569,12 @@ export function Inventory() {
         onClose={() => setGodownsOpen(false)}
         onChanged={(m) => { refresh(); notify(m); }}
       />
+      {mastersOpen && (
+        <Suspense fallback={null}>
+          {mastersOpen === 'groups' && <StockGroupsModal open items={positions.map((p) => p.item)} onClose={() => setMastersOpen('')} onChanged={(m) => { refresh(); notify(m); }} />}
+          {mastersOpen === 'units' && <UnitsModal open items={positions.map((p) => p.item)} onClose={() => setMastersOpen('')} onChanged={(m) => { refresh(); notify(m); }} />}
+        </Suspense>
+      )}
       <ConfirmDialog
         open={!!deleting}
         destructive

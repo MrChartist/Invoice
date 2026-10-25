@@ -82,6 +82,8 @@ export interface PurchaseLine {
   godown_id?: string;
   /** Additive (WP-3): the receipt-note (GRN) line this bill line bills. Goods came in on the GRN. */
   grn_line_id?: string;
+  /** Additive (WP-8): base units per one unit of this line (alternate unit, e.g. 1 BOX = 12); absent = 1. */
+  unit_factor?: number;
 }
 
 /** A supplier bill or a direct expense. Persisted in table `purchases`. */
@@ -102,6 +104,12 @@ export interface PurchaseRecord {
   place_of_supply?: string;
   category: string;
   lines: PurchaseLine[];
+  /**
+   * Additive (WP-8): landed cost — freight, loading … spread over the goods lines' stock cost only
+   * (memo: not in the total, GST or books; `src/lib/landed-cost.ts`). Basis absent = by value.
+   */
+  landed_costs?: { label: string; amount: number }[];
+  landed_basis?: 'value' | 'qty';
   taxable: number;
   cgst: number;
   sgst: number;
@@ -207,6 +215,9 @@ export interface PurchaseOrderLine {
   quantity: number;
   rate: number;
   tax_rate: number;
+  /** Additive (WP-8): the stock item picked on the line, and base units per line unit (absent = 1). */
+  item_id?: string;
+  unit_factor?: number;
 }
 
 /**
@@ -341,6 +352,9 @@ export interface ReceiptNoteLine {
   batch_no?: string;
   mfg_date?: string;
   expiry_date?: string;
+  /** Additive (WP-8): the stock item picked on the line, and base units per line unit (absent = 1). */
+  item_id?: string;
+  unit_factor?: number;
 }
 
 /**

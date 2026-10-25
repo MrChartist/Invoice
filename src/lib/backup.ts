@@ -336,6 +336,8 @@ const RECORD_TABLES = [
   'gst_setoffs', 'gst_challans', 'hsn_master',
   // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
   'year_end',
+  // Inventory masters (WP-8): stock groups, stock categories, units of measure
+  'stock_groups', 'stock_categories', 'units',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -354,6 +356,7 @@ const ID_TABLES = new Set([
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'gst_setoffs', 'gst_challans', 'hsn_master',
   'year_end',
+  'stock_groups', 'stock_categories', 'units',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

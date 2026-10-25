@@ -479,3 +479,36 @@ test('WP-7 readers (Tally supplier payments, books integrity) read the real purc
   });
   assert.equal(r.ok, true, 'a payment against the real bill is not orphaned');
 });
+
+test('WP-8 readers (item_id / unit_factor on bill lines, stock query, reorder with GRNs) read the real bill shape', async () => {
+  const { pendingPoQty } = await import('../src/lib/reorder.ts');
+  const { stockQuery } = await import('../src/lib/stock-query.ts');
+  const { computeStock } = await import('../src/lib/inventory.ts');
+  // A line picked from the stock list, bought by the box of 12.
+  const boxed: PurchaseRecord = { ...bill, lines: [{ ...bill.lines[0], name: 'Paper (supplier name)', unit: 'BOX', quantity: 2, rate: 1200, item_id: 's', unit_factor: 12 }] };
+  const core = readPurchaseLines(boxed)[0];
+  assert.deepEqual([core.itemId, core.unitFactor, core.quantity, core.unitCost], ['s', 12, 2, 1200]);
+  const plain = readPurchaseLines(bill)[0];
+  assert.deepEqual([plain.itemId, plain.unitFactor], ['', 1], 'older lines: no item, factor 1');
+  const items = [{ id: 's', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 5 }];
+  const ev = collectEvents({ items, moves: [], invoices: [], purchases: [boxed] }).get('s') ?? [];
+  assert.deepEqual(ev.map((e) => [e.qty, e.rate]), [[24, 100]], 'stock in base units at cost per base unit, matched by item_id');
+  // The money readers ignore the new line fields.
+  assert.equal(booksNormalize(boxed as never).taxable, booksNormalize(bill as never).taxable);
+  assert.equal(readPurchase(boxed)?.taxable, readPurchase(bill)?.taxable);
+  const [position] = computeStock({ items, moves: [], invoices: [], purchases: [boxed] });
+  const q = stockQuery({ position, events: ev, godowns: [], soLines: [], pendingPo: 0, day: '2026-12-31' });
+  assert.deepEqual(q.lastPurchases.map((r) => [r.party, r.qty, r.rate]), [['Acme Supplies', 24, 100]]);
+  const po = { id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-01', vendor_name: 'Acme Supplies', lines: [{ id: 'pl', name: 'Paper ream', hsn: '4802', quantity: 25, rate: 100, tax_rate: 18 }], taxable: 2500, cgst: 0, sgst: 0, igst: 0, total: 2500 };
+  const grn = { id: 'g', kind: 'GRN' as const, number: 'GRN/FY26-27/0001', date: '2026-04-05', vendor_name: 'Acme Supplies', po_id: 'po1', lines: [{ id: 'gl', name: 'Paper ream', hsn: '4802', quantity: 5, rate: 100, tax_rate: 18, po_line_id: 'pl' }] };
+  const viaGrn: PurchaseRecord = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], quantity: 5, po_line_id: 'pl', grn_line_id: 'gl' }] };
+  assert.equal(pendingPoQty([po], [viaGrn], items, [grn]).get('s'), 20, 'a bill against a GRN is counted once');
+  // Landed cost: stock cost only; every money / GST reader sees the bill unchanged.
+  const landed: PurchaseRecord = { ...bill, landed_costs: [{ label: 'Freight', amount: 100 }] };
+  assert.equal(readPurchaseLines(landed)[0].landedUnit, 10);
+  assert.equal(readPurchaseLines(landed)[0].unitCost, 100);
+  assert.deepEqual(booksNormalize(landed as never), booksNormalize(bill as never));
+  assert.deepEqual(exportNormalize(landed as never), exportNormalize(bill as never));
+  assert.deepEqual(gstNormalize(landed, '27'), gstNormalize(bill, '27'));
+  assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [landed] }).get('s')?.[0]?.rate, 110);
+});

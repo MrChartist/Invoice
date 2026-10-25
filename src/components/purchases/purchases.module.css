@@ -311,3 +311,38 @@
   font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
+
+/* WP-8: alternate unit under a bill line quantity ("BOX", "= 24 NOS"). */
+.lineUnit {
+  margin-top: 0.25rem;
+  width: 100%;
+}
+.lineUnitHint {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+/* WP-8: landed cost on a bill. */
+.landed {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.landedRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.landedRow > input:first-child {
+  flex: 2 1 12rem;
+}
+.landedRow > input:nth-child(2) {
+  flex: 1 1 7rem;
+}

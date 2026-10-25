@@ -186,6 +186,12 @@ export interface InvoiceItem {
   scheme_id?: string;
   /** Additive (6.9), invoice lines only: id of the paid line this free line belongs to. */
   free_of?: string;
+  /**
+   * Additive (WP-8), invoice lines only: the line is typed in an alternate unit of its stock item
+   * (`unit` = 'BOX'); one line unit is this many base units (snapshot, absent = 1). Stock moves
+   * quantity × unit_factor; the rate stays per line unit (`src/lib/units.ts`).
+   */
+  unit_factor?: number;
 }
 
 /** A quantity slab on a catalogue item (6.9). */

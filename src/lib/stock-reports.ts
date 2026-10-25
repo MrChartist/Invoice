@@ -5,12 +5,14 @@
  *  - Movement Analysis: inward / outward quantity and value per party;
  *  - Stock Ageing: closing stock by receipt-date bucket (FIFO layers), and by batch;
  *  - Negative stock exceptions: when an item went below zero, how far, and what caused it.
+ *  - Group-wise stock summary (WP-8): the stock-group tree with opening / inward / outward / closing.
  * Pure (no browser APIs).
  */
 
 import { num, round2 } from './invoice-calc';
-import type { LedgerRow, MoveKind, StockPosition } from './inventory';
+import { movementSummary, type LedgerRow, type MoveKind, type StockItem, type StockPosition } from './inventory';
 import type { TrackingMap } from './stock-tracking';
+import { treeRows, type StockGroup } from './stock-groups';
 
 const EPS = 1e-9;
 const roundQty = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
@@ -145,6 +147,19 @@ export function movementAnalysis(positions: readonly StockPosition[], from: stri
 export const AGE_BUCKETS = [30, 60, 90, 180] as const;
 export const AGE_LABELS = ['0–30 days', '31–60 days', '61–90 days', '91–180 days', 'Over 180 days'];
 
+/** User ageing slabs ("15, 45, 90"): ascending whole days above 0, at most 8; the default slabs when none parse. */
+export function parseAgeSlabs(text: string): number[] {
+  const list = [...new Set(String(text ?? '').split(/[\s,;]+/).map((x) => Math.round(Number(x))).filter((n) => Number.isFinite(n) && n > 0))]
+    .sort((a, b) => a - b)
+    .slice(0, 8);
+  return list.length ? list : [...AGE_BUCKETS];
+}
+
+/** Bounds of each bucket for labels: [{from: 0, to: 30}, …, {from: 181, to: null}]. */
+export function ageBucketBounds(buckets: readonly number[]): { from: number; to: number | null }[] {
+  return [...buckets.map((b, i) => ({ from: i === 0 ? 0 : buckets[i - 1] + 1, to: b })), { from: (buckets[buckets.length - 1] ?? 0) + 1, to: null }];
+}
+
 function dayNo(day: string): number {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
   return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000 : NaN;
@@ -264,4 +279,82 @@ export function negativeStockReport(positions: readonly StockPosition[]): Negati
     if (row) rows.push({ ...row, lowest: roundQty(row.lowest), current: roundQty(num(p.qty)) });
   }
   return rows.sort((a, b) => a.lowest - b.lowest);
+}
+
+/* ── Group-wise stock summary (WP-8) ──────────────────────────── */
+
+export interface GroupSummaryRow {
+  /** Group id, or the item id for an item row ('' = the "no group" heading). */
+  id: string;
+  kind: 'group' | 'item';
+  name: string;
+  depth: number;
+  item?: StockItem;
+  /** Quantities add up only when every item below shares one unit (`unit`); null otherwise. */
+  unit: string | null;
+  openingQty: number | null;
+  inQty: number | null;
+  outQty: number | null;
+  closingQty: number | null;
+  openingValue: number;
+  inValue: number;
+  outValue: number;
+  closingValue: number;
+}
+
+type Move = ReturnType<typeof movementSummary>[number];
+
+/**
+ * Tally's group-wise Stock Summary for [from, to]: each group (depth-first) totals every item in it and
+ * in its sub-groups, followed by its own items; items without a group (or with a deleted one) come last
+ * under a "no group" heading (id ''). Values agree with `movementSummary` to the rupee.
+ */
+export function groupWiseSummary(positions: readonly StockPosition[], groups: readonly StockGroup[], from: string, to: string): GroupSummaryRow[] {
+  const moves = movementSummary([...positions], from, to);
+  const known = new Set(groups.map((g) => g.id));
+  const parent = new Map(groups.map((g) => [g.id, g.parent_id && known.has(g.parent_id) ? g.parent_id : '']));
+  const itemRow = (m: Move, depth: number): GroupSummaryRow => ({
+    id: m.item.id, kind: 'item', name: m.item.name, depth, item: m.item, unit: m.item.unit,
+    openingQty: m.openingQty, inQty: m.inQty, outQty: m.outQty, closingQty: m.closingQty,
+    openingValue: m.openingValue, inValue: m.inValue, outValue: m.outValue, closingValue: m.closingValue,
+  });
+  const total = (id: string, name: string, depth: number, list: Move[]): GroupSummaryRow => {
+    const same = new Set(list.map((m) => (m.item.unit || '').toUpperCase())).size === 1;
+    const sumQ = (k: 'openingQty' | 'inQty' | 'outQty' | 'closingQty') => (same ? roundQty(list.reduce((s, m) => s + m[k], 0)) : null);
+    const sumV = (k: 'openingValue' | 'inValue' | 'outValue' | 'closingValue') => round2(list.reduce((s, m) => s + m[k], 0));
+    return {
+      id, kind: 'group', name, depth, unit: same ? list[0].item.unit : null,
+      openingQty: sumQ('openingQty'), inQty: sumQ('inQty'), outQty: sumQ('outQty'), closingQty: sumQ('closingQty'),
+      openingValue: sumV('openingValue'), inValue: sumV('inValue'), outValue: sumV('outValue'), closingValue: sumV('closingValue'),
+    };
+  };
+  // Every ancestor of an item's group collects it.
+  const under = new Map<string, Move[]>();
+  const own = new Map<string, Move[]>();
+  const loose: Move[] = [];
+  for (const m of moves) {
+    const g = m.item.group_id && known.has(m.item.group_id) ? m.item.group_id : '';
+    if (!g) {
+      loose.push(m);
+      continue;
+    }
+    own.set(g, [...(own.get(g) ?? []), m]);
+    const seen = new Set<string>();
+    for (let at: string = g; at && !seen.has(at); at = parent.get(at) ?? '') {
+      seen.add(at);
+      under.set(at, [...(under.get(at) ?? []), m]);
+    }
+  }
+  const rows: GroupSummaryRow[] = [];
+  for (const r of treeRows(groups)) {
+    const list = under.get(r.node.id);
+    if (!list?.length) continue;
+    rows.push(total(r.node.id, r.node.name, r.depth, list));
+    for (const m of [...(own.get(r.node.id) ?? [])].sort((a, b) => a.item.name.localeCompare(b.item.name))) rows.push(itemRow(m, r.depth + 1));
+  }
+  if (loose.length) {
+    rows.push(total('', '', 0, loose));
+    for (const m of loose.sort((a, b) => a.item.name.localeCompare(b.item.name))) rows.push(itemRow(m, 1));
+  }
+  return rows;
 }

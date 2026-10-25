@@ -3,19 +3,22 @@
  *
  * Per stock item: `reorder_level` (company-wide), optional `reorder_by_godown` and `min_order_qty`.
  *   shortfall = max(0, reorder level − closing)
- *   pending   = quantity still to receive on open / partly received purchase orders
+ *   pending   = quantity still to receive on open / partly received purchase orders (WP-8: less goods
+ *               already received on receipt notes (GRN) that are not billed yet, in base units)
  *   suggested = shortfall − pending, raised to the minimum order quantity (0 when nothing is needed)
  * Pending POs are company-wide, so per-godown rows show them but do not subtract them twice.
  *
  * Pure except for `loadReorderStatus`; the bell provider lives in stock-alerts.ts (lazy).
  */
 
-import type { PurchaseOrder, PurchaseOrderLine, PurchaseRecord } from '../types/purchases';
+import type { PurchaseOrder, PurchaseOrderLine, PurchaseRecord, ReceiptNote } from '../types/purchases';
 import { MAIN_GODOWN_ID } from '../types/stock';
 import type { AppNotification } from './notifications';
 import { num, round2 } from './invoice-calc';
 import { buildItemIndex, loadPositions, type StockItem, type StockPosition } from './inventory';
 import { poFulfilment } from './purchase-orders';
+import { purchaseOrderOutstanding } from './receipt-notes';
+import { lineFactor } from './units';
 import { loadTracking, type TrackingMap } from './stock-tracking';
 import { getTable } from './storage';
 
@@ -39,17 +42,36 @@ export interface ReorderRow {
   vendor?: string;
 }
 
-/** Quantity still to receive per stock item id on open / partly received purchase orders. */
-export function pendingPoQty(orders: readonly PurchaseOrder[], purchases: readonly PurchaseRecord[], items: readonly StockItem[]): Map<string, number> {
-  const index = buildItemIndex(items.filter((i) => i.track_stock));
+/**
+ * Quantity still to receive per stock item id (base units) on open / partly received purchase orders.
+ * With `receiptNotes` (WP-8) goods accepted on a GRN count as received before the bill arrives, using
+ * the same rule as the Purchase Order Outstanding report.
+ */
+export function pendingPoQty(
+  orders: readonly PurchaseOrder[], purchases: readonly PurchaseRecord[], items: readonly StockItem[], receiptNotes?: readonly ReceiptNote[],
+): Map<string, number> {
+  const tracked = items.filter((i) => i.track_stock);
+  const index = buildItemIndex(tracked);
+  const byId = new Map(tracked.map((i) => [i.id, i]));
+  const itemOf = (l: PurchaseOrderLine) => (l.item_id ? byId.get(l.item_id) : undefined) ?? index.find(l.name, l.hsn);
   const out = new Map<string, number>();
+  if (receiptNotes) {
+    const lines = new Map(orders.flatMap((po) => (po?.lines ?? []).map((l) => [l.id, l] as const)));
+    for (const r of purchaseOrderOutstanding(orders, purchases, receiptNotes, '9999-12-31')) {
+      const l = lines.get(r.lineId);
+      const it = l && itemOf(l);
+      if (!it || r.pending <= EPS) continue;
+      out.set(it.id, roundQty((out.get(it.id) ?? 0) + r.pending * lineFactor(l)));
+    }
+    return out;
+  }
   for (const po of orders) {
     const f = poFulfilment(po, purchases);
     if (f.state === 'Closed' || f.state === 'Received') continue;
     for (const l of f.lines) {
-      const it = index.find(l.line.name, l.line.hsn);
+      const it = itemOf(l.line);
       if (!it || l.pending <= EPS) continue;
-      out.set(it.id, roundQty((out.get(it.id) ?? 0) + l.pending));
+      out.set(it.id, roundQty((out.get(it.id) ?? 0) + l.pending * lineFactor(l.line)));
     }
   }
   return out;
@@ -111,7 +133,7 @@ export function poLinesFromReorder(rows: readonly ReorderRow[], newId: () => str
     if (prev) prev.quantity = roundQty(prev.quantity + r.suggested);
     else {
       byItem.set(r.item.id, {
-        id: newId(), name: r.item.name, ...(r.item.hsn ? { hsn: r.item.hsn } : {}), unit: r.item.unit,
+        id: newId(), name: r.item.name, ...(r.item.hsn ? { hsn: r.item.hsn } : {}), unit: r.item.unit, item_id: r.item.id,
         quantity: r.suggested, rate: r.rate, tax_rate: num(r.item.tax_rate),
       });
     }
@@ -139,7 +161,7 @@ export function reorderNotices(rows: readonly ReorderRow[], at: string): AppNoti
 export function loadReorderStatus(): ReorderRow[] {
   const positions = loadPositions();
   const items = positions.map((p) => p.item);
-  const pending = pendingPoQty(getTable<PurchaseOrder>('purchase_orders'), getTable<PurchaseRecord>('purchases'), items);
+  const pending = pendingPoQty(getTable<PurchaseOrder>('purchase_orders'), getTable<PurchaseRecord>('purchases'), items, getTable<ReceiptNote>('receipt_notes'));
   const needsGodowns = items.some((i) => i.reorder_by_godown && Object.keys(i.reorder_by_godown).length);
   return reorderStatus(positions, pending, needsGodowns ? loadTracking() : undefined);
 }
