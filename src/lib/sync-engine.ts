@@ -289,6 +289,7 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}job_work_in`]: 'date',
   [`${DB_PREFIX}job_work_principal`]: 'date',
   [`${DB_PREFIX}rejections_in`]: 'date',
+  [`${DB_PREFIX}production_plans`]: 'date',
   [`${DB_PREFIX}advances`]: 'date',
   [`${DB_PREFIX}fixed_assets`]: 'acquired_on',
   [`${DB_PREFIX}purchase_returns`]: 'date',
@@ -850,6 +851,7 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}job_work_in`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}job_work_principal`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}rejections_in`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}production_plans`]: { num: 'number', date: 'date' },
   // M5: every other numbered series (DN / GRN / RJO / PIS / PRL / PYP / PO).
   [`${DB_PREFIX}purchase_returns`]: { num: 'note_number', date: 'date' },
   [`${DB_PREFIX}receipt_notes`]: { num: 'number', date: 'date' },

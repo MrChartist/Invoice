@@ -132,7 +132,9 @@ test('Material Out validation: job worker godown, own source godown, batches, se
   assert.match(validateMaterialOut(out({ lines: [{ id: 'x', item_id: 'rod', qty: 0 }] }), ITEMS, GODOWNS), /above zero/);
   assert.match(validateMaterialOut(out({ lines: [] }), ITEMS, GODOWNS), /at least one/);
   const serial = [...ITEMS, item('phone', 'Phone', { track_serials: true })];
-  assert.match(validateMaterialOut(out({ lines: [{ id: 'x', item_id: 'phone', qty: 1 }] }), serial, GODOWNS), /serials/);
+  // 7S: serial-tracked items go by serial — one per unit.
+  assert.match(validateMaterialOut(out({ lines: [{ id: 'x', item_id: 'phone', qty: 1 }] }), serial, GODOWNS), /serial number/);
+  assert.equal(validateMaterialOut(out({ lines: [{ id: 'x', item_id: 'phone', qty: 1, serials: ['IMEI1'] }] }), serial, GODOWNS), '');
   assert.equal(findJobWorkerGodown(GODOWNS, { vendor_id: 'v1', name: 'Other' })?.id, 'jw1');
   assert.equal(findJobWorkerGodown(GODOWNS, { name: 'acme' })?.id, 'jw1');
   assert.equal(findJobWorkerGodown(GODOWNS, { name: 'Nobody' }), undefined);

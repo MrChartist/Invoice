@@ -27,6 +27,11 @@ export const EWAY_THRESHOLD = 50000;
 
 export type EwayTransMode = 'ROAD' | 'RAIL' | 'AIR' | 'SHIP';
 const TRANS_MODE_CODE: Record<EwayTransMode, number> = { ROAD: 1, RAIL: 2, AIR: 3, SHIP: 4 };
+/** 7S: portal sub-supply types for job work — outward to a job worker (4) and goods returned after job work (6). */
+export const EWAY_SUB_JOB_WORK = 4;
+export const EWAY_SUB_JOB_WORK_RETURN = 6;
+/** 7S: portal code of a transport mode (job-work challan builder in eway-job-work.ts). */
+export const ewayTransModeCode = (mode: EwayTransMode): number => TRANS_MODE_CODE[mode];
 
 /** Registration-plate formats the portal accepts: standard state series and BH series. */
 export const VEHICLE_REGEX = /^(?:[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}|[0-9]{2}BH[0-9]{4}[A-Z]{1,2})$/;

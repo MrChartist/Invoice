@@ -43,7 +43,7 @@ function ensureExpiryAlerts(onReady: () => void): void {
     // Batch expiry (6.6) and reorder-level (Phase 7) alerts share one lazily loaded provider.
     const wants = (i: (typeof items)[number]) =>
       i.track_batches || Number(i.reorder_level) > 0 || Object.values(i.reorder_by_godown ?? {}).some((v) => Number(v) > 0);
-    if (!items.some((i) => i.track_stock && wants(i))) return;
+    if (!items.some((i) => i.track_stock && wants(i)) && !getTable('job_work_out').length) return; // 7S: job-work clocks
   } catch {
     return;
   }

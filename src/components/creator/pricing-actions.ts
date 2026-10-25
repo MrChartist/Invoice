@@ -14,6 +14,7 @@ import {
   type PriceLevel, type PricingData,
 } from '../../lib/pricing';
 import type { InvoiceItem } from '../../types/invoice';
+import { PRICE_LIST_BASIS, priceListRate } from '../../lib/price-list';
 
 /** Notes don't take part: a credit / debit note re-states an earlier price. */
 const pricedDoc = () => {
@@ -35,18 +36,32 @@ export function editorPricing(): EditorPricing | null {
   return { data, level };
 }
 
-/** Re-price one line from its catalogue row (level + slab) and keep scheme free lines in step. */
-function reprice(lineId: string, ctx: EditorPricing, force = false): void {
+/** 7S (7.66): the stock item's selling price-list rate on the document date, for a line (one table read). */
+function listRateFor(line: Pick<InvoiceItem, 'name' | 'hsn'>): number | undefined {
+  if (!pricedDoc()) return undefined;
+  const items = getTable<StockItem>(TABLES.items);
+  if (!items.some((i) => i.selling_prices?.length)) return undefined;
+  return priceListRate(items, line.name, line.hsn, useInvoiceStore.getState().issue_date);
+}
+
+/**
+ * Re-price one line from its catalogue row (level + slab) and keep scheme free lines in step. 7S: a selling
+ * price list in force replaces the catalogue's base rate; a customer level's own rate still wins.
+ */
+function reprice(lineId: string, ctx: EditorPricing | null, force = false): void {
   const st = useInvoiceStore.getState();
   const line = st.items.find((i) => i.id === lineId);
   if (!line || line.free_of) return;
-  const cat = catalogItemFor(ctx.data.catalog, line.name);
-  if (!cat) return;
+  const cat = ctx ? catalogItemFor(ctx.data.catalog, line.name) : undefined;
+  const list = listRateFor(line);
+  if (!cat && list === undefined) return;
+  const base = list ?? num(cat?.rate);
   // A typed rate (no basis) is the user's choice: leave it, unless asked to re-price.
-  if (!force && !line.price_basis && num(line.rate) !== num(cat.rate)) return;
-  const quote = resolvePrice(cat, num(line.quantity), ctx.level);
-  if (quote.rate !== num(line.rate) || quote.basis !== line.price_basis) {
-    st.patchItem(lineId, { rate: quote.rate, price_basis: quote.basis });
+  if (!force && !line.price_basis && num(line.rate) !== base) return;
+  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs }, num(line.quantity), ctx?.level);
+  const basis = quote.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : quote.basis;
+  if (quote.rate !== num(line.rate) || basis !== line.price_basis) {
+    st.patchItem(lineId, { rate: quote.rate, price_basis: basis });
   }
 }
 
@@ -62,11 +77,7 @@ export function pickCatalogItem(lineId: string, source: Partial<InvoiceItem>): v
   const st = useInvoiceStore.getState();
   st.applyCatalogItem(lineId, source);
   const ctx = editorPricing();
-  if (!ctx) {
-    syncSchemes(null);
-    return;
-  }
-  reprice(lineId, ctx, true);
+  reprice(lineId, ctx, true); // 7S: also applies a selling price list without levels / slabs
   syncSchemes(ctx);
 }
 
@@ -126,7 +137,7 @@ export function addScannedCode(code: string): { ok: boolean; message: string } {
     st.patch({ items: r.items });
     st.applyCatalogItem(r.lineId, match.item); // same fields (and item custom fields) as a catalogue pick
     const ctx = editorPricing();
-    if (ctx) reprice(r.lineId, ctx, true);
+    reprice(r.lineId, ctx, true);
     syncSchemes(ctx);
   }
   const line = useInvoiceStore.getState().items.find((i) => i.id === r.lineId);

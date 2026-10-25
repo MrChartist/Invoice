@@ -23,11 +23,13 @@ import styles from '../components/manufacturing/manufacturing.module.css';
 
 // Phase 7M: job work / ITC-04 and Rejections In load on demand (own chunk).
 const JobWorkTab = lazy(() => import('../components/job-work/JobWorkTab').then((m) => ({ default: m.JobWorkTab })));
+// 7S: production plan / material requirement (own chunk).
+const MrpTab = lazy(() => import('../components/manufacturing/MrpTab').then((m) => ({ default: m.MrpTab })));
 const RejectionsInTab = lazy(() => import('../components/job-work/RejectionsInTab').then((m) => ({ default: m.RejectionsInTab })));
 
-type Tab = 'boms' | 'mfg' | 'journal' | 'physical' | 'jobwork' | 'rejections' | 'reorder' | 'reports';
-const TABS: Tab[] = ['boms', 'mfg', 'journal', 'physical', 'jobwork', 'rejections', 'reorder', 'reports'];
-const LABEL = { boms: 'tabBoms', mfg: 'tabMfg', journal: 'tabSj', physical: 'tabPhysical', jobwork: 'tabJobWork', rejections: 'tabRejections', reorder: 'tabReorder', reports: 'tabReports' } as const;
+type Tab = 'boms' | 'mfg' | 'journal' | 'physical' | 'jobwork' | 'rejections' | 'plan' | 'reorder' | 'reports';
+const TABS: Tab[] = ['boms', 'mfg', 'journal', 'physical', 'jobwork', 'rejections', 'plan', 'reorder', 'reports'];
+const LABEL = { boms: 'tabBoms', mfg: 'tabMfg', journal: 'tabSj', physical: 'tabPhysical', jobwork: 'tabJobWork', rejections: 'tabRejections', plan: 'tabPlan', reorder: 'tabReorder', reports: 'tabReports' } as const;
 
 /** /manufacturing — Tally-style manufacturing and stock vouchers (Phase 7). */
 export function Manufacturing() {
@@ -83,9 +85,9 @@ export function Manufacturing() {
               {tab === 'physical' && <PhysicalStockTab ctx={ctx} />}
               {tab === 'reorder' && <ReorderTab ctx={ctx} />}
               {tab === 'reports' && <StockReportsTab ctx={ctx} />}
-              {(tab === 'jobwork' || tab === 'rejections') && (
+              {(tab === 'jobwork' || tab === 'rejections' || tab === 'plan') && (
                 <Suspense fallback={<p className={styles.muted}>{mfgT('loading')}</p>}>
-                  {tab === 'jobwork' ? <JobWorkTab ctx={ctx} /> : <RejectionsInTab ctx={ctx} />}
+                  {tab === 'jobwork' ? <JobWorkTab ctx={ctx} /> : tab === 'plan' ? <MrpTab ctx={ctx} /> : <RejectionsInTab ctx={ctx} />}
                 </Suspense>
               )}
             </>

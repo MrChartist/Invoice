@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Plus, Printer, Truck, Trash2 } from 'lucide-react';
+import { FileJson, Pencil, Plus, Printer, Truck, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { cn, formatDate, todayInput } from '../../lib/utils';
@@ -17,6 +17,10 @@ import { jwT } from '../../i18n/areas/job-work';
 import { PartyField } from './shared';
 import { JwLinesGrid } from './JwLinesGrid';
 import { blankJwLine, cleanJw, qtyText, type JwData, type JwGridLine, type PartyValue } from './lines';
+import { JobWorkEwayDialog } from './JobWorkEwayDialog';
+import { collectEvents } from '../../lib/inventory';
+import { serialsAvailable } from '../../lib/serial-vouchers';
+import { s7T } from '../../i18n/areas/inventory-7s';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
@@ -26,6 +30,7 @@ export function MaterialOutPanel({ data }: { data: JwData }) {
   const { ctx } = data;
   const [editing, setEditing] = useState<MaterialOut | 'new' | null>(null);
   const [deleting, setDeleting] = useState<MaterialOut | null>(null);
+  const [eway, setEway] = useState<MaterialOut | null>(null);
   const rows = [...data.outs].sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number, undefined, { numeric: true }));
   const byId = new Map(ctx.items.map((i) => [i.id, i]));
   const pendingByOut = useMemo(() => {
@@ -68,6 +73,7 @@ export function MaterialOutPanel({ data }: { data: JwData }) {
                 <td className={styles.num}>{qtyText(pendingByOut.get(o.id) ?? 0)}</td>
                 <td className={surface.rowActions}>
                   <button type="button" className={controls.btnIcon} aria-label={`${jwT('printChallan')} ${o.number}`} title={jwT('printChallan')} onClick={() => print(o)}><Printer size={15} /></button>
+                  <button type="button" className={controls.btnIcon} aria-label={`${s7T('ewayJson')} ${o.number}`} title={s7T('ewayJson')} onClick={() => setEway(o)} data-testid={`jw-eway-${o.id}`}><FileJson size={15} /></button>
                   {ctx.canBooks && (
                     <>
                       <button type="button" className={controls.btnIcon} aria-label={`${jwT('edit')} ${o.number}`} onClick={() => setEditing(o)}><Pencil size={15} /></button>
@@ -82,6 +88,7 @@ export function MaterialOutPanel({ data }: { data: JwData }) {
         </table>
       </div>
       {editing && <OutModal data={data} doc={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onPrint={print} />}
+      {eway && <JobWorkEwayDialog challan={eway} items={ctx.items} units={data.units} onClose={() => setEway(null)} />}
       <ConfirmDialog
         open={!!deleting} destructive title={jwT('delete')} message={jwT('confirmDelete', { number: deleting?.number ?? '' })} confirmLabel={jwT('delete')}
         onClose={() => setDeleting(null)}
@@ -107,10 +114,24 @@ function OutModal({ data, doc, onClose, onPrint }: { data: JwData; doc: Material
   const [process, setProcess] = useState(doc?.process ?? '');
   const [lines, setLines] = useState<JwGridLine[]>(() => doc?.lines.map((l) => ({ ...l })) ?? [blankJwLine()]);
   const [eway, setEway] = useState(doc?.eway_bill_no ?? '');
+  // 7S: transport details for the e-Way bill JSON.
+  const [vehicle, setVehicle] = useState(doc?.vehicle_no ?? '');
+  const [transporterId, setTransporterId] = useState(doc?.transporter_id ?? '');
+  const [transporterName, setTransporterName] = useState(doc?.transporter_name ?? '');
+  const [distance, setDistance] = useState(doc?.distance_km ? String(doc.distance_km) : '');
   const [extended, setExtended] = useState(doc?.extended_until ?? '');
   const [narration, setNarration] = useState(doc?.narration ?? '');
   const [error, setError] = useState('');
-  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock && !i.track_serials).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
+  // 7S: serial-tracked items go to the job worker by serial.
+  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
+  const serialPool = useMemo(() => {
+    let events: ReturnType<typeof collectEvents> | null = null;
+    return (id: string, line: JwGridLine) => {
+      const docs = ctx.inputs.jobWorkDocs;
+      events ??= collectEvents({ ...ctx.inputs, includeTransfers: true, jobWorkDocs: docs ? { ...docs, outs: docs.outs.filter((x) => x.id !== doc?.id) } : docs });
+      return serialsAvailable(id, date, line.godown_id || MAIN_GODOWN_ID, events);
+    };
+  }, [ctx.inputs, doc, date]);
   const orders = data.orders.filter((o) => o.direction === 'out' && !o.closed);
   const existingGodown = doc ? ctx.godowns.find((g) => g.id === doc.job_worker_godown) : party.party_name.trim() ? findJobWorkerGodown(ctx.godowns, { vendor_id: party.vendor_id, name: party.party_name }) : undefined;
 
@@ -123,7 +144,7 @@ function OutModal({ data, doc, onClose, onPrint }: { data: JwData; doc: Material
     const others = { ...ctx.inputs, jobWorkDocs: ctx.inputs.jobWorkDocs ? { ...ctx.inputs.jobWorkDocs, outs: ctx.inputs.jobWorkDocs.outs.filter((o) => o.id !== doc?.id) } : undefined };
     for (const [from, ls] of groups) {
       try {
-        out.push(...transferIssues({ id: '__jw__', date, from_godown: from, to_godown: existingGodown?.id ?? '__new_jw__', lines: ls.map((l) => ({ id: l.id, item_id: l.item_id, qty: l.qty, unit_factor: l.unit_factor, ...(l.batch_no ? { batch_no: l.batch_no } : {}) })) }, others));
+        out.push(...transferIssues({ id: '__jw__', date, from_godown: from, to_godown: existingGodown?.id ?? '__new_jw__', lines: ls.map((l) => ({ id: l.id, item_id: l.item_id, qty: l.qty, unit_factor: l.unit_factor, ...(l.batch_no ? { batch_no: l.batch_no } : {}), ...(l.serials?.length ? { serials: l.serials } : {}) })) }, others));
       } catch {
         /* availability is advisory */
       }
@@ -148,7 +169,10 @@ function OutModal({ data, doc, onClose, onPrint }: { data: JwData; doc: Material
       const saved = materialOutDb.save({
         id: doc?.id, number: doc?.number, date, ...party, party_name: party.party_name, job_worker_godown: g.id,
         order_id: orderId || undefined, process: process.trim() || undefined, lines: cleanJw(lines),
-        eway_bill_no: eway.trim() || undefined, extended_until: extended || undefined, narration: narration.trim() || undefined,
+        eway_bill_no: eway.trim() || undefined,
+        vehicle_no: vehicle.trim().toUpperCase() || undefined, transporter_id: transporterId.trim().toUpperCase() || undefined,
+        transporter_name: transporterName.trim() || undefined, distance_km: num(distance) > 0 ? Math.round(num(distance)) : undefined,
+        extended_until: extended || undefined, narration: narration.trim() || undefined,
       }, ctx.items, godownsDb.list());
       onClose();
       ctx.changed(jwT('saved', { number: saved.number }));
@@ -201,7 +225,7 @@ function OutModal({ data, doc, onClose, onPrint }: { data: JwData; doc: Material
         </div>
         <p className={styles.muted}>{jwT('jwGodown')}: <strong>{existingGodown?.name ?? (party.party_name.trim() ? `${party.party_name.trim()} (job worker)` : '—')}</strong></p>
         <p className={styles.section}>{jwT('sendLabel')}</p>
-        <JwLinesGrid lines={lines} items={tracked} onChange={setLines} opts={{ label: jwT('sendLabel'), godowns: data.ownGodowns, batch: tracked.some((i) => i.track_batches), value: true, units: data.units }} />
+        <JwLinesGrid lines={lines} items={tracked} onChange={setLines} opts={{ label: jwT('sendLabel'), godowns: data.ownGodowns, batch: tracked.some((i) => i.track_batches), value: true, units: data.units, serials: 'out', serialPool }} />
         {warnings.length > 0 && <div className={styles.notice} role="status"><ul>{warnings.map((w) => <li key={w}>{w}</li>)}</ul></div>}
         <div className={controls.row3}>
           <div className={controls.field}>
@@ -216,6 +240,24 @@ function OutModal({ data, doc, onClose, onPrint }: { data: JwData; doc: Material
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwc-narr">{jwT('narration')}</label>
             <input id="jwc-narr" className={controls.input} value={narration} onChange={(e) => setNarration(e.target.value)} />
+          </div>
+        </div>
+        <div className={controls.row3}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="jwc-veh">{s7T('vehicleNo')}</label>
+            <input id="jwc-veh" className={controls.input} value={vehicle} onChange={(e) => setVehicle(e.target.value)} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="jwc-tid">{s7T('transporterId')}</label>
+            <input id="jwc-tid" className={controls.input} value={transporterId} onChange={(e) => setTransporterId(e.target.value)} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="jwc-tname">{s7T('transporterName')}</label>
+            <input id="jwc-tname" className={controls.input} value={transporterName} onChange={(e) => setTransporterName(e.target.value)} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="jwc-km">{s7T('distanceKm')}</label>
+            <input id="jwc-km" className={cn(controls.input, controls.inputNumeric)} inputMode="numeric" value={distance} onChange={(e) => setDistance(e.target.value)} />
           </div>
         </div>
         {error && <p className={cn(styles.notice, styles.danger)} role="alert">{error}</p>}

@@ -443,6 +443,23 @@ test('reorder status (Phase 7) reads received PO quantity from the real purchase
   assert.equal(pendingPoQty([po], [received], items).get('s'), 15);
 });
 
+test('7S readers: MRP nets the quantity still due on POs from the real bill shape; branch stock reads bill lines through the engine', async () => {
+  const { pendingPoQty } = await import('../src/lib/reorder.ts');
+  const { runMrp } = await import('../src/lib/mrp.ts');
+  const { godownSetValuer } = await import('../src/lib/ledger/branch-stock.ts');
+  const { computeStock } = await import('../src/lib/inventory.ts');
+  const items = [{ id: 's', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  const po = { id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-01', vendor_name: 'Acme Supplies', lines: [{ id: 'pl', name: 'Paper ream', hsn: '4802', quantity: 25, rate: 100, tax_rate: 18 }], taxable: 2500, cgst: 0, sgst: 0, igst: 0, total: 2500 };
+  const received: PurchaseRecord = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], po_line_id: 'pl', godown_id: 'g2' }] };
+  const onOrder = pendingPoQty([po], [received], items, []);
+  const inputs = { items, moves: [], invoices: [], purchases: [received] };
+  const stock = new Map(computeStock(inputs).map((p) => [p.item.id, p.qty]));
+  const [row] = runMrp({ plan: [{ item_id: 's', qty: 40 }], items, boms: [], stock, onOrder });
+  assert.deepEqual([row.stock, row.onOrder, row.net, row.action], [10, 15, 15, 'buy']);
+  const valuer = godownSetValuer(computeStock(inputs), collectEvents({ ...inputs, includeTransfers: true }), new Set(['g2']), 'x');
+  assert.equal(valuer.value('2026-04-30'), 100000, '10 reams × ₹100 in the bill line godown');
+});
+
 test('WP-6 readers: cess on bills, purchase HSN register and the monthly 1-vs-3B-vs-books reconciliation', async () => {
   const { purchaseHsnRegister } = await import('../src/lib/hsn-purchase-register.ts');
   const { reconMonthly } = await import('../src/lib/gst-recon-monthly.ts');

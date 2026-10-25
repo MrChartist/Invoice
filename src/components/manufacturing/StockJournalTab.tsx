@@ -14,6 +14,8 @@ import { MAIN_GODOWN_ID } from '../../types/stock';
 import type { AdditionalCost, StockJournal } from '../../types/manufacturing';
 import { mfgT } from '../../i18n/areas/manufacturing';
 import { LinesGrid } from './LinesGrid';
+import { collectEvents } from '../../lib/inventory';
+import { serialsAvailable } from '../../lib/serial-vouchers';
 import { blankLine, type GridLine } from './context';
 import { CostsGrid } from './CostsGrid';
 import { CostSummary, VoucherList } from './shared';
@@ -83,7 +85,8 @@ export function StockJournalTab({ ctx }: { ctx: MfgContext }) {
 const clean = (ls: GridLine[]) => ls.filter((l) => l.item_id).map((l) => ({ ...l, qty: num(l.qty) }));
 
 function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJournal | null; onClose: () => void }) {
-  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock && !i.track_serials).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
+  // 7S: serial-tracked items move by serial.
+  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
   const multi = ctx.godowns.length > 1;
   const [mode, setMode] = useState<'conversion' | 'transfer'>('conversion');
   const [date, setDate] = useState(journal?.date ?? todayInput());
@@ -96,6 +99,13 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
   const [error, setError] = useState('');
   const anyBatch = tracked.some((i) => i.track_batches);
   const units = useMemo(() => unitsDb.stored(), []);
+  const serialPool = useMemo(() => {
+    let events: ReturnType<typeof collectEvents> | null = null;
+    return (id: string, gd: string | undefined) => {
+      events ??= collectEvents({ ...ctx.inputs, includeTransfers: true, vouchers: (ctx.inputs.vouchers ?? []).filter((v) => v.id !== journal?.id) });
+      return serialsAvailable(id, date, gd || (mode === 'transfer' ? from : MAIN_GODOWN_ID), events);
+    };
+  }, [ctx.inputs, journal, date, mode, from]);
 
   const draft = useMemo((): StockJournal => ({
     id: journal?.id ?? '__draft__', number: journal?.number ?? '', date, consume: clean(consume), produce: clean(produce),
@@ -114,7 +124,7 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
   const submit = () => {
     try {
       if (mode === 'transfer') {
-        const lines = clean(consume).map((l) => ({ id: l.id, item_id: l.item_id, qty: l.qty, ...(l.batch_no ? { batch_no: l.batch_no } : {}), ...(l.unit_factor ? { unit: l.unit, unit_factor: l.unit_factor } : {}) }));
+        const lines = clean(consume).map((l) => ({ id: l.id, item_id: l.item_id, qty: l.qty, ...(l.batch_no ? { batch_no: l.batch_no } : {}), ...(l.unit_factor ? { unit: l.unit, unit_factor: l.unit_factor } : {}), ...(l.serials?.length ? { serials: l.serials } : {}) }));
         const tr = { id: '', date, from_godown: from, to_godown: to, lines };
         const err = validateTransferShape(tr) || transferIssues(tr, ctx.inputs)[0] || '';
         if (err) return setError(err);
@@ -177,15 +187,15 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
           multi ? (
             <>
               <p className={styles.muted}>{mfgT('transferHint')}</p>
-              <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('transfer'), batch: anyBatch, units }} />
+              <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('transfer'), batch: anyBatch, units, serials: 'out', serialPool }} />
             </>
           ) : <p className={styles.notice}>{mfgT('needGodowns')}</p>
         ) : (
           <>
             <p className={styles.section}>{mfgT('source')}</p>
-            <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('source'), godowns: ctx.godowns, batch: anyBatch, units }} />
+            <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('source'), godowns: ctx.godowns, batch: anyBatch, units, serials: 'out', serialPool }} />
             <p className={styles.section}>{mfgT('destination')}</p>
-            <LinesGrid lines={produce} items={tracked} onChange={setProduce} opts={{ label: mfgT('destination'), godowns: ctx.godowns, batch: anyBatch, valuation: true, units }} />
+            <LinesGrid lines={produce} items={tracked} onChange={setProduce} opts={{ label: mfgT('destination'), godowns: ctx.godowns, batch: anyBatch, valuation: true, units, serials: 'in' }} />
             <p className={styles.section}>{mfgT('additionalCosts')}</p>
             <CostsGrid costs={costs} onChange={setCosts} />
             {preview && <CostSummary s={preview} />}

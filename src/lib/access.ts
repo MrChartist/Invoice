@@ -303,6 +303,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   job_work_in: 'books.edit',
   job_work_principal: 'books.edit',
   rejections_in: 'books.edit',
+  // 7S: production plans (MRP)
+  production_plans: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
 };

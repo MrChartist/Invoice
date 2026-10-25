@@ -274,7 +274,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.34 | **Reorder levels + MOQ** (per godown optional), Reorder Status with pending POs and "Create purchase order", bell alert | Reorder Status | ✅ |
 | 7.35 | **Inventory reports**: Stock Summary drill-down (item → month → vouchers), Movement Analysis by party, Stock Ageing (FIFO layers, by batch), Negative stock exceptions (`src/lib/stock-reports.ts`) | Stock Summary, Movement Analysis, Ageing | ✅ |
 | 7.36 | Job work out / in orders, material sent / received, ITC-04 | Job Work vouchers | ✅ see 7M |
-| 7.37 | Serial-tracked items in manufacturing; production plan / material requirement vs BOM | — | Next step |
+| 7.37 | ✅ Serial-tracked items in manufacturing; production plan / material requirement vs BOM — done in 7S (7.130, 7.131) | — | ✅ |
 
 ### 7G · Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
 
@@ -333,7 +333,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.63 | ✅ **Sales Order Outstanding** (pending delivery / invoice by party · item · due date, overdue days) on Inventory → Order outstanding; reorder "pending PO" counts goods received on GRNs before the bill | P1-12 | done |
 | 7.64 | ✅ Configurable **ageing slabs** with Hindi bucket labels (Stock reports → Ageing) | P1-11 | done |
 | 7.65 | ✅ **Godown hierarchy** (godown inside a godown, stock rolled up), **standard cost / selling price lists** with effective dates, **Stock Query** (stock by godown / batch, last purchase / sale rates, pending orders, prices), **landed cost** on a bill (freight etc. spread to the goods' stock cost, memo only); stock-item delete blocked while BOMs / stock vouchers use it | P2 | done |
-| 7.66 | ⏳ (UQC mapping into GSTR-1 HSN / e-Invoice / e-Way and alternate-unit item profit: done after the merge; alternate units on POS lines and stock journals: done in 7.72) price lists feeding the editor's rate; group-wise reorder / ageing filters | P1-10, P2 | open |
+| 7.66 | ✅ (UQC mapping into GSTR-1 HSN / e-Invoice / e-Way and alternate-unit item profit: done after the merge; alternate units on POS lines and stock journals: done in 7.72) price lists feeding the editor's rate, group-wise reorder / ageing / movement filters, Manufacturing Journal components and physical counts in alternate units — done in 7S (7.134, 7.135) | P1-10, P2 | done |
 
 ### 7M · Job work, ITC-04, Rejections In, alternate units on stock vouchers (`docs/features/job-work.md`)
 
@@ -342,7 +342,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.70 | ✅ **Job work out**: Job Work Out order (`JWO/FY…`), **Material Out** delivery challan under Rule 55 / Sec 143 (`JWC/FY…`, printable in triplicate), **job-worker godowns** (created on first challan, `job_worker` flag — still our stock in the summary), **Material In** (`JWR/FY…`: processed goods at inputs + job charges − scrap, scrap, returned inputs, losses, 5C supplies; consumption typed or exploded from the BOM), **Sec 143 return clocks** (inputs 1 year, capital goods 3 years, tools none, extension) with due-soon / **deemed supply** alerts; stock event source `events-job-work.ts` (one registration line in `collectEvents`) | P1-9 | done |
 | 7.71 | ✅ **Job work in** (we are the job worker): principal's material received / sent back register (`JWP/FY…`, not our stock), job charges invoice (SAC 9988 service line opened in the editor); **ITC-04 working paper** (Table 4, 5A / 5B / 5C; half-yearly above ₹5 crore / annual from FY 2021-22, quarterly before — `ITC04_RULES` date-keyed in `tax-rules.ts`; CSV; verify with your CA) | P1-9 | done |
 | 7.72 | ✅ **Rejections In** (`RJI/FY…`): customer rejects goods on a delivery challan before invoicing — stock back while challans move stock, challan balance reduced and billed balance on conversion; **alternate units** (`unit_factor`) on POS lines, stock journals, stock transfers and manual adjustments; typed quantities rounded to the units master's decimal places | P1-8, P1-10 | done |
-| 7.73 | ⏳ Job work follow-ups: serial-tracked items to job workers, e-Way bill JSON for job-work challans, clock alerts in the bell, principal's goods by godown / batch, GSTR-1 / ITC-04 JSON | P1-9 | open |
+| 7.73 | ✅ Job work follow-ups: serial-tracked items to job workers, e-Way bill JSON for job-work challans, clock alerts in the bell, principal's goods by godown / batch, ITC-04 JSON (layout unverified) — done in 7S (7.132, 7.133); job charges reach GSTR-1 through the normal invoice export | P1-9 | done |
 
 
 ### 7O · GST & TDS follow-ups (`docs/features/gst-setoff.md`, `docs/features/tds-payables.md`)
@@ -383,7 +383,20 @@ Details: `docs/features/manufacturing.md`.
 | 7.81 | ✅ **Inter-branch transfer between distinct GSTINs** (Sec 25(4)): a stock transfer between godowns of two branches with different GSTINs offers "Tax invoice + bill" — TAX_INVOICE from the sending registration + matching ITC bill at the receiving branch, posted to new default ledgers 4030 / 5020 "Branch transfer" so the pair nets out; value per Rule 28 flagged "verify with your CA" (`src/lib/branch-transfer.ts`, `components/branches/BranchTransferDialog.tsx`) | P1-19 | done |
 | 7.82 | ✅ **Gateway Display drill = Books**: a balance-sheet head drills into its Schedule III break-up (party advances that moved sides, the valued closing-stock line inside Inventories), party lines straight to the party's monthly summary (`src/lib/gateway/drill.ts`) | P0-4 | done |
 | 7.83 | ✅ Small gaps: loyalty redemption in the invoice editor (lazy, only while the programme is on); palette "POS return / exchange" opens the return dialog (`/pos?return=1`); bell GST set-off reminder for every regular filer even before the set-off screen is used (never for composition); Alt+C create-on-the-fly for stock items and godowns (stock-transfer pickers, bill / PO line item names); Edit log on the stock item form (`tests/wiring-7n.test.ts`) | — | done |
-| 7.84 | ⏳ Branch follow-ups: per-godown closing-stock valuation for branch statements, Alt+C in the manufacturing / stock-journal line grids and the bill godown select, automatic Sec 25(4) prompt when the transfer is saved, branch column on GSTR-1 / 3B papers per GSTIN | P1-19 | open |
+| 7.84 | ⏳ Branch follow-ups: per-godown closing-stock valuation for branch statements, Alt+C in the manufacturing / stock-journal line grids and the bill godown select, automatic Sec 25(4) prompt when the transfer is saved — done in 7S (7.136); open: branch column on GSTR-1 / 3B papers per GSTIN (statutory GST track) | P1-19 | stock part done |
+
+### 7S · Inventory, manufacturing, job work & branch stock follow-ups (`docs/features/manufacturing.md`, `docs/features/job-work.md`)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.130 | ✅ **Serial-tracked items on stock vouchers**: Manufacturing Journal components consumed by serial and finished units / by-products given new serials; Stock Journal source / destination by serial; one serial per unit (whole base units), dated in-stock / not-needed-later checks on save, delete refused once a later entry used a produced serial; serial column with "Fill from stock" in the line grids (`src/lib/serial-vouchers.ts`, two `serials` fields in `pushVoucherEvents`) | 7.37 | done |
+| 7.131 | ✅ **Production plan / MRP** (`PP/FY…`, table `production_plans`): multi-level default-BOM explosion netted once per item at its low-level code against closing stock and open POs / GRNs; make vs buy with MOQ and last purchase rate; "Create purchase order", "Manufacture" opens a filled Manufacturing Journal; period lock, roles, audit, backup, sync (`src/lib/mrp.ts`, `MrpTab.tsx`) | 7.37 | done |
+| 7.132 | ✅ **Job work by serial**: Material Out sends serials to the job worker's godown (still our stock), Material In returns / consumes / supplies / loses them there, processed goods under new serials; checks on save and delete (`jobWorkSerialIssues`) | 7.73, P1-9 | done |
+| 7.133 | ✅ **Job work follow-ups**: e-Way bill JSON for a Material Out challan (sub-type 4 Job Work, CHL, tax values nil, transport saved on the challan; verify with your CA — `eway-job-work.ts`), Sec 143 clock alerts in the bell (lazy, `job-work-alerts.ts`), principal's goods by godown / batch (`job-work-principal.ts`), ITC-04 JSON beside the CSV (**layout unverified**, `itc04-json.ts`) | 7.73, P1-9 | done |
+| 7.134 | ✅ **Selling price lists in the editor**: the item's selling price in force on the document date becomes the line rate on pick ("Price list"); a customer level's own rate still wins, % levels apply to it, slabs below it apply, typed rates and credit / debit notes untouched (`price-list.ts`, `pricing-actions.ts`) | 7.66, P2 | done |
+| 7.135 | ✅ **Group / category filters** on Reorder Status, Movement Analysis and Stock Ageing (incl. by batch); **alternate units** on Manufacturing Journal component lines (FEFO in base units) and Physical Stock counts (`counted_typed`, base units stored) | 7.66, P1-10 | done |
+| 7.136 | ✅ **Branch stock**: per-godown closing-stock valuation for branch statements in Books and Gateway (branch godowns × company-wide unit cost; "No branch" takes the rest so branches add up — `ledger/branch-stock.ts`); Alt+C on manufacturing / stock-journal line grids (items, godowns) and the bill godown select; the Sec 25(4) tax invoice + bill dialog opens automatically when a transfer between two GSTINs is saved | 7.84, P1-19 | done |
+| 7.137 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), price lists on POS, ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
 
 ## Summary timeline
 

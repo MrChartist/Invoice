@@ -336,6 +336,8 @@ const RECORD_TABLES = [
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   // Job work and Rejections In (Phase 7M)
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  // 7S: production plans (MRP)
+  'production_plans',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
   'gst_setoffs', 'gst_challans', 'hsn_master',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
@@ -363,6 +365,7 @@ const ID_TABLES = new Set([
   'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  'production_plans',
   'gst_setoffs', 'gst_challans', 'hsn_master',
   'rcm_documents',
   'year_end',

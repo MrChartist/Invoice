@@ -89,7 +89,8 @@ Gateway `buildFrame` (`FrameOptions.branchId`). `scopeLedger(ledger, { branchId 
   depreciation, payroll, challans, advances received and on-account supplier payments are company level ("No branch"),
   as is a row tagged with a deleted branch — so the branches plus "No branch" always add up to the company books, and each
   branch trial balance balances on its own (`tests/branch-books.test.ts`).
-- Report-time closing stock is company-wide and is left out of a branch view (the screens say so).
+- Report-time closing stock in a branch view is the stock lying in the branch's godowns (7S, `branch-stock.ts`); see
+  reports-engine.md.
 - UI: branch filter (`BranchFilter`, shown once a branch exists) in the Books statements toolbar (Day book, P&L, Reports,
   TB, Ledger, BS, Cash flow), on Gateway Display (kept in the URL as `b=`), Transactions and the purchase list; branch
   select on manual vouchers (Books voucher editor, Gateway voucher entry).
@@ -160,5 +161,8 @@ regular (non-composition) GSTIN filer, even before the set-off screen was first 
 - Receivables statements read invoices / payments only, so a refund voucher does not appear there: a refunded walk-in
   return shows as a credit on the Walk-in customer statement (the ledger / TB / Books are right).
 - The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).
-- Branch-wise closing stock (per-godown valuation) is not apportioned; a branch view shows no report-time stock.
-- The Sec 25(4) pair is raised by hand from the transfer list; the e-invoice / e-way JSON for it is the normal one.
+- ~~Branch-wise closing stock is not apportioned~~ — 7S: per-godown valuation (`docs/features/reports-engine.md`).
+- ~~The Sec 25(4) pair is raised by hand from the transfer list~~ — 7S: saving a transfer between godowns of two branches
+  with different GSTINs opens the "Tax invoice + bill" dialog at once (the list button stays for later); the e-invoice /
+  e-way JSON for it is the normal one.
+- Alt+C on the bill line godown select creates a godown (7S).

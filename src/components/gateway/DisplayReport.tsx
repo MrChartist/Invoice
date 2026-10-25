@@ -6,6 +6,7 @@ import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { toIsoDate } from '../../lib/books';
 import { loadLedger, loadStockValuer } from '../../lib/ledger';
+import { loadBranchStockValuer } from '../../lib/ledger/branch-stock';
 import { buildFrame, decodePath, encodePath, isReportId, type Cell, type ColKey, type DisplayFrame, type DisplayRow, type ReportId, type Seg } from '../../lib/gateway/drill';
 import { isScreenId } from '../../lib/gateway/menu';
 import { cn, formatDate, formatMoney } from '../../lib/utils';
@@ -80,8 +81,8 @@ export function DisplayReport() {
   const ledger = useMemo(() => loadLedger(), []);
   // Same closing-stock-aware statements as Books (only the BS / P&L frames need the valuer).
   const needsStock = report === 'bs' || report === 'pl';
-  // Report-time stock is company-wide: a branch view leaves it out (branch-books.ts).
-  const stock = useMemo(() => (needsStock && !branchId ? loadStockValuer() : undefined), [needsStock, branchId]);
+  // 7S (7.84): a branch view values the stock lying in the branch's godowns (branch-stock.ts).
+  const stock = useMemo(() => (!needsStock ? undefined : branchId ? loadBranchStockValuer(branchId) : loadStockValuer()), [needsStock, branchId]);
   const today = toIsoDate(new Date());
   // A path that no longer resolves (deleted account …) falls back to its deepest valid frame.
   const frame = useMemo(() => {

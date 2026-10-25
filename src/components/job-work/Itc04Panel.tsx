@@ -7,6 +7,8 @@ import { downloadText } from '../../lib/download';
 import { getIndianFY } from '../../lib/invoice-number';
 import { buildItc04, itc04Csv, itc04Frequency, itc04Periods, type Itc04Frequency } from '../../lib/itc04';
 import { jwT } from '../../i18n/areas/job-work';
+import { s7T } from '../../i18n/areas/inventory-7s';
+import { buildItc04Json } from '../../lib/itc04-json';
 import type { JwData } from './lines';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
@@ -70,8 +72,14 @@ export function Itc04Panel({ data }: { data: JwData }) {
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => downloadText(`ITC-04-${period.key}.csv`, itc04Csv(report), 'text/csv')}>
             <Download size={14} aria-hidden="true" /> {jwT('downloadCsv')}
           </button>
+          {/* 7S: JSON beside the CSV — layout unverified, verify with your CA. */}
+          <button type="button" className={cn(controls.btnGhost, controls.btnSm)} title={s7T('itc04JsonNote')} data-testid="itc04-json"
+            onClick={() => downloadText(`ITC-04-${period.key}.json`, JSON.stringify(buildItc04Json(report, profile?.companyGstin ?? ''), null, 2), 'application/json')}>
+            <Download size={14} aria-hidden="true" /> {s7T('itc04Json')}
+          </button>
         </div>
       </div>
+      <p className={styles.muted}>{s7T('itc04JsonNote')}</p>
       <h3 className={styles.heading}>{jwT('table4')}</h3>
       <div className={surface.tableWrap}>
         <table className={surface.table}>

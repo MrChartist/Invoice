@@ -33,6 +33,8 @@ import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 import { lineFactor } from './units';
+import { serialLineShape, serialShapeError, touchesSerials, voucherSerialIssues, type SerialLine } from './serial-vouchers';
+import { assertRemovable, liveRemovalIssues } from './stock-timeline';
 
 export const BOMS_TABLE = VOUCHER_TABLES.boms;
 export const MFG_TABLE = VOUCHER_TABLES.manufacturing;
@@ -148,9 +150,11 @@ export function allocateFefo(
       continue;
     }
     const godown = l.godown_id || MAIN_GODOWN_ID;
-    const { lines: picks, short } = fefoAllocate(tracking.get(item.id), date, num(l.qty), godown);
-    picks.forEach((b, i) => out.push({ ...l, id: i === 0 ? l.id : newId(), qty: b.qty, batch_no: b.batch }));
-    if (short > EPS || picks.length === 0) out.push({ ...l, id: picks.length ? newId() : l.id, qty: picks.length ? short : num(l.qty) });
+    // 7S: a line typed in an alternate unit is allocated in base units and split back into its own unit.
+    const f = lineFactor(l);
+    const { lines: picks, short } = fefoAllocate(tracking.get(item.id), date, num(l.qty) * f, godown);
+    picks.forEach((b, i) => out.push({ ...l, id: i === 0 ? l.id : newId(), qty: roundQty(b.qty / f), batch_no: b.batch }));
+    if (short > EPS || picks.length === 0) out.push({ ...l, id: picks.length ? newId() : l.id, qty: picks.length ? roundQty(short / f) : num(l.qty) });
   }
   return out;
 }
@@ -188,20 +192,24 @@ function lineShapeErrors(lines: readonly VoucherStockLine[], byId: Map<string, S
     const item = trackedItem(byId, l.item_id);
     if (!item) return `${what}: choose a stock item that tracks stock.`;
     if (!(num(l.qty) > 0)) return `${item.name}: quantity must be above zero.`;
-    if (item.track_serials) return `${item.name} tracks serial numbers — use a stock adjustment for serial items.`;
+    // 7S: serial items move by serial (one per unit, whole base units).
+    const serialErr = serialLineShape(l, item);
+    if (serialErr) return serialErr;
     if (needBatch && item.track_batches && !l.batch_no?.trim()) return `${item.name}: choose the batch.`;
   }
   return '';
 }
 
 /** Shape checks for a Manufacturing Journal; returns an error message or ''. */
-export function validateManufacturing(v: Pick<ManufacturingVoucher, 'date' | 'item_id' | 'qty' | 'batch_no' | 'components' | 'outputs' | 'costs'>, items: readonly StockItem[]): string {
+export function validateManufacturing(v: Pick<ManufacturingVoucher, 'date' | 'item_id' | 'qty' | 'batch_no' | 'components' | 'outputs' | 'costs'> & Pick<Partial<ManufacturingVoucher>, 'serials'>, items: readonly StockItem[]): string {
   const byId = new Map(items.map((i) => [i.id, i]));
   if (!v.date) return 'Choose the date.';
   const fin = trackedItem(byId, v.item_id);
   if (!fin) return 'Choose the finished item (a stock item that tracks stock).';
-  if (fin.track_serials) return `${fin.name} tracks serial numbers — manufacturing of serial items is not supported yet.`;
   if (!(num(v.qty) > 0)) return 'The quantity to manufacture must be above zero.';
+  // 7S: serial-tracked finished goods get one new serial per unit.
+  const finErr = serialLineShape({ item_id: fin.id, qty: num(v.qty), serials: v.serials }, fin);
+  if (finErr) return finErr;
   if (fin.track_batches && !v.batch_no?.trim()) return `${fin.name}: enter the batch number of the finished goods.`;
   const comps = (v.components ?? []).filter((l) => l.item_id);
   if (comps.length === 0) return 'Add at least one component.';
@@ -210,6 +218,8 @@ export function validateManufacturing(v: Pick<ManufacturingVoucher, 'date' | 'it
   if (err) return err;
   const pct = (v.outputs ?? []).reduce((s, o) => s + (o.kind === 'co_product' ? num(o.cost_pct) : 0), 0);
   if (pct >= 100) return 'Co-product cost shares must add up to less than 100%.';
+  const dup = serialShapeError([...comps, { item_id: fin.id, qty: num(v.qty), serials: v.serials }, ...(v.outputs ?? []).filter((l) => l.item_id)], items);
+  if (dup) return dup;
   if ((v.costs ?? []).some((c) => num(c.value) < 0)) return 'Additional costs cannot be negative.';
   return '';
 }
@@ -241,7 +251,7 @@ export function validateStockJournal(j: Pick<StockJournal, 'date' | 'consume' | 
   if (err) return err;
   if (dst.reduce((s, l) => s + Math.max(num(l.cost_pct), 0), 0) > 100 + EPS) return 'Destination cost shares cannot exceed 100%.';
   if (isPureTransfer(j)) return 'This only moves stock between godowns — save it as a godown transfer instead.';
-  return '';
+  return serialShapeError([...src, ...dst], items);
 }
 
 /** Availability problems for the consumption lines on the voucher date (the voucher's saved copy left out). */
@@ -285,7 +295,10 @@ export interface PhysicalDraftLine {
   item_id: string;
   godown_id?: string;
   batch_no?: string;
+  /** Counted quantity, in `unit` when typed in an alternate unit (7S), else the base unit. */
   counted: number;
+  unit?: string;
+  unit_factor?: number;
 }
 
 /**
@@ -307,11 +320,15 @@ export function physicalLines(drafts: readonly PhysicalDraftLine[], date: string
         book = d.godown_id ? (b?.byGodown[d.godown_id] ?? 0) : (b?.qty ?? 0);
       } else book = d.godown_id ? (t.byGodown[d.godown_id] ?? 0) : t.qty;
     }
-    const counted = roundQty(Math.max(num(d.counted), 0));
+    // 7S: a count typed in an alternate unit is stored in base units (and the typed figure kept for display).
+    const f = lineFactor(d);
+    const typed = roundQty(Math.max(num(d.counted), 0));
+    const counted = roundQty(typed * f);
     const rate = positions.get(d.item_id)?.avgCost ?? 0;
     return {
       id: d.id, item_id: d.item_id, ...(d.godown_id ? { godown_id: d.godown_id } : {}), ...(batch ? { batch_no: batch } : {}),
       counted, book_qty: roundQty(book), diff: roundQty(counted - book), rate: round2(rate),
+      ...(f !== 1 ? { unit: d.unit, unit_factor: f, counted_typed: typed } : {}),
     };
   });
 }
@@ -340,7 +357,7 @@ export function physicalSummary(lines: readonly PhysicalStockLine[]): PhysicalSu
 
 /** Lines whose book quantity has changed since the count was saved (a back-dated bill or sale). */
 export function physicalDrift(v: PhysicalStockVoucher, inputs: StockInputs): { line: PhysicalStockLine; bookNow: number }[] {
-  const now = physicalLines(v.lines.map((l) => ({ ...l })), v.date, inputs, v.id);
+  const now = physicalLines(v.lines.map((l) => ({ ...l, counted: l.counted_typed ?? l.counted })), v.date, inputs, v.id);
   return v.lines
     .map((line, i) => ({ line, bookNow: now[i]?.book_qty ?? 0 }))
     .filter((r) => Math.abs(r.bookNow - r.line.book_qty) > EPS);
@@ -370,6 +387,14 @@ export function validatePhysical(v: { date: string; lines: readonly PhysicalDraf
 
 const now = () => new Date().toISOString();
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+
+/** 7S: serial lines checked against live stock on the voucher date (its saved copy left out); throws the first issue. */
+function assertSerials(inputs: StockInputs, ownId: string | undefined, date: string, consume: readonly SerialLine[], produce: readonly SerialLine[]): void {
+  if (!touchesSerials([...consume, ...produce], inputs.items)) return;
+  const others = { ...inputs, vouchers: (inputs.vouchers ?? []).filter((v) => v.id !== ownId) };
+  const issues = voucherSerialIssues({ consume, produce, day: date, input: others, multiGodown: true });
+  if (issues.length) throw new Error(issues[0]);
+}
 const lockOf = (r: { id: string; date: string; number: string }) => ({ id: r.id, issue_date: r.date, invoice_number: r.number });
 const tag = (state: string) => (state === 'overridden' ? ' (period lock overridden)' : '');
 
@@ -481,6 +506,7 @@ export const manufacturingDb = {
       costs: (input.costs ?? []).filter((c) => num(c.value) > 0),
     };
     if (inputs) {
+      assertSerials(inputs, input.id, input.date, draft.components, [{ item_id: input.item_id, qty: num(input.qty), serials: input.serials, godown_id: input.godown_id }, ...draft.outputs]);
       const vc = previewVoucherCost(inputs, mfgInput({ ...draft, id: input.id ?? '__draft__', number: input.number ?? '' } as ManufacturingVoucher));
       draft.cost_snapshot = costSnapshot(vc, input.item_id, input.qty);
     }
@@ -489,7 +515,11 @@ export const manufacturingDb = {
       (r) => `${r.qty} × ${name} from ${plural(r.components.length, 'component line')}`);
   },
 
-  remove: (id: string) => removeVoucher<ManufacturingVoucher>(MFG_TABLE, 'manufacturing', 'Manufacturing journal', id),
+  remove(id: string): void {
+    const v = manufacturingDb.get(id);
+    if (v && (v.serials?.length || [...v.components, ...v.outputs].some((l) => l.serials?.length))) assertRemovable({ errors: liveRemovalIssues({ refType: 'manufacturing', refId: id }).errors, warnings: [] });
+    removeVoucher<ManufacturingVoucher>(MFG_TABLE, 'manufacturing', 'Manufacturing journal', id);
+  },
 };
 
 export const stockJournalsDb = {
@@ -506,6 +536,7 @@ export const stockJournalsDb = {
       costs: (input.costs ?? []).filter((c) => num(c.value) > 0),
     };
     if (inputs) {
+      assertSerials(inputs, input.id, input.date, draft.consume, draft.produce);
       const vc = previewVoucherCost(inputs, sjInput({ ...draft, id: input.id ?? '__draft__', number: input.number ?? '' } as StockJournal));
       draft.cost_snapshot = costSnapshot(vc, undefined, draft.produce.reduce((s, l) => s + num(l.qty) * lineFactor(l), 0));
     }
@@ -513,7 +544,11 @@ export const stockJournalsDb = {
       (r) => `${plural(r.consume.length, 'source line')} → ${plural(r.produce.length, 'destination line')}`);
   },
 
-  remove: (id: string) => removeVoucher<StockJournal>(SJ_TABLE, 'stock_journal', 'Stock journal', id),
+  remove(id: string): void {
+    const j = stockJournalsDb.all().find((x) => x.id === id);
+    if (j && [...j.consume, ...j.produce].some((l) => l.serials?.length)) assertRemovable({ errors: liveRemovalIssues({ refType: 'stock_journal', refId: id }).errors, warnings: [] });
+    removeVoucher<StockJournal>(SJ_TABLE, 'stock_journal', 'Stock journal', id);
+  },
 };
 
 export const physicalStockDb = {
