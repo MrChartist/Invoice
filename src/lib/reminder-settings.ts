@@ -8,7 +8,8 @@ import { DB_PREFIX, getJson, setJson } from './storage';
 import { requireAccess } from './access';
 import { audit } from './audit';
 import { DEFAULT_REMINDER_SCHEDULE, type ReminderSchedule } from './reminders';
-import { normalizeSchedule, scheduleIssues } from './reminder-schedule';
+import { normalizeSchedule, scheduleIssues, templateFor } from './reminder-schedule';
+import type { ReminderStage } from './reminders';
 
 export const REMINDER_SETTINGS_KEY = `${DB_PREFIX}reminder_settings`;
 
@@ -38,4 +39,10 @@ export function saveReminderSchedule(next: ReminderSchedule): ReminderSchedule {
 export function resetReminderSchedule(templates = false): ReminderSchedule {
   const cur = loadReminderSchedule();
   return saveReminderSchedule({ ...DEFAULT_REMINDER_SCHEDULE, ...(templates || !cur.templates ? {} : { templates: cur.templates }) });
+}
+
+/** The edited wording for one stage, only when the company changed it and the language is English / Hinglish. */
+export function editedTemplate(s: ReminderSchedule, stage: ReminderStage, lang: string): { subject: string; body: string } | undefined {
+  if ((lang !== 'en' && lang !== 'hinglish') || !s.templates?.[lang]?.[stage]) return undefined;
+  return templateFor(stage, lang, s.templates);
 }

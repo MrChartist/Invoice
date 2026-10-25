@@ -32,7 +32,6 @@ import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
 import { remindT } from '../../i18n/areas/reminders';
 import { areaNodes } from '../../i18n/areas/nodes';
-import type { ReminderSchedule } from '../../lib/reminders';
 
 export interface ReminderModalProps {
   invoice: InvoiceRecord;
@@ -75,7 +74,7 @@ function ReminderModalBody({
   );
   // R2-A5: the company schedule decides the suggested stage; edited templates replace the built-in wording.
   // Loaded after the dialog opens (dynamic import) so the payment / dashboard bundles stay small.
-  const [schedule, setSchedule] = useState<ReminderSchedule | null>(null);
+  const [schedule, setSchedule] = useState<{ resolve: (stage: ReminderStage, lang: MessageLang) => { subject: string; body: string } | undefined } | null>(null);
   const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited));
   // 8H: the party's own message language when it has one (Client form), else English.
   const [lang, setLang] = useState<MessageLang>(() => partyLang(invoice));
@@ -88,11 +87,12 @@ function ReminderModalBody({
     void import('../../lib/reminder-settings').then((m) => {
       if (!live) return;
       const s = m.loadReminderSchedule();
-      setSchedule(s);
+      setSchedule({ resolve: (st, l) => m.editedTemplate(s, st, l) });
       if (edited.current) return;
       const st = suggestStage(invoice, new Date(), credited, s);
       setStage(st);
-      setMessage(buildReminderIn(invoice, st, partyLang(invoice), new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: s.templates }));
+      const l = partyLang(invoice);
+      setMessage(buildReminderIn(invoice, st, l, new Date(), { interestAccrued: interestForReminder(invoice), credited, template: m.editedTemplate(s, st, l) }));
     });
     return () => {
       live = false;
@@ -113,7 +113,7 @@ function ReminderModalBody({
     setStage(nextStage);
     setLang(nextLang);
     setMessage(
-      buildReminderIn(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule?.templates }),
+      buildReminderIn(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, template: schedule?.resolve(nextStage, nextLang) }),
     );
   };
 

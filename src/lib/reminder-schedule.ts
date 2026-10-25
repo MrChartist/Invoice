@@ -1,8 +1,8 @@
 /**
  * R2-A5: validation and normalisation of the company reminder schedule (pure). Kept out of `reminders.ts` so the
- * Dashboard's first-paint bundle only carries the defaults it needs.
+ * Dashboard's first-paint bundle only carries the defaults it needs. Also the template checks (placeholders).
  */
-import { DEFAULT_REMINDER_SCHEDULE, SCHEDULED_STAGES, type ReminderSchedule, type ReminderTemplates, type ScheduledStage } from './reminders';
+import { DEFAULT_REMINDER_SCHEDULE, SCHEDULED_STAGES, builtInTemplate, type ReminderLanguage, type ReminderSchedule, type ReminderStage, type ReminderTemplates, type ScheduledStage } from './reminders';
 
 const intIn = (v: unknown, d: number, max = 365) => {
   const n = Math.round(Number(v));
@@ -34,3 +34,23 @@ export function normalizeSchedule(raw: unknown): ReminderSchedule {
   if (o.templates && typeof o.templates === 'object') out.templates = o.templates as ReminderTemplates;
   return out;
 }
+
+/** Placeholder names a template may use (the variables `reminderVars` fills). */
+export const TEMPLATE_VARS = ['client', 'number', 'document', 'amount', 'balance', 'due', 'days', 'upi', 'business', 'phone', 'upi_line', 'terms_line'] as const;
+
+/** `{tokens}` in `text` that no reminder fills (shown as a warning in the template editor). */
+export function unknownPlaceholders(text: string): string[] {
+  const known = new Set<string>(TEMPLATE_VARS);
+  const out = new Set<string>();
+  for (const m of String(text ?? '').matchAll(/\{(\w+)\}/g)) if (!known.has(m[1])) out.add(`{${m[1]}}`);
+  return [...out];
+}
+
+/** The template to use for a stage: the override when it is filled in and valid, else the built-in text. */
+export function templateFor(stage: ReminderStage, lang: ReminderLanguage, templates?: ReminderTemplates): { subject: string; body: string } {
+  const base = builtInTemplate(stage, lang);
+  const o = templates?.[lang]?.[stage];
+  const pick = (v: string | undefined, d: string) => (v && v.trim() && unknownPlaceholders(v).length === 0 ? v : d);
+  return { subject: pick(o?.subject, base.subject), body: pick(o?.body, base.body) };
+}
+

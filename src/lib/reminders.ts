@@ -245,27 +245,11 @@ export interface ReminderExtras {
   interestAccrued?: number;
   /** Live credit notes linked to the invoice: the balance asked for (and the UPI amount) is net of them. */
   credited?: number;
-  /** R2-A5: the company's edited wording (blank or invalid = the built-in text). */
-  templates?: ReminderTemplates;
-}
-
-/** Placeholder names a template may use (the variables `reminderVars` fills). */
-export const TEMPLATE_VARS = ['client', 'number', 'document', 'amount', 'balance', 'due', 'days', 'upi', 'business', 'phone', 'upi_line', 'terms_line'] as const;
-
-/** `{tokens}` in `text` that no reminder fills (shown as a warning in the template editor). */
-export function unknownPlaceholders(text: string): string[] {
-  const known = new Set<string>(TEMPLATE_VARS);
-  const out = new Set<string>();
-  for (const m of String(text ?? '').matchAll(/\{(\w+)\}/g)) if (!known.has(m[1])) out.add(`{${m[1]}}`);
-  return [...out];
-}
-
-/** The template to use for a stage: the override when it is filled in and valid, else the built-in text. */
-export function templateFor(stage: ReminderStage, lang: ReminderLanguage, templates?: ReminderTemplates): { subject: string; body: string } {
-  const base = T[lang][stage];
-  const o = templates?.[lang]?.[stage];
-  const pick = (v: string | undefined, d: string) => (v && v.trim() && unknownPlaceholders(v).length === 0 ? v : d);
-  return { subject: pick(o?.subject, base.subject), body: pick(o?.body, base.body) };
+  /**
+   * R2-A5: the company's edited wording for THIS stage and language, already checked (`templateFor` in
+   * `reminder-schedule.ts`); absent = the built-in text.
+   */
+  template?: { subject: string; body: string };
 }
 
 /** The built-in wording of a stage (shown in the template editor). */
@@ -335,7 +319,7 @@ export function buildReminder(
   today: Date = new Date(),
   extras: ReminderExtras = {},
 ): ReminderMessage {
-  const t = templateFor(stage, lang, extras.templates);
+  const t = extras.template ?? T[lang][stage];
   const vars = reminderVars(invoice, stage, lang, today, extras);
   return { subject: tidy(fillTemplate(t.subject, vars)), body: tidy(fillTemplate(t.body, vars)) };
 }

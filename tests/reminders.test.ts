@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {
   stageForDays, daysUntil, buildReminder, pendingReminders, lastReminder, reminderCount,
   makeLogEntry, makeSnooze, reminderPriority, isSnoozed, termsMentionInterest, fillTemplate, suggestStage,
-  DEFAULT_REMINDER_SCHEDULE, templateFor, unknownPlaceholders, type ReminderSchedule,
+  DEFAULT_REMINDER_SCHEDULE, type ReminderSchedule,
 } from '../src/lib/reminders.ts';
-import { normalizeSchedule, scheduleIssues } from '../src/lib/reminder-schedule.ts';
+import { normalizeSchedule, scheduleIssues, templateFor, unknownPlaceholders } from '../src/lib/reminder-schedule.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
 const TODAY = new Date(2026, 9, 7, 15, 30); // 7 Oct 2026, afternoon
@@ -205,11 +205,11 @@ test('per-party mode: manual and never stay out of the queue', () => {
 test('template override with placeholders; blank or invalid falls back to the built-in text', () => {
   const i = inv({ due_date: '2026-10-01' });
   const templates = { en: { overdue_polite: { subject: 'Pay {number}', body: 'Dear {client}, {balance} is {days}. {business}' } } };
-  const m = buildReminder(i, 'overdue_polite', 'en', TODAY, { templates });
+  const m = buildReminder(i, 'overdue_polite', 'en', TODAY, { template: templateFor('overdue_polite', 'en', templates) });
   assert.equal(m.subject, 'Pay INV/FY26-27/0007');
   assert.match(m.body, /^Dear Asha, ₹\s?5,000\.00 is 6 days overdue\. MrChartist$/);
   assert.deepEqual(unknownPlaceholders('Hi {client} {bogus} {amt}'), ['{bogus}', '{amt}']);
-  const bad = buildReminder(i, 'overdue_polite', 'en', TODAY, { templates: { en: { overdue_polite: { body: 'Hi {bogus}' } } } });
+  const bad = buildReminder(i, 'overdue_polite', 'en', TODAY, { template: templateFor('overdue_polite', 'en', { en: { overdue_polite: { body: 'Hi {bogus}' } } }) });
   assert.equal(bad.body, buildReminder(i, 'overdue_polite', 'en', TODAY).body, 'unknown placeholder: built-in text');
   assert.equal(templateFor('overdue_polite', 'hinglish', templates).body, templateFor('overdue_polite', 'hinglish').body, 'other language untouched');
   assert.equal(templateFor('overdue_polite', 'en', { en: { overdue_polite: { body: '   ' } } }).body, templateFor('overdue_polite', 'en').body, 'blank: built-in');

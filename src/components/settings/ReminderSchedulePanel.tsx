@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { BellRing } from 'lucide-react';
 import { can } from '../../lib/access';
 import {
-  DEFAULT_REMINDER_SCHEDULE, SCHEDULED_STAGES, TEMPLATE_VARS, buildReminder, builtInTemplate, unknownPlaceholders,
+  DEFAULT_REMINDER_SCHEDULE, SCHEDULED_STAGES, buildReminder, builtInTemplate,
   type ReminderLanguage, type ReminderSchedule, type ReminderTemplates, type ScheduledStage,
 } from '../../lib/reminders';
 import { loadReminderSchedule, saveReminderSchedule } from '../../lib/reminder-settings';
-import { scheduleIssues } from '../../lib/reminder-schedule';
+import { TEMPLATE_VARS, scheduleIssues, templateFor, unknownPlaceholders } from '../../lib/reminder-schedule';
 import type { InvoiceRecord } from '../../types/invoice';
 import { localDb } from '../../lib/localDb';
 import { addDaysInput, todayInput } from '../../lib/utils';
@@ -46,7 +46,7 @@ export function ReminderSchedulePanel({ notify }: { notify: (m: string, tone?: '
   const sample = useMemo(() => sampleInvoice(), []);
   const tpl = s.templates?.[lang]?.[stage] ?? {};
   const unknown = [...unknownPlaceholders(tpl.subject ?? ''), ...unknownPlaceholders(tpl.body ?? '')];
-  const preview = buildReminder(sample, stage, lang, new Date(), { templates: s.templates });
+  const preview = buildReminder(sample, stage, lang, new Date(), { template: templateFor(stage, lang, s.templates) });
   const base = builtInTemplate(stage, lang);
 
   const num = (k: 'upcoming_days' | 'polite_after' | 'firm_after' | 'final_after') => (
