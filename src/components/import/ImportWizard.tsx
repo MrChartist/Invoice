@@ -1,10 +1,14 @@
-import { useCallback, useMemo, useReducer, useRef } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, FileSpreadsheet, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, CheckCircle2, FileSpreadsheet, RotateCcw, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { cn } from '../../lib/utils';
 import { localDb } from '../../lib/localDb';
 import { parseTable } from '../../lib/csv';
-import { invoiceAmountMapped, missingRequired, type ImportKind } from '../../lib/import-mapping';
+import { invoiceAmountMapped, isBooksKind, missingRequired, type ImportKind } from '../../lib/import-mapping';
+import { reloadAfterFlush } from '../../lib/storage';
+import { useT } from '../../i18n';
+import { vtT } from '../../i18n/areas/voucher-types';
+import { migT } from '../../i18n/areas/migration';
 import {
   applyImport,
   buildPreview,
@@ -51,8 +55,25 @@ export function ImportWizard(props: ImportWizardProps) {
 function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
   // Existing data is re-read when the review step opens so the duplicate check is current.
   const [state, dispatch] = useReducer(wizardReducer, initialKind, (k) => initialWizardState(k, readExisting()));
+  useT();
   const { step, kind, table, mapping, existing, duplicateMode, strictGstin, skipped, filter, running, report } = state;
   const cancelRef = useRef(false);
+  // P1-21 (7Q): books kinds (ledgers / suppliers / stock / vouchers) use import-books.ts, loaded on demand.
+  const books = isBooksKind(kind);
+  const [booksLib, setBooksLib] = useState<typeof import('../../lib/import-books') | null>(null);
+  const [undo, setUndo] = useState<'none' | 'ready' | 'busy'>('none');
+  useEffect(() => {
+    if (!books || booksLib) return;
+    let live = true;
+    void import('../../lib/import-books').then((m) => live && setBooksLib(m));
+    return () => {
+      live = false;
+    };
+  }, [books, booksLib]);
+  const booksExisting = useMemo(
+    () => (books && booksLib && step >= 2 ? booksLib.loadBooksExisting() : null),
+    [books, booksLib, step, report], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const options = useMemo(() => {
     const settings = localDb.settings.get();
@@ -67,13 +88,13 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
     };
   }, [duplicateMode, strictGstin]);
 
-  const preview = useMemo(
-    () =>
-      table && step >= 2
-        ? buildPreview({ kind, table, mapping, existing, options, skipped })
-        : null,
-    [table, step, kind, mapping, existing, options, skipped],
-  );
+  const preview = useMemo(() => {
+    if (!table || step < 2) return null;
+    if (isBooksKind(kind)) {
+      return booksLib && booksExisting ? booksLib.buildBooksPreview({ kind, table, mapping, existing: booksExisting, options: { duplicateMode, strictGstin }, skipped }) : null;
+    }
+    return buildPreview({ kind, table, mapping, existing, options, skipped });
+  }, [table, step, kind, mapping, existing, options, skipped, booksLib, booksExisting, duplicateMode, strictGstin]);
 
   const missing = missingRequired(kind, mapping);
   const amountMissing = kind === 'invoices' && !invoiceAmountMapped(mapping);
@@ -141,17 +162,47 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
     dispatch({ type: 'runStarted' });
     cancelRef.current = false;
     try {
-      const result = await applyImport(preview, createLocalSink(), {
-        chunkSize: 250,
-        onProgress: (done) => dispatch({ type: 'runProgress', done }),
-        shouldCancel: () => cancelRef.current,
-      });
+      let result: ImportReport;
+      if (isBooksKind(preview.kind)) {
+        if (!booksLib) throw new Error('The importer is still loading — try again.');
+        // One undo copy for the whole import (owner only), like the Tally import.
+        const { saveSafetySnapshot } = await import('../../lib/backup');
+        if (!(await saveSafetySnapshot('import')) && !window.confirm(migT('noUndoCopy'))) return;
+        result = await booksLib.applyBooksImport(preview, {
+          onProgress: (done) => dispatch({ type: 'runProgress', done }),
+          shouldCancel: () => cancelRef.current,
+        });
+        setUndo('ready');
+      } else {
+        result = await applyImport(preview, createLocalSink(), {
+          chunkSize: 250,
+          onProgress: (done) => dispatch({ type: 'runProgress', done }),
+          shouldCancel: () => cancelRef.current,
+        });
+      }
       dispatch({ type: 'runSucceeded', report: result, existing: readExisting() });
       onDone?.(result, kind);
     } catch (e) {
       dispatch({ type: 'runFailed', message: e instanceof Error ? e.message : 'The import failed unexpectedly.' });
     } finally {
       dispatch({ type: 'runEnded' });
+    }
+  };
+
+  const undoImport = async () => {
+    setUndo('busy');
+    try {
+      const { clearSafetySnapshot, getSafetySnapshot, restoreBackup } = await import('../../lib/backup');
+      const snap = await getSafetySnapshot();
+      if (snap) {
+        restoreBackup(snap.data);
+        await clearSafetySnapshot();
+      }
+      dispatch({ type: 'runFailed', message: vtT('undone') });
+      setTimeout(reloadAfterFlush, 600);
+    } catch (e) {
+      setUndo('ready');
+      dispatch({ type: 'runFailed', message: e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -174,9 +225,16 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
       )}
       <span className={styles.footerSpacer} />
       {report ? (
-        <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} onClick={onClose}>
-          Done
-        </button>
+        <>
+          {books && undo !== 'none' && (
+            <button type="button" className={cn(ctl.btn, ctl.btnOutline)} disabled={undo === 'busy'} onClick={() => void undoImport()} data-testid="import-undo">
+              <RotateCcw size={15} /> {vtT('undo')}
+            </button>
+          )}
+          <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} onClick={books ? () => { onClose(); setTimeout(reloadAfterFlush, 0); } : onClose}>
+            Done
+          </button>
+        </>
       ) : step < 3 ? (
         <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} disabled={nextDisabled} onClick={goNext}>
           Next <ArrowRight size={15} />
@@ -207,6 +265,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
       subtitle="Bring clients, items and opening invoices over from Excel, Vyapar, Zoho Books, Tally or Busy. Everything stays in this browser."
       footer={footer}
     >
+      {books && <p className={ctl.hint}>{vtT('undoHint')}</p>}
       <ol className={styles.steps} aria-label="Import progress">
         {STEPS.map((label, i) => (
           <li

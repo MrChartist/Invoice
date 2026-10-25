@@ -3,7 +3,12 @@
  * presets for popular accounting tools. Pure — no browser APIs.
  */
 
-export type ImportKind = 'clients' | 'items' | 'invoices';
+export type ImportKind = 'clients' | 'items' | 'invoices' | BooksImportKind;
+
+/** P1-21 (7Q): books kinds, written through the ledger / masters APIs by `import-books.ts` (owner only, one undo copy). */
+export type BooksImportKind = 'ledgers' | 'vendors' | 'stock' | 'vouchers';
+export const BOOKS_KINDS: readonly BooksImportKind[] = ['ledgers', 'vendors', 'stock', 'vouchers'];
+export const isBooksKind = (k: ImportKind): k is BooksImportKind => (BOOKS_KINDS as readonly string[]).includes(k);
 
 export type FieldType = 'text' | 'number' | 'percent' | 'date' | 'gstin' | 'state' | 'email' | 'status';
 
@@ -23,6 +28,10 @@ export const KIND_LABELS: Record<ImportKind, string> = {
   clients: 'Clients / Parties',
   items: 'Items (catalogue)',
   invoices: 'Opening invoices',
+  ledgers: 'Ledgers & opening balances',
+  vendors: 'Suppliers (vendors)',
+  stock: 'Stock items',
+  vouchers: 'Vouchers (journal / payment / receipt)',
 };
 
 export const IMPORT_SCHEMAS: Record<ImportKind, FieldDef[]> = {
@@ -215,6 +224,206 @@ export const IMPORT_SCHEMAS: Record<ImportKind, FieldDef[]> = {
     { key: 'item_hsn', label: 'Line HSN / SAC', type: 'text', synonyms: ['HSN/SAC', 'HSN', 'SAC', 'HSN Code', 'Item HSN'], example: ['', ''] },
     { key: 'item_tax_rate', label: 'Line GST %', type: 'percent', synonyms: ['Item Tax %', 'Item GST %', 'Line Tax %', 'Item Tax Rate'], example: ['', ''] },
     { key: 'item_unit', label: 'Line unit', type: 'text', synonyms: ['Usage unit', 'Item Unit', 'UOM', 'Unit'], example: ['', ''] },
+  ],
+
+  /* ── P1-21 (7Q): books kinds ── */
+  ledgers: [
+    {
+      key: 'name', label: 'Ledger name', type: 'text', required: true,
+      synonyms: ['Ledger Name', 'Ledger', 'Name', 'Account Name', 'Account', 'Particulars', 'Head of Account', 'Account Head'],
+      example: ['Office Rent', 'HDFC Bank 0012'],
+    },
+    {
+      key: 'group', label: 'Group (under)', type: 'text', required: true,
+      hint: 'Tally group (Indirect Expenses, Bank Accounts, Sundry Debtors …), a Schedule III head or one of your groups.',
+      synonyms: ['Group', 'Under', 'Parent', 'Group Name', 'Account Group', 'Primary Group', 'Ledger Group', 'Head'],
+      example: ['Indirect Expenses', 'Bank Accounts'],
+    },
+    {
+      key: 'code', label: 'Code', type: 'text',
+      synonyms: ['Code', 'Account Code', 'Ledger Code', 'GL Code', 'A/c Code'],
+      example: ['', ''],
+    },
+    {
+      key: 'alias', label: 'Alias', type: 'text',
+      synonyms: ['Alias', 'Short Name', 'Other Name'],
+      example: ['Rent', 'HDFC'],
+    },
+    {
+      key: 'opening_dr', label: 'Opening debit', type: 'number',
+      synonyms: ['Opening Dr', 'Opening Debit', 'Debit', 'Dr', 'Opening Balance Dr', 'Dr Amount', 'Debit Balance'],
+      example: ['', '250000'],
+    },
+    {
+      key: 'opening_cr', label: 'Opening credit', type: 'number',
+      synonyms: ['Opening Cr', 'Opening Credit', 'Credit', 'Cr', 'Opening Balance Cr', 'Cr Amount', 'Credit Balance'],
+      example: ['', ''],
+    },
+    {
+      key: 'opening', label: 'Opening balance (Dr / Cr)', type: 'number',
+      hint: 'One column with "Dr" / "Cr" (or a minus sign for credit) instead of two columns.',
+      synonyms: ['Opening Balance', 'Opening', 'Balance', 'Closing Balance', 'Op. Balance', 'Opening Bal'],
+      example: ['', ''],
+    },
+    {
+      key: 'gstin', label: 'GSTIN (parties)', type: 'gstin',
+      synonyms: ['GSTIN', 'GSTIN/UIN', 'GST No', 'GST Number'],
+      example: ['', ''],
+    },
+  ],
+
+  vendors: [
+    {
+      key: 'name', label: 'Supplier name', type: 'text', required: true,
+      synonyms: ['Supplier Name', 'Vendor Name', 'Name', 'Party Name', 'Supplier', 'Vendor', 'Ledger Name', 'Creditor'],
+      example: ['Rao Packaging Pvt Ltd', 'Sharma Transport'],
+    },
+    {
+      key: 'gstin', label: 'GSTIN', type: 'gstin',
+      synonyms: ['GSTIN', 'GSTIN/UIN', 'GST No', 'GST Number', 'Supplier GSTIN', 'Vendor GSTIN'],
+      example: ['27AAPFU0939F1ZV', ''],
+    },
+    {
+      key: 'pan', label: 'PAN', type: 'text',
+      synonyms: ['PAN', 'PAN No', 'PAN Number', 'Income Tax PAN', 'IT PAN'],
+      example: ['AAPFU0939F', ''],
+    },
+    {
+      key: 'state', label: 'State', type: 'state',
+      synonyms: ['State', 'State Name', 'State Code', 'Place'],
+      example: ['Maharashtra', 'Delhi'],
+    },
+    {
+      key: 'email', label: 'Email', type: 'email',
+      synonyms: ['Email', 'E-mail', 'Email ID', 'Email Address'],
+      example: ['ap@rao.in', ''],
+    },
+    {
+      key: 'phone', label: 'Phone', type: 'text',
+      synonyms: ['Phone', 'Mobile', 'Phone No', 'Mobile No', 'Contact No'],
+      example: ['9820012345', ''],
+    },
+    {
+      key: 'address', label: 'Address', type: 'text',
+      synonyms: ['Address', 'Billing Address', 'Mailing Address', 'Address 1'],
+      example: ['Plot 7, MIDC', ''],
+    },
+    {
+      key: 'msme_udyam', label: 'Udyam no. (MSME)', type: 'text',
+      synonyms: ['Udyam', 'Udyam No', 'Udyam Registration', 'MSME No', 'MSME Registration'],
+      example: ['', ''],
+    },
+    {
+      key: 'opening', label: 'Opening balance payable', type: 'number',
+      hint: 'What you owe the supplier on the books beginning date (Cr). Write "Dr" for an advance paid.',
+      synonyms: ['Opening Balance', 'Opening', 'Balance', 'Opening Cr', 'Payable', 'Outstanding'],
+      example: ['15000', ''],
+    },
+  ],
+
+  stock: [
+    {
+      key: 'name', label: 'Item name', type: 'text', required: true,
+      synonyms: ['Item Name', 'Stock Item', 'Stock Item Name', 'Name', 'Item', 'Product', 'Product Name', 'Particulars'],
+      example: ['A4 paper ream', 'Steel bolt M8'],
+    },
+    {
+      key: 'group', label: 'Stock group', type: 'text',
+      synonyms: ['Stock Group', 'Group', 'Under', 'Item Group', 'Category Group', 'Parent'],
+      example: ['Stationery', 'Hardware'],
+    },
+    {
+      key: 'unit', label: 'Unit', type: 'text',
+      synonyms: ['Unit', 'Units', 'UOM', 'Base Unit', 'Base Units', 'Unit of Measure'],
+      example: ['NOS', 'PCS'],
+    },
+    {
+      key: 'hsn', label: 'HSN / SAC', type: 'text',
+      synonyms: ['HSN', 'HSN/SAC', 'HSN Code', 'HSN SAC'],
+      example: ['48025610', '73181500'],
+    },
+    {
+      key: 'tax_rate', label: 'GST %', type: 'percent',
+      synonyms: ['GST %', 'GST Rate', 'Tax %', 'IGST %', 'Rate of GST', 'Tax Rate'],
+      example: ['12', '18'],
+    },
+    {
+      key: 'opening_qty', label: 'Opening quantity', type: 'number',
+      synonyms: ['Opening Qty', 'Opening Quantity', 'Op Qty', 'Opening Stock', 'Quantity', 'Qty', 'Closing Qty'],
+      example: ['120', '5000'],
+    },
+    {
+      key: 'opening_rate', label: 'Opening rate', type: 'number',
+      synonyms: ['Opening Rate', 'Rate', 'Cost', 'Cost Price', 'Purchase Rate', 'Unit Cost', 'Op Rate'],
+      example: ['240', '2.5'],
+    },
+    {
+      key: 'opening_value', label: 'Opening value', type: 'number',
+      hint: 'Used for the rate when no rate is given (value / quantity).',
+      synonyms: ['Opening Value', 'Value', 'Opening Amount', 'Op Value', 'Closing Value', 'Amount'],
+      example: ['', ''],
+    },
+    {
+      key: 'sale_rate', label: 'Selling rate', type: 'number',
+      synonyms: ['Selling Price', 'Sale Price', 'Sales Rate', 'MRP', 'Selling Rate', 'Standard Selling Price'],
+      example: ['280', '4'],
+    },
+    {
+      key: 'reorder_level', label: 'Reorder level', type: 'number',
+      synonyms: ['Reorder Level', 'Reorder', 'Min Stock', 'Minimum Stock', 'Re-order Level'],
+      example: ['20', '500'],
+    },
+    {
+      key: 'sku', label: 'SKU / part no.', type: 'text',
+      synonyms: ['SKU', 'Part No', 'Part Number', 'Item Code', 'Code'],
+      example: ['', ''],
+    },
+  ],
+
+  vouchers: [
+    {
+      key: 'voucher_no', label: 'Voucher number', type: 'text', required: true,
+      hint: 'Rows sharing a number (and date) form one voucher.',
+      synonyms: ['Voucher No', 'Voucher No.', 'Voucher Number', 'Vch No', 'Vch No.', 'Number', 'Ref No', 'JV No', 'Entry No'],
+      example: ['JV-1', 'JV-1'],
+    },
+    {
+      key: 'date', label: 'Date', type: 'date', required: true,
+      synonyms: ['Date', 'Voucher Date', 'Vch Date', 'Entry Date', 'Txn Date', 'Transaction Date'],
+      example: ['01-04-2026', '01-04-2026'],
+    },
+    {
+      key: 'type', label: 'Voucher type', type: 'text', required: true,
+      hint: 'Journal, Payment, Receipt or Contra (anything else is refused).',
+      synonyms: ['Voucher Type', 'Type', 'Vch Type', 'Entry Type'],
+      example: ['Journal', 'Journal'],
+    },
+    {
+      key: 'ledger', label: 'Ledger', type: 'text', required: true,
+      hint: 'A ledger of the chart of accounts, or a customer / supplier name (posted to Sundry Debtors / Creditors).',
+      synonyms: ['Ledger', 'Ledger Name', 'Account', 'Account Name', 'Particulars', 'Head of Account'],
+      example: ['Office Rent', 'Sharma Transport'],
+    },
+    {
+      key: 'dr', label: 'Debit', type: 'number',
+      synonyms: ['Debit', 'Dr', 'Debit Amount', 'Dr Amount', 'Debit (Rs)'],
+      example: ['25000', ''],
+    },
+    {
+      key: 'cr', label: 'Credit', type: 'number',
+      synonyms: ['Credit', 'Cr', 'Credit Amount', 'Cr Amount', 'Credit (Rs)'],
+      example: ['', '25000'],
+    },
+    {
+      key: 'narration', label: 'Narration', type: 'text',
+      synonyms: ['Narration', 'Remarks', 'Description', 'Notes', 'Memo'],
+      example: ['Rent for April', 'Rent for April'],
+    },
+    {
+      key: 'cost_centre', label: 'Cost centre', type: 'text',
+      synonyms: ['Cost Centre', 'Cost Center', 'Project', 'Department'],
+      example: ['', ''],
+    },
   ],
 };
 
@@ -486,3 +695,21 @@ export function templateRows(kind: ImportKind): string[][] {
 export function templateFileName(kind: ImportKind): string {
   return `mrchartist-import-template-${kind}.csv`;
 }
+
+/**
+ * 7.49: "trial balance as at 31-Mar" template for openings: the ledgers kind with the opening Dr / Cr
+ * columns, one row per ledger (parties under Sundry Debtors / Creditors become clients / vendors).
+ */
+export function trialBalanceTemplateRows(): string[][] {
+  return [
+    ['Ledger name', 'Group (under)', 'Opening debit', 'Opening credit'],
+    ['Capital Account - Owner', 'Capital Account', '', '500000'],
+    ['HDFC Bank 0012', 'Bank Accounts', '320000', ''],
+    ['Cash', 'Cash-in-Hand', '15000', ''],
+    ['Acme Traders Pvt Ltd', 'Sundry Debtors', '118000', ''],
+    ['Rao Packaging Pvt Ltd', 'Sundry Creditors', '', '45000'],
+    ['Furniture & Fixtures', 'Fixed Assets', '92000', ''],
+  ];
+}
+
+export const TB_TEMPLATE_FILE = 'mrchartist-import-template-trial-balance.csv';
