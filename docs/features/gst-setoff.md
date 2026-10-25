@@ -106,7 +106,10 @@ open items.
 
 Nothing in the shell: the tabs live inside the existing lazy GST reports page (`src/pages/GstReports.tsx`, `TABS` +
 `sectionBody`). Optional cross-links: Books → Vouchers register filter on voucher classes "GST set-off" / "GST payment
-(PMT-06)"; Dashboard "GST due" tile (WP-9) can read `periodPaymentStatus`.
+(PMT-06)"; Dashboard "GST due" tile (WP-9) can read `periodPaymentStatus`. Wired: Gateway Statutory **O** and a
+palette destination open the tab; the notification bell reminds when the last 3B period has no set-off posted (from 5
+days before the due date, once the set-off screen has been used — `src/lib/business-alerts.ts`). The HSN master's
+default rate now fills invoice / bill lines when an HSN is typed (`src/lib/hsn-defaults.ts`).
 
 ## Statutory values to verify with a CA
 

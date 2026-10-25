@@ -153,10 +153,11 @@ audited).
 
 ## Wiring for the lead
 
-Both screens are mounted today from **Settings → Data → "Migration & year-end"** (lazy chunks; Tally import
-shown to the owner only). Suggested extra entry points: Gateway / Books menu "Start new year" and "Import
-from Tally"; `EditLog` buttons on the voucher editor, purchase bill and stock item screens
-(`<EditLog open recordId={id} name={number} onClose={…} />`).
+Both screens open from **Settings → Data → "Migration & year-end"**, the **Books header** ("Start new year",
+"Import from Tally"), `/books?open=yearend|tally`, the Gateway (root **Y**, Import & export **T**) and the palette
+(lazy chunks; Tally import needs `data.restore`). **Edit log** buttons (`EditLogButton`) are on the Books voucher editor
+and the purchase bill form; the stock item screen is left to WP-8. The closing-stock step shows the report-time
+valuation when it is on and posts a journal only when it is off (`docs/features/reports-engine.md`).
 
 ## Hot / shared files touched
 

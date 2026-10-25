@@ -28,7 +28,7 @@ page is not `/pos` (POS owns F2–F10). Entries the signed-in role cannot use ar
 | F8 | Sales (invoice editor) | `/invoice` |
 | F9 | Purchase (bill form) | `/expenses?new=bill` |
 | Ctrl+F8 | Credit note | `/invoice?type=CREDIT_NOTE` |
-| Ctrl+F9 | Debit note | `/invoice?type=DEBIT_NOTE` |
+| Ctrl+F9 | Debit note (on `/expenses`: purchase-return debit note) | `/invoice?type=DEBIT_NOTE` · `/expenses?tab=returns&new=dn` |
 | Alt+F7 | Stock journal (and Manufacturing journal tab) | `/manufacturing?tab=journal` |
 | Ctrl+F7 | Physical stock | `/manufacturing?tab=physical` |
 | F11 | Features | `/settings?tab=defaults` |
@@ -52,7 +52,11 @@ themselves; the button bar offers both.
   stock shown as not available), **Banking** (R BRS, I statement import, C cheques, B cash / bank books),
   **Import & export** (I, E, B), **Display more reports** (T Trial balance, D Day book, A Account books,
   S Statements of accounts, I Inventory books, R Statutory reports) and their children.
-- Other modules add rows through `GATEWAY_EXTENSIONS` (same id replaces a built-in row, e.g. Stock journal).
+- Other modules add rows through `GATEWAY_EXTENSIONS` (same id replaces a built-in row, e.g. Stock journal). Rows
+  added by the integration pass: root **O** Accounts Info, **Y** Start new year; Import & export **T** Import from Tally;
+  Banking **D** deposit slip, **A** payment advice, **E** e-payments, **T** cash tally; Vouchers **E** debit note
+  (purchase return), **G** receipt note (GRN), **M** manufacturing journal; Statutory **D** TDS & TCS payables, **O** GST
+  set-off; Display more reports **O** Ratio analysis.
 
 ## Voucher entry (Contra / Payment / Receipt / Journal)
 | Key | Action |
@@ -80,8 +84,8 @@ themselves; the button bar offers both.
 ## Display reports and drill-down
 | Report (`r=`) | Root frame |
 |---|---|
-| `bs` Balance sheet | groups by side + Profit & loss A/c row, FY-to-date as at the period end (capped at today); totals tie |
-| `pl` Profit & loss | income / expense groups, net profit |
+| `bs` Balance sheet | the Books statement (`ledgerBalanceSheet` + `loadStockValuer()`): one row per head + Profit & loss A/c row + closing / opening stock rows (open the stock summary), FY-to-date as at the period end (capped at today); totals equal Books |
+| `pl` Profit & loss | income / expense groups, opening / closing stock, net profit (same as Books) |
 | `tb` Trial balance, `groups` Group summary | closing Dr / Cr per group |
 | `daybook` | every ledger voucher in the period (manual + automatic) |
 | `cash` | cash & bank ledgers |
@@ -99,5 +103,5 @@ Display reports.
 localStorage (`mrchartist_tally_terms`).
 
 ## Not built yet
-Stock journal / physical stock screens, Employee master (payroll), TDS payable statutory rows, Ratio analysis,
-bill-wise voucher references, single-entry voucher mode, voucher classes.
+Bill-wise voucher references, single-entry voucher mode and voucher classes on Gateway voucher entry (ROADMAP 7.19);
+`DrillStack` for the Display viewer.

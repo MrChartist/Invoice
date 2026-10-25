@@ -13,10 +13,27 @@ offline alternative is named) · 🚧 **in progress** (another agent is building
 
 **In progress elsewhere (not repeated in the work packages):**
 - ✅ **WIP-A Payroll** (`docs/features/payroll.md`): employees, pay heads, attendance, salary structures, PF / ESI / PT / TDS on salary, payslips, statutory payroll reports.
-- 🚧 **WIP-B Manufacturing & stock vouchers**: BOM, manufacturing journal, stock journal, physical stock, reorder.
-- 🚧 **WIP-C TDS & voucher classes**: TDS deducted on payments, 26Q / 27EQ, optional / memo / post-dated / reversing vouchers, bill-wise payables.
-- 🚧 **WIP-D Gateway**: Tally-style Gateway of Tally and F-key voucher entry.
+- ✅ **WIP-B Manufacturing & stock vouchers**: BOM, manufacturing journal, stock journal, physical stock, reorder.
+- ✅ **WIP-C TDS & voucher classes**: TDS deducted on payments, 26Q / 27EQ, optional / memo / post-dated / reversing vouchers, bill-wise payables.
+- ✅ **WIP-D Gateway**: Tally-style Gateway of Tally and F-key voucher entry.
 - Also found in other agents' worktrees: 🚧 e-commerce operator (Sec 52 / 9(5)) work in `src/lib/eco.ts` (worktree `agent-a9143…`), and 🚧 Hindi i18n round 2 (Settings, GST, Recurring, Bank).
+
+## Status after Phase 7 merge (integration pass, 2026-10-25)
+
+All twelve P0 gaps are closed and most P1 items are delivered (work packages WP-1 … WP-9 plus WIP-A … WIP-D, merged
+on `claude/elegant-cannon-cwapiv`; roadmap ids 7.1–7.61 in `docs/ROADMAP.md`). The integration pass then made every
+new screen reachable (Gateway rows, sidebar "Accounts Info", command palette, Books header, notification bell) and
+fixed the one cross-package inconsistency found: closing stock could be counted twice (report-time valuation from
+WP-2 plus the year-end closing-stock journal from WP-7). Now valuation nets any such journal, the wizard posts a
+journal only when valuation is off, and the Gateway Display BS / P&L use the same statements as Books (tested).
+
+| | Delivered | Partial | Open |
+|---|---|---|---|
+| P0 | P0-1 … P0-12 (all) | — | — |
+| P1 | P1-1, 2, 3, 4, 5, 11, 14, 15, 17, 18, 20, 22, 24, 25, 26 | P1-6, 7, 8, 12, 16, 19, 23 | P1-9 job work / ITC-04, P1-10 inventory masters (WP-8 in progress), P1-13 voucher types, P1-21 Excel import kinds |
+
+Status column / headings below are updated; the body text is the original analysis (it describes the gap, not
+today's app). Remaining follow-ups: `docs/ROADMAP.md` 7.7, 7.8, 7.19, 7.23, 7.28, 7.37, 7.43, 7.49, 7.59, 7.61.
 
 ---
 
@@ -394,7 +411,7 @@ pay sheet, statutory reports. Two follow-ups, P2, for after WIP-A: gratuity and 
 
 Each item lists what to build, the files it touches, size, dependencies, and the "Tally feel" to aim for. WP-n = the work package in section 8.
 
-### P0-1 Groups, ledgers and opening balances ("Accounts Info") — WP-1, size L
+### P0-1 Groups, ledgers and opening balances ("Accounts Info") — WP-1, size L — ✅ done (`docs/features/masters.md`; nav + Gateway "Accounts Info")
 - **Build:** user-defined groups and sub-groups under the Schedule III primaries (name, parent, nature inherited,
   "behaves like sub-ledger", "net Dr/Cr in reports"). Ledger master gains an `opening_balance` (paise, Dr / Cr) and
   `opening_as_of`, optional GST / TDS defaults, interest parameters and party bank details. The opening difference posts to "Difference in opening balances"
@@ -409,7 +426,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** screen titles "Group Creation", "Ledger Creation", "Chart of Accounts". Fields in Tally order (Name,
   (alias), Under, Opening Balance with Dr / Cr). Enter moves field to field; Ctrl+A accepts; Alt+C from any ledger field.
 
-### P0-2 Bill-wise opening outstandings for debtors — WP-1, size M
+### P0-2 Bill-wise opening outstandings for debtors — WP-1, size M — ✅ done (`docs/features/masters.md`)
 - **Build:** an `opening_bills` table: `{party_key, side: 'receivable'|'payable', ref_no, date, due_date, amount, dr_cr}`.
   Receivables ageing, statements, the receipt "Agst Ref" picker and the ledger read these bills like invoices, but they
   are **never** in GSTR / revenue / stock. The payable side is defined here and consumed by WIP-C.
@@ -418,7 +435,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** "Bill-wise Details for: <party>" sub-screen with Type of Ref (New Ref), Name, Due Date / Credit Days,
   Amount, Dr / Cr; the total must equal the ledger opening balance.
 
-### P0-3 One accounting truth: Day Book and P&L from the ledger, plus closing stock — WP-2, size M
+### P0-3 One accounting truth: Day Book and P&L from the ledger, plus closing stock — WP-2, size M — ✅ done (`docs/features/reports-engine.md`; no double count with year-end journals)
 - **Build:** switch the Day Book to vouchers from `buildLedger`, so it includes manual JV / CV / PV / RV, depreciation,
   fixed assets, advances and opening entries. Keep a type filter (Sales / Purchase / Receipt / Payment / Journal /
   Contra / Credit Note / Debit Note / Stock Journal once WIP-B lands). Switch the P&L tab to `ledgerProfitAndLoss`, with a
@@ -434,7 +451,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Depends on:** nothing (WIP-B stock journals feed in automatically if they extend `collectEvents`).
 - **Tally feel:** P&L horizontal by default (Particulars | Particulars), with "Gross Profit c/o" / "b/f" and "Nett Profit".
 
-### P0-4 Group Summary, drill-down everywhere, Alt+F1 — WP-2, size L
+### P0-4 Group Summary, drill-down everywhere, Alt+F1 — WP-2, size L — ✅ done (`docs/features/reports-engine.md`)
 - **Build:** a `groupSummary(ledger, period, groupId)` report (sub-groups and ledgers with opening / Dr / Cr / closing)
   and "Group Vouchers". A drill stack component: Enter / click goes one level down, **Esc goes back one level** and keeps the
   scroll and selected row. BS → Group → Ledger → Voucher (opens the document / voucher editor); P&L the same; TB
@@ -460,7 +477,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** "Debit Note" voucher (Ctrl+F9 from the purchase side), "Original Invoice No. / Date" fields, reason
   for note (GST "Reason for issuing note" list).
 
-### P0-6 GST set-off and payment posting — WP-6, size M
+### P0-6 GST set-off and payment posting — WP-6, size M — ✅ done (`docs/features/gst-setoff.md`; due notice in the bell)
 - **Build:** from the GSTR-3B of a period, a "GST liability set-off" journal (Dr Output IGST / CGST / SGST / cess,
   Cr Input heads per Rule 88A order, already computed in 3B) and a "GST payment" voucher (PMT-06 challan: CIN, BRN,
   date, bank; per head tax / interest / late fee / penalty / others → Dr electronic cash ledger 2360, Cr Bank; then
@@ -471,7 +488,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** Tally's "Stat Payment" (Alt+S in a Payment voucher) and "GST Adjustment" journal, with the same names
   "Increase of Tax Liability", "Decrease of Tax Liability", "Set Off of GST".
 
-### P0-7 Migration from Tally (masters, opening TB, vouchers) — WP-7, size L
+### P0-7 Migration from Tally (masters, opening TB, vouchers) — WP-7, size L — ✅ done (`docs/features/migration-audit.md`; Gateway / Books entry)
 - **Build:** a Tally XML importer (`ENVELOPE/BODY/IMPORTDATA/REQUESTDATA/TALLYMESSAGE` with `GROUP`, `LEDGER`,
   `STOCKITEM`, `STOCKGROUP`, `UNIT`, `GODOWN`, `VOUCHER`): masters → groups / ledgers with openings / parties (GSTIN,
   state, credit period, bill-wise openings from `BILLALLOCATIONS`) / stock items with opening. Vouchers → sales and purchase
@@ -483,7 +500,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** steps named the way a Tally user exports ("Display More Reports → List of Accounts → Export XML",
   "Day Book → Export"); the trial balance after import must match the Tally TB to the paisa, shown side by side.
 
-### P0-8 Each bank account as a ledger — WP-5, size M
+### P0-8 Each bank account as a ledger — WP-5, size M — ✅ done (`docs/features/banking.md`)
 - **Build:** a posting-line `bank_account_id` resolves to a per-account ledger ("HDFC Bank CA", group Bank Accounts or
   Bank OD for overdrafts). The TB / BS show each account; contra between banks works; the Books bank book picks an account;
   Tally export emits one ledger per bank. The main account keeps id 3510, so old data is unchanged.
@@ -492,7 +509,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
   (bank book per account), `src/lib/tally-xml.ts`, `src/components/bank/BankAccountsCard.tsx` (OD flag, opening).
 - **Tally feel:** banks are ledgers under "Bank Accounts" / "Bank OD A/c", visible in the Contra F4 picker.
 
-### P0-9 Multiple invoice copies (Original / Duplicate / Triplicate) — WP-4, size S–M
+### P0-9 Multiple invoice copies (Original / Duplicate / Triplicate) — WP-4, size S–M — ✅ done (`docs/features/printing.md`)
 - **Build:** a print / PDF option "Copies: Original for Recipient, Duplicate for Transporter, Triplicate for
   Supplier, Extra copy". It renders the same snapshot N times with a per-copy banner (accent colour; the banner is a template part)
   into one multi-page PDF / print job. A per-profile default (goods: 3 copies; services: 2, "Duplicate for supplier", Rule 48 / 49).
@@ -500,7 +517,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
   `src/lib/design-prefs.ts` (additive `copies`), PDF export helper. Keep `html-to-image` + `jspdf` (Critical Rule 6).
 - **Tally feel:** Tally's print screen "No. of Copies" + "Copy names" with Ctrl+P → Enter to print.
 
-### P0-10 Complete MCA audit trail — WP-7, size M
+### P0-10 Complete MCA audit trail — WP-7, size M — ✅ done (`docs/features/migration-audit.md`; Edit log on vouchers / bills)
 - **Build:** audit every write to every books table, not only `localDb` calls. Add a central hook in `setTable` for the books tables
   (purchases, purchase_payments, vouchers, stock_moves, stock_transfers, advances, cheques, fixed_assets, recurring,
   bank_statements…) that diffs by row id and records create / alter / delete with before / after field values.
@@ -511,7 +528,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** TallyPrime "Edit Log" (Alt+G → Edit Log) per voucher / master with "Altered by / on" and a "View
   Changes" diff.
 
-### P0-12 Tally export of every voucher — WP-7, size S–M
+### P0-12 Tally export of every voucher — WP-7, size S–M — ✅ done (`docs/features/migration-audit.md`)
 - **Build:** export supplier payments (`purchase_payments` → Payment voucher, Dr vendor with Agst Ref to the bill number,
   Cr Bank / Cash), manual JV / CV / PV / RV (`vouchers` → Journal / Contra / Payment / Receipt, mapping our accounts to
   Tally ledgers under the matching Tally groups), fixed-asset purchases and depreciation journals, and debit notes as their own
@@ -521,7 +538,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** imported vouchers keep our numbers and narration; ledgers land under Tally's own groups (Sundry
   Creditors, Bank Accounts, Indirect Expenses, Fixed Assets).
 
-### P0-11 Bill allocation in manual receipt / payment vouchers (receivable side) — WP-1 (with WIP-C), size S–M
+### P0-11 Bill allocation in manual receipt / payment vouchers (receivable side) — WP-1 (with WIP-C), size S–M — ✅ done (`docs/features/masters.md`, payable side `billwise.ts`)
 - **Build:** on a manual RV / PV line against Sundry Debtors, a bill-wise sub-screen (Agst Ref to open invoices /
   opening bills, Advance, On Account) that records `transactions` rows (receipts) so receivables agree with the ledger.
   **Coordinate with WIP-C**, which builds the payable side and probably the bill-wise UI component: reuse one
@@ -533,34 +550,34 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 
 ## 5. Prioritised gaps: P1
 
-| # | Gap | Build | Touches | Size | Depends | Tally feel |
-|---|---|---|---|---|---|---|
-| P1-1 | Ratio Analysis | Working capital, cash / bank / OD, Sundry Debtors / Creditors, stock, current ratio, quick ratio, debt / equity, GP %, NP %, operating cost %, receivable turnover (days), inventory turnover, return on investment / WC — each drillable | new `src/lib/ledger/ratios.ts`, `components/books/ledger/RatiosTab.tsx` | S–M | P0-3 (closing stock) | Tally "Ratio Analysis" two-pane layout (Principal Groups / Principal Ratios) |
-| P1-2 | Comparative columns (Alt+C) and month-wise columns | Column model for TB / P&L / BS / Group Summary: add column = another period, or auto-repeat by month / quarter | `src/lib/ledger/reports.ts` (period array), report tabs | M | P0-4 | "New Column" dialog, "Auto Repeat Columns" |
-| P1-3 | F12 configure per report | Options panel per report (show opening, narration, zero balances, scale ₹ / lakh / crore, sort by name / amount, show percentages), remembered per report | new `src/lib/report-prefs.ts` (device-local or a table), each tab | S–M | P0-4 | F12 panel with Yes / No toggles |
-| P1-4 | Registers: Sales / Purchase / Journal / Payment / Receipt / Contra / Debit Note / Credit Note, month-wise → vouchers, columnar | `registers(ledger, type, period)` + column picker (GSTIN, taxable, each tax, cess, TCS / TDS, narration) | new `src/lib/ledger/registers.ts`, `RegistersTab.tsx` | M | P0-3 | Tally "Sales Register" month list (Alt+F5 columnar) |
-| P1-5 | Exception reports | Negative ledgers, negative stock days, cash-in-hand negative on any date, debtors in credit / creditors in debit, vouchers with warnings, GST "uncertain transactions" with a resolve link | new `src/lib/ledger/exceptions.ts`, `ExceptionsTab.tsx`; reads `inventory`, `gst-reports` reconciliation | M | P0-3 | "Exception Reports" menu |
-| P1-6 | Receivables polish | Ageing by **due date or bill date**, user ageing slabs, interest column (party interest parameters), group-wise outstanding, bulk statements / reminder letters, "Confirmation of Accounts" letter for a date | `src/lib/receivables.ts`, `src/pages/Receivables.tsx`, `components/receivables/*` | M | P0-1 (groups) | "Bills Receivable", "Ledger Outstandings", "Confirmation of Accounts" |
-| P1-7 | Interest Calculation reports | Party / ledger / bill-wise interest using the ledger interest parameters (both sides, incl. loans), with "book interest" → a journal or a debit-note draft | `src/lib/interest.ts` (extend), new `InterestTab.tsx` | M | P0-1 | Tally "Interest Calculations" (Alt+I in a ledger) |
-| P1-8 | GRN / Receipt Note, Rejection In / Out, pending-bill reports | `RECEIPT_NOTE` doc (stock in before the bill; PO → GRN → Bill tracking), `REJECTION_OUT` (return before billing), `REJECTION_IN` (customer rejects a challan); "Goods received not billed", "Delivered not invoiced" | `src/types/purchases.ts`, new `src/lib/receipt-notes.ts`, `src/lib/inventory.ts` events (coordinate with WIP-B), `components/purchases/GrnTab.tsx` | M–L | WP-3 base | "Receipt Note" (Alt+F9), "Rejections In / Out" |
-| P1-9 | Job work in / out + ITC-04 | Material Out (to job worker, challan under Rule 55, 1-year / 3-year return clocks), Material In, job-worker godowns ("our stock with third party"), ITC-04 working paper (half-yearly / annual by turnover) | new `src/lib/job-work.ts`, `src/lib/itc04.ts`, godown flag, `components/inventory/JobWorkTab.tsx` | L | WIP-B (BOM / stock journal) | "Job Work Out Order", "Material Out" |
-| P1-10 | Inventory masters depth | Stock groups (tree) + categories, units master with UQC + decimals, **alternate / compound units** with conversion on lines (qty in Box → stock in Nos), group-wise stock summary, `PurchaseLine.item_id` | new `src/lib/stock-groups.ts`, `src/lib/units.ts`, additive `StockItem` fields, `components/inventory/{StockGroupsModal,UnitsModal}.tsx`, line editors | L | coordinate `inventory.ts` with WIP-B | "Stock Group", "Unit of Measure" (Simple / Compound), "Alternate Units: 1 Box = 12 Nos" |
-| P1-11 | Stock ageing + party-wise movement | Ageing by FIFO inward layers (slabs configurable), party-wise movement (who supplied / bought what) | new `src/lib/stock-ageing.ts`, Inventory tabs | M | — | "Ageing Analysis", "Movement Analysis → Party-wise" |
-| P1-12 | Order outstanding reports | Sales / purchase orders pending by party / item / due date, overdue orders | `src/lib/sales-orders.ts` / `purchase-orders.ts` (pure additions), a new Reports tab | S–M | — | "Sales Order Outstandings" |
-| P1-13 | Voucher Types master | User voucher types under a base type (Sales – Retail, Sales – Export), own prefix / suffix / starting number / restart (yearly, monthly), default print title / template, default bank, "use for POS" | new `src/lib/voucher-types.ts`; integrates with `invoice-number.ts` (numbering contract **must keep the Indian-FY default**) | M–L | coordinate with WIP-D | "Voucher Type Creation" |
-| P1-14 | Banking documents | Deposit slip print, payment advice (bills settled + TDS), bulk e-payment upload file (generic NEFT / RTGS CSV + HDFC / ICICI / SBI presets), cheque against several invoices, party bank details | new `src/lib/deposit-slip.ts`, `payment-advice.ts`, `bank-upload.ts`; `cheques.ts` (multi-allocation); `Vendor` bank fields | M | — | Banking menu: "Deposit Slip", "Payment Advice", "e-Payments" |
-| P1-15 | Print and communication | Per-print configuration (copies, logo / signature / bank / rate column, title override), manual voucher printing (JV / PV / RV / CV with "Prepared / Checked / Authorised by"), **batch print / ZIP of PDFs**, standard report print header | `components/preview/*`, new `src/lib/voucher-print.ts`, `src/lib/pdf-batch.ts` (uses `zip.ts`) | M | P0-9 | "Print Configuration" (F12 at print), "Multi-Voucher Print" |
-| P1-16 | GST depth | e-Invoice ShipDtls / DispDtls / PayDtls; cess on purchase bills; RCM self-invoice + Rule 52 payment voucher series; HSN master with rate history and default rate inheritance (company → group → item); purchase-side HSN / rate register; month-wise "GSTR-1 vs 3B vs Books" reconciliation; GSTR-9C working paper | `src/lib/einvoice.ts`, `purchases.ts`, new `src/lib/hsn-master.ts`, `src/lib/gstr9c.ts`, `components/gst-reports/*` | L | WP-3 (supplier notes for 9C ITC) | TallyPrime "GST Rate Setup", "Reconciliation of Returns" |
-| P1-17 | Dashboard tiles | Tile picker: cash, each bank, receivables, payables, GST payable (from P0-6), stock value, top items / parties, overdue POs | `src/pages/Dashboard.tsx`, `src/lib/stats.ts` | S–M | P0-6, P0-8 | TallyPrime 4 Dashboard "Add Tile" |
-| P1-18 | Approvals (maker-checker) | Optional: a clerk's invoices / bills / payments save as "Pending approval" (not issued, no number consumed until approved, or a provisional number); the owner approves or rejects with a note; bell notice | `src/lib/access.ts` (new action), `localDb.invoices.save` path, a new `approvals` table | M | — | Zoho-style; Tally users know it as "Approval Workflow" from Tally ERP add-ons |
-| P1-19 | Branch accounting | Branch = a profile GSTIN; branch-wise TB / P&L filter (from the document's sender GSTIN / cost centre), inter-branch stock transfer as a tax invoice between distinct persons (Sec 25(4)) with "Branch Transfer" accounts | `src/lib/ledger/reports.ts` (filter), `godowns.ts` (godown → branch) | M–L | P0-3 | Tally multi-GSTIN "Registration" selector in reports |
-| P1-20 | Year-end wizard | Checklist: closing stock, depreciation run, provisions journal, lock FY, opening bills check, carry-forward report, optional archive of old FYs to a separate "history" company | new `src/lib/year-end.ts`, `components/year-end/*` | M | P0-3, P0-10 | Tally "Split Company Data" (presented as "Start new year") |
-| P1-21 | Excel import of ledgers, vendors, stock items, vouchers | New import kinds in the wizard, mapped like clients / items | `src/lib/import-mapping.ts`, `importers.ts` (new kinds), wizard steps | M | P0-1 | TallyPrime 4 "Import → Excel" templates |
-| P1-22 | Tally XML export completeness (beyond P0-12) | Cost-centre allocations, godown / batch allocations (with masters), stock transfers as Stock Journal, per-bank ledgers, receipts at the realised FX rate, opening balances in masters | `src/lib/tally-xml.ts` | M | P0-1, P0-8 | — |
-| P1-23 | Alt+C inline master creation and edit log views | Inline create for ledger / stock item / godown / cost centre / unit from any picker; Edit Log for purchases / vouchers / stock | pickers (`VendorPicker`, `CostCentreSelect`, account picker in `VoucherEditor`), `components/audit/*` | M | P0-1, P0-10 | Alt+C |
-| P1-24 | Transport details on the invoice form, printed | Transporter name / ID, LR / GR no. and date, vehicle no., mode, distance on the document (feeds e-Way); printed on GST layouts | `src/types/invoice.ts` (additive + `RECORD_KEYS`, `normalizeRecord`), `DocumentMetaCard.tsx`, templates | S–M | — | "Dispatch details" sub-screen in a Tally Sales voucher |
-| P1-25 | POS returns / exchange | Return screen from a scanned bill number; credit note + refund tender; exchange nets the new bill | `src/pages/Pos.tsx`, `src/lib/pos.ts`, `documents.createCreditNote` | M | — | — |
-| P1-26 | Global period and Go To | One current period / date (Alt+F2 / F2) shared across Books, Reports, GST and Inventory; report names inside Books tabs in the palette | `src/lib/period-context.ts` (new, device-local), `PeriodBar.tsx`, `search.ts` | S–M | coordinate with WIP-D | Tally "Period" and "Date" buttons at the top-right |
+| # | Gap | Build | Touches | Size | Depends | Tally feel | Status (Phase 7 merge) |
+|---|---|---|---|---|---|---|---|
+| P1-1 | Ratio Analysis | Working capital, cash / bank / OD, Sundry Debtors / Creditors, stock, current ratio, quick ratio, debt / equity, GP %, NP %, operating cost %, receivable turnover (days), inventory turnover, return on investment / WC — each drillable | new `src/lib/ledger/ratios.ts`, `components/books/ledger/RatiosTab.tsx` | S–M | P0-3 (closing stock) | Tally "Ratio Analysis" two-pane layout (Principal Groups / Principal Ratios) | ✅ `ledger/ratios.ts` + closing stock (WP-2); Gateway row |
+| P1-2 | Comparative columns (Alt+C) and month-wise columns | Column model for TB / P&L / BS / Group Summary: add column = another period, or auto-repeat by month / quarter | `src/lib/ledger/reports.ts` (period array), report tabs | M | P0-4 | "New Column" dialog, "Auto Repeat Columns" | ✅ Group Summary / P&L (TB / BS one period) |
+| P1-3 | F12 configure per report | Options panel per report (show opening, narration, zero balances, scale ₹ / lakh / crore, sort by name / amount, show percentages), remembered per report | new `src/lib/report-prefs.ts` (device-local or a table), each tab | S–M | P0-4 | F12 panel with Yes / No toggles | ✅ `report-prefs.ts` (WP-2) |
+| P1-4 | Registers: Sales / Purchase / Journal / Payment / Receipt / Contra / Debit Note / Credit Note, month-wise → vouchers, columnar | `registers(ledger, type, period)` + column picker (GSTIN, taxable, each tax, cess, TCS / TDS, narration) | new `src/lib/ledger/registers.ts`, `RegistersTab.tsx` | M | P0-3 | Tally "Sales Register" month list (Alt+F5 columnar) | ✅ `registers.ts` (WP-2) |
+| P1-5 | Exception reports | Negative ledgers, negative stock days, cash-in-hand negative on any date, debtors in credit / creditors in debit, vouchers with warnings, GST "uncertain transactions" with a resolve link | new `src/lib/ledger/exceptions.ts`, `ExceptionsTab.tsx`; reads `inventory`, `gst-reports` reconciliation | M | P0-3 | "Exception Reports" menu | ✅ `exceptions.ts` (WP-2) |
+| P1-6 | Receivables polish | Ageing by **due date or bill date**, user ageing slabs, interest column (party interest parameters), group-wise outstanding, bulk statements / reminder letters, "Confirmation of Accounts" letter for a date | `src/lib/receivables.ts`, `src/pages/Receivables.tsx`, `components/receivables/*` | M | P0-1 (groups) | "Bills Receivable", "Ledger Outstandings", "Confirmation of Accounts" | 🟡 bulk statements + confirmation letters (WP-4); ageing slabs / interest column open |
+| P1-7 | Interest Calculation reports | Party / ledger / bill-wise interest using the ledger interest parameters (both sides, incl. loans), with "book interest" → a journal or a debit-note draft | `src/lib/interest.ts` (extend), new `InterestTab.tsx` | M | P0-1 | Tally "Interest Calculations" (Alt+I in a ledger) | 🟡 lib `ledger-interest.ts` (WP-1); no report screen |
+| P1-8 | GRN / Receipt Note, Rejection In / Out, pending-bill reports | `RECEIPT_NOTE` doc (stock in before the bill; PO → GRN → Bill tracking), `REJECTION_OUT` (return before billing), `REJECTION_IN` (customer rejects a challan); "Goods received not billed", "Delivered not invoiced" | `src/types/purchases.ts`, new `src/lib/receipt-notes.ts`, `src/lib/inventory.ts` events (coordinate with WIP-B), `components/purchases/GrnTab.tsx` | M–L | WP-3 base | "Receipt Note" (Alt+F9), "Rejections In / Out" | 🟡 GRN + Rejections Out (WP-3); Rejections In open |
+| P1-9 | Job work in / out + ITC-04 | Material Out (to job worker, challan under Rule 55, 1-year / 3-year return clocks), Material In, job-worker godowns ("our stock with third party"), ITC-04 working paper (half-yearly / annual by turnover) | new `src/lib/job-work.ts`, `src/lib/itc04.ts`, godown flag, `components/inventory/JobWorkTab.tsx` | L | WIP-B (BOM / stock journal) | "Job Work Out Order", "Material Out" | ❌ open |
+| P1-10 | Inventory masters depth | Stock groups (tree) + categories, units master with UQC + decimals, **alternate / compound units** with conversion on lines (qty in Box → stock in Nos), group-wise stock summary, `PurchaseLine.item_id` | new `src/lib/stock-groups.ts`, `src/lib/units.ts`, additive `StockItem` fields, `components/inventory/{StockGroupsModal,UnitsModal}.tsx`, line editors | L | coordinate `inventory.ts` with WIP-B | "Stock Group", "Unit of Measure" (Simple / Compound), "Alternate Units: 1 Box = 12 Nos" | 🚧 WP-8 in progress |
+| P1-11 | Stock ageing + party-wise movement | Ageing by FIFO inward layers (slabs configurable), party-wise movement (who supplied / bought what) | new `src/lib/stock-ageing.ts`, Inventory tabs | M | — | "Ageing Analysis", "Movement Analysis → Party-wise" | ✅ stock ageing + party movement (WIP-B) |
+| P1-12 | Order outstanding reports | Sales / purchase orders pending by party / item / due date, overdue orders | `src/lib/sales-orders.ts` / `purchase-orders.ts` (pure additions), a new Reports tab | S–M | — | "Sales Order Outstandings" | 🟡 purchase orders (WP-3); sales orders with WP-8 |
+| P1-13 | Voucher Types master | User voucher types under a base type (Sales – Retail, Sales – Export), own prefix / suffix / starting number / restart (yearly, monthly), default print title / template, default bank, "use for POS" | new `src/lib/voucher-types.ts`; integrates with `invoice-number.ts` (numbering contract **must keep the Indian-FY default**) | M–L | coordinate with WIP-D | "Voucher Type Creation" | ❌ open |
+| P1-14 | Banking documents | Deposit slip print, payment advice (bills settled + TDS), bulk e-payment upload file (generic NEFT / RTGS CSV + HDFC / ICICI / SBI presets), cheque against several invoices, party bank details | new `src/lib/deposit-slip.ts`, `payment-advice.ts`, `bank-upload.ts`; `cheques.ts` (multi-allocation); `Vendor` bank fields | M | — | Banking menu: "Deposit Slip", "Payment Advice", "e-Payments" | ✅ WP-5; vendor bank details on the vendor form |
+| P1-15 | Print and communication | Per-print configuration (copies, logo / signature / bank / rate column, title override), manual voucher printing (JV / PV / RV / CV with "Prepared / Checked / Authorised by"), **batch print / ZIP of PDFs**, standard report print header | `components/preview/*`, new `src/lib/voucher-print.ts`, `src/lib/pdf-batch.ts` (uses `zip.ts`) | M | P0-9 | "Print Configuration" (F12 at print), "Multi-Voucher Print" | ✅ WP-4 |
+| P1-16 | GST depth | e-Invoice ShipDtls / DispDtls / PayDtls; cess on purchase bills; RCM self-invoice + Rule 52 payment voucher series; HSN master with rate history and default rate inheritance (company → group → item); purchase-side HSN / rate register; month-wise "GSTR-1 vs 3B vs Books" reconciliation; GSTR-9C working paper | `src/lib/einvoice.ts`, `purchases.ts`, new `src/lib/hsn-master.ts`, `src/lib/gstr9c.ts`, `components/gst-reports/*` | L | WP-3 (supplier notes for 9C ITC) | TallyPrime "GST Rate Setup", "Reconciliation of Returns" | 🟡 WP-6 (HSN defaults wired on lines); RCM self-invoice open |
+| P1-17 | Dashboard tiles | Tile picker: cash, each bank, receivables, payables, GST payable (from P0-6), stock value, top items / parties, overdue POs | `src/pages/Dashboard.tsx`, `src/lib/stats.ts` | S–M | P0-6, P0-8 | TallyPrime 4 Dashboard "Add Tile" | ✅ WP-9 |
+| P1-18 | Approvals (maker-checker) | Optional: a clerk's invoices / bills / payments save as "Pending approval" (not issued, no number consumed until approved, or a provisional number); the owner approves or rejects with a note; bell notice | `src/lib/access.ts` (new action), `localDb.invoices.save` path, a new `approvals` table | M | — | Zoho-style; Tally users know it as "Approval Workflow" from Tally ERP add-ons | ✅ WP-9; banner, list filter, bell notice |
+| P1-19 | Branch accounting | Branch = a profile GSTIN; branch-wise TB / P&L filter (from the document's sender GSTIN / cost centre), inter-branch stock transfer as a tax invoice between distinct persons (Sec 25(4)) with "Branch Transfer" accounts | `src/lib/ledger/reports.ts` (filter), `godowns.ts` (godown → branch) | M–L | P0-3 | Tally multi-GSTIN "Registration" selector in reports | 🟡 branch master + tags + selects (WP-9); branch-wise TB / P&L, inter-branch invoice open |
+| P1-20 | Year-end wizard | Checklist: closing stock, depreciation run, provisions journal, lock FY, opening bills check, carry-forward report, optional archive of old FYs to a separate "history" company | new `src/lib/year-end.ts`, `components/year-end/*` | M | P0-3, P0-10 | Tally "Split Company Data" (presented as "Start new year") | ✅ WP-7; consistent with report-time closing stock |
+| P1-21 | Excel import of ledgers, vendors, stock items, vouchers | New import kinds in the wizard, mapped like clients / items | `src/lib/import-mapping.ts`, `importers.ts` (new kinds), wizard steps | M | P0-1 | TallyPrime 4 "Import → Excel" templates | ❌ open |
+| P1-22 | Tally XML export completeness (beyond P0-12) | Cost-centre allocations, godown / batch allocations (with masters), stock transfers as Stock Journal, per-bank ledgers, receipts at the realised FX rate, opening balances in masters | `src/lib/tally-xml.ts` | M | P0-1, P0-8 | — | ✅ WP-7 |
+| P1-23 | Alt+C inline master creation and edit log views | Inline create for ledger / stock item / godown / cost centre / unit from any picker; Edit Log for purchases / vouchers / stock | pickers (`VendorPicker`, `CostCentreSelect`, account picker in `VoucherEditor`), `components/audit/*` | M | P0-1, P0-10 | Alt+C | 🟡 Alt+C ledgers in voucher editors + Edit log on vouchers / bills; stock item / godown inline create open |
+| P1-24 | Transport details on the invoice form, printed | Transporter name / ID, LR / GR no. and date, vehicle no., mode, distance on the document (feeds e-Way); printed on GST layouts | `src/types/invoice.ts` (additive + `RECORD_KEYS`, `normalizeRecord`), `DocumentMetaCard.tsx`, templates | S–M | — | "Dispatch details" sub-screen in a Tally Sales voucher | ✅ WP-4 |
+| P1-25 | POS returns / exchange | Return screen from a scanned bill number; credit note + refund tender; exchange nets the new bill | `src/pages/Pos.tsx`, `src/lib/pos.ts`, `documents.createCreditNote` | M | — | — | ✅ WP-9 |
+| P1-26 | Global period and Go To | One current period / date (Alt+F2 / F2) shared across Books, Reports, GST and Inventory; report names inside Books tabs in the palette | `src/lib/period-context.ts` (new, device-local), `PeriodBar.tsx`, `search.ts` | S–M | coordinate with WIP-D | Tally "Period" and "Date" buttons at the top-right | ✅ `period-context.ts` (Books); GST / Inventory adopt later |
 
 ---
 

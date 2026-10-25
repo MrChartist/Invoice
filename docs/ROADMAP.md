@@ -201,7 +201,10 @@ Share, static catalogue HTML.
 
 ## Phase 7: Tally parity (v5.x)
 
-### Accounting depth
+Numbering: one sequence 7.1–7.61 in the sub-sections below (renumbered after the WP merge; the work-package
+documents in `docs/features/` keep their own WP ids). Gap ids refer to `docs/GAP_ANALYSIS.md`.
+
+### 7A · Accounting depth (TDS, voucher variants, bill-wise, masters, payroll)
 
 | # | Item | Tally feature | Status |
 |---|------|---------------|--------|
@@ -216,7 +219,7 @@ Share, static catalogue HTML.
 | 7.9 | ✅ **Masters & openings ("Accounts Info")**: user groups / sub-groups under the Schedule III primaries (nature and gross-profit effect inherited), Group / Ledger Create · Alter · Display with Tally keys (Enter / Ctrl+A / Esc, Alt+C hook), ledger and party opening balances on a books-beginning date posted as an Opening voucher with the difference in opening balances reported, bill-wise opening outstandings in receivables ageing and statements, opening trial balance screen, ledger interest parameters (lib), bill allocation on manual receipts — `docs/features/masters.md` | Groups, Ledgers, Opening balances, Bill-wise details (WP-1: P0-1, P0-2, P0-11, P1-7 lib) | done (P1-21 import kinds, P2 cost categories: open) |
 | 7.10 | ✅ **Payroll** (WIP-A): employees, pay heads (Tally calculation types), salary structures, attendance / production, Auto fill payroll run → Payroll voucher in the ledger, salary / PF / ESI / PT / TDS (192) payments, payslips, PF ECR, ESI, PT, Form 24Q / Form 16 Part B working papers (`/payroll`, `src/lib/payroll/`, `docs/features/payroll.md`) | Payroll | done |
 
-### Keyboard-first accounting (Gateway)
+### 7B · Keyboard-first accounting (Gateway)
 
 For users coming from TallyPrime: the same keyboard conventions on top of the existing ledger. Full key map:
 `docs/features/gateway-keyboard.md`.
@@ -230,80 +233,97 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.15 | ✅ **Keyboard help** (Ctrl+/ or ?) with a "Tally keys" group; clickable button bar for mouse / touch | `keymap.ts`, `ButtonBar.tsx` | S |
 | 7.16 | ✅ **"Tally terms" toggle** (Party, Sales voucher, Purchase voucher) on Gateway screens only | device-local preference | S |
 | 7.17 | ✅ **Stock journal (Alt+F7) / Physical stock (Ctrl+F7)**: keys and Gateway rows open `/manufacturing?tab=journal` / `?tab=physical` (WIP-B) | `TALLY_KEYS`, `menu.ts` | S |
-| 7.18 | ⏳ (partial) Employee master (Create / Alter), Payroll voucher and payroll statutory rows are in `GATEWAY_EXTENSIONS`; still open: **TDS** statutory rows (7.1–7.3), **Ratio analysis** report (7.6) | add through `GATEWAY_EXTENSIONS` when those modules exist | S |
+| 7.18 | ✅ **Gateway rows for every module** through `GATEWAY_EXTENSIONS`: Employee / Payroll voucher / payroll reports, TDS & TCS payables, GST set-off, Ratio analysis, Accounts Info, banking documents, purchase debit note, receipt note, manufacturing journal, Tally import, Start new year (integration pass, 7.60) | `src/lib/gateway/menu.ts` | S |
 | 7.19 | ⏳ Bill-wise references (7.5) and voucher classes (7.4) on Gateway voucher entry, single-entry mode | needs a voucher schema addition | M |
+
+### 7C · Banking & payments (WP-5, `docs/features/banking.md`)
+
+| # | Item | Notes | Effort |
+|---|------|-------|--------|
 | 7.20 | ✅ **Each bank account as its own ledger** (WP-5, P0-8): main account keeps 3510, others `bank:<id>` under Cash & bank or Bank OD A/c; receipts, supplier payments / advances, advance receipts / refunds, TDS challans and cheques post to their bank; per-bank openings; contra between banks (OD included); Books bank book per account; Tally one ledger per bank | `src/lib/bank-ledgers.ts`, `src/lib/ledger/postings-bank.ts`, `src/lib/tally-bank.ts`, `docs/features/banking.md` | M |
 | 7.21 | ✅ **Banking documents** (WP-5, P1-14): deposit / pay-in slip with cheques + cash denominations (`PIS/FY…`), payment advice (bills settled + TDS), bulk e-payment file (generic NEFT / RTGS CSV + HDFC / ICICI / SBI presets — check the format with your bank), cheque against several invoices / bills, vendor bank details | `deposit-slip.ts`, `payment-advice.ts`, `bank-upload.ts`, `cheques.ts`, `BankingDocs.tsx` | M |
 | 7.22 | ✅ **Bounce charges posting** and **day-end cash tally by denomination** (WP-5, P2) | `cheques.ts`, `cash-tally.ts` | S |
-| 7.23 | ⏳ Banking follow-ups: forex bank ledgers, vendor-form UI for bank details (only in e-Payments now), record payments from an e-payment file after bank confirmation, supplier payments in the Tally export, Contra voucher from a deposit slip's cash | — | M |
+| 7.23 | ⏳ Banking follow-ups: forex bank ledgers, record payments from an e-payment file after bank confirmation, supplier payments in the Tally export, Contra voucher from a deposit slip's cash (vendor-form bank details: done in 7.60) | — | M |
 
-### Purchase returns, receipt notes, order outstanding (WP-3)
+### 7D · Purchase returns, receipt notes, order outstanding (WP-3)
 
 | # | Item | Tally equivalent | Status |
 |---|---|---|---|
-| 7.20 | ✅ **Purchase return / supplier debit note** against a bill (`DN/FY<yy-yy>/<seq>`): quantity limited to billed less earlier returns, goods leave stock, ITC reversed, GST "reason for note", Agst Ref on the bill (bill-wise / payables), excess on account; Dr Creditors / Cr Purchase returns (5010) + input heads (`src/lib/purchase-returns.ts`, `ledger/postings-returns.ts`, `docs/features/purchase-returns.md`) | Debit Note (Ctrl+F9) | done |
-| 7.21 | ✅ **Supplier credit note received** (supplier's number / date, value only or with goods, with or without a bill); GSTR-3B ITC net of notes (`itcAdjustmentsFromNotes`), GSTR-2B CDNR matching (`bookBills` notes), Tally Debit Note voucher (`tally-debit-notes.ts`) | Debit Note with supplier ref | done |
-| 7.22 | ✅ **Receipt note (GRN)** → bill (PO → GRN → bill), **Rejections Out**, "Goods received not billed" (`src/lib/receipt-notes.ts`, stock source `events-returns.ts`) | Receipt Note (Alt+F9), Rejections Out | done |
-| 7.23 | ✅ **Purchase order outstanding** report (GRN-accepted + directly billed vs ordered, overdue days) | Purchase Order Outstandings | done |
-| 7.24 | Job work in / out (Rule 55 challans, 1 / 3-year return clocks, job-worker godowns) + **ITC-04** working paper; Rejections In (customer rejects a challan); sales-order outstanding (WP-8); GSTR-9 Table 6 / 9C use of supplier notes; TDS adjustment on a return of a TDS bill | Job Work Out / In Orders, Material Out / In, ITC-04 | open |
+| 7.24 | ✅ **Purchase return / supplier debit note** against a bill (`DN/FY<yy-yy>/<seq>`): quantity limited to billed less earlier returns, goods leave stock, ITC reversed, GST "reason for note", Agst Ref on the bill (bill-wise / payables), excess on account; Dr Creditors / Cr Purchase returns (5010) + input heads (`src/lib/purchase-returns.ts`, `ledger/postings-returns.ts`, `docs/features/purchase-returns.md`) | Debit Note (Ctrl+F9) | done |
+| 7.25 | ✅ **Supplier credit note received** (supplier's number / date, value only or with goods, with or without a bill); GSTR-3B ITC net of notes (`itcAdjustmentsFromNotes`), GSTR-2B CDNR matching (`bookBills` notes), Tally Debit Note voucher (`tally-debit-notes.ts`) | Debit Note with supplier ref | done |
+| 7.26 | ✅ **Receipt note (GRN)** → bill (PO → GRN → bill), **Rejections Out**, "Goods received not billed" (`src/lib/receipt-notes.ts`, stock source `events-returns.ts`) | Receipt Note (Alt+F9), Rejections Out | done |
+| 7.27 | ✅ **Purchase order outstanding** report (GRN-accepted + directly billed vs ordered, overdue days) | Purchase Order Outstandings | done |
+| 7.28 | Job work in / out (Rule 55 challans, 1 / 3-year return clocks, job-worker godowns) + **ITC-04** working paper; Rejections In (customer rejects a challan); sales-order outstanding (WP-8); GSTR-9 Table 6 / 9C use of supplier notes; TDS adjustment on a return of a TDS bill | Job Work Out / In Orders, Material Out / In, ITC-04 | open |
 
-### Printing & documents output (WP-4)
+### 7E · Printing & documents output (WP-4)
 
 | # | Item | Gap ids | Effort |
 |---|------|---------|--------|
-| 7.25 | ✅ **Printing & documents output**: Rule 48 copies in one print job / PDF with a per-profile default, transport details printed (GST dispatch cells + block), voucher printing, batch PDF / ZIP, bulk statements + confirmation-of-accounts letters, pre-printed stationery mode — `docs/features/printing.md` | P0-9, P1-15, P1-24, P1-6 (print), P2 | M |
+| 7.29 | ✅ **Printing & documents output**: Rule 48 copies in one print job / PDF with a per-profile default, transport details printed (GST dispatch cells + block), voucher printing, batch PDF / ZIP, bulk statements + confirmation-of-accounts letters, pre-printed stationery mode — `docs/features/printing.md` | P0-9, P1-15, P1-24, P1-6 (print), P2 | M |
 
-### Manufacturing & stock vouchers (WIP-B)
+### 7F · Manufacturing & stock vouchers (WIP-B)
 
 Details: `docs/features/manufacturing.md`.
 
 | # | Item | Tally equivalent | Status |
 |---|------|------------------|--------|
-| 7.B1 | **Bill of Materials** per stock item: components per unit, scrap %, by-products / co-products / scrap, optional godown, several BOMs with a default (`src/lib/manufacturing.ts`, table `boms`) | Components (BoM) | ✅ |
-| 7.B2 | **Manufacturing Journal** `MFG/FY…`: BOM explosion, FEFO batch consumption, additional costs (₹ / %), produced goods valued at component cost + additional − by-product / scrap; period lock, audit, roles | Alt+F7 Manufacturing Journal | ✅ |
-| 7.B3 | **Stock Journal** `SJ/FY…` for conversion / repacking; godown transfers stay STR (`stock_transfers`) | Alt+F7 Stock Journal | ✅ |
-| 7.B4 | **Physical Stock** `PHY/FY…`: counted vs book, shortage / excess with value, positions after the date follow the count, drift warning | Ctrl+F7 Physical Stock | ✅ |
-| 7.B5 | **Reorder levels + MOQ** (per godown optional), Reorder Status with pending POs and "Create purchase order", bell alert | Reorder Status | ✅ |
-| 7.B6 | **Inventory reports**: Stock Summary drill-down (item → month → vouchers), Movement Analysis by party, Stock Ageing (FIFO layers, by batch), Negative stock exceptions (`src/lib/stock-reports.ts`) | Stock Summary, Movement Analysis, Ageing | ✅ |
-| 7.B7 | Job work out / in orders, material sent / received, ITC-04 | Job Work vouchers | see 7.24 |
-| 7.B8 | Serial-tracked items in manufacturing; production plan / material requirement vs BOM | — | Next step |
+| 7.30 | **Bill of Materials** per stock item: components per unit, scrap %, by-products / co-products / scrap, optional godown, several BOMs with a default (`src/lib/manufacturing.ts`, table `boms`) | Components (BoM) | ✅ |
+| 7.31 | **Manufacturing Journal** `MFG/FY…`: BOM explosion, FEFO batch consumption, additional costs (₹ / %), produced goods valued at component cost + additional − by-product / scrap; period lock, audit, roles | Alt+F7 Manufacturing Journal | ✅ |
+| 7.32 | **Stock Journal** `SJ/FY…` for conversion / repacking; godown transfers stay STR (`stock_transfers`) | Alt+F7 Stock Journal | ✅ |
+| 7.33 | **Physical Stock** `PHY/FY…`: counted vs book, shortage / excess with value, positions after the date follow the count, drift warning | Ctrl+F7 Physical Stock | ✅ |
+| 7.34 | **Reorder levels + MOQ** (per godown optional), Reorder Status with pending POs and "Create purchase order", bell alert | Reorder Status | ✅ |
+| 7.35 | **Inventory reports**: Stock Summary drill-down (item → month → vouchers), Movement Analysis by party, Stock Ageing (FIFO layers, by batch), Negative stock exceptions (`src/lib/stock-reports.ts`) | Stock Summary, Movement Analysis, Ageing | ✅ |
+| 7.36 | Job work out / in orders, material sent / received, ITC-04 | Job Work vouchers | see 7.28 |
+| 7.37 | Serial-tracked items in manufacturing; production plan / material requirement vs BOM | — | Next step |
 
-### Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
+### 7G · Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
 
 | # | Item | Competitors | Effort |
 |---|------|-------------|--------|
-| 7.9a | ✅ **POS returns / exchange** (WP-9, P1-25): scan / pick the bill → lines & qty → credit note with goods back to stock → refund by cash / UPI / card (payment voucher) or exchange against the next bill; Z report shows returns, refunds and net (`src/lib/pos-returns.ts`, `docs/features/business-extras.md`) | Vyapar, Marg, Busy | M |
-| 7.9b | ✅ **Approvals (maker-checker)** (WP-9, P1-18): `doc.approve` (owner), "invoices above ₹X / all documents by clerks" policy, pending-approval drafts, owner queue, audit + `approvals` log (`src/lib/approval-gate.ts`, `approvals.ts`) | Zoho | M |
-| 7.9c | ✅ **Branches / locations** (WP-9, P1-19): branch master, additive `branch_id` on documents / purchases / vouchers (inferred from profile / GSTIN), branch filter + branch-wise summary; reports-engine option documented for WP-2 (`src/lib/branch.ts`) | Tally, Busy | M |
-| 7.9d | ✅ **Dashboard tiles** (WP-9, P1-17): receivables, payables, cash / bank, GST due, top items, low stock, branches, approvals, AMC, loyalty — per user, lazily loaded (`src/lib/dashboard-tiles.ts`) | TallyPrime 4 | S–M |
-| 7.9e | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
-| 7.9f | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
-| 7.26 | ✅ **Migration from Tally** (WP-7, P0-7): Tally XML import — groups, ledgers (accounts / customers / suppliers with GSTIN, state, PAN, credit period), opening TB + bill-wise openings, stock items / godowns, vouchers as manual vouchers (never invoices); dry run with mapping, duplicate detection on re-import, one undo copy, opening TB checked against Tally to the paisa (`src/lib/tally-import.ts`, `tally-import-apply.ts`, `tally-xml-read.ts`, `components/import/TallyImport.tsx`, `docs/features/migration-audit.md`) | Tally data migration | done |
-| 7.27 | ✅ **MCA audit trail completeness** (WP-7, P0-10): every books / masters table write diffed by row through one `onTableWrite` storage hook (create / alter / delete with before → after), archive segments instead of the 5,000-row cap (still hash-chained, in backups, verified as one chain), per-record Edit log, "cannot be disabled" statement (`src/lib/audit-edits.ts`, `audit.ts`, `audit-chain.ts`, `components/audit/EditLog.tsx`) | Edit Log (Alt+G) | done |
-| 7.28 | ✅ **Tally export of every voucher** (WP-7, P0-12 / P1-22): supplier payments (TDS on payment) and advances, manual Journal / Contra / Payment / Receipt with cost-centre allocations and reversals, fixed-asset + depreciation journals, stock transfers as Stock Journal; group / cost-centre / godown masters, ledger openings with bill-wise opening bills (`src/lib/tally-books.ts`) | Tally import of our XML | done |
-| 7.29 | ✅ **Year-end wizard** (WP-7, P1-20): integrity, closing stock (journal reversed on 1 April), depreciation check, provisions journal, opening bills review, lock the year, carry-forward report / CSV (`src/lib/year-end.ts`, `year-end-store.ts`, `components/year-end/YearEndWizard.tsx`) | "Start new year" / Split Company Data | done |
-| 7.30 | ✅ **Books integrity check** (WP-7, P2): TB and voucher balance, opening difference, orphaned receipts / supplier payments / allocations / document links / opening bills, negative cash days (`src/lib/books-integrity.ts`) | — | done |
-| 7.31 | ⏳ WP-7 follow-ups: Tally import of inventory vouchers (quantities), Excel TB template path, audit segment compression, per-FY auditor export with chain head, archive of old FYs to a "history" company, TDS challans in the Tally export | — | open |
+| 7.38 | ✅ **POS returns / exchange** (WP-9, P1-25): scan / pick the bill → lines & qty → credit note with goods back to stock → refund by cash / UPI / card (payment voucher) or exchange against the next bill; Z report shows returns, refunds and net (`src/lib/pos-returns.ts`, `docs/features/business-extras.md`) | Vyapar, Marg, Busy | M |
+| 7.39 | ✅ **Approvals (maker-checker)** (WP-9, P1-18): `doc.approve` (owner), "invoices above ₹X / all documents by clerks" policy, pending-approval drafts, owner queue, audit + `approvals` log (`src/lib/approval-gate.ts`, `approvals.ts`) | Zoho | M |
+| 7.40 | ✅ **Branches / locations** (WP-9, P1-19): branch master, additive `branch_id` on documents / purchases / vouchers (inferred from profile / GSTIN), branch filter + branch-wise summary; reports-engine option documented for WP-2 (`src/lib/branch.ts`) | Tally, Busy | M |
+| 7.41 | ✅ **Dashboard tiles** (WP-9, P1-17): receivables, payables, cash / bank, GST due, top items, low stock, branches, approvals, AMC, loyalty — per user, lazily loaded (`src/lib/dashboard-tiles.ts`) | TallyPrime 4 | S–M |
+| 7.42 | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
+| 7.43 | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
 
-### Reports engine & Tally report grammar (WP-2)
-
-| # | Item | Gap ids | Status |
-|---|------|---------|--------|
-| 7.25 | ✅ **One accounting truth**: Day Book and P&L from the ledger (manual vouchers, fixed assets, depreciation included); Trading account with **closing stock** from the inventory (FIFO / weighted average) or a typed figure; balance-sheet inventories — `docs/features/reports-engine.md` | P0-3 | done |
-| 7.26 | ✅ **Group Summary + drill-down everywhere** (BS / P&L / TB → group → ledger → months → vouchers → voucher; reusable DrillStack, Enter / Esc), Alt+F1, F12 options, Alt+F2 shared period context | P0-4, P1-3, P1-26 | done |
-| 7.27 | ✅ **Comparative columns** (previous period, month / quarter-wise), month-wise voucher registers with columnar view, exception reports, statistics, funds flow; closing stock in ratio analysis (7.6) | P1-1, P1-2, P1-4, P1-5, P2 | done |
-
-### GST depth & statutory postings (WP-6, `docs/features/gst-setoff.md`)
+### 7H · Migration, audit trail & year-end (WP-7, `docs/features/migration-audit.md`)
 
 | # | Item | Tally equivalent | Status |
 |---|------|------------------|--------|
-| 7.30 | ✅ **GST set-off journal** from a GSTR-3B period (P0-6): liability vs ITC vs cash by head, date-keyed utilisation order (Rule 88A / Sec 49A / original Sec 49(5), `GST_SETOFF_RULES`), Sec 50 interest + Sec 47 late fee estimates, Rule 86B warning; posted through `saveVoucher` (Dr Output / RCM payable / interest / late fee, Cr Input, Cr GST electronic cash ledger 2360); one journal per period × GSTIN (`src/lib/gst-setoff.ts`, "Set-off & payment" tab) | GST adjustment / Set Off of GST | done |
-| 7.31 | ✅ **PMT-06 challans** (`gst_challans`): CPIN, CIN / BRN, mode, bank ledger, major × minor head grid; deposit posts Dr electronic cash ledger / Cr bank; cash ledger balance by head, shortfall and "challan for the shortfall"; "Liability to be paid" card on the GSTR-3B tab | Stat Payment | done |
-| 7.32 | ✅ **Cess on purchase bills** (`cess_amount`): GSTR-3B 4A / 4C / 3.1(d) cess, cess credit against output cess only, GSTR-9 Tables 6 / 9, Input cess ledger posting | GST cess on purchases | done |
-| 7.33 | ✅ **e-Invoice ShipDtls / DispDtls / PayDtls / EwbDtls** from `invoice.ship_to`, a dispatch option, the sender's bank details and `invoice.transport` | e-Invoice with dispatch / ship-to / e-Way | done |
-| 7.34 | ✅ **HSN master** with dated rate history and default-rate inheritance (item → HSN → group → company), seeded from existing documents; **purchase HSN / rate register** (`hsn-master.ts`, `hsn-purchase-register.ts`) | GST Rate Setup, HSN-wise purchase summary | done |
-| 7.35 | ✅ **Month-wise GSTR-1 vs GSTR-3B vs Books** reconciliation and a **GSTR-9C working paper** (Tables 5 / 7 / 9 / 12 with adjustments) (`gst-recon-monthly.ts`, `gstr9c.ts`) | Reconciliation of Returns | done |
-| 7.36 | ⏳ WP-6 follow-ups: HSN-master defaults in the line editors, cess in Books `gstSummary` / accounting + Tally exports, ITC carry-forward into the next month's plan, PMT-09 / refunds, RCM self-invoice + Rule 52 voucher series, IFF JSON, EXPA, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 | — | open |
+| 7.44 | ✅ **Migration from Tally** (WP-7, P0-7): Tally XML import — groups, ledgers (accounts / customers / suppliers with GSTIN, state, PAN, credit period), opening TB + bill-wise openings, stock items / godowns, vouchers as manual vouchers (never invoices); dry run with mapping, duplicate detection on re-import, one undo copy, opening TB checked against Tally to the paisa (`src/lib/tally-import.ts`, `tally-import-apply.ts`, `tally-xml-read.ts`, `components/import/TallyImport.tsx`, `docs/features/migration-audit.md`) | Tally data migration | done |
+| 7.45 | ✅ **MCA audit trail completeness** (WP-7, P0-10): every books / masters table write diffed by row through one `onTableWrite` storage hook (create / alter / delete with before → after), archive segments instead of the 5,000-row cap (still hash-chained, in backups, verified as one chain), per-record Edit log, "cannot be disabled" statement (`src/lib/audit-edits.ts`, `audit.ts`, `audit-chain.ts`, `components/audit/EditLog.tsx`) | Edit Log (Alt+G) | done |
+| 7.46 | ✅ **Tally export of every voucher** (WP-7, P0-12 / P1-22): supplier payments (TDS on payment) and advances, manual Journal / Contra / Payment / Receipt with cost-centre allocations and reversals, fixed-asset + depreciation journals, stock transfers as Stock Journal; group / cost-centre / godown masters, ledger openings with bill-wise opening bills (`src/lib/tally-books.ts`) | Tally import of our XML | done |
+| 7.47 | ✅ **Year-end wizard** (WP-7, P1-20): integrity, closing stock (shows the report-time valuation when it is on; a journal reversed on 1 April only when it is off — never both, 7.60), depreciation check, provisions journal, opening bills review, lock the year, carry-forward report / CSV (`src/lib/year-end.ts`, `year-end-store.ts`, `components/year-end/YearEndWizard.tsx`) | "Start new year" / Split Company Data | done |
+| 7.48 | ✅ **Books integrity check** (WP-7, P2): TB and voucher balance, opening difference, orphaned receipts / supplier payments / allocations / document links / opening bills, negative cash days (`src/lib/books-integrity.ts`) | — | done |
+| 7.49 | ⏳ WP-7 follow-ups: Tally import of inventory vouchers (quantities), Excel TB template path, audit segment compression, per-FY auditor export with chain head, archive of old FYs to a "history" company, TDS challans in the Tally export | — | open |
+
+### 7I · Reports engine & Tally report grammar (WP-2)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.50 | ✅ **One accounting truth**: Day Book and P&L from the ledger (manual vouchers, fixed assets, depreciation included); Trading account with **closing stock** from the inventory (FIFO / weighted average) or a typed figure; balance-sheet inventories — `docs/features/reports-engine.md` | P0-3 | done |
+| 7.51 | ✅ **Group Summary + drill-down everywhere** (BS / P&L / TB → group → ledger → months → vouchers → voucher; reusable DrillStack, Enter / Esc), Alt+F1, F12 options, Alt+F2 shared period context | P0-4, P1-3, P1-26 | done |
+| 7.52 | ✅ **Comparative columns** (previous period, month / quarter-wise), month-wise voucher registers with columnar view, exception reports, statistics, funds flow; closing stock in ratio analysis (7.6) | P1-1, P1-2, P1-4, P1-5, P2 | done |
+
+### 7J · GST depth & statutory postings (WP-6, `docs/features/gst-setoff.md`)
+
+| # | Item | Tally equivalent | Status |
+|---|------|------------------|--------|
+| 7.53 | ✅ **GST set-off journal** from a GSTR-3B period (P0-6): liability vs ITC vs cash by head, date-keyed utilisation order (Rule 88A / Sec 49A / original Sec 49(5), `GST_SETOFF_RULES`), Sec 50 interest + Sec 47 late fee estimates, Rule 86B warning; posted through `saveVoucher` (Dr Output / RCM payable / interest / late fee, Cr Input, Cr GST electronic cash ledger 2360); one journal per period × GSTIN (`src/lib/gst-setoff.ts`, "Set-off & payment" tab) | GST adjustment / Set Off of GST | done |
+| 7.54 | ✅ **PMT-06 challans** (`gst_challans`): CPIN, CIN / BRN, mode, bank ledger, major × minor head grid; deposit posts Dr electronic cash ledger / Cr bank; cash ledger balance by head, shortfall and "challan for the shortfall"; "Liability to be paid" card on the GSTR-3B tab | Stat Payment | done |
+| 7.55 | ✅ **Cess on purchase bills** (`cess_amount`): GSTR-3B 4A / 4C / 3.1(d) cess, cess credit against output cess only, GSTR-9 Tables 6 / 9, Input cess ledger posting | GST cess on purchases | done |
+| 7.56 | ✅ **e-Invoice ShipDtls / DispDtls / PayDtls / EwbDtls** from `invoice.ship_to`, a dispatch option, the sender's bank details and `invoice.transport` | e-Invoice with dispatch / ship-to / e-Way | done |
+| 7.57 | ✅ **HSN master** with dated rate history and default-rate inheritance (item → HSN → group → company), seeded from existing documents; **purchase HSN / rate register** (`hsn-master.ts`, `hsn-purchase-register.ts`) | GST Rate Setup, HSN-wise purchase summary | done |
+| 7.58 | ✅ **Month-wise GSTR-1 vs GSTR-3B vs Books** reconciliation and a **GSTR-9C working paper** (Tables 5 / 7 / 9 / 12 with adjustments) (`gst-recon-monthly.ts`, `gstr9c.ts`) | Reconciliation of Returns | done |
+| 7.59 | ⏳ WP-6 follow-ups: cess in Books `gstSummary` / accounting + Tally exports, ITC carry-forward into the next month's plan, PMT-09 / refunds, RCM self-invoice + Rule 52 voucher series, IFF JSON, EXPA, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 | — | open |
+
+### 7K · Integration pass (after the WP merge)
+
+| # | Item | Status |
+|---|------|--------|
+| 7.60 | ✅ **Everything reachable and consistent**: closing stock never double counted (report-time valuation nets any closing-stock journal; year-end wizard posts a journal only when valuation is off, one-click switch either way); Gateway BS / P&L = Books statements with stock; Gateway rows, sidebar "Accounts Info", palette destinations, Books header entries for the year-end wizard / Tally import; Alt+C ledgers in the Books voucher editor; Edit log on vouchers and bills; approval banner, "Pending approval" filter, branch selects; bell notices for approvals / AMC / GST set-off due; vendor bank details; HSN-master default rate on invoice / bill lines; Ctrl+F9 on the purchase side = purchase debit note (`tests/closing-stock-yearend.test.ts`, `tests/wiring.test.ts`) | done |
+| 7.61 | ⏳ Integration follow-ups: branch filter on the Transactions / purchase lists and branch-wise TB / P&L (`branchPredicates` option in the reports engine), loyalty redemption in the invoice editor, POS "Return / exchange" deep link, branch select on manual vouchers, DrillStack for the Gateway Display viewer, PAN / TDS fields on the vendor form | open |
 
 ## Summary timeline
 
