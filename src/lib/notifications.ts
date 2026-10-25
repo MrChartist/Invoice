@@ -22,7 +22,7 @@ import { COMPLIANCE_TABLE, FORM_LABELS, pendingReturns, type FiledReturn, type F
 import { todayIso } from './tax-rules';
 import { pdcReminders, validUntil, type PdcKind } from './cheque-reminders';
 import type { Cheque } from '../types/cheques';
-import { receivableBalance } from './rcm';
+import { amountDue, linkedCredits, type CreditLinkRow, type CreditMap } from './amount-due';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -56,6 +56,8 @@ export interface NotificationContext {
   gstFrequency?: FilerFrequency;
   /** Cheque register (6.26) — post-dated cheque reminders. */
   cheques?: Cheque[];
+  /** Live credit notes per invoice (`linkedCredits`, src/lib/amount-due.ts): what they settle is not chased. */
+  credits?: CreditMap;
 }
 
 export type NotificationProvider = (ctx: NotificationContext) => AppNotification[];
@@ -105,10 +107,9 @@ function parseDate(value?: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function outstanding(inv: InvoiceRecord): number {
-  const v =
-    receivableBalance(inv);
-  return round2(Math.max(0, v));
+/** Amount due after receipts and linked credit notes (src/lib/amount-due.ts). */
+function outstanding(inv: InvoiceRecord, ctx: Pick<NotificationContext, 'credits'>): number {
+  return amountDue(inv, ctx.credits?.get(inv.id));
 }
 
 const isReceivable = (inv: InvoiceRecord) =>
@@ -123,10 +124,10 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 export const overdueProvider: NotificationProvider = (ctx) => {
   const rows = ctx.invoices.filter(
-    (i) => isReceivable(i) && effectiveStatus(i, ctx.now) === 'Overdue' && outstanding(i) > 0,
+    (i) => isReceivable(i) && effectiveStatus(i, ctx.now) === 'Overdue' && outstanding(i, ctx) > 0,
   );
   if (!rows.length) return [];
-  const total = round2(rows.reduce((s, i) => s + outstanding(i), 0));
+  const total = round2(rows.reduce((s, i) => s + outstanding(i, ctx), 0));
   return [
     {
       id: `overdue:${rows.length}:${total}`,
@@ -143,14 +144,14 @@ export const overdueProvider: NotificationProvider = (ctx) => {
 export const dueSoonProvider: NotificationProvider = (ctx) => {
   const rows = ctx.invoices.filter((i) => {
     if (!isReceivable(i) || i.status === 'Draft' || i.status === 'Paid') return false;
-    if (outstanding(i) <= 0) return false;
+    if (outstanding(i, ctx) <= 0) return false;
     const due = parseDate(i.due_date);
     if (!due) return false;
     const d = dayDiff(ctx.now, due);
     return d >= 0 && d <= DUE_SOON_DAYS;
   });
   if (!rows.length) return [];
-  const total = round2(rows.reduce((s, i) => s + outstanding(i), 0));
+  const total = round2(rows.reduce((s, i) => s + outstanding(i, ctx), 0));
   return [
     {
       id: `due-soon:${rows.length}:${total}`,
@@ -487,9 +488,11 @@ export function recordBackup(now: Date = new Date()): void {
 }
 
 export function buildContext(now: Date = new Date()): NotificationContext {
+  const invoices = getTable<InvoiceRecord>(KEYS.invoices);
   return {
     now,
-    invoices: getTable<InvoiceRecord>(KEYS.invoices),
+    invoices,
+    credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), invoices),
     clients: getTable<Client>(KEYS.clients),
     profile: localDb.settings.activeProfile(),
     gstFiled: getTable<FiledReturn>(COMPLIANCE_TABLE),

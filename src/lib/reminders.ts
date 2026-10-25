@@ -8,7 +8,8 @@ import type { InvoiceRecord } from '../types/invoice';
 import { DOCUMENT_LABELS } from '../types/invoice';
 import { formatCurrency, formatDate } from './utils';
 import { invoiceUpiLink } from './share';
-import { receivableBalance, receivableTotal } from './rcm';
+import { receivableTotal } from './rcm';
+import { amountDue, type CreditMap } from './amount-due';
 
 export const REMINDERS_TABLE = 'reminders';
 
@@ -89,8 +90,9 @@ export function stageForDays(daysToDue: number): ReminderStage | null {
   return 'overdue_final';
 }
 
-export function suggestStage(invoice: InvoiceRecord, today: Date = new Date()): ReminderStage {
-  if (invoice.status === 'Paid' || receivableBalance(invoice) <= 0) return 'thank_you';
+/** `credited`: live credit notes linked to the invoice (`linkedCredits`, src/lib/amount-due.ts). */
+export function suggestStage(invoice: InvoiceRecord, today: Date = new Date(), credited = 0): ReminderStage {
+  if (amountDue(invoice, credited) <= 0) return 'thank_you';
   return stageForDays(daysUntil(invoice.due_date, today)) ?? 'upcoming';
 }
 
@@ -196,6 +198,8 @@ export interface ReminderExtras {
    * into the message when the invoice's own terms mention interest / late fees.
    */
   interestAccrued?: number;
+  /** Live credit notes linked to the invoice: the balance asked for (and the UPI amount) is net of them. */
+  credited?: number;
 }
 
 export function reminderVars(
@@ -208,7 +212,8 @@ export function reminderVars(
   const cur = invoice.currency || 'INR';
   const s = invoice.sender;
   const upi = s?.upiId?.trim() ?? '';
-  const payLink = stage === 'thank_you' ? null : invoiceUpiLink(invoice);
+  const due = amountDue(invoice, extras.credited);
+  const payLink = stage === 'thank_you' ? null : invoiceUpiLink(invoice, due > 0 ? due : undefined);
   const upiLine =
     stage === 'thank_you' || !upi
       ? ''
@@ -231,7 +236,7 @@ export function reminderVars(
     document: DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice',
     // Reverse charge: the GST is the recipient's to pay, never asked for (src/lib/rcm.ts).
     amount: formatCurrency(receivableTotal(invoice), cur),
-    balance: formatCurrency(receivableBalance(invoice) > 0 ? receivableBalance(invoice) : receivableTotal(invoice), cur),
+    balance: formatCurrency(due > 0 ? due : receivableTotal(invoice), cur),
     due: invoice.due_date ? formatDate(invoice.due_date) : 'the due date',
     days: daysPhrase(daysUntil(invoice.due_date, today), lang),
     upi,
@@ -327,6 +332,8 @@ export interface PendingReminder {
   stage: ReminderStage;
   /** Signed days to due (negative = overdue). */
   daysToDue: number;
+  /** Amount due (after receipts and linked credit notes), in the invoice's currency. */
+  balance: number;
   count: number;
   lastSentAt: string | null;
   /** Who to chase first, 0–100 (see `reminderPriority`). The list is sorted by this. */
@@ -375,8 +382,7 @@ function clientKey(inv: InvoiceRecord): string {
   return (c?.gstin || c?.name || '').trim().toUpperCase();
 }
 
-function balanceInr(inv: InvoiceRecord): number {
-  const bal = receivableBalance(inv) || 0;
+function toInr(inv: InvoiceRecord, bal: number): number {
   const cur = (inv.currency || 'INR').toUpperCase();
   const fx = Number(inv.exchange_rate);
   return cur !== 'INR' && fx > 0 ? bal * fx : bal;
@@ -385,6 +391,8 @@ function balanceInr(inv: InvoiceRecord): number {
 export interface PendingOptions {
   /** Minimum days between reminders (default 3; 7 once past 30 days overdue). */
   cooldownDays?: number;
+  /** Live credit notes per invoice (`linkedCredits`): an invoice they settle is never chased. */
+  credits?: CreditMap;
 }
 
 const COLLECTIBLE = new Set(['INVOICE', 'TAX_INVOICE', 'PROFORMA', 'BILL_OF_SUPPLY']);
@@ -401,7 +409,9 @@ export function pendingReminders(
   for (const invoice of invoices) {
     if (!COLLECTIBLE.has(invoice.doc_type)) continue;
     if (invoice.status === 'Paid' || invoice.status === 'Cancelled' || invoice.status === 'Draft') continue;
-    if (!(receivableBalance(invoice) > 0)) continue;
+    // What is still owed after receipts AND linked credit notes (src/lib/amount-due.ts).
+    const balance = amountDue(invoice, opts.credits?.get(invoice.id));
+    if (!(balance > 0)) continue;
     const daysToDue = daysUntil(invoice.due_date, today);
     if (daysToDue < 0) overdueByClient.set(clientKey(invoice), (overdueByClient.get(clientKey(invoice)) ?? 0) + 1);
     const stage = stageForDays(daysToDue);
@@ -418,6 +428,7 @@ export function pendingReminders(
       invoice,
       stage,
       daysToDue,
+      balance,
       count: reminderCount(log, invoice.id),
       lastSentAt: last?.sent_at ?? null,
     });
@@ -428,7 +439,7 @@ export function pendingReminders(
       const own = r.daysToDue < 0 ? 1 : 0;
       const pr = reminderPriority({
         daysToDue: r.daysToDue,
-        balanceInr: balanceInr(r.invoice),
+        balanceInr: toInr(r.invoice, r.balance),
         otherOverdue: key ? Math.max(0, (overdueByClient.get(key) ?? 0) - own) : 0,
         remindersSent: r.count,
       });

@@ -17,7 +17,7 @@ import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-ca
 import { generateId, getTable, setTable } from './storage';
 import { receivableTotal } from './rcm';
 import { reasonReturnsGoods } from './credit-restock';
-import { localDb } from './localDb';
+import { localDb, resettleCreditedInvoices } from './localDb';
 import { getLockUntil, isPeriodLockedError } from './period-lock';
 import { amendmentCheck, buildAmendment, canAmend } from './amendments';
 import { loadFiled } from './compliance';
@@ -593,6 +593,8 @@ export function createCreditNote(invoice: InvoiceRecord, input: CreditInput): In
   if (stock.errors.length) throw new DocumentError(stock.errors.join(' '));
   const saved = localDb.invoices.save(record);
   addLink({ from_id: invoice.id, to_id: saved.id, relation: 'credit_note', reason: input.reason.trim() });
+  // The note may settle the rest of the invoice (status Paid) — see src/lib/amount-due.ts.
+  resettleCreditedInvoices(saved.id);
   return saved;
 }
 

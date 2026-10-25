@@ -41,7 +41,8 @@ import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { quoteState, quoteTone } from '../lib/quote-status';
 import { buildOrderIndex, fulfilmentFromIndex, ORDER_STATES, orderTone, type OrderState } from '../lib/sales-orders';
-import { bulkMarkPaid, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
+import { amountDue, linkedCredits } from '../lib/amount-due';
+import { bulkMarkPaid, bulkPaidTotal, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
 import { effectiveStatus } from '../lib/invoice-status';
 import { getTable } from '../lib/storage';
 import type { CreditLink } from '../lib/stats';
@@ -156,6 +157,8 @@ export function Transactions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const links = useMemo(() => getTable<CreditLink & { relation: string }>('doc_links'), [version]);
   const summary = useMemo(() => summarize(invoices, now, links, 'INR'), [invoices, links]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Amount due per row is net of linked credit notes (src/lib/amount-due.ts).
+  const credits = useMemo(() => linkedCredits(links, invoices), [invoices, links]);
   // One pass over every document gives each sales order its fulfilment state.
   const orderStates = useMemo(() => {
     const out = new Map<string, OrderState>();
@@ -453,7 +456,7 @@ export function Transactions() {
               <button
                 type="button"
                 className={controls.btnOutline}
-                disabled={!visibleSelected.some(canMarkPaid)}
+                disabled={!visibleSelected.some((i) => canMarkPaid(i, credits))}
                 onClick={() => setBulkPay({ method: 'Bank Transfer', date: todayInput() })}
               >
                 <CheckCheck size={16} /> {salesT('tx.markPaid')}
@@ -530,7 +533,8 @@ export function Transactions() {
                   if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={8} />;
                   const inv = rows[slot.index];
                   const status = effectiveStatus(inv, now);
-                  const canPay = isRevenueDoc(inv) && receivableBalance(inv) > 0;
+                  const due = isRevenueDoc(inv) ? amountDue(inv, credits.get(inv.id)) : 0;
+                  const canPay = due > 0;
                   const locked = isLocked(inv); // period lock: read-only, no edit / delete / payment
                   const lockedTitle = salesT('tx.lockedTitle');
                   const num = { number: inv.invoice_number };
@@ -579,7 +583,7 @@ export function Transactions() {
                       </td>
                       <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
                       <td className={cn(surface.numeric, styles.cBal)}>
-                        {isRevenueDoc(inv) ? formatCurrency(receivableBalance(inv), inv.currency) : '—'}
+                        {isRevenueDoc(inv) ? formatCurrency(due, inv.currency) : '—'}
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
@@ -648,8 +652,8 @@ export function Transactions() {
         open={!!bulkPay}
         onClose={() => setBulkPay(null)}
         size="sm"
-        title={salesT('tx.bulkTitle', { n: visibleSelected.filter(canMarkPaid).length })}
-        subtitle={salesT('tx.bulkSub', { amount: formatCurrency(visibleSelected.filter(canMarkPaid).reduce((s, i) => s + (Number(receivableBalance(i)) || 0), 0)) })}
+        title={salesT('tx.bulkTitle', { n: visibleSelected.filter((i) => canMarkPaid(i, credits)).length })}
+        subtitle={salesT('tx.bulkSub', { amount: formatCurrency(bulkPaidTotal(visibleSelected, credits)) })}
         footer={
           <>
             <button type="button" className={controls.btnOutline} onClick={() => setBulkPay(null)}>{salesT('cancel')}</button>

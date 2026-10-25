@@ -13,7 +13,8 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { useReminderLog } from './useReminderLog';
-import { receivableBalance } from '../../lib/rcm';
+import { getTable } from '../../lib/storage';
+import { linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
 import { useT } from '../../i18n';
 import { remindT } from '../../i18n/areas/reminders';
 
@@ -58,11 +59,12 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
   const source = invoices ?? all;
 
   const pending = useMemo(
-    () => pendingReminders(source, today ?? new Date(), log),
+    // Credit notes linked to an invoice settle part of it: never chased (src/lib/amount-due.ts).
+    () => pendingReminders(source, today ?? new Date(), log, { credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), source) }),
     [source, today, log],
   );
   const shown = pending.slice(0, limit);
-  const outstanding = pending.reduce((sum, p) => sum + receivableBalance(p.invoice), 0);
+  const outstanding = pending.reduce((sum, p) => sum + p.balance, 0);
 
   return (
     <section className={cn(surface.card, className)} aria-label={remindT('aria')}>
@@ -115,7 +117,7 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
                   {remindT(p.stage === 'upcoming' ? 'upcoming' : p.stage === 'due_today' ? 'due' : 'overdue')}
                 </span>
                 <span className={styles.amount}>
-                  {formatCurrency(receivableBalance(p.invoice), p.invoice.currency)}
+                  {formatCurrency(p.balance, p.invoice.currency)}
                 </span>
                 <button
                   type="button"

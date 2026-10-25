@@ -38,6 +38,7 @@ import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { nextReceiptNumber, recordSeries } from './series-counters';
 import { receivableTotal } from './rcm';
+import { linkedCredits, settledStatus, type CreditLinkRow } from './amount-due';
 import { assertNotPendingApproval, holdIfApprovalNeeded } from './approval-gate';
 import {
   PeriodLockedError,
@@ -414,6 +415,8 @@ export const localDb = {
         invoices.push(toSave);
       }
       setTable(KEYS.invoices, invoices);
+      // A credit note edited / cancelled / reinstated changes what its invoice still owes.
+      if (toSave.doc_type === 'CREDIT_NOTE' || stored?.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(toSave.id);
       // Files this document no longer lists (6.12) are deleted unless another record uses them.
       if (stored) releaseDropped(stored.attachments, toSave.attachments);
 
@@ -444,6 +447,7 @@ export const localDb = {
       const mine = payments.filter((t) => t.invoice_id === id).length;
       setTable(KEYS.invoices, all.filter((i) => i.id !== id));
       setTable(KEYS.transactions, payments.filter((t) => t.invoice_id !== id));
+      if (stored?.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(id);
       if (stored?.attachments?.length) releaseAttachments(stored.attachments.map((a) => a.id));
       if (stored) logSafe(() => invoiceDeleted(stored, mine, overridden ? OVERRIDE_NOTE : ''));
     },
@@ -468,6 +472,7 @@ export const localDb = {
       holdIfApprovalNeeded(next, before);
       invoices[idx] = next;
       setTable(KEYS.invoices, invoices);
+      if (next.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(id);
       logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
     },
 
@@ -628,20 +633,42 @@ export const localDb = {
  * received so far. TDS the customer withholds is settled with the tax office,
  * so it is never "owed" to us. A cancelled document stays cancelled: recording
  * (or removing) a payment must not resurrect it into revenue — the money is
- * still tracked in amount_paid.
+ * still tracked in amount_paid. Live credit notes linked to the invoice settle
+ * it too (`src/lib/amount-due.ts`): the status says Paid once receipts + credits
+ * cover it, while `balance_due` keeps its stored meaning (total − TDS − received).
  */
 function withPaid(inv: InvoiceRecord, paidRaw: number): InvoiceRecord {
   const paid = round2(Math.max(paidRaw, 0));
   // Outward reverse charge: the GST is the recipient's to pay, so it is never part of what is owed
   // (an older record's stored total includes it — src/lib/rcm.ts).
   const total = Math.max(receivableTotal(inv) - (Number(inv.tds_amount) || 0), 0);
-  let status = inv.status;
-  if (status !== 'Cancelled') {
-    if (paid >= total && total > 0) status = 'Paid';
-    else if (paid > 0) status = 'Partially Paid';
-    else if (status === 'Paid' || status === 'Partially Paid') status = 'Sent';
-  }
+  const status = settledStatus(inv.status, total, paid, creditedOn(inv.id));
   return { ...inv, amount_paid: paid, balance_due: round2(total - paid), status };
+}
+
+/** Σ live credit notes linked to `invoiceId` (shared parsed tables, nothing copied). */
+function creditedOn(invoiceId: string | undefined): number {
+  if (!invoiceId) return 0;
+  const mine = peekTable<CreditLinkRow>('doc_links').filter((l) => l.relation === 'credit_note' && l.from_id === invoiceId);
+  if (!mine.length) return 0;
+  return linkedCredits(mine, peekTable<InvoiceRecord>(KEYS.invoices)).get(invoiceId) ?? 0;
+}
+
+/**
+ * Re-derive the money status of the invoice(s) a credit note is linked to, after the note was
+ * issued, edited, cancelled, reinstated or deleted. Writes only when a status actually changes
+ * (a credit covering the rest makes the invoice Paid; cancelling it brings the balance back).
+ */
+export function resettleCreditedInvoices(noteId: string | undefined): void {
+  if (!noteId) return;
+  const targets = new Set(
+    peekTable<CreditLinkRow>('doc_links').filter((l) => l.relation === 'credit_note' && l.to_id === noteId).map((l) => l.from_id),
+  );
+  for (const id of targets) {
+    const inv = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id);
+    if (!inv || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
+    if (withPaid(inv, Number(inv.amount_paid) || 0).status !== inv.status) syncPaymentState(id, 0);
+  }
 }
 
 /** Apply a delta to an invoice's paid amount and re-derive its money status. */

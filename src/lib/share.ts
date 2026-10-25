@@ -172,14 +172,17 @@ export function upiLink(opts: UpiOptions): string | null {
   return `upi://pay?${parts.join('&')}`;
 }
 
-/** Payment link for an invoice's outstanding balance (INR only). */
-export function invoiceUpiLink(invoice: InvoiceRecord): string | null {
+/**
+ * Payment link for an invoice's outstanding balance (INR only). `amount` (optional) is the amount
+ * due when the caller knows it (net of linked credit notes, `amountDue` in src/lib/amount-due.ts).
+ */
+export function invoiceUpiLink(invoice: InvoiceRecord, amount?: number): string | null {
   const s = invoice.sender;
   if (!s?.upiId || (invoice.currency || 'INR').toUpperCase() !== 'INR') return null;
   return upiLink({
     pa: s.upiId,
     pn: s.companyName,
-    amount: receivableBalance(invoice) > 0 ? receivableBalance(invoice) : receivableTotal(invoice),
+    amount: amount && amount > 0 ? amount : receivableBalance(invoice) > 0 ? receivableBalance(invoice) : receivableTotal(invoice),
     note: `Payment for ${invoice.invoice_number}`,
   });
 }
