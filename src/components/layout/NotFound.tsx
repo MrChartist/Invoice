@@ -1,31 +1,32 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Compass, LayoutDashboard } from 'lucide-react';
+import { tNodes, useT } from '../../i18n';
 import styles from './NotFound.module.css';
 
 /** Catch-all inside the app shell: tells the user the page is missing instead of silently redirecting. */
 export function NotFound() {
   const { pathname } = useLocation();
+  const { t } = useT();
+  const docTitle = t('notFound.docTitle');
   useEffect(() => {
     const prev = document.title;
-    document.title = 'Page not found — Mr. Chartist Invoice';
+    document.title = docTitle;
     return () => {
       document.title = prev;
     };
-  }, []);
+  }, [docTitle]);
   return (
     <section className={styles.wrap} aria-labelledby="nf-title">
       <div className={styles.icon} aria-hidden="true">
         <Compass size={28} />
       </div>
       <h1 id="nf-title" className={styles.title}>
-        We can&apos;t find that page
+        {t('notFound.title')}
       </h1>
-      <p className={styles.text}>
-        Nothing lives at <code>{pathname}</code>. It may have moved, or the link is mistyped.
-      </p>
+      <p className={styles.text}>{tNodes('notFound.text', { path: <code>{pathname}</code> })}</p>
       <Link to="/" className={styles.btn}>
-        <LayoutDashboard size={16} aria-hidden="true" /> Back to dashboard
+        <LayoutDashboard size={16} aria-hidden="true" /> {t('notFound.back')}
       </Link>
     </section>
   );

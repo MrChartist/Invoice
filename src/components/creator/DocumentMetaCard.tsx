@@ -11,6 +11,7 @@ import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
 import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
+import { dueAfterIssueChange } from '../../lib/dates';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceStatus } from '../../types/invoice';
 import { useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
@@ -121,7 +122,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.issueDate')}</span>
-            <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, s.due_date)} />
+            <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, dueAfterIssueChange(s.issue_date, s.due_date, e.target.value))} />
           </label>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="due-date">{s.doc_type === 'SALES_ORDER' ? t('meta.deliveryBy') : t('meta.dueDate')}</label>
