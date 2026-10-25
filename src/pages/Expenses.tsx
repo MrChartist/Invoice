@@ -10,6 +10,7 @@ import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
 import { purT, purCategory, purStatus } from '../i18n/areas/purchases';
+import { capT } from '../i18n/areas/capture';
 import { BillModal } from '../components/purchases/BillModal';
 import { BranchFilter } from '../components/branches/BranchFilter';
 import { branchPredicates } from '../lib/branch';
@@ -47,7 +48,7 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 
-type Tab = 'bills' | 'orders' | 'vendors' | 'returns';
+type Tab = 'bills' | 'orders' | 'vendors' | 'returns' | 'inbox';
 
 // Purchase orders are a separate, rarely-opened tab: load it on demand.
 const PurchaseOrdersTab = lazy(() =>
@@ -56,7 +57,9 @@ const PurchaseOrdersTab = lazy(() =>
 
 // WP-3: purchase returns / supplier notes, receipt notes (GRN) and pending reports — also on demand.
 const ReturnsTab = lazy(() => import('../components/purchases/ReturnsTab').then((m) => ({ default: m.ReturnsTab })));
-const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns'];
+// 8C: capture from the e-invoice QR, documents inbox, draft / recurring bills — on demand.
+const InboxTab = lazy(() => import('../components/capture/InboxTab'));
+const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns', 'inbox'];
 
 const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: 'kindAll' | 'kindBills' | 'kindExpenses' }[] = [
   { id: 'ALL', label: 'kindAll' },
@@ -119,6 +122,7 @@ export function Expenses() {
   const payments = useMemo(() => paymentsDb.all(), [version]);
   // Read straight from the table so the PO library stays in the lazy tab's chunk.
   const orders = useMemo(() => getTable<PurchaseOrder>('purchase_orders'), [version]);
+  const inboxCount = useMemo(() => getTable('purchase_drafts').length + getTable<{ status?: string; draft_id?: string }>('doc_inbox').filter((r) => r.status === 'new' && !r.draft_id).length, [version]);
   const business = useMemo(() => businessContext(), [version]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
@@ -236,10 +240,25 @@ export function Expenses() {
           <button type="button" role="tab" aria-selected={tab === 'returns'} className={tab === 'returns' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('returns')}>
             {purT('tabReturns')}
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'inbox'} className={tab === 'inbox' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('inbox')} data-testid="tab-inbox">
+            {capT('tabInbox')} {inboxCount > 0 && <span className={styles.count}>{inboxCount}</span>}
+          </button>
         </div>
       </div>
 
-      {tab === 'orders' ? (
+      {tab === 'inbox' ? (
+        <Suspense fallback={null}>
+          <InboxTab
+            businessState={business.stateCode}
+            focusId={params.get('doc')}
+            onPost={openEdit}
+            onChanged={(message, tone) => {
+              reload();
+              if (message) notify(message, tone);
+            }}
+          />
+        </Suspense>
+      ) : tab === 'orders' ? (
         <Suspense fallback={null}>
           <PurchaseOrdersTab
             orders={orders}

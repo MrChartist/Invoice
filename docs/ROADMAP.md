@@ -488,6 +488,20 @@ From the Vyapar / myBillBook / OkCredit comparison: the phone and the shop count
 | 8.26 | ✅ **Web Bluetooth thermal printing** (BLE 58 / 80 mm ESC/POS, off by default, `bluetooth=(self)`), browser-print fallback | `escpos.ts`, `PosPrinter.tsx` | done |
 | 8.27 | ⏳ 8B follow-ups: share-target on iOS (no Web Share Target there), remembered BLE printer across reloads (`getDevices` still behind a flag), Payment-in quick-pay screen (khata work), tiles for price-list items, held carts across devices (deliberately not synced) | — | open |
 
+### 8C · Capture, bank rules, approvals (`docs/features/bill-capture.md`, `docs/features/banking.md` § Bank rules)
+
+Competitor parity with Zoho Books / Xero / QuickBooks / Refrens / TallyPrime 7.0 purchase capture and bank automation — without OCR or any network call.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.40 | ✅ **Supplier bill capture from the e-invoice signed QR**: camera (BarcodeDetector), photo / screenshot (BarcodeDetector on an ImageBitmap) or pasted text; JWT payload decoded (SellerGstin, BuyerGstin, DocNo, DocTyp, DocDt, TotInvVal, ItemCnt, MainHsnCode, Irn, IrnDt — **signature not verified offline**); draft bill prefilled (vendor by GSTIN or "Add supplier", bill no. / date / value / HSN, GST backed out when the HSN master knows the rate of a one-item bill, IRN stored as `einvoice_irn`), warning when BuyerGstin is none of our profiles, file kept as an attachment; PDFs are kept but their QR is not read (no PDF engine shipped) | `einvoice-qr.ts`, `bill-capture.ts`, `capture-browser.ts`, `InboxTab.tsx` | done |
+| 8.41 | ✅ **Unprocessed documents inbox** (`doc_inbox`) + **draft bills** (`purchase_drafts`, out of the books): make bill / make expense / dismiss; `openCaptureFromFile(file)` and `inboxDb.add` for the PWA share target | `doc-inbox.ts`, `purchase-drafts.ts` | done |
+| 8.42 | ✅ **Duplicate supplier bill guard**: same supplier (GSTIN / vendor / name) + normalised bill no. in the same FY, or same amount within ±3 days → soft warning, save again to override; possible duplicates listed in the exception report | `bill-duplicates.ts`, `bill-guard.ts`, `ledger/exceptions.ts` | done |
+| 8.43 | ✅ **Recurring bills / expenses** (`recurring_bills`, recurring.ts date rules): each occurrence writes a **draft** (never posted), idempotent; bell: supplier bills due this week, recurring bills due, drafts / inbox waiting (lazy provider) | `recurring-bills.ts`, `RecurringBillsPanel.tsx`, `capture-alerts.ts` | done |
+| 8.44 | ✅ **Approvals for bills, expenses and supplier payments**: thresholds (0 = all), clerk's bill held in `purchase_drafts` and payment in `payment_requests` (out of the books); owner approves (posts / pays) or rejects with a reason; shared `approvals` history; data-layer gate in `purchasesDb.save`; payments from bank statements / cheques / confirmed e-payment files exempt | `purchase-approval-gate.ts`, `purchase-approvals.ts`, `PurchaseApprovals.tsx` | done |
+| 8.45 | ✅ **Bank rules + memory** (`bank_rules`): ALL / ANY of narration contains / starts with / safe regex, counterparty token, amount range, debit / credit, bank account → expense (head, supplier, GST + ITC, cost centre, branch, mode), voucher to a ledger, receipt against a customer's invoices, contra (twin reused), ignore; run after invoice matching; every suggestion labelled Rule / Match / Memory; memory learned from past expense categorisations; "Create rule for similar lines?" after a manual expense; all-or-nothing batches through the existing writers (roles, period lock, approval gate, audit) | `bank-rules.ts`, `bank-rules-apply.ts`, `BankRulesPanel.tsx`, `RuleSuggestions.tsx` | done |
+| 8.46 | ⏳ 8C follow-ups: PDF page rendering for QR reading, a multi-line GST split from the QR (needs the full e-invoice JSON), rule actions with GST on vouchers, memory for receipts / vouchers, payment approval inside the e-payment batch screen, total-JS budget headroom | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

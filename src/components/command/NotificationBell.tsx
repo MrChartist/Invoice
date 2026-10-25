@@ -117,6 +117,31 @@ function ensureGstGuardAlerts(onReady: () => void): void {
     });
 }
 
+/**
+ * 8C notices (bills due this week, recurring / draft bills, inbox documents, purchase approvals): lazy,
+ * and only once an unpaid bill with a due date or one of the 8C tables has rows.
+ */
+let captureAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureCaptureAlerts(onReady: () => void): void {
+  if (captureAlerts !== 'off') return;
+  try {
+    const due = (r: unknown) => { const p = r as { due_date?: string; total?: number; amount_paid?: number } | null; return !!p?.due_date && Number(p.amount_paid) < Number(p.total); };
+    if (!['doc_inbox', 'purchase_drafts', 'recurring_bills', 'payment_requests'].some((t) => getTable(t).length) && !getTable('purchases').some(due)) return;
+  } catch {
+    return;
+  }
+  captureAlerts = 'loading';
+  import('../../lib/capture-alerts')
+    .then((m) => {
+      m.registerCaptureAlerts();
+      captureAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      captureAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -147,6 +172,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensureExpiryAlerts(reload);
     ensureBusinessAlerts(reload);
     ensureGstGuardAlerts(reload);
+    ensureCaptureAlerts(reload);
   }, []);
 
   useEffect(() => {

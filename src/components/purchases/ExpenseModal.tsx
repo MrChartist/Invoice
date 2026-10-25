@@ -17,6 +17,8 @@ import { useT } from '../../i18n';
 import { methodLabel } from '../../i18n/labels';
 import { purT, purCategory } from '../../i18n/areas/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
+import { saveBillGuarded } from '../../lib/bill-guard';
+import { capT } from '../../i18n/areas/capture';
 import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
@@ -72,6 +74,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? seeded ?? []);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [tds, setTds] = useState<BillTdsInput>(() => ({
     section: expense?.tds_section ?? '',
     on: expense?.tds_on ?? 'BILL',
@@ -99,7 +102,9 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
       return setError(purT('errTotalBelowPaid', { amount: formatCurrency(expense.amount_paid) }));
     }
     try {
-      const saved = purchasesDb.save({
+      // 8C: duplicate warnings (save again to override), approval hold (a "paid now" expense keeps its payment for approval).
+      const tdsPay = tdsResolved.fields.tds_on === 'PAYMENT' ? tdsResolved.fields.tds_amount ?? 0 : 0;
+      const res = saveBillGuarded({
         ...expense,
         kind: 'EXPENSE',
         vendor_id: vendor?.id,
@@ -123,7 +128,17 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
         ...tdsResolved.fields,
-      });
+      }, { confirmed: !!warning, payNow: !expense && paidNow ? { method, date, ...(tdsPay > 0 ? { tds_amount: tdsPay } : {}) } : undefined });
+      if (res.kind === 'warn') {
+        setWarning(res.message);
+        return;
+      }
+      if (res.kind === 'held') {
+        onSaved(capT('heldMsg'));
+        onClose();
+        return;
+      }
+      const saved = res.bill;
       if (!expense && paidNow) {
         // TDS deducted when paying: the payment is the net amount, the TDS settles the rest.
         const tdsNow = saved.tds_on === 'PAYMENT' ? saved.tds_amount ?? 0 : 0;
@@ -241,6 +256,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 
+      {warning && <p className={styles.formError} role="alert">{warning}</p>}
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
         <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>

@@ -354,6 +354,8 @@ const RECORD_TABLES = [
   'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
   // 8D GST guards: supplier follow-ups from the 2B match, 2B ITC pushed to the 3B view, GSTR-1 as-filed snapshots
   'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
+  // 8C: documents inbox, draft bills, recurring bills, bank rules, supplier payment requests
+  'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -383,6 +385,7 @@ const ID_TABLES = new Set([
   'stock_groups', 'stock_categories', 'units',
   'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
   'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
+  'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
