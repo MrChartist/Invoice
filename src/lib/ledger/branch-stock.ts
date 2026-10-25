@@ -22,8 +22,8 @@ import { collectEvents, liveInputs, loadPositions } from '../inventory';
 import { loadBranches, UNASSIGNED, type Branch } from '../branch';
 import { getTable } from '../storage';
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer } from '../../types/stock';
-import type { StockValuer } from './closing-stock';
-import { loadStockValuer } from './index';
+import { netOfStockJournals, type StockJournalPosting, type StockValuer } from './closing-stock';
+import { loadStockJournalPostings, loadStockValuer } from './index';
 
 const paise = (rupees: number) => Math.round((Number.isFinite(rupees) ? rupees : 0) * 100);
 
@@ -115,14 +115,24 @@ export interface BranchStockContext {
   godowns: readonly Godown[];
   /** The company valuer (`loadStockValuer()`), net of journals / ledger opening. */
   company: StockValuer | undefined;
+  /**
+   * Closing-stock journals in the books (`loadStockJournalPostings`). One tagged to a branch already
+   * carries that branch's stock in its ledger, so it is netted off that branch's valuation (review L5);
+   * untagged ones stay with "No branch" (the company valuer is already net of all of them).
+   */
+  journals?: readonly StockJournalPosting[];
 }
 
 /** Closing-stock valuer for one branch, or for "No branch" (the rest). Undefined when stock is not valued from the inventory. */
 export function branchStockValuer(branchId: string, ctx: BranchStockContext): StockValuer | undefined {
   if (!branchId || ctx.company?.mode !== 'inventory') return undefined;
   const label = `${ctx.company.label}, by godown`;
-  if (branchId !== UNASSIGNED) return godownSetValuer(ctx.positions, ctx.events, branchGodownIds(branchId, ctx.branches, ctx.godowns), label);
-  const parts = ctx.branches.map((b) => godownSetValuer(ctx.positions, ctx.events, branchGodownIds(b.id, ctx.branches, ctx.godowns), label));
+  const own = (id: string): StockValuer => {
+    const v = godownSetValuer(ctx.positions, ctx.events, branchGodownIds(id, ctx.branches, ctx.godowns), label);
+    return netOfStockJournals(v, (ctx.journals ?? []).filter((j) => j.branch_id === id)) ?? v;
+  };
+  if (branchId !== UNASSIGNED) return own(branchId);
+  const parts = ctx.branches.map((b) => own(b.id));
   const company = ctx.company;
   return {
     mode: 'inventory',
@@ -141,5 +151,5 @@ export function loadBranchStockValuer(branchId: string, positions?: () => StockP
   if (base?.mode !== 'inventory') return undefined;
   const input = liveInputs();
   const events = collectEvents({ ...input, transfers: getTable<StockTransfer>('stock_transfers'), includeTransfers: true });
-  return branchStockValuer(branchId, { positions: get(), events, branches, godowns: getTable<Godown>('godowns'), company: base });
+  return branchStockValuer(branchId, { positions: get(), events, branches, godowns: getTable<Godown>('godowns'), company: base, journals: loadStockJournalPostings() });
 }

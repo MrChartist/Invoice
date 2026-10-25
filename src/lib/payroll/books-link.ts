@@ -8,6 +8,7 @@
  * same records. Working papers — verify with your CA.
  */
 
+import { can } from '../access';
 import { round2 } from '../invoice-calc';
 import type { PayrollPayment } from '../../types/payroll';
 import { normalizePayments, normalizeRuns } from './records';
@@ -53,8 +54,46 @@ function bookOf(paidFrom: string): { account: 'cash' | 'bank'; bank_account_id?:
   return { account: paidFrom === 'cash' || /cash/i.test(paidFrom) ? 'cash' : 'bank' };
 }
 
-/** Payroll payments (salary, PF, ESI, PT, TDS 192, loans to employees) as Books Payment vouchers. */
-export function payrollBooksVouchers(rawPayments: readonly unknown[] | undefined): PayrollBooksVoucher[] {
+/**
+ * Payroll payments (salary, PF, ESI, PT, TDS 192, loans to employees) as Books Payment vouchers.
+ * Review L8: payroll is confidential, so a role without `payroll.view` gets one "Payroll (n entries)"
+ * line per day and cash / bank book with the total instead of the individual payments; the cash and
+ * bank balances stay exactly the same.
+ */
+export function payrollBooksVouchers(rawPayments: readonly unknown[] | undefined, detail: boolean = can('payroll.view')): PayrollBooksVoucher[] {
+  const rows = payrollBooksDetail(rawPayments);
+  return detail ? rows : aggregatePayrollVouchers(rows);
+}
+
+/** One line per (date, book) — what a role without payroll access sees. */
+export function aggregatePayrollVouchers(rows: readonly PayrollBooksVoucher[]): PayrollBooksVoucher[] {
+  const groups = new Map<string, PayrollBooksVoucher[]>();
+  for (const v of rows) {
+    const key = `${v.date}|${v.account}|${v.bank_account_id ?? ''}`;
+    const g = groups.get(key);
+    if (g) g.push(v);
+    else groups.set(key, [v]);
+  }
+  return [...groups.entries()].map(([key, g]) => ({
+    id: `prp:agg:${key}`,
+    date: g[0].date,
+    type: 'Payment' as const,
+    number: '',
+    party: payrollEntriesLabel(g.length),
+    narration: payrollEntriesLabel(g.length),
+    debit: round2(g.reduce((s, v) => s + v.debit, 0)),
+    credit: 0,
+    method: g[0].method,
+    account: g[0].account,
+    ...(g[0].bank_account_id ? { bank_account_id: g[0].bank_account_id } : {}),
+    link: '',
+  }));
+}
+
+/** "Payroll (n entries)" — the aggregated line's label. */
+export const payrollEntriesLabel = (n: number): string => `Payroll (${n} ${n === 1 ? 'entry' : 'entries'})`;
+
+function payrollBooksDetail(rawPayments: readonly unknown[] | undefined): PayrollBooksVoucher[] {
   return normalizePayments([...(rawPayments ?? [])]).map((p) => {
     const book = bookOf(p.paid_from || 'bank');
     return {

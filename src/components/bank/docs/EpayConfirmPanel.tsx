@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react';
 import { CheckCheck, Upload } from 'lucide-react';
-import { loadEpayBatches, matchResponse, parseBankResponse, recordConfirmed, type BankResponseRow } from '../../../lib/epay-confirm';
+import { loadEpayBatches, matchResponse, needsConfirmation, parseBankResponse, recordConfirmed, type BankResponseRow } from '../../../lib/epay-confirm';
 import { formatDate, formatMoney } from '../../../lib/utils';
 import { fxbT } from '../../../i18n/areas/extras-7u';
 import controls from '../../../styles/controls.module.css';
@@ -22,12 +22,15 @@ export default function EpayConfirmPanel({ notify, version }: { notify: Notify; 
   const [text, setText] = useState('');
   const [response, setResponse] = useState<BankResponseRow[] | null>(null);
   const [error, setError] = useState('');
+  // Review M3: amount-only matches the user ticked (row ids); reset with every new file.
+  const [confirmed, setConfirmed] = useState<ReadonlySet<string>>(() => new Set());
   const result = useMemo(() => (batch && response ? matchResponse(batch, response) : null), [batch, response]);
 
   if (!batches.length) return <p className={styles.muted}>{fxbT('noBatches')}</p>;
 
   const read = (raw: string) => {
     setText(raw);
+    setConfirmed(new Set());
     try {
       setResponse(parseBankResponse(raw));
       setError('');
@@ -39,7 +42,7 @@ export default function EpayConfirmPanel({ notify, version }: { notify: Notify; 
   const record = () => {
     if (!batch || !result) return;
     try {
-      const r = recordConfirmed(batch.id, result.matches);
+      const r = recordConfirmed(batch.id, result.matches, [...confirmed]);
       notify(fxbT('recordedPayments', { paid: String(r.paid), failed: String(r.failed), amount: `₹${formatMoney(r.total)}` }), 'success');
       setResponse(null);
       setText('');
@@ -49,6 +52,13 @@ export default function EpayConfirmPanel({ notify, version }: { notify: Notify; 
     }
   };
   const matchOf = (rowId: string) => result?.matches.find((m) => m.rowId === rowId);
+  const recordable = !!result && result.matches.some((m) => m.status !== 'pending' && (!needsConfirmation(m) || confirmed.has(m.rowId)));
+  const toggle = (rowId: string, on: boolean) => {
+    const next = new Set(confirmed);
+    if (on) next.add(rowId);
+    else next.delete(rowId);
+    setConfirmed(next);
+  };
   const statusLabel = { sent: 'stSent', paid: 'stPaid', failed: 'stFailed', pending: 'stPending' } as const;
 
   return (
@@ -82,7 +92,14 @@ export default function EpayConfirmPanel({ notify, version }: { notify: Notify; 
                       <td>{r.reference}</td>
                       <td className={surface.numeric}>{formatMoney(r.amount)}</td>
                       <td>{fxbT(statusLabel[r.status])}{r.utr ? ` · ${r.utr}` : ''}</td>
-                      <td>{m ? `${fxbT(statusLabel[m.status])} · ${fxbT(m.how === 'reference' ? 'byRef' : m.how === 'account' ? 'byAccount' : 'byAmount')}${m.utr ? ` · ${m.utr}` : ''}${m.date ? ` · ${formatDate(m.date)}` : ''}` : '—'}</td>
+                      <td>
+                        {m ? `${fxbT(statusLabel[m.status])} · ${fxbT(m.how === 'reference' ? 'byRef' : m.how === 'account' ? 'byAccount' : 'byAmount')}${m.utr ? ` · ${m.utr}` : ''}${m.date ? ` · ${formatDate(m.date)}` : ''}` : '—'}
+                        {m && needsConfirmation(m) && (
+                          <label style={{ display: 'block' }}>
+                            <input type="checkbox" checked={confirmed.has(m.rowId)} onChange={(e) => toggle(m.rowId, e.target.checked)} /> {fxbT('confirmAmount')}
+                          </label>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -90,9 +107,10 @@ export default function EpayConfirmPanel({ notify, version }: { notify: Notify; 
             </table>
           </div>
         )}
+        {result && result.matches.some(needsConfirmation) && <p className={styles.warn}>{fxbT('confirmAmountNote')}</p>}
         {result && result.unmatched.length > 0 && <p className={styles.warn}>{fxbT('unmatched', { lines: result.unmatched.join(', ') })}</p>}
         <div className={styles.toolbar}>
-          <button type="button" className={controls.btnPrimary} onClick={record} disabled={!result || !result.matches.some((m) => m.status !== 'pending')}><CheckCheck size={16} /> {fxbT('recordAll')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={record} disabled={!recordable}><CheckCheck size={16} /> {fxbT('recordAll')}</button>
         </div>
       </div>
     </section>

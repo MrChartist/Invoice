@@ -88,7 +88,7 @@ test('a closing-stock journal on top of valuation is netted off: every statement
 test('netOfStockJournals is pure; memo / optional journals and non-stock journals are ignored', () => {
   const v = manualValuer({ mode: 'manual', entries: [{ date: '2026-03-31', value: 500 }] });
   const mk = (extra: Record<string, unknown>) => ({
-    id: String(Math.random()), type: 'JOURNAL' as const, number: 'J', date: '2026-03-31', narration: 'Closing stock', created_at: '',
+    id: String(Math.random()), type: 'JOURNAL' as const, number: 'J', date: '2026-03-31', narration: 'Closing stock', voucher_class: CLOSING_STOCK_CLASS, created_at: '',
     lines: [{ account_id: 'stock', dr: 500, cr: 0 }, { account_id: 'purchases', dr: 0, cr: 500 }], ...extra,
   });
   assert.equal(stockJournalPostings([mk({ variant: 'MEMO' }), mk({ variant: 'OPTIONAL' })], '2026-10-01').length, 0);

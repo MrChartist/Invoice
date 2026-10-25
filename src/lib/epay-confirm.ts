@@ -8,7 +8,8 @@
  *    recognised by name: reference / narration, amount / debit, status, UTR, date, account).
  * 3. Matching (`matchResponse`): our reference with the same amount first; else the amount and the
  *    beneficiary account's last four digits; else an amount that only one open row and one response
- *    row share. A statement row has no status: being debited means paid.
+ *    row share (review M3: such an amount-only match is recorded as paid only once the user confirms it).
+ *    A statement row has no status: being debited means paid; credit / negative rows are skipped.
  * 4. "Record payments" is all or nothing (`recordConfirmed`): every paid row becomes one supplier
  *    payment (`recordSupplierPayment`: oldest bills first, the rest on account) from the batch's bank
  *    account on the bank's date, reference = the UTR; failed rows are marked failed. One refusal
@@ -123,10 +124,15 @@ export function parseBankResponse(text: string): BankResponseRow[] {
   const iDate = col(headers, /value date/, /(payment|transaction|txn|processed) date/, /date/);
   const iAcc = col(headers, /bene(ficiary)? ?(a\/?c|acc|account)/, /credit (a\/?c|account)/, /account/);
   const iReason = col(headers, /reason|remark|error/);
+  // Review M3: a Dr / Cr (or transaction type) column; credit rows are money coming IN, never a payment.
+  const iSide = col(headers, /^(dr ?\/ ?cr|cr ?\/ ?dr|d ?\/ ?c|c ?\/ ?d|dr cr|drcr|debit ?\/ ?credit|credit ?\/ ?debit)$/, /^(txn |transaction |entry )?type$/);
   const out: BankResponseRow[] = [];
   rows.slice(hi + 1).forEach((r, k) => {
     const amt = parseBankAmount(r[iAmt] ?? '');
     if (!amt || !(Math.abs(amt.value) > 0)) return;
+    // Credits and reversals (negative / bracketed figures, "Cr" markers) are not payments made.
+    if (amt.value < 0 || amt.side === 'Cr') return;
+    if (iSide >= 0 && iSide !== iAmt && /^(c|cr|cr\.|credit|credited|deposit)$/i.test((r[iSide] ?? '').trim())) return;
     const ref = (r[iRef] ?? '').trim();
     const narr = iNarr >= 0 && iNarr !== iRef ? (r[iNarr] ?? '').trim() : '';
     out.push({
@@ -263,13 +269,19 @@ export interface RecordResult {
 
 /**
  * Record the confirmed rows of a batch, all or nothing: paid → one supplier payment each (bills
- * oldest due first, any rest on account), failed → marked failed, pending → left open.
+ * oldest due first, any rest on account), failed → marked failed, pending → left open. A paid
+ * amount-only match counts only when its row id is in `confirmedRows` (the user ticked it).
  */
-export function recordConfirmed(batchId: string, matches: readonly EpayMatch[]): RecordResult {
+/** Review M3: an amount-only match that says "paid" records money only after the user confirms it. */
+export const needsConfirmation = (m: Pick<EpayMatch, 'how' | 'status'>): boolean => m.how === 'amount' && m.status === 'paid';
+
+export function recordConfirmed(batchId: string, matches: readonly EpayMatch[], confirmedRows: readonly string[] = []): RecordResult {
   requireAccess('books.edit');
   const batch = loadEpayBatches().find((b) => b.id === batchId);
   if (!batch) throw new EpayError('e-Payment batch not found.');
-  const byRow = new Map(matches.map((m) => [m.rowId, m]));
+  const ok = new Set(confirmedRows);
+  // Unconfirmed amount-only matches stay open (as if the bank had not answered for them yet).
+  const byRow = new Map(matches.filter((m) => !needsConfirmation(m) || ok.has(m.rowId)).map((m) => [m.rowId, m]));
   if (![...byRow.values()].some((m) => m.status !== 'pending')) throw new EpayError('Nothing confirmed to record.');
   return withTablesRollback([PAYMENTS_TABLE, PURCHASES_TABLE, VENDOR_PAYMENTS_TABLE, EPAY_BATCHES_TABLE], () => {
     let paid = 0;

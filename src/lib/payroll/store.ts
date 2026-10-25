@@ -719,10 +719,11 @@ export function recordPayrollPayment(input: PaymentInput): PayrollPayment {
   const [row] = normalizePayments([{ ...input, amount, id, number, paid_from: str(input.paid_from) || 'bank', created_at: now() }]);
   setTable(PAYROLL_TABLES.payments, [...all, row]);
   recordSeries(number);
-  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_add', doc_number: number, summary: `${PAYMENT_LABELS[row.kind]} paid ₹${formatMoney(amount)} on ${row.date} (${number})${row.period ? ` for ${row.period}` : ''}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_add', doc_number: number, summary: `${PAYMENT_LABELS[row.kind]} paid${row.kind === 'loan' ? '' : ` ₹${formatMoney(amount)}`} on ${row.date} (${number})${row.period ? ` for ${row.period}` : ''}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
   return row;
 }
 
+/** Review H1: a loan disbursement is one employee's amount, so its audit summary leaves the amount out. */
 export function deletePayrollPayment(id: string): void {
   guard();
   const all = loadPayrollPayments();
@@ -731,5 +732,5 @@ export function deletePayrollPayment(id: string): void {
   if (row.kind === 'loan' && row.loan_id && getTable<{ id?: string }>(PAYROLL_TABLES.loans).some((l) => l?.id === row.loan_id)) throw new PayrollError('This payment books a loan; delete the loan instead.');
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
   setTable(PAYROLL_TABLES.payments, all.filter((p) => p.id !== id));
-  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_remove', doc_number: row.number, summary: `${PAYMENT_LABELS[row.kind]} payment ${row.number} (₹${formatMoney(row.amount)}) deleted${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_remove', doc_number: row.number, summary: `${PAYMENT_LABELS[row.kind]} payment ${row.number}${row.kind === 'loan' ? '' : ` (₹${formatMoney(row.amount)})`} deleted${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
 }

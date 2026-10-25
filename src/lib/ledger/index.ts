@@ -64,8 +64,8 @@ export function loadStockPositions(): StockPosition[] {
 
 /**
  * Closing-stock valuer per the company setting (inventory FIFO / weighted average, typed figures, or
- * none). Positions are only computed in inventory mode. Closing-stock journals already posted to
- * Stock-in-hand (year-end wizard, or a typed "closing stock" journal) are netted off, so a statement
+ * none). Positions are only computed in inventory mode. Closing-stock journals already posted to an
+ * Inventories ledger (the year-end wizard's class) are netted off, so a statement
  * never counts the stock twice (`netOfStockJournals`); so is an opening balance typed on an Inventories ledger
  * (`netOfStockOpening` — item openings are already in the valuation). Every statement screen (Books, Gateway Display,
  * ratios) must use this one function so they agree.
@@ -75,12 +75,22 @@ export function loadStockValuer(positions?: StockPosition[], lazy?: () => StockP
   const get = () => (cached ??= lazy ? lazy() : loadPositions());
   const today = toIsoDate(new Date());
   const raw = stockValuerFor(loadClosingStockConfig(), get, loadSettings().method);
-  return netOfStockOpening(netOfStockJournals(raw, stockJournalPostings(manual, today)), stockLedgerOpening(), dayBefore(loadBooksBegin(today)));
+  const stockIds = inventoryLedgerIds();
+  return netOfStockOpening(netOfStockJournals(raw, stockJournalPostings(manual, today, stockIds)), stockLedgerOpening(stockIds), dayBefore(loadBooksBegin(today)));
+}
+
+/** Ids of the Inventories ledgers: Stock-in-hand and the user's own stock ledgers (review L5: one set for openings and journals). */
+export function inventoryLedgerIds(): ReadonlySet<string> {
+  return new Set(chartOf(loadUserAccounts()).filter((a) => a.group === 'INVENTORIES').map((a) => a.id));
+}
+
+/** Closing-stock journals in the books today (year-end wizard class, any Inventories ledger), with their branch tag. */
+export function loadStockJournalPostings(manual: readonly ManualVoucher[] = loadVouchers()): StockJournalPosting[] {
+  return stockJournalPostings(manual, toIsoDate(new Date()), inventoryLedgerIds());
 }
 
 /** Σ opening balances (debit-positive paise) of the Inventories ledgers (Stock-in-hand and user stock ledgers). */
-function stockLedgerOpening(): number {
-  const inventories = new Set(chartOf(loadUserAccounts()).filter((a) => a.group === 'INVENTORIES').map((a) => a.id));
+function stockLedgerOpening(inventories: ReadonlySet<string> = inventoryLedgerIds()): number {
   return loadOpenings().reduce((s, o) => s + (inventories.has(o.ledger_id) ? o.dr - o.cr : 0), 0);
 }
 
@@ -89,7 +99,7 @@ function stockLedgerOpening(): number {
  * year-end wizard). Empty when valuation is off or no such journal is in the books.
  */
 export function stockJournalConflicts(manual: readonly ManualVoucher[] = loadVouchers(), positions?: () => StockPosition[]): StockJournalPosting[] {
-  const postings = stockJournalPostings(manual, toIsoDate(new Date())).filter((p) => p.delta > 0);
+  const postings = loadStockJournalPostings(manual).filter((p) => p.delta > 0);
   if (!postings.length) return [];
   return effectiveMode(loadClosingStockConfig(), positions ?? (() => loadPositions())) === 'none' ? [] : postings;
 }

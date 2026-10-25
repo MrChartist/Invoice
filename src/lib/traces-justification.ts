@@ -303,18 +303,41 @@ export class JustificationError extends Error {
   }
 }
 
+const text = (v: unknown): string => (typeof v === 'string' || typeof v === 'number' ? clean(v) : '');
+const money = (v: unknown): number => (Number.isFinite(Number(v)) ? round2(Number(v)) : 0);
+
+function normalizeFinding(f: JustificationFinding): JustificationFinding {
+  return {
+    kind: f.kind,
+    pan: text(f.pan),
+    name: text(f.name),
+    section: text(f.section),
+    date: text(f.date),
+    base: money(f.base),
+    tds: money(f.tds),
+    demand: money(f.demand),
+    ...(text(f.key) ? { key: text(f.key) } : {}),
+    ...(f.resolved === true ? { resolved: true } : {}),
+  };
+}
+
 export function normalizeImports(rows: readonly unknown[]): JustificationImport[] {
   const out: JustificationImport[] = [];
   for (const raw of rows) {
     if (!raw || typeof raw !== 'object') continue;
     const o = raw as Partial<JustificationImport>;
     if (typeof o.id !== 'string' || !Array.isArray(o.findings)) continue;
+    // Review L7: rows come from backups / sync, so every field is checked, not only the id.
+    const meta = (o.meta && typeof o.meta === 'object' ? o.meta : {}) as Partial<JustificationMeta>;
     out.push({
-      ...(o as JustificationImport),
-      file_name: clean(o.file_name),
-      meta: { tan: clean(o.meta?.tan), fy: typeof o.meta?.fy === 'number' ? o.meta.fy : null, quarter: typeof o.meta?.quarter === 'number' ? o.meta.quarter : null, form: clean(o.meta?.form) },
-      findings: o.findings.filter((f): f is JustificationFinding => !!f && typeof f === 'object' && JUSTIFICATION_KINDS.includes((f as JustificationFinding).kind)),
+      id: o.id,
+      imported_on: (typeof o.imported_on === 'string' ? clean(o.imported_on) : '') || (typeof o.created_at === 'string' ? clean(o.created_at).slice(0, 10) : ''),
+      file_name: text(o.file_name),
+      meta: { tan: text(meta.tan), fy: typeof meta.fy === 'number' && Number.isFinite(meta.fy) ? meta.fy : null, quarter: typeof meta.quarter === 'number' && Number.isFinite(meta.quarter) ? meta.quarter : null, form: text(meta.form) },
+      findings: o.findings.filter((f): f is JustificationFinding => !!f && typeof f === 'object' && JUSTIFICATION_KINDS.includes((f as JustificationFinding).kind)).map(normalizeFinding),
       skipped: Number(o.skipped) || 0,
+      ...(o.truncated === true ? { truncated: true } : {}),
+      ...(text(o.created_at) ? { created_at: text(o.created_at) } : {}),
     });
   }
   return out.sort((a, b) => b.imported_on.localeCompare(a.imported_on));

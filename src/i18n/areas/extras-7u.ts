@@ -76,6 +76,8 @@ export const fxbT = defineArea(
     unmatched: 'Bank rows with no match (line {lines}) — check them by hand.',
     recordAll: 'Record confirmed payments',
     recordedPayments: '{paid} payment(s) of {amount} recorded, {failed} failed.',
+    confirmAmount: 'Same amount only — tick to record as paid',
+    confirmAmountNote: 'Rows matched by amount alone are left open unless you tick them: check the bank file first.',
   } as const,
   {
     docForex: 'विदेशी मुद्रा बैंक',
@@ -145,6 +147,8 @@ export const fxbT = defineArea(
     unmatched: 'बैंक की बिना मिलान वाली पंक्तियाँ (पंक्ति {lines}) — इन्हें स्वयं जाँचें।',
     recordAll: 'पुष्ट भुगतान दर्ज करें',
     recordedPayments: '{amount} के {paid} भुगतान दर्ज, {failed} विफल।',
+    confirmAmount: 'केवल राशि मिली — भुगतान दर्ज करने के लिए चुनें',
+    confirmAmountNote: 'केवल राशि से मिली पंक्तियाँ तब तक खुली रहती हैं जब तक आप उन्हें न चुनें: पहले बैंक फ़ाइल जाँचें।',
   },
 );
 

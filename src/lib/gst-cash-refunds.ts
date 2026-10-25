@@ -33,6 +33,7 @@ import { A, chartOf, loadUserAccounts } from './ledger/accounts';
 import { deleteVoucher, loadVouchers, rupeesToPaise, saveVoucher, type ManualVoucherLine } from './ledger/vouchers';
 import { assertUnlocked } from './period-lock';
 import { generateId, getTable, setTable } from './storage';
+import { withTablesRollback } from './table-txn';
 
 export const PMT09_TABLE = 'gst_pmt09';
 export const REFUNDS_TABLE = 'gst_refunds';
@@ -457,15 +458,46 @@ export interface RefundStep {
   bankLedgerId?: string;
 }
 
-/** Move a claim along its trail. PAID with a bank ledger posts (or updates) the receipt voucher. Audited. */
+/**
+ * Review L3: the steps a claim may take from each status (RFD-02 acknowledgement / RFD-03 deficiency,
+ * RFD-04 provisional, RFD-06 sanction or rejection, payment). A status may be recorded again (a second
+ * deficiency memo, a corrected payment). Rejected and withdrawn claims are closed; a paid claim can be
+ * stepped back (wrong entry), which removes its receipt voucher.
+ */
+export const REFUND_NEXT: Readonly<Record<RefundStatus, readonly RefundStatus[]>> = {
+  DRAFT: ['FILED', 'WITHDRAWN'],
+  FILED: ['FILED', 'ACKNOWLEDGED', 'DEFICIENCY', 'PROVISIONAL', 'SANCTIONED', 'REJECTED', 'WITHDRAWN'],
+  ACKNOWLEDGED: ['ACKNOWLEDGED', 'DEFICIENCY', 'PROVISIONAL', 'SANCTIONED', 'REJECTED', 'WITHDRAWN'],
+  DEFICIENCY: ['DEFICIENCY', 'FILED', 'ACKNOWLEDGED', 'REJECTED', 'WITHDRAWN'],
+  PROVISIONAL: ['PROVISIONAL', 'SANCTIONED', 'REJECTED', 'PAID'],
+  SANCTIONED: ['SANCTIONED', 'PAID'],
+  PAID: ['PAID', 'SANCTIONED', 'PROVISIONAL'],
+  REJECTED: [],
+  WITHDRAWN: [],
+};
+
+/** Statuses a claim in `status` may move to next. */
+export const nextRefundStatuses = (status: RefundStatus): readonly RefundStatus[] => REFUND_NEXT[status] ?? [];
+
+/**
+ * Move a claim along its trail. PAID with a bank ledger posts (or updates) the receipt voucher; leaving
+ * PAID removes it. All or nothing (claim + voucher + numbering). Audited.
+ */
 export function advanceRefund(id: string, step: RefundStep): GstRefundClaim {
   requireAccess('books.edit');
+  return withTablesRollback([REFUNDS_TABLE, 'vouchers', 'series_counters'], () => advanceRefundSteps(id, step));
+}
+
+function advanceRefundSteps(id: string, step: RefundStep): GstRefundClaim {
   const all = loadRefunds();
   const prev = all.find((r) => r.id === id);
   if (!prev) throw new CashRefundError('Refund claim not found.');
   const date = isoDay(step.date);
   if (!date) throw new CashRefundError('Choose the date of this step.');
   if (!REFUND_STATUSES.includes(step.status) || step.status === 'DRAFT') throw new CashRefundError('Choose the new status.');
+  if (!nextRefundStatuses(prev.status).includes(step.status)) {
+    throw new CashRefundError(nextRefundStatuses(prev.status).length ? `A ${prev.status.toLowerCase()} claim cannot be marked ${step.status.toLowerCase()}.` : `This claim is ${prev.status.toLowerCase()}; no further step can be recorded.`);
+  }
   if (prev.filed_on && date < prev.filed_on) throw new CashRefundError('A step cannot be dated before the filing date.');
   assertUnlocked({ id, issue_date: date, invoice_number: prev.arn }, 'edit');
   const next: GstRefundClaim = { ...prev, status: step.status, history: [...prev.history, { date, status: step.status, ...(s(step.note) ? { note: s(step.note).slice(0, 300) } : {}) }], updated_at: new Date().toISOString() };
@@ -494,10 +526,12 @@ export function advanceRefund(id: string, step: RefundStep): GstRefundClaim {
         next.voucher_number = v.number;
       }
     }
-  } else if (voucherExists && step.status === 'WITHDRAWN') {
-    deleteVoucher(prev.voucher_id!);
+  } else if (voucherExists || prev.voucher_id || prev.status === 'PAID') {
+    // Leaving PAID (any other status): the refund is no longer received, so its receipt goes.
+    if (voucherExists) deleteVoucher(prev.voucher_id!);
     delete next.voucher_id;
     delete next.voucher_number;
+    delete next.paid_on;
   }
   setTable(REFUNDS_TABLE, getTable<GstRefundClaim>(REFUNDS_TABLE).map((r) => (r?.id === id ? next : r)));
   audit.record({ entity: 'gst', entity_id: id, action: 'update', doc_number: next.arn ?? 'RFD', summary: `GST refund claim ${next.arn ?? id}: ${prev.status} → ${next.status} on ${date}${next.voucher_number && step.status === 'PAID' ? ` (receipt ${next.voucher_number})` : ''}` });
