@@ -58,7 +58,7 @@ cell returns to the computed value. Auto fill again keeps the overrides.
 ## Ledger postings (derived, never stored — see `docs/features/ledger.md`)
 | Voucher | Debit | Credit |
 |---|---|---|
-| Payroll (final run, dated the voucher date) | each earning's account — 6000 Salaries & wages, 6010 Allowances & overtime, 6020 Bonus (per employee cost centre); 6030 Employer's contribution to PF, 6040 … to ESI, 6050 PF admin & EDLI charges | 2420 Salary payable (net), 2340 PF payable (employee + employer + EDLI / admin), 2341 ESI payable, 2342 Professional tax payable, 2337 TDS payable — salaries (192), other deductions to their own account (loan recovery → 3610 Loans & advances to employees, other → 2400) |
+| Payroll (final run, dated the voucher date) | each earning's account — 6000 Salaries & wages, 6001 Allowances & overtime, 6002 Bonus (per employee cost centre); 6003 Employer's contribution to PF, 6004 … to ESI, 6005 PF admin & EDLI charges | 2425 Salary payable (net), 2343 PF payable (employee + employer + EDLI / admin), 2344 ESI payable, 2345 Professional tax payable, 2337 TDS payable — salaries (192), other deductions to their own account (loan recovery → 3615 Loans & advances to employees, other → 2400) |
 | Payroll payment | the payable (salary / PF / ESI / PT / TDS) | the chosen cash / bank account |
 
 Numbers `PRL` / `PYP` use the shared series high-water mark (`series-counters.ts`), so a deleted latest number is never reused. Reopening a final run removes its voucher until it is finalized again; it is refused while a salary payment points at
