@@ -6,9 +6,7 @@ import {
   diffText,
   effectiveAction,
   gstr2bActionsDb,
-  IMS_LABELS,
   itcEffect,
-  MATCH_LABELS,
   matchGstr2b,
   parseGstr2bJson,
   parseGstr2bWorkbook,
@@ -32,6 +30,19 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import local from './gst-reports.module.css';
 import styles from './gstr2b.module.css';
+import { useT } from '../../i18n';
+import { gvT } from '../../i18n/areas/gst-views';
+import { nodes } from '../../i18n/areas/nodes';
+
+const MATCH_KEY = {
+  matched: 'mMatched',
+  mismatch: 'mMismatch',
+  missing_in_books: 'mMissing',
+  not_in_2b: 'mNotIn2b',
+  itc_unavailable: 'mItcUnavailable',
+} as const;
+const IMS_KEY = { ACCEPT: 'imsAccept', REJECT: 'imsReject', PENDING: 'imsPending' } as const;
+const matchLabel = (c: MatchClass) => gvT(MATCH_KEY[c]);
 
 export interface Gstr2bViewProps {
   period: ReportPeriod;
@@ -47,6 +58,7 @@ const total3 = (h: Heads3) => round2(h.igst + h.cgst + h.sgst);
 
 /** "2B match" tab: load the portal's GSTR-2B (JSON / Excel), match it to purchase bills, keep an IMS worksheet. */
 export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bViewProps) {
+  useT();
   const fileRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<Gstr2bData | null>(null);
   const [fileName, setFileName] = useState('');
@@ -69,7 +81,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
     if (!file) return;
     setError('');
     if (file.size > MAX_IMPORT_BYTES) {
-      setError('That file is larger than 25 MB.');
+      setError(gvT('tooLarge'));
       return;
     }
     setBusy(true);
@@ -77,9 +89,9 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
       let parsed: Gstr2bData;
       if (XLSX_FILE_RE.test(file.name)) parsed = parseGstr2bWorkbook(await readXlsx(await file.arrayBuffer()));
       else if (/\.json$/i.test(file.name) || file.type.includes('json')) parsed = parseGstr2bJson(JSON.parse(await file.text()));
-      else throw new Error('Choose the GSTR-2B JSON or Excel (.xlsx) file downloaded from the GST portal.');
+      else throw new Error(gvT('wrongFile'));
       if (parsed.lines.length === 0) {
-        setError(parsed.warnings[0] ?? 'No documents found in that file.');
+        setError(parsed.warnings[0] ?? gvT('noDocs'));
         setData(null);
       } else {
         setData(parsed);
@@ -87,7 +99,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
         setFilter('all');
       }
     } catch (err) {
-      setError(err instanceof SyntaxError ? 'That JSON file is damaged or incomplete.' : err instanceof Error ? err.message : 'Could not read that file.');
+      setError(err instanceof SyntaxError ? gvT('damagedJson') : err instanceof Error ? err.message : gvT('readFailed'));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -106,7 +118,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
       gstr2bActionsDb.set(actionPeriod, row.line, action);
       setRev((n) => n + 1);
     } catch {
-      notify('Could not save the action — storage is full or unavailable', 'error');
+      notify(gvT('actionSaveFailed'), 'error');
     }
   };
 
@@ -114,16 +126,16 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
     const line = row.line;
     if (!line) return;
     if (!line.date) {
-      notify('This 2B line has no readable date; add the bill from Expenses instead', 'error');
+      notify(gvT('noDate'), 'error');
       return;
     }
     const vendor = vendorsDb.all().find((v) => (v.gstin ?? '').toUpperCase() === line.ctin);
     try {
       purchasesDb.save(billFromLine(line, vendor?.id));
       setRev((n) => n + 1);
-      notify(`Bill ${line.number} added to purchases — review it in Expenses`);
+      notify(gvT('billAdded', { number: line.number }));
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Could not create the bill', 'error');
+      notify(err instanceof Error ? err.message : gvT('billFailed'), 'error');
     }
   };
 
@@ -134,16 +146,16 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
     try {
       await downloadXlsx(`${fileBase}.xlsx`, [{ name: 'IMS worksheet', rows: worksheetRows(match, actions, actionPeriod) }]);
     } catch {
-      notify('Could not build the Excel file', 'error');
+      notify(gvT('xlsxFailed'), 'error');
     }
   };
 
   const rows = match ? match.rows.filter((r) => filter === 'all' || r.cls === filter) : [];
   const columns: Column<MatchRow>[] = [
-    { key: 'st', label: 'Status', render: (r) => <span className={styles[r.cls]}>{MATCH_LABELS[r.cls]}</span> },
+    { key: 'st', label: gvT('colStatus'), render: (r) => <span className={styles[r.cls]}>{matchLabel(r.cls)}</span> },
     {
       key: 'sup',
-      label: 'Supplier',
+      label: gvT('colSupplier'),
       render: (r) => (
         <>
           {r.line?.tradeName || r.bill?.partyName || '-'}
@@ -153,30 +165,30 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
     },
     {
       key: 'doc',
-      label: '2B document',
+      label: gvT('col2bDoc'),
       render: (r) =>
         r.line ? (
           <>
             <span className={surface.mono}>{r.line.number}</span>
             <span className={styles.sub}>
               {r.line.section}
-              {r.line.docType === 'CN' ? ' · credit note' : r.line.docType === 'DN' ? ' · debit note' : ''} · {r.line.date ? formatDate(r.line.date) : 'no date'}
+              {r.line.docType === 'CN' ? gvT('creditNote') : r.line.docType === 'DN' ? gvT('debitNote') : ''} · {r.line.date ? formatDate(r.line.date) : gvT('noDateShort')}
             </span>
           </>
         ) : (
           '-'
         ),
     },
-    { key: 'tx', label: '2B taxable', numeric: true, render: (r) => (r.line ? <Money value={r.line.sign * r.line.taxable} /> : '-') },
-    { key: 'tax', label: '2B tax', numeric: true, render: (r) => (r.line ? <Money value={r.line.sign * total3(r.line)} /> : '-') },
+    { key: 'tx', label: gvT('col2bTaxable'), numeric: true, render: (r) => (r.line ? <Money value={r.line.sign * r.line.taxable} /> : '-') },
+    { key: 'tax', label: gvT('col2bTax'), numeric: true, render: (r) => (r.line ? <Money value={r.line.sign * total3(r.line)} /> : '-') },
     {
       key: 'book',
-      label: 'Books bill',
+      label: gvT('colBooksBill'),
       render: (r) =>
         r.bill ? (
           <>
-            <span className={surface.mono}>{r.bill.number || '(no number)'}</span>
-            <span className={styles.sub}>{formatDate(r.bill.date)} · tax {formatMoney(r.bill.tax)}</span>
+            <span className={surface.mono}>{r.bill.number || gvT('noNumber')}</span>
+            <span className={styles.sub}>{gvT('billSub', { date: formatDate(r.bill.date), tax: formatMoney(r.bill.tax) })}</span>
           </>
         ) : (
           '-'
@@ -184,29 +196,29 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
     },
     {
       key: 'diff',
-      label: 'Difference',
+      label: gvT('colDifference'),
       render: (r) =>
         r.cls === 'not_in_2b'
-          ? 'Not in 2B: ITC at risk (Sec 16(2)(aa))'
+          ? gvT('notIn2bRisk')
           : r.line && !r.line.itcAvailable
-            ? `ITC not available${r.line.reason ? ` (${r.line.reason})` : ''}`
+            ? `${gvT('itcNotAvailable')}${r.line.reason ? ` (${r.line.reason})` : ''}`
             : r.diffs.length
-              ? `${diffText(r.diffs)}${r.taxDiff ? ` · tax ${formatMoney(r.taxDiff)}` : ''}`
+              ? `${diffText(r.diffs)}${r.taxDiff ? gvT('taxDiff', { amount: formatMoney(r.taxDiff) }) : ''}`
               : '',
     },
     {
       key: 'ims',
-      label: 'IMS action',
+      label: gvT('colIms'),
       render: (r) =>
         r.line ? (
           <select
             className={`${controls.select} ${styles.actionSelect}`}
-            aria-label={`IMS action for ${r.line.number}`}
+            aria-label={gvT('imsAria', { number: r.line.number })}
             value={effectiveAction(actions, actionPeriod, r.line)}
             onChange={(e) => setAction(r, e.target.value as ImsAction)}
           >
             {ACTIONS.map((a) => (
-              <option key={a} value={a}>{IMS_LABELS[a]}</option>
+              <option key={a} value={a}>{gvT(IMS_KEY[a])}</option>
             ))}
           </select>
         ) : (
@@ -219,7 +231,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
       render: (r) =>
         r.cls === 'missing_in_books' && r.line && r.line.sign > 0 ? (
           <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => createBill(r)}>
-            <FilePlus2 size={14} aria-hidden /> Create bill
+            <FilePlus2 size={14} aria-hidden /> {gvT('createBill')}
           </button>
         ) : null,
     },
@@ -241,18 +253,18 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
       >
         <p className={styles.dropText}>
           {data
-            ? <>Loaded <strong>{fileName}</strong>. Load another file to replace it.</>
-            : <>Download your <strong>GSTR-2B</strong> from the GST portal (Returns → GSTR-2B → Download JSON or Excel) and load it here. It is read on this device only; nothing is uploaded.</>}
+            ? nodes(gvT('loaded'), { file: <strong>{fileName}</strong> })
+            : nodes(gvT('intro'), { gstr2b: <strong>GSTR-2B</strong> })}
         </p>
         <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={busy} onClick={() => fileRef.current?.click()}>
-          <FileUp size={16} aria-hidden /> {busy ? 'Reading…' : data ? 'Load another file' : 'Load GSTR-2B'}
+          <FileUp size={16} aria-hidden /> {busy ? gvT('reading') : data ? gvT('loadAnother') : gvT('load2b')}
         </button>
         <input
           ref={fileRef}
           type="file"
           className={surface.srOnly}
           accept=".json,.xlsx,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          aria-label="Choose a GSTR-2B JSON or Excel file"
+          aria-label={gvT('chooseFile')}
           onChange={(e) => void load(e.target.files?.[0])}
         />
       </div>
@@ -261,16 +273,16 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
       {data && match && effect && (
         <>
           <div className={styles.meta}>
-            <span>2B GSTIN <strong className={surface.mono}>{data.gstin || 'not stated'}</strong></span>
-            <span>Return period <strong>{data.period ? `${data.period.slice(0, 2)}/${data.period.slice(2)}` : `not stated (using ${periodLabel(period)})`}</strong></span>
-            <span><strong>{data.lines.length}</strong> documents in 2B</span>
-            <span><strong>{bills.length}</strong> bills in books</span>
-            {data.generatedOn && <span>Generated {data.generatedOn}</span>}
+            <span>{gvT('meta2bGstin')} <strong className={surface.mono}>{data.gstin || gvT('notStated')}</strong></span>
+            <span>{gvT('metaPeriod')} <strong>{data.period ? `${data.period.slice(0, 2)}/${data.period.slice(2)}` : gvT('notStatedUsing', { period: periodLabel(period) })}</strong></span>
+            <span>{nodes(gvT('metaDocs'), { n: <strong>{data.lines.length}</strong> })}</span>
+            <span>{nodes(gvT('metaBills'), { n: <strong>{bills.length}</strong> })}</span>
+            {data.generatedOn && <span>{gvT('generated', { date: data.generatedOn })}</span>}
           </div>
-          {gstinMismatch && <p className={styles.warn}>This 2B is for {data.gstin}, but the page is filtered to {gstin}.</p>}
+          {gstinMismatch && <p className={styles.warn}>{gvT('gstinMismatch', { g2b: data.gstin, gstin })}</p>}
           {periodMismatch && (
             <p className={styles.warn}>
-              This 2B is for {data.period.slice(0, 2)}/{data.period.slice(2)}; "in books only" and the 3B comparison use bills dated in {periodLabel(period)}. Pick the matching month above.
+              {gvT('periodMismatch', { p2b: `${data.period.slice(0, 2)}/${data.period.slice(2)}`, period: periodLabel(period) })}
             </p>
           )}
           {data.warnings.map((w) => <p key={w} className={styles.warn}>{w}</p>)}
@@ -278,31 +290,31 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
           <div className={surface.statGrid}>
             {CLASSES.map((c) => (
               <div key={c} className={surface.stat}>
-                <div className={surface.statTop}><span className={surface.statLabel}>{MATCH_LABELS[c]}</span></div>
+                <div className={surface.statTop}><span className={surface.statLabel}>{matchLabel(c)}</span></div>
                 <div className={surface.statValue}>{match.counts[c]}</div>
               </div>
             ))}
           </div>
 
-          <h3 className={local.tbHeading}>GSTR-3B Table 4A(5) — books vs 2B</h3>
+          <h3 className={local.tbHeading}>{gvT('t4a5Head')}</h3>
           <div className={`${surface.tableWrap} ${styles.effect}`}>
             <table className={surface.table}>
-              <caption className={surface.srOnly}>Input tax credit comparison</caption>
+              <caption className={surface.srOnly}>{gvT('itcCaption')}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Figure</th>
+                  <th scope="col">{gvT('colFigure')}</th>
                   <th scope="col" style={{ textAlign: 'right' }}>IGST</th>
                   <th scope="col" style={{ textAlign: 'right' }}>CGST</th>
                   <th scope="col" style={{ textAlign: 'right' }}>SGST</th>
-                  <th scope="col" style={{ textAlign: 'right' }}>Total</th>
+                  <th scope="col" style={{ textAlign: 'right' }}>{gvT('total')}</th>
                 </tr>
               </thead>
               <tbody>
                 {([
-                  ['Books (what the GSTR-3B tab shows today)', effect.books],
-                  ['Books, limited to bills matched in 2B and accepted', effect.restricted],
-                  ['Difference: ITC at risk', effect.atRisk],
-                  ['Per 2B: accepted lines with ITC available', effect.per2b],
+                  [gvT('effBooks'), effect.books],
+                  [gvT('effRestricted'), effect.restricted],
+                  [gvT('effAtRisk'), effect.atRisk],
+                  [gvT('effPer2b'), effect.per2b],
                 ] as [string, Heads3][]).map(([label, h]) => (
                   <tr key={label}>
                     <th scope="row" style={{ fontWeight: 500 }}>{label}</th>
@@ -316,33 +328,33 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
             </table>
           </div>
           <p className={controls.hint} style={{ margin: 0 }}>
-            The GSTR-3B report is not changed. Since 1 Jan 2022 (Sec 16(2)(aa)) ITC can only be claimed for invoices that appear in GSTR-2B; for a value mismatch the lower of books and 2B is counted.
-            {effect.rejected + effect.pending > 0 ? ` ${effect.rejected} rejected and ${effect.pending} pending line(s) are left out.` : ''} ISD credit (4A(4)), reverse charge (4A(3)) and imports (4A(1)) are outside this comparison.
-            Lines with no action are deemed accepted, as on the IMS dashboard. Working paper only — verify with your CA before filing.
+            {gvT('effHint1')}
+            {effect.rejected + effect.pending > 0 ? gvT('effHintLeftOut', { rejected: effect.rejected, pending: effect.pending }) : ''}
+            {gvT('effHint2')}
           </p>
 
           <div className={local.toolbar}>
-            <div className={styles.chips} role="group" aria-label="Filter by status">
+            <div className={styles.chips} role="group" aria-label={gvT('filterStatus')}>
               <button type="button" className={filter === 'all' ? styles.chipOn : styles.chip} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
-                All ({match.rows.length})
+                {gvT('allCount', { n: match.rows.length })}
               </button>
               {CLASSES.map((c) => (
                 <button key={c} type="button" className={filter === c ? styles.chipOn : styles.chip} aria-pressed={filter === c} onClick={() => setFilter(c)}>
-                  {MATCH_LABELS[c]} ({match.counts[c]})
+                  {matchLabel(c)} ({match.counts[c]})
                 </button>
               ))}
             </div>
             <div className={styles.chips}>
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={exportCsv}>
-                <Download size={14} aria-hidden /> Worksheet CSV
+                <Download size={14} aria-hidden /> {gvT('worksheetCsv')}
               </button>
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => void exportXlsx()}>
-                <Download size={14} aria-hidden /> Worksheet .xlsx
+                <Download size={14} aria-hidden /> {gvT('worksheetXlsx')}
               </button>
             </div>
           </div>
 
-          <DataTable caption="GSTR-2B match" emptyText="Nothing in this group." rows={rows} rowKey={(r) => r.key} columns={columns} />
+          <DataTable caption={gvT('cap2b')} emptyText={gvT('empty2b')} rows={rows} rowKey={(r) => r.key} columns={columns} />
         </>
       )}
     </>

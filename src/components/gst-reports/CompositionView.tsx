@@ -11,6 +11,9 @@ import { DataTable, Money } from './DataTable';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import local from './gst-reports.module.css';
+import { useT } from '../../i18n';
+import { gvT } from '../../i18n/areas/gst-views';
+import { nodes } from '../../i18n/areas/nodes';
 
 export interface CompositionViewProps {
   invoices: InvoiceRecord[];
@@ -33,12 +36,12 @@ interface Row {
 
 const heads = (table: string, label: string, h: TaxHeads): Row => ({ table, label, value: h.value, igst: h.igst, cgst: h.cgst, sgst: h.sgst });
 
-const COLS = [
-  { key: 't', label: 'Table', render: (r: Row) => <span className={local.tag}>{r.table}</span> },
-  { key: 'l', label: 'Description', render: (r: Row) => r.label },
+const cols = () => [
+  { key: 't', label: gvT('colTable'), render: (r: Row) => <span className={local.tag}>{r.table}</span> },
+  { key: 'l', label: gvT('colDescription'), render: (r: Row) => r.label },
   ...(['value', 'igst', 'cgst', 'sgst'] as const).map((k) => ({
     key: k,
-    label: k === 'value' ? 'Value' : k.toUpperCase(),
+    label: k === 'value' ? gvT('colValue') : k.toUpperCase(),
     numeric: true,
     render: (r: Row) => (r[k] === undefined ? '' : <Money value={r[k] as number} />),
   })),
@@ -46,6 +49,8 @@ const COLS = [
 
 /** CMP-08 (quarter) and GSTR-4 (year) working papers for a composition profile (roadmap 5.9). */
 export default function CompositionView({ invoices, purchases, period, gstin, filerStateCode, category }: CompositionViewProps) {
+  useT();
+  const COLS = cols();
   const quarter = useMemo<ReportPeriod>(
     // CMP-08 is quarterly: the quarter holding the chosen month (Q1 for a whole FY).
     () => (period.kind === 'quarter' ? period : periodForDate('quarter', periodRange(period).from)),
@@ -78,7 +83,7 @@ export default function CompositionView({ invoices, purchases, period, gstin, fi
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} data-composition-view>
       <div className={local.toolbar}>
-        <div className={controls.segment} role="group" aria-label="Composition return">
+        <div className={controls.segment} role="group" aria-label={gvT('compReturn')}>
           <button type="button" aria-pressed={view === 'cmp08'} className={view === 'cmp08' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setView('cmp08')}>
             CMP-08 · {cmp.label}
           </button>
@@ -95,13 +100,11 @@ export default function CompositionView({ invoices, purchases, period, gstin, fi
               : downloadText(`GSTR4_${gstin || 'all'}_FY${g4.fyStart}.csv`, toCsv(gstr4Rows(g4)), 'text/csv')
           }
         >
-          <Download size={14} aria-hidden /> Download CSV
+          <Download size={14} aria-hidden /> {gvT('downloadCsv')}
         </button>
       </div>
       <p className={controls.hint}>
-        Category: {COMPOSITION_CATEGORY_LABELS[category ?? 'trader']} — {rate ?? '—'}% of turnover today (rates by document date, from tax-rules).
-        Turnover is every live Bill of Supply / invoice / debit note less credit notes issued under a composition profile. Reverse-charge purchases and imports of services
-        are taxed at the normal rate. A composition dealer cannot claim input tax credit. Interest, late fee and TDS/TCS credit are not computed. Working paper — verify with your CA.
+        {gvT('compHint', { category: COMPOSITION_CATEGORY_LABELS[category ?? 'trader'], rate: rate ?? '—' })}
       </p>
       {issues.length > 0 && (
         <ul className={local.gapList}>
@@ -112,17 +115,22 @@ export default function CompositionView({ invoices, purchases, period, gstin, fi
       )}
       {view === 'cmp08' ? (
         <>
-          <DataTable caption="CMP-08 statement" emptyText="" rows={cmpRows} rowKey={(r, i) => `${r.table}${i}`} columns={COLS} />
+          <DataTable caption={gvT('capCmp08')} emptyText="" rows={cmpRows} rowKey={(r, i) => `${r.table}${i}`} columns={COLS} />
           <p className={surface.sectionNote}>
-            {cmp.counts.documents} document(s) included; {cmp.counts.drafts} draft and {cmp.counts.cancelled} cancelled left out. Total payable in cash: <strong><Money value={cmp.payable.total} /></strong>.
-            {cmp.itcNotClaimable > 0 && <> GST of <Money value={cmp.itcNotClaimable} /> on purchase bills is not claimable (cost, not credit).</>}
+            {nodes(gvT('cmpCounts'), { docs: cmp.counts.documents, drafts: cmp.counts.drafts, cancelled: cmp.counts.cancelled, amount: <strong><Money value={cmp.payable.total} /></strong> })}
+            {cmp.itcNotClaimable > 0 && <> {nodes(gvT('cmpItc'), { amount: <Money value={cmp.itcNotClaimable} /> })}</>}
           </p>
         </>
       ) : (
         <>
-          <DataTable caption="GSTR-4 annual summary" emptyText="" rows={g4Rows} rowKey={(r, i) => `${r.table}${i}`} columns={COLS} />
+          <DataTable caption={gvT('capGstr4')} emptyText="" rows={g4Rows} rowKey={(r, i) => `${r.table}${i}`} columns={COLS} />
           <p className={surface.sectionNote}>
-            Turnover <Money value={g4.totals.turnover} /> · composition tax <Money value={g4.totals.compositionTax} /> · reverse-charge tax <Money value={g4.totals.rcmTax} /> · total <strong><Money value={g4.totals.payable} /></strong>.
+            {nodes(gvT('g4Totals'), {
+              turnover: <Money value={g4.totals.turnover} />,
+              tax: <Money value={g4.totals.compositionTax} />,
+              rcm: <Money value={g4.totals.rcmTax} />,
+              total: <strong><Money value={g4.totals.payable} /></strong>,
+            })}
           </p>
         </>
       )}

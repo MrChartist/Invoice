@@ -25,6 +25,9 @@ import { DataTable, Money } from './DataTable';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import local from './gst-reports.module.css';
+import { useT } from '../../i18n';
+import { gvT } from '../../i18n/areas/gst-views';
+import { nodes } from '../../i18n/areas/nodes';
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -38,11 +41,11 @@ export interface ComplianceViewProps {
   notify: (msg: string, tone?: 'error') => void;
 }
 
-const STATUS: Record<ReturnStatus, { label: string; cls: string; rank: number }> = {
-  overdue: { label: 'Overdue', cls: surface.badgeOverdue, rank: 0 },
-  'due-soon': { label: 'Due soon', cls: surface.badgePartial, rank: 1 },
-  upcoming: { label: 'Upcoming', cls: surface.badgeDraft, rank: 2 },
-  filed: { label: 'Filed', cls: surface.badgePaid, rank: 3 },
+const STATUS: Record<ReturnStatus, { label: 'stOverdue' | 'stDueSoon' | 'stUpcoming' | 'stFiled'; cls: string; rank: number }> = {
+  overdue: { label: 'stOverdue', cls: surface.badgeOverdue, rank: 0 },
+  'due-soon': { label: 'stDueSoon', cls: surface.badgePartial, rank: 1 },
+  upcoming: { label: 'stUpcoming', cls: surface.badgeDraft, rank: 2 },
+  filed: { label: 'stFiled', cls: surface.badgePaid, rank: 3 },
 };
 
 interface Row {
@@ -55,6 +58,7 @@ interface Row {
 }
 
 export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover, notify }: ComplianceViewProps) {
+  useT();
   const today = todayIso();
   const [frequency, setFrequency] = useState<FilerFrequency>(
     () => localDb.settings.get().gst_filing_frequency ?? (localDb.settings.activeProfile()?.gst_scheme === 'composition' ? 'composition' : 'monthly'),
@@ -98,7 +102,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
     try {
       localDb.settings.save({ ...localDb.settings.get(), gst_filing_frequency: f });
     } catch {
-      notify('Could not save the filing frequency', 'error');
+      notify(gvT('freqSaveFailed'), 'error');
     }
   };
 
@@ -108,7 +112,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
     try {
       saveFiled(next);
     } catch {
-      notify('Could not save — browser storage may be full', 'error');
+      notify(gvT('saveFailedFull'), 'error');
     }
   };
 
@@ -119,60 +123,60 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
     <>
       <div className={local.toolbar}>
         <label className={local.periodField}>
-          <span className={controls.label}>Filing frequency</span>
+          <span className={controls.label}>{gvT('filingFrequency')}</span>
           <select className={controls.select} value={frequency} onChange={(e) => changeFrequency(e.target.value as FilerFrequency)}>
-            <option value="monthly">Monthly (GSTR-1 by 11th, GSTR-3B by 20th)</option>
-            <option value="qrmp">Quarterly — QRMP (GSTR-1 by 13th, GSTR-3B by {qrmp3bDay(stateCode, today)}th)</option>
-            <option value="composition">Composition (CMP-08 by 18th after each quarter, GSTR-4 yearly)</option>
+            <option value="monthly">{gvT('freqMonthly')}</option>
+            <option value="qrmp">{gvT('freqQrmp', { day: qrmp3bDay(stateCode, today) })}</option>
+            <option value="composition">{gvT('freqComposition')}</option>
           </select>
         </label>
         <p className={controls.hint} style={{ margin: 0 }}>
           <CalendarClock size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {open.length
-            ? <>{open.length} overdue · estimated late fee + interest if filed today <strong><Money value={exposure} /></strong></>
-            : 'Nothing overdue.'}
+            ? nodes(gvT('overdueExposure'), { n: open.length, amount: <strong><Money value={exposure} /></strong> })
+            : gvT('nothingOverdue')}
         </p>
       </div>
       {frequency === 'qrmp' && turnover > QRMP_TURNOVER_LIMIT && (
-        <p className={controls.error} style={{ margin: 0 }}>QRMP is only open up to ₹5 crore of last-FY turnover; your entered turnover is above that.</p>
+        <p className={controls.error} style={{ margin: 0 }}>{gvT('qrmpLimit')}</p>
       )}
       {!since ? (
-        <p className={surface.sectionNote}>No issued tax invoices yet, so no returns are tracked. Returns appear from the month of your first tax invoice (up to 12 months back).</p>
+        <p className={surface.sectionNote}>{gvT('noReturns')}</p>
       ) : (
         <DataTable
-          caption="GST return calendar"
+          caption={gvT('capCalendar')}
           emptyText=""
           rows={rows}
           rowKey={(x) => x.r.id}
           columns={[
-            { key: 'f', label: 'Return', render: (x) => FORM_LABELS[x.r.form] },
-            { key: 'p', label: 'Period', render: (x) => x.r.label },
-            { key: 'd', label: 'Due', render: (x) => formatDate(x.r.due) },
-            { key: 's', label: 'Status', render: (x) => <span className={`${surface.badge} ${STATUS[x.status].cls}`}>{STATUS[x.status].label}{x.days > 0 && !x.r.optional ? ` · ${x.days}d late` : ''}</span> },
+            { key: 'f', label: gvT('colReturn'), render: (x) => FORM_LABELS[x.r.form] },
+            { key: 'p', label: gvT('period'), render: (x) => x.r.label },
+            { key: 'd', label: gvT('colDue'), render: (x) => formatDate(x.r.due) },
+            { key: 's', label: gvT('colStatus'), render: (x) => <span className={`${surface.badge} ${STATUS[x.status].cls}`}>{gvT(STATUS[x.status].label)}{x.days > 0 && !x.r.optional ? gvT('daysLate', { n: x.days }) : ''}</span> },
             {
               key: 'filed',
-              label: 'Filed',
+              label: gvT('colFiled'),
               render: (x) => (
                 <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
                   <label className={controls.check}>
-                    <input type="checkbox" checked={!!x.filed} onChange={(e) => mark(x.r, e.target.checked ? today : null)} aria-label={`${FORM_LABELS[x.r.form]} ${x.r.label} filed`} />
+                    <input type="checkbox" checked={!!x.filed} onChange={(e) => mark(x.r, e.target.checked ? today : null)} aria-label={gvT('filedAria', { form: FORM_LABELS[x.r.form], period: x.r.label })} />
                   </label>
                   {x.filed && (
                     <input type="date" className={controls.input} style={{ width: 'auto' }} value={x.filed.filed_on} max={today}
-                      aria-label="Filed on" onChange={(e) => e.target.value && mark(x.r, e.target.value)} />
+                      aria-label={gvT('filedOn')} onChange={(e) => e.target.value && mark(x.r, e.target.value)} />
                   )}
                 </span>
               ),
             },
-            { key: 'lf', label: 'Late fee (est.)', numeric: true, render: (x) => (x.lateFee ? <Money value={x.lateFee} /> : '-'), total: (x) => x.lateFee },
-            { key: 'in', label: 'Interest (est.)', numeric: true, render: (x) => (x.interest ? <Money value={x.interest} /> : '-'), total: (x) => x.interest },
+            { key: 'lf', label: gvT('colLateFee'), numeric: true, render: (x) => (x.lateFee ? <Money value={x.lateFee} /> : '-'), total: (x) => x.lateFee },
+            { key: 'in', label: gvT('colInterest'), numeric: true, render: (x) => (x.interest ? <Money value={x.interest} /> : '-'), total: (x) => x.interest },
           ]}
         />
       )}
       <ul className={local.notes}>
-        <li><strong>Estimates — verify with your CA.</strong> Due dates are the regular ones from the rules (Rules 59/61, QRMP Notifications 84-85/2020-CT); one-off extensions notified by CBIC are not tracked, so check the portal.</li>
-        <li>Late fee: ₹50/day (₹20/day for a nil return) per GSTR-1 / GSTR-3B, capped by last-FY turnover (Notifications 19/2021 and 20/2021-CT: ₹2,000 up to ₹1.5 crore, ₹5,000 up to ₹5 crore, ₹10,000 above; nil ₹500). GSTR-9 per Notification 7/2023-CT, capped on the turnover entered above.</li>
-        <li>Interest u/s 50(1): 18% p.a. simple, per day, on the net cash tax of the period's GSTR-3B (after ITC), counted from the day after the due date. For QRMP, monthly PMT-06 deposits are not modelled — interest is on the quarter's cash tax.</li>
-        <li>Filed marks are stored on this device (and in backups) per GSTIN. GSTR-9 is optional up to ₹2 crore turnover.</li>
+        <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
+        <li>{gvT('ncLateFee')}</li>
+        <li>{gvT('ncInterest')}</li>
+        <li>{gvT('ncFiled')}</li>
       </ul>
     </>
   );

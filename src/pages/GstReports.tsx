@@ -50,6 +50,9 @@ import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './GstReports.module.css';
 import local from '../components/gst-reports/gst-reports.module.css';
+import { useT } from '../i18n';
+import { gstT } from '../i18n/areas/gst';
+import { nodes } from '../i18n/areas/nodes';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 
@@ -59,25 +62,27 @@ const BulkEInvoiceModal = lazy(() => import('../components/einvoice/BulkEInvoice
 
 type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'gstr3b' | 'gstr2b' | 'composition';
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
+/** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
+const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
+  { id: 'overview', label: 'Overview', key: 'tabOverview' },
   { id: 'b2b', label: 'B2B' },
   { id: 'b2cl', label: 'B2CL' },
   { id: 'b2cs', label: 'B2CS' },
   { id: 'cdnr', label: 'CDNR' },
   { id: 'cdnur', label: 'CDNUR' },
-  { id: 'exp', label: 'Exports' },
-  { id: 'nil', label: 'Nil / Exempt' },
-  { id: 'at', label: 'Advances 11A' },
-  { id: 'txpd', label: 'Adjusted 11B' },
+  { id: 'exp', label: 'Exports', key: 'tabExp' },
+  { id: 'nil', label: 'Nil / Exempt', key: 'tabNil' },
+  { id: 'at', label: 'Advances 11A', key: 'tabAt' },
+  { id: 'txpd', label: 'Adjusted 11B', key: 'tabTxpd' },
   { id: 'hsn', label: 'HSN' },
-  { id: 'docs', label: 'Documents' },
-  { id: 'amend', label: 'Amendments' },
+  { id: 'docs', label: 'Documents', key: 'tabDocs' },
+  { id: 'amend', label: 'Amendments', key: 'tabAmend' },
   { id: 'gstr3b', label: 'GSTR-3B' },
-  { id: 'gstr2b', label: '2B match' },
-  { id: 'compliance', label: 'Compliance' },
-  { id: 'composition', label: 'Composition (CMP-08 / GSTR-4)' },
+  { id: 'gstr2b', label: '2B match', key: 'tab2b' },
+  { id: 'compliance', label: 'Compliance', key: 'tabCompliance' },
+  { id: 'composition', label: 'Composition (CMP-08 / GSTR-4)', key: 'tabComposition' },
 ];
+const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0] } | undefined) => (x?.key ? gstT(x.key) : x?.label);
 
 function download(name: string, mime: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
@@ -91,12 +96,13 @@ function download(name: string, mime: string, text: string) {
 }
 
 const pos = (code: string) => {
-  if (code === '96') return '96 - Other Countries';
+  if (code === '96') return gstT('otherCountries');
   const s = stateByCode(code);
   return s ? `${s.code} - ${s.name}` : code || '-';
 };
 
 export function GstReports() {
+  useT();
   const { notify, toastNode } = useToast();
   const invoices = useMemo(() => getTable<InvoiceRecord>('invoices'), []);
   const purchases = useMemo(() => getTable<unknown>('purchases'), []);
@@ -200,24 +206,24 @@ export function GstReports() {
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     const w = window.open(url, '_blank');
     if (w) w.addEventListener('load', () => w.print());
-    else notify('Your browser blocked the print window — allow pop-ups for this site and try again', 'error');
+    else notify(gstT('popupBlocked'), 'error');
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   /* ── column sets ── */
   const docCols = <T extends DocRow>(isNote = false): Column<T>[] => [
-    { key: 'ctin', label: 'GSTIN', render: (r) => <span className={surface.mono}>{r.ctin || '-'}</span> },
-    { key: 'party', label: 'Receiver', render: (r) => r.partyName || '-' },
+    { key: 'ctin', label: gstT('colGstin'), render: (r) => <span className={surface.mono}>{r.ctin || '-'}</span> },
+    { key: 'party', label: gstT('colReceiver'), render: (r) => r.partyName || '-' },
     {
       key: 'no',
-      label: isNote ? 'Note no' : 'Invoice no',
-      render: (r) => <Link to={`/invoice/${r.invoiceId}`} className={local.issueLink}>{r.number || '(no number)'}</Link>,
+      label: isNote ? gstT('colNoteNo') : gstT('colInvoiceNo'),
+      render: (r) => <Link to={`/invoice/${r.invoiceId}`} className={local.issueLink}>{r.number || gstT('noNumber')}</Link>,
     },
-    { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
-    { key: 'value', label: 'Value', numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
-    { key: 'pos', label: 'Place of supply', render: (r) => pos(r.pos) },
-    { key: 'rate', label: 'Rate %', numeric: true, render: (r) => r.items.map((i) => i.rate).join(', ') || '-' },
-    { key: 'txval', label: 'Taxable', numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
+    { key: 'date', label: gstT('colDate'), render: (r) => formatDate(r.date) },
+    { key: 'value', label: gstT('colValue'), numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
+    { key: 'pos', label: gstT('colPos'), render: (r) => pos(r.pos) },
+    { key: 'rate', label: gstT('colRate'), numeric: true, render: (r) => r.items.map((i) => i.rate).join(', ') || '-' },
+    { key: 'txval', label: gstT('colTaxable'), numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
     { key: 'igst', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
     { key: 'cgst', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
     { key: 'sgst', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
@@ -226,17 +232,17 @@ export function GstReports() {
   const hsnTable = (rows: HsnRow[], caption: string) => (
     <DataTable
       caption={caption}
-      emptyText="No HSN/SAC data in this table."
+      emptyText={gstT('noHsn')}
       rows={rows}
       rowKey={(r) => `${r.hsn}${r.uqc}${r.rate}`}
       columns={[
         { key: 'h', label: 'HSN/SAC', render: (r) => <span className={surface.mono}>{r.hsn}</span> },
-        { key: 'd', label: 'Description', render: (r) => r.description },
-        { key: 'u', label: 'UQC', render: (r) => r.uqc },
-        { key: 'q', label: 'Qty', numeric: true, render: (r) => r.qty },
-        { key: 'v', label: 'Total value', numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
-        { key: 'r', label: 'Rate %', numeric: true, render: (r) => r.rate },
-        { key: 't', label: 'Taxable', numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
+        { key: 'd', label: gstT('colDescription'), render: (r) => r.description },
+        { key: 'u', label: gstT('colUqc'), render: (r) => r.uqc },
+        { key: 'q', label: gstT('colQty'), numeric: true, render: (r) => r.qty },
+        { key: 'v', label: gstT('colTotalValue'), numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
+        { key: 'r', label: gstT('colRate'), numeric: true, render: (r) => r.rate },
+        { key: 't', label: gstT('colTaxable'), numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
         { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
         { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
         { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
@@ -247,37 +253,37 @@ export function GstReports() {
   const sectionBody = () => {
     switch (tab) {
       case 'b2b':
-        return <DataTable columns={docCols()} rows={g1.b2b} rowKey={(r) => r.invoiceId} caption="B2B invoices" emptyText="No invoices to registered businesses in this period." />;
+        return <DataTable columns={docCols()} rows={g1.b2b} rowKey={(r) => r.invoiceId} caption={gstT('capB2b')} emptyText={gstT('emptyB2b')} />;
       case 'b2cl':
-        return <DataTable columns={docCols()} rows={g1.b2cl} rowKey={(r) => r.invoiceId} caption="B2CL invoices" emptyText="No large inter-state invoices to unregistered buyers." />;
+        return <DataTable columns={docCols()} rows={g1.b2cl} rowKey={(r) => r.invoiceId} caption={gstT('capB2cl')} emptyText={gstT('emptyB2cl')} />;
       case 'cdnr':
-        return <DataTable columns={docCols(true)} rows={g1.cdnr} rowKey={(r) => r.invoiceId} caption="Credit notes to registered persons" emptyText="No credit notes to registered persons." />;
+        return <DataTable columns={docCols(true)} rows={g1.cdnr} rowKey={(r) => r.invoiceId} caption={gstT('capCdnr')} emptyText={gstT('emptyCdnr')} />;
       case 'cdnur': {
         const cols: Column<CdnRow>[] = [
           ...docCols<CdnRow>(true),
-          { key: 'typ', label: 'UR type', render: (r) => r.unregType ?? '' },
+          { key: 'typ', label: gstT('colUrType'), render: (r) => r.unregType ?? '' },
         ];
-        return <DataTable columns={cols} rows={g1.cdnur} rowKey={(r) => r.invoiceId} caption="Credit notes to unregistered persons" emptyText="No unregistered credit notes need separate reporting. Smaller ones are netted in B2CS." />;
+        return <DataTable columns={cols} rows={g1.cdnur} rowKey={(r) => r.invoiceId} caption={gstT('capCdnur')} emptyText={gstT('emptyCdnur')} />;
       }
       case 'exp': {
         const cols: Column<ExportRow>[] = [
           ...docCols<ExportRow>().filter((c) => c.key !== 'ctin'),
-          { key: 'typ', label: 'Type', render: (r) => (r.expType === 'WPAY' ? 'With IGST' : 'Without IGST (LUT)') },
+          { key: 'typ', label: gstT('colType'), render: (r) => (r.expType === 'WPAY' ? gstT('withIgst') : gstT('withoutIgst')) },
         ];
-        return <DataTable columns={cols} rows={g1.exp} rowKey={(r) => r.invoiceId} caption="Export invoices" emptyText="No export invoices (place of supply 96 - Other Countries)." />;
+        return <DataTable columns={cols} rows={g1.exp} rowKey={(r) => r.invoiceId} caption={gstT('capExp')} emptyText={gstT('emptyExp')} />;
       }
       case 'b2cs':
         return (
           <DataTable
-            caption="B2CS summary"
-            emptyText="No small B2C supplies in this period."
+            caption={gstT('capB2cs')}
+            emptyText={gstT('emptyB2cs')}
             rows={g1.b2cs}
             rowKey={(r) => `${r.supply}${r.pos}${r.rate}`}
             columns={[
-              { key: 'sply', label: 'Supply', render: (r) => (r.supply === 'INTRA' ? 'Intra-state' : 'Inter-state') },
-              { key: 'pos', label: 'Place of supply', render: (r) => pos(r.pos) },
-              { key: 'rate', label: 'Rate %', numeric: true, render: (r) => r.rate },
-              { key: 'tx', label: 'Taxable', numeric: true, render: (r) => <Money value={r.txval} />, total: (r) => r.txval },
+              { key: 'sply', label: gstT('colSupply'), render: (r) => (r.supply === 'INTRA' ? gstT('intra') : gstT('inter')) },
+              { key: 'pos', label: gstT('colPos'), render: (r) => pos(r.pos) },
+              { key: 'rate', label: gstT('colRate'), numeric: true, render: (r) => r.rate },
+              { key: 'tx', label: gstT('colTaxable'), numeric: true, render: (r) => <Money value={r.txval} />, total: (r) => r.txval },
               { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
               { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
               { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
@@ -287,15 +293,15 @@ export function GstReports() {
       case 'nil':
         return (
           <DataTable
-            caption="Nil-rated, exempt and non-GST outward supplies"
-            emptyText="No nil-rated or non-GST supplies."
+            caption={gstT('capNil')}
+            emptyText={gstT('emptyNil')}
             rows={g1.nil}
             rowKey={(r) => r.type}
             columns={[
-              { key: 'd', label: 'Description', render: (r) => nilLabel(r.type) },
-              { key: 'n', label: 'Nil rated', numeric: true, render: (r) => <Money value={r.nil} />, total: (r) => r.nil },
-              { key: 'e', label: 'Exempted', numeric: true, render: (r) => <Money value={r.exempt} />, total: (r) => r.exempt },
-              { key: 'g', label: 'Non-GST', numeric: true, render: (r) => <Money value={r.nonGst} />, total: (r) => r.nonGst },
+              { key: 'd', label: gstT('colDescription'), render: (r) => nilLabel(r.type) },
+              { key: 'n', label: gstT('colNil'), numeric: true, render: (r) => <Money value={r.nil} />, total: (r) => r.nil },
+              { key: 'e', label: gstT('colExempt'), numeric: true, render: (r) => <Money value={r.exempt} />, total: (r) => r.exempt },
+              { key: 'g', label: gstT('colNonGst'), numeric: true, render: (r) => <Money value={r.nonGst} />, total: (r) => r.nonGst },
             ]}
           />
         );
@@ -303,11 +309,11 @@ export function GstReports() {
       case 'txpd': {
         const rows = (tab === 'at' ? g1.at : g1.txpd) ?? [];
         const cols: Column<AdvanceTableRow>[] = [
-          { key: 'pos', label: 'Place of supply', render: (r) => pos(r.pos) },
-          { key: 'sply', label: 'Supply', render: (r) => (r.supply === 'INTRA' ? 'Intra-state' : 'Inter-state') },
-          { key: 'rate', label: 'Rate %', numeric: true, render: (r) => r.rate },
-          { key: 'g', label: 'Gross (incl. tax)', numeric: true, render: (r) => <Money value={r.gross} />, total: (r) => r.gross },
-          { key: 'tx', label: tab === 'at' ? 'Advance received (excl. tax)' : 'Advance adjusted (excl. tax)', numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
+          { key: 'pos', label: gstT('colPos'), render: (r) => pos(r.pos) },
+          { key: 'sply', label: gstT('colSupply'), render: (r) => (r.supply === 'INTRA' ? gstT('intra') : gstT('inter')) },
+          { key: 'rate', label: gstT('colRate'), numeric: true, render: (r) => r.rate },
+          { key: 'g', label: gstT('colGross'), numeric: true, render: (r) => <Money value={r.gross} />, total: (r) => r.gross },
+          { key: 'tx', label: tab === 'at' ? gstT('colAdvReceived') : gstT('colAdvAdjusted'), numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },
           { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
           { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
           { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} />, total: (r) => r.sgst },
@@ -315,31 +321,29 @@ export function GstReports() {
         return (
           <>
             <p className={controls.hint} style={{ margin: 0 }}>
-              {tab === 'at'
-                ? 'Table 11A: advances received in this period on which GST is due (services; goods only before 15 Nov 2017, Notification 66/2017-CT). Tax worked out on the advance, tax-inclusive.'
-                : 'Table 11B: advances adjusted against invoices (and refunded, Rule 51) in this period — the tax comes off. '}
-              {' '}Also included in GSTR-3B 3.1(a). <Link to="/receivables?tab=advances" className={local.issueLink}>Open advances</Link>. Verify with your CA.
+              {tab === 'at' ? gstT('hint11a') : gstT('hint11b')}
+              {' '}{gstT('alsoIn3b')} <Link to="/receivables?tab=advances" className={local.issueLink}>{gstT('openAdvances')}</Link>. {gstT('verifyCa')}
             </p>
-            <DataTable columns={cols} rows={rows} rowKey={(r) => `${r.pos}${r.rate}${r.supply}`} caption={tab === 'at' ? 'Advances received, Table 11A' : 'Advances adjusted, Table 11B'}
-              emptyText={tab === 'at' ? 'No taxable advances received in this period.' : 'No advances adjusted or refunded in this period.'} />
+            <DataTable columns={cols} rows={rows} rowKey={(r) => `${r.pos}${r.rate}${r.supply}`} caption={tab === 'at' ? gstT('cap11a') : gstT('cap11b')}
+              emptyText={tab === 'at' ? gstT('empty11a') : gstT('empty11b')} />
           </>
         );
       }
       case 'hsn': {
         const hint = (
           <p className={controls.hint} style={{ margin: 0 }}>
-            Minimum {g1.hsnMinDigits} HSN/SAC digits for a last-FY turnover of {lastFyTurnover ? formatMoney(lastFyTurnover) : '(not entered: assumed up to ₹5 crore)'} — 4 up to ₹5 crore, 6 above (Notification 78/2020-CT).
-            {g1.hsnSplit ? ' From January 2025 Table 12 is filed as two tables: B2B (registered recipients, incl. their credit/debit notes) and B2C (everyone else).' : ''}
+            {gstT('hsnHint', { digits: g1.hsnMinDigits, turnover: lastFyTurnover ? formatMoney(lastFyTurnover) : gstT('hsnNotEntered') })}
+            {g1.hsnSplit ? ` ${gstT('hsnSplit')}` : ''}
           </p>
         );
-        if (!g1.hsnSplit) return <>{hint}{hsnTable(g1.hsn, 'HSN-wise summary')}</>;
+        if (!g1.hsnSplit) return <>{hint}{hsnTable(g1.hsn, gstT('capHsn'))}</>;
         return (
           <>
             {hint}
-            <h3 className={local.tbHeading}>B2B — supplies to registered persons</h3>
-            {hsnTable(g1.hsnB2b, 'HSN summary, B2B')}
-            <h3 className={local.tbHeading}>B2C — supplies to unregistered persons</h3>
-            {hsnTable(g1.hsnB2c, 'HSN summary, B2C')}
+            <h3 className={local.tbHeading}>{gstT('hsnB2bHead')}</h3>
+            {hsnTable(g1.hsnB2b, gstT('capHsnB2b'))}
+            <h3 className={local.tbHeading}>{gstT('hsnB2cHead')}</h3>
+            {hsnTable(g1.hsnB2c, gstT('capHsnB2c'))}
           </>
         );
       }
@@ -347,71 +351,70 @@ export function GstReports() {
         return (
           <>
           <DataTable
-            caption="Documents issued"
-            emptyText="No numbered tax documents in this period."
+            caption={gstT('capDocs')}
+            emptyText={gstT('emptyDocs')}
             rows={g1.docIssue}
             rowKey={(r) => `${r.docType}${r.series}`}
             columns={[
-              { key: 't', label: 'Document type', render: (r) => r.docType },
-              { key: 's', label: 'Series', render: (r) => <span className={surface.mono}>{r.series}</span> },
-              { key: 'f', label: 'From', render: (r) => <span className={surface.mono}>{r.from}</span> },
-              { key: 'to', label: 'To', render: (r) => <span className={surface.mono}>{r.to}</span> },
-              { key: 'tot', label: 'Total', numeric: true, render: (r) => r.total, total: (r) => r.total, totalFormat: String },
-              { key: 'c', label: 'Cancelled', numeric: true, render: (r) => r.cancelled, total: (r) => r.cancelled, totalFormat: String },
-              { key: 'n', label: 'Net issued', numeric: true, render: (r) => r.netIssued, total: (r) => r.netIssued, totalFormat: String },
+              { key: 't', label: gstT('colDocType'), render: (r) => r.docType },
+              { key: 's', label: gstT('colSeries'), render: (r) => <span className={surface.mono}>{r.series}</span> },
+              { key: 'f', label: gstT('colFrom'), render: (r) => <span className={surface.mono}>{r.from}</span> },
+              { key: 'to', label: gstT('colTo'), render: (r) => <span className={surface.mono}>{r.to}</span> },
+              { key: 'tot', label: gstT('colTotal'), numeric: true, render: (r) => r.total, total: (r) => r.total, totalFormat: String },
+              { key: 'c', label: gstT('colCancelled'), numeric: true, render: (r) => r.cancelled, total: (r) => r.cancelled, totalFormat: String },
+              { key: 'n', label: gstT('colNetIssued'), numeric: true, render: (r) => r.netIssued, total: (r) => r.netIssued, totalFormat: String },
             ]}
           />
-          <h3 className={local.tbHeading}>Series gaps — FY{fyLabel} (whole year)</h3>
+          <h3 className={local.tbHeading}>{gstT('gapsHead', { fy: fyLabel })}</h3>
           {gaps.length === 0 ? (
-            <p className={controls.hint}>No missing numbers in any series this financial year.</p>
+            <p className={controls.hint}>{gstT('noGaps')}</p>
           ) : (
             <ul className={local.gapList}>
               {gaps.map((g) => (
                 <li key={`${g.prefix}${g.fy}`}>
-                  <strong className={surface.mono}>{g.prefix}/FY{g.fy}</strong>: {g.missingCount} unused number{g.missingCount === 1 ? '' : 's'} up to {String(g.highest).padStart(4, '0')} —{' '}
+                  <strong className={surface.mono}>{g.prefix}/FY{g.fy}</strong>: {gstT(g.missingCount === 1 ? 'gapOne' : 'gapMany', { n: g.missingCount, highest: String(g.highest).padStart(4, '0') })}{' '}
                   <span className={surface.mono}>{g.missingNumbers.slice(0, 12).join(', ')}{g.missingCount > 12 ? ' …' : ''}</span>
                 </li>
               ))}
             </ul>
           )}
           <p className={controls.hint}>
-            Rule 46 expects a consecutive series. Report unused numbers as cancelled in Table 13, or explain them to your CA.
+            {gstT('rule46')}
           </p>
           </>
         );
       case 'amend': {
         const amendCols = <T extends AmendDocRow>(isNote = false): Column<T>[] => [
-          { key: 'orig', label: isNote ? 'Original note' : 'Original invoice', render: (r) => <span className={surface.mono}>{r.origNumber} · {formatDate(r.origDate)}</span> },
-          { key: 'op', label: 'Filed in', render: (r) => `${r.origPeriod.slice(0, 2)}/${r.origPeriod.slice(2)}` },
+          { key: 'orig', label: isNote ? gstT('colOrigNote') : gstT('colOrigInvoice'), render: (r) => <span className={surface.mono}>{r.origNumber} · {formatDate(r.origDate)}</span> },
+          { key: 'op', label: gstT('colFiledIn'), render: (r) => `${r.origPeriod.slice(0, 2)}/${r.origPeriod.slice(2)}` },
           ...docCols<T>(isNote),
         ];
-        const empty = 'None in this period.';
+        const empty = gstT('noneInPeriod');
         return (
           <>
             <p className={controls.hint} style={{ margin: 0 }}>
-              Documents already reported in a filed return and amended in {label} (Amend on the document). The original stays in its own period&apos;s GSTR-1 unchanged;
-              GSTR-3B of this period includes the difference. B2CSA rows are the revised totals of the original month. Export amendments are not generated. Verify with your CA.
+              {gstT('amendHint', { period: label })}
             </p>
-            <h3 className={local.tbHeading}>B2BA — amended B2B invoices</h3>
+            <h3 className={local.tbHeading}>{gstT('b2baHead')}</h3>
             <DataTable columns={amendCols()} rows={am?.b2ba ?? []} rowKey={(r) => r.invoiceId} caption="B2BA" emptyText={empty} />
-            <h3 className={local.tbHeading}>B2CLA — amended B2C (large) invoices</h3>
+            <h3 className={local.tbHeading}>{gstT('b2claHead')}</h3>
             <DataTable columns={amendCols()} rows={am?.b2cla ?? []} rowKey={(r) => r.invoiceId} caption="B2CLA" emptyText={empty} />
-            <h3 className={local.tbHeading}>CDNRA — amended credit / debit notes (registered)</h3>
+            <h3 className={local.tbHeading}>{gstT('cdnraHead')}</h3>
             <DataTable columns={amendCols<AmendCdnRow>(true)} rows={am?.cdnra ?? []} rowKey={(r) => r.invoiceId} caption="CDNRA" emptyText={empty} />
-            <h3 className={local.tbHeading}>CDNURA — amended credit / debit notes (unregistered)</h3>
+            <h3 className={local.tbHeading}>{gstT('cdnuraHead')}</h3>
             <DataTable columns={amendCols<AmendCdnRow>(true)} rows={am?.cdnura ?? []} rowKey={(r) => r.invoiceId} caption="CDNURA" emptyText={empty} />
-            <h3 className={local.tbHeading}>B2CSA — revised B2C (others) rows</h3>
+            <h3 className={local.tbHeading}>{gstT('b2csaHead')}</h3>
             <DataTable
               caption="B2CSA"
               emptyText={empty}
               rows={am?.b2csa ?? []}
               rowKey={(r) => `${r.omon}${r.supply}${r.pos}${r.rate}`}
               columns={[
-                { key: 'm', label: 'Original month', render: (r) => `${r.omon.slice(0, 2)}/${r.omon.slice(2)}` },
-                { key: 'sply', label: 'Supply', render: (r) => (r.supply === 'INTRA' ? 'Intra-state' : 'Inter-state') },
-                { key: 'pos', label: 'Place of supply', render: (r) => pos(r.pos) },
-                { key: 'rate', label: 'Rate %', numeric: true, render: (r) => r.rate },
-                { key: 'tx', label: 'Taxable (revised)', numeric: true, render: (r) => <Money value={r.txval} /> },
+                { key: 'm', label: gstT('colOrigMonth'), render: (r) => `${r.omon.slice(0, 2)}/${r.omon.slice(2)}` },
+                { key: 'sply', label: gstT('colSupply'), render: (r) => (r.supply === 'INTRA' ? gstT('intra') : gstT('inter')) },
+                { key: 'pos', label: gstT('colPos'), render: (r) => pos(r.pos) },
+                { key: 'rate', label: gstT('colRate'), numeric: true, render: (r) => r.rate },
+                { key: 'tx', label: gstT('colTaxableRevised'), numeric: true, render: (r) => <Money value={r.txval} /> },
                 { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} /> },
                 { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} /> },
                 { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} /> },
@@ -422,7 +425,7 @@ export function GstReports() {
       }
       case 'composition':
         return (
-          <Suspense fallback={<p className={controls.hint}>Loading…</p>}>
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
             <CompositionView invoices={invoices} purchases={purchases} period={period} gstin={gstin} filerStateCode={filerStateCode} category={compositionProfile?.composition_category} />
           </Suspense>
         );
@@ -430,7 +433,7 @@ export function GstReports() {
         return <Gstr3bView report={g3} />;
       case 'gstr2b':
         return (
-          <Suspense fallback={<p className={controls.hint}>Loading…</p>}>
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
             <Gstr2bView period={period} gstin={gstin} filerStateCode={filerStateCode} notify={notify} />
           </Suspense>
         );
@@ -448,7 +451,7 @@ export function GstReports() {
       const rows = csvRowsToCells(parseCsv(sectionCsv(g1, tab as SectionId), { delimiter: ',' }));
       await downloadXlsx(`${fileBase}_${tab}.xlsx`, [{ name: TABS.find((x) => x.id === tab)?.label ?? tab, rows }]);
     } catch {
-      notify('Could not build the Excel file', 'error');
+      notify(gstT('xlsxFailed'), 'error');
     }
   };
 
@@ -457,20 +460,20 @@ export function GstReports() {
 
   const t = g1.totals;
   const tiles: { label: string; value: string; hint: string }[] = [
-    { label: 'Taxable value', value: formatMoney(t.taxable), hint: `${g1.counts.included} documents, net of credit notes` },
-    { label: 'IGST', value: formatMoney(t.igst), hint: 'Outward, net' },
+    { label: gstT('tileTaxable'), value: formatMoney(t.taxable), hint: gstT('tileTaxableHint', { n: g1.counts.included }) },
+    { label: 'IGST', value: formatMoney(t.igst), hint: gstT('tileIgstHint') },
     { label: 'CGST + SGST', value: formatMoney(t.cgst + t.sgst), hint: `CGST ${formatMoney(t.cgst)} · SGST ${formatMoney(t.sgst)}` },
-    { label: 'Payable in cash (3B)', value: formatMoney(g3.payment.cash.igst + g3.payment.cash.cgst + g3.payment.cash.sgst), hint: 'After ITC set-off' },
+    { label: gstT('tileCash'), value: formatMoney(g3.payment.cash.igst + g3.payment.cash.cgst + g3.payment.cash.sgst), hint: gstT('tileCashHint') },
   ];
 
   return (
     <div className={surface.page}>
       <PageHeader
-        title="GST reports"
-        subtitle="GSTR-1 sections and GSTR-3B summary, prepared offline from your invoices and purchases."
+        title={gstT('title')}
+        subtitle={gstT('subtitle')}
         actions={
           <>
-          <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!hasData || !gstin} title={!gstin ? 'Add a GSTIN in Settings to export GSTR-1 JSON' : undefined}
+          <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin1') : undefined}
             onClick={() => download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1, { gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }), null, 2))}>
             <FileJson size={16} aria-hidden /> GSTR-1 JSON
           </button>
@@ -478,18 +481,18 @@ export function GstReports() {
             onClick={() => download(`GSTR3B_${gstin || 'all'}_${g1.fp}.csv`, 'text/csv', gstr3bCsv(g3))}>
             <FileSpreadsheet size={16} aria-hidden /> GSTR-3B CSV
           </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={!gstin ? 'Add a GSTIN in Settings to export GSTR-3B JSON' : 'Working paper — check against the GST offline tool and your CA'}
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin3b') : gstT('json3bTitle')}
             onClick={() => download(`GSTR3B_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildGstr3bJson(g3, gstin, g1.fp), null, 2))}>
             <FileJson size={16} aria-hidden /> GSTR-3B JSON
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData} onClick={printSummary}>
-            <Printer size={16} aria-hidden /> Print summary
+            <Printer size={16} aria-hidden /> {gstT('printSummary')}
           </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('gstr9')} title="Annual return working paper from the 12 monthly GSTR-1 / 3B papers">
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('gstr9')} title={gstT('gstr9Title')}>
             <CalendarRange size={16} aria-hidden /> GSTR-9
           </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('bulk')} title="One e-Invoice / e-Way JSON for many invoices, and IRP response import">
-            <Files size={16} aria-hidden /> Bulk e-Invoice
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('bulk')} title={gstT('bulkTitle')}>
+            <Files size={16} aria-hidden /> {gstT('bulk')}
           </button>
           </>
         }
@@ -505,33 +508,33 @@ export function GstReports() {
         </Suspense>
       )}
 
-      <section className={`${surface.card} ${styles.filters}`} aria-label="Report filters">
+      <section className={`${surface.card} ${styles.filters}`} aria-label={gstT('filters')}>
         <PeriodPicker value={period} onChange={setPeriod} fyOptions={fyOptions} />
         <label className={local.periodField}>
-          <span className={controls.label}>Filer GSTIN</span>
+          <span className={controls.label}>{gstT('filerGstin')}</span>
           <select className={controls.select} value={gstin} onChange={(e) => setGstin(e.target.value)}>
-            <option value="">All sender profiles</option>
+            <option value="">{gstT('allProfiles')}</option>
             {gstins.map((x) => (
               <option key={x} value={x}>{x}</option>
             ))}
           </select>
         </label>
         <label className={local.periodField}>
-          <span className={controls.label}>Last FY turnover (₹)</span>
+          <span className={controls.label}>{gstT('lastFyTurnover')}</span>
           <input className={controls.input} inputMode="decimal" placeholder="0" value={turnover.gt}
             onChange={(e) => patchTurnover({ ...turnover, gt: e.target.value.replace(/[^0-9.]/g, '') })} />
         </label>
         <label className={local.periodField}>
-          <span className={controls.label}>This FY turnover so far (₹)</span>
+          <span className={controls.label}>{gstT('thisFyTurnover')}</span>
           <input className={controls.input} inputMode="decimal" placeholder="0" value={turnover.curGt}
             onChange={(e) => patchTurnover({ ...turnover, curGt: e.target.value.replace(/[^0-9.]/g, '') })} />
         </label>
         <p className={controls.hint} style={{ margin: 0, flexBasis: '100%' }}>
-          Written to the JSON as <code>gt</code> / <code>cur_gt</code>; last-FY turnover also sets the 4/6-digit HSN rule and the late-fee cap. Enter from your books; needs verification with your CA.
+          {nodes(gstT('turnoverHint'), { gt: <code>gt</code>, curGt: <code>cur_gt</code> })}
         </p>
         {period.kind !== 'month' && (
           <p className={controls.hint} style={{ margin: 0 }}>
-            Return period in the JSON is {g1.fp} (last month covered). GSTN files GSTR-1 monthly or quarterly (QRMP); upload one month at a time unless you are a quarterly filer.
+            {gstT('qrmpHint', { fp: g1.fp })}
           </p>
         )}
       </section>
@@ -539,7 +542,7 @@ export function GstReports() {
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
         <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
         <span>
-          <strong>Verify with your CA before filing.</strong> This is a working paper, not a filed return. Based on issue date, non-draft, non-cancelled tax documents; amended documents stay as filed in their own period and appear in the Amendments tab of the period they were amended in (export amendments are not generated); composition profiles use the CMP-08 / GSTR-4 tab; ISD, imports and e-commerce (TCS) are not handled; interest and late fee are estimates on the Compliance tab. B2CL threshold is ₹1 lakh for invoices from 1 Aug 2024 (₹2.5 lakh before). JSON follows the GST offline-tool layout but is not schema-validated against the portal.
+          <strong>{gstT('disclaimerStrong')}</strong> {gstT('disclaimer')}
         </span>
       </div>
 
@@ -547,9 +550,7 @@ export function GstReports() {
         <div className={`${surface.card} ${local.disclaimer}`} role="note" data-composition-banner>
           <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
           <span>
-            <strong>{compositionProfile.companyName || 'This profile'} is under the composition scheme.</strong> GSTR-1 and GSTR-3B do not apply to composition dealers —
-            they file a quarterly CMP-08 and an annual GSTR-4 instead (see the Composition tab). Documents issued under the composition profile are left out of the
-            GSTR-1 / 3B tables below. Input tax credit is not available to a composition dealer.
+            <strong>{gstT('compositionStrong', { name: compositionProfile.companyName || gstT('thisProfile') })}</strong> {gstT('compositionText')}
           </span>
         </div>
       )}
@@ -566,8 +567,8 @@ export function GstReports() {
         ))}
       </div>
 
-      <section className={surface.card} aria-label="Report sections">
-        <div className={local.tabs} role="tablist" aria-label="Report sections">
+      <section className={surface.card} aria-label={gstT('sections')}>
+        <div className={local.tabs} role="tablist" aria-label={gstT('sections')}>
           {TABS.map((x) => (
             <button
               key={x.id}
@@ -579,24 +580,24 @@ export function GstReports() {
               className={tab === x.id ? local.tabActive : local.tab}
               onClick={() => setTab(x.id)}
             >
-              {x.label}
+              {tabLabel(x)}
               {counts[x.id] ? <span className={local.tabCount}>{counts[x.id]}</span> : null}
             </button>
           ))}
         </div>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>
           <div className={local.toolbar}>
-            <h2 className={local.tbHeading}>{TABS.find((x) => x.id === tab)?.label}{tab === 'compliance' ? '' : ` · ${label}`}</h2>
+            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' ? '' : ` · ${label}`}</h2>
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>
-                <Download size={14} aria-hidden /> Download CSV
+                <Download size={14} aria-hidden /> {gstT('downloadCsv')}
               </button>
             )}
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => void downloadSectionXlsx()}>
-                <Download size={14} aria-hidden /> Download .xlsx
+                <Download size={14} aria-hidden /> {gstT('downloadXlsx')}
               </button>
             )}
           </div>
@@ -615,36 +616,36 @@ export function GstReports() {
     if (!hasData) {
       return (
         <p className={surface.sectionNote}>
-          No reportable tax documents in {label}. Create a tax invoice from <Link to="/invoice" className={local.issueLink}>the invoice creator</Link>; drafts, cancelled documents, quotations, proformas and challans are excluded.
+          {nodes(gstT('noData'), { period: label, link: <Link to="/invoice" className={local.issueLink}>{gstT('creatorLink')}</Link> })}
         </p>
       );
     }
     const rows = [
-      { id: 'b2b' as const, name: 'B2B - registered recipients', n: g1.b2b.length, tx: sumOf(g1.b2b, 'taxable'), tax: sumOf(g1.b2b, 'igst') + sumOf(g1.b2b, 'cgst') + sumOf(g1.b2b, 'sgst') },
-      { id: 'b2cl' as const, name: 'B2CL - large inter-state B2C', n: g1.b2cl.length, tx: sumOf(g1.b2cl, 'taxable'), tax: sumOf(g1.b2cl, 'igst') },
-      { id: 'b2cs' as const, name: 'B2CS - other B2C (net)', n: g1.b2cs.length, tx: sumOf(g1.b2cs, 'txval'), tax: sumOf(g1.b2cs, 'igst') + sumOf(g1.b2cs, 'cgst') + sumOf(g1.b2cs, 'sgst') },
-      { id: 'cdnr' as const, name: 'CDNR - credit notes (registered)', n: g1.cdnr.length, tx: sumOf(g1.cdnr, 'taxable'), tax: sumOf(g1.cdnr, 'igst') + sumOf(g1.cdnr, 'cgst') + sumOf(g1.cdnr, 'sgst') },
-      { id: 'cdnur' as const, name: 'CDNUR - credit notes (unregistered / export)', n: g1.cdnur.length, tx: sumOf(g1.cdnur, 'taxable'), tax: sumOf(g1.cdnur, 'igst') + sumOf(g1.cdnur, 'cgst') + sumOf(g1.cdnur, 'sgst') },
-      { id: 'exp' as const, name: 'Exports', n: g1.exp.length, tx: sumOf(g1.exp, 'taxable'), tax: sumOf(g1.exp, 'igst') },
-      ...(g1.at?.length ? [{ id: 'at' as const, name: 'Advances received (Table 11A)', n: g1.at.length, tx: sumOf(g1.at, 'taxable'), tax: sumOf(g1.at, 'igst') + sumOf(g1.at, 'cgst') + sumOf(g1.at, 'sgst') }] : []),
-      ...(g1.txpd?.length ? [{ id: 'txpd' as const, name: 'Advances adjusted (Table 11B, deducted)', n: g1.txpd.length, tx: sumOf(g1.txpd, 'taxable'), tax: sumOf(g1.txpd, 'igst') + sumOf(g1.txpd, 'cgst') + sumOf(g1.txpd, 'sgst') }] : []),
+      { id: 'b2b' as const, name: gstT('ovB2b'), n: g1.b2b.length, tx: sumOf(g1.b2b, 'taxable'), tax: sumOf(g1.b2b, 'igst') + sumOf(g1.b2b, 'cgst') + sumOf(g1.b2b, 'sgst') },
+      { id: 'b2cl' as const, name: gstT('ovB2cl'), n: g1.b2cl.length, tx: sumOf(g1.b2cl, 'taxable'), tax: sumOf(g1.b2cl, 'igst') },
+      { id: 'b2cs' as const, name: gstT('ovB2cs'), n: g1.b2cs.length, tx: sumOf(g1.b2cs, 'txval'), tax: sumOf(g1.b2cs, 'igst') + sumOf(g1.b2cs, 'cgst') + sumOf(g1.b2cs, 'sgst') },
+      { id: 'cdnr' as const, name: gstT('ovCdnr'), n: g1.cdnr.length, tx: sumOf(g1.cdnr, 'taxable'), tax: sumOf(g1.cdnr, 'igst') + sumOf(g1.cdnr, 'cgst') + sumOf(g1.cdnr, 'sgst') },
+      { id: 'cdnur' as const, name: gstT('ovCdnur'), n: g1.cdnur.length, tx: sumOf(g1.cdnur, 'taxable'), tax: sumOf(g1.cdnur, 'igst') + sumOf(g1.cdnur, 'cgst') + sumOf(g1.cdnur, 'sgst') },
+      { id: 'exp' as const, name: gstT('ovExp'), n: g1.exp.length, tx: sumOf(g1.exp, 'taxable'), tax: sumOf(g1.exp, 'igst') },
+      ...(g1.at?.length ? [{ id: 'at' as const, name: gstT('ovAt'), n: g1.at.length, tx: sumOf(g1.at, 'taxable'), tax: sumOf(g1.at, 'igst') + sumOf(g1.at, 'cgst') + sumOf(g1.at, 'sgst') }] : []),
+      ...(g1.txpd?.length ? [{ id: 'txpd' as const, name: gstT('ovTxpd'), n: g1.txpd.length, tx: sumOf(g1.txpd, 'taxable'), tax: sumOf(g1.txpd, 'igst') + sumOf(g1.txpd, 'cgst') + sumOf(g1.txpd, 'sgst') }] : []),
     ];
     return (
       <>
         <DataTable
-          caption="GSTR-1 overview"
+          caption={gstT('capOverview')}
           emptyText=""
           rows={rows}
           rowKey={(r) => r.id}
           columns={[
-            { key: 'n', label: 'Section', render: (r) => <button type="button" className={local.issueLink} style={{ background: 'none', border: 0, cursor: 'pointer', padding: 0 }} onClick={() => setTab(r.id)}>{r.name}</button> },
-            { key: 'c', label: 'Rows', numeric: true, render: (r) => r.n },
-            { key: 'tx', label: 'Taxable', numeric: true, render: (r) => <Money value={r.tx} /> },
-            { key: 'tax', label: 'Tax', numeric: true, render: (r) => <Money value={r.tax} /> },
+            { key: 'n', label: gstT('colSection'), render: (r) => <button type="button" className={local.issueLink} style={{ background: 'none', border: 0, cursor: 'pointer', padding: 0 }} onClick={() => setTab(r.id)}>{r.name}</button> },
+            { key: 'c', label: gstT('colRows'), numeric: true, render: (r) => r.n },
+            { key: 'tx', label: gstT('colTaxable'), numeric: true, render: (r) => <Money value={r.tx} /> },
+            { key: 'tax', label: gstT('colTax'), numeric: true, render: (r) => <Money value={r.tax} /> },
           ]}
         />
         <p className={surface.sectionNote}>
-          Excluded in this period: {g1.counts.drafts} draft, {g1.counts.cancelled} cancelled, {g1.counts.notTaxDocs} non-tax document(s) (quotation / proforma / challan). Credit notes are shown positive in CDNR/CDNUR and netted in totals, B2CS, nil, HSN and 3B.
+          {gstT('excluded', { drafts: g1.counts.drafts, cancelled: g1.counts.cancelled, notTax: g1.counts.notTaxDocs })}
         </p>
       </>
     );

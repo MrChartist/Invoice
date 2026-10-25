@@ -1,6 +1,9 @@
 import type { Gstr3bReport } from '../../lib/gst-reports';
 import { DataTable, Money, type Column } from './DataTable';
 import styles from './gst-reports.module.css';
+import { useT } from '../../i18n';
+import { gvT } from '../../i18n/areas/gst-views';
+import { plural } from '../../i18n/areas/plural';
 
 interface Row {
   table: string;
@@ -13,14 +16,15 @@ interface Row {
 
 const opt = (k: 'taxable' | 'igst' | 'cgst' | 'sgst'): Column<Row> => ({
   key: k,
-  label: k === 'taxable' ? 'Taxable value' : k.toUpperCase(),
+  label: k === 'taxable' ? gvT('colTaxableValue') : k.toUpperCase(),
   numeric: true,
   render: (r) => (r[k] === undefined ? '' : <Money value={r[k] as number} />),
 });
 
-const COLS: Column<Row>[] = [
-  { key: 'table', label: 'Table', render: (r) => <span className={styles.tag}>{r.table}</span> },
-  { key: 'label', label: 'Description', render: (r) => r.label },
+/** Built per render so the headers follow the interface language. */
+const cols = (): Column<Row>[] => [
+  { key: 'table', label: gvT('colTable'), render: (r) => <span className={styles.tag}>{r.table}</span> },
+  { key: 'label', label: gvT('colDescription'), render: (r) => r.label },
   opt('taxable'),
   opt('igst'),
   opt('cgst'),
@@ -28,6 +32,8 @@ const COLS: Column<Row>[] = [
 ];
 
 export function Gstr3bView({ report: b }: { report: Gstr3bReport }) {
+  useT();
+  const COLS = cols();
   const o = b.outward;
   const p = b.payment;
   const t31: Row[] = [
@@ -80,26 +86,31 @@ export function Gstr3bView({ report: b }: { report: Gstr3bReport }) {
 
   return (
     <>
-      {block('3.1 Outward and inward reverse-charge supplies', t31, '')}
-      {block('3.2 Inter-state supplies to unregistered persons', t32, 'No inter-state supplies to unregistered persons.')}
-      {block('4 Eligible input tax credit', t4, '')}
-      {block('5 Exempt, nil-rated and non-GST inward supplies', t5, '')}
-      {block('6.1 Payment of tax and ITC set-off', t61, '')}
+      {block(gvT('b31'), t31, '')}
+      {block(gvT('b32'), t32, gvT('b32Empty'))}
+      {block(gvT('b4'), t4, '')}
+      {block(gvT('b5'), t5, '')}
+      {block(gvT('b61'), t61, '')}
       <ul className={styles.notes}>
-        <li>Set-off order: IGST credit pays IGST, then CGST, then SGST; CGST and SGST credit pay their own head first, then IGST (never each other). Reverse-charge tax is payable in cash.</li>
-        <li>ITC is taken from purchase bills in the period ({b.purchasesConsidered} bill{b.purchasesConsidered === 1 ? '' : 's'} read). Imports, reverse charge, reversals and Sec 17(5) blocked credit follow the flags on each bill; ISD and cess on purchases are not modelled. Verify with your CA.</li>
+        <li>{gvT('n3bSetoff')}</li>
+        <li>{plural(gvT, 'n3bItcOne', 'n3bItcMany', b.purchasesConsidered)}</li>
         {b.advances && (
           <li>
-            3.1(a) includes advances (GSTR-1 Table 11): tax on advances received {(b.advances.received.igst + b.advances.received.cgst + b.advances.received.sgst).toFixed(2)} on {b.advances.received.taxable.toFixed(2)}, less advances adjusted or refunded {(b.advances.adjusted.igst + b.advances.adjusted.cgst + b.advances.adjusted.sgst).toFixed(2)} on {b.advances.adjusted.taxable.toFixed(2)}. 3.2 is not adjusted for advances.
+            {gvT('n3bAdvances', {
+              recTax: (b.advances.received.igst + b.advances.received.cgst + b.advances.received.sgst).toFixed(2),
+              recTaxable: b.advances.received.taxable.toFixed(2),
+              adjTax: (b.advances.adjusted.igst + b.advances.adjusted.cgst + b.advances.adjusted.sgst).toFixed(2),
+              adjTaxable: b.advances.adjusted.taxable.toFixed(2),
+            })}
           </li>
         )}
         {b.outwardRcmTaxable !== 0 && (
-          <li>Outward supplies of {b.outwardRcmTaxable.toFixed(2)} where the recipient pays tax under reverse charge are in GSTR-1 (B2B, RC = Y) but excluded from 3.1.</li>
+          <li>{gvT('n3bOutwardRcm', { amount: b.outwardRcmTaxable.toFixed(2) })}</li>
         )}
         {(b.unadjustedCredit.igst > 0 || b.unadjustedCredit.cgst > 0 || b.unadjustedCredit.sgst > 0) && (
-          <li>Credit notes exceed sales on some heads (IGST {b.unadjustedCredit.igst}, CGST {b.unadjustedCredit.cgst}, SGST {b.unadjustedCredit.sgst}); the excess cannot be set off this month.</li>
+          <li>{gvT('n3bExcessCredit', { igst: b.unadjustedCredit.igst, cgst: b.unadjustedCredit.cgst, sgst: b.unadjustedCredit.sgst })}</li>
         )}
-        <li>Interest and late fee are not computed.</li>
+        <li>{gvT('n3bNoInterest')}</li>
       </ul>
     </>
   );
