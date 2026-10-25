@@ -28,6 +28,8 @@ import { MAIN_GODOWN_ID } from '../../types/stock';
 import { useT } from '../../i18n';
 import { purT, purCategory } from '../../i18n/areas/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
+import { saveBillGuarded } from '../../lib/bill-guard';
+import { capT } from '../../i18n/areas/capture';
 import { BranchSelect } from '../branches/BranchSelect';
 import { EditLogButton } from '../audit/EditLogButton';
 import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
@@ -127,6 +129,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   // TDS deducted by us (Tally parity). Undefined rate / base / amount follow the suggestion.
   const [tds, setTds] = useState<BillTdsInput>(() => {
     const v = vendors.find((x) => x.id === init?.vendor_id);
@@ -203,7 +206,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       }
     }
     try {
-      purchasesDb.save({
+      // 8C: duplicate warnings (save again to override), approval hold, draft clean-up (bill-guard.ts).
+      const res = saveBillGuarded({
         ...purchase,
         kind: 'PURCHASE',
         vendor_id: vendor?.id ?? init?.vendor_id,
@@ -239,8 +243,12 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
         ...tdsResolved.fields,
-      });
-      onSaved(purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
+      }, { confirmed: !!warning });
+      if (res.kind === 'warn') {
+        setWarning(res.message);
+        return;
+      }
+      onSaved(res.kind === 'held' ? capT('heldMsg') : purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -427,6 +435,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 
+      {warning && <p className={styles.formError} role="alert">{warning}</p>}
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
         {purchase && <EditLogButton recordId={purchase.id} name={purchase.bill_number} />}

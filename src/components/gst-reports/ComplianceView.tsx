@@ -34,6 +34,8 @@ import { nodes } from '../../i18n/areas/nodes';
 
 // 7O (7.96): TDS deposit / 26Q due dates — loads the TDS engine only when this tab is open.
 const TdsDueCalendar = lazy(() => import('../tds/TdsDueCalendar'));
+// 8D (8.62): returns becoming time-barred (three years from the due date).
+const Gst8dPanel = lazy(() => import('./Gst8dPanel'));
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -181,6 +183,9 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
           ]}
         />
       )}
+      <Suspense fallback={null}>
+        <Gst8dPanel view="timebar" frequency={frequency} stateCode={stateCode} since={since} gstin={gstin} filed={filedRows} onMark={mark} />
+      </Suspense>
       <Suspense fallback={null}>
         <TdsDueCalendar today={today} />
       </Suspense>

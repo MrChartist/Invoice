@@ -28,6 +28,8 @@ import { assertUnlocked } from './period-lock';
 import { buildReceivables, type ReceiptRow } from './receivables';
 import { generateId, getTable, setTable } from './storage';
 import { withTablesRollback } from './table-txn';
+import { audit } from './audit';
+import { nextReceiptNumber, recordSeries, SERIES_TABLE } from './series-counters';
 
 export type VoucherReceipt = Payment & { voucher_id?: string; client_id?: string; client_name?: string };
 
@@ -180,6 +182,85 @@ export function saveReceiptVoucher(input: ManualVoucherInput, chart: readonly Ac
     const saved = saveVoucher(input, chart);
     if (allocations.length && receipts) syncVoucherReceipts(saved, receipts.party, receipts.total, allocations, receipts.method);
     return saved;
+  });
+}
+
+export interface PartyReceiptInput {
+  /** The party (client master id when known; the name is always written on the rows). */
+  client: { id?: string; name: string };
+  /** Rupees received, > 0. */
+  amount: number;
+  method: string;
+  /** UTR / UPI ref / cheque number. */
+  reference?: string;
+  note?: string;
+  /** Local day (YYYY-MM-DD). */
+  date: string;
+  /** Agst Ref allocations (invoice or opening bill ids); the rest goes On Account. */
+  allocations: readonly ReceiptAllocation[];
+}
+
+/**
+ * Quick "₹ Received" from the khata (8.2): one receipt from a party, split over its open bills
+ * (usually oldest first, `fifoAllocate` in `khata.ts`) and the remainder on account. The same rows
+ * a receipt voucher writes (minus the voucher): each allocation is a `localDb.payments.record` row
+ * (receipt number, invoice status, audit), tagged `client_id` / `client_name`; the remainder is one
+ * invoice-less row with the party, which receivables treat as an advance and Books post as a receipt
+ * from the party. All or nothing (H2): role, period lock and approval are checked for every bill
+ * before anything is written, and a failure half-way restores `transactions`, `invoices` and the
+ * receipt-number high-water mark.
+ */
+export function savePartyReceipt(input: PartyReceiptInput): VoucherReceipt[] {
+  requireAccess('payment.record');
+  const total = round2(Number(input.amount) || 0);
+  if (!(total > 0)) throw new Error('Enter an amount above zero.');
+  const name = input.client.name.trim();
+  if (!name) throw new Error('Pick the party who paid.');
+  const date = input.date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Enter the date the money came in.');
+  const used = input.allocations.filter((a) => a.amount > 0).map((a) => ({ ...a, amount: round2(a.amount) }));
+  const allocated = round2(used.reduce((s, a) => s + a.amount, 0));
+  if (allocated > total + 0.004) throw new Error('The bills add up to more than the amount received.');
+  const rest = round2(total - allocated);
+  // Every target first: nothing is written when one of them is refused.
+  for (const a of used) {
+    const target = localDb.invoices.getById(a.bill_id);
+    if (target) assertCanReceive(target);
+    else assertUnlocked({ issue_date: date, invoice_number: a.ref }, 'pay');
+  }
+  const overridden = rest > 0.004 ? assertUnlocked({ issue_date: date, invoice_number: 'On-account receipt' }, 'pay') === 'overridden' : false;
+  const tag = { ...(input.client.id ? { client_id: input.client.id } : {}), client_name: name };
+  return withTablesRollback(['transactions', 'invoices', SERIES_TABLE], () => {
+    const ids = new Set<string>();
+    for (const a of used) {
+      const p = localDb.payments.record({ invoiceId: a.bill_id, amount: a.amount, method: input.method, reference: input.reference, note: input.note, date });
+      ids.add(p.id);
+    }
+    const rows = getTable<VoucherReceipt>('transactions').map((r) => (ids.has(r.id) ? { ...r, ...tag } : r));
+    let onAccount: VoucherReceipt | null = null;
+    if (rest > 0.004) {
+      onAccount = {
+        id: generateId(), invoice_id: '', amount: rest, method: input.method || 'Cash', reference: input.reference,
+        note: input.note?.trim() || 'On account', date, receipt_number: nextReceiptNumber(date, rows), ...tag,
+      };
+      rows.push(onAccount);
+      ids.add(onAccount.id);
+    }
+    setTable('transactions', rows);
+    if (onAccount) {
+      recordSeries(onAccount.receipt_number);
+      const row = onAccount;
+      try {
+        audit.record({
+          entity: 'payment', entity_id: row.id, action: 'payment_add',
+          summary: `On-account receipt ₹${row.amount.toFixed(2)} from ${name} via ${row.method}${overridden ? ' (period-lock override)' : ''}`,
+          changes: [{ field: 'Amount', from: null, to: row.amount.toFixed(2) }, { field: 'Method', from: null, to: row.method }, { field: 'Date', from: null, to: row.date }],
+        });
+      } catch {
+        /* logging must never break a save */
+      }
+    }
+    return rows.filter((r) => ids.has(r.id));
   });
 }
 

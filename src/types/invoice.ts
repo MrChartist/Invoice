@@ -284,6 +284,11 @@ export interface SenderProfile {
   gst_scheme?: GstScheme;
   /** Additive: what kind of composition taxpayer — decides the rate (`compositionRate` in tax-rules). */
   composition_category?: CompositionCategory;
+  /**
+   * Additive (8D, 8.60): aggregate annual turnover (AATO, ₹) for e-invoicing — drives the e-invoice mandate check and
+   * the 30-day IRP reporting window (AATO ≥ ₹10 crore from 1 Apr 2025). Absent = unknown (no window shown).
+   */
+  einvoice_aato?: number;
 }
 
 /** GST registration type of a sender profile. */
@@ -559,6 +564,24 @@ export interface InvoiceRecord {
   offer?: { scheme_id: string; label: string; value: number };
   /** Pharma pack: prescription details for Schedule H / H1 / X sales (Schedule H1 register). */
   rx?: { patient: string; patient_address?: string; prescriber: string; prescriber_reg?: string };
+  /**
+   * Additive (8.5, daily khata loop): the party's balance frozen when the bill was first issued, so
+   * "Previous balance + This bill = Total due" prints the same on every reprint (Critical Rule 3).
+   * Absent on legacy documents (nothing is printed). See `src/lib/party-balance.ts`.
+   */
+  party_balance_snapshot?: PartyBalanceSnapshot;
+}
+
+/** 8.5: rupee figures frozen on the bill at issue (INR only). Total due = previous + bill − paid. */
+export interface PartyBalanceSnapshot {
+  /** Party ledger balance up to the bill date, without this bill (negative = advance / credit). */
+  previous: number;
+  /** What this bill adds to the party's account (receivable total less TDS). */
+  bill: number;
+  /** Paid at the counter when the bill was issued (optional). */
+  paid?: number;
+  /** Local day (YYYY-MM-DD) the snapshot was taken. */
+  as_of: string;
 }
 
 /** WP-9: maker-checker state kept on the document itself. */

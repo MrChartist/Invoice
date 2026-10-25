@@ -14,7 +14,7 @@
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
 import { round2, num } from './invoice-calc';
-import { DB_PREFIX, generateId, getJson, getTable, readRaw, setJson, setTable } from './storage';
+import { DB_PREFIX, generateId, getJson, getTable, peekTable, readRaw, setJson, setTable } from './storage';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv } from './csv';
 import { creditNoteReturnsGoods } from './credit-restock';
@@ -1407,7 +1407,8 @@ export function stockWarningForInvoice(
 ): StockShortfall[] {
   try {
     if (invoiceEffect(invoice.doc_type, 'Sent', true) !== 'out') return [];
-    const tracked = stockDb.items().filter((i) => i.track_stock);
+    // Read-only view: the stock master is parsed once per stored version, not on every keystroke.
+    const tracked = peekTable<StockItem>(TABLES.items).filter((i) => i.track_stock);
     if (!tracked.length) return [];
     const index = buildItemIndex(tracked);
     if (!(invoice.items ?? []).some((l) => num(l.quantity) > 0 && index.find(l.name, l.hsn))) return [];

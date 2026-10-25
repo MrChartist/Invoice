@@ -35,6 +35,7 @@ import styles from './gstr2b.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { nodes } from '../../i18n/areas/nodes';
+import { VendorFollowUp } from './VendorFollowUp';
 
 const MATCH_KEY = {
   matched: 'mMatched',
@@ -334,6 +335,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
             {effect.rejected + effect.pending > 0 ? gvT('effHintLeftOut', { rejected: effect.rejected, pending: effect.pending }) : ''}
             {gvT('effHint2')}
           </p>
+          <VendorFollowUp match={match} effect={effect} period={actionPeriod} periodLabel={periodLabel(period)} gstin={gstin} notify={notify} />
 
           <div className={local.toolbar}>
             <div className={styles.chips} role="group" aria-label={gvT('filterStatus')}>

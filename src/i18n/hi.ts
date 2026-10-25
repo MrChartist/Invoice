@@ -106,6 +106,8 @@ export const hi: Messages = {
   'shell.tabHome': 'होम',
   'shell.tabNew': 'नया',
   'shell.tabMore': 'और',
+  'shell.beta': 'बीटा',
+  'shell.betaAria': 'बीटा वर्ज़न (निजी टेस्ट बिल्ड)',
   'shell.backupSaved': 'बैकअप सेव हुआ ({file})',
   'shell.backupDownloaded': 'बैकअप डाउनलोड हुआ',
   'palette.newInvoice': 'नया इनवॉइस',
@@ -243,6 +245,12 @@ export const hi: Messages = {
   'dash.manageDirectory': 'ग्राहक सूची संभालें',
   'dash.profilesBackup': 'प्रोफ़ाइल और बैकअप',
   'dash.profilesBackupHint': 'व्यवसाय विवरण, बैंक, UPI',
+
+  // ── Missing page (404 inside the shell) ──
+  'notFound.docTitle': 'पेज नहीं मिला — Mr. Chartist Invoice',
+  'notFound.title': 'यह पेज नहीं मिला',
+  'notFound.text': '{path} पर कुछ नहीं है। हो सकता है यह हट गया हो या लिंक ग़लत लिखा हो।',
+  'notFound.back': 'डैशबोर्ड पर वापस',
 
   // ── Invoice editor ────────────────────────────────────────────────
   'editor.newDoc': 'नया दस्तावेज़: {doc}',

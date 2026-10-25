@@ -267,6 +267,11 @@ export const x7T = defineArea(
     printFailed: 'Could not print: {reason}',
     popupBlocked: 'Allow pop-ups to print the receipt.',
     portChosen: 'Printer port chosen',
+    modeBluetooth: 'ESC/POS over Bluetooth (BLE 58 / 80 mm printers)',
+    noBluetooth: 'This browser has no Web Bluetooth (use Chrome on Android or a computer), so Bluetooth printing is unavailable.',
+    chooseBt: 'Choose Bluetooth printer',
+    btChosen: 'Printer chosen: {name}',
+    btNote: 'Only Bluetooth Low Energy printers work from a browser. A classic Bluetooth printer: pair it in the phone settings and use browser print.',
   } as const,
   {
     agentsTitle: 'बिक्री एजेंट और कमीशन',
@@ -377,5 +382,10 @@ export const x7T = defineArea(
     printFailed: 'प्रिंट नहीं हुआ: {reason}',
     popupBlocked: 'रसीद प्रिंट करने के लिए पॉप-अप की अनुमति दें।',
     portChosen: 'प्रिंटर पोर्ट चुना गया',
+    modeBluetooth: 'Bluetooth पर ESC/POS (BLE 58 / 80 mm प्रिंटर)',
+    noBluetooth: 'इस ब्राउज़र में Web Bluetooth नहीं है (Android या कंप्यूटर पर Chrome लें), इसलिए Bluetooth प्रिंटिंग उपलब्ध नहीं।',
+    chooseBt: 'Bluetooth प्रिंटर चुनें',
+    btChosen: 'प्रिंटर चुना गया: {name}',
+    btNote: 'ब्राउज़र से सिर्फ़ Bluetooth Low Energy प्रिंटर चलते हैं। क्लासिक Bluetooth प्रिंटर: फ़ोन सेटिंग में पेयर करें और ब्राउज़र प्रिंट इस्तेमाल करें।',
   },
 );

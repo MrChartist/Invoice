@@ -1,5 +1,5 @@
 import { isStockDependencyError } from '../lib/stock-timeline';
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, FilePlus2, Landmark, PiggyBank, Receipt, Search, Tags, Wallet, Zap } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -10,6 +10,7 @@ import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
 import { purT, purCategory, purStatus } from '../i18n/areas/purchases';
+import { capT } from '../i18n/areas/capture';
 import { BillModal } from '../components/purchases/BillModal';
 import { BranchFilter } from '../components/branches/BranchFilter';
 import { branchPredicates } from '../lib/branch';
@@ -22,6 +23,9 @@ import type { BillSeed } from '../lib/purchase-orders';
 import { getTable } from '../lib/storage';
 import { can } from '../lib/access';
 import type { PurchaseOrder } from '../types/purchases';
+import type { AttachmentRef } from '../types/attachments';
+import { takeShared } from '../lib/share-inbox';
+import { releaseAttachments } from '../lib/attachments';
 import {
   PURCHASE_STATUSES,
   categorySummary,
@@ -44,7 +48,7 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 
-type Tab = 'bills' | 'orders' | 'vendors' | 'returns';
+type Tab = 'bills' | 'orders' | 'vendors' | 'returns' | 'inbox';
 
 // Purchase orders are a separate, rarely-opened tab: load it on demand.
 const PurchaseOrdersTab = lazy(() =>
@@ -53,7 +57,9 @@ const PurchaseOrdersTab = lazy(() =>
 
 // WP-3: purchase returns / supplier notes, receipt notes (GRN) and pending reports — also on demand.
 const ReturnsTab = lazy(() => import('../components/purchases/ReturnsTab').then((m) => ({ default: m.ReturnsTab })));
-const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns'];
+// 8C: capture from the e-invoice QR, documents inbox, draft / recurring bills — on demand.
+const InboxTab = lazy(() => import('../components/capture/InboxTab'));
+const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns', 'inbox'];
 
 const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: 'kindAll' | 'kindBills' | 'kindExpenses' }[] = [
   { id: 'ALL', label: 'kindAll' },
@@ -74,6 +80,9 @@ export function Expenses() {
   const [branch, setBranch] = useState('');
   // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
   const [billOpen, setBillOpen] = useState(() => params.get('new') === 'bill');
+  // 8.23: manifest shortcut "New expense" (?new=expense); a photo / PDF shared into the app adds `shared=1`.
+  const [expenseOpen, setExpenseOpen] = useState(() => params.get('new') === 'expense' && params.get('shared') !== '1' && can('books.edit'));
+  const [sharedFiles, setSharedFiles] = useState<AttachmentRef[] | null>(null);
   // A Tally key / Gateway link while this page is already open (F9, Ctrl+F9 → ?tab=returns&new=dn)
   // changes only the query: follow it (adjust-state-on-change, no effect).
   const query = params.toString();
@@ -83,8 +92,25 @@ export function Expenses() {
     const wanted = TAB_PARAMS.find((x) => x === params.get('tab'));
     if (wanted) setTab(wanted);
     if (params.get('new') === 'bill') setBillOpen(true);
+    if (params.get('new') === 'expense' && params.get('shared') !== '1' && can('books.edit')) setExpenseOpen(true);
   }
-  const [expenseOpen, setExpenseOpen] = useState(false);
+  useEffect(() => {
+    const files = params.get('shared') === '1' && can('books.edit') ? takeShared('receipt') : null;
+    if (!files) return;
+    void import('../lib/attachment-upload').then(async ({ attachFile }) => {
+      const refs: AttachmentRef[] = [];
+      for (const f of files.slice(0, 10)) {
+        try {
+          refs.push(await attachFile(f));
+        } catch (err) {
+          notify(`${f.name}: ${(err as Error).message}`, 'error');
+        }
+      }
+      setSharedFiles(refs);
+      setExpenseOpen(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [editing, setEditing] = useState<PurchaseRecord | null>(null);
   const [payFor, setPayFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<PurchaseRecord | null>(null);
@@ -96,6 +122,7 @@ export function Expenses() {
   const payments = useMemo(() => paymentsDb.all(), [version]);
   // Read straight from the table so the PO library stays in the lazy tab's chunk.
   const orders = useMemo(() => getTable<PurchaseOrder>('purchase_orders'), [version]);
+  const inboxCount = useMemo(() => getTable('purchase_drafts').length + getTable<{ status?: string; draft_id?: string }>('doc_inbox').filter((r) => r.status === 'new' && !r.draft_id).length, [version]);
   const business = useMemo(() => businessContext(), [version]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
@@ -118,6 +145,12 @@ export function Expenses() {
     else setBillOpen(true);
   };
   const closeForms = () => {
+    if (sharedFiles?.length) {
+      // Shared files the expense did not keep (form cancelled) are removed; ones a saved record uses stay.
+      const ids = sharedFiles.map((r) => r.id);
+      setTimeout(() => releaseAttachments(ids), 2000);
+    }
+    setSharedFiles(null);
     setBillOpen(false);
     setExpenseOpen(false);
     setEditing(null);
@@ -207,10 +240,25 @@ export function Expenses() {
           <button type="button" role="tab" aria-selected={tab === 'returns'} className={tab === 'returns' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('returns')}>
             {purT('tabReturns')}
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'inbox'} className={tab === 'inbox' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('inbox')} data-testid="tab-inbox">
+            {capT('tabInbox')} {inboxCount > 0 && <span className={styles.count}>{inboxCount}</span>}
+          </button>
         </div>
       </div>
 
-      {tab === 'orders' ? (
+      {tab === 'inbox' ? (
+        <Suspense fallback={null}>
+          <InboxTab
+            businessState={business.stateCode}
+            focusId={params.get('doc')}
+            onPost={openEdit}
+            onChanged={(message, tone) => {
+              reload();
+              if (message) notify(message, tone);
+            }}
+          />
+        </Suspense>
+      ) : tab === 'orders' ? (
         <Suspense fallback={null}>
           <PurchaseOrdersTab
             orders={orders}
@@ -349,6 +397,7 @@ export function Expenses() {
         open={expenseOpen}
         onClose={closeForms}
         expense={editing?.kind === 'EXPENSE' ? editing : null}
+        attachments={sharedFiles ?? undefined}
         vendors={vendors}
         businessState={business.stateCode}
         onSaved={saved}

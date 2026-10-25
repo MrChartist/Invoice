@@ -82,6 +82,11 @@ export const DEVICE_LOCAL_KEYS: readonly string[] = [
  * erase removes it, so the next sync compares from scratch and surfaces differences as conflicts.
  */
 export const SYNC_META_KEYS: readonly string[] = [`${DB_PREFIX}sync_state`, `${DB_PREFIX}sync_conflicts`, `${DB_PREFIX}sync_audit`];
+/**
+ * Working drafts of THIS device (8.21: POS bills on hold): per company in the data store, so sealed in
+ * vault mode, but never in a backup, never synced, not announced to other tabs; restore / erase remove them.
+ */
+export const DEVICE_DRAFT_KEYS: readonly string[] = [`${DB_PREFIX}pos_held`];
 const DEVICE_LOCAL = new Set(DEVICE_LOCAL_KEYS);
 
 /** True for keys that always live in localStorage, whatever the backend. */
@@ -829,6 +834,31 @@ export function getTable<T>(name: string): T[] {
   }
   // Snapshot images are stored by reference (assets.ts); readers always get the data URL back.
   return SNAPSHOT_TABLES.has(name) ? decodeRows(rows, assetIndex()) : rows;
+}
+
+/**
+ * Perf: parsed rows of a table, re-parsed only when its stored text (or, for snapshot tables, the
+ * asset table) changes. Shared between callers, so `peekTable` rows are READ-ONLY.
+ */
+const peekCache = new Map<string, { raw: string; assets: string | null; rows: readonly unknown[] }>();
+
+/**
+ * Read-only view of a table for hot paths (lookups, number series, building a new array of rows).
+ * Same rows as `getTable`, but parsed once per stored version and shared: never mutate the array
+ * or a row (copy it, e.g. `{ ...row }`, or use `getTable` for rows you will change).
+ */
+export function peekTable<T>(name: string): readonly T[] {
+  const raw = readRaw(DB_PREFIX + name);
+  if (!raw) {
+    peekCache.delete(name);
+    return [];
+  }
+  const assets = SNAPSHOT_TABLES.has(name) ? readRaw(DB_PREFIX + ASSET_TABLE) : null;
+  const hit = peekCache.get(name);
+  if (hit && hit.raw === raw && hit.assets === assets) return hit.rows as readonly T[];
+  const rows = getTable<T>(name);
+  peekCache.set(name, { raw, assets, rows });
+  return rows;
 }
 
 /**

@@ -1,8 +1,10 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { mailtoLink } from '../lib/share';
+import { mailtoLink, whatsappLink } from '../lib/share';
+import { buildWhatsAppStatement } from '../lib/khata';
+import { khataT } from '../i18n/areas/khata';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ChevronRight, Clock, Copy, Download, FileStack, FileText, Mail, Percent, Printer, Scale, Wallet,
+  AlertTriangle, BellRing, ChevronRight, Clock, Copy, Download, FileStack, FileText, Mail, MessageCircle, Percent, Printer, Scale, Send, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
@@ -40,6 +42,9 @@ const BulkStatements = lazy(() => import('../components/receivables/BulkStatemen
 const TdsTab = lazy(() => import('../components/receivables/TdsTab'));
 // Advance receipts (5.3): register, vouchers, apply / refund — loaded when opened.
 const AdvancesTab = lazy(() => import('../components/advances/AdvancesTab'));
+// Daily khata loop (8A): quick ₹ Received / ₹ Given and the party reminder queue, loaded on first use.
+const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
+const RemindQueue = lazy(() => import('../components/khata/RemindQueue'));
 
 type Tab = 'aging' | 'statements' | 'collections' | 'advances' | 'tds';
 const TABS: { id: Tab; label: () => string }[] = [
@@ -89,6 +94,7 @@ export function Receivables() {
   const currencies = useMemo(() => currenciesIn(data.invoices), [data.invoices]);
   const [currencyPick, setCurrencyPick] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [queue, setQueue] = useState<'overdue' | 'balance' | null>(null);
   const currency = currencyPick || currencies[0] || 'INR';
 
   const now = useMemo(() => new Date(), []);
@@ -162,7 +168,22 @@ export function Receivables() {
         <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setBulkOpen(true)} disabled={report.parties.length === 0}>
           <FileStack size={16} /> {printT('bulkStatements')}
         </button>
+        {currency === 'INR' && (
+          <>
+            <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setQueue('overdue')} disabled={report.totals.overdue <= 0}>
+              <BellRing size={16} /> {khataT('remindAll')}
+            </button>
+            <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setQueue('balance')} disabled={report.totals.net <= 0}>
+              <Send size={16} /> {khataT('sendBalances')}
+            </button>
+          </>
+        )}
       </Header>
+      {queue && (
+        <Suspense fallback={null}>
+          <RemindQueue kind={queue} onClose={() => setQueue(null)} />
+        </Suspense>
+      )}
       {bulkOpen && (
         <Suspense fallback={null}>
           <BulkStatements parties={report.parties} clients={data.clients} sender={localDb.settings.activeProfile()} currency={currency}
@@ -200,11 +221,11 @@ export function Receivables() {
       </div>
 
       <div role="tabpanel" id={`rcv-panel-${tab}`} aria-labelledby={`rcv-tab-${tab}`}>
-        {tab === 'aging' && <AgingTab report={report} currency={currency} fmt={fmt} lateFeeRules={lateFeeRules} onLateFee={addLateFee}
+        {tab === 'aging' && <AgingTab report={report} currency={currency} fmt={fmt} lateFeeRules={lateFeeRules} onLateFee={addLateFee} clients={data.clients}
           onStatement={(p) => { const n = new URLSearchParams(params); n.set('tab', 'statements'); n.set('party', p.key); setParams(n, { replace: true }); }} />}
         {tab === 'statements' && <StatementsTab report={report} data={data} currency={currency} now={now}
           partyKey={params.get('party') ?? ''} onPick={(k) => { const n = new URLSearchParams(params); n.set('party', k); setParams(n, { replace: true }); }}
-          notify={notify} />}
+          notify={notify} onChanged={() => setData(loadData())} />}
         {tab === 'collections' && (
           <div className={surface.card}>
             <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('billedVsReceived')}</h2></div>
@@ -271,8 +292,9 @@ function Stat({ label, value, hint, icon, tone }: {
 
 /* ── Aging ────────────────────────────────────────────────────── */
 
-function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee }: {
+function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee, clients }: {
   report: ReturnType<typeof buildReceivables>;
+  clients: ReturnType<typeof loadData>['clients'];
   currency: string;
   fmt: (n: number) => string;
   onStatement: (p: PartyReceivable) => void;
@@ -280,6 +302,12 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee 
   onLateFee: (invoiceId: string) => void;
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const sender = useMemo(() => localDb.settings.activeProfile(), []);
+  // WhatsApp statement per party row (8.3): wa.me with open bills, net due and a upi:// link.
+  const waHref = (p: PartyReceivable) => {
+    const c = clients.find((x) => (p.clientId && x.id === p.clientId) || x.name?.trim().toLowerCase() === p.name.trim().toLowerCase());
+    return whatsappLink(c?.phone, buildWhatsAppStatement({ sender, party: p }));
+  };
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const top = topDebtors(report, 5);
   const m = (n: number) => (n ? formatMoney(n, currency) : '—');
@@ -350,12 +378,20 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee 
                   <Fragment key={p.key}>
                     <tr {...vrow} aria-rowindex={rowIndex}>
                       <th scope="row" className={styles.partyCell}>
+                        <div className={styles.partyLine}>
                         {canExpand ? (
                           <button type="button" className={styles.expand} aria-expanded={expanded} onClick={() => toggle(p.key)}>
                             <ChevronRight size={16} className={expanded ? styles.chevOpen : styles.chev} aria-hidden="true" />
                             {p.name}
                           </button>
                         ) : <span className={styles.noExpand}>{p.name}</span>}
+                        {currency === 'INR' && p.net > 0.004 && (
+                          <a href={waHref(p)} target="_blank" rel="noopener noreferrer" className={controls.btnIcon} data-wa-statement
+                            aria-label={khataT('waStatementFor', { name: p.name })} title={khataT('waStatement')}>
+                            <MessageCircle size={14} />
+                          </a>
+                        )}
+                        </div>
                       </th>
                       {AGING_BUCKETS.map((b) => <td key={b} className={surface.numeric}>{m(p.buckets[b])}</td>)}
                       <td className={surface.numeric}>{m(p.creditNotes + p.advances)}</td>
@@ -450,7 +486,7 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
 
 /* ── Statements ───────────────────────────────────────────────── */
 
-function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }: {
+function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, onChanged }: {
   report: ReturnType<typeof buildReceivables>;
   data: ReturnType<typeof loadData>;
   currency: string;
@@ -458,8 +494,10 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
   partyKey: string;
   onPick: (key: string) => void;
   notify: (m: string, tone?: 'success' | 'error' | 'info') => void;
+  onChanged: () => void;
 }) {
   const party = report.parties.find((p) => p.key === partyKey) ?? report.parties[0];
+  const [entry, setEntry] = useState<'received' | 'given' | null>(null);
   const [from, setFrom] = useState(() => toDateInput(fyStart(now)));
   const [to, setTo] = useState(() => toDateInput(now));
   const [viewer, setViewer] = useState(false);
@@ -539,6 +577,24 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
         <div className={surface.cardHead}>
           <h2 className={styles.h2}>{party.name}</h2>
           <div className={surface.pageActions}>
+            {currency === 'INR' && client && can('payment.record') && (
+              <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setEntry('received')}
+                aria-label={khataT('receivedFrom', { name: party.name })}>
+                {khataT('received')}
+              </button>
+            )}
+            {currency === 'INR' && client && can('doc.create') && (
+              <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => setEntry('given')}
+                aria-label={khataT('givenTo', { name: party.name })}>
+                {khataT('given')}
+              </button>
+            )}
+            {currency === 'INR' && (
+              <a className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} target="_blank" rel="noopener noreferrer" data-wa-statement
+                href={whatsappLink(client?.phone, buildWhatsAppStatement({ sender, party }))}>
+                <MessageCircle size={14} /> {khataT('waStatement')}
+              </a>
+            )}
             <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={copy}>
               <Copy size={14} /> {rcvT('copyText')}
             </button>
@@ -616,6 +672,12 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
 
       <StatementViewer open={viewer} onClose={closeViewer} sender={sender} party={party} client={client}
         ledger={ledger} currency={currency} onError={(msg) => notify(msg, 'error')} />
+      {entry && client && (
+        <Suspense fallback={null}>
+          <QuickEntrySheet mode={entry} client={client} party={party} onClose={() => setEntry(null)}
+            onSaved={(message) => { notify(message); onChanged(); }} />
+        </Suspense>
+      )}
     </div>
   );
 }

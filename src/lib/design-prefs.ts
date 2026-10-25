@@ -72,6 +72,11 @@ export interface DesignPrefs {
   copies?: CopySetting;
   /** Additive (P2): print on pre-printed stationery — no letterhead / backgrounds, content offset. */
   preprinted?: PreprintedPrefs;
+  /**
+   * Additive (8.5): print "Previous balance + This bill = Total due" from the bill's own
+   * `party_balance_snapshot`. Absent / false = off (legacy look).
+   */
+  show_party_balance?: boolean;
   updated_at?: string;
 }
 
@@ -238,6 +243,10 @@ export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIG
     ...(() => {
       const pp = 'preprinted' in src ? sanitizePreprinted(src.preprinted) : base.preprinted;
       return pp ? { preprinted: pp } : {};
+    })(),
+    ...(() => {
+      const on = 'show_party_balance' in src ? src.show_party_balance === true : base.show_party_balance === true;
+      return on ? { show_party_balance: true } : {};
     })(),
     updated_at: typeof src.updated_at === 'string' ? src.updated_at : base.updated_at,
   };

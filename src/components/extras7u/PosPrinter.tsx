@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Printer } from 'lucide-react';
-import { choosePort, loadPrinterPrefs, savePrinterPrefs, serialSupported, type PrinterPrefs } from '../../lib/escpos';
+import { bluetoothSupported, chooseBluetoothPrinter, choosePort, loadPrinterPrefs, savePrinterPrefs, serialSupported, type PrinterPrefs } from '../../lib/escpos';
 import type { InvoiceRecord } from '../../types/invoice';
 import { printPosRaw } from './pos-raw-print';
 import { useT } from '../../i18n';
@@ -39,6 +39,7 @@ export function PosPrinterButton() {
   const [p, setP] = useState<PrinterPrefs>(() => loadPrinterPrefs());
   const [note, setNote] = useState('');
   const serial = serialSupported();
+  const ble = bluetoothSupported(); // 8.26
   const set = (next: PrinterPrefs) => {
     setP(next);
     savePrinterPrefs(next);
@@ -60,13 +61,14 @@ export function PosPrinterButton() {
       {open && (
         <div className={own.dialog} role="group" aria-label={x7T('printerTitle')}>
           <p className={own.sub}>{x7T('printerTitle')}</p>
-          {(['browser', 'raw', 'serial'] as const).map((m) => (
+          {(['browser', 'raw', 'serial', 'bluetooth'] as const).map((m) => (
             <label key={m} className={controls.check}>
-              <input type="radio" name="pos-printer-mode" checked={p.mode === m} disabled={m === 'serial' && !serial} onChange={() => set({ ...p, mode: m })} />
-              {x7T(m === 'browser' ? 'modeBrowser' : m === 'raw' ? 'modeRaw' : 'modeSerial')}
+              <input type="radio" name="pos-printer-mode" checked={p.mode === m} disabled={(m === 'serial' && !serial) || (m === 'bluetooth' && !ble)} onChange={() => set({ ...p, mode: m })} />
+              {x7T(m === 'browser' ? 'modeBrowser' : m === 'raw' ? 'modeRaw' : m === 'serial' ? 'modeSerial' : 'modeBluetooth')}
             </label>
           ))}
           {!serial && <p className={own.muted}>{x7T('noSerial')}</p>}
+          {!ble && <p className={own.muted}>{x7T('noBluetooth')}</p>}
           {p.mode === 'browser' && <p className={own.muted}>{x7T('browserDrawer')}</p>}
           {p.mode !== 'browser' && (
             <label className={controls.field}><span className={controls.label}>{x7T('width')}</span>
@@ -74,6 +76,13 @@ export function PosPrinterButton() {
                 <option value={58}>58 mm</option>
                 <option value={80}>80 mm</option>
               </select></label>
+          )}
+          {p.mode === 'bluetooth' && (
+            <>
+              <p className={own.muted}>{x7T('btNote')}</p>
+              <label className={controls.check}><input type="checkbox" checked={p.drawer} onChange={(e) => set({ ...p, drawer: e.target.checked })} /> {x7T('kickDrawer')}</label>
+              <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => chooseBluetoothPrinter().then((name) => setNote(name ? x7T('btChosen', { name }) : x7T('noBluetooth'))).catch((err: Error) => setNote(err.message))}>{x7T('chooseBt')}</button>
+            </>
           )}
           {p.mode === 'serial' && (
             <>

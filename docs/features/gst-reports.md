@@ -114,3 +114,15 @@ These are judgment calls the app makes one way; confirm them before filing.
   count each other's numbers as cancelled. The portal may expect separate series per purpose.
 - **3B never goes negative.** A downward amendment or credit note larger than a month's other liability leaves that month
   at zero; the excess is not carried forward here (enter it on the portal), so GSTR-9 Table 9 can then differ from 4N.
+
+## 8D: GST guards tab, GSTR-1A and Table 3.2 (8.61, 8.65)
+
+New lazy tab **GST guards** (`?tab=guards`, `src/components/gst-reports/Gst8dPanel.tsx`; logic `src/lib/gst-guards.ts`):
+
+- **IRP window list** — documents without an IRN with the 30-day countdown, plus the AATO field (see `einvoice.md`).
+- **Exceptions ("uncertain transactions")** for the selected period: `IRN_MISSING` / `IRP_WINDOW_CLOSED` (error; e-invoicing mandatory for the entered AATO on the document date), `B2B_NO_HSN`, `POS_STATE_MISMATCH` (POS ≠ buyer GSTIN state; fine for bill-to / ship-to), `RATE_NOT_IN_SLABS` (date-keyed `GST_SLAB_RULES`: the 2017 schedules, then from 22 Sep 2025 5 / 18 / 40 replacing 12 / 28, 28 kept for tobacco — verify), `B2CL_EDGE` (unregistered inter-state invoice within ±5% of the B2CL threshold).
+- **GSTR-1A working paper**: "Freeze GSTR-1 as filed" stores the period's GSTR-1 rows and 3B Table 3.2 in table `gstr1_snapshots` (`{ id: fp|gstin, fp, gstin, frozen_at, docs, b2cs, t32 }`, backed up, roles `books.edit`). Later edits of the same period appear as added / changed (fields listed) / removed documents and changed B2CS rows (`gstr1aDiff`). `GSTR1A_RULES`: from the July 2024 period (Rule 59(4A), Notification 12/2024-CT — verify the first period). Once GSTR-3B of the period is marked filed, the paper says GSTR-1A is closed (use later GSTR-1 amendments). A removed document cannot be deleted through GSTR-1A — use a credit note.
+- **Table 3.2 (under the GSTR-3B tab)**: per place of supply, taxable / IGST as per the frozen GSTR-1 vs books now (`table32Diff`). `GSTR3B_T32_LOCK_RULES` (keyed by the day the return is prepared): advisory 11 Apr 2025 made it non-editable from the April 2025 period; advisory 16 May 2025 kept it editable until further notice — append a version when the portal locks it again. Composition-dealer / UIN-holder supplies are not split out (books 3.2 covers unregistered persons only).
+- **Table 4 vs 2B** (under GSTR-3B): the 2B effect pushed from the 2B match tab (`gstr2b_itc`, see `gstr2b.md`) next to 4A(5) as per books. The return figures themselves are unchanged.
+
+Open question for your CA: whether a document dated in a filed month should be corrected through GSTR-1A (same period) or a later amendment depends on whether that period's 3B is filed; the app only guides.

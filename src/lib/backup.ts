@@ -17,7 +17,7 @@
  * unrelated site data.
  */
 
-import { DB_PREFIX, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
+import { DB_PREFIX, DEVICE_DRAFT_KEYS, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
@@ -65,7 +65,7 @@ const LOCAL_ONLY = new Set<string>(DEVICE_LOCAL_KEYS);
  * Never exported, restored or kept in the undo copy, but removed by a wipe (unlike LOCAL_ONLY): folder-sync
  * bookkeeping describes what this device last exchanged with the sync folder (docs/features/sync.md).
  */
-const NOT_BACKED_UP = new Set<string>(SYNC_META_KEYS);
+const NOT_BACKED_UP = new Set<string>([...SYNC_META_KEYS, ...DEVICE_DRAFT_KEYS]); // + POS bills on hold (8.21)
 const leaveOut = (key: string) => LOCAL_ONLY.has(key) || NOT_BACKED_UP.has(key);
 
 export interface BackupFile {
@@ -352,6 +352,10 @@ const RECORD_TABLES = [
   'stock_groups', 'stock_categories', 'units',
   // 7U: forex bank moves, e-payment batches, sales agents, commission postings
   'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
+  // 8D GST guards: supplier follow-ups from the 2B match, 2B ITC pushed to the 3B view, GSTR-1 as-filed snapshots
+  'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
+  // 8C: documents inbox, draft bills, recurring bills, bank rules, supplier payment requests
+  'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -380,6 +384,8 @@ const ID_TABLES = new Set([
   'year_end',
   'stock_groups', 'stock_categories', 'units',
   'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
+  'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
+  'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

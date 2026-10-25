@@ -14,6 +14,8 @@ import { tdsT } from '../../i18n/areas/tds';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
 import { paymentTdsLeft } from '../../lib/tds-payables';
 import { getTable } from '../../lib/storage';
+import { paymentNeedsApproval } from '../../lib/purchase-approval-gate';
+import { capT } from '../../i18n/areas/capture';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -56,9 +58,21 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   if (!bill) return <p className={styles.note}>{purT('billGone')}</p>;
   void version;
 
+  // 8.44: a clerk's payment above the owner's limit becomes a request (nothing is paid yet).
+  const held = paymentNeedsApproval(amount + tds);
   const submit = () => {
     const problem = validatePayment(bill, amount, date, tds);
     if (problem) return setError(problem);
+    if (held) {
+      void import('../../lib/purchase-approvals')
+        .then((m) => {
+          m.requestSupplierPayment({ purchaseId, amount, date, method, reference, bankAccountId: bankAccountId || undefined, tdsAmount: tds });
+          onChanged(capT('payHeld'));
+          onClose();
+        })
+        .catch((err: Error) => setError(err.message));
+      return;
+    }
     try {
       paymentsDb.record(purchaseId, { amount, date, method, reference, bankAccountId: bankAccountId || undefined, tdsAmount: tds });
       setTds(0);
@@ -141,10 +155,11 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
             </div>
           )}
           <BankAccountSelect id="pp-bank-account" label={purT('paidFrom')} method={method} value={bankAccountId} onChange={setBankAccountId} />
+          {held && <p className={styles.note}>{capT('payNeedsApproval')}</p>}
           {error && <p className={styles.formError} role="alert">{error}</p>}
           <div className={styles.inlineActions}>
             <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('close')}</button>
-            <button type="submit" className={controls.btnPrimary}>{purT('recordPayment')}</button>
+            <button type="submit" className={controls.btnPrimary}>{held ? capT('requestPay') : purT('recordPayment')}</button>
           </div>
         </form>
       )}

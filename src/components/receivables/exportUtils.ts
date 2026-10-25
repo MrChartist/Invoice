@@ -4,6 +4,7 @@
  * only load when the user actually exports a PDF.
  */
 import { ensureDevanagariFont } from '../../lib/fonts-ready';
+import { downloadBlob } from '../../lib/download';
 
 export function downloadTextFile(filename: string, text: string, mime = 'text/csv;charset=utf-8'): void {
   // BOM so Excel opens UTF-8 (₹, en dashes) correctly.
@@ -36,6 +37,11 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  * is sliced into page-height strips so long ledgers continue onto page 2, 3…
  */
 export async function exportNodeToPdf(node: HTMLElement, filename: string): Promise<void> {
+  downloadBlob(filename, await nodeToPdfBlob(node));
+}
+
+/** The same multi-page A4 PDF as a Blob (to hand to the share sheet, 8.3). */
+export async function nodeToPdfBlob(node: HTMLElement): Promise<Blob> {
   const [{ toPng }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
   await ensureDevanagariFont(node.textContent);
   const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true, backgroundColor: 'white' });
@@ -64,5 +70,5 @@ export async function exportNodeToPdf(node: HTMLElement, filename: string): Prom
     // JPEG keeps a multi-page statement to a few hundred KB; PNG made it tens of MB.
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, pageH, undefined, 'FAST');
   }
-  pdf.save(filename);
+  return pdf.output('blob');
 }

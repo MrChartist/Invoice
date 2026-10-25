@@ -109,6 +109,41 @@ and a small "Scan barcode" button above the editor's items.
   taxable value (it is also left out of the HSN summary, which skips zero-value lines). **Verify with your CA**
   (e.g. for related-party or "free sample" cases, where valuation rules differ).
 
+## 8B · Counter essentials (roadmap 8.21–8.22, 8.25–8.26)
+
+- **UPI QR for the exact amount** (`src/components/pos/PosUpiQr.tsx`, lazy with `qrcode.react`): as soon as the UPI
+  tender is above zero the payment card shows a QR built by the validating `upiLink` — `pa` / `pn` from the bill's
+  sender profile, `am` = the UPI tender, `tr` (and `tn` "Bill …") = the number the bill will take
+  (`localDb.invoices.nextNumber`, the same call the save makes). **Show to customer** fills the screen (Esc / Done
+  closes). The **"Paid? Enter the UTR"** box is the payment's reference. Nothing is verified online: the cashier
+  confirms the credit in their UPI app. No UPI ID on the profile → a hint and the plain reference box.
+- **Hold & new bill** (`src/lib/pos-hold.ts`, `HeldBills.tsx`): **Shift+F8** / *Hold & new* parks the cart (lines,
+  customer, dispatch, tenders, UTR) and starts a new bill; up to **9** carts; **F1** / *On hold (n)* lists them, Recall
+  or keys **1–9** bring one back (a bill already on the counter is parked first, so nothing is lost), Drop removes it.
+  Stored as `mrchartist_inv_pos_held` in the open company's data store, listed in `DEVICE_DRAFT_KEYS` (storage.ts):
+  survives a reload, sealed in vault mode like any value, **never in a backup, never synced, not announced to other
+  tabs**; restore / erase remove it. A held cart takes no number, moves no stock and is not audited; exchange credit
+  and loyalty redemption are not held (they stay with the counter / are re-applied after recall).
+- **Quick-item tiles** (`src/lib/pos-tiles.ts`, `PosTiles.tsx`) under the bill: a ★ Favourites tab (items starred
+  with ☆ on this device — `mrchartist_pos_favs`, a device-local preference outside the `mrchartist_inv_` prefix,
+  item ids only; until something is starred, the items on most recent POS bills) and one tab per top-level **stock
+  group** (WP-8; sub-groups roll up) for loose goods without a barcode. Tracked items at **zero stock are red ("out of
+  stock"), below zero red with the quantity**, in the tiles and the search list.
+- **Calculator in number fields** (8.25, `src/lib/calc-expr.ts` + `NumberInput`): every `NumberInput` (POS quantity
+  / rate / discount / tenders, editor and purchase amounts) accepts `120*3+40`, `2.5 x 4`, `(80+20)/2`, `1000+18%`
+  (shop-calculator percent), worked out as you type by a small recursive-descent parser — no `eval`, max 120
+  characters / 20 brackets deep; an incomplete or negative sum is not reported and the last good value comes back on
+  blur. `calculator={false}` turns it off for a field.
+- **Web Bluetooth printers** (8.26, `escpos.ts`): printer mode **ESC/POS over Bluetooth** next to Web Serial —
+  feature-detected (`navigator.bluetooth`, Chrome on Android / desktop), off by default, the printer is picked in the
+  browser's own chooser (*Choose Bluetooth printer*). Known BLE printer services (0x18F0, ISSC 49535343-…, 0xFF00,
+  0xFFE0, e7810a71-…) are tried in turn; the first writable characteristic gets the bytes in 180-byte writes
+  (`chunkBytes`). Drawer kick on cash bills as in serial mode. Failure → the browser print fallback. Classic (SPP)
+  Bluetooth printers are not reachable from a browser. `Permissions-Policy` gained `bluetooth=(self)`
+  (`scripts/security-headers.mjs`, regenerated header files; no CSP change).
+- Keys added to `POS_SHORTCUTS`: Shift+F8 hold, F1 bills on hold. Tests: `tests/phone-counter.test.ts`; e2e step "8B:
+  POS calculator qty, hold & recall across a reload, UPI QR…".
+
 ## Local roles (6.21)
 
 `/pos` and its sidebar entry need `doc.create` (owner, clerk); the bill and its payments go through the same

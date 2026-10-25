@@ -240,6 +240,7 @@ export function Transactions() {
         ...(inv.reverse_charge ? { rcm_tax_excluded: true, total: receivableTotal(inv) } : {}),
         balance_due: receivableTotal(inv),
         late_fee_for: undefined,
+        party_balance_snapshot: undefined, // 8.5: a copy takes its own balance when issued
         // Files stay with the original document (6.12); custom field values are copied like any other field.
         attachments: undefined,
         // An amendment marker belongs to the amended document only (5.9).

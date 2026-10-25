@@ -445,6 +445,63 @@ Details: `docs/features/manufacturing.md`.
 | 7.166 | ✅ **Branch stock**: per-godown closing-stock valuation for branch statements in Books and Gateway (branch godowns × company-wide unit cost; "No branch" takes the rest so branches add up — `ledger/branch-stock.ts`); Alt+C on manufacturing / stock-journal line grids (items, godowns) and the bill godown select; the Sec 25(4) tax invoice + bill dialog opens automatically when a transfer between two GSTINs is saved | 7.84, P1-19 | done |
 | 7.167 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), price lists on POS, ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
 
+### 8A · Daily khata loop (`docs/features/khata.md`)
+
+What Khatabook / OkCredit / Vyapar / myBillBook users do every day, offline: `wa.me` / `upi://` / Web Share / files only.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.1 | ✅ **Balance-first Clients list**: *To collect / Advance / Settled* from `buildReceivables` (opening bills, credit notes, advances), overdue line, sort by balance / most overdue / name, **Overdue only** chip, header totals *You'll get / You'll give*, phone card layout | `khata.ts`, `Clients.tsx` | done |
+| 8.2 | ✅ **₹ Received / ₹ Given** per party (Clients rows, Statements tab): amount-first sheet, Cash / UPI / Bank + UTR, date, note; FIFO allocation (editable), rest on account, saved all or nothing with roles, period lock and audit (`savePartyReceipt`); ₹ Given = one-line Bill of Supply (composition) / non-GST bill (no GSTIN), or the editor prefilled with the party for a GST registrant (no invented non-GST document) | `bill-allocation.ts`, `khata-actions.ts`, `QuickEntrySheet.tsx` | done |
+| 8.3 | ✅ **One-tap WhatsApp statement** (open bills + net due + `upi://` link) on Clients / Receivables rows and the statement viewer; **Share PDF** through the share sheet (download fallback); static **statement web page** with Pay-with-UPI panel + QR (`client-copy.ts` generalised) | `StatementViewer.tsx`, `client-copy-dom.ts` | done |
+| 8.4 | ✅ **Party reminders + "Remind all overdue"**: `buildPartyReminder` (total overdue, oldest bill, UPI link; English / Hinglish / Hindi), full-screen stepper one tap per party with skip / snooze / copy, logged in `reminders` with additive `party_key`; **Send everyone their balance** monthly preset | `khata.ts`, `RemindQueue.tsx` | done |
+| 8.5 | ✅ **Party balance on the bill**: Design Studio toggle (`show_party_balance`, per profile) prints *Previous balance + This bill = Total due* on every template and the thermal / POS receipt from `party_balance_snapshot` frozen at first issue (reprints never change; legacy prints nothing); accent variable only | `party-balance.ts`, `PartyBalanceBlock.tsx`, store / POS save | done |
+| 8.6 | ✅ **Due dates in shop use**: the party's credit days set the due date of a new document; the editor nudges for a due date on an unpaid bill | `useInvoiceStore.ts`, `DocumentMetaCard.tsx` | done |
+| 8.7 | ⏳ 8A follow-ups: balance snapshot on recurring / converted / late-fee documents issued outside the editor, per-party reminder language, statement web page from list rows, non-INR khata | — | open |
+
+### 8D · GST guards 2025–26 (`docs/features/einvoice.md`, `docs/features/gst-reports.md`, `docs/features/gstr2b.md`, `docs/features/compliance.md`)
+
+Statutory values date-keyed and append-only in the lazy `src/lib/gst-guards.ts` (not in the first-paint `tax-rules.ts`). Working papers — verify with your CA.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.60 | ✅ **IRP 30-day reporting window** (AATO ≥ ₹10 crore from 1 Apr 2025, invoices + credit / debit notes; ≥ ₹100 crore invoices from 1 Nov 2023): profile `einvoice_aato`, countdown in the e-Invoice dialog and the bulk list, GST guards list, bell at day 20 / day 27 (and once closed) for documents still without an IRN | `gst-guards.ts`, `IrpWindowNote.tsx`, `gst-guard-alerts.ts` | done |
+| 8.61 | ✅ **GSTR-1A working paper**: freeze the GSTR-1 as filed (`gstr1_snapshots`), later same-period additions / changes / removals listed (B2B / B2CL / CDNR / CDNUR / EXP + B2CS), closed once the period's 3B is marked filed; **GSTR-3B Table 3.2** as per GSTR-1 vs books per POS with the date-keyed lock (non-editable from the Apr 2025 period per advisory 11 Apr 2025, editable again per advisory 16 May 2025) | `gst-guards.ts`, `Gst8dPanel.tsx` (GST guards tab, under GSTR-3B) | done |
+| 8.62 | ✅ **Three-year time bar** (Sec 37(5) / 39(11) / 44(2) / 52(13), portal from 1 Aug 2025): "becomes barred on …" list on the Compliance tab (with "mark filed") and a bell notice 90 days ahead | `timeBarFor` / `timeBarList`, `Gst8dPanel.tsx` | done |
+| 8.63 | ✅ **Vendor follow-up from the 2B match** (Clear pattern): per-supplier note (not in 2B, value / tax / head / date / number differences, not in books) by WhatsApp / e-mail / PDF, "followed up on" marks (`gst_followups`); **matched ITC pushed** to a Table 4 panel under GSTR-3B (`gstr2b_itc`) | `gst-followup.ts`, `VendorFollowUp.tsx` | done |
+| 8.64 | ✅ **One cancel flow** (TallyPrime 7.0 pattern): cancelling a document with an IRN / EWB prepares the EWB + IRN cancel JSON together, shows the 24-hour deadlines (EWB first; after 24 h → credit note / recipient rejection) and tracks `einvoice_meta.irn_cancel` / `ewb_cancel` | `einvoice-cancel.ts`, `EinvCancelPanel.tsx` (in the cancel dialog) | done |
+| 8.65 | ✅ **GST exceptions** ("uncertain transactions"): missing HSN on B2B lines, POS vs GSTIN state, rate outside the date-keyed slab table (GST 2.0 from 22 Sep 2025), B2CL threshold edge (±5%), missing IRN where e-invoicing is mandatory (date-keyed mandate thresholds) | `gstExceptions`, GST guards tab | done |
+| 8.66 | ⏳ 8D follow-ups: Table 3.2 split for composition dealers / UIN holders; GSTR-1A JSON; IRN cancel from the bulk tool's response; time bar for GSTR-6 / 7 / 8; one-off due-date extensions | — | open |
+
+### 8B · Phone & counter (`docs/features/pwa-backup.md`, `docs/features/pos-barcode-pricing.md`)
+
+From the Vyapar / myBillBook / OkCredit comparison: the phone and the shop counter.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.20 | ✅ **Phone backup that happens**: encrypted "Share backup" through Web Share L2 (Drive / WhatsApp / Files; `.txt` fallback for Android Chrome; owner only; never readable in vault mode); nudges after 10 new documents or 3 days; "Backed up 2 h ago ✓ / Not backed up — tap to save" on the phone Dashboard and in the bell; a backup shared into the app opens the restore flow (owner, validation, undo copy) | `backup-share.ts`, `phone-backup.ts`, `ShareBackupDialog.tsx`, `BackupStatusLine.tsx` | done |
+| 8.21 | ✅ **Hold & new bill**: up to 9 parked carts (Shift+F8), recall list (F1, keys 1–9), kept per company on the device (`DEVICE_DRAFT_KEYS`: sealed, not backed up / synced) | `pos-hold.ts`, `HeldBills.tsx` | done |
+| 8.22 | ✅ **UPI QR at the counter** for the exact UPI amount (`am`, `tr` = bill number), full-screen customer view, "Paid? enter UTR"; **quick-item tiles** (favourites + stock groups); zero / negative stock in red | `PosUpiQr.tsx`, `pos-tiles.ts`, `PosTiles.tsx` | done |
+| 8.23 | ✅ **PWA entry points**: shortcuts (POS, Payment in → `/clients?pay=1`, New expense); `share_target` for backups, receipt images / PDFs (→ new expense with attachment) and CSV / XLSX (→ bank-statement import) | `manifest.json`, `sw.js`, `share-inbox.ts`, `ShareTarget.tsx` | done |
+| 8.24 | ✅ **Add party from contacts** (Contact Picker API, Android Chrome, feature-detected) | `contact-pick.ts`, `ContactPickButton.tsx` | done |
+| 8.25 | ✅ **Calculator in number fields** ("120*3+40", "1000+18%"), tiny parser, no eval | `calc-expr.ts`, `NumberInput.tsx` | done |
+| 8.26 | ✅ **Web Bluetooth thermal printing** (BLE 58 / 80 mm ESC/POS, off by default, `bluetooth=(self)`), browser-print fallback | `escpos.ts`, `PosPrinter.tsx` | done |
+| 8.27 | ⏳ 8B follow-ups: share-target on iOS (no Web Share Target there), remembered BLE printer across reloads (`getDevices` still behind a flag), Payment-in quick-pay screen (khata work), tiles for price-list items, held carts across devices (deliberately not synced) | — | open |
+
+### 8C · Capture, bank rules, approvals (`docs/features/bill-capture.md`, `docs/features/banking.md` § Bank rules)
+
+Competitor parity with Zoho Books / Xero / QuickBooks / Refrens / TallyPrime 7.0 purchase capture and bank automation — without OCR or any network call.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.40 | ✅ **Supplier bill capture from the e-invoice signed QR**: camera (BarcodeDetector), photo / screenshot (BarcodeDetector on an ImageBitmap) or pasted text; JWT payload decoded (SellerGstin, BuyerGstin, DocNo, DocTyp, DocDt, TotInvVal, ItemCnt, MainHsnCode, Irn, IrnDt — **signature not verified offline**); draft bill prefilled (vendor by GSTIN or "Add supplier", bill no. / date / value / HSN, GST backed out when the HSN master knows the rate of a one-item bill, IRN stored as `einvoice_irn`), warning when BuyerGstin is none of our profiles, file kept as an attachment; PDFs are kept but their QR is not read (no PDF engine shipped) | `einvoice-qr.ts`, `bill-capture.ts`, `capture-browser.ts`, `InboxTab.tsx` | done |
+| 8.41 | ✅ **Unprocessed documents inbox** (`doc_inbox`) + **draft bills** (`purchase_drafts`, out of the books): make bill / make expense / dismiss; `openCaptureFromFile(file)` and `inboxDb.add` for the PWA share target | `doc-inbox.ts`, `purchase-drafts.ts` | done |
+| 8.42 | ✅ **Duplicate supplier bill guard**: same supplier (GSTIN / vendor / name) + normalised bill no. in the same FY, or same amount within ±3 days → soft warning, save again to override; possible duplicates listed in the exception report | `bill-duplicates.ts`, `bill-guard.ts`, `ledger/exceptions.ts` | done |
+| 8.43 | ✅ **Recurring bills / expenses** (`recurring_bills`, recurring.ts date rules): each occurrence writes a **draft** (never posted), idempotent; bell: supplier bills due this week, recurring bills due, drafts / inbox waiting (lazy provider) | `recurring-bills.ts`, `RecurringBillsPanel.tsx`, `capture-alerts.ts` | done |
+| 8.44 | ✅ **Approvals for bills, expenses and supplier payments**: thresholds (0 = all), clerk's bill held in `purchase_drafts` and payment in `payment_requests` (out of the books); owner approves (posts / pays) or rejects with a reason; shared `approvals` history; data-layer gate in `purchasesDb.save`; payments from bank statements / cheques / confirmed e-payment files exempt | `purchase-approval-gate.ts`, `purchase-approvals.ts`, `PurchaseApprovals.tsx` | done |
+| 8.45 | ✅ **Bank rules + memory** (`bank_rules`): ALL / ANY of narration contains / starts with / safe regex, counterparty token, amount range, debit / credit, bank account → expense (head, supplier, GST + ITC, cost centre, branch, mode), voucher to a ledger, receipt against a customer's invoices, contra (twin reused), ignore; run after invoice matching; every suggestion labelled Rule / Match / Memory; memory learned from past expense categorisations; "Create rule for similar lines?" after a manual expense; all-or-nothing batches through the existing writers (roles, period lock, approval gate, audit) | `bank-rules.ts`, `bank-rules-apply.ts`, `BankRulesPanel.tsx`, `RuleSuggestions.tsx` | done |
+| 8.46 | ⏳ 8C follow-ups: PDF page rendering for QR reading, a multi-line GST split from the QR (needs the full e-invoice JSON), rule actions with GST on vouchers, memory for receipts / vouchers, payment approval inside the e-payment batch screen, total-JS budget headroom | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

@@ -369,6 +369,7 @@ export function DesignPanel({
             <Check checked={design.show_amount_in_words} onChange={(v) => set({ show_amount_in_words: v })}>{desT('words')}</Check>
             <Check checked={design.show_place_of_supply} onChange={(v) => set({ show_place_of_supply: v })}>{desT('pos')}</Check>
             <Check checked={design.show_tracking} onChange={(v) => set({ show_tracking: v })}>{desT('tracking')}</Check>
+            <Check checked={design.show_party_balance === true} onChange={(v) => set({ show_party_balance: v })}>{desT('partyBalance')}</Check>
           </div>
         </Section>
 

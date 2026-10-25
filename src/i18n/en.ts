@@ -111,6 +111,8 @@ export const en = {
   'shell.tabHome': 'Home',
   'shell.tabNew': 'New',
   'shell.tabMore': 'More',
+  'shell.beta': 'Beta',
+  'shell.betaAria': 'Beta version (private test build)',
   'shell.backupSaved': 'Backup saved ({file})',
   'shell.backupDownloaded': 'Backup downloaded',
   'palette.newInvoice': 'New invoice',
@@ -248,6 +250,12 @@ export const en = {
   'dash.manageDirectory': 'Manage your directory',
   'dash.profilesBackup': 'Profiles & backup',
   'dash.profilesBackupHint': 'Business details, bank, UPI',
+
+  // ── Missing page (404 inside the shell) ──
+  'notFound.docTitle': 'Page not found — Mr. Chartist Invoice',
+  'notFound.title': 'We can’t find that page',
+  'notFound.text': 'Nothing lives at {path}. It may have moved, or the link is mistyped.',
+  'notFound.back': 'Back to dashboard',
 } as const;
 
 /** Every key: the shell catalogue above plus the page catalogue (en-pages.ts, loaded with the pages). */

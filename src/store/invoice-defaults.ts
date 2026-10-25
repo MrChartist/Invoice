@@ -13,6 +13,7 @@ import { addDaysInput, todayInput } from '../lib/utils';
 import { readValues } from '../lib/custom-fields';
 import { readRefs } from '../lib/attachments';
 import { normalizeTransport } from '../lib/transport';
+import { sanitizePartyBalance } from '../lib/party-balance';
 import type { AppSettings } from '../lib/localDb';
 import type {
   AmendmentInfo,
@@ -267,6 +268,11 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(typeof r.agent_id === 'string' && r.agent_id ? { agent_id: r.agent_id } : {}),
     ...(r.offer && typeof r.offer === 'object' && Number((r.offer as { value?: unknown }).value) > 0 ? { offer: r.offer as InvoiceRecord['offer'] } : {}),
     ...(r.rx && typeof r.rx === 'object' ? { rx: r.rx as InvoiceRecord['rx'] } : {}),
+    // 8.5 (additive): party balance frozen on the bill at first issue.
+    ...(() => {
+      const snap = sanitizePartyBalance(r.party_balance_snapshot);
+      return snap ? { party_balance_snapshot: snap } : {};
+    })(),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

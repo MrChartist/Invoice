@@ -9,6 +9,7 @@ import { isLocked } from './period-lock';
 import { isRevenueDoc } from './stats';
 import { round2 } from './invoice-calc';
 import { receivableBalance } from './rcm';
+import { readLinks, totalCredited } from './documents';
 
 export type SortKey = 'date' | 'due' | 'number' | 'client' | 'total' | 'balance';
 export type SortDir = 'asc' | 'desc';
@@ -62,17 +63,21 @@ export interface BulkPaidResult {
   total: number;
 }
 
-/** Record the full balance of each document as received on `date`. One failure never stops the rest. */
+/** Record the balance of each document (net of credit notes) as received on `date`. One failure never stops the rest. */
 export function bulkMarkPaid(ids: readonly string[], opts: { method: string; date: string; reference?: string }): BulkPaidResult {
   const out: BulkPaidResult = { paid: [], skipped: [], total: 0 };
+  const links = readLinks();
+  const all = localDb.invoices.getAll();
   for (const id of ids) {
     const inv = localDb.invoices.getById(id);
     if (!inv) continue;
-    if (!canMarkPaid(inv)) {
+    // What the customer still owes: credit notes raised against the invoice are not collected in cash
+    // (the same balance the Record payment dialog offers).
+    const amount = canMarkPaid(inv) ? Math.max(round2(balanceOf(inv) - totalCredited(inv.id, links, all)), 0) : 0;
+    if (amount <= 0) {
       out.skipped.push({ number: inv.invoice_number, reason: isLocked(inv) ? 'locked period' : 'nothing to collect' });
       continue;
     }
-    const amount = round2(balanceOf(inv));
     try {
       localDb.payments.record({ invoiceId: id, amount, method: opts.method, date: opts.date, reference: opts.reference, note: 'Marked paid from the invoice list' });
       out.paid.push(inv.invoice_number);

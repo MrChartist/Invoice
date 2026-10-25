@@ -196,6 +196,25 @@ try {
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');
   });
 
+  await step('beta: badge next to the logo; Help -> Report a problem builds a local diagnostic', async () => {
+    await page.goto(srv.origin + '/');
+    const badge = page.getByRole('img', { name: 'Beta version (private test build)' }).first();
+    await badge.waitFor();
+    check(/^beta$/i.test((await badge.innerText()).trim()), 'Beta badge next to the logo, with an accessible label');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.getByRole('button', { name: /Report a problem/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Report a problem' });
+    await dlg.waitFor();
+    await page.waitForFunction(() => /Recent errors/.test(document.querySelector('[data-report-problem]')?.value ?? ''));
+    const text = await dlg.locator('[data-report-problem]').inputValue();
+    check(
+      /Version: \d+\.\d+\.\d+/.test(text) && /\[Storage health\]/.test(text) && /Screen: \/$/m.test(text) && !/E2E Trader|e2e@okhdfcbank/.test(text),
+      `diagnostic report: version, screen, storage health, no business data (${text.split('\n')[5]})`,
+    );
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+  });
+
   await step('create and save an invoice', async () => {
     await page.goto(srv.origin + '/invoice');
     await page.getByLabel('Client name').fill('Acme Buyers');
@@ -400,6 +419,31 @@ try {
       'receipt shows number, reference and amount in words');
     await popup.close();
     await page.keyboard.press('Escape');
+  });
+
+  await step('khata (8A): Clients shows the balance, ₹ Received drops it, the WhatsApp statement carries a upi:// link', async () => {
+    await page.goto(srv.origin + '/clients');
+    const row = page.locator('tr[data-client-row="Acme Buyers"]');
+    await row.getByText('To collect ₹2,540.00').waitFor();
+    check(true, 'balance-first Clients list: Acme Buyers shows "To collect ₹2,540.00"');
+    const wa = (await row.locator('a[data-wa-statement]').getAttribute('href')) ?? '';
+    const text = decodeURIComponent(wa.split('?text=')[1] ?? '');
+    check(wa.startsWith('https://wa.me/') && /upi:\/\/pay\?pa=e2e@okhdfcbank/.test(text) && /am=2540\.00/.test(text),
+      `WhatsApp statement link carries a upi:// link for the net due (${text.replace(/\s+/g, ' ').slice(0, 90)}…)`);
+    await row.getByRole('button', { name: 'Record money received from Acme Buyers' }).click();
+    const dlg = page.getByRole('dialog', { name: /Received from Acme Buyers/ });
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Amount (₹)', null, { timeout: 5000 });
+    check(true, 'the amount field is focused when the sheet opens');
+    await dlg.getByLabel('Amount (₹)', { exact: true }).fill('500');
+    await dlg.getByRole('radio', { name: 'UPI' }).click();
+    await dlg.getByLabel(/UTR/).fill('UPI-E2E-1');
+    const firstBill = await dlg.getByLabel(/^Amount for INV/).first().inputValue();
+    check(firstBill === '500', `the ₹500 is allocated to the oldest open bill first (${firstBill})`);
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await row.getByText('To collect ₹2,040.00').waitFor();
+    const tx = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.reference === 'UPI-E2E-1'))).filter((t) => t.reference === 'UPI-E2E-1');
+    check(tx.length === 1 && tx[0].amount === 500 && tx[0].method === 'UPI' && tx[0].client_name === 'Acme Buyers' && !!tx[0].invoice_id,
+      `₹ Received saved one UPI receipt against the bill, tagged with the party (${tx.length} row, ₹${tx[0]?.amount})`);
   });
 
   await step('bulk mark paid, then delete with undo', async () => {
@@ -997,6 +1041,59 @@ try {
     await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id));
     await writeJson(page, 'items_catalog', prevCatalog);
     await writeJson(page, 'pos_day_close', null);
+  });
+
+  await step('8B: POS calculator qty, hold & recall across a reload, UPI QR for the exact amount with the bill number', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-hold', name: 'E2E Hold Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865305',
+    }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8901030865305');
+    await scan.press('Enter');
+    const qty = page.getByLabel('Quantity of E2E Hold Soap (line 1)');
+    await qty.waitFor();
+    // 8.25: a sum typed into a number field is worked out (no eval).
+    await qty.fill('2*3');
+    await qty.press('Tab');
+    check((await qty.inputValue()) === '6', `calculator: "2*3" → ${await qty.inputValue()}`);
+
+    // 8.21: Shift+F8 parks the bill; it survives a reload (company store) and F1 → 1 recalls it.
+    await page.keyboard.press('Shift+F8');
+    await page.getByText(/Bill parked \(1 on hold\)/).first().waitFor();
+    check((await page.getByText('Scan an item or search by name to start the bill.').count()) === 1, 'hold starts a new bill');
+    const held = await readJson(page, 'pos_held', [], (v) => v.length === 1);
+    check(held.length === 1 && held[0].items?.[0]?.name === 'E2E Hold Soap' && held[0].items[0].quantity === 6, `held cart stored (${held.length})`);
+    await page.reload();
+    await scan.waitFor();
+    check(/1/.test(await page.locator('[data-pos-held]').innerText()), 'held count shown after a reload');
+    await page.keyboard.press('F1');
+    const dlg = page.getByRole('dialog', { name: 'Bills on hold' });
+    await dlg.waitFor();
+    await page.keyboard.press('1');
+    await qty.waitFor();
+    check((await qty.inputValue()) === '6', 'recalled bill keeps its lines');
+    const after = await readJson(page, 'pos_held', [], (v) => v.length === 0);
+    check(after.length === 0, 'recalled bill leaves the hold list');
+
+    // 8.22: UPI tender → customer-facing QR for the exact amount, bill number as the reference.
+    await page.keyboard.press('F6');
+    const qr = page.locator('[data-pos-upi-qr]');
+    await qr.waitFor();
+    check((await qr.getAttribute('data-pos-upi-qr')) === '708.00', `UPI QR amount (${await qr.getAttribute('data-pos-upi-qr')})`);
+    check((await qr.locator('svg').count()) > 0 && /INV\/FY\d\d-\d\d\/\d{4}/.test(await qr.innerText()), 'QR drawn with the bill number');
+    await qr.getByRole('button', { name: 'Show to customer' }).click();
+    const full = page.getByRole('dialog', { name: 'Pay by UPI' });
+    await full.waitFor();
+    await full.locator('#pos-utr-full').fill('UTR123456');
+    await full.getByRole('button', { name: 'Done' }).click();
+    check((await page.locator('#pos-utr').inputValue()) === 'UTR123456', 'UTR typed on the customer screen is kept');
+
+    await page.keyboard.press('F8');
+    await writeJson(page, 'pos_held', null);
+    await writeJson(page, 'items_catalog', prevCatalog);
   });
 
   await step('POS return: bill → return one item → refund cash; Z report shows the return (WP-9)', async () => {

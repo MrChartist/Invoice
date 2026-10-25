@@ -48,12 +48,31 @@ import type {
  */
 export function round2(n: number): number {
   if (!Number.isFinite(n)) return 0;
+  const fast = clearPaise(n * 100);
+  if (fast !== undefined) return fast;
   const abs = Math.abs(n);
   const s = String(abs);
   // Exponent-form strings (1e-7, 1.5e+21) cannot take the "e2" suffix.
   const scaled = s.includes('e') ? abs * 100 : Number(`${s}e2`);
   const r = Number(`${Math.round(scaled)}e-2`);
   return n < 0 && r !== 0 ? -r : r;
+}
+
+/**
+ * Fast path shared by the rounding helpers (perf: they run millions of times in the reports).
+ * `p` is a money value in paise computed in floating point; it differs from the exact decimal
+ * value by a few ulps at most, and Math.round only jumps at x.5, so when the fraction is clearly
+ * away from one half the exact path would pick the same integer k — and `k / 100` (IEEE division,
+ * k < 2^53) is exactly the double `Number(`${k}e-2`)` parses to. undefined = use the exact path.
+ * Pinned against the original implementations in tests/round-fastpath.test.ts.
+ */
+function clearPaise(p: number): number | undefined {
+  const abs = Math.abs(p);
+  if (abs < 1e13 && Math.abs(abs - Math.floor(abs) - 0.5) > (abs + 1) * 1e-12) {
+    const k = Math.round(abs);
+    return k === 0 ? 0 : p < 0 ? -k / 100 : k / 100;
+  }
+  return undefined;
 }
 
 /** Coerce anything that arrives from an <input> or legacy JSON into a finite number. */
@@ -95,6 +114,8 @@ function divHalfAway(n: bigint, d: bigint): bigint {
 
 /** round2(a * b / divisor), computed exactly. `divisor` must be a positive integer (1 or 100). */
 export function mulRound2(a: number, b: number, divisor = 1): number {
+  const fast = clearPaise((a * b * 100) / divisor);
+  if (fast !== undefined) return fast;
   const A = scaled(a);
   const B = scaled(b);
   if (!A || !B) return round2((a * b) / divisor);
@@ -110,8 +131,11 @@ export function pctOf(amount: number, pct: number): number {
 
 /** round2(amount / (1 + ratePct / 100)) — backs a tax-inclusive amount out to its base, exactly. */
 export function backOutPct(amount: number, ratePct: number): number {
+  const r6 = Number(ratePct.toFixed(6));
+  const fast = r6 > -100 ? clearPaise((amount * 10000) / (100 + r6)) : undefined;
+  if (fast !== undefined) return fast;
   const A = scaled(amount);
-  const R = scaled(Number(ratePct.toFixed(6)));
+  const R = scaled(r6);
   if (!A || !R) return round2(amount / (1 + ratePct / 100));
   const scale = 10n ** BigInt(R.s);
   const numerator = A.n * 100n * 100n * scale;

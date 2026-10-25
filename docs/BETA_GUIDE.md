@@ -1,0 +1,143 @@
+# Private beta: tester guide
+
+Thank you for testing **Mr. Chartist Invoice**. This page covers what the app is, how to set it up safely,
+what to test first, what is known to be missing, and how to report a problem.
+
+## 1. What the app is
+
+- An invoicing and light accounting app for Indian businesses: GST invoices and other sales documents, payments
+  and receivables, purchases and expenses (with ITC and TDS), inventory and manufacturing, books (day book,
+  ledgers, P&L, balance sheet), GST working papers (GSTR-1, GSTR-3B and more), e-Invoice / e-Way JSON, Tally
+  XML, payroll, and a Tally-style keyboard Gateway.
+- **Local-first and private.** There is no server and no account. Everything you type stays in this browser on
+  this device (IndexedDB). Nothing is uploaded, and the app makes no network calls of its own.
+- That also means **we cannot see your data or recover it**. Your backups are the only copy we cannot lose for
+  you (see section 4).
+- The **Beta** badge next to the logo marks this build as a private test build.
+
+## 2. Install it as an app (PWA)
+
+The app runs in any modern browser. Installing it gives it its own window and icon, and keeps it working offline.
+
+| Device | How |
+|---|---|
+| Chrome / Edge (Windows, macOS, Linux, ChromeOS) | Open the app, then the install icon in the address bar, or menu → *Install Mr. Chartist Invoice*. |
+| Android (Chrome) | Menu (⋮) → *Install app* / *Add to Home screen*. |
+| iPhone / iPad (Safari) | Share → *Add to Home Screen*. Use Safari: other iOS browsers cannot install it. |
+
+After an update is published, the app shows a *New version ready* notice. Choose *Reload* to switch to the new
+version. Your data is not touched by an update.
+
+## 3. Offline behaviour
+
+- After the first visit, every screen works without a connection, including screens you have never opened. The
+  app caches its own files only.
+- Saving, PDFs, reports and backups all work offline. Only things that are online by nature need a connection:
+  opening a WhatsApp / e-mail share, or a link to a government portal.
+- On iPhone / iPad, Safari can clear site data that has not been used for a few weeks. Install the app to the
+  Home Screen and keep backups.
+- **Settings → Data & backup** shows a storage health meter (space used, whether the browser promised to keep
+  the data, the last backup).
+
+## 4. Before you start: back up, or use a test company
+
+1. **Back up first.** If you already have real data in the app, open *Settings → Data & backup* → *Download
+   backup* (or an encrypted backup) and keep the file. A restore brings everything back exactly.
+2. **Better: test in a separate company.** Use the company switcher at the top of the sidebar to add a company
+   such as "Beta test". Each company is a separate data store on the device, so testing never touches your real
+   books. Switch back at any time.
+3. **Sample data.** *Settings → Data & backup* → *Try with sample data* fills a company with realistic demo
+   documents, and *Remove sample data* takes them out again.
+4. Optional: turn on automatic backups to a folder (Chrome / Edge) in the same panel.
+
+## 5. Roles on a shared device
+
+The owner can add local users in *Settings → Security*:
+
+| Role | Can |
+|---|---|
+| Owner | Everything, including settings, users, backups, restore, erase, period-lock overrides and payroll. |
+| Clerk | Create and edit documents, record payments, edit masters and books. Cannot delete issued documents, change settings or take full backups. |
+| Viewer | Read screens, print / download PDFs and export reports. |
+
+Roles are a convenience lock on a shared computer, not security: anyone with the device and browser developer
+tools can read the stored data. Please test each role and tell us about anything a role can do that it should
+not (or cannot do that it should).
+
+## 6. Hindi (हिंदी)
+
+Switch the interface language in *Settings* → *Language / भाषा*, or on the PIN screen. The choice is kept on
+this device only. The shell, Dashboard, invoice editor, payment dialog and many screens are in Hindi; some
+screens and messages are still English (roadmap 5.4). Please report untranslated text, awkward wording and
+any layout that breaks with Hindi text.
+
+## 7. What to test first
+
+Work through these flows end to end. After each step, check the numbers on the next screen.
+
+### A. Invoice → payment → GST papers
+1. Create a client with a GSTIN (in-state and out-of-state) and a few items with HSN codes and GST rates.
+2. New invoice: add lines, a discount, shipping; try tax-inclusive prices and a reverse-charge or export invoice.
+   Save, preview, download the PDF, try another template in Design Studio.
+3. Record a part payment, then the rest. Check the invoice status, *Receivables* (ageing, statement) and the
+   receipt.
+4. Issue a credit note against the invoice.
+5. *GST reports*: GSTR-1 (B2B / B2C / credit notes / HSN summary) and GSTR-3B for that month. Download the
+   JSON / Excel working papers.
+
+### B. Purchase → TDS
+1. Add a vendor and enter a purchase bill with ITC; try an expense and a purchase return.
+2. Record a payment that deducts TDS (for example 194C / 194J).
+3. Check *TDS & TCS* (payables, challans, returns), the vendor ledger in *Books*, and ITC in GSTR-3B.
+
+### C. Books and the Gateway
+1. *Books*: day book, cash / bank book, ledgers, trial balance, P&L and balance sheet for the financial year.
+   Every invoice, receipt, bill and payment should appear once.
+2. *Gateway* (the keyboard screen): enter vouchers with the Tally-style keys (F4 contra, F5 payment, F6 receipt,
+   F7 journal …), alter one, and check it in the day book.
+
+### D. Inventory and manufacturing
+1. *Inventory*: stock items with opening stock, godowns, batches / serials if you use them.
+2. Sell and buy tracked items and watch the stock position and the "only N in stock" warning in the editor.
+3. Manufacturing: a bill of materials, a manufacturing journal, a stock journal, a physical stock count.
+   Check the stock summary and the closing-stock value.
+
+### E. Payroll
+1. *Payroll* (owner only): employees, salary structures, a monthly payroll run with EPF / ESI / PT / TDS.
+2. Pay the run, check the payslips and the payroll postings in *Books*.
+
+Also useful: install / offline (section 2–3), backup and restore into a new company, two tabs open at once,
+and a phone-sized screen.
+
+## 8. Known limitations
+
+- **Statutory outputs are working papers.** GSTR-1 / 3B / 9, e-Invoice and e-Way JSON, TDS returns, Tally XML
+  and payroll statutory figures follow the published rules as we understand them, but they are not validated
+  against the GST portal, NIC, TRACES or EPFO tools. **Verify them with your CA before you file or pay.**
+- No server means no cloud sync between devices, apart from the optional encrypted folder sync (*Settings →
+  Data & backup*) through a folder you already sync (Google Drive, OneDrive, Dropbox …).
+- The 4–6 digit PIN is a lock screen; to encrypt the data at rest, turn on vault mode in *Settings → Security*.
+- Hindi is partial (section 6).
+- Open roadmap items are listed in [`docs/ROADMAP.md`](ROADMAP.md), rows marked ⏳ or 🟡. Main ones:
+  5.4 (more languages and screens), 7.19 (bill-wise references on Gateway voucher entry), 7.28 (GSTR-9C
+  Table 12 split), 7.49 (Tally import of inventory vouchers, Excel trial-balance template, per-FY auditor
+  export), 7.131 (Form 15CA / 15CB, 27Q extras, ISD postings, some GSTR-9 tables), 7.149 (payroll
+  perquisite and Form 12BA follow-ups), 7.158 (EEFC payments, POS extras) and 7.167 (MRP lead times, price
+  lists on POS, ITC-04 JSON check). Please do not report these as bugs, but do tell us if one blocks you.
+
+## 9. How to report a problem
+
+1. Open **Help & about** (the **?** button in the bar at the top right, or *More → Help & about* on a phone).
+2. Choose **Report a problem**. The app builds a short diagnostic report on your device: app version and build,
+   your browser, the screen you were on (record ids masked), the last 20 error messages (with names, numbers,
+   amounts, GSTINs and e-mail addresses masked) and a storage health summary. **It contains no business data,
+   and nothing is sent anywhere.** Read it before you share it.
+3. Choose **Copy report** and paste it into the beta feedback channel, below a short description:
+   - what you did (the steps, in order),
+   - what you expected,
+   - what happened instead,
+   - a screenshot or screen recording if you can (check it for real customer data first).
+4. If the app does not open at all, tell us the browser and device and what the screen shows.
+
+Never send a backup file or screenshots of real customer data unless we ask and you are comfortable with it.
+A copy of the sample-data company that shows the problem is the best evidence.

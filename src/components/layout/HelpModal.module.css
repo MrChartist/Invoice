@@ -135,3 +135,34 @@ kbd {
 .links a:hover {
   text-decoration: underline;
 }
+
+/* Private beta: Help → Report a problem. */
+.reportBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border: 1px dashed var(--input-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.reportBtn:hover {
+  background: var(--card-inner);
+  border-color: var(--ring);
+}
+
+.reportBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow);
+}
+
+.reportBtn > span:last-child {
+  display: grid;
+}

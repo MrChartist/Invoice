@@ -11,11 +11,13 @@ export interface GstinInputProps {
   onStateCode?: (code: string) => void;
   placeholder?: string;
   id?: string;
+  /** Accessible name when no `<label htmlFor={id}>` names the field. */
+  ariaLabel?: string;
   className?: string;
 }
 
 /** GSTIN field with an offline checksum check; stays quiet until the user has finished typing. */
-export function GstinInput({ value, onChange, onStateCode, placeholder = '22AAAAA0000A1Z5', id, className }: GstinInputProps) {
+export function GstinInput({ value, onChange, onStateCode, placeholder = '22AAAAA0000A1Z5', id, ariaLabel, className }: GstinInputProps) {
   const [touched, setTouched] = useState(false);
   const result = checkGstin(value);
   const showResult = value.length > 0 && (touched || value.length >= 15);
@@ -24,6 +26,7 @@ export function GstinInput({ value, onChange, onStateCode, placeholder = '22AAAA
     <>
       <input
         id={id}
+        aria-label={ariaLabel}
         className={cn(controls.input, controls.inputMono, showResult && !result.valid && controls.inputInvalid, className)}
         value={value}
         maxLength={15}

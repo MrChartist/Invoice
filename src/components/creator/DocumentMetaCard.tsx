@@ -11,10 +11,12 @@ import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
 import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
+import { dueAfterIssueChange } from '../../lib/dates';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceStatus } from '../../types/invoice';
 import { useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import { docLabel, statusLabel } from '../../i18n/labels';
+import { khataT } from '../../i18n/areas/khata';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../../pages/InvoiceCreator.module.css';
@@ -35,7 +37,7 @@ interface Props {
 export function DocumentMetaCard({ editing, saveTick }: Props) {
   const { t } = useT();
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
+    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
   );
 
   const nextNumber = useMemo(
@@ -120,11 +122,17 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.issueDate')}</span>
-            <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, s.due_date)} />
+            <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, dueAfterIssueChange(s.issue_date, s.due_date, e.target.value))} />
           </label>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="due-date">{s.doc_type === 'SALES_ORDER' ? t('meta.deliveryBy') : t('meta.dueDate')}</label>
             <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
+            {/* 8.6: an unpaid bill with no credit period nudges for a due date (ageing / reminders use it). */}
+            {(s.doc_type === 'INVOICE' || s.doc_type === 'TAX_INVOICE' || s.doc_type === 'BILL_OF_SUPPLY') &&
+              s.status !== 'Paid' && s.status !== 'Cancelled' && (Number(s.balance_due) || 0) > 0.004 &&
+              (!s.due_date || s.due_date <= s.issue_date) && (
+                <span className={controls.hint} role="note" data-due-nudge>{khataT('dueNudge')}</span>
+              )}
             <div className={styles.chips}>
               {DUE_PRESETS.map((d) => (
                 <button key={d} type="button" aria-label={d === 0 ? t('meta.dueOnReceipt') : t('meta.dueInDays', { n: d })} className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>

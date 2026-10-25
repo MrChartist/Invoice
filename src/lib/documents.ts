@@ -295,6 +295,7 @@ export function buildConvertedDraft(
     recurring_id: undefined,
     recurring_date: undefined,
     late_fee_for: undefined,
+    party_balance_snapshot: undefined, // 8.5: a new document takes its own balance at issue
     // Attachments belong to the source document (its signed copy, its receipts), not the new one.
     attachments: undefined,
     created_at: undefined,
@@ -542,6 +543,7 @@ export function buildCreditNote(
     recurring_id: undefined,
     recurring_date: undefined,
     late_fee_for: undefined,
+    party_balance_snapshot: undefined, // 8.5: a new document takes its own balance at issue
     created_at: undefined,
     updated_at: undefined,
     amends: undefined,
@@ -649,6 +651,7 @@ export function buildDebitNote(
     recurring_id: undefined,
     recurring_date: undefined,
     late_fee_for: undefined,
+    party_balance_snapshot: undefined, // 8.5: a new document takes its own balance at issue
     created_at: undefined,
     updated_at: undefined,
     amends: undefined,

@@ -285,6 +285,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master
   gst_setoffs: 'books.edit',
   gst_challans: 'books.edit',
+  // 8D GST guards
+  gst_followups: 'books.edit',
+  gstr2b_itc: 'books.edit',
+  gstr1_snapshots: 'books.edit',
   hsn_master: 'master.edit',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   rcm_documents: 'books.edit',
@@ -301,6 +305,12 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   // 7U: sales agents (master) and the commission payable journals posted for them
   sales_agents: 'master.edit',
   commission_postings: 'books.edit',
+  // 8C: documents inbox, draft bills (out of the books), recurring bills, bank rules, payment requests
+  doc_inbox: 'books.edit',
+  purchase_drafts: 'books.edit',
+  recurring_bills: 'books.edit',
+  bank_rules: 'books.edit',
+  payment_requests: 'books.edit',
   // approvals decision log: only the owner's decision writes it (approvals.ts `decide`); a clerk's
   // request lives on the document itself, so a clerk can never forge a decision row (review L5)
   approvals: 'doc.approve',

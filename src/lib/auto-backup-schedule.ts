@@ -38,7 +38,7 @@ const FREQUENCIES: BackupFrequency[] = ['daily', 'weekly', 'on-close'];
 
 /* ── Pure logic ────────────────────────────────────────────────── */
 
-function parseTime(iso: string | null | undefined): number | null {
+export function parseTime(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const t = Date.parse(iso);
   return Number.isFinite(t) ? t : null;
