@@ -18,9 +18,9 @@ import { localDayOf } from './dates';
 
 export const TILE_PREFS_KEY = `${DB_PREFIX}dashboard_tiles`;
 
-export type TileId = 'receivables' | 'payables' | 'cashBank' | 'topItems' | 'lowStock' | 'gstDue' | 'branches' | 'approvals' | 'amcDue' | 'loyalty';
+export type TileId = 'receivables' | 'payables' | 'cashBank' | 'topItems' | 'lowStock' | 'gstDue' | 'branches' | 'approvals' | 'amcDue' | 'loyalty' | 'agents' | 'offers' | 'pharma';
 
-export const ALL_TILES: readonly TileId[] = ['receivables', 'payables', 'cashBank', 'gstDue', 'topItems', 'lowStock', 'branches', 'approvals', 'amcDue', 'loyalty'];
+export const ALL_TILES: readonly TileId[] = ['receivables', 'payables', 'cashBank', 'gstDue', 'topItems', 'lowStock', 'branches', 'approvals', 'amcDue', 'loyalty', 'agents', 'offers', 'pharma'];
 export const DEFAULT_TILES: readonly TileId[] = ['receivables', 'payables', 'cashBank', 'gstDue', 'topItems', 'lowStock'];
 
 export function loadTilePrefs(userId = 'default'): TileId[] {

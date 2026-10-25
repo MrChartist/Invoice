@@ -23,6 +23,10 @@ const ApprovalsPanel = lazy(() => import('../approvals/ApprovalsPanel').then((m)
 const BranchesPanel = lazy(() => import('../branches/BranchesPanel').then((m) => ({ default: m.BranchesPanel })));
 const AmcPanel = lazy(() => import('../amc/AmcPanel').then((m) => ({ default: m.AmcPanel })));
 const LoyaltyPanel = lazy(() => import('../loyalty/LoyaltyPanel').then((m) => ({ default: m.LoyaltyPanel })));
+// 7U business extras (each its own chunk, only when the tile is on).
+const AgentsPanel = lazy(() => import('../extras7u/AgentsPanel').then((m) => ({ default: m.AgentsPanel })));
+const OffersPanel = lazy(() => import('../extras7u/OffersPanel').then((m) => ({ default: m.OffersPanel })));
+const PharmaPanel = lazy(() => import('../extras7u/PharmaPanel').then((m) => ({ default: m.PharmaPanel })));
 
 const TILE_LABEL: Record<TileId, Parameters<typeof tilesT>[0]> = {
   receivables: 'receivables',
@@ -35,6 +39,9 @@ const TILE_LABEL: Record<TileId, Parameters<typeof tilesT>[0]> = {
   approvals: 'approvals',
   amcDue: 'amcDue',
   loyalty: 'loyalty',
+  agents: 'agents',
+  offers: 'offers',
+  pharma: 'pharma',
 };
 
 /**
@@ -171,6 +178,9 @@ export function DashboardTiles() {
           {on('approvals') && <div data-tile="approvals"><ApprovalsPanel notify={notify} /></div>}
           {on('amcDue') && <div data-tile="amcDue"><AmcPanel notify={notify} icon={<Boxes size={16} />} /></div>}
           {on('loyalty') && <div data-tile="loyalty"><LoyaltyPanel notify={notify} /></div>}
+          {on('agents') && <div data-tile="agents"><AgentsPanel notify={notify} icon={<TrendingUp size={16} />} /></div>}
+          {on('offers') && <div data-tile="offers"><OffersPanel notify={notify} icon={<Receipt size={16} />} /></div>}
+          {on('pharma') && <div data-tile="pharma"><PharmaPanel notify={notify} icon={<Boxes size={16} />} /></div>}
         </Suspense>
       </div>
       <p className={controls.hint}>{tilesT('footnote')}</p>

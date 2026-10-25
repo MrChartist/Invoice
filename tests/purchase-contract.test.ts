@@ -582,3 +582,13 @@ test('7R readers (GSTR-9C rate-wise / Table 14, GSTR-9 Part V, per-GSTIN paper, 
   // Cess on a note is pro rata to the bill's `cess_amount` / `taxable`.
   assert.equal(noteCessFor({ ...bill, cess_amount: 40 }, 250), 10);
 });
+
+test('7U reader (e-payment confirmation: open bills of a supplier) reads the real bill shape', async () => {
+  const { openBillsOf } = await import('../src/lib/epay-confirm.ts');
+  const withVendor = { ...bill, vendor_id: 'v1', due_date: '2026-05-12' };
+  assert.deepEqual(openBillsOf([withVendor], { id: 'v1', name: 'Acme Supplies' }), [{ purchaseId: 'p1', balance: 1180, due: '2026-05-12' }]);
+  // Legacy rows without vendor_id match by name; paid / void bills drop out.
+  assert.equal(openBillsOf([bill], { id: 'v1', name: 'acme supplies' }).length, 1);
+  assert.equal(openBillsOf([{ ...bill, amount_paid: 1180 }], { name: 'Acme Supplies' }).length, 0);
+  assert.equal(openBillsOf([{ ...bill, status: 'Cancelled' } as never], { name: 'Acme Supplies' }).length, 0);
+});

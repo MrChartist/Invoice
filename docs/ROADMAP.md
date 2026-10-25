@@ -243,7 +243,7 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.20 | ✅ **Each bank account as its own ledger** (WP-5, P0-8): main account keeps 3510, others `bank:<id>` under Cash & bank or Bank OD A/c; receipts, supplier payments / advances, advance receipts / refunds, TDS challans and cheques post to their bank; per-bank openings; contra between banks (OD included); Books bank book per account; Tally one ledger per bank | `src/lib/bank-ledgers.ts`, `src/lib/ledger/postings-bank.ts`, `src/lib/tally-bank.ts`, `docs/features/banking.md` | M |
 | 7.21 | ✅ **Banking documents** (WP-5, P1-14): deposit / pay-in slip with cheques + cash denominations (`PIS/FY…`), payment advice (bills settled + TDS), bulk e-payment file (generic NEFT / RTGS CSV + HDFC / ICICI / SBI presets — check the format with your bank), cheque against several invoices / bills, vendor bank details | `deposit-slip.ts`, `payment-advice.ts`, `bank-upload.ts`, `cheques.ts`, `BankingDocs.tsx` | M |
 | 7.22 | ✅ **Bounce charges posting** and **day-end cash tally by denomination** (WP-5, P2) | `cheques.ts`, `cash-tally.ts` | S |
-| 7.23 | ⏳ Banking follow-ups: forex bank ledgers, record payments from an e-payment file after bank confirmation, supplier payments in the Tally export, Contra voucher from a deposit slip's cash (vendor-form bank details: done in 7.60) | — | M |
+| 7.23 | ✅ Banking follow-ups: forex bank ledgers, payments recorded from an e-payment file after bank confirmation, Contra from a deposit slip's cash, supplier payments in the Tally export (confirmed, WP-7) — see 7U (7.150–7.153); vendor-form bank details: done in 7.60 | `docs/features/banking.md` | M |
 
 ### 7D · Purchase returns, receipt notes, order outstanding (WP-3)
 
@@ -285,7 +285,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.40 | ✅ **Branches / locations** (WP-9, P1-19): branch master, additive `branch_id` on documents / purchases / vouchers (inferred from profile / GSTIN), branch filter + branch-wise summary; reports-engine option documented for WP-2 (`src/lib/branch.ts`) | Tally, Busy | M |
 | 7.41 | ✅ **Dashboard tiles** (WP-9, P1-17): receivables, payables, cash / bank, GST due, top items, low stock, branches, approvals, AMC, loyalty — per user, lazily loaded (`src/lib/dashboard-tiles.ts`) | TallyPrime 4 | S–M |
 | 7.42 | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
-| 7.43 | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
+| 7.43 | ✅ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS raw receipts + cash drawer, pharma pack — see 7U (7.154–7.157) | Marg, Busy | M |
 
 ### 7H · Migration, audit trail & year-end (WP-7, `docs/features/migration-audit.md`)
 
@@ -416,6 +416,20 @@ Details: `docs/features/manufacturing.md`.
 | 7.129 | ✅ **GSTR-1 Table 14A(a)** from amendment rows with the operator GSTIN; Table 14A(b) / Table 15 / 3B 3.1.1(i) documented as operator rows (nil in a supplier's return) | `eco-amend.ts`, `EcoView.tsx` | done |
 | 7.130 | ✅ **GSTR-1 / 3B by GSTIN** — one column per registration (branches / profiles), bills by branch GSTIN or place-of-supply State, unassigned listed, CSV | `gst-by-gstin.ts`, tab "By GSTIN" | done |
 | 7.131 | ⏳ 7R follow-ups: Form 15CA / 15CB, surcharge and Sec 195A grossing-up on 27Q; 27Q FVU text; TRACES flags in the Deductions tab; refund of IGST on goods exports (shipping-bill route); filed ITC refunds netted in the carried credit; ISD ledger postings and GSTR-6 amendments; books column on 9C rate-wise Table 9; Table 13 of GSTR-9 Part V; operator-side Table 15 / 3.1.1(i) | — | open |
+
+### 7U · Banking & business-extras follow-ups (`docs/features/banking.md`, `docs/features/business-extras.md`)
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 7.150 | ✅ **Forex bank ledgers**: `BankAccount.currency` + `fcy_opening` (EEFC / foreign-currency accounts, never the main account); balance in FCY (opening + same-currency receipts + entries) and INR (the ledger); money in at a typed rate, money out / conversion with the **realised** difference, period-end **revaluation** at a typed closing rate (**unrealised**, AS 11) — each a Journal through `saveVoucher` to 4930; table `fx_bank_moves`; no live rates; verify with your CA | `forex-bank.ts`, `ForexBankPanel.tsx` | done |
+| 7.151 | ✅ **Payments from an e-payment file after confirmation**: downloaded batches kept (`epay_batches`, `EPB/FY…`); bank response / status file or statement rows parsed by header; matched by reference, account + amount, unique amount; supplier payments recorded all or nothing (oldest bills first, rest on account, UTR as reference, bank's date); failed rows marked | `epay-confirm.ts`, `EpayConfirmPanel.tsx` | done |
+| 7.152 | ✅ **Contra for a deposit slip's cash**: Dr the slip's bank | Cr Cash on the slip date, posted before the cheques move (period lock refuses the slip), optional per slip | `deposit-slip.ts` | done |
+| 7.153 | ✅ **Supplier payments in the Tally export** confirmed (WP-7 `tally-books.ts`: Payment vouchers Agst Ref + TDS, advances / on account) and covered by a test with an EEFC-era bank ledger | `tests/banking-7u.test.ts` | done |
+| 7.154 | ✅ **Sales commission per agent**: agent master (flat % / % by stock group, on invoice or on receipt), `agent_id` on documents, statement + CSV, payable journal Dr Sales commission | Cr Sundry creditors (agent), periods never overlap; TDS 194H not computed (CA) | `sales-commission.ts`, `AgentsPanel.tsx` | done |
+| 7.155 | ✅ **Offers**: `schemes` extended with `kind` — buy A get B (₹0 line of item B with its HSN / rate) and bill-value slabs (% / ₹ off, best slab) applied after the price is chosen as an amount discount with its own line in the editor, POS and receipt (`offer`); GST on the net value (Sec 15(3)(a), Circular 92/11/2019) — verify with your CA | `offers.ts`, `pricing.ts`, `OffersPanel.tsx`, `EditorExtras.tsx` | done |
+| 7.156 | ✅ **ESC/POS**: per-device printer mode (browser default / raw 58–80 mm text receipt / ESC-POS over Web Serial, feature-detected, user-picked port), cash-drawer kick on cash bills only in serial mode, fallback to browser print; no network | `escpos.ts`, `PosPrinter.tsx` | done |
+| 7.157 | ✅ **Pharma pack**: drug licence numbers on the profile (printed), Schedule H / H1 / X on stock items, prescription on the bill, Schedule H1 register (CSV), near-expiry list, block expired / near-expiry sales option in every stock check | `pharma.ts`, `pharma-gate.ts`, `PharmaPanel.tsx` | done |
+| 7.158 | ⏳ 7U follow-ups: foreign-currency supplier payments from an EEFC account, bank-specific response presets, revaluation reversal option, TDS 194H on commission, agent on POS bills, per-customer offers, ESC/POS QR / logo, Schedule X register book format | — | open |
 
 ## Summary timeline
 

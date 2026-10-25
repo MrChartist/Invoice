@@ -264,6 +264,8 @@ export interface SenderProfile {
   pin?: string;
   /** Free line for a professional registration, e.g. "SEBI RA INH000015297". */
   regLine?: string;
+  /** Additive (7U pharma pack): drug licence number(s), e.g. "20B: KA-B12-123456, 21B: KA-B12-123457" — printed under the GSTIN. */
+  drug_licence?: string;
   logo?: string;
   signature?: string;
   bankName: string;
@@ -550,6 +552,13 @@ export interface InvoiceRecord {
   branch_transfer_id?: string;
   /** Additive (WP-9): loyalty points redeemed on this bill; `value` (₹) is part of its invoice discount. */
   loyalty_redeem?: { points: number; value: number };
+  /* ── 7U business extras (additive, all optional) ── */
+  /** `sales_agents` row id of the agent who earns commission on this document (`src/lib/sales-commission.ts`). */
+  agent_id?: string;
+  /** Bill-value offer applied (`src/lib/offers.ts`); `value` (₹) is part of the invoice's amount discount. */
+  offer?: { scheme_id: string; label: string; value: number };
+  /** Pharma pack: prescription details for Schedule H / H1 / X sales (Schedule H1 register). */
+  rx?: { patient: string; patient_address?: string; prescriber: string; prescriber_reg?: string };
 }
 
 /** WP-9: maker-checker state kept on the document itself. */

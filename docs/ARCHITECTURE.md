@@ -155,6 +155,10 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `purchase_returns` | purchase returns (WP-3, `src/lib/purchase-returns.ts`) | `PurchaseReturn` (`src/types/purchases.ts`): debit notes `DN/FY…` and supplier credit notes received, Agst Ref the bill via `adjusted_amount` (`docs/features/purchase-returns.md`) |
 | `receipt_notes` | receipt notes (WP-3, `src/lib/receipt-notes.ts`) | `ReceiptNote`: GRN `GRN/FY…` (stock in before the bill) and Rejections Out `RJO/FY…`; billed qty derived from bill lines' `grn_line_id` |
 | `deposit_slips` | banking (WP-5, `src/lib/deposit-slip.ts`) | `DepositSlip` pay-in slips `PIS/FY<yy-yy>/<seq>`: cheque ids, cash denomination counts, totals (`docs/features/banking.md`) |
+| `fx_bank_moves` | banking 7U (`src/lib/forex-bank.ts`) | Forex bank entries (in / out / revalue) on a foreign-currency bank account, each with its Journal id; key `pharma_settings` and device-local `mrchartist_pos_printer` are 7U too (`docs/features/business-extras.md`) |
+| `epay_batches` | banking 7U (`src/lib/epay-confirm.ts`) | Downloaded e-payment batches `EPB/FY<yy-yy>/<seq>`: rows sent / paid / failed, UTR, payment group id (`docs/features/banking.md`) |
+| `sales_agents` | business extras 7U (`src/lib/sales-commission.ts`) | Agent master: flat % / % by stock group, basis on invoice / on receipt |
+| `commission_postings` | business extras 7U (`src/lib/sales-commission.ts`) | Commission payable journals per agent and period (never overlapping) |
 | `cash_tally` | banking (WP-5, `src/lib/cash-tally.ts`) | `CashTally` day-end cash count by denomination vs the Books cash balance, one row per day |
 | `pos_returns` | POS returns (WP-9, `src/lib/pos-returns.ts`) | `PosReturn` per return: bill, credit note, settlement (`refund` / `exchange` / `account`), refunds by tender, voucher id, exchange bill; read by the Z report (`docs/features/business-extras.md`) |
 | `approvals` | approvals (WP-9, `src/lib/approvals.ts`) | `ApprovalLogRow` decision log (approved / rejected, by whom, note); the live state is `approval` on the invoice. Policy object under the key `approval_policy` |

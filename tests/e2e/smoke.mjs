@@ -1014,6 +1014,44 @@ try {
     await writeJson(page, 'items_catalog', prevCatalog);
   });
 
+  await step('7U: a bill-value offer applies on the POS with its own line; the Forex bank tab opens', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-offer', name: 'E2E Offer Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865299',
+    }]);
+    await writeJson(page, 'schemes', [{ id: 'e2e-bv', kind: 'bill_value', item_id: '', item_name: '', buy_qty: 0, free_qty: 0, label: 'E2E offer', slabs: [{ min_value: 150, percent: 10 }] }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8901030865299');
+    await scan.press('Enter');
+    await page.getByLabel('Quantity of E2E Offer Soap (line 1)').fill('2');
+    const offer = page.locator('[data-pos-offer]');
+    await offer.waitFor({ timeout: 5000 });
+    const offerText = await offer.innerText();
+    const total = await page.locator('[data-pos-total]').innerText();
+    check(/E2E offer: 10% off/.test(offerText) && /20\.00/.test(offerText), `offer line on the POS (${offerText})`);
+    check(/212\.(40|00)/.test(total), `GST on the value after the offer: 180 + 18% (${total})`);
+    await page.keyboard.press('F4');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    check(bill?.offer?.value === 20 && bill.taxable_value === 180 && Math.abs(bill.total - 212.4) < 0.5, `offer saved on the bill (${JSON.stringify(bill?.offer)}, ${bill?.total})`);
+    check((await page.locator('[data-pos-printer]').count()) === 1, 'printer settings button on the POS');
+
+    await page.goto(srv.origin + '/reconcile?tab=documents&doc=forex');
+    await page.getByRole('button', { name: 'Forex bank' }).waitFor();
+    const forex = page.getByText(/main account stays in rupees|EEFC \/ foreign-currency accounts/).first();
+    await forex.waitFor({ timeout: 10000 }).catch(() => {});
+    check((await forex.count()) > 0, 'Forex bank panel renders');
+
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => t.invoice_id !== bill?.id));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id));
+    await writeJson(page, 'items_catalog', prevCatalog);
+    await writeJson(page, 'schemes', null);
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');
