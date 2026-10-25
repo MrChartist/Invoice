@@ -160,6 +160,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `epay_batches` | banking 7U (`src/lib/epay-confirm.ts`) | Downloaded e-payment batches `EPB/FY<yy-yy>/<seq>`: rows sent / paid / failed, UTR, payment group id (`docs/features/banking.md`) |
 | `sales_agents` | business extras 7U (`src/lib/sales-commission.ts`) | Agent master: flat % / % by stock group, basis on invoice / on receipt |
 | `commission_postings` | business extras 7U (`src/lib/sales-commission.ts`) | Commission payable journals per agent and period (never overlapping) |
+| `business_loans` | loans 8H (`src/lib/loans.ts`) | `BusinessLoan` `LOAN/FY<yy-yy>/<seq>`: lender, principal, rate, tenure, first EMI, loan ledger id, disbursement voucher id and `payments` (EMI n, principal, interest, voucher id) (`docs/features/loans.md`) |
+| `currency_rates` | currency master 8H (`src/lib/currency-rates.ts`) | `CurrencyRate {id, currency, date, rate, source}` — ₹ per unit by date; FX documents pick the latest on or before their date |
 | `cash_tally` | banking (WP-5, `src/lib/cash-tally.ts`) | `CashTally` day-end cash count by denomination vs the Books cash balance, one row per day |
 | `pos_returns` | POS returns (WP-9, `src/lib/pos-returns.ts`) | `PosReturn` per return: bill, credit note, settlement (`refund` / `exchange` / `account`), refunds by tender, voucher id, exchange bill; read by the Z report (`docs/features/business-extras.md`) |
 | `approvals` | approvals (WP-9, `src/lib/approvals.ts`) | `ApprovalLogRow` decision log (approved / rejected, by whom, note); the live state is `approval` on the invoice. Policy object under the key `approval_policy` |

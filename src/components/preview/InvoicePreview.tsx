@@ -20,6 +20,7 @@ import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
 import { receivableBalance } from '../../lib/rcm';
+import { canDocRight } from '../../lib/user-rights';
 
 
 interface InvoicePreviewModalProps {
@@ -303,10 +304,10 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
             onPreprinted={setPreprinted}
             onSaveDefault={saveJobDefaults}
           />
-          <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
+          <button type="button" className={controls.btnOutline} onClick={() => window.print()} disabled={!canDocRight(invoice.doc_type ?? '', 'print')}>
             <Printer size={16} /> <span className={styles.hideSm}>Print</span>
           </button>
-          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy}>
+          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy || !canDocRight(invoice.doc_type ?? '', 'print')}>
             {busy ? <Loader2 size={16} className={styles.spin} /> : <Download size={16} />} PDF
           </button>
           <button type="button" className={controls.btnIcon} onClick={onClose} aria-label="Close preview">

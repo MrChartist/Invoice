@@ -30,6 +30,7 @@ const Time = lazy(() => import('./pages/Time').then((m) => ({ default: m.Time })
 const Payroll = lazy(() => import('./pages/Payroll').then((m) => ({ default: m.Payroll })));
 const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.Cheques })));
 const Tds = lazy(() => import('./pages/Tds').then((m) => ({ default: m.Tds })));
+const Loans = lazy(() => import('./pages/Loans').then((m) => ({ default: m.Loans })));
 const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
 const Gateway = lazy(() => import('./pages/Gateway').then((m) => ({ default: m.Gateway })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
@@ -45,7 +46,7 @@ function PageFallback() {
 /** Who is signed in and with which role: a change remounts the shell so every screen re-reads it. */
 const actorSignature = () => {
   const u = getCurrentUser();
-  return u ? `${u.id}:${u.role}:${u.grants?.join(',') ?? ''}` : '';
+  return u ? `${u.id}:${u.role}:${u.grants?.join(',') ?? ''}:${u.rights ? JSON.stringify(u.rights) : ''}` : '';
 };
 
 function App() {
@@ -106,6 +107,7 @@ function App() {
                 <Route path="/reconcile" element={<RequireAccess action="books.edit"><Reconcile /></RequireAccess>} />
                 <Route path="/cheques" element={<RequireAccess action="books.edit"><Cheques /></RequireAccess>} />
                 <Route path="/tds" element={<Tds />} />
+                <Route path="/loans" element={<Loans />} />
                 <Route path="/payroll" element={<RequireAccess action="payroll.view"><Payroll /></RequireAccess>} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/gst-reports" element={<GstReports />} />

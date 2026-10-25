@@ -74,6 +74,8 @@ export function Expenses() {
   const [branch, setBranch] = useState('');
   // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
   const [billOpen, setBillOpen] = useState(() => params.get('new') === 'bill');
+  // 8H quick create: "+" → Expense opens the quick-expense form (?new=expense).
+  const [expenseOpen, setExpenseOpen] = useState(() => params.get('new') === 'expense');
   // A Tally key / Gateway link while this page is already open (F9, Ctrl+F9 → ?tab=returns&new=dn)
   // changes only the query: follow it (adjust-state-on-change, no effect).
   const query = params.toString();
@@ -83,8 +85,8 @@ export function Expenses() {
     const wanted = TAB_PARAMS.find((x) => x === params.get('tab'));
     if (wanted) setTab(wanted);
     if (params.get('new') === 'bill') setBillOpen(true);
+    if (params.get('new') === 'expense') setExpenseOpen(true);
   }
-  const [expenseOpen, setExpenseOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseRecord | null>(null);
   const [payFor, setPayFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<PurchaseRecord | null>(null);

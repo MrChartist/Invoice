@@ -110,3 +110,10 @@ per-invoice helpers above (`remindersFor`, `pendingReminders` …) never count t
 viewer. The viewer's **Share PDF** uses `shareFile` (blocked → "Share PDF now", unsupported → download) and **Web page**
 uses the generalised `buildClientCopyHtml` (`pay.label`, `pay.ariaLabel`, `note`) with `freezePaper` / `documentCss`
 from `src/lib/client-copy-dom.ts`.
+
+## Message language (8H)
+
+Reminders can also be written in Hindi (Devanagari), Marathi, Gujarati and Tamil (`buildReminderIn`,
+`src/lib/message-langs.ts`), next to English and Hinglish. The reminder dialog has a language picker that defaults to the
+party's **message language** (additive `Client.message_lang`, set in the client form); khata party reminders and the
+WhatsApp statement follow it too. Amounts, dates and the UPI pay link are the same facts as in English.

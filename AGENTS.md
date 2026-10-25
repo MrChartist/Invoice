@@ -65,7 +65,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   any P&L / balance sheet so Books, the Gateway and ratios agree.
 - Device-local viewing preferences, outside the `mrchartist_inv_` prefix (never backed up or synced):
   `mrchartist_report_prefs` (F12 report options per report) and `mrchartist_report_period` (shared report period,
-  Alt+F2); `mrchartist_tally_terms` (Gateway "Tally terms").
+  Alt+F2); `mrchartist_tally_terms` (Gateway "Tally terms"); `mrchartist_plus_one_tap` (phone "+" opens a new invoice
+  directly, 8H) and `mrchartist_demo_pending` (wizard "explore with sample data" across the Demo-company reload, 8H).
+- 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
+  and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express

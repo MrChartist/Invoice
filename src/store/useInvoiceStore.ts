@@ -126,7 +126,7 @@ export const RECORD_KEYS = [
   'pos',
   'rcm_tax_excluded',
   'goods_returned',
-  'eco_gstin', 'eco_section', 'challan_purpose',
+  'eco_gstin', 'eco_section', 'challan_purpose', 'challan_hide_amounts', 'challan_returnable', 'challan_return_by',
   'transport',
   'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
   'agent_id', 'offer', 'rx',

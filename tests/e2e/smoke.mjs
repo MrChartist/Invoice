@@ -134,6 +134,11 @@ try {
   });
 
   await step('first-run setup wizard', async () => {
+    // 8H step 0: language + "What do you do?" (CA / full accounting keeps every module for the journey).
+    const start = page.getByRole('dialog', { name: 'What do you do?' });
+    await start.waitFor();
+    await start.getByRole('radio', { name: /CA \/ full accounting/ }).click();
+    await page.getByRole('button', { name: /Next/ }).click();
     const wizard = page.getByRole('dialog', { name: 'Your business' });
     await wizard.waitFor();
     await page.getByRole('button', { name: /Next/ }).click();
@@ -194,6 +199,45 @@ try {
     await page.getByLabel('Language / भाषा').first().selectOption('en');
     await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');
+  });
+
+  await step('8H: Marathi interface, shop-mode sidebar (Kirana) and the phone "+" quick-create sheet', async () => {
+    const nav = page.getByRole('navigation', { name: /Primary|मुख्य/ });
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('mr');
+    await nav.getByRole('link', { name: 'डॅशबोर्ड' }).waitFor();
+    await nav.getByRole('link', { name: 'ग्राहक' }).waitFor();
+    check((await page.evaluate(() => document.documentElement.lang)) === 'mr', 'Marathi sets <html lang="mr"> and the sidebar is in Marathi');
+    await page.getByLabel('Language / भाषा').first().selectOption('en');
+    await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
+
+    // Shop mode: Kirana hides Books / Payroll from the sidebar, keeps POS; "Show all features" brings them back.
+    await page.goto(srv.origin + '/settings?tab=defaults');
+    await page.getByLabel('Business type').selectOption('kirana');
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'POS' }).waitFor();
+    await nav.getByRole('link', { name: 'Books' }).waitFor({ state: 'detached' });
+    const hidden = (await nav.getByRole('link', { name: 'Payroll' }).count()) === 0 && (await nav.getByRole('link', { name: 'GST reports' }).count()) === 0;
+    check(hidden, 'Kirana shop mode narrows the sidebar (no Books, Payroll, GST reports; POS shown)');
+    await page.getByRole('button', { name: 'Show all features' }).click();
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'Books' }).waitFor();
+    check(true, '"Show all features" restores every module');
+
+    // Phone "+" opens the quick-create sheet; Expense opens the quick-expense form.
+    await page.setViewportSize({ width: 390, height: 844 });
+    try {
+      await page.goto(srv.origin + '/');
+      await page.getByRole('navigation', { name: 'Quick navigation' }).getByRole('button', { name: 'New' }).click();
+      const sheet = page.getByRole('dialog', { name: 'Create new' });
+      await sheet.waitFor();
+      await sheet.getByRole('link', { name: 'Expense' }).click();
+      await page.waitForURL(/\/expenses\?new=expense/);
+      await page.getByRole('dialog', { name: 'Quick add expense' }).waitFor();
+      check(true, '390 px: "+" → Create new → Expense opens the quick-expense form');
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
   });
 
   await step('beta: badge next to the logo; Help -> Report a problem builds a local diagnostic', async () => {

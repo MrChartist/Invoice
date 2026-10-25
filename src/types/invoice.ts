@@ -175,6 +175,10 @@ export interface InvoiceItem {
   sku?: string;
   /** Additive (6.7), catalogue rows only: maximum retail price printed on shelf labels. */
   mrp?: number;
+  /** Additive (8H catalogue v2), catalogue rows only: photo as an `asset:<id>` reference (assets table). */
+  image?: string;
+  /** Additive (8H), catalogue rows only: `stock_groups` row shown as the catalogue category. */
+  group_id?: string;
   /** Additive (6.9), catalogue rows only: quantity slabs — a line of at least `min_qty` gets `rate`. */
   qty_slabs?: QtySlab[];
   /**
@@ -234,6 +238,11 @@ export interface Client {
   credit_limit?: number;
   /** Additive (6.25): credit period in days; bills older than this with a balance raise the same warning. */
   credit_days?: number;
+  /**
+   * Additive (8H): language for reminders and WhatsApp statements to this party
+   * (`src/lib/message-langs.ts`). Absent = the interface language.
+   */
+  message_lang?: 'en' | 'hinglish' | 'hi' | 'mr' | 'gu' | 'ta';
   /** Additive (6.9): id of the `price_levels` row this party buys at (e.g. Wholesale). Absent = base rates. */
   price_level?: string;
   /**
@@ -436,6 +445,12 @@ export interface InvoiceRecord {
    * correction notes move no stock and take no cost of goods back.
    */
   goods_returned?: boolean;
+  /** Additive (8H), delivery challans: print without rates, amounts, tax or totals (quantities only). */
+  challan_hide_amounts?: boolean;
+  /** Additive (8H), delivery challans: goods sent to come back (job work, approval, repair) — printed as returnable. */
+  challan_returnable?: boolean;
+  /** Additive (8H): expected return date of a returnable challan (YYYY-MM-DD). */
+  challan_return_by?: string;
 
   /* ── Money knobs ───────────────────────────────────────────── */
   discount_type: DiscountType;

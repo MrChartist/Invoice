@@ -473,6 +473,24 @@ Statutory values date-keyed and append-only in the lazy `src/lib/gst-guards.ts` 
 | 8.65 | ✅ **GST exceptions** ("uncertain transactions"): missing HSN on B2B lines, POS vs GSTIN state, rate outside the date-keyed slab table (GST 2.0 from 22 Sep 2025), B2CL threshold edge (±5%), missing IRN where e-invoicing is mandatory (date-keyed mandate thresholds) | `gstExceptions`, GST guards tab | done |
 | 8.66 | ⏳ 8D follow-ups: Table 3.2 split for composition dealers / UIN holders; GSTR-1A JSON; IRN cancel from the bulk tool's response; time bar for GSTR-6 / 7 / 8; one-off due-date extensions | — | open |
 
+### 8H · Shop mode, languages, reach (`docs/features/shop-mode.md`, `docs/features/i18n.md`, `docs/features/loans.md`, `docs/features/security.md` § user rights)
+
+Vyapar / myBillBook / OkCredit parity for small shops, offline. First-paint JS +0.4 kB gz (176.7 → 177.1).
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.120 | ✅ **Shop mode**: business type (Kirana / Wholesale / Services / Manufacturer / CA-full) with module presets; company-level `modules` filter the sidebar and Dashboard tiles; Ctrl+K, links and Settings → Defaults → "Show all features" reach everything; existing companies = full | `shop-mode.ts` (shell), `shop-presets.ts`, `ShopModePanel.tsx`, `DashboardLayout.tsx` | done |
+| 8.121 | ✅ **Languages**: Marathi, Gujarati, Tamil (shell, Dashboard, editor, payment, POS, Clients) + Bengali, Telugu, Kannada (shell) in one lazy chunk; phrase glossary lets any `defineArea` screen be translated without touching its area file; amount in words (mr / gu / ta); reminders, party reminders and WhatsApp statements in Hindi / Marathi / Gujarati / Tamil; per-party **message language** on the client | `src/i18n/{mr,gu,ta,bn,te,kn,regional}.ts`, `amount-in-words-in.ts`, `message-langs.ts`, `ClientFormModal.tsx` | done |
+| 8.122 | ✅ **Catalogue v2**: item photos (asset refs, inlined), categories (stock groups), MRP / offer badges, a one-message WhatsApp **cart** under a hash-pinned CSP, script-free per-category order links | `catalogue-html.ts`, `catalogue-export.ts`, `item-images.ts`, `CatalogPanel.tsx` | done |
+| 8.123 | ✅ **Loans & EMIs**: reducing-balance schedule, disbursement Receipt voucher, EMI Payment vouchers split interest / principal through `saveVoucher`, statement CSV; table `business_loans` (backup, roles, sync DATED + NUMBERED, `LOAN/FY…` via series-counters) | `loans.ts`, `pages/Loans.tsx` | done |
+| 8.124 | ✅ **Finer user rights** (convenience access control): per-document create / alter / delete / print, back-dated days allowed, discount cap %, POS-only cashier preset; device-local user record, audited; `can()` / `requireAccess()` honour them; owner-only actions never lifted | `rights.ts` (shell), `user-rights.ts`, `RightsEditor.tsx` | done |
+| 8.125 | ✅ **Currency master**: dated reference rates (manual, RBI / FBIL CSV import), FX documents pick the rate by date (`currency_rates`) | `currency-rates.ts`, `CurrencyRatesPanel.tsx`, `ForexFields.tsx` | done |
+| 8.126 | ✅ **Import presets**: QuickBooks Online, Xero, Refrens, ClearOne, Marg (BUSY already) | `import-mapping.ts` | done |
+| 8.127 | ✅ **Delivery challan**: "hide amounts on print" (quantities only) and "returnable challan" with return-by date | `GstExtrasFields.tsx`, `ChallanQtyTable.tsx`, `TemplateEngine.tsx` | done |
+| 8.128 | ✅ **Quick create**: phone "+" opens a sheet (Sale invoice, POS bill, ₹ Payment in, Expense, Purchase bill, Quotation) filtered by role and modules; device setting keeps the old one-tap; Dashboard quick-action row | `quick-create.ts`, `QuickCreateSheet.tsx`, `DashboardStart.tsx` | done |
+| 8.129 | ✅ **Wizard step 0 + checklist v2**: language + business type (due days, template, landing on POS for kirana), composition → Bills of Supply, "Explore with sample data instead" in a separate Demo company; checklist adds item, WhatsApp, payment, backup; "Try with sample data" on an empty Dashboard | `onboarding.ts`, `SetupWizard.tsx`, `demo-company.ts`, `checklist.ts` | done |
+| 8.130 | ⏳ 8H follow-ups: more keys for Bengali / Telugu / Kannada and amount in words for them; self-hosted Noto subsets only if a script renders badly; loan prepayment re-schedule and interest certificates; per-voucher-type rights for purchases / vouchers in their own screens; catalogue cart for non-INR | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

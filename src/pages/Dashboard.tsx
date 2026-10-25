@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Banknote,
   CheckCircle2,
-  Circle,
   FilePlus2,
   FileText,
   Hourglass,
@@ -46,6 +45,7 @@ const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').th
 // WP-9: configurable tiles (receivables, payables, cash / bank, GST, top items, stock, branches,
 // approvals, AMC, loyalty) — their own chunk, mounted after first paint.
 const DashboardTiles = lazy(() => import('../components/dashboard/DashboardTiles').then((m) => ({ default: m.DashboardTiles })));
+const DashboardStart = lazy(() => import('../components/dashboard/DashboardStart').then((m) => ({ default: m.DashboardStart })));
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
 
 /** "2026-10" → "Oct" / "अक्टू॰" in the interface language (5.4). */
@@ -116,13 +116,6 @@ export function Dashboard() {
   const collectedPct = summary.billed > 0 ? Math.round((summary.received / summary.billed) * 100) : 0;
   const hasData = invoices.some(isRevenueDoc);
 
-  const checklist = [
-    { done: profileReady, label: t('dash.stepProfile'), to: '/settings' },
-    { done: clientCount > 0, label: t('dash.stepClient'), to: '/clients' },
-    { done: invoices.length > 0, label: t('dash.stepInvoice'), to: '/invoice' },
-  ];
-  const showChecklist = can('settings.manage') && checklist.some((c) => !c.done);
-
   return (
     <div className={surface.page}>
       <PageHeader
@@ -147,31 +140,16 @@ export function Dashboard() {
             open
             onClose={(finished) => {
               setWizardOpen(false);
-              if (finished) navigate('/invoice');
+              if (finished) navigate(typeof finished === 'string' ? finished : '/invoice');
             }}
           />
         </Suspense>
       )}
 
-      {showChecklist && (
-        <section className={styles.checklist} aria-label={t('dash.gettingStarted')}>
-          <div className={styles.checklistHead}>
-            <h2>{t('dash.getSetUp')}</h2>
-            <span>{t('dash.doneOf', { done: checklist.filter((c) => c.done).length, total: checklist.length })}</span>
-          </div>
-          <ul>
-            {checklist.map((c) => (
-              <li key={c.label}>
-                <Link to={c.to} className={c.done ? styles.stepDone : styles.step}>
-                  {c.done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                  <span>{c.label}</span>
-                  {!c.done && <ArrowRight size={14} className={styles.stepArrow} />}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* 8H: quick actions, checklist v2 and "Try with sample data" — lazy, after first paint. */}
+      <Suspense fallback={null}>
+        <DashboardStart profileReady={profileReady} />
+      </Suspense>
 
       <div className={surface.statGrid}>
         <StatCard label={t('dash.billed')} value={formatCurrency(summary.billed)} hint={`${summary.count === 1 ? t('dash.issuedOne') : t('dash.issuedMany', { n: summary.count })}${noRate ? t('dash.noRate', { n: noRate }) : ''}`} icon={Receipt} />

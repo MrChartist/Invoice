@@ -283,3 +283,38 @@ pinned to a fixed release through `overrides` in `package.json`.
 - **Import error CSVs** use the formula-guarded `toCsv`; file reads (backups, 26AS) are capped at 25 MB.
 - **Payments are atomic**: if the invoice update fails (quota), the payment row is rolled back.
 - **Service worker** only caches SPA routes as the app shell, never a real `.html` file such as `/offline.html`.
+
+## Finer user rights (8H, roadmap 8.124)
+
+**Convenience access control, not security** — the same caveat as roles: anyone with the device and developer tools can
+get round these checks. They stop a counter clerk from editing yesterday's bills or giving away a 40 % discount by
+mistake; vault mode and OS accounts are the real protection.
+
+Settings → Security → Users → **Rights** (owner only, `security.manage`) for each clerk / viewer:
+
+- **Per-document toggles** — create / alter / delete / print for Invoices & bills, Quotations / proformas / orders,
+  Credit & debit notes, Delivery challans, Payments received, Purchases & expenses, Vouchers. A toggle can only take a
+  right away; it never adds one the role does not have.
+- **Back-dated entries allowed (days)** — Tally's "days allowed": a document created or altered may be dated at most N
+  days before today (0 = today only). The period lock still applies on top.
+- **Discount cap %** — checked on every line discount and the bill discount (a ₹ discount is turned into a % of the
+  subtotal).
+- **POS-only cashier** — preset: sales create + print, payments create, nothing else; back-dated 0 days; 10 % cap; the
+  sidebar shows the Dashboard and POS only (Ctrl+K still lists what the role may open). Masters and report exports are
+  refused; `books.edit` stays so the Z report / day close and stock side effects of a sale keep working.
+
+Storage: additive `rights` on the device-local user record (`mrchartist_inv_auth_users`), like the payroll grant —
+never in a backup, never synced. Every change is audited ("User rights for … changed: before → after") and every open
+tab re-reads the user at once.
+
+Enforcement (`src/lib/rights.ts`, tiny and in the shell; rules in the lazy `src/lib/user-rights.ts`):
+
+- `can()` / `requireAccess()` apply the rights after the role matrix (`actorCan` → `rightsCan`), only for a clerk /
+  viewer, only to narrow: doc.create / doc.edit / doc.deleteDraft follow the sales-document toggles, payment.record the
+  payment toggle, books.edit the purchase / voucher toggles, master.edit and report.export are refused for a POS-only
+  cashier. Owner-only actions (delete issued, settings, users, restore, erase, period override, approvals, payroll
+  unless granted) are untouched. Approvals (`approval-gate.ts`) are a separate layer and unchanged.
+- Data layer: `localDb.invoices.save` (create / alter with the back-dated window and discount cap), `invoices.remove`
+  (delete) and `payments.record` (create) call `checkDocRight`. The rules load as soon as a user with rights signs in;
+  until they are in, a document write by that user is refused ("User rights are loading. Try again.") — fail closed.
+- Print / PDF buttons in the preview follow the print toggle.

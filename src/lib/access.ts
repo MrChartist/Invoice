@@ -6,13 +6,15 @@
  * checks. They stop a colleague from deleting an issued invoice or erasing the books by mistake;
  * vault mode (src/lib/vault.ts) and separate OS accounts are the real protection.
  *
- * This module imports nothing, so the data layer (localDb, backup, period-lock, audit) can ask
+ * This module imports only the pure `rights.ts` (which imports nothing), so the data layer (localDb, backup, period-lock, audit) can ask
  * `can()` / `requireAccess()` without import cycles. `auth.ts` registers who is signed in through
  * `setActorProvider()`; with no provider, or with no PIN set up, every check passes (single-user
  * installs, tests, and boot code such as migrations, which run inside `asSystem`, behave exactly as
  * before). Once a PIN is set up, a tab whose signed-in user cannot be resolved (locked, or the user was
  * removed in another tab) is SIGNED OUT: it gets the least privileged role, never the owner's.
  */
+
+import { rightsCan, type UserRights } from './rights';
 
 export type Role = 'owner' | 'clerk' | 'viewer';
 
@@ -105,6 +107,11 @@ export interface Actor {
    * are honoured (a trusted clerk may be given `payroll.view`); everything else stays role-based.
    */
   grants?: readonly string[];
+  /**
+   * Additive (8H): finer per-user rights (`rights.ts`) — per-document create / alter / delete / print,
+   * back-dated window, discount cap, POS-only. They only NARROW the role; the owner never has them.
+   */
+  rights?: UserRights;
 }
 
 /** Actions the owner may grant to a named clerk / viewer (7T). Payroll stays owner-only by default. */
@@ -112,6 +119,8 @@ export const GRANTABLE_ACTIONS: readonly AccessAction[] = ['payroll.view'];
 
 /** Role matrix plus the owner's per-user grants. */
 export function actorCan(actor: Actor | null, role: Role, action: AccessAction): boolean {
+  // Finer rights (8H) narrow a clerk / viewer only; checked separately so grants and approvals stay as they were.
+  if (actor && actor.role !== 'owner' && actor.role === role && !rightsCan(actor.rights, action)) return false;
   if (roleCan(role, action)) return true;
   return !!actor && actor.role === role && GRANTABLE_ACTIONS.includes(action) && !!actor.grants?.includes(action);
 }
@@ -342,6 +351,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   production_plans: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
+  // 8H: business loans & EMIs (vouchers go through saveVoucher) and the currency reference-rate master
+  business_loans: 'books.edit',
+  currency_rates: 'master.edit',
 };
 
 let systemDepth = 0;

@@ -312,6 +312,7 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}fx_bank_moves`]: 'date',
   [`${DB_PREFIX}epay_batches`]: 'date',
   [`${DB_PREFIX}commission_postings`]: 'date',
+  [`${DB_PREFIX}business_loans`]: 'date',
   [`${DB_PREFIX}pos_returns`]: 'day',
   [`${DB_PREFIX}cheques`]: chequeDay,
   [`${DB_PREFIX}ledger_openings`]: openingDay,
@@ -872,6 +873,7 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}payroll_payments`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}actuarial_valuations`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}employee_loans`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}business_loans`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}fnf_settlements`]: { num: 'number', date: 'pay_month' },
   [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
   // Review L2: RCM self-invoices (RCM/…) and payment vouchers (RPV/…) are two series in one table.

@@ -55,6 +55,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     rcm_tax_excluded: true,
     goods_returned: false,
     eco_gstin: '07AAACZ1234A1C5', eco_section: 'PAY_9_5', challan_purpose: 'JOB_WORK',
+    challan_hide_amounts: true, challan_returnable: true, challan_return_by: '2026-11-30',
     transport: { mode: 'ROAD', vehicle_no: 'MH12AB1234', transporter_name: 'Speedy', transporter_id: '27AAACS1234A1Z5', lr_no: 'LR1', lr_date: '2026-04-11', eway_bill_no: '321000123456', distance_km: 40 },
     approval: { state: 'pending', doc_id: 'full', requested_status: 'Sent', requested_by: 'Asha', requested_at: '2026-01-01T00:00:00.000Z' },
     branch_id: 'br1',

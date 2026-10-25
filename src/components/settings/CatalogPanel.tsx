@@ -30,6 +30,11 @@ import styles from './CatalogPanel.module.css';
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
 // The label sheet (encoders + print HTML) loads only when opened.
+import { ImageSlot } from './ProfileEditor';
+import { reachT } from '../../i18n/areas/reach';
+import { itemImageData, storeItemImage } from '../../lib/item-images';
+import { stockGroupsDb } from '../../lib/stock-groups';
+
 const LabelSheetModal = lazy(() => import('./LabelSheetModal').then((m) => ({ default: m.LabelSheetModal })));
 
 const BLANK: CatalogDraft = { name: '', type: 'Service', hsn: '', unit: 'NOS', rate: 0, tax_rate: 18, barcode: '', sku: '', mrp: 0, qty_slabs: [] };
@@ -47,6 +52,8 @@ const toDraft = (i: InvoiceItem): CatalogDraft => ({
   sku: i.sku ?? '',
   mrp: i.mrp ?? 0,
   qty_slabs: i.qty_slabs ?? [],
+  image: i.image ?? '',
+  group_id: i.group_id ?? '',
 });
 
 const ROUNDS: RoundTo[] = ['paise', 'rupee', 'five', 'ten'];
@@ -362,6 +369,32 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
               <label className={controls.field}>
                 <span className={controls.label}>{setT('mrp')}</span>
                 <NumberInput className={cn(controls.input, controls.inputNumeric)} value={draft.mrp ?? 0} onChange={(n) => setDraft({ ...draft, mrp: n })} placeholder={setT('forLabels')} />
+              </label>
+            </div>
+
+            {/* Catalogue v2 (8H): photo and category for the shared catalogue. */}
+            <div className={controls.row}>
+              <ImageSlot
+                label={reachT('photo')}
+                hint={reachT('photoHint')}
+                value={itemImageData(draft.image)}
+                maxDimension={480}
+                onPick={(data) => {
+                  try {
+                    setDraft({ ...draft, image: storeItemImage(data) });
+                  } catch (err) {
+                    notify((err as Error).message, 'error');
+                  }
+                }}
+                onClear={() => setDraft({ ...draft, image: '' })}
+                onError={(m) => notify(m, 'error')}
+              />
+              <label className={controls.field}>
+                <span className={controls.label}>{reachT('category')}</span>
+                <select className={controls.select} value={draft.group_id ?? ''} onChange={(e) => setDraft({ ...draft, group_id: e.target.value })}>
+                  <option value="">{reachT('noCategory')}</option>
+                  {stockGroupsDb.all().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
               </label>
             </div>
 
