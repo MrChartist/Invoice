@@ -17,27 +17,52 @@ import { LANG_KEY } from '../lib/storage';
 import { en, type MessageKey, type Messages } from './en';
 
 export type { MessageKey, Messages };
-export type Lang = 'en' | 'hi';
+export type Lang = 'en' | 'hi' | 'mr' | 'gu' | 'ta' | 'bn' | 'te' | 'kn';
 export type MessageVars = Record<string, string | number>;
 
-export const LANGUAGES: readonly { code: Lang; label: string; native: string }[] = [
-  { code: 'en', label: 'English', native: 'English' },
-  { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
-];
+/** Interface languages (native names only: the picker is labelled "Language / भाषा"). */
+export const LANGUAGES: readonly { code: Lang; native: string }[] = [
+  { code: 'en', native: 'English' },
+  { code: 'hi', native: 'हिन्दी' },
+  { code: 'mr', native: 'मराठी' },
+  { code: 'gu', native: 'ગુજરાતી' },
+  { code: 'ta', native: 'தமிழ்' },
+  { code: 'bn', native: 'বাংলা' },
+  { code: 'te', native: 'తెలుగు' },
+  { code: 'kn', native: 'ಕನ್ನಡ' },
+]
 
-/** Lazy catalogue loaders: each becomes its own chunk. */
-const LOADERS: Record<Exclude<Lang, 'en'>, () => Promise<Partial<Messages>>> = {
-  hi: () => import('./hi').then((m) => m.hi),
-};
+/**
+ * A lazily loaded language (8H): keyed strings plus a phrase glossary (English text → translation)
+ * that per-area catalogues (`defineArea`) consult, so a language can cover any screen's strings
+ * without editing that screen's area file. Anything missing falls back to English.
+ */
+export interface Catalogue {
+  messages: Partial<Messages>;
+  phrases?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Lazy catalogue loaders. Hindi is its own chunk; the other regional catalogues share ONE small chunk
+ * (`regional.ts`) so the first-paint bundle carries a single loader for all of them (8H).
+ */
+const load = (code: Exclude<Lang, 'en'>): Promise<Catalogue> =>
+  code === 'hi' ? import('./hi').then((m) => ({ messages: m.hi })) : import('./regional').then((m) => m.REGIONAL[code]);
 
 let lang: Lang = 'en';
 /** English: the shell catalogue now, page catalogues (en-pages.ts) as their chunks load. */
 const english: Partial<Messages> = { ...en };
 const loaded: Partial<Record<Lang, Partial<Messages>>> = {};
+const glossary: Partial<Record<Lang, Readonly<Record<string, string>>>> = {};
 const listeners = new Set<() => void>();
 
 export function isLang(value: unknown): value is Lang {
-  return value === 'en' || value === 'hi';
+  return LANGUAGES.some((l) => l.code === value);
+}
+
+/** The active language's translation of an English phrase, if its glossary has one. */
+export function phrase(text: string): string | undefined {
+  return lang === 'en' ? undefined : glossary[lang]?.[text];
 }
 
 /** Fill `{name}` placeholders; an unknown placeholder is left as written. */
@@ -49,7 +74,8 @@ export function interpolate(message: string, vars?: MessageVars): string {
 /** Translate `key` into the active language (English when the key is missing there). */
 export function t(key: MessageKey, vars?: MessageVars): string {
   const active = lang === 'en' ? undefined : loaded[lang]?.[key];
-  return interpolate(active || english[key] || key, vars);
+  const base = english[key];
+  return interpolate(active || (base && phrase(base)) || base || key, vars);
 }
 
 /** Called by a page catalogue (en-pages.ts) when its chunk loads. */
@@ -87,7 +113,7 @@ export function getLanguage(): Lang {
 
 /** Locale for dates written in words (weekday / month names). Digits stay Latin. */
 export function dateLocale(l: Lang = lang): string {
-  return l === 'hi' ? 'hi-IN-u-nu-latn' : 'en-IN';
+  return l === 'en' ? 'en-IN' : `${l}-IN-u-nu-latn`;
 }
 
 /** The language saved on this device ('en' when unset, unreadable or unknown). */
@@ -110,7 +136,9 @@ function emit(): void {
 
 async function ensureCatalogue(next: Lang): Promise<void> {
   if (next === 'en' || loaded[next]) return;
-  loaded[next] = await LOADERS[next]();
+  const c = await load(next);
+  glossary[next] = c.phrases ?? {};
+  loaded[next] = c.messages;
 }
 
 /**
@@ -169,10 +197,17 @@ export function useT(): { t: typeof t; lang: Lang } {
 export function resetI18nForTests(): void {
   lang = 'en';
   for (const k of Object.keys(loaded) as Lang[]) delete loaded[k];
+  for (const k of Object.keys(glossary) as Lang[]) delete glossary[k];
 }
 
 /** Test hook: make `catalogue` the active one (e.g. a partial catalogue to prove the fallback). */
-export function setCatalogueForTests(code: Exclude<Lang, 'en'>, catalogue: Partial<Messages>): void {
+export function setCatalogueForTests(code: Exclude<Lang, 'en'>, catalogue: Partial<Messages>, phrases: Record<string, string> = {}): void {
   loaded[code] = catalogue;
+  glossary[code] = phrases;
   lang = code;
+}
+
+/** Test hook: load a language's real catalogue (as `setLanguage` would) without touching storage. */
+export async function loadLanguageForTests(code: Lang): Promise<void> {
+  await setLanguage(code, { persist: false });
 }

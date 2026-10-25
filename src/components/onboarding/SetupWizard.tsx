@@ -7,27 +7,50 @@ import { TEMPLATES } from '../templates/registry';
 import { INDIAN_STATES } from '../../lib/india-states';
 import { localDb } from '../../lib/localDb';
 import { WIZARD_STEPS, answersFrom, applyAnswers, stepProblem, type WizardAnswers } from '../../lib/onboarding';
-import { useT } from '../../i18n';
+import { LANGUAGES, isLang, setLanguage, useT } from '../../i18n';
 import { setupT } from '../../i18n/areas/setup';
+import { reachT } from '../../i18n/areas/reach';
+import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
+import { BUSINESS_DEFAULTS, BUSINESS_TYPES, applyBusinessDefaults } from '../../lib/shop-presets';
+import { startDemoCompany, useDemoPending } from './demo-company';
 import controls from '../../styles/controls.module.css';
 import styles from './SetupWizard.module.css';
 
 /** Suggested starting designs (the full gallery stays in the editor and Design Studio). */
-const PICKS = ['classic_orange', 'corporate_navy', 'minimal_clean', 'modern_teal', 'freelancer_light', 'tech_startup'];
+const PICKS = ['classic_orange', 'corporate_navy', 'minimal_clean', 'modern_teal', 'freelancer_light', 'tech_startup', 'retail_receipt', 'gst_tax_invoice'];
 
 export interface SetupWizardProps {
   open: boolean;
-  /** `finished` = saved; false = skipped. */
-  onClose: (finished: boolean) => void;
+  /** `finished` = saved (true, or the route to open next, e.g. '/pos' for a kirana counter); false = skipped. */
+  onClose: (finished: boolean | string) => void;
 }
 
 /** First-run setup: four short steps that fill the active sender profile. */
 export function SetupWizard({ open, onClose }: SetupWizardProps) {
-  useT(); // re-render on a language switch (5.4)
   const [step, setStep] = useState(0);
   const [a, setA] = useState<WizardAnswers>(() => answersFrom(localDb.settings.activeProfile(), localDb.template.get()));
   const [error, setError] = useState('');
+  // Shop mode (8H): what the business does; "full" keeps every module (the default).
+  const [business, setBusiness] = useState<BusinessType>(() => localDb.settings.get().business_type ?? 'full');
+  const { lang } = useT();
+  const pickBusiness = (b: BusinessType) => {
+    setBusiness(b);
+    // The design follows the business type until the user picks one on the last step.
+    set({ templateId: BUSINESS_DEFAULTS[b].templateId });
+  };
+  const [demoBusy, setDemoBusy] = useState(false);
+  // "Explore with sample data instead": a separate Demo company (when this browser supports companies).
+  const exploreDemo = () => {
+    setDemoBusy(true);
+    try {
+      startDemoCompany();
+    } catch (err) {
+      setError((err as Error).message);
+      setDemoBusy(false);
+    }
+  };
   const current = WIZARD_STEPS[step];
+  useDemoPending(onClose);
   const last = step === WIZARD_STEPS.length - 1;
   const set = (patch: Partial<WizardAnswers>) => {
     setA((prev) => ({ ...prev, ...patch }));
@@ -39,9 +62,10 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     if (problem) return setError(problem);
     if (!last) return setStep((s) => s + 1);
     try {
-      localDb.settings.save(applyAnswers(localDb.settings.get(), a));
+      localDb.settings.save(applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business));
+      window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(true);
+      onClose(BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -61,7 +85,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       open={open}
       onClose={skip}
       size="md"
-      title={setupT(`title.${current}`)}
+      title={current === 'start' ? reachT('title.shop') : setupT(`title.${current}`)}
       subtitle={setupT('stepOf', { n: step + 1, total: WIZARD_STEPS.length })}
       footer={
         <div className={styles.footer}>
@@ -126,6 +150,26 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
           </>
         )}
 
+        {current === 'start' && (
+          <>
+            <label className={controls.field}>
+              <span className={controls.label}>{reachT('language')} / भाषा</span>
+              <select className={controls.select} value={lang} onChange={(e) => isLang(e.target.value) && void setLanguage(e.target.value).catch(() => undefined)}>
+                {LANGUAGES.map((l) => <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>)}
+              </select>
+            </label>
+            <p className={controls.hint}>{reachT('shopLede')}</p>
+            <div className={styles.shopGrid} role="radiogroup" aria-label={reachT('title.shop')}>
+              {BUSINESS_TYPES.map((b) => (
+                <button key={b} type="button" role="radio" aria-checked={business === b} className={styles.shopCard} onClick={() => pickBusiness(b)}>
+                  <strong>{reachT(`type.${b}`)}</strong>
+                  <span>{reachT(`hint.${b}`)}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
         {current === 'gst' && (
           <>
             <div className={styles.choice} role="radiogroup" aria-label={setupT('gstAria')}>
@@ -141,6 +185,9 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <label className={controls.label} htmlFor="wizard-gstin">GSTIN</label>
                 <GstinInput id="wizard-gstin" value={a.companyGstin} onChange={(v) => set({ companyGstin: v })} onStateCode={(code) => set({ stateCode: code })} />
                 <span className={controls.hint}>{setupT('stateFromGstin')}</span>
+                <label className={controls.check}>
+                  <input type="checkbox" checked={!!a.composition} onChange={(e) => set({ composition: e.target.checked })} /> {reachT('composition')}
+                </label>
               </div>
             ) : (
               <label className={controls.field}>
@@ -211,6 +258,12 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 ))}
               </div>
               <span className={controls.hint}>{setupT('designsAvailable', { n: TEMPLATES.length })}</span>
+            </div>
+            <div className={controls.field}>
+              <button type="button" className={controls.btnOutline} onClick={exploreDemo} disabled={demoBusy}>
+                {reachT('demoCta')}
+              </button>
+              <span className={controls.hint}>{reachT('demoHint')}</span>
             </div>
           </>
         )}

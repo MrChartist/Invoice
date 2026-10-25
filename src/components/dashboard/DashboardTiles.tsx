@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom';
 import { Boxes, Download, IndianRupee, Landmark, Receipt, Store, TrendingUp, Wallet } from 'lucide-react';
 import { useCan } from '../../hooks/useCan';
 import { useToast } from '../ui/useToast';
+import { enabledModules } from '../../lib/shop-mode';
+import { isTileVisible } from '../../lib/shop-presets';
 import { ALL_TILES, computeTiles, forBranch, loadTilePrefs, saveTilePrefs, type TileId } from '../../lib/dashboard-tiles';
 import { loadBooksData } from '../../lib/books';
 import { loadPositions } from '../../lib/inventory';
 import { UNASSIGNED, branchesDb } from '../../lib/branch';
 import { getTable } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
-import { buildCatalogueHtml } from '../../lib/catalogue-html';
+import { reachT } from '../../i18n/areas/reach';
 import { downloadText } from '../../lib/download';
 import type { CreditLink } from '../../lib/stats';
 import { cn, formatCurrency } from '../../lib/utils';
@@ -75,7 +77,9 @@ export function DashboardTiles() {
     return { books: loadBooksData(), links: getTable<CreditLink>('doc_links'), branches, stock };
   }, [tiles, branches]);
   const v = useMemo(() => computeTiles(forBranch(data, branch)), [data, branch]);
-  const on = (t: TileId) => tiles.includes(t);
+  // Shop mode (8H): tiles of modules this company does not use are hidden (and left out of the picker).
+  const modules = useMemo(() => enabledModules(localDb.settings.get()), []);
+  const on = (t: TileId) => tiles.includes(t) && isTileVisible(t, modules);
 
   const toggle = (t: TileId) => {
     const next = on(t) ? tiles.filter((x) => x !== t) : [...tiles, t];
@@ -87,17 +91,21 @@ export function DashboardTiles() {
     }
   };
 
-  const exportCatalogue = () => {
-    const p = localDb.settings.activeProfile();
+  // Catalogue v2 (8H): photos, categories, MRP badges and a one-message WhatsApp cart (or script-free).
+  const exportCatalogue = async (cart: boolean) => {
     const stock = new Map<string, number>();
     try {
       for (const s of loadPositions()) if (s.item.track_stock) stock.set(s.item.name.trim().toLowerCase(), s.qty);
     } catch {
       /* no stock */
     }
-    const html = buildCatalogueHtml(localDb.items.getAll(), { business: p?.companyName || '', phone: p?.companyPhone, email: p?.companyEmail, address: p?.companyAddress, gstin: p?.companyGstin, stock });
-    downloadText('catalogue.html', html, 'text/html');
-    notify(tilesT('catalogueDone'));
+    try {
+      const { exportCatalogueHtml } = await import('../../lib/catalogue-export');
+      downloadText('catalogue.html', await exportCatalogueHtml({ cart, stock }), 'text/html');
+      notify(tilesT('catalogueDone'));
+    } catch (err) {
+      notify((err as Error).message, 'error');
+    }
   };
 
   const money = (n: number) => formatCurrency(n);
@@ -127,14 +135,19 @@ export function DashboardTiles() {
           <details className={own.picker}>
             <summary>{tilesT('customise')}</summary>
             <div className={own.pickerBody}>
-              {ALL_TILES.map((t) => (
+              {ALL_TILES.filter((t) => isTileVisible(t, modules)).map((t) => (
                 <label key={t} className={controls.check}>
                   <input type="checkbox" checked={on(t)} onChange={() => toggle(t)} /> {tileLabel(t)}
                 </label>
               ))}
               {can('view') && (
-                <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={exportCatalogue}>
+                <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => void exportCatalogue(true)}>
                   <Download size={14} /> {tilesT('catalogue')}
+                </button>
+              )}
+              {can('view') && (
+                <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => void exportCatalogue(false)}>
+                  <Download size={14} /> {reachT('catPlain')}
                 </button>
               )}
             </div>

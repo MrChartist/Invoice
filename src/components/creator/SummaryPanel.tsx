@@ -8,6 +8,7 @@ import { amountInWords } from '../../lib/amount-in-words';
 import { cn, currencySymbol, formatCurrency } from '../../lib/utils';
 import type { GstMode } from '../../types/invoice';
 import { amountInWordsHi } from '../../lib/amount-in-words-hi';
+import { amountInWordsIn, isWordsLang } from '../../lib/amount-in-words-in';
 import { useT, type MessageKey } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
@@ -163,6 +164,7 @@ export function SummaryPanel() {
           </Suspense>
           <p className={styles.words}>{amountInWords(t.total, cur)}</p>
           {lang === 'hi' && <p className={styles.words} lang="hi">{amountInWordsHi(t.total, cur)}</p>}
+          {isWordsLang(lang) && <p className={styles.words} lang={lang}>{amountInWordsIn(lang, t.total, cur)}</p>}
 
           <div className={styles.inputRow}>
             <span>{tr('summary.amountReceived')}</span>
