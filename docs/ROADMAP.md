@@ -139,8 +139,8 @@ Larger features, each of which can ship on its own once Phases 1–4 are done.
 | 5.2 | ✅ **GSTR-9 annual working paper** from 12 months of GSTR-1/3B + HSN, compared against books (`docs/features/gstr9.md`; 8A typed in from GSTR-2B, since the 5.1 matcher does not keep the 2B file) | M | Needs 3.1, 3.2 |
 | 5.3 | ✅ **Advances / receipt vouchers / Table 11**: ADV/FY receipt vouchers (Rule 50) and RFV refunds (Rule 51), date-keyed GST on service advances (none on goods since Notification 66/2017-CT), apply to invoices through the payments API, GSTR-1 11A/11B + JSON `at`/`txpd`, 3B 3.1(a), GSTR-9 4F, ledger, receivables, Tally (`docs/features/advances.md`) | L | Needs 3.1 |
 | 5.4 | **Hindi-first i18n**: string extraction, amount in words in Hindi, self-hosted Noto Sans Devanagari subset in the precache (fixes PDFs that vary by device today); then Marathi/Tamil/Gujarati | L | |
-| 5.5 | **POS / thermal quick-bill mode**: one-screen counter billing, walk-in customer, 80 mm auto-print, change calculator | M | Reuses `thermal80` / ReceiptBody |
-| 5.6 | **Barcode/SKU**: `BarcodeDetector` camera scan with typed fallback, Code128 labels | M | Pairs with 5.5 |
+| 5.5 | ✅ **POS / thermal quick-bill mode**: one-screen counter billing, walk-in customer, 80 mm auto-print, change calculator (delivered as 6.8: `/pos`, `docs/features/pos-barcode-pricing.md`) | M | Reuses `thermal80` / ReceiptBody |
+| 5.6 | ✅ **Barcode/SKU**: `BarcodeDetector` camera scan with typed fallback, Code128 labels (delivered as 6.7) | M | Pairs with 5.5 |
 | 5.7 | **Multi-device via a shared folder**: encrypted store + per-device change log written to a Drive/Dropbox/iCloud folder (File System Access API); merge by UUID + `updated_at`, show conflicts to the user. The cloud client moves the files, so the app makes no network calls | L | Needs 0.6, 4.2 |
 | 5.8 | ✅ **Optional "vault mode"**: whole store encrypted at rest with a passphrase-wrapped key (clear warning: a lost passphrase means lost data) (`src/lib/vault.ts`, `docs/features/security.md`) | L | Needs 4.2 |
 | 5.9 | ✅ **Composition / Bill of Supply** (BOS series, Rule 49 declaration on every template, CMP-08 / GSTR-4 papers, Table 8 / 13 for regular-taxpayer BOS) and **amendments** (B2BA / B2CLA / CDNRA / CDNURA / B2CSA; original period unchanged) (`docs/features/composition-amendments.md`). Not covered: e-commerce Sec 52 / 9(5), export amendments (EXPA), GSTR-9 Pt V, CMP-08 interest / late fee | M each | — |
@@ -165,9 +165,9 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.4 | ✅ **Cash-flow statement** (indirect, AS 3) | Vyapar, Refrens, Zoho, Xero | S–M |
 | 6.5 | ✅ **Sales orders & purchase orders** with pending quantities → invoice / challan / bill (`src/lib/sales-orders.ts`, `src/lib/purchase-orders.ts`) | Refrens, Odoo, myBillBook, Vyapar, Zoho | M |
 | 6.6 | ✅ **Batch / expiry / MFG** on stock with FEFO and expiry alerts (`src/lib/stock-tracking.ts`, `docs/features/inventory.md`) | Vyapar, myBillBook, Busy, Marg | M |
-| 6.7 | **Barcode** scan (BarcodeDetector + keyboard wedge) and Code128/EAN-13 label sheets | Vyapar, myBillBook, Marg | M |
-| 6.8 | **POS quick bill**: walk-in, split cash/UPI tender, 80 mm auto-print, day-end Z report | Vyapar, myBillBook, Marg, Swipe | M |
-| 6.9 | **Price levels & schemes** (wholesale/retail/party rates, qty slabs, buy-X-get-Y) | Tally, Marg, Vyapar | M |
+| 6.7 | ✅ **Barcode** scan (BarcodeDetector + keyboard wedge) and Code128/EAN-13 label sheets (`src/lib/barcode.ts`, `scan.ts`, `label-sheet.ts`; camera allowed by `Permissions-Policy: camera=(self)`) | Vyapar, myBillBook, Marg | M |
+| 6.8 | ✅ **POS quick bill**: walk-in, split cash/UPI/card tender, 80 mm auto-print, day-end Z report + cash-drawer count (`/pos`, `src/lib/pos.ts`, `docs/features/pos-barcode-pricing.md`) | Vyapar, myBillBook, Marg, Swipe | M |
+| 6.9 | ✅ **Price levels & schemes** (wholesale/retail/party rates, qty slabs, buy-X-get-Y as a ₹0 line; `src/lib/pricing.ts`) | Tally, Marg, Vyapar | M |
 | 6.10 | ✅ **Multi-godown** stock with transfer vouchers (`STR/FY25-26/0001`, `src/lib/godowns.ts`) | Vyapar, Busy, myBillBook | M |
 | 6.11 | ✅ **Serial numbers / IMEI / warranty** lookup (Inventory → Serial lookup) | Busy, myBillBook | M |
 | 6.12 | ✅ **Attachments**: receipt photos / PDFs on bills, expenses, invoices (IndexedDB, one key per file, stored once by content, in backups; `src/lib/attachments.ts`, `docs/features/attachments-custom-fields.md`) | Zoho, Xero, Invoice Ninja | M |

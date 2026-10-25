@@ -12,6 +12,7 @@ import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { LineTracking } from './LineTracking';
 import { editorStockContext } from '../../lib/stock-tracking';
+import { afterLineChange, pickCatalogItem, setLineQuantity, setLineRate } from './pricing-actions';
 import controls from '../../styles/controls.module.css';
 import styles from './ItemsTable.module.css';
 
@@ -32,7 +33,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [docId, docType, issueDate, docStatus, stockTick],
   );
-  const { addItem, updateItem, duplicateItem, moveItem, removeItem, applyCatalogItem } = useInvoiceStore.getState();
+  const { addItem, updateItem, duplicateItem, moveItem, removeItem } = useInvoiceStore.getState();
   // Catalogue snapshot, refreshed whenever an item name gains focus.
   const [catalog, setCatalog] = useState<InvoiceItem[]>([]);
   const itemSuggestions = useCallback(
@@ -114,7 +115,8 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                     setStockTick((t) => t + 1);
                   }}
                   getSuggestions={itemSuggestions}
-                  onPick={(c) => applyCatalogItem(item.id, c)}
+                  onBlur={afterLineChange}
+                  onPick={(c) => pickCatalogItem(item.id, c)}
                   placeholder={`Item ${index + 1}`}
                   aria-label={`Item ${index + 1} name`}
                 />
@@ -130,6 +132,11 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 placeholder="Description (optional)"
                 aria-label={`Item ${index + 1} description`}
               />
+              {item.price_basis || item.free_of ? (
+                <div className={styles.customLine} title={item.free_of ? 'Free under a scheme' : 'Rate set by the price level / quantity slab — type a rate to override'}>
+                  {item.free_of ? 'Free (scheme)' : `${item.price_basis} price`}
+                </div>
+              ) : null}
               {item.custom_values?.length ? (
                 <div className={styles.customLine} title="Item details from the catalogue">
                   {item.custom_values.map((v) => `${v.label}: ${v.value}`).join(' · ')}
@@ -176,7 +183,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
             </div>
 
             <div className={styles.cell} data-label="Qty">
-              <NumberInput className={controls.ghostNumeric} data-field="quantity" value={item.quantity} blankZero={false} onChange={(n) => updateItem(item.id, 'quantity', n)} aria-label={`Item ${index + 1} quantity`} />
+              <NumberInput className={controls.ghostNumeric} data-field="quantity" value={item.quantity} blankZero={false} onChange={(n) => setLineQuantity(item.id, n)} aria-label={`Item ${index + 1} quantity`} />
             </div>
 
             <div className={styles.cell} data-label="Unit">
@@ -189,7 +196,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
 
             {priced && (
               <div className={styles.cell} data-label="Rate">
-                <NumberInput className={controls.ghostNumeric} data-field="rate" value={item.rate} onChange={(n) => updateItem(item.id, 'rate', n)} placeholder="0.00" aria-label={`Item ${index + 1} rate`} />
+                <NumberInput className={controls.ghostNumeric} data-field="rate" value={item.rate} onChange={(n) => setLineRate(item.id, n)} placeholder="0.00" aria-label={`Item ${index + 1} rate`} />
               </div>
             )}
 
@@ -233,7 +240,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
               <button type="button" className={controls.btnIcon} onClick={() => duplicateItem(item.id)} aria-label="Duplicate line">
                 <Copy size={14} />
               </button>
-              <button type="button" className={controls.btnDanger} onClick={() => removeItem(item.id)} aria-label="Remove line">
+              <button type="button" className={controls.btnDanger} onClick={() => { removeItem(item.id); afterLineChange(); }} aria-label="Remove line">
                 <Trash2 size={14} />
               </button>
             </div>

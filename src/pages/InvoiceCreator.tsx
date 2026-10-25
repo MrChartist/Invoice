@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { ItemsTable } from '../components/creator/ItemsTable';
+import { ScanBar } from '../components/creator/ScanBar';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
 import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
 import { StockWarnings } from '../components/creator/StockWarnings';
@@ -288,6 +289,7 @@ export function InvoiceCreator() {
                 {s.items.filter((i) => i.name.trim() || i.rate > 0).length} line{s.items.length === 1 ? '' : 's'}
               </span>
             </div>
+            <ScanBar disabled={readOnly} />
             <ItemsTable onPickCatalog={setItemTarget} />
             <StockWarnings />
           </section>

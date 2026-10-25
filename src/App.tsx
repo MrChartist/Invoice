@@ -27,6 +27,7 @@ const Inventory = lazy(() => import('./pages/Inventory').then((m) => ({ default:
 const Recurring = lazy(() => import('./pages/Recurring').then((m) => ({ default: m.Recurring })));
 const Time = lazy(() => import('./pages/Time').then((m) => ({ default: m.Time })));
 const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.Cheques })));
+const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -62,6 +63,7 @@ function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/invoice" element={<RequireAccess action="doc.create" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
                 <Route path="/invoice/:id" element={<RequireAccess action="doc.edit" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
+                <Route path="/pos" element={<RequireAccess action="doc.create" fallback="/transactions"><Pos /></RequireAccess>} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/recurring" element={<RequireAccess action="books.edit"><Recurring /></RequireAccess>} />

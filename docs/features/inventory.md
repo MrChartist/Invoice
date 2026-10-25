@@ -158,3 +158,10 @@ A simple user (no tracked items, one godown) sees no new field anywhere; the edi
   batch-enabled stock-item masters we do not export); Tally books everything to its main location. Stock transfers are
   not exported (they would be Stock Journal vouchers).
 - Godown pickers on purchase-order lines are not offered (a PO is not a stock document).
+
+## Barcodes (6.7)
+
+Stock items carry an optional `barcode` next to `sku` (item form). A scan in the editor or the POS matches it (after the
+catalogue's own barcode / SKU) and adds the item; label sheets include stock items with a code that are not in the
+catalogue. POS bills move stock like any invoice (FEFO batch auto-pick and serial checks as in the editor). See
+`docs/features/pos-barcode-pricing.md`.

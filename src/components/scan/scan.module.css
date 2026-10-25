@@ -1,0 +1,69 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field {
+  position: relative;
+  flex: 1 1 16rem;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.field svg {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.input {
+  padding-left: 2.1rem !important;
+  font-family: var(--font-mono);
+}
+
+.status {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  min-height: 1.1em;
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.statusError {
+  color: var(--destructive);
+}
+
+.statusOk {
+  color: var(--profit);
+}
+
+.video {
+  width: 100%;
+  max-height: 60vh;
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  object-fit: cover;
+  display: block;
+}
+
+.camWrap {
+  position: relative;
+}
+
+.aim {
+  position: absolute;
+  inset: 30% 12%;
+  border: 2px solid var(--pal-gold);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+.note {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  margin: 0.5rem 0 0;
+}

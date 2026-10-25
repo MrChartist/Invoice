@@ -8,6 +8,7 @@ import { checkGstin } from '../../lib/gstin';
 import { localDb } from '../../lib/localDb';
 import { isValidPan, isValidTan } from '../../lib/validators';
 import { MAX_FLAT_FEE, sanitizeClientLateFee, type ClientLateFeeMode } from '../../lib/late-fee-rule';
+import { priceLevelsDb } from '../../lib/pricing';
 import type { Client } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 
@@ -39,6 +40,8 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
   // Late-fee terms are edited as text so a half-typed number is not coerced on every keystroke.
   const [fee, setFee] = useState<{ mode: '' | ClientLateFeeMode; rate: string; grace: string }>({ mode: '', rate: '', grace: '' });
   const [credit, setCredit] = useState<{ limit: string; days: string }>({ limit: '', days: '' });
+  // Price levels (6.9): the picker appears only once a level exists.
+  const [levels] = useState(() => priceLevelsDb.all());
 
   useEffect(() => {
     if (open) {
@@ -89,6 +92,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         custom_fields: cleanValueMap(form.custom_fields, customFieldsDb.all()),
         credit_limit: creditLimit > 0 ? Math.round(creditLimit * 100) / 100 : undefined,
         credit_days: creditDays > 0 ? creditDays : undefined,
+        price_level: form.price_level && levels.some((l) => l.id === form.price_level) ? form.price_level : undefined,
         updated_at: new Date().toISOString(),
       };
       const id = localDb.clients.upsert({ ...payload, id: client?.id });
@@ -245,6 +249,16 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
             or when a bill is older than the credit days. It never stops you saving.
           </span>
         </fieldset>
+        {levels.length > 0 && (
+          <label className={controls.field}>
+            <span className={controls.label}>Price level</span>
+            <select className={controls.select} value={form.price_level ?? ''} onChange={(e) => set('price_level', e.target.value || undefined)}>
+              <option value="">Default rates</option>
+              {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            <span className={controls.hint}>The editor and POS price this client&apos;s items at this level. You can still type any rate.</span>
+          </label>
+        )}
         <label className={controls.field}>
           <span className={controls.label}>Private notes</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder="Never printed on documents" />

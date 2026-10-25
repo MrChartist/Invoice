@@ -162,6 +162,30 @@ export interface InvoiceItem {
   warranty_months?: number;
   /** Additive (6.10): godown the goods leave from (credit notes: return to). Absent = the default godown. */
   godown_id?: string;
+  /* ── Barcode & pricing (6.7 / 6.9) ── */
+  /** Additive (6.7), catalogue rows only: barcode printed on the pack (EAN-13 / UPC / Code 128 text). */
+  barcode?: string;
+  /** Additive (6.7), catalogue rows only: the shop's own item code; a scan matches it too. */
+  sku?: string;
+  /** Additive (6.7), catalogue rows only: maximum retail price printed on shelf labels. */
+  mrp?: number;
+  /** Additive (6.9), catalogue rows only: quantity slabs — a line of at least `min_qty` gets `rate`. */
+  qty_slabs?: QtySlab[];
+  /**
+   * Additive (6.9), invoice lines only: why the rate is what it is when it was set automatically
+   * (a price level name such as "Wholesale", or "Qty ≥ 10"). Absent = typed or the catalogue's base rate.
+   */
+  price_basis?: string;
+  /** Additive (6.9), invoice lines only: the scheme this free (₹0) line was given under. */
+  scheme_id?: string;
+  /** Additive (6.9), invoice lines only: id of the paid line this free line belongs to. */
+  free_of?: string;
+}
+
+/** A quantity slab on a catalogue item (6.9). */
+export interface QtySlab {
+  min_qty: number;
+  rate: number;
 }
 
 export interface Client {
@@ -198,6 +222,8 @@ export interface Client {
   credit_limit?: number;
   /** Additive (6.25): credit period in days; bills older than this with a balance raise the same warning. */
   credit_days?: number;
+  /** Additive (6.9): id of the `price_levels` row this party buys at (e.g. Wholesale). Absent = base rates. */
+  price_level?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -432,4 +458,6 @@ export interface InvoiceRecord {
   exempt_kind?: ExemptKind;
   /** Additive (5.9): set when a document reported in a filed return is amended (never copied). */
   amends?: AmendmentInfo;
+  /** Additive (6.8): billed at the POS counter (counted in that day's Z report). Never copied. */
+  pos?: boolean;
 }
