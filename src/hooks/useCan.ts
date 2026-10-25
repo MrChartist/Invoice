@@ -1,4 +1,4 @@
-import { currentActor, currentRole, roleCan, type AccessAction, type Actor, type Role } from '../lib/access';
+import { actorCan, currentActor, currentRole, type AccessAction, type Actor, type Role } from '../lib/access';
 
 export interface Access {
   /** May the signed-in user do `action`? */
@@ -16,5 +16,5 @@ export interface Access {
 export function useCan(): Access {
   const actor = currentActor();
   const role: Role = currentRole();
-  return { can: (action: AccessAction) => roleCan(role, action), role, actor };
+  return { can: (action: AccessAction) => actorCan(actor, role, action), role, actor };
 }

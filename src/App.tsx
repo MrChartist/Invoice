@@ -45,7 +45,7 @@ function PageFallback() {
 /** Who is signed in and with which role: a change remounts the shell so every screen re-reads it. */
 const actorSignature = () => {
   const u = getCurrentUser();
-  return u ? `${u.id}:${u.role}` : '';
+  return u ? `${u.id}:${u.role}:${u.grants?.join(',') ?? ''}` : '';
 };
 
 function App() {

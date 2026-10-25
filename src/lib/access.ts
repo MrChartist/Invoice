@@ -100,6 +100,20 @@ export interface Actor {
   id: string;
   name: string;
   role: Role;
+  /**
+   * Additive (7T): actions the owner granted this user on top of the role. Only `GRANTABLE_ACTIONS`
+   * are honoured (a trusted clerk may be given `payroll.view`); everything else stays role-based.
+   */
+  grants?: readonly string[];
+}
+
+/** Actions the owner may grant to a named clerk / viewer (7T). Payroll stays owner-only by default. */
+export const GRANTABLE_ACTIONS: readonly AccessAction[] = ['payroll.view'];
+
+/** Role matrix plus the owner's per-user grants. */
+export function actorCan(actor: Actor | null, role: Role, action: AccessAction): boolean {
+  if (roleCan(role, action)) return true;
+  return !!actor && actor.role === role && GRANTABLE_ACTIONS.includes(action) && !!actor.grants?.includes(action);
 }
 
 let provider: (() => Actor | null) | null = null;
@@ -148,7 +162,7 @@ export function currentRole(): Role {
 
 /** May the signed-in user do `action`? */
 export function can(action: AccessAction): boolean {
-  return roleCan(currentRole(), action);
+  return actorCan(currentActor(), currentRole(), action);
 }
 
 const DENIED_TEXT: Partial<Record<AccessAction, string>> = {
@@ -193,7 +207,7 @@ export function isAccessDeniedError(err: unknown): err is AccessDeniedError {
 /** Throws `AccessDeniedError` unless the signed-in user may do `action`. Used by the data layer. */
 export function requireAccess(action: AccessAction): void {
   const role = currentRole();
-  if (!roleCan(role, action)) throw new AccessDeniedError(action, role);
+  if (!actorCan(currentActor(), role, action)) throw new AccessDeniedError(action, role);
 }
 
 /* ── Table-level guard (defence in depth) ─────────────────────────
@@ -293,6 +307,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   payroll_adjustments: 'payroll.view',
   perquisites: 'payroll.view',
   fnf_settlements: 'payroll.view',
+  // payroll follow-ups (7T): Form 10E workings, actuarial valuations
+  payroll_relief89: 'payroll.view',
+  actuarial_valuations: 'payroll.view',
   // Phase 7 (Tally parity): manufacturing and stock vouchers
   manufacturing_vouchers: 'books.edit',
   stock_journals: 'books.edit',

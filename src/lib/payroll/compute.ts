@@ -8,7 +8,7 @@
 import { A } from '../ledger/accounts';
 import { STATUTORY_PAYABLE } from './postings';
 import { round2 } from '../invoice-calc';
-import { EPS_EXIT_AGE, ageBand, ccd2Pct, esiPeriodStart, esiRule, noPanRate, pfRule, tdsSalaryRuleFor } from '../payroll-rules';
+import { EPS_EXIT_AGE, ageBand, ccd2Pct, esiLowWageLimit, esiPeriodStart, esiRule, noPanRate, pfRule, s17viiLimit, tdsSalaryRuleFor } from '../payroll-rules';
 import type {
   ArrearsRecord,
   ArrearsSummary,
@@ -140,7 +140,15 @@ export interface ComputeInput {
    * month, or the month of joining). Undefined = decide on this month (the period's first month).
    */
   esiPeriodCovered?: boolean;
+  /**
+   * Additive (7T): add arrears and one-off salary items (bonus, leave encashment, other earnings)
+   * to the month's gross for the Professional Tax slab — the state's rule, chosen in Reports.
+   */
+  ptOnExtras?: boolean;
 }
+
+/** One-off item tags counted as salary for PT when `ptOnExtras` is on (reimbursements, gratuity and notice pay are not). */
+export const PT_EXTRA_TAGS: readonly PayslipTag[] = ['arrear', 'bonus', 'leave', 'adjust'];
 
 /** Additive (7P): a one-off payslip item (`key` is its pay-head id on the payslip, unique per line). */
 export interface ExtraItem {
@@ -166,6 +174,8 @@ export interface PayslipExtras {
   perquisitesLater?: number;
   /** A full & final settlement is paid in this payslip. */
   fnfId?: string;
+  /** Additive (7T): relief u/s 89(1) allowed in the year's TDS (Form 10E furnished, s. 192(2A)). */
+  relief89?: number;
 }
 
 export class PayrollComputeError extends Error {
@@ -378,13 +388,11 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
   const esiOn = onRolls && e.esi && !!stat('esi');
   const decidedRate = input.esiPeriodCovered === undefined ? esiRateWages : input.esiPeriodCovered ? 0 : Number.MAX_SAFE_INTEGER;
   const esi = esiOn ? esiContribution(esiWages, decidedRate, date, coveredBefore) : { covered: false, ee: 0, er: 0 };
-  const esi_ee = esiOn ? pick('esi', esi.ee) : 0;
+  // 7T: no employee share when the average daily wage is within the low-wage limit (employer still pays).
+  const lowWage = esiOn && esi.covered && esi.ee > 0 && payable > 0 && esiWages / payable <= esiLowWageLimit(date);
+  if (lowWage) notes.push(`ESI: average daily wage ₹${round2(esiWages / payable)} is within ₹${esiLowWageLimit(date)} — no employee share; the employer pays its share.`);
+  const esi_ee = esiOn ? pick('esi', lowWage ? 0 : esi.ee) : 0;
   const esi_er = esiOn && stat('esi_er') ? pick('esi_er', esi.er) : 0;
-
-  // PT on the month's regular gross (arrears / one-off items are not added — verify with your CA)
-  const ptBefore = round2(history.reduce((s, h) => s + h.line.pt, 0));
-  const ptOn = onRolls && e.pt && !!stat('pt');
-  const pt = ptOn ? pick('pt', professionalTax(e.state, regularGross, month, { gender: e.gender, paidBefore: ptBefore })) : 0;
 
   // One-off items: arrears, leave encashment, gratuity, notice pay, reimbursements, bonus, loan EMIs.
   const arr = arrearsItems(extras.arrears ?? [], input.heads);
@@ -408,6 +416,14 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
   const extraTaxable = round2(extraEarnings.reduce((s, x) => s + (x.taxable ?? x.amount), 0));
   const earnings = [...regularEarnings, ...extraEarnings];
   const gross = sumIf(earnings);
+
+  // PT on the month's regular gross; arrears / one-off salary items only when the state's rule is
+  // chosen (7T option `ptOnExtras`) — verify with your CA.
+  const ptBefore = round2(history.reduce((s, h) => s + h.line.pt, 0));
+  const ptOn = onRolls && e.pt && !!stat('pt');
+  const ptExtra = input.ptOnExtras ? round2(extraEarnings.filter((x) => x.tag && PT_EXTRA_TAGS.includes(x.tag)).reduce((s, x) => s + x.amount, 0)) : 0;
+  if (ptOn && ptExtra) notes.push(`Professional tax worked on gross incl. arrears / one-off items ₹${round2(regularGross + ptExtra)} (state rule chosen).`);
+  const pt = ptOn ? pick('pt', professionalTax(e.state, round2(regularGross + ptExtra), month, { gender: e.gender, paidBefore: ptBefore })) : 0;
 
   // Statutory contributions on arrears (worked per month when the arrears were computed).
   const pfHead = stat('pf');
@@ -434,6 +450,9 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
   const npsHeads = empHeads.filter((h) => h.nps);
   const nps_er = round2(npsHeads.reduce((s, h) => s + (values.get(h.id) ?? 0), 0));
   const npsRate = round2(npsHeads.reduce((s, h) => s + (rate.get(h.id) ?? 0), 0));
+  const superHeads = empHeads.filter((h) => h.superannuation);
+  const super_er = round2(superHeads.reduce((s, h) => s + (values.get(h.id) ?? 0), 0));
+  const superRate = round2(superHeads.reduce((s, h) => s + (rate.get(h.id) ?? 0), 0));
   const perqs = round2(Math.max(0, extras.perquisites ?? 0));
   const taxable_gross = round2(regularTaxable + extraTaxable + perqs + nps_er);
 
@@ -462,7 +481,15 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
       paid += p;
     }
     const laterPerq = round2(Math.max(0, extras.perquisitesLater ?? 0));
-    const annualGross = round2((e.prev_salary ?? 0) + ytdTaxable + taxable_gross + (rateTaxable + npsRate + laterPerq) * later.length);
+    // 7T s. 17(2)(vii): employer PF (EPF + EPS) + NPS + superannuation for the year above the limit
+    // is a perquisite (projected; not part of the month's taxable_gross, so never counted twice).
+    const contribLimit = s17viiLimit(fyStart);
+    const ytdContrib = round2(history.reduce((s, h) => s + h.line.eps + h.line.epf_er + (h.line.nps_er ?? 0) + (h.line.super_er ?? 0), 0));
+    const pfAtRate = pfErOn && later.length ? pfContribution(ratePfWages, date, { onActual: e.pf_on_actual, epsExcluded: e.eps_excluded || epsOver }) : null;
+    const erContribYear = round2(ytdContrib + pfEr + nps_er + super_er + ((pfAtRate ? pfAtRate.eps + pfAtRate.epf_er : 0) + npsRate + superRate) * later.length);
+    const s17vii = contribLimit === null ? 0 : Math.max(0, round2(erContribYear - contribLimit));
+    if (s17vii > 0) notes.push(`Employer PF + NPS + superannuation for the year ₹${erContribYear} exceeds ₹${contribLimit}: ₹${s17vii} taxed as a perquisite u/s 17(2)(vii) (accretion u/s 17(2)(viia) not computed).`);
+    const annualGross = round2((e.prev_salary ?? 0) + ytdTaxable + taxable_gross + (rateTaxable + npsRate + laterPerq) * later.length + s17vii);
     const annualNps = round2(ytdNps + nps_er + npsRate * later.length);
     // 80CCD(2) cap on salary = Basic + DA (approximated by the PF-wage heads).
     const salaryForCap = round2(ytdPfWages + pfWages + ratePfWages * later.length);
@@ -480,12 +507,24 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
     );
     const tax = incomeTax(inc.total_income, rule);
     const noPan = !e.pan;
-    const annualTax = noPan ? noPanTax(tax, noPanRate(fyStart)) : tax.total;
-    if (noPan && annualTax > tax.total) notes.push(`No PAN: TDS at ${noPanRate(fyStart)}% of income (s. 206AA) instead of the average rate.`);
+    const taxBeforeRelief = noPan ? noPanTax(tax, noPanRate(fyStart)) : tax.total;
+    if (noPan && taxBeforeRelief > tax.total) notes.push(`No PAN: TDS at ${noPanRate(fyStart)}% of income (s. 206AA) instead of the average rate.`);
+    // 7T relief u/s 89(1) allowed by the employer (s. 192(2A), Form 10E furnished).
+    const relief = Math.min(taxBeforeRelief, round2(Math.max(0, extras.relief89 ?? 0)));
+    if (relief > 0) notes.push(`Relief u/s 89(1) of ₹${relief} allowed in the year's TDS (Form 10E working) — verify with your CA.`);
+    const annualTax = round2(taxBeforeRelief - relief);
     const due = Math.max(0, round2(annualTax - ytdTds - (e.prev_tds ?? 0)));
     const computed = remainingMonths.length <= 1 || extras.fnfId ? Math.round(due) : Math.round(due / remainingMonths.length);
     tds = overrides[tdsHead.id] !== undefined ? round2(overrides[tdsHead.id]) : computed;
-    tds_working = { annual_income: inc.total_income, annual_tax: annualTax, deducted_before: round2(ytdTds + (e.prev_tds ?? 0)), months_left: extras.fnfId ? 1 : remainingMonths.length };
+    tds_working = {
+      annual_income: inc.total_income,
+      annual_tax: annualTax,
+      deducted_before: round2(ytdTds + (e.prev_tds ?? 0)),
+      months_left: extras.fnfId ? 1 : remainingMonths.length,
+      ...(relief > 0 ? { relief89: relief } : {}),
+      ...(erContribYear > 0 ? { er_contrib_year: erContribYear } : {}),
+      ...(s17vii > 0 ? { s17_vii: s17vii } : {}),
+    };
   }
 
   const statDed: [StatutoryKind, number][] = [['pf', pf_ee], ['esi', esi_ee], ['pt', pt], ['tds', tds]];
@@ -561,6 +600,8 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
     ...(extras.fnfId ? { fnf_id: extras.fnfId } : {}),
     ...(age ? { age_band: age } : {}),
     ...(notes.length ? { notes } : {}),
+    ...(super_er ? { super_er } : {}),
+    ...(lowWage ? { esi_low_wage: true } : {}),
   };
 }
 

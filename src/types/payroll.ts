@@ -103,6 +103,8 @@ export interface PayHead {
   order?: number;
   /** Additive (7P), employer heads: employer's NPS contribution — taxable salary, deductible u/s 80CCD(2). */
   nps?: boolean;
+  /** Additive (7T), employer heads: contribution to an approved superannuation fund (s. 17(2)(vii)). */
+  superannuation?: boolean;
   active: boolean;
   created_at: string;
 }
@@ -212,7 +214,17 @@ export interface PayslipLine {
   pt: number;
   tds: number;
   /** Annual tax projection behind the TDS figure (working). */
-  tds_working?: { annual_income: number; annual_tax: number; deducted_before: number; months_left: number };
+  tds_working?: {
+    annual_income: number;
+    annual_tax: number;
+    deducted_before: number;
+    months_left: number;
+    /** Additive (7T): relief u/s 89 allowed in the projection (Form 10E furnished, s. 192(2A)). */
+    relief89?: number;
+    /** Additive (7T): projected employer PF + NPS + superannuation for the FY, and the s. 17(2)(vii) excess taxed. */
+    er_contrib_year?: number;
+    s17_vii?: number;
+  };
   /** Manual amounts typed in the review grid, by pay head id (they win over the computed value). */
   overrides?: Record<string, number>;
   warnings?: string[];
@@ -229,6 +241,11 @@ export interface PayslipLine {
   age_band?: 'senior' | 'super_senior';
   /** Informational notes printed on the payslip (relief u/s 89, EPS stopped at 58, 206AA …). */
   notes?: string[];
+  /* ── Additive (7T) ── */
+  /** Employer contribution of the month to a superannuation fund (s. 17(2)(vii)). */
+  super_er?: number;
+  /** ESI employee share not deducted: average daily wage within the low-wage limit (employer still pays). */
+  esi_low_wage?: boolean;
 }
 
 /** Additive (7P): arrears totals carried on a payslip. */
@@ -324,6 +341,9 @@ export interface ArrearsMonth {
   esi_wages: number;
   esi_ee: number;
   esi_er: number;
+  /** Additive (7T): EPS / EDLI wage differences (arrear ECR). Older records: derived from PF wages. */
+  eps_wages?: number;
+  edli_wages?: number;
 }
 
 /** A back-dated revision's arrears, paid with the run of `pay_month`. */
@@ -425,7 +445,7 @@ export interface PayrollAdjustment {
   created_at: string;
 }
 
-export type PerquisiteKind = 'accommodation' | 'car' | 'other';
+export type PerquisiteKind = 'accommodation' | 'car' | 'other' | 'meals' | 'gift';
 
 /** A perquisite's taxable value per month (s. 17(2)), from `from_month` to `to_month` (open-ended if absent). */
 export interface Perquisite {
@@ -436,6 +456,8 @@ export interface Perquisite {
   from_month: string;
   to_month?: string;
   monthly_value: number;
+  /** Additive (7T): how the value was worked (Rule 3 valuation summary). */
+  basis?: string;
   created_at: string;
 }
 
@@ -461,6 +483,76 @@ export interface FnfSettlement {
   /** Recover every outstanding loan / advance from the settlement. */
   recover_loans: boolean;
   other: { name: string; kind: 'earning' | 'deduction'; amount: number; taxable?: boolean }[];
+  note?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   7T — relief u/s 89 (Form 10E) and actuarial valuations.
+   Tables: payroll_relief89, actuarial_valuations.
+   ════════════════════════════════════════════════════════════════ */
+
+/** One earlier FY an arrear relates to (Form 10E Annexure I, Table A). */
+export interface Relief89Year {
+  /** FY start year (2023 = FY 2023-24). */
+  fy: number;
+  regime: TaxRegime;
+  /** Total income of that year as assessed / returned (before this arrear). */
+  income: number;
+  /** Arrear relating to that year. */
+  arrears: number;
+}
+
+/** Relief u/s 89(1) working for arrears received in FY `fy` (Form 10E). */
+export interface Relief89Record {
+  id: string;
+  employee_id: string;
+  /** FY of receipt (start year). */
+  fy: number;
+  regime: TaxRegime;
+  /** Total income of the year of receipt INCLUDING the arrears. */
+  income_with: number;
+  years: Relief89Year[];
+  /** Relief worked when saved (recomputed on display). */
+  relief: number;
+  /** Allow the relief in the TDS projection (s. 192(2A): Form 10E furnished to the employer). */
+  apply_tds: boolean;
+  note?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type ActuarialKind = 'gratuity' | 'leave';
+export type ActuarialStandard = 'as15' | 'indas19';
+
+/** The actuary's figures for one valuation date (AS-15 / Ind AS 19), and the journal posted from them. */
+export interface ActuarialValuation {
+  id: string;
+  /** `ACT/FY25-26/0001`. */
+  number: string;
+  kind: ActuarialKind;
+  standard: ActuarialStandard;
+  /** Valuation (balance sheet) date — the journal date. */
+  date: string;
+  actuary: string;
+  report_ref?: string;
+  discount_rate?: number;
+  salary_escalation?: number;
+  opening: number;
+  current_service_cost: number;
+  interest_cost: number;
+  past_service_cost: number;
+  benefits_paid: number;
+  /** Actuarial loss (+) / gain (−) on the obligation. */
+  actuarial_loss: number;
+  closing: number;
+  /** Fair value of plan assets at the date (funded plans); the provision is the net liability. */
+  plan_assets?: number;
+  /** Provision for this benefit already in the books before this entry. */
+  book_balance: number;
+  voucher_id?: string;
+  voucher_number?: string;
   note?: string;
   created_at: string;
   updated_at?: string;

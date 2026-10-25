@@ -18,6 +18,7 @@ import { daysInMonth, fyStartOfMonth } from '../../lib/payroll/statutory';
 import { arrearsRegisterRows, pfLateRows } from '../../lib/payroll/depth-reports';
 import { loadArrears } from '../../lib/payroll/depth-records';
 import { loadPayrollPayments } from '../../lib/payroll/records';
+import { arrearEcrLines, arrearEcrRows, arrearEcrText, s17viiRows, tds201Rows } from '../../lib/payroll/followups';
 import { todayInput } from '../../lib/utils';
 import { downloadText } from '../../lib/download';
 import { payrollT as pT } from '../../i18n/areas/payroll';
@@ -85,6 +86,19 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
                 </span>
               ) : noRun,
             )}
+            {(() => {
+              const lines = arrearEcrLines(loadArrears(), employees, month);
+              return item(
+                pT('rep.arrearEcr'),
+                pT('rep.arrearEcrHint'),
+                lines.length ? (
+                  <span className={styles.inline}>
+                    <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`ECR-arrear-${month}.txt`, arrearEcrText(lines), 'text/plain')}><Download size={14} /> ECR .txt</button>
+                    {out(`pf-arrear-working-${month}`, arrearEcrRows(lines, month), 'PF arrears')}
+                  </span>
+                ) : <span className={styles.sub}>{pT('rep.noArrears')}</span>,
+              );
+            })()}
             {item(pT('rep.esi'), pT('rep.esiHint'), run ? out(`esi-${month}`, esiRows(run), 'ESI') : noRun)}
             {item(pT('rep.pt'), pT('rep.ptHint'), run ? out(`pt-register-${month}`, ptRegisterRows([run]), 'PT') : noRun)}
           </ul>
@@ -108,6 +122,8 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
             {item(pT('rep.ann2'), pT('rep.ann2Hint'), out(`form24Q-annexure2-FY${fyLabel}`, form24QAnnexure2Rows(fyRuns, employees, fyStart), '24Q Annexure II'))}
             {item(pT('rep.ptYear'), pT('rep.ptHint'), out(`pt-register-FY${fyLabel}`, ptRegisterRows(fyRuns), 'PT'))}
             {item(pT('rep.pfLate'), pT('rep.pfLateHint'), out(`pf-late-estimate-FY${fyLabel}`, pfLateRows(fyRuns, loadPayrollPayments(), fyStart, todayInput()), 'PF late'))}
+            {item(pT('rep.tds201'), pT('rep.tds201Hint'), out(`tds-201-1A-FY${fyLabel}`, tds201Rows(fyRuns, loadPayrollPayments(), fyStart, todayInput()), '201(1A)'))}
+            {item(pT('rep.s17vii'), pT('rep.s17viiHint'), out(`s17-2-vii-FY${fyLabel}`, s17viiRows(fyRuns, employees, fyStart), '17(2)(vii)'))}
             {item(pT('rep.arrears'), pT('rep.arrearsHint'), out(`arrears-FY${fyLabel}`, arrearsRegisterRows(loadArrears().filter((r) => fyStartOfMonth(r.pay_month) === `${fyStart}-04-01`), employees), 'Arrears'))}
             {item(
               pT('rep.f16'),

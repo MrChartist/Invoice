@@ -17,13 +17,15 @@ const LoansTab = lazy(() => import('../components/payroll/LoansTab').then((m) =>
 const LeaveTab = lazy(() => import('../components/payroll/LeaveTab').then((m) => ({ default: m.LeaveTab })));
 const ExtrasTab = lazy(() => import('../components/payroll/ExtrasTab').then((m) => ({ default: m.ExtrasTab })));
 const FnfTab = lazy(() => import('../components/payroll/FnfTab').then((m) => ({ default: m.FnfTab })));
+// 7T: relief u/s 89 (Form 10E), Rule 3 perquisite valuation, actuarial valuations, PT option, payroll access.
+const MoreTab = lazy(() => import('../components/payroll/MoreTab').then((m) => ({ default: m.MoreTab })));
 import { useT } from '../i18n';
 import { payrollT as pT } from '../i18n/areas/payroll';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/payroll/Payroll.module.css';
 
-const TABS = ['employees', 'heads', 'structures', 'attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports'] as const;
+const TABS = ['employees', 'heads', 'structures', 'attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports', 'more'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_KEY = {
   employees: 'tabs.employees',
@@ -38,8 +40,9 @@ const TAB_KEY = {
   extras: 'tabs.extras',
   loans: 'tabs.loans',
   fnf: 'tabs.fnf',
+  more: 'tabs.more',
 } as const;
-const MONTH_TABS: readonly Tab[] = ['attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports'];
+const MONTH_TABS: readonly Tab[] = ['attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports', 'more'];
 
 /** Payroll (Phase 7, Tally parity): masters, attendance, monthly run, payments and statutory working papers. */
 export function Payroll() {
@@ -93,6 +96,7 @@ export function Payroll() {
           {tab === 'extras' && <ExtrasTab month={month} {...common} />}
           {tab === 'loans' && <LoansTab month={month} {...common} />}
           {tab === 'fnf' && <FnfTab month={month} {...common} />}
+          {tab === 'more' && <MoreTab month={month} {...common} />}
         </Suspense>
       </div>
       <p className={styles.note}>{pT('footer')}</p>

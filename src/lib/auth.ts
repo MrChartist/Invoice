@@ -89,6 +89,8 @@ export interface StoredUser extends PinHash {
   role: Exclude<Role, 'owner'>;
   createdAt: string;
   v: 2;
+  /** Additive (7T): actions the owner granted on top of the role (only `GRANTABLE_ACTIONS` count). */
+  grants?: string[];
 }
 
 /** What the login screen and Settings may see about a user (never secrets). */
@@ -97,7 +99,14 @@ export interface UserSummary {
   name: string;
   role: Role;
   createdAt: string;
+  /** Additive (7T): owner's per-user grants (e.g. `payroll.view`). */
+  grants?: string[];
 }
+
+const cleanGrants = (g: unknown): string[] | undefined => {
+  const list = Array.isArray(g) ? [...new Set(g.filter((x): x is string => typeof x === 'string' && !!x))] : [];
+  return list.length ? list : undefined;
+};
 
 /** @internal Valid extra users, as stored. Used by users.ts. */
 export function readUsers(): StoredUser[] {
@@ -114,7 +123,11 @@ export function readUsers(): StoredUser[] {
       if (!u.hash || !u.salt || !u.iter || !u.kdf) continue;
       seen.add(u.id);
       // Anything but 'clerk' reads as the least privileged role (an "owner" here is never honoured).
-      out.push({ ...(u as StoredUser), role: u.role === 'clerk' ? 'clerk' : 'viewer' });
+      const grants = cleanGrants(u.grants);
+      const row: StoredUser = { ...(u as StoredUser), role: u.role === 'clerk' ? 'clerk' : 'viewer' };
+      if (grants) row.grants = grants;
+      else delete row.grants;
+      out.push(row);
     }
     return out;
   } catch {
@@ -134,7 +147,7 @@ export function listUsers(): UserSummary[] {
   if (!owner) return [];
   return [
     { id: OWNER_ID, name: owner.name, role: 'owner', createdAt: owner.createdAt },
-    ...readUsers().map((u) => ({ id: u.id, name: u.name, role: u.role, createdAt: u.createdAt })),
+    ...readUsers().map((u) => ({ id: u.id, name: u.name, role: u.role, createdAt: u.createdAt, ...(u.grants ? { grants: u.grants } : {}) })),
   ];
 }
 
@@ -204,7 +217,7 @@ export function getCurrentUser(): Actor | null {
   const id = sessionUserId();
   if (!id) return null;
   const u = findUser(id);
-  return u ? { id: u.id, name: u.name, role: u.role } : null;
+  return u ? { id: u.id, name: u.name, role: u.role, ...(u.grants ? { grants: u.grants } : {}) } : null;
 }
 
 // The data layer asks access.ts who is acting; this is the answer. Once a PIN is set up, a tab whose

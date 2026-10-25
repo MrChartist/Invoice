@@ -25,6 +25,9 @@ export const PAYROLL_TABLES = {
   adjustments: 'payroll_adjustments',
   perquisites: 'perquisites',
   fnf: 'fnf_settlements',
+  // 7T
+  relief89: 'payroll_relief89',
+  actuarial: 'actuarial_valuations',
 } as const;
 
 export const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');

@@ -299,6 +299,7 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}gst_challans`]: (r) => str(r.deposited_on) || str(r.generated_on) || undefined,
   [`${DB_PREFIX}payroll_runs`]: 'date',
   [`${DB_PREFIX}payroll_payments`]: 'date',
+  [`${DB_PREFIX}actuarial_valuations`]: 'date',
   [`${DB_PREFIX}deposit_slips`]: 'date',
   [`${DB_PREFIX}pos_returns`]: 'day',
   [`${DB_PREFIX}cheques`]: chequeDay,
@@ -856,6 +857,7 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}deposit_slips`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}payroll_runs`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}payroll_payments`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}actuarial_valuations`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
 };
 
