@@ -3,6 +3,9 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { buildGstr9 } from '../../lib/gstr9';
 import { buildGstr9c, type Gstr9cAdjustments, type Gstr9cLine } from '../../lib/gstr9c';
+import { gstr9cRateWise, gstr9cTable14, notesItcForFy } from '../../lib/gstr9c-extra';
+import { loadIsdInward } from '../../lib/isd';
+import { r7T } from '../../i18n/areas/gst-tds-7r';
 import { fyPeriod, gstSummary, itcWithCess, loadBooksData, profitAndLoss } from '../../lib/books';
 import { advanceTaxEvents } from '../../lib/advance-tax';
 import { readLinks } from '../../lib/documents';
@@ -50,16 +53,23 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
       links: readLinks(),
       advances: advanceTaxEvents(books.advances ?? [], books.transactions, books.invoices),
       purchaseNotes: books.purchaseReturns ?? [],
+      isdInward: loadIsdInward(),
       turnover: turnover || 0,
     });
     const g = gstSummary(books, period);
+    const purchases = getTable<unknown>('purchases');
     return {
       g9,
       books: {
         turnover: profitAndLoss(books, period).income,
         tax: { igst: g.outputIgst, cgst: g.outputCgst, sgst: g.outputSgst, cess: g.outputCess ?? 0 },
         itc: itcWithCess(g),
+        // 7R (7.127): supplier notes split out of Table 12.
+        notesItc: notesItcForFy(books.purchaseReturns, fyStart),
       },
+      // 7R (7.127): rate-wise Table 9 and expense-wise Table 14.
+      rate9: gstr9cRateWise(g9, purchases, filerStateCode),
+      t14: gstr9cTable14(g9, purchases, filerStateCode, books.purchaseReturns ?? []),
     };
   }, [fyStart, gstin, filerStateCode, turnover]);
   const report = useMemo(() => {
@@ -137,9 +147,64 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
         </table>
       </div>
 
+      <h3 className={local.tbHeading}>{r7T('c9RateTitle')}</h3>
+      <p className={styles.muted}>{r7T('c9RateHint')}</p>
+      <div className={styles.scroll}>
+        <table className={styles.grid} aria-label={r7T('c9RateTitle')} data-9c-rate>
+          <thead>
+            <tr>
+              <th scope="col">{soT('c9Line')}</th>
+              <th scope="col" style={{ textAlign: 'left' }}>{r7T('c9Rate')}</th>
+              <th scope="col">{r7T('c9Taxable')}</th>
+              <th scope="col">CGST</th>
+              <th scope="col">SGST</th>
+              <th scope="col">IGST</th>
+              <th scope="col">Cess</th>
+            </tr>
+          </thead>
+          <tbody>
+            {base.rate9.rows.map((r) => (
+              <tr key={r.id}>
+                <td>{r.id}</td>
+                <td style={{ textAlign: 'left' }}>{r.total ? <strong>{r.label}</strong> : r.label}</td>
+                <td>{r.total ? '' : formatMoney(r.taxable)}</td>
+                {(['cgst', 'sgst', 'igst', 'cess'] as const).map((k) => <td key={k} className={r.id === '9Q' && Math.abs(r[k]) > 1 ? styles.bad : undefined}>{formatMoney(r[k])}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <h3 className={local.tbHeading}>{soT('c9Itc')}</h3>
       {lines(report.table12, soT('c9Itc'))}
       <p className={styles.muted}>{soT('c9Reasons')}</p>
+
+      <h3 className={local.tbHeading}>{r7T('c9T14Title')}</h3>
+      <p className={styles.muted}>{r7T('c9T14Hint')}</p>
+      <div className={styles.scroll}>
+        <table className={styles.grid} aria-label={r7T('c9T14Title')} data-9c-t14>
+          <thead>
+            <tr>
+              <th scope="col">{soT('c9Line')}</th>
+              <th scope="col" style={{ textAlign: 'left' }}>{r7T('c9Expense')}</th>
+              <th scope="col">{r7T('c9Value')}</th>
+              <th scope="col">{r7T('c9TotalItc')}</th>
+              <th scope="col">{r7T('c9Eligible')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {base.t14.rows.map((r) => (
+              <tr key={r.id}>
+                <td>{r.id}</td>
+                <td style={{ textAlign: 'left', whiteSpace: 'normal' }}>{r.total ? <strong>{r.label}</strong> : r.label}</td>
+                <td>{r.total && !r.value ? '' : formatMoney(r.value)}</td>
+                <td>{r.total && !r.itc ? '' : formatMoney(r.itc)}</td>
+                <td className={r.id === '14T' && Math.abs(r.eligible) > 1 ? styles.bad : undefined}>{formatMoney(r.eligible)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

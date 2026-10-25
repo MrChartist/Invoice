@@ -23,6 +23,7 @@ import {
   threeBDue,
   type ChallanAmounts,
 } from '../../lib/gst-setoff';
+import { cashLedgerDetail, detailByHead, loadPmt09, loadRefunds } from '../../lib/gst-cash-refunds';
 import { GST_SETOFF_RULES, todayIso } from '../../lib/tax-rules';
 import { localDb } from '../../lib/localDb';
 import type { FilerFrequency } from '../../lib/compliance';
@@ -82,8 +83,11 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
   const record = setOffFor(setoffs, plan.periodKey, gstin);
   const credit = creditLedgerBalance(setoffs, gstin);
   const status = periodPaymentStatus(plan, challans, setoffs, gstin);
-  const balance = cashLedgerBalance(challans, setoffs);
-  const balanceForPeriod = cashLedgerBalance(challans, setoffs.filter((r) => r !== record));
+  // 7R (7.121): PMT-09 transfers move money between heads and filed cash refunds take it out.
+  const transfers = loadPmt09();
+  const refunds = loadRefunds();
+  const balance = transfers.length || refunds.length ? detailByHead(cashLedgerDetail(challans, setoffs, transfers, refunds)) : cashLedgerBalance(challans, setoffs);
+  const balanceForPeriod = transfers.length || refunds.length ? detailByHead(cashLedgerDetail(challans, setoffs.filter((r) => r !== record), transfers, refunds)) : cashLedgerBalance(challans, setoffs.filter((r) => r !== record));
   const label = periodLabel(period);
   const isFy = period.kind === 'fy';
   const oldOrder = plan.from < '2019-03-29';

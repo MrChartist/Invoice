@@ -342,6 +342,8 @@ const RECORD_TABLES = [
   'gst_setoffs', 'gst_challans', 'hsn_master',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   'rcm_documents',
+  // 7R: PMT-09 transfers, GST refund claims, ISD documents, TRACES justification imports
+  'gst_pmt09', 'gst_refunds', 'isd_documents', 'tds_justifications',
   // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
   'year_end',
   // Inventory masters (WP-8): stock groups, stock categories, units of measure
@@ -369,6 +371,7 @@ const ID_TABLES = new Set([
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
   'gst_setoffs', 'gst_challans', 'hsn_master',
   'rcm_documents',
+  'gst_pmt09', 'gst_refunds', 'isd_documents', 'tds_justifications',
   'year_end',
   'stock_groups', 'stock_categories', 'units',
 ]);

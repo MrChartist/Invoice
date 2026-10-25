@@ -70,7 +70,9 @@ function ensureBusinessAlerts(onReady: () => void): void {
     // 7O: TDS deposit / 26Q reminders once TDS is in use (a challan, or a bill / payment carrying TDS).
     const tds = (r: unknown) => Number((r as { tds_amount?: unknown } | null)?.tds_amount) > 0;
     const used = getTable('amc_contracts').length > 0 || getTable('gst_setoffs').length > 0 || getTable('gst_challans').length > 0
-      || getTable('tds_challans').length > 0 || getTable('purchases').some(tds) || getTable('purchase_payments').some(tds);
+      || getTable('tds_challans').length > 0 || getTable('purchases').some(tds) || getTable('purchase_payments').some(tds)
+      // 7R: TCS (27EQ) reminders once an invoice carries TCS.
+      || getTable('invoices').some((r) => Number((r as { tcs_amount?: unknown } | null)?.tcs_amount) > 0);
     if (!used && !(readApprovalPolicy().enabled && can('doc.approve'))) return;
   } catch {
     return;

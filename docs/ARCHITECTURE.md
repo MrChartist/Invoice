@@ -164,6 +164,10 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `gst_setoffs` | GST set-off (WP-6, `src/lib/gst-setoff.ts`) | `GstSetOffRecord` per 3B period × GSTIN: posted figures by head + the journal it wrote through `saveVoucher` (`docs/features/gst-setoff.md`) |
 | `gst_challans` | GST set-off (WP-6) | `GstChallan` PMT-06: CPIN, CIN / BRN, dates, major × minor head amounts; a paid challan's payment voucher id |
 | `hsn_master` | GST depth (WP-6, `src/lib/hsn-master.ts`) | `HsnMasterRow` code, description, UQC, goods / services, dated `rates` history (append-only by convention) |
+| `gst_pmt09` | cash ledger depth (7R, `src/lib/gst-cash-refunds.ts`) | `Pmt09Transfer` PMT-09: date, from / to major × minor head, amount, ARN; nothing posts (one cash-ledger account) |
+| `gst_refunds` | GST refunds (7R) | `GstRefundClaim` RFD-01: category, period, relevant date, ARN, claimed / provisional / sanctioned / rejected by head, status trail, receipt voucher id when paid (`docs/features/gst-setoff.md`) |
+| `isd_documents` | Input Service Distributor (7R, `src/lib/isd.ts`) | `IsdDoc` INWARD (invoices received by the ISD) / DISTRIBUTION (`ISD/FY…`) / RECEIVED (credit received by our unit → 3B 4A(4)) |
+| `tds_justifications` | TRACES import (7R, `src/lib/traces-justification.ts`) | `JustificationImport`: file name, TAN / FY / quarter / form read from the report, capped findings matched to register keys, resolved flags (`docs/features/tds-payables.md`) |
 | `stock_groups` / `stock_categories` | inventory masters (WP-8, `src/lib/stock-groups.ts`) | `StockTreeNode {id, name, parent_id?}` (nested); items point via `group_id` / `category_id`; `master.edit` (`docs/features/inventory-masters.md`) |
 | `units` | inventory masters (WP-8, `src/lib/units.ts`) | `UnitMaster`: simple unit (symbol, name, UQC, decimals; a built-in symbol is an override) or compound (`first` / `factor` / `second`); `master.edit` |
 

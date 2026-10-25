@@ -91,4 +91,8 @@ reports. Everything GST-related is a **working paper — verify with your CA**.
 - RCM / import returns: reversal of the self-assessed liability together with the ITC.
 - 7O (7.93 / 7.94): GSTR-9 (Tables 6 / 9) and the Compliance tab's late-fee / interest base now net supplier notes; a
   note on a bill with TDS at booking reverses the TDS pro rata (`tds_reversed`, Dr TDS payable instead of the
-  supplier) — treatment of TDS already deposited is for the CA. Supplier notes still carry no cess field.
+  supplier) — treatment of TDS already deposited is for the CA.
+- 7R (7.123): a note against a bill with compensation cess carries `cess_amount` (the bill's cess pro rata to the
+  note's taxable value, capped by earlier notes, inside `total`): 3B 4A cess / 3.1(d) cess, GSTR-9, Books, the ledger
+  (Cr Input cess 2353) and the Tally debit note ("Input Cess") reverse it; notes saved earlier carry none. On a bill
+  with TDS on payment, later payments suggest TDS net of the returned value (`paymentTdsLeft`).

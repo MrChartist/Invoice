@@ -132,7 +132,7 @@ test('GSTR-3B: a note in the period reduces 4A(5) and net ITC (4C); nothing in o
   // Reverse charge: 3.1(d) and 4A(3) fall together.
   const rcm = itcAdjustmentsFromNotes([note({ reverse_charge: true })], () => true);
   assert.equal(rcm[0].reverseCharge, true);
-  assert.deepEqual(itcNoteSummary(notes, (d) => d.startsWith('2025-06')), { count: 1, igst: 0, cgst: 27, sgst: 27, total: 54 });
+  assert.deepEqual(itcNoteSummary(notes, (d) => d.startsWith('2025-06')), { count: 1, igst: 0, cgst: 27, sgst: 27, cess: 0, total: 54 });
 });
 
 test('GSTR-2B: a CDNR credit note matches the supplier note by number, a value-only DN by value; invoices never match notes', () => {

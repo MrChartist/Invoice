@@ -442,6 +442,8 @@ export interface Gstr3bReport {
      * negative credit; the 3B tab shows this figure and flags it for the CA.
      */
     netSigned?: ItcHeads;
+    /** Additive (7R, 7.122): 4A(4) — eligible credit distributed to us by an Input Service Distributor. Absent when none. */
+    isd?: ItcHeads;
   };
   /** 5 — inward supplies from composition / exempt / nil suppliers (value). */
   inwardExempt: { inter: number; intra: number };
@@ -493,6 +495,11 @@ export interface BuildOptions {
    * the line reports as typed (2 at the UQC of BOX). Working paper: verify with your CA.
    */
   items?: ItemIndex;
+  /**
+   * Additive (7R, 7.122): ISD credit received by our unit(s) (`isdInwardRows` in isd.ts). Rows dated in the period
+   * (and of the filer GSTIN, when both are set) go to 4A(4) — ineligible ones to 4D(2) — and into 4C.
+   */
+  isdInward?: readonly { date: string; gstin?: string; igst: number; cgst: number; sgst: number; cess: number; eligible: boolean }[];
 }
 
 /**
@@ -1643,8 +1650,17 @@ export function buildGstr3b(
     }
   }
 
+  // 7R (7.122): ISD credit received (4A(4)); ineligible ISD credit is shown in 4D(2).
+  const isd = zeroHeads();
+  let hasIsd = false;
+  const filerG = (opts.gstin ?? '').trim().toUpperCase();
+  for (const r of opts.isdInward ?? []) {
+    if (!inPeriod(r.date, opts.period) || (filerG && r.gstin && r.gstin.toUpperCase() !== filerG)) continue;
+    hasIsd = true;
+    add(r.eligible ? isd : ineligible, r);
+  }
   const signedHead = (k: 'igst' | 'cgst' | 'sgst' | 'cess') =>
-    round2(impGoods[k] + impServices[k] + availRcm[k] + availOther[k] - reversedRules[k] - reversed[k]);
+    round2(impGoods[k] + impServices[k] + availRcm[k] + isd[k] + availOther[k] - reversedRules[k] - reversed[k]);
   const netSigned: ItcHeads = { igst: signedHead('igst'), cgst: signedHead('cgst'), sgst: signedHead('sgst'), cess: signedHead('cess') };
   const net: ItcHeads = { igst: Math.max(netSigned.igst, 0), cgst: Math.max(netSigned.cgst, 0), sgst: Math.max(netSigned.sgst, 0), cess: Math.max(netSigned.cess, 0) };
   const negativeNet = netSigned.igst < 0 || netSigned.cgst < 0 || netSigned.sgst < 0 || netSigned.cess < 0;
@@ -1683,6 +1699,7 @@ export function buildGstr3b(
       net,
       ineligible,
       ...(negativeNet ? { netSigned } : {}),
+      ...(hasIsd ? { isd } : {}),
     },
     inwardExempt,
     payment,

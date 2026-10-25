@@ -19,7 +19,7 @@ import { registerNotificationProvider, type AppNotification } from './notificati
 import { getTable, KEYS } from './storage';
 import { wireT } from '../i18n/areas/wiring';
 import { o7T } from '../i18n/areas/gst-tds-7o';
-import { loadTdsDue, usesTds, type DueItem } from './tds-payables';
+import { loadTcsDue, loadTdsDue, usesTcs, usesTds, type DueItem } from './tds-payables';
 
 /** 7O (7.96): remind this many days before a TDS deposit / 26Q due date (and keep reminding while overdue). */
 export const TDS_LEAD_DAYS = 5;
@@ -41,6 +41,8 @@ export interface BusinessAlertInput {
   setoff?: { gstin: string; frequency: FilerFrequency; stateCode?: string; postedKeys: ReadonlySet<string> };
   /** 7O (7.96): TDS deposit / return due items (`dueCalendar`) of the current and previous FY. */
   tdsDue?: readonly DueItem[];
+  /** 7R (7.120): TCS (27EQ) deposit / return due items from the TCS charged on invoices. */
+  tcsDue?: readonly DueItem[];
 }
 
 /** TDS due items worth a bell notice: deposits / returns overdue, or due within `TDS_LEAD_DAYS` (certificates skipped). */
@@ -116,8 +118,8 @@ export function businessNotices(input: BusinessAlertInput): AppNotification[] {
       });
     }
   }
-  for (const d of tdsDueReminders(input.tdsDue ?? [], input.today)) {
-    const what = d.what === 'deposit' ? o7T('nTdsDeposit', { kind: d.kind, period: d.period }) : o7T('nTdsReturn', { form: d.kind === 'TDS' ? '26Q' : '27EQ', period: d.period });
+  for (const d of tdsDueReminders([...(input.tdsDue ?? []), ...(input.tcsDue ?? [])], input.today)) {
+    const what = d.what === 'deposit' ? o7T('nTdsDeposit', { kind: d.kind, period: d.period }) : o7T('nTdsReturn', { form: d.form ?? (d.kind === 'TDS' ? '26Q' : '27EQ'), period: d.period });
     out.push({
       id: `tdsdue:${d.id}:${d.status}`,
       severity: d.status === 'overdue' ? 'critical' : 'warning',
@@ -154,6 +156,7 @@ export function registerBusinessAlerts(): void {
       invoices: ctx.invoices ?? getTable<InvoiceRecord>(KEYS.invoices),
       amc: getTable<AmcContract>(AMC_TABLE),
       ...(usesTds() ? { tdsDue: loadTdsDue(today) } : {}),
+      ...(usesTcs() ? { tcsDue: loadTcsDue(today) } : {}),
       ...(usesSetoff && gstin
         ? {
             setoff: {

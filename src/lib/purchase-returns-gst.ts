@@ -29,12 +29,26 @@ export function isLiveNote(n: PurchaseReturn | null | undefined): n is PurchaseR
   return !!n && typeof n === 'object' && !!isoDay(n.date) && num(n.total) > 0;
 }
 
-/** GST on the note (always >= 0). */
+/** GST on the note (always >= 0; cess excluded — see `noteCess`). */
 export const noteTax = (n: Pick<PurchaseReturn, 'cgst' | 'sgst' | 'igst'>): number => round2(Math.max(num(n.cgst), 0) + Math.max(num(n.sgst), 0) + Math.max(num(n.igst), 0));
 
-/** GST on the note that we pay to the government ourselves (reverse charge / imports), not the supplier. */
-export function noteSelfTax(n: Pick<PurchaseReturn, 'reverse_charge' | 'import_type' | 'cgst' | 'sgst' | 'igst'>): number {
-  return n.reverse_charge || n.import_type ? noteTax(n) : 0;
+/** Compensation cess reversed with the note (7R, 7.123; always >= 0, 0 on notes recorded before 7R). */
+export const noteCess = (n: Pick<PurchaseReturn, 'cess_amount'>): number => round2(Math.max(num(n.cess_amount), 0));
+
+/**
+ * Cess to reverse on a note against `bill`: the bill's cess × note taxable ÷ bill taxable (2 decimals), never more
+ * than what earlier notes left (`earlier`). 0 when the bill carries no cess. Working paper — verify with your CA.
+ */
+export function noteCessFor(bill: { cess_amount?: unknown; taxable?: unknown } | undefined | null, noteTaxable: number, earlier = 0): number {
+  const cess = round2(Math.max(num(bill?.cess_amount), 0));
+  const base = Math.max(num(bill?.taxable), 0);
+  if (!(cess > 0) || !(base > 0) || !(noteTaxable > 0)) return 0;
+  return Math.max(Math.min(round2((cess * Math.min(noteTaxable / base, 1))), round2(cess - Math.max(earlier, 0))), 0);
+}
+
+/** GST (+ cess, 7R) on the note that we pay to the government ourselves (reverse charge / imports), not the supplier. */
+export function noteSelfTax(n: Pick<PurchaseReturn, 'reverse_charge' | 'import_type' | 'cgst' | 'sgst' | 'igst' | 'cess_amount'>): number {
+  return n.reverse_charge || n.import_type ? round2(noteTax(n) + noteCess(n)) : 0;
 }
 
 /** TDS the note takes back from the TDS payable (7O, 7.94; the bill had TDS deducted at booking), >= 0. */
@@ -47,13 +61,14 @@ export function noteSupplierAmount(n: PurchaseReturn): number {
   return round2(Math.max(num(n.total) - noteSelfTax(n) - noteTdsReversed(n), 0));
 }
 
-/** The note's ITC (input tax it reverses): its GST when the bill claimed ITC, else 0. */
-export function noteItc(n: PurchaseReturn): { igst: number; cgst: number; sgst: number; total: number } {
-  if (!n.itc_eligible) return { igst: 0, cgst: 0, sgst: 0, total: 0 };
+/** The note's ITC (input tax it reverses): its GST (+ cess, 7R — `total` includes it) when the bill claimed ITC, else 0. */
+export function noteItc(n: PurchaseReturn): { igst: number; cgst: number; sgst: number; cess: number; total: number } {
+  if (!n.itc_eligible) return { igst: 0, cgst: 0, sgst: 0, cess: 0, total: 0 };
   const igst = round2(Math.max(num(n.igst), 0));
   const cgst = round2(Math.max(num(n.cgst), 0));
   const sgst = round2(Math.max(num(n.sgst), 0));
-  return { igst, cgst, sgst, total: round2(igst + cgst + sgst) };
+  const cess = noteCess(n);
+  return { igst, cgst, sgst, cess, total: round2(igst + cgst + sgst + cess) };
 }
 
 /**
@@ -65,7 +80,7 @@ export function itcAdjustmentsFromNotes(notes: readonly PurchaseReturn[], inPeri
   const out: NormalizedPurchase[] = [];
   for (const n of notes ?? []) {
     if (!isLiveNote(n) || !inPeriod(n.date)) continue;
-    const tax = noteTax(n);
+    const tax = round2(noteTax(n) + noteCess(n));
     // A note with no GST (exempt / unregistered supplier) would be read as a Table 5 value: leave it out.
     if (!(tax > 0)) continue;
     out.push({
@@ -81,6 +96,8 @@ export function itcAdjustmentsFromNotes(notes: readonly PurchaseReturn[], inPeri
       igst: -round2(Math.max(num(n.igst), 0)),
       cgst: -round2(Math.max(num(n.cgst), 0)),
       sgst: -round2(Math.max(num(n.sgst), 0)),
+      // 7R (7.123): cess on the note comes off 4A cess (and 3.1(d) cess for reverse charge) like the GST.
+      ...(noteCess(n) > 0 ? { cess: -noteCess(n) } : {}),
       itcReversed: 0,
       itcReversalReason: '',
       importType: n.import_type === 'GOODS' || n.import_type === 'SERVICES' ? n.import_type : '',
@@ -90,8 +107,8 @@ export function itcAdjustmentsFromNotes(notes: readonly PurchaseReturn[], inPeri
 }
 
 /** Totals of the ITC reduction for a period (the 3B tab's "Supplier notes" line). */
-export function itcNoteSummary(notes: readonly PurchaseReturn[], inPeriod: (date: string) => boolean): { count: number; igst: number; cgst: number; sgst: number; total: number } {
-  const s = { count: 0, igst: 0, cgst: 0, sgst: 0, total: 0 };
+export function itcNoteSummary(notes: readonly PurchaseReturn[], inPeriod: (date: string) => boolean): { count: number; igst: number; cgst: number; sgst: number; cess: number; total: number } {
+  const s = { count: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, total: 0 };
   for (const n of notes ?? []) {
     if (!isLiveNote(n) || !inPeriod(n.date)) continue;
     const itc = noteItc(n);
@@ -100,8 +117,9 @@ export function itcNoteSummary(notes: readonly PurchaseReturn[], inPeriod: (date
     s.igst = round2(s.igst + itc.igst);
     s.cgst = round2(s.cgst + itc.cgst);
     s.sgst = round2(s.sgst + itc.sgst);
+    s.cess = round2(s.cess + itc.cess);
   }
-  s.total = round2(s.igst + s.cgst + s.sgst);
+  s.total = round2(s.igst + s.cgst + s.sgst + s.cess);
   return s;
 }
 
@@ -159,7 +177,7 @@ export function booksReturnEffects(notes: readonly PurchaseReturn[] | undefined)
   const out: BooksReturnEffect[] = [];
   for (const n of notes ?? []) {
     if (!isLiveNote(n)) continue;
-    const tax = noteTax(n);
+    const tax = round2(noteTax(n) + noteCess(n));
     const itc = noteItc(n).total;
     out.push({
       date: n.date,

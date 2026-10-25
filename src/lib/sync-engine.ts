@@ -297,6 +297,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}tds_challans`]: 'date',
   [`${DB_PREFIX}gst_setoffs`]: 'date',
   [`${DB_PREFIX}gst_challans`]: (r) => str(r.deposited_on) || str(r.generated_on) || undefined,
+  // 7R: PMT-09 transfers (filing day), refund claims (filing day, else the period end), ISD documents.
+  [`${DB_PREFIX}gst_pmt09`]: 'date',
+  [`${DB_PREFIX}gst_refunds`]: (r) => str(r.filed_on) || str(r.period_to) || undefined,
+  [`${DB_PREFIX}isd_documents`]: 'date',
   [`${DB_PREFIX}payroll_runs`]: 'date',
   [`${DB_PREFIX}payroll_payments`]: 'date',
   [`${DB_PREFIX}actuarial_valuations`]: 'date',
@@ -862,6 +866,8 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}employee_loans`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}fnf_settlements`]: { num: 'number', date: 'pay_month' },
   [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
+  // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
+  // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };
 
 /** Duplicate document numbers (two devices issuing the same serial): listed, never renumbered. */
