@@ -1073,9 +1073,17 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   // A note follows the invoice it amends: B2CL only if that invoice was B2CL (its value and date
   // decide), so a small credit against a large invoice is reported in CDNUR, not netted into B2CS.
   const byId = new Map(filed.map((r) => [r.id, r]));
+  // First note link per note id (as `links.find` would pick), built once instead of a scan per note.
+  let noteLinks: Map<string, string> | undefined;
   const originalOf = (d: PDoc): InvoiceRecord | undefined => {
-    const link = opts.links?.find((l) => l.to_id === d.rec.id && (l.relation === 'credit_note' || l.relation === 'debit_note'));
-    return link ? byId.get(link.from_id) : undefined;
+    if (!noteLinks) {
+      noteLinks = new Map();
+      for (const l of opts.links ?? []) {
+        if ((l.relation === 'credit_note' || l.relation === 'debit_note') && !noteLinks.has(l.to_id)) noteLinks.set(l.to_id, l.from_id);
+      }
+    }
+    const from = noteLinks.get(d.rec.id);
+    return from !== undefined ? byId.get(from) : undefined;
   };
   const largeB2c = (d: PDoc): boolean => {
     const orig = d.isNote ? originalOf(d) : undefined;

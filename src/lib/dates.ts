@@ -36,6 +36,8 @@ export function localDayOf(d: Date): string {
 export function isoDay(value: unknown): string {
   if (value instanceof Date) return localDayOf(value);
   if (typeof value !== 'string') return '';
+  // Fast path (perf: called per row in every report): a bare day is already normalised.
+  if (value.length === 10 && DAY_RE.test(value)) return value;
   const s = value.trim();
   if (!s) return '';
   if (INSTANT_RE.test(s)) return localDayOf(new Date(s));

@@ -4,10 +4,11 @@ import { ShieldAlert } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
-import { creditCheck, masterFor, type BounceLike } from '../../lib/credit-limit';
+import { belongsTo, creditCheck, masterFor, type BounceLike } from '../../lib/credit-limit';
 import { localDb } from '../../lib/localDb';
-import { getTable } from '../../lib/storage';
+import { getTable, peekTable } from '../../lib/storage';
 import { todayInput } from '../../lib/utils';
+import type { InvoiceRecord } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
 import styles from './StockWarnings.module.css';
@@ -27,7 +28,10 @@ export function CreditWarning() {
   const context = useMemo(() => {
     const master = masterFor({ id: clientId, name: clientName ?? '' }, localDb.clients.getAll());
     if (!master) return null;
-    return { master, invoices: localDb.invoices.getAll(), cheques: getTable<BounceLike>('cheques') };
+    // Only this client's documents (creditCheck skips the rest anyway), so a keystroke that changes
+    // the draft total walks a handful of rows, not the whole table; read-only, so no re-parse either.
+    const invoices = peekTable<InvoiceRecord>('invoices').filter((inv) => belongsTo(inv, master));
+    return { master, invoices, cheques: getTable<BounceLike>('cheques') };
   }, [clientId, clientName]);
   if (!context) return null;
   const check = creditCheck({

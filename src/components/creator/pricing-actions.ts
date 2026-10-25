@@ -5,15 +5,15 @@
  */
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
-import { generateId, getTable } from '../../lib/storage';
+import { KEYS, generateId, getTable, peekTable } from '../../lib/storage';
 import { num } from '../../lib/invoice-calc';
 import { TABLES, type StockItem } from '../../lib/inventory';
 import { addScannedLine, findByCode } from '../../lib/scan';
 import {
-  catalogItemFor, levelForClient, loadPricing, masterClient, pricingInUse, resolvePrice, syncSchemeLines,
-  type PriceLevel, type PricingData,
+  PRICE_LEVELS_TABLE, SCHEMES_TABLE, catalogItemFor, levelForClient, masterClient, pricingInUse, resolvePrice, syncSchemeLines,
+  type PriceLevel, type PricingData, type Scheme,
 } from '../../lib/pricing';
-import type { InvoiceItem } from '../../types/invoice';
+import type { Client, InvoiceItem } from '../../types/invoice';
 import { PRICE_LIST_BASIS, priceListRate } from '../../lib/price-list';
 
 /** Notes don't take part: a credit / debit note re-states an earlier price. */
@@ -29,17 +29,29 @@ export interface EditorPricing {
 
 /** Pricing data and the current party's level, or null when the user has not set pricing up. */
 export function editorPricing(): EditorPricing | null {
-  const data = loadPricing();
+  const data = editorPricingData();
   if (!pricingInUse(data) || !pricedDoc()) return null;
   const st = useInvoiceStore.getState();
-  const level = levelForClient(masterClient(localDb.clients.getAll(), st.client), data.levels);
+  const level = levelForClient(masterClient(peekTable<Client>(KEYS.clients), st.client), data.levels);
   return { data, level };
 }
 
-/** 7S (7.66): the stock item's selling price-list rate on the document date, for a line (one table read). */
+/**
+ * `loadPricing()` as read-only views (perf: this runs on every quantity keystroke, and the tables
+ * only change on other screens). Nothing here mutates them: lines copy the fields they need.
+ */
+function editorPricingData(): PricingData {
+  return {
+    levels: peekTable<PriceLevel>(PRICE_LEVELS_TABLE) as PriceLevel[],
+    schemes: peekTable<Scheme>(SCHEMES_TABLE) as Scheme[],
+    catalog: peekTable<InvoiceItem>(KEYS.items) as InvoiceItem[],
+  };
+}
+
+/** 7S (7.66): the stock item's selling price-list rate on the document date, for a line (read-only view, no re-parse). */
 function listRateFor(line: Pick<InvoiceItem, 'name' | 'hsn'>): number | undefined {
   if (!pricedDoc()) return undefined;
-  const items = getTable<StockItem>(TABLES.items);
+  const items = peekTable<StockItem>(TABLES.items);
   if (!items.some((i) => i.selling_prices?.length)) return undefined;
   return priceListRate(items, line.name, line.hsn, useInvoiceStore.getState().issue_date);
 }

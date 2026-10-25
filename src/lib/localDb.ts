@@ -54,6 +54,7 @@ import {
   generateId,
   getJson,
   getTable,
+  peekTable,
   setJson,
   setTable,
 } from './storage';
@@ -325,12 +326,16 @@ export const localDb = {
 
   invoices: {
     getAll: () => getTable<InvoiceRecord>(KEYS.invoices),
-    getById: (id: string) => getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id),
+    /** A private copy of one document (the table is parsed once per stored version, not per lookup). */
+    getById: (id: string): InvoiceRecord | undefined => {
+      const found = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id);
+      return found ? structuredClone(found) : undefined;
+    },
 
     /** Next number in the series, derived from the highest one already issued. */
     nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string) =>
       nextInvoiceNumber({
-        existingNumbers: getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
+        existingNumbers: peekTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
         dateStr,
         docType,
         customPrefix: prefix ?? readSettings().invoicePrefix,
@@ -528,7 +533,8 @@ export const localDb = {
       if (input.bankAccountId && (input.method || '').toLowerCase() !== 'cash') payment.bank_account_id = input.bankAccountId;
       // An advance adjusted against the invoice (5.3): settles the bill, but is not new money.
       if (input.advanceId) payment.advance_id = input.advanceId;
-      const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
+      // Read-only lookup: the payment never changes this row (syncPaymentState writes a copy).
+      const target = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
       // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
       const realised = Number(input.realisedRate);
       if (realised > 0 && Number.isFinite(realised) && (target?.currency || 'INR').toUpperCase() !== 'INR') {
@@ -640,10 +646,13 @@ function withPaid(inv: InvoiceRecord, paidRaw: number): InvoiceRecord {
 
 /** Apply a delta to an invoice's paid amount and re-derive its money status. */
 function syncPaymentState(invoiceId: string, delta: number): void {
-  const invoices = getTable<InvoiceRecord>(KEYS.invoices);
-  const idx = invoices.findIndex((i) => i.id === invoiceId);
+  // Perf: the shared parsed table (usually already read by the caller) with ONE row replaced by a
+  // copy; the shared rows themselves are never mutated.
+  const shared = peekTable<InvoiceRecord>(KEYS.invoices);
+  const idx = shared.findIndex((i) => i.id === invoiceId);
   if (idx < 0) return;
-  const inv = invoices[idx];
+  const inv = shared[idx];
+  const invoices = shared.slice();
   invoices[idx] = {
     ...withPaid(inv, (Number(inv.amount_paid) || 0) + delta),
     updated_at: new Date().toISOString(),
@@ -657,7 +666,7 @@ function syncPaymentState(invoiceId: string, delta: number): void {
  */
 export function generateInvoiceNumber(dateStr?: string): string {
   return nextInvoiceNumber({
-    existingNumbers: getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
+    existingNumbers: peekTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
     dateStr,
     docType: 'INVOICE',
     customPrefix: 'INV',
