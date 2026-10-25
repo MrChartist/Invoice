@@ -15,6 +15,7 @@ import { readRefs } from '../lib/attachments';
 import { normalizeTransport } from '../lib/transport';
 import { sanitizePartyBalance } from '../lib/party-balance';
 import { normalizeSchedule, sanitizeAcceptance } from '../lib/doc-snapshots';
+import type {} from '../types/sales-r2';
 import type { AppSettings } from '../lib/localDb';
 import type {
   AmendmentInfo,
@@ -173,6 +174,11 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(num(item.cess_per_unit) > 0 ? { cess_per_unit: num(item.cess_per_unit) } : {}),
     amount: num(item.amount, quantity * rate),
     ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
+    // R2-B (additive): optional / alternative quotation lines, the source line a stage invoice bills.
+    ...(item.optional ? { optional: true } : {}),
+    ...(typeof item.selected === 'boolean' && (item.optional || item.alt_group) ? { selected: item.selected } : {}),
+    ...(typeof item.alt_group === 'string' && item.alt_group.trim() ? { alt_group: item.alt_group.trim() } : {}),
+    ...(item.progress_line_of ? { progress_line_of: String(item.progress_line_of) } : {}),
     ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
     ...(Array.isArray(item.bill_refs) && item.bill_refs.length ? { bill_refs: item.bill_refs.map(String) } : {}),
     ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
@@ -283,6 +289,14 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
       const acc = sanitizeAcceptance(r.acceptance);
       return acc ? { acceptance: acc } : {};
     })(),
+
+    // R2-B (additive): milestones, stage marks, quotation revisions / proposal sections, Kind attn.
+    ...(Array.isArray(r.milestones) && r.milestones.length ? { milestones: r.milestones as InvoiceRecord['milestones'] } : {}),
+    ...(r.progress_of && typeof r.progress_of === 'object' ? { progress_of: r.progress_of as InvoiceRecord['progress_of'] } : {}),
+    ...(typeof r.revision_of === 'string' && r.revision_of ? { revision_of: r.revision_of } : {}),
+    ...(num(r.revision_no) > 0 ? { revision_no: num(r.revision_no) } : {}),
+    ...(Array.isArray(r.proposal_sections) && r.proposal_sections.length ? { proposal_sections: r.proposal_sections as InvoiceRecord['proposal_sections'] } : {}),
+    ...(r.attention && typeof r.attention === 'object' && (r.attention as { name?: unknown }).name ? { attention: r.attention as InvoiceRecord['attention'] } : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

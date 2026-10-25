@@ -700,3 +700,21 @@ test('R2-C2 deferrals read the real purchase shape (prepaid expense source lines
   assert.equal(expenseAccountOf({ ...bill, kind: 'EXPENSE', category: 'Rent' }, []), 'rent');
   assert.equal(expenseAccountOf(bill, []), 'purchases');
 });
+
+test('R2-B5 back-to-back reader (backorders, cancel warning) reads bills against PO lines', async () => {
+  const { backorderRows, openLinkedPos } = await import('../src/lib/back-to-back.ts');
+  const po = {
+    id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-05', vendor_name: 'Acme Supplies', so_id: 'so1',
+    lines: [{ id: 'pl1', name: 'Paper ream', quantity: 10, rate: 100, tax_rate: 18, so_line_id: 'L1' }], taxable: 1000, cgst: 90, sgst: 90, igst: 0, total: 1180,
+  };
+  const order = {
+    id: 'so1', invoice_number: 'SO/FY26-27/0001', doc_type: 'SALES_ORDER', status: 'Sent', issue_date: '2026-04-01', due_date: '2026-04-30',
+    client: { name: 'C' }, items: [{ id: 'L1', name: 'Paper ream', type: 'goods', quantity: 10, rate: 150, amount: 1500 }],
+  };
+  const billed = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], po_line_id: 'pl1' }] };
+  const rows = backorderRows({ invoices: [order as never], links: [], orders: [po], purchases: [billed], notes: [] });
+  assert.equal(rows[0].pos[0].received, 10, 'the bill against the PO line counts as received');
+  assert.equal(rows[0].status, 'arrived');
+  assert.deepEqual(openLinkedPos('so1', [po], [billed], []), []);
+  assert.equal(openLinkedPos('so1', [po], [], []).length, 1);
+});

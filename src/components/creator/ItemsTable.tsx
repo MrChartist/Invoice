@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, Copy, Library, Plus, Trash2 } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { Typeahead } from '../ui/Typeahead';
@@ -21,6 +21,14 @@ import { afterLineChange, pickCatalogItem, setLineQuantity, setLineRate } from '
 import { tNodes, useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
+import { QuoteLineFlags } from './QuoteLineFlags';
+import flagStyles from './QuoteLineFlags.module.css';
+import { isExcludedLine } from '../../lib/invoice-calc';
+import { lineValue } from '../../lib/proposal-sections';
+import { s2T } from '../../i18n/areas/sales-r2';
+
+// R2-B3: proposal sections editor, quotations only (lazy).
+const ProposalSectionsCard = lazy(() => import('./ProposalSectionsCard').then((m) => ({ default: m.ProposalSectionsCard })));
 import styles from './ItemsTable.module.css';
 
 export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) => void }) {
@@ -156,6 +164,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 </div>
               ) : null}
               {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
+              {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
                 <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>
                   + Add cess
@@ -256,7 +265,10 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
 
             {priced && (
               <div className={cn(styles.cell, styles.amount)} data-label={t('items.colAmount')}>
-                {formatCurrency(amount, currency)}
+                {isExcludedLine(item) ? (
+                  // R2-B3: an unselected optional / alternative line — shown, but outside the total.
+                  <span className={flagStyles.excluded} title={s2T('q.optionalAmount')}>{formatCurrency(lineValue(item), currency)}</span>
+                ) : formatCurrency(amount, currency)}
               </div>
             )}
 
@@ -286,6 +298,11 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
           {tNodes('items.keyHint', { enter: <kbd>Enter</kbd>, alt: <kbd>Alt</kbd>, arrows: <><kbd>↑</kbd>/<kbd>↓</kbd></>, ctrl: <kbd>Ctrl</kbd> })}
         </span>
       </div>
+      {docType === 'QUOTATION' && (
+        <Suspense fallback={null}>
+          <ProposalSectionsCard />
+        </Suspense>
+      )}
     </div>
   );
 }

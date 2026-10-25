@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BellRing, FileUp, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
+import { BellRing, Download, FileUp, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { ImportWizard } from '../components/import/ImportWizard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -28,6 +28,9 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Clients.module.css';
 import { receivableTotal } from '../lib/rcm';
+import { clientsCsv, contactSearchFields } from '../lib/contacts';
+import { downloadText } from '../lib/download';
+import { s2T } from '../i18n/areas/sales-r2';
 
 // Daily khata loop (8A): the quick ₹ Received / ₹ Given sheet and the reminder queue load on first use.
 const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
@@ -123,7 +126,7 @@ export function Clients() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = q
-      ? rows.filter(({ client: c }) => c && [c.name, c.company, c.email, c.phone, c.city, c.gstin, c.pan, c.tan].some((f) => f?.toLowerCase().includes(q)))
+      ? rows.filter(({ client: c }) => c && [c.name, c.company, c.email, c.phone, c.city, c.gstin, c.pan, c.tan, ...contactSearchFields(c)].some((f) => f?.toLowerCase().includes(q)))
       : rows;
     if (overdueOnly) list = list.filter((r) => r.overdue > 0.004);
     return sortKhataRows(list, sort);
@@ -148,6 +151,10 @@ export function Clients() {
             <>
               <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
                 <FileUp size={16} /> {salesT('cl.import')}
+              </button>
+              {/* R2-B4: client list with the first contact / address columns (the import reads them back). */}
+              <button type="button" className={controls.btnOutline} disabled={!clients.length} onClick={() => downloadText('clients.csv', clientsCsv(clients), 'text/csv')} data-clients-csv>
+                <Download size={16} /> {s2T('exportCsv')}
               </button>
               <button type="button" className={controls.btnPrimary} onClick={openAdd}>
                 <Plus size={16} /> {salesT('cl.add')}
@@ -265,7 +272,8 @@ export function Clients() {
                               <Phone size={12} /> {c.phone}
                             </span>
                           ) : null}
-                          {!c.email && !c.phone && <span className={styles.sub}>—</span>}
+                          {!c.email && !c.phone && !c.contacts?.length && <span className={styles.sub}>—</span>}
+                          {c.contacts?.length ? <span className={styles.sub}>{s2T('c.nContacts', { n: c.contacts.length })}</span> : null}
                         </div>
                       </td>
                       <td className={styles.cLoc} data-empty={!c.city && !c.state ? 'true' : undefined}>

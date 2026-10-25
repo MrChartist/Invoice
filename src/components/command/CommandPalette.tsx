@@ -30,6 +30,7 @@ import { formatCombo } from '../../hooks/useHotkeys';
 import { tallyDestinations } from './tally-destinations';
 import { distDestinations } from './dist-destinations';
 import { r2cDestinations } from './r2c-destinations'; // R2-C
+import { salesR2Destinations } from './sales-r2-destinations'; // R2-B
 import { sfT } from '../../i18n/areas/smart-find';
 import styles from './CommandPalette.module.css';
 
@@ -176,6 +177,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   const tallyEntries = useMemo<StaticEntry[]>(() => (open ? [...tallyDestinations(), ...distDestinations()] : []), [open]); // + 8F
   // R2-C: books & output destinations (annual pack, deferrals, IMS, labels, display, package types)
   const r2cEntries = useMemo<StaticEntry[]>(() => (open ? r2cDestinations() : []), [open]);
+  // R2-B: round-2 sales screens (batch invoices, backorders)
+  const r2bEntries = useMemo<StaticEntry[]>(() => (open ? salesR2Destinations() : []), [open]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
@@ -191,7 +194,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       return [...base, ...staticRows.map((r) => ({ key: r.id, kind: 'result' as const, result: r }))];
     }
     const found = searchAll(q, {
-      data: { pages: [...pageEntries, ...tallyEntries, ...r2cEntries], actions: actionEntries },
+      data: { pages: [...pageEntries, ...tallyEntries, ...r2cEntries, ...r2bEntries], actions: actionEntries },
       perGroup: 6,
     });
     if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
@@ -199,7 +202,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     return groupResults(found).flatMap((g) =>
       g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
     );
-  }, [open, query, recents, pageEntries, tallyEntries, r2cEntries, actionEntries, allCompanies, peeked]);
+  }, [open, query, recents, pageEntries, tallyEntries, r2cEntries, r2bEntries, actionEntries, allCompanies, peeked]);
 
   // Reset on open; remember and restore focus.
   useEffect(() => {
