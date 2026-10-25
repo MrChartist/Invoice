@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Smartphone } from 'lucide-react';
+import { FilePlus2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
@@ -37,7 +37,7 @@ export function Distribution() {
       <PageHeader
         title={distT('title')}
         subtitle={distT('subtitle')}
-        actions={<Link to="/order-pad" className={controls.btnOutline}><Smartphone size={16} aria-hidden="true" /> {distT('orderPad')}</Link>}
+        actions={<Link to="/order-pad" className={controls.btnOutline}><FilePlus2 size={16} aria-hidden="true" /> {distT('orderPad')}</Link>}
       />
       <div className={own.stack}>
         <div className={controls.segment} role="tablist" aria-label={distT('title')}>

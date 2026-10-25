@@ -286,6 +286,7 @@ export function Inventory() {
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setMastersOpen('units')}>
             <Ruler size={14} aria-hidden="true" /> {imT('unitsBtn')}
           </button>
+          <Link to="/distribution" className={cn(controls.btnOutline, controls.btnSm)}>{skT('distLink')}</Link>
           {catalogueMissing.length > 0 && (
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={importCatalogue}>
               <ArrowDownToLine size={14} /> {invT('importFromCatalogueN', { n: catalogueMissing.length })}

@@ -304,7 +304,8 @@ try {
 
     const pdfPages = async () => {
       await dialog.getByRole('button', { name: /^Share/ }).click();
-      const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+      // A 3-copy capture can take over 10 s on a loaded box (seen at load average 7 on 4 cores).
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
       const body = readFileSync(await dl.path()).toString('latin1');
       return (body.match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
     };
@@ -1573,9 +1574,12 @@ try {
     await page.locator('[data-dist-reports]').waitFor({ timeout: 15000 });
     await page.getByRole('tab', { name: 'Beat plan' }).click();
     await page.locator('[data-beat-plan]').waitFor({ timeout: 15000 });
+    const prevStock = await readJson(page, 'stock_items', []);
+    await writeJson(page, 'stock_items', [...prevStock, { id: 'e2e-8f', name: 'E2E Soap', unit: 'NOS', track_stock: true, opening_qty: 5, opening_rate: 10, reorder_level: 0 }]);
     await page.goto(srv.origin + '/inventory?tab=analysis');
     await page.locator('[data-stock-analysis]').waitFor({ timeout: 15000 });
-    check(true, 'stock analysis tab renders');
+    check(await page.locator('[data-move-class="non"]').filter({ hasText: 'E2E Soap' }).count() === 1, 'stock analysis: an item with no outward is non-moving');
+    await writeJson(page, 'stock_items', prevStock.length ? prevStock : null);
     await writeJson(page, 'dist_beats', null);
     await writeJson(page, 'dist_areas', null);
   });

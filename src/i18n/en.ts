@@ -72,7 +72,6 @@ export const en = {
   'nav.receivables': 'Receivables',
   'nav.expenses': 'Expenses',
   'nav.inventory': 'Inventory',
-  'nav.distribution': 'Distribution',
   'nav.books': 'Books',
   'nav.reconcile': 'Reconcile',
   'nav.cheques': 'Cheques',

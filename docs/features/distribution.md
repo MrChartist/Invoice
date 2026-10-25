@@ -1,7 +1,8 @@
 # Distribution, pharma operations & stock depth (8F, roadmap 8.80–8.88)
 
 BUSY / Marg / Gofrugal / Zoho-Inventory parity for distributors and pharmacies. Everything is local: no server, no
-live sync. Screens: **Distribution** (`/distribution`, lazy), **Order pad** (`/order-pad`, salesman mode), and three
+live sync. Screens: **Distribution** (`/distribution`, lazy — opened from the Inventory toolbar or the command palette; no
+sidebar entry, the sidebar is unchanged), **Order pad** (`/order-pad`, salesman mode), and three
 Inventory tabs — *Fast / slow · ABC*, *Variants, kits & bins*, *Breakage / expiry* (each its own chunk).
 
 ## Credit-limit enforcement (8.80)

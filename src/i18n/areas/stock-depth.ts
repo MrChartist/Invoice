@@ -3,6 +3,7 @@ import { defineArea } from '../area';
 
 export const skT = defineArea(
   {
+    distLink: 'Distribution · van · pick list',
     tabAnalysis: 'Fast / slow · ABC',
     tabDepth: 'Variants, kits & bins',
     tabExpiry: 'Breakage / expiry',
@@ -76,6 +77,7 @@ export const skT = defineArea(
     rawSent: 'Sent to the label printer',
   } as const,
   {
+    distLink: 'वितरण · वैन · पिक लिस्ट',
     tabAnalysis: 'तेज़ / धीमा · ABC',
     tabDepth: 'वेरिएंट, किट और बिन',
     tabExpiry: 'टूट-फूट / एक्सपायरी',

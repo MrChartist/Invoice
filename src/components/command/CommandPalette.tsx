@@ -27,6 +27,7 @@ import {
 } from '../../lib/search';
 import { formatCombo } from '../../hooks/useHotkeys';
 import { tallyDestinations } from './tally-destinations';
+import { distDestinations } from './dist-destinations';
 import styles from './CommandPalette.module.css';
 
 export interface PaletteAction {
@@ -149,7 +150,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     [actions],
   );
   // Tally-parity screens (Phase 7): searchable, not listed on the empty palette.
-  const tallyEntries = useMemo<StaticEntry[]>(() => (open ? tallyDestinations() : []), [open]);
+  const tallyEntries = useMemo<StaticEntry[]>(() => (open ? [...tallyDestinations(), ...distDestinations()] : []), [open]); // + 8F
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 

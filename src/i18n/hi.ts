@@ -67,7 +67,6 @@ export const hi: Messages = {
   'nav.receivables': 'वसूली',
   'nav.expenses': 'खर्च',
   'nav.inventory': 'स्टॉक',
-  'nav.distribution': 'वितरण',
   'nav.books': 'बही-खाता',
   'nav.reconcile': 'बैंक मिलान',
   'nav.cheques': 'चेक',

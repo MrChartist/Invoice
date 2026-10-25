@@ -24,7 +24,6 @@ import {
   Receipt,
   Repeat,
   Scale,
-  Truck,
   Search,
   Settings,
   Sun,
@@ -89,7 +88,6 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
       { label: 'nav.recurring', path: '/recurring', icon: Repeat, need: 'books.edit' },
       { label: 'nav.time', path: '/time', icon: Timer, need: 'books.edit' },
       { label: 'nav.receivables', path: '/receivables', icon: Scale },
-      { label: 'nav.distribution', path: '/distribution', icon: Truck }, // 8F
     ],
   },
   {
