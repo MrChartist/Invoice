@@ -63,7 +63,7 @@ export type AccessAction =
   /** Export reports (CSV / Excel / GST papers). */
   | 'report.export'
   /** Approve / reject a document a clerk issued while approvals are on (WP-9 maker-checker). Owner only. */
-  | 'doc.approve';
+  | 'doc.approve'
   /**
    * See and run payroll (Phase 7): employees, salaries, payslips, statutory returns. Salaries are
    * confidential, so this is owner-only — clerks and viewers do not see the Payroll screen and the
