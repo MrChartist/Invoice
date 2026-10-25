@@ -17,7 +17,7 @@
 import type { PurchaseReturn } from '../../types/purchases';
 import { toPaise } from '../export-shared';
 import { num } from '../invoice-calc';
-import { isLiveNote, noteSelfTax, noteTdsReversed } from '../purchase-returns-gst';
+import { isLiveNote, noteCess, noteSelfTax, noteTdsReversed } from '../purchase-returns-gst';
 import { A, EXPENSE_CATEGORY_ACCOUNTS, groupOf, tdsAccountFor, type Account } from './accounts';
 import type { LedgerVoucher, PostingLine } from './postings';
 
@@ -51,18 +51,20 @@ export function purchaseReturnPostings(notes: readonly PurchaseReturn[] | undefi
     const cgst = toPaise(num(n.cgst));
     const sgst = toPaise(num(n.sgst));
     const igst = toPaise(num(n.igst));
+    // 7R (7.123): cess reversed with the note — Cr Input cess (2353) when ITC was claimed, else back to cost.
+    const cess = toPaise(noteCess(n));
     const gst = cgst + sgst + igst;
     const party = String(n.vendor_name ?? '').trim() || 'Unknown vendor';
     const cc = n.cost_centre_id || undefined;
-    const self = noteSelfTax(n) > 0 ? gst : 0;
+    const self = noteSelfTax(n) > 0 ? gst + cess : 0;
     // 7O (7.94): TDS deducted at booking on the bill comes back off the TDS payable, not the supplier.
     const tds = Math.min(toPaise(noteTdsReversed(n)), Math.max(total - self, 0));
     const lines: (PostingLine | null)[] = [
       line(A.creditors, total - self - tds, true, party, cc),
       line(tdsAccountFor(n.tds_section), tds, true, undefined, cc),
-      line(costAccountFor(n, chart), n.itc_eligible ? taxable : taxable + gst, false, undefined, cc),
+      line(costAccountFor(n, chart), n.itc_eligible ? taxable : taxable + gst + cess, false, undefined, cc),
     ];
-    if (n.itc_eligible) lines.push(line(A.inCgst, cgst, false, undefined, cc), line(A.inSgst, sgst, false, undefined, cc), line(A.inIgst, igst, false, undefined, cc));
+    if (n.itc_eligible) lines.push(line(A.inCgst, cgst, false, undefined, cc), line(A.inSgst, sgst, false, undefined, cc), line(A.inIgst, igst, false, undefined, cc), line(A.inCess, cess, false, undefined, cc));
     if (self) lines.push(line(n.import_type === 'GOODS' ? A.importIgst : A.rcmPayable, self, true, undefined, cc));
     const posted = lines.filter((l): l is PostingLine => !!l);
     const diff = posted.reduce((s, l) => s + l.dr - l.cr, 0);

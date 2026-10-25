@@ -555,3 +555,30 @@ test('branch-wise books and Sec 25(4) transfer bills (WP-9) read the real purcha
   const l = buildLedger({ invoices: [], transactions: [], purchases: [{ ...bill, branch_transfer_id: 'str1' }], vendors: [], purchasePayments: [], openings: [], userAccounts: [], manual: [], assets: [], today: '2026-05-01' } as never);
   assert.ok(l.vouchers[0].lines.some((x) => x.account === 'branch_transfer_in' && x.dr === 100000));
 });
+
+test('7R readers (GSTR-9C rate-wise / Table 14, GSTR-9 Part V, per-GSTIN paper, cess on notes) read the real bill shape', async () => {
+  const { gstr9cRateWise, gstr9cTable14 } = await import('../src/lib/gstr9c-extra.ts');
+  const { buildGstr9PartV } = await import('../src/lib/gstr9-partv.ts');
+  const { buildByGstin } = await import('../src/lib/gst-by-gstin.ts');
+  const { noteCessFor } = await import('../src/lib/purchase-returns-gst.ts');
+  const g9 = buildGstr9([], [bill], { fyStart: 2026, filerStateCode: '27' });
+  // A reverse-charge bill with a lump tax and no split: 5% RC row via splitLumpTax (intra-State → CGST + SGST).
+  const rcm = { ...bill, id: 'rc', reverse_charge: true, cgst: undefined, sgst: undefined, igst: undefined, tax_amount: 50, total: 1050 } as never;
+  const rate = gstr9cRateWise(g9, [rcm], '27');
+  const b = rate.rows.find((r) => r.id === '9B')!;
+  assert.equal(b.taxable, 1000);
+  assert.equal(b.cgst + b.sgst, 50);
+  // Table 14: the real bill (category Purchases, ITC claimed) lands in 14A with its GST; drafts are skipped.
+  const t14 = gstr9cTable14(g9, [bill, { ...bill, id: 'dr', status: 'Draft' } as never], '27');
+  assert.equal(t14.rows.find((r) => r.id === '14A')!.eligible, 180);
+  // Part V reads bill dates through readPurchase.
+  const note = { id: 'n', kind: 'DEBIT_NOTE', note_number: 'DN/1', date: '2026-05-01', purchase_id: 'p1', vendor_name: 'A', reason: 'OTHER', goods_returned: false, lines: [], taxable: 100, cgst: 9, sgst: 9, igst: 0, total: 118, itc_eligible: true, adjusted_amount: 0 } as never;
+  const pv = buildGstr9PartV([], { fyStart: 2025, rawPurchases: [bill], purchaseNotes: [note] });
+  assert.equal(pv.t12.cgst, 0, 'the bill of 12 Apr 2026 is not in FY 2025-26');
+  // Per-GSTIN paper assigns the bill by its place of supply (27).
+  const ka = `29AAPFU0939F1Z${gstinChecksumChar('29AAPFU0939F1Z')}`;
+  const r = buildByGstin([], [bill], { period: { kind: 'fy', fyStart: 2026 }, columns: [{ gstin: '27AAPFU0939F1ZV', label: 'MH' }, { gstin: ka, label: 'KA' }], branches: [] });
+  assert.equal(r.rows.find((x) => x.id === '4a')!.values[0], 180);
+  // Cess on a note is pro rata to the bill's `cess_amount` / `taxable`.
+  assert.equal(noteCessFor({ ...bill, cess_amount: 40 }, 250), 10);
+});

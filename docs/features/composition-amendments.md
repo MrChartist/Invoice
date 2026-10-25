@@ -119,10 +119,12 @@ with `oinum`, `oidt`, `inum`, `idt`, `val`, `sbpcode`, `sbnum`, `sbdt`, `itms[]`
 date (amending the number/date itself is possible by editing them). CSV: GST page → Amendments tab.
 
 ## Not covered (gaps)
-- E-commerce is in `gst-reports.md` (Table 14 / 3.1.1); Table 14A (amendments of Table 14) and Table 15 (operator's
-  own return) are not generated; an amended 9(5) supply is flagged `AMEND_ECO_95`. The composition bar on supplies
+- E-commerce is in `gst-reports.md` (Table 14 / 3.1.1); 7R adds Table 14A(a) from the amendment rows that carry the
+  operator GSTIN; Table 14A(b) and Table 15 (operator's own return) are not generated; an amended 9(5) supply is
+  flagged `AMEND_ECO_95`. The composition bar on supplies
   through a TCS operator (Sec 10(2)(d), goods allowed from 1 Oct 2023) is a warning in the editor only.
-- Amendments of Table 8 / HSN / documents issued and GSTR-9 Part V (amendments) are not generated.
+- Amendments of Table 8 / HSN / documents issued are not generated. GSTR-9 Part V reads the next FY's amendments of
+  this FY's documents (7R, `gstr9.md`).
 - Re-amending keeps the very first original and moves `amended_on`; the earlier amendment period then shows the
   latest revision (one level of history). There is no "undo amendment" button (edit the values back).
 - Composition eligibility (turnover limits, notified goods, inter-state bar) is warned about, not enforced; mixed

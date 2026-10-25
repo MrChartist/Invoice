@@ -6,7 +6,7 @@
  *
  * UNVERIFIED: the column order and section / collection codes follow the RPU as we understand it
  * and have not been validated against the current RPU or the FVU. Import through the RPU and
- * validate with the FVU; verify with your CA. Form 27Q (non-residents) is out of scope: payees
+ * validate with the FVU; verify with your CA. Form 27Q (non-residents) is a separate paper (tds-27q.ts): payees
  * flagged non-resident are left out of 26Q and listed as warnings.
  *
  * Pure (node:test).
@@ -171,7 +171,7 @@ export function form26Q(rows: readonly TdsDeductionRow[], challans: readonly Tds
     fy,
     quarter,
   );
-  for (const r of rows) if (r.nonResident && r.fy === fy && r.quarter === quarter) paper.warnings.push(`${r.payee} is non-resident: report in Form 27Q (not prepared by this app).`);
+  for (const r of rows) if (r.nonResident && r.fy === fy && r.quarter === quarter) paper.warnings.push(`${r.payee} is non-resident: report in Form 27Q (TDS and TCS page, Form 27Q tab).`);
   return paper;
 }
 

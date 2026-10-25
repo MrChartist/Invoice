@@ -42,8 +42,20 @@ export interface Vendor {
   tds_lower_limit?: number;
   tds_lower_from?: string;
   tds_lower_to?: string;
-  /** Non-resident payee: TDS goes in Form 27Q (flagged only — not computed by this app). */
+  /** Non-resident payee: TDS goes in Form 27Q (7R: working paper `src/lib/tds-27q.ts`). */
   non_resident?: boolean;
+  /**
+   * Additive (7R, 7.120): non-resident details for Form 27Q / DTAA — country, foreign tax id, Tax Residency
+   * Certificate number and last valid day, Form 10F furnished, no PE in India, DTAA rate (%) and article.
+   */
+  nr_country?: string;
+  nr_tin?: string;
+  nr_trc_no?: string;
+  nr_trc_to?: string;
+  nr_form10f?: boolean;
+  nr_no_pe?: boolean;
+  nr_dtaa_rate?: number;
+  nr_dtaa_article?: string;
   /**
    * Additive (WP-1 masters): id of a user sub-group under Sundry Creditors (`groups` table).
    * Absent = directly under Sundry Creditors. Opening balance: `ledger_openings`; bills: `opening_bills`.
@@ -344,6 +356,12 @@ export interface PurchaseReturn {
   tds_reversed?: number;
   /** Section code of that TDS (snapshot of the bill's `tds_section`). */
   tds_section?: string;
+  /**
+   * Additive (7R, 7.123): compensation cess reversed with the note (₹, inside `total`, outside cgst / sgst / igst) —
+   * the bill's `cess_amount` pro rata to the note's taxable value (`noteCessFor`). Cess credit (Input cess 2353)
+   * falls with it when the bill claimed ITC; on reverse-charge / import bills the self-assessed cess is reversed.
+   */
+  cess_amount?: number;
   cost_centre_id?: string;
   notes?: string;
   created_at?: string;

@@ -119,11 +119,11 @@ test('receipts and purchase register', () => {
 test('GST rate-wise summary groups by section and nets credit notes', () => {
   const t = buildDataset('gst_summary', fullSource());
   const rows = t.rows.map((r) => r.map(val));
-  // [Section, Rate, Docs, Taxable, CGST, SGST, IGST, Total Tax]
-  assert.deepEqual(rows[0], ['Sales', 18, 2, 1999.5, 90, 90, 179.91, 359.91]);
-  assert.deepEqual(rows[1], ['Credit Notes', 18, 1, -1000, -90, -90, 0, -180]);
-  assert.deepEqual(rows[2], ['Purchases', 18, 1, 2000, 180, 180, 0, 360]);
-  assert.deepEqual(rows[3], ['Net Sales', 18, '', 999.5, 0, 0, 179.91, 179.91]);
+  // [Section, Rate, Docs, Taxable, CGST, SGST, IGST, Cess (7R), Total Tax]
+  assert.deepEqual(rows[0], ['Sales', 18, 2, 1999.5, 90, 90, 179.91, 0, 359.91]);
+  assert.deepEqual(rows[1], ['Credit Notes', 18, 1, -1000, -90, -90, 0, 0, -180]);
+  assert.deepEqual(rows[2], ['Purchases', 18, 1, 2000, 180, 180, 0, 0, 360]);
+  assert.deepEqual(rows[3], ['Net Sales', 18, '', 999.5, 0, 0, 179.91, 0, 179.91]);
 });
 
 test('party and item masters dedupe and enrich', () => {

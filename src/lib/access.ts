@@ -268,6 +268,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   hsn_master: 'master.edit',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   rcm_documents: 'books.edit',
+  // 7R: PMT-09 transfers, GST refund claims, ISD documents, TRACES justification imports
+  gst_pmt09: 'books.edit',
+  gst_refunds: 'books.edit',
+  isd_documents: 'books.edit',
+  tds_justifications: 'books.edit',
   // business extras (WP-9)
   pos_returns: 'doc.create',
   branches: 'master.edit',

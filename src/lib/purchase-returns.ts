@@ -33,7 +33,7 @@ import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { calculateInvoice, num, round2 } from './invoice-calc';
 import { assertUnlocked } from './period-lock';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
-import { noteSupplierAmount } from './purchase-returns-gst';
+import { noteCessFor, noteSupplierAmount } from './purchase-returns-gst';
 import { balanceOf, purchasesDb } from './purchases';
 import { generateId, getTable, setTable } from './storage';
 import { tdsReversalForReturn } from './tds-payables';
@@ -297,7 +297,10 @@ export const purchaseReturnsDb = {
     const draftRecord0 = noteRecordFrom(draft, bill, number, 0);
     // 7O (7.94): a return on a bill with TDS deducted at booking takes the TDS on the returned value back.
     const tdsRev = bill ? tdsReversalForReturn(bill, draftRecord0.taxable, notesForBill(all, bill.id).reduce((t, x) => t + num(x.tds_reversed), 0)) : 0;
-    const draftRecord: PurchaseReturn = tdsRev > 0 ? { ...draftRecord0, tds_reversed: tdsRev, ...(bill?.tds_section ? { tds_section: bill.tds_section } : {}) } : draftRecord0;
+    const withTds: PurchaseReturn = tdsRev > 0 ? { ...draftRecord0, tds_reversed: tdsRev, ...(bill?.tds_section ? { tds_section: bill.tds_section } : {}) } : draftRecord0;
+    // 7R (7.123): the bill's compensation cess comes back with the note, pro rata to its taxable value.
+    const cessRev = bill ? noteCessFor(bill, withTds.taxable, notesForBill(all, bill.id).reduce((t, x) => t + num(x.cess_amount), 0)) : 0;
+    const draftRecord: PurchaseReturn = cessRev > 0 ? { ...withTds, cess_amount: cessRev, total: round2(withTds.total + cessRev), itc_eligible: !!bill?.itc_eligible } : withTds;
     const adjusted = bill ? round2(Math.min(noteSupplierAmount(draftRecord), balanceOf(bill))) : 0;
     const record: PurchaseReturn = { ...draftRecord, adjusted_amount: Math.max(adjusted, 0) };
     setTable(PURCHASE_RETURNS_TABLE, [...all, record]);
