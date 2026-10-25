@@ -24,7 +24,7 @@ import { round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import type { OpeningBillInput } from './receivables';
 import { formatMoney } from './utils';
-import { ensureBooksBegin, loadBooksBegin, loadOpenings, signedOpening } from './ledger/openings';
+import { assertOpeningsUnlocked, ensureBooksBegin, loadBooksBegin, loadOpenings, signedOpening } from './ledger/openings';
 
 export const OPENING_BILLS_TABLE = 'opening_bills';
 
@@ -147,6 +147,8 @@ export function saveOpeningBillsFor(party: { id: string; name: string; side: Ope
   requireAccess('books.edit');
   const errors = validateOpeningBills(drafts);
   if (errors.length) throw new Error(errors[0]);
+  // Opening outstandings post with the openings, on the day before the books begin (M2).
+  const lock = assertOpeningsUnlocked();
   const all = loadOpeningBills();
   const mine = all.filter((b) => b.party_id === party.id && b.side === party.side);
   const prevById = new Map(mine.map((b) => [b.id, b]));
@@ -176,7 +178,7 @@ export function saveOpeningBillsFor(party: { id: string; name: string; side: Ope
     entity_id: party.id,
     action: 'update',
     doc_number: party.name,
-    summary: `Opening bills for ${party.name}: ${next.length} bill${next.length === 1 ? '' : 's'}, ₹${formatMoney(Math.abs(total))} ${total >= 0 ? 'Dr' : 'Cr'}`,
+    summary: `Opening bills for ${party.name}: ${next.length} bill${next.length === 1 ? '' : 's'}, ₹${formatMoney(Math.abs(total))} ${total >= 0 ? 'Dr' : 'Cr'}${lock === 'overridden' ? ' (period lock overridden)' : ''}`,
   });
   return next;
 }

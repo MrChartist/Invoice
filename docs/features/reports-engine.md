@@ -48,7 +48,15 @@ A report-time line, never a stored voucher, so `postings.ts` is untouched.
 Statements call `stockChange(stock, end, dayBeforeStart)` → `{opening: value(start − 1) + openings inside, closing: value(end)}`;
 opening stock never becomes profit. Config is stored in **`mrchartist_inv_closing_stock`** (one JSON object
 `{mode?, opening?, entries: [{date, value (paise)}]}`, company data, backed up and synced like every `mrchartist_inv_*`
-key; additive, no migration). Edit it from P&L → **Closing stock**.
+key; additive, no migration). Edit it from P&L → **Closing stock**. Saving it (`saveClosingStockConfig`) needs
+**`books.edit`** (the control is hidden for viewers), is audited, and respects the period lock: a typed figure added,
+changed or removed on a locked day is refused, and the mode or the typed opening (which change every period) are refused
+while any period is locked, unless a PIN override on scope `closing_stock` is active (security review M1).
+
+**No double count with a Stock-in-hand opening (security review H1).** Item-master openings are already in the
+valuation, so an opening balance typed on Stock-in-hand / an Inventories ledger (or brought in by a Tally import that
+also creates the stock items with their openings) is netted off it from the opening day (`netOfStockOpening`, up to
+the opening stock the valuation itself carries): Inventories and capital hold the opening stock once.
 
 **No double count with closing-stock journals (integration pass).** A journal that books closing stock into
 Stock-in-hand (the year-end wizard's class "Year-end closing stock", or any journal narrated "closing stock" touching

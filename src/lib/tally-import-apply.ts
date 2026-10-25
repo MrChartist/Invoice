@@ -170,7 +170,13 @@ function run(plan: ImportPlan, result: ImportResult): void {
   /* 3. Openings + bill-wise openings. */
   const hasOpenings = plan.ledgers.some((l) => l.rec.opening !== 0) || plan.stockOpening > 0;
   if (hasOpenings && plan.counts.openings > 0) {
-    if (storedBooksBegin() !== plan.booksBegin) saveBooksBegin(plan.booksBegin);
+    if (storedBooksBegin() !== plan.booksBegin) {
+      try {
+        saveBooksBegin(plan.booksBegin);
+      } catch (err) {
+        result.failed.push(`Books beginning date: ${(err as Error).message}`);
+      }
+    }
     // Two Tally ledgers mapped onto one account (e.g. "CGST" and "Output CGST") add up.
     const byLedger = new Map<string, OpeningEntry>();
     const add = (ledger_id: string, amount: number, party_name?: string) => {
@@ -183,8 +189,13 @@ function run(plan: ImportPlan, result: ImportResult): void {
     }
     if (plan.stockOpening > 0) add(A.stock, plan.stockOpening);
     const entries = [...byLedger.values()].filter((e) => e.amount !== 0);
-    saveOpenings(entries);
-    result.openings = entries.length;
+    try {
+      saveOpenings(entries);
+      result.openings = entries.length;
+    } catch (err) {
+      // The opening day is in a locked period (M2): reported like any other refusal.
+      result.failed.push(`Opening balances: ${(err as Error).message}`);
+    }
     for (const l of plan.ledgers) {
       if (!l.rec.bills.length || (l.target.kind !== 'client' && l.target.kind !== 'vendor')) continue;
       const id = ids[lower(l.rec.name)];

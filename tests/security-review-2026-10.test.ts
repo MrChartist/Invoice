@@ -9,15 +9,20 @@ import { resetStorage } from './helpers/shim.ts';
 import { installSettings, createViaStore, clientMH, reload } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { setActorProvider } from '../src/lib/access.ts';
-import { getTable, setTable } from '../src/lib/storage.ts';
-import { A, buildLedger, loadLedgerInput, loadVouchers, saveVoucher, deleteVoucher } from '../src/lib/ledger/index.ts';
+import { SINGLETON_KEYS, getTable, setJson, setTable } from '../src/lib/storage.ts';
+import { A, buildLedger, loadLedgerInput, loadVouchers, saveVoucher, deleteVoucher, saveBooksBegin, saveOpenings, loadOpenings, storedBooksBegin } from '../src/lib/ledger/index.ts';
+import { loadClosingStockConfig, saveClosingStockConfig } from '../src/lib/ledger/closing-stock.ts';
+import { saveOpeningBillsFor } from '../src/lib/opening-bills.ts';
+import { audit } from '../src/lib/audit.ts';
+import { loadCheques, saveCheque, transitionCheque } from '../src/lib/cheques.ts';
+import { touchesLock } from '../src/lib/sync-engine.ts';
 import * as BA from '../src/lib/bill-allocation.ts';
 import { approveDocument, saveApprovalPolicy } from '../src/lib/approvals.ts';
 
 beforeEach(() => { resetStorage(); installSettings(); });
 afterEach(() => setActorProvider(null));
 
-const lockUntil = (d: string) => localDb.settings.save({ ...localDb.settings.get(), lock_until: d });
+const lockUntil = (d: string) => setJson(SINGLETON_KEYS.settings, { ...localDb.settings.get(), lock_until: d });
 const receipt = (amount: number, date = '2026-06-20') => ({
   type: 'RECEIPT' as const,
   date,
@@ -153,4 +158,90 @@ test('L5: a clerk cannot write the approvals decision log directly', () => {
   as('clerk', 'Asha');
   assert.throws(() => setTable('approvals', [{ id: 'x', doc_id: 'd', decision: 'approved' }]), /not allowed|access|permission/i);
   assert.equal(getTable('approvals').length, 0);
+});
+
+/* ── M1. Closing-stock settings: role, period lock, audit ─────────────────── */
+
+test('M1: closing-stock settings need books.edit, respect the lock and are audited', () => {
+  as('clerk', 'Asha');
+  saveClosingStockConfig({ mode: 'manual', opening: 100000, entries: [{ date: '2026-03-31', value: 200000 }] });
+  setActorProvider(() => ({ id: 'v', name: 'Vik', role: 'viewer' }));
+  assert.throws(() => saveClosingStockConfig({ mode: 'none' }), /not allowed|access|permission/i);
+  setActorProvider(null);
+  assert.ok(audit.all().some((r) => r.entity_id === 'closing_stock' && /Closing stock changed/.test(r.summary)));
+  lockUntil('2026-03-31');
+  assert.throws(() => saveClosingStockConfig({ mode: 'manual', opening: 100000, entries: [{ date: '2026-03-31', value: 250000 }] }), /lock/i, 'figure on a locked day');
+  assert.throws(() => saveClosingStockConfig({ mode: 'manual', opening: 100000, entries: [] }), /lock/i, 'removing a locked figure');
+  assert.throws(() => saveClosingStockConfig({ mode: 'manual', opening: 150000, entries: [{ date: '2026-03-31', value: 200000 }] }), /lock/i, 'opening while a period is locked');
+  assert.throws(() => saveClosingStockConfig({ mode: 'none', opening: 100000, entries: [{ date: '2026-03-31', value: 200000 }] }), /lock/i, 'mode while a period is locked');
+  const ok = saveClosingStockConfig({ mode: 'manual', opening: 100000, entries: [{ date: '2026-03-31', value: 200000 }, { date: '2026-09-30', value: 300000 }] });
+  assert.equal(ok.entries?.length, 2, 'an open day is fine');
+  assert.deepEqual(loadClosingStockConfig().entries?.map((e) => e.date), ['2026-03-31', '2026-09-30']);
+});
+
+/* ── M2. Openings follow the lock of the opening day ──────────────────────── */
+
+test('M2: openings, opening bills and the books-beginning date respect the period lock', () => {
+  saveBooksBegin('2026-04-01');
+  saveOpenings([{ ledger_id: A.bank, amount: 100_00 }]);
+  lockUntil('2026-03-31');
+  assert.throws(() => saveOpenings([{ ledger_id: A.bank, amount: 200_00 }]), /lock/i);
+  assert.equal(loadOpenings()[0].dr, 100_00);
+  assert.throws(() => saveOpeningBillsFor({ id: clientMH.id!, name: clientMH.name, side: 'receivable' }, [{ ref_no: 'OLD/1', date: '2026-02-01', amount: 100, dr_cr: 'Dr' }]), /lock/i);
+  assert.throws(() => saveBooksBegin('2026-10-01'), /lock/i, 'moving the opening out of a locked day');
+  assert.equal(storedBooksBegin(), '2026-04-01');
+  lockUntil('2025-12-31');
+  assert.throws(() => { saveBooksBegin('2025-10-01'); }, /lock/i, 'moving it into a locked day');
+  saveBooksBegin('2026-10-01');
+  saveOpenings([{ ledger_id: A.bank, amount: 300_00 }]);
+  assert.equal(loadOpenings()[0].dr, 300_00);
+});
+
+/* ── M4. Bouncing a cheque with several allocations is all-or-nothing ─────── */
+
+test('M4: a bounce refused on the second allocation reverses neither payment (reviewer repro)', () => {
+  const open = createViaStore({ date: '2026-10-05', lines: [{ qty: 1, rate: 1000, tax: 0 }] });
+  const old = createViaStore({ date: '2026-09-05', lines: [{ qty: 1, rate: 1000, tax: 0 }] });
+  const c = saveCheque({
+    direction: 'received', number: '000777', bank: 'HDFC Bank', cheque_date: '2026-10-10', amount: 2000, party_name: clientMH.name,
+    allocations: [{ invoice_id: open.id, amount: 1000 }, { invoice_id: old.id, amount: 1000 }],
+  } as never);
+  transitionCheque(c.id, 'cleared', { date: '2026-10-12', today: '2026-10-25' });
+  assert.equal(getTable('transactions').length, 2);
+  lockUntil('2026-09-30');
+  assert.throws(() => transitionCheque(c.id, 'bounced', { date: '2026-10-20', today: '2026-10-25' }), /lock/i);
+  assert.equal(getTable('transactions').length, 2, 'the open invoice’s payment is not reversed alone');
+  assert.equal(reload(open.id).status, 'Paid');
+  assert.equal(loadCheques()[0].status, 'cleared');
+});
+
+/* ── M5. Folder sync knows the dates of every ledger-affecting table ──────── */
+
+test('M5: a synced change inside the locked period is caught for the newer ledger tables', () => {
+  const P = 'mrchartist_inv_';
+  const lock = '2026-03-31';
+  const rows: [string, Record<string, string>][] = [
+    ['purchase_returns', { date: '2026-03-10' }],
+    ['receipt_notes', { date: '2026-03-10' }],
+    ['vendor_payments', { date: '2026-03-10' }],
+    ['tds_challans', { date: '2026-03-10' }],
+    ['gst_setoffs', { date: '2026-03-10' }],
+    ['gst_challans', { generated_on: '2026-03-10' }],
+    ['payroll_runs', { date: '2026-03-10' }],
+    ['payroll_payments', { date: '2026-03-10' }],
+    ['deposit_slips', { date: '2026-03-10' }],
+    ['pos_returns', { day: '2026-03-10' }],
+    ['cheques', { cheque_date: '2026-03-01', cleared_on: '2026-03-10' }],
+  ];
+  for (const [table, row] of rows) {
+    assert.equal(touchesLock(lock, P + table, undefined, row), true, table);
+    const moved = Object.fromEntries(Object.entries(row).map(([k]) => [k, '2026-05-01']));
+    assert.equal(touchesLock(lock, P + table, undefined, moved), false, `${table} open`);
+  }
+  assert.equal(touchesLock(lock, `${P}books_begin`, undefined, { id: 'books_begin', date: '2026-04-01' }), true, 'opening day 31 Mar');
+  assert.equal(touchesLock(lock, `${P}books_begin`, undefined, { id: 'books_begin', date: '2026-04-02' }), false);
+  saveBooksBegin('2026-04-01');
+  assert.equal(touchesLock(lock, `${P}ledger_openings`, undefined, { id: 'o', ledger_id: 'bank', dr: 1, cr: 0 }), true, 'openings post on 31 Mar');
+  assert.equal(touchesLock(lock, `${P}opening_bills`, undefined, { id: 'b', date: '2025-01-01' }), true);
+  assert.equal(touchesLock('2026-03-30', `${P}ledger_openings`, undefined, { id: 'o', ledger_id: 'bank', dr: 1, cr: 0 }), false);
 });

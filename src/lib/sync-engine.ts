@@ -21,6 +21,7 @@ import { attachmentKey, parseStoredAttachment, referencedAttachmentIds, storedAt
 import { numberKey, parseDocNumber } from './invoice-number';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { isDateLocked, normalizeLockDate } from './period-lock';
+import { openingDayFor, storedBooksBegin } from './ledger/openings';
 import { activeCompanyId } from './company-registry';
 import { asSystem, requireAccess, requireTableWrite, type AccessAction } from './access';
 import { SNAPSHOT_TABLES, ASSET_TABLE, parseAssets, referencedAssets } from './assets';
@@ -258,8 +259,21 @@ export function isSyncedKey(key: string): boolean {
   return key.startsWith(DB_PREFIX) && !EXCLUDED.has(key) && !key.startsWith(ATTACHMENT_KEY_PREFIX) && !key.startsWith(`${DB_PREFIX}audit_archive_`) && !isLocalOnlyKey(key);
 }
 
-/** Tables whose rows carry a document date that the period lock protects. */
-const DATED: Record<string, string> = {
+/** Opening balances post on the day before the books begin (local books-beginning date). */
+const openingDay = (): string | undefined => {
+  const begin = storedBooksBegin();
+  return begin ? openingDayFor(begin) : undefined;
+};
+const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+/** A cheque is in the books from its latest banking event (deposit / clearing / bounce / cancel). */
+const chequeDay = (r: Record<string, unknown>): string | undefined =>
+  ['deposited_on', 'presented_on', 'cleared_on', 'bounced_on', 'cancelled_on'].map((k) => str(r[k])).filter(Boolean).sort().pop();
+
+/**
+ * Tables whose rows carry a document date that the period lock protects: the date field, or a
+ * function of the row. Every table that reaches the ledger belongs here (security review M5).
+ */
+const DATED: Record<string, string | ((row: Record<string, unknown>) => string | undefined)> = {
   [`${DB_PREFIX}invoices`]: 'issue_date',
   [`${DB_PREFIX}transactions`]: 'date',
   [`${DB_PREFIX}purchases`]: 'date',
@@ -272,6 +286,20 @@ const DATED: Record<string, string> = {
   [`${DB_PREFIX}physical_stock`]: 'date',
   [`${DB_PREFIX}advances`]: 'date',
   [`${DB_PREFIX}fixed_assets`]: 'acquired_on',
+  [`${DB_PREFIX}purchase_returns`]: 'date',
+  [`${DB_PREFIX}receipt_notes`]: 'date',
+  [`${DB_PREFIX}vendor_payments`]: 'date',
+  [`${DB_PREFIX}tds_challans`]: 'date',
+  [`${DB_PREFIX}gst_setoffs`]: 'date',
+  [`${DB_PREFIX}gst_challans`]: (r) => str(r.deposited_on) || str(r.generated_on) || undefined,
+  [`${DB_PREFIX}payroll_runs`]: 'date',
+  [`${DB_PREFIX}payroll_payments`]: 'date',
+  [`${DB_PREFIX}deposit_slips`]: 'date',
+  [`${DB_PREFIX}pos_returns`]: 'day',
+  [`${DB_PREFIX}cheques`]: chequeDay,
+  [`${DB_PREFIX}ledger_openings`]: openingDay,
+  [`${DB_PREFIX}opening_bills`]: openingDay,
+  [`${DB_PREFIX}books_begin`]: (r) => (str(r.date) ? openingDayFor(str(r.date)) : undefined),
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -326,7 +354,9 @@ export const changesPaymentDetails = (before: string | null, after: string | nul
 
 const rowDate = (key: string, row: unknown): string | undefined => {
   const f = own(DATED, key);
-  return f && row && typeof row === 'object' ? ((row as Record<string, unknown>)[f] as string | undefined) : undefined;
+  if (!f || !row || typeof row !== 'object') return undefined;
+  const r = row as Record<string, unknown>;
+  return typeof f === 'function' ? f(r) : (r[f] as string | undefined);
 };
 
 /** Bill payment roll-ups touch only these fields; the local layer lets them through a lock (the payment row is checked by its own date). */
@@ -810,6 +840,13 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}manufacturing_vouchers`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}stock_journals`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}physical_stock`]: { num: 'number', date: 'date' },
+  // M5: every other numbered series (DN / GRN / RJO / PIS / PRL / PYP / PO).
+  [`${DB_PREFIX}purchase_returns`]: { num: 'note_number', date: 'date' },
+  [`${DB_PREFIX}receipt_notes`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}deposit_slips`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}payroll_runs`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}payroll_payments`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
 };
 
 /** Duplicate document numbers (two devices issuing the same serial): listed, never renumbered. */

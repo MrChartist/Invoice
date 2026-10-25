@@ -5,6 +5,7 @@
  * counted twice; the notice says so and offers the one-click switch to journal-only.
  */
 import { AlertTriangle } from 'lucide-react';
+import { can } from '../../../lib/access';
 import type { StockValuer } from '../../../lib/ledger';
 import { loadClosingStockConfig, saveClosingStockConfig } from '../../../lib/ledger/closing-stock';
 import { reportsT } from '../../../i18n/areas/reports-engine';
@@ -20,21 +21,23 @@ export function StockJournalNotice({ stock, onChanged, notify }: { stock?: Stock
       <AlertTriangle size={16} className={books.noticeIcon} aria-hidden="true" />
       <span>
         {reportsT('stockJournalNotice', { numbers })}{' '}
-        <button
-          type="button"
-          className={`${controls.btnGhost} ${controls.btnSm}`}
-          onClick={() => {
-            try {
-              saveClosingStockConfig({ ...loadClosingStockConfig(), mode: 'none' });
-              notify?.(reportsT('stockSaved'));
-              onChanged();
-            } catch (err) {
-              notify?.((err as Error).message);
-            }
-          }}
-        >
-          {reportsT('stockJournalOnly')}
-        </button>
+        {can('books.edit') && (
+          <button
+            type="button"
+            className={`${controls.btnGhost} ${controls.btnSm}`}
+            onClick={() => {
+              try {
+                saveClosingStockConfig({ ...loadClosingStockConfig(), mode: 'none' });
+                notify?.(reportsT('stockSaved'));
+                onChanged();
+              } catch (err) {
+                notify?.((err as Error).message);
+              }
+            }}
+          >
+            {reportsT('stockJournalOnly')}
+          </button>
+        )}
       </span>
     </div>
   );

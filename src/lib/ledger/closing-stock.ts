@@ -17,11 +17,15 @@
  * expensed in full by the postings, so closing stock is what turns them into cost of goods sold).
  *
  * Pure except `loadClosingStockConfig` / `saveClosingStockConfig` (one JSON key, company data, in
- * backups). Working papers — verify with your CA.
+ * backups; saving needs `books.edit`, respects the period lock and is audited). Working papers — verify with your CA.
  */
 
 import type { StockPosition } from '../inventory';
+import { requireAccess } from '../access';
+import { audit } from '../audit';
+import { assertUnlocked, getLockUntil } from '../period-lock';
 import { getJson, setJson, DB_PREFIX } from '../storage';
+import { formatMoney } from '../utils';
 import type { ManualVoucher } from './vouchers';
 
 /** Voucher class of the year-end wizard's closing-stock journal (re-exported by `year-end.ts`). */
@@ -81,11 +85,54 @@ export function loadClosingStockConfig(): ClosingStockConfig {
   return normalizeClosingStockConfig(getJson<unknown>(CLOSING_STOCK_KEY, {}));
 }
 
+/**
+ * Save the closing-stock source (security review M1). It changes every statement, so it is a books
+ * edit (`books.edit`, like the year-end wizard's switch) and respects the period lock:
+ *  - a typed entry added, changed or removed on a locked day is refused;
+ *  - the typed opening, or the mode, changes the statements of every period since the books began,
+ *    so either is refused while any period is locked (a PIN override on scope `closing_stock` lets
+ *    the owner through, audited as such).
+ * Audited. Returns the stored config.
+ */
 export function saveClosingStockConfig(cfg: ClosingStockConfig): ClosingStockConfig {
+  requireAccess('books.edit');
   const clean = normalizeClosingStockConfig(cfg);
+  const prev = loadClosingStockConfig();
+  const subject = (date: string) => ({ id: CLOSING_STOCK_SCOPE, issue_date: date, invoice_number: 'Closing stock' });
+  let overridden = false;
+  const check = (date: string) => {
+    if (assertUnlocked(subject(date), 'settings') === 'overridden') overridden = true;
+  };
+  const before = new Map((prev.entries ?? []).map((e) => [e.date, e.value]));
+  const after = new Map((clean.entries ?? []).map((e) => [e.date, e.value]));
+  const changedDays = [...new Set([...before.keys(), ...after.keys()])].filter((d) => before.get(d) !== after.get(d));
+  for (const d of changedDays) check(d);
+  const lockUntil = getLockUntil();
+  const modeChanged = (prev.mode ?? '') !== (clean.mode ?? '');
+  const openingChanged = (prev.opening ?? 0) !== (clean.opening ?? 0);
+  if (lockUntil && (modeChanged || openingChanged)) check(lockUntil);
+  if (!modeChanged && !openingChanged && !changedDays.length) return prev;
   setJson(CLOSING_STOCK_KEY, clean);
+  const parts = [
+    modeChanged ? `source ${clean.mode ?? 'automatic'} (was ${prev.mode ?? 'automatic'})` : '',
+    openingChanged ? `opening ₹${formatMoney((clean.opening ?? 0) / 100)} (was ₹${formatMoney((prev.opening ?? 0) / 100)})` : '',
+    changedDays.length ? `${changedDays.length} closing figure${changedDays.length === 1 ? '' : 's'} (${changedDays.join(', ')})` : '',
+  ].filter(Boolean);
+  try {
+    audit.record({
+      entity: 'settings',
+      entity_id: 'closing_stock',
+      action: 'update',
+      summary: `Closing stock changed: ${parts.join('; ')}${overridden ? ' (period lock overridden)' : ''}`,
+    });
+  } catch {
+    /* logging never blocks */
+  }
   return clean;
 }
+
+/** Period-lock override scope for the closing-stock settings. */
+export const CLOSING_STOCK_SCOPE = 'closing_stock';
 
 /** Last row at or before `date` in a date-sorted list ('' sorts first = opening). */
 function lastAtOrBefore<T extends { date: string }>(rows: readonly T[], date: string): T | undefined {

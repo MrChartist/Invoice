@@ -135,7 +135,8 @@ edit, so the merge-apply writes run as the app (`asSystem`) and a clerk / viewer
 ## Numbering safety
 Two devices can issue the same `INV/FY26-27/0007`. After every merge the engine groups documents by the canonical
 number key (`numberKey`) — invoices / notes / quotes, advance receipt vouchers (`ADV/…`), manual vouchers (`JV/…`) and
-stock transfers (`STR/…`): any number used by two documents is listed as a **duplicate** with both documents (invoices
+stock transfers (`STR/…`), manufacturing / stock journal / physical stock (`MFG`/`SJ`/`PHY`), debit notes (`DN`),
+GRNs / rejections (`GRN`/`RJO`), pay-in slips (`PIS`), payroll runs / payments (`PRL`/`PYP`) and purchase orders: any number used by two documents is listed as a **duplicate** with both documents (invoices
 link to the editor). Issued numbers are **never renumbered automatically**; the user renumbers or cancels one and marks the
 pair reviewed. Prevention:
 - **This device issues as**: a device-local choice of business profile (device key `mrchartist_inv_sync_device`); the
@@ -146,7 +147,10 @@ pair reviewed. Prevention:
 ## Period lock and vault
 - A synced add / edit / delete of a document dated on or before **this device's** lock date (`invoices`,
   `transactions`, `purchases`, `purchase_payments`, `vouchers`, `stock_moves`, `stock_transfers`, `advances`,
-  `fixed_assets` by `acquired_on`) is **not applied**: it is listed as a "locked period" conflict. **Apply with PIN**
+  `fixed_assets` by `acquired_on`; since the 2026-10 review also `manufacturing_vouchers`, `stock_journals`,
+  `physical_stock`, `purchase_returns`, `receipt_notes`, `vendor_payments`, `tds_challans`, `gst_setoffs`,
+  `gst_challans` (deposit / generation day), `payroll_runs`, `payroll_payments`, `deposit_slips`, `pos_returns` (`day`),
+  `cheques` (latest banking event) and `ledger_openings` / `opening_bills` / `books_begin` (the opening day)) is **not applied**: it is listed as a "locked period" conflict. **Apply with PIN**
   verifies the PIN (and the `period.override` permission) and writes an `override` audit row; **Keep mine** declines it
   (it stays on the other device; not offered again until it changes there). Another device's lock date is not applied
   to rows it already had, so a fresh device receives the locked history.
