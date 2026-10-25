@@ -41,6 +41,9 @@ import { isValidPan } from './validators';
 
 export type TdsQuarter = 1 | 2 | 3 | 4;
 
+/** 7P: payroll TDS (192) payments shown read-only in the same challan list (`payroll/tds-link.ts`). */
+export { isPayrollChallan, loadPayrollTdsChallans } from './payroll/tds-link';
+
 /* ── Periods ──────────────────────────────────────────────────── */
 
 /** Indian FY start year and quarter of a `YYYY-MM-DD` day (read as a calendar day). */

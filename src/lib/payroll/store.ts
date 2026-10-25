@@ -43,10 +43,14 @@ import {
   opt,
   str,
 } from './records';
-import { DEFAULT_PAY_HEADS, PayrollComputeError, applyPfAdminMinimum, computePayslip, structureFor, type HistoryEntry } from './compute';
-import { fyStartOfMonth, lastDayOfMonth } from './statutory';
+import { DEFAULT_PAY_HEADS, PayrollComputeError, applyPfAdminMinimum, computePayslip, historyFor, structureFor, structureRates } from './compute';
+import { lastDayOfMonth } from './statutory';
+import { EMPTY_DEPTH, extrasFor, unpaidLeaveDays, type DepthData } from './depth';
+import { loadDepth } from './depth-records';
+import { esiPeriodStart, esiRule } from '../payroll-rules';
 
-export { PAYROLL_TABLES, PAY_KINDS, isMonth, loadPayrollPayments, loadRuns, normalizePayments, normalizeRuns } from './records';
+export { PAYROLL_TABLES, PAY_KINDS, ALL_PAY_KINDS, isMonth, loadPayrollPayments, loadRuns, normalizePayments, normalizeRuns } from './records';
+export { historyFor } from './compute';
 
 const now = () => new Date().toISOString();
 
@@ -95,6 +99,9 @@ export function normalizeEmployees(rows: unknown[]): Employee[] {
       const n = num(o[k]);
       if (n > 0) e[k] = round2(n);
     }
+    const dob = day(o.dob);
+    if (dob) e.dob = dob;
+    if (num(o.notice_days) > 0) e.notice_days = Math.round(num(o.notice_days));
     out.push(e);
   }
   return out;
@@ -129,6 +136,7 @@ export function normalizePayHeads(rows: unknown[]): PayHead[] {
     if (o.taxable === false) h.taxable = false;
     if (str(o.account_id)) h.account_id = str(o.account_id);
     if (o.order !== undefined) h.order = num(o.order);
+    if (o.nps === true && h.kind === 'employer') h.nps = true;
     out.push(h);
   }
   return out;
@@ -203,6 +211,8 @@ export function validateEmployee(input: EmployeeInput, others: readonly Employee
   if (input.doj && !day(input.doj)) errors.push('Choose a valid date of joining.');
   if (input.dol && !day(input.dol)) errors.push('Choose a valid date of leaving.');
   if (input.doj && input.dol && input.dol < input.doj) errors.push('The date of leaving is before the date of joining.');
+  if (input.dob && !day(input.dob)) errors.push('Choose a valid date of birth.');
+  if (input.dob && input.doj && input.dob >= input.doj) errors.push('The date of birth is after the date of joining.');
   return errors;
 }
 
@@ -402,20 +412,30 @@ export interface PayrollData {
   structures: SalaryStructure[];
   attendance: AttendanceRow[];
   runs: PayrollRun[];
+  /** Additive (7P): arrears, loans, leave, adjustments, perquisites, F&F. Absent = none. */
+  depth?: DepthData;
 }
 
 export function loadPayrollData(): PayrollData {
-  return { employees: loadEmployees(), heads: loadPayHeads(), structures: loadStructures(), attendance: loadAttendance(), runs: loadRuns() };
+  return { employees: loadEmployees(), heads: loadPayHeads(), structures: loadStructures(), attendance: loadAttendance(), runs: loadRuns(), depth: loadDepth() };
 }
 
-/** Final payslips of `employeeId` earlier in the FY of `month`. */
-export function historyFor(employeeId: string, month: string, runs: readonly PayrollRun[]): HistoryEntry[] {
-  const fy = fyStartOfMonth(month).slice(0, 7);
-  return runs
-    .filter((r) => r.status === 'final' && r.month >= fy && r.month < month)
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .flatMap((r) => r.lines.filter((l) => l.employee_id === employeeId).map((line) => ({ month: r.month, line })));
+/**
+ * ESI coverage for the contribution period holding `month`: decided in its first month (or the month
+ * of joining). Undefined when `month` itself is that month (the engine decides on its wages).
+ */
+export function esiPeriodDecision(e: Employee, month: string, data: Pick<PayrollData, 'heads' | 'structures' | 'runs'>): boolean | undefined {
+  const start = esiPeriodStart(month);
+  const doj = e.doj?.slice(0, 7);
+  const decide = doj && doj > start ? doj : start;
+  if (decide >= month) return undefined;
+  const hist = data.runs.find((r) => r.status === 'final' && r.month === decide)?.lines.find((l) => l.employee_id === e.id);
+  if (hist) return hist.esi_covered;
+  const s = structureFor(e, decide, data.structures);
+  if (!s) return undefined;
+  return structureRates(s, data.heads, decide).esiRateWages <= esiRule(lastDayOfMonth(decide)).wage_ceiling;
 }
+
 
 export interface ComputedRun {
   lines: PayslipLine[];
@@ -429,19 +449,28 @@ export function computeRun(month: string, data: PayrollData, overrides: Record<s
   const skipped: string[] = [];
   const end = lastDayOfMonth(month);
   const start = `${month}-01`;
+  const depth = data.depth ?? EMPTY_DEPTH;
   for (const e of [...data.employees].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }))) {
-    if (!e.active && !(e.dol && e.dol >= start)) continue;
-    if (e.doj && e.doj > end) continue;
-    if (e.dol && e.dol < start) continue;
+    // 7P: a leaver whose full & final settlement or arrears are paid this month is on the run too.
+    const settling = depth.fnf.some((f) => f.employee_id === e.id && f.pay_month === month) || depth.arrears.some((r) => r.employee_id === e.id && r.pay_month === month);
+    if (!settling) {
+      if (!e.active && !(e.dol && e.dol >= start)) continue;
+      if (e.doj && e.doj > end) continue;
+      if (e.dol && e.dol < start) continue;
+    }
     try {
+      const att = data.attendance.find((a) => a.employee_id === e.id && a.month === month) ?? null;
+      const unpaid = unpaidLeaveDays(e.id, month, depth.leaveTypes, depth.leaveEntries);
       const line = computePayslip({
         month,
         employee: e,
         structure: structureFor(e, month, data.structures),
         heads: data.heads,
-        attendance: data.attendance.find((a) => a.employee_id === e.id && a.month === month) ?? null,
+        attendance: unpaid > 0 ? { id: att?.id ?? '', employee_id: e.id, month, lop: round2((att?.lop ?? 0) + unpaid), ...(att?.units ? { units: att.units } : {}) } : att,
         history: historyFor(e.id, month, data.runs),
         overrides: overrides[e.id],
+        extras: extrasFor(e, month, depth, data),
+        esiPeriodCovered: esiPeriodDecision(e, month, data),
       });
       if (line) lines.push(line);
     } catch (err) {
@@ -559,15 +588,17 @@ export function updateRunDate(runId: string, date: string): PayrollRun {
 
 export function runTotals(run: Pick<PayrollRun, 'lines'>) {
   const t = { gross: 0, deductions: 0, net: 0, pf_ee: 0, pf_er: 0, pf_admin: 0, esi_ee: 0, esi_er: 0, pt: 0, tds: 0, employees: run.lines.length };
+  // Statutory amounts by kind from the payslip lists, so arrears contributions (7P) are included.
+  const byKind = (list: PayslipLine['deductions'], k: StatutoryKind) => list.reduce((s, x) => s + (x.statutory === k ? x.amount : 0), 0);
   for (const l of run.lines) {
     t.gross += l.gross;
     t.deductions += l.total_deductions;
     t.net += l.net;
-    t.pf_ee += l.pf_ee;
-    t.pf_er += l.eps + l.epf_er;
-    t.pf_admin += l.edli + l.pf_admin;
-    t.esi_ee += l.esi_ee;
-    t.esi_er += l.esi_er;
+    t.pf_ee += byKind(l.deductions, 'pf');
+    t.pf_er += byKind(l.employer, 'pf_er');
+    t.pf_admin += byKind(l.employer, 'pf_admin');
+    t.esi_ee += byKind(l.deductions, 'esi');
+    t.esi_er += byKind(l.employer, 'esi_er');
     t.pt += l.pt;
     t.tds += l.tds;
   }
@@ -627,6 +658,7 @@ export const PAYMENT_LABELS: Record<PayrollPaymentKind, string> = {
   esi: 'ESI (ESIC challan)',
   pt: 'Professional tax',
   tds: 'TDS on salary (192)',
+  loan: 'Loan / advance to employee',
 };
 
 export interface PayableBalance {
@@ -638,7 +670,7 @@ export interface PayableBalance {
 
 /** What the final runs owe vs what has been paid, per kind (optionally up to a date). */
 export function payableBalances(runs: readonly PayrollRun[], payments: readonly PayrollPayment[], asOf?: string): PayableBalance[] {
-  const due: Record<PayrollPaymentKind, number> = { salary: 0, pf: 0, esi: 0, pt: 0, tds: 0 };
+  const due: Record<PayrollPaymentKind, number> = { salary: 0, pf: 0, esi: 0, pt: 0, tds: 0, loan: 0 };
   for (const r of runs) {
     if (r.status !== 'final' || (asOf && r.date > asOf)) continue;
     const t = runTotals(r);
@@ -660,7 +692,11 @@ export type PaymentInput = Omit<PayrollPayment, 'id' | 'number' | 'created_at'> 
 export function recordPayrollPayment(input: PaymentInput): PayrollPayment {
   guard();
   const all = loadPayrollPayments();
-  if (!PAY_KINDS.includes(input.kind)) throw new PayrollError('Choose what is being paid.');
+  if (!PAY_KINDS.includes(input.kind) && !(input.kind === 'loan' && input.loan_id)) throw new PayrollError('Choose what is being paid.');
+  if (input.kind === 'tds' && (str(input.bsr_code) || str(input.challan_no))) {
+    if (!/^\d{7}$/.test(str(input.bsr_code))) throw new PayrollError('BSR code is 7 digits.');
+    if (!/^\d{5}$/.test(str(input.challan_no))) throw new PayrollError('Challan serial number is 5 digits.');
+  }
   if (!day(input.date)) throw new PayrollError('Choose the payment date.');
   const amount = round2(num(input.amount));
   if (!(amount > 0)) throw new PayrollError('Enter the amount paid.');
@@ -684,6 +720,7 @@ export function deletePayrollPayment(id: string): void {
   const all = loadPayrollPayments();
   const row = all.find((p) => p.id === id);
   if (!row) return;
+  if (row.kind === 'loan' && row.loan_id && getTable<{ id?: string }>(PAYROLL_TABLES.loans).some((l) => l?.id === row.loan_id)) throw new PayrollError('This payment books a loan; delete the loan instead.');
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
   setTable(PAYROLL_TABLES.payments, all.filter((p) => p.id !== id));
   audit.record({ entity: 'payroll', entity_id: id, action: 'payment_remove', doc_number: row.number, summary: `${PAYMENT_LABELS[row.kind]} payment ${row.number} (₹${formatMoney(row.amount)}) deleted${lock === 'overridden' ? ' (period lock overridden)' : ''}` });

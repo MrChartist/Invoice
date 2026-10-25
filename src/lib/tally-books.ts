@@ -36,6 +36,7 @@ import type { TallyEntry, TallyVoucher } from './tally-xml';
 import type { TallyBankResolver } from './tally-bank';
 import { A, chartOf, loadUserAccounts, loadUserGroups } from './ledger/accounts';
 import { getTable } from './storage';
+import { can } from './access';
 import { isoDay } from './dates';
 import { depreciationSchedule, loadAssets } from './ledger/assets';
 import { loadVouchers } from './ledger/vouchers';
@@ -60,6 +61,9 @@ export interface TallyBooksSource {
   fixedAssets?: FixedAsset[];
   /** Local today (YYYY-MM-DD): post-dated vouchers and depreciation are taken as of this day. */
   today?: string;
+  /** Additive (7P): raw `payroll_runs` / `payroll_payments` rows for `tally-payroll.ts` (only when the user may see payroll). */
+  payrollRuns?: unknown[];
+  payrollPayments?: unknown[];
 }
 
 /** Ledger names the document export already uses (same names, so Tally sees one ledger each). */
@@ -400,6 +404,9 @@ export function loadTallyBooksSource(today: string): TallyBooksSource {
     stockItems: safe(() => getTable<{ id: string; name: string; unit?: string }>('stock_items')),
     godowns: safe(() => getTable<Godown>('godowns')),
     fixedAssets: safe(loadAssets),
+    // 7P: payroll is confidential (owner-only `payroll.view`), so it joins the export only for those who may see it.
+    payrollRuns: safe(() => (can('payroll.view') ? getTable<unknown>('payroll_runs') : undefined)),
+    payrollPayments: safe(() => (can('payroll.view') ? getTable<unknown>('payroll_payments') : undefined)),
     today,
   };
 }

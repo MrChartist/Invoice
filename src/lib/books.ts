@@ -32,6 +32,7 @@ import type { AdvanceRecord } from '../types/advances';
 import type { PurchaseReturn, VendorPayment } from '../types/purchases';
 import { booksReturnEffects } from './purchase-returns-gst';
 import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment } from './advance-tax';
+import { payrollBooksVouchers, payrollPnlEvents } from './payroll/books-link';
 
 /* ════════════════════════════════════════════════════════════════
    Types
@@ -117,6 +118,9 @@ export interface BooksData {
   advances?: AdvanceRecord[];
   /** Additive (WP-3): purchase returns / supplier credit notes (`purchase_returns`). Optional. */
   purchaseReturns?: PurchaseReturn[];
+  /** Additive (7P): raw `payroll_runs` / `payroll_payments` — payments in the cash / bank book, salary cost in the P&L. */
+  payrollRunRows?: unknown[];
+  payrollPaymentRows?: unknown[];
 }
 
 export const EMPTY_BOOKS: BooksData = {
@@ -556,6 +560,9 @@ export function buildVouchers(data: BooksData): Voucher[] {
     });
   }
 
+  // Payroll payments (7P): salary, PF / ESI / PT / TDS 192, loans to employees — cash out on the day paid.
+  out.push(...payrollBooksVouchers(data.payrollPaymentRows));
+
   return out.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
@@ -862,6 +869,8 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
       });
     }
   }
+  // Payroll (7P): salary cost on the run's voucher date (accrual) or when paid (cash).
+  events.push(...payrollPnlEvents(data.payrollRunRows, data.payrollPaymentRows, basis));
   return events;
 }
 
@@ -1202,6 +1211,8 @@ export function loadBooksData(): BooksData {
     advances: getTable<AdvanceRecord>(ADVANCES_TABLE),
     vendorPayments: getTable<VendorPayment>('vendor_payments'),
     purchaseReturns: getTable<PurchaseReturn>('purchase_returns'),
+    payrollRunRows: getTable<unknown>('payroll_runs'),
+    payrollPaymentRows: getTable<unknown>('payroll_payments'),
   };
 }
 

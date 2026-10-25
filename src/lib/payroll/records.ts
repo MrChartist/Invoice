@@ -17,6 +17,14 @@ export const PAYROLL_TABLES = {
   attendance: 'attendance',
   runs: 'payroll_runs',
   payments: 'payroll_payments',
+  // 7P
+  arrears: 'payroll_arrears',
+  loans: 'employee_loans',
+  leaveTypes: 'leave_types',
+  leaveEntries: 'leave_entries',
+  adjustments: 'payroll_adjustments',
+  perquisites: 'perquisites',
+  fnf: 'fnf_settlements',
 } as const;
 
 export const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -52,14 +60,17 @@ export function normalizeRuns(rows: unknown[]): PayrollRun[] {
   return out;
 }
 
+/** Kinds that clear a payroll payable (balances). */
 export const PAY_KINDS: PayrollPaymentKind[] = ['salary', 'pf', 'esi', 'pt', 'tds'];
+/** Every stored kind: the payables + `loan` (7P, loan / advance paid to an employee). */
+export const ALL_PAY_KINDS: PayrollPaymentKind[] = [...PAY_KINDS, 'loan'];
 
 export function normalizePayments(rows: unknown[]): PayrollPayment[] {
   const out: PayrollPayment[] = [];
   for (const r of rows) {
     const o = obj(r);
     const date = day(o?.date);
-    if (!o || !str(o.id) || !date || !PAY_KINDS.includes(o.kind as PayrollPaymentKind) || !(num(o.amount) > 0)) continue;
+    if (!o || !str(o.id) || !date || !ALL_PAY_KINDS.includes(o.kind as PayrollPaymentKind) || !(num(o.amount) > 0)) continue;
     out.push({
       id: str(o.id),
       kind: o.kind as PayrollPaymentKind,
@@ -71,6 +82,9 @@ export function normalizePayments(rows: unknown[]): PayrollPayment[] {
       ...(str(o.employee_id) ? { employee_id: str(o.employee_id) } : {}),
       ...(str(o.reference) ? { reference: str(o.reference) } : {}),
       ...(isMonth(o.period) ? { period: o.period } : {}),
+      ...(str(o.bsr_code) ? { bsr_code: str(o.bsr_code) } : {}),
+      ...(str(o.challan_no) ? { challan_no: str(o.challan_no) } : {}),
+      ...(str(o.loan_id) ? { loan_id: str(o.loan_id) } : {}),
       created_at: str(o.created_at),
     });
   }

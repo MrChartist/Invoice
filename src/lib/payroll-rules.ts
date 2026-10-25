@@ -304,3 +304,185 @@ export function tdsSalaryRule(regime: 'new' | 'old', fyStart: string): RegimeRul
 
 /** Section 80C cap applied to the employee's own PF (old regime). */
 export const SEC_80C_CAP = 150000;
+
+/* ════════════════════════════════════════════════════════════════
+   7P — payroll depth (arrears, loans, leave, gratuity, bonus, F&F, perquisites).
+   Appended: every table below is date-keyed; add versions, never overwrite.
+   Values marked UNVERIFIED are working assumptions for your CA to confirm.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Senior / super-senior citizen slabs (old regime only) ──────────── */
+
+/**
+ * Old-regime slabs by age (resident individuals): 60–79 at any time in the FY = senior, 80+ = super
+ * senior. The new regime (s. 115BAC) has one slab table for every age. Rebate u/s 87A, surcharge
+ * and cess as for the ordinary old regime.
+ */
+export const TDS_OLD_REGIME_AGE_RULES: readonly Versioned<{ senior: TaxSlab[]; super_senior: TaxSlab[] }>[] = [
+  {
+    from: '2012-04-01',
+    value: {
+      senior: [{ up_to: 300000, rate: 0 }, { up_to: 500000, rate: 5 }, { up_to: 1000000, rate: 20 }, { up_to: null, rate: 30 }],
+      super_senior: [{ up_to: 500000, rate: 0 }, { up_to: 1000000, rate: 20 }, { up_to: null, rate: 30 }],
+    },
+    source: 'First Schedule, Finance Acts (old regime): senior ₹3 lakh, super senior ₹5 lakh basic exemption',
+  },
+];
+
+export type AgeBand = 'normal' | 'senior' | 'super_senior';
+
+/**
+ * Age band for the FY starting `fyStart` (`YYYY-04-01`) from the date of birth. A person attains an
+ * age on the day before the birthday, so someone born on 1 April turns 60 on 31 March. UNVERIFIED
+ * convention — confirm with your CA.
+ */
+export function ageBand(dob: string | undefined, fyStart: string): AgeBand {
+  if (!dob || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return 'normal';
+  const endYear = Number(fyStart.slice(0, 4)) + 1;
+  if (dob <= `${endYear - 80}-04-01`) return 'super_senior';
+  if (dob <= `${endYear - 60}-04-01`) return 'senior';
+  return 'normal';
+}
+
+/** Regime rule for an employee: old-regime seniors get their own slabs (rebate, surcharge, cess as the old regime). */
+export function tdsSalaryRuleFor(regime: 'new' | 'old', fyStart: string, dob?: string): RegimeRule {
+  const band = regime === 'old' ? ageBand(dob, fyStart) : 'normal';
+  const base = tdsSalaryRule(regime, fyStart);
+  if (band === 'normal') return base;
+  return { ...base, slabs: ruleAt(TDS_OLD_REGIME_AGE_RULES, fyStart)[band] };
+}
+
+/* ── 80CCD(2) employer NPS, 206AA (no PAN) ──────────────────────────── */
+
+export interface Ccd2Rule {
+  /** Deduction cap, % of salary (Basic + DA), by regime. */
+  new_pct: number;
+  old_pct: number;
+}
+
+export const CCD2_RULES: readonly Versioned<Ccd2Rule>[] = [
+  { from: '2020-04-01', value: { new_pct: 10, old_pct: 10 }, source: 's. 80CCD(2): 10% of salary (non-government employers)' },
+  { from: '2024-04-01', value: { new_pct: 14, old_pct: 10 }, source: 'Finance (No. 2) Act 2024: 14% in the new regime' },
+];
+
+export function ccd2Pct(regime: 'new' | 'old', fyStart: string): number {
+  const r = ruleAt(CCD2_RULES, fyStart);
+  return regime === 'old' ? r.old_pct : r.new_pct;
+}
+
+/**
+ * s. 206AA for salary: without a PAN, tax is deducted at the average rate or 20%, whichever is
+ * higher (only when the income is taxable). Cess is not added on top of the 20% — UNVERIFIED,
+ * confirm with your CA.
+ */
+export const NO_PAN_SALARY_RULES: readonly Versioned<{ rate: number }>[] = [
+  { from: '2010-04-01', value: { rate: 20 }, source: 's. 206AA (Finance (No. 2) Act 2009)' },
+];
+
+export function noPanRate(fyStart: string): number {
+  return ruleAt(NO_PAN_SALARY_RULES, fyStart).rate;
+}
+
+/* ── Payment of Gratuity Act 1972 / s. 10(10) ───────────────────────── */
+
+export interface GratuityRule {
+  /** 15 days' wages for every completed year (or part above six months). */
+  days: number;
+  /** Month of 26 working days. */
+  divisor: number;
+  /** Continuous service needed (years), except on death or disablement. */
+  min_years: number;
+  /** Ceiling on gratuity under the Act (and the s. 10(10)(ii) exemption cap for private employees). */
+  ceiling: number;
+}
+
+export const GRATUITY_RULES: readonly Versioned<GratuityRule>[] = [
+  { from: '2010-05-24', value: { days: 15, divisor: 26, min_years: 5, ceiling: 1000000 }, source: 'Payment of Gratuity (Amendment) Act 2010: ₹10 lakh' },
+  { from: '2018-03-29', value: { days: 15, divisor: 26, min_years: 5, ceiling: 2000000 }, source: 'Payment of Gratuity (Amendment) Act 2018 / S.O. 1420(E): ₹20 lakh' },
+];
+
+export function gratuityRule(date: string): GratuityRule {
+  return ruleAt(GRATUITY_RULES, date);
+}
+
+/* ── Leave encashment on leaving, s. 10(10AA)(ii) ───────────────────── */
+
+export const LEAVE_ENCASH_RULES: readonly Versioned<{ exempt_cap: number }>[] = [
+  { from: '1998-04-01', value: { exempt_cap: 300000 }, source: 's. 10(10AA)(ii) notification: ₹3 lakh' },
+  { from: '2023-04-01', value: { exempt_cap: 2500000 }, source: 'Notification 31/2023: ₹25 lakh' },
+];
+
+export function leaveEncashCap(date: string): number {
+  return ruleAt(LEAVE_ENCASH_RULES, date).exempt_cap;
+}
+
+/* ── Payment of Bonus Act 1965 ───────────────────────────────────────── */
+
+export interface BonusRule {
+  min_pct: number;
+  max_pct: number;
+  /** Employees drawing salary (Basic + DA) up to this per month are eligible. */
+  eligibility_ceiling: number;
+  /** Bonus is calculated on salary up to this per month (or the minimum wage, if higher). */
+  calc_ceiling: number;
+  /** Minimum working days in the accounting year. */
+  min_days: number;
+  /** Minimum bonus amount (₹). */
+  min_amount: number;
+}
+
+export const BONUS_RULES: readonly Versioned<BonusRule>[] = [
+  { from: '2007-04-01', value: { min_pct: 8.33, max_pct: 20, eligibility_ceiling: 10000, calc_ceiling: 3500, min_days: 30, min_amount: 100 }, source: 'Payment of Bonus (Amendment) Act 2007' },
+  { from: '2014-04-01', value: { min_pct: 8.33, max_pct: 20, eligibility_ceiling: 21000, calc_ceiling: 7000, min_days: 30, min_amount: 100 }, source: 'Payment of Bonus (Amendment) Act 2015 (retrospective from 1 Apr 2014)' },
+];
+
+export function bonusRule(date: string): BonusRule {
+  return ruleAt(BONUS_RULES, date);
+}
+
+/* ── Loans to employees: perquisite u/s 17(2), Rule 3(7)(i) ─────────── */
+
+export interface LoanPerqRule {
+  /** Loans whose aggregate outstanding stays within this are not a perquisite. */
+  exempt_up_to: number;
+  /**
+   * SBI lending rate as on 1 April of the FY for a comparable loan, % p.a. UNVERIFIED placeholder —
+   * look up the SBI rate for the loan's purpose and type it on the loan (it overrides this).
+   */
+  sbi_rate: number;
+}
+
+export const LOAN_PERQ_RULES: readonly Versioned<LoanPerqRule>[] = [
+  // A later change of the small-loan limit must be added as a new version once confirmed (UNVERIFIED).
+  { from: '2001-04-01', value: { exempt_up_to: 20000, sbi_rate: 12 }, source: 'Rule 3(7)(i): ₹20,000 small-loan limit; SBI rate UNVERIFIED placeholder' },
+];
+
+export function loanPerqRule(fyStart: string): LoanPerqRule {
+  return ruleAt(LOAN_PERQ_RULES, fyStart);
+}
+
+/* ── PF late payment: interest u/s 7Q, damages u/s 14B ──────────────── */
+
+export interface PfLateRule {
+  /** Day of the next month the PF challan is due. */
+  due_day: number;
+  /** Simple interest, % p.a. (s. 7Q). */
+  interest_pct: number;
+  /** Damages (para 32A), % p.a. by months of delay (upper bound, inclusive; null = above). */
+  damages: { up_to_months: number | null; pct: number }[];
+}
+
+export const PF_LATE_RULES: readonly Versioned<PfLateRule>[] = [
+  {
+    from: '2008-09-26',
+    value: { due_day: 15, interest_pct: 12, damages: [{ up_to_months: 2, pct: 5 }, { up_to_months: 4, pct: 10 }, { up_to_months: 6, pct: 15 }, { up_to_months: null, pct: 25 }] },
+    source: 'EPF Scheme para 32A — estimate only; UNVERIFIED, EPFO levies damages by order',
+  },
+];
+
+export function pfLateRule(date: string): PfLateRule {
+  return ruleAt(PF_LATE_RULES, date);
+}
+
+/** Age at which EPS membership ends (EPS 1995, para 6): no EPS share after the month of the 58th birthday. */
+export const EPS_EXIT_AGE = 58;

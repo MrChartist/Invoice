@@ -330,6 +330,8 @@ const RECORD_TABLES = [
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
   // Payroll (Phase 7)
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
+  // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
+  'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
   // Manufacturing & stock vouchers (Phase 7): BOMs, Manufacturing / Stock Journals, Physical Stock
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
@@ -353,6 +355,8 @@ const ID_TABLES = new Set([
   'deposit_slips', 'cash_tally',
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
+  // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
+  'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'gst_setoffs', 'gst_challans', 'hsn_master',
   'year_end',

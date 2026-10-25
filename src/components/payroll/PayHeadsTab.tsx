@@ -308,6 +308,11 @@ function PayHeadModal({
           <label className={controls.check}><input type="checkbox" checked={f.taxable !== false} onChange={(e) => set('taxable', e.target.checked)} /> {pT('f.taxable')}</label>
         </div>
       )}
+      {f.kind === 'employer' && !f.statutory && (
+        <div className={styles.checks}>
+          <label className={controls.check}><input type="checkbox" checked={!!f.nps} onChange={(e) => set('nps', e.target.checked)} /> {pT('f.nps')}</label>
+        </div>
+      )}
       <label className={controls.check}><input type="checkbox" checked={f.active} onChange={(e) => set('active', e.target.checked)} /> {pT('f.active')}</label>
       {statutory && <p className={styles.note}>{pT('heads.statutoryHint')}</p>}
       {tried && errors.length > 0 && <p className={controls.error} role="alert">{errors[0]}</p>}

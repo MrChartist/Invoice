@@ -246,6 +246,9 @@ export function RunTab({ month, version, refresh, notify }: Props) {
           </div>
           <p className={styles.netPay}>{pT('slip.net', { amount: inr(slip.net) })}</p>
           <p className={styles.note}>{amountInWords(Math.max(0, slip.net), 'INR')}</p>
+          {slip.arrears && <p className={styles.note}>{pT('slip.arrears', { from: monthLabel(slip.arrears.from), to: monthLabel(slip.arrears.to), amount: inr(slip.arrears.gross) })}</p>}
+          {!!slip.perquisites && <p className={styles.note}>{pT('slip.perqs', { amount: inr(slip.perquisites) })}</p>}
+          {(slip.notes ?? []).map((n) => <p key={n} className={styles.note}>{n}</p>)}
           {slip.tds_working && (
             <p className={styles.note}>
               {pT('slip.tdsWorking', { income: inr(slip.tds_working.annual_income), tax: inr(slip.tds_working.annual_tax), before: inr(slip.tds_working.deducted_before), months: slip.tds_working.months_left })}

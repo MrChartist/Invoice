@@ -158,6 +158,15 @@ export interface IncomeTax {
   total: number;
 }
 
+/**
+ * s. 206AA (7P): without a PAN, the year's tax is at least `rate`% of total income (no cess on top),
+ * but only when the income is taxable at all. Returns the higher of the two.
+ */
+export function noPanTax(tax: IncomeTax, rate: number): number {
+  if (!(tax.total > 0)) return tax.total;
+  return Math.max(tax.total, Math.round((tax.income * rate) / 100 / 10) * 10);
+}
+
 export function incomeTax(totalIncome: number, rule: RegimeRule): IncomeTax {
   const income = Math.max(0, Math.round(totalIncome / 10) * 10); // s. 288A: income rounded to ₹10
   const gross = slabTax(income, rule);
@@ -182,6 +191,9 @@ export interface SalaryIncomeInput {
   /** Chapter VI-A deductions (old regime). */
   deductions?: number;
   other_income?: number;
+  /** Additive (7P): employer NPS contribution included in `gross`, and its 80CCD(2) cap (% × Basic + DA). */
+  nps_er?: number;
+  nps_cap?: number;
 }
 
 export interface SalaryIncome {
@@ -193,6 +205,8 @@ export interface SalaryIncome {
   other_income: number;
   gross_total_income: number;
   deductions: number;
+  /** Additive (7P): s. 80CCD(2) deduction (employer NPS) — allowed in both regimes. */
+  ccd2: number;
   total_income: number;
 }
 
@@ -206,6 +220,7 @@ export function salaryIncome(input: SalaryIncomeInput, rule: RegimeRule): Salary
   const other_income = round2(Math.max(0, input.other_income ?? 0));
   const gross_total_income = round2(income_from_salary + other_income);
   const deductions = rule.allows_deductions ? Math.min(gross_total_income, round2(Math.max(0, input.deductions ?? 0))) : 0;
+  const ccd2 = Math.min(round2(gross_total_income - deductions), round2(Math.max(0, Math.min(input.nps_er ?? 0, input.nps_cap ?? 0))));
   return {
     gross,
     exemptions,
@@ -215,7 +230,8 @@ export function salaryIncome(input: SalaryIncomeInput, rule: RegimeRule): Salary
     other_income,
     gross_total_income,
     deductions,
-    total_income: round2(gross_total_income - deductions),
+    ccd2,
+    total_income: round2(gross_total_income - deductions - ccd2),
   };
 }
 
