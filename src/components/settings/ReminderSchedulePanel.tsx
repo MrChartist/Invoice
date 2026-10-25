@@ -42,7 +42,7 @@ export function ReminderSchedulePanel({ notify }: { notify: (m: string, tone?: '
   const [lang, setLang] = useState<ReminderLanguage>('en');
   const allowed = can('settings.manage');
   const issues = scheduleIssues(s);
-  const sample = useMemo(sampleInvoice, []);
+  const sample = useMemo(() => sampleInvoice(), []);
   const tpl = s.templates?.[lang]?.[stage] ?? {};
   const unknown = [...unknownPlaceholders(tpl.subject ?? ''), ...unknownPlaceholders(tpl.body ?? '')];
   const preview = buildReminder(sample, stage, lang, new Date(), { templates: s.templates });

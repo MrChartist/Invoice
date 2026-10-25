@@ -42,7 +42,7 @@ export interface RemindQueueProps {
 export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
   useT();
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
-  const schedule = useMemo(loadReminderSchedule, []);
+  const schedule = useMemo(() => loadReminderSchedule(), []);
   const queue = useMemo(() => {
     const { input, report } = loadKhataReport();
     // R2-A4: a party with an open promise to pay is not reminded until the promised date.

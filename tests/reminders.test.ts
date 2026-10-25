@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   stageForDays, daysUntil, buildReminder, pendingReminders, lastReminder, reminderCount,
   makeLogEntry, makeSnooze, reminderPriority, isSnoozed, termsMentionInterest, fillTemplate, suggestStage,
+  DEFAULT_REMINDER_SCHEDULE, normalizeSchedule, scheduleIssues, templateFor, unknownPlaceholders, type ReminderSchedule,
 } from '../src/lib/reminders.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
@@ -159,4 +160,56 @@ test('pendingReminders: a large, older, repeat-overdue bill outranks a small new
   const usd = res.find((r) => r.invoice.id === 'usd')!;
   assert.ok(usd.priorityReasons.includes('₹4,15,000 outstanding'), 'foreign balance converted at the exchange rate');
   assert.ok(res.every((r, i) => i === 0 || res[i - 1].priority >= r.priority), 'sorted by priority');
+});
+
+/* ── R2-A5: configurable schedule, per-party mode, editable templates ── */
+
+test('the default schedule reproduces the original stages exactly', () => {
+  for (let d = 10; d >= -40; d--) assert.equal(stageForDays(d, DEFAULT_REMINDER_SCHEDULE), stageForDays(d), `day ${d}`);
+  assert.deepEqual(normalizeSchedule(null), DEFAULT_REMINDER_SCHEDULE);
+});
+
+test('custom offsets: upcoming window, polite grace, firm and final starts; cooldown per stage', () => {
+  const s: ReminderSchedule = { ...DEFAULT_REMINDER_SCHEDULE, upcoming_days: 5, polite_after: 2, firm_after: 10, final_after: 20, cooldowns: { ...DEFAULT_REMINDER_SCHEDULE.cooldowns, overdue_polite: 1 } };
+  assert.equal(stageForDays(5, s), 'upcoming');
+  assert.equal(stageForDays(6, s), null);
+  assert.equal(stageForDays(-2, s), 'due_today', 'within the polite grace');
+  assert.equal(stageForDays(-3, s), 'overdue_polite');
+  assert.equal(stageForDays(-11, s), 'overdue_firm');
+  assert.equal(stageForDays(-21, s), 'overdue_final');
+  const i = inv({ id: 'x', due_date: '2026-10-03' }); // 4 days late on TODAY
+  const yesterday = makeLogEntry('l1', 'x', 'whatsapp', 'overdue_polite', new Date(2026, 9, 6));
+  assert.equal(pendingReminders([i], TODAY, [yesterday]).length, 0, 'default cooldown 3 days');
+  assert.equal(pendingReminders([i], TODAY, [yesterday], { schedule: s }).length, 1, 'polite cooldown 1 day');
+  assert.equal(suggestStage(i, TODAY, 0, s), 'overdue_polite');
+});
+
+test('validation keeps the stages ordered; a stored out-of-order schedule falls back to the defaults', () => {
+  assert.ok(scheduleIssues({ polite_after: 5, firm_after: 5, final_after: 30 }).length);
+  assert.ok(scheduleIssues({ polite_after: 0, firm_after: 10, final_after: 9 }).length);
+  const n = normalizeSchedule({ upcoming_days: 2, polite_after: 9, firm_after: 3, final_after: 1, cooldowns: { overdue_final: 0 } });
+  assert.equal(n.upcoming_days, 2);
+  assert.deepEqual([n.polite_after, n.firm_after, n.final_after], [0, 7, 30]);
+  assert.equal(n.cooldowns.overdue_final, 1, 'cooldowns are at least one day');
+});
+
+test('per-party mode: manual and never stay out of the queue', () => {
+  const list = [inv({ id: 'a', due_date: '2026-09-30' }), inv({ id: 'b', due_date: '2026-09-30', client: { name: 'Bina', email: '', address: '', city: '', zip: '' } })];
+  const modes: Record<string, 'auto' | 'manual' | 'never'> = { Asha: 'never', Bina: 'manual' };
+  assert.equal(pendingReminders(list, TODAY, []).length, 2);
+  assert.equal(pendingReminders(list, TODAY, [], { modeOf: (x) => modes[x.client.name] }).length, 0);
+  assert.equal(pendingReminders(list, TODAY, [], { modeOf: () => 'auto' }).length, 2);
+});
+
+test('template override with placeholders; blank or invalid falls back to the built-in text', () => {
+  const i = inv({ due_date: '2026-10-01' });
+  const templates = { en: { overdue_polite: { subject: 'Pay {number}', body: 'Dear {client}, {balance} is {days}. {business}' } } };
+  const m = buildReminder(i, 'overdue_polite', 'en', TODAY, { templates });
+  assert.equal(m.subject, 'Pay INV/FY26-27/0007');
+  assert.match(m.body, /^Dear Asha, ₹\s?5,000\.00 is 6 days overdue\. MrChartist$/);
+  assert.deepEqual(unknownPlaceholders('Hi {client} {bogus} {amt}'), ['{bogus}', '{amt}']);
+  const bad = buildReminder(i, 'overdue_polite', 'en', TODAY, { templates: { en: { overdue_polite: { body: 'Hi {bogus}' } } } });
+  assert.equal(bad.body, buildReminder(i, 'overdue_polite', 'en', TODAY).body, 'unknown placeholder: built-in text');
+  assert.equal(templateFor('overdue_polite', 'hinglish', templates).body, templateFor('overdue_polite', 'hinglish').body, 'other language untouched');
+  assert.equal(templateFor('overdue_polite', 'en', { en: { overdue_polite: { body: '   ' } } }).body, templateFor('overdue_polite', 'en').body, 'blank: built-in');
 });

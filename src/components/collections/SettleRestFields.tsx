@@ -37,7 +37,7 @@ export interface SettleRestFieldsProps {
  */
 export function SettleRestFields({ invoice, due, amount, date, value, onChange, caption }: SettleRestFieldsProps) {
   useT();
-  const settings = useMemo(loadCollectionSettings, []);
+  const settings = useMemo(() => loadCollectionSettings(), []);
   const opts = settlementOptions(invoice, due, amount, date);
   if (!(opts.rest > 0.004) || !(amount > 0)) return null;
   const cap = clerkCap(rupeeValue(invoice), settings);
