@@ -12,6 +12,7 @@ import { ReceiptBody } from './parts/ReceiptBody';
 import { StatusStamp } from './parts/StatusStamp';
 import { IrnBlock } from './parts/IrnBlock';
 import { SupplyDeclaration } from './parts/SupplyDeclaration';
+import { rcmTaxNote } from './paper-helpers';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
 import type { EInvoiceMeta } from '../../lib/einvoice';
@@ -77,6 +78,9 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   // Read from the document's own sender snapshot first (Critical Rule 3), like the rest of the paper.
   const declaration = supplyDeclaration(invoice, invoice.sender ?? sender);
 
+  // Rule 46(p): tax payable on reverse charge, printed once under every layout (new-style RCM documents).
+  const rcmNote = rcmTaxNote(totals, (n) => cfg.currency(n, invoice.currency));
+
   const irn = buildIrnPrint(einvoiceMeta === undefined ? resolveEInvoiceMeta(invoice.id) : einvoiceMeta);
 
   const showInitials = (layout === 'corporate' || layout === 'centered') && sender.companyName;
@@ -130,6 +134,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {body}
           {irn && <IrnBlock model={irn} />}
           {declaration && <SupplyDeclaration text={declaration} />}
+          {rcmNote && <SupplyDeclaration text={rcmNote} />}
         </div>
       </div>
     </PaperContext.Provider>

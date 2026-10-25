@@ -18,6 +18,7 @@
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, CHARGES_LINE_ID, num, round2, taxLinesOf } from './invoice-calc';
 import { hasInrValue, inrTotals, inrValue } from './fx';
+import { receivableBalance } from './rcm';
 import {
   clean,
   filterInvoices,
@@ -194,7 +195,7 @@ export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}):
       money(s * a.roundOff),
       money(s * a.total),
       money(s * inrValue(num(inv.amount_paid), inv)),
-      money(s * inrValue(num(inv.balance_due), inv)),
+      money(s * inrValue(receivableBalance(inv), inv)),
       clean(inv.status),
       csvCurrency(inv),
       fmtDate(isoDate(inv.due_date), df),

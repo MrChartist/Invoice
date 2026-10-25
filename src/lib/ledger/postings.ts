@@ -43,6 +43,7 @@ import { isCreditNote, isSale, normalizePurchase, partyOfInvoice, accountForMeth
 import { allocateProportionally, calcInputFromRecord, calculateInvoice, num } from '../invoice-calc';
 import { invoiceAmounts, toPaise } from '../export-shared';
 import { fxNarration, inrValue } from '../fx';
+import { receivableTotal } from '../rcm';
 import { readPurchase } from '../purchase-normalize';
 import { realisedFx } from '../fx-gain';
 import { A, EXPENSE_CATEGORY_ACCOUNTS, chartOf, groupOf, type Account } from './accounts';
@@ -224,7 +225,12 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
     date,
     number: str(inv.invoice_number),
     party,
-    narration: [kind === 'Sales' ? 'Sales invoice' : kind, fxNarration(num(inv.total), inv)].filter(Boolean).join(' · '),
+    narration: [
+      kind === 'Sales' ? 'Sales invoice' : kind,
+      fxNarration(num(inv.total), inv),
+      // Outward reverse charge: the debtor owes the taxable value; the recipient pays the GST itself.
+      a.rcmTax > 0 && `reverse charge: GST ${a.rcmTax.toFixed(2)} payable by the recipient`,
+    ].filter(Boolean).join(' · '),
     lines: l.lines,
     link: `/invoice/${inv.id}`,
   };
@@ -245,8 +251,8 @@ function tdsSettlements(invoices: InvoiceRecord[], transactions: Payment[]): Map
     const after = before + Math.abs(toPaise(num(t.amount)));
     paid.set(inv.id, after);
     // Settlement is tracked in the document's currency; the TDS is booked in rupees.
-    const tds = Math.min(Math.max(toPaise(num(inv.tds_amount)), 0), Math.abs(toPaise(num(inv.total))));
-    const cashDue = Math.abs(toPaise(num(inv.total))) - tds;
+    const tds = Math.min(Math.max(toPaise(num(inv.tds_amount)), 0), Math.abs(toPaise(receivableTotal(inv))));
+    const cashDue = Math.abs(toPaise(receivableTotal(inv))) - tds;
     if (tds > 0 && before < cashDue && after >= cashDue) out.set(String(t.id), toPaise(inrValue(tds / 100, inv)));
   }
   return out;

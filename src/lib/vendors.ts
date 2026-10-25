@@ -8,6 +8,7 @@ import { balanceOf } from './purchases';
 import { round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { normalizeUdyam, validateUdyam } from './msme';
+import { supplierPayable } from './purchase-normalize';
 
 export const VENDORS_TABLE = 'vendors';
 
@@ -37,7 +38,7 @@ export function vendorBalances(purchases: PurchaseRecord[]): Map<string, VendorB
     if (!p.vendor_id) continue;
     const row = map.get(p.vendor_id) ?? { vendor_id: p.vendor_id, bills: 0, billed: 0, outstanding: 0 };
     row.bills += 1;
-    row.billed = round2(row.billed + p.total);
+    row.billed = round2(row.billed + supplierPayable(p));
     row.outstanding = round2(row.outstanding + balanceOf(p));
     map.set(p.vendor_id, row);
   }

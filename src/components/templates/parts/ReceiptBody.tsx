@@ -5,7 +5,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isTaxed } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
 
@@ -33,8 +33,10 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
   const cur = invoice.currency;
   const c = invoice.client;
   const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
-  const cgstSgst = isTaxed(invoice, totals);
-  const igst = !cgstSgst && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
+  // Reverse charge: the tax is printed in the recipient-pays note, never added up here.
+  const rcm = isRcmTotals(totals);
+  const cgstSgst = isTaxed(invoice, totals) && !rcm;
+  const igst = !cgstSgst && !rcm && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
   const upiUrl = buildUpiUrl(sender);
 
   return (
@@ -99,7 +101,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
         </>
       )}
       {igst && <Row label={invoice.gst_mode === 'SINGLE' ? 'Tax' : 'IGST'} value={money(totals.tax_amount, cur)} />}
-      {totals.cess_amount > 0 && <Row label="Cess" value={money(totals.cess_amount, cur)} />}
+      {totals.cess_amount > 0 && !rcm && <Row label="Cess" value={money(totals.cess_amount, cur)} />}
       {totals.tcs_amount > 0 && <Row label={invoice.tcs_label || 'TCS'} value={money(totals.tcs_amount, cur)} />}
       {totals.shipping > 0 && <Row label={totals.charges_line ? 'Shipping (taxable)' : 'Shipping'} value={money(totals.shipping, cur)} />}
       {totals.other_charges !== 0 && <Row label={totals.charges_line ? 'Other charges (taxable)' : 'Other charges'} value={money(totals.other_charges, cur)} />}

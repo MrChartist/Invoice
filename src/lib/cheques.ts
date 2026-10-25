@@ -30,6 +30,7 @@ import { paymentsDb, purchasesDb } from './purchases';
 import { generateId, getTable, setTable } from './storage';
 import { todayIso } from './tax-rules';
 import { isPostDated, validUntil } from './cheque-reminders';
+import { receivableBalance } from './rcm';
 
 export { isPostDated, validUntil } from './cheque-reminders';
 
@@ -223,7 +224,7 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
         if (!inv) note = 'The linked invoice no longer exists, so no payment was recorded.';
         else if ((inv.currency || 'INR').toUpperCase() !== 'INR') note = `${inv.invoice_number} is in ${inv.currency}: record the receipt from the invoice in that currency.`;
         else {
-          const balance = round2(num(inv.balance_due ?? num(inv.total) - num(inv.amount_paid)));
+          const balance = round2(num(receivableBalance(inv)));
           if (c.amount > balance + 0.005) {
             throw new ChequeError(`The cheque (${money(c.amount)}) is more than the balance of ${inv.invoice_number} (${money(balance)}). Unlink the invoice, or clear it without recording the payment.`);
           }

@@ -12,11 +12,11 @@
  *  - Pt II Table 4 (tax payable): 4A B2C = B2CL + B2CS + B2CL credit/debit notes (net, as
  *    the form asks); 4B B2B regular (not reverse charge); 4C exports with payment; 4D SEZ
  *    with payment; 4E deemed exports; 4F advances = GSTR-1 Table 11A − 11B for the year; 4G inward reverse
- *    charge = 3B 3.1(d); 4I/4J credit/debit notes on 4B-4E; 4K/4L amendments (0).
+ *    charge = 3B 3.1(d); 4I/4J credit/debit notes on 4B-4E; 4K/4L in-year amendments (revised − original).
  *  - Table 5 (no tax payable): 5A exports without payment; 5B SEZ without payment; 5C
  *    outward supplies where the recipient pays (reverse charge); 5D exempt (the app has no
  *    separate "exempt" flag: 0), 5E nil rated, 5F non-GST, all from GSTR-1 Table 8 (already
- *    net of notes); 5H/5I notes on 5A-5C; 5J/5K amendments (0).
+ *    net of notes); 5H/5I notes on 5A-5C; 5J/5K in-year amendments (revised − original).
  *  - Pt III Table 6: 6A = 3B 4A (all four heads, summed over the months); 6B from 3B 4A(5),
  *    split into inputs / capital goods / input services by the bill lines (SAC 99xxxx =
  *    services) or the expense category, else all inputs; capital goods only when a bill
@@ -332,14 +332,25 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     // 4F: advances taxed in the year less those adjusted / refunded (GSTR-1 Table 11A − 11B).
     for (const r of g.at ?? []) addTo(t4.F, { taxable: r.taxable, igst: r.igst, cgst: r.cgst, sgst: r.sgst, cess: r.cess });
     for (const r of g.txpd ?? []) addTo(t4.F, { taxable: r.taxable, igst: r.igst, cgst: r.cgst, sgst: r.sgst, cess: r.cess }, -1);
+    // 4K / 4L and 5J / 5K: in-year amendments, revised − original (the same deltas GSTR-3B took), so
+    // 4N agrees with the tax paid in Table 9. An increase goes to the (+) row, a decrease to the (−) row.
+    for (const e of g.amendments?.effects ?? []) {
+      const p = e.taxPayable;
+      const net = p.taxable + p.igst + p.cgst + p.sgst + p.cess;
+      if (net > 0) addTo(t4.K, p);
+      else if (net < 0) addTo(t4.L, p, -1);
+      if (e.noTax.taxable > 0) addTo(t5.J, { taxable: e.noTax.taxable });
+      else if (e.noTax.taxable < 0) addTo(t5.K, { taxable: -e.noTax.taxable });
+    }
   }
 
   const t4H = sumHeads(t4.A, t4.B, t4.C, t4.D, t4.E, t4.F, t4.G);
   const t4M = zero();
   addTo(t4M, t4.I, -1);
   addTo(t4M, t4.J);
-  addTo(t4M, t4.K, -1);
-  addTo(t4M, t4.L);
+  // 4M = −I + J + K − L (K: amendments that add, L: amendments that reduce).
+  addTo(t4M, t4.K);
+  addTo(t4M, t4.L, -1);
   const t4N = sumHeads(t4H, t4M);
 
   const table4: Gstr9Row[] = [
@@ -353,8 +364,8 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     row('4H', 'Sub-total (A to G above)', t4H, { total: true }),
     row('4I', 'Credit notes issued in respect of transactions specified in (B) to (E) above (-)', t4.I),
     row('4J', 'Debit notes issued in respect of transactions specified in (B) to (E) above (+)', t4.J),
-    row('4K', 'Supplies / tax declared through amendments (+)', t4.K, { note: 'Amendments are not modelled.' }),
-    row('4L', 'Supplies / tax reduced through amendments (-)', t4.L, { note: 'Amendments are not modelled.' }),
+    row('4K', 'Supplies / tax declared through amendments (+)', t4.K, { note: 'In-year amendments (GSTR-1 9A / 9C / 10): revised − original where it increased.' }),
+    row('4L', 'Supplies / tax reduced through amendments (-)', t4.L, { note: 'In-year amendments: revised − original where it decreased.' }),
     row('4M', 'Sub-total (I to L above)', t4M, { total: true }),
     row('4N', 'Supplies and advances on which tax is to be paid (H + M above)', t4N, { total: true }),
   ];
@@ -363,8 +374,9 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
   const t5L = zero();
   addTo(t5L, t5.H, -1);
   addTo(t5L, t5.I);
-  addTo(t5L, t5.J, -1);
-  addTo(t5L, t5.K);
+  // 5L = −H + I + J − K.
+  addTo(t5L, t5.J);
+  addTo(t5L, t5.K, -1);
   const t5M = sumHeads(t5G, t5L);
   const t5N = zero();
   addTo(t5N, { taxable: t4N.taxable + t5M.taxable - t4.G.taxable });
@@ -379,8 +391,8 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     row('5G', 'Sub-total (A to F above)', t5G, { total: true }),
     row('5H', 'Credit notes issued in respect of transactions specified in A to F above (-)', t5.H),
     row('5I', 'Debit notes issued in respect of transactions specified in A to F above (+)', t5.I),
-    row('5J', 'Supplies declared through amendments (+)', t5.J, { note: 'Amendments are not modelled.' }),
-    row('5K', 'Supplies reduced through amendments (-)', t5.K, { note: 'Amendments are not modelled.' }),
+    row('5J', 'Supplies declared through amendments (+)', t5.J, { note: 'In-year amendments of zero-rated / reverse-charge / nil lines (increase).' }),
+    row('5K', 'Supplies reduced through amendments (-)', t5.K, { note: 'In-year amendments of zero-rated / reverse-charge / nil lines (decrease).' }),
     row('5L', 'Sub-total (H to K above)', t5L, { total: true }),
     row('5M', 'Turnover on which tax is not to be paid (G + L above)', t5M, { total: true }),
     row('5N', 'Total turnover (including advances) (4N + 5M - 4G above)', t5N, { total: true }),
@@ -675,7 +687,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       ? `Aggregate turnover ${entered > 0 ? 'entered' : 'worked out'} (₹${usedTurnover.toFixed(2)}) is up to ₹2 crore: filing GSTR-9 is optional for this FY (check the FY's notification).`
       : `Aggregate turnover ${entered > 0 ? 'entered' : 'worked out'} (₹${usedTurnover.toFixed(2)}) is above ₹2 crore: GSTR-9 is mandatory (and GSTR-9C above ₹5 crore).`,
     'Built from the 12 monthly GSTR-1 / GSTR-3B working papers of this app, not from what was actually filed on the portal; amend for any differences in the filed returns.',
-    'Advances (4F) are the net of GSTR-1 Table 11A and 11B for the year. Amendments (4K/4L, 5J/5K, Pt V), ISD, TRAN credit and 8C/8E are not modelled and shown as 0.',
+    'Advances (4F) are the net of GSTR-1 Table 11A and 11B for the year. Amendments made in the year are in 4K/4L and 5J/5K (revised − original); Part V (amendments of this year’s supplies made next year), ISD, TRAN credit and 8C/8E are not modelled and shown as 0.',
     'Table 9 re-runs the monthly set-off carrying unused ITC into the next month; a month whose credit notes exceed its sales is not carried back.',
     'Books compare tax heads only and do not filter by GSTIN.',
   ];

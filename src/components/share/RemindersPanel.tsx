@@ -15,6 +15,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { ReminderModal } from './ReminderModal';
 import { useReminderLog } from './useReminderLog';
+import { receivableBalance } from '../../lib/rcm';
 
 export interface RemindersPanelProps {
   /** Defaults to every saved invoice from localDb. */
@@ -57,7 +58,7 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
     [source, today, log],
   );
   const shown = pending.slice(0, limit);
-  const outstanding = pending.reduce((sum, p) => sum + p.invoice.balance_due, 0);
+  const outstanding = pending.reduce((sum, p) => sum + receivableBalance(p.invoice), 0);
 
   return (
     <section className={cn(surface.card, className)} aria-label="Payment reminders">
@@ -110,7 +111,7 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
                   {p.stage === 'upcoming' ? 'Upcoming' : p.stage === 'due_today' ? 'Due' : 'Overdue'}
                 </span>
                 <span className={styles.amount}>
-                  {formatCurrency(p.invoice.balance_due, p.invoice.currency)}
+                  {formatCurrency(receivableBalance(p.invoice), p.invoice.currency)}
                 </span>
                 <button
                   type="button"

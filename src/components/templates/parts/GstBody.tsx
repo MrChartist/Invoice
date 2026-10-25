@@ -7,7 +7,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isTaxed, trackingText } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, trackingText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
 import { ItemCustomLine } from './CustomFieldsBlock';
@@ -43,6 +43,8 @@ export function GstBody({ invoice, sender, totals }: Props) {
   const cgstSgst = isTaxed(invoice, totals);
   const igst = !cgstSgst && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
   const taxed = cgstSgst || igst;
+  // Reverse charge: the HSN table still shows the tax (Rule 46(p)); the ledger rows above the total do not.
+  const rcm = isRcmTotals(totals);
   const lines = totals.lines;
   const showHsn = col.hsn && lines.some((l) => l.hsn);
   const showUnit = col.unit;
@@ -183,7 +185,7 @@ export function GstBody({ invoice, sender, totals }: Props) {
               <td className={cn(styles.right, styles.num)}>-{money(totals.invoice_discount_amount, cur)}</td>
             </tr>
           )}
-          {cgstSgst && (
+          {cgstSgst && !rcm && (
             <>
               <tr className={styles.gLedger}>
                 <td colSpan={spanBefore} className={styles.right}><b>CGST</b></td>
@@ -195,13 +197,13 @@ export function GstBody({ invoice, sender, totals }: Props) {
               </tr>
             </>
           )}
-          {igst && (
+          {igst && !rcm && (
             <tr className={styles.gLedger}>
               <td colSpan={spanBefore} className={styles.right}><b>{invoice.gst_mode === 'SINGLE' ? 'Tax' : 'IGST'}</b></td>
               <td className={cn(styles.right, styles.num)}>{money(totals.tax_amount, cur)}</td>
             </tr>
           )}
-          {totals.cess_amount > 0 && (
+          {totals.cess_amount > 0 && !rcm && (
             <tr className={styles.gLedger}>
               <td colSpan={spanBefore} className={styles.right}>Cess</td>
               <td className={cn(styles.right, styles.num)}>{money(totals.cess_amount, cur)}</td>
@@ -323,7 +325,7 @@ export function GstBody({ invoice, sender, totals }: Props) {
 
       {taxed && show.words && (
         <div className={styles.gWords}>
-          <span className={styles.gLabel}>Tax amount (in words)</span>
+          <span className={styles.gLabel}>{rcm ? 'Tax payable by the recipient under reverse charge (in words)' : 'Tax amount (in words)'}</span>
           <b>{amountInWords(totals.tax_amount, cur)}</b>
         </div>
       )}

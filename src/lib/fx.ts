@@ -76,8 +76,10 @@ export function inrRecord<T extends Partial<InvoiceRecord>>(rec: T): T {
   const total = mulRound2(num(rec.total), r);
   out.total = total;
   // Round-off absorbs the conversion drift so the parts still add up to the converted total.
+  // A reverse-charge document calculated without its tax in the total (src/lib/rcm.ts) keeps it out here too.
+  const rcmExcluded = !!rec.reverse_charge && !!rec.rcm_tax_excluded;
   const parts =
-    num(out.taxable_value) + num(out.tax_amount) + num(out.cess_amount) + num(out.tcs_amount) +
+    num(out.taxable_value) + (rcmExcluded ? 0 : num(out.tax_amount) + num(out.cess_amount)) + num(out.tcs_amount) +
     (chargesAreTaxed(rec) ? 0 : num(out.shipping) + num(out.other_charges));
   out.round_off = typeof rec.taxable_value === 'number' ? round2(total - parts) : mulRound2(num(rec.round_off), r);
   if (typeof rec.balance_due === 'number') {
@@ -129,7 +131,8 @@ export function inrTotals(calc: CalcTotals, rec: FxRecord): CalcTotals {
   const other_charges = m(calc.other_charges);
   const tcs_amount = m(calc.tcs_amount);
   const total = m(calc.total);
-  const parts = round2(taxable_value + tax_amount + cess_amount + (charges_line ? 0 : shipping + other_charges) + tcs_amount);
+  const rcm_tax = calc.rcm_tax ? round2(tax_amount + cess_amount) : 0;
+  const parts = round2(taxable_value + tax_amount + cess_amount - rcm_tax + (charges_line ? 0 : shipping + other_charges) + tcs_amount);
   const tds_amount = m(calc.tds_amount);
   const amount_paid = m(calc.amount_paid);
   const payable = round2(total - tds_amount);
@@ -153,6 +156,7 @@ export function inrTotals(calc: CalcTotals, rec: FxRecord): CalcTotals {
     tcs_amount,
     round_off: round2(total - parts),
     total,
+    rcm_tax,
     tds_amount,
     payable,
     amount_paid,

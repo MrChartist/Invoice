@@ -384,6 +384,8 @@ export const hi: Messages = {
   'summary.modeNone': 'कोई कर नहीं',
   'summary.tax': 'कर',
   'summary.cess': 'सेस',
+  'summary.rcmTax': 'प्राप्तकर्ता द्वारा देय कर (रिवर्स चार्ज)',
+  'summary.rcmTaxValue': '{amount} · कुल में शामिल नहीं',
   'summary.shipping': 'ढुलाई',
   'summary.otherCharges': 'अन्य शुल्क',
   'summary.chargesGst': 'ढुलाई और अन्य शुल्क पर GST लगाएँ',

@@ -29,8 +29,9 @@ import { isoDay, shiftDay } from './dates';
 import { fxRate } from './fx';
 import { mulRound2, num, round2 } from './invoice-calc';
 import { isMse, paymentLimit } from './msme';
-import { isVoidStatus, pickStr, readPurchase } from './purchase-normalize';
+import { isVoidStatus, pickStr, readPurchase, supplierPayableOf } from './purchase-normalize';
 import { previewOccurrences, scheduleStatus, templateTotals, type RecurringSchedule } from './recurring';
+import { receivableBalance } from './rcm';
 
 export const HORIZONS = [30, 90, 180] as const;
 export type Horizon = (typeof HORIZONS)[number];
@@ -192,7 +193,7 @@ export function buildForecast(input: ForecastInput): Forecast {
   // Open receivables.
   for (const inv of input.invoices) {
     if (!RECEIVABLE_DOCS.has(inv.doc_type ?? 'INVOICE') || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
-    const balance = round2(typeof inv.balance_due === 'number' ? num(inv.balance_due) : num(inv.total) - num(inv.tds_amount) - num(inv.amount_paid));
+    const balance = round2(typeof inv.balance_due === 'number' || inv.reverse_charge ? receivableBalance(inv) : num(inv.total) - num(inv.tds_amount) - num(inv.amount_paid));
     if (balance <= 0.004) continue;
     const rate = fxRate(inv);
     if (rate === null) {
@@ -260,7 +261,8 @@ export function buildForecast(input: ForecastInput): Forecast {
   for (const raw of input.purchases) {
     const bill = readPurchase(raw, vendors);
     if (!bill || isVoidStatus(bill.status)) continue;
-    const open = round2(bill.total - bill.paid - (pendingOut.get(bill.id) ?? 0));
+    // Supplier side only: reverse-charge / import GST is paid to the government, not the vendor.
+    const open = round2(supplierPayableOf(bill) - bill.paid - (pendingOut.get(bill.id) ?? 0));
     if (open <= 0.004) continue;
     const r = (raw ?? {}) as Record<string, unknown>;
     const dueRaw = isoDay(pickStr(r, ['due_date']));

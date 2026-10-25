@@ -25,6 +25,7 @@ import { isoDay } from './dates';
 import { csvCell, toCsv } from './csv';
 import type { AdvanceRecord } from '../types/advances';
 import { advanceMovements } from './advance-tax';
+import { receivableTotal } from './rcm';
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -269,7 +270,8 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   for (const inv of docs) {
     const key = keyOf(inv.client);
     const a = acc(key, inv.client?.name ?? '', inv.client?.id);
-    const total = round2(num(inv.total));
+    // Outward reverse charge: only the taxable value is receivable (src/lib/rcm.ts).
+    const total = round2(receivableTotal(inv));
     const issue = dateKey(inv.issue_date) || dateKey(inv.created_at);
 
     if (isCreditNote(inv)) {

@@ -49,7 +49,8 @@ Optional cross-links:
 
 ### Accounting rules
 - **Debit** is a live invoice (`INVOICE` / `TAX_INVOICE`). **Credit** is a payment or a `CREDIT_NOTE`.
-- Draft, Cancelled, Quotation, Proforma and Delivery Challan are excluded. Payments pointing at an excluded or unknown invoice are ignored.
+- Draft, Cancelled, Quotation, Proforma and Delivery Challan are excluded (a Draft credit note too — the dashboard's outstanding skips it as well). Payments pointing at an excluded or unknown invoice are ignored.
+- **Outward reverse charge:** a bill on which the recipient pays the GST is receivable at `receivableTotal(inv)` (`src/lib/rcm.ts`) — the taxable value (+ untaxed charges / TCS); an older record whose stored total includes the tax is read without it. The same figure drives aging, the dashboard, payment "balance", reminders, share / UPI amounts, interest and the credit-limit check; recording a payment of the taxable value marks the bill Paid.
 - Party key is the client `id`, else the case-folded name (so "Beta Co" and "beta co" merge).
 - **Legacy rows:** an invoice with `status: 'Paid'` or `amount_paid` greater than its payment rows gets a derived receipt for the difference. It is dated `updated_at` and flagged `derived: true`. This matches how the Transactions page marks invoices paid.
 - **Advances:** an overpayment on an invoice, and any payment row with no `invoice_id` but a `client_id` or `client_name`, becomes an advance. These are optional additive fields on the payment row. Other modules may write them, and `ReceiptRow` documents the shape.
@@ -168,8 +169,14 @@ Maths (`src/lib/late-fee.ts`, reusing `computeInterest` from `src/lib/interest.t
   grace: no fee; paid late: fee).
 - Under Sec 15(2)(d) CGST Act interest / late fee for delayed payment is part of the value of supply, so the line takes
   the principal supply's GST rate (`principalTaxRate`: the rate carrying the largest taxable value on the original;
-  export / LUT zero-rating carries over with the copied supply type). It is a draft: verify with your CA and edit
-  before issuing. Whether a fee can be charged depends on the agreement with the customer.
+  export / LUT zero-rating carries over with the copied supply type), and the HSN / SAC and goods-or-service `type` of
+  the principal supply's line (`principalItem`: the largest line at that rate), so GSTR-1's HSN summary and the
+  e-Invoice get a code. Reverse charge carries over too (the new document is calculated the current way). It is a
+  draft: verify with your CA and edit before issuing. Whether a fee can be charged depends on the agreement with the
+  customer.
+- The late-fee invoice is an **INR** document dated today: it never inherits the original's `exchange_rate` (which
+  belongs to the original's date). A flat fee is a rupee figure; interest on a foreign-currency bill is worked out in
+  that currency and converted at the original's exchange rate (the rate its receivable is booked at).
 - Terms come from the client master (matched by id, else name + GSTIN), falling back to the client snapshot on the
   invoice.
 - Period lock: when today falls inside the locked period the action refuses with the lock message (the save would also

@@ -7,7 +7,9 @@
  *
  *   1. stock   — a tracked inventory item: the cost of goods the inventory engine issued for THIS
  *                invoice (weighted average or FIFO, `inventory.ts`); a credit note takes the cost
- *                of the return back in;
+ *                of the return back in — only when goods actually came back (`credit-restock.ts`):
+ *                a discount / rate-difference / GST-correction note reduces revenue only, with no
+ *                cost and no quantity;
  *   2. purchases — otherwise the weighted average unit cost of purchase-bill lines with the same
  *                item name (and HSN when both sides have one), from bills dated on or before the
  *                sale (any bill if none is that old);
@@ -29,6 +31,7 @@ import { mulRound2, num, round2 } from './invoice-calc';
 import type { StockPosition } from './inventory';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { salesDocs, type SalesDoc } from './sales-reports';
+import { creditNoteReturnsGoods, type RestockLink } from './credit-restock';
 
 export type CostSource = 'stock' | 'purchases' | 'none';
 
@@ -38,6 +41,15 @@ export interface ProfitInputs {
   vendors?: readonly unknown[];
   positions?: readonly StockPosition[];
   clients?: readonly Client[];
+  /** `doc_links` rows: a credit note's reason decides whether goods came back (older notes). */
+  links?: readonly RestockLink[];
+}
+
+/** Credit notes that brought no goods back: revenue reduction only (no cost, no quantity). */
+function valueOnlyNotes(input: ProfitInputs): Set<string> {
+  return new Set(
+    input.invoices.filter((i) => i.doc_type === 'CREDIT_NOTE' && !creditNoteReturnsGoods(i, input.links ?? [])).map((i) => i.id),
+  );
 }
 
 const norm = (s: unknown) => String(s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -184,6 +196,7 @@ function totalsOf(rows: readonly { revenue: number; cost: number; profit: number
 export function itemProfitability(input: ProfitInputs, period: Period): { rows: ItemProfitRow[]; totals: ProfitTotals; excluded: number } {
   const { docs, excluded } = rupeeDocs(input.invoices);
   const coster = buildCoster(input.purchases, input.vendors, input.positions);
+  const valueOnly = valueOnlyNotes(input);
   const map = new Map<string, ItemProfitRow & { sources: Set<CostSource> }>();
   for (const d of docs) {
     if (!inPeriod(d.date, period)) continue;
@@ -191,6 +204,11 @@ export function itemProfitability(input: ProfitInputs, period: Period): { rows: 
       if (l.name === '(no line items)') continue;
       const key = norm(l.name) || '(unnamed)';
       const row = map.get(key) ?? { key, name: l.name || '(unnamed)', hsn: l.hsn, unit: l.unit, quantity: 0, revenue: 0, cost: 0, profit: 0, margin: null, source: 'none', uncosted: 0, sources: new Set<CostSource>() };
+      if (valueOnly.has(d.id)) {
+        row.revenue = round2(row.revenue + l.taxable);
+        map.set(key, row);
+        continue;
+      }
       const c = coster.cost(l, d);
       row.quantity = round2(row.quantity + l.quantity);
       row.revenue = round2(row.revenue + l.taxable);
@@ -231,6 +249,7 @@ export interface PartyProfitRow {
 export function partyProfitability(input: ProfitInputs, period: Period): { rows: PartyProfitRow[]; totals: ProfitTotals & { cogs: number; expenses: number }; excluded: number } {
   const { docs, excluded } = rupeeDocs(input.invoices);
   const coster = buildCoster(input.purchases, input.vendors, input.positions);
+  const valueOnly = valueOnlyNotes(input);
   const map = new Map<string, PartyProfitRow>();
   const byClientId = new Map<string, string>();
   const rowFor = (key: string, name: string, clientId: string | undefined, partyKey: string) => {
@@ -247,6 +266,7 @@ export function partyProfitability(input: ProfitInputs, period: Period): { rows:
     const row = rowFor(d.customerKey, d.customerName, d.clientId, d.partyKey);
     row.docs++;
     row.revenue = round2(row.revenue + d.taxable);
+    if (valueOnly.has(d.id)) continue;
     for (const l of d.lines) {
       const c = coster.cost(l, d);
       row.cogs = round2(row.cogs + c.cost);

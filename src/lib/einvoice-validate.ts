@@ -33,6 +33,7 @@ import {
   type EwayBill,
   type EwayOptions,
 } from './eway';
+import { rcmTaxOf } from './rcm';
 
 export interface PreflightResult {
   errors: PreflightIssue[];
@@ -145,7 +146,9 @@ export function validateEInvoice(
       }
     }
     // TotInvVal is in rupees; a foreign-currency total is compared at the invoice's exchange rate.
-    const raw = Number(record.total);
+    // A reverse-charge document saved the current way keeps the recipient's GST out of its total;
+    // TotInvVal still carries it (see einvoice.ts), so add it back before comparing.
+    const raw = Number(record.total) + (record.reverse_charge && record.rcm_tax_excluded ? rcmTaxOf(record) : 0);
     const stored = Number.isFinite(raw) ? inrValue(raw, record) : NaN;
     if (Number.isFinite(stored) && !near(stored, payload.ValDtls.TotInvVal)) {
       out.push(issue('warning', 'STORED_TOTAL', 'Totals', `Saved invoice total (₹${stored}) differs from the recalculated total (₹${payload.ValDtls.TotInvVal}). Open and re-save the invoice.`));

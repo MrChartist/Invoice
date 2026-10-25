@@ -21,6 +21,7 @@ import '../../i18n/en-pages'; // page strings (5.4)
 import { methodLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
+import { receivableBalance } from '../../lib/rcm';
 
 const METHODS = ['UPI', 'Bank transfer', 'Cash', 'Cheque', 'Card', 'Other'];
 
@@ -81,7 +82,8 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const payments = useMemo(() => (invoice ? localDb.payments.listFor(invoice.id) : []), [invoice, version]);
   // What is really still owed: the stored balance (already net of TDS) less any credit notes issued against it.
   const credited = live ? totalCredited(live.id, readLinks(), localDb.invoices.getAll()) : 0;
-  const balance = live ? Math.max(round2((live.balance_due ?? live.total - (live.amount_paid ?? 0)) - credited), 0) : 0;
+  // Reverse charge: the recipient's GST is never collected (src/lib/rcm.ts).
+  const balance = live ? Math.max(round2(receivableBalance(live) - credited), 0) : 0;
 
   useEffect(() => {
     if (!invoice) return;

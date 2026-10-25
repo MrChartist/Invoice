@@ -33,6 +33,7 @@ import { dateLocale, useT, type MessageKey } from '../i18n';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Dashboard.module.css';
+import { receivableBalance } from '../lib/rcm';
 
 function greeting(hour: number): MessageKey {
   if (hour < 12) return 'dash.morning';
@@ -234,7 +235,7 @@ export function Dashboard() {
                           {late ? (late === 1 ? t('dash.lateOne') : t('dash.lateMany', { n: late })) : t('dash.due', { date: formatDate(inv.due_date) })}
                         </span>
                       </div>
-                      <span className={styles.amount}>{formatCurrency(inv.balance_due ?? inv.total, inv.currency)}</span>
+                      <span className={styles.amount}>{formatCurrency(receivableBalance(inv), inv.currency)}</span>
                     </Link>
                   </li>
                 );

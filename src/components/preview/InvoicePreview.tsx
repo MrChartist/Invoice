@@ -17,6 +17,7 @@ import { buildClientCopyHtml } from '../../lib/client-copy';
 import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
+import { receivableBalance } from '../../lib/rcm';
 
 
 interface InvoicePreviewModalProps {
@@ -204,7 +205,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
       })
       .join('\n');
     const rec = invoice as unknown as InvoiceRecord;
-    const due = Number(rec.balance_due) > 0 ? rec.balance_due : 0;
+    const due = Math.max(receivableBalance(rec), 0);
     const html = buildClientCopyHtml({
       title: `${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number}`.trim(),
       paperHtml: clone.outerHTML,

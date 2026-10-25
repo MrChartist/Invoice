@@ -17,6 +17,7 @@ import { round2, num } from './invoice-calc';
 import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from './storage';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv } from './csv';
+import { creditNoteReturnsGoods } from './credit-restock';
 import { MAIN_GODOWN_ID, type StockTransfer } from '../types/stock';
 
 /* ── Types ───────────────────────────────────────────────────── */
@@ -159,7 +160,7 @@ export interface StockPosition {
 
 /** The slice of an invoice the engine reads. */
 export type InvoiceLike = Partial<
-  Pick<InvoiceRecord, 'id' | 'doc_type' | 'status' | 'issue_date' | 'invoice_number' | 'items' | 'client'>
+  Pick<InvoiceRecord, 'id' | 'doc_type' | 'status' | 'issue_date' | 'invoice_number' | 'items' | 'client' | 'goods_returned' | 'notes'>
 >;
 
 export interface StockInputs {
@@ -178,9 +179,10 @@ export interface StockInputs {
   includeTransfers?: boolean;
   /**
    * `doc_links` rows. When challans move stock, an invoice converted FROM a challan does not move it
-   * again (the goods left on the challan).
+   * again (the goods left on the challan). Credit-note links also carry the note's reason: only a
+   * credit note that returns goods moves stock (`creditNoteReturnsGoods`).
    */
-  links?: { from_id: string; to_id: string; relation: string }[];
+  links?: { from_id: string; to_id: string; relation: string; reason?: string }[];
 }
 
 const EPS = 1e-9;
@@ -349,6 +351,8 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     if (inv.id && fromChallan.has(inv.id)) continue;
     const effect = invoiceEffect(inv.doc_type, inv.status, includeChallans);
     if (!effect) continue;
+    // A discount / rate-difference / GST-correction credit note brings no goods back.
+    if (effect === 'in' && !creditNoteReturnsGoods(inv, input.links)) continue;
     const date = dayOf(inv.issue_date);
     const clientName = inv.client?.name ? ` · ${inv.client.name}` : '';
     for (const line of inv.items ?? []) {
@@ -913,7 +917,7 @@ export function liveInputs(): StockInputs {
     purchases: getTable<PurchaseLike>('purchases'),
     method: settings.method,
     includeChallans: settings.includeChallans,
-    links: getTable<{ from_id: string; to_id: string; relation: string }>('doc_links'),
+    links: getTable<{ from_id: string; to_id: string; relation: string; reason?: string }>('doc_links'),
   };
 }
 

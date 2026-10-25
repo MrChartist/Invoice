@@ -23,6 +23,9 @@
  *   - supply_type: SEZ/export without payment -> zero tax; with payment -> IGST
  *   - TCS: added to the invoice value (before round-off)
  *   - TDS: deducted from what the customer pays; invoice total unchanged
+ *   - rcm_exclude_tax (outward reverse charge, Sec 9(3)/(4)): GST and cess are still worked out
+ *     line by line and reported, but the RECIPIENT pays them, so they stay out of the total,
+ *     payable and balance due (`rcm_tax` carries the amount; see src/lib/rcm.ts)
  */
 
 import type {
@@ -193,8 +196,13 @@ export interface CalcTotals {
   other_charges: number;
   tcs_amount: number;
   round_off: number;
-  /** Invoice value (GST invoice total incl. TCS, after rounding). */
+  /** Invoice value (GST invoice total incl. TCS, after rounding). Excludes `rcm_tax`. */
   total: number;
+  /**
+   * GST + cess shown as "payable by the recipient under reverse charge" and left out of `total`
+   * (only with `rcm_exclude_tax`; 0 otherwise).
+   */
+  rcm_tax: number;
   tds_amount: number;
   /** total - tds_amount: what the customer actually owes in cash. */
   payable: number;
@@ -228,6 +236,12 @@ export interface CalcInput {
   tds_on_taxable?: boolean;
   /** Tax shipping + other charges (see step 6). Absent = untaxed, the legacy behaviour. */
   charges_taxable?: boolean;
+  /**
+   * Outward reverse charge: the tax is computed (and reported) but payable by the recipient, so it
+   * is not added to the total. Absent = the tax is part of the total (forward charge, and every
+   * reverse-charge record saved before `rcm_tax_excluded` existed).
+   */
+  rcm_exclude_tax?: boolean;
 }
 
 /**
@@ -261,9 +275,10 @@ export function calcInputFromRecord(
     tds_rate: num(rec.tds_rate),
     tds_on_taxable: rec.tds_on_taxable,
     charges_taxable: !!rec.charges_taxable,
+    rcm_exclude_tax: !!rec.reverse_charge && !!rec.rcm_tax_excluded,
     ...over,
     // A Bill of Supply never charges GST (Rule 49), whatever mode an import or conversion left behind.
-    ...(rec.doc_type === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as GstMode } : {}),
+    ...(rec.doc_type === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as GstMode, rcm_exclude_tax: false } : {}),
   };
 }
 
@@ -320,6 +335,7 @@ export const EMPTY_TOTALS: CalcTotals = {
   tcs_amount: 0,
   round_off: 0,
   total: 0,
+  rcm_tax: 0,
   tds_amount: 0,
   payable: 0,
   amount_paid: 0,
@@ -472,7 +488,9 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
   const tax_amount = round2(cgst_amount + sgst_amount + igst_amount);
   const cess_amount = round2(lines.reduce((s, l) => s + l.cess, 0));
 
-  const beforeTcs = round2(taxable_value + tax_amount + cess_amount + (charges_line ? 0 : chargesBase));
+  // Outward reverse charge: the recipient pays the GST + cess, so the supplier's total leaves them out.
+  const rcm_tax = input.rcm_exclude_tax ? round2(tax_amount + cess_amount) : 0;
+  const beforeTcs = round2(taxable_value + tax_amount + cess_amount - rcm_tax + (charges_line ? 0 : chargesBase));
   const tcsRate = input.tcs_enabled ? Math.max(num(input.tcs_rate), 0) : 0;
   const tcsBase = input.tcs_base === 'taxable' ? taxable_value : beforeTcs;
   const tcs_amount = pctOf(tcsBase, tcsRate);
@@ -506,6 +524,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
     tcs_amount,
     round_off,
     total,
+    rcm_tax,
     tds_amount,
     payable,
     amount_paid,

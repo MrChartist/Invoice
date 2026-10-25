@@ -35,7 +35,7 @@ import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, nu
 import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
-import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
+import { isNonSupplyCategory, isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import { b2clThreshold, b2clThresholdLabel, hsnMinDigits, hsnTableSplit } from './tax-rules';
 import type { AdvanceMovement } from './advance-tax';
 
@@ -316,6 +316,18 @@ export interface Gstr1Amendments {
   cdnra: AmendCdnRow[];
   cdnura: AmendCdnRow[];
   b2csa: B2csaRow[];
+  /**
+   * Additive: revised − original of each amendment made in the period (sign-aware), the same deltas
+   * GSTR-3B takes. `taxPayable` = supplies on which the supplier pays tax (GSTR-9 4K / 4L);
+   * `noTax` = taxable value of zero-rated-without-payment, reverse-charge and nil / exempt lines (5J / 5K).
+   */
+  effects?: AmendEffect[];
+}
+
+export interface AmendEffect {
+  number: string;
+  taxPayable: Gstr3bTaxRow;
+  noTax: { taxable: number };
 }
 
 export interface ItcHeads {
@@ -598,7 +610,10 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   }
 
   const recorded = num(rec.total, NaN);
-  const value = Number.isFinite(recorded) && recorded > 0 ? inrValue(round2(recorded), rec) : calc.total;
+  // GSTR-1 invoice value of an outward reverse-charge document includes the tax shown on it (as on
+  // documents saved before `rcm_tax_excluded`), even though the supplier's total leaves it out.
+  const rcmBack = docCalc.rcm_tax;
+  const value = Number.isFinite(recorded) && recorded > 0 ? inrValue(round2(recorded + rcmBack), rec) : round2(calc.total + calc.rcm_tax);
   if (Number.isFinite(recorded) && Math.abs(recorded - docCalc.total) > 1.01) {
     push('warning', 'TOTAL_MISMATCH', `stored total ${recorded} differs from recomputed ${docCalc.total}; the report uses the recomputed tax split.`);
   }
@@ -665,10 +680,15 @@ const taxOf = (l: PLine) => l.igst + l.cgst + l.sgst;
 /** A nil / exempt / non-GST line: no rate, no tax and no cess. */
 const isNilLine = (l: PLine) => l.rate <= 0 && taxOf(l) === 0 && l.cess === 0;
 
-function rateRows(lines: PLine[]): RateRow[] {
+/**
+ * Rate-wise rows of a document. Nil lines go to Table 8 — except on a zero-rated document (export /
+ * SEZ): a line priced at a nominal 0% is still a zero-rated supply, reported in EXP / SEZ (B2B) at
+ * rate 0, exactly as GSTR-3B 3.1(b) and GSTR-9 5A count it.
+ */
+function rateRows(lines: PLine[], zeroRated = false): RateRow[] {
   const map = new Map<number, RateRow>();
   for (const l of lines) {
-    if (isNilLine(l)) continue; // nil lines go to table 8
+    if (isNilLine(l) && !(zeroRated && l.taxable !== 0)) continue; // nil lines go to table 8
     const r = map.get(l.rate) ?? { rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
     r.txval = round2(r.txval + l.taxable);
     r.igst = round2(r.igst + l.igst);
@@ -721,9 +741,34 @@ function parseSeries(s: string): { prefix: string; n: number; width: number } | 
   return { prefix: m[1], n: parseInt(m[2], 10), width: m[2].length };
 }
 
-function buildDocIssue(all: InvoiceRecord[]): DocIssueRow[] {
+/** Table 13 document types the app issues besides invoices / notes (Rule 50 receipt, Rule 51 refund vouchers). */
+export const RECEIPT_VOUCHER_DOC = 'Receipt Voucher';
+export const REFUND_VOUCHER_DOC = 'Refund Voucher';
+
+/**
+ * GSTR-1 Table 13. Invoices / Bills of Supply, debit notes and credit notes come from the documents;
+ * receipt vouchers (advances, ADV/…) and refund vouchers (RFV/…) from the period's advance movements
+ * — every voucher issued counts, taxed or not. Delivery challans (doc 9–12) are NOT listed: the app
+ * cannot tell a challan for job work / approval / "other than supply" from one sent ahead of an
+ * invoice, so add those series on the portal (verify with your CA).
+ */
+function buildDocIssue(all: InvoiceRecord[], vouchers: readonly AdvanceMovement[] = []): DocIssueRow[] {
   interface Bucket { docType: string; prefix: string; width: number; nums: Set<number>; cancelled: Set<number> }
   const buckets = new Map<string, Bucket>();
+  const addNumber = (docType: string, number: string, cancelled = false) => {
+    const s = parseSeries(number);
+    if (!s) return;
+    const key = `${docType}|${s.prefix}`;
+    const b = buckets.get(key) ?? { docType, prefix: s.prefix, width: s.width, nums: new Set<number>(), cancelled: new Set<number>() };
+    b.nums.add(s.n);
+    b.width = Math.max(b.width, s.width);
+    if (cancelled) b.cancelled.add(s.n);
+    buckets.set(key, b);
+  };
+  for (const m of vouchers) {
+    if (m.kind === 'received') addNumber(RECEIPT_VOUCHER_DOC, m.number);
+    else if (m.kind === 'refunded' && m.ref) addNumber(REFUND_VOUCHER_DOC, m.ref);
+  }
   for (const rec of all) {
     if (!TAX_DOC_TYPES.has(rec.doc_type)) continue;
     // A draft was never issued. Left out of the range, it is counted as a gap (cancelled) when it sits
@@ -862,7 +907,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   };
 
   for (const d of docs) {
-    const items = rateRows(d.lines);
+    const items = rateRows(d.lines, d.zeroRated);
     const row = docRow(d, items);
     const label = d.number || d.rec.id;
 
@@ -954,7 +999,12 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     hsnB2c: sortHsn(hsnB2cMap),
     hsnSplit: hsnTableSplit(periodRange(opts.period).from),
     hsnMinDigits: hsnMinDigits(opts.turnover ?? 0, periodRange(opts.period).to),
-    docIssue: buildDocIssue(inScope.filter((r) => !isCompositionDoc(r))),
+    docIssue: buildDocIssue(
+      inScope.filter((r) => !isCompositionDoc(r)),
+      (opts.advances ?? []).filter(
+        (m) => inPeriod(m.date, opts.period) && (!wantGstin || !m.senderGstin || m.senderGstin === wantGstin),
+      ),
+    ),
     ...(adv.at.length ? { at: adv.at } : {}),
     ...(adv.txpd.length ? { txpd: adv.txpd } : {}),
     // `cess` only appears when there is some, so reports without cess keep their exact shape.
@@ -969,6 +1019,29 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
 }
 
 /* ───────────────────────── Amendments (5.9) ───────────────────────── */
+
+/** Revised − original of one amendment, split into tax-payable supplies and supplies without tax. */
+function amendEffect(number: string, cur: PDoc, orig: PDoc): AmendEffect {
+  const taxPayable: Gstr3bTaxRow = { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+  const noTax = { taxable: 0 };
+  const take = (d: PDoc, f: number) => {
+    for (const l of d.lines) {
+      const s = f * d.sign;
+      if (d.rcm || isNilLine(l) || (d.zeroRated && taxOf(l) === 0)) {
+        noTax.taxable = round2(noTax.taxable + s * l.taxable);
+        continue;
+      }
+      taxPayable.taxable = round2(taxPayable.taxable + s * l.taxable);
+      taxPayable.igst = round2(taxPayable.igst + s * l.igst);
+      taxPayable.cgst = round2(taxPayable.cgst + s * l.cgst);
+      taxPayable.sgst = round2(taxPayable.sgst + s * l.sgst);
+      taxPayable.cess = round2(taxPayable.cess + s * l.cess);
+    }
+  };
+  take(cur, 1);
+  take(orig, -1);
+  return { number, taxPayable, noTax };
+}
 
 /**
  * GSTR-1 amendment tables for the amendments MADE in `opts.period` (by `amends.amended_on`):
@@ -989,6 +1062,7 @@ function buildAmendments(
 ): { count: number; tables: Gstr1Amendments; deltas: PDoc[] } {
   const tables: Gstr1Amendments = { b2ba: [], b2cla: [], cdnra: [], cdnura: [], b2csa: [] };
   const deltas: PDoc[] = [];
+  const effects: AmendEffect[] = [];
   const periodEnd = periodRange(opts.period).to;
   const amended = invoices.filter(
     (r) => r?.amends && inPeriod(r.amends.amended_on, opts.period) && TAX_DOC_TYPES.has(r.doc_type) && !isCompositionDoc(r) && sameFiler(r),
@@ -1013,7 +1087,7 @@ function buildAmendments(
     const cur = prepare(rec, opts, issues);
     const orig = a.original ? prepare(asFiled(rec), opts, []) : null;
     if (!orig) flag('warning', 'AMEND_NO_ORIGINAL', 'the copy of the original as filed is missing; only the revised values are reported and GSTR-3B is not adjusted.');
-    const base = docRow(cur, rateRows(cur.lines));
+    const base = docRow(cur, rateRows(cur.lines, cur.zeroRated));
     const row: AmendDocRow = {
       ...base,
       origNumber: a.original_number,
@@ -1038,6 +1112,7 @@ function buildAmendments(
 
     deltas.push(cur);
     if (orig) deltas.push({ ...orig, sign: (orig.sign === 1 ? -1 : 1) as 1 | -1 });
+    if (orig) effects.push(amendEffect(label, cur, orig));
   }
 
   // B2CSA: revised B2CS rows of each original month touched by an amendment of this period.
@@ -1082,6 +1157,7 @@ function buildAmendments(
   tables.cdnra.sort(byDate);
   tables.cdnura.sort(byDate);
   tables.b2csa.sort((x, y) => x.omon.localeCompare(y.omon) || x.pos.localeCompare(y.pos) || x.rate - y.rate);
+  if (effects.length) tables.effects = effects;
   return { count, tables, deltas };
 }
 
@@ -1105,6 +1181,8 @@ export interface NormalizedPurchase {
   /** RULE_42 / RULE_43 / RULE_37 / SEC_17_5 / OTHER, or ''. */
   itcReversalReason: string;
   importType: '' | 'GOODS' | 'SERVICES';
+  /** Additive: the bill's category is not a supply at all (salaries, taxes … — `isNonSupplyCategory`). */
+  nonSupply?: boolean;
 }
 
 /**
@@ -1139,6 +1217,7 @@ export function normalizePurchase(raw: unknown, filerStateCode: string): Normali
     itcReversed: c.itcReversed,
     itcReversalReason: c.itcReversalReason,
     importType: c.importType,
+    ...(isNonSupplyCategory(c.category) ? { nonSupply: true } : {}),
   };
 }
 
@@ -1151,11 +1230,16 @@ const zeroHeads = (): ItcHeads => ({ igst: 0, cgst: 0, sgst: 0, cess: 0 });
 const zeroRow = (): Gstr3bTaxRow => ({ taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
 
 /**
- * Table 6.1 set-off, following the GST ordering rules:
- *  1. IGST credit settles IGST, then CGST, then SGST liability.
+ * Table 6.1 set-off, following Sec 49 / 49A and Rule 88A (Notification 16/2019-CT):
+ *  1. IGST credit settles IGST first. What is left must be used up against CGST and SGST
+ *     "in any order" before any CGST / SGST credit is touched, so it goes FIRST to the part of
+ *     each head that the head's own credit cannot cover (that is what minimises cash: CGST
+ *     credit can never pay SGST and vice versa), CGST shortfall before SGST shortfall, and only
+ *     then to the rest of the CGST / SGST liability.
  *  2. CGST credit then settles CGST, then IGST (never SGST).
  *  3. SGST credit then settles SGST, then IGST (never CGST).
- * Reverse-charge tax can only be paid in cash, so it bypasses ITC entirely.
+ * Reverse-charge tax can only be paid in cash, so it bypasses ITC entirely. The cash figures are
+ * a working paper: the portal's own set-off screen is what is filed (verify with your CA).
  */
 export function computeSetOff(
   liability: { igst: number; cgst: number; sgst: number },
@@ -1179,6 +1263,16 @@ export function computeSetOff(
     (used[credHead] as Record<string, number>)[liabHead] = round2(((used[credHead] as Record<string, number>)[liabHead] ?? 0) + amt);
   };
   take('igst', 'igst');
+  // Leftover IGST covers the shortfall each head's own credit leaves, then whatever remains.
+  const takeUpTo = (liabHead: 'cgst' | 'sgst', cap: number) => {
+    const amt = Math.min(avail.igst, rem[liabHead], Math.max(round2(cap), 0));
+    if (amt <= 0) return;
+    avail.igst = round2(avail.igst - amt);
+    rem[liabHead] = round2(rem[liabHead] - amt);
+    used.igst[liabHead] = round2(used.igst[liabHead] + amt);
+  };
+  takeUpTo('cgst', L.cgst - C.cgst);
+  takeUpTo('sgst', L.sgst - C.sgst);
   take('igst', 'cgst');
   take('igst', 'sgst');
   take('cgst', 'cgst');
@@ -1298,6 +1392,8 @@ export function buildGstr3b(
       add(rcm, p);
       claim(availRcm);
     } else if (tax === 0) {
+      // Salaries, taxes and other non-supplies are not inward supplies at all: never in Table 5.
+      if (p.nonSupply) continue;
       const inter = p.supplierState && filerStateCode ? p.supplierState !== filerStateCode : false;
       if (inter) inwardExempt.inter = round2(inwardExempt.inter + p.taxable);
       else inwardExempt.intra = round2(inwardExempt.intra + p.taxable);

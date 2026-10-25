@@ -32,6 +32,7 @@ import { generateId, getTable, setTable } from './storage';
 import { todayIso } from './tax-rules';
 import { formatCurrency, formatDate } from './utils';
 import { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, liveAdjustments, taxTotal, type AdvanceBalance } from './advance-tax';
+import { receivableTotal } from './rcm';
 
 export { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, isAdvanceAdjustment, liveAdjustments } from './advance-tax';
 export type { AdvanceBalance } from './advance-tax';
@@ -266,7 +267,7 @@ export function openAdvancesFor(
 
 /** What is still owed on the invoice (net of TDS), as the payment dialog computes it. */
 export function invoiceOpen(inv: InvoiceRecord): number {
-  const total = Math.max(num(inv.total) - num(inv.tds_amount), 0);
+  const total = Math.max(receivableTotal(inv) - num(inv.tds_amount), 0);
   return round2(Math.max(total - num(inv.amount_paid), 0));
 }
 

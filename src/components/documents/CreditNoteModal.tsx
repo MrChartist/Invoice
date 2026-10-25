@@ -10,6 +10,7 @@ import {
   readLinks,
 } from '../../lib/documents';
 import { localDb } from '../../lib/localDb';
+import { reasonReturnsGoods } from '../../lib/credit-restock';
 import type { InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './documents.module.css';
@@ -32,6 +33,9 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
   const [all] = useState(() => localDb.invoices.getAll());
   const [qty, setQty] = useState<Record<string, string>>({});
   const [reason, setReason] = useState<string>(CREDIT_REASONS[0]);
+  // null = follow the reason (on only for a sales return); a tick / untick by the user wins.
+  const [restockChoice, setRestockChoice] = useState<boolean | null>(null);
+  const goodsReturned = restockChoice ?? reasonReturnsGoods(reason);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
 
@@ -43,13 +47,14 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
         invoice,
         {
           reason,
+          goodsReturned,
           lines: lines.map((l) => ({ itemId: l.item.id, quantity: num(qty[l.item.id]) })),
         },
         links,
         all,
         { id: 'preview', invoice_number: 'preview', today: invoice.issue_date },
       ),
-    [invoice, reason, lines, qty, links, all],
+    [invoice, reason, goodsReturned, lines, qty, links, all],
   );
 
   const rec = preview.record;
@@ -64,6 +69,7 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
     try {
       const saved = createCreditNote(invoice, {
         reason,
+        goodsReturned,
         lines: lines.map((l) => ({ itemId: l.item.id, quantity: num(qty[l.item.id]) })),
       });
       onCreated(saved);
@@ -180,7 +186,10 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
                 id="cn-reason"
                 className={controls.select}
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  setRestockChoice(null);
+                }}
               >
                 {CREDIT_REASONS.map((r) => (
                   <option key={r} value={r}>
@@ -192,6 +201,15 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
                 Tax is recalculated using the invoice&apos;s GST mode and place of supply.
               </span>
             </div>
+
+            <label className={controls.check}>
+              <input type="checkbox" checked={goodsReturned} onChange={(e) => setRestockChoice(e.target.checked)} />
+              Goods returned to stock
+            </label>
+            <p className={controls.hint}>
+              Only goods that physically come back go into stock (and their serials / cost of goods). A discount, rate
+              difference or GST correction reduces the sale value only.
+            </p>
 
             <div className={styles.totals} aria-live="polite">
               <div className={styles.totalRow}>

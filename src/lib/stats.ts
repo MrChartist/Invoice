@@ -8,6 +8,7 @@ import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { daysOverdue } from './utils';
 import { docCurrency, hasInrValue, inrRecord, missingFxRate } from './fx';
+import { receivableBalance, receivableTotal } from './rcm';
 
 /** Only real, issued sales documents count as revenue — not quotes, challans or drafts. A debit note bills extra; a Bill of Supply is revenue with no output tax. */
 export function isRevenueDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {
@@ -17,9 +18,8 @@ export function isRevenueDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): b
 }
 
 function outstandingOf(inv: InvoiceRecord): number {
-  const balance =
-    typeof inv.balance_due === 'number' ? inv.balance_due : (inv.total ?? 0) - (inv.amount_paid ?? 0);
-  return Math.max(balance, 0);
+  // Reverse charge: the recipient pays the GST, so it is never outstanding (src/lib/rcm.ts).
+  return Math.max(receivableBalance(inv), 0);
 }
 
 /** Linked credit notes reduce what a customer still owes (see `doc_links`). */
@@ -80,18 +80,20 @@ export function summarize(
   for (const link of links) {
     if (link.relation !== 'credit_note') continue;
     const note = byId.get(link.to_id);
-    if (!note || note.doc_type !== 'CREDIT_NOTE' || note.status === 'Cancelled') continue;
-    creditTotals.set(link.from_id, (creditTotals.get(link.from_id) ?? 0) + (note.total ?? 0));
+    // A draft credit note is not issued yet: it reduces nothing.
+    if (!note || note.doc_type !== 'CREDIT_NOTE' || note.status === 'Cancelled' || note.status === 'Draft') continue;
+    creditTotals.set(link.from_id, (creditTotals.get(link.from_id) ?? 0) + receivableTotal(note));
   }
   for (const inv of invoices) {
-    if (inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft') out.credited += inv.total ?? 0;
+    if (inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft') out.credited += receivableTotal(inv);
   }
 
   for (const inv of invoices) {
     if (!isRevenueDoc(inv)) continue;
     out.count += 1;
-    out.billed += inv.total ?? 0;
-    out.received += Math.min(inv.amount_paid ?? 0, inv.total ?? 0);
+    const total = receivableTotal(inv);
+    out.billed += total;
+    out.received += Math.min(inv.amount_paid ?? 0, total);
     const due = Math.max(outstandingOf(inv) - (creditTotals.get(inv.id) ?? 0), 0);
     out.outstanding += due;
     if (due > 0 && effectiveStatus(inv, now) === 'Overdue') {
@@ -135,7 +137,7 @@ export function monthlyBilled(all: InvoiceRecord[], months = 6, now: Date = new 
     const credit = inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft';
     if (!isRevenueDoc(inv) && !credit) continue;
     const bucket = buckets.find((b) => inv.issue_date.startsWith(b.key));
-    if (bucket) bucket.billed = round2(bucket.billed + (credit ? -1 : 1) * (inv.total ?? 0));
+    if (bucket) bucket.billed = round2(bucket.billed + (credit ? -1 : 1) * receivableTotal(inv));
   }
   return buckets;
 }

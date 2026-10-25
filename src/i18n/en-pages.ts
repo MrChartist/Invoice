@@ -153,6 +153,8 @@ export const enPages = {
   'summary.modeNone': 'No tax',
   'summary.tax': 'Tax',
   'summary.cess': 'Cess',
+  'summary.rcmTax': 'Tax payable by the recipient (reverse charge)',
+  'summary.rcmTaxValue': '{amount} · not in total',
   'summary.shipping': 'Shipping',
   'summary.otherCharges': 'Other charges',
   'summary.chargesGst': 'Charge GST on shipping & other charges',

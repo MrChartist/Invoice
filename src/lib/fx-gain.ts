@@ -25,6 +25,7 @@ import { docCurrency, fxRate, inrValue, isForeignCurrency } from './fx';
 import { mulRound2, num, round2 } from './invoice-calc';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
+import { receivableTotal } from './rcm';
 
 export interface RealisedFx {
   currency: string;
@@ -189,7 +190,7 @@ export function revalueReceivables(
     const issued = isoDay(inv.issue_date);
     const bookRate = fxRate(inv);
     if (!issued || issued > asOf || bookRate === null) continue;
-    const open = round2(Math.abs(num(inv.total)) - Math.abs(num(inv.tds_amount)) - (paidBy.get(inv.id) ?? 0));
+    const open = round2(Math.abs(receivableTotal(inv)) - Math.abs(num(inv.tds_amount)) - (paidBy.get(inv.id) ?? 0));
     if (open <= 0.004) continue;
     const currency = docCurrency(inv);
     currencies.add(currency);

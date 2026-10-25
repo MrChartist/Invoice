@@ -6,6 +6,7 @@
 
 import type { InvoiceRecord, InvoiceStatus } from '../types/invoice';
 import { daysOverdue } from './utils';
+import { receivableBalance, type RcmFields } from './rcm';
 
 export const STATUS_OPTIONS: InvoiceStatus[] = [
   'Draft',
@@ -36,16 +37,14 @@ export function statusTone(status: InvoiceStatus): StatusTone {
 
 /** The status to show: an unpaid, already-sent document past its due date is Overdue. */
 export function effectiveStatus(
-  invoice: Pick<InvoiceRecord, 'status' | 'due_date' | 'balance_due' | 'total' | 'amount_paid'>,
+  invoice: Pick<InvoiceRecord, 'status' | 'due_date' | 'balance_due' | 'total' | 'amount_paid'> & RcmFields,
   now: Date = new Date(),
 ): InvoiceStatus {
   const stored = invoice.status;
   if (stored === 'Paid' || stored === 'Cancelled' || stored === 'Draft') return stored;
 
-  const outstanding =
-    typeof invoice.balance_due === 'number'
-      ? invoice.balance_due
-      : (invoice.total ?? 0) - (invoice.amount_paid ?? 0);
+  // Reverse charge: the GST is the recipient's to pay, never outstanding (src/lib/rcm.ts).
+  const outstanding = receivableBalance(invoice);
 
   if (outstanding <= 0) return 'Paid';
   return daysOverdue(invoice.due_date, now) > 0 ? 'Overdue' : stored;

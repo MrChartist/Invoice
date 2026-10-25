@@ -21,11 +21,12 @@
 import { DEFAULT_BANK_ID, accountIdOf, type BankAccount } from './bank-accounts';
 import { round2, num, untaxedCharges } from './invoice-calc';
 import { inrRecord, inrValue } from './fx';
+import { supplierView } from './rcm';
 import { receiptInr } from './fx-gain';
 import { getTable, setTable, generateId } from './storage';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
-import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
+import { isVoidStatus, readPurchase, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
 import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment } from './advance-tax';
@@ -288,7 +289,9 @@ export function partyOfInvoice(inv: InvoiceRecord): string {
  * document is booked at its exchange rate (`src/lib/fx.ts`); one without a rate stays at face value.
  */
 function invoiceAmounts(source: InvoiceRecord) {
-  const inv = inrRecord(source);
+  // Outward reverse charge: the GST is the recipient's to pay — no output tax, and only the
+  // taxable value is receivable, also on older records whose stored total includes it (src/lib/rcm.ts).
+  const inv = supplierView(inrRecord(source));
   const total = Math.abs(num(inv.total));
   const tax = Math.abs(num(inv.tax_amount));
   const hasTaxable = Number.isFinite(num(inv.taxable_value, NaN));
@@ -334,6 +337,13 @@ export interface NormPurchase {
   sgst: number;
   igst: number;
   total: number;
+  /**
+   * GST we pay to the government ourselves (reverse charge, import of services, customs IGST on
+   * imported goods) when it sits inside `total`. Owed to the government, never to the supplier.
+   */
+  selfTax: number;
+  /** What the supplier is owed: total − selfTax (`supplierPayable`). */
+  payable: number;
   itcEligible: boolean;
   /** Paid amount recorded on the row itself (fallback when no payment rows). */
   paidOnRow: number;
@@ -361,9 +371,16 @@ export function normalizePurchase(
     sgst: heads.sgst,
     igst: heads.igst,
     total: c.total,
+    selfTax: selfAssessedTaxOf(c),
+    payable: supplierPayableOf(c),
     itcEligible: c.itcEligible,
     paidOnRow: c.paid,
   };
+}
+
+/** Customs IGST on imported goods (paid with the Bill of Entry, not through GSTR-3B). */
+function isCustomsIgst(raw: RawPurchase): boolean {
+  return String((raw as { import_type?: unknown })?.import_type ?? '').toUpperCase() === 'GOODS';
 }
 
 /** Cost part of a purchase: taxable + GST that cannot be claimed as ITC. */
@@ -461,9 +478,10 @@ export function buildVouchers(data: BooksData): Voucher[] {
       type: p.isExpense ? 'Expense' : 'Purchase',
       number: p.number,
       party: p.party,
-      narration: `${categoryOf(p)}${p.gst ? ` (GST ${p.gst.toFixed(2)}${p.itcEligible ? ' ITC' : ' no ITC'})` : ''}`,
+      narration: `${categoryOf(p)}${p.gst ? ` (GST ${p.gst.toFixed(2)}${p.itcEligible ? ' ITC' : ' no ITC'}${p.selfTax ? ', paid by us (reverse charge / import)' : ''})` : ''}`,
       debit: 0,
-      credit: p.total,
+      // The supplier is credited with what it is owed; self-assessed GST is owed to the government.
+      credit: p.payable,
     });
   }
 
@@ -771,7 +789,7 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
       const paid = round2(Math.abs(num(pp.amount)));
       if (!p || !date || paid === 0) continue;
       paidRows.set(p.id, round2((paidRows.get(p.id) ?? 0) + paid));
-      const cost = p.total > 0 ? round2((paid * purchaseCost(p)) / p.total) : paid;
+      const cost = p.payable > 0 ? round2((paid * purchaseCost(p)) / p.payable) : paid;
       events.push({
         date,
         kind: 'expense',
@@ -784,7 +802,7 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
     // Bills marked paid on the row itself with no payment rows: paid on bill date.
     for (const p of purchases) {
       if (paidRows.has(p.id) || p.paidOnRow <= 0) continue;
-      const cost = p.total > 0 ? round2((p.paidOnRow * purchaseCost(p)) / p.total) : p.paidOnRow;
+      const cost = p.payable > 0 ? round2((p.paidOnRow * purchaseCost(p)) / p.payable) : p.paidOnRow;
       events.push({
         date: p.date,
         kind: 'expense',
@@ -907,7 +925,13 @@ export interface GstSummary {
   itc: number;
   /** GST on purchases that is NOT creditable (already in costs). */
   blockedGst: number;
-  /** output − ITC; negative means a refundable / carry-forward credit. */
+  /**
+   * Additive: GST payable by us under reverse charge on purchases (reverse-charge bills and imports of
+   * services — GSTR-3B 3.1(d)). Paid in cash; its ITC (if eligible) is inside `itc`. Customs IGST on
+   * imported goods is paid with the Bill of Entry, not through the return, so it is not in here.
+   */
+  rcmPayable?: number;
+  /** output + reverse-charge tax − ITC; negative means a refundable / carry-forward credit. */
   netPayable: number;
   /** Additive: cess on sales less cess on credit notes. Payable in cash — ITC cannot offset it. */
   outputCess?: number;
@@ -933,11 +957,13 @@ export function gstSummary(data: BooksData, period: Period): GstSummary {
   }
   let itc = 0;
   let blocked = 0;
+  let rcm = 0;
   for (const raw of data.purchases) {
     const p = normalizePurchase(raw, data.vendors);
     if (!p || !inPeriod(p.date, period)) continue;
     itc = round2(itc + purchaseItc(p));
     blocked = round2(blocked + (p.itcEligible ? 0 : p.gst));
+    if (p.selfTax && !isCustomsIgst(raw)) rcm = round2(rcm + p.selfTax);
   }
   const outputTotal = round2(cgst + sgst + igst);
   return {
@@ -947,7 +973,8 @@ export function gstSummary(data: BooksData, period: Period): GstSummary {
     outputTotal,
     itc,
     blockedGst: blocked,
-    netPayable: round2(outputTotal - itc),
+    rcmPayable: rcm,
+    netPayable: round2(outputTotal + rcm - itc),
     outputCess: cess,
   };
 }
@@ -1025,8 +1052,11 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
     .filter((p): p is NormPurchase => p !== null && upTo(p.date));
   let purchTotal = 0;
   let itc = 0;
+  // GST we owe the government on reverse-charge / import bills (not the supplier).
+  let selfTax = 0;
   for (const p of purchases) {
-    purchTotal += p.total;
+    purchTotal += p.payable;
+    selfTax += p.selfTax;
     itc += purchaseItc(p);
   }
   // Same rule on the payables side: cash that left the bank always reduces payables.
@@ -1042,7 +1072,7 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
 
   const ar = round2(salesTotal - cnTotal - receipts);
   const ap = round2(purchTotal - paid);
-  const gstNet = round2(outputGst - itc);
+  const gstNet = round2(outputGst + selfTax - itc);
 
   const assets = {
     cash,

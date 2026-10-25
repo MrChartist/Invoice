@@ -27,6 +27,7 @@ import { readLinks, type DocLink } from './documents';
 import { generateId } from './storage';
 import { localDb } from './localDb';
 import { isoDay, shiftDay } from './dates';
+import { inrValue } from './fx';
 import { isDateLocked, getLockUntil, lockMessage } from './period-lock';
 
 export { MAX_FLAT_FEE, describeClientLateFee, sanitizeClientLateFee, type ClientLateFee, type ClientLateFeeMode } from './late-fee-rule';
@@ -84,9 +85,36 @@ export function principalTaxRate(items: readonly InvoiceItem[] | undefined): num
   return best;
 }
 
-/** The one line on the late-fee invoice. */
-export function buildLateFeeItem(quote: LateFeeQuote, fee: ClientLateFee, original: Pick<InvoiceRecord, 'invoice_number' | 'due_date'> & { items?: InvoiceItem[] }): InvoiceItem | null {
+/**
+ * The principal supply's line: within the rate `principalTaxRate` picks, the line with the largest
+ * value (first one on a tie). Its HSN / SAC and goods-or-service type go on the late-fee line, so
+ * the fee reports under the supply it is part of (GSTR-1 HSN summary, e-Invoice HsnCd).
+ */
+export function principalItem(items: readonly InvoiceItem[] | undefined): InvoiceItem | undefined {
+  const rate = principalTaxRate(items);
+  let best: InvoiceItem | undefined;
+  let bestValue = -1;
+  for (const it of items ?? []) {
+    if (num(it.tax_rate) !== rate) continue;
+    const value = Math.abs(num(it.quantity) * num(it.rate));
+    if (value > bestValue) [best, bestValue] = [it, value];
+  }
+  return best;
+}
+
+/**
+ * The one line on the late-fee invoice, in RUPEES: a flat fee is a ₹ figure already; interest on a
+ * foreign-currency invoice is worked out in that currency and converted at the original's
+ * exchange rate (the rate its receivable is booked at). The fee invoice itself is an INR document.
+ */
+export function buildLateFeeItem(
+  quote: LateFeeQuote,
+  fee: ClientLateFee,
+  original: Pick<InvoiceRecord, 'invoice_number' | 'due_date'> & Partial<Pick<InvoiceRecord, 'items' | 'currency' | 'exchange_rate'>>,
+): InvoiceItem | null {
   if (!quote.eligible || !(quote.amount > 0)) return null;
+  const amount = fee.mode === 'percent_pa' ? inrValue(quote.amount, original) : round2(quote.amount);
+  const principal = principalItem(original.items);
   const i = quote.interest;
   const period = i.accrues_from && i.accrued_to ? ` for ${i.accrues_from} to ${i.accrued_to}` : '';
   const number = original.invoice_number || 'invoice';
@@ -98,12 +126,13 @@ export function buildLateFeeItem(quote: LateFeeQuote, fee: ClientLateFee, origin
     id: generateId(),
     name: `Late fee on ${number}`,
     description,
-    type: 'service',
+    type: principal?.type || 'service',
+    ...(principal?.hsn?.trim() ? { hsn: principal.hsn.trim() } : {}),
     unit: 'NOS',
     quantity: 1,
-    rate: quote.amount,
+    rate: amount,
     tax_rate: principalTaxRate(original.items),
-    amount: quote.amount,
+    amount,
   };
 }
 
@@ -130,6 +159,10 @@ export function buildLateFeeInvoice(
     issue_date: ctx.today,
     due_date: shiftDay(ctx.today, Math.max(0, Math.round(ctx.dueDays))),
     status: 'Draft',
+    // The fee line is in rupees (see buildLateFeeItem): the new-dated document is an INR invoice and
+    // never inherits the original's exchange rate (which belongs to the original's date).
+    currency: 'INR',
+    exchange_rate: undefined,
     items: [item],
     client: { ...original.client },
     sender: original.sender ? { ...original.sender } : null,
@@ -155,6 +188,8 @@ export function buildLateFeeInvoice(
     late_fee_for: original.id,
     amends: undefined,
     pos: undefined,
+    // A new document: on reverse charge (copied from the original) its tax stays out of the total.
+    rcm_tax_excluded: original.reverse_charge && original.doc_type !== 'BILL_OF_SUPPLY' ? true : undefined,
   };
   const t = calculateInvoice(calcInputFromRecord(rec));
   return {

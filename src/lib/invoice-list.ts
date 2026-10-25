@@ -8,6 +8,7 @@ import { localDb } from './localDb';
 import { isLocked } from './period-lock';
 import { isRevenueDoc } from './stats';
 import { round2 } from './invoice-calc';
+import { receivableBalance } from './rcm';
 
 export type SortKey = 'date' | 'due' | 'number' | 'client' | 'total' | 'balance';
 export type SortDir = 'asc' | 'desc';
@@ -27,7 +28,7 @@ export function matchesListFilter(inv: InvoiceRecord, f: ListFilter): boolean {
   return true;
 }
 
-const balanceOf = (i: InvoiceRecord) => (isRevenueDoc(i) ? Number(i.balance_due ?? i.total) || 0 : 0);
+const balanceOf = (i: InvoiceRecord) => (isRevenueDoc(i) ? Number(receivableBalance(i)) || 0 : 0);
 
 export function sortInvoices(rows: readonly InvoiceRecord[], key: SortKey, dir: SortDir): InvoiceRecord[] {
   const sign = dir === 'asc' ? 1 : -1;

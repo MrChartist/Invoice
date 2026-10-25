@@ -23,6 +23,7 @@ import type { Client, InvoiceRecord } from '../types/invoice';
 import { fxRate } from './fx';
 import { mulRound2, num, round2 } from './invoice-calc';
 import { isoDay } from './dates';
+import { receivableBalance, receivableTotal, type RcmFields } from './rcm';
 
 /** Document types the limit applies to (what creates a receivable). */
 const CREDIT_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
@@ -36,6 +37,10 @@ export interface CreditDraft {
   tds_amount?: number;
   currency?: string;
   exchange_rate?: number;
+  reverse_charge?: boolean;
+  rcm_tax_excluded?: boolean;
+  tax_amount?: number;
+  cess_amount?: number;
 }
 
 /** The minimal cheque shape the check reads (see `src/types/cheques.ts`). */
@@ -94,9 +99,10 @@ export function belongsTo(inv: Pick<InvoiceRecord, 'client'>, client: Pick<Clien
 function openInr(inv: CreditDraft & { balance_due?: number }, useBalance: boolean): number | null {
   const rate = fxRate(inv);
   if (rate === null) return null;
-  const raw = useBalance && typeof inv.balance_due === 'number'
-    ? num(inv.balance_due)
-    : num(inv.total) - num(inv.tds_amount) - num(inv.amount_paid);
+  // Reverse charge: the recipient's GST is never owed to us (src/lib/rcm.ts).
+  const raw = useBalance && (typeof inv.balance_due === 'number' || inv.reverse_charge)
+    ? receivableBalance(inv as RcmFields)
+    : receivableTotal(inv as RcmFields) - num(inv.tds_amount) - num(inv.amount_paid);
   const open = Math.max(round2(raw), 0);
   return rate === 1 ? open : mulRound2(open, rate);
 }

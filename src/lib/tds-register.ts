@@ -26,6 +26,7 @@ import { parseTable, toCsv } from './csv';
 import { scoreHeader } from './import-mapping';
 import { parseDate, parseNumber } from './importers';
 import { isValidTan } from './validators';
+import { receivableTotal } from './rcm';
 
 /* ── Periods ──────────────────────────────────────────────────── */
 
@@ -189,7 +190,7 @@ export function tdsInvoiceLines(input: TdsInput): TdsInvoiceLine[] {
   for (const inv of input.invoices ?? []) {
     if (!inv || !isLedgerDoc(inv) || isCreditNote(inv)) continue;
     if ((inv.currency || 'INR').toUpperCase() !== 'INR') continue;
-    const total = round2(num(inv.total));
+    const total = round2(receivableTotal(inv));
     const tds = round2(Math.min(Math.max(num(inv.tds_amount), 0), total));
     if (tds <= 0) continue;
     const date = isoDay(inv.issue_date) || isoDay(inv.created_at);

@@ -358,6 +358,19 @@ export interface InvoiceRecord {
   /** Two-digit GST state code of the place of supply. */
   place_of_supply: string;
   reverse_charge: boolean;
+  /**
+   * Additive: set on reverse-charge documents calculated by this version on. The GST is shown as
+   * "payable by the recipient" and is NOT inside `total` / `balance_due`. Older reverse-charge
+   * records (flag absent) stored a total that includes the tax; readers adapt through
+   * `src/lib/rcm.ts` — stored records are never rewritten.
+   */
+  rcm_tax_excluded?: boolean;
+  /**
+   * Additive, credit notes only: goods came back into stock (a sales return). Absent on older notes —
+   * then the note's reason decides (`src/lib/credit-restock.ts`). Discount / rate-difference / GST
+   * correction notes move no stock and take no cost of goods back.
+   */
+  goods_returned?: boolean;
 
   /* ── Money knobs ───────────────────────────────────────────── */
   discount_type: DiscountType;

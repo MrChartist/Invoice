@@ -186,7 +186,8 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
         val: round2(n.value),
         pos: n.pos,
         rchrg: n.rchrg,
-        inv_typ: 'R',
+        // The note carries its invoice's type (SEZ with / without payment, deemed export).
+        inv_typ: n.invTyp ?? 'R',
         itms: itms(n.items),
       })),
     }));
@@ -286,7 +287,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
           val: round2(n.value),
           pos: n.pos,
           rchrg: n.rchrg,
-          inv_typ: 'R',
+          inv_typ: n.invTyp ?? 'R',
           itms: itms(n.items),
         })),
       }));
@@ -322,7 +323,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
   }
 
   if (r.docIssue.length) {
-    const codes: Record<string, number> = { 'Invoices for outward supply': 1, 'Debit Note': 4, 'Credit Note': 5 };
+    const codes: Record<string, number> = { 'Invoices for outward supply': 1, 'Debit Note': 4, 'Credit Note': 5, 'Receipt Voucher': 6, 'Refund Voucher': 8 };
     const byType = groupBy(r.docIssue, (x) => x.docType);
     out.doc_issue = {
       doc_det: [...byType].sort((a, b) => (codes[a[0]] ?? 1) - (codes[b[0]] ?? 1)).map(([docType, rows]) => ({

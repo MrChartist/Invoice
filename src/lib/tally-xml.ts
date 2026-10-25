@@ -38,6 +38,7 @@
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { fxNarration, inrTotals, inrValue } from './fx';
+import { receivableTotal } from './rcm';
 import { advanceMovements } from './advance-tax';
 import {
   clean,
@@ -146,6 +147,10 @@ export interface TallyOptions {
   inputCgst?: string;
   inputSgst?: string;
   inputIgst?: string;
+  /** GST we owe under reverse charge on purchases / imports of services (Duties & Taxes). */
+  rcmPayableLedger?: string;
+  /** IGST on imported goods, paid at customs with the Bill of Entry (Duties & Taxes). */
+  customsIgstLedger?: string;
 }
 
 export const DEFAULT_LEDGER_NAMES = {
@@ -165,6 +170,8 @@ export const DEFAULT_LEDGER_NAMES = {
   inputCgst: 'Input CGST',
   inputSgst: 'Input SGST',
   inputIgst: 'Input IGST',
+  rcmPayableLedger: 'GST Payable on Reverse Charge',
+  customsIgstLedger: 'IGST Payable on Imports',
 } as const;
 
 type ResolvedOptions = Required<Omit<TallyOptions, 'range'>> & { range: DateRange };
@@ -196,6 +203,8 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
     inputCgst: n(o.inputCgst, DEFAULT_LEDGER_NAMES.inputCgst),
     inputSgst: n(o.inputSgst, DEFAULT_LEDGER_NAMES.inputSgst),
     inputIgst: n(o.inputIgst, DEFAULT_LEDGER_NAMES.inputIgst),
+    rcmPayableLedger: n(o.rcmPayableLedger, DEFAULT_LEDGER_NAMES.rcmPayableLedger),
+    customsIgstLedger: n(o.customsIgstLedger, DEFAULT_LEDGER_NAMES.customsIgstLedger),
   };
 }
 
@@ -414,7 +423,12 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       party,
       partyGstin: clean(inv.client?.gstin).toUpperCase(),
       stateName: stateNameOf(invoiceStateCode(inv)),
-      narration: [clean(inv.po_number) && `PO: ${clean(inv.po_number)}`, fxNarration(num(inv.total), inv)].filter(Boolean).join(' | '),
+      narration: [
+        clean(inv.po_number) && `PO: ${clean(inv.po_number)}`,
+        fxNarration(num(inv.total), inv),
+        // Outward reverse charge: no output-tax ledger, the recipient pays the GST (Rule 46(p)).
+        a.rcmTax > 0 && `Reverse charge: GST ${a.rcmTax.toFixed(2)} payable by the recipient`,
+      ].filter(Boolean).join(' | '),
       reference: clean(inv.po_number),
       entries,
       inventory,
@@ -445,8 +459,8 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       paidRows.set(p.invoice_id, after);
       const inv = byId.get(p.invoice_id)!;
       // Settlement is tracked in the document's currency; the TDS is posted in rupees.
-      const tds = Math.min(Math.max(toPaise(inv.tds_amount ?? 0), 0), toPaise(inv.total));
-      const cashDue = toPaise(inv.total) - tds;
+      const tds = Math.min(Math.max(toPaise(inv.tds_amount ?? 0), 0), toPaise(receivableTotal(inv)));
+      const cashDue = toPaise(receivableTotal(inv)) - tds;
       if (tds > 0 && before < cashDue && after >= cashDue) tdsOn.set(p, toPaise(inrValue(tds / 100, inv)));
     }
 
@@ -560,7 +574,15 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const total = Math.abs(toPaise(p.total));
       if (total === 0) continue;
       const entries: TallyEntry[] = [];
-      push(entries, p.partyName, 'Cr', total, { name: p.number || p.id || p.partyName, type: 'New Ref' });
+      // Reverse charge / imports: the supplier is owed only what it billed; the GST we pay ourselves
+      // goes to its own Duties & Taxes ledger (as the in-app ledger does: 2310 / 2311).
+      const selfTax = Math.abs(toPaise(p.selfTax));
+      const selfLedger = p.selfTaxKind === 'CUSTOMS' ? o.customsIgstLedger : o.rcmPayableLedger;
+      push(entries, p.partyName, 'Cr', Math.abs(toPaise(p.payable)), { name: p.number || p.id || p.partyName, type: 'New Ref' });
+      if (selfTax > 0) {
+        push(entries, selfLedger, 'Cr', selfTax);
+        std(selfLedger, 'Duties & Taxes');
+      }
       // GST on a bill whose ITC is blocked is part of the cost, never an "Input" credit.
       push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.itcEligible ? p.taxable : round2(p.taxable + p.tax))));
       if (p.itcEligible) {

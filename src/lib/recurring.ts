@@ -377,7 +377,8 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
 
 /** Totals for one run of a template, via the same engine the creator uses. */
 export function templateTotals(t: RecurringTemplate) {
-  return calculateInvoice(calcInputFromRecord(t as Partial<InvoiceRecord>, { amount_paid: 0 }));
+  // Each run is a new document: on reverse charge the tax stays out of its total (src/lib/rcm.ts).
+  return calculateInvoice(calcInputFromRecord(t as Partial<InvoiceRecord>, { amount_paid: 0, rcm_exclude_tax: !!t.reverse_charge }));
 }
 
 /** Approximate revenue per month if the schedule runs forever. */
@@ -451,7 +452,9 @@ export function buildInvoiceFromSchedule(
     notes: applyTokens(t.notes, occurrence),
     terms: applyTokens(t.terms, occurrence),
   };
-  const rec = normalizeRecord(raw, t.template_id);
+  const normalized = normalizeRecord(raw, t.template_id);
+  // A generated document is new: on reverse charge its tax stays out of the total (src/lib/rcm.ts).
+  const rec = normalized.reverse_charge && normalized.doc_type !== 'BILL_OF_SUPPLY' ? { ...normalized, rcm_tax_excluded: true } : normalized;
   const totals = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
   return {
     ...rec,

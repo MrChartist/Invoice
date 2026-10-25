@@ -3,6 +3,7 @@ import type { ImportType, ItcReversalReason, PurchaseRecord, Vendor } from '../.
 import { ITC_REVERSAL_REASONS, PURCHASE_CATEGORIES } from '../../types/purchases';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
+import { supplierPayableOf } from '../../lib/purchase-normalize';
 import type { BillSeed } from '../../lib/purchase-orders';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
@@ -112,6 +113,10 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const interState = !!importType || (!!pos && !!businessState && pos !== businessState);
   const advancedSet = rcm || !!importType || blocked || reversed > 0;
 
+  // Reverse charge / imports: the GST is paid by us to the government, so the supplier is owed only the taxable value.
+  const selfTax = rcm || !!importType;
+  const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total });
+
   const submit = () => {
     if (!vendor && !init?.vendor_name) return setError('Choose or create a vendor.');
     if (!billNumber.trim()) return setError("Enter the supplier's bill number.");
@@ -123,8 +128,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     if (importType === 'GOODS' && !boeNumber.trim()) return setError('Enter the Bill of Entry number for an import of goods.');
     if (portCode.trim() && !/^[A-Z0-9]{6}$/i.test(portCode.trim())) return setError('Port code is 6 letters / digits, e.g. INNSA1.');
     if (reversed < 0 || reversed > totals.tax + 0.004) return setError('ITC reversed cannot exceed the GST on the bill.');
-    if (purchase && totals.total < purchase.amount_paid) {
-      return setError(`Total cannot drop below the ${formatCurrency(purchase.amount_paid)} already paid.`);
+    if (purchase && supplierPayable < purchase.amount_paid) {
+      return setError(`The amount payable to the supplier cannot drop below the ${formatCurrency(purchase.amount_paid)} already paid.`);
     }
     let saveLines = real;
     if (stock) {
@@ -252,6 +257,12 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           </>
         )}
         <div className={styles.totalGrand}><span>Bill total</span><span>{formatCurrency(totals.total)}</span></div>
+        {selfTax && totals.tax > 0 && (
+          <div className={styles.totalRow}>
+            <span>Payable to the supplier (the GST is paid by you {importType === 'GOODS' ? 'at customs' : 'under reverse charge'})</span>
+            <span>{formatCurrency(supplierPayable)}</span>
+          </div>
+        )}
       </div>
 
       <label className={controls.check}>

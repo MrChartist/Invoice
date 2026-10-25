@@ -19,6 +19,7 @@ import type { PurchasePayment } from './purchases';
 import { num, round2 } from './invoice-calc';
 import { shiftDay } from './dates';
 import { MSME_43BH_FROM, MSME_PAYMENT_DAYS, rbiBankRate } from './tax-rules';
+import { supplierPayable } from './purchase-normalize';
 
 export const UDYAM_RE = /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/;
 
@@ -114,7 +115,8 @@ export function msmeBills(
   for (const bill of purchases) {
     const vendor = bill.vendor_id ? vendorById.get(bill.vendor_id) : undefined;
     if (!vendor || !isMse(vendor) || !bill.date || bill.date > asOf) continue;
-    const total = round2(num(bill.total));
+    // What the MSE supplier is owed: reverse-charge / import GST is ours to pay, not theirs.
+    const total = round2(supplierPayable(bill));
     const limit = paymentLimit(bill.date, bill.due_date);
     const paid = paymentsOf(bill, byBill).filter((p) => p.date <= asOf);
     let open = total;

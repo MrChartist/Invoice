@@ -13,6 +13,7 @@ import { getIndianFY } from './invoice-number';
 import { amountInWords } from './amount-in-words';
 import { formatCurrency, formatDate } from './utils';
 import { round2 } from './invoice-calc';
+import { receivableTotal } from './rcm';
 
 export function receiptNumber(payment: Pick<Payment, 'id' | 'date'>, all: readonly Pick<Payment, 'id' | 'date' | 'advance_id'>[]): string {
   const fy = getIndianFY(payment.date);
@@ -66,8 +67,9 @@ export function buildReceipt(invoice: InvoiceRecord, payment: Payment, allPaymen
     method: payment.method,
     reference: payment.reference ?? '',
     against: invoice.invoice_number,
-    invoiceTotal: Number(invoice.total) || 0,
-    balanceAfter: Math.max(round2((Number(invoice.total) || 0) - tds - paidSoFar), 0),
+    // Reverse charge: the recipient's GST is never part of what the receipt settles (src/lib/rcm.ts).
+    invoiceTotal: receivableTotal(invoice) || 0,
+    balanceAfter: Math.max(round2((receivableTotal(invoice) || 0) - tds - paidSoFar), 0),
   };
 }
 
