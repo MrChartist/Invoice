@@ -160,3 +160,69 @@ export function requireAccess(action: AccessAction): void {
   const role = currentRole();
   if (!roleCan(role, action)) throw new AccessDeniedError(action, role);
 }
+
+/* ── Table-level guard (defence in depth) ─────────────────────────
+ * The data APIs check `requireAccess` themselves; this map also stops a clerk / viewer from
+ * changing these tables through any path that does not (stock adjustments, catalogue edits,
+ * godowns, transfers, budgets, …). `storage.setTable` asks before every write. Tables the app
+ * writes as a side effect of viewing (audit, notifications, export / design preferences,
+ * compliance marks, reminder log) and the ones whose APIs already guard each operation with finer
+ * rules (invoices, payments) are deliberately not listed.
+ */
+const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
+  // masters
+  items_catalog: 'master.edit',
+  clients: 'master.edit',
+  vendors: 'master.edit',
+  stock_items: 'master.edit',
+  godowns: 'master.edit',
+  cost_centres: 'master.edit',
+  bank_accounts: 'master.edit',
+  price_levels: 'master.edit',
+  schemes: 'master.edit',
+  custom_fields: 'master.edit',
+  // books
+  stock_moves: 'books.edit',
+  stock_transfers: 'books.edit',
+  purchases: 'books.edit',
+  purchase_payments: 'books.edit',
+  purchase_orders: 'books.edit',
+  recurring: 'books.edit',
+  time_entries: 'books.edit',
+  mileage: 'books.edit',
+  accounts: 'books.edit',
+  vouchers: 'books.edit',
+  fixed_assets: 'books.edit',
+  budgets: 'books.edit',
+  cheques: 'books.edit',
+  advances: 'books.edit',
+  bank_statements: 'books.edit',
+  book_opening: 'books.edit',
+  tds_certificates: 'books.edit',
+  gstr2b_actions: 'books.edit',
+  einvoice_meta: 'books.edit',
+  pos_day_close: 'books.edit',
+};
+
+let systemDepth = 0;
+
+/**
+ * Run `fn` as the app rather than the signed-in user: for writes no person asked for directly
+ * (folder-sync merges of another device's changes, migrations). Synchronous by design, so a
+ * bypass can never stay open across an `await`.
+ */
+export function asSystem<T>(fn: () => T): T {
+  systemDepth++;
+  try {
+    return fn();
+  } finally {
+    systemDepth--;
+  }
+}
+
+/** Throws `AccessDeniedError` when the signed-in user may not write table `name`. */
+export function requireTableWrite(name: string): void {
+  if (systemDepth > 0) return;
+  const action = TABLE_ACTIONS[name];
+  if (action) requireAccess(action);
+}

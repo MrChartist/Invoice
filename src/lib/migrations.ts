@@ -15,6 +15,7 @@
  *    so the app keeps reading the old shape through its tolerant readers.
  */
 
+import { asSystem } from './access';
 import { audit } from './audit';
 import { DB_PREFIX, SINGLETON_KEYS, collectAppData, getJson, readRaw, removeRaw, setJson, writeRaw } from './storage';
 import { ASSET_TABLE, SNAPSHOT_TABLES, encodeRows, parseAssets, serializeAssets } from './assets';
@@ -151,7 +152,8 @@ export function runMigrations(migrations: Migration[] = MIGRATIONS): MigrationRe
   for (const m of pending) {
     const snapshot = collectAppData();
     try {
-      m.up();
+      // Schema upgrades are the app's own writes, whoever is signed in (roles, 6.21).
+      asSystem(() => m.up());
       writeRaw(SCHEMA_VERSION_KEY, String(m.version));
       version = m.version;
       applied.push(`${m.version}: ${m.name}`);

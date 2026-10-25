@@ -208,10 +208,15 @@ Shown in Settings → Activity, the document timeline and the CSV export (new la
 user, changing a role and resetting a PIN are logged (never the PIN).
 
 ### Known gaps
-Some secondary controls (e.g. on Inventory and Books tabs) are still visible to a viewer; the data-layer guards above
-refuse the writes that matter, others (stock adjustments, catalogue edits) are not guarded. Settings saves are hidden
+Some secondary controls (e.g. on Inventory and Books tabs) are still visible to a viewer. Their writes are refused:
+besides the per-API guards above, `storage.setTable` checks a table → permission map (`requireTableWrite` in
+`access.ts`: masters such as catalogue, stock items, godowns, cost centres, bank accounts, price levels → `master.edit`;
+stock moves, transfers, purchases, recurring, vouchers, budgets, fixed assets, cheques, advances … → `books.edit`).
+Invoices and payments are guarded by their APIs (finer rules); audit, notifications, export / design preferences and
+compliance marks stay writable because the app writes them while viewing. Writes no person asked for (folder-sync
+merges, migrations) run inside `asSystem()`. Settings saves are hidden
 from non-owners but not refused in `localDb.settings.save` (setup and GST-frequency flows call it). Tests:
-`tests/roles.test.ts`, e2e step "local roles" in `tests/e2e/smoke.mjs`.
+`tests/roles.test.ts`, `tests/roles-tables.test.ts`, e2e step "local roles" in `tests/e2e/smoke.mjs`.
 
 ## Review fixes (Phase 4)
 

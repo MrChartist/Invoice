@@ -21,6 +21,7 @@
 import { ASSET_TABLE, SNAPSHOT_TABLES, decodeRows, encodeRows, parseAssets, serializeAssets, type AssetIndex } from './assets';
 import { DATA_STORE, idbAvailable, idbClear, idbTx, resetIdbConnection } from './idb-kv';
 import { COMPANY_REGISTRY_KEY, DEFAULT_COMPANY_ID, activeCompanyId } from './company-registry';
+import { requireTableWrite } from './access';
 import {
   VAULT_KEY,
   VaultError,
@@ -799,6 +800,7 @@ export function getTable<T>(name: string): T[] {
 }
 
 export function setTable<T>(name: string, rows: T[]): void {
+  requireTableWrite(name); // roles (6.21): clerk / viewer limits, defence in depth
   if (!SNAPSHOT_TABLES.has(name)) {
     writeRaw(DB_PREFIX + name, JSON.stringify(rows));
     return;
