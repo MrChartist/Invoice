@@ -115,8 +115,9 @@ build-time config must use Vite's `VITE_` prefix.
   `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle.
 - The bill / PO / GRN line editor sets `PurchaseLine.item_id` when a stock item is picked (WP-8) and the stock engine
   matches on it first; older lines (and typed names) still match by name + HSN, so keep that fallback.
-- Alternate units: a line typed in another unit keeps quantity / rate as typed and snapshots `unit_factor`; every
-  stock reader must convert with `lineFactor` / `PurchaseLineCore.unitFactor` (`src/lib/units.ts`).
+- Alternate units: a line typed in another unit keeps quantity / rate as typed and snapshots `unit_factor` (invoice,
+  bill / GRN / return, POS, stock move, stock transfer, stock journal and job-work lines); every stock reader must
+  convert with `lineFactor` / `PurchaseLineCore.unitFactor` (`src/lib/units.ts`).
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.
 - A 4-6 digit PIN is a lock screen, not encryption of the stored data; optional vault mode (`src/lib/vault.ts`) encrypts the IndexedDB store at rest. Never write the `__vault__` record or sealed (`mcv1:`) values outside `storage.ts`.
