@@ -174,6 +174,10 @@ try {
       return document.fonts.check("16px 'Noto Sans Devanagari'", 'क');
     });
     check(stored === 'hi' && fontOk, `the choice is kept on this device (${stored}) and the self-hosted Devanagari font loads (${fontOk})`);
+    // Round 2 areas: the GST page (lazy chunk + its area catalogue) opens in Hindi too.
+    await page.goto(srv.origin + '/gst-reports');
+    await page.getByRole('heading', { name: 'GST रिपोर्ट' }).first().waitFor();
+    await page.getByText('दाख़िल करने से पहले अपने CA से जाँच करवाएँ।').first().waitFor();
     await page.goto(srv.origin + '/settings');
     await page.getByLabel('Language / भाषा').first().selectOption('en');
     await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
