@@ -231,3 +231,14 @@ test('charges_taxable: net charge of zero or less stays untaxed; no-tax mode tax
   const empty = calculateInvoice(input([], { tax_rate: 5, shipping: 100, charges_taxable: true }));
   assert.equal(empty.charges_line?.tax_rate, 5, 'no lines: the document fallback rate');
 });
+
+test('R2-B3: unselected optional / alternative quotation lines stay out of every total', () => {
+  const base = { gst_mode: 'CGST_SGST', discount_type: 'PERCENT', discount_rate: 10, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false, amount_paid: 0 } as Omit<CalcInput, 'items'>;
+  const item = (id: string, over: Partial<InvoiceItem> = {}): InvoiceItem => ({ id, name: id, type: 'service', quantity: 1, rate: 1000, tax_rate: 18, amount: 1000, ...over });
+  const t = calculateInvoice({ ...base, items: [item('a'), item('opt', { optional: true }), item('x', { alt_group: 'A', selected: true, rate: 400 }), item('y', { alt_group: 'A', rate: 600 })] });
+  assert.equal(t.subtotal, 1400);
+  assert.equal(t.discount_amount, 140, 'the invoice discount spreads over included lines only');
+  assert.equal(t.taxable_value, 1260);
+  const sel = calculateInvoice({ ...base, items: [item('a'), item('opt', { optional: true, selected: true })] });
+  assert.equal(sel.subtotal, 2000);
+});

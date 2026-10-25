@@ -13,7 +13,8 @@
  * still pending goes onto the new challan / invoice (see `sales-orders.ts`).
  */
 
-import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, isExcludedLine, num, round2 } from './invoice-calc';
+import type {} from '../types/sales-r2';
 import { generateId, getTable, setTable } from './storage';
 import { receivableTotal } from './rcm';
 import { reasonReturnsGoods } from './credit-restock';
@@ -40,7 +41,8 @@ import {
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
-export type DocRelation = 'converted' | 'credit_note' | 'debit_note' | 'cancelled';
+/** `progress` (R2-B2): stage invoice raised from a quotation / sales order; `revised` (R2-B3): old quote → its revision. */
+export type DocRelation = 'converted' | 'credit_note' | 'debit_note' | 'cancelled' | 'progress' | 'revised';
 
 export interface DocLink {
   id: string;
@@ -54,6 +56,8 @@ export interface DocLink {
   prev_status?: InvoiceStatus;
   /** `cancelled` only: user acknowledged recorded payments. */
   payments_acknowledged?: boolean;
+  /** `progress` only (R2-B2): the "remaining balance" invoice that closed the source. */
+  final?: boolean;
   created_at: string;
 }
 
@@ -168,6 +172,16 @@ function recompute(input: InvoiceRecord): InvoiceRecord {
     tcs_amount: t.tcs_amount,
     tds_amount: t.tds_amount,
   };
+}
+
+/** R2-B3: drop unselected optional / alternative lines and clear the flags on the ones kept. */
+export function keepSelectedLines(items: readonly InvoiceItem[]): InvoiceItem[] {
+  return (items ?? []).filter((i) => !isExcludedLine(i)).map((i) => {
+    if (!i.optional && !i.alt_group && i.selected === undefined) return i;
+    const { optional: _o, selected: _s, alt_group: _g, ...rest } = i;
+    void [_o, _s, _g];
+    return rest;
+  });
 }
 
 function cloneItems(items: InvoiceItem[]): InvoiceItem[] {
@@ -312,7 +326,16 @@ export function buildConvertedDraft(
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
     ...(source.doc_type === 'DELIVERY_CHALLAN' && ctx.rejected && target !== 'DELIVERY_CHALLAN' ? challanPart(source, ctx.rejected) : {}),
+    // R2-B3: a revision / proposal belongs to the quotation; R2-B2: stage marks belong to the stage invoice.
+    revision_of: undefined,
+    revision_no: undefined,
+    proposal_sections: undefined,
+    progress_of: undefined,
+    milestones: target === 'SALES_ORDER' && source.milestones?.length ? source.milestones.map((m) => ({ id: m.id, name: m.name, percent: m.percent, ...(m.expected_date ? { expected_date: m.expected_date } : {}) })) : undefined,
   };
+  // R2-B3: only the optional / alternative lines the client selected go onto the next document, as plain lines.
+  draft.items = keepSelectedLines(draft.items);
+  if (draft.items.length === 0) throw new DocumentError('No lines are left once unselected optional items are dropped.');
   return recompute(draft);
 }
 
@@ -871,7 +894,7 @@ export interface ChainNode {
   depth: number;
 }
 
-const CHAIN_RELATIONS: DocRelation[] = ['converted', 'credit_note', 'debit_note'];
+const CHAIN_RELATIONS: DocRelation[] = ['converted', 'credit_note', 'debit_note', 'progress', 'revised'];
 
 /**
  * Pure: every document connected to `id` through conversion / credit / debit
