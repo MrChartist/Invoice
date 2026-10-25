@@ -1864,6 +1864,29 @@ try {
     await writeJson(page, 'dist_areas', null);
   });
 
+  await step('R2-C: text size 130% applies before paint, no sideways scroll at 360 px; annual pack renders its pages', async () => {
+    await page.goto(srv.origin + '/settings?tab=security');
+    await page.locator('[data-display-prefs]').waitFor({ timeout: 15000 });
+    await page.locator('[data-text-scale="130"]').click();
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_display_prefs') ?? 'null'));
+    check(stored?.text_scale === 130 && (await idbGet(page, 'mrchartist_display_prefs')) === null, 'display prefs: device-local key in localStorage only');
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto(srv.origin + '/');
+    await page.waitForLoadState('domcontentloaded');
+    const fs = await page.evaluate(() => getComputedStyle(document.documentElement).fontSize);
+    check(fs === '20.8px', `130% text applied from theme-init.js before the app boots (${fs})`);
+    await page.locator('main').first().waitFor({ timeout: 15000 });
+    const overflow = await page.evaluate(() => Math.max(0, ...[document.documentElement, ...document.querySelectorAll('main')].map((e) => e.scrollWidth - e.clientWidth)));
+    check(overflow <= 1, `no horizontal scroll at 360 px and 130% (${overflow}px)`);
+    await page.evaluate(() => localStorage.removeItem('mrchartist_display_prefs'));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(srv.origin + '/books?tab=rpt');
+    await page.getByRole('button', { name: 'Annual pack' }).click();
+    await page.locator('[data-annual-preview] .ap-page').first().waitFor({ timeout: 15000 });
+    check(await page.locator('[data-annual-preview] .ap-page').count() === 6, 'annual pack: cover, balance sheet, P&L, cash flow, trial balance, notes');
+    check(/verify with your CA/.test((await page.locator('[data-annual-preview]').textContent()) ?? ''), 'annual pack carries the "verify with your CA" draft line');
+  });
+
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
     // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
     await page.goto(srv.origin + '/settings?tab=data');

@@ -14,6 +14,7 @@
 import { getTable, setTable } from './storage';
 import { formatMoney } from './utils';
 import { sanitizeCopies, type CopySetting } from './print-copies';
+import type { DocumentType } from '../types/invoice';
 
 export const DESIGN_TABLE = 'design_prefs';
 /** `profile_id` of the row that applies to every profile without its own row. */
@@ -77,7 +78,98 @@ export interface DesignPrefs {
    * `party_balance_snapshot`. Absent / false = off (legacy look).
    */
   show_party_balance?: boolean;
+  /**
+   * Additive (R2-C5): printed label overrides keyed by `LabelKey` (`src/components/templates/labels.ts`).
+   * Blank / absent = the default label. Layered key by key: global ← profile.
+   */
+  labels?: LabelOverrides;
+  /** Additive (R2-C5): label overrides for one document type only (win over `labels`). */
+  labels_by_type?: Partial<Record<DocumentType, LabelOverrides>>;
+  /**
+   * Additive (R2-C5): text appended to the printed document title per type ("Tax Invoice — Professional
+   * Services"). The statutory title itself always prints and cannot be replaced.
+   */
+  title_suffix?: Partial<Record<DocumentType, string>>;
   updated_at?: string;
+}
+
+/* ── Label overrides (R2-C5) ──────────────────────────────────── */
+
+/** Every printed label a user may rename — the keys of `labels.ts` (checked there at compile time). */
+export const LABEL_KEYS = [
+  'billTo', 'shipTo', 'preparedFor', 'issueDate', 'quoteDate', 'dueDate', 'validUntil', 'deliveryBy', 'poRef',
+  'placeOfSupply', 'currency', 'reverseCharge', 'document', 'invoiceNo', 'desc', 'hsn', 'qty', 'rate', 'disc',
+  'taxable', 'gst', 'gstRate', 'amount', 'subtotal', 'discount', 'cgst', 'sgst', 'igst', 'tax', 'shipping', 'other',
+  'roundOff', 'total', 'balanceDue', 'words', 'payDetails', 'notes', 'terms', 'notesTerms', 'signatory', 'scanToPay',
+  'account', 'acNo', 'ifsc', 'bank', 'upi',
+] as const;
+export type OverridableLabel = (typeof LABEL_KEYS)[number];
+export type LabelOverrides = Partial<Record<OverridableLabel, string>>;
+
+export const LABEL_DOC_TYPES: readonly DocumentType[] = [
+  'TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY', 'QUOTATION', 'PROFORMA', 'SALES_ORDER', 'DELIVERY_CHALLAN', 'CREDIT_NOTE', 'DEBIT_NOTE',
+];
+const LABEL_MAX = 40;
+const SUFFIX_MAX = 60;
+
+/** Clean one override map: known keys only, trimmed text, blanks dropped. Undefined when empty. */
+export function sanitizeLabels(value: unknown, base?: LabelOverrides): LabelOverrides | undefined {
+  const out: LabelOverrides = { ...(base ?? {}) };
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const v = value as Record<string, unknown>;
+    for (const k of LABEL_KEYS) {
+      if (!(k in v)) continue;
+      const t = typeof v[k] === 'string' ? text(v[k], LABEL_MAX).trim() : '';
+      if (t) out[k] = t;
+      else delete out[k];
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function sanitizeByType<T>(value: unknown, base: Partial<Record<DocumentType, T>> | undefined, clean: (v: unknown, b?: T) => T | undefined): Partial<Record<DocumentType, T>> | undefined {
+  const out: Partial<Record<DocumentType, T>> = { ...(base ?? {}) };
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const v = value as Record<string, unknown>;
+    for (const dt of LABEL_DOC_TYPES) {
+      if (!(dt in v)) continue;
+      const c = clean(v[dt], out[dt]);
+      if (c === undefined) delete out[dt];
+      else out[dt] = c;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+const cleanSuffix = (v: unknown): string | undefined => {
+  const t = typeof v === 'string' ? text(v, SUFFIX_MAX).trim() : '';
+  return t || undefined;
+};
+
+/**
+ * The label to print for `key` on a `docType` document, or undefined for the default. Resolution:
+ * document type → profile → global → default (profile and global are already layered in `design`).
+ */
+export function labelOverride(design: Pick<DesignPrefs, 'labels' | 'labels_by_type'> | null | undefined, key: string, docType?: DocumentType): string | undefined {
+  if (!design) return undefined;
+  const k = key as OverridableLabel;
+  return (docType ? design.labels_by_type?.[docType]?.[k] : undefined) || design.labels?.[k] || undefined;
+}
+
+/**
+ * The design to hand to the template engine for one document: the type's own label overrides are
+ * flattened into `labels`, so every part reads one map. Unchanged object when there is nothing to flatten.
+ */
+export function designForDoc<T extends Pick<DesignPrefs, 'labels' | 'labels_by_type'>>(design: T, docType: DocumentType | undefined): T {
+  const own = docType ? design.labels_by_type?.[docType] : undefined;
+  if (!own || !Object.keys(own).length) return design;
+  return { ...design, labels: { ...(design.labels ?? {}), ...own } };
+}
+
+/** "TAX INVOICE — PROFESSIONAL SERVICES": the statutory title always leads; the suffix is appended. */
+export function docTitleText(baseTitle: string, design: Pick<DesignPrefs, 'title_suffix'> | null | undefined, docType: DocumentType | undefined): string {
+  const suffix = docType ? design?.title_suffix?.[docType]?.trim() : '';
+  return suffix ? `${baseTitle} — ${suffix}` : baseTitle;
 }
 
 export interface PreprintedPrefs {
@@ -248,6 +340,13 @@ export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIG
       const on = 'show_party_balance' in src ? src.show_party_balance === true : base.show_party_balance === true;
       return on ? { show_party_balance: true } : {};
     })(),
+    // R2-C5 labels / title suffix: merged key by key over the base (global ← profile).
+    ...(() => {
+      const labels = sanitizeLabels(src.labels, base.labels);
+      const byType = sanitizeByType<LabelOverrides>(src.labels_by_type, base.labels_by_type, (v, b) => sanitizeLabels(v, b));
+      const suffix = sanitizeByType<string>(src.title_suffix, base.title_suffix, (v) => cleanSuffix(v));
+      return { ...(labels ? { labels } : {}), ...(byType ? { labels_by_type: byType } : {}), ...(suffix ? { title_suffix: suffix } : {}) };
+    })(),
     updated_at: typeof src.updated_at === 'string' ? src.updated_at : base.updated_at,
   };
 }
@@ -362,6 +461,10 @@ export function applyPreset(current: DesignPrefs, presetId: string): DesignPrefs
     // Print-job settings are not part of the look: a preset keeps them.
     ...(current.copies !== undefined ? { copies: current.copies } : {}),
     ...(current.preprinted ? { preprinted: current.preprinted } : {}),
+    // R2-C5: labels and title suffixes are wording, not look — a preset keeps them.
+    ...(current.labels ? { labels: current.labels } : {}),
+    ...(current.labels_by_type ? { labels_by_type: current.labels_by_type } : {}),
+    ...(current.title_suffix ? { title_suffix: current.title_suffix } : {}),
     updated_at: current.updated_at,
   };
   return sanitizeDesign(preset.patch, base);

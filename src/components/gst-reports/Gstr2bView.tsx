@@ -36,6 +36,8 @@ import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { nodes } from '../../i18n/areas/nodes';
 import { VendorFollowUp } from './VendorFollowUp';
+import { ImsCell, ImsEditor, ImsSummaryPanel } from './ImsDetails'; // R2-C3
+import { imsT } from '../../i18n/areas/gst-r2';
 
 const MATCH_KEY = {
   matched: 'mMatched',
@@ -71,6 +73,9 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
   const [filter, setFilter] = useState<MatchClass | 'all'>('all');
   // Bumped after a write (IMS action, new bill) so the derived data re-reads storage.
   const [rev, setRev] = useState(0);
+  // R2-C3: document whose IMS details are open, and the remark check (date-keyed default, can be switched off).
+  const [editKey, setEditKey] = useState<string | null>(null);
+  const [remarksOn, setRemarksOn] = useState(true);
 
   const range = useMemo(() => periodRange(period), [period]);
   const actionPeriod = data?.period || periodFp(period);
@@ -229,6 +234,11 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
         ),
     },
     {
+      key: 'imsx',
+      label: imsT('colDetails'),
+      render: (r) => (r.line ? <ImsCell line={r.line} actions={actions} period={actionPeriod} remarksOn={remarksOn} onEdit={() => setEditKey(r.key)} /> : null),
+    },
+    {
       key: 'act',
       label: '',
       render: (r) =>
@@ -335,6 +345,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
             {effect.rejected + effect.pending > 0 ? gvT('effHintLeftOut', { rejected: effect.rejected, pending: effect.pending }) : ''}
             {gvT('effHint2')}
           </p>
+          <ImsSummaryPanel match={match} actions={actions} period={actionPeriod} gstin={data.gstin || gstin} remarksOn={remarksOn} onRemarksOn={setRemarksOn} notify={notify} />
           <VendorFollowUp match={match} effect={effect} period={actionPeriod} periodLabel={periodLabel(period)} gstin={gstin} notify={notify} />
 
           <div className={local.toolbar}>
@@ -358,6 +369,23 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
             </div>
           </div>
 
+          {(() => {
+            const row = editKey ? match.rows.find((x) => x.key === editKey) : undefined;
+            return row?.line ? (
+              <ImsEditor
+                key={row.key}
+                line={row.line}
+                period={actionPeriod}
+                actions={actions}
+                notify={notify}
+                onClose={() => setEditKey(null)}
+                onSaved={() => {
+                  setEditKey(null);
+                  setRev((n) => n + 1);
+                }}
+              />
+            ) : null;
+          })()}
           <DataTable caption={gvT('cap2b')} emptyText={gvT('empty2b')} rows={rows} rowKey={(r) => r.key} columns={columns} />
         </>
       )}

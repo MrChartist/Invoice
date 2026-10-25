@@ -7,7 +7,7 @@ import { localDb, blankProfile } from '../../lib/localDb';
 import { TEMPLATES, templateById } from '../templates/registry';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { ShareMenu } from '../share';
-import { paperSize, resolve as resolveDesign, saveDesign, loadDesign, sanitizePreprinted, type PreprintedPrefs } from '../../lib/design-prefs';
+import { designForDoc, paperSize, resolve as resolveDesign, saveDesign, loadDesign, sanitizePreprinted, type PreprintedPrefs } from '../../lib/design-prefs';
 import { printCopies, sanitizeCopies, supplyNature, type CopySetting } from '../../lib/print-copies';
 import { invoicePdfName, PdfBuilder } from '../../lib/pdf-batch';
 import { PrintOptions } from './PrintOptions';
@@ -66,7 +66,7 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
   // Print-job options (P0-9 copies, P2 pre-printed): start from the profile's default, change per job.
   const [copySetting, setCopySetting] = useState<CopySetting>(() => sanitizeCopies(design.copies));
   const [preprinted, setPreprinted] = useState<PreprintedPrefs>(() => design.preprinted ?? { on: false, top_mm: 40, left_mm: 0 });
-  const jobDesign = useMemo(() => ({ ...design, preprinted }), [design, preprinted]);
+  const jobDesign = useMemo(() => designForDoc({ ...design, preprinted }, invoice.doc_type), [design, preprinted, invoice.doc_type]); // R2-C5 per-type labels
   const nature = supplyNature(invoice);
   const copies = printCopies(invoice, copySetting);
 

@@ -359,6 +359,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   production_plans: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
+  // R2-C: notes to accounts and deferral schedules are books; packing lists are documents; package types a master
+  notes_to_accounts: 'books.edit',
+  deferrals: 'books.edit',
+  packing_lists: 'doc.create',
+  package_types: 'master.edit',
 };
 
 let systemDepth = 0;

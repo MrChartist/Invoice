@@ -32,6 +32,7 @@ const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomF
 // Folder sync (5.7): the panel brings the whole sync engine, so it loads only on the Data tab.
 const SyncPanel = lazy(() => import('../components/sync/SyncPanel').then((m) => ({ default: m.SyncPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
+const DisplayPanel = lazy(() => import('../components/settings/DisplayPanel')); // R2-C6 (Security & device tab)
 
 type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
@@ -288,6 +289,7 @@ export function Settings() {
         </Suspense>
       )}
       {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
+      {tab === 'security' && <Suspense fallback={null}><DisplayPanel /></Suspense>}
 
       </div>
 

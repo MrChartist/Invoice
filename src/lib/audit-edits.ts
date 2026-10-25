@@ -78,6 +78,11 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   pos_returns: { entity: 'invoice', label: 'POS return' },
   doc_links: { entity: 'invoice', label: 'Document link' },
   year_end: { entity: 'settings', label: 'Year-end checklist' },
+  // R2-C: notes to accounts, deferral schedules, packing lists, package types
+  notes_to_accounts: { entity: 'settings', label: 'Notes to accounts' },
+  deferrals: { entity: 'voucher', label: 'Deferral schedule' },
+  packing_lists: { entity: 'invoice', label: 'Packing list' },
+  package_types: { entity: 'item', label: 'Package type' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */
