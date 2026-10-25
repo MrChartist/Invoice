@@ -8,6 +8,8 @@ import { priceLevelsDb, schemeLabel, schemesDb, validateLevel, validateScheme, t
 import { KEYS, getTable } from '../../lib/storage';
 import type { Client } from '../../types/invoice';
 import { cn, formatDate } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { setT } from '../../i18n/areas/settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
@@ -21,6 +23,7 @@ const blankScheme = (): Scheme => ({ id: '', item_id: '', item_name: '', buy_qty
  * changes how invoices are priced until a level is given to a client or a scheme is added.
  */
 export function PricingPanel({ notify }: { notify: Notify }) {
+  useT(); // re-render on a language switch (5.4)
   const [version, setVersion] = useState(0);
   const reload = () => setVersion((v) => v + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,7 +48,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
     const msg = validateLevel(level, levels);
     if (msg) return setError(msg);
     priceLevelsDb.save(level);
-    notify(`Price level ${level.name.trim()} saved`);
+    notify(setT('levelSaved', { name: level.name.trim() }));
     setLevel(null);
     reload();
   };
@@ -54,7 +57,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
     const msg = validateScheme(scheme);
     if (msg) return setError(msg);
     schemesDb.save(scheme);
-    notify(`Scheme on ${scheme.item_name} saved`);
+    notify(setT('schemeSaved', { name: scheme.item_name }));
     setScheme(null);
     reload();
   };
@@ -63,20 +66,19 @@ export function PricingPanel({ notify }: { notify: Notify }) {
     <section className={surface.card}>
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon}>
-          <Tags size={16} /> Price levels &amp; schemes
+          <Tags size={16} /> {setT('levelsSchemes')}
         </span>
         <div className={surface.pageActions}>
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => { setError(''); setLevel({ id: '', name: '', percent_off: 0 }); }}>
-            <Plus size={14} /> Add price level
+            <Plus size={14} /> {setT('addLevel')}
           </button>
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => { setError(''); setScheme(blankScheme()); }} disabled={catalog.length === 0}>
-            <Gift size={14} /> Add scheme
+            <Gift size={14} /> {setT('addScheme')}
           </button>
         </div>
       </div>
       <p className={cn(surface.sectionNote, styles.note)}>
-        Give a client a price level (Clients → edit) and the editor and POS use that level&apos;s rates when you pick an item —
-        an item&apos;s own level rate, else the level&apos;s % off its default rate. Quantity slabs are set per item above. Typing a rate on a line always wins.
+        {setT('pricingNote')}
       </p>
 
       {levels.length > 0 && (
@@ -84,11 +86,11 @@ export function PricingPanel({ notify }: { notify: Notify }) {
           <table className={surface.table}>
             <thead>
               <tr>
-                <th>Price level</th>
-                <th className={surface.numeric}>% off default rate</th>
-                <th className={surface.numeric}>Item rates</th>
-                <th className={surface.numeric}>Clients</th>
-                <th aria-label="Actions" />
+                <th>{setT('thLevel')}</th>
+                <th className={surface.numeric}>{setT('thPctOff')}</th>
+                <th className={surface.numeric}>{setT('thItemRates')}</th>
+                <th className={surface.numeric}>{setT('thClients')}</th>
+                <th aria-label={setT('thActions')} />
               </tr>
             </thead>
             <tbody>
@@ -100,10 +102,10 @@ export function PricingPanel({ notify }: { notify: Notify }) {
                   <td className={surface.numeric}>{usage.get(l.id) ?? 0}</td>
                   <td>
                     <div className={surface.rowActions}>
-                      <button type="button" className={controls.btnIcon} aria-label={`Edit ${l.name}`} onClick={() => { setError(''); setLevel({ ...l }); }}>
+                      <button type="button" className={controls.btnIcon} aria-label={setT('editNamed', { name: l.name })} onClick={() => { setError(''); setLevel({ ...l }); }}>
                         <Pencil size={16} />
                       </button>
-                      <button type="button" className={controls.btnDanger} aria-label={`Delete ${l.name}`} onClick={() => setRemoving({ kind: 'level', id: l.id, name: l.name })}>
+                      <button type="button" className={controls.btnDanger} aria-label={setT('deleteNamed', { name: l.name })} onClick={() => setRemoving({ kind: 'level', id: l.id, name: l.name })}>
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -120,10 +122,10 @@ export function PricingPanel({ notify }: { notify: Notify }) {
           <table className={surface.table}>
             <thead>
               <tr>
-                <th>Scheme</th>
-                <th>Valid</th>
-                <th>Status</th>
-                <th aria-label="Actions" />
+                <th>{setT('thScheme')}</th>
+                <th>{setT('thValid')}</th>
+                <th>{setT('thStatus')}</th>
+                <th aria-label={setT('thActions')} />
               </tr>
             </thead>
             <tbody>
@@ -133,7 +135,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
                     <div className={styles.name}>{s.item_name}</div>
                     <div className={styles.sub}>{schemeLabel(s)}</div>
                   </td>
-                  <td>{s.valid_from || s.valid_to ? `${s.valid_from ? formatDate(s.valid_from) : '…'} – ${s.valid_to ? formatDate(s.valid_to) : '…'}` : 'Always'}</td>
+                  <td>{s.valid_from || s.valid_to ? `${s.valid_from ? formatDate(s.valid_from) : '…'} – ${s.valid_to ? formatDate(s.valid_to) : '…'}` : setT('always')}</td>
                   <td>
                     <label className={controls.check}>
                       <input
@@ -141,15 +143,15 @@ export function PricingPanel({ notify }: { notify: Notify }) {
                         checked={s.active !== false}
                         onChange={(e) => { schemesDb.save({ ...s, active: e.target.checked }); reload(); }}
                       />
-                      {s.active === false ? 'Paused' : 'Running'}
+                      {s.active === false ? setT('paused') : setT('running')}
                     </label>
                   </td>
                   <td>
                     <div className={surface.rowActions}>
-                      <button type="button" className={controls.btnIcon} aria-label={`Edit scheme on ${s.item_name}`} onClick={() => { setError(''); setScheme({ ...s }); }}>
+                      <button type="button" className={controls.btnIcon} aria-label={setT('editSchemeOn', { name: s.item_name })} onClick={() => { setError(''); setScheme({ ...s }); }}>
                         <Pencil size={16} />
                       </button>
-                      <button type="button" className={controls.btnDanger} aria-label={`Delete scheme on ${s.item_name}`} onClick={() => setRemoving({ kind: 'scheme', id: s.id, name: s.item_name })}>
+                      <button type="button" className={controls.btnDanger} aria-label={setT('deleteSchemeOn', { name: s.item_name })} onClick={() => setRemoving({ kind: 'scheme', id: s.id, name: s.item_name })}>
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -162,9 +164,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
       )}
       {schemes.length > 0 && (
         <p className={cn(surface.sectionNote, styles.note)}>
-          Free goods are billed as a separate ₹0 line under the paid line, and leave stock. GST is charged on the price actually paid for the
-          bundle (CBIC Circular 92/11/2019-GST: &quot;buy one get one free&quot; is one supply of both items for that price), so the free line carries no
-          taxable value. Verify with your CA.
+          {setT('freeGoodsNote')}
         </p>
       )}
 
@@ -172,24 +172,24 @@ export function PricingPanel({ notify }: { notify: Notify }) {
         open={!!level}
         onClose={() => setLevel(null)}
         size="sm"
-        title={level?.id ? 'Edit price level' : 'Add price level'}
+        title={level?.id ? setT('editLevel') : setT('addLevel')}
         footer={
           <>
-            <button type="button" className={controls.btnOutline} onClick={() => setLevel(null)}>Cancel</button>
-            <button type="button" className={controls.btnPrimary} onClick={saveLevel}>Save level</button>
+            <button type="button" className={controls.btnOutline} onClick={() => setLevel(null)}>{setT('cancel')}</button>
+            <button type="button" className={controls.btnPrimary} onClick={saveLevel}>{setT('saveLevel')}</button>
           </>
         }
       >
         {level && (
           <div className={styles.form}>
             <label className={controls.field}>
-              <span className={controls.label}>Name *</span>
-              <input className={controls.input} value={level.name} onChange={(e) => setLevel({ ...level, name: e.target.value })} placeholder="Wholesale" autoFocus />
+              <span className={controls.label}>{setT('nameReq')}</span>
+              <input className={controls.input} value={level.name} onChange={(e) => setLevel({ ...level, name: e.target.value })} placeholder={setT('levelNamePh')} autoFocus />
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>% off the default rate</span>
+              <span className={controls.label}>{setT('pctOffDefault')}</span>
               <NumberInput className={cn(controls.input, controls.inputNumeric)} value={level.percent_off ?? 0} onChange={(n) => setLevel({ ...level, percent_off: n })} placeholder="0" />
-              <span className={controls.hint}>Used for items without their own rate in this level (set those in each item&apos;s form).</span>
+              <span className={controls.hint}>{setT('pctOffHint')}</span>
             </label>
             {error && <p className={controls.error} role="alert">{error}</p>}
           </div>
@@ -200,19 +200,19 @@ export function PricingPanel({ notify }: { notify: Notify }) {
         open={!!scheme}
         onClose={() => setScheme(null)}
         size="md"
-        title={scheme?.id ? 'Edit scheme' : 'Add scheme'}
-        subtitle="Buy X, get Y of the same item free"
+        title={scheme?.id ? setT('editScheme') : setT('addScheme')}
+        subtitle={setT('schemeSub')}
         footer={
           <>
-            <button type="button" className={controls.btnOutline} onClick={() => setScheme(null)}>Cancel</button>
-            <button type="button" className={controls.btnPrimary} onClick={saveScheme}>Save scheme</button>
+            <button type="button" className={controls.btnOutline} onClick={() => setScheme(null)}>{setT('cancel')}</button>
+            <button type="button" className={controls.btnPrimary} onClick={saveScheme}>{setT('saveScheme')}</button>
           </>
         }
       >
         {scheme && (
           <div className={styles.form}>
             <label className={controls.field}>
-              <span className={controls.label}>Item *</span>
+              <span className={controls.label}>{setT('itemReq')}</span>
               <select
                 className={controls.select}
                 value={scheme.item_id}
@@ -221,27 +221,27 @@ export function PricingPanel({ notify }: { notify: Notify }) {
                   setScheme({ ...scheme, item_id: e.target.value, item_name: it?.name ?? '' });
                 }}
               >
-                <option value="">Choose an item…</option>
+                <option value="">{setT('chooseItem')}</option>
                 {catalog.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
             </label>
             <div className={controls.row}>
               <label className={controls.field}>
-                <span className={controls.label}>Buy</span>
+                <span className={controls.label}>{setT('buy')}</span>
                 <NumberInput className={cn(controls.input, controls.inputNumeric)} value={scheme.buy_qty} onChange={(n) => setScheme({ ...scheme, buy_qty: n })} />
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>Get free</span>
+                <span className={controls.label}>{setT('getFree')}</span>
                 <NumberInput className={cn(controls.input, controls.inputNumeric)} value={scheme.free_qty} onChange={(n) => setScheme({ ...scheme, free_qty: n })} />
               </label>
             </div>
             <div className={controls.row}>
               <label className={controls.field}>
-                <span className={controls.label}>From (optional)</span>
+                <span className={controls.label}>{setT('fromOpt')}</span>
                 <input type="date" className={controls.input} value={scheme.valid_from ?? ''} onChange={(e) => setScheme({ ...scheme, valid_from: e.target.value || undefined })} />
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>To (optional)</span>
+                <span className={controls.label}>{setT('toOpt')}</span>
                 <input type="date" className={controls.input} value={scheme.valid_to ?? ''} onChange={(e) => setScheme({ ...scheme, valid_to: e.target.value || undefined })} />
               </label>
             </div>
@@ -253,17 +253,17 @@ export function PricingPanel({ notify }: { notify: Notify }) {
       <ConfirmDialog
         open={!!removing}
         destructive
-        title={removing?.kind === 'level' ? 'Delete this price level?' : 'Delete this scheme?'}
+        title={removing?.kind === 'level' ? setT('deleteLevelTitle') : setT('deleteSchemeTitle')}
         message={
           removing?.kind === 'level'
-            ? `“${removing.name}” is removed and clients on it go back to default rates. Invoices already issued keep their prices.`
-            : `The scheme on “${removing?.name ?? ''}” stops. Invoices already issued keep their free lines.`
+            ? setT('deleteLevelMsg', { name: removing.name })
+            : setT('deleteSchemeMsg', { name: removing?.name ?? '' })
         }
-        confirmLabel="Delete"
+        confirmLabel={setT('delete')}
         onConfirm={() => {
           if (removing?.kind === 'level') priceLevelsDb.remove(removing.id);
           else if (removing) schemesDb.remove(removing.id);
-          notify('Deleted');
+          notify(setT('deleted'));
           reload();
         }}
         onClose={() => setRemoving(null)}

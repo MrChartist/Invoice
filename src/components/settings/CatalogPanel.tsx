@@ -21,6 +21,8 @@ import { levelRate, priceLevelsDb } from '../../lib/pricing';
 import { getTable } from '../../lib/storage';
 import { TABLES, type StockItem } from '../../lib/inventory';
 import { cn, formatCurrency } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { setT } from '../../i18n/areas/settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
@@ -47,15 +49,11 @@ const toDraft = (i: InvoiceItem): CatalogDraft => ({
   qty_slabs: i.qty_slabs ?? [],
 });
 
-const ROUND_LABELS: Record<RoundTo, string> = {
-  paise: 'Nearest paisa',
-  rupee: 'Nearest rupee',
-  five: 'Nearest ₹5',
-  ten: 'Nearest ₹10',
-};
+const ROUNDS: RoundTo[] = ['paise', 'rupee', 'five', 'ten'];
 
 /** Add, edit, remove and bulk-revise the saved items (default rate, HSN/SAC, unit, GST). */
 export function CatalogPanel({ notify }: { notify: Notify }) {
+  useT(); // re-render on a language switch (5.4)
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<CatalogDraft | null>(null);
@@ -112,7 +110,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
       const n = text === '' ? undefined : Number(text);
       if (l.rates?.[result.item.id] !== n) priceLevelsDb.setItemRate(l.id, result.item.id, n);
     }
-    notify(draft.id ? `${result.item.name} updated` : `${result.item.name} added`);
+    notify(draft.id ? setT('itemUpdated', { name: result.item.name }) : setT('itemAdded', { name: result.item.name }));
     setDraft(null);
     setError(null);
     reload();
@@ -121,7 +119,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
   const applyRevision = () => {
     const ids = selected.size > 0 ? selected : ('all' as const);
     const changed = adjustCatalogRates(ids, percent, roundMode);
-    notify(changed ? `Updated the rate of ${changed} item${changed === 1 ? '' : 's'}` : 'No rates changed', changed ? 'success' : 'info');
+    notify(changed ? setT(changed === 1 ? 'ratesUpdatedOne' : 'ratesUpdatedMany', { n: changed }) : setT('noRatesChanged'), changed ? 'success' : 'info');
     setRevise(false);
     reload();
   };
@@ -132,43 +130,43 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
     <section className={surface.card}>
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon}>
-          <Package size={16} /> Items &amp; default rates
+          <Package size={16} /> {setT('itemsRates')}
         </span>
         <div className={surface.pageActions}>
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setLabels(true)} disabled={items.length === 0}>
-            <Barcode size={14} /> Print labels
+            <Barcode size={14} /> {setT('printLabels')}
           </button>
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setRevise(true)} disabled={items.length === 0}>
-            <Percent size={14} /> Revise rates
+            <Percent size={14} /> {setT('reviseRates')}
           </button>
           <button
             type="button"
             className={cn(controls.btnPrimary, controls.btnSm)}
             onClick={() => openDraft({ ...BLANK })}
           >
-            <Plus size={14} /> Add item
+            <Plus size={14} /> {setT('addItem')}
           </button>
         </div>
       </div>
 
       <p className={cn(surface.sectionNote, styles.note)}>
-        These are the rates the invoice editor pre-fills when you pick an item. Changing one here does not touch invoices you have already issued.
+        {setT('catalogNote')}
       </p>
 
       {items.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No saved items yet"
-          text="Add the services or products you bill most often, with their rate and GST. Items you use on a saved invoice are also remembered here."
+          title={setT('noItems')}
+          text={setT('noItemsText')}
         />
       ) : (
         <>
           <div className={styles.toolbar}>
             <label className={styles.search}>
               <Search size={15} />
-              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or HSN / SAC" aria-label="Search items" />
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={setT('searchItemsPh')} aria-label={setT('searchItems')} />
             </label>
-            {selected.size > 0 && <span className={styles.selCount}>{selected.size} selected</span>}
+            {selected.size > 0 && <span className={styles.selCount}>{setT('nSelected', { n: selected.size })}</span>}
           </div>
           <div className={surface.tableWrap}>
             <table className={surface.table}>
@@ -179,15 +177,15 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                       type="checkbox"
                       checked={allShownSelected}
                       onChange={(e) => setSelected(e.target.checked ? new Set(filtered.map((i) => i.id)) : new Set())}
-                      aria-label="Select all shown items"
+                      aria-label={setT('selectAll')}
                     />
                   </th>
-                  <th>Item</th>
-                  <th>HSN / SAC</th>
-                  <th>Unit</th>
-                  <th className={surface.numeric}>GST</th>
-                  <th className={surface.numeric}>Default rate</th>
-                  <th aria-label="Actions" />
+                  <th>{setT('thItem')}</th>
+                  <th>{setT('thHsn')}</th>
+                  <th>{setT('thUnit')}</th>
+                  <th className={surface.numeric}>{setT('thGst')}</th>
+                  <th className={surface.numeric}>{setT('thRate')}</th>
+                  <th aria-label={setT('thActions')} />
                 </tr>
               </thead>
               <tbody>
@@ -205,13 +203,13 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                             return next;
                           })
                         }
-                        aria-label={`Select ${i.name}`}
+                        aria-label={setT('selectNamed', { name: i.name })}
                       />
                     </td>
                     <td>
                       <div className={styles.name}>{i.name}</div>
                       <div className={styles.sub}>
-                        {[i.type || 'Service', i.sku && `SKU ${i.sku}`, i.barcode && `Barcode ${i.barcode}`, i.qty_slabs?.length ? `${i.qty_slabs.length} qty slab${i.qty_slabs.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}
+                        {[i.type === 'Product' ? setT('type.Product') : i.type && i.type !== 'Service' ? i.type : setT('type.Service'), i.sku && setT('skuN', { sku: i.sku }), i.barcode && setT('barcodeN', { code: i.barcode }), i.qty_slabs?.length ? setT(i.qty_slabs.length === 1 ? 'slabsOne' : 'slabsMany', { n: i.qty_slabs.length }) : ''].filter(Boolean).join(' · ')}
                       </div>
                     </td>
                     <td className={surface.mono}>{i.hsn || '—'}</td>
@@ -223,13 +221,13 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                         <button
                           type="button"
                           className={controls.btnIcon}
-                          aria-label={`Edit ${i.name}`}
-                          title="Edit"
+                          aria-label={setT('editNamed', { name: i.name })}
+                          title={setT('edit')}
                           onClick={() => openDraft(toDraft(i))}
                         >
                           <Pencil size={16} />
                         </button>
-                        <button type="button" className={controls.btnDanger} aria-label={`Remove ${i.name}`} title="Remove" onClick={() => setRemoving(i)}>
+                        <button type="button" className={controls.btnDanger} aria-label={setT('removeNamed', { name: i.name })} title={setT('remove')} onClick={() => setRemoving(i)}>
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -246,15 +244,15 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
         open={!!draft}
         onClose={() => setDraft(null)}
         size="md"
-        title={draft?.id ? 'Edit item' : 'Add item'}
-        subtitle="Used to pre-fill new invoice lines"
+        title={draft?.id ? setT('editItem') : setT('addItem')}
+        subtitle={setT('itemSub')}
         footer={
           <>
             <button type="button" className={controls.btnOutline} onClick={() => setDraft(null)}>
-              Cancel
+              {setT('cancel')}
             </button>
             <button type="submit" form="catalog-form" className={controls.btnPrimary}>
-              {draft?.id ? 'Save changes' : 'Add item'}
+              {draft?.id ? setT('saveChanges') : setT('addItem')}
             </button>
           </>
         }
@@ -270,7 +268,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
             }}
           >
             <label className={controls.field}>
-              <span className={controls.label}>Name *</span>
+              <span className={controls.label}>{setT('nameReq')}</span>
               <input
                 className={cn(controls.input, fieldError('name') && controls.inputInvalid)}
                 value={draft.name}
@@ -282,14 +280,14 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
             </label>
             <div className={controls.row}>
               <label className={controls.field}>
-                <span className={controls.label}>Type</span>
+                <span className={controls.label}>{setT('type')}</span>
                 <select className={controls.select} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
-                  <option>Service</option>
-                  <option>Product</option>
+                  <option value="Service">{setT('type.Service')}</option>
+                  <option value="Product">{setT('type.Product')}</option>
                 </select>
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>HSN / SAC</span>
+                <span className={controls.label}>{setT('thHsn')}</span>
                 <input
                   className={cn(controls.input, controls.inputMono, fieldError('hsn') && controls.inputInvalid)}
                   value={draft.hsn}
@@ -303,7 +301,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
             </div>
             <div className={controls.row3}>
               <label className={controls.field}>
-                <span className={controls.label}>Default rate (₹)</span>
+                <span className={controls.label}>{setT('defaultRateRs')}</span>
                 <NumberInput
                   className={cn(controls.input, controls.inputNumeric, fieldError('rate') && controls.inputInvalid)}
                   value={draft.rate}
@@ -313,7 +311,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                 {fieldError('rate') && <span className={controls.error}>{fieldError('rate')}</span>}
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>GST rate</span>
+                <span className={controls.label}>{setT('gstRate')}</span>
                 <select className={controls.select} value={draft.tax_rate} onChange={(e) => setDraft({ ...draft, tax_rate: Number(e.target.value) })}>
                   {GST_SLABS.map((r) => (
                     <option key={r} value={r}>
@@ -323,7 +321,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                 </select>
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>Unit</span>
+                <span className={controls.label}>{setT('unit')}</span>
                 <select className={controls.select} value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })}>
                   {UNITS.map((u) => (
                     <option key={u}>{u}</option>
@@ -333,26 +331,26 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
             </div>
             <div className={controls.row3}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="catalog-barcode">Barcode</label>
+                <label className={controls.label} htmlFor="catalog-barcode">{setT('barcode')}</label>
                 <div className={styles.inline}>
                   <input
                     id="catalog-barcode"
                     className={cn(controls.input, controls.inputMono, fieldError('barcode') && controls.inputInvalid)}
                     value={draft.barcode ?? ''}
                     onChange={(e) => setDraft({ ...draft, barcode: e.target.value })}
-                    placeholder="Scan or type"
+                    placeholder={setT('scanOrType')}
                     aria-invalid={!!fieldError('barcode')}
                   />
                   {!draft.barcode && (
-                    <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={generateBarcode} title="Assign an in-store EAN-13 (starts with 2)">
-                      New
+                    <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={generateBarcode} title={setT('newCodeHint')}>
+                      {setT('newCode')}
                     </button>
                   )}
                 </div>
                 {fieldError('barcode') && <span className={controls.error}>{fieldError('barcode')}</span>}
               </div>
               <label className={controls.field}>
-                <span className={controls.label}>SKU / item code</span>
+                <span className={controls.label}>{setT('sku')}</span>
                 <input
                   className={cn(controls.input, controls.inputMono, fieldError('sku') && controls.inputInvalid)}
                   value={draft.sku ?? ''}
@@ -362,43 +360,43 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                 {fieldError('sku') && <span className={controls.error}>{fieldError('sku')}</span>}
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>MRP (₹)</span>
-                <NumberInput className={cn(controls.input, controls.inputNumeric)} value={draft.mrp ?? 0} onChange={(n) => setDraft({ ...draft, mrp: n })} placeholder="For labels" />
+                <span className={controls.label}>{setT('mrp')}</span>
+                <NumberInput className={cn(controls.input, controls.inputNumeric)} value={draft.mrp ?? 0} onChange={(n) => setDraft({ ...draft, mrp: n })} placeholder={setT('forLabels')} />
               </label>
             </div>
 
             <fieldset className={styles.group}>
-              <legend className={controls.label}>Quantity slabs (optional)</legend>
+              <legend className={controls.label}>{setT('qtySlabs')}</legend>
               {(draft.qty_slabs ?? []).map((slab, n) => (
                 <div key={n} className={styles.inline}>
-                  <span className={styles.sub}>Qty ≥</span>
+                  <span className={styles.sub}>{setT('qtyGte')}</span>
                   <NumberInput
                     className={cn(controls.input, controls.inputNumeric, styles.small)}
                     value={slab.min_qty}
                     onChange={(v) => setDraft({ ...draft, qty_slabs: (draft.qty_slabs ?? []).map((x, k) => (k === n ? { ...x, min_qty: v } : x)) })}
-                    aria-label={`Slab ${n + 1} minimum quantity`}
+                    aria-label={setT('slabMin', { n: n + 1 })}
                   />
-                  <span className={styles.sub}>rate ₹</span>
+                  <span className={styles.sub}>{setT('rateRs')}</span>
                   <NumberInput
                     className={cn(controls.input, controls.inputNumeric, styles.small)}
                     value={slab.rate}
                     onChange={(v) => setDraft({ ...draft, qty_slabs: (draft.qty_slabs ?? []).map((x, k) => (k === n ? { ...x, rate: v } : x)) })}
-                    aria-label={`Slab ${n + 1} rate`}
+                    aria-label={setT('slabRate', { n: n + 1 })}
                   />
-                  <button type="button" className={controls.btnIcon} aria-label={`Remove slab ${n + 1}`} onClick={() => setDraft({ ...draft, qty_slabs: (draft.qty_slabs ?? []).filter((_, k) => k !== n) })}>
+                  <button type="button" className={controls.btnIcon} aria-label={setT('removeSlab', { n: n + 1 })} onClick={() => setDraft({ ...draft, qty_slabs: (draft.qty_slabs ?? []).filter((_, k) => k !== n) })}>
                     <X size={14} />
                   </button>
                 </div>
               ))}
               <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setDraft({ ...draft, qty_slabs: [...(draft.qty_slabs ?? []), { min_qty: 0, rate: draft.rate }] })}>
-                <Plus size={14} /> Add slab
+                <Plus size={14} /> {setT('addSlab')}
               </button>
-              <span className={controls.hint}>A line of at least that quantity gets the slab rate (the lower of a party&apos;s level rate and the slab wins).</span>
+              <span className={controls.hint}>{setT('slabHint')}</span>
             </fieldset>
 
             {levels.length > 0 && (
               <fieldset className={styles.group}>
-                <legend className={controls.label}>Price levels</legend>
+                <legend className={controls.label}>{setT('priceLevels')}</legend>
                 <div className={controls.row3}>
                   {levels.map((l) => {
                     const fromPct = levelRate({ ...l, rates: undefined }, { id: draft.id ?? '', rate: draft.rate });
@@ -410,13 +408,13 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                           inputMode="decimal"
                           value={levelRates[l.id] ?? ''}
                           onChange={(e) => setLevelRates((r) => ({ ...r, [l.id]: e.target.value.replace(/[^\d.]/g, '') }))}
-                          placeholder={fromPct !== undefined ? `${fromPct} (${l.percent_off}% off)` : `${draft.rate} (base)`}
+                          placeholder={fromPct !== undefined ? setT('levelPh', { rate: fromPct, pct: l.percent_off ?? 0 }) : setT('basePh', { rate: draft.rate })}
                         />
                       </label>
                     );
                   })}
                 </div>
-                <span className={controls.hint}>Leave blank to use the level&apos;s % off the default rate.</span>
+                <span className={controls.hint}>{setT('levelBlankHint')}</span>
               </fieldset>
             )}
 
@@ -429,23 +427,22 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
         open={revise}
         onClose={() => setRevise(false)}
         size="sm"
-        title="Revise default rates"
-        subtitle={selected.size > 0 ? `${selected.size} selected item${selected.size === 1 ? '' : 's'}` : `All ${items.length} items`}
+        title={setT('reviseTitle')}
+        subtitle={selected.size > 0 ? setT(selected.size === 1 ? 'selectedItemsOne' : 'selectedItemsMany', { n: selected.size }) : setT('allItems', { n: items.length })}
         footer={
           <>
             <button type="button" className={controls.btnOutline} onClick={() => setRevise(false)}>
-              Cancel
+              {setT('cancel')}
             </button>
             <button type="button" className={controls.btnPrimary} onClick={applyRevision}>
-              Apply {percent >= 0 ? '+' : ''}
-              {percent}%
+              {setT('apply', { pct: `${percent >= 0 ? '+' : ''}${percent}` })}
             </button>
           </>
         }
       >
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Change by (%)</span>
+            <span className={controls.label}>{setT('changeBy')}</span>
             <input
               className={cn(controls.input, controls.inputNumeric)}
               type="number"
@@ -455,18 +452,18 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
             />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Round to</span>
+            <span className={controls.label}>{setT('roundTo')}</span>
             <select className={controls.select} value={roundMode} onChange={(e) => setRoundMode(e.target.value as RoundTo)}>
-              {(Object.keys(ROUND_LABELS) as RoundTo[]).map((k) => (
+              {ROUNDS.map((k) => (
                 <option key={k} value={k}>
-                  {ROUND_LABELS[k]}
+                  {setT(`round.${k}`)}
                 </option>
               ))}
             </select>
           </label>
         </div>
         <p className={controls.hint}>
-          Use a negative number to lower rates. Free items (rate 0) stay free. Existing invoices are never changed.
+          {setT('reviseHint')}
         </p>
       </Modal>
 
@@ -479,9 +476,9 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
       <ConfirmDialog
         open={!!removing}
         destructive
-        title="Remove this item?"
-        message={`“${removing?.name ?? ''}” will be removed from your catalogue. Invoices that already use it are not affected.`}
-        confirmLabel="Remove"
+        title={setT('removeItemTitle')}
+        message={setT('removeItemMsg', { name: removing?.name ?? '' })}
+        confirmLabel={setT('remove')}
         onConfirm={() => {
           if (removing) removeCatalogItem(removing.id);
           setSelected((s) => {
@@ -489,7 +486,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
             if (removing) next.delete(removing.id);
             return next;
           });
-          notify('Item removed');
+          notify(setT('itemRemoved'));
           reload();
         }}
         onClose={() => setRemoving(null)}

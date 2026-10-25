@@ -4,10 +4,12 @@ import { ChangePinModal } from './ChangePinModal';
 import { EncryptedBackup } from './EncryptedBackup';
 import { VaultPanel } from './VaultPanel';
 import { UsersPanel } from './UsersPanel';
-import { ROLE_HINTS, ROLE_LABELS } from '../../lib/access';
 import { useCan } from '../../hooks/useCan';
 import { IDLE_CHOICES, getIdleTimeout, logout, setIdleTimeout } from '../../lib/auth';
 import { daysSinceBackup, getLastBackup } from '../../lib/backup';
+import { useT } from '../../i18n';
+import { secT } from '../../i18n/areas/security';
+import { roleLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Security.module.css';
@@ -19,9 +21,9 @@ interface Props {
 }
 
 function idleLabel(minutes: number): string {
-  if (minutes === 0) return 'Never';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-  return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
+  if (minutes === 0) return secT('never');
+  if (minutes < 60) return secT(minutes === 1 ? 'minuteOne' : 'minuteMany', { n: minutes });
+  return secT(minutes === 60 ? 'hourOne' : 'hourMany', { n: minutes / 60 });
 }
 
 /**
@@ -29,6 +31,7 @@ function idleLabel(minutes: number): string {
  * (6.21) sees only their own PIN, "Lock now" and what their role allows.
  */
 export function SecurityPanel({ notify, onLock }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const [pinOpen, setPinOpen] = useState(false);
   const [idle, setIdle] = useState(getIdleTimeout);
   const { can, role, actor } = useCan();
@@ -42,17 +45,17 @@ export function SecurityPanel({ notify, onLock }: Props) {
       <section className={surface.card}>
         <div className={surface.cardHead}>
           <span className={surface.cardHeadIcon}>
-            <KeyRound size={16} /> PIN &amp; auto-lock
+            <KeyRound size={16} /> {secT('pinAutoLock')}
           </span>
         </div>
         <div className={surface.cardBody}>
           <div className={styles.rowBetween}>
             <div className={styles.rowText}>
-              <strong>{manage ? 'PIN' : `Your PIN${actor ? ` (${actor.name})` : ''}`}</strong>
-              <span>Stored only as a salted PBKDF2 hash. Five wrong attempts trigger a temporary lock that doubles each time.</span>
+              <strong>{manage ? secT('pin') : actor ? secT('yourPinNamed', { name: actor.name }) : secT('yourPin')}</strong>
+              <span>{secT('pinStored')}</span>
             </div>
             <button type="button" className={controls.btnOutline} onClick={() => setPinOpen(true)}>
-              <KeyRound size={16} /> Change PIN
+              <KeyRound size={16} /> {secT('changePin')}
             </button>
           </div>
 
@@ -62,19 +65,19 @@ export function SecurityPanel({ notify, onLock }: Props) {
 
           <div className={styles.rowBetween}>
             <div className={styles.rowText}>
-              <strong>Lock after inactivity</strong>
-              <span>The app locks when you have not touched it for this long. Invoices are autosaved, so nothing is lost.</span>
+              <strong>{secT('lockAfter')}</strong>
+              <span>{secT('lockAfterText')}</span>
             </div>
             <div className={`${controls.field} ${styles.selectWrap}`}>
               <select
                 className={controls.select}
-                aria-label="Auto-lock after inactivity"
+                aria-label={secT('autoLockAria')}
                 value={idle}
                 onChange={(e) => {
                   const minutes = Number(e.target.value);
                   setIdleTimeout(minutes);
                   setIdle(minutes);
-                  notify(minutes === 0 ? 'Auto-lock turned off' : `Auto-lock after ${idleLabel(minutes)}`);
+                  notify(minutes === 0 ? secT('autoLockOff') : secT('autoLockAfter', { time: idleLabel(minutes) }));
                 }}
               >
                 {IDLE_CHOICES.map((m) => (
@@ -90,8 +93,8 @@ export function SecurityPanel({ notify, onLock }: Props) {
 
           <div className={styles.rowBetween}>
             <div className={styles.rowText}>
-              <strong>Lock now</strong>
-              <span>Return to the PIN screen immediately.</span>
+              <strong>{secT('lockNow')}</strong>
+              <span>{secT('lockNowText')}</span>
             </div>
             <button
               type="button"
@@ -102,7 +105,7 @@ export function SecurityPanel({ notify, onLock }: Props) {
                 else window.location.reload();
               }}
             >
-              <Lock size={16} /> Lock now
+              <Lock size={16} /> {secT('lockNow')}
             </button>
           </div>
         </div>
@@ -112,17 +115,14 @@ export function SecurityPanel({ notify, onLock }: Props) {
         <section className={surface.card}>
           <div className={surface.cardHead}>
             <span className={surface.cardHeadIcon}>
-              <ShieldCheck size={16} /> Your role: {ROLE_LABELS[role]}
+              <ShieldCheck size={16} /> {secT('yourRole', { role: roleLabel(role) })}
             </span>
           </div>
           <div className={surface.cardBody}>
-            <p className={surface.sectionNote}>{ROLE_HINTS[role]}</p>
+            <p className={surface.sectionNote}>{secT(`hint.${role}`)}</p>
             <div className={styles.note} role="note">
               <Info size={16} aria-hidden="true" />
-              <span>
-                The owner manages users, PINs, vault mode and backups. Roles are a convenience on a shared device, not security.
-                Forgot your PIN? The owner can set a new one.
-              </span>
+              <span>{secT('ownerManages')}</span>
             </div>
           </div>
         </section>
@@ -136,14 +136,14 @@ export function SecurityPanel({ notify, onLock }: Props) {
       <section className={surface.card}>
         <div className={surface.cardHead}>
           <span className={surface.cardHeadIcon}>
-            <ShieldCheck size={16} /> Encrypted backup
+            <ShieldCheck size={16} /> {secT('encryptedBackup')}
           </span>
           {last ? (
             <span className={days !== null && days > 30 ? styles.badgeWarn : styles.badgeOk}>
-              Last backup {days === 0 ? 'today' : `${days} day${days === 1 ? '' : 's'} ago`}
+              {days === 0 ? secT('lastBackupToday') : secT(days === 1 ? 'lastBackupOne' : 'lastBackupMany', { n: days ?? 0 })}
             </span>
           ) : (
-            <span className={styles.badgeWarn}>No backup yet</span>
+            <span className={styles.badgeWarn}>{secT('noBackup')}</span>
           )}
         </div>
         <div className={surface.cardBody}>
@@ -152,7 +152,7 @@ export function SecurityPanel({ notify, onLock }: Props) {
       </section>
       )}
 
-      <ChangePinModal open={pinOpen} onClose={() => setPinOpen(false)} onChanged={() => notify('PIN changed')} />
+      <ChangePinModal open={pinOpen} onClose={() => setPinOpen(false)} onChanged={() => notify(secT('pinChanged'))} />
     </div>
   );
 }

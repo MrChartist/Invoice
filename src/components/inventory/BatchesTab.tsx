@@ -6,6 +6,8 @@ import { shiftDay } from '../../lib/dates';
 import { expiringBatches, isExpired, type TrackingMap } from '../../lib/stock-tracking';
 import { godownName } from '../../lib/godowns';
 import type { Godown } from '../../types/stock';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
@@ -33,6 +35,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
   godowns: Godown[];
   onDownload: (filename: string, csv: string) => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const [view, setView] = useState<View>('all');
   const multi = godowns.length > 1;
 
@@ -48,7 +51,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
       for (const b of t.batches) {
         if (Math.abs(b.qty) < 1e-9) continue;
         out.push({
-          key: `${t.item.id}|${b.batch}`, item: t.item.name, unit: t.item.unit, batch: b.batch || '(no batch)',
+          key: `${t.item.id}|${b.batch}`, item: t.item.name, unit: t.item.unit, batch: b.batch || invT('noBatch'),
           mfg: b.mfg, expiry: b.expiry, mrp: b.mrp, qty: b.qty, byGodown: b.byGodown,
         });
       }
@@ -57,10 +60,10 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
   }, [tracking, today, days, view]);
 
   const status = (r: Row) => {
-    if (!r.expiry) return <span className={styles.muted}>No expiry</span>;
-    if (isExpired(r.expiry, today)) return <span className={styles.expired}>Expired</span>;
-    if (r.expiry <= shiftDay(today, days)) return <span className={styles.soon}>Expiring soon</span>;
-    return <span className={styles.in}>OK</span>;
+    if (!r.expiry) return <span className={styles.muted}>{invT('noExpiry')}</span>;
+    if (isExpired(r.expiry, today)) return <span className={styles.expired}>{invT('statusExpired')}</span>;
+    if (r.expiry <= shiftDay(today, days)) return <span className={styles.soon}>{invT('expiringSoon')}</span>;
+    return <span className={styles.in}>{invT('ok')}</span>;
   };
 
   const csv = () => {
@@ -72,8 +75,8 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
   return (
     <>
       <div className={styles.lookupHead} style={{ padding: '0 0 0.75rem' }}>
-        <div className={controls.segment} role="group" aria-label="Batch view">
-          {([['all', 'Stock by batch'], ['expiring', `Expiring in ${days} days`], ['expired', 'Expired']] as const).map(([k, label]) => (
+        <div className={controls.segment} role="group" aria-label={invT('batchView')}>
+          {([['all', invT('stockByBatch')], ['expiring', invT('expiringIn', { n: days })], ['expired', invT('statusExpired')]] as const).map(([k, label]) => (
             <button key={k} type="button" aria-pressed={view === k} className={view === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setView(k)}>
               {label}
             </button>
@@ -86,16 +89,16 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
       <table className={surface.table}>
         <thead>
           <tr>
-            <th>Item</th><th>Batch</th><th>MFG</th><th>Expiry</th><th className={surface.numeric}>Qty</th>
-            {multi && <th>By godown</th>}
-            <th>Status</th>
+            <th>{invT('thItem')}</th><th>{invT('thBatch')}</th><th>{invT('thMfg')}</th><th>{invT('thExpiry')}</th><th className={surface.numeric}>{invT('thQty')}</th>
+            {multi && <th>{invT('thByGodown')}</th>}
+            <th>{invT('thStatus')}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
               <td>{r.item}</td>
-              <td className={styles.mono}>{r.batch}{r.mrp ? <span className={styles.muted}> · MRP {r.mrp}</span> : null}</td>
+              <td className={styles.mono}>{r.batch}{r.mrp ? <span className={styles.muted}>{invT('mrpN', { mrp: r.mrp })}</span> : null}</td>
               <td>{r.mfg ? formatDate(r.mfg) : '—'}</td>
               <td>{r.expiry ? formatDate(r.expiry) : '—'}</td>
               <td className={cn(surface.numeric, r.qty < 0 && styles.negative)}>{r.qty} {r.unit}</td>
@@ -109,7 +112,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
           ))}
           {rows.length === 0 && (
             <tr><td colSpan={multi ? 7 : 6} className={styles.muted}>
-              {view === 'all' ? 'No batch stock yet — record a purchase bill with batch numbers.' : 'Nothing here. Well stocked!'}
+              {view === 'all' ? invT('noBatchStock') : invT('wellStocked')}
             </td></tr>
           )}
         </tbody>

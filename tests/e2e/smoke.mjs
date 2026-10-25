@@ -185,6 +185,9 @@ try {
     await page.getByText('दाख़िल करने से पहले अपने CA से जाँच करवाएँ।').first().waitFor();
     check(true, 'GST page shows Hindi (gst area catalogue)');
     await page.goto(srv.origin + '/settings');
+    // Round 2 area catalogues: the Settings tabs follow the language too.
+    await page.getByRole('tab', { name: 'डेटा और बैकअप' }).waitFor();
+    check(true, 'Settings tabs are in Hindi (डेटा और बैकअप)');
     await page.getByLabel('Language / भाषा').first().selectOption('en');
     await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');

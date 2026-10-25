@@ -1,4 +1,6 @@
-import { COST_CENTRE_KIND_LABELS, costCentreLabel, pickableCentres, type CostCentre } from '../../lib/cost-centres';
+import { costCentreLabel, pickableCentres, type CostCentre } from '../../lib/cost-centres';
+import { useT } from '../../i18n';
+import { fldT } from '../../i18n/areas/fields';
 import controls from '../../styles/controls.module.css';
 
 interface Props {
@@ -19,7 +21,8 @@ interface Props {
  * Cost centre / project picker (6.16). Renders nothing until at least one cost centre exists,
  * so the forms stay clean for users who never set one up.
  */
-export function CostCentreSelect({ id, value, onChange, centres, label, ariaLabel, emptyLabel = 'Unallocated', className, hint }: Props) {
+export function CostCentreSelect({ id, value, onChange, centres, label, ariaLabel, emptyLabel, className, hint }: Props) {
+  useT(); // re-render on a language switch (5.4)
   if (!centres.length) return null;
   const options = pickableCentres(centres, value);
   const select = (
@@ -28,14 +31,14 @@ export function CostCentreSelect({ id, value, onChange, centres, label, ariaLabe
       className={className ?? controls.select}
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value || undefined)}
-      aria-label={label ? undefined : ariaLabel ?? 'Cost centre'}
+      aria-label={label ? undefined : ariaLabel ?? fldT('costCentre')}
       data-testid={id}
     >
-      <option value="">{emptyLabel}</option>
+      <option value="">{emptyLabel ?? fldT('unallocated')}</option>
       {options.map((c) => (
         <option key={c.id} value={c.id}>
-          {costCentreLabel(c, centres)} · {COST_CENTRE_KIND_LABELS[c.kind]}
-          {c.active ? '' : ' (inactive)'}
+          {costCentreLabel(c, centres)} · {fldT(`kind.${c.kind}`)}
+          {c.active ? '' : fldT('inactive')}
         </option>
       ))}
     </select>

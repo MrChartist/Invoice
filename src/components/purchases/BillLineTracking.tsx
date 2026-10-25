@@ -3,6 +3,7 @@ import type { StockItem } from '../../lib/inventory';
 import type { Godown } from '../../types/stock';
 import { parseSerials } from '../../lib/stock-tracking';
 import { num } from '../../lib/invoice-calc';
+import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -31,11 +32,11 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
     <div className={styles.trackGrid}>
       {ctx.godowns.length > 1 && (
         <label className={controls.field}>
-          <span className={controls.label}>Godown</span>
+          <span className={controls.label}>{purT('godown')}</span>
           <select
             className={controls.select}
             value={line.godown_id || ctx.defaultGodown}
-            aria-label={`Line ${n} godown`}
+            aria-label={purT('lineGodown', { n })}
             onChange={(e) => onPatch({ godown_id: e.target.value })}
           >
             {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -45,24 +46,24 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
       {item.track_batches && (
         <>
           <label className={controls.field}>
-            <span className={controls.label}>Batch no.</span>
-            <input className={controls.input} value={line.batch_no ?? ''} aria-label={`Line ${n} batch number`} onChange={(e) => onPatch({ batch_no: e.target.value || undefined })} />
+            <span className={controls.label}>{purT('batchNo')}</span>
+            <input className={controls.input} value={line.batch_no ?? ''} aria-label={purT('lineBatch', { n })} onChange={(e) => onPatch({ batch_no: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>MFG date</span>
-            <input type="date" className={controls.input} value={line.mfg_date ?? ''} aria-label={`Line ${n} manufacturing date`} onChange={(e) => onPatch({ mfg_date: e.target.value || undefined })} />
+            <span className={controls.label}>{purT('mfgDate')}</span>
+            <input type="date" className={controls.input} value={line.mfg_date ?? ''} aria-label={purT('lineMfg', { n })} onChange={(e) => onPatch({ mfg_date: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Expiry date</span>
-            <input type="date" className={controls.input} value={line.expiry_date ?? ''} aria-label={`Line ${n} expiry date`} onChange={(e) => onPatch({ expiry_date: e.target.value || undefined })} />
+            <span className={controls.label}>{purT('expiryDate')}</span>
+            <input type="date" className={controls.input} value={line.expiry_date ?? ''} aria-label={purT('lineExpiry', { n })} onChange={(e) => onPatch({ expiry_date: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>MRP</span>
+            <span className={controls.label}>{purT('mrp')}</span>
             <input
               className={`${controls.input} ${controls.inputNumeric}`}
               inputMode="decimal"
               value={line.mrp ?? ''}
-              aria-label={`Line ${n} MRP`}
+              aria-label={purT('lineMrp', { n })}
               onChange={(e) => onPatch({ mrp: num(e.target.value) > 0 ? num(e.target.value) : undefined })}
             />
           </label>
@@ -71,14 +72,14 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
       {item.track_serials && (
         <label className={`${controls.field} ${styles.trackWide}`}>
           <span className={controls.label}>
-            Serial / IMEI numbers — one per line ({serials.length} of {want})
+            {purT('serialsLabel', { have: serials.length, want })}
           </span>
           <textarea
             className={controls.textarea}
             rows={Math.min(Math.max(want, 2), 6)}
             defaultValue={serials.join('\n')}
-            aria-label={`Line ${n} serial numbers`}
-            placeholder="Scan or paste, one per line"
+            aria-label={purT('lineSerials', { n })}
+            placeholder={purT('serialsPh')}
             onChange={(e) => {
               const list = parseSerials(e.target.value);
               onPatch({ serials: list.length ? list : undefined });

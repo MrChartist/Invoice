@@ -7,6 +7,8 @@ import { localDb } from '../../lib/localDb';
 import { readRaw, SINGLETON_KEYS } from '../../lib/storage';
 import { cn } from '../../lib/utils';
 import { useToast } from '../ui/useToast';
+import { useT } from '../../i18n';
+import { desT } from '../../i18n/areas/design';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 
@@ -15,6 +17,7 @@ import controls from '../../styles/controls.module.css';
  * sender profile), tune the design, watch the live preview, save.
  */
 export function DesignStudio() {
+  useT(); // re-render on a language switch (5.4)
   const { notify, toastNode } = useToast();
   const profiles = useMemo(() => {
     try {
@@ -42,9 +45,9 @@ export function DesignStudio() {
       const saved = saveDesign({ ...design, profile_id: scope });
       setDesign(saved);
       setDirty(false);
-      notify(scope === GLOBAL_PROFILE_ID ? 'Default design saved' : 'Profile design saved');
+      notify(scope === GLOBAL_PROFILE_ID ? desT('defaultSaved') : desT('profileSaved'));
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Could not save the design', 'error');
+      notify(err instanceof Error ? err.message : desT('saveFail'), 'error');
     }
   };
 
@@ -54,9 +57,9 @@ export function DesignStudio() {
       else resetDesign(GLOBAL_PROFILE_ID);
       setDesign(resolve(scope));
       setDirty(false);
-      notify('Design reset to defaults', 'info');
+      notify(desT('resetDone'), 'info');
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Could not reset the design', 'error');
+      notify(err instanceof Error ? err.message : desT('resetFail'), 'error');
     }
   };
 
@@ -65,26 +68,26 @@ export function DesignStudio() {
       <div className={surface.pageHead}>
         <div>
           <h1 className={surface.pageTitle}>
-            <Palette size={22} aria-hidden="true" /> Design Studio
+            <Palette size={22} aria-hidden="true" /> {desT('title')}
           </h1>
           <p className={surface.pageSubtitle}>
-            Colours, fonts, columns, paper size and stamps for every invoice you issue.
+            {desT('subtitle')}
           </p>
         </div>
         <div className={surface.pageActions}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="ds-scope">Applies to</label>
+            <label className={controls.label} htmlFor="ds-scope">{desT('appliesTo')}</label>
             <select id="ds-scope" className={controls.select} value={scope} onChange={(e) => changeScope(e.target.value)}>
-              <option value={GLOBAL_PROFILE_ID}>All profiles (default)</option>
+              <option value={GLOBAL_PROFILE_ID}>{desT('allProfiles')}</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.companyName || 'Untitled profile'}
+                  {p.companyName || desT('untitled')}
                 </option>
               ))}
             </select>
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="ds-template">Preview template</label>
+            <label className={controls.label} htmlFor="ds-template">{desT('previewTemplate')}</label>
             <select id="ds-template" className={controls.select} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
               {TEMPLATES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -94,7 +97,7 @@ export function DesignStudio() {
             </select>
           </div>
           <button type="button" className={cn(controls.btn, controls.btnPrimary)} onClick={save} disabled={!dirty}>
-            <Save size={15} aria-hidden="true" /> Save design
+            <Save size={15} aria-hidden="true" /> {desT('saveDesign')}
           </button>
         </div>
       </div>

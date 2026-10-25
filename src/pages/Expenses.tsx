@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
+import { purT, purCategory, purStatus } from '../i18n/areas/purchases';
 import { BillModal } from '../components/purchases/BillModal';
 import { ExpenseModal } from '../components/purchases/ExpenseModal';
 import { PurchasePaymentModal } from '../components/purchases/PurchasePaymentModal';
@@ -47,10 +48,10 @@ const PurchaseOrdersTab = lazy(() =>
   import('../components/purchases/PurchaseOrdersTab').then((m) => ({ default: m.PurchaseOrdersTab })),
 );
 
-const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: string }[] = [
-  { id: 'ALL', label: 'All' },
-  { id: 'PURCHASE', label: 'Bills' },
-  { id: 'EXPENSE', label: 'Expenses' },
+const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: 'kindAll' | 'kindBills' | 'kindExpenses' }[] = [
+  { id: 'ALL', label: 'kindAll' },
+  { id: 'PURCHASE', label: 'kindBills' },
+  { id: 'EXPENSE', label: 'kindExpenses' },
 ];
 
 /** Expenses & purchases: supplier bills, quick expenses, payables and vendors. */
@@ -108,14 +109,14 @@ export function Expenses() {
 
   const exportCsv = () => {
     downloadText(`purchases-${today}.csv`, toCsv(purchasesToCsvRows(rows, today)), 'text/csv');
-    notify(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`);
+    notify(purT(rows.length === 1 ? 'exportedOne' : 'exportedMany', { n: rows.length }));
   };
 
   const remove = (p: PurchaseRecord) => {
     try {
       purchasesDb.remove(p.id);
       reload();
-      notify('Entry deleted');
+      notify(purT('entryDeleted'));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -127,21 +128,21 @@ export function Expenses() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Expenses & purchases"
-        subtitle="Supplier bills, day-to-day spends, what you owe and the GST you can claim back."
+        title={purT('title')}
+        subtitle={purT('subtitle')}
         actions={
           <>
             <button type="button" className={controls.btnOutline} onClick={exportCsv} disabled={tab !== 'bills' || rows.length === 0}>
-              <Download size={16} /> Export CSV
+              <Download size={16} /> {purT('exportCsv')}
             </button>
             {/* Local roles (6.21): a viewer cannot record bills; the data layer refuses it too. */}
             {can('books.edit') && (
               <>
                 <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
-                  <Zap size={16} /> Quick expense
+                  <Zap size={16} /> {purT('quickExpense')}
                 </button>
                 <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
-                  <FilePlus2 size={16} /> Add bill
+                  <FilePlus2 size={16} /> {purT('addBill')}
                 </button>
               </>
             )}
@@ -150,35 +151,35 @@ export function Expenses() {
       />
 
       <div className={surface.statGrid}>
-        <StatCard label="Payables" value={formatCurrency(payables)} icon={Wallet} tone={payables > 0 ? 'warning' : 'default'} hint="Owed to vendors" />
-        <StatCard label="Paid this month" value={formatCurrency(paidThisMonth)} icon={Landmark} tone="profit" />
+        <StatCard label={purT('statPayables')} value={formatCurrency(payables)} icon={Wallet} tone={payables > 0 ? 'warning' : 'default'} hint={purT('statPayablesHint')} />
+        <StatCard label={purT('statPaidMonth')} value={formatCurrency(paidThisMonth)} icon={Landmark} tone="profit" />
         <StatCard
-          label={composition ? 'GST on bills (no ITC)' : 'ITC available'}
+          label={composition ? purT('statGstNoItc') : purT('statItc')}
           value={formatCurrency(itc.total)}
           icon={PiggyBank}
           tone={composition ? 'default' : 'brand'}
-          hint={composition ? 'Composition scheme: not claimable' : itc.ineligible > 0 ? `${formatCurrency(itc.ineligible)} not claimed` : 'This month'}
+          hint={composition ? purT('statCompositionHint') : itc.ineligible > 0 ? purT('statNotClaimed', { amount: formatCurrency(itc.ineligible) }) : purT('statThisMonth')}
         />
         <StatCard
-          label="Top category"
-          value={topCategory ? topCategory.category : '—'}
+          label={purT('statTopCategory')}
+          value={topCategory ? purCategory(topCategory.category) : '—'}
           icon={Tags}
-          hint={topCategory ? `${formatCurrency(topCategory.total)} this month` : 'Nothing logged this month'}
+          hint={topCategory ? purT('statAmountThisMonth', { amount: formatCurrency(topCategory.total) }) : purT('statNothingMonth')}
         />
       </div>
 
       <MsmeCard purchases={purchases} vendors={vendors} payments={payments} today={today} />
 
       <div className={styles.tabs}>
-        <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Section">
+        <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label={purT('section')}>
           <button type="button" role="tab" aria-selected={tab === 'bills'} className={tab === 'bills' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('bills')}>
-            Bills & expenses <span className={styles.count}>{purchases.length}</span>
+            {purT('tabBills')} <span className={styles.count}>{purchases.length}</span>
           </button>
           <button type="button" role="tab" aria-selected={tab === 'orders'} className={tab === 'orders' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('orders')}>
-            Purchase orders <span className={styles.count}>{orders.length}</span>
+            {purT('tabOrders')} <span className={styles.count}>{orders.length}</span>
           </button>
           <button type="button" role="tab" aria-selected={tab === 'vendors'} className={tab === 'vendors' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('vendors')}>
-            Vendors <span className={styles.count}>{vendors.length}</span>
+            {purT('tabVendors')} <span className={styles.count}>{vendors.length}</span>
           </button>
         </div>
       </div>
@@ -221,11 +222,11 @@ export function Expenses() {
                   type="search"
                   value={filter.query ?? ''}
                   onChange={(e) => patch({ query: e.target.value })}
-                  placeholder="Search vendor, bill no or GSTIN"
-                  aria-label="Search bills and expenses"
+                  placeholder={purT('searchPlaceholder')}
+                  aria-label={purT('searchLabel')}
                 />
               </label>
-              <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Filter by type">
+              <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label={purT('filterType')}>
                 {KINDS.map((k) => (
                   <button
                     key={k.id}
@@ -235,35 +236,35 @@ export function Expenses() {
                     className={filter.kind === k.id ? controls.segmentBtnActive : controls.segmentBtn}
                     onClick={() => patch({ kind: k.id })}
                   >
-                    {k.label}
+                    {purT(k.label)}
                   </button>
                 ))}
               </div>
             </div>
             <div className={styles.toolbarRow}>
-              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.status} onChange={(e) => patch({ status: e.target.value as PurchaseFilter['status'] })} aria-label="Filter by status">
-                <option value="ALL">All statuses</option>
+              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.status} onChange={(e) => patch({ status: e.target.value as PurchaseFilter['status'] })} aria-label={purT('filterStatus')}>
+                <option value="ALL">{purT('allStatuses')}</option>
                 {PURCHASE_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{purStatus(s)}</option>
                 ))}
               </select>
-              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.category} onChange={(e) => patch({ category: e.target.value })} aria-label="Filter by category">
-                <option value="ALL">All categories</option>
+              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.category} onChange={(e) => patch({ category: e.target.value })} aria-label={purT('filterCategory')}>
+                <option value="ALL">{purT('allCategories')}</option>
                 {PURCHASE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{purCategory(c)}</option>
                 ))}
               </select>
               <label className={styles.dateField}>
-                From
+                {purT('from')}
                 <input type="date" className={controls.input} value={filter.from ?? ''} max={filter.to || undefined} onChange={(e) => patch({ from: e.target.value })} />
               </label>
               <label className={styles.dateField}>
-                To
+                {purT('to')}
                 <input type="date" className={controls.input} value={filter.to ?? ''} min={filter.from || undefined} onChange={(e) => patch({ to: e.target.value })} />
               </label>
               {hasFilters && (
                 <button type="button" className={controls.btnGhost} onClick={() => setFilter({ kind: 'ALL', status: 'ALL', category: 'ALL' })}>
-                  Clear
+                  {purT('clear')}
                 </button>
               )}
             </div>
@@ -317,9 +318,9 @@ export function Expenses() {
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this entry?"
-        message={`${deleting?.vendor_name ?? ''}${deleting?.bill_number ? ` (${deleting.bill_number})` : ''} and its payment history will be permanently removed from this device.`}
-        confirmLabel="Delete"
+        title={purT('deleteTitle')}
+        message={purT('deleteMessage', { name: `${deleting?.vendor_name ?? ''}${deleting?.bill_number ? ` (${deleting.bill_number})` : ''}` })}
+        confirmLabel={purT('delete')}
         onConfirm={() => deleting && remove(deleting)}
         onClose={() => setDeleting(null)}
       />

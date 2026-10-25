@@ -4,6 +4,8 @@ import { DEFAULT_BANK_ID, bankAccountsDb, type BankAccount } from '../../lib/ban
 import type { BankStatement } from '../../lib/bank-recon';
 import { generateId } from '../../lib/storage';
 import { formatMoney } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import bank from './reconcile.module.css';
@@ -39,6 +41,7 @@ const toDraft = (a?: BankAccount): Draft => ({
  * second and the BRS, imports and payment forms let you choose the account.
  */
 export function BankAccountsCard({ accounts, statements, payments, onChange, notify }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const [draft, setDraft] = useState<Draft | null>(null);
   const inUse = (id: string) => statements.some((s) => s.bank_account_id === id) || payments.some((p) => p.bank_account_id === id);
 
@@ -46,8 +49,8 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
     e.preventDefault();
     if (!draft) return;
     const opening = draft.opening.trim() === '' ? undefined : Number(draft.opening);
-    if (opening !== undefined && !Number.isFinite(opening)) return notify('Enter a valid opening balance.', 'error');
-    if (opening !== undefined && !draft.opening_as_of) return notify('Choose the date of the opening balance.', 'error');
+    if (opening !== undefined && !Number.isFinite(opening)) return notify(bankT('errOpening'), 'error');
+    if (opening !== undefined && !draft.opening_as_of) return notify(bankT('errOpeningDate'), 'error');
     try {
       const existing = accounts.find((a) => a.id === draft.id);
       bankAccountsDb.save({
@@ -87,18 +90,17 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
     <section className={surface.card} aria-labelledby="bank-accounts-title" style={{ marginBottom: '1rem' }}>
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon} id="bank-accounts-title">
-          <Landmark size={16} /> Bank accounts
+          <Landmark size={16} /> {bankT('bankAccounts')}
         </span>
         {!draft && (
           <button type="button" className={controls.btnOutline} onClick={() => setDraft(toDraft())}>
-            <Plus size={16} /> Add account
+            <Plus size={16} /> {bankT('addAccount')}
           </button>
         )}
       </div>
       <div className={surface.cardBody}>
         <p className={surface.sectionNote} style={{ marginTop: 0 }}>
-          Keep more than one bank account? Add them here: each statement, receipt and supplier payment can then name its account,
-          and each account reconciles on its own. Give each account its own opening balance; the Books bank opening stays the total.
+          {bankT('accountsNote')}
         </p>
         <div className={bank.stack}>
           {accounts.map((a) => (
@@ -106,16 +108,16 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
               <span>
                 <strong>{a.name}</strong>
                 {a.number ? ` · ${a.number}` : ''}
-                {a.opening !== undefined && a.opening_as_of ? ` · opening ₹${formatMoney(a.opening)} on ${a.opening_as_of}` : ''}
-                {a.active === false ? ' · inactive' : ''}
+                {a.opening !== undefined && a.opening_as_of ? bankT('openingOn', { amount: `₹${formatMoney(a.opening)}`, date: a.opening_as_of }) : ''}
+                {a.active === false ? bankT('inactive') : ''}
               </span>
               <span className={bank.toolbarGroup}>
-                <button type="button" className={controls.btnOutline} onClick={() => setDraft(toDraft(a))}>Edit</button>
+                <button type="button" className={controls.btnOutline} onClick={() => setDraft(toDraft(a))}>{bankT('edit')}</button>
                 {a.id !== DEFAULT_BANK_ID && (
-                  <button type="button" className={controls.btnOutline} onClick={() => toggle(a)}>{a.active === false ? 'Reactivate' : 'Deactivate'}</button>
+                  <button type="button" className={controls.btnOutline} onClick={() => toggle(a)}>{a.active === false ? bankT('reactivate') : bankT('deactivate')}</button>
                 )}
                 {a.id !== DEFAULT_BANK_ID && !inUse(a.id) && (
-                  <button type="button" className={controls.btnOutline} onClick={() => remove(a)}>Delete</button>
+                  <button type="button" className={controls.btnOutline} onClick={() => remove(a)}>{bankT('delete')}</button>
                 )}
               </span>
             </div>
@@ -125,28 +127,28 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
           <form onSubmit={save} className={bank.stack} style={{ marginTop: '1rem' }}>
             <div className={controls.row}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="ba-name">Account name</label>
-                <input id="ba-name" className={controls.input} value={draft.name} autoFocus onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. ICICI current account" />
+                <label className={controls.label} htmlFor="ba-name">{bankT('accountName')}</label>
+                <input id="ba-name" className={controls.input} value={draft.name} autoFocus onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={bankT('accountNamePh')} />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="ba-number">Account (last digits, optional)</label>
-                <input id="ba-number" className={controls.input} value={draft.number} onChange={(e) => setDraft({ ...draft, number: e.target.value })} placeholder="e.g. ••4521" />
+                <label className={controls.label} htmlFor="ba-number">{bankT('accountNumber')}</label>
+                <input id="ba-number" className={controls.input} value={draft.number} onChange={(e) => setDraft({ ...draft, number: e.target.value })} placeholder={bankT('accountNumberPh')} />
               </div>
             </div>
             <div className={controls.row}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="ba-opening">Opening balance (₹, optional)</label>
+                <label className={controls.label} htmlFor="ba-opening">{bankT('openingBalance')}</label>
                 <input id="ba-opening" className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={draft.opening}
                   onChange={(e) => setDraft({ ...draft, opening: e.target.value.replace(/[^0-9.-]/g, '') })} />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="ba-asof">As of</label>
+                <label className={controls.label} htmlFor="ba-asof">{bankT('asOf')}</label>
                 <input id="ba-asof" type="date" className={controls.input} value={draft.opening_as_of} onChange={(e) => setDraft({ ...draft, opening_as_of: e.target.value })} />
               </div>
             </div>
             <div className={bank.toolbarGroup}>
-              <button type="submit" className={controls.btnPrimary}>Save account</button>
-              <button type="button" className={controls.btnOutline} onClick={() => setDraft(null)}>Cancel</button>
+              <button type="submit" className={controls.btnPrimary}>{bankT('saveAccount')}</button>
+              <button type="button" className={controls.btnOutline} onClick={() => setDraft(null)}>{bankT('cancel')}</button>
             </div>
           </form>
         )}

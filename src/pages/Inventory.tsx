@@ -29,6 +29,8 @@ import { DEFAULT_EXPIRY_ALERT_DAYS } from '../lib/inventory';
 import { expiringBatches, godownSummary, liveTrackingInputs, computeTracking } from '../lib/stock-tracking';
 import { godownsDb } from '../lib/godowns';
 import { MAIN_GODOWN_ID } from '../types/stock';
+import { useT } from '../i18n';
+import { invT } from '../i18n/areas/inventory';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
@@ -50,6 +52,7 @@ function download(filename: string, csv: string) {
 }
 
 export function Inventory() {
+  useT(); // re-render on a language switch (5.4)
   const [version, setVersion] = useState(0);
   const [settings, setSettings] = useState<InventorySettings>(() => loadSettings());
   const [searchParams] = useSearchParams();
@@ -97,10 +100,10 @@ export function Inventory() {
   const godownRows = useMemo(() => (multi ? godownSummary(tracking) : []), [multi, tracking]);
   const transfersUse = useMemo(() => new Set(transfers.flatMap((t) => [t.from_godown, t.to_godown])), [transfers]);
   const tabs = ([
-    ['summary', 'Stock summary'], ['movement', 'Movement'], ['dead', 'Dead stock'], ['margin', 'Margin'],
-    ...(showBatches ? [['batches', 'Batches & expiry']] : []),
-    ...(multi ? [['godowns', 'Godowns'], ['transfers', 'Transfers']] : []),
-    ...(showSerials ? [['serials', 'Serial lookup']] : []),
+    ['summary', invT('tabSummary')], ['movement', invT('tabMovement')], ['dead', invT('tabDead')], ['margin', invT('tabMargin')],
+    ...(showBatches ? [['batches', invT('tabBatches')]] : []),
+    ...(multi ? [['godowns', invT('tabGodowns')], ['transfers', invT('tabTransfers')]] : []),
+    ...(showSerials ? [['serials', invT('tabSerials')]] : []),
   ] as [Tab, string][]);
   const activeTab: Tab = tabs.some(([k]) => k === tab) ? tab : 'summary';
 
@@ -110,7 +113,7 @@ export function Inventory() {
       refresh();
       notify(okMsg);
     } catch (err) {
-      notify(err instanceof StorageWriteError ? err.message : 'Could not save changes.', 'error');
+      notify(err instanceof StorageWriteError ? err.message : invT('saveFailed'), 'error');
     }
   };
 
@@ -118,7 +121,7 @@ export function Inventory() {
     try {
       saveSettings(next);
     } catch {
-      notify('Could not save inventory settings.', 'error');
+      notify(invT('settingsFailed'), 'error');
     }
     setSettings(next);
   };
@@ -152,7 +155,7 @@ export function Inventory() {
           }),
         );
       }
-    }, `Imported ${catalogueMissing.length} item${catalogueMissing.length === 1 ? '' : 's'} from your catalogue`);
+    }, invT(catalogueMissing.length === 1 ? 'importedOne' : 'importedMany', { n: catalogueMissing.length }));
 
   const adjustPos = positions.find((p) => p.item.id === adjustId) ?? null;
   const ledgerPos = positions.find((p) => p.item.id === ledgerId) ?? null;
@@ -179,60 +182,60 @@ export function Inventory() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Inventory"
-        subtitle="Live stock from your invoices, purchases and adjustments — nothing is edited on your documents."
+        title={invT('title')}
+        subtitle={invT('subtitle')}
         actions={
           <>
             <button type="button" className={controls.btnOutline} onClick={() => download(`stock-summary-${todayInput()}.csv`, stockSummaryCsv(positions))} disabled={!hasItems}>
-              <Download size={16} aria-hidden="true" /> Export CSV
+              <Download size={16} aria-hidden="true" /> {invT('exportCsv')}
             </button>
             <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}>
-              <Plus size={16} aria-hidden="true" /> Add item
+              <Plus size={16} aria-hidden="true" /> {invT('addItem')}
             </button>
           </>
         }
       />
 
       <div className={surface.statGrid}>
-        <StatCard label="Stock value" value={`₹ ${formatMoney(totals.stockValue)}`} hint={`${settings.method === 'FIFO' ? 'FIFO' : 'Weighted average'} costing`} icon={Boxes} />
-        <StatCard label="SKUs" value={String(totals.skus)} hint={`${totals.tracked} tracked`} icon={PackagePlus} />
-        <StatCard label="Low stock" value={String(totals.lowCount)} hint={`${totals.outCount} out of stock`} icon={TrendingDown} tone={totals.lowCount ? 'warning' : 'default'} />
-        <StatCard label="Negative stock" value={String(totals.negativeCount)} hint={totals.negativeCount ? 'Sold more than recorded' : 'All balances valid'} icon={AlertTriangle} tone={totals.negativeCount ? 'loss' : 'default'} />
+        <StatCard label={invT('statValue')} value={`₹ ${formatMoney(totals.stockValue)}`} hint={settings.method === 'FIFO' ? invT('costingFifo') : invT('costingAvg')} icon={Boxes} />
+        <StatCard label={invT('statSkus')} value={String(totals.skus)} hint={invT('tracked', { n: totals.tracked })} icon={PackagePlus} />
+        <StatCard label={invT('statLow')} value={String(totals.lowCount)} hint={invT('outCount', { n: totals.outCount })} icon={TrendingDown} tone={totals.lowCount ? 'warning' : 'default'} />
+        <StatCard label={invT('statNegative')} value={String(totals.negativeCount)} hint={totals.negativeCount ? invT('soldMore') : invT('allValid')} icon={AlertTriangle} tone={totals.negativeCount ? 'loss' : 'default'} />
       </div>
 
       <div className={surface.card}>
         <div className={styles.settingsBar}>
           <label className="inline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span className={controls.label}>Costing</span>
+            <span className={controls.label}>{invT('costing')}</span>
             <select
               className={cn(controls.select, styles.methodSelect)} value={settings.method}
               onChange={(e) => updateSettings({ ...settings, method: e.target.value as CostingMethod })}
-              aria-label="Costing method"
+              aria-label={invT('costingMethod')}
             >
-              <option value="WEIGHTED_AVG">Weighted average</option>
+              <option value="WEIGHTED_AVG">{invT('weightedAvg')}</option>
               <option value="FIFO">FIFO</option>
             </select>
           </label>
           <label className={controls.check}>
             <input type="checkbox" checked={settings.includeChallans} onChange={(e) => updateSettings({ ...settings, includeChallans: e.target.checked })} />
-            Delivery challans reduce stock
+            {invT('challans')}
           </label>
           {showBatches && (
             <label className="inline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className={controls.label}>Expiry alert (days)</span>
+              <span className={controls.label}>{invT('expiryAlert')}</span>
               <input
                 type="number" min={1} max={3650} className={cn(controls.input, controls.inputNumeric)} style={{ width: '5.5rem' }}
-                value={expiryDays} aria-label="Expiry alert window in days"
+                value={expiryDays} aria-label={invT('expiryAlertAria')}
                 onChange={(e) => updateSettings({ ...settings, expiryAlertDays: Math.min(3650, Math.max(1, Math.round(Number(e.target.value) || DEFAULT_EXPIRY_ALERT_DAYS))) })}
               />
             </label>
           )}
           {multi && (
             <label className="inline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className={controls.label}>Default godown</span>
+              <span className={controls.label}>{invT('defaultGodown')}</span>
               <select
                 className={cn(controls.select, styles.methodSelect)} value={godowns.some((g) => g.id === settings.defaultGodown) ? settings.defaultGodown : MAIN_GODOWN_ID}
-                aria-label="Default godown for new bill and invoice lines"
+                aria-label={invT('defaultGodownAria')}
                 onChange={(e) => updateSettings({ ...settings, defaultGodown: e.target.value === MAIN_GODOWN_ID ? undefined : e.target.value })}
               >
                 {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -240,17 +243,17 @@ export function Inventory() {
             </label>
           )}
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setGodownsOpen(true)}>
-            <Warehouse size={14} aria-hidden="true" /> Godowns{multi ? ` (${godowns.length})` : ''}
+            <Warehouse size={14} aria-hidden="true" /> {invT('godowns')}{multi ? ` (${godowns.length})` : ''}
           </button>
           {catalogueMissing.length > 0 && (
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={importCatalogue}>
-              <ArrowDownToLine size={14} /> Import {catalogueMissing.length} from catalogue
+              <ArrowDownToLine size={14} /> {invT('importFromCatalogueN', { n: catalogueMissing.length })}
             </button>
           )}
         </div>
 
         <div className={styles.toolbar}>
-          <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Inventory reports">
+          <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label={invT('reports')}>
             {tabs.map(([k, label]) => (
               <button key={k} type="button" role="tab" aria-selected={activeTab === k} className={activeTab === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(k)}>
                 {label}
@@ -262,28 +265,28 @@ export function Inventory() {
               <div className={styles.search}>
                 <Search size={16} className={styles.searchIcon} aria-hidden />
                 <input
-                  type="search" className={cn(controls.input, styles.searchInput)} placeholder="Search name, SKU, HSN, location"
-                  value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search stock items"
+                  type="search" className={cn(controls.input, styles.searchInput)} placeholder={invT('searchPh')}
+                  value={query} onChange={(e) => setQuery(e.target.value)} aria-label={invT('searchAria')}
                 />
               </div>
-              <select className={cn(controls.select, styles.methodSelect)} value={filter} onChange={(e) => setFilter(e.target.value as Filter)} aria-label="Filter by status">
-                <option value="all">All items</option>
-                <option value="low">Low stock</option>
-                <option value="out">Out of stock</option>
-                <option value="negative">Negative</option>
-                <option value="untracked">Not tracked</option>
+              <select className={cn(controls.select, styles.methodSelect)} value={filter} onChange={(e) => setFilter(e.target.value as Filter)} aria-label={invT('filterStatus')}>
+                <option value="all">{invT('allItems')}</option>
+                <option value="low">{invT('st.low')}</option>
+                <option value="out">{invT('st.out')}</option>
+                <option value="negative">{invT('st.negative')}</option>
+                <option value="untracked">{invT('st.untracked')}</option>
               </select>
             </>
           )}
           {activeTab === 'movement' && (
             <div className={styles.dateRange}>
-              <div className={controls.field}><label className={controls.label} htmlFor="inv-from">From</label><input id="inv-from" type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-              <div className={controls.field}><label className={controls.label} htmlFor="inv-to">To</label><input id="inv-to" type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <div className={controls.field}><label className={controls.label} htmlFor="inv-from">{invT('from')}</label><input id="inv-from" type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <div className={controls.field}><label className={controls.label} htmlFor="inv-to">{invT('to')}</label><input id="inv-to" type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </div>
           )}
           {activeTab === 'dead' && (
             <label className={controls.field} style={{ maxWidth: 180 }}>
-              <span className={controls.label}>No movement for (days)</span>
+              <span className={controls.label}>{invT('noMovementDays')}</span>
               <input type="number" min={1} className={cn(controls.input, controls.inputNumeric)} value={deadDays} onChange={(e) => setDeadDays(Math.max(1, Number(e.target.value) || 1))} />
             </label>
           )}
@@ -291,19 +294,19 @@ export function Inventory() {
 
         {expiring.length > 0 && activeTab === 'summary' && (
           <div className={styles.warnings} role="alert">
-            <strong><AlertTriangle size={14} style={{ verticalAlign: '-2px' }} /> Expiry</strong>
+            <strong><AlertTriangle size={14} style={{ verticalAlign: '-2px' }} /> {invT('expiry')}</strong>
             <span>
-              {expiring.filter((r) => r.daysLeft < 0).length} batch(es) expired and {expiring.filter((r) => r.daysLeft >= 0).length} expiring within {expiryDays} days.{' '}
-              <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setTab('batches')}>Review batches</button>
+              {invT('expiryWarn', { expired: expiring.filter((r) => r.daysLeft < 0).length, soon: expiring.filter((r) => r.daysLeft >= 0).length, days: expiryDays })}{' '}
+              <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setTab('batches')}>{invT('reviewBatches')}</button>
             </span>
           </div>
         )}
 
         {negatives.length > 0 && activeTab === 'summary' && (
           <div className={styles.warnings} role="alert">
-            <strong><AlertTriangle size={14} style={{ verticalAlign: '-2px' }} /> Negative stock</strong>
+            <strong><AlertTriangle size={14} style={{ verticalAlign: '-2px' }} /> {invT('statNegative')}</strong>
             <span>
-              {negatives.map((p) => `${p.item.name} (${p.qty} ${p.item.unit})`).join(', ')} — invoices sold more than your purchases and opening stock record. Add a purchase or an adjustment to correct it.
+              {invT('negWarn', { list: negatives.map((p) => `${p.item.name} (${p.qty} ${p.item.unit})`).join(', ') })}
             </span>
           </div>
         )}
@@ -311,13 +314,13 @@ export function Inventory() {
         {!hasItems ? (
           <EmptyState
             icon={Boxes}
-            title="No stock items yet"
-            text="Add the products you sell with an opening quantity. Sales on invoices will reduce stock automatically; purchases add to it."
+            title={invT('emptyTitle')}
+            text={invT('emptyText')}
             action={
               <div className={surface.pageActions} style={{ justifyContent: 'center' }}>
-                <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}><Plus size={16} /> Add first item</button>
+                <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}><Plus size={16} /> {invT('addFirst')}</button>
                 {catalogueMissing.length > 0 && (
-                  <button type="button" className={controls.btnOutline} onClick={importCatalogue}><ArrowDownToLine size={16} /> Import from catalogue</button>
+                  <button type="button" className={controls.btnOutline} onClick={importCatalogue}><ArrowDownToLine size={16} /> {invT('importFromCatalogue')}</button>
                 )}
               </div>
             }
@@ -328,13 +331,13 @@ export function Inventory() {
               <table className={surface.table}>
                 <thead>
                   <tr>
-                    <th>Item</th><th className={surface.numeric}>Qty</th><th className={surface.numeric}>Avg cost</th>
-                    <th className={surface.numeric}>Value</th><th className={surface.numeric}>Reorder</th><th>Status</th>
-                    <th><span className={surface.srOnly}>Actions</span></th>
+                    <th>{invT('thItem')}</th><th className={surface.numeric}>{invT('thQty')}</th><th className={surface.numeric}>{invT('thAvgCost')}</th>
+                    <th className={surface.numeric}>{invT('thValue')}</th><th className={surface.numeric}>{invT('thReorder')}</th><th>{invT('thStatus')}</th>
+                    <th><span className={surface.srOnly}>{invT('thActions')}</span></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0 && <tr><td colSpan={7} className={styles.itemMeta}>No items match.</td></tr>}
+                  {filtered.length === 0 && <tr><td colSpan={7} className={styles.itemMeta}>{invT('noItemsMatch')}</td></tr>}
                   {filtered.map((p) => (
                     <tr key={p.item.id}>
                       <td>{nameCell(p)}</td>
@@ -345,10 +348,10 @@ export function Inventory() {
                       <td><StockChip status={p.status} /></td>
                       <td>
                         <span className={surface.rowActions}>
-                          <button type="button" className={controls.btnIcon} title="Stock ledger" aria-label={`Ledger for ${p.item.name}`} onClick={() => setLedgerId(p.item.id)}><BookOpen size={16} /></button>
-                          {p.item.track_stock && <button type="button" className={controls.btnIcon} title="Adjust stock" aria-label={`Adjust ${p.item.name}`} onClick={() => setAdjustId(p.item.id)}><SlidersHorizontal size={16} /></button>}
-                          <button type="button" className={controls.btnIcon} title="Edit item" aria-label={`Edit ${p.item.name}`} onClick={() => setEditing({ item: p.item, isNew: false })}><Edit3 size={16} /></button>
-                          <button type="button" className={controls.btnDanger} title="Delete item" aria-label={`Delete ${p.item.name}`} onClick={() => setDeleting(p.item)}><Trash2 size={16} /></button>
+                          <button type="button" className={controls.btnIcon} title={invT('ledger')} aria-label={invT('ledgerFor', { name: p.item.name })} onClick={() => setLedgerId(p.item.id)}><BookOpen size={16} /></button>
+                          {p.item.track_stock && <button type="button" className={controls.btnIcon} title={invT('adjust')} aria-label={invT('adjustNamed', { name: p.item.name })} onClick={() => setAdjustId(p.item.id)}><SlidersHorizontal size={16} /></button>}
+                          <button type="button" className={controls.btnIcon} title={invT('editItem')} aria-label={invT('editNamed', { name: p.item.name })} onClick={() => setEditing({ item: p.item, isNew: false })}><Edit3 size={16} /></button>
+                          <button type="button" className={controls.btnDanger} title={invT('deleteItem')} aria-label={invT('deleteNamed', { name: p.item.name })} onClick={() => setDeleting(p.item)}><Trash2 size={16} /></button>
                         </span>
                       </td>
                     </tr>
@@ -361,8 +364,8 @@ export function Inventory() {
               <table className={surface.table}>
                 <thead>
                   <tr>
-                    <th>Item</th><th className={surface.numeric}>Opening</th><th className={surface.numeric}>In</th>
-                    <th className={surface.numeric}>Out</th><th className={surface.numeric}>Closing</th><th className={surface.numeric}>Closing value</th>
+                    <th>{invT('thItem')}</th><th className={surface.numeric}>{invT('thOpening')}</th><th className={surface.numeric}>{invT('thIn')}</th>
+                    <th className={surface.numeric}>{invT('thOut')}</th><th className={surface.numeric}>{invT('thClosing')}</th><th className={surface.numeric}>{invT('thClosingValue')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -376,7 +379,7 @@ export function Inventory() {
                       <td className={surface.numeric}>{formatMoney(m.closingValue)}</td>
                     </tr>
                   ))}
-                  {movement.length === 0 && <tr><td colSpan={6} className={styles.itemMeta}>No tracked items.</td></tr>}
+                  {movement.length === 0 && <tr><td colSpan={6} className={styles.itemMeta}>{invT('noTracked')}</td></tr>}
                 </tbody>
               </table>
             )}
@@ -384,7 +387,7 @@ export function Inventory() {
             {activeTab === 'dead' && (
               <table className={surface.table}>
                 <thead>
-                  <tr><th>Item</th><th className={surface.numeric}>Qty</th><th className={surface.numeric}>Value locked</th><th>Last movement</th><th className={surface.numeric}>Days idle</th></tr>
+                  <tr><th>{invT('thItem')}</th><th className={surface.numeric}>{invT('thQty')}</th><th className={surface.numeric}>{invT('thValueLocked')}</th><th>{invT('thLastMovement')}</th><th className={surface.numeric}>{invT('thDaysIdle')}</th></tr>
                 </thead>
                 <tbody>
                   {dead.map((d) => (
@@ -392,11 +395,11 @@ export function Inventory() {
                       <td>{nameCell(d.position)}</td>
                       <td className={surface.numeric}>{d.position.qty} {d.position.item.unit}</td>
                       <td className={surface.numeric}>{formatMoney(d.position.value)}</td>
-                      <td>{d.lastMovement ? formatDate(d.lastMovement) : 'Never'}</td>
+                      <td>{d.lastMovement ? formatDate(d.lastMovement) : invT('never')}</td>
                       <td className={surface.numeric}>{d.daysIdle}</td>
                     </tr>
                   ))}
-                  {dead.length === 0 && <tr><td colSpan={5} className={styles.itemMeta}>Nothing has been idle for {deadDays}+ days.</td></tr>}
+                  {dead.length === 0 && <tr><td colSpan={5} className={styles.itemMeta}>{invT('nothingIdle', { n: deadDays })}</td></tr>}
                 </tbody>
               </table>
             )}
@@ -409,9 +412,9 @@ export function Inventory() {
               <table className={surface.table}>
                 <thead>
                   <tr>
-                    <th>Item</th>
+                    <th>{invT('thItem')}</th>
                     {godowns.map((g) => <th key={g.id} className={surface.numeric}>{g.name}</th>)}
-                    <th className={surface.numeric}>Total</th>
+                    <th className={surface.numeric}>{invT('thTotal')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -424,7 +427,7 @@ export function Inventory() {
                       <td className={surface.numeric}><strong>{r.total} {r.item.unit}</strong></td>
                     </tr>
                   ))}
-                  {godownRows.length === 0 && <tr><td colSpan={godowns.length + 2} className={styles.itemMeta}>No tracked items.</td></tr>}
+                  {godownRows.length === 0 && <tr><td colSpan={godowns.length + 2} className={styles.itemMeta}>{invT('noTracked')}</td></tr>}
                 </tbody>
               </table>
             )}
@@ -447,7 +450,7 @@ export function Inventory() {
             {activeTab === 'margin' && (
               <table className={surface.table}>
                 <thead>
-                  <tr><th>Item</th><th className={surface.numeric}>Sold</th><th className={surface.numeric}>Avg sale</th><th className={surface.numeric}>Avg cost</th><th className={surface.numeric}>Margin / unit</th><th className={surface.numeric}>Margin %</th><th className={surface.numeric}>Total margin</th></tr>
+                  <tr><th>{invT('thItem')}</th><th className={surface.numeric}>{invT('thSold')}</th><th className={surface.numeric}>{invT('thAvgSale')}</th><th className={surface.numeric}>{invT('thAvgCost')}</th><th className={surface.numeric}>{invT('thMarginUnit')}</th><th className={surface.numeric}>{invT('thMarginPct')}</th><th className={surface.numeric}>{invT('thTotalMargin')}</th></tr>
                 </thead>
                 <tbody>
                   {margins.map((m) => (
@@ -461,7 +464,7 @@ export function Inventory() {
                       <td className={cn(surface.numeric, m.totalMargin < 0 && styles.negative)}>{formatMoney(m.totalMargin)}</td>
                     </tr>
                   ))}
-                  {margins.length === 0 && <tr><td colSpan={7} className={styles.itemMeta}>No tracked items.</td></tr>}
+                  {margins.length === 0 && <tr><td colSpan={7} className={styles.itemMeta}>{invT('noTracked')}</td></tr>}
                 </tbody>
               </table>
             )}
@@ -476,7 +479,7 @@ export function Inventory() {
         takenNames={takenNames}
         onClose={() => setEditing(null)}
         onSave={(item) => {
-          guard(() => stockDb.saveItem(item), editing?.isNew ? 'Item added' : 'Item updated');
+          guard(() => stockDb.saveItem(item), editing?.isNew ? invT('itemAdded') : invT('itemUpdated'));
           setEditing(null);
         }}
       />
@@ -488,7 +491,7 @@ export function Inventory() {
         defaultGodown={settings.defaultGodown}
         onClose={() => setAdjustId(null)}
         onSave={(move: StockMove) => {
-          guard(() => stockDb.addMove(move), 'Stock adjusted');
+          guard(() => stockDb.addMove(move), invT('stockAdjusted'));
           setAdjustId(null);
         }}
       />
@@ -496,7 +499,7 @@ export function Inventory() {
         open={!!ledgerPos}
         position={ledgerPos}
         onClose={() => setLedgerId(null)}
-        onDeleteMove={(id) => guard(() => stockDb.deleteMove(id), 'Adjustment removed')}
+        onDeleteMove={(id) => guard(() => stockDb.deleteMove(id), invT('adjRemoved'))}
         onDownload={download}
       />
       <GodownsModal
@@ -510,11 +513,11 @@ export function Inventory() {
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete stock item?"
-        message={`"${deleting?.name ?? ''}" and its manual adjustments will be removed. Invoices are not affected.`}
-        confirmLabel="Delete"
+        title={invT('deleteTitle')}
+        message={invT('deleteMessage', { name: deleting?.name ?? '' })}
+        confirmLabel={invT('delete')}
         onClose={() => setDeleting(null)}
-        onConfirm={() => deleting && guard(() => stockDb.deleteItem(deleting.id), 'Item deleted')}
+        onConfirm={() => deleting && guard(() => stockDb.deleteItem(deleting.id), invT('itemDeleted'))}
       />
       {toastNode}
     </div>

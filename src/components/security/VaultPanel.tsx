@@ -12,6 +12,8 @@ import { hasBackupEncryption, getConfig } from '../../lib/auto-backup';
 import '../../lib/backup'; // registers the undo-copy hook for vault switches
 import '../../lib/sync-keystore'; // and the folder-sync key hook (sealed with the vault key)
 import { MIN_PASSPHRASE } from '../../lib/vault';
+import { useT } from '../../i18n';
+import { secT } from '../../i18n/areas/security';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Security.module.css';
@@ -21,6 +23,7 @@ type Mode = 'idle' | 'enable' | 'change' | 'disable';
 
 /** Settings → Security → Vault mode (5.8): encrypt the whole store on this device. */
 export function VaultPanel({ notify }: { notify: Notify }) {
+  useT(); // re-render on a language switch (5.4)
   const [on, setOn] = useState(vaultEnabled);
   const [mode, setMode] = useState<Mode>('idle');
   const [current, setCurrent] = useState('');
@@ -57,23 +60,23 @@ export function VaultPanel({ notify }: { notify: Notify }) {
     e.preventDefault();
     setError('');
     if (mode !== 'disable') {
-      if (pass.length < MIN_PASSPHRASE) return setError(`Use a passphrase of at least ${MIN_PASSPHRASE} characters.`);
-      if (pass !== again) return setError('The passphrases do not match.');
+      if (pass.length < MIN_PASSPHRASE) return setError(secT('errShortPass', { n: MIN_PASSPHRASE }));
+      if (pass !== again) return setError(secT('errPassMismatch'));
     }
-    if (mode === 'enable' && !ack) return setError('Tick the box to confirm you understand there is no recovery.');
+    if (mode === 'enable' && !ack) return setError(secT('errAck'));
     setBusy(true);
     try {
       if (mode === 'enable') {
         await enableVault(pass);
         setOn(true);
-        notify('Vault mode is on. Your data on this device is now encrypted.');
+        notify(secT('vaultOn'));
       } else if (mode === 'change') {
         await changeVaultPassphrase(current, pass);
-        notify('Vault passphrase changed.');
+        notify(secT('vaultChanged'));
       } else if (mode === 'disable') {
         await disableVault(current);
         setOn(false);
-        notify('Vault mode is off. Data on this device is stored readable again.', 'info');
+        notify(secT('vaultOff'), 'info');
       }
       reset();
     } catch (err) {
@@ -87,32 +90,28 @@ export function VaultPanel({ notify }: { notify: Notify }) {
     <section className={surface.card} aria-labelledby="vault-title">
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon} id="vault-title">
-          <LockKeyhole size={16} /> Vault mode
+          <LockKeyhole size={16} /> {secT('vaultMode')}
         </span>
-        <span className={on ? styles.badgeOk : styles.badge}>{on ? 'On' : 'Off'}</span>
+        <span className={on ? styles.badgeOk : styles.badge}>{on ? secT('on') : secT('off')}</span>
       </div>
       <div className={surface.cardBody}>
         <div className={styles.form}>
           <div className={styles.note}>
             <ShieldCheck size={16} />
-            <span>
-              Encrypts everything this app stores on this device (invoices, clients, books, settings) with AES-256. The key is unlocked
-              by a passphrase you type each time the app opens, so someone who copies this browser&rsquo;s data cannot read it. Unlike
-              the PIN, this protects the stored data itself. While the app is open and unlocked, the data is in memory as usual.
-            </span>
+            <span>{secT('vaultIntro')}</span>
           </div>
 
           {!supported && (
             <div className={styles.note} role="status">
               <AlertTriangle size={16} />
-              <span>Vault mode needs this browser&rsquo;s database (IndexedDB) and a secure (https) page, which are not available here.</span>
+              <span>{secT('vaultUnsupported')}</span>
             </div>
           )}
 
           {on && plainFolderBackup && (
             <div className={styles.note} role="status">
               <AlertTriangle size={16} />
-              <span>Automatic folder backups are not encrypted. Set a backup passphrase under Data &amp; backup so copies outside the vault are protected too.</span>
+              <span>{secT('plainFolder')}</span>
             </div>
           )}
 
@@ -120,19 +119,19 @@ export function VaultPanel({ notify }: { notify: Notify }) {
             <div className={styles.buttons}>
               {!on && (
                 <button type="button" className={controls.btnPrimary} disabled={!supported} onClick={() => reset('enable')}>
-                  <LockKeyhole size={16} /> Turn on vault mode
+                  <LockKeyhole size={16} /> {secT('turnOn')}
                 </button>
               )}
               {on && (
                 <>
                   <button type="button" className={controls.btnOutline} onClick={() => reloadAfterFlush()}>
-                    Lock vault now
+                    {secT('lockVault')}
                   </button>
                   <button type="button" className={controls.btnOutline} onClick={() => reset('change')}>
-                    Change passphrase
+                    {secT('changePass')}
                   </button>
                   <button type="button" className={controls.btnOutline} onClick={() => reset('disable')}>
-                    Turn off
+                    {secT('turnOff')}
                   </button>
                 </>
               )}
@@ -143,14 +142,13 @@ export function VaultPanel({ notify }: { notify: Notify }) {
                 <div className={styles.note} role="note">
                   <AlertTriangle size={16} />
                   <span>
-                    <strong>There is no recovery.</strong> If you forget this passphrase, the data on this device cannot be opened by anyone.
-                    Keep a backup (preferably encrypted) somewhere else.
+                    <strong>{secT('noRecovery')}</strong> {secT('noRecoveryText')}
                   </span>
                 </div>
               )}
               {(mode === 'change' || mode === 'disable') && (
                 <div className={controls.field}>
-                  <label className={controls.label} htmlFor="vault-current">Current passphrase</label>
+                  <label className={controls.label} htmlFor="vault-current">{secT('currentPass')}</label>
                   <input id="vault-current" className={controls.input} type="password" autoComplete="current-password" value={current}
                     onChange={(e) => setCurrent(e.target.value)} />
                 </div>
@@ -158,12 +156,12 @@ export function VaultPanel({ notify }: { notify: Notify }) {
               {mode !== 'disable' && (
                 <div className={styles.passRow}>
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor="vault-pass">{mode === 'change' ? 'New passphrase' : 'Passphrase'}</label>
+                    <label className={controls.label} htmlFor="vault-pass">{mode === 'change' ? secT('newPass') : secT('passphrase')}</label>
                     <input id="vault-pass" className={controls.input} type="password" autoComplete="new-password" value={pass}
-                      onChange={(e) => setPass(e.target.value)} placeholder={`At least ${MIN_PASSPHRASE} characters`} />
+                      onChange={(e) => setPass(e.target.value)} placeholder={secT('atLeast', { n: MIN_PASSPHRASE })} />
                   </div>
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor="vault-pass2">Repeat passphrase</label>
+                    <label className={controls.label} htmlFor="vault-pass2">{secT('repeatPass')}</label>
                     <input id="vault-pass2" className={`${controls.input} ${again && again !== pass ? controls.inputInvalid : ''}`}
                       type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
                   </div>
@@ -172,16 +170,16 @@ export function VaultPanel({ notify }: { notify: Notify }) {
               {mode === 'enable' && (
                 <label className={styles.rowText} style={{ flexDirection: 'row', gap: '0.5rem', alignItems: 'center' }}>
                   <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-                  <span>I understand that a lost passphrase means lost data.</span>
+                  <span>{secT('ack')}</span>
                 </label>
               )}
               {error && <span className={controls.error} role="alert">{error}</span>}
               <div className={styles.buttons}>
                 <button type="submit" className={mode === 'disable' ? controls.btnDanger : controls.btnPrimary} disabled={busy}>
-                  {busy ? 'Working…' : mode === 'enable' ? 'Encrypt my data' : mode === 'change' ? 'Change passphrase' : 'Turn off vault mode'}
+                  {busy ? secT('working') : mode === 'enable' ? secT('encrypt') : mode === 'change' ? secT('changePass') : secT('turnOffVault')}
                 </button>
                 <button type="button" className={controls.btnOutline} onClick={() => reset()} disabled={busy}>
-                  Cancel
+                  {secT('cancel')}
                 </button>
               </div>
             </form>

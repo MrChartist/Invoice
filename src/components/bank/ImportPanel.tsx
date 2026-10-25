@@ -11,6 +11,8 @@ import {
   type ParsedStatement,
 } from '../../lib/bank-recon';
 import { formatDate, formatMoney } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './reconcile.module.css';
@@ -25,6 +27,7 @@ const MAP_FIELDS: ColumnField[] = ['date', 'narration', 'debit', 'credit', 'amou
 
 /** Choose / drop a bank CSV, check what was understood, fix the columns if needed, then import. */
 export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) {
+  useT(); // re-render on a language switch (5.4)
   const inputId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -45,7 +48,7 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
     if (!file) return;
     setReadError('');
     if (file.size > 8 * 1024 * 1024) {
-      setReadError('That file is over 8 MB — export a shorter period from your bank.');
+      setReadError(bankT('errTooBig'));
       return;
     }
     try {
@@ -59,7 +62,7 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
       setRemap(false);
       setBankLabel('');
     } catch (err) {
-      setReadError(err instanceof Error && err.name === 'ZipError' ? err.message : 'Could not read that file.');
+      setReadError(err instanceof Error && err.name === 'ZipError' ? err.message : bankT('errRead'));
     }
   };
 
@@ -100,10 +103,9 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
           }}
         >
           <span className={styles.dropIcon} aria-hidden="true"><FileUp size={24} /></span>
-          <h3 className={styles.dropTitle}>Import a bank statement</h3>
+          <h3 className={styles.dropTitle}>{bankT('importTitle')}</h3>
           <p className={styles.muted} style={{ maxWidth: 460 }}>
-            Download the statement as <strong>CSV</strong> or <strong>Excel (.xlsx)</strong> from your net banking (HDFC, ICICI, SBI, Axis, Kotak and most others work) and drop it here.
-            Nothing leaves your device.
+            {bankT('importText')}
           </p>
           <input
             ref={fileRef}
@@ -114,10 +116,10 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
             onChange={(e) => void load(e.target.files?.[0])}
           />
           <label htmlFor={inputId} className={controls.btnPrimary} style={{ cursor: 'pointer' }}>
-            <Upload size={16} /> Choose CSV / Excel file
+            <Upload size={16} /> {bankT('chooseFile')}
           </label>
           {readError && <div className={controls.error} role="alert">{readError}</div>}
-          {onCancel && <button type="button" className={controls.btnGhost} onClick={onCancel}>Cancel</button>}
+          {onCancel && <button type="button" className={controls.btnGhost} onClick={onCancel}>{bankT('cancel')}</button>}
         </div>
       )}
 
@@ -125,16 +127,16 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
         <div className={surface.card}>
           <div className={surface.cardHead}>
             <span>{fileName}</span>
-            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={reset}>Choose another file</button>
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={reset}>{bankT('chooseAnother')}</button>
           </div>
           <div className={surface.cardBody}>
             <div className={styles.previewMeta} role="status">
-              <span>Bank: <strong>{bankLabel || parsed.bankLabel}</strong></span>
-              <span><strong>{parsed.lines.length}</strong> transactions found</span>
-              <span><strong>{split.fresh.length}</strong> new</span>
-              {split.duplicates.length > 0 && <span><strong>{split.duplicates.length}</strong> already imported (will be skipped)</span>}
-              {parsed.skipped > 0 && <span>{parsed.skipped} non-transaction rows ignored</span>}
-              {parsed.openingBalance !== undefined && <span>Opening balance <strong>{formatMoney(parsed.openingBalance)}</strong></span>}
+              <span>{bankT('bankN')} <strong>{bankLabel || parsed.bankLabel}</strong></span>
+              <span><strong>{parsed.lines.length}</strong> {bankT('txFound')}</span>
+              <span><strong>{split.fresh.length}</strong> {bankT('newN')}</span>
+              {split.duplicates.length > 0 && <span><strong>{split.duplicates.length}</strong> {bankT('alreadyImported')}</span>}
+              {parsed.skipped > 0 && <span>{bankT('nonTx', { n: parsed.skipped })}</span>}
+              {parsed.openingBalance !== undefined && <span>{bankT('openingN')} <strong>{formatMoney(parsed.openingBalance)}</strong></span>}
             </div>
 
             {parsed.warnings.map((w) => (
@@ -156,14 +158,14 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
               <>
                 <div className={styles.previewScroll}>
                   <table className={styles.previewTable}>
-                    <caption className={surface.srOnly}>First transactions found in the file</caption>
+                    <caption className={surface.srOnly}>{bankT('firstTx')}</caption>
                     <thead>
                       <tr>
-                        <th scope="col">Date</th>
-                        <th scope="col">Narration</th>
-                        <th scope="col" style={{ textAlign: 'right' }}>Debit</th>
-                        <th scope="col" style={{ textAlign: 'right' }}>Credit</th>
-                        <th scope="col" style={{ textAlign: 'right' }}>Balance</th>
+                        <th scope="col">{bankT('thDate')}</th>
+                        <th scope="col">{bankT('thNarration')}</th>
+                        <th scope="col" style={{ textAlign: 'right' }}>{bankT('thDebit')}</th>
+                        <th scope="col" style={{ textAlign: 'right' }}>{bankT('thCredit')}</th>
+                        <th scope="col" style={{ textAlign: 'right' }}>{bankT('thBalance')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -179,9 +181,9 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
                     </tbody>
                   </table>
                 </div>
-                {parsed.lines.length > 8 && <p className={styles.muted}>…and {parsed.lines.length - 8} more.</p>}
+                {parsed.lines.length > 8 && <p className={styles.muted}>{bankT('andMoreN', { n: parsed.lines.length - 8 })}</p>}
                 <div className={controls.field} style={{ maxWidth: 320 }}>
-                  <label className={controls.label} htmlFor={`${inputId}-label`}>Bank / account label</label>
+                  <label className={controls.label} htmlFor={`${inputId}-label`}>{bankT('bankLabel')}</label>
                   <input
                     id={`${inputId}-label`}
                     className={controls.input}
@@ -192,12 +194,12 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
                 </div>
                 <div className={styles.toolbarGroup}>
                   <button type="button" className={controls.btnPrimary} disabled={split.fresh.length === 0} onClick={doImport}>
-                    Import {split.fresh.length} transaction{split.fresh.length === 1 ? '' : 's'}
+                    {bankT(split.fresh.length === 1 ? 'importOne' : 'importMany', { n: split.fresh.length })}
                   </button>
                   <button type="button" className={controls.btnOutline} onClick={() => setRemap(true)}>
-                    Columns look wrong?
+                    {bankT('columnsWrong')}
                   </button>
-                  {split.fresh.length === 0 && <span className={styles.muted}>Every line in this file is already imported.</span>}
+                  {split.fresh.length === 0 && <span className={styles.muted}>{bankT('allImported')}</span>}
                 </div>
               </>
             )}
@@ -218,9 +220,9 @@ function MappingStep({ parsed, onApply }: { parsed: ParsedStatement; onApply: (c
 
   return (
     <div className={styles.stack}>
-      <p className={styles.muted}>Tell us which column is which. We remember nothing — pick once per file.</p>
+      <p className={styles.muted}>{bankT('mapIntro')}</p>
       <div className={controls.field} style={{ maxWidth: 520 }}>
-        <label className={controls.label} htmlFor={`${id}-hr`}>Header row</label>
+        <label className={controls.label} htmlFor={`${id}-hr`}>{bankT('headerRow')}</label>
         <select
           id={`${id}-hr`}
           className={controls.select}
@@ -231,14 +233,14 @@ function MappingStep({ parsed, onApply }: { parsed: ParsedStatement; onApply: (c
           }}
         >
           {rows.slice(0, 25).map((r, i) => (
-            <option key={i} value={i}>Row {i + 1}: {r.filter(Boolean).join(' | ').slice(0, 70) || '(blank)'}</option>
+            <option key={i} value={i}>{bankT('rowN', { n: i + 1, text: r.filter(Boolean).join(' | ').slice(0, 70) || bankT('blank') })}</option>
           ))}
         </select>
       </div>
       <div className={styles.mapGrid}>
         {MAP_FIELDS.map((f) => (
           <div key={f} className={controls.field}>
-            <label className={controls.label} htmlFor={`${id}-${f}`}>{COLUMN_FIELD_LABELS[f]}</label>
+            <label className={controls.label} htmlFor={`${id}-${f}`}>{bankT(`col.${f}`) || COLUMN_FIELD_LABELS[f]}</label>
             <select
               id={`${id}-${f}`}
               className={controls.select}
@@ -253,9 +255,9 @@ function MappingStep({ parsed, onApply }: { parsed: ParsedStatement; onApply: (c
                 });
               }}
             >
-              <option value={-1}>(not in file)</option>
+              <option value={-1}>{bankT('notInFile')}</option>
               {header.map((h, i) => (
-                <option key={i} value={i}>{`Column ${i + 1}: ${h || '(blank)'}`}</option>
+                <option key={i} value={i}>{bankT('columnN', { n: i + 1, text: h || bankT('blank') })}</option>
               ))}
             </select>
           </div>
@@ -268,7 +270,7 @@ function MappingStep({ parsed, onApply }: { parsed: ParsedStatement; onApply: (c
           disabled={cols.date === undefined || (cols.debit === undefined && cols.credit === undefined && cols.amount === undefined)}
           onClick={() => onApply(cols, headerRow)}
         >
-          Use these columns
+          {bankT('useColumns')}
         </button>
       </div>
     </div>

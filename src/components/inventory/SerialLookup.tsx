@@ -5,16 +5,18 @@ import { cn, formatDate } from '../../lib/utils';
 import { godownName } from '../../lib/godowns';
 import { lookupSerial, type SerialRef, type TrackingMap } from '../../lib/stock-tracking';
 import type { Godown } from '../../types/stock';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
 function docLink(ref: SerialRef | undefined) {
   if (!ref) return '—';
-  const label = `${ref.refNumber || 'Document'} · ${formatDate(ref.date)}`;
+  const label = `${ref.refNumber || invT('document')} · ${formatDate(ref.date)}`;
   if (ref.refType === 'invoice' && ref.refId) return <Link to={`/invoice/${ref.refId}`}>{label}</Link>;
   if (ref.refType === 'purchase') return <Link to="/expenses">{label}</Link>;
-  if (ref.kind === 'opening') return 'Opening stock';
-  if (ref.kind === 'adjustment') return `Stock adjustment · ${formatDate(ref.date)}`;
+  if (ref.kind === 'opening') return invT('openingStock');
+  if (ref.kind === 'adjustment') return invT('stockAdjustmentOn', { date: formatDate(ref.date) });
   return label;
 }
 
@@ -25,6 +27,7 @@ export function SerialLookup({ tracking, today, godowns, initialQuery = '' }: {
   godowns: Godown[];
   initialQuery?: string;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const [query, setQuery] = useState(initialQuery);
   const results = useMemo(() => lookupSerial(tracking, query, today), [tracking, query, today]);
   const multi = godowns.length > 1;
@@ -32,7 +35,7 @@ export function SerialLookup({ tracking, today, godowns, initialQuery = '' }: {
   return (
     <div className={styles.lookupList}>
       <div className={controls.field} style={{ maxWidth: 420 }}>
-        <label className={controls.label} htmlFor="serial-q">Serial / IMEI number</label>
+        <label className={controls.label} htmlFor="serial-q">{invT('serialLabel')}</label>
         <div style={{ position: 'relative' }}>
           <input
             id="serial-q"
@@ -40,42 +43,42 @@ export function SerialLookup({ tracking, today, godowns, initialQuery = '' }: {
             className={cn(controls.input, styles.mono)}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Scan or type a serial or IMEI"
+            placeholder={invT('serialPh')}
             autoComplete="off"
             autoFocus
           />
         </div>
       </div>
       {query.trim() && results.length === 0 && (
-        <p className={styles.muted}><Search size={14} aria-hidden="true" /> No serial matches “{query.trim()}”.</p>
+        <p className={styles.muted}><Search size={14} aria-hidden="true" /> {invT('noSerial', { q: query.trim() })}</p>
       )}
       {query.trim() && results.map((r) => (
-        <article key={`${r.item.id}|${r.serial}`} className={styles.lookupCard} aria-label={`Serial ${r.serial}`}>
+        <article key={`${r.item.id}|${r.serial}`} className={styles.lookupCard} aria-label={invT('serialAria', { serial: r.serial })}>
           <div className={styles.lookupHead}>
             <span className={styles.mono}>{r.serial}</span>
             <span className={styles.muted}>{r.item.name}</span>
             <span className={r.inStock ? styles.in : styles.muted}>
-              {r.inStock ? `In stock${multi ? ` · ${godownName(godowns, r.godown)}` : ''}` : 'Sold'}
+              {r.inStock ? (multi ? invT('inStockAt', { godown: godownName(godowns, r.godown) }) : invT('inStock')) : invT('sold')}
             </span>
           </div>
           <div>
-            <div className={styles.summaryLabel}>Purchased</div>
+            <div className={styles.summaryLabel}>{invT('purchased')}</div>
             <div>{docLink(r.received)}</div>
-            {r.received?.party && <div className={styles.muted}>Vendor: {r.received.party}</div>}
+            {r.received?.party && <div className={styles.muted}>{invT('vendorN', { name: r.received.party })}</div>}
           </div>
           <div>
-            <div className={styles.summaryLabel}>Sold</div>
+            <div className={styles.summaryLabel}>{invT('sold')}</div>
             <div>{docLink(r.sale)}</div>
-            {r.sale?.party && <div className={styles.muted}>Client: {r.sale.party}</div>}
-            {r.returned && <div className={styles.muted}>Returned: {r.returned.refNumber} · {formatDate(r.returned.date)}</div>}
+            {r.sale?.party && <div className={styles.muted}>{invT('clientN', { name: r.sale.party })}</div>}
+            {r.returned && <div className={styles.muted}>{invT('returnedN', { number: r.returned.refNumber ?? '', date: formatDate(r.returned.date) })}</div>}
           </div>
           <div>
-            <div className={styles.summaryLabel}>Warranty</div>
+            <div className={styles.summaryLabel}>{invT('warrantyHead')}</div>
             {r.warranty === 'none' ? (
-              <div className={styles.muted}>{r.sale ? 'No warranty recorded' : '—'}</div>
+              <div className={styles.muted}>{r.sale ? invT('noWarranty') : '—'}</div>
             ) : (
               <div className={r.warranty === 'active' ? styles.in : styles.expired}>
-                {r.warranty === 'active' ? 'Active' : 'Expired'} · until {formatDate(r.warrantyUntil)} ({r.warrantyMonths} months)
+                {invT(r.warranty === 'active' ? 'warrantyActive' : 'warrantyExpired', { date: formatDate(r.warrantyUntil), n: r.warrantyMonths })}
               </div>
             )}
           </div>

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Download, Share, X } from 'lucide-react';
 import { useInstallPrompt } from '../../lib/pwa';
 import { readRaw, writeRaw } from '../../lib/storage';
+import { useT } from '../../i18n';
+import { pwaT } from '../../i18n/areas/pwa';
 import controls from '../../styles/controls.module.css';
 import styles from './Pwa.module.css';
 
@@ -24,6 +26,7 @@ export interface InstallPromptProps {
 }
 
 export function InstallPrompt({ variant = 'banner' }: InstallPromptProps) {
+  useT(); // re-render on a language switch (5.4)
   const { canInstall, showIosHint, install } = useInstallPrompt();
   const [dismissed, setDismissed] = useState(wasDismissed);
   const [iosOpen, setIosOpen] = useState(false);
@@ -39,12 +42,12 @@ export function InstallPrompt({ variant = 'banner' }: InstallPromptProps) {
           onClick={() => (canInstall ? void install() : setIosOpen((v) => !v))}
           aria-expanded={showIosHint ? iosOpen : undefined}
         >
-          <Download size={14} aria-hidden="true" /> Install app
+          <Download size={14} aria-hidden="true" /> {pwaT('installApp')}
         </button>
         {iosOpen && showIosHint && (
           <p className={styles.desc} role="note">
-            Tap <Share size={12} aria-hidden="true" style={{ verticalAlign: '-1px' }} /> Share, then{' '}
-            <strong>Add to Home Screen</strong>.
+            {pwaT('iosTap')} <Share size={12} aria-hidden="true" style={{ verticalAlign: '-1px' }} /> {pwaT('iosShareThen')}{' '}
+            <strong>{pwaT('addHome')}</strong>.
           </p>
         )}
       </>
@@ -64,15 +67,15 @@ export function InstallPrompt({ variant = 'banner' }: InstallPromptProps) {
 
   return (
     <div className={styles.dock}>
-      <section className={styles.banner} role="region" aria-label="Install app">
+      <section className={styles.banner} role="region" aria-label={pwaT('installApp')}>
         <span className={styles.icon} aria-hidden="true">
           {canInstall ? <Download size={16} /> : <Share size={16} />}
         </span>
         <div className={styles.text}>
-          <p className={styles.title}>Install Mr. Chartist Invoice</p>
+          <p className={styles.title}>{pwaT('installTitle')}</p>
           {canInstall ? (
             <>
-              <p className={styles.desc}>Works fully offline, opens in its own window and keeps your data on this device.</p>
+              <p className={styles.desc}>{pwaT('installDesc')}</p>
               <div className={styles.actions}>
                 <button
                   type="button"
@@ -82,21 +85,21 @@ export function InstallPrompt({ variant = 'banner' }: InstallPromptProps) {
                     if (outcome === 'dismissed') dismiss();
                   }}
                 >
-                  Install
+                  {pwaT('install')}
                 </button>
                 <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={dismiss}>
-                  Not now
+                  {pwaT('notNow')}
                 </button>
               </div>
             </>
           ) : (
             <p className={styles.desc}>
-              Tap <Share size={12} aria-hidden="true" style={{ verticalAlign: '-1px' }} /> Share in Safari, then{' '}
-              <strong>Add to Home Screen</strong> to use it like an app, offline.
+              {pwaT('iosTap')} <Share size={12} aria-hidden="true" style={{ verticalAlign: '-1px' }} /> {pwaT('iosShareSafari')}{' '}
+              <strong>{pwaT('addHome')}</strong> {pwaT('addHomeTail')}
             </p>
           )}
         </div>
-        <button type="button" className={styles.close} onClick={dismiss} aria-label="Dismiss install prompt">
+        <button type="button" className={styles.close} onClick={dismiss} aria-label={pwaT('dismissInstall')}>
           <X size={16} />
         </button>
       </section>

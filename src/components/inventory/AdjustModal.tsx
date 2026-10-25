@@ -6,6 +6,8 @@ import { makeAdjustment, type StockMove, type StockPosition } from '../../lib/in
 import { batchOptions, duplicateSerials, parseSerials, serialsInStock, type ItemTracking } from '../../lib/stock-tracking';
 import { MAIN_GODOWN_ID, type Godown } from '../../types/stock';
 import { SerialPicker } from './SerialPicker';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
@@ -30,6 +32,7 @@ export function AdjustModal(props: AdjustModalProps) {
 }
 
 function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], defaultGodown }: AdjustModalProps & { position: StockPosition }) {
+  useT(); // re-render on a language switch (5.4)
   const [direction, setDirection] = useState<'add' | 'remove'>('add');
   const [qty, setQty] = useState('');
   const [rate, setRate] = useState('');
@@ -53,17 +56,17 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
   // Removing serial-tracked stock: the quantity is the serials ticked.
   const q = bySerial && direction === 'remove' ? picked.length : num(qty);
   const after = position.qty + (direction === 'add' ? q : -q);
-  const qtyError = q <= 0 ? (bySerial && direction === 'remove' ? 'Tick the serials to remove.' : 'Enter a quantity greater than zero.') : '';
-  const dateError = !date ? 'Choose a date.' : '';
+  const qtyError = q <= 0 ? (bySerial && direction === 'remove' ? invT('errTickSerials') : invT('errQty')) : '';
+  const dateError = !date ? invT('errDate') : '';
   const where = multi ? godown : undefined;
   const removable = byBatch && direction === 'remove' ? batchOptions(tracking, date, where) : [];
   const dups = duplicateSerials(addSerials);
   const trackError =
-    bySerial && direction === 'add' && addSerials.length !== q ? `List one serial per unit (${addSerials.length} listed for ${q}).`
-    : dups.length ? `Serial ${dups[0]} is listed twice.`
+    bySerial && direction === 'add' && addSerials.length !== q ? invT('errSerialCount', { listed: addSerials.length, qty: q })
+    : dups.length ? invT('errSerialTwice', { serial: dups[0] })
     : bySerial && direction === 'add' && addSerials.some((s) => tracking?.serials.some((x) => x.inStock && x.serial.toUpperCase() === s.toUpperCase()))
-      ? 'One of these serials is already in stock.'
-    : byBatch && direction === 'remove' && removable.length > 0 && !batch ? 'Choose the batch to remove.'
+      ? invT('errSerialInStock')
+    : byBatch && direction === 'remove' && removable.length > 0 && !batch ? invT('errChooseBatch')
     : '';
 
   const submit = () => {
@@ -88,24 +91,24 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
       open={open}
       onClose={onClose}
       size="sm"
-      title="Adjust stock"
-      subtitle={`${item.name} · currently ${position.qty} ${item.unit}`}
+      title={invT('adjust')}
+      subtitle={invT('adjustSub', { name: item.name, qty: position.qty, unit: item.unit })}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="button" className={controls.btnPrimary} onClick={submit}>Record adjustment</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{invT('cancel')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={submit}>{invT('recordAdj')}</button>
         </>
       }
     >
       <form className={styles.form} onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
-        <div className={controls.segment} role="group" aria-label="Adjustment direction">
-          <button type="button" className={direction === 'add' ? controls.segmentBtnActive : controls.segmentBtn} aria-pressed={direction === 'add'} onClick={() => setDirection('add')}>Add stock</button>
-          <button type="button" className={direction === 'remove' ? controls.segmentBtnActive : controls.segmentBtn} aria-pressed={direction === 'remove'} onClick={() => setDirection('remove')}>Remove stock</button>
+        <div className={controls.segment} role="group" aria-label={invT('direction')}>
+          <button type="button" className={direction === 'add' ? controls.segmentBtnActive : controls.segmentBtn} aria-pressed={direction === 'add'} onClick={() => setDirection('add')}>{invT('addStock')}</button>
+          <button type="button" className={direction === 'remove' ? controls.segmentBtnActive : controls.segmentBtn} aria-pressed={direction === 'remove'} onClick={() => setDirection('remove')}>{invT('removeStock')}</button>
         </div>
 
         <div className={controls.row}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-q`}>Quantity ({item.unit}) *</label>
+            <label className={controls.label} htmlFor={`${uid}-q`}>{invT('qtyUnit', { unit: item.unit })}</label>
             <input
               id={`${uid}-q`} className={`${controls.input} ${controls.inputNumeric} ${touched && qtyError ? controls.inputInvalid : ''}`}
               inputMode="decimal" value={bySerial && direction === 'remove' ? String(q) : qty} onChange={(e) => setQty(e.target.value)} autoFocus
@@ -114,14 +117,14 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
             {touched && qtyError && <span className={controls.error} role="alert">{qtyError}</span>}
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-d`}>Date *</label>
+            <label className={controls.label} htmlFor={`${uid}-d`}>{invT('dateReq')}</label>
             <input id={`${uid}-d`} type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
 
         {multi && (
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-g`}>Godown</label>
+            <label className={controls.label} htmlFor={`${uid}-g`}>{invT('godown')}</label>
             <select id={`${uid}-g`} className={controls.select} value={godown} onChange={(e) => { setGodown(e.target.value); setPicked([]); setBatch(''); }}>
               {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
@@ -131,27 +134,27 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
         {byBatch && direction === 'add' && (
           <div className={controls.row3}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-b`}>Batch no.</label>
+              <label className={controls.label} htmlFor={`${uid}-b`}>{invT('batchNo')}</label>
               <input id={`${uid}-b`} className={controls.input} value={batch} onChange={(e) => setBatch(e.target.value)} />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-mfg`}>MFG date</label>
+              <label className={controls.label} htmlFor={`${uid}-mfg`}>{invT('mfgDate')}</label>
               <input id={`${uid}-mfg`} type="date" className={controls.input} value={mfg} onChange={(e) => setMfg(e.target.value)} />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-exp`}>Expiry date</label>
+              <label className={controls.label} htmlFor={`${uid}-exp`}>{invT('expiryDate')}</label>
               <input id={`${uid}-exp`} type="date" className={controls.input} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
             </div>
           </div>
         )}
         {byBatch && direction === 'remove' && removable.length > 0 && (
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-rb`}>Batch</label>
+            <label className={controls.label} htmlFor={`${uid}-rb`}>{invT('batch')}</label>
             <select id={`${uid}-rb`} className={controls.select} value={batch} onChange={(e) => setBatch(e.target.value)}>
-              <option value="">Choose…</option>
+              <option value="">{invT('choose')}</option>
               {removable.map((b) => (
                 <option key={b.batch} value={b.batch}>
-                  {b.batch}{b.expiry ? ` · exp ${b.expiry}` : ''} · {b.qty} {item.unit}{b.expired ? ' · EXPIRED' : ''}
+                  {b.batch}{b.expiry ? ` · ${invT('exp', { date: b.expiry })}` : ''} · {b.qty} {item.unit}{b.expired ? ` · ${invT('expired')}` : ''}
                 </option>
               ))}
             </select>
@@ -159,37 +162,37 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
         )}
         {bySerial && direction === 'add' && (
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-sn`}>Serial / IMEI numbers (one per line)</label>
+            <label className={controls.label} htmlFor={`${uid}-sn`}>{invT('serialsAdd')}</label>
             <textarea id={`${uid}-sn`} className={controls.textarea} rows={3} value={serialText} onChange={(e) => setSerialText(e.target.value)} />
           </div>
         )}
         {bySerial && direction === 'remove' && (
-          <SerialPicker label="Serials to remove" options={serialsInStock(tracking, where)} value={picked} onChange={setPicked} />
+          <SerialPicker label={invT('serialsRemove')} options={serialsInStock(tracking, where)} value={picked} onChange={setPicked} />
         )}
         {touched && trackError && <span className={controls.error} role="alert">{trackError}</span>}
 
         {direction === 'add' && (
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-r`}>Unit cost</label>
-            <input id={`${uid}-r`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={`Blank = current average (${position.avgCost})`} />
+            <label className={controls.label} htmlFor={`${uid}-r`}>{invT('unitCost')}</label>
+            <input id={`${uid}-r`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={invT('unitCostPh', { avg: position.avgCost })} />
           </div>
         )}
 
         <div className={controls.field}>
-          <label className={controls.label} htmlFor={`${uid}-why`}>Reason</label>
+          <label className={controls.label} htmlFor={`${uid}-why`}>{invT('reason')}</label>
           <select id={`${uid}-why`} className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}>
-            {REASONS.map((r) => <option key={r}>{r}</option>)}
+            {REASONS.map((r) => <option key={r} value={r}>{invT(`reason.${r}` as 'reason.Other')}</option>)}
           </select>
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor={`${uid}-n`}>Note</label>
+          <label className={controls.label} htmlFor={`${uid}-n`}>{invT('note')}</label>
           <input id={`${uid}-n`} className={controls.input} value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 
         {q > 0 && (
           <div className={`${styles.notice} ${after < 0 ? styles.noticeDanger : ''}`} role="status">
-            After this adjustment: <strong>{Math.round(after * 1000) / 1000} {item.unit}</strong>
-            {after < 0 && ' (negative stock)'}
+            {invT('after')} <strong>{Math.round(after * 1000) / 1000} {item.unit}</strong>
+            {after < 0 && invT('negativeParen')}
           </div>
         )}
         <button type="submit" hidden />
