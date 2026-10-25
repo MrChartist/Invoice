@@ -71,3 +71,8 @@
   flex-direction: column;
   gap: 0.75rem;
 }
+
+/* Interface language picker (5.4). */
+.lang {
+  align-self: flex-end;
+}

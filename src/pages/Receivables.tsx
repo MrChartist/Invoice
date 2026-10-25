@@ -20,6 +20,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
 import { AgingStack, CollectionsChart, ShareBar, AgeChip } from '../components/receivables/Charts';
 import { StatementViewer } from '../components/receivables/StatementViewer';
 import { downloadTextFile } from '../components/receivables/exportUtils';
@@ -61,6 +63,7 @@ export function Receivables() {
   const [params, setParams] = useSearchParams();
   const [data, setData] = useState(loadData);
   const { notify, toastNode } = useToast();
+  const { t } = useT();
 
   useEffect(() => {
     const refresh = () => setData(loadData());
@@ -118,12 +121,12 @@ export function Receivables() {
         <div className={surface.card}>
           <EmptyState
             icon={Scale}
-            title="Nothing to reconcile yet"
-            text="Issue an invoice to a client and record payments against it. Outstanding balances, aging and client statements appear here automatically."
+            title={t('list.rcvEmptyTitle')}
+            text={t('list.rcvEmptyText')}
             action={
               <>
-                {can('doc.create') && <Link to="/invoice" className={`${controls.btn} ${controls.btnPrimary}`}>Create invoice</Link>}{' '}
-                {can('payment.record') && <Link to="/receivables?tab=advances" className={`${controls.btn} ${controls.btnOutline}`}>Record an advance</Link>}
+                {can('doc.create') && <Link to="/invoice" className={`${controls.btn} ${controls.btnPrimary}`}>{t('list.rcvCreate')}</Link>}{' '}
+                {can('payment.record') && <Link to="/receivables?tab=advances" className={`${controls.btn} ${controls.btnOutline}`}>{t('list.rcvAdvance')}</Link>}
               </>
             }
           />

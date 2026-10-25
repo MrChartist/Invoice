@@ -29,21 +29,29 @@ import { getIndianFY } from '../lib/invoice-number';
 import { effectiveStatus } from '../lib/invoice-status';
 import { attentionList, compactInr, foreignWithoutRate, isRevenueDoc, monthlyBilled, summarize } from '../lib/stats';
 import { daysOverdue, formatCurrency, formatDate } from '../lib/utils';
+import { dateLocale, useT, type MessageKey } from '../i18n';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Dashboard.module.css';
 
-function greeting(hour: number): string {
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+function greeting(hour: number): MessageKey {
+  if (hour < 12) return 'dash.morning';
+  if (hour < 17) return 'dash.afternoon';
+  return 'dash.evening';
 }
 
 // Pulls in the whole sample-data builder, so it loads after first paint.
 const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').then((m) => ({ default: m.SetupWizard })));
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
 
+/** "2026-10" → "Oct" / "अक्टू॰" in the interface language (5.4). */
+function monthName(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleString(dateLocale(), { month: 'short' });
+}
+
 export function Dashboard() {
+  const { t } = useT();
   const user = getCurrentUser() ?? getUser();
   const navigate = useNavigate();
   // Local roles (6.21): set-up and creation prompts only for roles that may act on them.
@@ -100,21 +108,21 @@ export function Dashboard() {
   const hasData = invoices.some(isRevenueDoc);
 
   const checklist = [
-    { done: profileReady, label: 'Add your business & payment details', to: '/settings' },
-    { done: clientCount > 0, label: 'Add your first client', to: '/clients' },
-    { done: invoices.length > 0, label: 'Create your first invoice', to: '/invoice' },
+    { done: profileReady, label: t('dash.stepProfile'), to: '/settings' },
+    { done: clientCount > 0, label: t('dash.stepClient'), to: '/clients' },
+    { done: invoices.length > 0, label: t('dash.stepInvoice'), to: '/invoice' },
   ];
   const showChecklist = can('settings.manage') && checklist.some((c) => !c.done);
 
   return (
     <div className={surface.page}>
       <PageHeader
-        title={`${greeting(now.getHours())}, ${user?.name?.split(' ')[0] || 'there'}`}
-        subtitle={`Financial year FY${fy.label} · ${now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`}
+        title={t('dash.greeting', { greeting: t(greeting(now.getHours())), name: user?.name?.split(' ')[0] || t('dash.there') })}
+        subtitle={t('dash.subtitle', { fy: fy.label, date: now.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' }) })}
         actions={
           can('doc.create') ? (
             <Link to="/invoice" className={controls.btnPrimary}>
-              <FilePlus2 size={16} /> New invoice
+              <FilePlus2 size={16} /> {t('nav.newInvoice')}
             </Link>
           ) : undefined
         }
@@ -137,12 +145,10 @@ export function Dashboard() {
       )}
 
       {showChecklist && (
-        <section className={styles.checklist} aria-label="Getting started">
+        <section className={styles.checklist} aria-label={t('dash.gettingStarted')}>
           <div className={styles.checklistHead}>
-            <h2>Get set up</h2>
-            <span>
-              {checklist.filter((c) => c.done).length} of {checklist.length} done
-            </span>
+            <h2>{t('dash.getSetUp')}</h2>
+            <span>{t('dash.doneOf', { done: checklist.filter((c) => c.done).length, total: checklist.length })}</span>
           </div>
           <ul>
             {checklist.map((c) => (
@@ -159,13 +165,13 @@ export function Dashboard() {
       )}
 
       <div className={surface.statGrid}>
-        <StatCard label="Billed" value={formatCurrency(summary.billed)} hint={`${summary.count} issued invoice${summary.count === 1 ? '' : 's'}${noRate ? ` · ${noRate} foreign-currency without an exchange rate left out` : ''}`} icon={Receipt} />
-        <StatCard label="Received" value={formatCurrency(summary.received)} hint={`${collectedPct}% collected`} icon={Banknote} tone="profit" />
-        <StatCard label="Outstanding" value={formatCurrency(summary.outstanding)} hint="Yet to be paid" icon={Hourglass} tone="warning" />
+        <StatCard label={t('dash.billed')} value={formatCurrency(summary.billed)} hint={`${summary.count === 1 ? t('dash.issuedOne') : t('dash.issuedMany', { n: summary.count })}${noRate ? t('dash.noRate', { n: noRate }) : ''}`} icon={Receipt} />
+        <StatCard label={t('dash.received')} value={formatCurrency(summary.received)} hint={t('dash.collected', { pct: collectedPct })} icon={Banknote} tone="profit" />
+        <StatCard label={t('dash.outstanding')} value={formatCurrency(summary.outstanding)} hint={t('dash.yetToBePaid')} icon={Hourglass} tone="warning" />
         <StatCard
-          label="Overdue"
+          label={t('dash.overdue')}
           value={formatCurrency(summary.overdueAmount)}
-          hint={summary.overdueCount ? `${summary.overdueCount} past due date` : 'Nothing overdue'}
+          hint={summary.overdueCount ? t('dash.pastDue', { n: summary.overdueCount }) : t('dash.nothingOverdue')}
           icon={AlertTriangle}
           tone={summary.overdueCount ? 'loss' : 'default'}
         />
@@ -176,10 +182,10 @@ export function Dashboard() {
       <div className={styles.grid}>
         <section className={surface.card}>
           <div className={surface.cardHead}>
-            <span>Billed · last 6 months</span>
+            <span>{t('dash.billed6m')}</span>
             <span className={styles.muted}>{formatCurrency(months.reduce((s, m) => s + m.billed, 0))}</span>
           </div>
-          <div className={styles.chart} role="img" aria-label="Bar chart of amount billed per month">
+          <div className={styles.chart} role="img" aria-label={t('dash.chartAria')}>
             {months.map((m, i) => {
               const height = Math.max((m.billed / peak) * 100, m.billed > 0 ? 4 : 0);
               const latest = i === months.length - 1;
@@ -190,29 +196,29 @@ export function Dashboard() {
                     <div
                       className={latest ? styles.barLatest : styles.bar}
                       style={{ height: `${height}%` }}
-                      title={`${m.label}: ${formatCurrency(m.billed)}`}
+                      title={`${monthName(m.key)}: ${formatCurrency(m.billed)}`}
                     />
                   </div>
-                  <span className={styles.barLabel}>{m.label}</span>
+                  <span className={styles.barLabel}>{monthName(m.key)}</span>
                 </div>
               );
             })}
           </div>
-          {!hasData && <p className={styles.chartEmpty}>Your billing trend appears here once you issue an invoice.</p>}
+          {!hasData && <p className={styles.chartEmpty}>{t('dash.chartEmpty')}</p>}
         </section>
 
         <section className={surface.card}>
           <div className={surface.cardHead}>
-            <span>Needs attention</span>
+            <span>{t('dash.needsAttention')}</span>
             <Link to="/transactions" className={styles.link}>
-              View all
+              {t('dash.viewAll')}
             </Link>
           </div>
           {attention.length === 0 ? (
             <EmptyState
               icon={CheckCircle2}
-              title="All clear"
-              text={chasing.size > 0 ? "Everything unpaid is already in the payment reminders above." : "No unpaid invoices. Nicely done."}
+              title={t('dash.allClear')}
+              text={chasing.size > 0 ? t('dash.allInReminders') : t('dash.noUnpaid')}
             />
           ) : (
             <ul className={styles.list}>
@@ -223,9 +229,9 @@ export function Dashboard() {
                     <Link to={`/invoice/${inv.id}`} className={styles.row}>
                       <Avatar name={inv.client?.name || '?'} size={34} square />
                       <div className={styles.rowMain}>
-                        <span className={styles.rowTitle}>{inv.client?.name || 'Unknown client'}</span>
+                        <span className={styles.rowTitle}>{inv.client?.name || t('dash.unknownClient')}</span>
                         <span className={late ? styles.late : styles.muted}>
-                          {late ? `${late} day${late === 1 ? '' : 's'} overdue` : `Due ${formatDate(inv.due_date)}`}
+                          {late ? (late === 1 ? t('dash.lateOne') : t('dash.lateMany', { n: late })) : t('dash.due', { date: formatDate(inv.due_date) })}
                         </span>
                       </div>
                       <span className={styles.amount}>{formatCurrency(inv.balance_due ?? inv.total, inv.currency)}</span>
@@ -241,21 +247,21 @@ export function Dashboard() {
       <section className={surface.card}>
         <div className={surface.cardHead}>
           <span className={surface.cardHeadIcon}>
-            <FileText size={16} /> Recent documents
+            <FileText size={16} /> {t('dash.recent')}
           </span>
           <Link to="/transactions" className={styles.link}>
-            Open ledger <ArrowRight size={13} />
+            {t('dash.openLedger')} <ArrowRight size={13} />
           </Link>
         </div>
         {recent.length === 0 ? (
           <EmptyState
             icon={FileText}
-            title="No invoices yet"
-            text="Create your first GST-ready invoice in under a minute. It is saved only on this device."
+            title={t('dash.noInvoices')}
+            text={t('dash.noInvoicesText')}
             action={
               can('doc.create') ? (
                 <Link to="/invoice" className={controls.btnPrimary}>
-                  <FilePlus2 size={16} /> Create an invoice
+                  <FilePlus2 size={16} /> {t('common.createInvoice')}
                 </Link>
               ) : undefined
             }
@@ -265,11 +271,11 @@ export function Dashboard() {
             <table className={`${surface.table} ${styles.recent}`}>
               <thead>
                 <tr>
-                  <th>Document</th>
-                  <th>Client</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th className={surface.numeric}>Amount</th>
+                  <th>{t('dash.colDocument')}</th>
+                  <th>{t('dash.colClient')}</th>
+                  <th>{t('dash.colDate')}</th>
+                  <th>{t('dash.colStatus')}</th>
+                  <th className={surface.numeric}>{t('dash.colAmount')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -298,11 +304,11 @@ export function Dashboard() {
         <Link to="/books?tab=pnl" className={styles.quickItem}>
           <Receipt size={18} />
           <div>
-            <strong>{profit ? `${formatCurrency(profit.netProfit)} net profit` : 'Profit & loss'}</strong>
+            <strong>{profit ? t('dash.netProfit', { amount: formatCurrency(profit.netProfit) }) : t('dash.pnl')}</strong>
             <span>
               {profit
-                ? `FY${fy.label} · income ${formatCurrency(profit.income)} · expenses ${formatCurrency(profit.expenses)}`
-                : `FY${fy.label} · open the books`}
+                ? t('dash.pnlHint', { fy: fy.label, income: formatCurrency(profit.income), expenses: formatCurrency(profit.expenses) })
+                : t('dash.openBooks', { fy: fy.label })}
             </span>
           </div>
           <ArrowRight size={16} />
@@ -311,8 +317,8 @@ export function Dashboard() {
           <Link to="/inventory" className={styles.quickItem}>
             <AlertTriangle size={18} />
             <div>
-              <strong>{lowStock} item{lowStock === 1 ? '' : 's'} low on stock</strong>
-              <span>Review reorder levels</span>
+              <strong>{lowStock === 1 ? t('dash.lowStockOne') : t('dash.lowStockMany', { n: lowStock })}</strong>
+              <span>{t('dash.reviewReorder')}</span>
             </div>
             <ArrowRight size={16} />
           </Link>
@@ -320,16 +326,16 @@ export function Dashboard() {
         <Link to="/clients" className={styles.quickItem}>
           <Users size={18} />
           <div>
-            <strong>{clientCount} client{clientCount === 1 ? '' : 's'}</strong>
-            <span>Manage your directory</span>
+            <strong>{clientCount === 1 ? t('dash.clientsOne') : t('dash.clientsMany', { n: clientCount })}</strong>
+            <span>{t('dash.manageDirectory')}</span>
           </div>
           <ArrowRight size={16} />
         </Link>
         <Link to="/settings" className={styles.quickItem}>
           <FileText size={18} />
           <div>
-            <strong>Profiles &amp; backup</strong>
-            <span>Business details, bank, UPI</span>
+            <strong>{t('dash.profilesBackup')}</strong>
+            <span>{t('dash.profilesBackupHint')}</span>
           </div>
           <ArrowRight size={16} />
         </Link>

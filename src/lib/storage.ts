@@ -10,7 +10,7 @@
  *    on `pagehide` / hidden). Other tabs are told over a BroadcastChannel and refresh.
  *
  * Device-local keys (PIN credential / lockout / session / idle, last backup, the backend
- * marker) and the non-prefixed `theme` always stay in localStorage.
+ * marker, interface language) and the non-prefixed `theme` always stay in localStorage.
  *
  * Every read is fail-soft (a corrupt or unavailable store yields an empty table rather
  * than a white screen) and every write reports failures so the UI can tell the user their
@@ -54,6 +54,9 @@ export const SINGLETON_KEYS = {
 
 export const THEME_KEY = 'theme';
 
+/** Interface language of THIS device (5.4): 'en' (default) or 'hi'. Read before unlock, never backed up. */
+export const LANG_KEY = `${DB_PREFIX}lang`;
+
 /** Device-local marker: 'idb' once this device's data has moved to IndexedDB. */
 export const STORAGE_BACKEND_KEY = `${DB_PREFIX}storage_backend`;
 
@@ -70,6 +73,7 @@ export const DEVICE_LOCAL_KEYS: readonly string[] = [
   STORAGE_BACKEND_KEY,
   COMPANY_REGISTRY_KEY,
   `${DB_PREFIX}sync_device`, // folder sync (5.7): this device's id / name / per-company switch
+  LANG_KEY,
 ];
 
 /**

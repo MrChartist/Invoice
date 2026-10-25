@@ -5,6 +5,7 @@ import { registerServiceWorker } from './lib/pwa';
 import { runMigrations } from './lib/migrations';
 import { initCrossTab } from './lib/cross-tab';
 import { initStorage } from './lib/storage';
+import { initI18n } from './i18n';
 import './fonts.css';
 import './index.css';
 
@@ -28,7 +29,8 @@ function start(root: Root): void {
 
 // Load the data into the IndexedDB-backed cache (moving it out of localStorage on first run)
 // before anything renders; until then the page shows only its background. Typically a few ms.
-void initStorage().then((init) => {
+// The saved interface language (5.4) loads in parallel, so even the PIN / vault screens open translated.
+void Promise.all([initStorage(), initI18n()]).then(([init]) => {
   if (init.backend === 'unavailable') {
     void import('./boot-unavailable').then((m) => m.showUnavailable(init.reason, { vaultDamaged: init.vaultDamaged }));
     return;

@@ -6,6 +6,8 @@ import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
 import { BillModal } from '../components/purchases/BillModal';
 import { ExpenseModal } from '../components/purchases/ExpenseModal';
 import { PurchasePaymentModal } from '../components/purchases/PurchasePaymentModal';
@@ -54,6 +56,7 @@ const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: string }[] = [
 /** Expenses & purchases: supplier bills, quick expenses, payables and vendors. */
 export function Expenses() {
   const { notify, toastNode } = useToast();
+  const { t } = useT();
   const [version, setVersion] = useState(0);
   const [params] = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => (params.get('tab') === 'orders' ? 'orders' : params.get('tab') === 'vendors' ? 'vendors' : 'bills'));
@@ -269,16 +272,16 @@ export function Expenses() {
           {purchases.length === 0 ? (
             <EmptyState
               icon={Receipt}
-              title="No bills or expenses yet"
-              text="Log supplier bills to track payables and claim input tax credit, or quick-add everyday expenses."
+              title={t('list.expEmptyTitle')}
+              text={t('list.expEmptyText')}
               action={
                 <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
-                  <FilePlus2 size={16} /> Add your first bill
+                  <FilePlus2 size={16} /> {t('list.expAddFirst')}
                 </button>
               }
             />
           ) : rows.length === 0 ? (
-            <EmptyState icon={Search} title="No matches" text="Try a different search or filter." />
+            <EmptyState icon={Search} title={t('common.noMatches')} text={t('common.tryOtherSearchFilter')} />
           ) : (
             <PurchasesTable rows={rows} today={today} onPay={(p) => setPayFor(p.id)} onEdit={openEdit} onDelete={setDeleting} />
           )}

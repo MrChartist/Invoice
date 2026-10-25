@@ -5,6 +5,9 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
+import { LanguageSwitch } from '../components/ui/LanguageSwitch';
 import { ProfileEditor } from '../components/settings/ProfileEditor';
 import { DefaultsPanel } from '../components/settings/DefaultsPanel';
 import { CatalogPanel } from '../components/settings/CatalogPanel';
@@ -54,6 +57,7 @@ function profileProblem(p: SenderProfile): string {
 
 export function Settings() {
   const { notify, toastNode } = useToast();
+  const { t } = useT();
   const [params] = useSearchParams();
   // The signed-in user only changes at the PIN screen, which unmounts this page.
   const [TABS] = useState(() => ALL_TABS.filter((t) => canDo(t.need)));
@@ -141,7 +145,7 @@ export function Settings() {
       localDb.settings.save({ ...settings, onboarded: true });
       setSettings((s) => ({ ...s, onboarded: true }));
       setDirty(false);
-      notify('Settings saved');
+      notify(t('settings.saved'));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -157,13 +161,16 @@ export function Settings() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Settings"
-        subtitle={
-          canDo('settings.manage')
-            ? 'Your business details, payment info and defaults. Saved only on this device.'
-            : 'Business settings, backups and users are managed by the owner.'
+        title={t('settings.title')}
+        subtitle={canDo('settings.manage') ? t('settings.subOwner') : t('settings.subOther')}
+        actions={
+          <div className={styles.langBox} title={t('settings.languageHint')}>
+            <span className={styles.langLabel}>{t('common.language')}</span>
+            <LanguageSwitch />
+          </div>
         }
       />
+
 
       <div className={controls.segment} role="tablist" aria-label="Settings sections" style={{ alignSelf: 'flex-start', maxWidth: '100%', flexWrap: 'wrap' }} onKeyDown={onTabKey}>
         {TABS.map(({ id, label, icon: Icon }) => (
@@ -283,11 +290,11 @@ export function Settings() {
 
       {dirty && (
         <div className={styles.saveBar} role="region" aria-label="Unsaved changes">
-          <span>You have unsaved changes</span>
+          <span>{t('settings.unsaved')}</span>
           <div className={styles.saveActions}>
-            <button type="button" className={controls.btnOutline} onClick={discard}>Discard</button>
+            <button type="button" className={controls.btnOutline} onClick={discard}>{t('common.discard')}</button>
             <button type="button" className={controls.btnPrimary} onClick={save}>
-              <Save size={16} /> Save settings
+              <Save size={16} /> {t('settings.save')}
             </button>
           </div>
         </div>

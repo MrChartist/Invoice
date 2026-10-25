@@ -16,7 +16,9 @@ import {
   resetAllData,
   unlock,
 } from '../lib/auth';
-import { ROLE_LABELS } from '../lib/access';
+import { tNodes, useT } from '../i18n';
+import { roleLabel } from '../i18n/labels';
+import { LanguageSwitch } from '../components/ui/LanguageSwitch';
 import { reloadAfterFlush } from '../lib/storage';
 import controls from '../styles/controls.module.css';
 import styles from './LoginPage.module.css';
@@ -37,6 +39,7 @@ function formatCountdown(ms: number): string {
 const digitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, 6);
 
 export function LoginPage({ onSuccess }: LoginPageProps) {
+  const { t } = useT();
   const existingUser = getUser();
   // Local roles (6.21): with more than one user on this device, pick who is signing in.
   const users = listUsers();
@@ -90,24 +93,24 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
     setBusy(true);
     try {
       if (mode === 'register') {
-        if (!name.trim()) return setError('Please enter your name.');
-        if (!isValidPinFormat(pin)) return setError('Choose a PIN of 4 to 6 digits.');
-        if (pin !== confirm) return setError('The two PINs do not match.');
+        if (!name.trim()) return setError(t('login.errName'));
+        if (!isValidPinFormat(pin)) return setError(t('login.errPinFormat'));
+        if (pin !== confirm) return setError(t('login.errPinMatch'));
         if (await login(name, pin)) onSuccess();
-        else setError('Could not create the account. Please try again.');
+        else setError(t('login.errCreate'));
       } else {
         const result = await unlock(pin, undefined, selected?.id ?? OWNER_ID);
         if (result.ok) return onSuccess();
         setPin('');
         if (result.locked) {
           setLockedMs(result.retryInMs);
-          setError('Too many incorrect attempts.');
+          setError(t('login.errTooMany'));
         } else {
-          setError(`Incorrect PIN. ${result.attemptsLeft} ${result.attemptsLeft === 1 ? 'attempt' : 'attempts'} left before a temporary lock.`);
+          setError(result.attemptsLeft === 1 ? t('login.errIncorrectOne') : t('login.errIncorrectMany', { n: result.attemptsLeft }));
         }
       }
     } catch (err) {
-      setError((err as Error).message || 'Something went wrong.');
+      setError((err as Error).message || t('login.errGeneric'));
     } finally {
       setBusy(false);
     }
@@ -124,7 +127,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     const companies = readRegistry(); // the reset clears the registry
-    if (!resetAllData(phrase)) return setError('The confirmation phrase does not match.');
+    if (!resetAllData(phrase)) return setError(t('login.errPhrase'));
     // Also drop the undo copy, backup key and folder link kept in IndexedDB (security: no way back to the old data).
     const [{ forgetDeviceData }, { eraseOtherCompanies }] = await Promise.all([import('../lib/auto-backup'), import('../lib/companies')]);
     await forgetDeviceData();
@@ -139,55 +142,49 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
         <Logo height={40} tone="on-dark" />
         <div className={styles.brandBody}>
           <h1 className={styles.headline}>
-            Invoices &amp; books, <em>on your device.</em>
+            {t('login.headline')} <em>{t('login.headlineEm')}</em>
           </h1>
           <p className={styles.lede}>
-            GST-ready invoicing, ledgers and reports that work offline. Nothing is uploaded — your PIN only unlocks this browser.
+            {t('login.lede')}
           </p>
         </div>
         <ul className={styles.points}>
-          <li><WifiOff size={16} /> Works fully offline, zero tracking</li>
-          <li><ShieldCheck size={16} /> PIN stored as a salted PBKDF2 hash</li>
-          <li><TimerReset size={16} /> Auto-locks when you step away</li>
+          <li><WifiOff size={16} /> {t('login.pointOffline')}</li>
+          <li><ShieldCheck size={16} /> {t('login.pointHash')}</li>
+          <li><TimerReset size={16} /> {t('login.pointLock')}</li>
         </ul>
       </aside>
 
       <main className={styles.formSide}>
         <div className={styles.card}>
+          <LanguageSwitch compact className={styles.lang} />
           {mode === 'forgot' && !isOwner ? (
             <div className={styles.form}>
               <div>
-                <h2 className={styles.title}>Forgot your PIN?</h2>
+                <h2 className={styles.title}>{t('login.forgotTitle')}</h2>
                 <p className={styles.subtitle}>
-                  Ask the owner{users[0]?.name ? ` (${users[0].name})` : ''} to set a new PIN for {selected?.name ?? 'you'} in Settings → Security → Users.
-                  Nothing is erased.
+                  {t('login.askOwner', { owner: users[0]?.name ? ` (${users[0].name})` : '', name: selected?.name ?? t('login.you') })}
                 </p>
               </div>
               <div className={styles.links}>
                 <button type="button" className={styles.linkBtn} onClick={() => switchMode('login')}>
-                  Go back
+                  {t('login.goBack')}
                 </button>
               </div>
             </div>
           ) : mode === 'forgot' ? (
             <form className={styles.form} onSubmit={handleReset} noValidate>
               <div>
-                <h2 className={styles.title}>Forgot your PIN?</h2>
-                <p className={styles.subtitle}>
-                  Your data lives only in this browser, so there is no server to reset it. The only way back in is to erase everything on this
-                  device and start fresh.
-                </p>
+                <h2 className={styles.title}>{t('login.forgotTitle')}</h2>
+                <p className={styles.subtitle}>{t('login.forgotText')}</p>
               </div>
               <div className={styles.noticeWarn} role="alert">
                 <AlertTriangle size={16} />
-                <span>
-                  This permanently deletes every invoice, client, item, profile and your PIN. If you have a backup file, you can restore it
-                  afterwards from Settings.
-                </span>
+                <span>{t('login.eraseWarn')}</span>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="reset-phrase">
-                  Type <span className={styles.phrase}>{RESET_PHRASE}</span> to confirm
+                  {tNodes('common.typeToConfirm', { word: <span className={styles.phrase}>{RESET_PHRASE}</span> })}
                 </label>
                 <input
                   id="reset-phrase"
@@ -206,11 +203,11 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                 className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock} ${styles.dangerBtn}`}
                 disabled={!isResetPhrase(phrase)}
               >
-                Erase everything and start over
+                {t('login.eraseButton')}
               </button>
               <div className={styles.links}>
                 <button type="button" className={styles.linkBtn} onClick={() => switchMode('login')}>
-                  I remembered it — go back
+                  {t('login.remembered')}
                 </button>
               </div>
             </form>
@@ -218,18 +215,16 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
             <form className={styles.form} onSubmit={handleSubmit} noValidate>
               <div>
                 <h2 className={styles.title}>
-                  {mode === 'register' ? 'Create your account' : selected?.name ? `Welcome back, ${selected.name}` : 'Welcome back'}
+                  {mode === 'register' ? t('login.createTitle') : selected?.name ? t('login.welcomeBackName', { name: selected.name }) : t('login.welcomeBack')}
                 </h2>
                 <p className={styles.subtitle}>
-                  {mode === 'register'
-                    ? 'Set a PIN to protect your invoices. Your data stays 100% on this device.'
-                    : 'Enter your PIN to unlock.'}
+                  {mode === 'register' ? t('login.createSub') : t('login.unlockSub')}
                 </p>
               </div>
 
               {mode === 'login' && users.length > 1 && (
                 <div className={controls.field}>
-                  <label className={controls.label} htmlFor="login-user">User</label>
+                  <label className={controls.label} htmlFor="login-user">{t('shell.user')}</label>
                   <div className={styles.inputWrap}>
                     <Users size={16} className={styles.inputIcon} />
                     <select
@@ -240,7 +235,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                     >
                       {users.map((u) => (
                         <option key={u.id} value={u.id}>
-                          {u.name} ({ROLE_LABELS[u.role]})
+                          {u.name} ({roleLabel(u.role)})
                         </option>
                       ))}
                     </select>
@@ -250,7 +245,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
               {mode === 'register' && (
                 <div className={controls.field}>
-                  <label className={controls.label} htmlFor="login-name">Full name</label>
+                  <label className={controls.label} htmlFor="login-name">{t('login.fullName')}</label>
                   <div className={styles.inputWrap}>
                     <User size={16} className={styles.inputIcon} />
                     <input
@@ -258,7 +253,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                       className={`${controls.input} ${styles.withIcon}`}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Your name or business"
+                      placeholder={t('login.namePlaceholder')}
                       autoComplete="name"
                       autoFocus
                     />
@@ -268,7 +263,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="login-pin">
-                  {mode === 'register' ? 'Create a PIN (4–6 digits)' : 'PIN'}
+                  {mode === 'register' ? t('login.createPin') : t('login.pin')}
                 </label>
                 <div className={styles.inputWrap}>
                   <Lock size={16} className={styles.inputIcon} />
@@ -291,7 +286,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                     type="button"
                     className={styles.reveal}
                     onClick={() => setReveal((r) => !r)}
-                    aria-label={reveal ? 'Hide PIN' : 'Show PIN'}
+                    aria-label={reveal ? t('login.hidePin') : t('login.showPin')}
                   >
                     {reveal ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -304,10 +299,10 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                     <span id="login-pin-hint" className={strength.warning ? controls.hint : controls.ok}>
                       {strength.warning ?? (
                         <>
-                          <CheckCircle2 size={13} /> Looks good
+                          <CheckCircle2 size={13} /> {t('login.looksGood')}
                         </>
                       )}
-                      {strength.level === 'weak' && ' You can still use it, but a less obvious PIN protects you better.'}
+                      {strength.level === 'weak' && t('login.weakNote')}
                     </span>
                   </>
                 )}
@@ -315,7 +310,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
 
               {mode === 'register' && (
                 <div className={controls.field}>
-                  <label className={controls.label} htmlFor="login-confirm">Confirm PIN</label>
+                  <label className={controls.label} htmlFor="login-confirm">{t('login.confirmPin')}</label>
                   <div className={styles.inputWrap}>
                     <Lock size={16} className={styles.inputIcon} />
                     <input
@@ -337,16 +332,14 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
               {locked && (
                 <div className={styles.noticeError} role="alert">
                   <Lock size={16} />
-                  <span>
-                    Too many incorrect attempts. Try again in <span className={styles.countdown}>{formatCountdown(lockedMs)}</span>.
-                  </span>
+                  <span>{tNodes('login.lockedNotice', { time: <span className={styles.countdown}>{formatCountdown(lockedMs)}</span> })}</span>
                 </div>
               )}
               {!locked && error && <div className={styles.noticeError} role="alert">{error}</div>}
               {mode === 'login' && !locked && !error && getAttemptsLeft(selected?.id) < 5 && (
                 <div className={styles.noticeWarn}>
                   <AlertTriangle size={16} />
-                  <span>{getAttemptsLeft(selected?.id)} attempts left before a temporary lock.</span>
+                  <span>{t('login.attemptsLeft', { n: getAttemptsLeft(selected?.id) })}</span>
                 </div>
               )}
 
@@ -355,20 +348,20 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                 className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock}`}
                 disabled={busy || locked || pin.length < 4}
               >
-                {busy ? 'Checking…' : mode === 'register' ? 'Create account' : 'Unlock'} <ArrowRight size={18} />
+                {busy ? t('login.checking') : mode === 'register' ? t('login.createAccount') : t('login.unlock')} <ArrowRight size={18} />
               </button>
 
               {mode === 'login' && (
                 <div className={styles.links}>
                   <button type="button" className={styles.linkBtn} onClick={() => switchMode('forgot')}>
-                    Forgot PIN?
+                    {t('login.forgotPin')}
                   </button>
                 </div>
               )}
             </form>
           )}
 
-          <p className={styles.foot}>Your data never leaves this device. Zero backend. Zero tracking.</p>
+          <p className={styles.foot}>{t('login.foot')}</p>
         </div>
       </main>
     </div>

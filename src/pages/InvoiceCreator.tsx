@@ -32,6 +32,9 @@ import { getJson, SINGLETON_KEYS } from '../lib/storage';
 import { cn } from '../lib/utils';
 import { num } from '../lib/invoice-calc';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord } from '../types/invoice';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
+import { docLabel } from '../i18n/labels';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
@@ -62,6 +65,7 @@ export function InvoiceCreator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
+  const { t, lang } = useT();
   const s = useInvoiceStore(
     useShallow((st) => pick(st, ['attachments', 'currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'patch', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),
   );
@@ -156,13 +160,13 @@ export function InvoiceCreator() {
         setErrors(result.errors);
         if (result.locked) setLockTick((t) => t + 1);
         window.scrollTo?.({ top: 0 });
-        notify(result.errors[0] ?? 'Could not save.', 'error');
+        notify(result.errors[0] ?? t('editor.couldNotSave'), 'error');
         return;
       }
       setErrors([]);
       setSaveTick((t) => t + 1);
       const rec = result.record!;
-      const message = `${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number} saved`;
+      const message = t('editor.savedMsg', { doc: docLabel(rec.doc_type), number: rec.invoice_number });
       if (andNew) {
         // Save & new: straight to a clean form of the same type.
         useInvoiceStore.getState().newDraft(rec.doc_type);
@@ -172,13 +176,14 @@ export function InvoiceCreator() {
         return;
       }
       const gap = result.gap;
+      const gapList = gap ? gap.missingNumbers.slice(0, 3).join(', ') : '';
       const gapHint = gap
-        ? `Series gap: ${gap.missingNumbers.slice(0, 3).join(', ')}${gap.missingCount > 3 ? ` and ${gap.missingCount - 3} more` : ''} left unused.`
+        ? t('editor.seriesGap', { numbers: gap.missingCount > 3 ? t('editor.andMore', { list: gapList, n: gap.missingCount - 3 }) : gapList })
         : '';
       setSavedToast({ message, gapHint });
       if (!id) navigate(`/invoice/${rec.id}`, { replace: true });
     },
-    [id, navigate, notify],
+    [id, navigate, notify, lang],
   );
 
   // Warn before a refresh/tab close would drop edits to a saved document (new documents autosave as drafts).
@@ -201,15 +206,15 @@ export function InvoiceCreator() {
   if (missing) {
     return (
       <div className={surface.page}>
-        <PageHeader title="Document not found" subtitle="It may have been deleted, or it lives in another browser." />
+        <PageHeader title={t('editor.notFound')} subtitle={t('editor.notFoundSub')} />
         <button type="button" className={cn(controls.btnPrimary)} style={{ alignSelf: 'flex-start' }} onClick={() => navigate('/transactions')}>
-          Back to invoices
+          {t('editor.backToInvoices')}
         </button>
       </div>
     );
   }
 
-  const label = DOCUMENT_LABELS[s.doc_type];
+  const label = docLabel(s.doc_type);
 
   return (
     <div className={cn(surface.page, styles.page)}>
@@ -230,12 +235,12 @@ export function InvoiceCreator() {
       {hasDraft && (
         <div className={styles.banner} role="status">
           <History size={16} />
-          <span>You have an unsaved draft from earlier.</span>
+          <span>{t('editor.draftBanner')}</span>
           <button type="button" className={controls.btnOutline + ' ' + controls.btnSm} onClick={() => { useInvoiceStore.getState().restoreDraft(); setHasDraft(false); }}>
-            Restore draft
+            {t('editor.restoreDraft')}
           </button>
           <button type="button" className={controls.btnGhost + ' ' + controls.btnSm} onClick={() => { startNew(); }}>
-            Discard
+            {t('common.discard')}
           </button>
         </div>
       )}
@@ -253,14 +258,14 @@ export function InvoiceCreator() {
       {errors.length > 0 && (
         <div className={styles.errors} role="alert">
           <div>
-            <strong>Fix these before saving</strong>
+            <strong>{t('editor.fixErrors')}</strong>
             <ul>
               {errors.map((e) => (
                 <li key={e}>{e}</li>
               ))}
             </ul>
           </div>
-          <button type="button" className={controls.btnIcon} onClick={() => setErrors([])} aria-label="Dismiss">
+          <button type="button" className={controls.btnIcon} onClick={() => setErrors([])} aria-label={t('common.dismiss')}>
             <X size={16} />
           </button>
         </div>
@@ -268,12 +273,12 @@ export function InvoiceCreator() {
 
       <div className={styles.layout}>
         <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
-          <legend className={surface.srOnly}>{readOnly ? 'Document (locked, read-only)' : 'Document'}</legend>
+          <legend className={surface.srOnly}>{readOnly ? t('editor.docLegendLocked') : t('editor.docLegend')}</legend>
           <DocumentMetaCard editing={editing} saveTick={saveTick} />
           <SupplyNotice />
 
           <section className={surface.card}>
-            <div className={surface.cardHead}>2 · Parties</div>
+            <div className={surface.cardHead}>{t('editor.parties')}</div>
             <div className={surface.cardBody}>
               <PartiesSection profiles={profiles} onSearchClients={() => setClientsOpen(true)} />
             </div>
@@ -285,9 +290,12 @@ export function InvoiceCreator() {
 
           <section className={surface.card}>
             <div className={surface.cardHead}>
-              <span>3 · Items</span>
+              <span>{t('editor.items')}</span>
               <span className={styles.muted}>
-                {s.items.filter((i) => i.name.trim() || i.rate > 0).length} line{s.items.length === 1 ? '' : 's'}
+                {(() => {
+                  const n = s.items.filter((i) => i.name.trim() || i.rate > 0).length;
+                  return n === 1 ? t('editor.linesOne') : t('editor.linesMany', { n });
+                })()}
               </span>
             </div>
             <ScanBar disabled={readOnly} />
@@ -296,14 +304,14 @@ export function InvoiceCreator() {
           </section>
 
           <section className={surface.card}>
-            <div className={surface.cardHead}>4 · Notes &amp; terms</div>
+            <div className={surface.cardHead}>{t('editor.notesTerms')}</div>
             <div className={surface.cardBody}>
               <label className={controls.field}>
-                <span className={controls.label}>Note to client</span>
-                <textarea className={controls.textarea} rows={2} value={s.notes} onChange={(e) => s.setNotes(e.target.value)} placeholder="Thank you for your business." />
+                <span className={controls.label}>{t('editor.noteToClient')}</span>
+                <textarea className={controls.textarea} rows={2} value={s.notes} onChange={(e) => s.setNotes(e.target.value)} placeholder={t('editor.notePlaceholder')} />
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>Terms &amp; conditions</span>
+                <span className={controls.label}>{t('editor.terms')}</span>
                 <textarea className={controls.textarea} rows={3} value={s.terms} onChange={(e) => s.setTerms(e.target.value)} />
               </label>
             </div>
@@ -312,13 +320,13 @@ export function InvoiceCreator() {
           <CustomFieldsCard />
 
           <section className={surface.card}>
-            <div className={surface.cardHead}>Internal attachments</div>
+            <div className={surface.cardHead}>{t('editor.attachments')}</div>
             <div className={surface.cardBody}>
               <AttachmentsPanel
                 value={s.attachments}
                 onChange={(next) => s.patch({ attachments: next.length ? next : undefined })}
-                label="Attachments"
-                hint="Signed copies, purchase orders, delivery proofs — photos or PDFs. Kept on this device and in backups; never printed or shared with the client."
+                label={t('editor.attachmentsLabel')}
+                hint={t('editor.attachmentsHint')}
               />
             </div>
           </section>
@@ -326,22 +334,22 @@ export function InvoiceCreator() {
 
         <aside className={styles.side}>
           <section className={surface.card}>
-            <div className={surface.cardHead}>Summary</div>
+            <div className={surface.cardHead}>{t('editor.summary')}</div>
             <div className={surface.cardBody}>
               <fieldset className={cn(styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
-                <legend className={surface.srOnly}>Summary and tax</legend>
+                <legend className={surface.srOnly}>{t('editor.summaryLegend')}</legend>
                 <SummaryPanel />
                 <AdvancedTaxPanel />
               </fieldset>
               <div className={styles.sideActions}>
                 <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()} disabled={readOnly}>
-                  <Save size={18} /> Save {label.toLowerCase()}
+                  <Save size={18} /> {t('editor.saveDoc', { doc: lang === 'en' ? label.toLowerCase() : label })}
                 </button>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => save(false, true)} disabled={readOnly}>
-                  <FilePlus2 size={16} /> Save &amp; new
+                  <FilePlus2 size={16} /> {t('editor.saveNew')}
                 </button>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => setPreviewOpen(true)}>
-                  <Eye size={16} /> Preview &amp; download PDF
+                  <Eye size={16} /> {t('editor.previewPdf')}
                 </button>
               </div>
             </div>
@@ -349,9 +357,9 @@ export function InvoiceCreator() {
 
           {editing && s.id && (
             <section className={surface.card}>
-              <div className={surface.cardHead}>Document actions</div>
+              <div className={surface.cardHead}>{t('editor.docActions')}</div>
               <div className={surface.cardBody}>
-                <Suspense fallback={<p className={styles.muted}>Loading…</p>}>
+                <Suspense fallback={<p className={styles.muted}>{t('common.loading')}</p>}>
                   <DocumentActions invoiceId={s.id} refreshKey={saveTick + lockTick} onChanged={() => setLockTick((t) => t + 1)} />
                 </Suspense>
               </div>
@@ -361,10 +369,10 @@ export function InvoiceCreator() {
           <section className={surface.card}>
             <div className={surface.cardHead}>
               <span className={surface.cardHeadIcon}>
-                <Palette size={16} /> Template
+                <Palette size={16} /> {t('editor.template')}
               </span>
               <Link to="/design" className={styles.muted} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
-                Customise
+                {t('editor.customise')}
               </Link>
             </div>
             <div className={surface.cardBody}>
@@ -389,10 +397,10 @@ export function InvoiceCreator() {
       <ConfirmDialog
         open={!!expiredAsk}
         destructive
-        title="Sell an expired batch?"
-        message={`${expiredAsk?.lines.join(' ') ?? ''} Selling expired goods is usually not allowed — pick another batch unless you are sure.`}
-        confirmLabel="Sell anyway"
-        cancelLabel="Pick another batch"
+        title={t('editor.expiredTitle')}
+        message={t('editor.expiredMsg', { lines: expiredAsk?.lines.join(' ') ?? '' })}
+        confirmLabel={t('editor.sellAnyway')}
+        cancelLabel={t('editor.pickAnother')}
         onClose={() => setExpiredAsk(null)}
         onConfirm={() => {
           const ask = expiredAsk;

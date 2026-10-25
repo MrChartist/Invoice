@@ -54,6 +54,8 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (`mrchartist_inv_kv`, `mrchartist_inv_kv__<id>`) with the same keys inside.
 - Folder sync (5.7, `docs/features/sync.md`): `mrchartist_inv_sync_device` (device-local id/name), and per company
   `sync_state` / `sync_conflicts` / `sync_audit` (`SYNC_META_KEYS`: never in a backup, removed by restore/erase).
+- `mrchartist_inv_lang` — device-local interface language (`en` default / `hi`, 5.4); never in backups. UI strings go
+  through `t()` / `useT()` (`src/i18n/`, how-to + Hindi glossary in `docs/features/i18n.md`).
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express

@@ -10,13 +10,15 @@
 :root {
   color-scheme: light;
 
-  /* Fonts — same stacks as mrchartist.com */
-  --font-display: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-  --font-body: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-accent: 'DM Serif Display', Georgia, serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
+  /* Fonts — same stacks as mrchartist.com. Noto Sans Devanagari leads but only covers Devanagari
+     (unicode-range in fonts.css), so Hindi text looks the same on every device and Latin is untouched. */
+  --font-devanagari: 'Noto Sans Devanagari';
+  --font-display: var(--font-devanagari), 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-body: var(--font-devanagari), 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-accent: var(--font-devanagari), 'DM Serif Display', Georgia, serif;
+  --font-mono: var(--font-devanagari), 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
   /* Used by the invoice templates (not the app chrome) */
-  --font-serif: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  --font-serif: var(--font-devanagari), 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 
   /* Type scale — use these instead of raw sizes */
   --text-2xs: 0.625rem;

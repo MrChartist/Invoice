@@ -16,6 +16,9 @@ import type { InvoiceRecord, Payment } from '../../types/invoice';
 import { realisedFx } from '../../lib/fx-gain';
 import { fxRate, isForeignCurrency } from '../../lib/fx';
 import { BankAccountSelect } from '../bank/BankAccountSelect';
+import { tNodes, useT } from '../../i18n';
+import '../../i18n/en-pages'; // page strings (5.4)
+import { methodLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 
@@ -57,6 +60,7 @@ function refreshEditor(id: string) {
 }
 
 export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps) {
+  const { t } = useT();
   const [version, setVersion] = useState(0);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState(METHODS[0]);
@@ -100,19 +104,19 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (locked) return setError('This document is in a locked period.');
+    if (locked) return setError(t('pay.errLocked'));
     const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) return setError('Enter an amount above zero.');
-    if (value > balance + 0.005) return setError(`This is more than the balance of ${formatCurrency(balance, live.currency)}.`);
+    if (!Number.isFinite(value) || value <= 0) return setError(t('pay.errAmount'));
+    if (value > balance + 0.005) return setError(t('pay.errMore', { amount: formatCurrency(balance, live.currency) }));
     try {
       const rate = Number(realised);
-      if (realised.trim() && !(rate > 0)) return setError('Enter the realised rate in rupees, or leave it blank.');
+      if (realised.trim() && !(rate > 0)) return setError(t('pay.errRate'));
       const payment = localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date, realisedRate: foreign && rate > 0 ? rate : undefined, bankAccountId: bankAccountId || undefined });
       setVersion((v) => v + 1);
       refreshEditor(live.id);
       setError('');
       const cleared = value >= balance - 0.005;
-      onChanged(cleared ? `${live.invoice_number} marked as paid` : `Recorded ${formatCurrency(value, live.currency)}`);
+      onChanged(cleared ? t('pay.markedPaid', { number: live.invoice_number }) : t('pay.recorded', { amount: formatCurrency(value, live.currency) }));
       if (cleared) setSettled(payment);
       else setAmount(String(Math.max(round2(balance - value), 0)));
     } catch (err) {
@@ -129,7 +133,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     }
     setVersion((v) => v + 1);
     if (live) refreshEditor(live.id);
-    onChanged('Payment removed');
+    onChanged(t('pay.removed'));
   };
 
   return (
@@ -137,30 +141,30 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
       open
       onClose={onClose}
       size="md"
-      title="Record payment"
+      title={t('pay.title')}
       subtitle={`${live.invoice_number} · ${live.client?.name ?? ''}`}
       footer={
         <>
           <button type="button" className={controls.btnOutline} onClick={onClose}>
-            Close
+            {t('common.close')}
           </button>
           <button type="submit" form="payment-form" className={controls.btnPrimary} disabled={balance <= 0 || locked}>
-            Record payment
+            {t('pay.submit')}
           </button>
         </>
       }
     >
       <dl className={styles.summary}>
         <div>
-          <dt>Total</dt>
+          <dt>{t('pay.total')}</dt>
           <dd>{formatCurrency(live.total, live.currency)}</dd>
         </div>
         <div>
-          <dt>Received</dt>
+          <dt>{t('pay.received')}</dt>
           <dd className={styles.good}>{formatCurrency(live.amount_paid ?? 0, live.currency)}</dd>
         </div>
         <div>
-          <dt>Balance</dt>
+          <dt>{t('pay.balance')}</dt>
           <dd className={balance > 0 ? styles.due : styles.good}>{formatCurrency(balance, live.currency)}</dd>
         </div>
       </dl>
@@ -169,11 +173,11 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
         <div className={styles.lockBanner} role="alert">
           <Lock size={18} aria-hidden="true" />
           <div className={styles.lockText}>
-            <strong>Locked period</strong>
+            <strong>{t('pay.lockedTitle')}</strong>
             <span>
-              Books are locked up to {prettyDay(getLockUntil())} and this document is dated {prettyDay(live.issue_date)}, so payments can&apos;t be added or removed.{' '}
+              {tNodes('pay.lockedText', { until: prettyDay(getLockUntil()), date: prettyDay(live.issue_date) })}{' '}
               <Link to={`/invoice/${live.id}`} onClick={onClose}>
-                Open it to unlock with your PIN
+                {t('pay.openToUnlock')}
               </Link>
               .
             </span>
@@ -185,7 +189,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
         <form id="payment-form" onSubmit={submit} className={styles.form} noValidate>
           <div className={controls.row}>
             <label className={controls.field}>
-              <span className={controls.label}>Amount</span>
+              <span className={controls.label}>{t('pay.amount')}</span>
               <input
                 className={controls.inputNumeric + ' ' + controls.input}
                 type="number"
@@ -199,28 +203,28 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               />
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>Date received</span>
+              <span className={controls.label}>{t('pay.dateReceived')}</span>
               <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
             </label>
           </div>
           <div className={controls.row}>
             <label className={controls.field}>
-              <span className={controls.label}>Method</span>
+              <span className={controls.label}>{t('pay.method')}</span>
               <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
                 {METHODS.map((m) => (
-                  <option key={m}>{m}</option>
+                  <option key={m} value={m}>{methodLabel(m)}</option>
                 ))}
               </select>
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>{referenceLabel(method)} (optional)</span>
-              <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value.trimStart())} placeholder={method === 'Cash' ? 'Receipt book no.' : 'e.g. 412345678901'} />
+              <span className={controls.label}>{t('pay.referenceOptional', { label: referenceLabel(method) })}</span>
+              <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value.trimStart())} placeholder={method === 'Cash' ? t('pay.refPhCash') : t('pay.refPh')} />
             </label>
           </div>
-          <BankAccountSelect id="pay-bank-account" label="Received into" method={method} value={bankAccountId} onChange={setBankAccountId} />
+          <BankAccountSelect id="pay-bank-account" label={t('pay.receivedInto')} method={method} value={bankAccountId} onChange={setBankAccountId} />
           {foreign && (
             <label className={controls.field}>
-              <span className={controls.label}>Rate realised, ₹ per {live.currency} (optional)</span>
+              <span className={controls.label}>{t('pay.rateRealised', { currency: live.currency })}</span>
               <input
                 className={controls.inputNumeric + ' ' + controls.input}
                 type="number"
@@ -229,12 +233,16 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                 inputMode="decimal"
                 value={realised}
                 onChange={(e) => setRealised(e.target.value)}
-                placeholder={`Invoice rate ${fxRate(live)}`}
+                placeholder={t('pay.invoiceRate', { rate: String(fxRate(live)) })}
               />
               <span className={controls.hint}>
                 {preview
-                  ? `Exchange ${preview.gain >= 0 ? 'gain' : 'loss'} of ₹${Math.abs(preview.gain).toFixed(2)} (₹${preview.realisedInr.toFixed(2)} received vs ₹${preview.bookInr.toFixed(2)} at the invoice rate) — posted to the ledger. GST keeps the invoice rate.`
-                  : 'The rate your bank converted at (see the FIRC / bank advice). The difference from the invoice rate is booked as exchange gain or loss.'}
+                  ? t(preview.gain >= 0 ? 'pay.fxGain' : 'pay.fxLoss', {
+                      amount: Math.abs(preview.gain).toFixed(2),
+                      realised: preview.realisedInr.toFixed(2),
+                      book: preview.bookInr.toFixed(2),
+                    })
+                  : t('pay.fxHint')}
               </span>
             </label>
           )}
@@ -242,19 +250,19 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
         </form>
       ) : locked ? null : settled ? (
         <div className={styles.paidPanel} role="status">
-          <strong>Paid in full</strong>
-          <span>{live.invoice_number} is settled. Send the client a receipt or a quick thank-you.</span>
+          <strong>{t('pay.paidFull')}</strong>
+          <span>{t('pay.settled', { number: live.invoice_number })}</span>
           <div className={styles.paidActions}>
             <button type="button" className={controls.btnPrimary} onClick={() => openReceipt(live, settled)}>
-              <Receipt size={16} /> Receipt
+              <Receipt size={16} /> {t('pay.receipt')}
             </button>
             <button type="button" className={controls.btnOutline} onClick={() => setThanksOpen(true)}>
-              <Heart size={16} /> Send thank-you
+              <Heart size={16} /> {t('pay.thanks')}
             </button>
           </div>
         </div>
       ) : (
-        <p className={controls.ok}>Fully paid. Nothing is outstanding.</p>
+        <p className={controls.ok}>{t('pay.fullyPaid')}</p>
       )}
       {thanksOpen && <ReminderModal invoice={live} open onClose={() => setThanksOpen(false)} />}
 
@@ -275,24 +283,24 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
 
       {payments.length > 0 && (
         <div>
-          <div className={styles.historyLabel}>Payment history</div>
+          <div className={styles.historyLabel}>{t('pay.history')}</div>
           <ul className={styles.history}>
             {payments.map((p) => (
               <li key={p.id}>
                 <div>
                   <strong>{formatCurrency(p.amount, live.currency)}</strong>
                   <span>
-                    {p.advance_id ? `Advance ${p.reference ?? ''} adjusted` : p.method} · {formatDate(p.date)}
+                    {p.advance_id ? t('pay.advanceAdjusted', { ref: p.reference ?? '' }) : methodLabel(p.method)} · {formatDate(p.date)}
                     {p.reference && !p.advance_id ? ` · ${p.reference}` : ''}
-                    {p.realised_rate ? ` · realised @ ₹${p.realised_rate}` : ''}
+                    {p.realised_rate ? ` · ${t('pay.realisedAt', { rate: p.realised_rate })}` : ''}
                   </span>
                 </div>
                 {!p.advance_id && (
-                  <button type="button" className={controls.btnIcon} onClick={() => openReceipt(live, p)} aria-label={`Receipt for ${formatCurrency(p.amount, live.currency)}`} title="Print receipt">
+                  <button type="button" className={controls.btnIcon} onClick={() => openReceipt(live, p)} aria-label={t('pay.receiptFor', { amount: formatCurrency(p.amount, live.currency) })} title={t('pay.printReceipt')}>
                     <Receipt size={15} />
                   </button>
                 )}
-                <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={`Remove payment of ${formatCurrency(p.amount, live.currency)}`}>
+                <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={t('pay.removeFor', { amount: formatCurrency(p.amount, live.currency) })}>
                   <Trash2 size={15} />
                 </button>
               </li>

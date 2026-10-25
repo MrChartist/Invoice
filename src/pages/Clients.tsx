@@ -7,6 +7,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
 import { ClientFormModal } from '../components/modals/ClientFormModal';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
@@ -22,6 +24,7 @@ import styles from './Clients.module.css';
 
 export function Clients() {
   const { notify, toastNode } = useToast();
+  const { t } = useT();
   // Local roles (6.21): a viewer can look clients up but not change them.
   const edit = can('master.edit');
   const [version, setVersion] = useState(0);
@@ -137,18 +140,18 @@ export function Clients() {
         {clients.length === 0 ? (
           <EmptyState
             icon={UserPlus}
-            title="No clients yet"
-            text="Add a client once and pick them in a click on every future invoice."
+            title={t('list.clientsEmptyTitle')}
+            text={t('list.clientsEmptyText')}
             action={
               edit ? (
                 <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-                  <Plus size={16} /> Add your first client
+                  <Plus size={16} /> {t('list.clientsAddFirst')}
                 </button>
               ) : undefined
             }
           />
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Users} title="No matches" text="Try a different search." />
+          <EmptyState icon={Users} title={t('common.noMatches')} text={t('common.tryOtherSearch')} />
         ) : (
           <div className={surface.tableWrap}>
             <table className={`${surface.table} ${styles.directory}`}>

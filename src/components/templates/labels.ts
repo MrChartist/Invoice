@@ -69,7 +69,7 @@ const HI: Record<LabelKey, string> = {
   currency: 'मुद्रा',
   reverseCharge: 'रिवर्स चार्ज',
   document: 'दस्तावेज़',
-  invoiceNo: 'चालान संख्या',
+  invoiceNo: 'इनवॉइस संख्या',
   desc: 'विवरण',
   hsn: 'एचएसएन/एसएसी',
   qty: 'मात्रा',
@@ -105,15 +105,15 @@ const HI: Record<LabelKey, string> = {
 };
 
 export const DOC_TITLE_HI: Record<DocumentType, string> = {
-  INVOICE: 'चालान',
-  TAX_INVOICE: 'कर चालान',
+  INVOICE: 'इनवॉइस',
+  TAX_INVOICE: 'टैक्स इनवॉइस',
   QUOTATION: 'कोटेशन',
-  PROFORMA: 'प्रोफार्मा चालान',
+  PROFORMA: 'प्रोफ़ॉर्मा इनवॉइस',
   CREDIT_NOTE: 'क्रेडिट नोट',
   DEBIT_NOTE: 'डेबिट नोट',
   DELIVERY_CHALLAN: 'डिलीवरी चालान',
-  SALES_ORDER: 'बिक्री आदेश',
-  BILL_OF_SUPPLY: 'आपूर्ति का बिल',
+  SALES_ORDER: 'बिक्री ऑर्डर',
+  BILL_OF_SUPPLY: 'बिल ऑफ़ सप्लाई',
 };
 
 export type Labeller = (key: LabelKey) => ReactNode;

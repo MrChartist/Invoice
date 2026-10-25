@@ -1,0 +1,22 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted-foreground);
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.select {
+  width: auto;
+  min-width: 7.5rem;
+}
+
+.compact {
+  min-width: 6.5rem;
+  min-height: 2rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
