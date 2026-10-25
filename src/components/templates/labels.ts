@@ -1,5 +1,6 @@
 import { createElement, Fragment, type ReactNode } from 'react';
 import type { DocumentType } from '../../types/invoice';
+import type { LabelOverrides, OverridableLabel } from '../../lib/design-prefs';
 import styles from './invoice-paper.module.css';
 
 /** English label text — identical to what the original four layouts printed. */
@@ -53,6 +54,16 @@ const EN = {
 } as const;
 
 export type LabelKey = keyof typeof EN;
+
+// R2-C5: the Design Studio's list of overridable labels must name exactly these keys.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const LABEL_KEYS_MATCH: Same<LabelKey, OverridableLabel> = true;
+void LABEL_KEYS_MATCH;
+
+/** The default English label (for the Design Studio's placeholders). */
+export function defaultLabel(key: LabelKey): string {
+  return EN[key];
+}
 
 /** Hindi second line for the bilingual layout. */
 const HI: Record<LabelKey, string> = {
@@ -118,10 +129,15 @@ export const DOC_TITLE_HI: Record<DocumentType, string> = {
 
 export type Labeller = (key: LabelKey) => ReactNode;
 
-/** Plain English, or English with a small Hindi line underneath. */
-export function makeLabels(bilingual: boolean): Labeller {
-  if (!bilingual) return (key) => EN[key];
+/**
+ * Plain English, or English with a small Hindi line underneath. A Design Studio override (R2-C5)
+ * replaces the English text; an overridden label prints without the Hindi line (it no longer matches).
+ */
+export function makeLabels(bilingual: boolean, overrides?: LabelOverrides): Labeller {
+  const own = (key: LabelKey) => overrides?.[key]?.trim() || '';
+  if (!bilingual) return (key) => own(key) || EN[key];
   return (key) =>
+    own(key) ||
     createElement(
       Fragment,
       null,

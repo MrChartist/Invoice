@@ -371,6 +371,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   // 8H: business loans & EMIs (vouchers go through saveVoucher) and the currency reference-rate master
   business_loans: 'books.edit',
   currency_rates: 'master.edit',
+  // R2-C: notes to accounts and deferral schedules are books; packing lists are documents; package types a master
+  notes_to_accounts: 'books.edit',
+  deferrals: 'books.edit',
+  packing_lists: 'doc.create',
+  package_types: 'master.edit',
 };
 
 let systemDepth = 0;

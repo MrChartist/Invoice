@@ -325,6 +325,9 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}ledger_openings`]: openingDay,
   [`${DB_PREFIX}opening_bills`]: openingDay,
   [`${DB_PREFIX}books_begin`]: (r) => (str(r.date) ? openingDayFor(str(r.date)) : undefined),
+  // R2-C: deferral schedules (their journals are `vouchers` rows, locked on their own dates) and packing lists
+  [`${DB_PREFIX}deferrals`]: (r) => str((r.source as Record<string, unknown> | undefined)?.date) || str(r.start) || undefined,
+  [`${DB_PREFIX}packing_lists`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -888,6 +891,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
   // Review L2: RCM self-invoices (RCM/…) and payment vouchers (RPV/…) are two series in one table.
   [`${DB_PREFIX}rcm_documents`]: { num: 'number', date: 'date', scope: 'kind' },
+  // R2-C: packing lists (PKL/FY…)
+  [`${DB_PREFIX}packing_lists`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

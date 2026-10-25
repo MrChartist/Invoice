@@ -46,6 +46,7 @@ import { normalizePurchase } from './gst-reports';
 import { checkGstin } from './gstin';
 import { notesAsBookBills } from './purchase-returns-gst';
 import { generateId, getTable, setTable } from './storage';
+import { IMS_REMARK_RULES, ruleAt } from './tax-rules';
 import type { XlsxWorkbook } from './xlsx';
 
 /* ───────────────────────── Types ───────────────────────── */
@@ -680,6 +681,15 @@ export interface Gstr2bAction {
   action: ImsAction;
   note?: string;
   updated_at: string;
+  /**
+   * Additive (R2-C3): ITC reduction declared by head on a credit note (CDNR / CDNRA) or a B2BA amendment
+   * that reduces tax. Positive amounts. Absent = the note's own tax (credit notes) / nothing (B2BA).
+   */
+  itc_reduction?: TaxHeads;
+  /** Additive (R2-C3): ITC actually claimed on an invoice when the claim is partial. Absent = the full tax. */
+  declared_itc?: TaxHeads;
+  /** Additive (R2-C3): remark sent with a Pending / Rejected decision. */
+  remark?: string;
 }
 
 export const GSTR2B_ACTIONS_TABLE = 'gstr2b_actions';
@@ -696,13 +706,45 @@ export const gstr2bActionsDb = {
   all: (): Gstr2bAction[] => getTable<Gstr2bAction>(GSTR2B_ACTIONS_TABLE),
   forPeriod: (period: string): Map<string, Gstr2bAction> =>
     new Map(gstr2bActionsDb.all().filter((a) => a.period === period).map((a) => [a.id, a])),
-  /** Record a decision (replaces an earlier one for the same document). */
+  /** Record a decision (replaces an earlier one for the same document; R2-C3 details are kept). */
   set(period: string, line: Gstr2bLine, action: ImsAction, note?: string): Gstr2bAction {
     const id = actionId(period, line);
+    const prev = gstr2bActionsDb.all().find((a) => a.id === id);
     const row: Gstr2bAction = {
       id, period, section: line.section, ctin: line.ctin, inum: normBillNo(line.number), action,
-      note: note?.trim() || undefined, updated_at: new Date().toISOString(),
+      note: note?.trim() || prev?.note || undefined, updated_at: new Date().toISOString(),
+      ...(prev?.itc_reduction ? { itc_reduction: prev.itc_reduction } : {}),
+      ...(prev?.declared_itc ? { declared_itc: prev.declared_itc } : {}),
+      ...(prev?.remark ? { remark: prev.remark } : {}),
     };
+    setTable(GSTR2B_ACTIONS_TABLE, [...gstr2bActionsDb.all().filter((a) => a.id !== id), row]);
+    return row;
+  },
+  /**
+   * R2-C3: save the ITC reduction / declared ITC / remark of a document. The decision itself is kept
+   * (deemed Accept when none was recorded). `null` removes a detail; `undefined` keeps it.
+   */
+  setDetails(
+    period: string,
+    line: Gstr2bLine,
+    patch: { itc_reduction?: TaxHeads | null; declared_itc?: TaxHeads | null; remark?: string | null },
+  ): Gstr2bAction {
+    const id = actionId(period, line);
+    const prev = gstr2bActionsDb.all().find((a) => a.id === id);
+    const base: Gstr2bAction = prev ?? { id, period, section: line.section, ctin: line.ctin, inum: normBillNo(line.number), action: 'ACCEPT', updated_at: '' };
+    const row: Gstr2bAction = { ...base, updated_at: new Date().toISOString() };
+    const apply = <K extends 'itc_reduction' | 'declared_itc'>(k: K, v: TaxHeads | null | undefined) => {
+      if (v === undefined) return;
+      if (v === null) delete row[k];
+      else row[k] = cleanHeads(v);
+    };
+    apply('itc_reduction', patch.itc_reduction);
+    apply('declared_itc', patch.declared_itc);
+    if (patch.remark !== undefined) {
+      const r = (patch.remark ?? '').trim().slice(0, 500);
+      if (r) row.remark = r;
+      else delete row.remark;
+    }
     setTable(GSTR2B_ACTIONS_TABLE, [...gstr2bActionsDb.all().filter((a) => a.id !== id), row]);
     return row;
   },
@@ -711,6 +753,129 @@ export const gstr2bActionsDb = {
     setTable(GSTR2B_ACTIONS_TABLE, gstr2bActionsDb.all().filter((a) => a.id !== id));
   },
 };
+
+/* ───────────────────────── IMS ITC reduction (R2-C3) ───────────────────────── */
+
+const zeroHeads = (): TaxHeads => ({ igst: 0, cgst: 0, sgst: 0, cess: 0 });
+const HEADS = ['igst', 'cgst', 'sgst', 'cess'] as const;
+
+/** Non-negative, rounded heads (anything unreadable → 0). */
+export function cleanHeads(h: Partial<Record<keyof TaxHeads, unknown>> | null | undefined): TaxHeads {
+  const out = zeroHeads();
+  for (const k of HEADS) {
+    const n = Number(h?.[k]);
+    out[k] = Number.isFinite(n) && n > 0 ? round2(n) : 0;
+  }
+  return out;
+}
+
+export const headsTotal = (h: TaxHeads): number => round2(h.igst + h.cgst + h.sgst + h.cess);
+
+/** A credit note (or B2BA amendment) on which an ITC reduction can be declared. */
+export function reductionApplies(line: Pick<Gstr2bLine, 'section' | 'docType'>): boolean {
+  return ((line.section === 'CDNR' || line.section === 'CDNRA') && line.docType === 'CN') || line.section === 'B2BA';
+}
+
+/** An invoice / debit note on which a partial "declared ITC" can be entered. */
+export function declaredItcApplies(line: Pick<Gstr2bLine, 'section' | 'sign'>): boolean {
+  return line.sign > 0 && (line.section === 'B2B' || line.section === 'B2BA' || line.section === 'CDNR' || line.section === 'CDNRA');
+}
+
+/** Pre-fill: a credit note reduces ITC by its own tax; a B2BA amendment by nothing until the user says so. */
+export function defaultReduction(line: Gstr2bLine): TaxHeads {
+  if ((line.section === 'CDNR' || line.section === 'CDNRA') && line.docType === 'CN') return cleanHeads(line);
+  return zeroHeads();
+}
+
+/**
+ * The ITC reduction that counts for a document: only Accepted or Pending credit notes reduce ITC (a rejected
+ * note does not); the declared figures when stored, else the default.
+ */
+export function effectiveReduction(line: Gstr2bLine, action: Gstr2bAction | undefined): TaxHeads {
+  if (!reductionApplies(line)) return zeroHeads();
+  const act = action?.action ?? 'ACCEPT';
+  if (act === 'REJECT') return zeroHeads();
+  return action?.itc_reduction ? cleanHeads(action.itc_reduction) : defaultReduction(line);
+}
+
+/** ITC claimed on an invoice: the declared figures when partial, else the 2B tax (0 when not accepted / available). */
+export function effectiveDeclaredItc(line: Gstr2bLine, action: Gstr2bAction | undefined): TaxHeads {
+  if (!declaredItcApplies(line) || (action?.action ?? 'ACCEPT') !== 'ACCEPT' || !line.itcAvailable) return zeroHeads();
+  return action?.declared_itc ? cleanHeads(action.declared_itc) : cleanHeads(line);
+}
+
+/** "MMYYYY" → the first day of that return period (YYYY-MM-01), '' when unreadable. */
+export function periodStartOf(period: string): string {
+  return /^\d{6}$/.test(period) ? `${period.slice(2)}-${period.slice(0, 2)}-01` : '';
+}
+
+/** Whether a remark is required for this decision (date-keyed rule in tax-rules.ts unless switched off). */
+export function remarkRequired(line: Pick<Gstr2bLine, 'docType' | 'section'>, action: ImsAction, period: string, enabled = true): boolean {
+  if (!enabled || action === 'ACCEPT' || line.docType !== 'CN') return false;
+  const rule = ruleAt(IMS_REMARK_RULES, periodStartOf(period) || undefined);
+  return action === 'PENDING' ? rule.pending : rule.reject;
+}
+
+export interface ImsIssue {
+  key: string;
+  number: string;
+  message: string;
+}
+
+/** Problems with the period's IMS decisions: missing remarks, a reduction or declared ITC above the 2B tax. */
+export function imsIssues(match: Pick<MatchResult, 'rows'>, actions: ReadonlyMap<string, Gstr2bAction>, period: string, remarksOn = true): ImsIssue[] {
+  const out: ImsIssue[] = [];
+  for (const r of match.rows) {
+    const l = r.line;
+    if (!l) continue;
+    const a = actions.get(actionId(period, l));
+    const act = a?.action ?? 'ACCEPT';
+    if (remarkRequired(l, act, period, remarksOn) && !a?.remark?.trim()) out.push({ key: r.key, number: l.number, message: `Remark needed for ${act === 'PENDING' ? 'Pending' : 'Rejected'} credit note ${l.number}` });
+    for (const k of HEADS) {
+      if (a?.itc_reduction && a.itc_reduction[k] > l[k] + 0.5 && l.section !== 'B2BA') out.push({ key: r.key, number: l.number, message: `ITC reduction (${k.toUpperCase()}) on ${l.number} is more than the note's tax` });
+      if (a?.declared_itc && a.declared_itc[k] > l[k] + 0.5) out.push({ key: r.key, number: l.number, message: `Declared ITC (${k.toUpperCase()}) on ${l.number} is more than the 2B tax` });
+    }
+  }
+  return out;
+}
+
+export interface ImsSummary {
+  accepted: number;
+  rejected: number;
+  pending: number;
+  /** Total ITC reduction declared on accepted / pending credit notes (and B2BA), by head. */
+  reduction: TaxHeads;
+  /** Invoices with a partial claim: ITC given up (2B tax − declared), by head. */
+  notClaimed: TaxHeads;
+  /** Documents carrying a declared reduction / partial claim. */
+  reductionDocs: number;
+  partialDocs: number;
+}
+
+/** Period summary of the IMS decisions (display next to the 3B Table 4 working; the 3B builder is unchanged). */
+export function imsSummary(match: Pick<MatchResult, 'rows'>, actions: ReadonlyMap<string, Gstr2bAction>, period: string): ImsSummary {
+  const s: ImsSummary = { accepted: 0, rejected: 0, pending: 0, reduction: zeroHeads(), notClaimed: zeroHeads(), reductionDocs: 0, partialDocs: 0 };
+  for (const r of match.rows) {
+    const l = r.line;
+    if (!l) continue;
+    const a = actions.get(actionId(period, l));
+    const act = a?.action ?? 'ACCEPT';
+    if (act === 'ACCEPT') s.accepted++;
+    else if (act === 'REJECT') s.rejected++;
+    else s.pending++;
+    const red = effectiveReduction(l, a);
+    if (headsTotal(red) > 0) {
+      s.reductionDocs++;
+      for (const k of HEADS) s.reduction[k] = round2(s.reduction[k] + red[k]);
+    }
+    if (a?.declared_itc && act === 'ACCEPT' && declaredItcApplies(l)) {
+      const d = effectiveDeclaredItc(l, a);
+      s.partialDocs++;
+      for (const k of HEADS) s.notClaimed[k] = round2(s.notClaimed[k] + Math.max(0, l[k] - d[k]));
+    }
+  }
+  return s;
+}
 
 /* ───────────────────────── 3B effect (4A(5)) ───────────────────────── */
 
