@@ -33,17 +33,17 @@ A `snooze` row stores its resume date (`YYYY-MM-DD`) in `note`. It is part of th
 `normalizePhone(raw, cc='91')` (digits only, `+91` default; handles `+91`, `0`, `00`, spaces, 10-digit; null if invalid),
 `formatPhoneDisplay`, `whatsappLink(phone, text)`, `mailtoLink({to, cc, bcc, subject, body})` (CRLF body, invalid addresses dropped),
 `smsLink`, `telLink`, `isValidEmail`, `isValidUpiId`, `upiLink({pa, pn, amount, note, tr})`,
-`invoiceUpiLink(invoice)` (INR only, balance due, note "Payment for <number>"),
+`invoiceUpiLink(invoice, amount?)` (INR only, balance due — or `amount` when the caller passes the amount due net of credit notes — note "Payment for <number>"),
 `invoiceSummaryText(invoice)`, `truncateForUrl`, `MAX_URL_LENGTH` (1900 encoded chars; longer text is trimmed with an ellipsis, never splitting emoji).
 
 ## lib/reminders.ts exports
 
 `ReminderStage` = `upcoming | due_today | overdue_polite | overdue_firm | overdue_final | thank_you`.
-Boundaries: upcoming = 1 to 3 days before due, due_today = 0, polite = 1 to 7 days late, firm = 8 to 30, final = 31+. `stageForDays(n)`, `suggestStage(invoice, today)`,
-`buildReminder(invoice, stage, 'en'|'hinglish', today)` returns `{subject, body}` using `{client} {number} {amount} {balance} {due} {days} {upi} {business} {phone}`.
+Boundaries: upcoming = 1 to 3 days before due, due_today = 0, polite = 1 to 7 days late, firm = 8 to 30, final = 31+. `stageForDays(n)`, `suggestStage(invoice, today, credited?)`,
+`buildReminder(invoice, stage, 'en'|'hinglish', today, {interestAccrued?, credited?})` returns `{subject, body}` using `{client} {number} {amount} {balance} {due} {days} {upi} {business} {phone}`.
 The final notice mentions late-payment charges only when `termsMentionInterest` finds interest/late fee/penalty wording in the invoice's own terms or notes; no legal claims are invented.
 Log helpers: `remindersFor`, `reminderCount`, `lastReminder`, `snoozedUntil`, `isSnoozed`, `makeLogEntry`, `makeSnooze`.
-`pendingReminders(invoices, today, log, {cooldownDays})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with balance, in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted by chase priority (`reminderPriority`, 0–100, ties most overdue first): days overdue up to 50 (linear to 90 days; not-yet-due 0–5), balance in ₹ up to 30 (log scale, ₹1,000 → 0, ₹10 lakh+ → 30; foreign documents converted at their exchange rate), the client's other overdue bills 5 each up to 10 (client matched by GSTIN, else name), reminders already sent 5 each up to 10. Level: high ≥ 50, medium ≥ 25, else low; the Dashboard card shows the level with the reasons as a tooltip.
+`pendingReminders(invoices, today, log, {cooldownDays, credits})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with an amount due (`amountDue`, net of the linked credit notes in `credits` = `linkedCredits(doc_links, invoices)`, `src/lib/amount-due.ts`; each row carries it as `balance`), in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted by chase priority (`reminderPriority`, 0–100, ties most overdue first): days overdue up to 50 (linear to 90 days; not-yet-due 0–5), balance in ₹ up to 30 (log scale, ₹1,000 → 0, ₹10 lakh+ → 30; foreign documents converted at their exchange rate), the client's other overdue bills 5 each up to 10 (client matched by GSTIN, else name), reminders already sent 5 each up to 10. Level: high ≥ 50, medium ≥ 25, else low; the Dashboard card shows the level with the reasons as a tooltip.
 
 ## Components
 

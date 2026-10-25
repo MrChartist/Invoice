@@ -33,7 +33,7 @@ import { dateLocale, useT, type MessageKey } from '../i18n';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Dashboard.module.css';
-import { receivableBalance } from '../lib/rcm';
+import { amountDue, linkedCredits } from '../lib/amount-due';
 
 function greeting(hour: number): MessageKey {
   if (hour < 12) return 'dash.morning';
@@ -105,8 +105,10 @@ export function Dashboard() {
   // Foreign-currency documents count in rupees at their exchange rate; without a rate they are left out.
   const noRate = foreignWithoutRate(invoices);
   // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
-  const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders')).map((p) => p.invoice.id));
-  const attention = attentionList(invoices, 50, now)
+  // What credit notes settled is never chased (src/lib/amount-due.ts).
+  const credits = linkedCredits(links, invoices);
+  const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders'), { credits }).map((p) => p.invoice.id));
+  const attention = attentionList(invoices, 50, now, credits)
     .filter((inv) => !chasing.has(inv.id))
     .slice(0, 5);
   const recent = [...invoices]
@@ -243,7 +245,7 @@ export function Dashboard() {
                           {late ? (late === 1 ? t('dash.lateOne') : t('dash.lateMany', { n: late })) : t('dash.due', { date: formatDate(inv.due_date) })}
                         </span>
                       </div>
-                      <span className={styles.amount}>{formatCurrency(receivableBalance(inv), inv.currency)}</span>
+                      <span className={styles.amount}>{formatCurrency(amountDue(inv, credits.get(inv.id)), inv.currency)}</span>
                     </Link>
                   </li>
                 );

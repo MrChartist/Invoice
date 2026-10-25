@@ -4,6 +4,8 @@
  */
 import { useMemo, useState } from 'react';
 import { buildReceivables } from '../../../lib/receivables';
+import { getTable } from '../../../lib/storage';
+import type { CreditLinkRow } from '../../../lib/amount-due';
 import {
   REGISTER_LABELS,
   columnarRegister,
@@ -180,7 +182,7 @@ function ExceptionsView({ period, data, today, positions }: Props) {
   const drill = useDrill();
   const openVoucher = useOpenVoucher();
   const ex = useMemo(() => {
-    const rec = buildReceivables({ invoices: data.invoices, payments: data.transactions, advances: data.advances });
+    const rec = buildReceivables({ invoices: data.invoices, payments: data.transactions, advances: data.advances, links: getTable<CreditLinkRow>('doc_links') });
     const overdue = rec.parties.flatMap((p) =>
       p.bills.filter((b) => b.daysOverdue > 0).map((b) => ({ party: p.name, number: b.number, dueDate: b.dueDate, outstanding: Math.round(b.outstanding * 100), daysOverdue: b.daysOverdue, invoiceId: b.invoiceId })),
     );

@@ -8,6 +8,7 @@ import type { AdvanceRecord } from '../types/advances';
 import { localDb } from './localDb';
 import { getTable, setTable, generateId } from './storage';
 import { buildReceivables, type BuildInput, type ReceiptRow, type ReceivablesReport } from './receivables';
+import type { CreditLinkRow } from './amount-due';
 import { loadReceivableOpeningBills } from './opening-bills';
 import { computePartyBalanceSnapshot, type SnapshotOptions } from './khata';
 import { REMINDERS_TABLE, type ReminderRecord } from './reminders';
@@ -24,6 +25,8 @@ export function loadReceivablesInput(): BuildInput {
     payments: localDb.payments.getAll() as ReceiptRow[],
     clients,
     advances: getTable<AdvanceRecord>('advances'),
+    // Credit notes allocated to the invoice they were raised against (src/lib/amount-due.ts).
+    links: getTable<CreditLinkRow>('doc_links'),
     openingBills: loadReceivableOpeningBills(clients),
   };
 }

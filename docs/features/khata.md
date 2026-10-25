@@ -5,6 +5,10 @@ see who owes what, take money in with two taps, give credit, send a statement or
 and print the party's running balance on the bill. Everything is offline: the app only builds `wa.me` and
 `upi://` links, hands files to the OS share sheet (Web Share Level 2) or downloads them. Nothing is sent by the app.
 
+`loadReceivablesInput` passes the `doc_links` table, so a credit note raised against a bill is allocated to it
+(`receivables.md` → Bill-wise credit notes): open bills, the overdue amount and the reminder queue never chase the
+credited part.
+
 | Piece | Where | Tests |
 |---|---|---|
 | Pure maths: balance rows, totals, FIFO, WhatsApp statement, party reminders, queue, snapshot | `src/lib/khata.ts` | `tests/khata.test.ts` |

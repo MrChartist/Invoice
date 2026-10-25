@@ -10,6 +10,7 @@ import {
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
 import { getTable } from '../lib/storage';
+import type { CreditLinkRow } from '../lib/amount-due';
 import type { AdvanceRecord } from '../types/advances';
 import { loadReceivableOpeningBills } from '../lib/opening-bills';
 import { createLateFeeInvoice, describeClientLateFee, lateFeeRuleFor, type ClientLateFee } from '../lib/late-fee';
@@ -67,6 +68,8 @@ function loadData() {
     payments: localDb.payments.getAll() as ReceiptRow[],
     clients,
     advances: getTable<AdvanceRecord>('advances'),
+    // Credit notes allocated to the invoice they were raised against (src/lib/amount-due.ts).
+    links: getTable<CreditLinkRow>('doc_links'),
     // Bill-wise opening outstandings (WP-1 masters): age and appear in statements like invoices.
     openingBills: loadReceivableOpeningBills(clients),
   };
