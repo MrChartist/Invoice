@@ -214,7 +214,7 @@ documents in `docs/features/` keep their own WP ids). Gap ids refer to `docs/GAP
 | 7.4 | ✅ **Voucher variants**: optional (make regular), memorandum, post-dated (with PDC summary), reversing journals, voucher classes (`src/lib/ledger/voucher-variants.ts`) | Optional / Memo / Post-dated / Reversing journal | done |
 | 7.5 | ✅ **Bill-wise payables**: Agst Ref over several bills, Advance / On Account / New Ref, later adjustment, ageing, party bill-wise view, MSMED interest (`src/lib/billwise.ts`) | Bill-wise details, outstanding ageing | done |
 | 7.6 | ✅ **Ratio analysis** from the ledger with drill-down (`src/lib/ledger/ratios.ts`) | Ratio Analysis | done |
-| 7.7 | ⏳ (Sec 194-O / 194R / 194S presets, certificate limits / validity: done in 7O — 7.95, 7.97) Form 27Q (non-residents; flag kept), TRACES justification import | — | open |
+| 7.7 | ✅ (Sec 194-O / 194R / 194S presets, certificate limits / validity: done in 7O — 7.95, 7.97) Form 27Q working paper with DTAA vs Act rate and TRACES justification import: done in 7R (7.120) | — | done |
 | 7.8 | ✅ Vendor-form fields for PAN / deductee type / 206AB / Sec 197, TDS dates in the compliance calendar / notification bell — done in 7O (7.95, 7.96) | — | done |
 | 7.9 | ✅ **Masters & openings ("Accounts Info")**: user groups / sub-groups under the Schedule III primaries (nature and gross-profit effect inherited), Group / Ledger Create · Alter · Display with Tally keys (Enter / Ctrl+A / Esc, Alt+C hook), ledger and party opening balances on a books-beginning date posted as an Opening voucher with the difference in opening balances reported, bill-wise opening outstandings in receivables ageing and statements, opening trial balance screen, ledger interest parameters (lib), bill allocation on manual receipts — `docs/features/masters.md` | Groups, Ledgers, Opening balances, Bill-wise details (WP-1: P0-1, P0-2, P0-11, P1-7 lib) | done (P1-21 import kinds, P2 cost categories: open) |
 | 7.10 | ✅ **Payroll** (WIP-A): employees, pay heads (Tally calculation types), salary structures, attendance / production, Auto fill payroll run → Payroll voucher in the ledger, salary / PF / ESI / PT / TDS (192) payments, payslips, PF ECR, ESI, PT, Form 24Q / Form 16 Part B working papers (`/payroll`, `src/lib/payroll/`, `docs/features/payroll.md`) | Payroll | done |
@@ -243,7 +243,7 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.20 | ✅ **Each bank account as its own ledger** (WP-5, P0-8): main account keeps 3510, others `bank:<id>` under Cash & bank or Bank OD A/c; receipts, supplier payments / advances, advance receipts / refunds, TDS challans and cheques post to their bank; per-bank openings; contra between banks (OD included); Books bank book per account; Tally one ledger per bank | `src/lib/bank-ledgers.ts`, `src/lib/ledger/postings-bank.ts`, `src/lib/tally-bank.ts`, `docs/features/banking.md` | M |
 | 7.21 | ✅ **Banking documents** (WP-5, P1-14): deposit / pay-in slip with cheques + cash denominations (`PIS/FY…`), payment advice (bills settled + TDS), bulk e-payment file (generic NEFT / RTGS CSV + HDFC / ICICI / SBI presets — check the format with your bank), cheque against several invoices / bills, vendor bank details | `deposit-slip.ts`, `payment-advice.ts`, `bank-upload.ts`, `cheques.ts`, `BankingDocs.tsx` | M |
 | 7.22 | ✅ **Bounce charges posting** and **day-end cash tally by denomination** (WP-5, P2) | `cheques.ts`, `cash-tally.ts` | S |
-| 7.23 | ⏳ Banking follow-ups: forex bank ledgers, record payments from an e-payment file after bank confirmation, supplier payments in the Tally export, Contra voucher from a deposit slip's cash (vendor-form bank details: done in 7.60) | — | M |
+| 7.23 | ✅ Banking follow-ups: forex bank ledgers, payments recorded from an e-payment file after bank confirmation, Contra from a deposit slip's cash, supplier payments in the Tally export (confirmed, WP-7) — see 7U (7.150–7.153); vendor-form bank details: done in 7.60 | `docs/features/banking.md` | M |
 
 ### 7D · Purchase returns, receipt notes, order outstanding (WP-3)
 
@@ -274,7 +274,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.34 | **Reorder levels + MOQ** (per godown optional), Reorder Status with pending POs and "Create purchase order", bell alert | Reorder Status | ✅ |
 | 7.35 | **Inventory reports**: Stock Summary drill-down (item → month → vouchers), Movement Analysis by party, Stock Ageing (FIFO layers, by batch), Negative stock exceptions (`src/lib/stock-reports.ts`) | Stock Summary, Movement Analysis, Ageing | ✅ |
 | 7.36 | Job work out / in orders, material sent / received, ITC-04 | Job Work vouchers | ✅ see 7M |
-| 7.37 | Serial-tracked items in manufacturing; production plan / material requirement vs BOM | — | Next step |
+| 7.37 | ✅ Serial-tracked items in manufacturing; production plan / material requirement vs BOM — done in 7S (7.130, 7.131) | — | ✅ |
 
 ### 7G · Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
 
@@ -285,7 +285,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.40 | ✅ **Branches / locations** (WP-9, P1-19): branch master, additive `branch_id` on documents / purchases / vouchers (inferred from profile / GSTIN), branch filter + branch-wise summary; reports-engine option documented for WP-2 (`src/lib/branch.ts`) | Tally, Busy | M |
 | 7.41 | ✅ **Dashboard tiles** (WP-9, P1-17): receivables, payables, cash / bank, GST due, top items, low stock, branches, approvals, AMC, loyalty — per user, lazily loaded (`src/lib/dashboard-tiles.ts`) | TallyPrime 4 | S–M |
 | 7.42 | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
-| 7.43 | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
+| 7.43 | ✅ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS raw receipts + cash drawer, pharma pack — see 7U (7.154–7.157) | Marg, Busy | M |
 
 ### 7H · Migration, audit trail & year-end (WP-7, `docs/features/migration-audit.md`)
 
@@ -316,7 +316,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.56 | ✅ **e-Invoice ShipDtls / DispDtls / PayDtls / EwbDtls** from `invoice.ship_to`, a dispatch option, the sender's bank details and `invoice.transport` | e-Invoice with dispatch / ship-to / e-Way | done |
 | 7.57 | ✅ **HSN master** with dated rate history and default-rate inheritance (item → HSN → group → company), seeded from existing documents; **purchase HSN / rate register** (`hsn-master.ts`, `hsn-purchase-register.ts`) | GST Rate Setup, HSN-wise purchase summary | done |
 | 7.58 | ✅ **Month-wise GSTR-1 vs GSTR-3B vs Books** reconciliation and a **GSTR-9C working paper** (Tables 5 / 7 / 9 / 12 with adjustments) (`gst-recon-monthly.ts`, `gstr9c.ts`) | Reconciliation of Returns | done |
-| 7.59 | ⏳ WP-6 follow-ups (cess in Books / exports / Tally, ITC carry-forward, RCM self-invoice + Rule 52 series, IFF JSON: done in 7O — 7.90–7.98): PMT-09 / refunds, EXPA, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 | — | open |
+| 7.59 | ✅ WP-6 follow-ups (cess in Books / exports / Tally, ITC carry-forward, RCM self-invoice + Rule 52 series, IFF JSON: done in 7O — 7.90–7.98; EXPA: built with the amendments, `gst-reports.md`): PMT-09 / refunds, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 — done in 7R (7.121–7.127) | — | done |
 
 ### 7K · Integration pass (after the WP merge)
 
@@ -333,7 +333,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.63 | ✅ **Sales Order Outstanding** (pending delivery / invoice by party · item · due date, overdue days) on Inventory → Order outstanding; reorder "pending PO" counts goods received on GRNs before the bill | P1-12 | done |
 | 7.64 | ✅ Configurable **ageing slabs** with Hindi bucket labels (Stock reports → Ageing) | P1-11 | done |
 | 7.65 | ✅ **Godown hierarchy** (godown inside a godown, stock rolled up), **standard cost / selling price lists** with effective dates, **Stock Query** (stock by godown / batch, last purchase / sale rates, pending orders, prices), **landed cost** on a bill (freight etc. spread to the goods' stock cost, memo only); stock-item delete blocked while BOMs / stock vouchers use it | P2 | done |
-| 7.66 | ⏳ (UQC mapping into GSTR-1 HSN / e-Invoice / e-Way and alternate-unit item profit: done after the merge; alternate units on POS lines and stock journals: done in 7.72) price lists feeding the editor's rate; group-wise reorder / ageing filters | P1-10, P2 | open |
+| 7.66 | ✅ (UQC mapping into GSTR-1 HSN / e-Invoice / e-Way and alternate-unit item profit: done after the merge; alternate units on POS lines and stock journals: done in 7.72) price lists feeding the editor's rate, group-wise reorder / ageing / movement filters, Manufacturing Journal components and physical counts in alternate units — done in 7S (7.134, 7.135) | P1-10, P2 | done |
 
 ### 7M · Job work, ITC-04, Rejections In, alternate units on stock vouchers (`docs/features/job-work.md`)
 
@@ -342,7 +342,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.70 | ✅ **Job work out**: Job Work Out order (`JWO/FY…`), **Material Out** delivery challan under Rule 55 / Sec 143 (`JWC/FY…`, printable in triplicate), **job-worker godowns** (created on first challan, `job_worker` flag — still our stock in the summary), **Material In** (`JWR/FY…`: processed goods at inputs + job charges − scrap, scrap, returned inputs, losses, 5C supplies; consumption typed or exploded from the BOM), **Sec 143 return clocks** (inputs 1 year, capital goods 3 years, tools none, extension) with due-soon / **deemed supply** alerts; stock event source `events-job-work.ts` (one registration line in `collectEvents`) | P1-9 | done |
 | 7.71 | ✅ **Job work in** (we are the job worker): principal's material received / sent back register (`JWP/FY…`, not our stock), job charges invoice (SAC 9988 service line opened in the editor); **ITC-04 working paper** (Table 4, 5A / 5B / 5C; half-yearly above ₹5 crore / annual from FY 2021-22, quarterly before — `ITC04_RULES` date-keyed in `tax-rules.ts`; CSV; verify with your CA) | P1-9 | done |
 | 7.72 | ✅ **Rejections In** (`RJI/FY…`): customer rejects goods on a delivery challan before invoicing — stock back while challans move stock, challan balance reduced and billed balance on conversion; **alternate units** (`unit_factor`) on POS lines, stock journals, stock transfers and manual adjustments; typed quantities rounded to the units master's decimal places | P1-8, P1-10 | done |
-| 7.73 | ⏳ Job work follow-ups: serial-tracked items to job workers, e-Way bill JSON for job-work challans, clock alerts in the bell, principal's goods by godown / batch, GSTR-1 / ITC-04 JSON | P1-9 | open |
+| 7.73 | ✅ Job work follow-ups: serial-tracked items to job workers, e-Way bill JSON for job-work challans, clock alerts in the bell, principal's goods by godown / batch, ITC-04 JSON (layout unverified) — done in 7S (7.132, 7.133); job charges reach GSTR-1 through the normal invoice export | P1-9 | done |
 
 
 ### 7O · GST & TDS follow-ups (`docs/features/gst-setoff.md`, `docs/features/tds-payables.md`)
@@ -358,7 +358,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.96 | ✅ **TDS dates in the GST compliance calendar** (lazy `TdsDueCalendar`) and the **notification bell** (deposit / 26Q overdue or due within 5 days) | Statutory reminders | done |
 | 7.97 | ✅ **Sec 194-O / 194R / 194S** presets, date-keyed append-only (`TDS_EXTRA_SECTION_RULES` in `tax-rules.ts`, thresholds `TDS_EXTRA_THRESHOLD_RULES`), on both the receivables and payables side — unverified, see CA list | TDS nature of payment | done |
 | 7.98 | ✅ **IFF JSON** (QRMP months 1–2): B2B / CDNR (+ amendments) from the month's GSTR-1 build with the ₹50 lakh check (`src/lib/iff.ts`, date-keyed limit) — layout unverified | — | done |
-| 7.99 | ⏳ 7O follow-ups: Form 27Q return working paper / DTAA rates, TRACES justification import, 194-O ₹5 lakh individual exemption and 5% no-PAN rate, TDS on payment-mode bills reduced by later returns, PMT-09 / refunds, GSTR-9C Table 12 split of supplier notes, cess on supplier notes, accounting `gst_summary` export cess, TCS (27EQ) items in the bell | — | open |
+| 7.99 | ✅ 7O follow-ups — all done in 7R: Form 27Q / DTAA (7.120), TRACES import (7.120), 194-O ₹5 lakh exemption and 5% no-PAN rate (7.120), TDS on payment-mode bills reduced by later returns (7.120), PMT-09 / refunds (7.121), 9C Table 12 split (7.127), cess on supplier notes (7.123), `gst_summary` cess (7.125), TCS (27EQ) in the bell (7.120) | — | done |
 
 ### 7P · Payroll depth (`docs/features/payroll.md`)
 
@@ -398,7 +398,52 @@ Details: `docs/features/manufacturing.md`.
 | 7.81 | ✅ **Inter-branch transfer between distinct GSTINs** (Sec 25(4)): a stock transfer between godowns of two branches with different GSTINs offers "Tax invoice + bill" — TAX_INVOICE from the sending registration + matching ITC bill at the receiving branch, posted to new default ledgers 4030 / 5020 "Branch transfer" so the pair nets out; value per Rule 28 flagged "verify with your CA" (`src/lib/branch-transfer.ts`, `components/branches/BranchTransferDialog.tsx`) | P1-19 | done |
 | 7.82 | ✅ **Gateway Display drill = Books**: a balance-sheet head drills into its Schedule III break-up (party advances that moved sides, the valued closing-stock line inside Inventories), party lines straight to the party's monthly summary (`src/lib/gateway/drill.ts`) | P0-4 | done |
 | 7.83 | ✅ Small gaps: loyalty redemption in the invoice editor (lazy, only while the programme is on); palette "POS return / exchange" opens the return dialog (`/pos?return=1`); bell GST set-off reminder for every regular filer even before the set-off screen is used (never for composition); Alt+C create-on-the-fly for stock items and godowns (stock-transfer pickers, bill / PO line item names); Edit log on the stock item form (`tests/wiring-7n.test.ts`) | — | done |
-| 7.84 | ⏳ Branch follow-ups: per-godown closing-stock valuation for branch statements, Alt+C in the manufacturing / stock-journal line grids and the bill godown select, automatic Sec 25(4) prompt when the transfer is saved, branch column on GSTR-1 / 3B papers per GSTIN | P1-19 | open |
+| 7.84 | ✅ Branch follow-ups: per-godown closing stock for branch statements, Alt+C in manufacturing / stock-journal grids and the bill godown select, automatic Sec 25(4) prompt (7S, 7.160–7.167); GSTR-1 / 3B column per GSTIN (7R, 7.130) | P1-19 | done |
+
+### 7R · GST & TDS statutory gaps (`docs/features/tds-payables.md`, `docs/features/gst-setoff.md`, `docs/features/gstr9.md`)
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 7.120 | ✅ **TDS**: **Form 27Q** working paper (non-residents: Sec 195-R / F / I / O sections, Act rates date-keyed with cess in `NR_ACT_RATE_RULES`, vendor country / TIN / TRC / Form 10F / DTAA rate, DTAA only with TRC + 10F, Sec 206AA / Rule 37BC, short-deduction flags, CSV / XLSX, filed mark, separate 27Q due item); **TRACES justification import** (tolerant text / CSV parser with untrusted-file caps, matched to deductions, resolve, table `tds_justifications`); **194-O** ₹5 lakh individual / HUF exemption and 5% no-PAN rate; **TDS on payment-mode bills** net of later supplier returns; **TCS (27EQ)** deposit / return items in the bell (light reader, bell stays lazy) — all unverified, CA list | `tds-27q.ts`, `traces-justification.ts`, `tds-payables.ts`, `tds-rules.ts`, `Tds7rTabs.tsx` | done |
+| 7.121 | ✅ **Electronic cash ledger by minor head**, **PMT-09** transfers (`gst_pmt09`) and **refund claims RFD-01** (`gst_refunds`: categories, ARN, trail RFD-02/03/04/06/05, Sec 54(1) last day, Sec 56 delay estimate, receipt voucher on PAID: Dr bank / Cr 2360 or input heads); **Rule 89(4)** LUT refund working paper | `gst-cash-refunds.ts`, tab "Cash ledger & refunds" | done |
+| 7.122 | ✅ **ISD**: invoices received / ISD invoices issued (`ISD/FY…`) / ISD credit received (`isd_documents`), Rule 39 distribution by turnover (CGST / SGST → IGST across States), **GSTR-6** working paper (Tables 3, 4, 5, 8; due 13th), ISD credit received → **3B 4A(4)**, JSON ISD row, **GSTR-9 6G** | `isd.ts`, tab "ISD / GSTR-6" | done |
+| 7.123 | ✅ **Cess on supplier notes** (`cess_amount` pro rata from the bill) reversed in 3B, GSTR-9, Books, ledger (Input cess 2353) and Tally debit notes | `purchase-returns(-gst).ts`, `postings-returns.ts`, `tally-debit-notes.ts` | done |
+| 7.124 | ✅ **GSTR-3B JSON writes the signed 4(C)** (`GSTR3B_JSON_LAYOUT.signedNetItc`, Circular 170/02/2022-GST as understood) and the 4A(4) ISD row | `gstr-json.ts` | done |
+| 7.125 | ✅ Accounting **`gst_summary` export Cess column** (inside Total Tax) | `accounting-export.ts` | done |
+| 7.126 | ✅ **Consolidated e-Way Bill (EWB-02)** JSON from several EWB numbers for one vehicle (saved or pasted, checks, expired flags; layout unverified) | `eway-consolidated.ts`, tab "Consolidated e-Way" | done |
+| 7.127 | ✅ **GSTR-9C** rate-wise **Table 9** (9A–9Q incl. RC rows), **Table 14** (ITC on expenses by head vs 7J), **Table 12 split** of supplier notes (12A-N) | `gstr9c-extra.ts`, `gstr9c.ts`, `Gstr9cView.tsx` | done |
+| 7.128 | ✅ **GSTR-9 Part V** (Tables 10–12, 14 from next-FY notes / amendments / supplier notes up to the date-keyed cut-off; 13 noted) | `gstr9-partv.ts`, `gstr9.ts` | done |
+| 7.129 | ✅ **GSTR-1 Table 14A(a)** from amendment rows with the operator GSTIN; Table 14A(b) / Table 15 / 3B 3.1.1(i) documented as operator rows (nil in a supplier's return) | `eco-amend.ts`, `EcoView.tsx` | done |
+| 7.130 | ✅ **GSTR-1 / 3B by GSTIN** — one column per registration (branches / profiles), bills by branch GSTIN or place-of-supply State, unassigned listed, CSV | `gst-by-gstin.ts`, tab "By GSTIN" | done |
+| 7.131 | ⏳ 7R follow-ups: Form 15CA / 15CB, surcharge and Sec 195A grossing-up on 27Q; 27Q FVU text; TRACES flags in the Deductions tab; refund of IGST on goods exports (shipping-bill route); filed ITC refunds netted in the carried credit; ISD ledger postings and GSTR-6 amendments; books column on 9C rate-wise Table 9; Table 13 of GSTR-9 Part V; operator-side Table 15 / 3.1.1(i) | — | open |
+
+### 7U · Banking & business-extras follow-ups (`docs/features/banking.md`, `docs/features/business-extras.md`)
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 7.150 | ✅ **Forex bank ledgers**: `BankAccount.currency` + `fcy_opening` (EEFC / foreign-currency accounts, never the main account); balance in FCY (opening + same-currency receipts + entries) and INR (the ledger); money in at a typed rate, money out / conversion with the **realised** difference, period-end **revaluation** at a typed closing rate (**unrealised**, AS 11) — each a Journal through `saveVoucher` to 4930; table `fx_bank_moves`; no live rates; verify with your CA | `forex-bank.ts`, `ForexBankPanel.tsx` | done |
+| 7.151 | ✅ **Payments from an e-payment file after confirmation**: downloaded batches kept (`epay_batches`, `EPB/FY…`); bank response / status file or statement rows parsed by header; matched by reference, account + amount, unique amount; supplier payments recorded all or nothing (oldest bills first, rest on account, UTR as reference, bank's date); failed rows marked | `epay-confirm.ts`, `EpayConfirmPanel.tsx` | done |
+| 7.152 | ✅ **Contra for a deposit slip's cash**: Dr the slip's bank | Cr Cash on the slip date, posted before the cheques move (period lock refuses the slip), optional per slip | `deposit-slip.ts` | done |
+| 7.153 | ✅ **Supplier payments in the Tally export** confirmed (WP-7 `tally-books.ts`: Payment vouchers Agst Ref + TDS, advances / on account) and covered by a test with an EEFC-era bank ledger | `tests/banking-7u.test.ts` | done |
+| 7.154 | ✅ **Sales commission per agent**: agent master (flat % / % by stock group, on invoice or on receipt), `agent_id` on documents, statement + CSV, payable journal Dr Sales commission | Cr Sundry creditors (agent), periods never overlap; TDS 194H not computed (CA) | `sales-commission.ts`, `AgentsPanel.tsx` | done |
+| 7.155 | ✅ **Offers**: `schemes` extended with `kind` — buy A get B (₹0 line of item B with its HSN / rate) and bill-value slabs (% / ₹ off, best slab) applied after the price is chosen as an amount discount with its own line in the editor, POS and receipt (`offer`); GST on the net value (Sec 15(3)(a), Circular 92/11/2019) — verify with your CA | `offers.ts`, `pricing.ts`, `OffersPanel.tsx`, `EditorExtras.tsx` | done |
+| 7.156 | ✅ **ESC/POS**: per-device printer mode (browser default / raw 58–80 mm text receipt / ESC-POS over Web Serial, feature-detected, user-picked port), cash-drawer kick on cash bills only in serial mode, fallback to browser print; no network | `escpos.ts`, `PosPrinter.tsx` | done |
+| 7.157 | ✅ **Pharma pack**: drug licence numbers on the profile (printed), Schedule H / H1 / X on stock items, prescription on the bill, Schedule H1 register (CSV), near-expiry list, block expired / near-expiry sales option in every stock check | `pharma.ts`, `pharma-gate.ts`, `PharmaPanel.tsx` | done |
+| 7.158 | ⏳ 7U follow-ups: foreign-currency supplier payments from an EEFC account, bank-specific response presets, revaluation reversal option, TDS 194H on commission, agent on POS bills, per-customer offers, ESC/POS QR / logo, Schedule X register book format | — | open |
+
+
+### 7S · Inventory, manufacturing, job work & branch stock follow-ups (`docs/features/manufacturing.md`, `docs/features/job-work.md`)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.160 | ✅ **Serial-tracked items on stock vouchers**: Manufacturing Journal components consumed by serial and finished units / by-products given new serials; Stock Journal source / destination by serial; one serial per unit (whole base units), dated in-stock / not-needed-later checks on save, delete refused once a later entry used a produced serial; serial column with "Fill from stock" in the line grids (`src/lib/serial-vouchers.ts`, two `serials` fields in `pushVoucherEvents`) | 7.37 | done |
+| 7.161 | ✅ **Production plan / MRP** (`PP/FY…`, table `production_plans`): multi-level default-BOM explosion netted once per item at its low-level code against closing stock and open POs / GRNs; make vs buy with MOQ and last purchase rate; "Create purchase order", "Manufacture" opens a filled Manufacturing Journal; period lock, roles, audit, backup, sync (`src/lib/mrp.ts`, `MrpTab.tsx`) | 7.37 | done |
+| 7.162 | ✅ **Job work by serial**: Material Out sends serials to the job worker's godown (still our stock), Material In returns / consumes / supplies / loses them there, processed goods under new serials; checks on save and delete (`jobWorkSerialIssues`) | 7.73, P1-9 | done |
+| 7.163 | ✅ **Job work follow-ups**: e-Way bill JSON for a Material Out challan (sub-type 4 Job Work, CHL, tax values nil, transport saved on the challan; verify with your CA — `eway-job-work.ts`), Sec 143 clock alerts in the bell (lazy, `job-work-alerts.ts`), principal's goods by godown / batch (`job-work-principal.ts`), ITC-04 JSON beside the CSV (**layout unverified**, `itc04-json.ts`) | 7.73, P1-9 | done |
+| 7.164 | ✅ **Selling price lists in the editor**: the item's selling price in force on the document date becomes the line rate on pick ("Price list"); a customer level's own rate still wins, % levels apply to it, slabs below it apply, typed rates and credit / debit notes untouched (`price-list.ts`, `pricing-actions.ts`) | 7.66, P2 | done |
+| 7.165 | ✅ **Group / category filters** on Reorder Status, Movement Analysis and Stock Ageing (incl. by batch); **alternate units** on Manufacturing Journal component lines (FEFO in base units) and Physical Stock counts (`counted_typed`, base units stored) | 7.66, P1-10 | done |
+| 7.166 | ✅ **Branch stock**: per-godown closing-stock valuation for branch statements in Books and Gateway (branch godowns × company-wide unit cost; "No branch" takes the rest so branches add up — `ledger/branch-stock.ts`); Alt+C on manufacturing / stock-journal line grids (items, godowns) and the bill godown select; the Sec 25(4) tax invoice + bill dialog opens automatically when a transfer between two GSTINs is saved | 7.84, P1-19 | done |
+| 7.167 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), price lists on POS, ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
 
 ## Summary timeline
 

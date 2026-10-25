@@ -144,9 +144,13 @@ per row. `tests/perf.test.ts` paths unchanged.
 - Sales-order fulfilment, Tally XML inventory lines and the GSTR-9 / purchase HSN registers (inward side) still read
   line quantities as typed; the SO index is consistent while the invoice keeps the order line's unit.
 - ~~Alternate units on POS lines, stock journals, transfers and adjustments~~ — 7M (`docs/features/job-work.md`): `unit` +
-  `unit_factor` on those lines too, converted by every stock reader. Manufacturing Journal component lines and
-  physical stock counts are still base unit only.
-- Price lists are not yet applied automatically to the editor's rate (pricing.ts / price levels own that); standard
-  cost is not used for valuation (FIFO / weighted average stay the methods).
-- Group / category filters on Reorder, Ageing and Movement reports; categories have no summary report yet.
+  `unit_factor` on those lines too, converted by every stock reader. ~~Manufacturing Journal component lines and
+  physical stock counts are still base unit only~~ — 7S (`docs/features/manufacturing.md`).
+- ~~Price lists are not yet applied automatically to the editor's rate~~ — 7S: picking an item in the invoice editor
+  takes the selling price in force on the document date (`src/lib/price-list.ts`, `pricing-actions.ts`), basis "Price
+  list"; a customer level's own rate still wins, a % level applies to the list rate, slabs below it still apply, a typed
+  rate is never overwritten, credit / debit notes are not re-priced. Standard cost is not used for valuation (FIFO /
+  weighted average stay the methods). POS does not read price lists yet.
+- ~~Group / category filters on Reorder, Ageing and Movement reports~~ — 7S (`stock-filters.ts`); categories have no
+  summary report yet.
 - Landed cost per line by hand (only by value / quantity split); landed cost on GRNs before the bill.

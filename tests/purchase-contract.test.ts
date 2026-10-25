@@ -443,6 +443,23 @@ test('reorder status (Phase 7) reads received PO quantity from the real purchase
   assert.equal(pendingPoQty([po], [received], items).get('s'), 15);
 });
 
+test('7S readers: MRP nets the quantity still due on POs from the real bill shape; branch stock reads bill lines through the engine', async () => {
+  const { pendingPoQty } = await import('../src/lib/reorder.ts');
+  const { runMrp } = await import('../src/lib/mrp.ts');
+  const { godownSetValuer } = await import('../src/lib/ledger/branch-stock.ts');
+  const { computeStock } = await import('../src/lib/inventory.ts');
+  const items = [{ id: 's', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  const po = { id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-01', vendor_name: 'Acme Supplies', lines: [{ id: 'pl', name: 'Paper ream', hsn: '4802', quantity: 25, rate: 100, tax_rate: 18 }], taxable: 2500, cgst: 0, sgst: 0, igst: 0, total: 2500 };
+  const received: PurchaseRecord = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], po_line_id: 'pl', godown_id: 'g2' }] };
+  const onOrder = pendingPoQty([po], [received], items, []);
+  const inputs = { items, moves: [], invoices: [], purchases: [received] };
+  const stock = new Map(computeStock(inputs).map((p) => [p.item.id, p.qty]));
+  const [row] = runMrp({ plan: [{ item_id: 's', qty: 40 }], items, boms: [], stock, onOrder });
+  assert.deepEqual([row.stock, row.onOrder, row.net, row.action], [10, 15, 15, 'buy']);
+  const valuer = godownSetValuer(computeStock(inputs), collectEvents({ ...inputs, includeTransfers: true }), new Set(['g2']), 'x');
+  assert.equal(valuer.value('2026-04-30'), 100000, '10 reams × ₹100 in the bill line godown');
+});
+
 test('WP-6 readers: cess on bills, purchase HSN register and the monthly 1-vs-3B-vs-books reconciliation', async () => {
   const { purchaseHsnRegister } = await import('../src/lib/hsn-purchase-register.ts');
   const { reconMonthly } = await import('../src/lib/gst-recon-monthly.ts');
@@ -554,4 +571,41 @@ test('branch-wise books and Sec 25(4) transfer bills (WP-9) read the real purcha
   const { buildLedger } = await import('../src/lib/ledger/postings.ts');
   const l = buildLedger({ invoices: [], transactions: [], purchases: [{ ...bill, branch_transfer_id: 'str1' }], vendors: [], purchasePayments: [], openings: [], userAccounts: [], manual: [], assets: [], today: '2026-05-01' } as never);
   assert.ok(l.vouchers[0].lines.some((x) => x.account === 'branch_transfer_in' && x.dr === 100000));
+});
+
+test('7R readers (GSTR-9C rate-wise / Table 14, GSTR-9 Part V, per-GSTIN paper, cess on notes) read the real bill shape', async () => {
+  const { gstr9cRateWise, gstr9cTable14 } = await import('../src/lib/gstr9c-extra.ts');
+  const { buildGstr9PartV } = await import('../src/lib/gstr9-partv.ts');
+  const { buildByGstin } = await import('../src/lib/gst-by-gstin.ts');
+  const { noteCessFor } = await import('../src/lib/purchase-returns-gst.ts');
+  const g9 = buildGstr9([], [bill], { fyStart: 2026, filerStateCode: '27' });
+  // A reverse-charge bill with a lump tax and no split: 5% RC row via splitLumpTax (intra-State → CGST + SGST).
+  const rcm = { ...bill, id: 'rc', reverse_charge: true, cgst: undefined, sgst: undefined, igst: undefined, tax_amount: 50, total: 1050 } as never;
+  const rate = gstr9cRateWise(g9, [rcm], '27');
+  const b = rate.rows.find((r) => r.id === '9B')!;
+  assert.equal(b.taxable, 1000);
+  assert.equal(b.cgst + b.sgst, 50);
+  // Table 14: the real bill (category Purchases, ITC claimed) lands in 14A with its GST; drafts are skipped.
+  const t14 = gstr9cTable14(g9, [bill, { ...bill, id: 'dr', status: 'Draft' } as never], '27');
+  assert.equal(t14.rows.find((r) => r.id === '14A')!.eligible, 180);
+  // Part V reads bill dates through readPurchase.
+  const note = { id: 'n', kind: 'DEBIT_NOTE', note_number: 'DN/1', date: '2026-05-01', purchase_id: 'p1', vendor_name: 'A', reason: 'OTHER', goods_returned: false, lines: [], taxable: 100, cgst: 9, sgst: 9, igst: 0, total: 118, itc_eligible: true, adjusted_amount: 0 } as never;
+  const pv = buildGstr9PartV([], { fyStart: 2025, rawPurchases: [bill], purchaseNotes: [note] });
+  assert.equal(pv.t12.cgst, 0, 'the bill of 12 Apr 2026 is not in FY 2025-26');
+  // Per-GSTIN paper assigns the bill by its place of supply (27).
+  const ka = `29AAPFU0939F1Z${gstinChecksumChar('29AAPFU0939F1Z')}`;
+  const r = buildByGstin([], [bill], { period: { kind: 'fy', fyStart: 2026 }, columns: [{ gstin: '27AAPFU0939F1ZV', label: 'MH' }, { gstin: ka, label: 'KA' }], branches: [] });
+  assert.equal(r.rows.find((x) => x.id === '4a')!.values[0], 180);
+  // Cess on a note is pro rata to the bill's `cess_amount` / `taxable`.
+  assert.equal(noteCessFor({ ...bill, cess_amount: 40 }, 250), 10);
+});
+
+test('7U reader (e-payment confirmation: open bills of a supplier) reads the real bill shape', async () => {
+  const { openBillsOf } = await import('../src/lib/epay-confirm.ts');
+  const withVendor = { ...bill, vendor_id: 'v1', due_date: '2026-05-12' };
+  assert.deepEqual(openBillsOf([withVendor], { id: 'v1', name: 'Acme Supplies' }), [{ purchaseId: 'p1', balance: 1180, due: '2026-05-12' }]);
+  // Legacy rows without vendor_id match by name; paid / void bills drop out.
+  assert.equal(openBillsOf([bill], { id: 'v1', name: 'acme supplies' }).length, 1);
+  assert.equal(openBillsOf([{ ...bill, amount_paid: 1180 }], { name: 'Acme Supplies' }).length, 0);
+  assert.equal(openBillsOf([{ ...bill, status: 'Cancelled' } as never], { name: 'Acme Supplies' }).length, 0);
 });

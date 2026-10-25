@@ -110,7 +110,38 @@ every POS quantity change.
 
 ## Gaps / next steps
 
-- Serial-tracked items cannot go to a job worker yet.
-- No automatic e-Way bill JSON for job-work challans (the number can be typed).
-- Job Work In side does not track the principal's goods by godown / batch; no job-work-in stock report beyond the register.
-- Alerts are shown on the Job work tab only (not in the bell), to keep the bell chunk unchanged.
+- ~~Serial-tracked items cannot go to a job worker yet~~ — 7S.
+- ~~No automatic e-Way bill JSON for job-work challans~~ — 7S.
+- ~~Job Work In side does not track the principal's goods by godown / batch~~ — 7S (register by godown / batch; still not our stock).
+- ~~Alerts are shown on the Job work tab only~~ — 7S: the bell shows them (lazy provider).
+- e-Way JSON for goods we send back to a principal (sub-type 6 "job work returns") is not generated yet; GSTR-1 JSON of
+  job charges is the normal invoice export.
+
+## 7S follow-ups (roadmap 7.73)
+
+- **Serials**: `JobWorkLine.serials` (additive). Material Out lines list the serials sent (they must be in the source
+  godown on the challan date); Material In consumed / returned / supplied / lost lines name serials at the job worker's
+  godown; processed goods and scrap come in under new serials (`jobWorkSerialIssues`, checked in `materialOutDb.save` /
+  `materialInDb.save` against live stock without the document's own copy). The events carry the serials
+  (`events-job-work.ts`), so a serial at the job worker shows in Serial lookup under his godown and is still our stock.
+  Deleting a challan / Material In whose serials a later entry used is refused. Grids show a serial column with
+  "Fill from stock".
+- **e-Way bill JSON** (`src/lib/eway-job-work.ts`): Material Out row → "e-Way bill JSON": bulk-upload layout of `eway.ts`
+  (version 1.0.0621), supply type O, sub-type 4 "Job Work" (`EWAY_SUB_JOB_WORK`, the only eway.ts change), document CHL;
+  from = business profile, to = job worker (supplier master address / GSTIN / state); lines with HSN, UQC, value, the
+  GST rate split IGST or CGST + SGST — tax values nil (no tax on a job-work challan). Transport (vehicle, transporter ID /
+  name, distance) is saved on the challan. "Needed" when inter-State or above ₹50,000. Not portal-validated: verify with
+  your CA.
+- **Clock alerts in the bell** (`src/lib/job-work-alerts.ts`): one critical notice for lines past their Sec 143 clock
+  (deemed supply, "verify with your CA") and one warning for lines due within 30 days, linking to Return clocks. The
+  lazy stock-alerts provider registers them; the bell loads it when a `job_work_out` row exists (one table-length check
+  in the shell).
+- **Principal's goods by godown / batch** (`src/lib/job-work-principal.ts`): principal movement lines take `godown_id` and
+  `batch_no` (additive); "Principal's goods by godown / batch" lists received − sent back per principal × item × godown ×
+  batch. A return without godown / batch settles the oldest balances of that item first. Register only — never our stock.
+- **ITC-04 JSON** (`src/lib/itc04-json.ts`): "Download JSON (layout unverified)" beside the CSV — `m2jw` (Table 4),
+  `jw2m` (5A), `jw2jw` (5B), `jwsupply` (5C) grouped by job worker GSTIN, `fp` = MMYYYY of the period's last month,
+  dd-mm-yyyy dates. **The layout is not verified against the portal / offline tool**; the CSV stays the reference.
+
+CA points added by 7S: e-Way bill for job-work challans (Rule 138 — inter-State always, intra-State above ₹50,000; tax
+values nil), ITC-04 JSON keys / codes, and whether the principal's goods register needs the principal's batch.

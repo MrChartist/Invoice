@@ -17,6 +17,10 @@
  * "buy one get one free" as one supply of both goods for that price, not a free supply — so the ₹0
  * line has no taxable value. Verify with your CA.
  *
+ * 7U: `kind: 'buy_get'` — buy `buy_qty` of item A, get `free_qty` of item B (`free_item_id` /
+ * `free_item_name`) as the ₹0 line; `kind: 'bill_value'` — bill-value discount slabs (`slabs`), applied
+ * as an invoice discount by `offers.ts`, never as a line. Absent kind = the original same-item scheme.
+ *
  * Pure logic first; storage wrappers at the bottom.
  */
 
@@ -51,6 +55,22 @@ export interface Scheme {
   /** false = paused. Absent = active. */
   active?: boolean;
   created_at?: string;
+  /* ── 7U offers (additive) ── */
+  /** Absent / 'same' = buy X get Y of the same item; 'buy_get' = buy A get B; 'bill_value' = bill-value slabs. */
+  kind?: 'same' | 'buy_get' | 'bill_value';
+  /** buy_get: the free item (catalogue id + name). */
+  free_item_id?: string;
+  free_item_name?: string;
+  /** bill_value: from a bill value (after line discounts) → % off or ₹ off; the highest slab reached applies. */
+  slabs?: BillSlab[];
+  /** bill_value: printed name, e.g. "Diwali offer". */
+  label?: string;
+}
+
+export interface BillSlab {
+  min_value: number;
+  percent?: number;
+  amount?: number;
 }
 
 export interface PriceQuote {
@@ -110,7 +130,9 @@ export function resolvePrice(
 /** True when the scheme runs on `day` (YYYY-MM-DD). */
 export function schemeActive(s: Scheme, day: string): boolean {
   if (s.active === false) return false;
-  if (!(num(s.buy_qty) > 0) || !(num(s.free_qty) > 0)) return false;
+  if (s.kind === 'bill_value') {
+    if (!(s.slabs ?? []).some((x) => num(x.min_value) >= 0 && (num(x.percent) > 0 || num(x.amount) > 0))) return false;
+  } else if (!(num(s.buy_qty) > 0) || !(num(s.free_qty) > 0)) return false;
   if (s.valid_from && day < s.valid_from) return false;
   if (s.valid_to && day > s.valid_to) return false;
   return true;
@@ -123,7 +145,7 @@ export function schemeFor(
   day: string,
 ): Scheme | undefined {
   return schemes.find(
-    (s) => schemeActive(s, day) && ((item.id && s.item_id === item.id) || norm(s.item_name) === norm(item.name)),
+    (s) => s.kind !== 'bill_value' && schemeActive(s, day) && ((item.id && s.item_id === item.id) || norm(s.item_name) === norm(item.name)),
   );
 }
 
@@ -134,7 +156,14 @@ export function freeQty(s: Pick<Scheme, 'buy_qty' | 'free_qty'>, paidQty: number
   return Math.floor((paidQty + 1e-9) / buy) * num(s.free_qty);
 }
 
-export const schemeLabel = (s: Pick<Scheme, 'buy_qty' | 'free_qty'>) => `Buy ${s.buy_qty} get ${s.free_qty} free`;
+export const schemeLabel = (s: Pick<Scheme, 'buy_qty' | 'free_qty'> & Partial<Pick<Scheme, 'kind' | 'item_name' | 'free_item_name' | 'label' | 'slabs'>>): string => {
+  if (s.kind === 'bill_value') {
+    const slabs = (s.slabs ?? []).map((x) => `${num(x.percent) > 0 ? `${num(x.percent)}%` : `₹${num(x.amount)}`} off from ₹${num(x.min_value)}`);
+    return `${s.label?.trim() || 'Bill offer'}: ${slabs.join(', ')}`;
+  }
+  if (s.kind === 'buy_get') return `Buy ${s.buy_qty} ${s.item_name ?? ''} get ${s.free_qty} ${s.free_item_name ?? ''} free`.replace(/\s+/g, ' ');
+  return `Buy ${s.buy_qty} get ${s.free_qty} free`;
+};
 
 /**
  * Add, update or remove the ₹0 free lines of `items` so each paid line carries exactly the free
@@ -147,6 +176,8 @@ export function syncSchemeLines(
   schemes: readonly Scheme[],
   day: string,
   newId: () => string = generateId,
+  /** 7U: the catalogue, to give a buy-A-get-B free line item B's HSN / unit / GST rate. */
+  catalog: readonly InvoiceItem[] = [],
 ): InvoiceItem[] {
   if (schemes.length === 0 && !items.some((i) => i.free_of)) return items as InvoiceItem[];
   const paidIds = new Set(items.filter((i) => !i.free_of).map((i) => i.id));
@@ -168,17 +199,20 @@ export function syncSchemeLines(
       if (existing) changed = true;
       continue;
     }
+    const other = scheme.kind === 'buy_get'
+      ? (scheme.free_item_id && catalog.find((c) => c.id === scheme.free_item_id)) || catalog.find((c) => norm(c.name) === norm(scheme.free_item_name ?? '')) || { name: scheme.free_item_name ?? line.name, type: line.type, hsn: line.hsn, unit: line.unit, tax_rate: line.tax_rate }
+      : null;
     const free: InvoiceItem = {
       ...(existing ?? {}),
       id: existing?.id ?? newId(),
-      name: line.name,
+      name: other ? other.name : line.name,
       description: `Free under scheme: ${schemeLabel(scheme)}`,
-      type: line.type,
-      hsn: line.hsn,
-      unit: line.unit,
+      type: other?.type ?? line.type,
+      hsn: other ? other.hsn : line.hsn,
+      unit: other ? other.unit : line.unit,
       quantity: want,
       rate: 0,
-      tax_rate: line.tax_rate,
+      tax_rate: other ? other.tax_rate : line.tax_rate,
       discount_percent: 0,
       amount: 0,
       scheme_id: scheme.id,
@@ -214,8 +248,21 @@ export function validateLevel(level: Pick<PriceLevel, 'id' | 'name' | 'percent_o
 }
 
 /** Validation for the scheme form; '' when fine. */
-export function validateScheme(s: Pick<Scheme, 'item_id' | 'item_name' | 'buy_qty' | 'free_qty' | 'valid_from' | 'valid_to'>): string {
+export function validateScheme(s: Pick<Scheme, 'item_id' | 'item_name' | 'buy_qty' | 'free_qty' | 'valid_from' | 'valid_to'> & Partial<Pick<Scheme, 'kind' | 'free_item_id' | 'free_item_name' | 'slabs'>>): string {
+  if (s.kind === 'bill_value') {
+    const slabs = s.slabs ?? [];
+    if (!slabs.length) return 'Add at least one bill-value slab.';
+    for (const x of slabs) {
+      if (!(num(x.min_value) >= 0)) return 'A slab needs the bill value it starts from.';
+      if (!(num(x.percent) > 0) === !(num(x.amount) > 0)) return 'Give each slab either a % off or a ₹ off.';
+      if (num(x.percent) > 100) return 'A % off cannot be above 100.';
+      if (num(x.amount) > 0 && num(x.amount) > num(x.min_value)) return 'A ₹ off cannot be more than the bill value it starts from.';
+    }
+    if (s.valid_from && s.valid_to && s.valid_to < s.valid_from) return 'The scheme ends before it starts.';
+    return '';
+  }
   if (!s.item_id && !s.item_name.trim()) return 'Pick the item the scheme is on.';
+  if (s.kind === 'buy_get' && !s.free_item_id && !(s.free_item_name ?? '').trim()) return 'Pick the item given free.';
   if (!(num(s.buy_qty) > 0) || !Number.isInteger(num(s.buy_qty))) return 'Buy quantity must be a whole number above zero.';
   if (!(num(s.free_qty) > 0) || !Number.isInteger(num(s.free_qty))) return 'Free quantity must be a whole number above zero.';
   if (s.valid_from && s.valid_to && s.valid_to < s.valid_from) return 'The scheme ends before it starts.';
@@ -326,6 +373,9 @@ export const schemesDb = {
       ...(s.valid_from ? { valid_from: s.valid_from.slice(0, 10) } : {}),
       ...(s.valid_to ? { valid_to: s.valid_to.slice(0, 10) } : {}),
       ...(s.active === false ? { active: false } : {}),
+      ...(s.kind && s.kind !== 'same' ? { kind: s.kind } : {}),
+      ...(s.kind === 'buy_get' ? { free_item_id: s.free_item_id ?? '', free_item_name: (s.free_item_name ?? '').trim() } : {}),
+      ...(s.kind === 'bill_value' ? { slabs: (s.slabs ?? []).map((x) => ({ min_value: round2(num(x.min_value)), ...(num(x.percent) > 0 ? { percent: num(x.percent) } : { amount: round2(num(x.amount)) }) })).sort((a, b) => a.min_value - b.min_value), ...(s.label?.trim() ? { label: s.label.trim() } : {}) } : {}),
       created_at: s.created_at || new Date().toISOString(),
     };
     const idx = all.findIndex((x) => x.id === row.id);

@@ -9,7 +9,7 @@
  *  receipts           one row per payment received
  *  parties            customers + vendors master
  *  items              item master (catalog + items seen on invoices)
- *  gst_summary        GST-rate-wise taxable value / CGST / SGST / IGST
+ *  gst_summary        GST-rate-wise taxable value / CGST / SGST / IGST / Cess (7R)
  *
  * CSV is RFC-4180 (CRLF, quoted when needed). Text cells that could be parsed
  * as spreadsheet formulas are neutralised with a leading apostrophe.
@@ -397,14 +397,16 @@ export function itemMaster(source: ExportSource, opts: CsvOptions = {}): CsvTabl
   return table('items', ['Item Name', 'Description', 'HSN/SAC', 'Usage Unit', 'Selling Price', 'Tax %', 'Item Type', 'Source'], rows);
 }
 
-interface Bucket { taxable: number; cgst: number; sgst: number; igst: number; docs: Set<string> }
+interface Bucket { taxable: number; cgst: number; sgst: number; igst: number; cess: number; docs: Set<string> }
 
 export function gstSummary(source: ExportSource, opts: CsvOptions = {}): CsvTable {
   const range = opts.range ?? {};
   const buckets = new Map<string, { section: string; rate: number; b: Bucket }>();
-  const bump = (section: string, rate: number, taxable: number, cgst: number, sgst: number, igst: number, doc: string) => {
+  // 7R (7.125): compensation cess is its own column (sales lines, credit notes, purchase bills); "Total Tax" includes it.
+  const bump = (section: string, rate: number, taxable: number, cgst: number, sgst: number, igst: number, doc: string, cess = 0) => {
     const key = `${section}|${rate}`;
-    const cur = buckets.get(key) ?? { section, rate, b: { taxable: 0, cgst: 0, sgst: 0, igst: 0, docs: new Set<string>() } };
+    const cur = buckets.get(key) ?? { section, rate, b: { taxable: 0, cgst: 0, sgst: 0, igst: 0, cess: 0, docs: new Set<string>() } };
+    cur.b.cess += cess;
     cur.b.taxable += taxable;
     cur.b.cgst += cgst;
     cur.b.sgst += sgst;
@@ -428,17 +430,17 @@ export function gstSummary(source: ExportSource, opts: CsvOptions = {}): CsvTabl
       for (const l of taxLinesOf(calc)) {
         // SINGLE mode has no split — report it under IGST/"tax" so the total tax column stays right.
         const split = l.cgst + l.sgst + l.igst;
-        bump(section, l.tax_rate, l.taxable, l.cgst, l.sgst, l.igst + Math.max(0, l.tax - split), doc);
+        bump(section, l.tax_rate, l.taxable, l.cgst, l.sgst, l.igst + Math.max(0, l.tax - split), doc, num(l.cess));
       }
     } else {
       const a = invoiceAmounts(inv);
       const rate = a.taxable > 0 ? round2((a.tax / a.taxable) * 100) : 0;
-      bump(section, rate, a.taxable, a.cgst, a.sgst, a.igst + a.otherTax, doc);
+      bump(section, rate, a.taxable, a.cgst, a.sgst, a.igst + a.otherTax, doc, num(a.cess));
     }
   }
   for (const p of filterPurchases(source.purchases, source.vendors, range)) {
     const rate = p.taxable > 0 ? round2((p.tax / p.taxable) * 100) : 0;
-    bump('Purchases', rate, p.taxable, p.cgst, p.sgst, p.igst + Math.max(0, p.tax - p.cgst - p.sgst - p.igst), p.number || p.id);
+    bump('Purchases', rate, p.taxable, p.cgst, p.sgst, p.igst + Math.max(0, p.tax - p.cgst - p.sgst - p.igst), p.number || p.id, num(p.cess));
   }
   const order: Record<string, number> = { Sales: 0, 'Credit Notes': 1, Purchases: 2 };
   const entries = [...buckets.values()].sort((a, b) => order[a.section] - order[b.section] || a.rate - b.rate);
@@ -446,7 +448,7 @@ export function gstSummary(source: ExportSource, opts: CsvOptions = {}): CsvTabl
     const mult = section === 'Credit Notes' ? -1 : 1;
     return [
       section, rate, b.docs.size, money(mult * b.taxable), money(mult * b.cgst), money(mult * b.sgst),
-      money(mult * b.igst), money(mult * (b.cgst + b.sgst + b.igst)),
+      money(mult * b.igst), money(mult * b.cess), money(mult * (b.cgst + b.sgst + b.igst + b.cess)),
     ];
   });
   // Net sales (sales minus credit notes) per rate — what goes in GSTR-1 totals.
@@ -454,14 +456,14 @@ export function gstSummary(source: ExportSource, opts: CsvOptions = {}): CsvTabl
   for (const { section, rate, b } of entries) {
     if (section === 'Purchases') continue;
     const m = section === 'Credit Notes' ? -1 : 1;
-    const cur = net.get(rate) ?? [0, 0, 0, 0];
-    cur[0] += m * b.taxable; cur[1] += m * b.cgst; cur[2] += m * b.sgst; cur[3] += m * b.igst;
+    const cur = net.get(rate) ?? [0, 0, 0, 0, 0];
+    cur[0] += m * b.taxable; cur[1] += m * b.cgst; cur[2] += m * b.sgst; cur[3] += m * b.igst; cur[4] += m * b.cess;
     net.set(rate, cur);
   }
   for (const [rate, v] of [...net.entries()].sort((a, b) => a[0] - b[0])) {
-    rows.push(['Net Sales', rate, '', money(v[0]), money(v[1]), money(v[2]), money(v[3]), money(v[1] + v[2] + v[3])]);
+    rows.push(['Net Sales', rate, '', money(v[0]), money(v[1]), money(v[2]), money(v[3]), money(v[4]), money(v[1] + v[2] + v[3] + v[4])]);
   }
-  return table('gst_summary', ['Section', 'GST Rate %', 'Documents', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'], rows);
+  return table('gst_summary', ['Section', 'GST Rate %', 'Documents', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Cess', 'Total Tax'], rows);
 }
 
 /** Build one dataset by id. */

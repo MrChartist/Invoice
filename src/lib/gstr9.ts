@@ -63,7 +63,8 @@ import { ecoReporting } from './tax-rules';
 import { readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv, type CsvCell } from './gstr-json';
 import type { PurchaseReturn } from '../types/purchases';
-import { isLiveNote, noteTax } from './purchase-returns-gst';
+import { isLiveNote, noteCess, noteTax } from './purchase-returns-gst';
+import { buildGstr9PartV } from './gstr9-partv';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -174,6 +175,15 @@ export interface Gstr9Options {
    * the bill they are against. Working paper — verify with your CA.
    */
   purchaseNotes?: readonly PurchaseReturn[];
+  /** Additive (7R, 7.122): ISD credit received (`isdInwardRows`) — each month's 3B 4A(4) and Table 6G. */
+  isdInward?: BuildOptions['isdInward'];
+  /**
+   * Additive (7R, 7.128): build Part V (Tables 10–14) from the next FY's documents up to the cut-off
+   * (`buildGstr9PartV`). Off by default (it runs up to eight more monthly builds).
+   */
+  nextFy?: boolean;
+  /** With `nextFy`: today's date — the window never runs past it. */
+  today?: string;
 }
 
 export interface Gstr9Report {
@@ -299,6 +309,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       units: opts.units,
       items: opts.items,
       ...(opts.purchaseNotes ? { purchaseNotes: opts.purchaseNotes } : {}),
+      ...(opts.isdInward ? { isdInward: opts.isdInward } : {}),
     });
     return { period, label: periodLabel(period), gstr1: rep.gstr1, gstr3b: rep.gstr3b };
   });
@@ -532,9 +543,10 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       if (typeof id === 'string') billsById.set(id, raw);
     }
     for (const n of opts.purchaseNotes) {
-      if (!isLiveNote(n) || !inFy(n.date, fyStart) || !(noteTax(n) > 0)) continue;
+      if (!isLiveNote(n) || !inFy(n.date, fyStart) || !(noteTax(n) + noteCess(n) > 0)) continue;
       notesNetted++;
-      const heads: Gstr9Heads = { taxable: 0, igst: num(n.igst), cgst: num(n.cgst), sgst: num(n.sgst), cess: 0 };
+      // 7R (7.123): cess reversed with the note comes off the cess column too.
+      const heads: Gstr9Heads = { taxable: 0, igst: num(n.igst), cgst: num(n.cgst), sgst: num(n.sgst), cess: noteCess(n) };
       if (!n.itc_eligible) {
         addTo(t8F, heads, -1);
         continue;
@@ -553,7 +565,9 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
   }
 
   const t6B = sumHeads(b6.inputs, b6.capital, b6.services);
+  // 7R (7.122): credit received from an Input Service Distributor = the months' 3B 4A(4).
   const t6G = zero();
+  for (const m of months) if (m.gstr3b.itc.isd) addTo(t6G, m.gstr3b.itc.isd);
   const t6H = zero();
   const t6I = sumHeads(t6B, b6.C, b6.D, b6.E, b6.F, t6G, t6H);
   const t6J = sumHeads(t6I);
@@ -570,7 +584,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     taxRow('6D', 'Inward supplies received from registered persons liable to reverse charge', b6.D),
     taxRow('6E', 'Import of goods (including supplies from SEZs)', b6.E),
     taxRow('6F', 'Import of services (excluding inward supplies from SEZs)', b6.F),
-    taxRow('6G', 'Input tax credit received from ISD', t6G, { note: 'ISD is not modelled.' }),
+    taxRow('6G', 'Input tax credit received from ISD', t6G, { note: 'ISD credit received (ISD tab, “received by our unit”) = the months’ 3B 4A(4).' }),
     taxRow('6H', 'Amount of ITC reclaimed (other than B above) under the provisions of the Act', t6H, { note: 'Not modelled.' }),
     taxRow('6I', 'Sub-total (B to H above)', t6I, { total: true }),
     taxRow('6J', 'Difference (I - A above)', t6J, { total: true }),
@@ -680,12 +694,15 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
   ];
 
   const amendNote = 'Amendments / next-FY adjustments are not modelled: enter them on the portal if any.';
+  // 7R (7.128): Part V from the next FY's documents up to the cut-off, when asked for.
+  const pv = opts.nextFy ? buildGstr9PartV(invoices, { fyStart, gstin, filerStateCode: opts.filerStateCode, links: opts.links, units: opts.units, items: opts.items, purchaseNotes: opts.purchaseNotes, rawPurchases, today: opts.today }) : null;
+  const pvNote = pv ? `Next-FY window to ${pv.cutoff}.` : amendNote;
   const partV: Gstr9Row[] = [
-    row('10', 'Supplies / tax declared through amendments (+) (net of debit notes)', zero(), { note: amendNote }),
-    row('11', 'Supplies / tax reduced through amendments (-) (net of credit notes)', zero(), { note: amendNote }),
-    taxRow('12', 'Reversal of ITC availed during previous financial year', zero(), { note: amendNote }),
-    taxRow('13', 'ITC availed for the previous financial year', zero(), { note: amendNote }),
-    taxRow('14', 'Differential tax paid on account of declaration in 10 & 11 above', zero(), { note: amendNote }),
+    row('10', 'Supplies / tax declared through amendments (+) (net of debit notes)', pv ? pv.t10 : zero(), { note: pv ? `${pv.counts.debitNotes} debit note(s), ${pv.counts.amendmentsUp} upward amendment(s). ${pvNote}` : amendNote }),
+    row('11', 'Supplies / tax reduced through amendments (-) (net of credit notes)', pv ? pv.t11 : zero(), { note: pv ? `${pv.counts.creditNotes} credit note(s), ${pv.counts.amendmentsDown} downward amendment(s). ${pvNote}` : amendNote }),
+    taxRow('12', 'Reversal of ITC availed during previous financial year', pv ? pv.t12 : zero(), { note: pv ? `${pv.counts.supplierNotes} supplier note(s) / purchase return(s) on this FY's bills. ${pvNote}` : amendNote }),
+    taxRow('13', 'ITC availed for the previous financial year', zero(), { note: pv ? 'Not known to the app (bills are claimed in the month of their date): enter on the portal.' : amendNote }),
+    taxRow('14', 'Differential tax paid on account of declaration in 10 & 11 above', pv ? pv.t14 : zero(), { note: pv ? 'Tax payable on 10 − 11 per head (paid: enter on the portal).' : amendNote }),
   ];
 
   /* ── Table 17: outward HSN = sum of the monthly GSTR-1 Table 12 ── */
@@ -752,6 +769,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     'Advances (4F) are the net of GSTR-1 Table 11A and 11B for the year. Amendments made in the year are in 4K/4L and 5J/5K (revised − original); Part V (amendments of this year’s supplies made next year), ISD, TRAN credit and 8C/8E are not modelled and shown as 0.',
     'Table 9 re-runs the monthly set-off carrying unused ITC into the next month; a month whose credit notes exceed its sales is not carried back.',
     'Books compare tax heads only and do not filter by GSTIN.',
+    ...(pv ? pv.notes : []),
     ...(notesNetted ? [`${notesNetted} supplier note(s) (purchase returns / credit notes received) are netted: in each month's 3B (Table 6A, Table 9) and in Table 6B–6F / 8 in the bucket of the bill they are against. Verify with your CA.`] : []),
   ];
 
@@ -841,7 +859,7 @@ export function gstr9Csv(r: Gstr9Report): string {
     ['Description', 'Tax payable', 'Paid in cash', 'Paid through ITC - IGST', 'Paid through ITC - CGST', 'Paid through ITC - SGST', 'Paid through ITC - Cess', 'Note'],
     ...r.table9.map((x): CsvCell[] => [x.label, x.payable, x.cash, x.itc.igst, x.itc.cgst, x.itc.sgst, x.itc.cess, x.note ?? '']),
     [],
-    ...block('Part V - Tables 10-14 (not modelled)', r.partV),
+    ...block(r.partV.some((x) => x.igst || x.cgst || x.sgst || x.cess || x.taxable) ? 'Part V - Tables 10-14' : 'Part V - Tables 10-14 (not modelled)', r.partV),
     ...hsn('Table 17 - HSN summary of outward supplies', r.table17),
     ...hsn('Table 18 - HSN summary of inward supplies', r.table18),
     ['Comparison - GSTR-1 vs GSTR-3B vs books'],
@@ -897,7 +915,7 @@ ${table('Pt III - Table 8: Other ITC information', r.table8)}
 <table><thead><tr><th>Description</th><th class="n">Payable</th><th class="n">Cash</th><th class="n">ITC IGST</th><th class="n">ITC CGST</th><th class="n">ITC SGST</th><th class="n">ITC Cess</th></tr></thead><tbody>
 ${r.table9.map((x) => `<tr><td>${esc(x.label)}${x.note ? `<div class="m">${esc(x.note)}</div>` : ''}</td><td class="n">${n(x.payable)}</td><td class="n">${n(x.cash)}</td><td class="n">${n(x.itc.igst)}</td><td class="n">${n(x.itc.cgst)}</td><td class="n">${n(x.itc.sgst)}</td><td class="n">${n(x.itc.cess)}</td></tr>`).join('\n')}
 </tbody></table>
-${table('Pt V - Tables 10-14 (not modelled)', r.partV)}
+${table(r.partV.some((x) => x.igst || x.cgst || x.sgst || x.cess || x.taxable) ? 'Pt V - Tables 10-14' : 'Pt V - Tables 10-14 (not modelled)', r.partV)}
 ${hsn('Pt VI - Table 17: HSN summary of outward supplies', r.table17)}
 ${hsn('Pt VI - Table 18: HSN summary of inward supplies', r.table18)}
 <h2>Differences - GSTR-1 vs GSTR-3B vs books</h2>

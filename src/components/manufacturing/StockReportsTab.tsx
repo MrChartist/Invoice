@@ -10,6 +10,9 @@ import {
 } from '../../lib/stock-reports';
 import { stockGroupsDb } from '../../lib/stock-groups';
 import { mfgT } from '../../i18n/areas/manufacturing';
+import { ItemFilterBar } from './ItemFilterBar';
+import { useItemFilterIds } from './useItemFilterIds';
+import { NO_FILTER, applyItemFilter } from '../../lib/stock-filters';
 import { money, qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
@@ -25,6 +28,10 @@ const ageLabels = (buckets: readonly number[]) =>
 export function StockReportsTab({ ctx }: { ctx: MfgContext }) {
   const [report, setReport] = useState<Report>('summary');
   const positions = useMemo(() => computeStock(ctx.inputs).filter((p) => p.item.track_stock), [ctx.inputs]);
+  // 7S (7.66): Movement and Ageing narrow to a stock group / category.
+  const [filter, setFilter] = useState(NO_FILTER);
+  const ids = useItemFilterIds(filter, ctx.items);
+  const narrowed = useMemo(() => applyItemFilter(positions, ids, (p) => p.item.id), [positions, ids]);
   const today = todayInput();
   const reports: [Report, string][] = [['summary', mfgT('rSummary')], ['groups', mfgT('rGroups')], ['movement', mfgT('rMovement')], ['ageing', mfgT('rAgeing')], ['negative', mfgT('rNegative')]];
   return (
@@ -36,8 +43,9 @@ export function StockReportsTab({ ctx }: { ctx: MfgContext }) {
       </div>
       {report === 'summary' && <SummaryDrill positions={positions} today={today} />}
       {report === 'groups' && <GroupSummary positions={positions} today={today} />}
-      {report === 'movement' && <Movement positions={positions} today={today} />}
-      {report === 'ageing' && <Ageing positions={positions} today={today} ctx={ctx} />}
+      {(report === 'movement' || report === 'ageing') && <ItemFilterBar value={filter} onChange={setFilter} idPrefix={`sr-${report}`} />}
+      {report === 'movement' && <Movement positions={narrowed} today={today} />}
+      {report === 'ageing' && <Ageing positions={narrowed} today={today} ctx={ctx} ids={ids} />}
       {report === 'negative' && <Negative positions={positions} />}
     </>
   );
@@ -204,13 +212,17 @@ function GroupSummary({ positions, today }: { positions: Positions; today: strin
   );
 }
 
-function Ageing({ positions, today, ctx }: { positions: Positions; today: string; ctx: MfgContext }) {
+function Ageing({ positions, today, ctx, ids }: { positions: Positions; today: string; ctx: MfgContext; ids: Set<string> | null }) {
   const [byBatch, setByBatch] = useState(false);
   const [slabText, setSlabText] = useState(AGE_BUCKETS.join(', '));
   const slabs = useMemo(() => parseAgeSlabs(slabText), [slabText]);
   const labels = ageLabels(slabs);
   const rows = useMemo(() => stockAgeing(positions, today, slabs), [positions, today, slabs]);
-  const batches = useMemo(() => (byBatch ? batchAgeing(computeTracking(ctx.inputs), today, slabs) : []), [byBatch, ctx.inputs, today, slabs]);
+  const batches = useMemo(() => {
+    if (!byBatch) return [];
+    const tracking = computeTracking(ctx.inputs);
+    return batchAgeing(ids ? new Map([...tracking].filter(([id]) => ids.has(id))) : tracking, today, slabs);
+  }, [byBatch, ctx.inputs, today, slabs, ids]);
   const anyBatch = ctx.items.some((i) => i.track_batches);
   return (
     <>

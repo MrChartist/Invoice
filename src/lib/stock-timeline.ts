@@ -99,7 +99,8 @@ export interface RemovalIssues {
 }
 
 export interface RemovalRef {
-  refType: 'purchase' | 'transfer' | 'invoice';
+  /** 7S adds the stock vouchers and job-work documents (serial removal checks). */
+  refType: 'purchase' | 'transfer' | 'invoice' | 'manufacturing' | 'stock_journal' | 'job_work_out' | 'job_work_in';
   refId: string;
 }
 

@@ -12,6 +12,9 @@ import { businessContext } from '../../lib/purchases-context';
 import { godownName } from '../../lib/godowns';
 import type { PurchaseOrder, PurchaseRecord, Vendor } from '../../types/purchases';
 import { mfgT } from '../../i18n/areas/manufacturing';
+import { ItemFilterBar } from './ItemFilterBar';
+import { useItemFilterIds } from './useItemFilterIds';
+import { NO_FILTER, applyItemFilter } from '../../lib/stock-filters';
 import { qtyText, money, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
@@ -23,11 +26,15 @@ const rowKey = (itemId: string, godown?: string) => `${itemId}|${godown ?? ''}`;
 export function ReorderTab({ ctx }: { ctx: MfgContext }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const vendors = useMemo(() => getTable<Vendor>('vendors').sort((a, b) => a.name.localeCompare(b.name)), [ctx.version]);
-  const rows = useMemo(() => {
+  const allRows = useMemo(() => {
     const positions = computeStock(ctx.inputs);
     const pending = pendingPoQty(getTable<PurchaseOrder>('purchase_orders'), getTable<PurchaseRecord>('purchases'), ctx.items);
     return reorderStatus(positions, pending, computeTracking(ctx.inputs));
   }, [ctx.inputs, ctx.items]);
+  // 7S (7.66): stock group / category filter.
+  const [filter, setFilter] = useState(NO_FILTER);
+  const ids = useItemFilterIds(filter, ctx.items);
+  const rows = useMemo(() => applyItemFilter(allRows, ids, (r) => r.item.id), [allRows, ids]);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [vendorId, setVendorId] = useState('');
   const selected = rows.filter((r) => picked.has(rowKey(r.item.id, r.godown)) && r.suggested > 0);
@@ -77,6 +84,7 @@ export function ReorderTab({ ctx }: { ctx: MfgContext }) {
           </span>
         )}
       </div>
+      <ItemFilterBar value={filter} onChange={setFilter} idPrefix="reorder" />
       <div className={surface.tableWrap}>
         <table className={surface.table}>
           <thead>

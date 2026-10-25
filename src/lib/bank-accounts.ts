@@ -35,6 +35,11 @@ export interface BankAccount {
   account_no?: string;
   ifsc?: string;
   branch?: string;
+  /* ── 7U forex bank ledgers (EEFC / foreign-currency accounts) — additive ── */
+  /** ISO currency of a foreign-currency account (USD, EUR…); absent = INR. Never on the main account. */
+  currency?: string;
+  /** Opening balance in that currency on `opening_as_of` (`opening` stays the rupee value). */
+  fcy_opening?: number;
 }
 
 const MAIN: BankAccount = { id: DEFAULT_BANK_ID, name: 'Main bank account', active: true };
@@ -70,6 +75,8 @@ function clean(rows: unknown[]): BankAccount[] {
       ...(typeof o.account_no === 'string' && o.account_no.trim() ? { account_no: o.account_no.replace(/\s+/g, '') } : {}),
       ...(typeof o.ifsc === 'string' && o.ifsc.trim() ? { ifsc: o.ifsc.trim().toUpperCase() } : {}),
       ...(typeof o.branch === 'string' && o.branch.trim() ? { branch: o.branch.trim() } : {}),
+      ...(id !== DEFAULT_BANK_ID && typeof o.currency === 'string' && /^[A-Za-z]{3}$/.test(o.currency.trim()) && o.currency.trim().toUpperCase() !== 'INR' ? { currency: o.currency.trim().toUpperCase() } : {}),
+      ...(Number.isFinite(Number(o.fcy_opening)) && o.fcy_opening !== undefined && o.fcy_opening !== '' ? { fcy_opening: round2(Number(o.fcy_opening)) } : {}),
     });
   }
   if (!seen.has(DEFAULT_BANK_ID)) out.unshift({ ...MAIN });

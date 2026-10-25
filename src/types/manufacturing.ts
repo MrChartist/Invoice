@@ -81,6 +81,11 @@ export interface VoucherStockLine {
    */
   unit?: string;
   unit_factor?: number;
+  /**
+   * Additive (7S): serial / IMEI numbers of a serial-tracked item, one per unit (count = qty, base unit only).
+   * Consumption lines name serials in stock; production lines name new serials.
+   */
+  serials?: string[];
 }
 
 /** Production line of a voucher: the cost split rules mirror `BomOutput`. */
@@ -129,6 +134,8 @@ export interface ManufacturingVoucher {
   batch_no?: string;
   mfg_date?: string;
   expiry_date?: string;
+  /** Additive (7S): serials given to the finished units of a serial-tracked item (count = qty). */
+  serials?: string[];
   /** Actual consumption (pre-filled from the BOM, editable; batch items split FEFO). */
   components: VoucherStockLine[];
   /** By-products, co-products and scrap. */
@@ -171,6 +178,13 @@ export interface PhysicalStockLine {
   diff: number;
   /** Unit cost on the date when saved (shortage / excess value). */
   rate?: number;
+  /**
+   * Additive (7S): the count was typed in an alternate unit — `counted_typed` in `unit` (factor `unit_factor`).
+   * `counted`, `book_qty` and `diff` stay in the item's base unit, so readers need no conversion.
+   */
+  unit?: string;
+  unit_factor?: number;
+  counted_typed?: number;
 }
 
 /** Physical Stock voucher (Tally Ctrl+F7). Table `physical_stock`. */
@@ -180,6 +194,33 @@ export interface PhysicalStockVoucher {
   number: string;
   date: string;
   lines: PhysicalStockLine[];
+  narration?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** One planned finished item of a production plan (7S). */
+export interface ProductionPlanLine {
+  id: string;
+  item_id: string;
+  /** Finished quantity planned (item's base unit). */
+  qty: number;
+}
+
+/**
+ * Production plan (7S, MRP). Table `production_plans`, `PP/FY<yy-yy>/<seq>`. A planning record only: it moves no
+ * stock and posts nothing; the material requirement is recomputed live from BOMs, stock and open orders.
+ */
+export interface ProductionPlan {
+  id: string;
+  number: string;
+  /** yyyy-mm-dd the plan is made on (FY of the number). */
+  date: string;
+  /** When the goods are needed (information). */
+  due_date?: string;
+  lines: ProductionPlanLine[];
+  /** Marked done (kept for reference). */
+  closed?: boolean;
   narration?: string;
   created_at?: string;
   updated_at?: string;

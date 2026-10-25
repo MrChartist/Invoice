@@ -561,7 +561,8 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
     itc('4A(5)', 'ITC available: all other ITC', b.itc.availableOther),
     itc('4B(1)', 'ITC reversed: rules 38, 42, 43 and section 17(5)', b.itc.reversedRules),
     itc('4B(2)', 'ITC reversed: others', b.itc.reversedOther),
-    itc('4C', 'Net ITC available', b.itc.net),
+    ...(b.itc.isd ? [itc('4A(4)', 'ITC available: inward supplies from ISD', b.itc.isd)] : []),
+    itc('4C', 'Net ITC available', b.itc.netSigned ?? b.itc.net),
     itc('4D(2)', 'Ineligible ITC: others', b.itc.ineligible),
     ['5', 'Inward supplies from composition / exempt / nil - inter-state', b.inwardExempt.inter, '', '', ''],
     ['5', 'Inward supplies from composition / exempt / nil - intra-state', b.inwardExempt.intra, '', '', ''],
@@ -583,6 +584,9 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
  * the key names follow the GSTN JSON and must be checked against the current offline tool —
  * verify with your CA before uploading.
  */
+/** 7R: GSTR-3B JSON choices that are not verified against the offline tool (flip here once confirmed). */
+export const GSTR3B_JSON_LAYOUT = { signedNetItc: true } as const;
+
 export function buildGstr3bJson(b: Gstr3bReport, gstin: string, retPeriod: string): Record<string, unknown> {
   const r = (n: number) => round2(n ?? 0);
   const tax = (t: { taxable?: number; igst: number; cgst: number; sgst: number; cess: number }, withTxval = true) => ({
@@ -614,11 +618,15 @@ export function buildGstr3bJson(b: Gstr3bReport, gstin: string, retPeriod: strin
         itc('IMPG', b.itc.importGoods),
         itc('IMPS', b.itc.importServices),
         itc('ISRC', b.itc.availableRcm),
-        itc('ISD', zero),
+        itc('ISD', b.itc.isd ?? zero),
         itc('OTH', b.itc.availableOther),
       ],
       itc_rev: [itc('RUL', b.itc.reversedRules), itc('OTH', b.itc.reversedOther)],
-      itc_net: tax(b.itc.net, false),
+      // 7R (7.124): Table 4(C) = 4(A) − 4(B) as the portal computes it, SIGNED. When reversals / supplier notes exceed
+      // the period's ITC the portal shows a negative 4(C) (and adds it to the liability in 6.1 — Circular
+      // 170/02/2022-GST as understood), so the JSON no longer floors it at zero. `GSTR3B_JSON_LAYOUT.signedNetItc`
+      // switches back to the floored figure if the offline tool rejects a negative value. Verify with your CA.
+      itc_net: tax(GSTR3B_JSON_LAYOUT.signedNetItc ? b.itc.netSigned ?? b.itc.net : b.itc.net, false),
       itc_inelg: [itc('RUL', zero), itc('OTH', b.itc.ineligible)],
     },
     inward_sup: {

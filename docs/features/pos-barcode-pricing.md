@@ -121,8 +121,7 @@ close needs `payment.record` (`dayCloseDb.close`). A viewer sees neither the POS
   normal invoice list and can be edited there like any invoice.
 - A walk-in bill upserts one "Walk-in customer" client row (and a client per typed walk-in name), the same as any
   invoice saved by the editor.
-- No cash-drawer kick / ESC-POS raw printing (the browser prints the 80 mm page; set the thermal printer as default
-  and the paper to 80 mm). No weighing-scale barcodes (price-embedded EAN-13 "2…" codes are matched as plain codes).
+- Cash drawer / ESC-POS raw printing and 58 mm text receipts: 7U (`docs/features/business-extras.md`). No weighing-scale barcodes (price-embedded EAN-13 "2…" codes are matched as plain codes).
 - Camera scanning needs `BarcodeDetector` (not in Firefox / Safari as of this writing); USB / typed entry works everywhere.
 - Price levels and schemes apply in the editor and the POS; importers, recurring runs and conversions keep the rates
-  they carry. Schemes are same-item only (no "buy A get B", no bill-value offers). Label layouts are fixed presets.
+  they carry. Buy-A-get-B and bill-value offers: 7U (`docs/features/business-extras.md`). Label layouts are fixed presets.
