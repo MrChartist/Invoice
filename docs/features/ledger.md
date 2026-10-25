@@ -32,7 +32,8 @@ Schedule III balance sheet with a fixed-asset register, and an AS 3 cash-flow st
 Groups follow Schedule III (Division I) headings; `direct` groups (Purchases, Direct expenses) feed gross profit.
 User groups / sub-groups (WP-1) nest under these 24 primaries and inherit nature and `direct`; an account in a sub-group
 keeps the primary in `group` and the sub-group in `under`, so every statement here is unchanged (`docs/features/masters.md`).
-A receipt row without an invoice now posts to its `client_name` party instead of "Unknown customer".
+A receipt row without an invoice now posts to its `client_name` party instead of "Unknown customer"; receipt rows a
+manual voucher allocated bill-wise (`voucher_id`) are not posted again (the voucher posts them).
 
 ## Posting rules (automatic)
 | Source | Debit | Credit |

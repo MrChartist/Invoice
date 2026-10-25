@@ -612,7 +612,9 @@ export function buildLedger(input: LedgerInput): Ledger {
   for (const inv of input.invoices) push(salesVoucher(inv));
   const tds = tdsSettlements(input.invoices, input.transactions);
   // Advance adjustments are journals from "Advances from customers", not cash (below).
-  for (const t of input.transactions) if (!isAdvanceAdjustment(t)) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
+  // WP-1 (P0-11): receipt rows a manual voucher allocated bill-wise are posted by that voucher, not again here.
+  const allocatedBy = new Set(input.manual.map((m) => m.id));
+  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
   for (const m of advanceMovements(input.advances ?? [], input.transactions, input.invoices)) {
     push(advanceVoucher(m, m.invoiceId ? invById.get(m.invoiceId) : undefined, m.kind === 'adjusted' ? tds.get(m.sourceId) ?? 0 : 0));
   }

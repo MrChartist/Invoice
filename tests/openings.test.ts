@@ -300,3 +300,39 @@ test('migrations: nothing to map (stored shapes are additive) — a run over mas
   assert.equal(runMigrations().status, 'current', 'second run is idempotent');
   assert.ok(after[SCHEMA_VERSION_KEY]);
 });
+
+test('P0-11: a manual receipt allocated bill-wise settles the opening bill once (receivables + ledger agree); delete removes it', async () => {
+  const { syncVoucherReceipts, removeVoucherReceipts, openRefsFor, validateAllocations, voucherReceipts } = await import('../src/lib/bill-allocation.ts');
+  const { saveVoucher, loadVouchers } = await import('../src/lib/ledger/index.ts');
+  setTable('clients', [asha]);
+  saveOpeningBillsFor({ id: 'c1', name: 'Asha', side: 'receivable' }, [{ ref_no: 'OLD/1', date: '2026-02-01', due_date: '2026-03-01', amount: 10_000, dr_cr: 'Dr' }]);
+  const refs = openRefsFor('Asha Traders', undefined, new Date(2026, 5, 30));
+  assert.deepEqual(refs.map((r) => [r.ref, r.outstanding, r.opening]), [['OLD/1', 10_000, true]]);
+  assert.deepEqual(validateAllocations([{ bill_id: refs[0].id, ref: 'OLD/1', amount: 12_000 }], 12_000, refs), ['OLD/1: only 10000.00 is due.']);
+  const v = saveVoucher({
+    type: 'RECEIPT',
+    date: '2026-05-10',
+    narration: 'Received',
+    lines: [
+      { account_id: A.bank, dr: 12_000_00, cr: 0 },
+      { account_id: A.debtors, dr: 0, cr: 12_000_00, party: 'Asha Traders' },
+    ],
+  });
+  syncVoucherReceipts(v, 'Asha Traders', 12_000, [{ bill_id: refs[0].id, ref: 'OLD/1', amount: 10_000 }], 'Bank Transfer');
+  const rows = voucherReceipts(v.id);
+  assert.deepEqual(rows.map((r) => [r.invoice_id ? 'agst' : 'onacc', r.amount, r.client_id]), [['agst', 10_000, 'c1'], ['onacc', 2_000, 'c1']]);
+  // Receivables: bill cleared, 2,000 on account (net −2,000).
+  const transactions = getTable('transactions');
+  const rep = buildReceivables({ invoices: [], payments: transactions as never, clients: [asha], openingBills: loadReceivableOpeningBills([asha], '2026-10-25') }, { now: new Date(2026, 5, 30) });
+  assert.equal(rep.parties[0].bills.length, 0);
+  assert.equal(rep.parties[0].net, -2_000);
+  // Ledger: the voucher posts once; its receipt rows do not post again.
+  const ledger = buildLedger(loadLedgerInput({ ...EMPTY_BOOKS, transactions: transactions as never }, '2026-10-25'));
+  const st = accountStatement(ledger, A.debtors, FY, 'Asha Traders')!;
+  assert.equal(st.opening, 10_000_00);
+  assert.equal(st.closing, -2_000_00, 'ledger party balance = receivables net');
+  assert.equal(ledger.vouchers.filter((x) => x.kind === 'Receipt').length, 1);
+  removeVoucherReceipts(v.id);
+  assert.equal(voucherReceipts(v.id).length, 0);
+  assert.equal(loadVouchers().length, 1);
+});

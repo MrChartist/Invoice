@@ -1,7 +1,7 @@
 # Masters & openings — "Accounts Info" (WP-1)
 
 Tally-style groups, sub-groups, ledgers and opening balances, so a CA can load a 31 March trial balance and start
-on 1 April. Gap ids P0-1, P0-2, P1-7 (lib) from `docs/GAP_ANALYSIS.md`; P0-11 is a documented hook (below).
+on 1 April. Gap ids P0-1, P0-2, P0-11 (receivable side) and P1-7 (lib) from `docs/GAP_ANALYSIS.md`.
 Everything is a **working paper — verify with your CA**.
 
 | | |
@@ -50,6 +50,14 @@ time; a dangling `under` falls back to the primary. All normalisers are idempote
 - **Receipts against opening bills.** A `transactions` row with `invoice_id` = the opening bill id (plus `client_id`,
   `client_name`) settles that bill in receivables; the ledger posts it to that party (postings now fall back to
   `client_name` for receipts without an invoice, which also fixes on-account receipts that showed "Unknown customer").
+- **Bill allocation on manual receipts (P0-11).** In the voucher editor, a Receipt whose credit line is Sundry Debtors
+  with a party shows "Bill-wise details for: <party>": Agst Ref against the party's open invoices and opening bills
+  (amounts or "Allocate oldest first"), the rest On Account. On save (`src/lib/bill-allocation.ts`
+  `syncVoucherReceipts`) each allocation becomes a `transactions` row tagged `voucher_id` + `client_id` /
+  `client_name` through `localDb.payments`, so invoice status, receivables, statements and the Books cash book see it.
+  The ledger posts the voucher once: `buildLedger` skips transactions rows whose `voucher_id` names a stored voucher
+  (an orphan row posts as a plain receipt). Editing re-syncs; deleting from the Vouchers tab removes the rows.
+  Optional / memo / post-dated vouchers get no rows. WIP-C's `billwise.ts` covers the payable side.
 - **Interest (P1-7, lib).** `interestOnBalances` / `ledgerInterest`: simple interest on the end-of-day balance, Dr / Cr /
   both, 365 or 360 days. No report screen yet.
 
@@ -81,17 +89,19 @@ picker can call `useCreateOnTheFly` on Alt+C.
 | `groupTree(userGroups?)`, `groupDescendants(id)`, `groupPath(id)` | `ledger/groups.ts` | WP-2 group summary |
 | `ledgersInGroup(groupId, masters?, {recursive})`, `allLedgers(m)`, `findLedger(id)`, `loadMasters()` | `ledger/groups.ts` | WP-2, WP-7 import |
 | `openingBalance(ledgerId, asOf?)`, `loadOpenings()`, `saveOpenings(entries)`, `openingDifference()`, `loadBooksBegin()` | `ledger/openings.ts` | WP-2, WP-7 opening TB import |
-| `openingBillsFor(partyId, side?)`, `saveOpeningBillsFor()`, `receivableOpeningBills()` | `opening-bills.ts` | WIP-C bill-wise payables, P0-11 |
+| `openingBillsFor(partyId, side?)`, `saveOpeningBillsFor()`, `receivableOpeningBills()` | `opening-bills.ts` | WIP-C bill-wise payables |
+| `openRefsFor(party)`, `syncVoucherReceipts()`, `removeVoucherReceipts()`, `allocationsOf()` + `BillAllocation` component | `bill-allocation.ts`, `components/masters/BillAllocation.tsx` | voucher entry (Gateway F-key screens) |
 | `groupOf(id, userGroups?)`, `primaryOf()`, `allGroups()`, `immediateGroupOf()`, `PrimaryGroupId`, `GroupId = string` | `ledger/accounts.ts` | everyone (payroll / manufacturing add accounts with a primary `group`) |
 | `registerAccountProvider(name, fn)`, `providedAccounts()` | `ledger/accounts.ts` | WP-5 synthesised bank ledgers |
 | `BuildInput.openingBills` / `OpeningBillInput`, `Bill.opening` | `receivables.ts` | receivables consumers |
 
 ## Not done / hooks
 
-- **P0-11 bill allocation in manual RV / PV** — WIP-C (TDS / bill-wise payables) was not merged when this package was
-  rebased, so the voucher editor is untouched. Hook: an allocation becomes a `transactions` row `{invoice_id: <invoice or
-  opening bill id>, client_id, client_name, amount, date, method}` (receivable side); the payable side reads
-  `openingBillsFor(vendorId, 'payable')`. Payable opening bills are stored and posted but not yet in a payables ageing.
+- **Payable opening bills** are stored and posted to the ledger but WIP-C's payables ageing (`billwise.ts`) does not read
+  them yet: wire `openingBillsFor(vendorId, 'payable')` into `billwisePayables`. Manual PV lines have no bill allocation
+  (supplier payments allocate through WIP-C's payment dialog).
+- A customer's TDS is not booked to TDS receivable when the settling receipt is a voucher allocation (only invoice
+  receipts book it).
 - **P1-21 import kinds** (ledgers / vendors / openings in the CSV wizard) — not done; the wizard's kinds are wired through
   `import-mapping.ts` and its UI, larger than "straightforward". `saveOpenings` / `saveOpeningBillsFor` are the write APIs to use.
 - **P2 cost categories** — not done.
