@@ -14,7 +14,7 @@ checks them first, and records what the portals return. **The app never calls a 
 `src/lib/einvoice.ts`
 - `buildEInvoice(record, options?) -> { payload, assumptions }` NIC schema v1.1 for one invoice.
 - `buildEInvoiceBulk(payloads)`, `stringifyEInvoice(payloadOrArray)` (always emits a JSON array, accepted by the IRP bulk tool). Bulk selection with preflight: `src/lib/einvoice-bulk.ts` (below).
-- `mapUnitToUqc`, `toNicDate`, `parseIsoDate`, `splitAddress`, `normalisePhone`, `DOC_NO_REGEX`, `UQC_CODES`.
+- `mapUnitToUqc`, `portalUqc` (units-master UQC first, WP-8), `toNicDate`, `parseIsoDate`, `splitAddress`, `normalisePhone`, `DOC_NO_REGEX`, `UQC_CODES`.
 - Meta: `EInvoiceMeta`, `getEInvoiceMeta(invoiceId)`, `getAllEInvoiceMeta()`, `saveEInvoiceMeta(meta)`, `deleteEInvoiceMeta(id)`, `upsertMeta(rows, meta)` (pure), `validateMeta(meta)`.
 
 `src/lib/eway.ts`

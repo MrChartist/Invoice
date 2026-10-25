@@ -45,6 +45,7 @@ import { buildEwayBulk, stringifyEway, type EwayBill, type EwayPayload, type Ewa
 import { preflightEInvoice, preflightEway } from './einvoice-validate';
 import { parseTable, stripBom } from './csv';
 import { getTable, setTable } from './storage';
+import type { UnitMaster } from './units';
 
 /* ───────────────────────── Shared ───────────────────────── */
 
@@ -77,6 +78,8 @@ export interface BulkContext {
   allInvoices?: readonly InvoiceRecord[];
   /** Include documents that already have an IRN (e-Invoice) / e-Way Bill no. (e-Way). Default false. */
   includeDone?: boolean;
+  /** Additive (WP-8): the units master, so a user-defined unit is sent as its UQC. */
+  units?: readonly UnitMaster[];
 }
 
 const E_INVOICE_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE']);
@@ -169,6 +172,7 @@ export function buildBulkEInvoice(invoices: readonly InvoiceRecord[], ctx: BulkC
     const pf = preflightEInvoice(inv, {
       now: ctx.now,
       fallbackSender: inv.sender ? null : ctx.fallbackSender ?? null,
+      units: ctx.units,
       preceding: original ? [{ no: original.invoice_number, date: String(original.issue_date).slice(0, 10) }] : undefined,
     });
     if (!pf.ready) {
@@ -235,6 +239,7 @@ export function buildBulkEway(
     const pf = preflightEway(inv, {
       now: ctx.now,
       fallbackSender: inv.sender ? null : ctx.fallbackSender ?? null,
+      units: ctx.units,
       transport: savedTransport(m) ?? ctx.transport ?? {},
     });
     if (!pf.ready) {

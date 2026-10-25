@@ -15,7 +15,7 @@ import {
 } from '../lib/books';
 import { isoDay } from '../lib/dates';
 import { round2 } from '../lib/invoice-calc';
-import { loadPositions, type StockPosition } from '../lib/inventory';
+import { buildItemIndex, loadPositions, type StockPosition } from '../lib/inventory';
 import { localDb } from '../lib/localDb';
 import { getTable } from '../lib/storage';
 import type { RestockLink } from '../lib/credit-restock';
@@ -89,6 +89,8 @@ export function Reports() {
   /* eslint-enable react-hooks/exhaustive-deps */
 
   const { docs, excludedForeign } = useMemo(() => salesDocs(invoices), [invoices]);
+  // Stock items by name: sales-by-item reads alternate-unit lines (2 BOX of 12) in the item's base unit.
+  const itemIndex = useMemo(() => buildItemIndex(positions.map((p) => p.item)), [positions]);
   const customers = useMemo(() => salesByCustomer(docs, period), [docs, period]);
   const conc = useMemo(() => concentration(customers), [customers]);
   const taxRep = useMemo(() => taxByRate(docs, period), [docs, period]);
@@ -205,7 +207,7 @@ export function Reports() {
 
       <div role="tabpanel" id={`rep-panel-${tab}`} aria-labelledby={`rep-tab-${tab}`} tabIndex={0} className={styles.panel}>
         {tab === 'customers' && <CustomersTab report={customers} period={period} />}
-        {tab === 'items' && <ItemsTab docs={docs} period={period} />}
+        {tab === 'items' && <ItemsTab docs={docs} period={period} index={itemIndex} />}
         {tab === 'monthly' && <MonthlyTab docs={docs} period={period} />}
         {tab === 'top' && <TopCustomersTab report={customers} period={period} />}
         {tab === 'tax' && <TaxTab rep={taxRep} period={period} />}

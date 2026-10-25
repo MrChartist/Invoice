@@ -71,7 +71,7 @@ export interface TopItem {
 
 const SALES = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
 
-/** Best sellers by taxable value in the period (credit notes subtract). */
+/** Best sellers by taxable value in the period (credit notes subtract). `qty` is in the item's base unit. */
 export function topItems(invoices: readonly InvoiceRecord[], from: string, to: string, limit = 5): TopItem[] {
   const map = new Map<string, TopItem>();
   for (const inv of invoices) {
@@ -83,7 +83,9 @@ export function topItems(invoices: readonly InvoiceRecord[], from: string, to: s
       if (!name) continue;
       const key = name.toLowerCase();
       const row = map.get(key) ?? { name, qty: 0, value: 0 };
-      row.qty += sign * num(l.quantity);
+      // Base units (WP-8): a line typed as 2 BOX of 12 counts 24, so it adds up with lines in NOS. Inline,
+      // not units.ts, to keep the dashboard chunk small.
+      row.qty += sign * num(l.quantity) * (num(l.unit_factor) > 0 ? num(l.unit_factor) : 1);
       row.value += sign * num(l.quantity) * num(l.rate) * (1 - num(l.discount_percent) / 100);
       map.set(key, row);
     }

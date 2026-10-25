@@ -11,6 +11,7 @@ import { localDb } from '../../lib/localDb';
 import { readLinks } from '../../lib/documents';
 import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { getAllEInvoiceMeta } from '../../lib/einvoice';
+import { unitsDb } from '../../lib/units';
 import type { EwayTransMode } from '../../lib/eway';
 import {
   buildBulkEInvoice,
@@ -96,7 +97,7 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
 
   const data = useMemo(() => {
     void version;
-    return { invoices: getTable<InvoiceRecord>('invoices'), meta: getAllEInvoiceMeta(), links: readLinks() };
+    return { invoices: getTable<InvoiceRecord>('invoices'), meta: getAllEInvoiceMeta(), links: readLinks(), units: unitsDb.stored() };
   }, [version]);
   // Bills of Supply move goods on an e-Way Bill (NIC type BIL) but have no e-Invoice: offered on request.
   const [withBos, setWithBos] = useState(false);
@@ -108,7 +109,7 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
   const selected = useMemo(() => candidates.filter((c) => picked.has(c.invoice.id)).map((c) => c.invoice), [candidates, picked]);
   const fallbackSender = useMemo(() => localDb.settings.activeProfile(), []);
   const ctx = useMemo(
-    () => ({ now, fallbackSender, meta: data.meta, links: data.links, allInvoices: data.invoices, includeDone }),
+    () => ({ now, fallbackSender, meta: data.meta, links: data.links, allInvoices: data.invoices, includeDone, units: data.units }),
     [now, fallbackSender, data, includeDone],
   );
   const einv = useMemo(() => buildBulkEInvoice(selected.filter((i) => !isEwayOnly(i)), ctx), [selected, ctx]);

@@ -114,7 +114,7 @@ function checkParty(
 export function validateEInvoice(
   payload: EInvoicePayload,
   record?: InvoiceRecord,
-  opts: { now?: Date } = {},
+  opts: { now?: Date; units?: EInvoiceOptions['units'] } = {},
 ): PreflightIssue[] {
   const out: PreflightIssue[] = [];
   const now = opts.now ?? new Date();
@@ -141,7 +141,7 @@ export function validateEInvoice(
       out.push(issue('warning', 'B2C', 'Buyer', 'No buyer GSTIN: this looks like a B2C sale, which does not need an e-Invoice.'));
     }
     for (const [i, raw] of (record.items ?? []).entries()) {
-      if (isUnitGuessed(raw.unit)) {
+      if (isUnitGuessed(raw.unit, opts.units)) {
         out.push(issue('warning', 'ITEM_UNIT_GUESS', `Item ${i + 1}`, `Item ${i + 1}: unit "${raw.unit}" has no standard UQC and is sent as OTH.`));
       }
     }
@@ -313,7 +313,7 @@ export function preflightEInvoice(
   options: EInvoiceOptions & { now?: Date } = {},
 ): PreflightResult & { payload: EInvoicePayload } {
   const { payload, assumptions } = buildEInvoice(record, options);
-  const issues = [...validateEInvoice(payload, record, { now: options.now }), ...assumptions];
+  const issues = [...validateEInvoice(payload, record, { now: options.now, units: options.units }), ...assumptions];
   return { ...splitIssues(issues), payload };
 }
 

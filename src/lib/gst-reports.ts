@@ -48,6 +48,8 @@ import type { EcoSection } from '../types/invoice';
 import type { AdvanceMovement } from './advance-tax';
 import type { PurchaseReturn } from '../types/purchases';
 import { itcAdjustmentsFromNotes } from './purchase-returns-gst';
+import { lineFactor, uqcFor, type UnitMaster } from './units';
+import type { ItemIndex } from './inventory';
 
 /* ───────────────────────── Period ───────────────────────── */
 
@@ -473,6 +475,18 @@ export interface BuildOptions {
   advances?: readonly AdvanceMovement[];
   /** Additive (WP-3): `purchase_returns` rows — supplier notes dated in the period reduce ITC (`itcAdjustmentsFromNotes`). */
   purchaseNotes?: readonly PurchaseReturn[];
+  /**
+   * Additive (WP-8): the units master (`unitsDb.stored()`): a unit with a UQC of its own reports as that
+   * UQC in the HSN summary (built-in mapping otherwise).
+   */
+  units?: readonly UnitMaster[];
+  /**
+   * Additive (WP-8): stock items by name (`buildItemIndex`). An invoice line typed in an alternate unit
+   * (2 BOX, `unit_factor` 12) is summarised in the item's base unit — 24 at the UQC of NOS — so one HSN
+   * row carries one UQC per item, as the stock records do. Without it (or when the line names no item)
+   * the line reports as typed (2 at the UQC of BOX). Working paper: verify with your CA.
+   */
+  items?: ItemIndex;
 }
 
 /**
@@ -573,6 +587,23 @@ export function toUqc(unit: string | undefined, hsn: string): string {
   if (hsn.startsWith('99')) return 'NA'; // SAC — services carry no quantity
   const u = (unit ?? '').trim().toUpperCase();
   return UQC[u] ?? (u ? 'OTH' : 'NOS');
+}
+
+/**
+ * UQC and quantity of an outward line for the HSN summary (WP-8): an alternate-unit line converts to
+ * the item's base unit when `items` resolves it; the units master's UQC wins over the built-in map;
+ * SAC lines stay NA.
+ */
+export function hsnLineQty(
+  l: { name: string; hsn: string; unit: string; quantity: number; unit_factor?: number },
+  opts: Pick<BuildOptions, 'units' | 'items'>,
+): { uqc: string; qty: number } {
+  const f = lineFactor(l);
+  const base = f !== 1 ? opts.items?.find(l.name, l.hsn)?.unit?.trim() : undefined;
+  const unit = base || l.unit;
+  const qty = base ? Math.round(l.quantity * f * 1000) / 1000 : l.quantity;
+  if (l.hsn.startsWith('99')) return { uqc: 'NA', qty };
+  return { uqc: uqcFor(unit, opts.units ?? [], (u) => toUqc(u, l.hsn)), qty };
 }
 
 function filerState(gstin: string, fallback?: string): string {
@@ -681,20 +712,23 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     push('warning', 'TOTAL_MISMATCH', `stored total ${recorded} differs from recomputed ${docCalc.total}; the report uses the recomputed tax split.`);
   }
 
-  const toPLine = (l: (typeof calc.lines)[number]): PLine => ({
-    // Zero-rated supplies keep the slab they were priced at (GSTR-1 reports txval against it).
-    rate: mode === 'NONE' ? 0 : zeroRated ? l.nominal_rate : l.tax_rate,
-    hsn: l.hsn,
-    uqc: toUqc(l.unit, l.hsn),
-    desc: l.name,
-    qty: l.quantity,
-    taxable: l.taxable,
-    igst: l.igst,
-    cgst: l.cgst,
-    sgst: l.sgst,
-    cess: l.cess,
-    lineTotal: l.total,
-  });
+  const toPLine = (l: (typeof calc.lines)[number]): PLine => {
+    const hq = hsnLineQty(l, opts);
+    return {
+      // Zero-rated supplies keep the slab they were priced at (GSTR-1 reports txval against it).
+      rate: mode === 'NONE' ? 0 : zeroRated ? l.nominal_rate : l.tax_rate,
+      hsn: l.hsn,
+      uqc: hq.uqc,
+      desc: l.name,
+      qty: hq.qty,
+      taxable: l.taxable,
+      igst: l.igst,
+      cgst: l.cgst,
+      sgst: l.sgst,
+      cess: l.cess,
+      lineTotal: l.total,
+    };
+  };
   const lines: PLine[] = calc.lines.map(toPLine);
   // Taxable freight / other charges: part of the principal supply's value, so no quantity of its own.
   if (calc.charges_line) lines.push({ ...toPLine(calc.charges_line), qty: 0 });

@@ -14,11 +14,12 @@ import {
   guessLocality,
   isServiceHsn,
   issue,
-  mapUnitToUqc,
+  portalUqc,
   splitAddress,
   toNicDate,
   type PreflightIssue,
 } from './einvoice';
+import type { UnitMaster } from './units';
 
 export const EWAY_VERSION = '1.0.0621';
 /** Consignment value above which an e-Way Bill is mandatory for goods. */
@@ -114,6 +115,8 @@ export interface EwayOptions {
   /** Dispatch-from / ship-to when they differ from the seller / buyer. */
   shipFrom?: { addr1?: string; place?: string; pin?: string | number; stateCode?: string };
   shipTo?: { addr1?: string; place?: string; pin?: string | number; stateCode?: string };
+  /** Additive (WP-8): the units master (`unitsDb.stored()`): a unit with its own UQC is sent as that UQC. */
+  units?: readonly UnitMaster[];
 }
 
 export interface EwayBuild {
@@ -211,7 +214,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
       productDesc: (l.name || 'Item').slice(0, 100),
       hsnCode: codeNum(l.hsn),
       quantity: Math.round(l.quantity * 1000) / 1000,
-      qtyUnit: mapUnitToUqc(l.unit),
+      qtyUnit: portalUqc(l.unit, options.units),
       taxableAmount: l.taxable,
       sgstRate: intraSplit ? rate / 2 : 0,
       cgstRate: intraSplit ? rate / 2 : 0,

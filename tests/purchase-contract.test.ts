@@ -295,6 +295,16 @@ test('profitability (6.25) costs sales from the real purchase lines and billable
   assert.equal(rep.rows[0].expenses, 1000);
 });
 
+test('profitability (WP-8) costs per base unit from bill lines typed in an alternate unit', async () => {
+  const { buildCoster } = await import('../src/lib/profitability.ts');
+  const boxed: PurchaseRecord = { ...bill, id: 'p6', lines: [{ ...bill.lines[0], unit: 'BOX', unit_factor: 5 }] };
+  const unit = buildCoster([bill]).cost({ name: 'Paper ream', hsn: '4802', quantity: 1 }, { id: 's', date: '2026-05-01' }).cost;
+  // Same bill, lines in BOX of 5: one base unit costs a fifth; a sale of 1 BOX (factor 5) costs the same as before.
+  const c = buildCoster([boxed]);
+  assert.equal(c.cost({ name: 'Paper ream', hsn: '4802', quantity: 1 }, { id: 's', date: '2026-05-01' }).cost, unit / 5);
+  assert.equal(c.cost({ name: 'Paper ream', hsn: '4802', quantity: 1, unitFactor: 5 }, { id: 's', date: '2026-05-01' }).cost, unit);
+});
+
 test('composition returns (CMP-08 / GSTR-4) read the real purchase shape: RCM taxed, ordinary ITC never claimed', async () => {
   const { buildCmp08, buildGstr4 } = await import('../src/lib/composition-returns.ts');
   const q = { kind: 'quarter' as const, fyStart: 2026, quarter: 1 as const };

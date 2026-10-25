@@ -125,6 +125,12 @@ export interface CalcLine {
   hsn: string;
   unit: string;
   quantity: number;
+  /**
+   * Base units per one line unit (`InvoiceItem.unit_factor`, WP-8 alternate units: 2 BOX of 12 NOS
+   * carries 12). Absent = 1. Money is per the line unit as typed; quantity-in-stock readers
+   * (costing, HSN summary quantity) multiply by it.
+   */
+  unit_factor?: number;
   rate: number;
   tax_rate: number;
   /**
@@ -456,6 +462,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
       hsn: (l.item.hsn ?? '').trim(),
       unit: (l.item.unit ?? '').trim(),
       quantity: l.quantity,
+      ...(num(l.item.unit_factor) > 0 && num(l.item.unit_factor) !== 1 ? { unit_factor: num(l.item.unit_factor) } : {}),
       rate: l.rate,
       tax_rate: l.tax_rate,
       nominal_rate: l.nominal_rate,

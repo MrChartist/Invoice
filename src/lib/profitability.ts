@@ -16,6 +16,10 @@
  *   3. none    — services and items never bought: no cost (shown as "not costed", so a 100 %
  *                margin is visibly an assumption).
  *
+ * Both cost sources are per BASE unit; a line typed in an alternate unit (WP-8: 2 BOX where 1 BOX =
+ * 12 NOS, `unit_factor: 12`) is costed on quantity × factor (24 NOS). Revenue and GST stay as typed.
+ * Purchase-bill lots are converted the same way (quantity × factor, cost ÷ factor).
+ *
  * Party profit also deducts billable expenses (6.14) incurred for that client in the period
  * (purchase bills with `billable_to_client_id`, at cost: taxable value when ITC is claimed, else the
  * total), whether or not they have been re-billed yet.
@@ -30,7 +34,7 @@ import { fxRate } from './fx';
 import { mulRound2, num, round2 } from './invoice-calc';
 import type { StockPosition } from './inventory';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
-import { salesDocs, type SalesDoc } from './sales-reports';
+import { salesDocs, salesLineFactor, type SalesDoc } from './sales-reports';
 import { creditNoteReturnsGoods, type RestockLink } from './credit-restock';
 
 export type CostSource = 'stock' | 'purchases' | 'none';
@@ -98,25 +102,33 @@ interface PurchaseLot {
 }
 
 export interface Coster {
-  /** Signed cost of `qty` (signed) of an item on document `docId` dated `date`, and where it came from. */
-  cost(line: { name: string; hsn: string; quantity: number }, doc: { id: string; date: string }): { cost: number; source: CostSource };
+  /**
+   * Signed cost of a line (signed quantity in its own unit; `unitFactor` base units per unit, absent = 1)
+   * on document `docId` dated `date`, and where it came from.
+   */
+  cost(line: { name: string; hsn: string; quantity: number; unitFactor?: number }, doc: { id: string; date: string }): { cost: number; source: CostSource };
+  /** The item's base unit from the stock items, when the line names one. */
+  baseUnit(name: string, hsn: string): string | undefined;
 }
 
 export function buildCoster(purchases: readonly unknown[], vendors: readonly unknown[] = [], positions: readonly StockPosition[] = []): Coster {
   // Inventory: per tracked item, the cost issued (or returned) per invoice.
   const stockByName = new Map<string, StockPosition[]>();
+  const anyByName = new Map<string, StockPosition[]>();
   for (const p of positions) {
-    if (!p.item.track_stock) continue;
     const k = norm(p.item.name);
+    anyByName.set(k, [...(anyByName.get(k) ?? []), p]);
+    if (!p.item.track_stock) continue;
     stockByName.set(k, [...(stockByName.get(k) ?? []), p]);
   }
-  const findStock = (name: string, hsn: string): StockPosition | undefined => {
-    const list = stockByName.get(norm(name));
+  const findIn = (map: Map<string, StockPosition[]>, name: string, hsn: string): StockPosition | undefined => {
+    const list = map.get(norm(name));
     if (!list) return undefined;
     const h = norm(hsn);
     if (!h) return list[0];
     return list.find((p) => norm(p.item.hsn) === h) ?? list.find((p) => !norm(p.item.hsn));
   };
+  const findStock = (name: string, hsn: string) => findIn(stockByName, name, hsn);
   // Purchases: lots by item name.
   const lots = new Map<string, PurchaseLot[]>();
   for (const raw of purchases) {
@@ -125,7 +137,9 @@ export function buildCoster(purchases: readonly unknown[], vendors: readonly unk
     for (const l of readPurchaseLines(raw)) {
       if (!l.name || !(l.quantity > 0) || !(l.unitCost > 0)) continue;
       const k = norm(l.name);
-      lots.set(k, [...(lots.get(k) ?? []), { date: bill.date, hsn: norm(l.hsn), qty: l.quantity, unitCost: l.unitCost }]);
+      // Per base unit: 2 BOX of 12 @ ₹600 is 24 NOS @ ₹50.
+      const f = l.unitFactor > 0 ? l.unitFactor : 1;
+      lots.set(k, [...(lots.get(k) ?? []), { date: bill.date, hsn: norm(l.hsn), qty: l.quantity * f, unitCost: l.unitCost / f }]);
     }
   }
   const avgCost = (name: string, hsn: string, date: string): number | null => {
@@ -139,8 +153,12 @@ export function buildCoster(purchases: readonly unknown[], vendors: readonly unk
   };
 
   return {
+    baseUnit(name, hsn) {
+      return findIn(anyByName, name, hsn)?.item.unit?.trim() || undefined;
+    },
     cost(line, doc) {
-      const q = num(line.quantity);
+      // Both sources below cost a BASE unit: an alternate-unit line (2 BOX of 12) moves 24 of them.
+      const q = num(line.quantity) * salesLineFactor(line);
       if (!q) return { cost: 0, source: 'none' };
       const pos = findStock(line.name, line.hsn);
       if (pos) {
@@ -210,7 +228,11 @@ export function itemProfitability(input: ProfitInputs, period: Period): { rows: 
         continue;
       }
       const c = coster.cost(l, d);
-      row.quantity = round2(row.quantity + l.quantity);
+      const f = salesLineFactor(l);
+      const base = f !== 1 ? coster.baseUnit(l.name, l.hsn) : undefined;
+      // Quantity in the item's base unit when an alternate-unit line can be resolved to it.
+      row.quantity = round2(row.quantity + (base ? l.quantity * f : l.quantity));
+      if (base) row.unit = base;
       row.revenue = round2(row.revenue + l.taxable);
       row.cost = round2(row.cost + c.cost);
       if (c.source === 'none') row.uncosted = round2(row.uncosted + l.taxable);
