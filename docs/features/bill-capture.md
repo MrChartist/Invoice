@@ -77,3 +77,12 @@ sync engine's DATED / NUMBERED lists (they sync like any other key). Additive `P
 `purchases.ts` (gate + envelope strip), `types/purchases.ts`, `attachments.ts`, `backup.ts`, `access.ts`,
 `ledger/exceptions.ts`, `ReportsHub.tsx`, `BillModal.tsx`, `ExpenseModal.tsx`, `PurchasePaymentModal.tsx`,
 `BillwiseTab.tsx`, `ApprovalsPanel.tsx`, `NotificationBell.tsx`, `Expenses.tsx`, `Reconcile.tsx`.
+
+## 8.160 "Scan bill" in the Expenses header (8I)
+- Button **Scan bill** next to Add bill (only with `books.edit`), as in myBillBook's Purchases → Scan invoice. It opens a
+  lazy chooser (`components/capture/ScanBillDialog.tsx`, strings `src/i18n/areas/bill-scan.ts`): **Scan e-invoice QR with
+  the camera** (only where `cameraScanSupported()` — BarcodeDetector + camera on a secure page), **Take a photo of the bill**
+  (`<input capture="environment">`) and **Choose a photo or PDF** — both through `openCaptureFromFile`.
+- A live camera QR goes through `captureFromQrText(text, 'camera')` (`capture-browser.ts`, same path as the Inbox tab's
+  camera / paste): inbox row + draft bill, warnings in the toast. Every route ends on the inbox row
+  (`/expenses?tab=inbox&doc=<id>`), where the draft is reviewed and posted as before.

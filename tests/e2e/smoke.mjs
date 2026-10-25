@@ -506,6 +506,42 @@ try {
     await edit.waitFor({ state: 'detached' });
   });
 
+  await step('8I: Scan bill in the Expenses header opens the capture chooser; GST filing steps, grouped tabs and the JSON check', async () => {
+    await page.goto(srv.origin + '/expenses');
+    await page.getByTestId('scan-bill').click();
+    const chooser = page.getByRole('dialog', { name: 'Scan a supplier bill' });
+    await chooser.waitFor();
+    check(await chooser.getByRole('button', { name: 'Choose a photo or PDF' }).isVisible() && await chooser.getByRole('button', { name: 'Take a photo of the bill' }).isVisible(),
+      'Scan bill opens the chooser (photo / file; camera QR where BarcodeDetector exists)');
+    await page.keyboard.press('Escape');
+    await chooser.waitFor({ state: 'detached' });
+
+    // An old deep link still lands on its tab inside the grouped tab strip.
+    await page.goto(srv.origin + '/gst-reports?tab=setoff');
+    await page.locator('[data-filing-strip]').waitFor();
+    const setoff = page.getByRole('tab', { name: /Set-off/ });
+    check((await setoff.getAttribute('aria-selected')) === 'true', '?tab=setoff still opens Set-off & payment');
+    check(await page.locator('[data-tab-group]').count() === 4, 'tabs grouped into GSTR-1 / GSTR-3B / Reconcile / Tools');
+    await setoff.focus();
+    await page.keyboard.press('ArrowRight');
+    check((await page.getByRole('tab', { name: /Cash ledger/ }).getAttribute('aria-selected')) === 'true', 'arrow key moves to the next tab');
+    await page.locator('[data-filing-check]').click();
+    const pf = page.getByRole('dialog', { name: 'Check before filing' });
+    await pf.waitFor();
+    check(await pf.getByText(/verify with your CA/).count() > 0, 'the check keeps the "verify with your CA" wording');
+    await page.keyboard.press('Escape');
+    await pf.waitFor({ state: 'detached' });
+    const json = page.locator('[data-gstr1-json]');
+    if ((await page.locator('[data-gstr1-json] [data-json-badge]').count()) > 0 && await json.isEnabled()) {
+      await json.click();
+      const dl = page.getByRole('dialog', { name: 'Check before you download GSTR-1 JSON' });
+      await dl.waitFor();
+      check(await dl.getByRole('button', { name: 'Download anyway' }).isVisible(), 'GSTR-1 JSON with problems stops at the check first');
+      await page.keyboard.press('Escape');
+      await dl.waitFor({ state: 'detached' });
+    }
+  });
+
   await step('TDS on payables: a 194J bill with TDS, payment of the net amount, the deduction in Form 26Q', async () => {
     await page.goto(srv.origin + '/expenses');
     await page.getByRole('button', { name: /Add bill/ }).click();
