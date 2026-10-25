@@ -18,12 +18,21 @@
  *      Expense    Cr party        Payment      Dr party
  */
 
-import { round2, num } from './invoice-calc';
+import { DEFAULT_BANK_ID, accountIdOf, type BankAccount } from './bank-accounts';
+import { round2, num, untaxedCharges } from './invoice-calc';
+import { inrRecord, inrValue } from './fx';
+import { supplierView } from './rcm';
+import { receiptInr } from './fx-gain';
 import { getTable, setTable, generateId } from './storage';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
-import { isVoidStatus, readPurchase } from './purchase-normalize';
+import { isVoidStatus, readPurchase, selfAssessedCessOf, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
+import type { AdvanceRecord } from '../types/advances';
+import type { PurchaseReturn, VendorPayment } from '../types/purchases';
+import { booksReturnEffects } from './purchase-returns-gst';
+import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment } from './advance-tax';
+import { payrollBooksVouchers, payrollPnlEvents } from './payroll/books-link';
 
 /* ════════════════════════════════════════════════════════════════
    Types
@@ -58,6 +67,8 @@ export interface Voucher {
   method?: string;
   /** Which cash/bank book the voucher moves money in, if any. */
   account?: CashAccount;
+  /** Bank sub-account (`bank-accounts.ts`) when `account` is 'bank'; missing = the main account. */
+  bank_account_id?: string;
   /** Invoice id for Sales / Credit Note / Receipt vouchers — drill-through. */
   invoice_id?: string;
   /** In-app link for drill-through (`/invoice/:id`). */
@@ -96,8 +107,20 @@ export interface BooksData {
     date?: string;
     method?: string;
     reference?: string;
+    bank_account_id?: string;
+    /** Additive (Tally parity): TDS deducted on this payment — settles the bill with `amount`, owed to the government. */
+    tds_amount?: number;
   }>;
   openings: OpeningBalance[];
+  /** Additive (Tally parity): supplier advances / on-account payments (`vendor_payments`). Optional for older callers. */
+  vendorPayments?: VendorPayment[];
+  /** Advance receipts (5.3, `advances` table). Optional so older callers / fixtures stay valid. */
+  advances?: AdvanceRecord[];
+  /** Additive (WP-3): purchase returns / supplier credit notes (`purchase_returns`). Optional. */
+  purchaseReturns?: PurchaseReturn[];
+  /** Additive (7P): raw `payroll_runs` / `payroll_payments` — payments in the cash / bank book, salary cost in the P&L. */
+  payrollRunRows?: unknown[];
+  payrollPaymentRows?: unknown[];
 }
 
 export const EMPTY_BOOKS: BooksData = {
@@ -254,26 +277,33 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-const SALES_TYPES = new Set(['INVOICE', 'TAX_INVOICE']);
+const SALES_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
 
 function isLive(inv: InvoiceRecord): boolean {
   return inv.status !== 'Draft' && inv.status !== 'Cancelled';
 }
 
-function isSale(inv: InvoiceRecord): boolean {
+/** Sales-side document that posts (invoice / tax invoice / debit note, not Draft or Cancelled). Shared with the ledger. */
+export function isSale(inv: InvoiceRecord): boolean {
   return isLive(inv) && SALES_TYPES.has(inv.doc_type ?? 'INVOICE');
 }
 
-function isCreditNote(inv: InvoiceRecord): boolean {
+export function isCreditNote(inv: InvoiceRecord): boolean {
   return isLive(inv) && inv.doc_type === 'CREDIT_NOTE';
 }
 
-function partyOfInvoice(inv: InvoiceRecord): string {
+export function partyOfInvoice(inv: InvoiceRecord): string {
   return str(inv.client?.company) || str(inv.client?.name) || 'Cash sale';
 }
 
-/** Taxable / GST / total of an invoice-like row, tolerant of legacy rows. */
-function invoiceAmounts(inv: InvoiceRecord) {
+/**
+ * Taxable / GST / total of an invoice-like row, tolerant of legacy rows. In rupees: a foreign-currency
+ * document is booked at its exchange rate (`src/lib/fx.ts`); one without a rate stays at face value.
+ */
+function invoiceAmounts(source: InvoiceRecord) {
+  // Outward reverse charge: the GST is the recipient's to pay — no output tax, and only the
+  // taxable value is receivable, also on older records whose stored total includes it (src/lib/rcm.ts).
+  const inv = supplierView(inrRecord(source));
   const total = Math.abs(num(inv.total));
   const tax = Math.abs(num(inv.tax_amount));
   const hasTaxable = Number.isFinite(num(inv.taxable_value, NaN));
@@ -285,7 +315,8 @@ function invoiceAmounts(inv: InvoiceRecord) {
   // bills the full total) and the Books disagree by exactly those amounts.
   const cess = Math.abs(num(inv.cess_amount));
   const tcs = Math.abs(num(inv.tcs_amount));
-  const charges = num(inv.shipping) + num(inv.other_charges);
+  // Taxed charges (`charges_taxable`) already sit inside taxable_value.
+  const charges = untaxedCharges(inv);
   // Legacy rows with no taxable_value: whatever is left after the taxes is the income.
   const income = hasTaxable
     ? round2(taxable + charges + num(inv.round_off))
@@ -318,6 +349,21 @@ export interface NormPurchase {
   sgst: number;
   igst: number;
   total: number;
+  /**
+   * GST we pay to the government ourselves (reverse charge, import of services, customs IGST on
+   * imported goods) when it sits inside `total`. Owed to the government, never to the supplier.
+   */
+  selfTax: number;
+  /** What the supplier is owed: total − selfTax − TDS deducted on booking (`supplierPayable`). */
+  payable: number;
+  /** Additive: TDS deducted when the bill was booked (owed to the government). */
+  tds: number;
+  /**
+   * Additive (7O, 7.90): compensation cess on the bill (outside `gst`) and the part of it we pay
+   * ourselves (reverse charge / imports — never owed to the supplier). Optional for older callers.
+   */
+  cess?: number;
+  selfCess?: number;
   itcEligible: boolean;
   /** Paid amount recorded on the row itself (fallback when no payment rows). */
   paidOnRow: number;
@@ -330,6 +376,8 @@ export function normalizePurchase(
   // One shared reader for the purchases table (see purchase-normalize.ts).
   const c = readPurchase(raw, vendors);
   if (!c || isVoidStatus(c.status)) return null;
+  // Same split as GST reports / exports for legacy rows that carry only a lump tax or a rate.
+  const heads = splitLumpTax(c, raw, c.placeOfSupply);
   return {
     id: c.id || `${c.date}-${c.total}`,
     number: c.number,
@@ -337,24 +385,39 @@ export function normalizePurchase(
     party: c.partyName || 'Unknown vendor',
     category: c.category,
     isExpense: c.isExpense,
-    taxable: c.taxable,
-    gst: c.tax,
-    cgst: c.cgst,
-    sgst: c.sgst,
-    igst: c.igst,
+    taxable: heads.taxable,
+    gst: heads.tax,
+    cgst: heads.cgst,
+    sgst: heads.sgst,
+    igst: heads.igst,
     total: c.total,
+    selfTax: selfAssessedTaxOf(c),
+    payable: supplierPayableOf(c),
+    tds: c.tdsOnBill,
+    ...(c.cess > 0 ? { cess: c.cess, selfCess: selfAssessedCessOf(c) } : {}),
     itcEligible: c.itcEligible,
     paidOnRow: c.paid,
   };
 }
 
-/** Cost part of a purchase: taxable + GST that cannot be claimed as ITC. */
-export function purchaseCost(p: NormPurchase): number {
-  return round2(p.taxable + (p.itcEligible ? 0 : p.gst));
+/** Customs IGST on imported goods (paid with the Bill of Entry, not through GSTR-3B). */
+function isCustomsIgst(raw: RawPurchase): boolean {
+  return String((raw as { import_type?: unknown })?.import_type ?? '').toUpperCase() === 'GOODS';
 }
 
+/** Cost part of a purchase: taxable + GST (and cess, 7O) that cannot be claimed as ITC. */
+export function purchaseCost(p: NormPurchase): number {
+  return round2(p.taxable + (p.itcEligible ? 0 : p.gst + (p.cess ?? 0)));
+}
+
+/** GST input credit of a bill (CGST + SGST + IGST; cess is `purchaseItcCess` — it offsets output cess only). */
 export function purchaseItc(p: NormPurchase): number {
   return p.itcEligible ? p.gst : 0;
+}
+
+/** 7O (7.90): cess input credit of a bill (Sec 11(2) Compensation Cess Act: pays cess only). */
+export function purchaseItcCess(p: NormPurchase): number {
+  return p.itcEligible ? round2(p.cess ?? 0) : 0;
 }
 
 function categoryOf(p: NormPurchase): string {
@@ -406,10 +469,14 @@ export function buildVouchers(data: BooksData): Voucher[] {
   }
 
   for (const t of data.transactions) {
+    // An advance adjusted against an invoice moved no money: the cash came in on the advance.
+    if (isAdvanceAdjustment(t)) continue;
     const date = toIsoDate(t.date);
-    const amount = round2(Math.abs(num(t.amount)));
-    if (!date || amount === 0) continue;
     const inv = invById.get(t.invoice_id);
+    // A receipt against a foreign-currency invoice is booked at the rupees actually realised
+    // (its `realised_rate`), else at the invoice's rate — the same figure the ledger's bank gets.
+    const amount = round2(receiptInr(t, inv));
+    if (!date || amount === 0) continue;
     out.push({
       id: `rcpt:${t.id}`,
       date,
@@ -421,6 +488,7 @@ export function buildVouchers(data: BooksData): Voucher[] {
       credit: amount,
       method: str(t.method) || 'Bank transfer',
       account: accountForMethod(t.method),
+      bank_account_id: accountForMethod(t.method) === 'bank' && t.bank_account_id ? t.bank_account_id : undefined,
       invoice_id: inv?.id,
       link: inv ? `/invoice/${inv.id}` : undefined,
     });
@@ -438,9 +506,10 @@ export function buildVouchers(data: BooksData): Voucher[] {
       type: p.isExpense ? 'Expense' : 'Purchase',
       number: p.number,
       party: p.party,
-      narration: `${categoryOf(p)}${p.gst ? ` (GST ${p.gst.toFixed(2)}${p.itcEligible ? ' ITC' : ' no ITC'})` : ''}`,
+      narration: `${categoryOf(p)}${p.gst ? ` (GST ${p.gst.toFixed(2)}${p.itcEligible ? ' ITC' : ' no ITC'}${p.selfTax ? ', paid by us (reverse charge / import)' : ''})` : ''}`,
       debit: 0,
-      credit: p.total,
+      // The supplier is credited with what it is owed; self-assessed GST is owed to the government.
+      credit: p.payable,
     });
   }
 
@@ -460,8 +529,52 @@ export function buildVouchers(data: BooksData): Voucher[] {
       credit: 0,
       method: str(pp.method) || 'Bank transfer',
       account: accountForMethod(pp.method),
+      bank_account_id: accountForMethod(pp.method) === 'bank' && pp.bank_account_id ? str(pp.bank_account_id) : undefined,
     });
   }
+
+  // Supplier advances / on-account payments (bill-wise payables): cash out on the day paid.
+  for (const vp of data.vendorPayments ?? []) {
+    const date = toIsoDate(vp.date);
+    const amount = round2(Math.abs(num(vp.amount)));
+    if (!date || amount === 0) continue;
+    out.push({
+      id: `vpay:${vp.id}`,
+      date,
+      type: 'Payment',
+      number: str(vp.reference) || str(vp.ref_name),
+      party: str(vp.vendor_name) || 'Unknown vendor',
+      narration: vp.kind === 'ADVANCE' ? 'Advance to supplier' : vp.kind === 'NEW_REF' ? `New ref ${str(vp.ref_name)}`.trim() : 'On account',
+      debit: amount,
+      credit: 0,
+      method: str(vp.method) || 'Bank transfer',
+      account: accountForMethod(vp.method),
+      bank_account_id: accountForMethod(vp.method) === 'bank' && vp.bank_account_id ? str(vp.bank_account_id) : undefined,
+    });
+  }
+
+  // Advance receipts (5.3) are cash in on the day received; refunds of an advance are cash out.
+  for (const m of advanceMovements(data.advances ?? [], data.transactions, data.invoices)) {
+    if (m.kind === 'adjusted') continue;
+    const received = m.kind === 'received';
+    out.push({
+      id: `${received ? 'adv' : 'advrf'}:${m.sourceId}`,
+      date: m.date,
+      type: received ? 'Receipt' : 'Payment',
+      number: received ? m.number : m.ref || m.number,
+      party: m.party,
+      narration: received ? `Advance received${m.taxed ? ` (incl. GST ${round2(m.igst + m.cgst + m.sgst).toFixed(2)})` : ''}` : `Refund of advance ${m.number}`,
+      debit: received ? 0 : m.gross,
+      credit: received ? m.gross : 0,
+      method: str(m.method) || 'Bank transfer',
+      account: accountForMethod(m.method),
+      bank_account_id: accountForMethod(m.method) === 'bank' && m.bank_account_id ? m.bank_account_id : undefined,
+      link: '/receivables?tab=advances',
+    });
+  }
+
+  // Payroll payments (7P): salary, PF / ESI / PT / TDS 192, loans to employees — cash out on the day paid.
+  out.push(...payrollBooksVouchers(data.payrollPaymentRows));
 
   return out.sort(
     (a, b) =>
@@ -538,6 +651,50 @@ export function accountBalanceAt(
     bal = round2(bal + movement(v));
   }
   return bal;
+}
+
+/**
+ * Book balance of one bank account at the end of `date`: its own opening plus the bank vouchers
+ * tagged to it. Until the main account has its own opening it uses the Books bank opening, so a
+ * single-account user sees exactly the old figure.
+ */
+export function bankAccountBalanceAt(
+  vouchers: readonly Voucher[],
+  openings: OpeningBalance[],
+  account: BankAccount,
+  date: string,
+): { balance: number; openingMissing: boolean } {
+  let amount = 0;
+  let from = '';
+  let missing = false;
+  if (account.opening !== undefined && account.opening_as_of && account.opening_as_of <= date) {
+    amount = account.opening;
+    from = account.opening_as_of;
+  } else if (account.id === DEFAULT_BANK_ID) {
+    const o = openingFor(openings, 'bank', date);
+    amount = num(o?.amount);
+    from = o?.as_of ?? '';
+    missing = !o;
+  } else missing = true;
+  let bal = round2(amount);
+  for (const v of vouchers) {
+    if (v.account !== 'bank' || v.date > date || v.date < from || accountIdOf(v) !== account.id) continue;
+    bal = round2(bal + (v.type === 'Receipt' ? v.credit : v.type === 'Payment' ? -v.debit : 0));
+  }
+  return { balance: bal, openingMissing: missing };
+}
+
+/**
+ * Bank book of ONE bank account (WP-5): the vouchers tagged to it, opened with its own opening, or —
+ * for the main account without one — the Books bank opening. Same rule as `bankAccountBalanceAt` and
+ * the ledger's per-bank openings (`ledger/postings-bank.ts`).
+ */
+export function bankAccountBook(vouchers: readonly Voucher[], openings: OpeningBalance[], account: BankAccount, period: Period): CashBook {
+  const tagged = vouchers.filter((v) => v.account === 'bank' && accountIdOf(v) === account.id);
+  const own: OpeningBalance[] =
+    account.opening !== undefined && account.opening_as_of ? [{ id: `own:${account.id}`, account: 'bank', amount: account.opening, as_of: account.opening_as_of }] : [];
+  const ops = own.length ? own : account.id === DEFAULT_BANK_ID ? openings.filter((o) => o.account === 'bank') : [];
+  return cashBook(tagged, ops, 'bank', period);
 }
 
 export interface BookRow {
@@ -656,9 +813,9 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
   if (basis === 'cash') {
     for (const t of data.transactions) {
       const date = toIsoDate(t.date);
-      const paid = round2(Math.abs(num(t.amount)));
-      if (!date || paid === 0) continue;
       const inv = invById.get(t.invoice_id);
+      const paid = round2(Math.abs(inrValue(num(t.amount), inv)));
+      if (!date || paid === 0) continue;
       let amount = paid;
       if (inv) {
         if (!isSale(inv)) continue; // receipts only count against sales invoices
@@ -687,16 +844,21 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
         ref: p.id,
       });
     }
+    // WP-3: purchase returns / supplier credit notes take the cost back on the note date.
+    for (const r of booksReturnEffects(data.purchaseReturns)) {
+      events.push({ date: r.date, kind: 'expense', amount: -r.cost, category: r.category, direct: !r.isExpense, ref: r.ref });
+    }
   } else {
     const byId = new Map(purchases.map((p) => [p.id, p]));
     const paidRows = new Map<string, number>();
     for (const pp of data.purchasePayments) {
       const p = byId.get(str(pp.purchase_id));
       const date = toIsoDate(pp.date);
-      const paid = round2(Math.abs(num(pp.amount)));
+      // TDS deducted on the payment settles the bill as much as the cash does.
+      const paid = round2(Math.abs(num(pp.amount)) + Math.max(num(pp.tds_amount), 0));
       if (!p || !date || paid === 0) continue;
       paidRows.set(p.id, round2((paidRows.get(p.id) ?? 0) + paid));
-      const cost = p.total > 0 ? round2((paid * purchaseCost(p)) / p.total) : paid;
+      const cost = p.payable > 0 ? round2((paid * purchaseCost(p)) / p.payable) : paid;
       events.push({
         date,
         kind: 'expense',
@@ -709,7 +871,7 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
     // Bills marked paid on the row itself with no payment rows: paid on bill date.
     for (const p of purchases) {
       if (paidRows.has(p.id) || p.paidOnRow <= 0) continue;
-      const cost = p.total > 0 ? round2((p.paidOnRow * purchaseCost(p)) / p.total) : p.paidOnRow;
+      const cost = p.payable > 0 ? round2((p.paidOnRow * purchaseCost(p)) / p.payable) : p.paidOnRow;
       events.push({
         date: p.date,
         kind: 'expense',
@@ -720,6 +882,8 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
       });
     }
   }
+  // Payroll (7P): salary cost on the run's voucher date (accrual) or when paid (cash).
+  events.push(...payrollPnlEvents(data.payrollRunRows, data.payrollPaymentRows, basis));
   return events;
 }
 
@@ -832,10 +996,29 @@ export interface GstSummary {
   itc: number;
   /** GST on purchases that is NOT creditable (already in costs). */
   blockedGst: number;
-  /** output − ITC; negative means a refundable / carry-forward credit. */
+  /**
+   * Additive: GST payable by us under reverse charge on purchases (reverse-charge bills and imports of
+   * services — GSTR-3B 3.1(d)). Paid in cash; its ITC (if eligible) is inside `itc`. Customs IGST on
+   * imported goods is paid with the Bill of Entry, not through the return, so it is not in here.
+   */
+  rcmPayable?: number;
+  /** output + reverse-charge tax − ITC; negative means a refundable / carry-forward credit. */
   netPayable: number;
   /** Additive: cess on sales less cess on credit notes. Payable in cash — ITC cannot offset it. */
   outputCess?: number;
+  /**
+   * Additive (7O, 7.90): cess credit on eligible purchase bills (GSTR-3B 4A cess), reverse-charge cess
+   * we pay ourselves (3.1(d) cess) and output cess + reverse-charge cess − cess credit. Cess credit
+   * offsets cess only, so it is kept out of `itc` / `netPayable`. Working paper — verify with your CA.
+   */
+  itcCess?: number;
+  rcmCess?: number;
+  netCessPayable?: number;
+}
+
+/** ITC including cess credit — the figure GSTR-3B 4C / GSTR-9 Table 6 / 9C Table 12 compare with. */
+export function itcWithCess(g: Pick<GstSummary, 'itc' | 'itcCess'>): number {
+  return round2(g.itc + (g.itcCess ?? 0));
 }
 
 export function gstSummary(data: BooksData, period: Period): GstSummary {
@@ -858,11 +1041,17 @@ export function gstSummary(data: BooksData, period: Period): GstSummary {
   }
   let itc = 0;
   let blocked = 0;
+  let rcm = 0;
+  let itcCess = 0;
+  let rcmCess = 0;
   for (const raw of data.purchases) {
     const p = normalizePurchase(raw, data.vendors);
     if (!p || !inPeriod(p.date, period)) continue;
     itc = round2(itc + purchaseItc(p));
+    itcCess = round2(itcCess + purchaseItcCess(p));
     blocked = round2(blocked + (p.itcEligible ? 0 : p.gst));
+    if (p.selfTax && !isCustomsIgst(raw)) rcm = round2(rcm + p.selfTax);
+    if (p.selfCess && !isCustomsIgst(raw)) rcmCess = round2(rcmCess + p.selfCess);
   }
   const outputTotal = round2(cgst + sgst + igst);
   return {
@@ -872,8 +1061,12 @@ export function gstSummary(data: BooksData, period: Period): GstSummary {
     outputTotal,
     itc,
     blockedGst: blocked,
-    netPayable: round2(outputTotal - itc),
+    rcmPayable: rcm,
+    netPayable: round2(outputTotal + rcm - itc),
     outputCess: cess,
+    itcCess,
+    rcmCess,
+    netCessPayable: round2(cess + rcmCess - itcCess),
   };
 }
 
@@ -932,9 +1125,17 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   // cancelled. That money then shows up as a customer advance instead of vanishing
   // into the balancing figure.
   let receipts = 0;
+  const invById = new Map(data.invoices.map((i) => [i.id, i]));
   for (const t of data.transactions) {
-    if (!upTo(toIsoDate(t.date))) continue;
-    receipts += Math.abs(num(t.amount));
+    if (isAdvanceAdjustment(t) || !upTo(toIsoDate(t.date))) continue;
+    receipts += Math.abs(inrValue(num(t.amount), invById.get(t.invoice_id)));
+  }
+  // Advances (5.3): the cash received (less refunds) is a credit to customers. GST paid on an
+  // advance is left out here: the liability and the matching "GST paid on advances" asset cancel
+  // (the double-entry ledger shows both).
+  for (const m of advanceMovements(data.advances ?? [], data.transactions, data.invoices)) {
+    if (!upTo(m.date) || m.kind === 'adjusted') continue;
+    receipts += m.kind === 'received' ? m.gross : -m.gross;
   }
 
   const purchases = data.purchases
@@ -942,16 +1143,35 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
     .filter((p): p is NormPurchase => p !== null && upTo(p.date));
   let purchTotal = 0;
   let itc = 0;
+  // GST we owe the government on reverse-charge / import bills (not the supplier).
+  let selfTax = 0;
   for (const p of purchases) {
-    purchTotal += p.total;
-    itc += purchaseItc(p);
+    purchTotal += p.payable;
+    selfTax += p.selfTax + (p.selfCess ?? 0);
+    itc += purchaseItc(p) + purchaseItcCess(p);
+  }
+  // WP-3: purchase returns / supplier notes reduce what we owe, the ITC and any self-assessed GST
+  // (7O: and the TDS payable when the bill had TDS at booking).
+  let tdsReturned = 0;
+  for (const r of booksReturnEffects(data.purchaseReturns)) {
+    if (!upTo(r.date)) continue;
+    purchTotal -= r.payable;
+    selfTax -= r.selfTax;
+    itc -= r.itc;
+    tdsReturned += r.tds ?? 0;
   }
   // Same rule on the payables side: cash that left the bank always reduces payables.
   let paid = 0;
+  // TDS we deducted (on bills and on payments) is owed to the government, not the supplier.
+  let tdsDeducted = -tdsReturned;
+  for (const p of purchases) tdsDeducted += p.tds;
   for (const pp of data.purchasePayments) {
     if (!upTo(toIsoDate(pp.date))) continue;
-    paid += Math.abs(num(pp.amount));
+    const tds = Math.max(num(pp.tds_amount), 0);
+    paid += Math.abs(num(pp.amount)) + tds;
+    tdsDeducted += tds;
   }
+  for (const vp of data.vendorPayments ?? []) if (upTo(toIsoDate(vp.date))) paid += Math.abs(num(vp.amount));
 
   const vouchers = buildVouchers(data);
   const cash = accountBalanceAt(vouchers, data.openings, 'cash', asOf);
@@ -959,7 +1179,7 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
 
   const ar = round2(salesTotal - cnTotal - receipts);
   const ap = round2(purchTotal - paid);
-  const gstNet = round2(outputGst - itc);
+  const gstNet = round2(outputGst + selfTax - itc);
 
   const assets = {
     cash,
@@ -975,7 +1195,8 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   const liabilities = {
     payables: Math.max(ap, 0),
     // GST / cess payable (net of ITC) plus TCS collected and not yet deposited.
-    gstPayable: round2(Math.max(gstNet, 0) + Math.max(round2(tcsCollected), 0)),
+    // TDS deducted from suppliers is added too (deposits are not tracked here; the ledger has them).
+    gstPayable: round2(Math.max(gstNet, 0) + Math.max(round2(tcsCollected), 0) + round2(tdsDeducted)),
     customerAdvances: Math.max(-ar, 0),
     total: 0,
   };
@@ -1023,6 +1244,11 @@ export function loadBooksData(): BooksData {
     vendors: getTable<BooksData['vendors'][number]>('vendors'),
     purchasePayments: getTable<BooksData['purchasePayments'][number]>('purchase_payments'),
     openings: loadOpenings(),
+    advances: getTable<AdvanceRecord>(ADVANCES_TABLE),
+    vendorPayments: getTable<VendorPayment>('vendor_payments'),
+    purchaseReturns: getTable<PurchaseReturn>('purchase_returns'),
+    payrollRunRows: getTable<unknown>('payroll_runs'),
+    payrollPaymentRows: getTable<unknown>('payroll_payments'),
   };
 }
 

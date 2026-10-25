@@ -65,7 +65,7 @@ export function ActivityTimeline({ invoiceId, refreshKey, initial = 6 }: Activit
               <div className={styles.tBody}>
                 <div className={styles.tSummary}>{r.summary}</div>
                 <span className={styles.tMeta}>
-                  {AUDIT_ACTION_LABELS[r.action]} · {formatWhen(r.at)}
+                  {AUDIT_ACTION_LABELS[r.action]} · {formatWhen(r.at)}{r.by ? ` · by ${r.by}` : ''}
                 </span>
                 {expandable && (
                   <>

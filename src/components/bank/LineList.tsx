@@ -11,6 +11,8 @@ import {
   type Suggestion,
 } from '../../lib/bank-recon';
 import { formatDate, formatMoney } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './reconcile.module.css';
@@ -41,8 +43,8 @@ export interface LineListProps {
 const PAGE = 100;
 
 function describe(c: Candidate | undefined): { title: string; sub: string } {
-  if (!c) return { title: 'Entry removed from the books', sub: '' };
-  const what = c.kind === 'payment' ? 'Receipt' : 'Payment';
+  if (!c) return { title: bankT('entryRemoved'), sub: '' };
+  const what = c.kind === 'payment' ? bankT('receipt') : bankT('payment');
   return {
     title: [what, c.docNumber, c.party && `· ${c.party}`].filter(Boolean).join(' '),
     sub: `${formatMoney(c.amount)} · ${formatDate(c.date)}${c.method ? ` · ${c.method}` : ''}`,
@@ -50,6 +52,7 @@ function describe(c: Candidate | undefined): { title: string; sub: string } {
 }
 
 export function LineList(props: LineListProps) {
+  useT(); // re-render on a language switch (5.4)
   const { items } = props;
   const [shown, setShown] = useState(PAGE);
   // New filter / search / data => start from the top again.
@@ -58,7 +61,7 @@ export function LineList(props: LineListProps) {
 
   return (
     <>
-      <ul className={styles.list} aria-label="Bank statement lines">
+      <ul className={styles.list} aria-label={bankT('linesAria')}>
         {items.slice(0, shown).map((it) => (
           <LineRow key={it.line.id} item={it} {...props} />
         ))}
@@ -66,7 +69,7 @@ export function LineList(props: LineListProps) {
       {items.length > shown && (
         <div style={{ padding: '0.875rem 1.25rem', borderTop: '1px solid var(--border)' }}>
           <button type="button" className={controls.btnOutline} onClick={() => setShown((n) => n + PAGE)}>
-            Show {Math.min(PAGE, items.length - shown)} more ({items.length - shown} left)
+            {bankT('showMore', { n: Math.min(PAGE, items.length - shown), left: items.length - shown })}
           </button>
         </div>
       )}
@@ -90,19 +93,19 @@ function LineRow({ item, entries, suggestions, showBank, ...act }: LineListProps
         {mode !== 'Other' && <span className={styles.mode}>{mode}</span>}
       </div>
       <div className={styles.cNarr}>
-        <div className={styles.narr} title={line.narration}>{line.narration || '(no narration)'}</div>
+        <div className={styles.narr} title={line.narration}>{line.narration || bankT('noNarration')}</div>
         <div className={styles.narrMeta}>
-          {[showBank && item.bank, line.ref && `Ref ${line.ref}`, line.balance !== undefined && `Bal ${formatMoney(line.balance)}`].filter(Boolean).join(' · ')}
+          {[showBank && item.bank, line.ref && bankT('refN', { ref: line.ref }), line.balance !== undefined && bankT('balN', { amount: formatMoney(line.balance) })].filter(Boolean).join(' · ')}
         </div>
       </div>
       <div className={`${styles.amount} ${styles.cAmount} ${credit ? styles.pos : styles.neg}`}>
-        <span className={surface.srOnly}>{credit ? 'Credit ' : 'Debit '}</span>
+        <span className={surface.srOnly}>{credit ? bankT('creditSr') : bankT('debitSr')}</span>
         {credit ? '+' : '−'}₹{formatMoney(amount)}
       </div>
       <div className={`${styles.side} ${styles.cSide}`}>
         {state === 'matched' && (
           <>
-            <span className={styles.statusOk}><CheckCircle2 size={12} aria-hidden="true" /> Matched</span>
+            <span className={styles.statusOk}><CheckCircle2 size={12} aria-hidden="true" /> {bankT('matched')}</span>
             {matchedEntries.map((c, i) => {
               const d = describe(c);
               return (
@@ -118,29 +121,29 @@ function LineRow({ item, entries, suggestions, showBank, ...act }: LineListProps
             })}
             <div className={styles.actions}>
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => act.onUnmatch(line.id)}>
-                <Undo2 size={14} /> Unmatch
+                <Undo2 size={14} /> {bankT('unmatch')}
               </button>
             </div>
           </>
         )}
         {state === 'manual' && (
           <>
-            <span className={styles.statusOk}><Check size={12} aria-hidden="true" /> Reconciled manually</span>
+            <span className={styles.statusOk}><Check size={12} aria-hidden="true" /> {bankT('manual')}</span>
             <NoteField line={line} onNote={act.onNote} />
             <div className={styles.actions}>
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => act.onUnmatch(line.id)}>
-                <Undo2 size={14} /> Reopen
+                <Undo2 size={14} /> {bankT('reopen')}
               </button>
             </div>
           </>
         )}
         {state === 'ignored' && (
           <>
-            <span className={styles.status}><CircleSlash size={12} aria-hidden="true" /> Ignored</span>
+            <span className={styles.status}><CircleSlash size={12} aria-hidden="true" /> {bankT('ignored')}</span>
             <NoteField line={line} onNote={act.onNote} />
             <div className={styles.actions}>
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => act.onIgnore(line.id, false)}>
-                <Undo2 size={14} /> Restore
+                <Undo2 size={14} /> {bankT('restore')}
               </button>
             </div>
           </>
@@ -148,29 +151,29 @@ function LineRow({ item, entries, suggestions, showBank, ...act }: LineListProps
         {(state === 'unmatched' || state === 'orphan') && (
           <>
             {state === 'orphan' && (
-              <span className={styles.statusWarn}>The matched entry was deleted — match again</span>
+              <span className={styles.statusWarn}>{bankT('orphan')}</span>
             )}
             {sug && <SuggestionCard sug={sug} entries={entries} onConfirm={() => act.onConfirm(sug)} onOther={() => act.onMatchManually(line)} />}
             <div className={styles.actions}>
               {!sug && (
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => act.onMatchManually(line)}>
-                  <Search size={14} /> Match…
+                  <Search size={14} /> {bankT('matchDots')}
                 </button>
               )}
               {credit ? (
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => act.onCreateReceipt(line)}>
-                  <Receipt size={14} /> Create receipt
+                  <Receipt size={14} /> {bankT('createReceipt')}
                 </button>
               ) : (
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => act.onCreateExpense(line)}>
-                  <FilePlus2 size={14} /> Create expense
+                  <FilePlus2 size={14} /> {bankT('createExpense')}
                 </button>
               )}
-              <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => act.onMarkReconciled(line.id)} title="Accounted for outside the books (e.g. bank charge you will enter later)">
-                <Check size={14} /> Mark reconciled
+              <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => act.onMarkReconciled(line.id)} title={bankT('markReconciledHint')}>
+                <Check size={14} /> {bankT('markReconciled')}
               </button>
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => act.onIgnore(line.id, true)}>
-                <Ban size={14} /> Ignore
+                <Ban size={14} /> {bankT('ignore')}
               </button>
             </div>
           </>
@@ -187,10 +190,10 @@ function SuggestionCard({ sug, entries, onConfirm, onOther }: { sug: Suggestion;
   return (
     <div className={tier === 'high' ? styles.suggestHigh : tier === 'medium' ? styles.suggestMed : styles.suggest}>
       <div className={styles.suggestHead}>
-        <span className={tier === 'high' ? styles.pillHigh : tier === 'medium' ? styles.pillMed : styles.pillLow} title="Confidence of this suggestion">
-          {sug.confidence}% · {tier === 'high' ? 'High' : tier === 'medium' ? 'Medium' : 'Low'}
+        <span className={tier === 'high' ? styles.pillHigh : tier === 'medium' ? styles.pillMed : styles.pillLow} title={bankT('confidence')}>
+          {sug.confidence}% · {tier === 'high' ? bankT('high') : tier === 'medium' ? bankT('medium') : bankT('low')}
         </span>
-        <span className={styles.candSub}>{isPick ? (sug.combo ? 'Suggested split' : 'Suggested match') : 'Alternative (best entry fits another line better)'}</span>
+        <span className={styles.candSub}>{isPick ? (sug.combo ? bankT('suggestedSplit') : bankT('suggestedMatch')) : bankT('alternative')}</span>
       </div>
       {items.map((d, i) => (
         <div key={i}>
@@ -198,15 +201,15 @@ function SuggestionCard({ sug, entries, onConfirm, onOther }: { sug: Suggestion;
           <div className={styles.candSub}>{d.sub}</div>
         </div>
       ))}
-      <ul className={styles.reasons} aria-label="Why this match">
+      <ul className={styles.reasons} aria-label={bankT('why')}>
         {sug.reasons.map((r) => <li key={r}>{r}</li>)}
       </ul>
       <div className={styles.actions}>
         <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={onConfirm}>
-          <Check size={14} /> Confirm
+          <Check size={14} /> {bankT('confirm')}
         </button>
         <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={onOther}>
-          <Link2 size={14} /> Other…
+          <Link2 size={14} /> {bankT('other')}
         </button>
       </div>
     </div>
@@ -218,8 +221,8 @@ function NoteField({ line, onNote }: { line: BankLine; onNote: (id: string, note
   return (
     <input
       className={`${controls.input} ${styles.noteInput}`}
-      aria-label="Note for this line"
-      placeholder="Add a note"
+      aria-label={bankT('noteAria')}
+      placeholder={bankT('notePh')}
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => value !== (line.note ?? '') && onNote(line.id, value)}

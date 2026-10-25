@@ -1,8 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, Lock, RotateCcw } from 'lucide-react';
+import { Ban, FileClock, Lock, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { StatusBadge } from '../ui/StatusBadge';
+import { quoteState, quoteTone } from '../../lib/quote-status';
+import { getTable } from '../../lib/storage';
 import { ConvertMenu } from '../documents/ConvertMenu';
 import { CreditNoteModal } from '../documents/CreditNoteModal';
+import { DebitNoteModal } from '../documents/DebitNoteModal';
 import { CancelDialog } from '../documents/CancelDialog';
 import { DocumentTimeline } from '../documents/DocumentTimeline';
 import { ShareMenu } from '../share';
@@ -12,10 +16,16 @@ import { OverdueInterest } from '../interest';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
 import { isLocked } from '../../lib/period-lock';
+import { canAmend } from '../../lib/amendments';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
+import { stateLabel } from '../../i18n/areas/sales';
 import styles from './DocumentActions.module.css';
 
+const OrderFulfilment = lazy(() => import('../documents/OrderFulfilment').then((m) => ({ default: m.OrderFulfilment })));
+const AmendDialog = lazy(() => import('../documents/AmendDialog').then((m) => ({ default: m.AmendDialog })));
 const ActivityTimeline = lazy(() => import('../audit/ActivityTimeline').then((m) => ({ default: m.ActivityTimeline })));
 
 /** Everything you can do with an already-saved document, in one place. */
@@ -29,10 +39,13 @@ export function DocumentActions({
   /** Called after an action changed the stored document (cancel / reinstate). */
   onChanged?: () => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
   const [creditOpen, setCreditOpen] = useState(false);
+  const [debitOpen, setDebitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [amendOpen, setAmendOpen] = useState(false);
   const [saved, setSaved] = useState<InvoiceRecord | undefined>(() => localDb.invoices.getById(invoiceId));
 
   // Re-read the stored row whenever the editor saves or an action changes it.
@@ -59,35 +72,82 @@ export function DocumentActions({
   };
 
   const cancelled = saved.status === 'Cancelled';
-  const canCredit = saved.doc_type === 'INVOICE' || saved.doc_type === 'TAX_INVOICE';
+  const canCredit = saved.doc_type === 'INVOICE' || saved.doc_type === 'TAX_INVOICE' || saved.doc_type === 'BILL_OF_SUPPLY';
   const locked = isLocked(saved);
+  const isOrder = saved.doc_type === 'SALES_ORDER';
 
   return (
     <div className={styles.wrap}>
       <div className={styles.row}>
         <span data-share-anchor>
-          <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.status === 'Paid'} />
+          <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.doc_type === 'SALES_ORDER' || saved.status === 'Paid'} />
         </span>
-        <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} />
-        <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />
-        <EInvoiceButton invoice={saved} />
+        <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} onRequestDebitNote={canCredit ? () => setDebitOpen(true) : undefined} />
+        {!isOrder && <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />}
+        {/* A Bill of Supply is never e-invoiced; it can still need an e-Way Bill (document type BIL). */}
+        {!isOrder && <EInvoiceButton invoice={saved} label={saved.doc_type === 'BILL_OF_SUPPLY' ? edT('daEway') : undefined} />}
         <button
           type="button"
           className={`${controls.btnOutline} ${controls.btnSm}`}
           onClick={() => setCancelOpen(true)}
           disabled={locked}
-          title={locked ? 'This document is in a locked period — unlock it with your PIN first' : undefined}
+          title={locked ? edT('daLockedTitle') : undefined}
         >
-          {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? 'Reinstate' : 'Cancel document'}
+          {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? edT('daReinstate') : edT('daCancel')}
         </button>
+        {canAmend(saved) && (
+          <button
+            type="button"
+            className={`${controls.btnOutline} ${controls.btnSm}`}
+            onClick={() => setAmendOpen(true)}
+            title={edT('daAmendTitle')}
+          >
+            <FileClock size={16} /> {edT('daAmend')}
+          </button>
+        )}
       </div>
+
+      {saved.doc_type === 'QUOTATION' && (() => {
+        const q = quoteState(saved, getTable<{ from_id: string; relation: string }>('doc_links'));
+        const setOutcome = (outcome: 'Accepted' | 'Declined' | undefined) => {
+          try {
+            localDb.invoices.setQuoteStatus(saved.id, outcome);
+            reloadEditor();
+          } catch (err) {
+            window.alert((err as Error).message);
+          }
+        };
+        return (
+          <div className={styles.row} role="group" aria-label={edT('daQuoteOutcome')}>
+            <span>{edT('daQuotation')}</span> <StatusBadge status={stateLabel(q)} tone={quoteTone(q)} />
+            {q !== 'Converted' && (
+              <>
+                <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Accepted'}
+                  onClick={() => setOutcome(saved.quote_status === 'Accepted' ? undefined : 'Accepted')}>
+                  <ThumbsUp size={15} /> {edT('daAccepted')}
+                </button>
+                <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Declined'}
+                  onClick={() => setOutcome(saved.quote_status === 'Declined' ? undefined : 'Declined')}>
+                  <ThumbsDown size={15} /> {edT('daDeclined')}
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
+
+      {isOrder && (
+        <Suspense fallback={null}>
+          <OrderFulfilment order={saved} locked={locked} refreshKey={tick + refreshKey} onChanged={reloadEditor} />
+        </Suspense>
+      )}
 
       <OverdueInterest invoice={saved} onAddLine={addInterestLine} />
 
       <DocumentTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
 
-      <section aria-label="Activity" className={styles.activity}>
-        <h3 className={styles.activityHead}>Activity</h3>
+      <section aria-label={edT('daActivity')} className={styles.activity}>
+        <h3 className={styles.activityHead}>{edT('daActivity')}</h3>
         <Suspense fallback={null}>
           <ActivityTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
         </Suspense>
@@ -102,7 +162,23 @@ export function DocumentActions({
           navigate(`/invoice/${rec.id}`);
         }}
       />
+      {debitOpen && (
+        <DebitNoteModal
+          invoice={saved}
+          open
+          onClose={() => setDebitOpen(false)}
+          onCreated={(rec) => {
+            setDebitOpen(false);
+            navigate(`/invoice/${rec.id}`);
+          }}
+        />
+      )}
       <CancelDialog invoice={saved} open={cancelOpen} onClose={() => setCancelOpen(false)} onDone={reloadEditor} />
+      {amendOpen && (
+        <Suspense fallback={null}>
+          <AmendDialog invoice={saved} open onClose={() => setAmendOpen(false)} onDone={reloadEditor} />
+        </Suspense>
+      )}
     </div>
   );
 }

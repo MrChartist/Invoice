@@ -4,7 +4,10 @@ import { Modal } from '../ui/Modal';
 import { localDb } from '../../lib/localDb';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency } from '../../lib/utils';
+import { pickCatalogItem } from '../creator/pricing-actions';
 import type { InvoiceItem } from '../../types/invoice';
+import { useT } from '../../i18n';
+import { salesT } from '../../i18n/areas/sales';
 import styles from './PickerList.module.css';
 
 interface Props {
@@ -15,7 +18,7 @@ interface Props {
 }
 
 export function ItemSearchModal({ isOpen, onClose, targetItemId }: Props) {
-  const applyCatalogItem = useInvoiceStore((s) => s.applyCatalogItem);
+  useT(); // re-render on a language switch (5.4)
   const currency = useInvoiceStore((s) => s.currency);
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -29,19 +32,19 @@ export function ItemSearchModal({ isOpen, onClose, targetItemId }: Props) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = q ? items.filter((i) => i.name?.toLowerCase().includes(q) || i.hsn?.toLowerCase().includes(q)) : items;
+    const list = q ? items.filter((i) => i.name?.toLowerCase().includes(q) || i.hsn?.toLowerCase().includes(q) || i.barcode?.toLowerCase() === q || i.sku?.toLowerCase().includes(q)) : items;
     return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [items, query]);
 
   return (
-    <Modal open={isOpen} onClose={onClose} title="Choose from your catalogue" subtitle="Items are remembered when you save an invoice" flush>
+    <Modal open={isOpen} onClose={onClose} title={salesT('pick.itemTitle')} subtitle={salesT('pick.itemSub')} flush>
       <label className={styles.search}>
         <Search size={16} />
-        <input autoFocus type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or HSN / SAC" aria-label="Search items" />
+        <input autoFocus type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={salesT('pick.itemSearch')} aria-label={salesT('pick.itemSearchAria')} />
       </label>
       {filtered.length === 0 ? (
         <p className={styles.empty}>
-          {items.length === 0 ? 'Your catalogue is empty. Items you use on a saved invoice appear here automatically.' : 'No items match your search.'}
+          {items.length === 0 ? salesT('pick.noItems') : salesT('pick.noItemMatch')}
         </p>
       ) : (
         <ul className={styles.list}>
@@ -51,14 +54,14 @@ export function ItemSearchModal({ isOpen, onClose, targetItemId }: Props) {
                 type="button"
                 className={styles.item}
                 onClick={() => {
-                  applyCatalogItem(targetItemId, item);
+                  pickCatalogItem(targetItemId, item);
                   onClose();
                 }}
               >
                 <span className={styles.main}>
                   <span className={styles.title}>{item.name}</span>
                   <span className={styles.sub}>
-                    {[item.hsn && `HSN/SAC ${item.hsn}`, typeof item.tax_rate === 'number' && `GST ${item.tax_rate}%`, item.unit].filter(Boolean).join(' · ') || item.type || 'Service'}
+                    {[item.hsn && `HSN/SAC ${item.hsn}`, typeof item.tax_rate === 'number' && `GST ${item.tax_rate}%`, item.unit].filter(Boolean).join(' · ') || item.type || salesT('pick.service')}
                   </span>
                 </span>
                 <span className={styles.price}>{formatCurrency(item.rate, currency)}</span>

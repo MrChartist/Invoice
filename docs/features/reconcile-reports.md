@@ -43,3 +43,19 @@ const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.R
 <Route path="/reports" element={<Reports />} />
 ```
 Nav (`DashboardLayout` "Accounts & GST" group): `{ label: 'Reconcile', path: '/reconcile', icon: Landmark }`, `{ label: 'Reports', path: '/reports', icon: BarChart3 }` (lucide-react). Optional links: Books "Cash & bank" tab -> `/reconcile`; Dashboard top-customer card -> `/reports?tab=top`; Receivables -> `/reports`; command palette entries for both (`/reconcile?tab=brs` opens the BRS). Add `bank-recon.ts` / `sales-reports.ts` to `tests/purchase-contract.test.ts` reader list if desired (both read purchases through `readPurchase` / books' `normalizePurchase`).
+
+## Several bank accounts
+
+`src/lib/bank-accounts.ts` keeps a `bank_accounts` table (main account implicit, id `default`). Once a second
+account exists:
+
+- Bank reconciliation shows a **Bank account** picker; statements, match candidates, the books balance and the BRS
+  all work on that account. Imports go into the selected account (`BankStatement.bank_account_id`).
+- Receipts (`Payment.bank_account_id`) and supplier payments (`PurchasePayment.bank_account_id`) get a "Received
+  into" / "Paid from" picker (not for cash). Receipts or expenses created from a statement line take the
+  statement's account. Missing = the main account, so existing data needs no migration.
+- Each account has its own opening balance (Statements tab → Bank accounts). The main account falls back to the
+  Books bank opening while it has none, so single-account users see the old figure. The per-account books balance
+  is `bankAccountBalanceAt` in `books.ts` (opening + bank vouchers tagged to the account).
+- The Books bank book, the double-entry ledger (account 3510) and Tally keep one Bank total. Cheques clear into the
+  main account. An account in use cannot be deleted, only made inactive.

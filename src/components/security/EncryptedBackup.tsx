@@ -1,17 +1,23 @@
+import { reloadAfterFlush } from '../../lib/storage';
 import { useRef, useState } from 'react';
 import { Download, FileLock2, Info, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import {
   restoreBackup,
+  saveSafetySnapshot,
   backupFilename,
   buildEncryptedBackup,
   decryptBackup,
   isEncryptedBackup,
   markBackupDone,
   parseBackup,
+  attachmentRestoreNote,
+  MAX_BACKUP_BYTES,
   type BackupSummary,
 } from '../../lib/backup';
 import { downloadText } from '../../lib/download';
+import { useT } from '../../i18n';
+import { secT } from '../../i18n/areas/security';
 import controls from '../../styles/controls.module.css';
 import styles from './Security.module.css';
 
@@ -27,6 +33,7 @@ interface Pending {
  * plain backup is still handled by the Data panel; this accepts either kind.
  */
 export function EncryptedBackup({ notify }: { notify: Notify }) {
+  useT(); // re-render on a language switch (5.4)
   const fileInput = useRef<HTMLInputElement>(null);
   const [pass, setPass] = useState('');
   const [again, setAgain] = useState('');
@@ -41,8 +48,8 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
   const exportEncrypted = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (pass.length < 8) return setError('Use a passphrase of at least 8 characters.');
-    if (pass !== again) return setError('The passphrases do not match.');
+    if (pass.length < 8) return setError(secT('errShortPass', { n: 8 }));
+    if (pass !== again) return setError(secT('errPassMismatch'));
     setBusy(true);
     try {
       const text = await buildEncryptedBackup(pass);
@@ -50,7 +57,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
       markBackupDone();
       setPass('');
       setAgain('');
-      notify('Encrypted backup downloaded. Keep the passphrase safe — it cannot be recovered.');
+      notify(secT('encDownloaded'));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -68,6 +75,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
   const onFile = async (file?: File) => {
     if (!file) return;
     try {
+      if (file.size > MAX_BACKUP_BYTES) throw new Error(secT('fileTooBig'));
       const text = await file.text();
       if (isEncryptedBackup(text)) {
         setPending({ text, fileName: file.name });
@@ -97,12 +105,14 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
     }
   };
 
-  const restore = () => {
+  const restore = async () => {
     if (!summary) return;
     try {
+      // Undo copy for Settings → Data → "Undo last restore" (owner only: checked before it is replaced).
+      await saveSafetySnapshot('restore');
       restoreBackup(summary.data);
-      notify('Backup restored — reloading…');
-      setTimeout(() => window.location.reload(), 700);
+      notify(secT('restored'));
+      setTimeout(reloadAfterFlush, 700);
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -116,19 +126,16 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
       <form className={styles.form} onSubmit={exportEncrypted} noValidate>
         <div className={styles.note}>
           <Info size={16} />
-          <span>
-            Encrypted backups are scrambled with AES-256 using a key derived from your passphrase. Without the passphrase the file
-            cannot be opened — not even by us — so store it somewhere safe. Your PIN is never included in any backup.
-          </span>
+          <span>{secT('encIntro')}</span>
         </div>
         <div className={styles.passRow}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="enc-pass">Passphrase</label>
+            <label className={controls.label} htmlFor="enc-pass">{secT('passphrase')}</label>
             <input id="enc-pass" className={controls.input} type="password" autoComplete="new-password" value={pass}
-              onChange={(e) => setPass(e.target.value)} placeholder="At least 8 characters" />
+              onChange={(e) => setPass(e.target.value)} placeholder={secT('atLeast', { n: 8 })} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="enc-pass2">Repeat passphrase</label>
+            <label className={controls.label} htmlFor="enc-pass2">{secT('repeatPass')}</label>
             <input id="enc-pass2" className={`${controls.input} ${again && again !== pass ? controls.inputInvalid : ''}`}
               type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
           </div>
@@ -136,10 +143,10 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
         {error && <span className={controls.error} role="alert">{error}</span>}
         <div className={styles.buttons}>
           <button type="submit" className={controls.btnPrimary} disabled={busy || !pass}>
-            <Download size={16} /> {busy && !pending ? 'Encrypting…' : 'Download encrypted backup'}
+            <Download size={16} /> {busy && !pending ? secT('encrypting') : secT('downloadEnc')}
           </button>
           <button type="button" className={controls.btnOutline} onClick={() => fileInput.current?.click()}>
-            <Upload size={16} /> Restore encrypted backup
+            <Upload size={16} /> {secT('restoreEnc')}
           </button>
         </div>
         <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
@@ -149,20 +156,20 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
         open={!!pending}
         onClose={closeRestore}
         size="sm"
-        title={needsPassphrase ? 'Unlock encrypted backup' : 'Restore this backup?'}
+        title={needsPassphrase ? secT('unlockEnc') : secT('restoreTitle')}
         subtitle={pending?.fileName}
         footer={
           needsPassphrase ? (
             <>
-              <button type="button" className={controls.btnOutline} onClick={closeRestore}>Cancel</button>
+              <button type="button" className={controls.btnOutline} onClick={closeRestore}>{secT('cancel')}</button>
               <button type="submit" form="enc-restore-form" className={controls.btnPrimary} disabled={busy || !restorePass}>
-                <FileLock2 size={16} /> {busy ? 'Decrypting…' : 'Decrypt'}
+                <FileLock2 size={16} /> {busy ? secT('decrypting') : secT('decrypt')}
               </button>
             </>
           ) : (
             <>
-              <button type="button" className={controls.btnOutline} onClick={closeRestore}>Cancel</button>
-              <button type="button" className={controls.btnPrimary} onClick={restore}>Restore</button>
+              <button type="button" className={controls.btnOutline} onClick={closeRestore}>{secT('cancel')}</button>
+              <button type="button" className={controls.btnPrimary} onClick={restore}>{secT('restore')}</button>
             </>
           )
         }
@@ -170,7 +177,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
         {needsPassphrase ? (
           <form id="enc-restore-form" className={styles.form} onSubmit={decrypt} noValidate>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="enc-restore-pass">Passphrase</label>
+              <label className={controls.label} htmlFor="enc-restore-pass">{secT('passphrase')}</label>
               <input id="enc-restore-pass" className={controls.input} type="password" autoComplete="off" autoFocus
                 value={restorePass} onChange={(e) => setRestorePass(e.target.value)} />
             </div>
@@ -178,8 +185,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
           </form>
         ) : (
           <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
-            Contains {summary?.summary.invoices} invoice{summary?.summary.invoices === 1 ? '' : 's'} and {summary?.summary.clients}{' '}
-            client{summary?.summary.clients === 1 ? '' : 's'}. Everything currently on this device will be replaced by this backup (your PIN is kept).
+            {secT('contains', { invoices: summary?.summary.invoices ?? 0, clients: summary?.summary.clients ?? 0 })} {attachmentRestoreNote(summary?.summary)} {secT('replaceWarn')}
           </p>
         )}
       </Modal>

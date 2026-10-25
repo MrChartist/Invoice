@@ -5,6 +5,8 @@ import { StatementDocument, type StatementDocumentProps } from './StatementDocum
 import { downloadTextFile, exportNodeToPdf, safeFilename } from './exportUtils';
 import { statementCsv } from '../../lib/receivables';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { rcvT } from '../../i18n/areas/receivables';
 import styles from './StatementViewer.module.css';
 
 export interface StatementViewerProps extends StatementDocumentProps {
@@ -15,6 +17,7 @@ export interface StatementViewerProps extends StatementDocumentProps {
 
 /** Full-screen A4 preview of a client statement with Print / PDF / CSV. */
 export function StatementViewer({ open, onClose, onError, ...doc }: StatementViewerProps) {
+  useT(); // re-render on a language switch (5.4)
   const paperRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,19 +45,19 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
     try {
       await exportNodeToPdf(paperRef.current, `${base}.pdf`);
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : 'Could not create the PDF.');
+      onError?.(err instanceof Error ? err.message : rcvT('pdfFailed'));
     } finally {
       setBusy(false);
     }
   };
 
   return createPortal(
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={`Statement for ${doc.party.name}`}>
+    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={rcvT('svAria', { name: doc.party.name })}>
       <div className={`${styles.toolbar} no-print`}>
-        <span className={styles.title}>Statement preview · A4</span>
+        <span className={styles.title}>{rcvT('svTitle')}</span>
         <div className={styles.actions}>
           <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => window.print()}>
-            <Printer size={14} /> Print
+            <Printer size={14} /> {rcvT('print')}
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
             onClick={() => downloadTextFile(`${base}.csv`, statementCsv(doc.ledger))}>
@@ -63,7 +66,7 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
           <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={handlePdf} disabled={busy}>
             {busy ? <Loader2 size={14} className={styles.spin} /> : <Download size={14} />} PDF
           </button>
-          <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={onClose} aria-label="Close preview">
+          <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={onClose} aria-label={rcvT('closePreview')}>
             <X size={16} />
           </button>
         </div>

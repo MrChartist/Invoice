@@ -17,6 +17,7 @@ import type {
 } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { localDayOf } from './dates';
+import { requireAccess } from './access';
 import {
   DuplicateNumberError,
   findNumberClash,
@@ -34,6 +35,10 @@ import {
   type AuditInput,
 } from './audit';
 import { clientLogged, settingsLogged } from './audit-events';
+import { releaseAttachments, releaseDropped } from './attachments';
+import { nextReceiptNumber, recordSeries } from './series-counters';
+import { receivableTotal } from './rcm';
+import { assertNotPendingApproval, holdIfApprovalNeeded } from './approval-gate';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -73,10 +78,20 @@ export interface AppSettings {
    * Additive field — absent / '' means the books are open. See `period-lock.ts`.
    */
   lock_until?: string;
+  /**
+   * GST return filing frequency for the compliance calendar (`compliance.ts`).
+   * Additive field — absent means monthly.
+   */
+  gst_filing_frequency?: 'monthly' | 'qrmp' | 'composition';
 }
 
 export const DEFAULT_TERMS =
   'Payment due within 14 days of the invoice date. Please quote the invoice number with your payment.';
+
+/** A document counts as issued once it has left Draft (6.21: only the owner may delete one). */
+export function isIssued(inv: Pick<InvoiceRecord, 'status'>): boolean {
+  return inv.status !== 'Draft';
+}
 
 export function blankProfile(): SenderProfile {
   return {
@@ -159,6 +174,10 @@ function readSettings(): AppSettings {
     roundOff: Boolean(stored.roundOff ?? base.roundOff),
     onboarded: Boolean(stored.onboarded ?? Boolean(profiles[0]?.companyName)),
     lock_until: normalizeLockDate(stored.lock_until) || undefined,
+    gst_filing_frequency:
+      stored.gst_filing_frequency === 'qrmp' || stored.gst_filing_frequency === 'monthly' || stored.gst_filing_frequency === 'composition'
+        ? stored.gst_filing_frequency
+        : undefined,
   };
 }
 
@@ -245,6 +264,7 @@ export const localDb = {
       return id;
     },
     remove: (id: string) => {
+      requireAccess('master.edit');
       const all = getTable<Client>(KEYS.clients);
       const gone = all.find((c) => c.id === id);
       setTable(KEYS.clients, all.filter((c) => c.id !== id));
@@ -266,20 +286,31 @@ export const localDb = {
      * value it already has and only gains the ones it was missing — used when learning from a
      * saved invoice, so a one-off price on one invoice never silently rewrites the default rate.
      */
-    upsert: (item: Partial<InvoiceItem> & { name: string }, opts: { fillOnly?: boolean } = {}) => {
+    upsert: (item: Partial<InvoiceItem> & { name: string }, opts: { fillOnly?: boolean } = {}) =>
+      localDb.items.upsertMany([item], opts),
+    /** `upsert` for several items with one read and (only if something changed) one write. */
+    upsertMany: (incoming: (Partial<InvoiceItem> & { name: string })[], opts: { fillOnly?: boolean } = {}) => {
       const items = getTable<InvoiceItem>(KEYS.items);
-      const name = item.name.trim().toLowerCase();
-      if (!name) return;
-      const idx = items.findIndex((i) => i.name?.trim().toLowerCase() === name);
-      if (idx >= 0) {
-        // A line typed without an HSN / unit must not erase the catalogue's.
-        items[idx] = opts.fillOnly
-          ? { ...keepFilled(item), ...keepFilled(items[idx]) } as InvoiceItem
-          : { ...items[idx], ...keepFilled(item) };
-      } else {
-        items.push({ ...(item as InvoiceItem), id: generateId() });
+      let changed = false;
+      for (const item of incoming) {
+        const name = item.name.trim().toLowerCase();
+        if (!name) continue;
+        const idx = items.findIndex((i) => i.name?.trim().toLowerCase() === name);
+        if (idx >= 0) {
+          // A line typed without an HSN / unit must not erase the catalogue's.
+          const next = opts.fillOnly
+            ? { ...keepFilled(item), ...keepFilled(items[idx]) } as InvoiceItem
+            : { ...items[idx], ...keepFilled(item) };
+          if (JSON.stringify(next) !== JSON.stringify(items[idx])) {
+            items[idx] = next;
+            changed = true;
+          }
+        } else {
+          items.push({ ...(item as InvoiceItem), id: generateId() });
+          changed = true;
+        }
       }
-      setTable(KEYS.items, items);
+      if (changed) setTable(KEYS.items, items);
     },
     remove: (id: string) =>
       setTable(KEYS.items, getTable<InvoiceItem>(KEYS.items).filter((i) => i.id !== id)),
@@ -328,6 +359,8 @@ export const localDb = {
       const invoices = getTable<InvoiceRecord>(KEYS.invoices);
       const idx = invoices.findIndex((i) => i.id === invoice.id);
       const stored = idx >= 0 ? invoices[idx] : undefined;
+      // Local roles (6.21): a viewer cannot write documents.
+      requireAccess(stored ? 'doc.edit' : 'doc.create');
       const now = new Date().toISOString();
       const toSave: InvoiceRecord = { ...invoice, updated_at: now };
 
@@ -345,9 +378,17 @@ export const localDb = {
         toSave.id = invoice.id || generateId();
         toSave.created_at = now;
         if (!toSave.invoice_number) {
-          toSave.invoice_number = localDb.invoices.nextNumber(toSave.issue_date, toSave.doc_type);
+          // The snapshotted sender profile's prefix wins, as in the editor (`saveInvoice`).
+          toSave.invoice_number = localDb.invoices.nextNumber(
+            toSave.issue_date,
+            toSave.doc_type,
+            toSave.sender?.invoicePrefix || undefined,
+          );
         }
       }
+
+      // WP-9 maker-checker: a clerk's document that needs the owner's approval is held as a pending draft.
+      holdIfApprovalNeeded(toSave, stored);
 
       // GST Rule 46: one number, one document (a document may keep its own legacy number).
       if (toSave.invoice_number && !(stored && numberKey(stored.invoice_number) === numberKey(toSave.invoice_number))) {
@@ -368,37 +409,37 @@ export const localDb = {
         invoices.push(toSave);
       }
       setTable(KEYS.invoices, invoices);
+      // Files this document no longer lists (6.12) are deleted unless another record uses them.
+      if (stored) releaseDropped(stored.attachments, toSave.attachments);
 
       logSafe(() => (stored ? invoiceUpdated(stored, toSave, overridden ? OVERRIDE_NOTE : '') : invoiceCreated(toSave)));
 
       // Grow the local CRM / catalogue from real usage.
-      if (toSave.client?.name?.trim()) localDb.clients.upsert(toSave.client);
-      for (const item of toSave.items ?? []) {
-        if (item.name?.trim()) {
-          localDb.items.upsert(
-            {
-              name: item.name,
-              type: item.type,
-              rate: item.rate,
-              hsn: item.hsn,
-              unit: item.unit,
-              tax_rate: item.tax_rate,
-            },
-            { fillOnly: true },
-          );
-        }
+      if (toSave.client?.name?.trim()) {
+        // Credit terms (6.25) live on the client master only: an old snapshot must never reset them.
+        const { credit_limit: _limit, credit_days: _days, ...snapshot } = toSave.client;
+        localDb.clients.upsert(snapshot);
       }
+      localDb.items.upsertMany(
+        (toSave.items ?? [])
+          .filter((item) => item.name?.trim())
+          .map((item) => ({ name: item.name, type: item.type, rate: item.rate, hsn: item.hsn, unit: item.unit, tax_rate: item.tax_rate })),
+        { fillOnly: true },
+      );
       return toSave;
     },
 
     remove: (id: string) => {
       const all = getTable<InvoiceRecord>(KEYS.invoices);
       const stored = all.find((i) => i.id === id);
+      // Local roles (6.21): only the owner deletes an issued document; a clerk may delete drafts.
+      if (stored) requireAccess(isIssued(stored) ? 'doc.deleteIssued' : 'doc.deleteDraft');
       const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
       const payments = getTable<Payment>(KEYS.transactions);
       const mine = payments.filter((t) => t.invoice_id === id).length;
       setTable(KEYS.invoices, all.filter((i) => i.id !== id));
       setTable(KEYS.transactions, payments.filter((t) => t.invoice_id !== id));
+      if (stored?.attachments?.length) releaseAttachments(stored.attachments.map((a) => a.id));
       if (stored) logSafe(() => invoiceDeleted(stored, mine, overridden ? OVERRIDE_NOTE : ''));
     },
 
@@ -406,6 +447,7 @@ export const localDb = {
       const invoices = getTable<InvoiceRecord>(KEYS.invoices);
       const idx = invoices.findIndex((i) => i.id === id);
       if (idx < 0) return;
+      requireAccess('doc.edit');
       const before = invoices[idx];
       const action: LockAction =
         status === 'Cancelled' && before.status !== 'Cancelled'
@@ -414,7 +456,41 @@ export const localDb = {
             ? 'reinstate'
             : 'edit';
       const overridden = assertUnlocked(before, action) === 'overridden';
-      invoices[idx] = { ...before, status, updated_at: new Date().toISOString() };
+      // WP-9 / H3: a pending document is issued only by the owner's decision; a draft issued from
+      // here passes the same gate as a save (held as a pending draft when it needs approval).
+      if (status !== 'Draft' && status !== 'Cancelled') assertNotPendingApproval(before, 'it can be issued or marked paid');
+      const next: InvoiceRecord = { ...before, status, updated_at: new Date().toISOString() };
+      holdIfApprovalNeeded(next, before);
+      invoices[idx] = next;
+      setTable(KEYS.invoices, invoices);
+      logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
+    },
+
+    /** Record (or clear) the client's answer to a quotation. Respects the period lock; audited. */
+    setQuoteStatus: (id: string, quoteStatus: InvoiceRecord['quote_status']) => {
+      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+      const idx = invoices.findIndex((i) => i.id === id);
+      if (idx < 0) return;
+      const before = invoices[idx];
+      if (before.doc_type !== 'QUOTATION' || before.quote_status === quoteStatus) return;
+      const overridden = assertUnlocked(before, 'edit') === 'overridden';
+      invoices[idx] = { ...before, quote_status: quoteStatus, updated_at: new Date().toISOString() };
+      setTable(KEYS.invoices, invoices);
+      logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
+    },
+
+    /** Close a sales order on `closedOn` (YYYY-MM-DD), or reopen it with `undefined`. Respects the period lock; audited. */
+    setOrderClosed: (id: string, closedOn: string | undefined) => {
+      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+      const idx = invoices.findIndex((i) => i.id === id);
+      if (idx < 0) return;
+      const before = invoices[idx];
+      if (before.doc_type !== 'SALES_ORDER' || (before.order_closed_on || undefined) === closedOn) return;
+      const overridden = assertUnlocked(before, 'edit') === 'overridden';
+      const next: InvoiceRecord = { ...before, updated_at: new Date().toISOString() };
+      if (closedOn) next.order_closed_on = closedOn;
+      else delete next.order_closed_on;
+      invoices[idx] = next;
       setTable(KEYS.invoices, invoices);
       logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
     },
@@ -432,7 +508,8 @@ export const localDb = {
       ),
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
-    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string }): Payment => {
+    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string; advanceId?: string }): Payment => {
+      requireAccess('payment.record');
       const amount = round2(Number(input.amount) || 0);
       // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
       if (!(amount > 0)) throw new Error('Enter a payment amount above zero.');
@@ -447,12 +524,37 @@ export const localDb = {
         // stamp still says 31 Mar and would file the receipt in the previous FY.
         date: input.date || localDayOf(new Date()),
       };
+      // Multi-account BRS: which bank account it went into (never for cash).
+      if (input.bankAccountId && (input.method || '').toLowerCase() !== 'cash') payment.bank_account_id = input.bankAccountId;
+      // An advance adjusted against the invoice (5.3): settles the bill, but is not new money.
+      if (input.advanceId) payment.advance_id = input.advanceId;
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
+      // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
+      const realised = Number(input.realisedRate);
+      if (realised > 0 && Number.isFinite(realised) && (target?.currency || 'INR').toUpperCase() !== 'INR') {
+        payment.realised_rate = realised;
+      }
       const overridden = target ? assertUnlocked(target, 'pay') === 'overridden' : false;
-      const rows = getTable<Payment>(KEYS.transactions);
-      rows.push(payment);
-      setTable(KEYS.transactions, rows);
-      syncPaymentState(input.invoiceId, payment.amount);
+      assertNotPendingApproval(target, 'record payments');
+      const before = getTable<Payment>(KEYS.transactions);
+      // Receipt voucher number, fixed at record time (never reused after a delete / cheque bounce).
+      if (!payment.advance_id) payment.receipt_number = nextReceiptNumber(payment.date, before);
+      setTable(KEYS.transactions, [...before, payment]);
+      try {
+        syncPaymentState(input.invoiceId, payment.amount);
+      } catch (err) {
+        // Keep ledger and invoice consistent: a payment row whose invoice update failed (quota)
+        // would be recorded again on retry.
+        setTable(KEYS.transactions, before);
+        throw err;
+      }
+      if (payment.receipt_number) {
+        try {
+          recordSeries(payment.receipt_number);
+        } catch {
+          /* the stamped number itself is what keeps receipts stable */
+        }
+      }
       logSafe(() => {
         const row = paymentLogged('payment_add', payment, target);
         return overridden ? { ...row, summary: row.summary + OVERRIDE_NOTE } : row;
@@ -460,14 +562,53 @@ export const localDb = {
       return payment;
     },
 
+    /**
+     * Set (or clear, with 0 / undefined) the realised exchange rate of a receipt on a foreign-currency
+     * invoice (6.19). Changes the ledger's bank and FX figures, so it respects the period lock.
+     */
+    setRealisedRate: (paymentId: string, rate: number | undefined): Payment | undefined => {
+      const rows = getTable<Payment>(KEYS.transactions);
+      const idx = rows.findIndex((t) => t.id === paymentId);
+      if (idx < 0) return undefined;
+      const row = rows[idx];
+      const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
+      if (!target || (target.currency || 'INR').toUpperCase() === 'INR') throw new Error('Only receipts on foreign-currency invoices carry a realised rate.');
+      const value = Number(rate);
+      const next: Payment = { ...row };
+      if (value > 0 && Number.isFinite(value)) next.realised_rate = value;
+      else delete next.realised_rate;
+      if (next.realised_rate === row.realised_rate) return row;
+      // Locked by the receipt's own date (the bank entry it changes) and the invoice's.
+      const overridden =
+        assertUnlocked({ id: target.id, issue_date: row.date, invoice_number: target.invoice_number }, 'edit') === 'overridden' ||
+        assertUnlocked(target, 'edit') === 'overridden';
+      rows[idx] = next;
+      setTable(KEYS.transactions, rows);
+      logSafe(() => ({
+        entity: 'payment',
+        entity_id: row.id,
+        action: 'update',
+        parent_id: target.id,
+        doc_number: target.invoice_number,
+        summary: `Realised rate on a ${target.currency} receipt against ${target.invoice_number} ${next.realised_rate ? `set to ₹${next.realised_rate}` : 'cleared'}${overridden ? OVERRIDE_NOTE : ''}`,
+      }));
+      return next;
+    },
+
     remove: (paymentId: string) => {
       const rows = getTable<Payment>(KEYS.transactions);
       const row = rows.find((t) => t.id === paymentId);
       if (!row) return;
+      requireAccess('payment.record');
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
       const overridden = target ? assertUnlocked(target, 'unpay') === 'overridden' : false;
       setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));
-      syncPaymentState(row.invoice_id, -row.amount);
+      try {
+        syncPaymentState(row.invoice_id, -row.amount);
+      } catch (err) {
+        setTable(KEYS.transactions, rows);
+        throw err;
+      }
       logSafe(() => {
         const entry = paymentLogged('payment_remove', row, target);
         return overridden ? { ...entry, summary: entry.summary + OVERRIDE_NOTE } : entry;
@@ -485,7 +626,9 @@ export const localDb = {
  */
 function withPaid(inv: InvoiceRecord, paidRaw: number): InvoiceRecord {
   const paid = round2(Math.max(paidRaw, 0));
-  const total = Math.max((Number(inv.total) || 0) - (Number(inv.tds_amount) || 0), 0);
+  // Outward reverse charge: the GST is the recipient's to pay, so it is never part of what is owed
+  // (an older record's stored total includes it — src/lib/rcm.ts).
+  const total = Math.max(receivableTotal(inv) - (Number(inv.tds_amount) || 0), 0);
   let status = inv.status;
   if (status !== 'Cancelled') {
     if (paid >= total && total > 0) status = 'Paid';

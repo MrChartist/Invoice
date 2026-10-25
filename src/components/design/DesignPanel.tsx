@@ -28,6 +28,8 @@ import { calculateInvoice } from '../../lib/invoice-calc';
 import { cn } from '../../lib/utils';
 import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
 import { SAMPLE_SENDER, buildSampleInvoice } from './sample';
+import { useT } from '../../i18n';
+import { desT } from '../../i18n/areas/design';
 import controls from '../../styles/controls.module.css';
 import styles from './DesignPanel.module.css';
 
@@ -100,13 +102,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-const COLUMN_LABELS: [keyof ShowColumns, string][] = [
-  ['hsn', 'HSN / SAC'],
-  ['unit', 'Unit'],
-  ['discount', 'Discount'],
-  ['tax_rate', 'GST rate'],
-  ['taxable', 'Taxable value'],
-];
+const COLUMNS: (keyof ShowColumns)[] = ['hsn', 'unit', 'discount', 'tax_rate', 'taxable'];
 
 /** Live mini-preview: renders the paper at its real size, scaled to fit the column. */
 function LivePreview({
@@ -184,6 +180,7 @@ export function DesignPanel({
   onReset,
   className,
 }: DesignPanelProps) {
+  useT(); // re-render on a language switch (5.4)
   const uid = useId();
   const design = value.profile_id === profileId ? value : { ...value, profile_id: profileId };
   const meta = templateById(templateId);
@@ -215,7 +212,7 @@ export function DesignPanel({
   return (
     <div className={cn(styles.root, className)}>
       <div className={styles.controls}>
-        <Section title="Presets">
+        <Section title={desT('presets')}>
           <div className={styles.presets}>
             {presets.map((p) => (
               <button key={p.id} type="button" className={styles.preset} onClick={() => onChange(applyPreset(design, p.id))}>
@@ -226,16 +223,16 @@ export function DesignPanel({
           </div>
         </Section>
 
-        <Section title="Colour & type">
+        <Section title={desT('colourType')}>
           <div className={controls.field}>
-            <span className={controls.label}>Accent colour</span>
-            <div className={styles.swatches} role="group" aria-label="Accent colour">
+            <span className={controls.label}>{desT('accent')}</span>
+            <div className={styles.swatches} role="group" aria-label={desT('accent')}>
               <button
                 type="button"
                 className={design.accent ? styles.swatchTemplate : cn(styles.swatchTemplate, styles.swatchActive)}
                 style={{ background: templateAccent }}
-                title={`Template default (${meta.name})`}
-                aria-label={`Template default colour ${templateAccent}`}
+                title={desT('templateDefault', { name: meta.name })}
+                aria-label={desT('templateDefaultColour', { hex: templateAccent })}
                 aria-pressed={!design.accent}
                 onClick={() => set({ accent: undefined })}
               />
@@ -256,7 +253,7 @@ export function DesignPanel({
                 className={styles.colorInput}
                 value={sanitizeHex(effectiveAccent) ?? MR_CHARTIST_ORANGE}
                 onChange={(e) => set({ accent: e.target.value })}
-                aria-label="Custom accent colour"
+                aria-label={desT('customAccent')}
               />
               <input
                 className={cn(controls.input, controls.inputMono, styles.hexInput)}
@@ -265,16 +262,16 @@ export function DesignPanel({
                 onChange={(e) => setHexDraft(e.target.value)}
                 onBlur={(e) => commitHex(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && commitHex(hexDraft ?? effectiveAccent)}
-                aria-label="Accent hex code"
+                aria-label={desT('hexCode')}
                 spellCheck={false}
               />
             </div>
           </div>
 
           <div className={controls.field}>
-            <span className={controls.label}>Font</span>
+            <span className={controls.label}>{desT('font')}</span>
             <div className={styles.segScroll}>
-              <div className={controls.segment} role="radiogroup" aria-label="Font">
+              <div className={controls.segment} role="radiogroup" aria-label={desT('font')}>
                 <button
                   type="button"
                   role="radio"
@@ -282,7 +279,7 @@ export function DesignPanel({
                   className={!design.font ? controls.segmentBtnActive : controls.segmentBtn}
                   onClick={() => set({ font: undefined })}
                 >
-                  Template
+                  {desT('template')}
                 </button>
                 {FONT_OPTIONS.map((f) => (
                   <button
@@ -302,82 +299,83 @@ export function DesignPanel({
           </div>
         </Section>
 
-        <Section title="Page">
+        <Section title={desT('page')}>
           <div className={styles.grid2}>
             <Seg<PaperKind>
-              label="Paper"
+              label={desT('paper')}
               value={design.paper}
               options={[
                 { value: 'A4', label: 'A4' },
                 { value: 'A5', label: 'A5' },
-                { value: 'thermal80', label: '80 mm receipt' },
+                { value: 'thermal80', label: desT('thermal') },
               ]}
               onChange={(paper) => set({ paper })}
             />
             <Seg<Density>
-              label="Density"
+              label={desT('density')}
               value={design.density}
               options={[
-                { value: 'compact', label: 'Compact' },
-                { value: 'comfortable', label: 'Comfortable' },
-                { value: 'spacious', label: 'Spacious' },
+                { value: 'compact', label: desT('compact') },
+                { value: 'comfortable', label: desT('comfortable') },
+                { value: 'spacious', label: desT('spacious') },
               ]}
               onChange={(density) => set({ density })}
             />
             <Seg<LogoPosition>
-              label="Logo position"
+              label={desT('logoPosition')}
               value={design.logo_position}
               options={[
-                { value: 'auto', label: 'Template' },
-                { value: 'left', label: 'Left' },
-                { value: 'center', label: 'Centre' },
-                { value: 'right', label: 'Right' },
+                { value: 'auto', label: desT('template') },
+                { value: 'left', label: desT('left') },
+                { value: 'center', label: desT('centre') },
+                { value: 'right', label: desT('right') },
               ]}
               onChange={(logo_position) => set({ logo_position })}
             />
             <Seg<LogoSize>
-              label="Logo size"
+              label={desT('logoSize')}
               value={design.logo_size}
               options={[
-                { value: 's', label: 'Small' },
-                { value: 'm', label: 'Medium' },
-                { value: 'l', label: 'Large' },
+                { value: 's', label: desT('small') },
+                { value: 'm', label: desT('medium') },
+                { value: 'l', label: desT('large') },
               ]}
               onChange={(logo_size) => set({ logo_size })}
             />
           </div>
         </Section>
 
-        <Section title="Item columns">
+        <Section title={desT('itemColumns')}>
           <div className={styles.checks}>
-            {COLUMN_LABELS.map(([key, label]) => (
+            {COLUMNS.map((key) => (
               <Check
                 key={key}
                 checked={design.show_columns[key]}
                 onChange={(v) => set({ show_columns: { ...design.show_columns, [key]: v } })}
               >
-                {label}
+                {desT(`col.${key}`)}
               </Check>
             ))}
           </div>
-          <p className={controls.hint}>A column with no data (for example HSN when no item has one) stays hidden even when ticked.</p>
+          <p className={controls.hint}>{desT('columnsHint')}</p>
         </Section>
 
-        <Section title="Sections">
+        <Section title={desT('sections')}>
           <div className={styles.checks}>
-            <Check checked={design.show_bank} onChange={(v) => set({ show_bank: v })}>Bank details</Check>
-            <Check checked={design.show_qr} onChange={(v) => set({ show_qr: v })}>UPI QR code</Check>
-            <Check checked={design.show_signature} onChange={(v) => set({ show_signature: v })}>Signature</Check>
-            <Check checked={design.show_terms} onChange={(v) => set({ show_terms: v })}>Terms</Check>
-            <Check checked={design.show_amount_in_words} onChange={(v) => set({ show_amount_in_words: v })}>Amount in words</Check>
-            <Check checked={design.show_place_of_supply} onChange={(v) => set({ show_place_of_supply: v })}>Place of supply</Check>
+            <Check checked={design.show_bank} onChange={(v) => set({ show_bank: v })}>{desT('bank')}</Check>
+            <Check checked={design.show_qr} onChange={(v) => set({ show_qr: v })}>{desT('qr')}</Check>
+            <Check checked={design.show_signature} onChange={(v) => set({ show_signature: v })}>{desT('signature')}</Check>
+            <Check checked={design.show_terms} onChange={(v) => set({ show_terms: v })}>{desT('terms')}</Check>
+            <Check checked={design.show_amount_in_words} onChange={(v) => set({ show_amount_in_words: v })}>{desT('words')}</Check>
+            <Check checked={design.show_place_of_supply} onChange={(v) => set({ show_place_of_supply: v })}>{desT('pos')}</Check>
+            <Check checked={design.show_tracking} onChange={(v) => set({ show_tracking: v })}>{desT('tracking')}</Check>
           </div>
         </Section>
 
-        <Section title="Watermark & notes">
+        <Section title={desT('watermarkNotes')}>
           <div className={styles.grid2}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-wm`}>Watermark</label>
+              <label className={controls.label} htmlFor={`${uid}-wm`}>{desT('watermark')}</label>
               <select
                 id={`${uid}-wm`}
                 className={controls.select}
@@ -389,14 +387,14 @@ export function DesignPanel({
                   else set({ watermark: customWatermark.trim() || 'SAMPLE' });
                 }}
               >
-                <option value="none">None</option>
-                <option value="auto">Status stamp (Paid / Overdue / Cancelled / Draft)</option>
-                <option value="custom">Custom text</option>
+                <option value="none">{desT('none')}</option>
+                <option value="auto">{desT('stamp')}</option>
+                <option value="custom">{desT('customText')}</option>
               </select>
             </div>
             {watermarkMode === 'custom' && (
               <div className={controls.field}>
-                <label className={controls.label} htmlFor={`${uid}-wmt`}>Watermark text</label>
+                <label className={controls.label} htmlFor={`${uid}-wmt`}>{desT('watermarkText')}</label>
                 <input
                   id={`${uid}-wmt`}
                   className={controls.input}
@@ -410,34 +408,34 @@ export function DesignPanel({
               </div>
             )}
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-hn`}>Header note</label>
+              <label className={controls.label} htmlFor={`${uid}-hn`}>{desT('headerNote')}</label>
               <input
                 id={`${uid}-hn`}
                 className={controls.input}
                 value={design.header_note}
                 maxLength={160}
-                placeholder="e.g. Original for recipient"
+                placeholder={desT('headerNotePh')}
                 onChange={(e) => set({ header_note: e.target.value })}
               />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-ft`}>Footer text</label>
+              <label className={controls.label} htmlFor={`${uid}-ft`}>{desT('footerText')}</label>
               <input
                 id={`${uid}-ft`}
                 className={controls.input}
                 value={design.footer_text}
                 maxLength={200}
-                placeholder="e.g. Thank you for your business"
+                placeholder={desT('footerTextPh')}
                 onChange={(e) => set({ footer_text: e.target.value })}
               />
             </div>
           </div>
         </Section>
 
-        <Section title="Formats">
+        <Section title={desT('formats')}>
           <div className={styles.grid2}>
             <Seg<NumberFormat>
-              label="Number grouping"
+              label={desT('grouping')}
               value={design.number_format}
               options={[
                 { value: 'indian', label: '12,34,567' },
@@ -446,7 +444,7 @@ export function DesignPanel({
               onChange={(number_format) => set({ number_format })}
             />
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-df`}>Date format</label>
+              <label className={controls.label} htmlFor={`${uid}-df`}>{desT('dateFormat')}</label>
               <select
                 id={`${uid}-df`}
                 className={controls.select}
@@ -464,17 +462,17 @@ export function DesignPanel({
         </Section>
 
         <div className={styles.footerRow}>
-          <span className={styles.saved}>Changes apply to the preview instantly; save to keep them.</span>
+          <span className={styles.saved}>{desT('applyNote')}</span>
           <button type="button" className={cn(controls.btn, controls.btnOutline)} onClick={reset}>
-            <RotateCcw size={14} aria-hidden="true" /> Reset to defaults
+            <RotateCcw size={14} aria-hidden="true" /> {desT('reset')}
           </button>
         </div>
       </div>
 
-      <aside className={styles.previewCol} aria-label="Live preview">
+      <aside className={styles.previewCol} aria-label={desT('livePreview')}>
         <div className={styles.previewCard}>
           <div className={styles.previewHead}>
-            <span>Live preview</span>
+            <span>{desT('livePreview')}</span>
             <span>
               {meta.name} · {paperSize(design).label}
             </span>

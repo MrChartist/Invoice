@@ -1,17 +1,42 @@
 /**
  * Backup / restore of everything the app keeps in localStorage.
  *
+ * Attachments (6.12) are one `mrchartist_inv_att_<id>` key per file, so they ride along too;
+ * on restore each file is re-checked by content (damaged / disallowed ones are left out) and
+ * references to files the backup lacks are reported, not refused (see attachments.ts).
+ *
+ * Self-contained: the `mrchartist_inv_assets` table (logo / signature images that
+ * invoice snapshots reference since schema v3) is an ordinary app key, so it rides
+ * along, and a file whose references do not resolve is refused. Older backups with
+ * inline images restore as they are and are moved to references by the v3 migration
+ * on the reload that follows.
+ *
  * Exports carry only `mrchartist_inv_*` keys and never the PIN session. Imports
  * accept the same keys (and the older flat `{key: value}` file) and refuse
  * anything outside that namespace, so a doctored file cannot overwrite
  * unrelated site data.
  */
 
-import { DB_PREFIX, collectAppData, readRaw, writeRaw } from './storage';
+import { DB_PREFIX, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
+import { idbDel, idbGet, idbSet } from './idb-kv';
+import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
+import { requireAccess } from './access';
+import { ASSET_TABLE, SNAPSHOT_TABLES, parseAssets, referencedAssets } from './assets';
+import { checkBackupAttachments } from './attachments';
+import { CUSTOM_FIELDS_TABLE } from './custom-fields';
 import { localDayOf } from './dates';
-import { audit } from './audit';
-import { CryptoError, decryptString, encryptString, isCipherEnvelope, type CipherEnvelope } from './crypto';
+import { AUDIT_TABLE, audit } from './audit';
+import type { AuditEntry } from '../types/audit';
+import {
+  CryptoError,
+  decryptString,
+  encryptString,
+  encryptWithKey,
+  isCipherEnvelope,
+  type CipherEnvelope,
+  type StoredEncryptionKey,
+} from './crypto';
 
 export const BACKUP_APP_ID = 'mrchartist-invoice';
 
@@ -36,6 +61,12 @@ export class EncryptedBackupError extends Error {
 }
 
 const LOCAL_ONLY = new Set<string>(DEVICE_LOCAL_KEYS);
+/**
+ * Never exported, restored or kept in the undo copy, but removed by a wipe (unlike LOCAL_ONLY): folder-sync
+ * bookkeeping describes what this device last exchanged with the sync folder (docs/features/sync.md).
+ */
+const NOT_BACKED_UP = new Set<string>(SYNC_META_KEYS);
+const leaveOut = (key: string) => LOCAL_ONLY.has(key) || NOT_BACKED_UP.has(key);
 
 export interface BackupFile {
   app: typeof BACKUP_APP_ID;
@@ -48,12 +79,71 @@ export interface BackupSummary {
   invoices: number;
   clients: number;
   keys: number;
+  /** Attachment files (6.12) in the backup. */
+  attachments?: number;
+  /** Files records refer to but the backup does not contain (restored as "file missing"). */
+  missingAttachments?: number;
+  /** Damaged or disallowed attachment files left out of the restore. */
+  droppedAttachments?: number;
 }
 
-export function buildBackup(now: Date = new Date()): BackupFile {
+/**
+ * Largest backup file the restore screen reads. Higher than the CSV import cap because a backup
+ * carries attachments (6.12): receipt photos and PDFs travel inside it as base64.
+ */
+export const MAX_BACKUP_BYTES = 200 * 1024 * 1024;
+
+/** Extra sentence(s) for the restore confirmation about attachment files ('' when there are none). */
+export function attachmentRestoreNote(summary: BackupSummary | undefined | null): string {
+  if (!summary) return '';
+  const plural = (n: number) => `${n} attached file${n === 1 ? '' : 's'}`;
+  const parts: string[] = [];
+  if (summary.attachments) parts.push(`It also carries ${plural(summary.attachments)}.`);
+  if (summary.missingAttachments) parts.push(`${plural(summary.missingAttachments)} referred to by its records ${summary.missingAttachments === 1 ? 'is' : 'are'} not in this file and will show as missing.`);
+  if (summary.droppedAttachments) parts.push(`${plural(summary.droppedAttachments)} could not be read and will be left out.`);
+  return parts.join(' ');
+}
+
+function collectBackup(now: Date): BackupFile {
   const data = collectAppData();
-  for (const key of LOCAL_ONLY) delete data[key];
+  for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   return { app: BACKUP_APP_ID, version: 1, exportedAt: now.toISOString(), data };
+}
+
+/**
+ * A full backup (every table). Local roles (6.21): handing someone a copy of the books is owner-only,
+ * so this throws AccessDeniedError for a clerk / viewer. Scheduled folder backups the owner set up use
+ * {@link buildScheduledBackup} instead and keep running whoever is signed in.
+ */
+export function buildBackup(now: Date = new Date()): BackupFile {
+  requireAccess('data.backup');
+  return collectBackup(now);
+}
+
+/**
+ * @internal Scheduled backups only (auto-backup.ts, unattended runs into the folder the owner chose):
+ * no role check, by design — the owner configured them, and the file goes to the owner's folder.
+ */
+export function buildScheduledBackup(now: Date = new Date()): BackupFile {
+  return collectBackup(now);
+}
+
+/**
+ * Vault mode (5.8) encrypts the data at rest, so a readable backup file would undo it: plain JSON
+ * exports are refused while the vault is on (use a passphrase-encrypted backup instead).
+ */
+export function plainBackupAllowed(): boolean {
+  return !vaultEnabled();
+}
+
+export const VAULT_PLAIN_BACKUP_MESSAGE =
+  'Vault mode is on, so backups must be encrypted: set a backup passphrase (Settings → Data → Automatic backups) or use Encrypted backup in Settings → Security.';
+
+/** Text of a plain (unencrypted) full backup for a manual download. Owner only; refused in vault mode. */
+export function exportPlainBackup(now: Date = new Date()): string {
+  requireAccess('data.backup');
+  if (!plainBackupAllowed()) throw new Error(VAULT_PLAIN_BACKUP_MESSAGE);
+  return JSON.stringify(collectBackup(now), null, 2);
 }
 
 export function backupFilename(now: Date = new Date(), encrypted = false): string {
@@ -91,6 +181,22 @@ export async function buildEncryptedBackup(passphrase: string, now: Date = new D
     version: 1,
     exportedAt: now.toISOString(),
     envelope: await encryptString(plain, passphrase),
+  };
+  return JSON.stringify(file, null, 2);
+}
+
+/**
+ * Same file format as `buildEncryptedBackup`, encrypted with a stored passphrase-derived key. Owner only,
+ * except `scheduled` runs (unattended folder backups the owner set up, see auto-backup.ts).
+ */
+export async function buildEncryptedBackupWithKey(stored: StoredEncryptionKey, now: Date = new Date(), opts: { scheduled?: boolean } = {}): Promise<string> {
+  const backup = opts.scheduled ? buildScheduledBackup(now) : buildBackup(now);
+  const file: EncryptedBackupFile = {
+    app: BACKUP_APP_ID,
+    encrypted: true,
+    version: 1,
+    exportedAt: now.toISOString(),
+    envelope: await encryptWithKey(JSON.stringify(backup), stored),
   };
   return JSON.stringify(file, null, 2);
 }
@@ -155,14 +261,21 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
   if (root.app === BACKUP_APP_ID && root.encrypted === true) throw new EncryptedBackupError();
   const source = (root.app === BACKUP_APP_ID && root.data && typeof root.data === 'object' ? root.data : root) as Record<string, unknown>;
 
+  if (root.app === BACKUP_APP_ID && typeof root.version === 'number' && root.version > 1) {
+    throw new Error('This backup was made by a newer version of the app. Update the app, then restore it.');
+  }
+
   const data: Record<string, string> = {};
   for (const [key, value] of Object.entries(source)) {
-    if (!key.startsWith(DB_PREFIX) || LOCAL_ONLY.has(key)) continue;
+    if (!key.startsWith(DB_PREFIX) || leaveOut(key)) continue;
     if (typeof value === 'string') data[key] = value;
   }
   if (Object.keys(data).length === 0) {
     throw new Error('No invoice data found in this file.');
   }
+  validateBackupData(data);
+  // Attachment files are checked by content; bad ones are left out, dangling references reported.
+  const files = checkBackupAttachments(data);
 
   return {
     data,
@@ -170,12 +283,258 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
       invoices: countRows(data[`${DB_PREFIX}invoices`]),
       clients: countRows(data[`${DB_PREFIX}clients`]),
       keys: Object.keys(data).length,
+      ...(files.files ? { attachments: files.files } : {}),
+      ...(files.missing ? { missingAttachments: files.missing } : {}),
+      ...(files.dropped ? { droppedAttachments: files.dropped } : {}),
     },
   };
 }
 
-/** Writes validated backup keys into storage. Throws StorageWriteError if the quota is hit. */
-export function applyBackup(data: Record<string, string>): void {
+/** Tables whose rows are records; a restore refuses a file where one of them is malformed. */
+const RECORD_TABLES = [
+  'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases',
+  'purchase_payments', 'recurring', 'doc_links', 'audit_log', 'gstr2b_actions', 'einvoice_meta', ASSET_TABLE,
+  // Double-entry ledger (6.1–6.3)
+  'accounts', 'vouchers', 'fixed_assets',
+  // Time & billable costs (6.13 / 6.14)
+  'time_entries', 'mileage',
+  // Purchase orders (6.5)
+  'purchase_orders',
+  // Cost centres & budgets (6.16 / 6.17)
+  'cost_centres', 'budgets',
+  // Custom field definitions (6.23)
+  CUSTOM_FIELDS_TABLE,
+  // Cheque register (6.26)
+  'cheques',
+  // Bank accounts (multi-account BRS)
+  'bank_accounts',
+  // Inventory: stock items and moves, godowns + stock transfers (6.10)
+  'stock_items', 'stock_moves', 'godowns', 'stock_transfers',
+  // Advance receipts (5.3)
+  'advances',
+  // Price levels & schemes (6.9), POS day-close records (6.8)
+  'price_levels', 'schemes', 'pos_day_close',
+  // Tally parity: TDS challans / manual deductions / return marks, supplier advances (bill-wise)
+  'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
+  // Series high-water marks: STR / PO / ADV / RFV / RCPT numbers are never reused (integrity review)
+  'series_counters',
+  // GSTR-4 typed-in Tables 7-9 per FY × GSTIN (5.9)
+  'gstr4_manual',
+  // WP-3: purchase returns / supplier notes, receipt notes (GRN) and rejections out
+  'purchase_returns', 'receipt_notes',
+  // Masters & openings (WP-1)
+  'groups', 'ledger_openings', 'books_begin', 'opening_bills',
+  // Banking (WP-5): deposit slips, day-end cash tally
+  'deposit_slips', 'cash_tally',
+  // Business extras (WP-9): POS returns, approvals, branches, loyalty, AMC contracts
+  'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
+  // Payroll (Phase 7)
+  'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
+  // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
+  'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
+  // Payroll follow-ups (7T): relief u/s 89 (Form 10E) workings, actuarial valuations
+  'payroll_relief89', 'actuarial_valuations',
+  // Manufacturing & stock vouchers (Phase 7): BOMs, Manufacturing / Stock Journals, Physical Stock
+  'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
+  // Job work and Rejections In (Phase 7M)
+  'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
+  'gst_setoffs', 'gst_challans', 'hsn_master',
+  // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
+  'rcm_documents',
+  // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
+  'year_end',
+  // Inventory masters (WP-8): stock groups, stock categories, units of measure
+  'stock_groups', 'stock_categories', 'units',
+];
+/** Core tables whose rows must also carry an `id`. */
+const ID_TABLES = new Set([
+  'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
+  'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', 'cheques', 'bank_accounts', ASSET_TABLE, CUSTOM_FIELDS_TABLE,
+  'stock_items', 'godowns', 'stock_transfers', 'advances',
+  'price_levels', 'schemes', 'pos_day_close',
+  'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
+  'series_counters',
+  'gstr4_manual',
+  'purchase_returns', 'receipt_notes',
+  'groups', 'ledger_openings', 'books_begin', 'opening_bills',
+  'deposit_slips', 'cash_tally',
+  'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
+  'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
+  // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
+  'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
+  // Payroll follow-ups (7T): relief u/s 89 (Form 10E) workings, actuarial valuations
+  'payroll_relief89', 'actuarial_valuations',
+  'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
+  'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  'gst_setoffs', 'gst_challans', 'hsn_master',
+  'rcm_documents',
+  'year_end',
+  'stock_groups', 'stock_categories', 'units',
+]);
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * Shape check before anything is written: record tables must be JSON arrays of objects
+ * (core tables with ids), settings an object, and the schema version not newer than this
+ * app understands. Throws a readable Error naming the bad table.
+ */
+export function validateBackupData(data: Record<string, string>): void {
+  const version = data[SCHEMA_VERSION_KEY];
+  if (version !== undefined) {
+    const n = Number(version);
+    if (!Number.isInteger(n) || n < 0) throw new Error('This backup has an invalid schema version.');
+    if (n > LATEST_SCHEMA_VERSION) {
+      throw new Error('This backup was made by a newer version of the app. Update the app, then restore it.');
+    }
+  }
+  for (const table of RECORD_TABLES) {
+    const raw = data[DB_PREFIX + table];
+    if (raw === undefined) continue;
+    let rows: unknown;
+    try {
+      rows = JSON.parse(raw);
+    } catch {
+      throw new Error(`The "${table}" table in this backup is damaged (not valid JSON).`);
+    }
+    if (!Array.isArray(rows)) throw new Error(`The "${table}" table in this backup is not a list.`);
+    const needsId = ID_TABLES.has(table);
+    // Older versions wrote numeric ids, so a number is fine; a missing id is not.
+    const hasId = (r: Record<string, unknown>) => (typeof r.id === 'string' && r.id !== '') || typeof r.id === 'number';
+    const bad = rows.findIndex((r) => !isPlainObject(r) || (needsId && !hasId(r)));
+    if (bad >= 0) throw new Error(`Row ${bad + 1} of the "${table}" table in this backup is damaged.`);
+  }
+  // Audit archive segments (WP-7, `audit_archive_<n>`): lists of rows like `audit_log` itself.
+  for (const key of Object.keys(data)) {
+    if (!key.startsWith(`${DB_PREFIX}audit_archive_`)) continue;
+    let rows: unknown;
+    try {
+      rows = JSON.parse(data[key]);
+    } catch {
+      rows = null;
+    }
+    if (!Array.isArray(rows) || rows.some((r) => !isPlainObject(r))) throw new Error(`The audit archive "${key.slice(DB_PREFIX.length)}" in this backup is damaged.`);
+  }
+  // Backups are self-contained: every logo/signature reference must resolve inside the file.
+  const refs = new Set<string>();
+  for (const table of SNAPSHOT_TABLES) {
+    const raw = data[DB_PREFIX + table];
+    if (raw !== undefined) referencedAssets(JSON.parse(raw) as unknown[], refs);
+  }
+  if (refs.size > 0) {
+    const assets = parseAssets(data[DB_PREFIX + ASSET_TABLE]);
+    const missing = [...refs].filter((id) => !assets.byId.has(id)).length;
+    if (missing > 0) throw new Error(`This backup is missing ${missing} logo/signature image${missing === 1 ? '' : 's'} its invoices refer to.`);
+  }
+  const settings = data[`${DB_PREFIX}settings`];
+  if (settings !== undefined) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(settings);
+    } catch {
+      parsed = null;
+    }
+    if (!isPlainObject(parsed)) throw new Error('The settings in this backup are damaged.');
+  }
+}
+
+/* ── Safety snapshot (taken before a restore or wipe) ──────────── */
+
+const SAFETY_KEY = 'safety-snapshot';
+
+export interface SafetySnapshot {
+  at: string;
+  /** Additive (WP-7): 'import' — taken before a Tally import, undone like a restore. */
+  reason: 'restore' | 'wipe' | 'import';
+  data: Record<string, string>;
+}
+
+/** As stored: in vault mode the data is one sealed JSON string instead of a plain object. */
+interface StoredSnapshot {
+  at: string;
+  reason: SafetySnapshot['reason'];
+  data?: Record<string, string>;
+  sealed?: string;
+}
+
+/**
+ * Keep a copy of everything on this device in IndexedDB (separate from the
+ * localStorage quota) so a restore or wipe can be undone. Resolves false if the
+ * browser cannot store it; callers decide whether to continue.
+ */
+export async function saveSafetySnapshot(reason: SafetySnapshot['reason'], now: Date = new Date()): Promise<boolean> {
+  // Roles (6.21): only someone allowed to restore / erase may replace the owner's undo copy.
+  requireAccess(reason === 'wipe' ? 'data.erase' : 'data.restore');
+  const data = collectAppData();
+  // Audit archive segments (WP-7) are app keys like any other: they ride along in backups and this copy.
+  for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
+  if (Object.keys(data).length === 0) return true; // nothing to protect
+  return storeSnapshot({ at: now.toISOString(), reason, data });
+}
+
+async function storeSnapshot(snap: SafetySnapshot): Promise<boolean> {
+  // Vault mode: the undo copy must not sit in IndexedDB readable.
+  const record: StoredSnapshot = vaultEnabled()
+    ? { at: snap.at, reason: snap.reason, sealed: await vaultSeal(SAFETY_KEY, JSON.stringify(snap.data)) }
+    : { at: snap.at, reason: snap.reason, data: snap.data };
+  return idbSet(SAFETY_KEY, record);
+}
+
+// Carry the undo copy across a vault on/off switch: one saved before vault mode is sealed once the
+// vault is on (it would otherwise stay readable); a sealed one is written back readable when the
+// vault is turned off (it could not be opened any more).
+registerVaultTransition({
+  before: () => getSafetySnapshot(),
+  after: async (snap) => {
+    if (snap) await storeSnapshot(snap as SafetySnapshot);
+  },
+});
+
+export async function getSafetySnapshot(): Promise<SafetySnapshot | null> {
+  const s = await idbGet<StoredSnapshot>(SAFETY_KEY);
+  if (!s || typeof s.at !== 'string') return null;
+  if (typeof s.sealed === 'string') {
+    const text = await vaultUnseal(SAFETY_KEY, s.sealed);
+    if (text === null) return null;
+    try {
+      const data: unknown = JSON.parse(text);
+      return isPlainObject(data) ? { at: s.at, reason: s.reason, data: data as Record<string, string> } : null;
+    } catch {
+      return null;
+    }
+  }
+  return isPlainObject(s.data) ? { at: s.at, reason: s.reason, data: s.data } : null;
+}
+
+export async function clearSafetySnapshot(): Promise<void> {
+  await idbDel(SAFETY_KEY);
+}
+
+const AUDIT_KEY = DB_PREFIX + AUDIT_TABLE;
+
+/** Chain head + row count of a stored / backed-up audit log (raw JSON). */
+function logInfo(raw: string | null | undefined): { head: string | null; rows: number } {
+  try {
+    const rows = raw ? (JSON.parse(raw) as AuditEntry[]) : [];
+    if (!Array.isArray(rows) || !rows.length) return { head: null, rows: 0 };
+    return { head: rows[rows.length - 1]?.hash ?? null, rows: rows.length };
+  } catch {
+    return { head: null, rows: 0 };
+  }
+}
+
+/**
+ * Writes validated backup keys into storage. Throws StorageWriteError if the quota is hit.
+ *
+ * Audit log: a backup that carries one brings its own chain (which still verifies on its own); a
+ * `restore` marker is then appended to it, linked to the backup's head, recording that head and the
+ * head + size of the log it replaced. A backup without a log leaves this device's log in place and
+ * the marker continues it. `replaced` is passed by `restoreBackup`, which wipes before writing.
+ */
+export function applyBackup(data: Record<string, string>, replaced?: { head: string | null; rows: number }): void {
+  requireAccess('data.restore');
+  const prior = replaced ?? (AUDIT_KEY in data ? logInfo(readRaw(AUDIT_KEY)) : undefined);
   // All-or-nothing: if the browser refuses a write half-way (quota), put back what was
   // there before so a failed restore can never leave a mix of old and new tables.
   const written: Array<[string, string | null]> = [];
@@ -188,7 +547,7 @@ export function applyBackup(data: Record<string, string>): void {
   } catch (err) {
     for (const [key, before] of written.reverse()) {
       try {
-        if (before === null) localStorage.removeItem(key);
+        if (before === null) removeRaw(key);
         else writeRaw(key, before);
       } catch {
         /* best effort: the original error is what the user needs to see */
@@ -197,11 +556,17 @@ export function applyBackup(data: Record<string, string>): void {
     throw err;
   }
   // Restoring replaces whatever was there; that is allowed even over a locked period, but never silent.
+  const restored = logInfo(data[AUDIT_KEY]);
   audit.record({
     entity: 'system',
     entity_id: 'backup',
     action: 'restore',
     summary: `Data restored from a backup (${Object.keys(data).length} data keys)`,
+    seal: {
+      restored_head: restored.head,
+      restored_rows: restored.rows,
+      ...(prior ? { replaced_head: prior.head, replaced_rows: prior.rows } : {}),
+    },
   });
 }
 
@@ -212,13 +577,15 @@ export function applyBackup(data: Record<string, string>): void {
  * never touched. Prefer this over `applyBackup` when "replace my data" is meant.
  */
 export function restoreBackup(data: Record<string, string>): void {
+  // Local roles (6.21): restoring replaces everything, so it is owner-only — checked before anything is touched.
+  requireAccess('data.restore');
   const snapshot = collectAppData();
   for (const key of LOCAL_ONLY) delete snapshot[key];
   try {
-    wipeAppData();
-    applyBackup(data);
+    wipeTables();
+    applyBackup(data, logInfo(snapshot[AUDIT_KEY]));
   } catch (err) {
-    wipeAppData();
+    wipeTables();
     for (const [key, value] of Object.entries(snapshot)) {
       try {
         writeRaw(key, value);
@@ -230,9 +597,14 @@ export function restoreBackup(data: Record<string, string>): void {
   }
 }
 
-/** Removes every app-owned key except this device's PIN / lock settings. */
-export function wipeAppData(): void {
+function wipeTables(): void {
   for (const key of Object.keys(collectAppData())) {
-    if (!LOCAL_ONLY.has(key)) localStorage.removeItem(key);
+    if (!LOCAL_ONLY.has(key)) removeRaw(key);
   }
+}
+
+/** Removes every app-owned key except this device's PIN / lock settings. Owner only (6.21). */
+export function wipeAppData(): void {
+  requireAccess('data.erase');
+  wipeTables();
 }

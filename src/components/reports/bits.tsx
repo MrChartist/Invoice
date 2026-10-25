@@ -3,6 +3,8 @@ import { ArrowDownRight, ArrowUpRight, Download, Minus } from 'lucide-react';
 import { downloadCsv } from '../books/download';
 import controls from '../../styles/controls.module.css';
 import styles from './reports.module.css';
+import { useT } from '../../i18n';
+import { repT } from '../../i18n/areas/reports';
 
 /** Inline % bar + number, for the "share of sales" columns. */
 export function Share({ value }: { value: number }) {
@@ -32,9 +34,10 @@ export function Delta({ value }: { value: number | null }) {
 }
 
 export function ExportButton({ filename, csv }: { filename: string; csv: () => string }) {
+  useT();
   return (
     <button type="button" className={controls.btnOutline} onClick={() => downloadCsv(filename, csv())}>
-      <Download size={16} /> Export CSV
+      <Download size={16} /> {repT('exportCsv')}
     </button>
   );
 }

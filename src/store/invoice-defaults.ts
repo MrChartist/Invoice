@@ -10,13 +10,20 @@ import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput, todayInput } from '../lib/utils';
+import { readValues } from '../lib/custom-fields';
+import { readRefs } from '../lib/attachments';
+import { normalizeTransport } from '../lib/transport';
 import type { AppSettings } from '../lib/localDb';
 import type {
+  AmendmentInfo,
+  ChallanPurpose,
+  EcoSection,
   Client,
   DocumentType,
   InvoiceItem,
   InvoiceRecord,
   SenderProfile,
+  ShipTo,
 } from '../types/invoice';
 
 export function blankClient(): Client {
@@ -69,7 +76,10 @@ export function makeDraft(opts: DraftOptions): InvoiceRecord {
   const issue = todayInput();
   const homeState = senderStateCode(sender);
   const taxRate = num(settings.defaultTaxRate);
-  const gst_mode = deriveGstMode({
+  // Composition dealers issue Bills of Supply (no tax) by default.
+  const composition = sender?.gst_scheme === 'composition';
+  const docType: DocumentType = opts.docType ?? (composition ? 'BILL_OF_SUPPLY' : 'INVOICE');
+  const gst_mode = docType === 'BILL_OF_SUPPLY' ? 'NONE' : deriveGstMode({
     senderStateCode: homeState,
     placeOfSupply: homeState,
     senderHasGstin: Boolean(sender?.companyGstin?.trim()),
@@ -79,7 +89,7 @@ export function makeDraft(opts: DraftOptions): InvoiceRecord {
   return {
     id: '',
     invoice_number: '',
-    doc_type: opts.docType ?? 'INVOICE',
+    doc_type: docType,
     issue_date: issue,
     due_date: addDaysInput(num(settings.defaultDueDays, 14), issue),
     status: 'Draft',
@@ -160,7 +170,51 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(num(item.cess_rate) > 0 ? { cess_rate: num(item.cess_rate) } : {}),
     ...(num(item.cess_per_unit) > 0 ? { cess_per_unit: num(item.cess_per_unit) } : {}),
     amount: num(item.amount, quantity * rate),
+    ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
+    ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
+    ...(Array.isArray(item.bill_refs) && item.bill_refs.length ? { bill_refs: item.bill_refs.map(String) } : {}),
+    ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
+    // Stock tracking (6.6 / 6.10 / 6.11): absent on untracked lines so their snapshots never change.
+    ...(item.batch_no ? { batch_no: String(item.batch_no) } : {}),
+    ...(item.batch_expiry ? { batch_expiry: String(item.batch_expiry).slice(0, 10) } : {}),
+    ...(item.batch_mfg ? { batch_mfg: String(item.batch_mfg).slice(0, 10) } : {}),
+    ...(Array.isArray(item.serials) && item.serials.length ? { serials: item.serials.map(String) } : {}),
+    ...(num(item.warranty_months) > 0 ? { warranty_months: num(item.warranty_months) } : {}),
+    ...(item.godown_id ? { godown_id: String(item.godown_id) } : {}),
+    // Pricing (6.9): absent unless a level / slab / scheme set the line.
+    ...(item.price_basis ? { price_basis: String(item.price_basis) } : {}),
+    ...(item.scheme_id ? { scheme_id: String(item.scheme_id) } : {}),
+    ...(item.free_of ? { free_of: String(item.free_of) } : {}),
+    // Alternate unit (WP-8): only on lines typed in one, so base-unit lines keep their exact shape.
+    ...(num(item.unit_factor) > 0 && num(item.unit_factor) !== 1 ? { unit_factor: num(item.unit_factor) } : {}),
   };
+}
+
+/** A stored amendment marker, or undefined when it is missing or unusable. */
+function normalizeAmends(raw: unknown): AmendmentInfo | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const a = raw as Partial<AmendmentInfo>;
+  const original_number = String(a.original_number ?? '').trim();
+  const original_date = String(a.original_date ?? '').slice(0, 10);
+  const amended_on = String(a.amended_on ?? '').slice(0, 10);
+  if (!original_number || !/^\d{4}-\d{2}-\d{2}$/.test(original_date) || !/^\d{4}-\d{2}-\d{2}$/.test(amended_on)) return undefined;
+  return {
+    original_number,
+    original_date,
+    period: String(a.period ?? ''),
+    amended_on,
+    ...(a.reason ? { reason: String(a.reason) } : {}),
+    ...(a.original && typeof a.original === 'object' ? { original: a.original } : {}),
+  };
+}
+
+const CHALLAN_PURPOSES = new Set(['JOB_WORK', 'APPROVAL', 'LIQUID_GAS', 'OTHER_THAN_SUPPLY', 'ANTICIPATION']);
+
+/** E-commerce operator fields: kept only with a GSTIN; the section only when it is a known one. */
+function ecoFields(gstin: unknown, section: unknown): { eco_gstin?: string; eco_section?: EcoSection } {
+  const g = typeof gstin === 'string' ? gstin.trim().toUpperCase() : '';
+  if (!g) return {};
+  return { eco_gstin: g, ...(section === 'TCS_52' || section === 'PAY_9_5' ? { eco_section: section } : {}) };
 }
 
 /** Upgrade any stored record (old or new) to the current `InvoiceRecord` shape. */
@@ -199,6 +253,16 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
       resolveStateCode({ gstin: client.gstin, name: client.state }) ??
       '',
     reverse_charge: Boolean(r.reverse_charge),
+    // Only stored on reverse-charge documents calculated without the tax in the total (src/lib/rcm.ts).
+    ...(r.reverse_charge && r.rcm_tax_excluded ? { rcm_tax_excluded: true } : {}),
+    ...(typeof r.goods_returned === 'boolean' ? { goods_returned: r.goods_returned } : {}),
+    // WP-9 (additive): approval state, branch, loyalty redemption.
+    ...(r.approval && typeof r.approval === 'object' ? { approval: r.approval as InvoiceRecord['approval'] } : {}),
+    ...(typeof r.branch_id === 'string' && r.branch_id ? { branch_id: r.branch_id } : {}),
+    ...(typeof r.branch_transfer_id === 'string' && r.branch_transfer_id ? { branch_transfer_id: r.branch_transfer_id } : {}),
+    ...(r.loyalty_redeem && typeof r.loyalty_redeem === 'object' && Number((r.loyalty_redeem as { points?: unknown }).points) > 0
+      ? { loyalty_redeem: { points: Number((r.loyalty_redeem as { points: number }).points), value: Number((r.loyalty_redeem as { value?: number }).value) || 0 } }
+      : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),
@@ -244,7 +308,50 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     tcs_amount: num(r.tcs_amount),
     tds_amount: num(r.tds_amount),
 
+    ...(r.quote_status === 'Accepted' || r.quote_status === 'Declined' ? { quote_status: r.quote_status } : {}),
+    ...(r.ship_to && typeof r.ship_to === 'object' ? { ship_to: { ...(r.ship_to as ShipTo) } } : {}),
+    // Additive fields stay absent on legacy rows so their snapshots never change.
+    ...(r.charges_taxable ? { charges_taxable: true } : {}),
+    ...(num(r.exchange_rate) > 0 ? { exchange_rate: num(r.exchange_rate) } : {}),
+    ...(r.shipping_bill_no ? { shipping_bill_no: String(r.shipping_bill_no) } : {}),
+    ...(r.shipping_bill_date ? { shipping_bill_date: String(r.shipping_bill_date).slice(0, 10) } : {}),
+    ...(r.port_code ? { port_code: String(r.port_code).toUpperCase() } : {}),
+    ...(typeof r.late_fee_for === 'string' && r.late_fee_for ? { late_fee_for: r.late_fee_for } : {}),
+    ...(r.sales_order_id ? { sales_order_id: String(r.sales_order_id) } : {}),
+    ...(r.order_closed_on ? { order_closed_on: String(r.order_closed_on).slice(0, 10) } : {}),
+    ...(typeof r.cost_centre_id === 'string' && r.cost_centre_id ? { cost_centre_id: r.cost_centre_id } : {}),
+    ...(readValues(r.custom_values).length ? { custom_values: readValues(r.custom_values) } : {}),
+    ...(readRefs(r.attachments).length ? { attachments: readRefs(r.attachments) } : {}),
+    ...(r.exempt_kind === 'NIL' || r.exempt_kind === 'EXEMPT' || r.exempt_kind === 'NON_GST' ? { exempt_kind: r.exempt_kind } : {}),
+    ...(normalizeAmends(r.amends) ? { amends: normalizeAmends(r.amends) } : {}),
+    ...(r.pos === true ? { pos: true } : {}),
+    ...ecoFields(r.eco_gstin, r.eco_section),
+    ...(CHALLAN_PURPOSES.has(String(r.challan_purpose)) ? { challan_purpose: r.challan_purpose as ChallanPurpose } : {}),
+    ...(() => {
+      const transport = normalizeTransport(r.transport);
+      return transport ? { transport } : {};
+    })(),
+
     created_at: r.created_at,
     updated_at: r.updated_at,
+  };
+}
+
+/** The client fields an invoice copies from a directory entry (shared by the picker and the typeahead). */
+export function clientToParty(c: Partial<Client>): Partial<Client> {
+  return {
+    name: c.name ?? '',
+    company: c.company ?? '',
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+    address: c.address ?? '',
+    city: c.city ?? '',
+    state: c.state ?? '',
+    state_code: c.state_code ?? '',
+    zip: c.zip ?? '',
+    gstin: c.gstin ?? '',
+    // Party custom-field values (6.23): the store copies them into the document snapshot and
+    // never keeps this map on the invoice's client copy.
+    custom_fields: c.custom_fields ?? {},
   };
 }

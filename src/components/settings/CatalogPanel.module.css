@@ -58,3 +58,45 @@
   flex-direction: column;
   gap: 0.875rem;
 }
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.small {
+  width: 6.5rem;
+}
+
+.group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem 0.75rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.codeCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+/* A barcode is always dark bars on white, in both themes. */
+.preview {
+  width: 9rem;
+  height: 1.6rem;
+}
+
+.previewBg {
+  fill: white;
+}
+
+.previewBar {
+  fill: black;
+}

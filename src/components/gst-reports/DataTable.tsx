@@ -3,6 +3,8 @@ import { round2 } from '../../lib/invoice-calc';
 import { formatMoney } from '../../lib/utils';
 import surface from '../../styles/surface.module.css';
 import styles from './gst-reports.module.css';
+import { useT } from '../../i18n';
+import { gvT } from '../../i18n/areas/gst-views';
 
 export interface Column<T> {
   key: string;
@@ -30,6 +32,7 @@ export interface DataTableProps<T> {
 
 /** Plain accessible table with an optional totals row. */
 export function DataTable<T>({ columns, rows, rowKey, caption, emptyText }: DataTableProps<T>) {
+  useT();
   if (rows.length === 0) {
     return <p className={surface.sectionNote}>{emptyText}</p>;
   }
@@ -62,7 +65,7 @@ export function DataTable<T>({ columns, rows, rowKey, caption, emptyText }: Data
           <tfoot>
             <tr className={styles.totalRow}>
               {columns.map((c, i) => {
-                if (!c.total) return <td key={c.key}>{i === 0 ? 'Total' : ''}</td>;
+                if (!c.total) return <td key={c.key}>{i === 0 ? gvT('total') : ''}</td>;
                 const sum = round2(rows.reduce((s, r) => s + c.total!(r), 0));
                 return (
                   <td key={c.key} className={surface.numeric}>

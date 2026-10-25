@@ -16,7 +16,9 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
-import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, CHARGES_LINE_ID, num, round2, taxLinesOf } from './invoice-calc';
+import { hasInrValue, inrTotals, inrValue } from './fx';
+import { receivableBalance } from './rcm';
 import {
   clean,
   filterInvoices,
@@ -37,6 +39,7 @@ import {
   type ExportSource,
 } from './export-shared';
 import { generateTallyExport, type TallyOptions } from './tally-xml';
+import { registerCells, registerColumns } from './custom-fields';
 import { csvCell as baseCsvCell, safeText } from './csv';
 
 export * from './export-shared';
@@ -157,13 +160,17 @@ const table = (id: DatasetId, headers: string[], rows: Cell[][]): CsvTable => ({
 });
 
 const docLabel = (inv: InvoiceRecord) =>
-  voucherKindOf(inv, true) === 'CREDIT_NOTE' ? 'Credit Note' : inv.doc_type === 'TAX_INVOICE' ? 'Tax Invoice' : 'Invoice';
+  voucherKindOf(inv, true) === 'CREDIT_NOTE' ? 'Credit Note' : inv.doc_type === 'DEBIT_NOTE' ? 'Debit Note' : inv.doc_type === 'TAX_INVOICE' ? 'Tax Invoice' : inv.doc_type === 'BILL_OF_SUPPLY' ? 'Bill of Supply' : 'Invoice';
+/** Amounts are in rupees whenever the document has a rupee value; otherwise at face value in its own currency. */
+const csvCurrency = (inv: InvoiceRecord) => (hasInrValue(inv) ? 'INR' : clean(inv.currency) || 'INR');
 const sign = (inv: InvoiceRecord) => (voucherKindOf(inv, true) === 'CREDIT_NOTE' ? -1 : 1);
 const gstTreatment = (gstin: string) => (clean(gstin).length === 15 ? 'business_gst' : 'consumer');
 const placeOfSupply = (code: string) => (code ? `${code}-${stateNameOf(code)}` : '');
 
 export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}): CsvTable {
   const df = opts.dateFormat ?? 'iso';
+  // Custom fields (6.23): one trailing column per label used on these documents (none → no columns).
+  const extra = registerColumns(invoices);
   const rows = invoices.map((inv): Cell[] => {
     const a = invoiceAmounts(inv);
     const s = sign(inv);
@@ -183,14 +190,16 @@ export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}):
       money(s * a.tax),
       money(s * a.cess),
       money(s * a.tcs),
-      money(s * a.charges),
+      // Taxed charges are inside the taxable value; this column is the untaxed remainder.
+      money(s * (a.chargesTaxed ? 0 : a.charges)),
       money(s * a.roundOff),
       money(s * a.total),
-      money(s * num(inv.amount_paid)),
-      money(s * num(inv.balance_due)),
+      money(s * inrValue(num(inv.amount_paid), inv)),
+      money(s * inrValue(receivableBalance(inv), inv)),
       clean(inv.status),
-      clean(inv.currency) || 'INR',
+      csvCurrency(inv),
       fmtDate(isoDate(inv.due_date), df),
+      ...registerCells(inv, extra).map((v) => clean(v)),
     ];
   });
   return table(
@@ -199,6 +208,7 @@ export function salesRegister(invoices: InvoiceRecord[], opts: CsvOptions = {}):
       'Date', 'Voucher No', 'Document Type', 'Party Name', 'Party GSTIN', 'Place of Supply',
       'Reverse Charge', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax', 'Cess', 'TCS', 'Other Charges',
       'Round Off', 'Invoice Total', 'Amount Received', 'Balance Due', 'Status', 'Currency', 'Due Date',
+      ...extra,
     ],
     rows,
   );
@@ -211,13 +221,14 @@ export function salesItems(invoices: InvoiceRecord[], opts: CsvOptions = {}): Cs
     const code = invoiceStateCode(inv);
     const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
     const calc = items.length
-      ? calculateInvoice(
-          calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 }),
+      ? inrTotals(
+          calculateInvoice(calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 })),
+          inv,
         )
       : null;
     const s = sign(inv);
-    (calc?.lines ?? []).forEach((l, i) => {
-      const src = items[i];
+    (calc ? taxLinesOf(calc) : []).forEach((l, i) => {
+      const src: InvoiceItem | undefined = l.id === CHARGES_LINE_ID ? undefined : items[i];
       rows.push([
         fmtDate(isoDate(inv.issue_date), df),
         clean(inv.invoice_number),
@@ -228,7 +239,7 @@ export function salesItems(invoices: InvoiceRecord[], opts: CsvOptions = {}): Cs
         gstTreatment(inv.client?.gstin ?? ''),
         placeOfSupply(code),
         fmtDate(isoDate(inv.due_date), df),
-        clean(inv.currency) || 'INR',
+        csvCurrency(inv),
         clean(l.name),
         clean(src?.description),
         clean(l.hsn),
@@ -271,6 +282,7 @@ export function purchaseRegister(source: ExportSource, opts: CsvOptions = {}): C
     money(p.sgst),
     money(round2(p.tax - p.cgst - p.sgst)),
     money(p.tax),
+    money(p.cess),
     money(p.roundOff),
     money(p.total),
     p.status,
@@ -280,7 +292,7 @@ export function purchaseRegister(source: ExportSource, opts: CsvOptions = {}): C
     'purchase_register',
     [
       'Date', 'Bill No', 'Vendor Name', 'Vendor GSTIN', 'Place of Supply', 'Taxable Value',
-      'CGST', 'SGST', 'IGST', 'Total Tax', 'Round Off', 'Bill Total', 'Status', 'Notes',
+      'CGST', 'SGST', 'IGST', 'Total Tax', 'Cess', 'Round Off', 'Bill Total', 'Status', 'Notes',
     ],
     rows,
   );
@@ -405,19 +417,15 @@ export function gstSummary(source: ExportSource, opts: CsvOptions = {}): CsvTabl
     const section = s < 0 ? 'Credit Notes' : 'Sales';
     const doc = clean(inv.invoice_number) || inv.id;
     const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
+    // Charges stay in: when they are taxable they are one more line at the principal rate.
     const calc = items.length
-      ? calculateInvoice(
-          calcInputFromRecord(inv, {
-            shipping: 0,
-            other_charges: 0,
-            round_off_enabled: false,
-            round_mode: 'none',
-            amount_paid: 0,
-          }),
+      ? inrTotals(
+          calculateInvoice(calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 })),
+          inv,
         )
       : null;
     if (calc && calc.lines.length) {
-      for (const l of calc.lines) {
+      for (const l of taxLinesOf(calc)) {
         // SINGLE mode has no split — report it under IGST/"tax" so the total tax column stays right.
         const split = l.cgst + l.sgst + l.igst;
         bump(section, l.tax_rate, l.taxable, l.cgst, l.sgst, l.igst + Math.max(0, l.tax - split), doc);

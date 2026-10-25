@@ -41,13 +41,14 @@ money (`toPaise`, `fixed2`), `ExportSource`, `voucherKindOf`, `invoiceAmounts`, 
 ### Tally conventions
 
 - Debit = `ISDEEMEDPOSITIVE` Yes + negative `AMOUNT`; credit = No + positive. Every voucher sums to 0.
-- Sales: Dr party (bill ref "New Ref"), Cr Sales, Cr Output CGST/SGST/IGST (legacy single-tax -> "Output GST"), Cr Freight and Other Charges, +/- Round Off.
-- Credit Note: mirror image. Receipt: Dr Bank Account (or Cash if method is "Cash"), Cr party with "Agst Ref" to the invoice number; voucher number `<invoice>/R<n>`.
+- Sales: Dr party (bill ref "New Ref"), Cr Sales, Cr Output CGST/SGST/IGST (legacy single-tax -> "Output GST"), Cr Freight and Other Charges (when `charges_taxable`, Sales gets only the items' taxable value and the freight's GST is in the output-tax ledgers), +/- Round Off. Foreign-currency documents and their receipts are posted in rupees at the invoice's `exchange_rate`, with the foreign amount in the narration.
+- Credit Note: mirror image. Receipt: Dr Bank Account (or Cash if method is "Cash"), Cr party with "Agst Ref" to the invoice number; voucher number `<invoice>/R<n>`. When the invoice carries customer TDS, the receipt that clears the cash due (total − TDS) also posts Dr `TDS Receivable` (Current Assets, option `tdsLedger`) and credits the party gross, so the party ledger closes.
 - Purchase: Cr vendor, Dr Purchases, Dr Input CGST/SGST/IGST, +/- Round Off.
 - Any gap between an invoice's stored total and its parts (rounding, legacy rows) is posted to the Round Off ledger so Tally never rejects an unbalanced voucher.
 - Two files: **Masters** (`All Masters`: ledgers, units, stock items) then **Vouchers** (`Vouchers`); a Combined single file is also offered.
 - Drafts (unless opted in), cancelled, quotations, proforma and delivery challans are excluded. Output is sorted and deterministic.
 - Re-importing the same period creates duplicates in Tally; the UI says so.
+- Batch / godown allocations (roadmap 6.6 / 6.10) and stock transfer vouchers are **not exported**: Tally needs godown and batch-enabled stock-item masters for `BATCHALLOCATIONS.LIST` / `GODOWNNAME`, so inventory lines land in Tally's main location without batches (see `docs/features/inventory.md`).
 
 ### CSV datasets (headers are the contract)
 

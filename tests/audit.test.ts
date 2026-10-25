@@ -6,6 +6,7 @@ import { clientMH, createViaStore, installSettings, reload } from './helpers/wor
 import { localDb } from '../src/lib/localDb.ts';
 import { AUDIT_MAX_ROWS, AUDIT_TABLE, audit, diffClient, diffInvoice } from '../src/lib/audit.ts';
 import { auditToCsv, filterAudit } from '../src/lib/audit-query.ts';
+import { verifyAuditChain } from '../src/lib/audit-chain.ts';
 import { getTable, setTable } from '../src/lib/storage.ts';
 import type { AuditEntry } from '../src/types/audit.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
@@ -133,18 +134,38 @@ test('clients and settings are logged; sensitive profile fields are flagged, nev
   assert.match(defaults.summary, /Due in \(days\) 14 → 30/);
 });
 
-test('the log is capped at the newest rows', () => {
+test('past the row limit the oldest rows move to an archive segment (WP-7): kept, chained, nothing dropped', () => {
   const seed: AuditEntry[] = Array.from({ length: AUDIT_MAX_ROWS }, (_, n) => ({
     id: `s${n}`, at: new Date(2025, 0, 1, 0, 0, n).toISOString(), entity: 'system', entity_id: 'x', action: 'update', summary: `row ${n}`,
   }));
   setTable(AUDIT_TABLE, seed);
   audit.record({ entity: 'system', entity_id: 'x', action: 'update', summary: 'newest' });
   audit.record({ entity: 'system', entity_id: 'x', action: 'update', summary: 'newest 2' });
-  const all = getTable<AuditEntry>(AUDIT_TABLE);
-  assert.equal(all.length, AUDIT_MAX_ROWS);
-  assert.equal(all[0].summary, 'row 2', 'the two oldest rows were dropped');
-  assert.equal(all[all.length - 1].summary, 'newest 2');
+  const live = getTable<AuditEntry>(AUDIT_TABLE);
+  assert.ok(live.length <= AUDIT_MAX_ROWS);
+  assert.equal(live.length, AUDIT_MAX_ROWS - 500 + 2, '4,500 kept + the archive anchor + the next row');
+  const anchor = live[live.length - 2];
+  assert.equal(anchor.action, 'archive');
+  assert.equal(anchor.seal?.segment, 'audit_archive_0001');
+  assert.match(anchor.summary, /moved to archive audit_archive_0001/);
+  assert.equal(live[live.length - 1].summary, 'newest 2');
   assert.equal(audit.all()[0].summary, 'newest 2', 'all() is newest first');
+  const archived = getTable<AuditEntry>('audit_archive_0001');
+  // seed + the chain_start seal of the seed + 2 new rows + the archive anchor: every row is still somewhere.
+  assert.equal(archived.length + live.length, AUDIT_MAX_ROWS + 4);
+  assert.equal(audit.fullRows().length, archived.length + live.length);
+  const liveReport = verifyAuditChain(live);
+  assert.equal(liveReport.ok, true, liveReport.broken?.message);
+  assert.equal(liveReport.trimmed, undefined, 'nothing was removed');
+  assert.deepEqual(liveReport.archived, { rows: archived.length, segments: 1 });
+  const full = verifyAuditChain(audit.fullRows());
+  assert.equal(full.ok, true, full.broken?.message);
+  // Tampering inside an archive segment is caught by the full verification.
+  const bad = audit.fullRows();
+  bad[10] = { ...bad[10], summary: 'changed' };
+  assert.equal(verifyAuditChain(bad).ok, false);
+  // An archived row still shows in a record's edit log.
+  assert.ok(audit.forRecord('x').length > live.length - 1);
 });
 
 test('a throwing logger can never break a save', () => {
@@ -211,7 +232,7 @@ test('filterAudit by entity, action, date range and text; CSV export escapes and
 
   const csv = auditToCsv(entries);
   const lines = csv.split('\r\n');
-  assert.equal(lines[0], 'When,Entity,Action,Document,Summary,Field,From,To');
+  assert.equal(lines[0], 'When,Entity,Action,Document,Summary,Field,From,To,By');
   assert.ok(lines[1].includes('Total'));
   assert.ok(!lines.some((l) => /(^|,)=HYPERLINK/.test(l)), 'formula injection is neutralised');
 });

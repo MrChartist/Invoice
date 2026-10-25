@@ -8,12 +8,14 @@
  * Enforcement lives in the data layer (`localDb`) — not in the UI — so no
  * screen, importer or recurring run can bypass it. The only way past it is a
  * short-lived, in-memory override that is granted after the PIN is verified and
- * is itself written to the audit log.
+ * is itself written to the audit log. With local roles (6.21) only the owner may
+ * ask for one: the PIN checked is the signed-in user's, and that must be the owner.
  *
  * This module must not import `localDb` (localDb imports it). It reads the
  * settings blob directly.
  */
 
+import { requireAccess } from './access';
 import { verifyPin } from './auth';
 import { audit } from './audit';
 import { isoDay } from './dates';
@@ -139,6 +141,8 @@ export interface GrantOptions {
  * Returns false (and grants nothing) on a wrong PIN. Always audited.
  */
 export async function grantOverride(pin: string, opts: GrantOptions): Promise<boolean> {
+  // Local roles (6.21): only the owner may unlock a locked period (rejects with AccessDeniedError).
+  requireAccess('period.override');
   const now = opts.now ?? Date.now();
   const ok = await (opts.verify ?? ((p: string) => verifyPin(p)))(pin);
   if (!ok) return false;

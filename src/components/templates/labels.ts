@@ -5,11 +5,13 @@ import styles from './invoice-paper.module.css';
 /** English label text — identical to what the original four layouts printed. */
 const EN = {
   billTo: 'Bill to',
+  shipTo: 'Ship to',
   preparedFor: 'Prepared for',
   issueDate: 'Issue date',
   quoteDate: 'Quote date',
   dueDate: 'Due date',
   validUntil: 'Valid until',
+  deliveryBy: 'Delivery by',
   poRef: 'PO / Ref',
   placeOfSupply: 'Place of supply',
   currency: 'Currency',
@@ -55,17 +57,19 @@ export type LabelKey = keyof typeof EN;
 /** Hindi second line for the bilingual layout. */
 const HI: Record<LabelKey, string> = {
   billTo: 'बिल प्राप्तकर्ता',
+  shipTo: 'माल भेजने का पता',
   preparedFor: 'प्रस्तुत',
   issueDate: 'जारी तिथि',
   quoteDate: 'कोटेशन तिथि',
   dueDate: 'देय तिथि',
   validUntil: 'मान्य तिथि',
+  deliveryBy: 'डिलीवरी तिथि',
   poRef: 'ऑर्डर संदर्भ',
   placeOfSupply: 'आपूर्ति स्थान',
   currency: 'मुद्रा',
   reverseCharge: 'रिवर्स चार्ज',
   document: 'दस्तावेज़',
-  invoiceNo: 'चालान संख्या',
+  invoiceNo: 'इनवॉइस संख्या',
   desc: 'विवरण',
   hsn: 'एचएसएन/एसएसी',
   qty: 'मात्रा',
@@ -101,12 +105,15 @@ const HI: Record<LabelKey, string> = {
 };
 
 export const DOC_TITLE_HI: Record<DocumentType, string> = {
-  INVOICE: 'चालान',
-  TAX_INVOICE: 'कर चालान',
+  INVOICE: 'इनवॉइस',
+  TAX_INVOICE: 'टैक्स इनवॉइस',
   QUOTATION: 'कोटेशन',
-  PROFORMA: 'प्रोफार्मा चालान',
+  PROFORMA: 'प्रोफ़ॉर्मा इनवॉइस',
   CREDIT_NOTE: 'क्रेडिट नोट',
+  DEBIT_NOTE: 'डेबिट नोट',
   DELIVERY_CHALLAN: 'डिलीवरी चालान',
+  SALES_ORDER: 'बिक्री ऑर्डर',
+  BILL_OF_SUPPLY: 'बिल ऑफ़ सप्लाई',
 };
 
 export type Labeller = (key: LabelKey) => ReactNode;

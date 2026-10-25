@@ -7,17 +7,19 @@
 
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, pctOf, round2 } from './invoice-calc';
+import { inrTotals } from './fx';
 import { stateByCode, stateByName } from './india-states';
 import {
   extractPin,
   guessLocality,
   isServiceHsn,
   issue,
-  mapUnitToUqc,
+  portalUqc,
   splitAddress,
   toNicDate,
   type PreflightIssue,
 } from './einvoice';
+import type { UnitMaster } from './units';
 
 export const EWAY_VERSION = '1.0.0621';
 /** Consignment value above which an e-Way Bill is mandatory for goods. */
@@ -113,6 +115,8 @@ export interface EwayOptions {
   /** Dispatch-from / ship-to when they differ from the seller / buyer. */
   shipFrom?: { addr1?: string; place?: string; pin?: string | number; stateCode?: string };
   shipTo?: { addr1?: string; place?: string; pin?: string | number; stateCode?: string };
+  /** Additive (WP-8): the units master (`unitsDb.stored()`): a unit with its own UQC is sent as that UQC. */
+  units?: readonly UnitMaster[];
 }
 
 export interface EwayBuild {
@@ -140,6 +144,8 @@ function codeNum(code?: string): number {
 export function ewayDocType(doc: InvoiceRecord['doc_type']): EwayBill['docType'] {
   if (doc === 'DELIVERY_CHALLAN') return 'CHL';
   if (doc === 'CREDIT_NOTE') return 'CNT';
+  // A Bill of Supply (composition dealer / exempt goods) moves goods too: NIC document type BIL.
+  if (doc === 'BILL_OF_SUPPLY') return 'BIL';
   return 'INV';
 }
 
@@ -149,7 +155,9 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const client = record.client ?? ({} as InvoiceRecord['client']);
   const t = options.transport ?? {};
 
-  const calc = calculateInvoice(calcInputFromRecord(record));
+  // The portal takes rupees: a foreign-currency invoice is converted at its exchange rate.
+  // The e-Way bill's invoice value includes the GST shown on the document, reverse charge or not.
+  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record, { rcm_exclude_tax: false })), record);
 
   const sellerGstin = (sender?.companyGstin ?? '').trim().toUpperCase();
   const gstinStateFrom = sellerGstin.slice(0, 2);
@@ -167,15 +175,22 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const toGstinState = /^\d{2}/.test(buyerGstin) ? buyerGstin.slice(0, 2) : '';
   const clientState = stateByCode(client.state_code)?.code ?? stateByName(client.state)?.code ?? '';
   const toState = isExport ? '99' : toGstinState || clientState || (record.place_of_supply ?? '');
-  const toAddr = splitAddress(options.shipTo?.addr1 ?? client.address ?? '');
-  const actTo = options.shipTo?.stateCode ?? (isExport ? '99' : clientState || toState);
-  const shipDiffers = !!(options.shipTo || options.shipFrom);
+  // A ship-to address saved on the invoice applies unless the caller overrides it.
+  const savedShip = record.ship_to && (record.ship_to.address || record.ship_to.state_code)
+    ? { addr1: record.ship_to.address, place: record.ship_to.city, pin: record.ship_to.zip, stateCode: record.ship_to.state_code }
+    : undefined;
+  const shipTo = options.shipTo ?? savedShip;
+  const toAddr = splitAddress(shipTo?.addr1 ?? client.address ?? '');
+  const actTo = shipTo?.stateCode ?? (isExport ? '99' : clientState || toState);
+  const shipDiffers = !!(shipTo || options.shipFrom);
 
   // Goods only — e-Way Bills do not apply to services.
   const goods = calc.lines.filter((l) => !isServiceHsn(l.hsn));
   const skippedServiceLines = calc.lines.length - goods.length;
   const allGoods = skippedServiceLines === 0;
-  const sum = (pick: (l: (typeof goods)[number]) => number) => round2(goods.reduce((s, l) => s + pick(l), 0));
+  // Taxable freight is part of the goods' value: its taxable amount and GST join the totals.
+  const valued = allGoods && calc.charges_line ? [...goods, calc.charges_line] : goods;
+  const sum = (pick: (l: (typeof goods)[number]) => number) => round2(valued.reduce((s, l) => s + pick(l), 0));
   const noTax = record.gst_mode === 'NONE';
   const taxable = sum((l) => l.taxable);
   const cgst = sum((l) => l.cgst);
@@ -186,7 +201,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const advolOf = (l: (typeof goods)[number]) => pctOf(l.taxable, l.cess_rate);
   const cessAdvol = sum(advolOf);
   const cessFixed = sum((l) => round2(l.cess - advolOf(l)));
-  const other = allGoods ? round2(calc.shipping + calc.other_charges + calc.tcs_amount) : 0;
+  const other = allGoods ? round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount) : 0;
   const totInv = allGoods
     ? calc.total
     : round2(taxable + cgst + sgst + igst + cessAdvol + cessFixed);
@@ -199,7 +214,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
       productDesc: (l.name || 'Item').slice(0, 100),
       hsnCode: codeNum(l.hsn),
       quantity: Math.round(l.quantity * 1000) / 1000,
-      qtyUnit: mapUnitToUqc(l.unit),
+      qtyUnit: portalUqc(l.unit, options.units),
       taxableAmount: l.taxable,
       sgstRate: intraSplit ? rate / 2 : 0,
       cgstRate: intraSplit ? rate / 2 : 0,
@@ -231,8 +246,8 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
     toTrdName: (client.company || client.name || '').trim(),
     toAddr1: toAddr.addr1,
     toAddr2: toAddr.addr2,
-    toPlace: (options.shipTo?.place ?? client.city ?? '').trim(),
-    toPincode: isExport ? 999999 : pinOf(options.shipTo?.pin) || pinOf(client.zip) || extractPin(client.address),
+    toPlace: (shipTo?.place ?? client.city ?? '').trim(),
+    toPincode: isExport ? 999999 : pinOf(shipTo?.pin) || pinOf(client.zip) || extractPin(client.address),
     actToStateCode: codeNum(actTo),
     toStateCode: codeNum(toState),
     totalValue: taxable,

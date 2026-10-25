@@ -1,6 +1,7 @@
 /* Mr. Chartist Invoice — app-shell service worker.
  *
- * - Same-origin only (plus Google Fonts, stale-while-revalidate). No other network calls.
+ * - Same-origin only: fonts are self-hosted (src/fonts.css), and requests to any other origin are
+ *   never intercepted or cached. No other network calls.
  * - Navigations: network-first (3.5s budget) -> cached index.html, so SPA deep links such as
  *   /invoice/abc open offline. The shell is refreshed on every successful navigation.
  * - /assets/* (fingerprinted by Vite): cache-first; discovered at runtime and also precached
@@ -52,7 +53,9 @@ async function precacheManifest(shell, assets) {
   const res = await fetch('/precache-manifest.json', { cache: 'no-store' });
   if (!res.ok) throw new ManifestMissing('precache manifest ' + res.status);
   const manifest = await res.json();
-  await Promise.all(
+  // allSettled, not all: every fetch/put must have finished before a failed install deletes the
+  // half-filled shell cache, or a straggling put could leave it behind.
+  const results = await Promise.allSettled(
     manifest.files.map(async (url) => {
       const r = await fetch(new Request(url, { cache: 'reload' }));
       if (!r.ok) throw new Error('precache ' + url + ' ' + r.status);
@@ -62,6 +65,8 @@ async function precacheManifest(shell, assets) {
       else await shell.put(url, r);
     }),
   );
+  const failed = results.find((r) => r.status === 'rejected');
+  if (failed) throw failed.reason;
 }
 
 self.addEventListener('install', (event) => {
@@ -131,7 +136,9 @@ async function handleNavigation(request) {
   const cached = await shell.match(SHELL_URL);
   const network = fetch(request).then(async (res) => {
     const type = res.headers.get('content-type') || '';
-    if (res.ok && type.includes('text/html')) await safePut(shell, SHELL_URL, res.clone());
+    // Only an SPA route (no file extension) is the app shell; /offline.html etc. must never replace it.
+    const isSpaRoute = !/\.[a-z0-9]+$/i.test(new URL(request.url).pathname);
+    if (res.ok && isSpaRoute && type.includes('text/html')) await safePut(shell, SHELL_URL, res.clone());
     return res;
   });
   try {
@@ -160,8 +167,8 @@ async function staleWhileRevalidate(request, cacheName, max) {
   const hit = await cache.match(request);
   const refresh = fetch(request)
     .then(async (res) => {
-      // Opaque (no-cors) font responses report status 0; cache those, never errors.
-      if (res.ok || res.type === 'opaque') {
+      // Same-origin only (see the fetch handler): cache successful responses, never errors.
+      if (res.ok) {
         await safePut(cache, request, res.clone());
         trim(cache, max);
       }

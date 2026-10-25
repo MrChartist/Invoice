@@ -6,6 +6,8 @@ import { round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
 import { downloadCsv } from '../books/download';
 import { formatDate, formatMoney } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './reconcile.module.css';
@@ -22,6 +24,7 @@ export interface BrsViewProps {
 
 /** Tally-style Bank Reconciliation Statement: books balance -> timing differences -> bank balance. */
 export function BrsView({ brs, bankLabel, openingMissing }: BrsViewProps) {
+  useT(); // re-render on a language switch (5.4)
   const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
@@ -46,14 +49,14 @@ export function BrsView({ brs, bankLabel, openingMissing }: BrsViewProps) {
     <div className={styles.stack}>
       <div className={styles.toolbar}>
         <p className={styles.muted} style={{ maxWidth: 640 }}>
-          Starts from the balance in your Books for the bank account and walks it to the bank&apos;s own balance. A non-zero difference means a transaction is missing on one side or the books opening balance is off.
+          {bankT('brsIntro')}
         </p>
         <div className={styles.toolbarGroup}>
           <button type="button" className={controls.btnOutline} onClick={() => downloadCsv(`brs-${brs.asOf}.csv`, brsCsv(brs))}>
-            <Download size={16} /> Export CSV
+            <Download size={16} /> {bankT('exportCsv')}
           </button>
           <button type="button" className={controls.btnOutline} onClick={() => setPrinting(true)}>
-            <Printer size={16} /> Print
+            <Printer size={16} /> {bankT('print')}
           </button>
         </div>
       </div>
@@ -61,16 +64,14 @@ export function BrsView({ brs, bankLabel, openingMissing }: BrsViewProps) {
       {openingMissing && (
         <div className={styles.noticeWarn} role="note">
           <AlertTriangle size={16} className={styles.noticeIcon} aria-hidden="true" />
-          <span>
-            No bank opening balance is set in <strong>Books → Cash &amp; bank</strong>, so the books balance below is only the movements recorded in this app. Enter the opening balance to make the difference meaningful.
-          </span>
+          <span>{bankT('brsNoOpening')}</span>
         </div>
       )}
 
       <div className={surface.card}>
         <div className={surface.cardHead}>
-          <span>Bank reconciliation statement — {bankLabel}</span>
-          <span className={styles.muted}>as on {formatDate(brs.asOf)}</span>
+          <span>{bankT('brsTitle', { bank: bankLabel })}</span>
+          <span className={styles.muted}>{bankT('asOn', { date: formatDate(brs.asOf) })}</span>
         </div>
         <Paper brs={brs} />
       </div>
@@ -83,22 +84,22 @@ export function BrsView({ brs, bankLabel, openingMissing }: BrsViewProps) {
         )}
         <span>
           {brs.statementBalance === null
-            ? 'The statement has no balance column. Enter the closing balance under Statements to see the difference.'
+            ? bankT('brsNoBalance')
             : reconciled
-              ? 'Fully reconciled: the books walk exactly to the bank statement balance.'
-              : `Unexplained difference of ${money(brs.difference ?? 0)}. Check unmatched lines, ignored lines and the books opening balance.`}
+              ? bankT('brsReconciled')
+              : bankT('brsUnexplained', { amount: money(brs.difference ?? 0) })}
         </span>
       </div>
 
       {printing &&
         createPortal(
           <div className={styles.printRoot}>
-            <h1 style={{ fontSize: '16pt', margin: 0 }}>{localDb.settings.activeProfile()?.companyName || 'Bank reconciliation'}</h1>
+            <h1 style={{ fontSize: '16pt', margin: 0 }}>{localDb.settings.activeProfile()?.companyName || bankT('title')}</h1>
             <h2 style={{ fontSize: '12pt', margin: '4pt 0 12pt' }}>
-              Bank reconciliation statement — {bankLabel} — as on {formatDate(brs.asOf)}
+              {bankT('brsPrintTitle', { bank: bankLabel, date: formatDate(brs.asOf) })}
             </h2>
             <Paper brs={brs} />
-            <p style={{ fontSize: '8pt', marginTop: '14pt' }}>Working paper generated from your own books; verify with your accountant.</p>
+            <p style={{ fontSize: '8pt', marginTop: '14pt' }}>{bankT('brsPrintNote')}</p>
           </div>,
           document.body,
         )}
@@ -123,7 +124,7 @@ function Section({ title, items, sign }: { title: string; items: readonly BrsIte
           <span className={styles.amt}>{money(it.amount)}</span>
         </div>
       ))}
-      {items.length > 200 && <div className={styles.brsSub}><span>…and {items.length - 200} more (see the CSV)</span><span /></div>}
+      {items.length > 200 && <div className={styles.brsSub}><span>{bankT('andMore', { n: items.length - 200 })}</span><span /></div>}
     </>
   );
 }
@@ -133,23 +134,23 @@ function Paper({ brs }: { brs: Brs }) {
   return (
     <div className={styles.brs}>
       <div className={styles.brsTotal}>
-        <span>Balance as per books</span>
+        <span>{bankT('balBooks')}</span>
         <span className={styles.amt}>{money(brs.booksBalance)}</span>
       </div>
-      <Section title="Add: payments issued, not yet debited by the bank" items={brs.paymentsNotCleared} sign={1} />
-      <Section title="Less: receipts recorded, not yet credited by the bank" items={brs.receiptsNotCleared} sign={-1} />
-      <Section title="Add: credited by the bank, not in books" items={brs.bankCreditsNotInBooks} sign={1} />
-      <Section title="Less: debited by the bank, not in books" items={brs.bankDebitsNotInBooks} sign={-1} />
+      <Section title={bankT('addNotDebited')} items={brs.paymentsNotCleared} sign={1} />
+      <Section title={bankT('lessNotCredited')} items={brs.receiptsNotCleared} sign={-1} />
+      <Section title={bankT('addCreditedNotBooks')} items={brs.bankCreditsNotInBooks} sign={1} />
+      <Section title={bankT('lessDebitedNotBooks')} items={brs.bankDebitsNotInBooks} sign={-1} />
       <div className={styles.brsTotal}>
-        <span>Balance as per bank (computed)</span>
+        <span>{bankT('balBankComputed')}</span>
         <span className={styles.amt}>{money(brs.computedBankBalance)}</span>
       </div>
       <div className={styles.brsRow}>
-        <span>Balance as per bank statement</span>
+        <span>{bankT('balBankStatement')}</span>
         <span className={styles.amt}>{brs.statementBalance === null ? '—' : money(brs.statementBalance)}</span>
       </div>
       <div className={styles.brsTotal}>
-        <span>Difference</span>
+        <span>{bankT('statDiff')}</span>
         <span className={`${styles.amt} ${diff === null ? '' : Math.abs(diff) <= 0.01 ? styles.diffOk : styles.diffBad}`}>
           {diff === null ? '—' : money(diff)}
         </span>

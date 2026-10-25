@@ -7,10 +7,15 @@
  */
 
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
-import { num, round2 } from './invoice-calc';
+import type { AdvanceRecord } from '../types/advances';
+import type { TallyBooksSource } from './tally-books';
+import type { PurchaseReturn } from '../types/purchases';
+import { chargesAreTaxed, num, round2 } from './invoice-calc';
+import { inrRecord } from './fx';
+import { rcmTaxOf, supplierView } from './rcm';
 import { resolveStateCode, stateByCode } from './india-states';
 import { isoDay } from './dates';
-import { isVoidStatus, readPurchase } from './purchase-normalize';
+import { isVoidStatus, readPurchase, selfAssessedCessOf, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 
 /* ── Dates ────────────────────────────────────────────────────── */
 
@@ -94,6 +99,15 @@ export interface ExportSource {
   purchases: unknown[];
   /** Raw `vendors` rows — shape owned by another module, read defensively. */
   vendors: unknown[];
+  /** Advance receipts (5.3). Optional: absent = none. */
+  advances?: AdvanceRecord[];
+  /** Additive (WP-3): purchase returns / supplier credit notes (`purchase_returns`). Optional. */
+  purchaseReturns?: PurchaseReturn[];
+  /**
+   * Additive (WP-7, P0-12 / P1-22): the rest of the books for the Tally export — supplier payments,
+   * manual vouchers, fixed assets, stock transfers, user groups, openings, cost centres. Optional.
+   */
+  books?: TallyBooksSource;
 }
 
 export function emptySource(): ExportSource {
@@ -107,7 +121,7 @@ export type VoucherKind = 'SALES' | 'CREDIT_NOTE';
 /** Which accounting voucher an invoice becomes, or null if it is not a ledger document. */
 export function voucherKindOf(inv: InvoiceRecord, includeDrafts = false): VoucherKind | null {
   const t = inv.doc_type ?? 'INVOICE';
-  if (t === 'QUOTATION' || t === 'PROFORMA' || t === 'DELIVERY_CHALLAN') return null;
+  if (t === 'QUOTATION' || t === 'PROFORMA' || t === 'DELIVERY_CHALLAN' || t === 'SALES_ORDER') return null;
   if (inv.status === 'Cancelled') return null;
   if (inv.status === 'Draft' && !includeDrafts) return null;
   return t === 'CREDIT_NOTE' ? 'CREDIT_NOTE' : 'SALES';
@@ -125,19 +139,38 @@ export interface InvoiceAmounts {
   /** Tax with no CGST/SGST/IGST split (legacy "SINGLE" mode). */
   otherTax: number;
   tax: number;
-  /** shipping + other charges (untaxed). */
+  /** shipping + other charges, taxed or not. */
   charges: number;
+  /**
+   * The charges were taxed (`charges_taxable`): they are INSIDE `taxable` and their GST is inside
+   * cgst/sgst/igst. A ledger posts them to the freight ledger and `taxable - charges` to Sales.
+   */
+  chargesTaxed: boolean;
   /** GST cess (kept out of `tax`, which is CGST+SGST+IGST). */
   cess: number;
   /** TCS collected on the invoice: a liability to the government, not income. */
   tcs: number;
+  /** What the customer owes (an outward reverse-charge document's tax is NOT in it). */
   total: number;
-  /** total - (taxable + tax + charges + cess + tcs): rounding plus any legacy inconsistency. Signed. */
+  /** total - (taxable + tax + untaxed charges + cess + tcs): rounding plus any legacy inconsistency. Signed. */
   roundOff: number;
+  /**
+   * Outward reverse charge: GST + cess shown on the document as payable by the RECIPIENT. The heads
+   * above (cgst / sgst / igst / tax / cess) are then 0 — the supplier neither collects nor owes it.
+   */
+  rcmTax: number;
 }
 
-/** Read an invoice's money tolerantly (legacy rows may lack computed fields). */
-export function invoiceAmounts(inv: InvoiceRecord): InvoiceAmounts {
+/**
+ * Read an invoice's money tolerantly (legacy rows may lack computed fields). Always in rupees:
+ * a foreign-currency document is converted at its exchange rate (`src/lib/fx.ts`); one without
+ * a rate stays at face value.
+ */
+export function invoiceAmounts(source: InvoiceRecord): InvoiceAmounts {
+  const converted = inrRecord(source);
+  const rcmTax = rcmTaxOf(converted);
+  // Outward reverse charge: no output tax, and only the taxable value is receivable (src/lib/rcm.ts).
+  const inv = supplierView(converted);
   let taxable = round2(num(inv.taxable_value));
   if (!taxable && num(inv.subtotal) > 0) taxable = round2(num(inv.subtotal) - num(inv.discount_amount));
   const cgst = round2(num(inv.cgst_amount));
@@ -145,12 +178,15 @@ export function invoiceAmounts(inv: InvoiceRecord): InvoiceAmounts {
   const igst = round2(num(inv.igst_amount));
   const tax = round2(Math.max(num(inv.tax_amount), cgst + sgst + igst));
   const otherTax = round2(Math.max(0, tax - cgst - sgst - igst));
-  const charges = round2(num(inv.shipping) + num(inv.other_charges));
+  const chargesTaxed = chargesAreTaxed(source);
+  const charges = chargesTaxed
+    ? round2(Math.max(num(inv.shipping), 0) + num(inv.other_charges))
+    : round2(num(inv.shipping) + num(inv.other_charges));
   const cess = round2(num(inv.cess_amount));
   const tcs = round2(num(inv.tcs_amount));
-  const parts = round2(taxable + tax + charges + cess + tcs);
+  const parts = round2(taxable + tax + (chargesTaxed ? 0 : charges) + cess + tcs);
   const total = round2(num(inv.total) !== 0 ? num(inv.total) : parts + num(inv.round_off));
-  return { taxable, cgst, sgst, igst, otherTax, tax, charges, cess, tcs, total, roundOff: round2(total - parts) };
+  return { taxable, cgst, sgst, igst, otherTax, tax, charges, chargesTaxed, cess, tcs, total, roundOff: round2(total - parts), rcmTax };
 }
 
 export function invoiceStateCode(inv: InvoiceRecord): string {
@@ -209,11 +245,27 @@ export interface NormalPurchase {
   igst: number;
   tax: number;
   total: number;
+  /** total − taxable − tax − cess (7O: cess no longer lands here). Signed. */
   roundOff: number;
+  /** Additive (7O, 7.90): compensation cess on the bill (`cess_amount`), outside `tax`; 0 when none. */
+  cess: number;
+  /** Additive (7O): the part of `cess` we pay ourselves (reverse charge → RCM payable; imported goods → customs). */
+  selfCess: number;
   status: string;
   notes: string;
   /** Additive: false when the GST on this bill is NOT claimed as input credit. */
   itcEligible: boolean;
+  /**
+   * Additive: GST inside `total` that WE pay to the government (reverse charge / import of services
+   * → 'RCM'; IGST on imported goods paid at customs → 'CUSTOMS'). Never owed to the supplier.
+   */
+  selfTax: number;
+  selfTaxKind: '' | 'RCM' | 'CUSTOMS';
+  /** Additive: what the supplier is owed — total − selfTax − TDS deducted on booking (`supplierPayable`). */
+  payable: number;
+  /** Additive (Tally parity): TDS deducted on booking the bill, and its section code ('' = none). */
+  tds: number;
+  tdsSection: string;
 }
 
 type Rec = Record<string, unknown>;
@@ -226,6 +278,9 @@ export function normalizePurchase(raw: unknown, vendors: unknown[] = []): Normal
   const c = readPurchase(r, vendors);
   const date = c?.date || isoDate(r.created_at);
   if (!c || !date || !c.partyName || !c.total) return null;
+  // A legacy row with only a lump tax: split it like GST reports do (the bill's place of supply
+  // stands for the buyer's state), so Tally / registers never post it all as IGST.
+  const heads = splitLumpTax(c, r, c.placeOfSupply);
   return {
     id: c.id,
     number: c.number,
@@ -237,16 +292,23 @@ export function normalizePurchase(raw: unknown, vendors: unknown[] = []): Normal
       gstin: c.partyGstin,
       name: '',
     }),
-    taxable: c.taxable,
-    cgst: c.cgst,
-    sgst: c.sgst,
-    igst: c.igst,
-    tax: c.tax,
+    taxable: heads.taxable,
+    cgst: heads.cgst,
+    sgst: heads.sgst,
+    igst: heads.igst,
+    tax: heads.tax,
     total: c.total,
-    roundOff: c.roundOff,
+    roundOff: round2(c.total - heads.taxable - heads.tax - c.cess),
+    cess: c.cess,
+    selfCess: selfAssessedCessOf(c),
     status: clean(r.status),
     notes: c.notes,
     itcEligible: c.itcEligible,
+    selfTax: selfAssessedTaxOf(c),
+    selfTaxKind: selfAssessedTaxOf(c) + selfAssessedCessOf(c) > 0 ? (c.importType === 'GOODS' ? 'CUSTOMS' : 'RCM') : '',
+    payable: supplierPayableOf(c),
+    tds: c.tdsOnBill,
+    tdsSection: c.tdsSection,
   };
 }
 

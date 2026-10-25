@@ -7,6 +7,8 @@ import type { Payment } from '../../types/invoice';
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { recordReceiptFromLine } from './actions';
+import { useT } from '../../i18n';
+import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import styles from './reconcile.module.css';
 
@@ -25,13 +27,14 @@ export interface CreateReceiptModalProps {
  * time until nothing is left.
  */
 export function CreateReceiptModal({ line, onClose, onChanged, onSettled }: CreateReceiptModalProps) {
+  useT(); // re-render on a language switch (5.4)
   return (
     <Modal
       open={!!line}
       onClose={onClose}
       size="lg"
-      title="Create receipt from this credit"
-      subtitle="Records a payment received on the bank date, with the UTR / reference found in the narration."
+      title={bankT('receiptTitle')}
+      subtitle={bankT('receiptSub')}
     >
       {line && <Body key={line.id} line={line} onClose={onClose} onChanged={onChanged} onSettled={onSettled} />}
     </Modal>
@@ -88,7 +91,7 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateReceiptModalPr
         setAmount(0);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not record the receipt.');
+      setError(err instanceof Error ? err.message : bankT('errReceipt'));
     }
   };
 
@@ -97,24 +100,24 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateReceiptModalPr
       <div className={styles.lineBrief}>
         <strong className={styles.amt}>+₹{formatMoney(line.credit)} · {formatDate(line.date)} · {inferMode(line.narration)}</strong>
         <span className={styles.muted}>{line.narration}</span>
-        <span className={styles.muted}>Reference to record: <strong>{referenceFor(line) || '—'}</strong></span>
+        <span className={styles.muted}>{bankT('refToRecord')} <strong>{referenceFor(line) || '—'}</strong></span>
       </div>
 
       {created.length > 0 && (
         <div className={styles.notice} role="status">
-          Recorded {created.length} receipt{created.length === 1 ? '' : 's'} (₹{formatMoney(paid)}). <strong>₹{formatMoney(remaining)} of this credit is still unallocated</strong> — pick the next invoice.
+          {bankT('recordedProgress', { n: created.length, amount: `₹${formatMoney(paid)}` })} <strong>{bankT('unallocated', { amount: `₹${formatMoney(remaining)}` })}</strong> {bankT('pickNext')}
         </div>
       )}
 
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="rc-q">{query ? 'Search results' : 'Likely invoices'} — or search all open invoices</label>
-        <input id="rc-q" className={controls.input} placeholder="Invoice no. or customer…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <label className={controls.label} htmlFor="rc-q">{query ? bankT('searchResults') : bankT('likelyInvoices')} {bankT('orSearchAll')}</label>
+        <input id="rc-q" className={controls.input} placeholder={bankT('receiptSearchPh')} value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
 
       {candidates.length === 0 ? (
-        <p className={styles.muted}>No open invoice looks like this credit. Search by invoice number or customer name.</p>
+        <p className={styles.muted}>{bankT('noOpenInvoice')}</p>
       ) : (
-        <ul className={styles.pickList} aria-label="Open invoices">
+        <ul className={styles.pickList} aria-label={bankT('openInvoices')}>
           {candidates.map((inv) => (
             <li key={inv.id}>
               <label className={styles.pickItem}>
@@ -122,9 +125,9 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateReceiptModalPr
                 <span className={styles.pickBody}>
                   <span className={styles.pickTitle}>{inv.invoice_number} · {inv.client?.company || inv.client?.name}</span>
                   <br />
-                  <span className={styles.pickSub}>Issued {formatDate(inv.issue_date)} · total ₹{formatMoney(inv.total)}</span>
+                  <span className={styles.pickSub}>{bankT('issuedTotal', { date: formatDate(inv.issue_date), amount: `₹${formatMoney(inv.total)}` })}</span>
                 </span>
-                <span className={styles.amt}>₹{formatMoney(openBalance(inv))} due</span>
+                <span className={styles.amt}>{bankT('dueN', { amount: `₹${formatMoney(openBalance(inv))}` })}</span>
               </label>
             </li>
           ))}
@@ -133,10 +136,10 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateReceiptModalPr
 
       {selected && (
         <div className={controls.field} style={{ maxWidth: 260 }}>
-          <label className={controls.label} htmlFor="rc-amt">Amount to record</label>
+          <label className={controls.label} htmlFor="rc-amt">{bankT('amountToRecord')}</label>
           <NumberInput id="rc-amt" className={`${controls.input} ${controls.inputNumeric}`} value={amount} onChange={setAmount} />
           <span className={controls.hint}>
-            Balance ₹{formatMoney(balance)}. {reasons.length ? reasons.join(' · ') : ''}
+            {bankT('balanceN', { amount: `₹${formatMoney(balance)}` })} {reasons.length ? reasons.join(' · ') : ''}
           </span>
         </div>
       )}
@@ -144,9 +147,9 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateReceiptModalPr
       {error && <div className={controls.error} role="alert">{error}</div>}
 
       <div className={styles.toolbarGroup} style={{ justifyContent: 'flex-end' }}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>{created.length ? 'Done for now' : 'Cancel'}</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{created.length ? bankT('doneForNow') : bankT('cancel')}</button>
         <button type="button" className={controls.btnPrimary} disabled={!selected || !(amount > 0)} onClick={submit}>
-          Record receipt
+          {bankT('recordReceipt')}
         </button>
       </div>
     </div>

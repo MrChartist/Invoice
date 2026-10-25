@@ -1,26 +1,42 @@
-import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
+import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
+import { pick } from '../store/pick';
+import { useShallow } from 'zustand/react/shallow';
 import { PageHeader } from '../components/ui/PageHeader';
-import { StatusBadge } from '../components/ui/StatusBadge';
 import { useToast } from '../components/ui/useToast';
+import { useHsnDefaultRate } from '../hooks/useHsnDefaultRate';
 import { ItemsTable } from '../components/creator/ItemsTable';
+import { ScanBar } from '../components/creator/ScanBar';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
 import { AdvancedTaxPanel } from '../components/creator/AdvancedTaxPanel';
 import { StockWarnings } from '../components/creator/StockWarnings';
+import { CreditWarning } from '../components/creator/CreditWarning';
 import { PartiesSection } from '../components/creator/PartiesSection';
 import { TemplatePicker } from '../components/creator/TemplatePicker';
-import { isSaveShortcut } from '../components/creator/line-keys';
+import { CreatorHeader } from '../components/creator/CreatorHeader';
+import { DocumentMetaCard } from '../components/creator/DocumentMetaCard';
+import { SupplyNotice } from '../components/creator/SupplyNotice';
+import { GstExtrasFields } from '../components/creator/GstExtrasFields';
+import { MobileSaveBar } from '../components/creator/MobileSaveBar';
+import { CustomFieldsCard } from '../components/creator/CustomFieldsCard';
+import { AttachmentsPanel } from '../components/attachments/AttachmentsPanel';
+import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKeys';
+import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
-import { ClientSearchModal } from '../components/modals/ClientSearchModal';
-import { ItemSearchModal } from '../components/modals/ItemSearchModal';
 import { localDb } from '../lib/localDb';
+import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
+import { editorStockContext, liveDocTrackingIssues } from '../lib/stock-tracking';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { getJson, SINGLETON_KEYS } from '../lib/storage';
-import { STATUS_OPTIONS } from '../lib/invoice-status';
-import { addDaysInput, CURRENCIES, formatCurrency, cn } from '../lib/utils';
-import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord, type InvoiceStatus } from '../types/invoice';
+import { cn } from '../lib/utils';
+import { num } from '../lib/invoice-calc';
+import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord } from '../types/invoice';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
+import { docLabel } from '../i18n/labels';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
@@ -34,20 +50,30 @@ const DocumentActions = lazy(() =>
   import('../components/creator/DocumentActions').then((m) => ({ default: m.DocumentActions })),
 );
 
+// Unadjusted advances of the client (5.3): the advances maths stays out of the editor chunk.
+// WP-9 maker-checker: banner for a document pending / rejected approval (chunk loads only then).
+const ApprovalBanner = lazy(() => import('../components/approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalBanner })));
+const AdvanceNotice = lazy(() => import('../components/creator/AdvanceNotice').then((m) => ({ default: m.AdvanceNotice })));
+
+// The pickers start closed: they load right after the editor renders, off the first-paint path.
+const ClientSearchModal = lazy(() => import('../components/modals/ClientSearchModal').then((m) => ({ default: m.ClientSearchModal })));
+const ItemSearchModal = lazy(() => import('../components/modals/ItemSearchModal').then((m) => ({ default: m.ItemSearchModal })));
+
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
   import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
 );
-
-const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
-const DUE_PRESETS = [0, 7, 15, 30, 45];
 
 export function InvoiceCreator() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
-  const s = useInvoiceStore();
+  useHsnDefaultRate(); // WP-6: HSN master rate on lines whose HSN is typed
+  const { t, lang } = useT();
+  const s = useInvoiceStore(
+    useShallow((st) => pick(st, ['approval', 'attachments', 'currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'patch', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),
+  );
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
@@ -58,14 +84,12 @@ export function InvoiceCreator() {
   const [saveTick, setSaveTick] = useState(0);
   const [lockTick, setLockTick] = useState(0);
   const [savedToast, setSavedToast] = useState<{ message: string; gapHint: string } | null>(null);
+  // Selling an expired batch is blocked until the user confirms it (6.6).
+  const [expiredAsk, setExpiredAsk] = useState<{ andNew: boolean; lines: string[] } | null>(null);
 
   const profiles = useMemo(() => localDb.settings.get().profiles.filter((p) => p.companyName.trim()), []);
   const editing = Boolean(s.id);
-  const nextNumber = useMemo(
-    () => (s.invoice_number ? '' : localDb.invoices.nextNumber(s.issue_date, s.doc_type, s.sender?.invoicePrefix || undefined)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [s.invoice_number, s.issue_date, s.doc_type, s.sender?.invoicePrefix, s.id],
-  );
+  const openPreview = useCallback(() => setPreviewOpen(true), []);
 
   // The stored copy decides whether the document is frozen (the edited date must not unlock itself).
   const stored = useMemo(
@@ -76,15 +100,6 @@ export function InvoiceCreator() {
   const storedLock = stored ? lockState(stored) : 'open';
   const readOnly = storedLock === 'locked';
   const dateLocked = storedLock === 'open' && lockState({ id: s.id, issue_date: s.issue_date }) === 'locked';
-
-  // GST Rule 46: live uniqueness check of a hand-typed number (deferred so typing stays snappy).
-  const typedNumber = useDeferredValue(s.invoice_number);
-  const numberCheck = useMemo(
-    () => (typedNumber.trim() ? localDb.invoices.checkNumber(typedNumber, s.id || undefined) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [typedNumber, s.id, saveTick],
-  );
-  const numberTaken = numberCheck && !numberCheck.ok ? numberCheck.clash : undefined;
 
   // Decide what the editor shows when the route changes.
   useEffect(() => {
@@ -110,23 +125,53 @@ export function InvoiceCreator() {
   // Keep the sender snapshot populated for brand-new documents.
   useEffect(() => {
     const store = useInvoiceStore.getState();
-    if (!store.sender && profiles.length) store.setSender(localDb.settings.activeProfile() ?? profiles[0]);
+    if (!store.sender && profiles.length) store.setSender(issuingProfile(profiles, localDb.settings.activeProfile()) ?? profiles[0]);
   }, [profiles, id]);
 
   const save = useCallback(
-    (asDraft = false, andNew = false) => {
+    (asDraft = false, andNew = false, expiredOk = false) => {
+      // Batch / serial / godown checks (6.6 / 6.10 / 6.11) — only when issuing; drafts never move stock.
+      if (!asDraft) {
+        const st = useInvoiceStore.getState();
+        const ctx = editorStockContext({ id: st.id, doc_type: st.doc_type, issue_date: st.issue_date });
+        if (ctx?.multi) {
+          for (const it of st.items) {
+            if (!it.godown_id && it.name.trim() && ctx.find(it.name, it.hsn)) st.patchItem(it.id, { godown_id: ctx.defaultGodown });
+          }
+        }
+        if (ctx) {
+          const now = useInvoiceStore.getState();
+          const issues = liveDocTrackingIssues({
+            id: now.id || undefined,
+            doc_type: now.doc_type,
+            status: now.status === 'Draft' ? 'Sent' : now.status,
+            issue_date: now.issue_date,
+            items: now.items.filter((i) => i.name.trim() || num(i.rate) > 0),
+          });
+          if (issues.errors.length) {
+            setErrors(issues.errors);
+            window.scrollTo?.({ top: 0 });
+            notify(issues.errors[0], 'error');
+            return;
+          }
+          if (issues.expired.length && !expiredOk) {
+            setExpiredAsk({ andNew, lines: issues.expired });
+            return;
+          }
+        }
+      }
       const result = useInvoiceStore.getState().saveInvoice({ asDraft });
       if (!result.ok) {
         setErrors(result.errors);
         if (result.locked) setLockTick((t) => t + 1);
         window.scrollTo?.({ top: 0 });
-        notify(result.errors[0] ?? 'Could not save.', 'error');
+        notify(result.errors[0] ?? t('editor.couldNotSave'), 'error');
         return;
       }
       setErrors([]);
       setSaveTick((t) => t + 1);
       const rec = result.record!;
-      const message = `${DOCUMENT_LABELS[rec.doc_type]} ${rec.invoice_number} saved`;
+      const message = t('editor.savedMsg', { doc: docLabel(rec.doc_type), number: rec.invoice_number });
       if (andNew) {
         // Save & new: straight to a clean form of the same type.
         useInvoiceStore.getState().newDraft(rec.doc_type);
@@ -136,72 +181,25 @@ export function InvoiceCreator() {
         return;
       }
       const gap = result.gap;
+      const gapList = gap ? gap.missingNumbers.slice(0, 3).join(', ') : '';
       const gapHint = gap
-        ? `Series gap: ${gap.missingNumbers.slice(0, 3).join(', ')}${gap.missingCount > 3 ? ` and ${gap.missingCount - 3} more` : ''} left unused.`
+        ? t('editor.seriesGap', { numbers: gap.missingCount > 3 ? t('editor.andMore', { list: gapList, n: gap.missingCount - 3 }) : gapList })
         : '';
       setSavedToast({ message, gapHint });
       if (!id) navigate(`/invoice/${rec.id}`, { replace: true });
     },
-    [id, navigate, notify],
+    [id, navigate, notify, lang],
   );
 
-  // Ctrl/⌘+S saves, Ctrl/⌘+P previews.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      const key = e.key.toLowerCase();
-      if (isSaveShortcut(e)) {
-        e.preventDefault();
-        save();
-      } else if (key === 's') {
-        e.preventDefault();
-        save();
-      } else if (key === 'p') {
-        e.preventDefault();
-        setPreviewOpen(true);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [save]);
-
   // Warn before a refresh/tab close would drop edits to a saved document (new documents autosave as drafts).
-  useEffect(() => {
-    if (!(s.dirty && s.id)) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [s.dirty, s.id]);
-
-  // Lift toasts above the fixed mobile save bar so they never cover Save.
-  useEffect(() => {
-    const mq = window.matchMedia?.('(max-width: 900px)');
-    if (!mq) return;
-    const apply = () => document.documentElement.style.setProperty('--bottom-bar-h', mq.matches ? '4.25rem' : '0px');
-    apply();
-    mq.addEventListener('change', apply);
-    return () => {
-      mq.removeEventListener('change', apply);
-      document.documentElement.style.removeProperty('--bottom-bar-h');
-    };
-  }, []);
+  useUnsavedChangesWarning(Boolean(s.dirty && s.id));
+  useBottomBarInset();
 
   // Easy exit: drafts autosave, so leaving never loses work. Esc closes when no field or dialog is active.
   const exitCreator = useCallback(() => navigate(id ? '/transactions' : '/'), [id, navigate]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.closest('input, textarea, select, [contenteditable]') || t.closest('[role="dialog"]'))) return;
-      if (document.querySelector('[role="dialog"]')) return;
-      exitCreator();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [exitCreator]);
+  const saveIssued = useCallback(() => save(), [save]);
+  // Ctrl/⌘+S saves, Ctrl/⌘+P previews, Esc leaves.
+  useCreatorKeys({ onSave: saveIssued, onPreview: openPreview, onExit: exitCreator });
 
   const startNew = (docType?: DocumentType) => {
     useInvoiceStore.getState().newDraft(docType);
@@ -213,61 +211,41 @@ export function InvoiceCreator() {
   if (missing) {
     return (
       <div className={surface.page}>
-        <PageHeader title="Document not found" subtitle="It may have been deleted, or it lives in another browser." />
+        <PageHeader title={t('editor.notFound')} subtitle={t('editor.notFoundSub')} />
         <button type="button" className={cn(controls.btnPrimary)} style={{ alignSelf: 'flex-start' }} onClick={() => navigate('/transactions')}>
-          Back to invoices
+          {t('editor.backToInvoices')}
         </button>
       </div>
     );
   }
 
-  const label = DOCUMENT_LABELS[s.doc_type];
+  const label = docLabel(s.doc_type);
 
   return (
     <div className={cn(surface.page, styles.page)}>
-      <PageHeader
-        title={
-          <>
-            {editing ? `Edit ${label.toLowerCase()}` : `New ${label.toLowerCase()}`}
-            {s.invoice_number && <span className={styles.number}>{s.invoice_number}</span>}
-            {editing && <StatusBadge status={s.status} />}
-          </>
-        }
-        subtitle={s.dirty ? 'Unsaved changes — autosaved as a draft on this device' : editing ? 'All changes saved' : 'Fill in the details, then save.'}
-        actions={
-          <>
-            {editing && (
-              <button type="button" className={controls.btnOutline} onClick={() => startNew()}>
-                <FilePlus2 size={16} /> New
-              </button>
-            )}
-            <button type="button" className={controls.btnOutline} onClick={() => setPreviewOpen(true)}>
-              <Eye size={16} /> Preview
-            </button>
-            {!editing && (
-              <button type="button" className={controls.btnOutline} onClick={() => save(true)} disabled={readOnly}>
-                Save draft
-              </button>
-            )}
-            <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly} title={readOnly ? 'Locked — unlock with your PIN to edit' : 'Save (Ctrl+S)'}>
-              <Save size={16} /> Save
-            </button>
-            <button type="button" className={controls.btnOutline} onClick={exitCreator} title="Close (Esc) — drafts are kept" aria-label="Close">
-              <X size={16} /> Close
-            </button>
-          </>
-        }
+      <CreatorHeader
+        label={label}
+        editing={editing}
+        invoiceNumber={s.invoice_number}
+        status={s.status}
+        dirty={s.dirty}
+        readOnly={readOnly}
+        onNew={() => startNew()}
+        onPreview={openPreview}
+        onSaveDraft={() => save(true)}
+        onSave={() => save()}
+        onClose={exitCreator}
       />
 
       {hasDraft && (
         <div className={styles.banner} role="status">
           <History size={16} />
-          <span>You have an unsaved draft from earlier.</span>
+          <span>{t('editor.draftBanner')}</span>
           <button type="button" className={controls.btnOutline + ' ' + controls.btnSm} onClick={() => { useInvoiceStore.getState().restoreDraft(); setHasDraft(false); }}>
-            Restore draft
+            {t('editor.restoreDraft')}
           </button>
           <button type="button" className={controls.btnGhost + ' ' + controls.btnSm} onClick={() => { startNew(); }}>
-            Discard
+            {t('common.discard')}
           </button>
         </div>
       )}
@@ -282,17 +260,23 @@ export function InvoiceCreator() {
         </Suspense>
       ) : null}
 
+      {s.approval && s.approval.state !== 'approved' && (
+        <Suspense fallback={null}>
+          <ApprovalBanner approval={s.approval} />
+        </Suspense>
+      )}
+
       {errors.length > 0 && (
         <div className={styles.errors} role="alert">
           <div>
-            <strong>Fix these before saving</strong>
+            <strong>{t('editor.fixErrors')}</strong>
             <ul>
               {errors.map((e) => (
                 <li key={e}>{e}</li>
               ))}
             </ul>
           </div>
-          <button type="button" className={controls.btnIcon} onClick={() => setErrors([])} aria-label="Dismiss">
+          <button type="button" className={controls.btnIcon} onClick={() => setErrors([])} aria-label={t('common.dismiss')}>
             <X size={16} />
           </button>
         </div>
@@ -300,154 +284,84 @@ export function InvoiceCreator() {
 
       <div className={styles.layout}>
         <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
-          <legend className={surface.srOnly}>{readOnly ? 'Document (locked, read-only)' : 'Document'}</legend>
-          <section className={surface.card}>
-            <div className={surface.cardHead}>1 · Document</div>
-            <div className={surface.cardBody}>
-              <div className={controls.row3}>
-                <label className={controls.field}>
-                  <span className={controls.label}>Type</span>
-                  <select className={controls.select} value={s.doc_type} onChange={(e) => s.setDocType(e.target.value as DocumentType)} disabled={editing && Boolean(s.invoice_number)}>
-                    {DOC_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {DOCUMENT_LABELS[t]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={controls.field}>
-                  <span className={controls.label}>Number</span>
-                  <input
-                    className={`${controls.input} ${controls.inputMono}`}
-                    style={{ textTransform: 'none' }}
-                    value={s.invoice_number}
-                    onChange={(e) => s.setInvoiceNumber(e.target.value)}
-                    placeholder={nextNumber || 'Auto'}
-                    aria-invalid={numberTaken ? true : undefined}
-                    aria-describedby="number-hint"
-                  />
-                  <span id="number-hint" aria-live="polite">
-                    {numberTaken ? (
-                      <span className={cn(styles.numberHint, styles.numberBad)}>
-                        <AlertTriangle size={13} aria-hidden="true" />
-                        <span>
-                          Already used by {numberTaken.invoice_number}
-                          {numberTaken.client?.name ? ` (${numberTaken.client.name})` : ''}. Every document needs its own number (GST Rule 46).
-                        </span>
-                      </span>
-                    ) : numberCheck?.gap ? (
-                      <span className={cn(styles.numberHint, styles.numberGap)}>
-                        <AlertTriangle size={13} aria-hidden="true" />
-                        <span>
-                          This skips {numberCheck.gap.missingNumbers.slice(0, 3).join(', ')}
-                          {numberCheck.gap.missingCount > 3 ? ` and ${numberCheck.gap.missingCount - 3} more` : ''}. Allowed, but a gap in the series may need explaining at filing.
-                        </span>
-                      </span>
-                    ) : !editing ? (
-                      <span className={controls.hint}>Leave blank to number automatically.</span>
-                    ) : null}
-                  </span>
-                </label>
-                <label className={controls.field}>
-                  <span className={controls.label}>PO / reference no.</span>
-                  <input className={controls.input} value={s.po_number ?? ''} onChange={(e) => s.patch({ po_number: e.target.value })} placeholder="Optional" />
-                </label>
-              </div>
-              <div className={controls.row3}>
-                <label className={controls.field}>
-                  <span className={controls.label}>Issue date</span>
-                  <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, s.due_date)} />
-                </label>
-                <div className={controls.field}>
-                  <label className={controls.label} htmlFor="due-date">Due date</label>
-                  <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
-                  <div className={styles.chips}>
-                    {DUE_PRESETS.map((d) => (
-                      <button key={d} type="button" aria-label={d === 0 ? 'Due on receipt' : `Due in ${d} days`} className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>
-                        {d === 0 ? 'Now' : `${d}d`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className={styles.pair}>
-                  <label className={controls.field}>
-                    <span className={controls.label}>Currency</span>
-                    <select className={controls.select} value={s.currency} onChange={(e) => s.setCurrency(e.target.value)}>
-                      {CURRENCIES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.symbol} {c.code}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={controls.field}>
-                    <span className={controls.label}>Status</span>
-                    <select className={controls.select} value={s.status === 'Overdue' ? 'Sent' : s.status} onChange={(e) => s.setStatus(e.target.value as InvoiceStatus)}>
-                      {STATUS_OPTIONS.map((o) => (
-                        <option key={o}>{o}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
-              <label className={controls.check}>
-                <input type="checkbox" checked={s.reverse_charge} onChange={(e) => s.setReverseCharge(e.target.checked)} />
-                Tax is payable on reverse charge
-              </label>
-            </div>
-          </section>
+          <legend className={surface.srOnly}>{readOnly ? t('editor.docLegendLocked') : t('editor.docLegend')}</legend>
+          <DocumentMetaCard editing={editing} saveTick={saveTick} />
+          <SupplyNotice />
+          <GstExtrasFields />
 
           <section className={surface.card}>
-            <div className={surface.cardHead}>2 · Parties</div>
+            <div className={surface.cardHead}>{t('editor.parties')}</div>
             <div className={surface.cardBody}>
               <PartiesSection profiles={profiles} onSearchClients={() => setClientsOpen(true)} />
             </div>
+            <CreditWarning />
+            <Suspense fallback={null}>
+              <AdvanceNotice onApplied={(m) => notify(m)} />
+            </Suspense>
           </section>
 
           <section className={surface.card}>
             <div className={surface.cardHead}>
-              <span>3 · Items</span>
+              <span>{t('editor.items')}</span>
               <span className={styles.muted}>
-                {s.items.filter((i) => i.name.trim() || i.rate > 0).length} line{s.items.length === 1 ? '' : 's'}
+                {(() => {
+                  const n = s.items.filter((i) => i.name.trim() || i.rate > 0).length;
+                  return n === 1 ? t('editor.linesOne') : t('editor.linesMany', { n });
+                })()}
               </span>
             </div>
+            <ScanBar disabled={readOnly} />
             <ItemsTable onPickCatalog={setItemTarget} />
             <StockWarnings />
           </section>
 
           <section className={surface.card}>
-            <div className={surface.cardHead}>4 · Notes &amp; terms</div>
+            <div className={surface.cardHead}>{t('editor.notesTerms')}</div>
             <div className={surface.cardBody}>
               <label className={controls.field}>
-                <span className={controls.label}>Note to client</span>
-                <textarea className={controls.textarea} rows={2} value={s.notes} onChange={(e) => s.setNotes(e.target.value)} placeholder="Thank you for your business." />
+                <span className={controls.label}>{t('editor.noteToClient')}</span>
+                <textarea className={controls.textarea} rows={2} value={s.notes} onChange={(e) => s.setNotes(e.target.value)} placeholder={t('editor.notePlaceholder')} />
               </label>
               <label className={controls.field}>
-                <span className={controls.label}>Terms &amp; conditions</span>
+                <span className={controls.label}>{t('editor.terms')}</span>
                 <textarea className={controls.textarea} rows={3} value={s.terms} onChange={(e) => s.setTerms(e.target.value)} />
               </label>
+            </div>
+          </section>
+
+          <CustomFieldsCard />
+
+          <section className={surface.card}>
+            <div className={surface.cardHead}>{t('editor.attachments')}</div>
+            <div className={surface.cardBody}>
+              <AttachmentsPanel
+                value={s.attachments}
+                onChange={(next) => s.patch({ attachments: next.length ? next : undefined })}
+                label={t('editor.attachmentsLabel')}
+                hint={t('editor.attachmentsHint')}
+              />
             </div>
           </section>
         </fieldset>
 
         <aside className={styles.side}>
           <section className={surface.card}>
-            <div className={surface.cardHead}>Summary</div>
+            <div className={surface.cardHead}>{t('editor.summary')}</div>
             <div className={surface.cardBody}>
               <fieldset className={cn(styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
-                <legend className={surface.srOnly}>Summary and tax</legend>
+                <legend className={surface.srOnly}>{t('editor.summaryLegend')}</legend>
                 <SummaryPanel />
                 <AdvancedTaxPanel />
               </fieldset>
               <div className={styles.sideActions}>
                 <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()} disabled={readOnly}>
-                  <Save size={18} /> Save {label.toLowerCase()}
+                  <Save size={18} /> {t('editor.saveDoc', { doc: lang === 'en' ? label.toLowerCase() : label })}
                 </button>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => save(false, true)} disabled={readOnly}>
-                  <FilePlus2 size={16} /> Save &amp; new
+                  <FilePlus2 size={16} /> {t('editor.saveNew')}
                 </button>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => setPreviewOpen(true)}>
-                  <Eye size={16} /> Preview &amp; download PDF
+                  <Eye size={16} /> {t('editor.previewPdf')}
                 </button>
               </div>
             </div>
@@ -455,9 +369,9 @@ export function InvoiceCreator() {
 
           {editing && s.id && (
             <section className={surface.card}>
-              <div className={surface.cardHead}>Document actions</div>
+              <div className={surface.cardHead}>{t('editor.docActions')}</div>
               <div className={surface.cardBody}>
-                <Suspense fallback={<p className={styles.muted}>Loading…</p>}>
+                <Suspense fallback={<p className={styles.muted}>{t('common.loading')}</p>}>
                   <DocumentActions invoiceId={s.id} refreshKey={saveTick + lockTick} onChanged={() => setLockTick((t) => t + 1)} />
                 </Suspense>
               </div>
@@ -467,10 +381,10 @@ export function InvoiceCreator() {
           <section className={surface.card}>
             <div className={surface.cardHead}>
               <span className={surface.cardHeadIcon}>
-                <Palette size={16} /> Template
+                <Palette size={16} /> {t('editor.template')}
               </span>
               <Link to="/design" className={styles.muted} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
-                Customise
+                {t('editor.customise')}
               </Link>
             </div>
             <div className={surface.cardBody}>
@@ -480,27 +394,32 @@ export function InvoiceCreator() {
         </aside>
       </div>
 
-      <div className={cn(styles.mobileBar, 'no-print')}>
-        <div>
-          <span>Total</span>
-          <strong>{formatCurrency(s.total, s.currency)}</strong>
-        </div>
-        <button type="button" className={controls.btnOutline} onClick={() => setPreviewOpen(true)} aria-label="Preview">
-          <Eye size={16} />
-        </button>
-        <button type="button" className={controls.btnPrimary} onClick={() => save()} disabled={readOnly}>
-          <Save size={16} /> Save
-        </button>
-      </div>
+      <MobileSaveBar total={s.total} currency={s.currency} readOnly={readOnly} onPreview={openPreview} onSave={() => save()} />
 
       {previewOpen && (
         <Suspense fallback={null}>
           <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
         </Suspense>
       )}
-      <ClientSearchModal isOpen={clientsOpen} onClose={() => setClientsOpen(false)} />
-      <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
+      <Suspense fallback={null}>
+        <ClientSearchModal isOpen={clientsOpen} onClose={() => setClientsOpen(false)} />
+        <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
+      </Suspense>
       {toastNode}
+      <ConfirmDialog
+        open={!!expiredAsk}
+        destructive
+        title={t('editor.expiredTitle')}
+        message={t('editor.expiredMsg', { lines: expiredAsk?.lines.join(' ') ?? '' })}
+        confirmLabel={t('editor.sellAnyway')}
+        cancelLabel={t('editor.pickAnother')}
+        onClose={() => setExpiredAsk(null)}
+        onConfirm={() => {
+          const ask = expiredAsk;
+          setExpiredAsk(null);
+          if (ask) save(false, ask.andNew, true);
+        }}
+      />
       {savedToast && (
         <Suspense fallback={null}>
         <SavedToast

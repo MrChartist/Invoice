@@ -10,9 +10,11 @@
  */
 
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
-import { calcInputFromRecord, calculateInvoice, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, round2, type CalcLine } from './invoice-calc';
+import { docCurrency, inrTotals, missingFxRate } from './fx';
 import { stateByCode, stateByName } from './india-states';
 import { getTable, setTable } from './storage';
+import { uqcFor, type UnitMaster } from './units';
 
 /* ── Shared issue type (used by both validators) ───────────────── */
 
@@ -99,6 +101,55 @@ export interface EInvExpDtls {
   CntCode?: string;
 }
 
+/** Additive (WP-6): consignee when goods go somewhere other than the buyer's address (from `invoice.ship_to`). */
+export interface EInvShipDtls {
+  Gstin?: string;
+  LglNm: string;
+  TrdNm?: string;
+  Addr1: string;
+  Addr2?: string;
+  Loc: string;
+  Pin: number;
+  Stcd: string;
+}
+
+/** Additive (WP-6): dispatch-from address when goods leave from somewhere other than the seller's address. */
+export interface EInvDispDtls {
+  Nm: string;
+  Addr1: string;
+  Addr2?: string;
+  Loc: string;
+  Pin: number;
+  Stcd: string;
+}
+
+/** Additive (WP-6): payee / payment terms (from the sender's bank details and the due date). */
+export interface EInvPayDtls {
+  Nm?: string;
+  AccDet?: string;
+  Mode?: string;
+  FinInsBr?: string;
+  PayTerm?: string;
+  PayInstr?: string;
+  CrTrn?: string;
+  DirDr?: string;
+  CrDay?: number;
+  PaidAmt?: number;
+  PaymtDue?: number;
+}
+
+/** Additive (WP-6): Part-B e-Way details generated with the IRN (from `invoice.transport`). */
+export interface EInvEwbDtls {
+  TransId?: string;
+  TransName?: string;
+  TransMode?: '1' | '2' | '3' | '4';
+  Distance: number;
+  TransDocNo?: string;
+  TransDocDt?: string;
+  VehNo?: string;
+  VehType?: 'R' | 'O';
+}
+
 export interface EInvoicePayload {
   Version: '1.1';
   TranDtls: {
@@ -114,6 +165,10 @@ export interface EInvoicePayload {
   ValDtls: EInvValDtls;
   PrecDocDtls?: { InvNo: string; InvDt: string }[];
   ExpDtls?: EInvExpDtls;
+  DispDtls?: EInvDispDtls;
+  ShipDtls?: EInvShipDtls;
+  PayDtls?: EInvPayDtls;
+  EwbDtls?: EInvEwbDtls;
 }
 
 export interface EInvoiceOptions {
@@ -130,6 +185,14 @@ export interface EInvoiceOptions {
   preceding?: { no: string; date: string }[];
   /** Export extras. `date` is yyyy-mm-dd. */
   export?: { shipBillNo?: string; shipBillDate?: string; portCode?: string; countryCode?: string; refundClaim?: boolean };
+  /** Additive (WP-6): dispatch-from address (godown / branch) when it is not the seller's address. */
+  dispatch?: { name?: string; address?: string; city?: string; pin?: string | number; state_code?: string };
+  /** Additive (WP-6): leave out PayDtls (default: included when the sender has bank details). */
+  withPayment?: boolean;
+  /** Additive (WP-6): leave out EwbDtls (default: included when `invoice.transport` names a vehicle, transporter or LR). */
+  withEwb?: boolean;
+  /** Additive (WP-8): the units master (`unitsDb.stored()`): a unit with its own UQC is sent as that UQC. */
+  units?: readonly UnitMaster[];
 }
 
 export interface EInvoiceBuild {
@@ -159,6 +222,15 @@ const UNIT_MAP: Record<string, string> = {
   HRS: 'OTH', HR: 'OTH', DAY: 'OTH', DAYS: 'OTH', MONTH: 'OTH', LOT: 'OTH',
 };
 
+/**
+ * Portal UQC of a line unit (WP-8): the units master's UQC when the unit has one (and it is a portal
+ * code), else the built-in mapping (`mapUnitToUqc`).
+ */
+export function portalUqc(unit: string | undefined, units: readonly UnitMaster[] = []): string {
+  const u = uqcFor(unit, units, mapUnitToUqc);
+  return (UQC_CODES as readonly string[]).includes(u) ? u : mapUnitToUqc(unit);
+}
+
 /** Map the app's free unit text to a portal UQC (falls back to OTH). */
 export function mapUnitToUqc(unit?: string): string {
   const key = (unit ?? '').trim().toUpperCase();
@@ -167,8 +239,9 @@ export function mapUnitToUqc(unit?: string): string {
   return (UQC_CODES as readonly string[]).includes(key) ? key : 'OTH';
 }
 
-/** True when the unit text was not recognised and fell back to OTH by guesswork. */
-export function isUnitGuessed(unit?: string): boolean {
+/** True when the unit text was not recognised and fell back to OTH by guesswork (a units-master UQC is not a guess). */
+export function isUnitGuessed(unit?: string, units: readonly UnitMaster[] = []): boolean {
+  if (units.length && (UQC_CODES as readonly string[]).includes(uqcFor(unit, units, () => ''))) return false;
   const key = (unit ?? '').trim().toUpperCase();
   return !!key && !(key in UNIT_MAP) && !(UQC_CODES as readonly string[]).includes(key);
 }
@@ -285,8 +358,11 @@ export function sanitiseFileStem(s: string): string {
 
 /** The document types the IRP accepts. Quotes, proformas and challans are not e-invoiceable. */
 export function eInvoiceDocType(record: Pick<InvoiceRecord, 'doc_type'>, override?: EInvoiceDocType) {
+  // A Bill of Supply is outside e-invoicing (Rule 48(4) covers tax invoices and notes only), even with an override.
+  if (record.doc_type === 'BILL_OF_SUPPLY') return null;
   if (override) return override;
   if (record.doc_type === 'CREDIT_NOTE') return 'CRN' as const;
+  if (record.doc_type === 'DEBIT_NOTE') return 'DBN' as const;
   if (record.doc_type === 'INVOICE' || record.doc_type === 'TAX_INVOICE') return 'INV' as const;
   return null;
 }
@@ -307,7 +383,14 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   const client = record.client ?? ({} as InvoiceRecord['client']);
 
   // Full record in: supply type, tax-inclusive pricing, cess, TCS and round mode all change ValDtls.
-  const calc = calculateInvoice(calcInputFromRecord(record));
+  // The IRP takes rupees only: a foreign-currency invoice is converted at its exchange rate
+  // (ExpDtls.ForCur then names the original currency).
+  // Reverse charge (RegRev 'Y'): the schema's value totals still include the tax shown on the invoice
+  // (NIC adds AssVal + tax heads), so the recipient-pays tax is kept in TotInvVal here.
+  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record, { rcm_exclude_tax: false })), record);
+  if (missingFxRate(record)) {
+    assumptions.push(issue('error', 'FX_RATE_MISSING', 'Currency', `Amounts are in ${docCurrency(record)} but the invoice has no exchange rate. The IRP needs INR values — add the CBIC / shipping-bill rate on the invoice.`));
+  }
 
   // ── Seller ──
   const sellerGstin = clean(sender?.companyGstin).toUpperCase();
@@ -426,7 +509,7 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
       IsServc: isServiceHsn(l.hsn) ? 'Y' : 'N',
       HsnCd: l.hsn,
       Qty: Math.round(l.quantity * 1000) / 1000,
-      Unit: mapUnitToUqc(l.unit),
+      Unit: portalUqc(l.unit, options.units),
       UnitPrice: Math.round(unitPrice * 1000) / 1000,
       TotAmt: totAmt,
       Discount: discount,
@@ -441,10 +524,14 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
       TotItemVal: round2(l.taxable + l.cgst + l.sgst + l.igst + l.cess),
     };
   });
+  // Taxable freight / other charges travel as their own item (ValDtls.OthChrg is outside AssVal and
+  // carries no tax), under the principal line's HSN and rate, so AssVal and the tax totals reconcile.
+  if (calc.charges_line) items.push(chargesItem(calc.charges_line, items.length + 1, noTax));
 
   const intra = !!sellerStcd && pos === sellerStcd;
   // The IRP has no TCS field: it travels in "other charges" so TotInvVal still reconciles.
-  const othChrg = round2(calc.shipping + calc.other_charges + calc.tcs_amount);
+  // Untaxed freight / other charges ride there too; taxed ones are an item above.
+  const othChrg = round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount);
   const valDtls: EInvValDtls = {
     AssVal: calc.taxable_value,
     CgstVal: calc.cgst_amount,
@@ -483,19 +570,108 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
     }));
   }
 
+  // ── Additive (WP-6): DispDtls / ShipDtls / PayDtls / EwbDtls ──
+  const disp = options.dispatch;
+  if (disp && (clean(disp.address) || clean(disp.state_code))) {
+    const a = splitAddress(clean(disp.address));
+    const stcd = stateByCode(disp.state_code)?.code ?? sellerStcd;
+    const loc = clean(disp.city) || guessLocality(clean(disp.address), stateByCode(stcd)?.name) || (stateByCode(stcd)?.name ?? '');
+    payload.DispDtls = { Nm: (clean(disp.name) || seller.LglNm).slice(0, 100), Addr1: a.addr1, Loc: loc.slice(0, 50), Pin: toPin(disp.pin) || extractPin(disp.address), Stcd: stcd };
+    if (a.addr2) payload.DispDtls.Addr2 = a.addr2;
+    if (!payload.DispDtls.Pin) assumptions.push(issue('warning', 'DISP_PIN', 'Dispatch', 'Dispatch-from address has no 6-digit PIN.'));
+  }
+  const ship = record.ship_to;
+  if (ship && (clean(ship.address) || clean(ship.state_code))) {
+    const a = splitAddress(clean(ship.address));
+    const shipGstin = clean(ship.gstin).toUpperCase();
+    const stcd = (isExport ? FOREIGN_STATE : stateByCode(ship.state_code)?.code) || (shipGstin.length >= 2 ? shipGstin.slice(0, 2) : buyer.Stcd);
+    const loc = clean(ship.city) || guessLocality(clean(ship.address), stateByCode(stcd)?.name) || (stateByCode(stcd)?.name ?? '');
+    const pin = isExport ? FOREIGN_PIN : toPin(ship.zip) || extractPin(ship.address);
+    const sd: EInvShipDtls = { LglNm: (clean(ship.name) || buyer.LglNm).slice(0, 100), Addr1: a.addr1, Loc: loc.slice(0, 50), Pin: pin, Stcd: stcd };
+    if (shipGstin) sd.Gstin = shipGstin;
+    if (a.addr2) sd.Addr2 = a.addr2;
+    payload.ShipDtls = sd;
+    if (!pin) assumptions.push(issue('warning', 'SHIP_PIN', 'Ship to', 'Ship-to address has no 6-digit PIN; add it to the delivery address.'));
+    if (shipGstin && shipGstin.slice(0, 2) !== stcd) assumptions.push(issue('warning', 'SHIP_STATE_MISMATCH', 'Ship to', `Ship-to state ${stcd} differs from the state in its GSTIN (${shipGstin.slice(0, 2)}).`));
+  }
+  const bankAcc = clean(sender?.accountNumber);
+  if (options.withPayment !== false && (bankAcc || clean(sender?.ifsc))) {
+    const pay: EInvPayDtls = {};
+    const nm = clean(sender?.accountName) || seller.LglNm;
+    if (nm) pay.Nm = nm.slice(0, 100);
+    if (bankAcc) pay.AccDet = bankAcc.replace(/\s+/g, '').slice(0, 18);
+    if (clean(sender?.ifsc)) pay.FinInsBr = clean(sender?.ifsc).toUpperCase().slice(0, 11);
+    const terms = clean(record.terms).replace(/\s+/g, ' ');
+    if (terms) pay.PayTerm = terms.slice(0, 100);
+    const di = parseIsoDate(record.issue_date);
+    const dd = parseIsoDate(record.due_date);
+    if (di && dd) {
+      const days = Math.round((Date.UTC(dd.y, dd.m - 1, dd.d) - Date.UTC(di.y, di.m - 1, di.d)) / 86400000);
+      if (days > 0) pay.CrDay = days;
+    }
+    if (docCurrency(record) === 'INR') {
+      const paid = round2(Math.max(Number(record.amount_paid) || 0, 0));
+      if (paid > 0) pay.PaidAmt = paid;
+      const due = round2(Math.max(calc.total - paid, 0));
+      if (due > 0) pay.PaymtDue = due;
+    }
+    if (Object.keys(pay).length) payload.PayDtls = pay;
+  }
+  const t = record.transport;
+  if (options.withEwb !== false && t && (clean(t.vehicle_no) || clean(t.transporter_id) || clean(t.lr_no))) {
+    const modeCode = ({ ROAD: '1', RAIL: '2', AIR: '3', SHIP: '4' } as const)[t.mode ?? 'ROAD'];
+    const ewb: EInvEwbDtls = { Distance: Math.max(Math.round(Number(t.distance_km) || 0), 0) };
+    if (clean(t.transporter_id)) ewb.TransId = clean(t.transporter_id).toUpperCase();
+    if (clean(t.transporter_name)) ewb.TransName = clean(t.transporter_name).slice(0, 100);
+    if (clean(t.vehicle_no) || clean(t.lr_no)) ewb.TransMode = modeCode;
+    if (clean(t.lr_no)) ewb.TransDocNo = clean(t.lr_no).slice(0, 15);
+    if (clean(t.lr_date)) ewb.TransDocDt = toNicDate(t.lr_date);
+    if (clean(t.vehicle_no)) {
+      ewb.VehNo = clean(t.vehicle_no).toUpperCase().replace(/[\s-]/g, '');
+      ewb.VehType = 'R';
+    }
+    payload.EwbDtls = ewb;
+    if (!ewb.Distance) assumptions.push(issue('warning', 'EWB_DISTANCE', 'e-Way', 'Distance is 0: the portal then works out the PIN-to-PIN distance (verify).'));
+  }
+
   if (isExport) {
     const exp: EInvExpDtls = {};
     const e = options.export;
-    if (e?.shipBillNo) exp.ShipBNo = e.shipBillNo;
-    if (e?.shipBillDate) exp.ShipBDt = toNicDate(e.shipBillDate);
-    if (e?.portCode) exp.Port = e.portCode.toUpperCase();
+    // Shipping-bill details saved on the invoice apply unless the caller overrides them.
+    const shipBillNo = clean(e?.shipBillNo) || clean(record.shipping_bill_no);
+    const shipBillDate = clean(e?.shipBillDate) || clean(record.shipping_bill_date);
+    const portCode = clean(e?.portCode) || clean(record.port_code);
+    if (shipBillNo) exp.ShipBNo = shipBillNo;
+    if (shipBillDate) exp.ShipBDt = toNicDate(shipBillDate);
+    if (portCode) exp.Port = portCode.toUpperCase();
     if (e?.refundClaim !== undefined) exp.RefClm = e.refundClaim ? 'Y' : 'N';
-    if (record.currency && record.currency !== 'INR') exp.ForCur = record.currency;
+    if (docCurrency(record) !== 'INR') exp.ForCur = docCurrency(record);
     if (e?.countryCode) exp.CntCode = e.countryCode.toUpperCase();
     if (Object.keys(exp).length) payload.ExpDtls = exp;
   }
 
   return { payload, assumptions };
+}
+
+/** The taxable charges line as an e-Invoice item (Qty 1, unit OTH). */
+function chargesItem(l: CalcLine, slNo: number, noTax: boolean): EInvItem {
+  return {
+    SlNo: String(slNo),
+    PrdDesc: l.name,
+    IsServc: isServiceHsn(l.hsn) ? 'Y' : 'N',
+    HsnCd: l.hsn,
+    Qty: 1,
+    Unit: 'OTH',
+    UnitPrice: l.taxable,
+    TotAmt: l.taxable,
+    Discount: 0,
+    AssAmt: l.taxable,
+    GstRt: noTax ? 0 : l.tax_rate,
+    IgstAmt: l.igst,
+    CgstAmt: l.cgst,
+    SgstAmt: l.sgst,
+    TotItemVal: round2(l.taxable + l.cgst + l.sgst + l.igst),
+  };
 }
 
 /** Bulk upload wrapper — the IRP offline/bulk tool takes an array of invoices. */

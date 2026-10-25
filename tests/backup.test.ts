@@ -87,6 +87,8 @@ test('encrypted backup: round-trips, hides content, and never carries device-loc
   store.set('mrchartist_inv_auth', '{"name":"x","hash":"h"}');
   store.set('mrchartist_inv_auth_guard', '{}');
   store.set('mrchartist_inv_last_backup', '2026-01-01T00:00:00Z');
+  // A PIN is set up (the auth record above), so the owner must be signed in: full backups are owner-only.
+  Object.assign(globalThis, { sessionStorage: { getItem: (k: string) => (k === 'mrchartist_inv_session' ? '1' : null), setItem() {}, removeItem() {} } });
   const text = await buildEncryptedBackup('a long passphrase');
   assert.ok(isEncryptedBackup(text));
   assert.ok(!text.includes('Secret Client'));
@@ -115,4 +117,32 @@ test('encrypted backup: parseBackup flags it, tampering is detected, plaintext i
   assert.equal(isEncryptedBackup('nope'), false);
   await assert.rejects(decryptBackup('{"a":1}', 'x'), /not an encrypted/);
   assert.match(backupFilename(new Date('2026-04-01T00:00:00Z'), true), /2026-04-01\.encrypted\.json$/);
+});
+
+test('parseBackup refuses damaged record tables, bad settings and newer versions', async () => {
+  const { LATEST_SCHEMA_VERSION } = await import('../src/lib/migrations.ts');
+  const file = (data: Record<string, string>, version = 1) => JSON.stringify({ app: 'mrchartist-invoice', version, exportedAt: '', data });
+  const ok = { mrchartist_inv_invoices: '[{"id":"a"}]', mrchartist_inv_settings: '{"profiles":[]}' };
+  assert.equal(parseBackup(file(ok)).summary.invoices, 1);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_invoices: '{"id":"a"}' })), /"invoices" table .* not a list/);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_invoices: '[{"id":"a"},' })), /"invoices" table .* damaged/);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_clients: '[{"name":"no id"}]' })), /Row 1 of the "clients"/);
+  assert.throws(() => parseBackup(file({ mrchartist_inv_audit_log: '[1,2]' })), /"audit_log"/);
+  // Ledger tables (6.1–6.3) are validated too and carried whole.
+  assert.throws(() => parseBackup(file({ ...ok, mrchartist_inv_vouchers: '[{"type":"JOURNAL"}]' })), /Row 1 of the "vouchers"/);
+  assert.throws(() => parseBackup(file({ ...ok, mrchartist_inv_accounts: '{}' })), /"accounts" table .* not a list/);
+  assert.throws(() => parseBackup(file({ ...ok, mrchartist_inv_fixed_assets: '[1]' })), /"fixed_assets"/);
+  const ledger = { ...ok, mrchartist_inv_vouchers: '[{"id":"v1","type":"JOURNAL","lines":[]}]', mrchartist_inv_accounts: '[{"id":"u1"}]', mrchartist_inv_fixed_assets: '[{"id":"f1"}]' };
+  assert.equal(parseBackup(file(ledger)).data.mrchartist_inv_vouchers, ledger.mrchartist_inv_vouchers);
+  // IRN / Ack rows written by the bulk IRP import (6.24) are validated too.
+  assert.throws(() => parseBackup(file({ mrchartist_inv_einvoice_meta: '{"invoice_id":"a"}' })), /"einvoice_meta" table .* not a list/);
+  assert.equal(parseBackup(file({ ...ok, mrchartist_inv_einvoice_meta: '[{"invoice_id":"a","irn":"x"}]' })).data.mrchartist_inv_einvoice_meta, '[{"invoice_id":"a","irn":"x"}]');
+  assert.throws(() => parseBackup(file({ mrchartist_inv_settings: '[]' })), /settings/);
+  assert.throws(() => parseBackup(file(ok, 2)), /newer version/);
+  assert.throws(
+    () => parseBackup(file({ ...ok, mrchartist_inv_schema_version: String(LATEST_SCHEMA_VERSION + 1) })),
+    /newer version/,
+  );
+  // Unknown and loosely-shaped keys still pass through untouched.
+  assert.equal(parseBackup(file({ ...ok, mrchartist_inv_template: 'modern' })).data.mrchartist_inv_template, 'modern');
 });

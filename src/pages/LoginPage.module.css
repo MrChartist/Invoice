@@ -282,3 +282,8 @@
 @media (prefers-reduced-motion: reduce) {
   .card { animation: none; }
 }
+
+/* Interface language picker (5.4), top-right of the card. */
+.lang {
+  align-self: flex-end;
+}

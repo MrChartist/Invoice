@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { changePin, isValidPinFormat, pinStrength } from '../../lib/auth';
+import { useT } from '../../i18n';
+import { secT } from '../../i18n/areas/security';
 import controls from '../../styles/controls.module.css';
 import styles from './Security.module.css';
 
@@ -13,14 +15,15 @@ interface Props {
 const digits = (v: string) => v.replace(/\D/g, '').slice(0, 6);
 
 const MESSAGES = {
-  'wrong-pin': 'The current PIN is incorrect.',
-  'invalid-format': 'The new PIN must be 4 to 6 digits.',
-  'same-pin': 'The new PIN must be different from the current one.',
-  'no-account': 'No account found on this device.',
+  'wrong-pin': 'errWrongPin',
+  'invalid-format': 'errFormat',
+  'same-pin': 'errSame',
+  'no-account': 'errNoAccount',
 } as const;
 
 /** Verifies the current PIN, then stores a freshly salted hash of the new one. */
 export function ChangePinModal({ open, onClose, onChanged }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -39,8 +42,8 @@ export function ChangePinModal({ open, onClose, onChanged }: Props) {
     e.preventDefault();
     if (busy) return;
     setError('');
-    if (!isValidPinFormat(newPin)) return setError(MESSAGES['invalid-format']);
-    if (newPin !== confirm) return setError('The two new PINs do not match.');
+    if (!isValidPinFormat(newPin)) return setError(secT(MESSAGES['invalid-format']));
+    if (newPin !== confirm) return setError(secT('errMismatch'));
     setBusy(true);
     try {
       const result = await changePin(oldPin, newPin);
@@ -48,9 +51,9 @@ export function ChangePinModal({ open, onClose, onChanged }: Props) {
         onChanged?.();
         close();
       } else if (result.reason === 'locked') {
-        setError(`Too many incorrect attempts. Try again in ${Math.ceil((result.retryInMs ?? 0) / 1000)} seconds.`);
+        setError(secT('errLocked', { n: Math.ceil((result.retryInMs ?? 0) / 1000) }));
       } else {
-        setError(MESSAGES[result.reason]);
+        setError(secT(MESSAGES[result.reason]));
       }
     } catch (err) {
       setError((err as Error).message);
@@ -66,36 +69,36 @@ export function ChangePinModal({ open, onClose, onChanged }: Props) {
       open={open}
       onClose={close}
       size="sm"
-      title="Change PIN"
-      subtitle="Enter your current PIN, then choose a new one."
+      title={secT('changePin')}
+      subtitle={secT('changePinSub')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={close}>Cancel</button>
+          <button type="button" className={controls.btnOutline} onClick={close}>{secT('cancel')}</button>
           <button
             type="submit"
             form="change-pin-form"
             className={controls.btnPrimary}
             disabled={busy || oldPin.length < 4 || newPin.length < 4 || confirm.length < 4}
           >
-            {busy ? 'Saving…' : 'Change PIN'}
+            {busy ? secT('saving') : secT('changePin')}
           </button>
         </>
       }
     >
       <form id="change-pin-form" className={styles.form} onSubmit={submit} noValidate>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="cp-old">Current PIN</label>
+          <label className={controls.label} htmlFor="cp-old">{secT('currentPin')}</label>
           <input id="cp-old" className={controls.input} type="password" inputMode="numeric" autoComplete="current-password"
             value={oldPin} onChange={(e) => setOldPin(digits(e.target.value))} maxLength={6} />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="cp-new">New PIN (4–6 digits)</label>
+          <label className={controls.label} htmlFor="cp-new">{secT('newPin')}</label>
           <input id="cp-new" className={controls.input} type="password" inputMode="numeric" autoComplete="new-password"
             value={newPin} onChange={(e) => setNewPin(digits(e.target.value))} maxLength={6} />
-          {strength?.warning && <span className={controls.hint}>{strength.warning} You can still use it.</span>}
+          {strength?.warning && <span className={controls.hint}>{strength.warning} {secT('stillUse')}</span>}
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="cp-confirm">Confirm new PIN</label>
+          <label className={controls.label} htmlFor="cp-confirm">{secT('confirmPin')}</label>
           <input id="cp-confirm" className={`${controls.input} ${confirm && confirm !== newPin ? controls.inputInvalid : ''}`}
             type="password" inputMode="numeric" autoComplete="new-password"
             value={confirm} onChange={(e) => setConfirm(digits(e.target.value))} maxLength={6} />

@@ -8,9 +8,10 @@
 
 import type { Client, InvoiceItem, InvoiceRecord, SenderProfile } from '../types/invoice';
 import { checkGstin } from './gstin';
+import { GST_SLABS } from './tax-rules';
 import { INDIAN_STATES, stateByCode } from './india-states';
 import { calculateInvoice, deriveGstMode, round2 } from './invoice-calc';
-import { writeCsv } from './csv';
+import { toCsv } from './csv';
 import { fieldsFor, type ColumnMapping, type ImportKind } from './import-mapping';
 import { KEYS, generateId, getTable, setTable } from './storage';
 import { audit } from './audit';
@@ -516,7 +517,7 @@ function buildItemRecord(row: string[], ctx: RowCtx): CatalogDraft | null {
   const tax = readNumber(ctx, 'items', c('tax_rate'), 'tax_rate', { min: 0, max: 100 });
   if (tax !== undefined) {
     rec.tax_rate = tax;
-    if (![0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28].includes(tax)) {
+    if (!GST_SLAB_LIST.includes(tax)) {
       warn(ctx, 'tax_rate', `GST ${tax}% is not a standard slab`);
     }
   }
@@ -544,7 +545,7 @@ function findItem(items: InvoiceItem[], name: string, hsn: string): InvoiceItem 
    Invoices
    ══════════════════════════════════════════════════════════════ */
 
-const GST_SLAB_LIST = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28];
+const GST_SLAB_LIST: readonly number[] = GST_SLABS;
 
 function snapSlab(rate: number): number {
   for (const s of GST_SLAB_LIST) if (Math.abs(s - rate) <= 0.15) return s;
@@ -1236,13 +1237,11 @@ export function errorRowsCsv(table: ImportTable, preview: ImportPreview, firstDa
       out.push([i + firstDataLine, ...(table.rows[i] ?? []), errs.join(' | ')]);
     }
   }
-  return writeCsv(out, { bom: true });
+  // Echoes untrusted cells back into a spreadsheet: use the formula-guarded writer.
+  return '\uFEFF' + toCsv(out);
 }
 
 /** CSV rows for the report of an actual apply (errors from the engine + the sink). */
 export function reportErrorsCsv(report: ImportReport): string {
-  return writeCsv(
-    [['Source row', 'Record', 'Problem'], ...report.errors.map((e) => [e.line, e.label, e.message])],
-    { bom: true },
-  );
+  return '\uFEFF' + toCsv([['Source row', 'Record', 'Problem'], ...report.errors.map((e) => [e.line, e.label, e.message])]);
 }

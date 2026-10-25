@@ -7,7 +7,14 @@
  *   3. invoice discount = distributed across lines in proportion to (2)
  *   4. taxable value    = gross − line discount − allocated invoice discount
  *   5. GST              = taxable × line slab, split CGST/SGST or charged as IGST
- *   6. shipping / other charges are added after tax (not taxed)
+ *   6. shipping / other charges are added after tax (not taxed) — unless the
+ *      document sets `charges_taxable` (CGST Act s.15(2)(c): incidental charges
+ *      the supplier bills are part of the value of supply). Then they form one
+ *      extra taxable "charges line" taxed at the HIGHEST GST rate among the
+ *      document's lines (the principal-supply rule of s.8(a), applied
+ *      conservatively), under that line's HSN, with no cess. Charges are always
+ *      tax-exclusive, the invoice discount never reaches them, and a net
+ *      charge of zero or less is left untaxed (a negative "charge" is a discount).
  *   7. optional round-off (nearest / up / down) of the invoice value
  *
  * Extensions (all default off, legacy records are unaffected):
@@ -16,6 +23,9 @@
  *   - supply_type: SEZ/export without payment -> zero tax; with payment -> IGST
  *   - TCS: added to the invoice value (before round-off)
  *   - TDS: deducted from what the customer pays; invoice total unchanged
+ *   - rcm_exclude_tax (outward reverse charge, Sec 9(3)/(4)): GST and cess are still worked out
+ *     line by line and reported, but the RECIPIENT pays them, so they stay out of the total,
+ *     payable and balance due (`rcm_tax` carries the amount; see src/lib/rcm.ts)
  */
 
 import type {
@@ -115,6 +125,12 @@ export interface CalcLine {
   hsn: string;
   unit: string;
   quantity: number;
+  /**
+   * Base units per one line unit (`InvoiceItem.unit_factor`, WP-8 alternate units: 2 BOX of 12 NOS
+   * carries 12). Absent = 1. Money is per the line unit as typed; quantity-in-stock readers
+   * (costing, HSN summary quantity) multiply by it.
+   */
+  unit_factor?: number;
   rate: number;
   tax_rate: number;
   /**
@@ -158,8 +174,18 @@ export interface HsnSummaryRow {
   total: number;
 }
 
+/** Id of the synthetic line that carries taxable freight / other charges. */
+export const CHARGES_LINE_ID = '__charges__';
+export const CHARGES_LINE_NAME = 'Freight & other charges';
+
 export interface CalcTotals {
   lines: CalcLine[];
+  /**
+   * Taxable shipping + other charges (`charges_taxable`), or null when the
+   * charges are untaxed. Kept OUT of `lines` (which mirror the item rows) but
+   * included in taxable_value, the tax totals, `slabs` and `hsn_rows`.
+   */
+  charges_line: CalcLine | null;
   /** Sum of gross line amounts, before any discount. */
   subtotal: number;
   line_discount_total: number;
@@ -176,8 +202,13 @@ export interface CalcTotals {
   other_charges: number;
   tcs_amount: number;
   round_off: number;
-  /** Invoice value (GST invoice total incl. TCS, after rounding). */
+  /** Invoice value (GST invoice total incl. TCS, after rounding). Excludes `rcm_tax`. */
   total: number;
+  /**
+   * GST + cess shown as "payable by the recipient under reverse charge" and left out of `total`
+   * (only with `rcm_exclude_tax`; 0 otherwise).
+   */
+  rcm_tax: number;
   tds_amount: number;
   /** total - tds_amount: what the customer actually owes in cash. */
   payable: number;
@@ -209,6 +240,14 @@ export interface CalcInput {
   tds_enabled?: boolean;
   tds_rate?: number;
   tds_on_taxable?: boolean;
+  /** Tax shipping + other charges (see step 6). Absent = untaxed, the legacy behaviour. */
+  charges_taxable?: boolean;
+  /**
+   * Outward reverse charge: the tax is computed (and reported) but payable by the recipient, so it
+   * is not added to the total. Absent = the tax is part of the total (forward charge, and every
+   * reverse-charge record saved before `rcm_tax_excluded` existed).
+   */
+  rcm_exclude_tax?: boolean;
 }
 
 /**
@@ -241,8 +280,17 @@ export function calcInputFromRecord(
     tds_enabled: !!rec.tds_enabled,
     tds_rate: num(rec.tds_rate),
     tds_on_taxable: rec.tds_on_taxable,
+    charges_taxable: !!rec.charges_taxable,
+    rcm_exclude_tax: !!rec.reverse_charge && !!rec.rcm_tax_excluded,
     ...over,
+    // A Bill of Supply never charges GST (Rule 49), whatever mode an import or conversion left behind.
+    ...(rec.doc_type === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as GstMode, rcm_exclude_tax: false } : {}),
   };
+}
+
+/** The GST mode a document is calculated with: a Bill of Supply is always untaxed. */
+export function effectiveGstMode(docType: InvoiceRecord['doc_type'] | undefined, mode: GstMode): GstMode {
+  return docType === 'BILL_OF_SUPPLY' ? 'NONE' : mode;
 }
 
 /** True when any line carries cess — UIs show a cess column only then. */
@@ -277,6 +325,7 @@ export function applyRounding(value: number, mode: RoundMode): number {
 
 export const EMPTY_TOTALS: CalcTotals = {
   lines: [],
+  charges_line: null,
   subtotal: 0,
   line_discount_total: 0,
   invoice_discount_amount: 0,
@@ -292,6 +341,7 @@ export const EMPTY_TOTALS: CalcTotals = {
   tcs_amount: 0,
   round_off: 0,
   total: 0,
+  rcm_tax: 0,
   tds_amount: 0,
   payable: 0,
   amount_paid: 0,
@@ -412,6 +462,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
       hsn: (l.item.hsn ?? '').trim(),
       unit: (l.item.unit ?? '').trim(),
       quantity: l.quantity,
+      ...(num(l.item.unit_factor) > 0 && num(l.item.unit_factor) !== 1 ? { unit_factor: num(l.item.unit_factor) } : {}),
       rate: l.rate,
       tax_rate: l.tax_rate,
       nominal_rate: l.nominal_rate,
@@ -430,17 +481,23 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
     };
   });
 
-  const taxable_value = round2(lines.reduce((s, l) => s + l.taxable, 0));
-  const cgst_amount = round2(lines.reduce((s, l) => s + l.cgst, 0));
-  const sgst_amount = round2(lines.reduce((s, l) => s + l.sgst, 0));
-  const igst_amount = round2(lines.reduce((s, l) => s + l.igst, 0));
-  const tax_amount = round2(cgst_amount + sgst_amount + igst_amount);
-  const cess_amount = round2(lines.reduce((s, l) => s + l.cess, 0));
-
   // ── Steps 6–7: extra charges and round-off ────────────────────
   const shipping = round2(Math.max(num(input.shipping), 0));
   const other_charges = round2(num(input.other_charges));
-  const beforeTcs = round2(taxable_value + tax_amount + cess_amount + shipping + other_charges);
+  const chargesBase = round2(shipping + other_charges);
+  const charges_line = input.charges_taxable && chargesBase > 0 ? chargesLine(lines, chargesBase, taxMode, fallbackRate, zeroRated) : null;
+  const taxLines = charges_line ? [...lines, charges_line] : lines;
+
+  const taxable_value = round2(taxLines.reduce((s, l) => s + l.taxable, 0));
+  const cgst_amount = round2(taxLines.reduce((s, l) => s + l.cgst, 0));
+  const sgst_amount = round2(taxLines.reduce((s, l) => s + l.sgst, 0));
+  const igst_amount = round2(taxLines.reduce((s, l) => s + l.igst, 0));
+  const tax_amount = round2(cgst_amount + sgst_amount + igst_amount);
+  const cess_amount = round2(lines.reduce((s, l) => s + l.cess, 0));
+
+  // Outward reverse charge: the recipient pays the GST + cess, so the supplier's total leaves them out.
+  const rcm_tax = input.rcm_exclude_tax ? round2(tax_amount + cess_amount) : 0;
+  const beforeTcs = round2(taxable_value + tax_amount + cess_amount - rcm_tax + (charges_line ? 0 : chargesBase));
   const tcsRate = input.tcs_enabled ? Math.max(num(input.tcs_rate), 0) : 0;
   const tcsBase = input.tcs_base === 'taxable' ? taxable_value : beforeTcs;
   const tcs_amount = pctOf(tcsBase, tcsRate);
@@ -458,6 +515,7 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
 
   return {
     lines,
+    charges_line,
     subtotal,
     line_discount_total,
     invoice_discount_amount,
@@ -473,13 +531,65 @@ export function calculateInvoice(input: CalcInput): CalcTotals {
     tcs_amount,
     round_off,
     total,
+    rcm_tax,
     tds_amount,
     payable,
     amount_paid,
     balance_due: round2(payable - amount_paid),
-    slabs: buildSlabs(lines),
-    hsn_rows: buildHsnRows(lines),
+    slabs: buildSlabs(taxLines),
+    hsn_rows: buildHsnRows(taxLines),
   };
+}
+
+/**
+ * The taxable charges line (see step 6): the highest-rate line is the principal
+ * supply — its rate and HSN apply (ties go to the larger taxable value). With no
+ * item lines the document's fallback rate applies. No cess is charged on it.
+ */
+function chargesLine(lines: CalcLine[], amount: number, mode: GstMode, fallbackRate: number, zeroRated: boolean): CalcLine {
+  let principal: CalcLine | undefined;
+  for (const l of lines) {
+    if (!principal || l.nominal_rate > principal.nominal_rate || (l.nominal_rate === principal.nominal_rate && l.taxable > principal.taxable)) principal = l;
+  }
+  const nominal = principal ? principal.nominal_rate : Math.max(num(fallbackRate), 0);
+  const rate = zeroRated || mode === 'NONE' ? 0 : principal ? principal.tax_rate : nominal;
+  const parts = splitTax(pctOf(amount, rate), mode);
+  const tax = round2(parts.cgst + parts.sgst + parts.igst);
+  return {
+    id: CHARGES_LINE_ID,
+    name: CHARGES_LINE_NAME,
+    hsn: principal?.hsn ?? '',
+    unit: principal?.unit ?? '',
+    quantity: 1,
+    rate: amount,
+    tax_rate: rate,
+    nominal_rate: nominal,
+    cess_rate: 0,
+    cess_per_unit: 0,
+    cess: 0,
+    gross: amount,
+    line_discount: 0,
+    invoice_discount: 0,
+    taxable: amount,
+    ...parts,
+    tax,
+    total: round2(amount + tax),
+  };
+}
+
+/** Item lines plus the taxable charges line, if any — every line that carries taxable value. */
+export function taxLinesOf(calc: Pick<CalcTotals, 'lines' | 'charges_line'>): CalcLine[] {
+  return calc.charges_line ? [...calc.lines, calc.charges_line] : calc.lines;
+}
+
+/** True when a stored record's shipping + other charges were taxed (and so sit inside its taxable value). */
+export function chargesAreTaxed(rec: Partial<Pick<InvoiceRecord, 'charges_taxable' | 'shipping' | 'other_charges'>>): boolean {
+  return !!rec.charges_taxable && round2(Math.max(num(rec.shipping), 0) + num(rec.other_charges)) > 0;
+}
+
+/** Shipping + other charges of a stored record that sit OUTSIDE its taxable value (0 when they were taxed). */
+export function untaxedCharges(rec: Partial<Pick<InvoiceRecord, 'charges_taxable' | 'shipping' | 'other_charges'>>): number {
+  return chargesAreTaxed(rec) ? 0 : round2(num(rec.shipping) + num(rec.other_charges));
 }
 
 /**
@@ -509,7 +619,7 @@ export function allocateProportionally(weights: number[], amount: number): numbe
   return parts.map((p) => Number(p) / 100);
 }
 
-function buildSlabs(lines: CalcLine[]): TaxSlabRow[] {
+export function buildSlabs(lines: CalcLine[]): TaxSlabRow[] {
   const map = new Map<number, TaxSlabRow>();
   for (const l of lines) {
     if (l.taxable === 0 && l.tax === 0) continue;
@@ -526,7 +636,7 @@ function buildSlabs(lines: CalcLine[]): TaxSlabRow[] {
   return [...map.values()].sort((a, b) => a.rate - b.rate);
 }
 
-function buildHsnRows(lines: CalcLine[]): HsnSummaryRow[] {
+export function buildHsnRows(lines: CalcLine[]): HsnSummaryRow[] {
   const map = new Map<string, HsnSummaryRow>();
   for (const l of lines) {
     if (l.taxable === 0 && l.tax === 0) continue;

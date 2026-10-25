@@ -358,3 +358,8 @@
   .qtyInput { width: 7rem; min-height: 44px; }
   .fullBtn { min-height: 40px; }
 }
+
+.form {
+  display: grid;
+  gap: 0.75rem;
+}

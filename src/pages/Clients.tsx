@@ -7,17 +7,28 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
+import { salesT } from '../i18n/areas/sales';
 import { ClientFormModal } from '../components/modals/ClientFormModal';
 import { localDb } from '../lib/localDb';
+import { can } from '../lib/access';
 import { isRevenueDoc } from '../lib/stats';
+import { ADVANCES_TABLE, advanceBalance } from '../lib/advance-tax';
+import { getTable } from '../lib/storage';
+import type { AdvanceRecord } from '../types/advances';
 import { formatCurrency } from '../lib/utils';
 import type { Client } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Clients.module.css';
+import { receivableTotal } from '../lib/rcm';
 
 export function Clients() {
   const { notify, toastNode } = useToast();
+  const { t } = useT();
+  // Local roles (6.21): a viewer can look clients up but not change them.
+  const edit = can('master.edit');
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Client | null>(null);
@@ -26,14 +37,16 @@ export function Clients() {
   const [importOpen, setImportOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // `/clients?new=1` (from the command palette) opens the add dialog directly.
+  // `/clients?new=1` (from the command palette) opens the add dialog directly;
+  // `/clients?edit=<id>` (from the TDS register) opens that client's editor.
   useEffect(() => {
-    if (searchParams.get('new') === '1') {
-      setEditing(null);
+    const editId = searchParams.get('edit');
+    if (edit && (searchParams.get('new') === '1' || editId)) {
+      setEditing(editId ? localDb.clients.getById(editId) ?? null : null);
       setFormOpen(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, edit]);
 
   useEffect(() => {
     const refresh = () => setVersion((v) => v + 1);
@@ -51,9 +64,26 @@ export function Clients() {
       const key = inv.client?.name?.trim().toLowerCase();
       if (!key || !isRevenueDoc(inv)) continue;
       const row = map.get(key) ?? { total: 0, count: 0 };
-      row.total += inv.total ?? 0;
+      row.total += receivableTotal(inv);
       row.count += 1;
       map.set(key, row);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
+
+  // Unadjusted advances (5.3) per client id and lower-cased name.
+  const advanceOpen = useMemo(() => {
+    const map = new Map<string, number>();
+    const advances = getTable<AdvanceRecord>(ADVANCES_TABLE);
+    if (!advances.length) return map;
+    const payments = localDb.payments.getAll();
+    const invoices = localDb.invoices.getAll();
+    for (const a of advances) {
+      const open = advanceBalance(a, payments, invoices).open;
+      if (open <= 0.004) continue;
+      const key = a.client?.id || `name:${(a.client?.name ?? '').trim().toLowerCase()}`;
+      map.set(key, (map.get(key) ?? 0) + open);
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +92,7 @@ export function Clients() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q
-      ? clients.filter((c) => [c.name, c.company, c.email, c.phone, c.city, c.gstin].some((f) => f?.toLowerCase().includes(q)))
+      ? clients.filter((c) => [c.name, c.company, c.email, c.phone, c.city, c.gstin, c.pan, c.tan].some((f) => f?.toLowerCase().includes(q)))
       : clients;
     return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [clients, query]);
@@ -79,17 +109,19 @@ export function Clients() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Clients"
-        subtitle={`${clients.length} saved · clients are also added automatically when you save an invoice`}
+        title={salesT('cl.title')}
+        subtitle={salesT('cl.subtitle', { n: clients.length })}
         actions={
-          <>
-            <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
-              <FileUp size={16} /> Import
-            </button>
-            <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-              <Plus size={16} /> Add client
-            </button>
-          </>
+          edit ? (
+            <>
+              <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
+                <FileUp size={16} /> {salesT('cl.import')}
+              </button>
+              <button type="button" className={controls.btnPrimary} onClick={openAdd}>
+                <Plus size={16} /> {salesT('cl.add')}
+              </button>
+            </>
+          ) : undefined
         }
       />
 
@@ -101,8 +133,8 @@ export function Clients() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, company, city or GSTIN"
-              aria-label="Search clients"
+              placeholder={salesT('cl.searchPh')}
+              aria-label={salesT('cl.searchAria')}
             />
           </label>
         </div>
@@ -110,27 +142,29 @@ export function Clients() {
         {clients.length === 0 ? (
           <EmptyState
             icon={UserPlus}
-            title="No clients yet"
-            text="Add a client once and pick them in a click on every future invoice."
+            title={t('list.clientsEmptyTitle')}
+            text={t('list.clientsEmptyText')}
             action={
-              <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-                <Plus size={16} /> Add your first client
-              </button>
+              edit ? (
+                <button type="button" className={controls.btnPrimary} onClick={openAdd}>
+                  <Plus size={16} /> {t('list.clientsAddFirst')}
+                </button>
+              ) : undefined
             }
           />
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Users} title="No matches" text="Try a different search." />
+          <EmptyState icon={Users} title={t('common.noMatches')} text={t('common.tryOtherSearch')} />
         ) : (
           <div className={surface.tableWrap}>
             <table className={`${surface.table} ${styles.directory}`}>
               <thead>
                 <tr>
-                  <th>Client</th>
-                  <th>Contact</th>
-                  <th>Location</th>
-                  <th>GSTIN</th>
-                  <th className={surface.numeric}>Billed</th>
-                  <th aria-label="Actions" />
+                  <th>{salesT('cl.colClient')}</th>
+                  <th>{salesT('cl.colContact')}</th>
+                  <th>{salesT('cl.colLocation')}</th>
+                  <th>{salesT('cl.colGstin')}</th>
+                  <th className={surface.numeric}>{salesT('cl.colBilled')}</th>
+                  <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
               <tbody>
@@ -173,30 +207,47 @@ export function Clients() {
                           <span className={styles.sub}>—</span>
                         )}
                       </td>
-                      <td className={`${surface.mono} ${styles.cGst}`} data-empty={!c.gstin ? 'true' : undefined}>{c.gstin || <span className={styles.sub}>—</span>}</td>
+                      <td className={`${surface.mono} ${styles.cGst}`} data-empty={!c.gstin && !c.pan && !c.tan ? 'true' : undefined}>
+                        {c.gstin || (!c.pan && !c.tan && <span className={styles.sub}>—</span>)}
+                        {(c.pan || c.tan) && (
+                          <div className={styles.sub}>{[c.pan && `PAN ${c.pan}`, c.tan && `TAN ${c.tan}`].filter(Boolean).join(' · ')}</div>
+                        )}
+                      </td>
                       <td className={`${surface.numeric} ${styles.cBilled}`}>
                         {b ? (
                           <>
                             {formatCurrency(b.total)}
                             <div className={styles.sub}>
-                              {b.count} invoice{b.count === 1 ? '' : 's'}
+                              {b.count === 1 ? salesT('cl.invoicesOne') : salesT('cl.invoicesMany', { n: b.count })}
                             </div>
                           </>
                         ) : (
                           <span className={styles.sub}>—</span>
                         )}
+                        {(() => {
+                          const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
+                          return adv > 0 ? (
+                            <div className={styles.sub}>
+                              <Link to={`/receivables?tab=advances&party=${encodeURIComponent(c.id ?? `name:${c.name.trim().toLowerCase()}`)}`}>{salesT('cl.advance', { amount: formatCurrency(adv) })}</Link>
+                            </div>
+                          ) : null;
+                        })()}
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
-                          <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={`Statement for ${c.name}`} title="Account statement">
+                          <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={salesT('cl.statementFor', { name: c.name })} title={salesT('cl.statement')}>
                             <Scale size={16} />
                           </Link>
-                          <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`} title="Edit">
-                            <Pencil size={16} />
-                          </button>
-                          <button type="button" className={controls.btnDanger} onClick={() => setDeleting(c)} aria-label={`Delete ${c.name}`} title="Delete">
-                            <Trash2 size={16} />
-                          </button>
+                          {edit && (
+                            <>
+                              <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={salesT('cl.editOf', { name: c.name })} title={salesT('edit')}>
+                                <Pencil size={16} />
+                              </button>
+                              <button type="button" className={controls.btnDanger} onClick={() => setDeleting(c)} aria-label={salesT('cl.deleteOf', { name: c.name })} title={salesT('delete')}>
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -214,7 +265,7 @@ export function Clients() {
         onClose={() => setImportOpen(false)}
         onDone={() => {
           setVersion((v) => v + 1);
-          notify('Clients imported');
+          notify(salesT('cl.imported'));
         }}
       />
       <ClientFormModal
@@ -223,19 +274,19 @@ export function Clients() {
         onClose={() => setFormOpen(false)}
         onSaved={(c, isNew) => {
           setVersion((v) => v + 1);
-          notify(isNew ? `${c.name} added` : `${c.name} updated`);
+          notify(salesT(isNew ? 'cl.added' : 'cl.updated', { name: c.name }));
         }}
       />
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this client?"
-        message={`${deleting?.name ?? ''} will be removed from your directory. Invoices already issued keep their own copy of the client details.`}
-        confirmLabel="Delete client"
+        title={salesT('cl.deleteTitle')}
+        message={salesT('cl.deleteMsg', { name: deleting?.name ?? '' })}
+        confirmLabel={salesT('cl.deleteConfirm')}
         onConfirm={() => {
           if (deleting?.id) localDb.clients.remove(deleting.id);
           setVersion((v) => v + 1);
-          notify('Client deleted');
+          notify(salesT('cl.deleted'));
         }}
         onClose={() => setDeleting(null)}
       />

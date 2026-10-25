@@ -1,15 +1,27 @@
-import { useMemo, useState } from 'react';
+import { isStockDependencyError } from '../lib/stock-timeline';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, FilePlus2, Landmark, PiggyBank, Receipt, Search, Tags, Wallet, Zap } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
+import { purT, purCategory, purStatus } from '../i18n/areas/purchases';
 import { BillModal } from '../components/purchases/BillModal';
+import { BranchFilter } from '../components/branches/BranchFilter';
+import { branchPredicates } from '../lib/branch';
 import { ExpenseModal } from '../components/purchases/ExpenseModal';
 import { PurchasePaymentModal } from '../components/purchases/PurchasePaymentModal';
 import { PurchasesTable } from '../components/purchases/PurchasesTable';
 import { VendorsTab } from '../components/purchases/VendorsTab';
+import { MsmeCard } from '../components/purchases/MsmeCard';
+import type { BillSeed } from '../lib/purchase-orders';
+import { getTable } from '../lib/storage';
+import { can } from '../lib/access';
+import type { PurchaseOrder } from '../types/purchases';
 import {
   PURCHASE_STATUSES,
   categorySummary,
@@ -23,6 +35,7 @@ import {
   type PurchaseFilter,
 } from '../lib/purchases';
 import { businessContext } from '../lib/purchases-context';
+import { localDb } from '../lib/localDb';
 import { vendorsDb } from '../lib/vendors';
 import { downloadText, toCsv } from '../lib/download';
 import { formatCurrency, todayInput } from '../lib/utils';
@@ -31,21 +44,46 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 
-type Tab = 'bills' | 'vendors';
+type Tab = 'bills' | 'orders' | 'vendors' | 'returns';
 
-const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: string }[] = [
-  { id: 'ALL', label: 'All' },
-  { id: 'PURCHASE', label: 'Bills' },
-  { id: 'EXPENSE', label: 'Expenses' },
+// Purchase orders are a separate, rarely-opened tab: load it on demand.
+const PurchaseOrdersTab = lazy(() =>
+  import('../components/purchases/PurchaseOrdersTab').then((m) => ({ default: m.PurchaseOrdersTab })),
+);
+
+// WP-3: purchase returns / supplier notes, receipt notes (GRN) and pending reports — also on demand.
+const ReturnsTab = lazy(() => import('../components/purchases/ReturnsTab').then((m) => ({ default: m.ReturnsTab })));
+const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns'];
+
+const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: 'kindAll' | 'kindBills' | 'kindExpenses' }[] = [
+  { id: 'ALL', label: 'kindAll' },
+  { id: 'PURCHASE', label: 'kindBills' },
+  { id: 'EXPENSE', label: 'kindExpenses' },
 ];
 
 /** Expenses & purchases: supplier bills, quick expenses, payables and vendors. */
 export function Expenses() {
   const { notify, toastNode } = useToast();
+  const { t } = useT();
   const [version, setVersion] = useState(0);
-  const [tab, setTab] = useState<Tab>('bills');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => TAB_PARAMS.find((x) => x === params.get('tab')) ?? 'bills');
+  const [seed, setSeed] = useState<BillSeed | null>(null);
   const [filter, setFilter] = useState<PurchaseFilter>({ kind: 'ALL', status: 'ALL', category: 'ALL' });
-  const [billOpen, setBillOpen] = useState(false);
+  // WP-9: branch filter (own tag, else the only branch in the bill's place-of-supply state).
+  const [branch, setBranch] = useState('');
+  // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
+  const [billOpen, setBillOpen] = useState(() => params.get('new') === 'bill');
+  // A Tally key / Gateway link while this page is already open (F9, Ctrl+F9 → ?tab=returns&new=dn)
+  // changes only the query: follow it (adjust-state-on-change, no effect).
+  const query = params.toString();
+  const [seenQuery, setSeenQuery] = useState(query);
+  if (seenQuery !== query) {
+    setSeenQuery(query);
+    const wanted = TAB_PARAMS.find((x) => x === params.get('tab'));
+    if (wanted) setTab(wanted);
+    if (params.get('new') === 'bill') setBillOpen(true);
+  }
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseRecord | null>(null);
   const [payFor, setPayFor] = useState<string | null>(null);
@@ -56,6 +94,8 @@ export function Expenses() {
   const purchases = useMemo(() => purchasesDb.all(), [version]);
   const vendors = useMemo(() => vendorsDb.all(), [version]);
   const payments = useMemo(() => paymentsDb.all(), [version]);
+  // Read straight from the table so the PO library stays in the lazy tab's chunk.
+  const orders = useMemo(() => getTable<PurchaseOrder>('purchase_orders'), [version]);
   const business = useMemo(() => businessContext(), [version]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
@@ -63,10 +103,13 @@ export function Expenses() {
   const month = today.slice(0, 7);
   const patch = (p: Partial<PurchaseFilter>) => setFilter((f) => ({ ...f, ...p }));
 
-  const rows = filterPurchases(purchases, filter, today);
+  const inBranch = branchPredicates(branch).purchase;
+  const rows = filterPurchases(purchases, filter, today).filter((p) => !branch || inBranch(p));
   const payables = payablesOutstanding(purchases);
   const paidThisMonth = paidInMonth(payments, month);
   const itc = itcTotals(purchases, month);
+  // A composition dealer cannot claim ITC (Sec 10(4)): the GST on bills is a cost. The data stays as entered.
+  const composition = useMemo(() => localDb.settings.activeProfile()?.gst_scheme === 'composition', []);
   const topCategory = categorySummary(purchases.filter((p) => p.date.startsWith(month)))[0];
 
   const openEdit = (p: PurchaseRecord) => {
@@ -78,6 +121,7 @@ export function Expenses() {
     setBillOpen(false);
     setExpenseOpen(false);
     setEditing(null);
+    setSeed(null);
   };
   const saved = (message: string) => {
     reload();
@@ -86,15 +130,17 @@ export function Expenses() {
 
   const exportCsv = () => {
     downloadText(`purchases-${today}.csv`, toCsv(purchasesToCsvRows(rows, today)), 'text/csv');
-    notify(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`);
+    notify(purT(rows.length === 1 ? 'exportedOne' : 'exportedMany', { n: rows.length }));
   };
 
-  const remove = (p: PurchaseRecord) => {
+  const remove = (p: PurchaseRecord, confirmStock = false) => {
     try {
-      purchasesDb.remove(p.id);
+      purchasesDb.remove(p.id, { confirmStock });
       reload();
-      notify('Entry deleted');
+      notify(purT('entryDeleted'));
     } catch (err) {
+      // Later sales used this bill's stock: ask before letting it go negative (serial conflicts never confirm).
+      if (isStockDependencyError(err) && err.confirmable && window.confirm(`${err.message}\n\nDelete the bill anyway?`)) return remove(p, true);
       notify((err as Error).message, 'error');
     }
   };
@@ -105,53 +151,104 @@ export function Expenses() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Expenses & purchases"
-        subtitle="Supplier bills, day-to-day spends, what you owe and the GST you can claim back."
+        title={purT('title')}
+        subtitle={purT('subtitle')}
         actions={
           <>
             <button type="button" className={controls.btnOutline} onClick={exportCsv} disabled={tab !== 'bills' || rows.length === 0}>
-              <Download size={16} /> Export CSV
+              <Download size={16} /> {purT('exportCsv')}
             </button>
-            <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
-              <Zap size={16} /> Quick expense
-            </button>
-            <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
-              <FilePlus2 size={16} /> Add bill
-            </button>
+            {/* Local roles (6.21): a viewer cannot record bills; the data layer refuses it too. */}
+            {can('books.edit') && (
+              <>
+                <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
+                  <Zap size={16} /> {purT('quickExpense')}
+                </button>
+                <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
+                  <FilePlus2 size={16} /> {purT('addBill')}
+                </button>
+              </>
+            )}
           </>
         }
       />
 
       <div className={surface.statGrid}>
-        <StatCard label="Payables" value={formatCurrency(payables)} icon={Wallet} tone={payables > 0 ? 'warning' : 'default'} hint="Owed to vendors" />
-        <StatCard label="Paid this month" value={formatCurrency(paidThisMonth)} icon={Landmark} tone="profit" />
+        <StatCard label={purT('statPayables')} value={formatCurrency(payables)} icon={Wallet} tone={payables > 0 ? 'warning' : 'default'} hint={purT('statPayablesHint')} />
+        <StatCard label={purT('statPaidMonth')} value={formatCurrency(paidThisMonth)} icon={Landmark} tone="profit" />
         <StatCard
-          label="ITC available"
+          label={composition ? purT('statGstNoItc') : purT('statItc')}
           value={formatCurrency(itc.total)}
           icon={PiggyBank}
-          tone="brand"
-          hint={itc.ineligible > 0 ? `${formatCurrency(itc.ineligible)} not claimed` : 'This month'}
+          tone={composition ? 'default' : 'brand'}
+          hint={composition ? purT('statCompositionHint') : itc.ineligible > 0 ? purT('statNotClaimed', { amount: formatCurrency(itc.ineligible) }) : purT('statThisMonth')}
         />
         <StatCard
-          label="Top category"
-          value={topCategory ? topCategory.category : '—'}
+          label={purT('statTopCategory')}
+          value={topCategory ? purCategory(topCategory.category) : '—'}
           icon={Tags}
-          hint={topCategory ? `${formatCurrency(topCategory.total)} this month` : 'Nothing logged this month'}
+          hint={topCategory ? purT('statAmountThisMonth', { amount: formatCurrency(topCategory.total) }) : purT('statNothingMonth')}
         />
       </div>
 
+      <MsmeCard purchases={purchases} vendors={vendors} payments={payments} today={today} />
+
       <div className={styles.tabs}>
-        <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Section">
+        <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label={purT('section')}>
           <button type="button" role="tab" aria-selected={tab === 'bills'} className={tab === 'bills' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('bills')}>
-            Bills & expenses <span className={styles.count}>{purchases.length}</span>
+            {purT('tabBills')} <span className={styles.count}>{purchases.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'orders'} className={tab === 'orders' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('orders')}>
+            {purT('tabOrders')} <span className={styles.count}>{orders.length}</span>
           </button>
           <button type="button" role="tab" aria-selected={tab === 'vendors'} className={tab === 'vendors' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('vendors')}>
-            Vendors <span className={styles.count}>{vendors.length}</span>
+            {purT('tabVendors')} <span className={styles.count}>{vendors.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'returns'} className={tab === 'returns' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('returns')}>
+            {purT('tabReturns')}
           </button>
         </div>
       </div>
 
-      {tab === 'vendors' ? (
+      {tab === 'orders' ? (
+        <Suspense fallback={null}>
+          <PurchaseOrdersTab
+            orders={orders}
+            vendors={vendors}
+            purchases={purchases}
+            businessState={business.stateCode}
+            onVendorCreated={reload}
+            onConvert={(s) => {
+              setEditing(null);
+              setSeed(s);
+              setBillOpen(true);
+            }}
+            onChanged={(message, tone) => {
+              reload();
+              if (message) notify(message, tone);
+            }}
+          />
+        </Suspense>
+      ) : tab === 'returns' ? (
+        <Suspense fallback={null}>
+          <ReturnsTab
+            key={params.get('new') ?? ''}
+            purchases={purchases}
+            vendors={vendors}
+            orders={orders}
+            onVendorCreated={reload}
+            onConvert={(s) => {
+              setEditing(null);
+              setSeed(s);
+              setBillOpen(true);
+            }}
+            onChanged={(message, tone) => {
+              reload();
+              if (message) notify(message, tone);
+            }}
+          />
+        </Suspense>
+      ) : tab === 'vendors' ? (
         <VendorsTab
           vendors={vendors}
           purchases={purchases}
@@ -170,11 +267,11 @@ export function Expenses() {
                   type="search"
                   value={filter.query ?? ''}
                   onChange={(e) => patch({ query: e.target.value })}
-                  placeholder="Search vendor, bill no or GSTIN"
-                  aria-label="Search bills and expenses"
+                  placeholder={purT('searchPlaceholder')}
+                  aria-label={purT('searchLabel')}
                 />
               </label>
-              <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label="Filter by type">
+              <div className={`${controls.segment} ${styles.touchSeg}`} role="tablist" aria-label={purT('filterType')}>
                 {KINDS.map((k) => (
                   <button
                     key={k.id}
@@ -184,35 +281,36 @@ export function Expenses() {
                     className={filter.kind === k.id ? controls.segmentBtnActive : controls.segmentBtn}
                     onClick={() => patch({ kind: k.id })}
                   >
-                    {k.label}
+                    {purT(k.label)}
                   </button>
                 ))}
               </div>
             </div>
             <div className={styles.toolbarRow}>
-              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.status} onChange={(e) => patch({ status: e.target.value as PurchaseFilter['status'] })} aria-label="Filter by status">
-                <option value="ALL">All statuses</option>
+              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.status} onChange={(e) => patch({ status: e.target.value as PurchaseFilter['status'] })} aria-label={purT('filterStatus')}>
+                <option value="ALL">{purT('allStatuses')}</option>
                 {PURCHASE_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{purStatus(s)}</option>
                 ))}
               </select>
-              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.category} onChange={(e) => patch({ category: e.target.value })} aria-label="Filter by category">
-                <option value="ALL">All categories</option>
+              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.category} onChange={(e) => patch({ category: e.target.value })} aria-label={purT('filterCategory')}>
+                <option value="ALL">{purT('allCategories')}</option>
                 {PURCHASE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{purCategory(c)}</option>
                 ))}
               </select>
+              <BranchFilter value={branch} onChange={setBranch} className={`${controls.select} ${styles.filterSelect}`} testId="pur-branch" />
               <label className={styles.dateField}>
-                From
+                {purT('from')}
                 <input type="date" className={controls.input} value={filter.from ?? ''} max={filter.to || undefined} onChange={(e) => patch({ from: e.target.value })} />
               </label>
               <label className={styles.dateField}>
-                To
+                {purT('to')}
                 <input type="date" className={controls.input} value={filter.to ?? ''} min={filter.from || undefined} onChange={(e) => patch({ to: e.target.value })} />
               </label>
               {hasFilters && (
                 <button type="button" className={controls.btnGhost} onClick={() => setFilter({ kind: 'ALL', status: 'ALL', category: 'ALL' })}>
-                  Clear
+                  {purT('clear')}
                 </button>
               )}
             </div>
@@ -221,16 +319,16 @@ export function Expenses() {
           {purchases.length === 0 ? (
             <EmptyState
               icon={Receipt}
-              title="No bills or expenses yet"
-              text="Log supplier bills to track payables and claim input tax credit, or quick-add everyday expenses."
+              title={t('list.expEmptyTitle')}
+              text={t('list.expEmptyText')}
               action={
                 <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
-                  <FilePlus2 size={16} /> Add your first bill
+                  <FilePlus2 size={16} /> {t('list.expAddFirst')}
                 </button>
               }
             />
           ) : rows.length === 0 ? (
-            <EmptyState icon={Search} title="No matches" text="Try a different search or filter." />
+            <EmptyState icon={Search} title={t('common.noMatches')} text={t('common.tryOtherSearchFilter')} />
           ) : (
             <PurchasesTable rows={rows} today={today} onPay={(p) => setPayFor(p.id)} onEdit={openEdit} onDelete={setDeleting} />
           )}
@@ -241,6 +339,7 @@ export function Expenses() {
         open={billOpen}
         onClose={closeForms}
         purchase={editing?.kind === 'PURCHASE' ? editing : null}
+        seed={seed}
         vendors={vendors}
         onVendorCreated={reload}
         businessState={business.stateCode}
@@ -265,9 +364,9 @@ export function Expenses() {
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this entry?"
-        message={`${deleting?.vendor_name ?? ''}${deleting?.bill_number ? ` (${deleting.bill_number})` : ''} and its payment history will be permanently removed from this device.`}
-        confirmLabel="Delete"
+        title={purT('deleteTitle')}
+        message={purT('deleteMessage', { name: `${deleting?.vendor_name ?? ''}${deleting?.bill_number ? ` (${deleting.bill_number})` : ''}` })}
+        confirmLabel={purT('delete')}
         onConfirm={() => deleting && remove(deleting)}
         onClose={() => setDeleting(null)}
       />

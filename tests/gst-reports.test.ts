@@ -195,7 +195,7 @@ test('GSTR-1: HSN summary nets credit notes', () => {
   assert.deepEqual([laptops.qty, laptops.taxable, laptops.igst, laptops.uqc], [10, 10000, 1800, 'NOS']);
 });
 
-test('GSTR-1: document issued summary counts cancelled + draft numbers', () => {
+test('GSTR-1: document issued summary counts cancelled numbers and a draft gap', () => {
   const inv_ = g1.docIssue.find((d) => d.docType === 'Invoices for outward supply')!;
   assert.deepEqual([inv_.from, inv_.to, inv_.total, inv_.cancelled, inv_.netIssued], ['INV/FY25-26/0001', 'INV/FY25-26/0007', 7, 2, 5]);
   const cn = g1.docIssue.find((d) => d.docType === 'Credit Note')!;
@@ -276,6 +276,49 @@ test('ITC reversal reduces net ITC pro rata', () => {
   ], { period: PERIOD, gstin: FILER });
   assert.deepEqual(r.gstr3b.itc.reversedOther, { igst: 0, cgst: 45, sgst: 45, cess: 0 });
   assert.deepEqual(r.gstr3b.itc.net, { igst: 0, cgst: 45, sgst: 45, cess: 0 });
+});
+
+test('3B: imports go to 4A(1)/4A(2); import of services is reverse charge in 3.1(d)', () => {
+  const r = buildGstReport([], [
+    { id: 'ig', bill_date: '2025-04-04', vendor_name: 'Shenzhen Co', taxable: 10000, igst: 1800, import_type: 'GOODS', boe_number: '1234567', itc_eligible: true },
+    { id: 'is', bill_date: '2025-04-05', vendor_name: 'AWS Inc', taxable: 5000, igst: 900, import_type: 'SERVICES', itc_eligible: true },
+  ], { period: PERIOD, gstin: FILER });
+  const b3 = r.gstr3b;
+  assert.deepEqual(b3.itc.importGoods, { igst: 1800, cgst: 0, sgst: 0, cess: 0 });
+  assert.deepEqual(b3.itc.importServices, { igst: 900, cgst: 0, sgst: 0, cess: 0 });
+  assert.deepEqual(b3.itc.availableOther, { igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  // Only the services import is an inward reverse-charge supply; customs IGST is not in 3.1.
+  assert.equal(b3.outward.inwardRcm.taxable, 5000);
+  assert.equal(b3.outward.inwardRcm.igst, 900);
+  assert.equal(b3.itc.net.igst, 2700);
+  assert.equal(b3.payment.rcLiability.igst, 900);
+  // Foreign suppliers have no GSTIN: no ITC_NO_GSTIN warning for imports.
+  assert.ok(!r.issues.some((i) => i.code === 'ITC_NO_GSTIN'));
+});
+
+test('3B: domestic reverse charge feeds 3.1(d) and 4A(3)', () => {
+  const r = buildGstReport([], [
+    { bill_date: '2025-04-06', vendor_name: 'GTA', taxable: 2000, cgst: 50, sgst: 50, reverse_charge: true, itc_eligible: true },
+  ], { period: PERIOD, gstin: FILER });
+  assert.deepEqual(r.gstr3b.itc.availableRcm, { igst: 0, cgst: 50, sgst: 50, cess: 0 });
+  assert.equal(r.gstr3b.outward.inwardRcm.cgst, 50);
+});
+
+test('3B: Rule 42/43 reversals go to 4B(1), Rule 37 to 4B(2); Sec 17(5) blocked credit is 4A + 4B(1)', () => {
+  const r = buildGstReport([], [
+    { bill_date: '2025-04-03', supplier_gstin: MH_SUPPLIER, taxable: 1000, cgst: 90, sgst: 90, itc_reversed: 36, itc_reversal_reason: 'RULE_42' },
+    { bill_date: '2025-04-03', supplier_gstin: MH_SUPPLIER, taxable: 1000, cgst: 90, sgst: 90, itc_reversed: 18, itc_reversal_reason: 'RULE_37' },
+    { bill_date: '2025-04-03', supplier_gstin: DL_SUPPLIER, taxable: 1000, igst: 280, itc_eligible: false, itc_reversal_reason: 'SEC_17_5' },
+    { bill_date: '2025-04-03', supplier_gstin: DL_SUPPLIER, taxable: 1000, igst: 50, itc_eligible: false },
+  ], { period: PERIOD, gstin: FILER });
+  const itc = r.gstr3b.itc;
+  assert.deepEqual(itc.availableOther, { igst: 280, cgst: 180, sgst: 180, cess: 0 });
+  assert.deepEqual(itc.reversedRules, { igst: 280, cgst: 18, sgst: 18, cess: 0 });
+  assert.deepEqual(itc.reversedOther, { igst: 0, cgst: 9, sgst: 9, cess: 0 });
+  assert.deepEqual(itc.net, { igst: 0, cgst: 153, sgst: 153, cess: 0 });
+  // Ineligible without a 17(5) reason stays in 4D(2).
+  assert.deepEqual(itc.ineligible, { igst: 50, cgst: 0, sgst: 0, cess: 0 });
+  assert.ok(gstr3bCsv(r.gstr3b).includes('4B(1)'));
 });
 
 test('absent / empty purchases are fine', () => {
@@ -390,4 +433,14 @@ test('printable summary escapes content and carries the CA disclaimer', () => {
   assert.ok(html.includes('Verify with your CA'));
   assert.ok(html.includes('&lt;b&gt;'));
   assert.ok(html.includes('A &amp; B'));
+});
+
+test('GSTR-1: a trailing draft does not extend the issued series', () => {
+  const docs = [
+    inv({ id: 'd1', invoice_number: 'INV/FY25-26/0001', items: [item('a', 1, 100, 18)] }),
+    inv({ id: 'd2', invoice_number: 'INV/FY25-26/0002', items: [item('b', 1, 100, 18)] }),
+    inv({ id: 'd3', invoice_number: 'INV/FY25-26/0003', status: 'Draft', items: [item('c', 1, 100, 18)] }),
+  ];
+  const row = buildGstReport(docs, [], { period: PERIOD, gstin: FILER }).gstr1.docIssue[0];
+  assert.deepEqual([row.from, row.to, row.total, row.cancelled, row.netIssued], ['INV/FY25-26/0001', 'INV/FY25-26/0002', 2, 0, 2]);
 });

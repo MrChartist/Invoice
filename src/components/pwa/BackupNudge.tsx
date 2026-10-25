@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert, X } from 'lucide-react';
-import {
-  downloadBackupNow,
-  getLastBackup,
-  getSnooze,
-  hasBackupWorthyData,
-  runAutoBackup,
-  shouldNudge,
-  snoozeNudge,
-  getFolderHandle,
-  type BackupResult,
-} from '../../lib/auto-backup';
+import { getLastBackup, getSnooze, hasBackupWorthyData, shouldNudge, snoozeNudge } from '../../lib/auto-backup-schedule';
+// The backup builder / folder writer loads only when the user acts on the nudge.
+import type { BackupResult } from '../../lib/auto-backup';
+import { useT } from '../../i18n';
+import { pwaT } from '../../i18n/areas/pwa';
 import controls from '../../styles/controls.module.css';
 import styles from './Pwa.module.css';
 
@@ -30,6 +24,7 @@ function due(): boolean {
 
 /** Non-blocking banner: shown when data exists and the last backup is over 7 days old. */
 export function BackupNudge({ onResult }: BackupNudgeProps) {
+  useT(); // re-render on a language switch (5.4)
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -51,8 +46,9 @@ export function BackupNudge({ onResult }: BackupNudgeProps) {
     setBusy(true);
     // Prefer the connected folder; otherwise (or if it fails) fall back to a plain download.
     let result: BackupResult | null = null;
+    const { getFolderHandle, runAutoBackup, downloadBackupNow } = await import('../../lib/auto-backup');
     if (await getFolderHandle()) result = await runAutoBackup({ interactive: true });
-    if (!result || !result.ok) result = downloadBackupNow();
+    if (!result || !result.ok) result = await downloadBackupNow();
     setBusy(false);
     onResult?.(result);
     if (result.ok) setShow(false);
@@ -60,15 +56,13 @@ export function BackupNudge({ onResult }: BackupNudgeProps) {
 
   return (
     <div className={styles.dock}>
-      <section className={styles.banner} role="region" aria-label="Backup reminder">
+      <section className={styles.banner} role="region" aria-label={pwaT('backupRegion')}>
         <span className={styles.icon} aria-hidden="true">
           <ShieldAlert size={16} />
         </span>
         <div className={styles.text}>
-          <p className={styles.title}>Back up your invoices</p>
-          <p className={styles.desc}>
-            Your data lives only in this browser. It has been over a week since your last backup.
-          </p>
+          <p className={styles.title}>{pwaT('backupTitle')}</p>
+          <p className={styles.desc}>{pwaT('backupDesc')}</p>
           <div className={styles.actions}>
             <button
               type="button"
@@ -76,7 +70,7 @@ export function BackupNudge({ onResult }: BackupNudgeProps) {
               onClick={backupNow}
               disabled={busy}
             >
-              {busy ? 'Backing up...' : 'Backup now'}
+              {busy ? pwaT('backingUp') : pwaT('backupNow')}
             </button>
             <button
               type="button"
@@ -86,14 +80,14 @@ export function BackupNudge({ onResult }: BackupNudgeProps) {
                 setShow(false);
               }}
             >
-              Remind later
+              {pwaT('remindLater')}
             </button>
           </div>
         </div>
         <button
           type="button"
           className={styles.close}
-          aria-label="Dismiss backup reminder"
+          aria-label={pwaT('dismissBackup')}
           onClick={() => {
             snoozeNudge();
             setShow(false);

@@ -8,6 +8,8 @@ export interface ToastProps {
   message: string;
   tone?: ToastTone;
   duration?: number;
+  /** Optional button, e.g. Undo. Clicking it runs `onClick` and closes the toast. */
+  action?: { label: string; onClick: () => void };
   onClose: () => void;
 }
 
@@ -17,7 +19,7 @@ const TONE = {
   info: { icon: Info, colour: 'var(--primary)' },
 } as const;
 
-export function Toast({ message, tone = 'success', duration = 3200, onClose }: ToastProps) {
+export function Toast({ message, tone = 'success', duration = 3200, action, onClose }: ToastProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export function Toast({ message, tone = 'success', duration = 3200, onClose }: T
       className="no-print"
       style={{
         position: 'fixed',
-        bottom: 'calc(1.25rem + var(--bottom-bar-h, 0px))',
+        bottom: 'calc(1.25rem + var(--bottom-bar-h, 0px) + var(--tab-bar-h, 0px))',
         right: '1.25rem',
         left: 'auto',
         zIndex: 10000,
@@ -65,6 +67,28 @@ export function Toast({ message, tone = 'success', duration = 3200, onClose }: T
       <span style={{ fontSize: '0.875rem', fontWeight: 500, lineHeight: 1.45, flex: 1 }}>
         {message}
       </span>
+      {action && (
+        <button
+          type="button"
+          onClick={() => {
+            action.onClick();
+            setVisible(false);
+            setTimeout(onClose, 260);
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--brand-text)',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            cursor: 'pointer',
+            padding: 0,
+            flexShrink: 0,
+          }}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         aria-label="Dismiss notification"

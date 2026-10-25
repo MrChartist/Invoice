@@ -7,6 +7,7 @@
 import type { InvoiceRecord } from '../types/invoice';
 import { DOCUMENT_LABELS } from '../types/invoice';
 import { formatCurrency, formatDate } from './utils';
+import { receivableBalance, receivableTotal } from './rcm';
 
 /** Encoded-URL budget. WhatsApp/browsers cope with ~2k; stay well inside. */
 export const MAX_URL_LENGTH = 1900;
@@ -178,7 +179,7 @@ export function invoiceUpiLink(invoice: InvoiceRecord): string | null {
   return upiLink({
     pa: s.upiId,
     pn: s.companyName,
-    amount: invoice.balance_due > 0 ? invoice.balance_due : invoice.total,
+    amount: receivableBalance(invoice) > 0 ? receivableBalance(invoice) : receivableTotal(invoice),
     note: `Payment for ${invoice.invoice_number}`,
   });
 }
@@ -201,9 +202,47 @@ export function invoiceSummaryText(invoice: InvoiceRecord): string {
   lines.push('');
   lines.push(`Total: ${formatCurrency(invoice.total, cur)}`);
   if ((invoice.amount_paid ?? 0) > 0) lines.push(`Paid: ${formatCurrency(invoice.amount_paid, cur)}`);
-  if (invoice.balance_due > 0) lines.push(`Balance due: ${formatCurrency(invoice.balance_due, cur)}`);
+  const due = receivableBalance(invoice);
+  if (due > 0) lines.push(`Balance due: ${formatCurrency(due, cur)}`);
   const s = invoice.sender;
-  if (s?.upiId && invoice.balance_due > 0) lines.push(`UPI: ${s.upiId}`);
+  if (s?.upiId && due > 0) lines.push(`UPI: ${s.upiId}`);
   if (s?.companyName) lines.push('', `Thank you, ${s.companyName}`);
   return lines.join('\n');
+}
+
+/* ── Sharing files through the OS share sheet (Web Share Level 2) ── */
+
+interface FileShareNavigator {
+  share?: (data: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+  canShare?: (data: { files?: File[] }) => boolean;
+}
+
+/** True when this browser can hand a file to other apps (Android Chrome, iOS/macOS Safari, Edge on Windows). */
+export function canShareFiles(sample?: File, nav: FileShareNavigator | undefined = globalThis.navigator as FileShareNavigator | undefined): boolean {
+  if (!nav?.share || !nav.canShare) return false;
+  try {
+    const probe = sample ?? new File([new Uint8Array([37, 80, 68, 70])], 'probe.pdf', { type: 'application/pdf' });
+    return nav.canShare({ files: [probe] });
+  } catch {
+    return false;
+  }
+}
+
+/** `blocked`: the browser wanted a fresh tap (the PDF took too long to build) — share again from a button. */
+export type ShareFileResult = 'shared' | 'cancelled' | 'unsupported' | 'blocked' | 'failed';
+
+/** Open the OS share sheet with `file` (e.g. straight into a WhatsApp chat). Never throws. */
+export async function shareFile(
+  file: File,
+  opts: { title?: string; text?: string } = {},
+  nav: FileShareNavigator | undefined = globalThis.navigator as FileShareNavigator | undefined,
+): Promise<ShareFileResult> {
+  if (!canShareFiles(file, nav)) return 'unsupported';
+  try {
+    await nav!.share!({ files: [file], title: opts.title, text: opts.text });
+    return 'shared';
+  } catch (err) {
+    const name = (err as Error)?.name;
+    return name === 'AbortError' ? 'cancelled' : name === 'NotAllowedError' ? 'blocked' : 'failed';
+  }
 }

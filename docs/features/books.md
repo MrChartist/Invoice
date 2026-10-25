@@ -1,13 +1,13 @@
-# Books (Day book, Cash & bank, Profit & loss, Balance sheet)
+# Books (Day book, Cash & bank, Profit & loss + the double-entry ledger tabs)
 
 Tally-style books built read-only from invoices, payments received and (if present) purchases / vendors / purchase payments.
 
 | | |
 |---|---|
-| Route | `/books` (tabs via `?tab=day\|cash\|pnl\|bs`) |
+| Route | `/books` (tabs via `?tab=day\|cash\|vch\|ledger\|tb\|pnl\|bs\|cf\|coa`; the ledger tab also takes `acct` and `party`) |
 | Nav label / icon | "Books" / `BookOpen` (lucide-react) |
 | Page | `src/pages/Books.tsx` (+ `Books.module.css`), named export `Books` |
-| Components | `src/components/books/*` (PeriodBar, TrendChart, DayBookTab, CashBankTab, ProfitLossTab, BalanceSheetTab, OpeningBalanceModal, download.ts) |
+| Components | `src/components/books/*` (PeriodBar, TrendChart, CashBankTab, ProfitLossTab — now the P&L tab's "Documents view (indicative)", OpeningBalanceModal, download.ts; ledger tabs in `ledger/`, including the ledger Day Book and Trading / P&L — see `docs/features/reports-engine.md`) |
 | Lib | `src/lib/books.ts` (pure, tested in `tests/books.test.ts`) |
 
 ## Tables
@@ -16,12 +16,14 @@ Tally-style books built read-only from invoices, payments received and (if prese
 
 ## Accounting rules
 - Sales = `INVOICE`/`TAX_INVOICE` that are not Draft/Cancelled; credit notes = `CREDIT_NOTE`. Quotations, proformas and challans are ignored.
-- Income = **taxable value** of sales less credit notes. GST on sales is a liability, never income.
+- Income = **taxable value** of sales less credit notes. GST on sales is a liability, never income. Taxed freight sits inside the taxable value; untaxed charges and round-off are added.
+- Foreign-currency invoices and their receipts are booked in rupees at the invoice's `exchange_rate` (`src/lib/fx.ts`); without a rate, at face value. No realised exchange gain/loss.
 - Purchase cost = taxable + GST only when the bill is **not ITC-eligible**; eligible GST is ITC (asset), excluded from expenses.
 - Purchases (`kind`/`type` not containing "EXPENSE") are direct costs -> gross profit; rows whose `kind`/`type`/`doc_type` contains `EXPENSE` are indirect -> net profit.
 - Accrual: invoice/bill dates. Cash basis: receipts/payments apportioned by `taxable/total` (receipt) and `cost/total` (payment); credit notes reduce income on issue date either way.
 - Cash book = method `Cash`; bank book = everything else (UPI, Bank transfer, Cheque, Card, other).
-- Balance sheet is labelled **indicative**: cash+bank, receivables, ITC receivable, payables, GST payable, retained earnings (cumulative accrual profit) and a balancing "Capital & other" line (absorbs opening balances, capital, drawings, GST remitted).
+- The **Balance sheet tab now shows the Schedule III balance sheet from the double-entry ledger** (see `docs/features/ledger.md`). `balanceSheet()` below is kept (tests, CSV) and stays consistent with it: same cash and bank, same receivables except customer TDS, which the ledger moves to TDS receivable.
+- `balanceSheet()` is labelled **indicative**: cash+bank, receivables, ITC receivable, payables, GST payable, retained earnings (cumulative accrual profit) and a balancing "Capital & other" line (absorbs opening balances, capital, drawings, GST remitted).
 - Purchase rows are read through tolerant aliases (`date|bill_date|purchase_date`, `taxable_value|taxable|subtotal`, `tax_amount|gst_amount|gst|tax|cgst+sgst+igst`, `total|grand_total|amount`, `itc_eligible` (default true), `category`, `vendor_id|vendor_name`, `status` Draft/Cancelled skipped, `amount_paid` fallback when no payment rows) so the purchases module's exact field names are not a hard dependency. Align by editing `normalizePurchase` if they differ.
 
 ## Exported symbols (`src/lib/books.ts`)

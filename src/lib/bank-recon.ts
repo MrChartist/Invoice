@@ -15,12 +15,13 @@
  * optional fields.
  */
 
-import { parseCsvDetailed, toCsv } from './csv';
+import { TableLimitError, parseCsvDetailed, toCsv } from './csv';
 import { isoDay } from './dates';
 import { num, round2 } from './invoice-calc';
 import { readPurchase, isVoidStatus } from './purchase-normalize';
 import { generateId, getTable, setTable } from './storage';
 import type { InvoiceRecord, Payment } from '../types/invoice';
+import { receivableBalance } from './rcm';
 
 /* ════════════════════════════════════════════════════════════════
    Types
@@ -62,6 +63,8 @@ export interface BankStatement {
   opening_balance?: number;
   /** Additive: closing balance typed by the user when the file has no balance column. */
   closing_balance?: number;
+  /** Additive (multi-account BRS): which bank account this statement is for; missing = the main account. */
+  bank_account_id?: string;
 }
 
 export const STATEMENTS_TABLE = 'bank_statements';
@@ -292,7 +295,14 @@ function clean(s: string): string {
 
 /** Parse a bank statement CSV. Never throws: an unreadable file yields no lines plus a warning. */
 export function parseBankStatement(text: string, options: ParseOptions = {}): ParsedStatement {
-  const { rows } = parseCsvDetailed(text ?? '');
+  let rows: string[][];
+  try {
+    rows = parseCsvDetailed(text ?? '').rows;
+  } catch (err) {
+    // Too many cells to parse safely: report it like any other unusable file (never a crash).
+    if (!(err instanceof TableLimitError)) throw err;
+    return { lines: [], bankLabel: 'Bank statement', columns: {}, headers: [], headerRow: -1, skipped: 0, warnings: [err.message], rawRows: [] };
+  }
   const warnings: string[] = [];
   const empty = (w: string, columns: ColumnMap = {}, headers: string[] = [], headerRow = -1): ParsedStatement => ({
     lines: [],
@@ -449,8 +459,10 @@ export function makeStatement(
   lines: Omit<BankLine, 'id'>[],
   fileName: string,
   now: Date = new Date(),
+  bankAccountId?: string,
 ): BankStatement {
   return {
+    ...(bankAccountId && bankAccountId !== 'default' ? { bank_account_id: bankAccountId } : {}),
     id: generateId(),
     imported_at: now.toISOString(),
     bank_label: parsed.bankLabel,
@@ -625,6 +637,8 @@ export interface Candidate {
   party: string;
   /** Source document id (invoice id / purchase id), for drill-through. */
   docId: string;
+  /** Bank account it went through (`bank-accounts.ts`); missing = the main account. */
+  bank_account_id?: string;
 }
 
 const isCashMethod = (m: unknown) => String(m ?? '').trim().toLowerCase() === 'cash';
@@ -641,7 +655,8 @@ export function receiptCandidates(invoices: readonly InvoiceRecord[], payments: 
   for (const p of payments) {
     const amount = round2(Math.abs(num(p.amount)));
     const date = isoDay(p.date);
-    if (!date || amount === 0 || isCashMethod(p.method)) continue;
+    // An advance adjusted against an invoice (5.3) moved no money through the bank.
+    if (!date || amount === 0 || isCashMethod(p.method) || p.advance_id) continue;
     const inv = byId.get(p.invoice_id);
     out.push({
       kind: 'payment',
@@ -653,6 +668,7 @@ export function receiptCandidates(invoices: readonly InvoiceRecord[], payments: 
       docNumber: inv?.invoice_number ?? '',
       party: partyOfInvoice(inv),
       docId: p.invoice_id,
+      bank_account_id: p.bank_account_id || undefined,
     });
   }
   return out;
@@ -665,6 +681,7 @@ export interface PurchasePaymentRow {
   date?: string;
   method?: string;
   reference?: string;
+  bank_account_id?: string;
 }
 
 /** Payments made to vendors that can show up on a bank statement. */
@@ -694,6 +711,7 @@ export function payoutCandidates(
       docNumber: bill?.number ?? '',
       party: bill?.partyName ?? '',
       docId: String(pp.purchase_id ?? ''),
+      bank_account_id: pp.bank_account_id || undefined,
     });
   }
   return out;
@@ -969,9 +987,9 @@ export interface InvoiceSuggestion {
 
 /** Invoice still owing money (balance after payments). */
 export function openBalance(inv: InvoiceRecord): number {
-  const live = inv.status !== 'Draft' && inv.status !== 'Cancelled' && (inv.doc_type === 'INVOICE' || inv.doc_type === 'TAX_INVOICE' || !inv.doc_type);
+  const live = inv.status !== 'Draft' && inv.status !== 'Cancelled' && (inv.doc_type === 'INVOICE' || inv.doc_type === 'TAX_INVOICE' || inv.doc_type === 'BILL_OF_SUPPLY' || !inv.doc_type);
   if (!live) return 0;
-  const owing = typeof inv.balance_due === 'number' ? inv.balance_due : num(inv.total) - num(inv.amount_paid);
+  const owing = receivableBalance(inv);
   return Math.max(round2(owing), 0);
 }
 
@@ -1353,6 +1371,7 @@ export function normalizeStatements(rows: unknown[]): BankStatement[] {
       lines,
       ...(Number.isFinite(num(r.opening_balance, NaN)) && r.opening_balance !== undefined ? { opening_balance: num(r.opening_balance) } : {}),
       ...(Number.isFinite(num(r.closing_balance, NaN)) && r.closing_balance !== undefined ? { closing_balance: num(r.closing_balance) } : {}),
+      ...(typeof r.bank_account_id === 'string' && r.bank_account_id ? { bank_account_id: r.bank_account_id } : {}),
     });
   }
   return out;

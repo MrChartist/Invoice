@@ -4,7 +4,12 @@ import { Modal } from '../ui/Modal';
 import { formatCurrency } from '../../lib/utils';
 import { num } from '../../lib/invoice-calc';
 import { DocumentError, cancelDocument, reinstateDocument } from '../../lib/documents';
+import { isStockDependencyError } from '../../lib/stock-timeline';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
+import { useT } from '../../i18n';
+import { salesT } from '../../i18n/areas/sales';
+import { docLabel } from '../../i18n/labels';
+import { areaNodes } from '../../i18n/areas/nodes';
 import controls from '../../styles/controls.module.css';
 import styles from './documents.module.css';
 
@@ -22,22 +27,25 @@ export function CancelDialog(props: CancelDialogProps) {
 }
 
 function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
+  useT(); // re-render on a language switch (5.4)
   const isCancelled = invoice.status === 'Cancelled';
   const paid = num(invoice.amount_paid);
   const [reason, setReason] = useState('');
   const [ack, setAck] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const label = DOCUMENT_LABELS[invoice.doc_type];
+  const label = docLabel(invoice.doc_type in DOCUMENT_LABELS ? invoice.doc_type : 'INVOICE');
 
-  const submit = () => {
+  const submit = (acknowledgeStock = false): void => {
     try {
       const rec = isCancelled
         ? reinstateDocument(invoice)
-        : cancelDocument(invoice, reason, { acknowledgePayments: ack });
+        : cancelDocument(invoice, reason, { acknowledgePayments: ack, acknowledgeStock });
       onDone(rec);
       onClose();
     } catch (err) {
-      setError(err instanceof DocumentError || err instanceof Error ? err.message : 'Something went wrong.');
+      // A credit note whose returned goods were partly used since: confirm before taking them out again.
+      if (isStockDependencyError(err) && err.confirmable && window.confirm(`${err.message}\n\n${salesT('cn.cancelDoc')}?`)) return submit(true);
+      setError(err instanceof DocumentError || err instanceof Error ? err.message : salesT('somethingWrong'));
     }
   };
 
@@ -48,21 +56,21 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
       open
       onClose={onClose}
       size="sm"
-      title={isCancelled ? `Reinstate ${label}` : `Cancel ${label}`}
+      title={isCancelled ? salesT('cn.reinstateTitle', { doc: label }) : salesT('cn.cancelTitle', { doc: label })}
       subtitle={invoice.invoice_number}
       footer={
         <>
           <button type="button" className={controls.btnOutline} onClick={onClose}>
-            {isCancelled ? 'Close' : 'Keep document'}
+            {isCancelled ? salesT('close') : salesT('cn.keep')}
           </button>
           <button
             type="button"
             className={controls.btnPrimary}
             style={isCancelled ? undefined : { backgroundColor: 'var(--destructive)' }}
-            onClick={submit}
+            onClick={() => submit()}
             disabled={disabled}
           >
-            {isCancelled ? 'Reinstate' : 'Cancel document'}
+            {isCancelled ? salesT('cn.reinstate') : salesT('cn.cancelDoc')}
           </button>
         </>
       }
@@ -70,17 +78,16 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
       <div className={styles.stack}>
         {isCancelled ? (
           <p className={controls.hint}>
-            This restores the document to its previous status. Nothing was deleted when it was cancelled.
+            {salesT('cn.reinstateHint')}
           </p>
         ) : (
           <>
             <p className={controls.hint}>
-              The document stays on record with a Cancelled status and is excluded from outstanding
-              balances. The number is not reused.
+              {salesT('cn.cancelHint')}
             </p>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="cancel-reason">
-                Reason
+                {salesT('reason')}
               </label>
               <textarea
                 id="cancel-reason"
@@ -88,18 +95,17 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
                 rows={3}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Issued in error, order withdrawn"
+                placeholder={salesT('cn.reasonPh')}
               />
             </div>
             {paid > 0 && (
               <div className={styles.warn} role="alert">
                 <AlertTriangle size={16} color="var(--warning)" aria-hidden="true" />
                 <div>
-                  <strong>{formatCurrency(paid, invoice.currency || 'INR')}</strong> has already been
-                  recorded as received. Cancelling does not refund or delete those payments.
+                  {areaNodes(salesT('cn.paidWarn'), { amount: <strong>{formatCurrency(paid, invoice.currency || 'INR')}</strong> })}
                   <label className={styles.check}>
                     <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-                    <span>I understand; cancel anyway.</span>
+                    <span>{salesT('cn.ack')}</span>
                   </label>
                 </div>
               </div>

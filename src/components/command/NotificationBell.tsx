@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getTable, subscribeStorageChanges } from '../../lib/storage';
+import { readApprovalPolicy } from '../../lib/approval-gate';
+import { can } from '../../lib/access';
 import {
   dismiss,
   loadNotifState,
@@ -28,6 +31,62 @@ export interface NotificationBellProps {
   className?: string;
 }
 
+/**
+ * Batch expiry (6.6) and reorder (Phase 7) alerts need the stock engine: load that provider lazily,
+ * and only once some stock item tracks batches or has a reorder level, so simple users never download it.
+ */
+let expiryAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureExpiryAlerts(onReady: () => void): void {
+  if (expiryAlerts !== 'off') return;
+  try {
+    const items = getTable<{ track_stock?: boolean; track_batches?: boolean; reorder_level?: number; reorder_by_godown?: Record<string, number> }>('stock_items');
+    // Batch expiry (6.6) and reorder-level (Phase 7) alerts share one lazily loaded provider.
+    const wants = (i: (typeof items)[number]) =>
+      i.track_batches || Number(i.reorder_level) > 0 || Object.values(i.reorder_by_godown ?? {}).some((v) => Number(v) > 0);
+    if (!items.some((i) => i.track_stock && wants(i))) return;
+  } catch {
+    return;
+  }
+  expiryAlerts = 'loading';
+  import('../../lib/stock-alerts')
+    .then((m) => {
+      m.registerExpiryAlerts();
+      expiryAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      expiryAlerts = 'off';
+    });
+}
+
+/**
+ * Phase 7 notices (pending approvals, AMC reminders, GST set-off due): their provider loads lazily and
+ * only once approvals are on for an approver, an AMC contract exists or the GST set-off screen was used.
+ */
+let businessAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureBusinessAlerts(onReady: () => void): void {
+  if (businessAlerts !== 'off') return;
+  try {
+    // 7O: TDS deposit / 26Q reminders once TDS is in use (a challan, or a bill / payment carrying TDS).
+    const tds = (r: unknown) => Number((r as { tds_amount?: unknown } | null)?.tds_amount) > 0;
+    const used = getTable('amc_contracts').length > 0 || getTable('gst_setoffs').length > 0 || getTable('gst_challans').length > 0
+      || getTable('tds_challans').length > 0 || getTable('purchases').some(tds) || getTable('purchase_payments').some(tds);
+    if (!used && !(readApprovalPolicy().enabled && can('doc.approve'))) return;
+  } catch {
+    return;
+  }
+  businessAlerts = 'loading';
+  import('../../lib/business-alerts')
+    .then((m) => {
+      m.registerBusinessAlerts();
+      businessAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      businessAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -48,6 +107,15 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     } catch {
       setItems([]);
     }
+    const reload = () => {
+      try {
+        setItems(loadVisibleNotifications(new Date()));
+      } catch {
+        /* keep what is shown */
+      }
+    };
+    ensureExpiryAlerts(reload);
+    ensureBusinessAlerts(reload);
   }, []);
 
   useEffect(() => {
@@ -56,7 +124,9 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     const timer = setInterval(refresh, pollMs);
     window.addEventListener('focus', refresh);
     window.addEventListener('storage', refresh);
+    const unsubscribe = subscribeStorageChanges(refresh);
     return () => {
+      unsubscribe();
       clearInterval(timer);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('storage', refresh);

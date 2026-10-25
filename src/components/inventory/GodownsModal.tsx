@@ -1,0 +1,129 @@
+import { useState } from 'react';
+import { Edit3, Plus, Trash2 } from 'lucide-react';
+import { Modal } from '../ui/Modal';
+import { godownTree, godownsDb, liveGodownReferences } from '../../lib/godowns';
+import { descendantIds } from '../../lib/stock-groups';
+import { imT } from '../../i18n/areas/inventory-masters';
+import { depthClass } from './tree-indent';
+import { godownInUse, type TrackingMap } from '../../lib/stock-tracking';
+import { MAIN_GODOWN_ID, type Godown } from '../../types/stock';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
+import controls from '../../styles/controls.module.css';
+import surface from '../../styles/surface.module.css';
+import styles from './inventory.module.css';
+
+/**
+ * Add, rename or delete godowns (6.10). Main always exists; creating a second godown turns on
+ * godown pickers on bills and invoices, per-godown stock and transfer vouchers.
+ */
+export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, onChanged }: {
+  open: boolean;
+  godowns: Godown[];
+  tracking: TrackingMap;
+  /** Godown ids named on any transfer. */
+  transfersUse: Set<string>;
+  onClose: () => void;
+  onChanged: (message: string) => void;
+}) {
+  useT(); // re-render on a language switch (5.4)
+  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string } | null>(null);
+  // WP-8: godowns may sit inside another godown (warehouse → store room); shown as a tree.
+  const tree = godownTree(godowns);
+  const blocked = editing?.id ? descendantIds(editing.id, godowns) : new Set<string>();
+  const [error, setError] = useState('');
+
+  const save = () => {
+    if (!editing) return;
+    try {
+      godownsDb.save({ id: editing.id, name: editing.name, address: editing.address, parent_id: editing.parent_id || undefined });
+      onChanged(editing.id ? invT('godownRenamed') : invT('godownAdded', { name: editing.name.trim() }));
+      setEditing(null);
+      setError('');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const remove = (g: Godown) => {
+    try {
+      // Anything that names it counts: drafts, quotations, cancelled documents, untracked lines,
+      // recurring templates and the default-godown setting too.
+      const refs = liveGodownReferences(g.id);
+      if (refs.length) throw new Error(`${g.name} is still used by ${refs.join(', ')}, so it cannot be deleted.`);
+      godownsDb.remove(g.id, godownInUse(tracking, g.id) || transfersUse.has(g.id));
+      onChanged(invT('godownDeleted', { name: g.name }));
+      setError('');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="md"
+      title={invT('godowns')}
+      subtitle={invT('godownsSub')}
+      footer={<button type="button" className={controls.btnOutline} onClick={onClose}>{invT('done')}</button>}
+    >
+      <div className={styles.form}>
+        <table className={surface.table}>
+          <thead><tr><th>{invT('thName')}</th><th>{invT('thAddress')}</th><th><span className={surface.srOnly}>{invT('thActions')}</span></th></tr></thead>
+          <tbody>
+            {tree.map(({ node, depth }) => ({ g: godowns.find((x) => x.id === node.id) ?? { id: node.id, name: node.name }, depth })).map(({ g, depth }) => (
+              <tr key={g.id}>
+                <td><span className={depthClass(depth)}>{g.name}</span>{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}</td>
+                <td className={styles.muted}>{g.address || '—'}</td>
+                <td>
+                  <span className={surface.rowActions}>
+                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '' })}>
+                      <Edit3 size={16} />
+                    </button>
+                    {g.id !== MAIN_GODOWN_ID && (
+                      <button type="button" className={controls.btnDanger} aria-label={invT('deleteNamed', { name: g.name })} onClick={() => remove(g)}>
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {editing ? (
+          <form className={styles.form} onSubmit={(e) => { e.preventDefault(); save(); }}>
+            <div className={controls.row}>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="gd-name">{invT('godownName')}</label>
+                <input id="gd-name" className={controls.input} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus />
+              </div>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="gd-addr">{invT('addressOptional')}</label>
+                <input id="gd-addr" className={controls.input} value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} />
+              </div>
+            </div>
+            <div className={controls.field}>
+              <label className={controls.label} htmlFor="gd-parent">{imT('godownParent')}</label>
+              <select id="gd-parent" className={controls.select} value={editing.parent_id} onChange={(e) => setEditing({ ...editing, parent_id: e.target.value })}>
+                <option value="">{imT('topLevel')}</option>
+                {tree.filter((r) => !blocked.has(r.node.id)).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
+              </select>
+            </div>
+            <div className={surface.pageActions}>
+              <button type="button" className={controls.btnOutline} onClick={() => { setEditing(null); setError(''); }}>{invT('cancel')}</button>
+              <button type="submit" className={controls.btnPrimary}>{editing.id ? invT('save') : invT('addGodown')}</button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setEditing({ name: '', address: '', parent_id: '' })}>
+            <Plus size={14} aria-hidden="true" /> {invT('addGodown')}
+          </button>
+        )}
+        {error && <span className={controls.error} role="alert">{error}</span>}
+      </div>
+    </Modal>
+  );
+}

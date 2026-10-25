@@ -14,3 +14,8 @@ export function isValidIfsc(value?: string): boolean {
 export function isValidPan(value?: string): boolean {
   return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test((value ?? '').trim().toUpperCase());
 }
+
+/** TAN (tax deduction account number): four letters, five digits, one letter. */
+export function isValidTan(value?: string): boolean {
+  return /^[A-Z]{4}[0-9]{5}[A-Z]$/.test((value ?? '').trim().toUpperCase());
+}

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../../lib/utils';
-import { formatPlaceOfSupply } from '../../../lib/india-states';
+import { formatPlaceOfSupply, stateByCode } from '../../../lib/india-states';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
@@ -30,6 +30,8 @@ export function PartyPanel({ invoice, plain, skipDates }: PartyPanelProps) {
   const isQuote = invoice.doc_type === 'QUOTATION';
   const placeOfSupply = formatPlaceOfSupply(invoice.place_of_supply);
   const cityLine = [c.city, c.zip].filter(Boolean).join(' ');
+  const ship = invoice.ship_to && (invoice.ship_to.address || invoice.ship_to.name) ? invoice.ship_to : null;
+  const shipState = ship?.state_code ? stateByCode(ship.state_code)?.name : '';
 
   return (
     <section className={cn(plain ? styles.partiesPlain : styles.parties)}>
@@ -83,13 +85,45 @@ export function PartyPanel({ invoice, plain, skipDates }: PartyPanelProps) {
             </>
           )}
         </div>
+        {ship && (
+          <div className={styles.shipTo}>
+            <div className={styles.eyebrow}>{t('shipTo')}</div>
+            <div className={styles.meta}>
+              {ship.name && (
+                <>
+                  <strong>{ship.name}</strong>
+                  <br />
+                </>
+              )}
+              {(ship.address ?? '').split('\n').filter(Boolean).map((line, i) => (
+                <span key={i}>
+                  {line}
+                  <br />
+                </span>
+              ))}
+              {[ship.city, ship.zip].filter(Boolean).join(' ')}
+              {shipState && (
+                <>
+                  {(ship.city || ship.zip) && <br />}
+                  {shipState}
+                </>
+              )}
+              {ship.gstin && (
+                <>
+                  <br />
+                  <span className={styles.metaLabel}>GSTIN:</span> {ship.gstin}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={styles.metaGrid}>
         {!skipDates && (
           <>
             <MetaRow label={isQuote ? t('quoteDate') : t('issueDate')} value={date(invoice.issue_date)} />
-            <MetaRow label={isQuote ? t('validUntil') : t('dueDate')} value={date(invoice.due_date)} />
+            <MetaRow label={isQuote ? t('validUntil') : invoice.doc_type === 'SALES_ORDER' ? t('deliveryBy') : t('dueDate')} value={date(invoice.due_date)} />
           </>
         )}
         <MetaRow label={t('poRef')} value={invoice.po_number || undefined} />

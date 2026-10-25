@@ -634,6 +634,14 @@
   line-height: 1.3;
 }
 
+/* Amount in words, Hindi line (5.4): "रुपये … मात्र" under the English words. */
+.biWords {
+  display: block;
+  font-family: 'Noto Sans Devanagari', var(--font-body), sans-serif;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
 .biTitle {
   font-family: 'Noto Sans Devanagari', 'Mukta', var(--font-body), sans-serif;
   font-size: 15px;
@@ -1097,3 +1105,113 @@
 .irnCompact .irnText { width: 100%; }
 .paper[data-paper='a5'] .irnText { font-size: 8.5px; }
 .paper[data-paper='a5'] .irnMono { font-size: 8px; }
+
+.shipTo {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed currentColor;
+  border-top-color: color-mix(in srgb, currentColor 25%, transparent);
+}
+
+/* ── Extra details: printable custom fields (6.23) ────────────── */
+.extra {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--tpl-accent);
+  background: var(--tpl-soft);
+  border-radius: 4px;
+}
+
+.extraCompact {
+  margin: 6px 0;
+}
+
+.extraGrid {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 16px;
+}
+
+.extraCompact .extraGrid {
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+
+.extraItem {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  min-width: 0;
+}
+
+.extraItem dt {
+  color: var(--tpl-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.extraItem dt::after {
+  content: ':';
+}
+
+.extraItem dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Composition dealer declaration (Rule 49), printed under every layout. */
+.supplyDeclaration {
+  margin-top: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--tpl-accent);
+  border-radius: 4px;
+  color: var(--tpl-accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.01em;
+  break-inside: avoid;
+}
+
+/* ── Copy banner (P0-9: Original / Duplicate / Triplicate) ─────── */
+.copyBanner {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: calc(var(--tpl-gap) * -0.5);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.copyBanner span {
+  border: 1px solid var(--tpl-accent);
+  border-radius: 3px;
+  padding: 2px 8px;
+}
+
+.paper[data-paper='thermal80'] .copyBanner { justify-content: center; margin-bottom: 0; }
+
+/* ── Pre-printed stationery (P2): no letterhead, no backgrounds ── */
+.preHead {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 1px solid var(--tpl-line);
+  padding-bottom: 6px;
+}
+
+.preHead strong { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tpl-ink); }
+.preHead span { font-family: var(--font-mono); font-size: 11px; color: var(--tpl-body); }
+
+.paper[data-preprinted] { background: transparent !important; box-shadow: none; }
+.paper[data-preprinted]::before,
+.paper[data-preprinted]::after { display: none !important; }
+.paper[data-preprinted] .watermark,
+.paper[data-preprinted] .letterFoot { display: none; }
+.paper[data-preprinted] .gSeller { visibility: hidden; }
+.paper[data-preprinted] .gTitle { background: transparent; color: var(--tpl-ink); }

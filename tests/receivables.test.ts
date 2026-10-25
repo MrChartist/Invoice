@@ -20,7 +20,7 @@ import {
   topDebtors,
   type ReceiptRow,
 } from '../src/lib/receivables.ts';
-import type { InvoiceRecord } from '../src/types/invoice.ts';
+import type { Client, InvoiceRecord } from '../src/types/invoice.ts';
 
 /* Fixed "today": 7 Oct 2026 (local). */
 const NOW = new Date(2026, 9, 7);
@@ -69,10 +69,10 @@ const invoices: InvoiceRecord[] = [
   inv({ id: 'can', status: 'Cancelled', total: 8888, issue_date: '2026-09-02' }),
   inv({ id: 'qtn', doc_type: 'QUOTATION', total: 7777, issue_date: '2026-09-02' }),
   inv({
-    id: 'inv4', client: { name: 'Beta Co' }, issue_date: '2026-08-01', due_date: '2026-08-31',
+    id: 'inv4', client: { name: 'Beta Co' } as Client, issue_date: '2026-08-01', due_date: '2026-08-31',
     total: 3000, amount_paid: 3000, status: 'Paid', updated_at: '2026-08-20T10:00:00',
   }),
-  inv({ id: 'inv5', client: { name: 'beta co' }, issue_date: '2026-09-15', due_date: '2026-09-20', total: 2000, amount_paid: 2500, status: 'Paid' }),
+  inv({ id: 'inv5', client: { name: 'beta co' } as Client, issue_date: '2026-09-15', due_date: '2026-09-20', total: 2000, amount_paid: 2500, status: 'Paid' }),
 ];
 const payments: ReceiptRow[] = [
   pay('inv1', 4000, '2026-06-20'),
@@ -199,7 +199,7 @@ test('DSO over 90 days = net receivables / net sales x 90', () => {
 });
 
 test('currency filter keeps currencies apart', () => {
-  const mixed = [...invoices, inv({ id: 'usd1', currency: 'USD', total: 50, client: { id: 'u', name: 'US Inc' } })];
+  const mixed = [...invoices, inv({ id: 'usd1', currency: 'USD', total: 50, client: { id: 'u', name: 'US Inc' } as Client })];
   assert.deepEqual(currenciesIn(mixed), ['INR', 'USD']);
   const usd = buildReceivables({ invoices: mixed, payments }, { currency: 'USD', now: NOW });
   assert.equal(usd.totals.net, 50);

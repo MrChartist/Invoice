@@ -1,0 +1,180 @@
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { Boxes, Download, IndianRupee, Landmark, Receipt, Store, TrendingUp, Wallet } from 'lucide-react';
+import { useCan } from '../../hooks/useCan';
+import { useToast } from '../ui/useToast';
+import { ALL_TILES, computeTiles, forBranch, loadTilePrefs, saveTilePrefs, type TileId } from '../../lib/dashboard-tiles';
+import { loadBooksData } from '../../lib/books';
+import { loadPositions } from '../../lib/inventory';
+import { UNASSIGNED, branchesDb } from '../../lib/branch';
+import { getTable } from '../../lib/storage';
+import { localDb } from '../../lib/localDb';
+import { buildCatalogueHtml } from '../../lib/catalogue-html';
+import { downloadText } from '../../lib/download';
+import type { CreditLink } from '../../lib/stats';
+import { cn, formatCurrency } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { tilesT } from '../../i18n/areas/extras';
+import controls from '../../styles/controls.module.css';
+import surface from '../../styles/surface.module.css';
+import own from './tiles.module.css';
+
+const ApprovalsPanel = lazy(() => import('../approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalsPanel })));
+const BranchesPanel = lazy(() => import('../branches/BranchesPanel').then((m) => ({ default: m.BranchesPanel })));
+const AmcPanel = lazy(() => import('../amc/AmcPanel').then((m) => ({ default: m.AmcPanel })));
+const LoyaltyPanel = lazy(() => import('../loyalty/LoyaltyPanel').then((m) => ({ default: m.LoyaltyPanel })));
+
+const TILE_LABEL: Record<TileId, Parameters<typeof tilesT>[0]> = {
+  receivables: 'receivables',
+  payables: 'payables',
+  cashBank: 'cashBank',
+  gstDue: 'gstDue',
+  topItems: 'topItems',
+  lowStock: 'lowStock',
+  branches: 'branches',
+  approvals: 'approvals',
+  amcDue: 'amcDue',
+  loyalty: 'loyalty',
+};
+
+/**
+ * Configurable dashboard tiles (WP-9, P1-17). Mounted lazily below the dashboard's own content,
+ * so first paint is unchanged; the figures are computed here, after the chunk loads.
+ */
+export function DashboardTiles() {
+  useT();
+  const { can, actor } = useCan();
+  const { notify, toastNode } = useToast();
+  const userId = actor?.id ?? 'default';
+  const [tiles, setTiles] = useState<TileId[]>(() => loadTilePrefs(userId));
+  const [branch, setBranch] = useState('');
+  const [tick, setTick] = useState(0);
+  const branches = useMemo(() => branchesDb.all(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const data = useMemo(() => {
+    const showStock = tiles.includes('lowStock');
+    let stock: { name: string; qty: number; unit: string; reorder: number; isLow: boolean }[] = [];
+    if (showStock) {
+      try {
+        stock = loadPositions().map((p) => ({ name: p.item.name, qty: p.qty, unit: p.item.unit || '', reorder: Number(p.item.reorder_level) || 0, isLow: p.isLow }));
+      } catch {
+        stock = [];
+      }
+    }
+    return { books: loadBooksData(), links: getTable<CreditLink>('doc_links'), branches, stock };
+  }, [tiles, branches]);
+  const v = useMemo(() => computeTiles(forBranch(data, branch)), [data, branch]);
+  const on = (t: TileId) => tiles.includes(t);
+
+  const toggle = (t: TileId) => {
+    const next = on(t) ? tiles.filter((x) => x !== t) : [...tiles, t];
+    setTiles(next);
+    try {
+      saveTilePrefs(next, userId);
+    } catch {
+      /* a viewer's preference just is not remembered */
+    }
+  };
+
+  const exportCatalogue = () => {
+    const p = localDb.settings.activeProfile();
+    const stock = new Map<string, number>();
+    try {
+      for (const s of loadPositions()) if (s.item.track_stock) stock.set(s.item.name.trim().toLowerCase(), s.qty);
+    } catch {
+      /* no stock */
+    }
+    const html = buildCatalogueHtml(localDb.items.getAll(), { business: p?.companyName || '', phone: p?.companyPhone, email: p?.companyEmail, address: p?.companyAddress, gstin: p?.companyGstin, stock });
+    downloadText('catalogue.html', html, 'text/html');
+    notify(tilesT('catalogueDone'));
+  };
+
+  const money = (n: number) => formatCurrency(n);
+  const stat = (id: TileId, icon: ReactNode, value: string, hint: string, to?: string) => (
+    <div className={surface.stat} data-tile={id} key={id}>
+      <div className={surface.statTop}>
+        <span className={surface.statLabel}>{tilesT(TILE_LABEL[id])}</span>
+        <span className={surface.statIcon}>{icon}</span>
+      </div>
+      <div className={surface.statValue}>{to ? <Link to={to}>{value}</Link> : value}</div>
+      <div className={surface.statHint}>{hint}</div>
+    </div>
+  );
+
+  return (
+    <section className={own.wrap} aria-label={tilesT('title')}>
+      <div className={own.head}>
+        <h2 className={own.title}><Boxes size={16} /> {tilesT('title')}</h2>
+        <div className={own.tools}>
+          {branches.length > 0 && (
+            <select className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={tilesT('branchFilter')}>
+              <option value="">{tilesT('allBranches')}</option>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              <option value={UNASSIGNED}>{tilesT('noBranch')}</option>
+            </select>
+          )}
+          <details className={own.picker}>
+            <summary>{tilesT('customise')}</summary>
+            <div className={own.pickerBody}>
+              {ALL_TILES.map((t) => (
+                <label key={t} className={controls.check}>
+                  <input type="checkbox" checked={on(t)} onChange={() => toggle(t)} /> {tilesT(TILE_LABEL[t])}
+                </label>
+              ))}
+              {can('view') && (
+                <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={exportCatalogue}>
+                  <Download size={14} /> {tilesT('catalogue')}
+                </button>
+              )}
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div className={surface.statGrid}>
+        {on('receivables') && stat('receivables', <Receipt size={16} />, money(v.receivables.outstanding), tilesT('overdueHint', { amount: money(v.receivables.overdue), n: String(v.receivables.overdueCount) }), '/receivables')}
+        {on('payables') && stat('payables', <Wallet size={16} />, money(v.payables.due), tilesT('billsHint', { n: String(v.payables.bills) }), '/expenses')}
+        {on('cashBank') && stat('cashBank', <Landmark size={16} />, money(v.cashBank.cash + v.cashBank.bank), tilesT('cashBankHint', { cash: money(v.cashBank.cash), bank: money(v.cashBank.bank) }), '/books')}
+        {on('gstDue') && stat('gstDue', <IndianRupee size={16} />, money(v.gstDue.payable + v.gstDue.cess), tilesT('gstHint', { month: v.gstDue.month }), '/gst-reports')}
+      </div>
+
+      <div className={own.grid}>
+        {on('topItems') && (
+          <div className={surface.card} data-tile="topItems">
+            <div className={surface.cardHead}><span className={surface.cardHeadIcon}><TrendingUp size={16} /> {tilesT('topItems')}</span></div>
+            <div className={surface.cardBody}>
+              {v.topItems.length === 0 ? <p className={controls.hint}>{tilesT('noSales')}</p> : (
+                <ol className={own.list}>
+                  {v.topItems.map((t) => <li key={t.name}><span>{t.name} <small>× {t.qty}</small></span><strong>{money(t.value)}</strong></li>)}
+                </ol>
+              )}
+            </div>
+          </div>
+        )}
+        {on('lowStock') && (
+          <div className={surface.card} data-tile="lowStock">
+            <div className={surface.cardHead}><span className={surface.cardHeadIcon}><Boxes size={16} /> {tilesT('lowStock')}</span></div>
+            <div className={surface.cardBody}>
+              {v.lowStock.length === 0 ? <p className={controls.hint}>{tilesT('stockOk')}</p> : (
+                <ul className={own.list}>
+                  {v.lowStock.map((s) => <li key={s.name}><Link to="/inventory">{s.name}</Link><strong>{tilesT('stockLine', { qty: String(s.qty), unit: s.unit, reorder: String(s.reorder) })}</strong></li>)}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+        <Suspense fallback={null}>
+          {on('branches') && (
+            <div data-tile="branches">
+              <BranchesPanel rows={v.branches} canEdit={can('master.edit')} onChanged={() => setTick((t) => t + 1)} notify={notify} icon={<Store size={16} />} />
+            </div>
+          )}
+          {on('approvals') && <div data-tile="approvals"><ApprovalsPanel notify={notify} /></div>}
+          {on('amcDue') && <div data-tile="amcDue"><AmcPanel notify={notify} icon={<Boxes size={16} />} /></div>}
+          {on('loyalty') && <div data-tile="loyalty"><LoyaltyPanel notify={notify} /></div>}
+        </Suspense>
+      </div>
+      <p className={controls.hint}>{tilesT('footnote')}</p>
+      {toastNode}
+    </section>
+  );
+}

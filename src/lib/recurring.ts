@@ -18,6 +18,7 @@ import { localDb } from './localDb';
 import { generateId, getTable, setTable } from './storage';
 import { isPeriodLockedError } from './period-lock';
 import { normalizeRecord } from '../store/invoice-defaults';
+import { liveDocTrackingIssues } from './stock-tracking';
 
 export const RECURRING_TABLE = 'recurring';
 /** Most missed occurrences materialised in a single catch-up. */
@@ -71,6 +72,11 @@ export interface RecurringTemplate {
   tds_section?: string;
   tds_rate?: number;
   tds_on_taxable?: boolean;
+  /** Additive: freight / other charges are taxed (roadmap 3.3). The exchange rate is NOT kept:
+      each occurrence needs the rate of its own date. */
+  charges_taxable?: boolean;
+  /** Additive (6.16): cost centre each generated invoice is booked to. */
+  cost_centre_id?: string;
 }
 
 export interface RecurringHistoryEntry {
@@ -333,7 +339,13 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
     template_id: inv.template_id,
     client: { ...inv.client },
     sender: inv.sender ? { ...inv.sender } : null,
-    items: inv.items.filter((i) => i.name?.trim() || num(i.rate) > 0).map((i) => ({ ...i })),
+    // Serials and batches belong to one sale: every occurrence picks its own (6.6 / 6.11).
+    items: inv.items
+      .filter((i) => i.name?.trim() || num(i.rate) > 0)
+      .map(({ serials: _s, batch_no: _b, batch_expiry: _e, batch_mfg: _m, ...i }) => {
+        void [_s, _b, _e, _m];
+        return { ...i };
+      }),
     gst_mode: inv.gst_mode,
     place_of_supply: inv.place_of_supply,
     reverse_charge: inv.reverse_charge,
@@ -359,12 +371,15 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
     tds_section: inv.tds_section,
     tds_rate: inv.tds_rate,
     tds_on_taxable: inv.tds_on_taxable,
+    ...(inv.charges_taxable ? { charges_taxable: true } : {}),
+    ...(inv.cost_centre_id ? { cost_centre_id: inv.cost_centre_id } : {}),
   };
 }
 
 /** Totals for one run of a template, via the same engine the creator uses. */
 export function templateTotals(t: RecurringTemplate) {
-  return calculateInvoice(calcInputFromRecord(t as Partial<InvoiceRecord>, { amount_paid: 0 }));
+  // Each run is a new document: on reverse charge the tax stays out of its total (src/lib/rcm.ts).
+  return calculateInvoice(calcInputFromRecord(t as Partial<InvoiceRecord>, { amount_paid: 0, rcm_exclude_tax: !!t.reverse_charge }));
 }
 
 /** Approximate revenue per month if the schedule runs forever. */
@@ -408,6 +423,9 @@ export function createSchedule(input: {
 }
 
 /** Pure: one invoice for one occurrence. No storage access. */
+/** Id of the document generated for one occurrence of a schedule (stable across devices). */
+export const recurringDocId = (scheduleId: string, occurrence: string): string => `rec-${scheduleId}-${occurrence}`;
+
 export function buildInvoiceFromSchedule(
   s: RecurringSchedule,
   occurrence: string,
@@ -415,24 +433,29 @@ export function buildInvoiceFromSchedule(
 ): GeneratedInvoice {
   const t = s.template;
   const issue = opts.issueDate || occurrence;
+  // Deterministic ids per (schedule, occurrence): with folder sync (5.7) two devices generating the same
+  // occurrence produce ONE document (merged by id), never two invoices with two numbers.
+  const docId = recurringDocId(s.id, occurrence);
   const raw = {
     ...t,
-    id: '',
+    id: docId,
     invoice_number: opts.invoiceNumber,
     issue_date: issue,
     due_date: addDays(issue, s.due_in_days),
     status: s.mode === 'issue' ? 'Sent' : 'Draft',
     amount_paid: 0,
-    items: t.items.map((i) => ({
+    items: t.items.map((i, n) => ({
       ...i,
-      id: generateId(),
+      id: `${docId}-l${n + 1}`,
       name: applyTokens(i.name, occurrence),
       description: applyTokens(i.description, occurrence),
     })),
     notes: applyTokens(t.notes, occurrence),
     terms: applyTokens(t.terms, occurrence),
   };
-  const rec = normalizeRecord(raw, t.template_id);
+  const normalized = normalizeRecord(raw, t.template_id);
+  // A generated document is new: on reverse charge its tax stays out of the total (src/lib/rcm.ts).
+  const rec = normalized.reverse_charge && normalized.doc_type !== 'BILL_OF_SUPPLY' ? { ...normalized, rcm_tax_excluded: true } : normalized;
   const totals = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
   return {
     ...rec,
@@ -481,6 +504,11 @@ export interface GenerateResult {
   invoice: InvoiceRecord;
   /** False when the occurrence had already been generated (idempotent hit). */
   created: boolean;
+  /**
+   * 'issue' schedules only: why the invoice was saved as a Draft instead (batch / serial / godown checks
+   * failed — recurring templates carry no serials or batches, so tracked items must be picked by hand).
+   */
+  heldAsDraft?: string[];
 }
 
 /**
@@ -504,9 +532,20 @@ export function generateInvoiceFromSchedule(
     s.template.doc_type,
     s.template.sender?.invoicePrefix || undefined,
   );
-  const built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
+  let built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
+  // Issuing straight away skips the editor, so run its stock checks here; a tracked item that needs a
+  // serial / batch (or an expired batch) keeps the invoice a Draft for the user to complete.
+  let heldAsDraft: string[] | undefined;
+  if (built.status !== 'Draft') {
+    const issues = liveDocTrackingIssues(built);
+    const problems = [...issues.errors, ...issues.expired];
+    if (problems.length) {
+      heldAsDraft = problems;
+      built = { ...built, status: 'Draft' };
+    }
+  }
   const saved = localDb.invoices.save(built);
-  return { invoice: saved, created: true };
+  return { invoice: saved, created: true, ...(heldAsDraft ? { heldAsDraft } : {}) };
 }
 
 /** Pure: schedule after consuming occurrences (generated and/or skipped). */
@@ -566,9 +605,10 @@ export function runDueSchedules(today: string): RunReport {
       }
       for (const occurrence of due.dates) {
         try {
-          const { invoice, created } = generateInvoiceFromSchedule(current, occurrence);
+          const { invoice, created, heldAsDraft } = generateInvoiceFromSchedule(current, occurrence);
           current = recordGenerated(current, occurrence, invoice);
           if (created) report.generated.push(invoice);
+          if (heldAsDraft) report.errors.push(`${listed.name}: ${invoice.invoice_number} saved as a draft — ${heldAsDraft[0]}`);
         } catch (err) {
           // An occurrence inside the locked period is skipped (counted), never forced in.
           if (!isPeriodLockedError(err)) throw err;
@@ -583,13 +623,7 @@ export function runDueSchedules(today: string): RunReport {
   return report;
 }
 
-export function recurringToastMessage(generated: InvoiceRecord[]): string {
-  const n = generated.length;
-  if (n === 0) return '';
-  const drafts = generated.filter((g) => g.status === 'Draft').length;
-  const base = `${n} recurring invoice${n === 1 ? '' : 's'} created`;
-  return drafts === n ? `${base} as draft${n === 1 ? '' : 's'} for review` : base;
-}
+export { recurringToastMessage } from './recurring-message';
 
 /* ── Manual actions ───────────────────────────────────────────── */
 

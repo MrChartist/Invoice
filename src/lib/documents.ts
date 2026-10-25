@@ -6,16 +6,30 @@
  * storage-backed wrappers that persist through `localDb.invoices.save` (so the
  * client / catalogue sync keeps working) and the `doc_links` table.
  *
- * Debit notes: `DocumentType` has no DEBIT_NOTE (shared type file is frozen),
- * so a debit note is an INVOICE whose `po_number` holds the original invoice
- * number, whose notes say "Debit note against …", and which is tied to the
- * original by a `debit_note` doc_link.
+ * Sales orders convert partially (pending quantities only) — see `sales-orders.ts`.
+ *
+ * Debit notes are their own DEBIT_NOTE type (DBN series), tied to the original
+ * by a `debit_note` doc_link. Sales orders convert partially: only the quantity
+ * still pending goes onto the new challan / invoice (see `sales-orders.ts`).
  */
 
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
+import { receivableTotal } from './rcm';
+import { reasonReturnsGoods } from './credit-restock';
 import { localDb } from './localDb';
-import { isPeriodLockedError } from './period-lock';
+import { getLockUntil, isPeriodLockedError } from './period-lock';
+import { amendmentCheck, buildAmendment, canAmend } from './amendments';
+import { loadFiled } from './compliance';
+import { orderConversionBlocked, orderFulfilment, pendingQuantities } from './sales-orders';
+import { liveDocTrackingIssues } from './stock-tracking';
+import { liveRemovalIssues, assertRemovable } from './stock-timeline';
+import { ADVANCES_TABLE, advanceBalance } from './advance-tax';
+import { doubleBilledRows, liveInvoiceIds, mileageDb, timeDb } from './timesheets';
+import { purchasesDb } from './purchases';
+import { REJECTIONS_IN_TABLE, rejectedByLine } from './rejections-in';
+import type { RejectionIn } from '../types/job-work';
+import type { AdvanceRecord } from '../types/advances';
 import {
   DOCUMENT_LABELS,
   type DocumentType,
@@ -62,16 +76,20 @@ export const CREDIT_REASONS = [
 
 /* ── Transition matrix ─────────────────────────────────────────── */
 
-const SALES_INVOICE_TARGETS: DocumentType[] = ['TAX_INVOICE', 'INVOICE'];
+const SALES_INVOICE_TARGETS: DocumentType[] = ['TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY'];
 
 const TRANSITIONS: Record<DocumentType, DocumentType[]> = {
-  QUOTATION: ['PROFORMA', ...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
+  QUOTATION: ['SALES_ORDER', 'PROFORMA', ...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
+  // Sales orders convert PARTIALLY: only the quantity still pending (see sales-orders.ts).
+  SALES_ORDER: ['DELIVERY_CHALLAN', ...SALES_INVOICE_TARGETS],
   PROFORMA: [...SALES_INVOICE_TARGETS, 'DELIVERY_CHALLAN'],
   INVOICE: ['DELIVERY_CHALLAN'],
   TAX_INVOICE: ['DELIVERY_CHALLAN'],
+  BILL_OF_SUPPLY: ['DELIVERY_CHALLAN'],
   DELIVERY_CHALLAN: [...SALES_INVOICE_TARGETS],
   // Credit notes are only ever raised from an invoice via createCreditNote.
   CREDIT_NOTE: [],
+  DEBIT_NOTE: [],
 };
 
 export interface ConversionOption {
@@ -79,23 +97,27 @@ export interface ConversionOption {
   label: string;
 }
 
+/** A sales bill: invoice, tax invoice or Bill of Supply (credit / debit notes and receivables treat them alike). */
 export function isInvoiceType(t: DocumentType): boolean {
-  return t === 'INVOICE' || t === 'TAX_INVOICE';
+  return t === 'INVOICE' || t === 'TAX_INVOICE' || t === 'BILL_OF_SUPPLY';
 }
 
 /** Conversions allowed for a document. Cancelled documents cannot be converted. */
 export function allowedConversions(
-  source: Pick<InvoiceRecord, 'doc_type' | 'status'>,
+  source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on'>>,
 ): ConversionOption[] {
   if (source.status === 'Cancelled') return [];
+  // A closed sales order takes no more challans / invoices until it is reopened.
+  if (source.doc_type === 'SALES_ORDER' && source.order_closed_on) return [];
+  const pending = source.doc_type === 'SALES_ORDER' ? ' (pending qty)' : '';
   return (TRANSITIONS[source.doc_type] ?? []).map((target) => ({
     target,
-    label: `Convert to ${DOCUMENT_LABELS[target]}`,
+    label: `Convert to ${DOCUMENT_LABELS[target]}${pending}`,
   }));
 }
 
 export function canConvert(
-  source: Pick<InvoiceRecord, 'doc_type' | 'status'>,
+  source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on'>>,
   target: DocumentType,
 ): boolean {
   return allowedConversions(source).some((o) => o.target === target);
@@ -121,7 +143,12 @@ export function addDays(isoDate: string, days: number): string {
   return localIsoDate(dt);
 }
 
-function recompute(rec: InvoiceRecord): InvoiceRecord {
+function recompute(input: InvoiceRecord): InvoiceRecord {
+  // A NEW document (conversion, credit / debit note) on reverse charge is calculated the current way:
+  // the tax is payable by the recipient and stays out of its total (src/lib/rcm.ts).
+  const rec: InvoiceRecord = input.reverse_charge && input.doc_type !== 'BILL_OF_SUPPLY'
+    ? { ...input, rcm_tax_excluded: true }
+    : { ...input, rcm_tax_excluded: undefined };
   // The FULL record goes in (supply type, tax-inclusive pricing, cess, TCS/TDS,
   // round mode): a credit note against an export/LUT invoice must stay zero-rated.
   const t = calculateInvoice(calcInputFromRecord(rec));
@@ -164,6 +191,80 @@ export interface ConvertContext {
   invoice_number: string;
   today: string;
   dueDays: number;
+  /**
+   * Sales order source only: quantity still pending per order line id. Lines that are absent
+   * (or zero) are left off the new document.
+   */
+  pending?: Record<string, number>;
+  /** Sales order source only: carry shipping / other charges (false once an earlier document of this kind took them). */
+  carryCharges?: boolean;
+  /** Delivery challan source only (7M): quantity rejected per challan line id (Rejections In); billed is the balance. */
+  rejected?: Record<string, number>;
+}
+
+/** A challan's lines less what the customer rejected (Rejections In); fully rejected lines are left off. */
+function challanPart(source: InvoiceRecord, rejected: Record<string, number>): Partial<InvoiceRecord> {
+  const items: InvoiceItem[] = [];
+  let partial = false;
+  for (const line of source.items ?? []) {
+    const rej = num(rejected[line.id]);
+    if (!(rej > 0)) {
+      items.push({ ...line, id: generateId() });
+      continue;
+    }
+    partial = true;
+    const q = round2(num(line.quantity) - rej);
+    if (q > 0) items.push({ ...line, id: generateId(), quantity: q, amount: round2(q * num(line.rate)) });
+  }
+  if (items.length === 0) throw new DocumentError('Everything on this challan was rejected: there is nothing to invoice.');
+  return {
+    items,
+    ...(partial && source.discount_type === 'AMOUNT' && num(source.discount_rate) > 0
+      ? { discount_type: 'PERCENT' as const, discount_rate: equivalentDiscountPct(source) }
+      : {}),
+  };
+}
+
+/** The invoice-level discount re-expressed as a percent of the net line value, so a part-document gets its share. */
+function equivalentDiscountPct(invoice: InvoiceRecord): number {
+  const calc = calculateInvoice(
+    calcInputFromRecord(invoice, {
+      shipping: 0,
+      other_charges: 0,
+      round_off_enabled: false,
+      round_mode: 'none',
+      amount_paid: 0,
+    }),
+  );
+  const netBase = round2(calc.subtotal - calc.line_discount_total);
+  return netBase > 0 ? (calc.invoice_discount_amount / netBase) * 100 : 0;
+}
+
+/** Sales order → challan / invoice: only the pending quantity, each line stamped with the order line it fulfils. */
+function orderPart(source: InvoiceRecord, ctx: ConvertContext): Partial<InvoiceRecord> {
+  const pending = ctx.pending ?? {};
+  const items: InvoiceItem[] = [];
+  let partial = false;
+  for (const line of source.items ?? []) {
+    const q = round2(num(pending[line.id]));
+    if (q <= 0) {
+      if (num(line.quantity) > 0) partial = true;
+      continue;
+    }
+    if (q < num(line.quantity)) partial = true;
+    items.push({ ...line, id: generateId(), quantity: q, amount: round2(q * num(line.rate)), order_line_id: line.id });
+  }
+  if (items.length === 0) throw new DocumentError('Nothing is pending on this sales order.');
+  const carry = ctx.carryCharges !== false;
+  return {
+    items,
+    sales_order_id: source.id,
+    order_closed_on: undefined,
+    ...(partial && source.discount_type === 'AMOUNT' && num(source.discount_rate) > 0
+      ? { discount_type: 'PERCENT' as const, discount_rate: equivalentDiscountPct(source) }
+      : {}),
+    ...(carry ? {} : { shipping: 0, other_charges: 0 }),
+  };
 }
 
 /** Pure: the new draft produced by converting `source` to `target`. */
@@ -193,8 +294,23 @@ export function buildConvertedDraft(
     // A derived document is not itself the recurring occurrence it was copied from.
     recurring_id: undefined,
     recurring_date: undefined,
+    late_fee_for: undefined,
+    // Attachments belong to the source document (its signed copy, its receipts), not the new one.
+    attachments: undefined,
     created_at: undefined,
     updated_at: undefined,
+    order_closed_on: undefined,
+    // An amendment marker belongs to the one document that was amended — never to a copy.
+    amends: undefined,
+    pos: undefined,
+    // A challan's Rule 55 purpose (GSTR-1 Table 13) means nothing on the invoice it becomes.
+    challan_purpose: target === 'DELIVERY_CHALLAN' ? source.challan_purpose : undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
+    branch_transfer_id: undefined,
+    ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
+    ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
+    ...(source.doc_type === 'DELIVERY_CHALLAN' && ctx.rejected && target !== 'DELIVERY_CHALLAN' ? challanPart(source, ctx.rejected) : {}),
   };
   return recompute(draft);
 }
@@ -203,7 +319,7 @@ export function buildConvertedDraft(
 export function statusAfterConversion(
   source: Pick<InvoiceRecord, 'doc_type' | 'status'>,
 ): InvoiceStatus {
-  if ((source.doc_type === 'QUOTATION' || source.doc_type === 'PROFORMA') && source.status === 'Draft') {
+  if ((source.doc_type === 'QUOTATION' || source.doc_type === 'PROFORMA' || source.doc_type === 'SALES_ORDER') && source.status === 'Draft') {
     return 'Sent';
   }
   return source.status;
@@ -213,23 +329,41 @@ export function statusAfterConversion(
 export function convertDocument(source: InvoiceRecord, target: DocumentType): InvoiceRecord {
   const today = localIsoDate();
   const settings = localDb.settings.get();
+  let order: Pick<ConvertContext, 'pending' | 'carryCharges'> = {};
+  if (source.doc_type === 'SALES_ORDER' && canConvert(source, target)) {
+    const all = localDb.invoices.getAll();
+    const links = readLinks();
+    const fresh = all.find((i) => i.id === source.id) ?? source;
+    const f = orderFulfilment(fresh, all, links);
+    const kind = target === 'DELIVERY_CHALLAN' ? 'deliver' : 'invoice';
+    const blocked = orderConversionBlocked(f, kind);
+    if (blocked) throw new DocumentError(blocked);
+    const sameKind = (t: DocumentType) => (kind === 'deliver' ? t === 'DELIVERY_CHALLAN' : isInvoiceType(t));
+    order = {
+      pending: pendingQuantities(f, kind),
+      carryCharges: !all.some((d) => f.documentIds.includes(d.id) && sameKind(d.doc_type)),
+    };
+  }
+  const rejected = source.doc_type === 'DELIVERY_CHALLAN' ? rejectedByLine(getTable<RejectionIn>(REJECTIONS_IN_TABLE), source.id) : {};
   const draft = buildConvertedDraft(source, target, {
+    ...(Object.keys(rejected).length ? { rejected } : {}),
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, target, source.sender?.invoicePrefix || undefined),
     today,
     dueDays: num(settings.defaultDueDays, 14),
+    ...order,
   });
   const saved = localDb.invoices.save(draft);
   addLink({ from_id: source.id, to_id: saved.id, relation: 'converted' });
 
   const nextStatus = statusAfterConversion(source);
-  if (nextStatus !== source.status) {
-    try {
-      localDb.invoices.setStatus(source.id, nextStatus);
-    } catch (err) {
-      // A source document inside a locked period keeps its status; the conversion itself still stands.
-      if (!isPeriodLockedError(err)) throw err;
-    }
+  // Converting a quotation means the client said yes.
+  try {
+    if (nextStatus !== source.status) localDb.invoices.setStatus(source.id, nextStatus);
+    if (source.doc_type === 'QUOTATION' && !source.quote_status) localDb.invoices.setQuoteStatus(source.id, 'Accepted');
+  } catch (err) {
+    // A source document inside a locked period keeps its status; the conversion itself still stands.
+    if (!isPeriodLockedError(err)) throw err;
   }
   return saved;
 }
@@ -298,12 +432,17 @@ export function totalCredited(
   links: DocLink[],
   allInvoices: InvoiceRecord[],
 ): number {
-  return round2(creditNotesFor(invoiceId, links, allInvoices).reduce((s, c) => s + num(c.total), 0));
+  return round2(creditNotesFor(invoiceId, links, allInvoices).reduce((s, c) => s + receivableTotal(c), 0));
 }
 
 export interface CreditInput {
   lines: CreditLineRequest[];
   reason: string;
+  /**
+   * Goods come back into stock (the form's "Goods returned to stock" box). Defaults to the reason:
+   * on for a sales return, off for a discount / rate difference / GST correction / cancelled service.
+   */
+  goodsReturned?: boolean;
 }
 
 export interface CreditDraftResult {
@@ -331,6 +470,15 @@ export function buildCreditNote(
   if (!input.reason?.trim()) errors.push('Choose a reason for the credit note.');
 
   const status = creditableLines(invoice, links, allInvoices);
+  // Serials already taken back by earlier live credit notes against this invoice (per line).
+  const returnedSerials = new Map<string, Set<string>>();
+  for (const cn of creditNotesFor(invoice.id, links, allInvoices)) {
+    for (const it of cn.items ?? []) {
+      const set = returnedSerials.get(it.id) ?? new Set<string>();
+      for (const s of it.serials ?? []) set.add(s.trim().toUpperCase());
+      returnedSerials.set(it.id, set);
+    }
+  }
   const picked: InvoiceItem[] = [];
   for (const req of input.lines) {
     const qty = round2(num(req.quantity));
@@ -347,29 +495,34 @@ export function buildCreditNote(
       continue;
     }
     // Same id as the original line: that is how cumulative credit is tracked.
-    picked.push({ ...line.item, quantity: qty, amount: round2(qty * num(line.item.rate)) });
+    picked.push({
+      ...line.item,
+      quantity: qty,
+      amount: round2(qty * num(line.item.rate)),
+      // A partial credit returns only as many serials as units: the first ones NOT already returned on an
+      // earlier credit note against this line (edit the note to choose others).
+      ...(line.item.serials?.length
+        ? { serials: line.item.serials.filter((s) => !returnedSerials.get(line.item.id)?.has(s.trim().toUpperCase())).slice(0, Math.floor(qty)) }
+        : {}),
+    });
   }
   if (picked.length === 0 && errors.length === 0) {
     errors.push('Enter a quantity to credit on at least one line.');
   }
   if (errors.length) return { record: null, errors };
+  const goodsReturned = input.goodsReturned ?? reasonReturnsGoods(input.reason);
+  // No goods come back: no serials are returned either (stock tracking follows the same flag).
+  if (!goodsReturned) {
+    for (const p of picked) delete p.serials;
+  }
 
   // Re-express the original invoice-level discount as an equivalent percent so
   // a partial credit gets a proportional share of it.
-  const origCalc = calculateInvoice(
-    calcInputFromRecord(invoice, {
-      shipping: 0,
-      other_charges: 0,
-      round_off_enabled: false,
-      round_mode: 'none',
-      amount_paid: 0,
-    }),
-  );
-  const netBase = round2(origCalc.subtotal - origCalc.line_discount_total);
-  const discountPct = netBase > 0 ? (origCalc.invoice_discount_amount / netBase) * 100 : 0;
+  const discountPct = equivalentDiscountPct(invoice);
 
   const base: InvoiceRecord = {
     ...invoice,
+    attachments: undefined, // never copied from the original (6.12)
     id: ctx.id,
     invoice_number: ctx.invoice_number,
     doc_type: 'CREDIT_NOTE',
@@ -388,8 +541,16 @@ export function buildCreditNote(
     notes: `Credit note against ${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number} dated ${invoice.issue_date}. Reason: ${input.reason.trim()}.`,
     recurring_id: undefined,
     recurring_date: undefined,
+    late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
+    amends: undefined,
+    pos: undefined,
+    transport: undefined, // the original's dispatch details (P1-24)
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
+    branch_transfer_id: undefined,
+    goods_returned: goodsReturned,
   };
   const rec = recompute(base);
   // A credit note is not receivable; it reduces the original's balance.
@@ -398,7 +559,8 @@ export function buildCreditNote(
   // Compare BEFORE whole-rupee round-off: every credit note is rounded on its own,
   // so two part-credits that together cover the invoice can each round up and sum
   // to a rupee more than the (also rounded) invoice — which must not block them.
-  const preRound = (r: Pick<InvoiceRecord, 'total' | 'round_off'>) => num(r.total) - num(r.round_off);
+  // Reverse charge: compare what the customer owes (an older invoice's stored total includes the tax).
+  const preRound = (r: InvoiceRecord) => receivableTotal(r) - num(r.round_off);
   const already = round2(
     creditNotesFor(invoice.id, links, allInvoices).reduce((s, c) => s + preRound(c), 0),
   );
@@ -424,12 +586,15 @@ export function createCreditNote(invoice: InvoiceRecord, input: CreditInput): In
     today,
   });
   if (!record) throw new DocumentError(errors.join(' '));
+  // Same serial / batch checks as issuing from the editor (the note is saved as Sent straight away).
+  const stock = liveDocTrackingIssues(record);
+  if (stock.errors.length) throw new DocumentError(stock.errors.join(' '));
   const saved = localDb.invoices.save(record);
   addLink({ from_id: invoice.id, to_id: saved.id, relation: 'credit_note', reason: input.reason.trim() });
   return saved;
 }
 
-/* ── Debit notes (modelled as INVOICE) ─────────────────────────── */
+/* ── Debit notes (own DEBIT_NOTE type and DBN series, linked to the invoice) ─── */
 
 export interface DebitLine {
   name: string;
@@ -464,7 +629,9 @@ export function buildDebitNote(
   }));
   return recompute({
     ...invoice,
+    attachments: undefined, // never copied from the original (6.12)
     id: ctx.id,
+    doc_type: 'DEBIT_NOTE',
     invoice_number: ctx.invoice_number,
     issue_date: ctx.today,
     due_date: addDays(ctx.today, ctx.dueDays),
@@ -481,8 +648,15 @@ export function buildDebitNote(
     notes: `Debit note against ${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number} dated ${invoice.issue_date}. Reason: ${input.reason.trim()}.`,
     recurring_id: undefined,
     recurring_date: undefined,
+    late_fee_for: undefined,
     created_at: undefined,
     updated_at: undefined,
+    amends: undefined,
+    pos: undefined,
+    transport: undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
+    branch_transfer_id: undefined,
   });
 }
 
@@ -493,7 +667,7 @@ export function createDebitNote(
   const today = localIsoDate();
   const rec = buildDebitNote(invoice, input, {
     id: generateId(),
-    invoice_number: localDb.invoices.nextNumber(today, invoice.doc_type, invoice.sender?.invoicePrefix || undefined),
+    invoice_number: localDb.invoices.nextNumber(today, 'DEBIT_NOTE'),
     today,
     dueDays: num(localDb.settings.get().defaultDueDays, 14),
   });
@@ -516,12 +690,12 @@ export function effectiveOutstanding(
   allInvoices: InvoiceRecord[],
 ): number {
   if (invoice.status === 'Cancelled') return 0;
-  if (!isInvoiceType(invoice.doc_type)) return 0;
+  if (!isInvoiceType(invoice.doc_type) && invoice.doc_type !== 'DEBIT_NOTE') return 0;
   const credit = totalCredited(invoice.id, links, allInvoices);
   // TDS the customer withholds is never collectable from them (it is settled with the tax office).
   return Math.max(
     0,
-    round2(num(invoice.total) - num(invoice.tds_amount) - num(invoice.amount_paid) - credit),
+    round2(receivableTotal(invoice) - num(invoice.tds_amount) - num(invoice.amount_paid) - credit),
   );
 }
 
@@ -534,6 +708,11 @@ export function activeCancellation(id: string, links: DocLink[]): DocLink | unde
 export interface CancelOptions {
   /** Required to cancel a document that already has payments recorded. */
   acknowledgePayments?: boolean;
+  /**
+   * Cancelling a goods-returning credit note takes its goods out of stock again. When later documents
+   * already used those quantities (not serials — those always refuse), the user must confirm.
+   */
+  acknowledgeStock?: boolean;
 }
 
 export function cancelBlockedReason(invoice: InvoiceRecord, opts: CancelOptions = {}): string | null {
@@ -553,6 +732,8 @@ export function cancelDocument(
   const fresh = localDb.invoices.getById(invoice.id) ?? invoice;
   const blocked = cancelBlockedReason(fresh, opts);
   if (blocked) throw new DocumentError(blocked);
+  // A credit note's returned goods may since have been sold again (stock-timeline.ts).
+  if (fresh.doc_type === 'CREDIT_NOTE') assertRemovable(liveRemovalIssues({ refType: 'invoice', refId: fresh.id }), opts.acknowledgeStock);
   const saved = localDb.invoices.save({ ...fresh, status: 'Cancelled' });
   addLink({
     from_id: fresh.id,
@@ -566,24 +747,114 @@ export function cancelDocument(
 }
 
 export function restoredStatus(
-  inv: Pick<InvoiceRecord, 'amount_paid' | 'total'>,
+  inv: Pick<InvoiceRecord, 'amount_paid' | 'total'> & Partial<InvoiceRecord>,
   prev?: InvoiceStatus,
 ): InvoiceStatus {
   if (prev && prev !== 'Cancelled') return prev;
   const paid = num(inv.amount_paid);
-  if (paid > 0) return paid >= num(inv.total) ? 'Paid' : 'Partially Paid';
+  if (paid > 0) return paid >= receivableTotal(inv) ? 'Paid' : 'Partially Paid';
   return 'Sent';
 }
 
-/** Undo a cancellation: restores the pre-cancel status and retires the link. */
+const money2 = (n: number) => `₹${round2(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Why a cancelled document cannot come back with `status`: while it was cancelled its effects were
+ * released, and something else may have used them since —
+ *  - serials resold / batches used (the issue checks, as of its date and against later documents);
+ *  - an advance adjusted against it was applied elsewhere, so it would be over-adjusted;
+ *  - time entries, trips or re-billed costs it billed were billed on another invoice;
+ *  - its sales order was fulfilled by other documents.
+ * Pure over the given data except the stock check (live).
+ */
+export function reinstateIssues(
+  fresh: InvoiceRecord,
+  status: InvoiceStatus,
+  ctx: {
+    links: DocLink[];
+    invoices: InvoiceRecord[];
+    payments: { invoice_id: string; amount: number; advance_id?: string }[];
+    advances: AdvanceRecord[];
+    time: Parameters<typeof doubleBilledRows>[1];
+  },
+): string[] {
+  const errors: string[] = [];
+  const restored: InvoiceRecord = { ...fresh, status };
+  const all = ctx.invoices.map((i) => (i.id === fresh.id ? restored : i));
+
+  if (status !== 'Draft') errors.push(...liveDocTrackingIssues(restored).errors);
+
+  const advIds = new Set(ctx.payments.filter((p) => p.invoice_id === fresh.id && p.advance_id).map((p) => p.advance_id as string));
+  for (const adv of ctx.advances.filter((a) => advIds.has(a.id))) {
+    const bal = advanceBalance(adv, ctx.payments as never, all);
+    const over = round2(bal.adjusted + bal.refunded - bal.amount);
+    if (over > 0.005) {
+      errors.push(`Advance ${adv.number} was used elsewhere while this document was cancelled: reinstating it would adjust ${money2(bal.adjusted + bal.refunded)} against an advance of ${money2(bal.amount)}. Remove the advance adjustment from this document (or the other one) first.`);
+    }
+  }
+
+  const twice = doubleBilledRows(fresh, ctx.time, liveInvoiceIds(ctx.invoices, fresh.id));
+  if (twice.length) {
+    const numbers = [...new Set(twice.map((t) => ctx.invoices.find((i) => i.id === t.by)?.invoice_number || 'another invoice'))];
+    const kinds = [...new Set(twice.map((t) => (t.kind === 'time' ? 'time entries' : t.kind === 'mileage' ? 'mileage trips' : 're-billed expenses')))];
+    errors.push(`${twice.length} ${kinds.join(' / ')} on this document ${twice.length === 1 ? 'has' : 'have'} since been billed on ${numbers.join(', ')}. Remove ${twice.length === 1 ? 'it' : 'them'} from one of the invoices first.`);
+  }
+
+  if (fresh.sales_order_id) {
+    const so = ctx.invoices.find((i) => i.id === fresh.sales_order_id);
+    if (so) {
+      const before = orderFulfilment(so, ctx.invoices, ctx.links);
+      const after = orderFulfilment(so, all, ctx.links);
+      const mine = new Set((fresh.items ?? []).map((i) => i.order_line_id).filter(Boolean));
+      for (const l of after.lines) {
+        if (!mine.has(l.item.id)) continue;
+        const prev = before.lines.find((b) => b.item.id === l.item.id);
+        const overD = l.delivered > l.ordered + 1e-6 && l.delivered > (prev?.delivered ?? 0);
+        const overI = l.invoiced > l.ordered + 1e-6 && l.invoiced > (prev?.invoiced ?? 0);
+        if (overD || overI) {
+          errors.push(`"${l.item.name || 'Item'}" on sales order ${so.invoice_number}: ${overI ? `${l.invoiced} would be invoiced` : `${l.delivered} would be delivered`} against ${l.ordered} ordered — other documents fulfilled it meanwhile.`);
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+/** Undo a cancellation: restores the pre-cancel status and retires the link (refused when `reinstateIssues` finds a conflict). */
 export function reinstateDocument(invoice: InvoiceRecord): InvoiceRecord {
   const fresh = localDb.invoices.getById(invoice.id) ?? invoice;
   if (fresh.status !== 'Cancelled') throw new DocumentError('This document is not cancelled.');
   const links = readLinks();
   const link = activeCancellation(fresh.id, links);
-  const saved = localDb.invoices.save({ ...fresh, status: restoredStatus(fresh, link?.prev_status) });
+  const status = restoredStatus(fresh, link?.prev_status);
+  const problems = reinstateIssues(fresh, status, {
+    links,
+    invoices: localDb.invoices.getAll(),
+    payments: localDb.payments.getAll(),
+    advances: getTable<AdvanceRecord>(ADVANCES_TABLE),
+    time: { time: timeDb.all(), mileage: mileageDb.all(), expenses: purchasesDb.all() },
+  });
+  if (problems.length) throw new DocumentError(`Cannot reinstate ${fresh.invoice_number}: ${problems.join(' ')}`);
+  const saved = localDb.invoices.save({ ...fresh, status });
   if (link) setTable(DOC_LINKS_TABLE, links.filter((l) => l.id !== link.id));
   return saved;
+}
+
+/* ── Amendments (GSTR-1 B2BA / CDNRA …, see amendments.ts) ─────────── */
+
+/**
+ * Marks a saved document as amended: freezes a copy of it as reported (so its original period's GSTR-1
+ * never changes) and stamps today as the amendment date. The user then edits and saves as usual. The
+ * period lock applies (a locked document must be unlocked with the PIN first).
+ */
+export function startAmendment(invoice: InvoiceRecord, reason = ''): InvoiceRecord {
+  const fresh = localDb.invoices.getById(invoice.id) ?? invoice;
+  if (!canAmend(fresh)) {
+    throw new DocumentError('Only issued tax invoices and credit / debit notes of a regular GST profile can be amended in GSTR-1.');
+  }
+  const check = amendmentCheck(fresh, { filed: loadFiled(), lockUntil: getLockUntil() });
+  const amends = buildAmendment(fresh, localIsoDate(), { period: fresh.amends?.period || check.period, reason });
+  return localDb.invoices.save({ ...fresh, amends });
 }
 
 /* ── Chain ─────────────────────────────────────────────────────── */

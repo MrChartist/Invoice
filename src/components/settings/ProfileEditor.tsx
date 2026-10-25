@@ -5,7 +5,11 @@ import { INDIAN_STATES } from '../../lib/india-states';
 import { imageToDataUrl } from '../../lib/image';
 import { panFromGstin } from '../../lib/gstin';
 import { isValidIfsc, isValidPan, isValidUpi } from '../../lib/validators';
-import type { SenderProfile } from '../../types/invoice';
+import { COMPOSITION_CATEGORY_LABELS, COMPOSITION_DECLARATION } from '../../lib/bill-of-supply';
+import { compositionRate, todayIso } from '../../lib/tax-rules';
+import type { CompositionCategory, GstScheme, SenderProfile } from '../../types/invoice';
+import { useT } from '../../i18n';
+import { setT } from '../../i18n/areas/settings';
 import controls from '../../styles/controls.module.css';
 import styles from './Settings.module.css';
 
@@ -15,7 +19,7 @@ interface Props {
   onError: (message: string) => void;
 }
 
-function ImageSlot({
+export function ImageSlot({
   label,
   hint,
   value,
@@ -32,6 +36,7 @@ function ImageSlot({
   onClear: () => void;
   onError: (message: string) => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -41,7 +46,7 @@ function ImageSlot({
     try {
       onPick(await imageToDataUrl(file, maxDimension));
     } catch (err) {
-      onError(err instanceof DOMException || !(err instanceof Error) ? 'That file could not be read as an image.' : err.message);
+      onError(err instanceof DOMException || !(err instanceof Error) ? setT('imageReadFail') : err.message);
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -51,28 +56,29 @@ function ImageSlot({
   return (
     <div className={styles.slot}>
       <div className={styles.slotPreview}>
-        {value ? <img src={value} alt={`${label} preview`} /> : <ImagePlus size={22} />}
+        {value ? <img src={value} alt={setT('preview', { label })} /> : <ImagePlus size={22} />}
       </div>
       <div className={styles.slotBody}>
         <div className={controls.label} id={`slot-${label}`}>{label}</div>
         <p className={controls.hint}>{hint}</p>
         <div className={styles.slotActions}>
           <button type="button" className={controls.btnOutline + ' ' + controls.btnSm} onClick={() => input.current?.click()} disabled={busy}>
-            <Upload size={14} /> {value ? 'Replace' : 'Upload'}
+            <Upload size={14} /> {value ? setT('replace') : setT('upload')}
           </button>
           {value && (
             <button type="button" className={controls.btnGhost + ' ' + controls.btnSm} onClick={onClear}>
-              <Trash2 size={14} /> Remove
+              <Trash2 size={14} /> {setT('remove')}
             </button>
           )}
         </div>
-        <input ref={input} type="file" aria-label={`Upload ${label.toLowerCase()} image`} accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => pick(e.target.files?.[0])} />
+        <input ref={input} type="file" aria-label={setT('uploadImage', { label: label.toLowerCase() })} accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => pick(e.target.files?.[0])} />
       </div>
     </div>
   );
 }
 
 export function ProfileEditor({ profile, onChange, onError }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const gstinPan = panFromGstin(profile.companyGstin);
   const upiBad = !!profile.upiId && !isValidUpi(profile.upiId);
   const ifscBad = !!profile.ifsc && !isValidIfsc(profile.ifsc);
@@ -81,55 +87,55 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
   return (
     <div className={styles.editor}>
       <fieldset className={styles.group}>
-        <legend>Business identity</legend>
+        <legend>{setT('identity')}</legend>
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Name on invoices *</span>
+            <span className={controls.label}>{setT('nameOnInvoices')}</span>
             <input className={controls.input} value={profile.companyName} onChange={(e) => onChange({ companyName: e.target.value })} placeholder="Rohit Singh" />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Tagline / designation</span>
+            <span className={controls.label}>{setT('tagline')}</span>
             <input className={controls.input} value={profile.companyTagline} onChange={(e) => onChange({ companyTagline: e.target.value })} placeholder="Research Analyst" />
           </label>
         </div>
         <label className={controls.field}>
-          <span className={controls.label}>Registration line (optional)</span>
+          <span className={controls.label}>{setT('regLine')}</span>
           <input className={controls.input} value={profile.regLine ?? ''} onChange={(e) => onChange({ regLine: e.target.value })} placeholder="SEBI Reg. No. INH000015297" />
-          <span className={controls.hint}>Printed under your address — use it for SEBI, ICAI, MCA or similar registrations.</span>
+          <span className={controls.hint}>{setT('regLineHint')}</span>
         </label>
         <label className={controls.field}>
-          <span className={controls.label}>Address</span>
-          <textarea className={controls.textarea} rows={3} value={profile.companyAddress} onChange={(e) => onChange({ companyAddress: e.target.value })} placeholder={'Street, area\nCity, State PIN'} />
+          <span className={controls.label}>{setT('address')}</span>
+          <textarea className={controls.textarea} rows={3} value={profile.companyAddress} onChange={(e) => onChange({ companyAddress: e.target.value })} placeholder={setT('addressPh')} />
         </label>
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>City</span>
+            <span className={controls.label}>{setT('city')}</span>
             <input className={controls.input} value={profile.city ?? ''} onChange={(e) => onChange({ city: e.target.value })} placeholder="Thane" />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>PIN code</span>
+            <span className={controls.label}>{setT('pin')}</span>
             <input className={controls.input} inputMode="numeric" maxLength={6} value={profile.pin ?? ''} onChange={(e) => onChange({ pin: e.target.value.replace(/\D/g, '') })} placeholder="400601" />
-            <span className={controls.hint}>Needed for e-Invoice / e-Way bill JSON.</span>
+            <span className={controls.hint}>{setT('pinHint')}</span>
           </label>
         </div>
         <div className={controls.row3}>
           <label className={controls.field}>
-            <span className={controls.label}>Phone</span>
+            <span className={controls.label}>{setT('phone')}</span>
             <input className={controls.input} type="tel" value={profile.companyPhone} onChange={(e) => onChange({ companyPhone: e.target.value })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Email</span>
+            <span className={controls.label}>{setT('email')}</span>
             <input className={controls.input} type="email" value={profile.companyEmail} onChange={(e) => onChange({ companyEmail: e.target.value })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Website</span>
+            <span className={controls.label}>{setT('website')}</span>
             <input className={controls.input} value={profile.companyWebsite} onChange={(e) => onChange({ companyWebsite: e.target.value })} placeholder="mrchartist.com" />
           </label>
         </div>
       </fieldset>
 
       <fieldset className={styles.group}>
-        <legend>Tax registration</legend>
+        <legend>{setT('taxReg')}</legend>
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="p-gstin">GSTIN</label>
@@ -149,12 +155,12 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
               placeholder={gstinPan || 'ABCDE1234F'}
               onChange={(e) => onChange({ pan: e.target.value.toUpperCase() })}
             />
-            {panBad && <span className={controls.error}>PAN should look like ABCDE1234F</span>}
+            {panBad && <span className={controls.error}>{setT('panBad')}</span>}
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>State of business</span>
+            <span className={controls.label}>{setT('stateOfBusiness')}</span>
             <select className={controls.select} value={profile.stateCode ?? ''} onChange={(e) => onChange({ stateCode: e.target.value })}>
-              <option value="">Select state</option>
+              <option value="">{setT('selectState')}</option>
               {INDIAN_STATES.map((s) => (
                 <option key={s.code} value={s.code}>
                   {s.code} — {s.name}
@@ -163,55 +169,87 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
             </select>
           </label>
         </div>
-        <p className={controls.hint}>Leave GSTIN empty if you are not GST-registered — tax lines are then hidden from your invoices. Your state decides CGST + SGST vs IGST.</p>
+        <p className={controls.hint}>{setT('gstinHint')}</p>
+        <div className={controls.row}>
+          <label className={controls.field}>
+            <span className={controls.label}>{setT('gstScheme')}</span>
+            <select
+              className={controls.select}
+              value={profile.gst_scheme ?? 'regular'}
+              onChange={(e) => {
+                const gst_scheme = e.target.value as GstScheme;
+                onChange(gst_scheme === 'composition' ? { gst_scheme, composition_category: profile.composition_category ?? 'trader' } : { gst_scheme });
+              }}
+            >
+              <option value="regular">{setT('schemeRegular')}</option>
+              <option value="composition">{setT('schemeComposition')}</option>
+            </select>
+          </label>
+          {profile.gst_scheme === 'composition' && (
+            <label className={controls.field}>
+              <span className={controls.label}>{setT('compositionCategory')}</span>
+              <select className={controls.select} value={profile.composition_category ?? 'trader'} onChange={(e) => onChange({ composition_category: e.target.value as CompositionCategory })}>
+                {(Object.keys(COMPOSITION_CATEGORY_LABELS) as CompositionCategory[]).map((k) => (
+                  <option key={k} value={k}>{COMPOSITION_CATEGORY_LABELS[k]}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {profile.gst_scheme === 'composition' && (
+          <p className={controls.hint}>
+            {setT('compositionRate', { rate: compositionRate(profile.composition_category ?? 'trader', todayIso()) ?? '—' })}{' '}
+            {setT('compositionDocs', { declaration: COMPOSITION_DECLARATION })}
+          </p>
+        )}
       </fieldset>
 
       <fieldset className={styles.group}>
-        <legend>Payment details</legend>
+        <legend>{setT('paymentDetails')}</legend>
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Account holder</span>
+            <span className={controls.label}>{setT('accountHolder')}</span>
             <input className={controls.input} value={profile.accountName} onChange={(e) => onChange({ accountName: e.target.value })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Bank &amp; branch</span>
+            <span className={controls.label}>{setT('bankBranch')}</span>
             <input className={controls.input} value={profile.bankName} onChange={(e) => onChange({ bankName: e.target.value })} placeholder="HDFC Bank, Thane" />
           </label>
         </div>
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Account number</span>
+            <span className={controls.label}>{setT('accountNumber')}</span>
             <input className={`${controls.input} ${controls.inputMono}`} inputMode="numeric" value={profile.accountNumber} onChange={(e) => onChange({ accountNumber: e.target.value.replace(/\s/g, '') })} />
           </label>
           <label className={controls.field}>
             <span className={controls.label}>IFSC</span>
             <input className={`${controls.input} ${controls.inputMono} ${ifscBad ? controls.inputInvalid : ''}`} maxLength={11} value={profile.ifsc} onChange={(e) => onChange({ ifsc: e.target.value.toUpperCase() })} placeholder="HDFC0000123" />
-            {ifscBad && <span className={controls.error}>IFSC should look like HDFC0000123</span>}
+            {ifscBad && <span className={controls.error}>{setT('ifscBad')}</span>}
           </label>
         </div>
         <label className={controls.field}>
-          <span className={controls.label}>UPI ID</span>
+          <span className={controls.label}>{setT('upiId')}</span>
           <input className={`${controls.input} ${upiBad ? controls.inputInvalid : ''}`} value={profile.upiId} onChange={(e) => onChange({ upiId: e.target.value.trim() })} placeholder="name@bank" autoCapitalize="none" />
-          {upiBad ? <span className={controls.error}>UPI ID should look like name@bank</span> : <span className={controls.hint}>Drives the scannable “Scan to pay” QR on every invoice.</span>}
+          {upiBad ? <span className={controls.error}>{setT('upiBad')}</span> : <span className={controls.hint}>{setT('upiHint')}</span>}
         </label>
       </fieldset>
 
       <fieldset className={styles.group}>
-        <legend>Branding &amp; numbering</legend>
+        <legend>{setT('branding')}</legend>
         <div className={styles.slots}>
-          <ImageSlot label="Logo" hint="PNG with a transparent background looks best." value={profile.logo} maxDimension={480} onPick={(logo) => onChange({ logo })} onClear={() => onChange({ logo: '' })} onError={onError} />
-          <ImageSlot label="Signature" hint="Printed above “Authorized signatory”." value={profile.signature} maxDimension={420} onPick={(signature) => onChange({ signature })} onClear={() => onChange({ signature: '' })} onError={onError} />
+          <ImageSlot label={setT('logo')} hint={setT('logoHint')} value={profile.logo} maxDimension={480} onPick={(logo) => onChange({ logo })} onClear={() => onChange({ logo: '' })} onError={onError} />
+          <ImageSlot label={setT('signature')} hint={setT('signatureHint')} value={profile.signature} maxDimension={420} onPick={(signature) => onChange({ signature })} onClear={() => onChange({ signature: '' })} onError={onError} />
         </div>
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Number prefix (optional)</span>
+            <span className={controls.label}>{setT('numberPrefix')}</span>
             <input className={`${controls.input} ${controls.inputMono}`} maxLength={8} value={profile.invoicePrefix ?? ''} onChange={(e) => onChange({ invoicePrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })} placeholder="INV" />
-            <span className={controls.hint}>Numbers look like {profile.invoicePrefix || 'INV'}/FY25-26/0001.</span>
+            <span className={controls.hint}>{setT('numbersLook', { example: `${profile.invoicePrefix || 'INV'}/FY25-26/0001` })}</span>
           </label>
         </div>
         <label className={controls.field}>
-          <span className={controls.label}>Default terms for this profile</span>
-          <textarea className={controls.textarea} rows={3} value={profile.defaultTerms ?? ''} onChange={(e) => onChange({ defaultTerms: e.target.value })} placeholder="Leave empty to use the global default terms." />
+          <span className={controls.label}>{setT('profileTerms')}</span>
+          <textarea className={controls.textarea} rows={3} value={profile.defaultTerms ?? ''} onChange={(e) => onChange({ defaultTerms: e.target.value })} placeholder={setT('profileTermsPh')} />
         </label>
       </fieldset>
     </div>

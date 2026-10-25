@@ -6,8 +6,15 @@
  * Logging is strictly best-effort: `audit.record` NEVER throws and a full quota
  * only costs the log row, never the user's save.
  *
- * Storage: table `audit_log` (`mrchartist_inv_audit_log`), oldest → newest,
- * capped at `AUDIT_MAX_ROWS` (oldest rows are dropped first).
+ * Storage: table `audit_log` (`mrchartist_inv_audit_log`), oldest → newest. Past `AUDIT_MAX_ROWS`
+ * the oldest rows move to an archive segment (`audit_archive_0001`, … one key each, WP-7 / P0-10):
+ * still hash-chained, still in every backup, never dropped. An `archive` anchor in the live log
+ * records each move. Only a full storage quota still sheds rows (recorded by a `truncate` anchor).
+ *
+ * Coverage (WP-7): besides the explicit `audit.record` calls, every `setTable` write to a books /
+ * masters table is diffed by row (`audit-edits.ts`, through the one `onTableWrite` storage hook), so
+ * direct table writers are logged too and module rows gain field-level before → after. There is no
+ * setting that turns the log off.
  *
  * Privacy: rows carry field-level before/after for business data only. Contact
  * details (email, phone, address), bank details and free-text notes are never
@@ -16,16 +23,21 @@
 
 import type { AuditAction, AuditChange, AuditEntry } from '../types/audit';
 import type { Client, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
+import { currentActor } from './access';
 import { round2 } from './invoice-calc';
-import { generateId, getTable, setTable } from './storage';
+import { sha256 } from './sha256';
+import { DB_PREFIX, generateId, getTable, listKeys, onTableWrite, setTable } from './storage';
+import { mergeChanges, observeTableWrite, setEditRecorder, takeEdit } from './audit-edits';
 import { formatCurrency } from './utils';
 
 export const AUDIT_TABLE = 'audit_log';
 export const AUDIT_MAX_ROWS = 5000;
+/** Archive segments (WP-7): table `audit_archive_<4 digits>`, oldest first. */
+export const AUDIT_ARCHIVE_PREFIX = 'audit_archive_';
 /** Text fields are excerpted to this many characters in a diff. */
 const EXCERPT = 60;
 
-export type AuditInput = Omit<AuditEntry, 'id' | 'at'> & { at?: string };
+export type AuditInput = Omit<AuditEntry, 'id' | 'at' | 'prev' | 'hash'> & { at?: string };
 
 /* ── Diff helpers (pure) ───────────────────────────────────────── */
 
@@ -215,6 +227,120 @@ export function summarizeChanges(changes: AuditChange[], max = 3): string {
   return shown.join('; ') + (more > 0 ? `; +${more} more` : '');
 }
 
+/* ── Hash chain (4.5) ──────────────────────────────────────────── */
+/*
+ * Each row stores `prev` (the previous row's hash) and `hash` = SHA-256(canonical(row without `hash`)).
+ * Rows written before 4.5 carry neither; a run of them is sealed by the `chain_start` anchor that follows
+ * it (count + digest). Older rows the app removes itself (row cap / storage full) are recorded by a
+ * `truncate` anchor. Verification lives in `audit-chain.ts` (lazy; not on the data path).
+ */
+
+/** `prev` of the very first chained row. */
+export const AUDIT_GENESIS = '0'.repeat(64);
+/** Passing the row cap trims the log to this many rows in one go (plus one `truncate` anchor). */
+const CAP_KEEP = AUDIT_MAX_ROWS - 500;
+
+/** Canonical serialisation: JSON with object keys sorted and `undefined` members left out. */
+export function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+  if (v && typeof v === 'object') {
+    const o = v as Loose;
+    const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(o[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v ?? null);
+}
+
+/** SHA-256 over every field of the row except `hash` itself (`prev` included). */
+export const rowHash = (e: AuditEntry): string => sha256(canonical({ ...e, hash: undefined }));
+/** Digest that seals a run of unchained (legacy) rows inside an anchor. */
+export const legacyDigest = (rows: AuditEntry[]): string => sha256(canonical(rows));
+
+type RowInput = Omit<AuditEntry, 'id' | 'at' | 'prev' | 'hash'> & { at?: string };
+
+/** Push `r` onto `rows`, linked to the current last row. */
+function link(rows: AuditEntry[], r: Omit<AuditEntry, 'prev' | 'hash'>): AuditEntry {
+  const row: AuditEntry = { ...r, prev: rows.length ? (rows[rows.length - 1].hash ?? AUDIT_GENESIS) : AUDIT_GENESIS };
+  row.hash = rowHash(row);
+  rows.push(row);
+  return row;
+}
+
+/** If the log ends in unchained rows, append a `chain_start` anchor sealing them (mutates). */
+function sealTail(rows: AuditEntry[], at: string): boolean {
+  let run = 0;
+  while (run < rows.length && !rows[rows.length - 1 - run].hash) run++;
+  if (!run) return false;
+  const legacy = rows.splice(rows.length - run, run);
+  // Linked to the last chained row before the run (or genesis), then placed after the rows it seals.
+  const anchor = link(rows, {
+    id: generateId(), at, entity: 'system', entity_id: AUDIT_TABLE, action: 'chain_start',
+    summary: `Integrity chain started; ${run} earlier entr${run === 1 ? 'y' : 'ies'} sealed as they were`,
+    seal: { legacy: { count: run, digest: legacyDigest(legacy) } },
+  });
+  rows.splice(rows.length - 1, 1, ...legacy, anchor);
+  return true;
+}
+
+function append(rows: AuditEntry[], input: RowInput): AuditEntry {
+  const at = input.at ?? new Date().toISOString();
+  sealTail(rows, at);
+  return link(rows, { ...input, id: generateId(), at });
+}
+
+/**
+ * Keep the newest `keep` rows and append an anchor saying what went and why: `truncate` (rows dropped
+ * — storage full, or the old row cap) or `archive` (rows moved to segment `segment`, kept).
+ */
+function trim(rows: AuditEntry[], keep: number, reason: 'storage' | 'cap' | 'archive', segment?: string): AuditEntry[] {
+  const kept = rows.slice(rows.length - keep);
+  let lead = 0;
+  while (lead < kept.length && !kept[lead].hash) lead++;
+  const dropped = rows.length - kept.length;
+  const moved = rows.slice(0, dropped);
+  append(kept, {
+    entity: 'system', entity_id: AUDIT_TABLE, action: reason === 'archive' ? 'archive' : 'truncate',
+    summary: reason === 'archive'
+      ? `${dropped.toLocaleString('en-IN')} older entries moved to archive ${segment} (kept, still sealed, included in backups)`
+      : `Older entries removed (${reason === 'storage' ? 'storage full' : `${AUDIT_MAX_ROWS.toLocaleString('en-IN')}-entry limit`}): ${dropped} dropped`,
+    seal: {
+      reason, dropped, cut: kept[lead]?.prev ?? AUDIT_GENESIS,
+      ...(reason === 'archive' ? { segment, archived_head: moved[moved.length - 1]?.hash ?? null } : {}),
+      ...(lead ? { legacy: { count: lead, digest: legacyDigest(kept.slice(0, lead)) } } : {}),
+    },
+  });
+  return kept;
+}
+
+/* ── Archive segments (WP-7, P0-10) ───────────────────────────── */
+
+/** Table names of the archive segments, oldest first. */
+export function auditSegments(): string[] {
+  const p = DB_PREFIX + AUDIT_ARCHIVE_PREFIX;
+  return listKeys(p)
+    .map((k) => k.slice(DB_PREFIX.length))
+    .filter((t) => /^audit_archive_\d{4,}$/.test(t))
+    .sort((a, b) => Number(a.slice(AUDIT_ARCHIVE_PREFIX.length)) - Number(b.slice(AUDIT_ARCHIVE_PREFIX.length)));
+}
+
+function nextSegmentName(): string {
+  const last = auditSegments().pop();
+  const n = last ? Number(last.slice(AUDIT_ARCHIVE_PREFIX.length)) + 1 : 1;
+  return `${AUDIT_ARCHIVE_PREFIX}${String(n).padStart(4, '0')}`;
+}
+
+/** Move the oldest rows to a new segment; returns the live rows to keep (with the anchor), or null if the segment could not be written. */
+function archiveOldest(rows: AuditEntry[]): AuditEntry[] | null {
+  const segment = nextSegmentName();
+  const cut = rows.length - CAP_KEEP;
+  try {
+    setTable(segment, rows.slice(0, cut));
+  } catch {
+    return null;
+  }
+  return trim(rows, CAP_KEEP, 'archive', segment);
+}
+
 /* ── Store ─────────────────────────────────────────────────────── */
 
 function readAll(): AuditEntry[] {
@@ -222,13 +348,14 @@ function readAll(): AuditEntry[] {
 }
 
 function writeCapped(rows: AuditEntry[]): void {
-  const capped = rows.length > AUDIT_MAX_ROWS ? rows.slice(rows.length - AUDIT_MAX_ROWS) : rows;
+  // Over the row limit: archive (never drop). Only if the segment cannot be stored does the old cap apply.
+  const capped = rows.length > AUDIT_MAX_ROWS ? (archiveOldest(rows) ?? trim(rows, CAP_KEEP, 'cap')) : rows;
   try {
     setTable(AUDIT_TABLE, capped);
   } catch {
-    // Quota: shed the oldest half once and retry. If that fails too, give up silently.
+    // Quota: shed the oldest half once (recorded by a `truncate` anchor) and retry. If that fails too, give up silently.
     try {
-      setTable(AUDIT_TABLE, capped.slice(Math.floor(capped.length / 2)));
+      setTable(AUDIT_TABLE, trim(capped, Math.floor(capped.length / 2), 'storage'));
     } catch {
       /* the user's save matters more than its log row */
     }
@@ -236,22 +363,27 @@ function writeCapped(rows: AuditEntry[]): void {
 }
 
 export const audit = {
-  /** Append one row. Never throws; returns the row, or null if it could not be written. */
+  /** Append one chained row. Never throws; returns the row, or null if it could not be built. */
   record(input: AuditInput): AuditEntry | null {
     try {
-      const entry: AuditEntry = {
-        id: generateId(),
-        at: input.at ?? new Date().toISOString(),
+      // Who did it (6.21): an explicit `by` wins, else whoever is signed in to this tab.
+      const by = input.by ?? currentActor()?.name;
+      // WP-7: field-level before → after tracked from the table write this row is about.
+      const edit = takeEdit(input.entity_id);
+      const changes = edit?.changes.length ? mergeChanges(input.changes, edit.changes) : input.changes;
+      const rows = readAll();
+      const entry = append(rows, {
+        at: input.at,
         entity: input.entity,
         entity_id: input.entity_id,
         action: input.action,
         summary: input.summary,
-        ...(input.changes && input.changes.length ? { changes: input.changes } : {}),
+        ...(changes && changes.length ? { changes } : {}),
         ...(input.doc_number ? { doc_number: input.doc_number } : {}),
         ...(input.parent_id ? { parent_id: input.parent_id } : {}),
-      };
-      const rows = readAll();
-      rows.push(entry);
+        ...(input.seal ? { seal: input.seal } : {}),
+        ...(by ? { by } : {}),
+      });
       writeCapped(rows);
       return entry;
     } catch {
@@ -259,20 +391,69 @@ export const audit = {
     }
   },
 
+  /** Seal unchained (pre-4.5) rows at the end of the log with a `chain_start` anchor. False when there were none. */
+  sealLegacy(): boolean {
+    const rows = readAll();
+    if (!sealTail(rows, new Date().toISOString())) return false;
+    setTable(AUDIT_TABLE, rows);
+    return true;
+  },
+
+  /** Hash of the newest row. Noted down outside the app, it makes a later rewrite of the log detectable. */
+  head(): string | null {
+    const rows = readAll();
+    return rows.length ? (rows[rows.length - 1].hash ?? null) : null;
+  },
+
+  /** Oldest → newest, exactly as stored (what verification works on). */
+  rows(): AuditEntry[] {
+    return readAll();
+  },
+
   /** Newest first. */
   all(): AuditEntry[] {
     return readAll().slice().reverse();
   },
 
-  /** Rows about one document: its own edits plus its payments. Newest first. */
+  /** Archived segments + the live log, oldest → newest: the whole chain (verification, auditor export). */
+  fullRows(): AuditEntry[] {
+    const out: AuditEntry[] = [];
+    for (const seg of auditSegments()) out.push(...getTable<AuditEntry>(seg));
+    out.push(...readAll());
+    return out;
+  },
+
+  /** Rows about one document: its own edits plus its payments, archives included. Newest first. */
   forInvoice(invoiceId: string): AuditEntry[] {
-    return audit.all().filter((e) => e.entity_id === invoiceId || e.parent_id === invoiceId);
+    return audit.forRecord(invoiceId);
+  },
+
+  /** Edit log of one record (any entity): its rows plus rows that hang off it, archives included. Newest first. */
+  forRecord(id: string): AuditEntry[] {
+    if (!id) return [];
+    return audit.fullRows().filter((e) => e.entity_id === id || e.parent_id === id).reverse();
+  },
+
+  /** Number of archive segments. */
+  segmentCount(): number {
+    return auditSegments().length;
+  },
+
+  /** Rows held in archive segments. */
+  archivedCount(): number {
+    return auditSegments().reduce((s, seg) => s + getTable<AuditEntry>(seg).length, 0);
   },
 
   count(): number {
     return readAll().length;
   },
 };
+
+// WP-7 (P0-10): the edit log of every books table. Registered once when the writing half loads (no storage read).
+setEditRecorder((input) => {
+  audit.record(input);
+});
+onTableWrite(observeTableWrite);
 
 /* ── Convenience builders used by localDb ──────────────────────── */
 

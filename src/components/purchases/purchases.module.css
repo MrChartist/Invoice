@@ -107,6 +107,18 @@
 .colAmt { width: 16%; }
 .colAct { width: 44px; }
 
+/* Tracked stock lines (6.6 / 6.10 / 6.11): batch, dates, serials and godown under the line. */
+.lines tr.trackRow td {
+  background: var(--card-inner);
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+.trackGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem 0.75rem;
+}
+.trackWide { grid-column: 1 / -1; }
+
 /* ── Totals ──────────────────────────────────────────────────── */
 .totals {
   margin-left: auto;
@@ -143,6 +155,28 @@
   font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--muted-foreground);
+}
+
+/* ── Advanced GST (bill form) ───────────────────────────────── */
+.advanced {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-inner);
+}
+
+.advanced > summary {
+  cursor: pointer;
+  padding: 0.625rem 0.875rem;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.advancedBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 0 0.875rem 0.875rem;
 }
 
 /* ── Payment history ─────────────────────────────────────────── */
@@ -258,4 +292,57 @@
   .lines td :is(input, select) { border: 1px solid var(--border); min-height: 44px; width: 100%; text-align: left; }
   .lines td button { min-height: 44px; width: 100%; }
   .lineAmount { text-align: right; }
+}
+
+/* Purchase orders tab */
+.poBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.poNote {
+  margin: 0;
+  padding: 0.75rem 1.25rem 1rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+/* WP-8: alternate unit under a bill line quantity ("BOX", "= 24 NOS"). */
+.lineUnit {
+  margin-top: 0.25rem;
+  width: 100%;
+}
+.lineUnitHint {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+/* WP-8: landed cost on a bill. */
+.landed {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.landedRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.landedRow > input:first-child {
+  flex: 2 1 12rem;
+}
+.landedRow > input:nth-child(2) {
+  flex: 1 1 7rem;
 }

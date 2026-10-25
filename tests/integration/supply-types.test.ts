@@ -115,7 +115,22 @@ test('inter-state B2B: IGST only, b2b section, 3B IGST head', () => {
   assertCrossModule(inv, 'inter');
 });
 
-test('B2C placement: B2CL above 2.5 lakh inter-state, otherwise B2CS (intra and inter)', () => {
+test('B2CL threshold follows the issue date: ₹1 lakh from Aug 2024, ₹2.5 lakh before', () => {
+  const retailKA = { ...clientRetail, id: 'r-ka', name: 'Retail KA', state_code: '29' };
+  // 100 x 1,000 = 1,00,000 + 18% = 1,18,000: above ₹1L, below ₹2.5L
+  const now = mk({ client: retailKA, lines: [{ qty: 100, rate: 1000, tax: 18 }] });
+  assert.equal(now.total, 118000);
+  const rn = gst(now);
+  assert.equal(rn.gstr1.b2cl.length, 1);
+  assert.equal(rn.gstr1.b2cs.length, 0);
+
+  const old = mk({ client: retailKA, date: '2024-07-15', lines: [{ qty: 100, rate: 1000, tax: 18 }] });
+  const ro = buildGstReport([old], [], { period: { kind: 'month', fyStart: 2024, month: 7 }, gstin: SELLER_GSTIN });
+  assert.equal(ro.gstr1.b2cl.length, 0);
+  assert.equal(ro.gstr1.b2cs.length, 1);
+});
+
+test('B2C placement: B2CL above the threshold inter-state, otherwise B2CS (intra and inter)', () => {
   const retailKA = { ...clientRetail, id: 'r-ka', name: 'Retail KA', state_code: '29' };
   // 250 x 1,000 = 250,000 + 18% = 295,000 > 2,50,000, unregistered, inter-state -> B2CL
   const big = mk({ client: retailKA, lines: [{ qty: 250, rate: 1000, tax: 18 }] });
@@ -247,6 +262,21 @@ test('TDS 10% on taxable: invoice total unchanged, customer pays 10,800, nothing
   const bs = balanceSheet(data, '2026-04-30');
   assert.equal(bs.assets.receivables, 1000);
   assert.equal(bs.equity.capitalAndOther, 0);
+});
+
+test('Tally: the settling receipt posts Dr TDS Receivable so the party ledger closes', () => {
+  const inv = mk({ tds: { rate: 10 } }); // total 11,800, TDS 1,000, cash due 10,800
+  localDb.payments.record({ invoiceId: inv.id, amount: 5000, method: 'UPI', date: '2026-04-20' });
+  localDb.payments.record({ invoiceId: inv.id, amount: 5800, method: 'UPI', date: '2026-04-25' });
+  const m = tally([reload(inv.id)]);
+  const receipts = m.vouchers.filter((v) => v.type === 'Receipt');
+  assert.equal(receipts.length, 2);
+  assert.equal(posted(receipts[0], 'TDS Receivable'), 0, 'part payment carries no TDS');
+  assert.equal(posted(receipts[1], 'TDS Receivable'), -100000);
+  const party = receipts[0].party;
+  const partyNet = m.vouchers.reduce((sum, v) => sum + posted(v, party), 0);
+  assert.equal(partyNet, 0, 'sale + receipts + TDS close the party ledger');
+  for (const v of m.vouchers) assert.equal(voucherImbalance(v), 0);
 });
 
 test('TDS on invoice total (not taxable): 10% of 11,800 = 1,180', () => {

@@ -6,8 +6,11 @@
  * testable; storage goes through `getTable`/`setTable` like every other table.
  */
 
-import type { InvoiceItem } from '../types/invoice';
+import type { InvoiceItem, QtySlab } from '../types/invoice';
 import { round2 } from './invoice-calc';
+import { ean13CheckDigit, isCode128BText } from './barcode';
+import { codeKey } from './scan';
+import { cleanSlabs } from './pricing';
 import { KEYS, generateId, getTable, setTable } from './storage';
 
 export interface CatalogDraft {
@@ -19,16 +22,23 @@ export interface CatalogDraft {
   unit: string;
   rate: number;
   tax_rate: number;
+  /** Item custom-field values (6.23), already cleaned; undefined clears them. */
+  custom_fields?: Record<string, string>;
+  /** Barcode / SKU / MRP (6.7) and quantity slabs (6.9); blank clears them. */
+  barcode?: string;
+  sku?: string;
+  mrp?: number;
+  qty_slabs?: QtySlab[];
 }
 
-export type CatalogError = { field: 'name' | 'rate' | 'hsn' | 'tax_rate'; message: string };
+export type CatalogError = { field: 'name' | 'rate' | 'hsn' | 'tax_rate' | 'barcode' | 'sku'; message: string };
 
 const norm = (s: string | undefined) => (s ?? '').trim().toLowerCase();
 
 /** First problem with a draft, or null when it can be saved. */
 export function validateCatalogItem(
   draft: CatalogDraft,
-  existing: Pick<InvoiceItem, 'id' | 'name'>[],
+  existing: (Pick<InvoiceItem, 'id' | 'name'> & Partial<Pick<InvoiceItem, 'barcode' | 'sku'>>)[],
 ): CatalogError | null {
   if (!draft.name.trim()) return { field: 'name', message: 'Give the item a name.' };
   const clash = existing.find((i) => norm(i.name) === norm(draft.name) && i.id !== draft.id);
@@ -39,6 +49,20 @@ export function validateCatalogItem(
   }
   if (!Number.isFinite(draft.tax_rate) || draft.tax_rate < 0 || draft.tax_rate > 100) {
     return { field: 'tax_rate', message: 'GST rate must be between 0 and 100.' };
+  }
+  const barcode = (draft.barcode ?? '').trim();
+  if (barcode) {
+    if (!isCode128BText(barcode)) return { field: 'barcode', message: 'A barcode takes letters, digits and plain punctuation only.' };
+    if (/^\d{13}$/.test(barcode) && ean13CheckDigit(barcode.slice(0, 12)) !== Number(barcode[12])) {
+      return { field: 'barcode', message: `This EAN-13 has a wrong check digit — it should end in ${ean13CheckDigit(barcode.slice(0, 12))}.` };
+    }
+    const twin = existing.find((i) => i.id !== draft.id && codeKey((i as InvoiceItem).barcode) === codeKey(barcode));
+    if (twin) return { field: 'barcode', message: `“${twin.name}” already has this barcode.` };
+  }
+  const sku = (draft.sku ?? '').trim();
+  if (sku) {
+    const twin = existing.find((i) => i.id !== draft.id && codeKey((i as InvoiceItem).sku) === codeKey(sku));
+    if (twin) return { field: 'sku', message: `“${twin.name}” already uses this SKU.` };
   }
   return null;
 }
@@ -56,13 +80,39 @@ export function applyCatalogDraft(
     unit: draft.unit,
     rate: round2(draft.rate),
     tax_rate: draft.tax_rate,
+    ...('custom_fields' in draft ? { custom_fields: draft.custom_fields } : {}),
+  };
+  // Barcode / SKU / MRP / slabs: only touched when the draft carries them; blank removes them.
+  const extras: Partial<InvoiceItem> = {};
+  const drop: (keyof InvoiceItem)[] = [];
+  const text = (k: 'barcode' | 'sku') => {
+    if (!(k in draft)) return;
+    const v = draft[k]?.trim();
+    if (v) extras[k] = v;
+    else drop.push(k);
+  };
+  text('barcode');
+  text('sku');
+  if ('mrp' in draft) {
+    if (Number(draft.mrp) > 0) extras.mrp = round2(Number(draft.mrp));
+    else drop.push('mrp');
+  }
+  if ('qty_slabs' in draft) {
+    const slabs = cleanSlabs(draft.qty_slabs);
+    if (slabs.length) extras.qty_slabs = slabs;
+    else drop.push('qty_slabs');
+  }
+  const finish = (row: InvoiceItem): InvoiceItem => {
+    const out = { ...row, ...extras };
+    for (const k of drop) delete out[k];
+    return out;
   };
   const idx = draft.id ? items.findIndex((i) => i.id === draft.id) : -1;
   if (idx >= 0) {
-    const saved = { ...items[idx], ...base };
+    const saved = finish({ ...items[idx], ...base });
     return { items: items.map((i, n) => (n === idx ? saved : i)), saved };
   }
-  const saved = { quantity: 1, amount: 0, ...base, id: newId() } as InvoiceItem;
+  const saved = finish({ quantity: 1, amount: 0, ...base, id: newId() } as InvoiceItem);
   return { items: [...items, saved], saved };
 }
 

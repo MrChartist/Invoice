@@ -15,8 +15,11 @@ import { downloadCsv, tone } from './download';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './books.module.css';
+import { useT } from '../../i18n';
+import { booksT } from '../../i18n/areas/books';
 
 export function ProfitLossTab({ data, period }: { data: BooksData; period: Period }) {
+  useT();
   const [basis, setBasis] = useState<Basis>('accrual');
   const pnl = useMemo(() => profitAndLoss(data, period, basis), [data, period, basis]);
   const trend = useMemo(() => monthlyTrend(data, period, basis), [data, period, basis]);
@@ -31,14 +34,14 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
-        <div className={controls.segment} role="group" aria-label="Accounting basis">
+        <div className={controls.segment} role="group" aria-label={booksT('basisGroup')}>
           <button
             type="button"
             className={basis === 'accrual' ? controls.segmentBtnActive : controls.segmentBtn}
             aria-pressed={basis === 'accrual'}
             onClick={() => setBasis('accrual')}
           >
-            Accrual basis
+            {booksT('accrual')}
           </button>
           <button
             type="button"
@@ -46,7 +49,7 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
             aria-pressed={basis === 'cash'}
             onClick={() => setBasis('cash')}
           >
-            Cash basis
+            {booksT('cash')}
           </button>
         </div>
         <button
@@ -54,79 +57,79 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
           className={controls.btnOutline}
           onClick={() => downloadCsv(`profit-loss-${basis}-${period.start}_to_${period.end}.csv`, profitLossCsv(pnl))}
         >
-          <Download size={16} /> Export CSV
+          <Download size={16} /> {booksT('exportCsv')}
         </button>
       </div>
 
       <p className={styles.muted} style={{ margin: 0 }}>
         {basis === 'accrual'
-          ? 'Income and costs are counted on the invoice / bill date, whether or not money has moved.'
-          : 'Income and costs are counted when money is received / paid, apportioned to the GST-exclusive share of each invoice or bill. Credit notes reduce income on their issue date.'}
-        {' '}GST collected is a liability and never counted as income.
+          ? booksT('accrualNote')
+          : booksT('cashNote')}
+        {' '}{booksT('gstLiabilityNote')}
       </p>
 
       <div className={surface.statGrid}>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Income</span>
+            <span className={surface.statLabel}>{booksT('income')}</span>
             <span className={surface.statIcon}><TrendingUp size={15} color="var(--profit)" /></span>
           </div>
           <div className={surface.statValue}>{formatMoney(pnl.income)}</div>
-          <div className={surface.statHint}>excl. GST, net of credit notes</div>
+          <div className={surface.statHint}>{booksT('incomeHint')}</div>
         </div>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Expenses</span>
+            <span className={surface.statLabel}>{booksT('expenses')}</span>
             <span className={surface.statIcon}><TrendingDown size={15} color="var(--loss)" /></span>
           </div>
           <div className={surface.statValue}>{formatMoney(pnl.totalExpenses)}</div>
-          <div className={surface.statHint}>incl. non-creditable GST</div>
+          <div className={surface.statHint}>{booksT('expensesHint')}</div>
         </div>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Net profit</span>
+            <span className={surface.statLabel}>{booksT('netProfit')}</span>
             <span className={surface.statIcon}><PiggyBank size={15} /></span>
           </div>
           <div className={`${surface.statValue} ${cls(pnl.netProfit)}`}>{formatMoney(pnl.netProfit)}</div>
-          <div className={surface.statHint}>gross {formatMoney(pnl.grossProfit)}</div>
+          <div className={surface.statHint}>{booksT('grossHint', { amount: formatMoney(pnl.grossProfit) })}</div>
         </div>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Margin</span>
+            <span className={surface.statLabel}>{booksT('margin')}</span>
             <span className={surface.statIcon}><Percent size={15} /></span>
           </div>
           <div className={`${surface.statValue} ${cls(pnl.margin)}`}>{pnl.margin.toFixed(1)}%</div>
-          <div className={surface.statHint}>net profit ÷ income</div>
+          <div className={surface.statHint}>{booksT('marginHint')}</div>
         </div>
       </div>
 
       <div className={surface.card}>
-        <div className={surface.cardHead}>Monthly trend</div>
+        <div className={surface.cardHead}>{booksT('monthlyTrend')}</div>
         <TrendChart points={trend} />
       </div>
 
       <div className={styles.twoCol}>
         <div className={surface.card}>
-          <div className={surface.cardHead}>Profit &amp; loss statement</div>
+          <div className={surface.cardHead}>{booksT('plStatement')}</div>
           <ul className={styles.statement}>
-            <li className={styles.stmtHead}><span>Income</span><span>Amount (₹)</span></li>
-            <li className={styles.stmtRow}><span>Sales &amp; charges (excl. GST)</span><span className={styles.amt}>{formatMoney(pnl.sales)}</span></li>
-            <li className={styles.stmtSub}><span>Less: credit notes</span><span className={styles.amt}>{formatMoney(pnl.creditNotes)}</span></li>
-            <li className={styles.stmtTotal}><span>Net income</span><span className={styles.amt}>{formatMoney(pnl.income)}</span></li>
-            <li className={styles.stmtHead}><span>Direct costs</span><span /></li>
+            <li className={styles.stmtHead}><span>{booksT('income')}</span><span>{booksT('amountRs')}</span></li>
+            <li className={styles.stmtRow}><span>{booksT('salesCharges')}</span><span className={styles.amt}>{formatMoney(pnl.sales)}</span></li>
+            <li className={styles.stmtSub}><span>{booksT('lessCreditNotes')}</span><span className={styles.amt}>{formatMoney(pnl.creditNotes)}</span></li>
+            <li className={styles.stmtTotal}><span>{booksT('netIncome')}</span><span className={styles.amt}>{formatMoney(pnl.income)}</span></li>
+            <li className={styles.stmtHead}><span>{booksT('directCosts')}</span><span /></li>
             {pnl.expenses.filter((e) => e.direct).map((e) => (
               <li key={`d-${e.category}`} className={styles.stmtRow}><span>{e.category}</span><span className={styles.amt}>{formatMoney(e.amount)}</span></li>
             ))}
             <li className={styles.stmtTotal}>
-              <span>Gross profit</span>
+              <span>{booksT('grossProfit')}</span>
               <span className={`${styles.amt} ${cls(pnl.grossProfit)}`}>{formatMoney(pnl.grossProfit)}</span>
             </li>
-            <li className={styles.stmtHead}><span>Indirect expenses</span><span /></li>
+            <li className={styles.stmtHead}><span>{booksT('indirectExpenses')}</span><span /></li>
             {pnl.expenses.filter((e) => !e.direct).map((e) => (
               <li key={`i-${e.category}`} className={styles.stmtRow}><span>{e.category}</span><span className={styles.amt}>{formatMoney(e.amount)}</span></li>
             ))}
             <li className={styles.stmtTotal}>
-              <span>Net profit</span>
+              <span>{booksT('netProfit')}</span>
               <span className={`${styles.amt} ${cls(pnl.netProfit)}`}>{formatMoney(pnl.netProfit)}</span>
             </li>
           </ul>
@@ -134,17 +137,17 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
 
         <div className={styles.stack}>
           <div className={surface.card}>
-            <div className={surface.cardHead}>Expenses by category</div>
+            <div className={surface.cardHead}>{booksT('expensesByCategory')}</div>
             {pnl.expenses.length === 0 ? (
               <p className={styles.muted} style={{ padding: '1.25rem', margin: 0 }}>
-                No purchases or expenses in this period.
+                {booksT('noExpenses')}
               </p>
             ) : (
               <ul className={styles.barList}>
                 {pnl.expenses.map((e) => (
                   <li key={`${e.direct}-${e.category}`} className={styles.barItem}>
                     <div className={styles.barMeta}>
-                      <span>{e.category}{e.direct ? ' (direct)' : ''}</span>
+                      <span>{e.category}{e.direct ? booksT('directSuffix') : ''}</span>
                       <span className={styles.amt}>{formatMoney(e.amount)}</span>
                     </div>
                     <div className={styles.barTrack} aria-hidden="true">
@@ -160,14 +163,14 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
           </div>
 
           <div className={surface.card}>
-            <div className={surface.cardHead}>GST position (liability)</div>
+            <div className={surface.cardHead}>{booksT('gstPosition')}</div>
             <ul className={styles.statement}>
-              <li className={styles.stmtRow}><span>Output GST on sales (net of credit notes)</span><span className={styles.amt}>{formatMoney(gst.outputTotal)}</span></li>
+              <li className={styles.stmtRow}><span>{booksT('outputGst')}</span><span className={styles.amt}>{formatMoney(gst.outputTotal)}</span></li>
               <li className={styles.stmtSub}><span>CGST / SGST / IGST</span><span className={styles.amt}>{formatMoney(gst.outputCgst)} / {formatMoney(gst.outputSgst)} / {formatMoney(gst.outputIgst)}</span></li>
-              <li className={styles.stmtRow}><span>Less: input tax credit</span><span className={styles.amt}>{formatMoney(gst.itc)}</span></li>
-              <li className={styles.stmtSub}><span>Non-creditable GST (in expenses)</span><span className={styles.amt}>{formatMoney(gst.blockedGst)}</span></li>
+              <li className={styles.stmtRow}><span>{booksT('lessItc')}</span><span className={styles.amt}>{formatMoney(gst.itc)}</span></li>
+              <li className={styles.stmtSub}><span>{booksT('blockedGst')}</span><span className={styles.amt}>{formatMoney(gst.blockedGst)}</span></li>
               <li className={styles.stmtTotal}>
-                <span>{gst.netPayable >= 0 ? 'Net GST payable' : 'ITC carry-forward'}</span>
+                <span>{gst.netPayable >= 0 ? booksT('netGstPayable') : booksT('itcCarry')}</span>
                 <span className={styles.amt}>{formatMoney(Math.abs(gst.netPayable))}</span>
               </li>
             </ul>

@@ -17,16 +17,38 @@
  * Voucher shapes:
  *   Sales        Dr Party | Cr Sales, Cr Output CGST/SGST/IGST, Cr charges, ± Round Off
  *   Credit Note  Cr Party | Dr Sales, Dr Output taxes, ... (mirror of Sales)
- *   Receipt      Dr Bank/Cash | Cr Party (bill allocation "Agst Ref" the invoice)
+ *   Receipt      Dr Bank/Cash [+ Dr TDS Receivable on the settling receipt] | Cr Party (bill allocation "Agst Ref" the invoice)
  *   Purchase     Cr Party | Dr Purchases, Dr Input CGST/SGST/IGST, ± Round Off
+ *   Advance      Receipt: Dr Bank/Cash | Cr Party (bill allocation "Advance", the ADV/… number);
+ *                refund: Payment: Dr Party ("Agst Ref" the ADV number) | Cr Bank/Cash. Applying an
+ *                advance to an invoice is bill-wise matching inside Tally, so no voucher is sent for
+ *                it; GST on advances (Tally's advance receipt / stat adjustment) is not exported (5.3).
+ *
+ *   Books (WP-7, P0-12 / P1-22, `tally-books.ts`): supplier payments and advances, manual Journal /
+ *                Contra / Payment / Receipt vouchers (with cost-centre allocations), fixed-asset and
+ *                depreciation journals, stock transfers as Stock Journal; masters for user groups,
+ *                cost centres, godowns and ledger opening balances with bill-wise opening bills.
  *
  * Any difference between the invoice's stored total and the sum of its
  * component amounts (rounding, legacy rows) is posted to the Round Off ledger,
  * so a voucher can never be rejected by Tally as "Debit and Credit totals differ".
+ *
+ * Taxable freight (`charges_taxable`): the charges go to the charges ledger and their
+ * GST into the same output-tax ledgers; Sales gets only the items' taxable value.
+ * Foreign-currency documents are posted in rupees at the invoice's exchange rate
+ * (receipts too — realised exchange gain/loss is not computed; post it in Tally).
+ * Working papers: verify with your CA before importing.
  */
 
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
+import { fxNarration, inrTotals, inrValue } from './fx';
+import { receivableTotal } from './rcm';
+import { advanceMovements } from './advance-tax';
+import { debitNoteVouchers } from './tally-debit-notes';
+import { tallyBankResolver } from './tally-bank';
+import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
+import { payrollTallyVouchers } from './tally-payroll';
 import {
   clean,
   emptySource,
@@ -129,9 +151,17 @@ export interface TallyOptions {
   outputCess?: string;
   /** TCS collected from the customer (a liability, never income). */
   tcsLedger?: string;
+  /** TDS the customer withheld (an asset claimed against your income tax). */
+  tdsLedger?: string;
   inputCgst?: string;
   inputSgst?: string;
   inputIgst?: string;
+  /** Additive (7O, 7.90): compensation cess credit on purchase bills (Duties & Taxes). */
+  inputCess?: string;
+  /** GST we owe under reverse charge on purchases / imports of services (Duties & Taxes). */
+  rcmPayableLedger?: string;
+  /** IGST on imported goods, paid at customs with the Bill of Entry (Duties & Taxes). */
+  customsIgstLedger?: string;
 }
 
 export const DEFAULT_LEDGER_NAMES = {
@@ -147,9 +177,13 @@ export const DEFAULT_LEDGER_NAMES = {
   outputGst: 'Output GST',
   outputCess: 'Output Cess',
   tcsLedger: 'TCS Payable',
+  tdsLedger: 'TDS Receivable',
   inputCgst: 'Input CGST',
   inputSgst: 'Input SGST',
   inputIgst: 'Input IGST',
+  inputCess: 'Input Cess',
+  rcmPayableLedger: 'GST Payable on Reverse Charge',
+  customsIgstLedger: 'IGST Payable on Imports',
 } as const;
 
 type ResolvedOptions = Required<Omit<TallyOptions, 'range'>> & { range: DateRange };
@@ -177,15 +211,19 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
     outputGst: n(o.outputGst, DEFAULT_LEDGER_NAMES.outputGst),
     outputCess: n(o.outputCess, DEFAULT_LEDGER_NAMES.outputCess),
     tcsLedger: n(o.tcsLedger, DEFAULT_LEDGER_NAMES.tcsLedger),
+    tdsLedger: n(o.tdsLedger, DEFAULT_LEDGER_NAMES.tdsLedger),
     inputCgst: n(o.inputCgst, DEFAULT_LEDGER_NAMES.inputCgst),
     inputSgst: n(o.inputSgst, DEFAULT_LEDGER_NAMES.inputSgst),
     inputIgst: n(o.inputIgst, DEFAULT_LEDGER_NAMES.inputIgst),
+    inputCess: n(o.inputCess, DEFAULT_LEDGER_NAMES.inputCess),
+    rcmPayableLedger: n(o.rcmPayableLedger, DEFAULT_LEDGER_NAMES.rcmPayableLedger),
+    customsIgstLedger: n(o.customsIgstLedger, DEFAULT_LEDGER_NAMES.customsIgstLedger),
   };
 }
 
 /* ── Voucher model (pure data — what the tests assert on) ─────── */
 
-export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase';
+export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase' | 'Payment' | 'Debit Note' | 'Journal' | 'Contra' | 'Stock Journal';
 export type Side = 'Dr' | 'Cr';
 
 export interface TallyEntry {
@@ -194,7 +232,9 @@ export interface TallyEntry {
   /** Always positive, integer paise. */
   paise: number;
   /** Bill allocation (party ledgers only). */
-  bill?: { name: string; type: 'New Ref' | 'Agst Ref' };
+  bill?: { name: string; type: 'New Ref' | 'Agst Ref' | 'Advance' };
+  /** Additive (WP-7, P1-22): cost-centre allocation of this entry (amounts sum to `paise`). */
+  costCentres?: Array<{ name: string; paise: number }>;
 }
 
 export interface TallyInventoryLine {
@@ -221,6 +261,8 @@ export interface TallyVoucher {
   inventory: TallyInventoryLine[];
   /** Ledger name of the entry the inventory lines allocate to. */
   inventoryLedger: string;
+  /** Additive (WP-7): Stock Journal (stock transfer) — quantity out of `from`, into `to`. */
+  stock?: { from: string; to: string; lines: Array<{ item: string; unit: string; qty: number; batch?: string }> };
 }
 
 /** Signed paise: debit negative, credit positive. */
@@ -242,6 +284,11 @@ interface LedgerDef {
   phone?: string;
   duty?: 'Central Tax' | 'State Tax' | 'Integrated Tax' | 'Cess';
   billwise?: boolean;
+  /** Additive (WP-7): opening balance, debit-positive paise, and bill-wise opening bills. */
+  opening?: number;
+  bills?: Array<{ name: string; date: string; paise: number }>;
+  /** Additive (WP-7): cost centres are applicable (an entry allocates to one). */
+  costCentres?: boolean;
 }
 
 export interface TallyBuild {
@@ -249,6 +296,10 @@ export interface TallyBuild {
   ledgers: LedgerDef[];
   stockItems: Array<{ name: string; unit: string; hsn: string; gstRate: number }>;
   warnings: string[];
+  /** Additive (WP-7): user group masters (parents first), cost centres and godowns the vouchers use. */
+  groups?: Array<{ name: string; parent: string }>;
+  costCentres?: string[];
+  godowns?: string[];
 }
 
 export interface TallyCounts {
@@ -258,6 +309,11 @@ export interface TallyCounts {
   creditNotes: number;
   receipts: number;
   purchases: number;
+  /** Additive (WP-7). */
+  payments?: number;
+  journals?: number;
+  contras?: number;
+  stockJournals?: number;
 }
 
 /** Push an entry; zero amounts are dropped. */
@@ -281,8 +337,9 @@ function lineItems(inv: InvoiceRecord): TallyInventoryLine[] {
   const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
   if (!items.length) return [];
   try {
-    const calc = calculateInvoice(
-      calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 }),
+    const calc = inrTotals(
+      calculateInvoice(calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 })),
+      inv,
     );
     return calc.lines
       .filter((l) => clean(l.name))
@@ -314,6 +371,10 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
   };
   const std = (name: string, parent: string, duty?: LedgerDef['duty']) =>
     addLedger({ name, parent, ...(duty ? { duty } : {}) });
+  const bankOf = tallyBankResolver(o.bankLedger, o.cashLedger);
+  const centreName = new Map((source.books?.costCentres ?? []).map((c) => [c.id, c.name]));
+  const ccLedgers = new Set<string>();
+  const allocatedBy = new Set((source.books?.manualVouchers ?? []).map((v) => v.id));
 
   const registerParty = (inv: InvoiceRecord, name: string) => {
     const c = inv.client ?? ({} as InvoiceRecord['client']);
@@ -368,8 +429,15 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     push(entries, party, credit ? 'Cr' : 'Dr', total, { name: number, type: 'New Ref' });
     const taxable = inventory.length
       ? inventory.reduce((s, l) => s + l.paise, 0)
-      : Math.abs(toPaise(a.taxable));
+      : Math.abs(toPaise(a.chargesTaxed ? round2(a.taxable - a.charges) : a.taxable));
     push(entries, salesLedger, credit ? 'Dr' : 'Cr', taxable);
+    // WP-7 (P1-22): the document's cost centre on its sales entry.
+    const cc = inv.cost_centre_id ? centreName.get(inv.cost_centre_id) : undefined;
+    const salesEntry = entries.find((e) => e.ledger === salesLedger && !e.bill);
+    if (cc && salesEntry) {
+      salesEntry.costCentres = [{ name: cc, paise: salesEntry.paise }];
+      ccLedgers.add(salesLedger);
+    }
     taxLedgers(inv, absA, credit, entries);
     push(entries, o.otherChargesLedger, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.charges)));
     // Cess and TCS get their own ledgers: left out they would be swallowed by Round Off.
@@ -397,7 +465,12 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       party,
       partyGstin: clean(inv.client?.gstin).toUpperCase(),
       stateName: stateNameOf(invoiceStateCode(inv)),
-      narration: clean(inv.po_number) ? `PO: ${clean(inv.po_number)}` : '',
+      narration: [
+        clean(inv.po_number) && `PO: ${clean(inv.po_number)}`,
+        fxNarration(num(inv.total), inv),
+        // Outward reverse charge: no output-tax ledger, the recipient pays the GST (Rule 46(p)).
+        a.rcmTax > 0 && `Reverse charge: GST ${a.rcmTax.toFixed(2)} payable by the recipient`,
+      ].filter(Boolean).join(' | '),
       reference: clean(inv.po_number),
       entries,
       inventory,
@@ -419,20 +492,46 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       seqOf.set(p, n);
     }
     const paidRows = new Map<string, number>();
-    for (const p of allSorted) paidRows.set(p.invoice_id, (paidRows.get(p.invoice_id) ?? 0) + toPaise(p.amount));
+    // TDS the customer withheld is settled on the receipt that clears the cash due (total - TDS):
+    // Dr TDS Receivable / Cr Party, so the party ledger closes in Tally.
+    const tdsOn = new Map<Payment, number>();
+    for (const p of allSorted) {
+      const before = paidRows.get(p.invoice_id) ?? 0;
+      const after = before + toPaise(p.amount);
+      paidRows.set(p.invoice_id, after);
+      const inv = byId.get(p.invoice_id)!;
+      // Settlement is tracked in the document's currency; the TDS is posted in rupees.
+      const tds = Math.min(Math.max(toPaise(inv.tds_amount ?? 0), 0), toPaise(receivableTotal(inv)));
+      const cashDue = toPaise(receivableTotal(inv)) - tds;
+      if (tds > 0 && before < cashDue && after >= cashDue) tdsOn.set(p, toPaise(inrValue(tds / 100, inv)));
+    }
 
+    for (const p of allSorted) {
+      if (p.advance_id && tdsOn.has(p)) {
+        const inv = byId.get(p.invoice_id)!;
+        warnings.push(`${clean(inv.invoice_number) || inv.id}: the customer's TDS is settled by an advance adjustment, which has no voucher here — post the TDS journal in Tally.`);
+      }
+    }
     for (const p of filterPayments(source.payments, sales, o.range)) {
+      // Applying an advance (5.3) is bill-wise matching in Tally: the money came in on the advance.
+      if (p.advance_id) continue;
+      // WP-7: a receipt row a manual voucher allocated bill-wise (P0-11) goes out with that voucher, not twice.
+      if (allocatedBy.has(String((p as { voucher_id?: unknown }).voucher_id ?? ''))) continue;
       const inv = byId.get(p.invoice_id)!;
       const party = partyNameOf(inv.client);
       registerParty(inv, party);
-      const isCash = /^\s*cash\s*$/i.test(String(p.method ?? ''));
-      const bank = isCash ? o.cashLedger : o.bankLedger;
-      std(bank, isCash ? 'Cash-in-Hand' : 'Bank Accounts');
-      const paise = toPaise(p.amount);
+      const { ledger: bank, parent: bankParent } = bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
+      std(bank, bankParent);
+      const paise = toPaise(inrValue(num(p.amount), inv));
       const invNo = clean(inv.invoice_number) || String(inv.id);
       const entries: TallyEntry[] = [];
       push(entries, bank, 'Dr', paise);
-      push(entries, party, 'Cr', paise, { name: invNo, type: 'Agst Ref' });
+      const tds = tdsOn.get(p) ?? 0;
+      if (tds > 0) {
+        std(o.tdsLedger, 'Current Assets');
+        push(entries, o.tdsLedger, 'Dr', tds);
+      }
+      push(entries, party, 'Cr', paise + tds, { name: invNo, type: 'Agst Ref' });
       vouchers.push({
         type: 'Receipt',
         date: isoDate(p.date),
@@ -440,10 +539,61 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         party,
         partyGstin: '',
         stateName: '',
-        narration: [clean(p.method), clean(p.reference) && `Ref ${clean(p.reference)}`, `Against ${invNo}`]
+        narration: [
+          clean(p.method),
+          clean(p.reference) && `Ref ${clean(p.reference)}`,
+          `Against ${invNo}`,
+          tds > 0 && `TDS ${fixed2(tds / 100)} withheld${clean(inv.tds_section) ? ` u/s ${clean(inv.tds_section)}` : ''}`,
+          fxNarration(num(p.amount), inv),
+        ]
           .filter(Boolean)
           .join(' | '),
         reference: clean(p.reference),
+        entries,
+        inventory: [],
+        inventoryLedger: '',
+      });
+    }
+    // Advance receipts and refunds (5.3), dated in range.
+    for (const m of advanceMovements(source.advances ?? [], source.payments, source.invoices)) {
+      if (m.kind === 'adjusted') continue;
+      if ((o.range.from && m.date < o.range.from) || (o.range.to && m.date > o.range.to)) continue;
+      const adv = (source.advances ?? []).find((a) => a.id === m.advanceId);
+      const party = partyNameOf(adv?.client);
+      addLedger({
+        name: party,
+        parent: 'Sundry Debtors',
+        billwise: true,
+        gstin: clean(adv?.client?.gstin).toUpperCase(),
+        stateName: stateNameOf(adv?.client?.state_code || adv?.place_of_supply || ''),
+        address: [clean(adv?.client?.address)].filter(Boolean),
+        email: clean(adv?.client?.email),
+      });
+      const { ledger: bank, parent: bankParent } = bankOf(m);
+      std(bank, bankParent);
+      const paise = toPaise(m.gross);
+      const entries: TallyEntry[] = [];
+      const received = m.kind === 'received';
+      if (received) {
+        push(entries, bank, 'Dr', paise);
+        push(entries, party, 'Cr', paise, { name: m.number, type: 'Advance' });
+      } else {
+        push(entries, party, 'Dr', paise, { name: m.number, type: 'Agst Ref' });
+        push(entries, bank, 'Cr', paise);
+      }
+      vouchers.push({
+        type: received ? 'Receipt' : 'Payment',
+        date: m.date,
+        number: received ? m.number : m.ref || m.number,
+        party,
+        partyGstin: '',
+        stateName: '',
+        narration: [
+          received ? 'Advance received' : `Refund of advance ${m.number}`,
+          clean(m.method),
+          m.taxed && `GST on advance ${fixed2(round2(m.igst + m.cgst + m.sgst))} (not posted: record it in Tally)`,
+        ].filter(Boolean).join(' | '),
+        reference: received ? clean(adv?.reference) : '',
         entries,
         inventory: [],
         inventoryLedger: '',
@@ -466,13 +616,35 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const total = Math.abs(toPaise(p.total));
       if (total === 0) continue;
       const entries: TallyEntry[] = [];
-      push(entries, p.partyName, 'Cr', total, { name: p.number || p.id || p.partyName, type: 'New Ref' });
+      // Reverse charge / imports: the supplier is owed only what it billed; the GST we pay ourselves
+      // goes to its own Duties & Taxes ledger (as the in-app ledger does: 2310 / 2311).
+      // 7O: self-assessed cess (reverse charge / customs) goes to the same Duties & Taxes ledger as the GST.
+      const selfTax = Math.abs(toPaise(p.selfTax)) + Math.abs(toPaise(p.selfCess ?? 0));
+      const selfLedger = p.selfTaxKind === 'CUSTOMS' ? o.customsIgstLedger : o.rcmPayableLedger;
+      push(entries, p.partyName, 'Cr', Math.abs(toPaise(p.payable)), { name: p.number || p.id || p.partyName, type: 'New Ref' });
+      if (selfTax > 0) {
+        push(entries, selfLedger, 'Cr', selfTax);
+        std(selfLedger, 'Duties & Taxes');
+      }
+      // TDS deducted on booking the bill: owed to the government, one Duties & Taxes ledger per section.
+      const tds = Math.abs(toPaise(p.tds));
+      if (tds > 0) {
+        const tdsLedger = `TDS Payable ${(p.tdsSection || '').replace(/-.*/, '')}`.trim();
+        push(entries, tdsLedger, 'Cr', tds);
+        std(tdsLedger, 'Duties & Taxes');
+      }
       // GST on a bill whose ITC is blocked is part of the cost, never an "Input" credit.
-      push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.itcEligible ? p.taxable : round2(p.taxable + p.tax))));
+      // 7O: cess too — input cess credit when ITC is claimed, else part of the cost (never round-off).
+      const cess = Math.abs(toPaise(p.cess ?? 0));
+      push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.itcEligible ? p.taxable : round2(p.taxable + p.tax))) + (p.itcEligible ? 0 : cess));
       if (p.itcEligible) {
         push(entries, o.inputCgst, 'Dr', Math.abs(toPaise(p.cgst)));
         push(entries, o.inputSgst, 'Dr', Math.abs(toPaise(p.sgst)));
         push(entries, o.inputIgst, 'Dr', Math.abs(toPaise(round2(p.tax - p.cgst - p.sgst))));
+        if (cess > 0) {
+          push(entries, o.inputCess, 'Dr', cess);
+          std(o.inputCess, 'Duties & Taxes', 'Cess');
+        }
       }
       balanceWithRoundOff(entries, o.roundOffLedger);
       addLedger({
@@ -501,23 +673,35 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         inventoryLedger: '',
       });
     }
+    vouchers.push(...debitNoteVouchers(source.purchaseReturns, o, addLedger)); // WP-3: purchase returns (tally-debit-notes.ts)
   }
 
-  // Only keep tax/std ledgers that vouchers actually use.
+  // WP-7 (P0-12 / P1-22): supplier payments, manual vouchers, asset journals, stock journals, openings.
+  if (source.books) {
+    vouchers.push(...booksVouchers(source.books, { purchases: o.includePurchases ? source.purchases : [], vendors: source.vendors }, o, addLedger, bankOf, warnings));
+    openingLedgers(source.books, source.clients, source.vendors, o, addLedger);
+    vouchers.push(...payrollTallyVouchers(source.books, o, addLedger)); // 7P: payroll journals + payments (tally-payroll.ts)
+  }
+  for (const name of ccLedgers) addLedger({ name, parent: '', costCentres: true });
+
+  // Only keep tax/std ledgers that vouchers actually use (and ledgers carrying an opening balance).
   const used = new Set(vouchers.flatMap((v) => v.entries.map((e) => e.ledger)));
   const ledgers = [...ledgerMap.values()]
-    .filter((l) => used.has(l.name))
+    .filter((l) => used.has(l.name) || !!l.opening)
     .sort((a, b) => a.parent.localeCompare(b.parent) || a.name.localeCompare(b.name));
   const stockItems = [...stockMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const costCentres = [...new Set(vouchers.flatMap((v) => v.entries.flatMap((e) => (e.costCentres ?? []).map((c) => c.name))))].sort();
+  const godowns = [...new Set(vouchers.flatMap((v) => (v.stock ? [v.stock.from, v.stock.to] : [])))].filter((g) => g !== 'Main Location').sort();
+  const groups = source.books ? groupMasters(source.books) : [];
 
-  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, Receipt: 3 };
+  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, 'Debit Note': 2.5, Receipt: 3, Payment: 4, Contra: 4.5, Journal: 5, 'Stock Journal': 6 };
   vouchers.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
       typeOrder[a.type] - typeOrder[b.type] ||
       a.number.localeCompare(b.number),
   );
-  return { vouchers, ledgers, stockItems, warnings };
+  return { vouchers, ledgers, stockItems, warnings, ...(groups.length ? { groups } : {}), ...(costCentres.length ? { costCentres } : {}), ...(godowns.length ? { godowns } : {}) };
 }
 
 function stripEmpty<T extends object>(o: T): Partial<T> {
@@ -538,6 +722,10 @@ export function countTally(build: TallyBuild): TallyCounts {
     creditNotes: c('Credit Note'),
     receipts: c('Receipt'),
     purchases: c('Purchase'),
+    payments: c('Payment'),
+    journals: c('Journal'),
+    contras: c('Contra'),
+    stockJournals: c('Stock Journal'),
   };
 }
 
@@ -555,7 +743,18 @@ function ledgerXml(l: LedgerDef): Lines {
   const body: Lines = [];
   body.push(...el('PARENT', l.parent));
   body.push(...el('ISBILLWISEON', yn(!!l.billwise)));
-  body.push(...el('ISCOSTCENTRESON', 'No'));
+  body.push(...el('ISCOSTCENTRESON', yn(!!l.costCentres)));
+  if (l.opening) {
+    // Tally's sign: a debit opening is negative.
+    body.push(...el('OPENINGBALANCE', tallyAmount(-l.opening)));
+    for (const b of l.bills ?? []) {
+      body.push(...el('BILLALLOCATIONS.LIST', [
+        ...el('NAME', b.name),
+        ...(b.date ? el('BILLDATE', tallyDate(b.date)) : []),
+        ...el('OPENINGBALANCE', tallyAmount(-b.paise)),
+      ]));
+    }
+  }
   if (l.duty) {
     body.push(...el('TAXTYPE', 'GST'));
     body.push(...el('GSTDUTYHEAD', l.duty));
@@ -653,6 +852,15 @@ function entryXml(e: TallyEntry, tag = 'ALLLEDGERENTRIES.LIST', withBills = true
       ]),
     );
   }
+  if (e.costCentres?.length) {
+    body.push(
+      ...el('CATEGORYALLOCATIONS.LIST', [
+        ...el('CATEGORY', 'Primary Cost Category'),
+        ...el('ISDEEMEDPOSITIVE', yn(debit)),
+        ...e.costCentres.flatMap((c) => el('COSTCENTREALLOCATIONS.LIST', [...el('NAME', c.name), ...el('AMOUNT', tallyAmount(debit ? -c.paise : c.paise))])),
+      ]),
+    );
+  }
   return el(tag, body);
 }
 
@@ -671,7 +879,7 @@ function qtyText(n: number): string {
 function voucherXml(v: TallyVoucher): Lines {
   const isInv = v.inventory.length > 0;
   const credit = v.type === 'Credit Note';
-  const isParty = v.type !== 'Receipt';
+  const isParty = v.type === 'Sales' || v.type === 'Credit Note' || v.type === 'Purchase' || v.type === 'Debit Note';
   const header: Lines = [
     ...el('DATE', tallyDate(v.date)),
     ...el('EFFECTIVEDATE', tallyDate(v.date)),
@@ -725,6 +933,28 @@ function voucherXml(v: TallyVoucher): Lines {
     if (isInv && e === inventoryEntry) continue;
     body.push(...entryXml(e));
   }
+  if (v.stock) {
+    // Stock Journal (WP-7): consumption out of one godown, production into the other, quantity only.
+    for (const [tag, godown, inward] of [['INVENTORYENTRIESOUT.LIST', v.stock.from, false], ['INVENTORYENTRIESIN.LIST', v.stock.to, true]] as const) {
+      for (const l of v.stock.lines) {
+        const q = `${qtyText(l.qty)} ${l.unit}`;
+        body.push(...el(tag, [
+          ...el('STOCKITEMNAME', l.item),
+          ...el('ISDEEMEDPOSITIVE', yn(inward)),
+          ...el('ACTUALQTY', q),
+          ...el('BILLEDQTY', q),
+          ...el('AMOUNT', '0.00'),
+          ...el('BATCHALLOCATIONS.LIST', [
+            ...el('GODOWNNAME', godown),
+            ...el('BATCHNAME', l.batch || 'Primary Batch'),
+            ...el('ACTUALQTY', q),
+            ...el('BILLEDQTY', q),
+            ...el('AMOUNT', '0.00'),
+          ]),
+        ]));
+      }
+    }
+  }
   return el('TALLYMESSAGE', el('VOUCHER', body, {
     VCHTYPE: v.type,
     ACTION: 'Create',
@@ -759,10 +989,26 @@ function applicableFromOf(build: TallyBuild): string {
   return `${m >= 4 ? y : y - 1}0401`;
 }
 
+function groupXml(g: { name: string; parent: string }): Lines {
+  return el('TALLYMESSAGE', el('GROUP', [...el('PARENT', g.parent), ...ledgerNameList(g.name)], { NAME: g.name, ACTION: 'Create' }), { 'xmlns:UDF': 'TallyUDF' });
+}
+
+function costCentreXml(name: string): Lines {
+  return el('TALLYMESSAGE', el('COSTCENTRE', [...el('CATEGORY', 'Primary Cost Category'), ...el('PARENT', ''), ...ledgerNameList(name)], { NAME: name, ACTION: 'Create' }), { 'xmlns:UDF': 'TallyUDF' });
+}
+
+function godownXml(name: string): Lines {
+  return el('TALLYMESSAGE', el('GODOWN', [...el('PARENT', ''), ...ledgerNameList(name)], { NAME: name, ACTION: 'Create' }), { 'xmlns:UDF': 'TallyUDF' });
+}
+
 function mastersMessages(build: TallyBuild): Lines {
   const units = [...new Set(build.stockItems.map((s) => s.unit))].sort();
   const from = applicableFromOf(build);
   return cat(
+    // WP-7: groups first (ledgers name them as parent), then cost centres and godowns.
+    ...(build.groups ?? []).map(groupXml),
+    ...(build.costCentres ?? []).map(costCentreXml),
+    ...(build.godowns ?? []).map(godownXml),
     ...build.ledgers.map(ledgerXml),
     ...units.map(unitXml),
     ...build.stockItems.map((s) => stockItemXml(s, from)),

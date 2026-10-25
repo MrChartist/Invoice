@@ -30,7 +30,7 @@ export interface PaperConfig {
   currency: (amount: number, currency?: string) => string;
   date: (value: string | Date) => string;
   col: { hsn: boolean; unit: boolean; discount: boolean; taxRate: boolean; taxable: boolean };
-  show: { qr: boolean; signature: boolean; bank: boolean; terms: boolean; words: boolean; place: boolean };
+  show: { qr: boolean; signature: boolean; bank: boolean; terms: boolean; words: boolean; place: boolean; tracking: boolean };
   logoSize: 's' | 'm' | 'l';
   logoPosition: 'auto' | 'left' | 'right' | 'center';
   headerNote: string;
@@ -77,6 +77,7 @@ export function buildPaperConfig(
       terms: d ? d.show_terms : true,
       words: d ? d.show_amount_in_words : true,
       place: d ? d.show_place_of_supply : true,
+      tracking: d ? d.show_tracking !== false : true,
     },
     logoSize: d?.logo_size ?? 'm',
     logoPosition: d?.logo_position ?? 'auto',

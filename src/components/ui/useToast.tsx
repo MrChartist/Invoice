@@ -5,6 +5,8 @@ interface ToastData {
   key: number;
   message: string;
   tone: ToastTone;
+  action?: { label: string; onClick: () => void };
+  duration?: number;
 }
 
 /**
@@ -16,12 +18,15 @@ interface ToastData {
 export function useToast() {
   const [toast, setToast] = useState<ToastData | null>(null);
 
-  const notify = useCallback((message: string, tone: ToastTone = 'success') => {
-    setToast({ key: Date.now(), message, tone });
-  }, []);
+  const notify = useCallback(
+    (message: string, tone: ToastTone = 'success', opts: { action?: ToastData['action']; duration?: number } = {}) => {
+      setToast({ key: Date.now(), message, tone, ...opts });
+    },
+    [],
+  );
 
   const toastNode = toast ? (
-    <Toast key={toast.key} message={toast.message} tone={toast.tone} onClose={() => setToast(null)} />
+    <Toast key={toast.key} message={toast.message} tone={toast.tone} action={toast.action} duration={toast.duration} onClose={() => setToast(null)} />
   ) : null;
 
   return { notify, toastNode };

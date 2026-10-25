@@ -111,3 +111,29 @@
   color: var(--muted-foreground);
   font-size: var(--text-base);
 }
+
+.paidPanel {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--profit) 10%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--profit) 35%, var(--border));
+  font-size: var(--text-sm);
+}
+
+.paidPanel strong {
+  color: var(--profit);
+  font-size: var(--text-md);
+}
+
+.paidPanel span {
+  color: var(--muted-foreground);
+}
+
+.paidActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}

@@ -23,6 +23,9 @@ import { daysOverdue, formatMoney, formatDate } from './utils';
 import { amountInWords } from './amount-in-words';
 import { isoDay } from './dates';
 import { csvCell, toCsv } from './csv';
+import type { AdvanceRecord } from '../types/advances';
+import { advanceMovements } from './advance-tax';
+import { receivableTotal } from './rcm';
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -33,7 +36,27 @@ export type ReceiptRow = Payment & { client_id?: string; client_name?: string; c
 export const AGING_BUCKETS = ['Not due', '1–30 days', '31–60 days', '61–90 days', '90+ days'] as const;
 export type AgingBucketLabel = (typeof AGING_BUCKETS)[number];
 
-export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance';
+export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance' | 'opening';
+
+/**
+ * A bill-wise opening outstanding (WP-1 `opening_bills`, `src/lib/opening-bills.ts`): owed when the
+ * books began, never a document (no GST / revenue). INR only. A Dr bill ages like an invoice and is
+ * settled by payment rows whose `invoice_id` is the bill id; a Cr bill is an opening credit
+ * (advance) of the party.
+ */
+export interface OpeningBillInput {
+  id: string;
+  party_id?: string;
+  party_name: string;
+  ref_no: string;
+  date: string;
+  due_date: string;
+  /** Rupees, > 0. */
+  amount: number;
+  dr_cr: 'Dr' | 'Cr';
+  /** The part of a typed opening balance not split into bills (Tally "On Account"). */
+  on_account?: boolean;
+}
 
 export interface LedgerEntry {
   /** yyyy-mm-dd */
@@ -61,6 +84,8 @@ export interface Bill {
   outstanding: number;
   daysOverdue: number;
   bucket: AgingBucketLabel;
+  /** Additive (WP-1): an opening bill, not an invoice (`invoiceId` is the opening bill id). */
+  opening?: boolean;
 }
 
 export interface PartyReceivable {
@@ -107,6 +132,14 @@ export interface BuildInput {
   invoices: InvoiceRecord[];
   payments: ReceiptRow[];
   clients?: Client[];
+  /**
+   * Advance receipts (5.3, INR only). The advance is the credit (dated when received); the payment
+   * row with `advance_id` that applies it settles the bill but adds no second credit; a refund is a
+   * debit. Unadjusted balances count in `advances`.
+   */
+  advances?: AdvanceRecord[];
+  /** Additive (WP-1): bill-wise opening outstandings (INR), see `OpeningBillInput`. */
+  openingBills?: OpeningBillInput[];
 }
 
 export interface Ledger {
@@ -123,7 +156,7 @@ export interface Ledger {
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
-const REVENUE_TYPES: DocumentType[] = ['INVOICE', 'TAX_INVOICE'];
+const REVENUE_TYPES: DocumentType[] = ['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY'];
 
 /** Documents that move the sales ledger: live invoices and credit notes. */
 export function isLedgerDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {
@@ -166,7 +199,7 @@ function emptyBuckets(): Record<AgingBucketLabel, number> {
   return { 'Not due': 0, '1–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
 }
 
-const KIND_ORDER: Record<LedgerEntryKind, number> = { invoice: 0, credit_note: 1, payment: 2, advance: 2 };
+const KIND_ORDER: Record<LedgerEntryKind, number> = { opening: -1, invoice: 0, credit_note: 1, payment: 2, advance: 2 };
 
 function sortEntries(entries: LedgerEntry[]): LedgerEntry[] {
   return entries
@@ -239,12 +272,16 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     return a;
   };
 
+  // Opening bills (WP-1): INR only, keyed like invoices (client id, else the name).
+  const openingBills = currency === 'INR' ? (input.openingBills ?? []).filter((b) => b && b.amount > 0 && b.date) : [];
+  const openingById = new Map(openingBills.map((b) => [b.id, b]));
+
   // Payments grouped by invoice; invoice-less receipts are on-account advances.
   const paidByInvoice = new Map<string, ReceiptRow[]>();
   const onAccount: ReceiptRow[] = [];
   for (const p of input.payments) {
     if (!(num(p.amount) > 0)) continue;
-    if (p.invoice_id && docById.has(p.invoice_id)) {
+    if (p.invoice_id && (docById.has(p.invoice_id) || openingById.has(p.invoice_id))) {
       const list = paidByInvoice.get(p.invoice_id) ?? [];
       list.push(p);
       paidByInvoice.set(p.invoice_id, list);
@@ -261,7 +298,8 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   for (const inv of docs) {
     const key = keyOf(inv.client);
     const a = acc(key, inv.client?.name ?? '', inv.client?.id);
-    const total = round2(num(inv.total));
+    // Outward reverse charge: only the taxable value is receivable (src/lib/rcm.ts).
+    const total = round2(receivableTotal(inv));
     const issue = dateKey(inv.issue_date) || dateKey(inv.created_at);
 
     if (isCreditNote(inv)) {
@@ -283,6 +321,15 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     for (const p of paidByInvoice.get(inv.id) ?? []) {
       const amt = round2(num(p.amount));
       paid = round2(paid + amt);
+      if (p.advance_id) {
+        // The money arrived with the advance (already a credit): show the adjustment, move nothing.
+        a.entries.push({
+          date: dateKey(p.date) || issue, kind: 'advance', ref: p.reference || inv.invoice_number,
+          particulars: `Advance ${p.reference || ''} adjusted against ${inv.invoice_number} (${formatMoney(amt, currency)})`.replace(/\s+/g, ' '),
+          debit: 0, credit: 0, balance: 0, invoiceId: inv.id,
+        });
+        continue;
+      }
       a.entries.push({
         date: dateKey(p.date) || issue, kind: 'payment',
         ref: p.reference || inv.invoice_number,
@@ -328,6 +375,42 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     }
   }
 
+  for (const b of openingBills) {
+    const key = keyOf({ id: b.party_id, name: b.party_name });
+    const a = acc(key, b.party_name, b.party_id);
+    const amount = round2(b.amount);
+    const label = b.on_account ? 'Opening balance – on account' : `Opening bill ${b.ref_no}`;
+    if (b.dr_cr === 'Cr') {
+      a.entries.push({ date: b.date, kind: 'opening', ref: b.ref_no, particulars: `${label} (credit)`, debit: 0, credit: amount, balance: 0 });
+      a.advances = round2(a.advances + amount);
+      continue;
+    }
+    a.entries.push({ date: b.date, kind: 'opening', ref: b.ref_no, particulars: label, debit: amount, credit: 0, balance: 0, invoiceId: b.id });
+    let paid = 0;
+    for (const p of paidByInvoice.get(b.id) ?? []) {
+      const amt = round2(num(p.amount));
+      paid = round2(paid + amt);
+      a.entries.push({
+        date: dateKey(p.date) || b.date, kind: 'payment', ref: p.reference || b.ref_no,
+        particulars: `Receipt – ${p.method || 'Payment'} (against ${b.ref_no})`,
+        debit: 0, credit: amt, balance: 0, invoiceId: b.id,
+      });
+    }
+    const outstanding = round2(Math.max(amount - paid, 0));
+    const excess = round2(Math.max(paid - amount, 0));
+    if (excess > 0) a.advances = round2(a.advances + excess);
+    if (outstanding > 0.004) {
+      const due = b.due_date || b.date;
+      a.bills.push({
+        invoiceId: b.id, number: b.ref_no, issueDate: b.date, dueDate: due,
+        total: amount, paid, outstanding,
+        daysOverdue: daysOverdue(due, now),
+        bucket: agingBucket(due, now) as AgingBucketLabel,
+        opening: true,
+      });
+    }
+  }
+
   for (const p of onAccount) {
     const known = p.client_id ? clientById.get(p.client_id) : undefined;
     const name = p.client_name ?? known?.name ?? '';
@@ -340,6 +423,34 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       debit: 0, credit: amt, balance: 0,
     });
     a.advances = round2(a.advances + amt);
+  }
+
+  // Advance receipts (5.3): received = credit, refund = debit, unadjusted balance = advance.
+  if (currency === 'INR' && input.advances?.length) {
+    const unadjusted = new Map<string, number>();
+    for (const m of advanceMovements(input.advances, input.payments, input.invoices)) {
+      const adv = input.advances.find((x) => x.id === m.advanceId);
+      const key = keyOf({ id: adv?.client?.id, name: adv?.client?.name });
+      const a = acc(key, adv?.client?.name ?? m.party, adv?.client?.id);
+      if (m.kind === 'received') {
+        a.entries.push({
+          date: m.date, kind: 'advance', ref: m.number,
+          particulars: `Advance receipt – ${m.method || 'Payment'}${m.ref ? ` (${m.ref})` : ''}`,
+          debit: 0, credit: m.gross, balance: 0,
+        });
+      } else if (m.kind === 'refunded') {
+        a.entries.push({
+          date: m.date, kind: 'advance', ref: m.ref || m.number,
+          particulars: `Refund of advance ${m.number}`, debit: m.gross, credit: 0, balance: 0,
+        });
+      }
+      const sign = m.kind === 'received' ? 1 : -1;
+      unadjusted.set(key, round2((unadjusted.get(key) ?? 0) + sign * m.gross));
+    }
+    for (const [key, open] of unadjusted) {
+      const a = accs.get(key);
+      if (a && open > 0.004) a.advances = round2(a.advances + open);
+    }
   }
 
   const totals: ReceivablesReport['totals'] = {
@@ -443,7 +554,7 @@ export function monthlyCollections(report: ReceivablesReport, months = 12, now: 
       if (!r) continue;
       if (e.kind === 'invoice') r.billed = round2(r.billed + e.debit);
       else if (e.kind === 'credit_note') r.credited = round2(r.credited + e.credit);
-      else r.received = round2(r.received + e.credit);
+      else if (e.kind !== 'opening') r.received = round2(r.received + e.credit);
     }
   }
   for (const r of rows) {

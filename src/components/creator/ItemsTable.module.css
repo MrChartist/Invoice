@@ -271,3 +271,84 @@
   border-color: var(--brand);
   box-shadow: 0 0 0 2px var(--primary-glow);
 }
+
+/* Item custom fields (6.23) copied from the catalogue. */
+.customLine {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  padding: 0 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+/* Batch / serial / godown pickers under a tracked line (6.6 / 6.10 / 6.11). */
+.trackRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  padding: 0.25rem 0.5rem;
+  font-size: var(--text-sm);
+}
+
+.trackField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 140px;
+  flex: 1 1 160px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.trackWide {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.trackAlert,
+.trackNote {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.trackAlert {
+  color: var(--loss);
+  font-weight: 600;
+}
+
+.trackNote {
+  color: var(--warning);
+}
+
+/* Scan box + price level note above the items (6.7 / 6.9). */
+.scanBar {
+  padding: 0.75rem 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.levelNote {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+/* WP-8: base-unit reading under a line typed in an alternate unit ("= 24 NOS"). */
+.unitHint {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--muted-foreground);
+  margin-top: 0.15rem;
+  white-space: nowrap;
+}

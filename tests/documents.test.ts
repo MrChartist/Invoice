@@ -69,7 +69,10 @@ const ctx = { id: 'cn1', invoice_number: 'CRN/FY25-26/0001', today: '2025-07-01'
 test('transition matrix', () => {
   const t = (d: InvoiceRecord['doc_type']) =>
     docs.allowedConversions({ doc_type: d, status: 'Draft' }).map((o) => o.target);
-  assert.deepEqual(t('QUOTATION'), ['PROFORMA', 'TAX_INVOICE', 'INVOICE', 'DELIVERY_CHALLAN']);
+  assert.deepEqual(t('QUOTATION'), ['SALES_ORDER', 'PROFORMA', 'TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY', 'DELIVERY_CHALLAN']);
+  assert.deepEqual(t('SALES_ORDER'), ['DELIVERY_CHALLAN', 'TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY']);
+  assert.deepEqual(t('BILL_OF_SUPPLY'), ['DELIVERY_CHALLAN']);
+  assert.deepEqual(docs.allowedConversions({ doc_type: 'SALES_ORDER', status: 'Sent', order_closed_on: '2025-07-01' }), []);
   assert.ok(!t('PROFORMA').includes('PROFORMA'));
   assert.deepEqual(t('CREDIT_NOTE'), []);
   assert.deepEqual(docs.allowedConversions({ doc_type: 'QUOTATION', status: 'Cancelled' }), []);
@@ -231,15 +234,42 @@ test('createCreditNote persists, numbers CRN series and enforces caps', () => {
   assert.equal(docs.getDocumentChain('p1').length, 3);
 });
 
-test('debit note is an INVOICE referencing the original', () => {
+test('debit note is a DEBIT_NOTE referencing the original', () => {
   const inv = make();
   const d = docs.buildDebitNote(
     inv,
     { reason: 'Rate difference', lines: [{ name: 'Rate revision', quantity: 1, rate: 500, tax_rate: 18 }] },
     { id: 'd1', invoice_number: 'INV/FY25-26/0002', today: '2025-07-01', dueDays: 7 },
   );
-  assert.equal(d.doc_type, 'TAX_INVOICE');
+  assert.equal(d.doc_type, 'DEBIT_NOTE');
   assert.equal(d.po_number, inv.invoice_number);
   assert.equal(d.total, 590);
   assert.equal(d.due_date, '2025-07-08');
+});
+
+test('sales order conversion: pending quantities only, stamped lines, AMOUNT discount re-expressed as a share', () => {
+  const so = make({ doc_type: 'SALES_ORDER', status: 'Sent', discount_type: 'AMOUNT', discount_rate: 100, shipping: 50 });
+  const d = docs.buildConvertedDraft(so, 'DELIVERY_CHALLAN', {
+    id: 'dc1',
+    invoice_number: 'DCH/FY25-26/0001',
+    today: '2025-08-01',
+    dueDays: 10,
+    pending: { a: 1 },
+    carryCharges: false,
+  });
+  assert.equal(d.sales_order_id, so.id);
+  assert.deepEqual(d.items.map((i) => [i.order_line_id, i.quantity]), [['a', 1]]);
+  assert.notEqual(d.items[0].id, 'a');
+  assert.equal(d.shipping, 0);
+  // 100 off a 5,101 order is 1.9604 %; one line of 1,000 gets 19.60 of it, not the whole 100.
+  assert.equal(d.discount_type, 'PERCENT');
+  assert.equal(d.discount_amount, 19.6);
+  assert.throws(
+    () => docs.buildConvertedDraft(so, 'INVOICE', { id: 'x', invoice_number: 'INV/1', today: '2025-08-01', dueDays: 0, pending: {} }),
+    /Nothing is pending/,
+  );
+  // A full conversion keeps the order's own discount and charges.
+  const full = docs.buildConvertedDraft(so, 'INVOICE', { id: 'y', invoice_number: 'INV/2', today: '2025-08-01', dueDays: 0, pending: { a: 4, b: 2 } });
+  assert.equal(full.total, so.total);
+  assert.equal(full.discount_type, 'AMOUNT');
 });

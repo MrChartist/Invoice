@@ -24,6 +24,7 @@ import { num, round2 } from './invoice-calc';
 import { creditNotesFor, readLinks, type DocLink } from './documents';
 import { localDb } from './localDb';
 import { termsMentionInterest } from './reminders';
+import { receivableTotal } from './rcm';
 
 export const LATE_FEE_KEY = `${DB_PREFIX}late_fee`;
 
@@ -235,7 +236,7 @@ export function computeInterest(
   config: LateFeeConfig,
   asOf: string | Date = new Date(),
 ): InterestResult {
-  if (inv.doc_type !== 'INVOICE' && inv.doc_type !== 'TAX_INVOICE') return empty('not_invoice');
+  if (inv.doc_type !== 'INVOICE' && inv.doc_type !== 'TAX_INVOICE' && inv.doc_type !== 'BILL_OF_SUPPLY') return empty('not_invoice');
   if (inv.status === 'Draft' || inv.status === 'Cancelled') return empty('draft_or_cancelled');
   const principal = round2(Math.max(num(inv.total) - num(inv.tds_amount), 0));
   if (!config.enabled) return empty('disabled', principal);
@@ -352,14 +353,15 @@ export function interestInputFor(
     doc_type: invoice.doc_type,
     status: invoice.status,
     due_date: invoice.due_date,
-    total: invoice.total,
+    // Reverse charge: interest runs on what the customer owes, never on the recipient's GST.
+    total: receivableTotal(invoice),
     tds_amount: invoice.tds_amount,
     payments: payments
       .filter((p) => p.invoice_id === invoice.id)
       .map((p) => ({ date: p.date, amount: p.amount })),
     credits: creditNotesFor(invoice.id, links, allInvoices).map((c) => ({
       date: c.issue_date,
-      amount: Math.max(num(c.total), 0),
+      amount: Math.max(receivableTotal(c), 0),
     })),
   };
 }

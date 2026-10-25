@@ -43,7 +43,7 @@ Boundaries: upcoming = 1 to 3 days before due, due_today = 0, polite = 1 to 7 da
 `buildReminder(invoice, stage, 'en'|'hinglish', today)` returns `{subject, body}` using `{client} {number} {amount} {balance} {due} {days} {upi} {business} {phone}`.
 The final notice mentions late-payment charges only when `termsMentionInterest` finds interest/late fee/penalty wording in the invoice's own terms or notes; no legal claims are invented.
 Log helpers: `remindersFor`, `reminderCount`, `lastReminder`, `snoozedUntil`, `isSnoozed`, `makeLogEntry`, `makeSnooze`.
-`pendingReminders(invoices, today, log, {cooldownDays})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with balance, in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted most overdue first.
+`pendingReminders(invoices, today, log, {cooldownDays})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with balance, in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted by chase priority (`reminderPriority`, 0–100, ties most overdue first): days overdue up to 50 (linear to 90 days; not-yet-due 0–5), balance in ₹ up to 30 (log scale, ₹1,000 → 0, ₹10 lakh+ → 30; foreign documents converted at their exchange rate), the client's other overdue bills 5 each up to 10 (client matched by GSTIN, else name), reminders already sent 5 each up to 10. Level: high ≥ 50, medium ≥ 25, else low; the Dashboard card shows the level with the reasons as a tooltip.
 
 ## Components
 
@@ -69,3 +69,20 @@ import { ShareMenu } from '../components/share';
 4. Thank-you on payment: after recording a payment that clears the balance, open `<ReminderModal invoice={inv} open onClose=... />` (its default stage is `thank_you` when paid).
 
 No routes, no new dependencies, no edits to shared core files.
+
+## Sharing the PDF itself
+
+Where the browser can hand files to other apps (Android Chrome, iOS/macOS Safari, Edge), the preview's Share menu
+offers **Share PDF…**: the PDF is built in the browser and passed to the OS share sheet (`shareFile` in
+`src/lib/share.ts`, Web Share Level 2), so it lands in a WhatsApp chat or mail as an attachment. If the browser
+refuses because building the PDF outlasted the tap (`blocked`), a **Share PDF now** button finishes it with one more
+tap; browsers without file sharing get a normal download.
+
+## Client copy (web page)
+
+Share → **Client copy (web page)** turns the rendered preview into one static HTML file (`buildClientCopyHtml` in
+`src/lib/client-copy.ts`): the page markup is cloned, QR canvases are frozen into PNG images, the app's stylesheet
+rules are inlined, and an on-screen pay panel adds the amount due, a tappable **Pay with UPI** (`upi://`) button,
+the UPI ID and QR. It carries its own `default-src 'none'` CSP, no scripts (`sanitizePaper` strips any), and opens
+offline in any browser; printing hides the pay panel. Shared as a file where supported, otherwise downloaded.
+Fonts fall back to the system font outside the app.

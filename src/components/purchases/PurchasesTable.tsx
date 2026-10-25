@@ -1,8 +1,10 @@
-import { Banknote, Pencil, Trash2 } from 'lucide-react';
+import { Banknote, Paperclip, Pencil, Trash2 } from 'lucide-react';
 import type { PurchaseRecord } from '../../types/purchases';
 import { balanceOf, deriveStatus } from '../../lib/purchases';
 import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { PurchaseStatusBadge } from './PurchaseStatusBadge';
+import { useT } from '../../i18n';
+import { purT, purCategory } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -17,19 +19,20 @@ export interface PurchasesTableProps {
 }
 
 export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: PurchasesTableProps) {
+  useT(); // re-render on a language switch (5.4)
   return (
     <div className={surface.tableWrap}>
       <table className={surface.table}>
         <thead>
           <tr>
-            <th>Vendor</th>
-            <th>Date</th>
-            <th>Category</th>
-            <th>Status</th>
-            <th className={surface.numeric}>GST</th>
-            <th className={surface.numeric}>Total</th>
-            <th className={surface.numeric}>Balance</th>
-            <th aria-label="Actions" />
+            <th>{purT('thVendor')}</th>
+            <th>{purT('thDate')}</th>
+            <th>{purT('thCategory')}</th>
+            <th>{purT('thStatus')}</th>
+            <th className={surface.numeric}>{purT('thGst')}</th>
+            <th className={surface.numeric}>{purT('thTotal')}</th>
+            <th className={surface.numeric}>{purT('thBalance')}</th>
+            <th aria-label={purT('thActions')} />
           </tr>
         </thead>
         <tbody>
@@ -42,17 +45,22 @@ export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: Purchas
                 <td>
                   <div className={tabStyles.name}>
                     <span>{p.vendor_name || '—'}</span>
-                    <span className={styles.kindTag}>{p.kind === 'EXPENSE' ? 'Expense' : 'Bill'}</span>
+                    <span className={styles.kindTag}>{p.kind === 'EXPENSE' ? purT('kindExpense') : purT('kindBill')}</span>
+                    {p.attachments?.length ? (
+                      <span className={styles.kindTag} title={purT(p.attachments.length === 1 ? 'attachedOne' : 'attachedMany', { n: p.attachments.length })} aria-label={purT(p.attachments.length === 1 ? 'attachedOne' : 'attachedMany', { n: p.attachments.length })}>
+                        <Paperclip size={11} aria-hidden="true" /> {p.attachments.length}
+                      </span>
+                    ) : null}
                   </div>
                   {p.bill_number && <div className={tabStyles.sub}>{p.bill_number}</div>}
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {formatDate(p.date)}
                   {p.due_date && p.kind === 'PURCHASE' && (
-                    <div className={cn(tabStyles.sub, status === 'Overdue' && styles.overdue)}>Due {formatDate(p.due_date)}</div>
+                    <div className={cn(tabStyles.sub, status === 'Overdue' && styles.overdue)}>{purT('due', { date: formatDate(p.due_date) })}</div>
                   )}
                 </td>
-                <td>{p.category}</td>
+                <td>{purCategory(p.category)}</td>
                 <td><PurchaseStatusBadge status={status} /></td>
                 <td className={surface.numeric}>
                   {tax > 0 ? formatCurrency(tax) : '—'}
@@ -65,16 +73,16 @@ export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: Purchas
                     <button
                       type="button"
                       className={controls.btnIcon}
-                      title={balance > 0 ? 'Record payment' : 'Payment history'}
-                      aria-label={`Payments for ${p.vendor_name} ${p.bill_number}`}
+                      title={balance > 0 ? purT('recordPayment') : purT('paymentHistory')}
+                      aria-label={purT('paymentsFor', { name: `${p.vendor_name} ${p.bill_number}` })}
                       onClick={() => onPay(p)}
                     >
                       <Banknote size={16} />
                     </button>
-                    <button type="button" className={controls.btnIcon} title="Edit" aria-label={`Edit ${p.vendor_name} ${p.bill_number}`} onClick={() => onEdit(p)}>
+                    <button type="button" className={controls.btnIcon} title={purT('edit')} aria-label={purT('editNamed', { name: `${p.vendor_name} ${p.bill_number}` })} onClick={() => onEdit(p)}>
                       <Pencil size={16} />
                     </button>
-                    <button type="button" className={controls.btnDanger} title="Delete" aria-label={`Delete ${p.vendor_name} ${p.bill_number}`} onClick={() => onDelete(p)}>
+                    <button type="button" className={controls.btnDanger} title={purT('delete')} aria-label={purT('deleteNamed', { name: `${p.vendor_name} ${p.bill_number}` })} onClick={() => onDelete(p)}>
                       <Trash2 size={16} />
                     </button>
                   </div>

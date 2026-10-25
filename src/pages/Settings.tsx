@@ -1,17 +1,24 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Check, Copy, Database, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
+import { Building2, Check, Copy, Database, ListPlus, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
+import { setT } from '../i18n/areas/settings';
+import { LanguageSwitch } from '../components/ui/LanguageSwitch';
 import { ProfileEditor } from '../components/settings/ProfileEditor';
 import { DefaultsPanel } from '../components/settings/DefaultsPanel';
 import { CatalogPanel } from '../components/settings/CatalogPanel';
+import { PricingPanel } from '../components/settings/PricingPanel';
 import { LateFeeSettings } from '../components/interest';
 import { DataPanel } from '../components/settings/DataPanel';
 import { SecurityPanel } from '../components/security/SecurityPanel';
+import { CompaniesPanel } from '../components/companies/CompaniesPanel';
 import { AutoBackupPanel } from '../components/pwa/AutoBackupPanel';
+import { can as canDo, type AccessAction } from '../lib/access';
 import { blankProfile, localDb, type AppSettings } from '../lib/localDb';
 import { checkGstin } from '../lib/gstin';
 import { isValidIfsc, isValidPan, isValidUpi } from '../lib/validators';
@@ -21,35 +28,43 @@ import surface from '../styles/surface.module.css';
 import styles from '../components/settings/Settings.module.css';
 
 // The activity log is only needed on its own tab, so it stays out of the Settings chunk.
+const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomFieldsPanel').then((m) => ({ default: m.CustomFieldsPanel })));
+// Folder sync (5.7): the panel brings the whole sync engine, so it loads only on the Data tab.
+const SyncPanel = lazy(() => import('../components/sync/SyncPanel').then((m) => ({ default: m.SyncPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
 
-type Tab = 'business' | 'items' | 'defaults' | 'data' | 'activity' | 'security';
+type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
-const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
-  { id: 'business', label: 'Business profiles', icon: Building2 },
-  { id: 'items', label: 'Items & rates', icon: Package },
-  { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
-  { id: 'data', label: 'Data & backup', icon: Database },
-  { id: 'activity', label: 'Activity', icon: ScrollText },
-  { id: 'security', label: 'Security', icon: ShieldCheck },
+/** `need`: local roles (6.21) — a clerk or viewer sees only the tabs their role may use. */
+const ALL_TABS: { id: Tab; label: Parameters<typeof setT>[0]; icon: typeof Building2; need: AccessAction }[] = [
+  { id: 'business', label: 'tabBusiness', icon: Building2, need: 'settings.manage' },
+  { id: 'items', label: 'tabItems', icon: Package, need: 'master.edit' },
+  { id: 'fields', label: 'tabFields', icon: ListPlus, need: 'settings.manage' },
+  { id: 'defaults', label: 'tabDefaults', icon: SlidersHorizontal, need: 'settings.manage' },
+  { id: 'data', label: 'tabData', icon: Database, need: 'data.restore' },
+  { id: 'activity', label: 'tabActivity', icon: ScrollText, need: 'view' },
+  { id: 'security', label: 'tabSecurity', icon: ShieldCheck, need: 'view' },
 ];
 
 /** The first problem that should block saving, or '' when the profile is fine. */
 function profileProblem(p: SenderProfile): string {
-  if (!p.companyName.trim()) return 'Add a business name — it is printed at the top of every invoice.';
-  if (p.companyGstin && !checkGstin(p.companyGstin).valid) return 'The GSTIN is not valid. Fix it or clear it.';
-  if (p.pan && !isValidPan(p.pan)) return 'The PAN is not valid.';
-  if (p.ifsc && !isValidIfsc(p.ifsc)) return 'The IFSC code is not valid.';
-  if (p.upiId && !isValidUpi(p.upiId)) return 'The UPI ID is not valid.';
+  if (!p.companyName.trim()) return setT('errName');
+  if (p.companyGstin && !checkGstin(p.companyGstin).valid) return setT('errGstin');
+  if (p.pan && !isValidPan(p.pan)) return setT('errPan');
+  if (p.ifsc && !isValidIfsc(p.ifsc)) return setT('errIfsc');
+  if (p.upiId && !isValidUpi(p.upiId)) return setT('errUpi');
   return '';
 }
 
 export function Settings() {
   const { notify, toastNode } = useToast();
+  const { t } = useT();
   const [params] = useSearchParams();
+  // The signed-in user only changes at the PIN screen, which unmounts this page.
+  const [TABS] = useState(() => ALL_TABS.filter((t) => canDo(t.need)));
   const [tab, setTab] = useState<Tab>(() => {
     const t = params.get('tab');
-    return TABS.some((x) => x.id === t) ? (t as Tab) : 'business';
+    return TABS.some((x) => x.id === t) ? (t as Tab) : TABS[0].id;
   });
   const [settings, setSettings] = useState<AppSettings>(() => localDb.settings.get());
   const [editingId, setEditingId] = useState(() => localDb.settings.get().activeProfileId);
@@ -112,7 +127,7 @@ export function Settings() {
   };
 
   const duplicateProfile = () => {
-    const copy: SenderProfile = { ...blankProfile(), ...editing, id: blankProfile().id, companyName: `${editing.companyName || 'Untitled profile'} (copy)` };
+    const copy: SenderProfile = { ...blankProfile(), ...editing, id: blankProfile().id, companyName: setT('copySuffix', { name: editing.companyName || setT('untitled') }) };
     setSettings((s) => ({ ...s, profiles: [...s.profiles, copy] }));
     setEditingId(copy.id!);
     setDirty(true);
@@ -131,7 +146,7 @@ export function Settings() {
       localDb.settings.save({ ...settings, onboarded: true });
       setSettings((s) => ({ ...s, onboarded: true }));
       setDirty(false);
-      notify('Settings saved');
+      notify(t('settings.saved'));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -146,9 +161,19 @@ export function Settings() {
 
   return (
     <div className={surface.page}>
-      <PageHeader title="Settings" subtitle="Your business details, payment info and defaults. Saved only on this device." />
+      <PageHeader
+        title={t('settings.title')}
+        subtitle={canDo('settings.manage') ? t('settings.subOwner') : t('settings.subOther')}
+        actions={
+          <div className={styles.langBox} title={t('settings.languageHint')}>
+            <span className={styles.langLabel}>{t('common.language')}</span>
+            <LanguageSwitch />
+          </div>
+        }
+      />
 
-      <div className={controls.segment} role="tablist" aria-label="Settings sections" style={{ alignSelf: 'flex-start', maxWidth: '100%', flexWrap: 'wrap' }} onKeyDown={onTabKey}>
+
+      <div className={controls.segment} role="tablist" aria-label={setT('sections')} style={{ alignSelf: 'flex-start', maxWidth: '100%', flexWrap: 'wrap' }} onKeyDown={onTabKey}>
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -162,7 +187,7 @@ export function Settings() {
             onClick={() => setTab(id)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', minHeight: 40 }}
           >
-            <Icon size={14} aria-hidden="true" /> {label}
+            <Icon size={14} aria-hidden="true" /> {setT(label)}
           </button>
         ))}
       </div>
@@ -172,20 +197,20 @@ export function Settings() {
         <div className={styles.layout}>
           <section className={surface.card}>
             <div className={surface.cardHead}>
-              <span>Profiles</span>
+              <span>{setT('profiles')}</span>
               <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={addProfile}>
-                <Plus size={14} /> Add
+                <Plus size={14} /> {setT('add')}
               </button>
             </div>
             <div className={styles.profileList}>
               {settings.profiles.map((p) => (
                 <button key={p.id} type="button" className={`${styles.profileBtn} ${p.id === editing.id ? styles.profileBtnActive : ''}`} onClick={() => setEditingId(p.id!)}>
-                  <Avatar name={p.companyName || 'New'} size={32} square src={p.logo} />
+                  <Avatar name={p.companyName || setT('newProfile')} size={32} square src={p.logo} />
                   <span className={styles.profileText}>
-                    <strong>{p.companyName || 'Untitled profile'}</strong>
-                    <span>{p.companyGstin || 'No GSTIN'}</span>
+                    <strong>{p.companyName || setT('untitled')}</strong>
+                    <span>{p.companyGstin || setT('noGstin')}</span>
                   </span>
-                  {p.id === settings.activeProfileId && <Star size={13} fill="currentColor" color="var(--brand)" aria-label="Default profile" />}
+                  {p.id === settings.activeProfileId && <Star size={13} fill="currentColor" color="var(--brand)" aria-label={setT('defaultProfile')} />}
                 </button>
               ))}
             </div>
@@ -194,20 +219,20 @@ export function Settings() {
           <section className={surface.card}>
             <div className={surface.cardHead}>
               <div className={styles.editorHead} style={{ width: '100%' }}>
-                <span>{editing.companyName || 'Untitled profile'}</span>
+                <span>{editing.companyName || setT('untitled')}</span>
                 <div className={surface.pageActions}>
                   {editing.id === settings.activeProfileId ? (
-                    <span className={styles.defaultTag}><Check size={12} /> Default profile</span>
+                    <span className={styles.defaultTag}><Check size={12} /> {setT('defaultProfile')}</span>
                   ) : (
                     <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => patchSettings({ activeProfileId: editing.id! })}>
-                      <Star size={14} /> Make default
+                      <Star size={14} /> {setT('makeDefault')}
                     </button>
                   )}
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={duplicateProfile}>
-                    <Copy size={14} /> Duplicate
+                    <Copy size={14} /> {setT('duplicate')}
                   </button>
                   {settings.profiles.length > 1 && (
-                    <button type="button" className={controls.btnDanger} onClick={() => setDeleting(editing)} aria-label="Delete this profile">
+                    <button type="button" className={controls.btnDanger} onClick={() => setDeleting(editing)} aria-label={setT('deleteProfile')}>
                       <Trash2 size={16} />
                     </button>
                   )}
@@ -216,8 +241,7 @@ export function Settings() {
             </div>
             <div className={surface.cardBody}>
               <p className={surface.sectionNote}>
-                Each invoice stores its own copy of these details when you save it, so editing a profile later never
-                changes invoices you have already issued.
+                {setT('snapshotNote')}
               </p>
               <ProfileEditor profile={editing} onChange={patchProfile} onError={(m) => notify(m, 'error')} />
             </div>
@@ -225,7 +249,17 @@ export function Settings() {
         </div>
       )}
 
-      {tab === 'items' && <CatalogPanel notify={notify} />}
+      {tab === 'items' && (
+        <>
+          <CatalogPanel notify={notify} />
+          <PricingPanel notify={notify} />
+        </>
+      )}
+      {tab === 'fields' && (
+        <Suspense fallback={null}>
+          <CustomFieldsPanel notify={notify} />
+        </Suspense>
+      )}
       {tab === 'defaults' && (
         <>
           <DefaultsPanel settings={settings} onChange={patchSettings} />
@@ -238,11 +272,18 @@ export function Settings() {
       {tab === 'data' && (
         <>
           <DataPanel notify={notify} />
-          <AutoBackupPanel onNotify={notify} />
+          {/* Roles (6.21): full backups and folder sync are owner-only (the library checks too). */}
+          {canDo('data.backup') && <AutoBackupPanel onNotify={notify} />}
+          {canDo('settings.manage') && (
+            <Suspense fallback={null}>
+              <SyncPanel notify={notify} />
+            </Suspense>
+          )}
+          <CompaniesPanel notify={notify} />
         </>
       )}
       {tab === 'activity' && (
-        <Suspense fallback={<p className={surface.sectionNote}>Loading activity…</p>}>
+        <Suspense fallback={<p className={surface.sectionNote}>{setT('loadingActivity')}</p>}>
           <ActivityPanel />
         </Suspense>
       )}
@@ -251,12 +292,12 @@ export function Settings() {
       </div>
 
       {dirty && (
-        <div className={styles.saveBar} role="region" aria-label="Unsaved changes">
-          <span>You have unsaved changes</span>
+        <div className={styles.saveBar} role="region" aria-label={setT('unsavedRegion')}>
+          <span>{t('settings.unsaved')}</span>
           <div className={styles.saveActions}>
-            <button type="button" className={controls.btnOutline} onClick={discard}>Discard</button>
+            <button type="button" className={controls.btnOutline} onClick={discard}>{t('common.discard')}</button>
             <button type="button" className={controls.btnPrimary} onClick={save}>
-              <Save size={16} /> Save settings
+              <Save size={16} /> {t('settings.save')}
             </button>
           </div>
         </div>
@@ -265,9 +306,9 @@ export function Settings() {
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this profile?"
-        message={`“${deleting?.companyName || 'Untitled profile'}” will be removed after you save. Invoices already issued keep their own copy of these details.`}
-        confirmLabel="Delete profile"
+        title={setT('deleteProfileTitle')}
+        message={setT('deleteProfileMsg', { name: deleting?.companyName || setT('untitled') })}
+        confirmLabel={setT('deleteProfileBtn')}
         onConfirm={() => deleting && removeProfile(deleting.id!)}
         onClose={() => setDeleting(null)}
       />

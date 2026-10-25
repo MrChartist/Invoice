@@ -26,6 +26,7 @@ import {
   type StaticEntry,
 } from '../../lib/search';
 import { formatCombo } from '../../hooks/useHotkeys';
+import { tallyDestinations } from './tally-destinations';
 import styles from './CommandPalette.module.css';
 
 export interface PaletteAction {
@@ -147,6 +148,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       })),
     [actions],
   );
+  // Tally-parity screens (Phase 7): searchable, not listed on the empty palette.
+  const tallyEntries = useMemo<StaticEntry[]>(() => (open ? tallyDestinations() : []), [open]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
@@ -162,14 +165,14 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       return [...base, ...staticRows.map((r) => ({ key: r.id, kind: 'result' as const, result: r }))];
     }
     const found = searchAll(q, {
-      data: { ...data, pages: pageEntries, actions: actionEntries },
+      data: { ...data, pages: [...pageEntries, ...tallyEntries], actions: actionEntries },
       perGroup: 6,
     });
     // Render order follows group relevance, so flatten through groupResults.
     return groupResults(found).flatMap((g) =>
       g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
     );
-  }, [open, query, recents, data, pageEntries, actionEntries]);
+  }, [open, query, recents, data, pageEntries, tallyEntries, actionEntries]);
 
   // Reset on open; remember and restore focus.
   useEffect(() => {

@@ -13,6 +13,7 @@
 
 import { getTable, setTable } from './storage';
 import { formatMoney } from './utils';
+import { sanitizeCopies, type CopySetting } from './print-copies';
 
 export const DESIGN_TABLE = 'design_prefs';
 /** `profile_id` of the row that applies to every profile without its own row. */
@@ -54,6 +55,8 @@ export interface DesignPrefs {
   show_terms: boolean;
   show_amount_in_words: boolean;
   show_place_of_supply: boolean;
+  /** Batch / expiry / serial / warranty sub-line under tracked stock lines (6.6 / 6.11). */
+  show_tracking: boolean;
   /** 'none' | 'auto-status' | any other text = custom watermark. */
   watermark: string;
   paper: PaperKind;
@@ -62,7 +65,33 @@ export interface DesignPrefs {
   header_note: string;
   number_format: NumberFormat;
   date_format: DateFormat;
+  /**
+   * Additive (P0-9): copies per print job / PDF — 'single' (default, one paper, no banner), 'auto'
+   * (Rule 48: goods 3, services 2) or an explicit list. Absent = 'single'. See `print-copies.ts`.
+   */
+  copies?: CopySetting;
+  /** Additive (P2): print on pre-printed stationery — no letterhead / backgrounds, content offset. */
+  preprinted?: PreprintedPrefs;
   updated_at?: string;
+}
+
+export interface PreprintedPrefs {
+  on: boolean;
+  /** Blank space left at the top for the printed letterhead, mm (0–120). */
+  top_mm: number;
+  /** Extra left margin, mm (-20–40). */
+  left_mm: number;
+}
+
+/** Clamp a stored pre-printed setting; undefined when absent or malformed. */
+export function sanitizePreprinted(value: unknown): PreprintedPrefs | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const v = value as Record<string, unknown>;
+  const clamp = (n: unknown, lo: number, hi: number, d: number) => {
+    const x = typeof n === 'number' && Number.isFinite(n) ? n : d;
+    return Math.min(hi, Math.max(lo, Math.round(x * 10) / 10));
+  };
+  return { on: v.on === true, top_mm: clamp(v.top_mm, 0, 120, 40), left_mm: clamp(v.left_mm, -20, 40, 0) };
 }
 
 export const LOGO_POSITIONS: LogoPosition[] = ['auto', 'left', 'right', 'center'];
@@ -121,6 +150,7 @@ export const DEFAULT_DESIGN: DesignPrefs = {
   show_terms: true,
   show_amount_in_words: true,
   show_place_of_supply: true,
+  show_tracking: true,
   watermark: WATERMARK_NONE,
   paper: 'A4',
   density: 'comfortable',
@@ -192,6 +222,7 @@ export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIG
     show_terms: bool(src.show_terms, base.show_terms),
     show_amount_in_words: bool(src.show_amount_in_words, base.show_amount_in_words),
     show_place_of_supply: bool(src.show_place_of_supply, base.show_place_of_supply),
+    show_tracking: bool(src.show_tracking, base.show_tracking),
     watermark: watermarkRaw === '' ? WATERMARK_NONE : watermarkRaw,
     paper: pick(src.paper, PAPER_KINDS, base.paper),
     density: pick(src.density, DENSITIES, base.density),
@@ -199,6 +230,15 @@ export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIG
     header_note: 'header_note' in src ? text(src.header_note, 160) : base.header_note,
     number_format: pick(src.number_format, NUMBER_FORMATS, base.number_format),
     date_format: pick(src.date_format, DATE_FORMATS, base.date_format),
+    // Additive keys stay absent unless set, so a legacy design object round-trips unchanged.
+    ...(() => {
+      const copies = 'copies' in src ? sanitizeCopies(src.copies) : base.copies;
+      return copies !== undefined ? { copies } : {};
+    })(),
+    ...(() => {
+      const pp = 'preprinted' in src ? sanitizePreprinted(src.preprinted) : base.preprinted;
+      return pp ? { preprinted: pp } : {};
+    })(),
     updated_at: typeof src.updated_at === 'string' ? src.updated_at : base.updated_at,
   };
 }
@@ -310,6 +350,9 @@ export function applyPreset(current: DesignPrefs, presetId: string): DesignPrefs
     font: current.font,
     footer_text: current.footer_text,
     header_note: current.header_note,
+    // Print-job settings are not part of the look: a preset keeps them.
+    ...(current.copies !== undefined ? { copies: current.copies } : {}),
+    ...(current.preprinted ? { preprinted: current.preprinted } : {}),
     updated_at: current.updated_at,
   };
   return sanitizeDesign(preset.patch, base);
@@ -420,7 +463,7 @@ export interface Stamp {
 export function stampFor(watermark: string, status: string, docType: string): Stamp | null {
   if (!watermark || watermark === WATERMARK_NONE) return null;
   if (watermark !== WATERMARK_AUTO) return { label: watermark.toUpperCase(), tone: 'custom' };
-  const billable = docType !== 'QUOTATION' && docType !== 'DELIVERY_CHALLAN';
+  const billable = docType !== 'QUOTATION' && docType !== 'DELIVERY_CHALLAN' && docType !== 'SALES_ORDER';
   if (status === 'Cancelled') return { label: 'CANCELLED', tone: 'cancelled' };
   if (status === 'Draft') return { label: 'DRAFT', tone: 'draft' };
   if (status === 'Paid' && billable) return { label: 'PAID', tone: 'paid' };

@@ -7,6 +7,8 @@ import controls from '../../styles/controls.module.css';
 import styles from './ExportCenter.module.css';
 import { getTable, setTable, KEYS } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
+import type { AdvanceRecord } from '../../types/advances';
+import type { PurchaseReturn } from '../../types/purchases';
 import type { Client, InvoiceRecord, Payment } from '../../types/invoice';
 import {
   DATASETS,
@@ -25,8 +27,27 @@ import {
   type ExportSource,
 } from '../../lib/accounting-export';
 import { generateTallyExport, DEFAULT_LEDGER_NAMES, type TallyOptions } from '../../lib/tally-xml';
+import { loadTallyBooksSource } from '../../lib/tally-books';
 import { useToast } from '../ui/useToast';
 import { downloadFile, downloadSequentially } from './download';
+import { useT } from '../../i18n';
+import { expT } from '../../i18n/areas/exports';
+import { nodes } from '../../i18n/areas/nodes';
+
+/** Screen names of the datasets (the CSV files and their headers stay English). */
+const DATASET_KEYS = {
+  sales_register: ['dsSalesRegister', 'dsSalesRegisterText'],
+  sales_items: ['dsSalesItems', 'dsSalesItemsText'],
+  purchase_register: ['dsPurchaseRegister', 'dsPurchaseRegisterText'],
+  receipts: ['dsReceipts', 'dsReceiptsText'],
+  parties: ['dsParties', 'dsPartiesText'],
+  items: ['dsItems', 'dsItemsText'],
+  gst_summary: ['dsGstSummary', 'dsGstSummaryText'],
+} as const;
+type DatasetKeyed = keyof typeof DATASET_KEYS;
+const dsKeys = (id: string) => (id in DATASET_KEYS ? DATASET_KEYS[id as DatasetKeyed] : null);
+const dsTitle = (d: { id: string; title: string }) => { const k = dsKeys(d.id); return k ? expT(k[0]) : d.title; };
+const dsText = (d: { id: string; description: string }) => { const k = dsKeys(d.id); return k ? expT(k[1]) : d.description; };
 
 const PREFS_TABLE = 'export_prefs';
 
@@ -78,6 +99,10 @@ function loadSource(): ExportSource {
     items: getTable<Record<string, unknown>>(KEYS.items),
     purchases: getTable<unknown>('purchases'),
     vendors: getTable<unknown>('vendors'),
+    advances: getTable<AdvanceRecord>('advances'),
+    purchaseReturns: getTable<PurchaseReturn>('purchase_returns'),
+    // WP-7 (P0-12 / P1-22): supplier payments, manual vouchers, asset journals, stock transfers, openings.
+    books: loadTallyBooksSource(isoDate(new Date())),
   };
 }
 
@@ -87,6 +112,7 @@ export interface ExportCenterProps {
 }
 
 export function ExportCenter({ companyName }: ExportCenterProps) {
+  useT();
   const { notify, toastNode } = useToast();
   const [source, setSource] = useState<ExportSource | null>(null);
   const [prefs, setPrefs] = useState<Prefs | null>(null);
@@ -197,9 +223,9 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
     try {
       const b = bundle();
       await downloadSequentially([...b.files, b.combined]);
-      notify(`Downloaded ${b.files.length + 1} files for your accountant`);
+      notify(expT('downloaded', { n: b.files.length + 1 }));
     } catch {
-      notify('Download failed — your browser may have blocked multiple downloads.', 'error');
+      notify(expT('downloadFailed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -207,19 +233,19 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
 
   const noCompany = !prefs.companyName.trim();
   const c = tally.counts;
-  const voucherTotal = c.sales + c.creditNotes + c.receipts + c.purchases;
+  const voucherTotal = c.sales + c.creditNotes + c.receipts + c.purchases + (c.payments ?? 0) + (c.journals ?? 0) + (c.contras ?? 0) + (c.stockJournals ?? 0);
 
   return (
     <div className={styles.grid}>
       <div className={styles.stack}>
         <section className={surface.card} aria-labelledby="ex-period">
           <div className={surface.cardHead}>
-            <span className={surface.cardHeadIcon} id="ex-period">Period and format</span>
+            <span className={surface.cardHeadIcon} id="ex-period">{expT('periodFormat')}</span>
           </div>
           <div className={surface.cardBody}>
             <div className={styles.filters}>
               <div className={`${controls.field} ${styles.wide}`}>
-                <label className={controls.label} htmlFor="ex-period-sel">Period</label>
+                <label className={controls.label} htmlFor="ex-period-sel">{expT('period')}</label>
                 <select
                   id="ex-period-sel"
                   className={controls.select}
@@ -227,28 +253,28 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
                   onChange={(e) => update({ period: e.target.value })}
                 >
                   {fyOptions.map((y) => (
-                    <option key={y} value={`fy:${y}`}>{fyLabel(y)} (Apr {y} – Mar {y + 1})</option>
+                    <option key={y} value={`fy:${y}`}>{expT('fyOption', { fy: fyLabel(y), from: y, to: y + 1 })}</option>
                   ))}
-                  <option value="all">All time</option>
-                  <option value="custom">Custom range</option>
+                  <option value="all">{expT('allTime')}</option>
+                  <option value="custom">{expT('customRange')}</option>
                 </select>
               </div>
               {prefs.period === 'custom' && (
                 <>
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor="ex-from">From</label>
+                    <label className={controls.label} htmlFor="ex-from">{expT('from')}</label>
                     <input id="ex-from" type="date" className={controls.input} value={prefs.from} onChange={(e) => update({ from: e.target.value })} />
                   </div>
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor="ex-to">To</label>
+                    <label className={controls.label} htmlFor="ex-to">{expT('to')}</label>
                     <input id="ex-to" type="date" className={controls.input} value={prefs.to} onChange={(e) => update({ to: e.target.value })} />
                   </div>
                 </>
               )}
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="ex-datefmt">CSV date format</label>
+                <label className={controls.label} htmlFor="ex-datefmt">{expT('dateFormat')}</label>
                 <select id="ex-datefmt" className={controls.select} value={prefs.dateFormat} onChange={(e) => update({ dateFormat: e.target.value as DateFormat })}>
-                  <option value="iso">2025-04-15 (unambiguous)</option>
+                  <option value="iso">{expT('isoOption')}</option>
                   <option value="dmy">15-04-2025 (DD-MM-YYYY)</option>
                 </select>
               </div>
@@ -256,23 +282,22 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
             <div className={styles.checks}>
               <label className={controls.check}>
                 <input type="checkbox" checked={prefs.bom} onChange={(e) => update({ bom: e.target.checked })} />
-                UTF-8 BOM (keeps ₹ and accents intact in Excel)
+                {expT('bom')}
               </label>
               <label className={controls.check}>
                 <input type="checkbox" checked={prefs.includeDrafts} onChange={(e) => update({ includeDrafts: e.target.checked })} />
-                Include drafts
+                {expT('includeDrafts')}
               </label>
             </div>
             <p className={surface.sectionNote}>
-              Quotations, proforma invoices, delivery challans and cancelled documents are never exported.
-              Credit notes appear as negative amounts in CSVs and as Credit Note vouchers in Tally.
+              {expT('neverExported')}
             </p>
           </div>
         </section>
 
         <section className={surface.card} aria-labelledby="ex-datasets">
           <div className={surface.cardHead}>
-            <span className={surface.cardHeadIcon} id="ex-datasets"><FileSpreadsheet size={16} aria-hidden="true" /> CSV datasets</span>
+            <span className={surface.cardHeadIcon} id="ex-datasets"><FileSpreadsheet size={16} aria-hidden="true" /> {expT('csvDatasets')}</span>
           </div>
           <ul className={styles.datasetList}>
             {DATASETS.map((d) => {
@@ -282,24 +307,24 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
                 <li key={d.id} className={styles.dataset}>
                   <input
                     type="checkbox"
-                    aria-label={`Include ${d.title} in the accountant bundle`}
+                    aria-label={expT('includeInBundle', { title: dsTitle(d) })}
                     checked={on}
                     onChange={() => toggleDataset(d.id)}
                     style={{ width: 16, height: 16, accentColor: 'var(--primary)' }}
                   />
                   <div className={styles.datasetMain}>
-                    <h3 className={styles.datasetTitle}>{d.title}</h3>
-                    <p className={styles.datasetText}>{d.description}</p>
-                    <p className={styles.datasetFit}>Works with: {d.compatibleWith}</p>
+                    <h3 className={styles.datasetTitle}>{dsTitle(d)}</h3>
+                    <p className={styles.datasetText}>{dsText(d)}</p>
+                    <p className={styles.datasetFit}>{expT('worksWith', { list: d.compatibleWith })}</p>
                   </div>
                   <div className={styles.datasetActions}>
-                    <span className={`${styles.count} ${n ? styles.countOn : ''}`} aria-label={`${n} rows`}>{n} rows</span>
+                    <span className={`${styles.count} ${n ? styles.countOn : ''}`} aria-label={expT('rows', { n })}>{expT('rows', { n })}</span>
                     <button
                       type="button"
                       className={`${controls.btnOutline} ${controls.btnSm}`}
                       disabled={n === 0}
                       onClick={() => downloadFile(csvFile(d.id))}
-                      aria-label={`Download ${d.title} CSV`}
+                      aria-label={expT('downloadCsvOf', { title: dsTitle(d) })}
                     >
                       <Download size={14} aria-hidden="true" /> CSV
                     </button>
@@ -317,10 +342,11 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
             <span className={surface.cardHeadIcon} id="ex-tally"><FileCode2 size={16} aria-hidden="true" /> Tally Prime XML</span>
           </div>
           <div className={surface.cardBody}>
-            <div className={styles.tallyCounts} role="list" aria-label="Tally export contents">
+            <div className={styles.tallyCounts} role="list" aria-label={expT('tallyContents')}>
               {[
-                ['Ledgers', c.ledgers], ['Sales', c.sales], ['Credit notes', c.creditNotes],
-                ['Receipts', c.receipts], ['Purchases', c.purchases], ['Stock items', c.stockItems],
+                [expT('cLedgers'), c.ledgers], [expT('cSales'), c.sales], [expT('cCreditNotes'), c.creditNotes],
+                [expT('cReceipts'), c.receipts], [expT('cPurchases'), c.purchases], [expT('cStockItems'), c.stockItems],
+                [expT('cPayments'), c.payments ?? 0], [expT('cJournals'), (c.journals ?? 0) + (c.contras ?? 0)], [expT('cStockJournals'), c.stockJournals ?? 0],
               ].map(([k, v]) => (
                 <div key={k} className={styles.mini} role="listitem">
                   <span className={styles.miniValue}>{v}</span>
@@ -330,7 +356,7 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
             </div>
 
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="ex-company">Company name in Tally</label>
+              <label className={controls.label} htmlFor="ex-company">{expT('companyInTally')}</label>
               <input
                 id="ex-company"
                 className={`${controls.input} ${noCompany ? controls.inputInvalid : ''}`}
@@ -340,19 +366,19 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
                 aria-describedby="ex-company-hint"
               />
               <span id="ex-company-hint" className={noCompany ? controls.error : controls.hint}>
-                Must match the open company in Tally exactly, including spaces and punctuation.
+                {expT('companyHint')}
               </span>
             </div>
 
             <details className={styles.details}>
-              <summary>Ledger names and options</summary>
+              <summary>{expT('ledgerOptions')}</summary>
               <div className={controls.row}>
                 {([
-                  ['salesLedger', 'Sales ledger'],
-                  ['purchaseLedger', 'Purchase ledger'],
-                  ['bankLedger', 'Bank ledger'],
-                  ['cashLedger', 'Cash ledger'],
-                  ['roundOffLedger', 'Round-off ledger'],
+                  ['salesLedger', expT('salesLedger')],
+                  ['purchaseLedger', expT('purchaseLedger')],
+                  ['bankLedger', expT('bankLedger')],
+                  ['cashLedger', expT('cashLedger')],
+                  ['roundOffLedger', expT('roundOffLedger')],
                 ] as const).map(([key, text]) => (
                   <div className={controls.field} key={key}>
                     <label className={controls.label} htmlFor={`ex-${key}`}>{text}</label>
@@ -362,10 +388,10 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
               </div>
               <label className={controls.check} style={{ marginTop: '0.75rem' }}>
                 <input type="checkbox" checked={prefs.includeInventory} onChange={(e) => update({ includeInventory: e.target.checked })} />
-                Post item lines as stock-item inventory entries
+                {expT('postInventory')}
               </label>
               <p className={surface.sectionNote}>
-                Leave inventory off for service businesses. When on, stock items and units are created in the masters file.
+                {expT('inventoryHint')}
               </p>
             </details>
 
@@ -373,10 +399,10 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
               <div className={styles.warn} role="alert">
                 <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: 'var(--warning)' }} />
                 <div>
-                  <strong>{tally.build.warnings.length} item(s) need a look</strong>
+                  <strong>{expT('needLook', { n: tally.build.warnings.length })}</strong>
                   <ul>
                     {tally.build.warnings.slice(0, 5).map((w) => <li key={w}>{w}</li>)}
-                    {tally.build.warnings.length > 5 && <li>…and {tally.build.warnings.length - 5} more</li>}
+                    {tally.build.warnings.length > 5 && <li>{expT('andMore', { n: tally.build.warnings.length - 5 })}</li>}
                   </ul>
                 </div>
               </div>
@@ -385,15 +411,15 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
             <div className={styles.btnRow}>
               <button type="button" className={`${controls.btnPrimary} ${controls.btn}`} disabled={noCompany || tally.counts.ledgers === 0}
                 onClick={() => downloadFile(xmlFile('masters'))}>
-                <Download size={16} aria-hidden="true" /> 1. Masters XML
+                <Download size={16} aria-hidden="true" /> {expT('mastersXml')}
               </button>
               <button type="button" className={`${controls.btnPrimary} ${controls.btn}`} disabled={noCompany || voucherTotal === 0}
                 onClick={() => downloadFile(xmlFile('vouchers'))}>
-                <Download size={16} aria-hidden="true" /> 2. Vouchers XML ({voucherTotal})
+                <Download size={16} aria-hidden="true" /> {expT('vouchersXml', { n: voucherTotal })}
               </button>
               <button type="button" className={`${controls.btnOutline} ${controls.btn}`} disabled={noCompany || voucherTotal === 0}
                 onClick={() => downloadFile(xmlFile('combined'))}>
-                <Download size={16} aria-hidden="true" /> Combined (single file)
+                <Download size={16} aria-hidden="true" /> {expT('combined')}
               </button>
             </div>
           </div>
@@ -401,20 +427,18 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
 
         <section className={surface.card} aria-labelledby="ex-send">
           <div className={surface.cardHead}>
-            <span className={surface.cardHeadIcon} id="ex-send"><Send size={16} aria-hidden="true" /> Send to accountant</span>
+            <span className={surface.cardHeadIcon} id="ex-send"><Send size={16} aria-hidden="true" /> {expT('sendHead')}</span>
           </div>
           <div className={surface.cardBody}>
             <p className={surface.sectionNote}>
-              Downloads every ticked CSV, both Tally XML files and one combined JSON file for {label === 'all-time' ? 'all time' : label}.
-              Browsers cannot create zip files without extra software, so the files download one after another —
-              attach them all to one email. If your browser asks, allow multiple downloads.
+              {expT('sendNote', { period: label === 'all-time' ? expT('allTimeLower') : label })}
             </p>
             <div className={styles.btnRow}>
               <button type="button" className={`${controls.btnPrimary} ${controls.btn}`} disabled={busy || noCompany} onClick={sendAll}>
-                <Send size={16} aria-hidden="true" /> {busy ? 'Downloading…' : 'Download bundle'}
+                <Send size={16} aria-hidden="true" /> {busy ? expT('downloading') : expT('downloadBundle')}
               </button>
-              <button type="button" className={`${controls.btnOutline} ${controls.btn}`} disabled={noCompany} onClick={() => { downloadFile(bundle().combined); notify('Combined JSON downloaded'); }}>
-                <FileJson size={16} aria-hidden="true" /> Single JSON file
+              <button type="button" className={`${controls.btnOutline} ${controls.btn}`} disabled={noCompany} onClick={() => { downloadFile(bundle().combined); notify(expT('jsonDownloaded')); }}>
+                <FileJson size={16} aria-hidden="true" /> {expT('singleJson')}
               </button>
             </div>
           </div>
@@ -422,21 +446,19 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
 
         <section className={surface.card} aria-labelledby="ex-help">
           <div className={surface.cardHead}>
-            <span className={surface.cardHeadIcon} id="ex-help"><BookOpen size={16} aria-hidden="true" /> Import into Tally Prime</span>
+            <span className={surface.cardHeadIcon} id="ex-help"><BookOpen size={16} aria-hidden="true" /> {expT('importHead')}</span>
           </div>
           <div className={surface.cardBody}>
             <ol className={styles.steps}>
-              <li>Open the company in Tally Prime (name must match <span className={styles.kbd}>{prefs.companyName || 'your company'}</span>).</li>
-              <li>Take a backup first: <span className={styles.kbd}>Gateway of Tally</span> → <span className={styles.kbd}>Alt+Y</span> Data → Backup.</li>
-              <li>Press <span className={styles.kbd}>Alt+O</span> (Import) → <span className={styles.kbd}>Data</span>, or go to Gateway of Tally → <span className={styles.kbd}>Import Data</span>.</li>
-              <li>Choose <strong>Masters XML</strong> first, set “Behaviour of import if master exists” to <em>Combine Opening Balances</em> or <em>Ignore Duplicates</em>, and import.</li>
-              <li>Repeat with <strong>Vouchers XML</strong> (or use the Combined file once). Review Day Book for the period.</li>
-              <li>If Tally reports exceptions, open <span className={styles.kbd}>tallyimport.log</span> in the Tally folder; the usual cause is a ledger name or company name that does not match exactly.</li>
+              <li>{nodes(expT('step1'), { company: <span className={styles.kbd}>{prefs.companyName || expT('yourCompany')}</span> })}</li>
+              <li>{nodes(expT('step2'), { gateway: <span className={styles.kbd}>Gateway of Tally</span>, alty: <span className={styles.kbd}>Alt+Y</span> })}</li>
+              <li>{nodes(expT('step3'), { alto: <span className={styles.kbd}>Alt+O</span>, data: <span className={styles.kbd}>Data</span>, importData: <span className={styles.kbd}>Import Data</span> })}</li>
+              <li>{nodes(expT('step4'), { masters: <strong>Masters XML</strong>, combine: <em>Combine Opening Balances</em>, ignore: <em>Ignore Duplicates</em> })}</li>
+              <li>{nodes(expT('step5'), { vouchers: <strong>Vouchers XML</strong> })}</li>
+              <li>{nodes(expT('step6'), { log: <span className={styles.kbd}>tallyimport.log</span> })}</li>
             </ol>
             <p className={surface.sectionNote}>
-              <Info size={12} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> Importing the same file twice creates duplicate vouchers —
-              export a fresh period range each time. Spreadsheets: Zoho Books, Vyapar and Busy accept the CSVs through their
-              Import menus; map columns by header name.
+              <Info size={12} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {expT('duplicates')}
             </p>
           </div>
         </section>

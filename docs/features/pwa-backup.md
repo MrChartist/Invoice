@@ -50,7 +50,12 @@ The module captures `beforeinstallprompt` on import, so import it early (main.ts
   `filesToDelete(names, keep)`, `isBackupFile`, `parseConfig`, `describeAge`.
 - Storage: `getConfig/saveConfig`, `getLastBackup/recordBackup`, `snoozeNudge/getSnooze`, `hasBackupWorthyData`.
 - Actions (never throw, return `BackupResult`): `chooseBackupFolder`, `disconnectFolder`, `getFolderHandle`,
-  `runAutoBackup({interactive})`, `runDueBackup()`, `downloadBackupNow()` (Safari/Firefox fallback), `isFolderBackupSupported()`.
+  `runAutoBackup({interactive})`, `runDueBackup()`, `downloadBackupNow()` (async; Safari/Firefox fallback), `isFolderBackupSupported()`.
+- **Encryption (opt-in):** `setBackupPassphrase(pass)` derives an AES-GCM key (PBKDF2, random salt) and stores it in
+  IndexedDB (`backup-enc-key`) as a **non-extractable, encrypt-only** `CryptoKey` — the passphrase is never stored.
+  While a key exists, folder and download backups are written as `mrchartist-invoice-backup-YYYY-MM-DD.encrypted.json`
+  in the same format as a manual encrypted export, so Settings → Data restores them with the passphrase on any device.
+  `clearBackupPassphrase()` goes back to plain JSON.
 - Keys (all `mrchartist_inv_*`, so they ride along in JSON backups): `mrchartist_inv_last_backup` (ISO),
   `mrchartist_inv_auto_backup` (`{enabled, frequency: daily|weekly|on-close, retention}`), `mrchartist_inv_backup_snooze`.
   Also `mrchartist_inv_install_dismissed` (InstallPrompt). The folder handle is in IndexedDB, not localStorage.
@@ -81,3 +86,38 @@ The module captures `beforeinstallprompt` on import, so import it early (main.ts
 `npx tsc -b`, `npm run lint` (0 errors), `npm test` (34 pass), `npm run build` pass. Playwright smoke against
 `vite preview`: SW registered, page became controlled, shell/assets/fonts cached, and with the context offline
 `/invoice/abc` loaded the React shell (200, root mounted).
+
+## Restore safety
+
+- `parseBackup` / `validateBackupData` refuse a file before anything is written when a record table
+  (`invoices`, `clients`, `items_catalog`, `transactions`, `vendors`, `purchases`, `purchase_payments`, `recurring`,
+  `doc_links`, `audit_log`, `assets`) is not a JSON array of objects (core tables and `assets` need an `id`), settings
+  are not an object, the file / `schema_version` is newer than this app, or an invoice / recurring snapshot refers to
+  an `asset:<id>` image the file does not contain.
+- Backups stay self-contained: the `assets` table (snapshot logos / signatures since schema v3) is an ordinary
+  `mrchartist_inv_*` key and rides along. An older backup with inline images restores as is, renders the same, and
+  the v3 migration moves its images into `assets` on the reload after the restore.
+- Backups read the in-memory cache (`collectAppData`), so they contain exactly what the app shows; a restore,
+  erase or forgot-PIN reset commits to IndexedDB (`reloadAfterFlush`) before the page reloads.
+- Before a restore or an erase, `saveSafetySnapshot(reason)` copies every app key into IndexedDB (`safety-snapshot`,
+  in the `kv` store, separate from the data tables). Settings → Data shows **Undo last restore / erase** while that copy exists.
+
+## Storage health
+
+`src/lib/storage-health.ts`: `measureStorage()` counts app keys through the storage layer (the IndexedDB-backed
+cache since 4.2, else localStorage, which `navigator.storage.estimate()` does not cover); the quota is ~5 MB on
+localStorage and the browser's IndexedDB estimate otherwise (Settings → Data), the logo/signature images still copied inline into invoice snapshots (pre-v3 data),
+the shared `assets` table (`sharedImageChars`) and invoices that reference it (`invoicesSharingImages`); `assessStorage()` turns
+that plus persistence, iOS-Safari-outside-Home-Screen and backup age into findings (`ok`/`warn`/`critical`) shown in
+Settings → Data. Folder backups are read back after writing (`isIntactBackup`); a file that does not reopen intact is
+reported as a failed backup and the "last backup" time is not advanced.
+
+Attachment files (6.12, one `mrchartist_inv_att_<id>` key each) are reported as a single "attachments" entry with
+their count, size and how many no record uses any more; Settings → Data offers **Clean up unused files**
+(`docs/features/attachments-custom-fields.md`). The restore pickers accept backups up to 200 MB (`MAX_BACKUP_BYTES`)
+because receipts travel inside the file.
+
+**Folder sync (5.7)** reuses the same File System Access patterns (handle in the company's IndexedDB `kv` store,
+`queryPermission` / `requestPermission` only on a click, unattended runs report `permission`) and a stored
+non-extractable key derived from a separate sync passphrase; see `docs/features/sync.md`. Sync bookkeeping is never in
+a backup, and a restore removes it so the next sync compares from scratch.

@@ -103,7 +103,7 @@ npm run dev        # http://localhost:5173
 | `npm run check:size` | Bundle-size budget used in CI |
 | `npm run verify:offline` | Checks the built app and precache list for offline use |
 
-**Deploying:** serve `dist/` from any static host. The host must return `index.html` for unknown paths (deep links such as `/invoice/abc`) and serve `sw.js` from the site root. Ready-made headers and rewrites are included for Netlify (`netlify.toml`), Vercel (`vercel.json`) and Cloudflare Pages (`public/_headers`). Please read the [licence](#licence) before hosting it for other people.
+**Deploying:** serve `dist/` from any static host. The host must return `index.html` for unknown paths (deep links such as `/invoice/abc`) and serve `sw.js` from the site root. Ready-made headers and rewrites are included for Netlify (`netlify.toml`), Vercel (`vercel.json`) and Cloudflare Pages (`public/_headers`), all generated from `scripts/security-headers.mjs` (`node scripts/gen-headers.mjs`); the build also embeds the CSP as a `<meta>` tag for hosts that ignore those files. Please read the [licence](#licence) before hosting it for other people.
 
 ## First run
 
@@ -125,7 +125,7 @@ Please read this section before you rely on the app for real records.
 - **Bank reconciliation** treats the bank as a single account.
 - **Foreign-currency documents** are excluded from INR totals, not converted.
 - **The balance sheet is indicative only.** Fixed assets, loans and GST remittances are not tracked.
-- **`.xlsx` files are not read directly** (that would need a dependency). Export to CSV first.
+- **Excel**: `.xlsx` is read (first sheet) and written by a small built-in reader/writer — no dependency. Old `.xls`, `.ods` and password-protected workbooks are not supported; save them as `.xlsx` or CSV.
 - **Aggregate turnover** for the GSTR-1 JSON is entered by you in the GST reports screen. Verify it with your CA.
 
 ## Architecture

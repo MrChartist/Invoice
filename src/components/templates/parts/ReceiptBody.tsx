@@ -5,8 +5,10 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isTaxed } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
+import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
+import { TransportBlock } from './TransportBlock';
 
 interface Props {
   invoice: InvoiceRecord;
@@ -32,8 +34,10 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
   const cur = invoice.currency;
   const c = invoice.client;
   const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
-  const cgstSgst = isTaxed(invoice, totals);
-  const igst = !cgstSgst && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
+  // Reverse charge: the tax is printed in the recipient-pays note, never added up here.
+  const rcm = isRcmTotals(totals);
+  const cgstSgst = isTaxed(invoice, totals) && !rcm;
+  const igst = !cgstSgst && !rcm && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
   const upiUrl = buildUpiUrl(sender);
 
   return (
@@ -62,6 +66,8 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           {c.gstin && <> · GSTIN {c.gstin}</>}
         </div>
       )}
+      <CustomFieldsBlock invoice={invoice} compact />
+      <TransportBlock invoice={invoice} compact />
       <hr className={styles.rcRule} />
 
       <div className={styles.rcItems}>
@@ -73,6 +79,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
                 {i + 1}. {line.name || '—'}
                 {col.hsn && line.hsn && <span className={styles.rcSmall}> [{line.hsn}]</span>}
               </div>
+              <ItemCustomLine values={src?.custom_values} />
               <div className={styles.rcRow}>
                 <span>
                   {formatQuantity(line.quantity)}
@@ -96,10 +103,10 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
         </>
       )}
       {igst && <Row label={invoice.gst_mode === 'SINGLE' ? 'Tax' : 'IGST'} value={money(totals.tax_amount, cur)} />}
-      {totals.cess_amount > 0 && <Row label="Cess" value={money(totals.cess_amount, cur)} />}
+      {totals.cess_amount > 0 && !rcm && <Row label="Cess" value={money(totals.cess_amount, cur)} />}
       {totals.tcs_amount > 0 && <Row label={invoice.tcs_label || 'TCS'} value={money(totals.tcs_amount, cur)} />}
-      {totals.shipping > 0 && <Row label="Shipping" value={money(totals.shipping, cur)} />}
-      {totals.other_charges !== 0 && <Row label="Other charges" value={money(totals.other_charges, cur)} />}
+      {totals.shipping > 0 && <Row label={totals.charges_line ? 'Shipping (taxable)' : 'Shipping'} value={money(totals.shipping, cur)} />}
+      {totals.other_charges !== 0 && <Row label={totals.charges_line ? 'Other charges (taxable)' : 'Other charges'} value={money(totals.other_charges, cur)} />}
       {totals.round_off !== 0 && <Row label="Round off" value={money(totals.round_off, cur)} />}
       <hr className={styles.rcRule} />
       <div className={cn(styles.rcRow, styles.rcGrand)}>

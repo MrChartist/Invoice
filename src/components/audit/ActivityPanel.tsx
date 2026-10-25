@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Download, ScrollText } from 'lucide-react';
+import { Download, History, ScrollText } from 'lucide-react';
 import { AUDIT_MAX_ROWS, audit } from '../../lib/audit';
+import { useT } from '../../i18n';
+import { migT } from '../../i18n/areas/migration';
 import { auditToCsv, filterAudit, type AuditFilter } from '../../lib/audit-query';
 import { downloadText } from '../../lib/download';
 import { localDayOf } from '../../lib/dates';
@@ -14,6 +16,7 @@ import {
   type AuditEntry,
 } from '../../types/audit';
 import { AuditChanges } from './AuditChanges';
+import { AuditIntegrity } from './AuditIntegrity';
 import { formatWhen, toneOf } from './audit-format';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -22,12 +25,15 @@ import styles from './audit.module.css';
 const PAGE = 100;
 const TAG = { good: styles.tagCreate, bad: styles.tagDanger, lock: styles.tagLock, neutral: '' } as const;
 
-function Row({ e, open, onToggle }: { e: AuditEntry; open: boolean; onToggle: () => void }) {
+function Row({ e, open, onToggle, onRecord }: { e: AuditEntry; open: boolean; onToggle: () => void; onRecord: (id: string) => void }) {
   const has = (e.changes?.length ?? 0) > 0;
   return (
     <>
       <tr>
-        <td className={styles.when}>{formatWhen(e.at)}</td>
+        <td className={styles.when}>
+          {formatWhen(e.at)}
+          {e.by && <div>by {e.by}</div>}
+        </td>
         <td>
           <span className={`${styles.tag} ${TAG[toneOf(e.action)]}`}>{AUDIT_ACTION_LABELS[e.action]}</span>
         </td>
@@ -44,6 +50,11 @@ function Row({ e, open, onToggle }: { e: AuditEntry; open: boolean; onToggle: ()
             e.summary
           )}
           {open && <AuditChanges changes={e.changes} />}
+          {e.entity !== 'system' && e.entity_id && (
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => onRecord(e.entity_id)}>
+              <History size={12} aria-hidden="true" /> {migT('editLog')}
+            </button>
+          )}
         </td>
       </tr>
     </>
@@ -52,7 +63,11 @@ function Row({ e, open, onToggle }: { e: AuditEntry; open: boolean; onToggle: ()
 
 /** Settings → Activity: the full edit log with filters, search and CSV export. */
 export function ActivityPanel() {
+  useT();
   const [version] = useState(0);
+  // WP-7: archived segments on request; one record's edit log on request.
+  const [archived, setArchived] = useState(false);
+  const [record, setRecord] = useState<string | null>(null);
   const [entity, setEntity] = useState<AuditEntity | 'all'>('all');
   const [action, setAction] = useState<AuditAction | 'all'>('all');
   const [from, setFrom] = useState('');
@@ -63,8 +78,10 @@ export function ActivityPanel() {
 
   const all = useMemo(() => {
     void version;
-    return audit.all();
-  }, [version]);
+    const base = archived || record ? audit.fullRows().slice().reverse() : audit.all();
+    return record ? base.filter((e) => e.entity_id === record || e.parent_id === record) : base;
+  }, [version, archived, record]);
+  const archivedRows = useMemo(() => audit.archivedCount(), [version]); // eslint-disable-line react-hooks/exhaustive-deps
   const filter: AuditFilter = { entity, action, from, to, q };
   const rows = useMemo(() => filterAudit(all, filter), [all, entity, action, from, to, q]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = rows.slice(0, limit);
@@ -95,6 +112,9 @@ export function ActivityPanel() {
           Every change to documents, payments, clients and settings is recorded on this device — like Tally&apos;s edit log.
           Contact and bank details are noted as &ldquo;changed&rdquo;, never copied.
         </p>
+        <p className={surface.sectionNote} role="note">{migT('cannotDisable')}</p>
+
+        <AuditIntegrity />
 
         <div className={styles.toolbar}>
           <label className={`${controls.field} ${styles.searchField}`}>
@@ -142,6 +162,22 @@ export function ActivityPanel() {
           </label>
         </div>
 
+        {(archivedRows > 0 || record) && (
+          <div className={styles.panelHead}>
+            {archivedRows > 0 && (
+              <label className={controls.check}>
+                <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> {migT('includeArchived')}
+                <span className={styles.count}> · {migT('archivedCount', { n: archivedRows, s: audit.segmentCount() })}</span>
+              </label>
+            )}
+            {record && (
+              <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setRecord(null)}>
+                {migT('recordFilter')} · {migT('clearRecord')}
+              </button>
+            )}
+          </div>
+        )}
+
         <div className={styles.panelHead}>
           <span className={styles.count} aria-live="polite">
             {rows.length} of {all.length} entr{all.length === 1 ? 'y' : 'ies'}
@@ -171,7 +207,7 @@ export function ActivityPanel() {
                 </thead>
                 <tbody>
                   {shown.map((e) => (
-                    <Row key={e.id} e={e} open={open === e.id} onToggle={() => setOpen(open === e.id ? null : e.id)} />
+                    <Row key={e.id} e={e} open={open === e.id} onToggle={() => setOpen(open === e.id ? null : e.id)} onRecord={(id) => { setRecord(id); setLimit(PAGE); }} />
                   ))}
                 </tbody>
               </table>
@@ -182,7 +218,7 @@ export function ActivityPanel() {
                 <div key={e.id} className={styles.card}>
                   <div>
                     <span className={`${styles.tag} ${TAG[toneOf(e.action)]}`}>{AUDIT_ACTION_LABELS[e.action]}</span>{' '}
-                    <span className={styles.when}>{formatWhen(e.at)}</span>
+                    <span className={styles.when}>{formatWhen(e.at)}{e.by ? ` · by ${e.by}` : ''}</span>
                   </div>
                   <div>{e.summary}</div>
                   <AuditChanges changes={e.changes} />
@@ -197,7 +233,7 @@ export function ActivityPanel() {
             )}
           </>
         )}
-        <p className={styles.limit}>The newest {AUDIT_MAX_ROWS.toLocaleString('en-IN')} entries are kept; older ones roll off. Included in backups.</p>
+        <p className={styles.limit}>The live log holds up to {AUDIT_MAX_ROWS.toLocaleString('en-IN')} entries; past that the oldest move to a sealed archive segment (an &ldquo;Older entries archived&rdquo; entry records it) and stay part of the chain and of every backup. Only a full browser storage still removes entries, and an &ldquo;Older entries removed&rdquo; entry records that.</p>
       </div>
     </section>
   );

@@ -4,7 +4,6 @@ import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
 import type { InvoiceRecord } from '../../types/invoice';
 import {
-  STAGE_LABELS,
   STAGE_ORDER,
   buildReminder,
   lastReminder,
@@ -23,6 +22,11 @@ import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
 import { useReminderLog } from './useReminderLog';
+import { receivableBalance } from '../../lib/rcm';
+import { useT } from '../../i18n';
+import { shareT } from '../../i18n/areas/share';
+import { remindT } from '../../i18n/areas/reminders';
+import { areaNodes } from '../../i18n/areas/nodes';
 
 export interface ReminderModalProps {
   invoice: InvoiceRecord;
@@ -34,10 +38,12 @@ export interface ReminderModalProps {
 
 type Composer = 'whatsapp' | 'email' | 'sms';
 
-const COMPOSERS: { id: Composer; label: string; icon: typeof Mail }[] = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
-  { id: 'email', label: 'Email', icon: Mail },
-  { id: 'sms', label: 'SMS', icon: MessageSquare },
+const CHANNEL_KEYS: Record<ReminderChannel, true> = { whatsapp: true, email: true, sms: true, copy: true, snooze: true };
+
+const COMPOSERS: { id: Composer; icon: typeof Mail }[] = [
+  { id: 'whatsapp', icon: MessageCircle },
+  { id: 'email', icon: Mail },
+  { id: 'sms', icon: MessageSquare },
 ];
 
 export function ReminderModal({ invoice, open, onClose, onSent }: ReminderModalProps) {
@@ -50,6 +56,7 @@ function ReminderModalBody({
   onClose,
   onSent,
 }: Omit<ReminderModalProps, 'open'>) {
+  useT(); // re-render on a language switch (5.4)
   const { notify, toastNode } = useToast();
   const { log, record, snooze } = useReminderLog();
 
@@ -94,42 +101,42 @@ function ReminderModalBody({
       run();
       finish(entry, doneText);
     } catch (err) {
-      notify((err as Error).message || 'Could not log the reminder.', 'error');
+      notify((err as Error).message || shareT('rmLogFailed'), 'error');
     }
   };
 
   const send = () => {
     if (channel === 'whatsapp') {
-      logAndRun('whatsapp', () => openLink(whatsappLink(phone, message.body)), 'Opened WhatsApp. Reminder logged.');
+      logAndRun('whatsapp', () => openLink(whatsappLink(phone, message.body)), shareT('rmOpenedWa'));
     } else if (channel === 'email') {
       logAndRun(
         'email',
         () => openLink(mailtoLink({ to: email, subject: message.subject, body: message.body })),
-        'Opened your email app. Reminder logged.',
+        shareT('rmOpenedEmail'),
       );
     } else {
-      logAndRun('sms', () => openLink(smsLink(phone, message.body)), 'Opened SMS. Reminder logged.');
+      logAndRun('sms', () => openLink(smsLink(phone, message.body)), shareT('rmOpenedSms'));
     }
   };
 
   const copy = async () => {
     const text = channel === 'email' ? `${message.subject}\n\n${message.body}` : message.body;
-    if (await copyText(text)) logAndRun('copy', () => undefined, 'Message copied. Reminder logged.');
-    else notify('Could not copy. Select the text and copy it manually.', 'error');
+    if (await copyText(text)) logAndRun('copy', () => undefined, shareT('rmCopied'));
+    else notify(shareT('rmCopyFailed'), 'error');
   };
 
   const doSnooze = (days: number) => {
     try {
       const entry = snooze(invoice.id, days);
-      finish(entry, `Snoozed for ${days} days.`);
+      finish(entry, shareT('rmSnoozed', { n: days }));
       onClose();
     } catch (err) {
-      notify((err as Error).message || 'Could not snooze.', 'error');
+      notify((err as Error).message || shareT('rmSnoozeFailed'), 'error');
     }
   };
 
   const sendLabel =
-    channel === 'whatsapp' ? 'Open in WhatsApp' : channel === 'email' ? 'Open in Email' : 'Open in SMS';
+    channel === 'whatsapp' ? shareT('rmOpenWa') : channel === 'email' ? shareT('rmOpenEmail') : shareT('rmOpenSms');
   const recipientBad = channel === 'email' ? !emailOk : !phoneOk;
   const smsLong = channel === 'sms' && message.body.length > 320;
 
@@ -139,15 +146,15 @@ function ReminderModalBody({
         open
         onClose={onClose}
         size="lg"
-        title="Payment reminder"
-        subtitle="Nothing is sent by this app. It opens your own WhatsApp, email or SMS app with the message filled in."
+        title={shareT('reminder')}
+        subtitle={shareT('rmSub')}
         footer={
           <div className={styles.footActions}>
             <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => doSnooze(3)}>
-              <BellOff size={15} /> Snooze 3 days
+              <BellOff size={15} /> {shareT('rmSnooze3')}
             </button>
             <button type="button" className={controls.btnOutline} onClick={copy}>
-              <Copy size={15} /> Copy
+              <Copy size={15} /> {shareT('rmCopy')}
             </button>
             <button type="button" className={controls.btnPrimary} onClick={send} disabled={recipientBad}>
               {sendLabel}
@@ -157,15 +164,15 @@ function ReminderModalBody({
       >
         <div className={styles.stack}>
           <div className={styles.summaryLine}>
-            <span><strong>{invoice.client?.name || 'Client'}</strong></span>
+            <span><strong>{invoice.client?.name || shareT('rmClient')}</strong></span>
             <span>{invoice.invoice_number}</span>
-            <span>Balance <strong>{formatCurrency(invoice.balance_due, cur)}</strong></span>
-            <span>Due {formatDate(invoice.due_date)}</span>
-            {last && <span>Last reminded {formatDate(last.sent_at)} ({history.length}x)</span>}
+            <span>{areaNodes(shareT('rmBalance'), { amount: <strong>{formatCurrency(receivableBalance(invoice), cur)}</strong> })}</span>
+            <span>{shareT('rmDue', { date: formatDate(invoice.due_date) })}</span>
+            {last && <span>{shareT('rmLast', { date: formatDate(last.sent_at), n: history.length })}</span>}
           </div>
 
           <div className={controls.field}>
-            <span className={controls.label} id="rm-stage">Tone</span>
+            <span className={controls.label} id="rm-stage">{shareT('rmTone')}</span>
             <div className={styles.chips} role="group" aria-labelledby="rm-stage">
               {STAGE_ORDER.map((s) => (
                 <button
@@ -175,7 +182,7 @@ function ReminderModalBody({
                   aria-pressed={s === stage}
                   onClick={() => regenerate(s, lang)}
                 >
-                  {STAGE_LABELS[s]}
+                  {remindT(`stage.${s}`)}
                 </button>
               ))}
             </div>
@@ -183,9 +190,9 @@ function ReminderModalBody({
 
           <div className={controls.row}>
             <div className={controls.field}>
-              <span className={controls.label}>Channel</span>
-              <div className={controls.segment} role="group" aria-label="Channel">
-                {COMPOSERS.map(({ id, label, icon: Icon }) => (
+              <span className={controls.label}>{shareT('rmChannel')}</span>
+              <div className={controls.segment} role="group" aria-label={shareT('rmChannel')}>
+                {COMPOSERS.map(({ id, icon: Icon }) => (
                   <button
                     key={id}
                     type="button"
@@ -193,14 +200,14 @@ function ReminderModalBody({
                     aria-pressed={channel === id}
                     onClick={() => setChannel(id)}
                   >
-                    <Icon size={14} /> {label}
+                    <Icon size={14} /> {shareT(`ch.${id}`)}
                   </button>
                 ))}
               </div>
             </div>
             <div className={controls.field}>
-              <span className={controls.label}>Language</span>
-              <div className={controls.segment} role="group" aria-label="Language">
+              <span className={controls.label}>{shareT('rmLanguage')}</span>
+              <div className={controls.segment} role="group" aria-label={shareT('rmLanguage')}>
                 <button
                   type="button"
                   className={lang === 'en' ? controls.segmentBtnActive : controls.segmentBtn}
@@ -223,7 +230,7 @@ function ReminderModalBody({
 
           {channel === 'email' ? (
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rm-email">Send to (email)</label>
+              <label className={controls.label} htmlFor="rm-email">{shareT('rmSendEmail')}</label>
               <input
                 id="rm-email"
                 type="email"
@@ -233,11 +240,11 @@ function ReminderModalBody({
                 placeholder="client@example.com"
                 autoComplete="off"
               />
-              {!emailOk && <span className={controls.hint}>Add the client's email to open your mail app.</span>}
+              {!emailOk && <span className={controls.hint}>{shareT('rmNoEmail')}</span>}
             </div>
           ) : (
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rm-phone">Send to (mobile)</label>
+              <label className={controls.label} htmlFor="rm-phone">{shareT('rmSendMobile')}</label>
               <input
                 id="rm-phone"
                 type="tel"
@@ -249,15 +256,15 @@ function ReminderModalBody({
                 autoComplete="off"
               />
               <span className={controls.hint}>
-                {phoneOk ? `Will use +${normalizePhone(phone)}. ` : 'Enter a valid number. '}
-                10-digit numbers default to +91.
+                {phoneOk ? shareT('rmWillUse', { phone: normalizePhone(phone) ?? '' }) : shareT('rmBadPhone')}
+                {shareT('rmPlus91')}
               </span>
             </div>
           )}
 
           {channel === 'email' && (
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rm-subject">Subject</label>
+              <label className={controls.label} htmlFor="rm-subject">{shareT('rmSubject')}</label>
               <input
                 id="rm-subject"
                 className={controls.input}
@@ -268,7 +275,7 @@ function ReminderModalBody({
           )}
 
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="rm-body">Message (editable)</label>
+            <label className={controls.label} htmlFor="rm-body">{shareT('rmMessage')}</label>
             <textarea
               id="rm-body"
               className={cn(controls.textarea, styles.messageArea)}
@@ -276,17 +283,17 @@ function ReminderModalBody({
               onChange={(e) => setMessage((m) => ({ ...m, body: e.target.value }))}
             />
             <div className={cn(styles.counter, smsLong && styles.counterWarn)}>
-              {message.body.length} characters{smsLong ? ' (long for SMS, may be split)' : ''}
+              {shareT('rmChars', { n: message.body.length })}{smsLong ? shareT('rmLong') : ''}
             </div>
           </div>
 
           {history.length > 0 && (
             <div className={controls.field}>
-              <span className={controls.label}>Previous reminders</span>
+              <span className={controls.label}>{shareT('rmHistory')}</span>
               <ul className={styles.history}>
                 {history.slice(0, 5).map((h) => (
                   <li key={h.id}>
-                    {formatDate(h.sent_at)} · {h.channel} · {STAGE_LABELS[h.tone]}
+                    {formatDate(h.sent_at)} · {h.channel in CHANNEL_KEYS ? shareT(`ch.${h.channel}`) : h.channel} · {remindT(`stage.${h.tone}`)}
                   </li>
                 ))}
               </ul>

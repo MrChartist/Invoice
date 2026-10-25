@@ -11,7 +11,49 @@ export type AuditEntity =
   | 'settings'
   | 'purchase'
   | 'item'
-  | 'system';
+  | 'system'
+  /** Double-entry ledger (6.1): manual vouchers, user accounts, fixed-asset register. */
+  | 'voucher'
+  | 'account'
+  | 'fixed_asset'
+  /** Cost centres / projects (6.16) and budgets (6.17). */
+  | 'cost_centre'
+  | 'budget'
+  /** Cheque register (6.26). */
+  | 'cheque'
+  /** Stock transfer voucher between godowns (6.10). */
+  | 'stock_transfer'
+  /** Advance receipts, refunds and adjustments (5.3). */
+  | 'advance'
+  /** TDS / TCS challans, manual deductions and return-filed marks (Tally parity). */
+  | 'tds'
+  /** Supplier advances / on-account payments and their bill-wise adjustments (Tally parity). */
+  | 'vendor_payment'
+  /** Integrity review: godown masters, purchase orders, manual stock adjustments, POS day-close counts. */
+  | 'godown'
+  | 'purchase_order'
+  | 'stock_adjustment'
+  | 'pos_day_close'
+  /** Payroll masters: employees, groups, pay heads, salary structures, production types (Phase 7). */
+  | 'employee'
+  /** Payroll runs, attendance, salary / statutory payments (Phase 7). */
+  | 'payroll'
+  /** Phase 7 (Tally parity): Bill of Materials, Manufacturing Journal, Stock Journal, Physical Stock. */
+  | 'bom'
+  | 'manufacturing'
+  | 'stock_journal'
+  | 'physical_stock'
+  /** Phase 7M: job work orders, Material Out / In, principal's material; Rejections In (sales side). */
+  | 'job_work'
+  | 'rejection_in'
+  /** GST set-off journals, PMT-06 challans and the HSN master (WP-6). */
+  | 'gst'
+  /** WP-7 (P0-10): rows the table-write edit log records for tables without a module-level entity. */
+  | 'vendor'
+  | 'purchase_payment'
+  | 'recurring'
+  | 'opening'
+  | 'bank_statement';
 
 export type AuditAction =
   | 'create'
@@ -25,7 +67,12 @@ export type AuditAction =
   | 'unlock'
   | 'override'
   | 'restore'
-  | 'import';
+  | 'import'
+  /** Integrity anchors (4.5): written by the app itself, never by a user action. */
+  | 'chain_start'
+  | 'truncate'
+  /** WP-7 (P0-10): older rows moved to an archive segment (kept, still chained, still in backups). */
+  | 'archive';
 
 export interface AuditChange {
   field: string;
@@ -48,6 +95,37 @@ export interface AuditEntry {
   doc_number?: string;
   /** Owning document id for rows that hang off one (payments). */
   parent_id?: string;
+  /**
+   * Name of the local user signed in when the change was made (6.21). Covered by `hash`.
+   * Absent on older rows, on rows written before anyone signed in, and on integrity anchors.
+   */
+  by?: string;
+  /**
+   * Tamper evidence (4.5). `prev` is the previous row's `hash` (or `AUDIT_GENESIS` for the first row);
+   * `hash` is SHA-256 over the canonical form of every other field of this row, `prev` included.
+   * Absent on rows written before 4.5 (the legacy segment).
+   */
+  prev?: string;
+  hash?: string;
+  /** Extra facts carried by anchor rows (`chain_start`, `truncate`, `restore`). Covered by `hash`. */
+  seal?: AuditSeal;
+}
+
+export interface AuditSeal {
+  /** Unchained rows immediately before this anchor (chain_start) or at the start of the log (truncate). */
+  legacy?: { count: number; digest: string };
+  /** truncate: why older rows were removed, how many, and the `prev` of the first chained row kept. */
+  reason?: 'storage' | 'cap' | 'archive';
+  /** archive (WP-7): table name of the segment the rows went to (`audit_archive_0001`) and its last hash. */
+  segment?: string;
+  archived_head?: string | null;
+  dropped?: number;
+  cut?: string;
+  /** restore: chain head + row count of the backup's own log, and of the log it replaced. */
+  restored_head?: string | null;
+  restored_rows?: number;
+  replaced_head?: string | null;
+  replaced_rows?: number;
 }
 
 export const AUDIT_ENTITIES: AuditEntity[] = [
@@ -59,6 +137,32 @@ export const AUDIT_ENTITIES: AuditEntity[] = [
   'purchase',
   'item',
   'system',
+  'voucher',
+  'account',
+  'fixed_asset',
+  'cost_centre',
+  'budget',
+  'cheque',
+  'advance',
+  'stock_transfer',
+  'tds',
+  'vendor_payment',
+  'godown',
+  'purchase_order',
+  'stock_adjustment',
+  'pos_day_close',
+  'vendor',
+  'purchase_payment',
+  'recurring',
+  'opening',
+  'bank_statement',
+  'employee',
+  'payroll',
+  'bom',
+  'manufacturing',
+  'stock_journal',
+  'physical_stock',
+  'gst',
 ];
 
 export const AUDIT_ACTIONS: AuditAction[] = [
@@ -74,6 +178,9 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   'override',
   'restore',
   'import',
+  'chain_start',
+  'truncate',
+  'archive',
 ];
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -89,6 +196,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   override: 'Lock overridden',
   restore: 'Restored',
   import: 'Imported',
+  chain_start: 'Chain started',
+  truncate: 'Older entries removed',
+  archive: 'Older entries archived',
 };
 
 export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
@@ -100,4 +210,32 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   purchase: 'Purchases',
   item: 'Catalogue',
   system: 'System',
+  voucher: 'Vouchers',
+  account: 'Chart of accounts',
+  fixed_asset: 'Fixed assets',
+  cost_centre: 'Cost centres',
+  budget: 'Budgets',
+  cheque: 'Cheques',
+  stock_transfer: 'Stock transfers',
+  advance: 'Advances',
+  tds: 'TDS / TCS',
+  vendor_payment: 'Supplier advances',
+  godown: 'Godowns',
+  purchase_order: 'Purchase orders',
+  stock_adjustment: 'Stock adjustments',
+  pos_day_close: 'POS day close',
+  employee: 'Payroll masters',
+  payroll: 'Payroll',
+  bom: 'Bills of materials',
+  manufacturing: 'Manufacturing journals',
+  stock_journal: 'Stock journals',
+  physical_stock: 'Physical stock',
+  job_work: 'Job work',
+  rejection_in: 'Rejections in',
+  gst: 'GST set-off / challan',
+  vendor: 'Suppliers',
+  purchase_payment: 'Supplier payments',
+  recurring: 'Recurring schedules',
+  opening: 'Opening balances',
+  bank_statement: 'Bank statements',
 };

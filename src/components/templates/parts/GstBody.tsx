@@ -2,18 +2,23 @@ import type { ReactNode } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { cn, currencySymbol, formatQuantity } from '../../../lib/utils';
 import { amountInWords } from '../../../lib/amount-in-words';
-import { formatPlaceOfSupply } from '../../../lib/india-states';
+import { formatPlaceOfSupply, stateByCode } from '../../../lib/india-states';
 import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isTaxed } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, trackingText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
+import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
+import { ItemCustomLine } from './CustomFieldsBlock';
+import { transportRows } from '../../../lib/transport';
 
 interface Props {
   invoice: InvoiceRecord;
   sender: SenderProfile;
   totals: CalcTotals;
+  /** e-Way number the IRN block already prints (not repeated in the dispatch cells). */
+  skipEway?: string;
 }
 
 function Cell({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -30,9 +35,10 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
  * document facts on top, the item grid with tax ledgers as rows, an HSN/SAC
  * tax summary, then bank/declaration and the signatory box.
  */
-export function GstBody({ invoice, sender, totals }: Props) {
+export function GstBody({ invoice, sender, totals, skipEway }: Props) {
   const { money, currency, date, col, show, footerText, headerNote } = usePaper();
   const c = invoice.client;
+  const ship = invoice.ship_to && (invoice.ship_to.address || invoice.ship_to.name) ? invoice.ship_to : null;
   const cur = invoice.currency;
   const symbol = currencySymbol(cur);
   const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
@@ -40,6 +46,8 @@ export function GstBody({ invoice, sender, totals }: Props) {
   const cgstSgst = isTaxed(invoice, totals);
   const igst = !cgstSgst && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
   const taxed = cgstSgst || igst;
+  // Reverse charge: the HSN table still shows the tax (Rule 46(p)); the ledger rows above the total do not.
+  const rcm = isRcmTotals(totals);
   const lines = totals.lines;
   const showHsn = col.hsn && lines.some((l) => l.hsn);
   const showUnit = col.unit;
@@ -88,12 +96,21 @@ export function GstBody({ invoice, sender, totals }: Props) {
           </div>
         </div>
         <div className={styles.gMeta}>
-          <Cell label={isQuote ? 'Quotation No.' : 'Invoice No.'}>{invoice.invoice_number || 'DRAFT'}</Cell>
+          <Cell label={isQuote ? 'Quotation No.' : invoice.doc_type === 'SALES_ORDER' ? 'Order No.' : 'Invoice No.'}>{invoice.invoice_number || 'DRAFT'}</Cell>
           <Cell label="Dated">{date(invoice.issue_date)}</Cell>
-          <Cell label={isQuote ? 'Valid until' : 'Due date'}>{date(invoice.due_date) || '—'}</Cell>
+          <Cell label={isQuote ? 'Valid until' : invoice.doc_type === 'SALES_ORDER' ? 'Delivery by' : 'Due date'}>{date(invoice.due_date) || '—'}</Cell>
           <Cell label="Buyer's Ref / PO">{invoice.po_number || '—'}</Cell>
           {show.place && <Cell label="Place of supply">{place || '—'}</Cell>}
           <Cell label="Reverse charge">{invoice.reverse_charge ? 'Yes' : 'No'}</Cell>
+          {/* Tally's "Dispatch details" (P1-24): only when the document carries transport details. */}
+          {transportRows(invoice.transport, (d) => date(d), { skipEway }).map((r) => (
+            <Cell key={`tr-${r.key}`} label={r.label}>
+              <span data-transport-row={r.key}>{r.value}</span>
+            </Cell>
+          ))}
+          {printableValues(invoice.custom_values).map((v) => (
+            <Cell key={v.id} label={v.label}>{formatCustomValue(v, (d) => date(d))}</Cell>
+          ))}
         </div>
       </div>
 
@@ -112,6 +129,18 @@ export function GstBody({ invoice, sender, totals }: Props) {
           </div>
         </div>
         <div className={styles.gCell}>
+          {ship && (
+            <div style={{ marginBottom: 8 }}>
+              <div className={styles.gLabel}>Consignee (Ship to)</div>
+              {ship.name && <div className={styles.gName} style={{ fontSize: 13 }}>{ship.name}</div>}
+              <div className={styles.meta}>
+                {(ship.address ?? '').split('\n').filter(Boolean).map((l, i) => <span key={i}>{l}<br /></span>)}
+                {[ship.city, ship.zip].filter(Boolean).join(' ')}
+                {ship.state_code && <><br />{stateByCode(ship.state_code)?.name}</>}
+                {ship.gstin && <><br /><b>GSTIN/UIN:</b> {ship.gstin}</>}
+              </div>
+            </div>
+          )}
           <div className={styles.gLabel}>Currency</div>
           <div className={styles.gValue}>{cur}</div>
           {invoice.balance_due > 0 && invoice.amount_paid > 0 && (
@@ -145,6 +174,8 @@ export function GstBody({ invoice, sender, totals }: Props) {
                 <td>
                   <div className={styles.itemName}>{line.name || '—'}</div>
                   {src?.description && <div className={styles.itemDesc}>{src.description}</div>}
+                  <ItemCustomLine values={src?.custom_values} />
+                  {show.tracking && trackingText(src) && <div className={styles.itemDesc}>{trackingText(src)}</div>}
                 </td>
                 {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
                 <td className={cn(styles.right, styles.num)}>{formatQuantity(line.quantity)}</td>
@@ -163,7 +194,7 @@ export function GstBody({ invoice, sender, totals }: Props) {
               <td className={cn(styles.right, styles.num)}>-{money(totals.invoice_discount_amount, cur)}</td>
             </tr>
           )}
-          {cgstSgst && (
+          {cgstSgst && !rcm && (
             <>
               <tr className={styles.gLedger}>
                 <td colSpan={spanBefore} className={styles.right}><b>CGST</b></td>
@@ -175,13 +206,13 @@ export function GstBody({ invoice, sender, totals }: Props) {
               </tr>
             </>
           )}
-          {igst && (
+          {igst && !rcm && (
             <tr className={styles.gLedger}>
               <td colSpan={spanBefore} className={styles.right}><b>{invoice.gst_mode === 'SINGLE' ? 'Tax' : 'IGST'}</b></td>
               <td className={cn(styles.right, styles.num)}>{money(totals.tax_amount, cur)}</td>
             </tr>
           )}
-          {totals.cess_amount > 0 && (
+          {totals.cess_amount > 0 && !rcm && (
             <tr className={styles.gLedger}>
               <td colSpan={spanBefore} className={styles.right}>Cess</td>
               <td className={cn(styles.right, styles.num)}>{money(totals.cess_amount, cur)}</td>
@@ -195,13 +226,13 @@ export function GstBody({ invoice, sender, totals }: Props) {
           )}
           {totals.shipping > 0 && (
             <tr className={styles.gLedger}>
-              <td colSpan={spanBefore} className={styles.right}>Shipping</td>
+              <td colSpan={spanBefore} className={styles.right}>Shipping{totals.charges_line ? ' (taxable)' : ''}</td>
               <td className={cn(styles.right, styles.num)}>{money(totals.shipping, cur)}</td>
             </tr>
           )}
           {totals.other_charges !== 0 && (
             <tr className={styles.gLedger}>
-              <td colSpan={spanBefore} className={styles.right}>Other charges</td>
+              <td colSpan={spanBefore} className={styles.right}>Other charges{totals.charges_line ? ' (taxable)' : ''}</td>
               <td className={cn(styles.right, styles.num)}>{money(totals.other_charges, cur)}</td>
             </tr>
           )}
@@ -303,7 +334,7 @@ export function GstBody({ invoice, sender, totals }: Props) {
 
       {taxed && show.words && (
         <div className={styles.gWords}>
-          <span className={styles.gLabel}>Tax amount (in words)</span>
+          <span className={styles.gLabel}>{rcm ? 'Tax payable by the recipient under reverse charge (in words)' : 'Tax amount (in words)'}</span>
           <b>{amountInWords(totals.tax_amount, cur)}</b>
         </div>
       )}

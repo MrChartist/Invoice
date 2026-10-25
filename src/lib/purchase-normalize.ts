@@ -15,6 +15,8 @@
 import type { PurchaseRecord } from '../types/purchases';
 import { num, round2 } from './invoice-calc';
 import { isoDay } from './dates';
+import { checkGstin } from './gstin';
+import { allocateLandedCost } from './landed-cost';
 
 type Rec = Record<string, unknown>;
 
@@ -79,15 +81,37 @@ export interface PurchaseCore {
   /** Total GST on the bill: the larger of the explicit total and the split sum. */
   tax: number;
   total: number;
-  /** total - taxable - tax: rounding, or any inconsistency in an imported row. Signed. */
+  /**
+   * total - taxable - tax: rounding, or any inconsistency in an imported row. Signed.
+   * Cess (below) is NOT taken out, so readers that ignore cess still balance (cess then sits in round-off).
+   */
   roundOff: number;
+  /** Additive (WP-6): compensation cess on the bill (`cess_amount` / `cess`), >= 0; outside `tax`. */
+  cess: number;
   itcEligible: boolean;
   reverseCharge: boolean;
   itcReversed: number;
+  /** Upper-cased reversal reason (RULE_42 / RULE_43 / RULE_37 / SEC_17_5 / OTHER) or ''. */
+  itcReversalReason: string;
+  /** 'GOODS' / 'SERVICES' for imports, '' for domestic bills. */
+  importType: '' | 'GOODS' | 'SERVICES';
   paid: number;
   /** Lower-cased raw status ('' when the row has none). */
   status: string;
   notes: string;
+  /** TDS section code we deducted under ('' = none). */
+  tdsSection: string;
+  /** TDS amount on the bill (whether deducted at booking or on payment), >= 0. */
+  tdsAmount: number;
+  /** TDS deducted when the bill was booked (`tds_on` 'BILL', the default): it is never owed to the supplier. */
+  tdsOnBill: number;
+}
+
+/** TDS deducted at booking: `tds_on` 'BILL' or unset, with a positive `tds_amount`, capped at the total. */
+function tdsOnBillOf(r: Rec, total: number): number {
+  const amt = Math.max(pickNum(r, ['tds_amount']) ?? 0, 0);
+  if (!(amt > 0) || str(r.tds_on).toUpperCase() === 'PAYMENT') return 0;
+  return round2(Math.min(amt, total));
 }
 
 const DATE_KEYS = ['date', 'bill_date', 'purchase_date', 'invoice_date', 'issue_date'] as const;
@@ -98,6 +122,11 @@ const TAX_KEYS = ['tax_amount', 'gst_amount', 'total_tax', 'gst', 'tax'] as cons
 const TOTAL_KEYS = ['total', 'grand_total', 'total_amount', 'amount'] as const;
 const NUMBER_KEYS = ['bill_number', 'purchase_number', 'vendor_invoice_number', 'supplier_invoice_number', 'invoice_number', 'number', 'reference'] as const;
 const SPLIT_KEYS = ['cgst', 'cgst_amount', 'sgst', 'sgst_amount', 'igst', 'igst_amount'] as const;
+
+function readImportType(v: string): '' | 'GOODS' | 'SERVICES' {
+  const t = v.toUpperCase();
+  return t === 'GOODS' || t === 'SERVICES' ? t : '';
+}
 
 /**
  * Read one purchases row. Returns null for things that are not bills at all
@@ -162,13 +191,124 @@ export function readPurchase(raw: unknown, vendors: readonly unknown[] = []): Pu
     tax,
     total,
     roundOff: round2(total - round2(taxable) - tax),
+    cess: round2(Math.abs(pickNum(r, ['cess_amount', 'cess']) ?? 0)),
     itcEligible,
     reverseCharge: r.reverse_charge === true || r.rcm === true,
     itcReversed: round2(Math.max(pickNum(r, ['itc_reversed', 'itc_reversal']) ?? 0, 0)),
+    itcReversalReason: pickStr(r, ['itc_reversal_reason']).toUpperCase(),
+    importType: readImportType(pickStr(r, ['import_type'])),
     paid: round2(Math.abs(pickNum(r, ['amount_paid', 'paid_amount']) ?? 0)),
     status: pickStr(r, ['status']).toLowerCase(),
     notes: pickStr(r, ['notes', 'narration']),
+    tdsSection: pickStr(r, ['tds_section']),
+    tdsAmount: round2(Math.max(pickNum(r, ['tds_amount']) ?? 0, 0)),
+    tdsOnBill: tdsOnBillOf(r, total),
   };
+}
+
+/**
+ * Expense categories that are NOT a supply at all, so they never belong in GSTR-3B Table 5
+ * (inward exempt / nil / non-GST supplies):
+ *  - salaries, wages, payroll, bonus, gratuity, director's remuneration — services by an employee
+ *    to the employer (Schedule III, entry 1);
+ *  - PF / ESI / professional-tax / income-tax / TDS / GST payments — taxes and statutory dues;
+ *  - depreciation — a book entry, not a purchase.
+ * Bank interest on loans stays IN Table 5: it is an exempt supply (12/2017-CT(R) entry 27), not a
+ * non-supply. Matched on the lower-cased category name. Verify unusual heads with your CA.
+ */
+export const NON_SUPPLY_CATEGORY_PATTERNS: readonly RegExp[] = [
+  /salar/, /wage/, /payroll/, /\bbonus\b/, /gratuity/, /remuneration/,
+  /provident fund/, /\bp\.?f\.?\b/, /\besic?\b/, /professional tax/, /income[- ]tax/, /\btds\b/, /gst (paid|payment)/,
+  /depreciation/,
+];
+
+export function isNonSupplyCategory(category: string | undefined | null): boolean {
+  const c = String(category ?? '').trim().toLowerCase();
+  return !!c && NON_SUPPLY_CATEGORY_PATTERNS.some((re) => re.test(c));
+}
+
+/**
+ * GST on the bill that WE pay to the government ourselves — reverse charge (Sec 9(3)/(4)), import
+ * of services (RCM) and IGST on imported goods (paid at customs with the Bill of Entry) — when the
+ * stored total actually includes it (an imported row may carry only the taxable value). That tax is
+ * never owed to the supplier.
+ */
+export function selfAssessedTaxOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'>): number {
+  if (!(c.reverseCharge || c.importType !== '') || !(c.tax > 0)) return 0;
+  const totalIncludesTax = Math.abs(c.total - (c.taxable + c.tax)) <= Math.abs(c.total - c.taxable);
+  return totalIncludesTax ? round2(c.tax) : 0;
+}
+
+/**
+ * Compensation cess on a reverse-charge / import bill that WE pay to the government (7O, 7.90): the
+ * cess is self-assessed exactly like the GST (RCM cess in GSTR-3B 3.1(d); customs cess with the Bill
+ * of Entry), so it is never owed to the supplier — when the stored total actually includes it.
+ */
+export function selfAssessedCessOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'> & Partial<Pick<PurchaseCore, 'cess'>>): number {
+  const cess = Math.max(c.cess ?? 0, 0);
+  if (!(c.reverseCharge || c.importType !== '') || !(cess > 0)) return 0;
+  const withoutCess = c.taxable + selfAssessedTaxOf(c);
+  const totalIncludesCess = Math.abs(c.total - (withoutCess + cess)) <= Math.abs(c.total - withoutCess);
+  return totalIncludesCess ? round2(cess) : 0;
+}
+
+/**
+ * What the supplier is owed on a bill: its total less any self-assessed GST (and, 7O, self-assessed
+ * cess) inside it, less TDS we deducted when booking the bill (that part is owed to the government —
+ * TDS payable).
+ */
+export function supplierPayableOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'> & Partial<Pick<PurchaseCore, 'tdsOnBill' | 'cess'>>): number {
+  return round2(c.total - selfAssessedTaxOf(c) - selfAssessedCessOf(c) - Math.max(c.tdsOnBill ?? 0, 0));
+}
+
+/**
+ * `supplierPayable(bill)` — the one definition of the supplier's side of a purchases row, for every
+ * reader that needs "what we owe the vendor" (balance, status, payment checks, MSME tracker, payables
+ * aging, cash forecast, cheques, bank matching, Books payables, Tally / ledger creditor). Stored bills
+ * are never rewritten: an RCM / import bill keeps `total` = taxable + tax, and this takes the tax out.
+ */
+export function supplierPayable(raw: unknown): number {
+  const c = readPurchase(raw);
+  if (c) return supplierPayableOf(c);
+  return round2(Math.abs(num(asRec(raw).total)));
+}
+
+/**
+ * GST heads for a row that carries only a lump tax figure (or just a rate) and no
+ * cgst/sgst/igst split — older or imported data. The lump is split by supplier state vs
+ * the buyer's (filer's) state: different → IGST, same or unknown → CGST + SGST.
+ * Rows with an explicit split are returned unchanged. Shared by GST reports and the
+ * accounting / Tally exports so every module splits a legacy row the same way.
+ */
+export function splitLumpTax(
+  c: PurchaseCore,
+  raw: unknown,
+  filerStateCode: string,
+  supplierStateCode: string = checkGstin(c.partyGstin).stateCode ?? c.vendorStateCode,
+): { taxable: number; igst: number; cgst: number; sgst: number; tax: number } {
+  if (c.hasSplit) return { taxable: c.taxable, igst: c.igst, cgst: c.cgst, sgst: c.sgst, tax: c.tax };
+  const o = asRec(raw);
+  let tax = c.taxField;
+  if (tax === undefined) {
+    const rate = pickNum(o, ['tax_rate', 'gst_rate']);
+    if (rate !== undefined) tax = round2((c.taxable * rate) / 100);
+  }
+  tax = round2(tax ?? 0);
+  let igst = 0;
+  let cgst = 0;
+  let sgst = 0;
+  const inter = supplierStateCode && filerStateCode ? supplierStateCode !== filerStateCode : false;
+  if (inter) igst = tax;
+  else {
+    sgst = round2(tax / 2);
+    cgst = round2(tax - sgst);
+  }
+  let taxable = c.taxable;
+  // A lump tax that readPurchase could not see (rate only) was not taken out of the total.
+  if (c.taxField === undefined && pickNum(o, ['taxable', 'taxable_value', 'taxable_amount', 'subtotal']) === undefined) {
+    taxable = round2(Math.max(c.total - tax, 0));
+  }
+  return { taxable: round2(taxable), igst, cgst, sgst, tax };
 }
 
 /** One stock-relevant line of a bill. */
@@ -178,6 +318,25 @@ export interface PurchaseLineCore {
   quantity: number;
   /** Unit cost after the line discount, before tax. */
   unitCost: number;
+  /* Stock tracking (6.6 / 6.10 / 6.11); '' / [] when the line carries none. */
+  batchNo: string;
+  /** yyyy-mm-dd or ''. */
+  mfgDate: string;
+  expiryDate: string;
+  mrp: number;
+  serials: string[];
+  godownId: string;
+  /** Additive (WP-3): the receipt-note (GRN) line this bill line bills, or ''. */
+  grnLineId: string;
+  /** Additive (WP-6): GST rate % of the line (`tax_rate` / `gst_rate`), 0 when absent; unit (`unit`) or ''. */
+  taxRate: number;
+  unit: string;
+  /** Additive (WP-8): the stock item picked on the line (`item_id`), or '' (older lines match by name + HSN). */
+  itemId: string;
+  /** Additive (WP-8): base units per one unit of the line (`unit_factor`, alternate units); 1 when absent. */
+  unitFactor: number;
+  /** Additive (WP-8): landed cost per line unit from the bill's `landed_costs` (stock cost only; 0 = none). */
+  landedUnit: number;
 }
 
 /** The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. */
@@ -196,7 +355,23 @@ export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
       hsn: pickStr(line, ['hsn']),
       quantity,
       unitCost: rate,
+      batchNo: pickStr(line, ['batch_no', 'batch']),
+      mfgDate: isoDay(pickStr(line, ['mfg_date'])),
+      expiryDate: isoDay(pickStr(line, ['expiry_date', 'expiry'])),
+      mrp: Math.max(num(line.mrp), 0),
+      serials: Array.isArray(line.serials) ? line.serials.map((x) => str(x)).filter(Boolean) : [],
+      godownId: pickStr(line, ['godown_id']),
+      grnLineId: pickStr(line, ['grn_line_id']),
+      taxRate: Math.max(pickNum(line, ['tax_rate', 'gst_rate']) ?? 0, 0),
+      unit: pickStr(line, ['unit', 'uqc']),
+      itemId: pickStr(line, ['item_id']),
+      unitFactor: num(line.unit_factor) > 0 ? num(line.unit_factor) : 1,
+      landedUnit: 0,
     });
+  }
+  if (Array.isArray(r.landed_costs) && r.landed_costs.length) {
+    const extra = allocateLandedCost(out, r.landed_costs, r.landed_basis === 'qty' ? 'qty' : 'value');
+    out.forEach((l, i) => { l.landedUnit = extra[i]; });
   }
   return out;
 }

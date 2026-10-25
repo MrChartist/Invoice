@@ -1,22 +1,29 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, FolderOpen, HardDrive, Play, Unplug } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, FolderOpen, HardDrive, Lock, Play, Unplug } from 'lucide-react';
 import {
   RETENTION_OPTIONS,
   chooseBackupFolder,
+  clearBackupPassphrase,
   describeAge,
   disconnectFolder,
   downloadBackupNow,
   getConfig,
   getFolderHandle,
   getLastBackup,
+  hasBackupEncryption,
   isFolderBackupSupported,
   runAutoBackup,
   saveConfig,
+  setBackupPassphrase,
   type AutoBackupConfig,
   type BackupFrequency,
   type BackupResult,
 } from '../../lib/auto-backup';
 import { requestPersistentStorage, type StorageStatus } from '../../lib/pwa';
+import { useT } from '../../i18n';
+import { syncT } from '../../i18n/areas/sync';
+import { vaultEnabled } from '../../lib/storage';
+import { VAULT_PLAIN_BACKUP_MESSAGE } from '../../lib/backup';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Pwa.module.css';
@@ -26,17 +33,14 @@ export interface AutoBackupPanelProps {
   onNotify?: (message: string, tone?: 'success' | 'error' | 'info') => void;
 }
 
-const FREQ_LABEL: Record<BackupFrequency, string> = {
-  daily: 'Daily',
-  weekly: 'Weekly',
-  'on-close': 'When I close or leave the app',
-};
+const FREQS: BackupFrequency[] = ['daily', 'weekly', 'on-close'];
 
 function mb(bytes: number | null): string {
   return bytes === null ? '-' : `${(bytes / 1048576).toFixed(bytes < 10485760 ? 1 : 0)} MB`;
 }
 
 export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
+  useT(); // re-render on a language switch (5.4)
   const supported = isFolderBackupSupported();
   const [config, setConfig] = useState<AutoBackupConfig>(getConfig);
   const [folder, setFolder] = useState<string | null>(null);
@@ -44,10 +48,14 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
   const [busy, setBusy] = useState(false);
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [encrypted, setEncrypted] = useState<boolean | null>(null);
+  const [pass, setPass] = useState('');
+  const [pass2, setPass2] = useState('');
 
   useEffect(() => {
     let alive = true;
     getFolderHandle().then((h) => alive && setFolder(h?.name ?? null));
+    hasBackupEncryption().then((on) => alive && setEncrypted(on));
     requestPersistentStorage().then((s) => alive && setStorage(s));
     return () => {
       alive = false;
@@ -68,8 +76,8 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
       setError(null);
       onNotify?.(
         r.method === 'folder'
-          ? `Backup saved to ${r.folder ?? 'your folder'}`
-          : `Backup downloaded as ${r.filename}`,
+          ? syncT('savedTo', { folder: r.folder ?? syncT('yourFolder') })
+          : syncT('downloadedAs', { file: r.filename }),
         'success',
       );
     } else {
@@ -84,24 +92,43 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
       setFolder(r.name);
       setError(null);
       update({ enabled: true });
-      onNotify?.(`Backups will be saved to ${r.name}`, 'success');
+      onNotify?.(syncT('willSaveTo', { folder: r.name }), 'success');
     } else if (r.reason === 'failed') {
-      setError('Could not remember that folder. Try a different one.');
+      setError(syncT('folderFail'));
     }
   };
 
   const runNow = async () => {
     setBusy(true);
-    const r = folder ? await runAutoBackup({ interactive: true }) : downloadBackupNow();
+    const r = folder ? await runAutoBackup({ interactive: true }) : await downloadBackupNow();
     setBusy(false);
     report(r);
+  };
+
+  const enableEncryption = async () => {
+    if (pass !== pass2) return setError(syncT('passMismatch'));
+    setBusy(true);
+    const r = await setBackupPassphrase(pass);
+    setBusy(false);
+    if (!r.ok) return setError(r.message);
+    setPass('');
+    setPass2('');
+    setError(null);
+    setEncrypted(true);
+    onNotify?.(syncT('encOn'), 'success');
+  };
+
+  const disableEncryption = async () => {
+    await clearBackupPassphrase();
+    setEncrypted(false);
+    onNotify?.(syncT('encOff'), 'info');
   };
 
   const disconnect = async () => {
     await disconnectFolder();
     setFolder(null);
     update({ enabled: false });
-    onNotify?.('Backup folder disconnected', 'info');
+    onNotify?.(syncT('disconnected'), 'info');
   };
 
   const now = new Date();
@@ -111,7 +138,7 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
     <section className={surface.card} aria-labelledby="auto-backup-title">
       <header className={surface.cardHead}>
         <span className={surface.cardHeadIcon} id="auto-backup-title">
-          <HardDrive size={16} aria-hidden="true" /> Automatic backups
+          <HardDrive size={16} aria-hidden="true" /> {syncT('autoTitle')}
         </span>
       </header>
       <div className={`${surface.cardBody} ${styles.panelBody}`}>
@@ -122,7 +149,7 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
             <CheckCircle2 size={18} className={styles.statusOk} aria-hidden="true" />
           )}
           <span className={styles.statusText}>
-            Last backup: <strong>{describeAge(last, now)}</strong>
+            {syncT('lastBackup')} <strong>{describeAge(last, now)}</strong>
             {last && <small>{new Date(last).toLocaleString('en-IN')}</small>}
           </span>
         </div>
@@ -133,25 +160,30 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
           </p>
         )}
 
+        {encrypted === false && vaultEnabled() && (
+          <p className={controls.error} role="alert">
+            <AlertTriangle size={13} aria-hidden="true" /> {VAULT_PLAIN_BACKUP_MESSAGE} {syncT('noBackupUntil')}
+          </p>
+        )}
+
         {!supported ? (
           <p className={controls.hint}>
-            This browser cannot save to a folder automatically (Safari and Firefox). Use the button below to download a
-            backup file regularly, and keep it somewhere safe like iCloud Drive or Google Drive.
+            {syncT('noFolderSupport')}
           </p>
         ) : (
           <>
             <div className={styles.folder}>
               <div>
-                <span className={controls.label}>Backup folder</span>
-                <div className={styles.folderName}>{folder ?? 'Not connected'}</div>
+                <span className={controls.label}>{syncT('backupFolder')}</span>
+                <div className={styles.folderName}>{folder ?? syncT('notConnected')}</div>
               </div>
               <div className={styles.buttons}>
                 <button type="button" className={controls.btnOutline} onClick={choose}>
-                  <FolderOpen size={15} aria-hidden="true" /> {folder ? 'Change folder' : 'Choose folder'}
+                  <FolderOpen size={15} aria-hidden="true" /> {folder ? syncT('changeFolder') : syncT('chooseFolderBtn')}
                 </button>
                 {folder && (
                   <button type="button" className={controls.btnGhost} onClick={disconnect}>
-                    <Unplug size={15} aria-hidden="true" /> Disconnect
+                    <Unplug size={15} aria-hidden="true" /> {syncT('disconnect')}
                   </button>
                 )}
               </div>
@@ -165,11 +197,11 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
                     checked={config.enabled}
                     onChange={(e) => update({ enabled: e.target.checked })}
                   />
-                  Back up automatically
+                  {syncT('autoOn')}
                 </label>
                 <div className={controls.row}>
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor="ab-freq">How often</label>
+                    <label className={controls.label} htmlFor="ab-freq">{syncT('howOften')}</label>
                     <select
                       id="ab-freq"
                       className={controls.select}
@@ -177,13 +209,13 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
                       disabled={!config.enabled}
                       onChange={(e) => update({ frequency: e.target.value as BackupFrequency })}
                     >
-                      {(Object.keys(FREQ_LABEL) as BackupFrequency[]).map((f) => (
-                        <option key={f} value={f}>{FREQ_LABEL[f]}</option>
+                      {FREQS.map((f) => (
+                        <option key={f} value={f}>{syncT(`freq.${f}`)}</option>
                       ))}
                     </select>
                   </div>
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor="ab-keep">Keep newest</label>
+                    <label className={controls.label} htmlFor="ab-keep">{syncT('keepNewest')}</label>
                     <select
                       id="ab-keep"
                       className={controls.select}
@@ -191,36 +223,85 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
                       onChange={(e) => update({ retention: Number(e.target.value) })}
                     >
                       {RETENTION_OPTIONS.map((n) => (
-                        <option key={n} value={n}>{n} backups</option>
+                        <option key={n} value={n}>{syncT('nBackups', { n })}</option>
                       ))}
                     </select>
                   </div>
                 </div>
                 <p className={controls.hint}>
-                  Scheduled backups run while the app is open. After a browser restart the browser may ask you to
-                  re-allow folder access; click Back up now once to do that. Older files beyond the limit are removed,
-                  but only files this app created.
+                  {syncT('scheduleHint')}
                 </p>
               </>
             )}
           </>
         )}
 
+        {encrypted !== null && (
+          <div className={controls.field}>
+            <span className={controls.label}>
+              <Lock size={13} aria-hidden="true" /> {syncT('encryption')}
+            </span>
+            {encrypted ? (
+              <>
+                <p className={controls.hint}>
+                  {syncT('encOnText')}
+                </p>
+                <div className={styles.buttons}>
+                  <button type="button" className={controls.btnGhost} onClick={disableEncryption}>
+                    {syncT('stopEnc')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className={controls.hint}>
+                  {syncT('encOffText')}
+                </p>
+                <div className={controls.row}>
+                  <input
+                    type="password"
+                    className={controls.input}
+                    aria-label={syncT('backupPassAria')}
+                    placeholder={syncT('backupPassPh')}
+                    autoComplete="new-password"
+                    value={pass}
+                    onChange={(e) => setPass(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    className={controls.input}
+                    aria-label={syncT('repeatBackupAria')}
+                    placeholder={syncT('repeatPh')}
+                    autoComplete="new-password"
+                    value={pass2}
+                    onChange={(e) => setPass2(e.target.value)}
+                  />
+                </div>
+                <div className={styles.buttons}>
+                  <button type="button" className={controls.btnOutline} onClick={enableEncryption} disabled={busy || pass.length < 8}>
+                    <Lock size={15} aria-hidden="true" /> {syncT('encryptBackups')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div className={styles.buttons}>
           <button type="button" className={controls.btnPrimary} onClick={runNow} disabled={busy}>
-            <Play size={15} aria-hidden="true" /> {busy ? 'Backing up...' : 'Back up now'}
+            <Play size={15} aria-hidden="true" /> {busy ? syncT('backingUp') : syncT('backUpNow')}
           </button>
           {folder && (
-            <button type="button" className={controls.btnOutline} onClick={() => report(downloadBackupNow())}>
-              <Download size={15} aria-hidden="true" /> Download a copy
+            <button type="button" className={controls.btnOutline} onClick={async () => report(await downloadBackupNow())}>
+              <Download size={15} aria-hidden="true" /> {syncT('downloadCopy')}
             </button>
           )}
         </div>
 
         {storage?.supported && (
           <p className={controls.hint}>
-            Browser storage: {storage.persisted ? 'protected from automatic clean-up' : 'not yet protected from clean-up'}
-            {storage.usage !== null && storage.quota !== null && ` (${mb(storage.usage)} of ${mb(storage.quota)} used)`}.
+            {storage.persisted ? syncT('storageProtected') : syncT('storageNotProtected')}
+            {storage.usage !== null && storage.quota !== null && syncT('usedOf', { used: mb(storage.usage), quota: mb(storage.quota) })}.
           </p>
         )}
       </div>

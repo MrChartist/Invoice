@@ -255,3 +255,85 @@ CI budgets in `scripts/check-bundle-size.mjs` were reset to the achieved result 
 Already fixed in src before this report was written (no action needed): dicebear avatar calls removed, duplicate Google Fonts `@import` removed, jspdf/html-to-image loaded with dynamic `import()`, service worker registered in `main.tsx`.
 
 Integration notes: `public/sw.js` merges the PWA module's worker with the build-stamped precache manifest. A manifest listing a failing file rejects the install (old worker keeps serving); no manifest at all falls back to discovering assets from `index.html`. The inline theme script moved to `public/theme-init.js` so the CSP can stay `script-src 'self'`. `node scripts/verify-offline.mjs` passes against the merged build.
+
+---
+
+## Long tables (Roadmap 4.3, 2026-10-24)
+
+Measured with `PERF_ONLY=tables node tests/perf/run.mjs` (production build, headless Chromium, 1366x800,
+desktop CPU, median of 3 runs). The harness seeds n invoices across n/3 parties, unlocks the PIN session
+(earlier "300 invoices" rows in section 2 waited for `#root > *`, which can be the PIN screen), then:
+long tasks during load, rows in the DOM, scrolling `main#main` 20 screens (one frame per step), and
+clicking the "Client" sort header until the next frame.
+
+| | max long task on load | DOM rows | longest task while scrolling | sort click |
+|---|---|---|---|---|
+| `/transactions` @300, before | 174 ms (193 / 229 ms tasks) | 300 | 52 ms | 574 ms |
+| `/transactions` @300, after | 110 ms | 12 | 0 | 89 ms |
+| `/transactions` @1000, before | 507 ms | 1000 | 56 ms | 1516 ms |
+| `/transactions` @1000, after | 127 ms | 12 | 0 | 101 ms |
+| `/receivables` @300 (100 parties), before | 61 ms | 100 | 0 | — |
+| `/receivables` @300, after | 0 (no task over 50 ms) | 100 (under threshold) | 0 | — |
+| `/receivables` @1000 (334 parties), before | 144 ms | 334 | 0 | — |
+| `/receivables` @1000, after | 89 ms | 10 | 0 | — |
+
+Two changes produce this:
+1. **`Intl` formatters are cached** (`src/lib/utils.ts`). `formatCurrency`, `formatMoney`, `formatQuantity` and
+   `formatDate` built a new `Intl.NumberFormat` / `DateTimeFormat` on every call; a CPU profile of the scroll test
+   showed them at ~750 ms self time, far ahead of React. With only this change (virtualisation off):
+   `/transactions` @300 161 ms max task, sort 483 ms; @1000 524 ms, sort 1081 ms; `/receivables` @300 62 ms.
+   `formatDate` formats the local calendar day in UTC so a cached formatter is safe across time-zone changes.
+2. **Row windowing** (`src/hooks/useVirtualRows.ts` + pure maths in `src/lib/virtual-window.ts`, no dependency) on the
+   invoice list, the receivables party table, each party's expanded bill list and the statement ledger. It
+   turns the sort click from ~0.5-1 s into ~0.1 s and keeps the DOM at a screenful at any list size.
+
+How the windowing behaves:
+- Only lists **over 100 rows** are windowed; smaller ones render exactly as before (no extra attributes).
+- Real `<table>` markup stays; unmounted runs are replaced by `aria-hidden` spacer rows. Windowed tables set
+  `aria-rowcount` and each row `aria-rowindex` (counting header, opening-balance, expanded detail and footer rows).
+- Row heights are measured after render (keyed by row id, so re-sorting keeps them), so the 640px card layout and
+  expanded receivables rows need no configuration. It follows the real scroll container (`main#main`), falling back
+  to the window, and re-measures on resize via `ResizeObserver`.
+- The row holding keyboard focus stays mounted when scrolled away, so Tab order and focus are never lost.
+  Selection, "select all" and bulk actions operate on the data, not the DOM, so they cover off-screen rows.
+- Printing renders every row (`beforeprint`).
+- **Known trade-off:** browser find-in-page (Ctrl+F) only finds rows currently mounted; the page's own search box
+  searches everything.
+
+Not changed: the remaining ~100 ms task on `/transactions` is reading and parsing the invoice table plus the
+route chunk; caching the parsed table in the store (section 2) is the next step.
+
+## Component split (Roadmap 4.4, 2026-10-24)
+
+Pure refactor of `ImportWizard` and `InvoiceCreator`. Typing latency, `/invoice` with 20 lines
+(`PERF_ONLY=typing node tests/perf/run.mjs`, the section now unlocks the session and uses the current
+"Item N name" labels), 5 alternating runs each against a build of the previous commit: median of run medians
+20.4 ms before / 17.5 ms after, p95 31.9 / 28.0 ms — within run-to-run noise (single runs range 17-24 ms), so no
+regression. `DocumentMetaCard` subscribes to its own store slice, so typing in a line no longer re-renders the
+document fields. Bundle: initial JS 182.1 -> 181.6 kB gz, entry 85.0 -> 84.6 kB gz (the split itself cost
+~0.25 kB; recovered with `store/pick.ts` for the long `useShallow` selectors and by loading the closed
+client/item picker modals as lazy chunks right after the editor renders).
+
+## jsPDF optional imports stubbed (Phase 6)
+
+`html2canvas`, `canvg` (+ core-js) and `dompurify` are jsPDF's optional dynamic imports, used only by
+`doc.html()` / `addSvgAsImage()`, which the app never calls (html-to-image rasterises pages). `vite.config.ts`
+aliases them to `src/lib/stubs/jspdf-optional.ts` (throws if ever reached). Total JS 736.9 → 633.3 kB gz,
+precache 155 → 152 files; initial JS unchanged (154.7 kB). PDF download/share verified by the e2e journey.
+
+## Shell trim + total budget (Phase 6)
+
+Backup actions (`auto-backup.ts` → `backup.ts`, encryption, folder writing) load on demand: the shell imports only
+`auto-backup-schedule.ts` (nudge timing and config), `AutoBackupRunner` imports the runner at its first run, and the
+Forgot-PIN erase imports its helpers when used. Initial JS 172.5 → 168.5 kB gz (entry 65.7 → 61.7). Lazy-loading the
+reminder composer was tried and reverted: it shares `useReminderLog` with the Dashboard card, so rolldown created an
+entry ↔ chunk import cycle for a ~3 kB gain. `check-bundle-size.mjs` now de-duplicates the initial list (Vite emits
+the entry twice when a cycle exists). The total (offline precache) budget is 900 kB; the 185 kB initial budget is
+unchanged.
+
+## Notification bell after first paint (Phase 6)
+
+`NotificationBellSlot` lazy-loads the bell (notification engine, compliance calendar, cheque / interest reminders)
+right after first paint, showing a same-sized inert bell meanwhile; the Dashboard imports `RemindersPanel` directly
+instead of through the `components/share` barrel (which pulled `ShareMenu` and the share helpers into the entry).
+Initial JS 178.3 → 173.3 kB gz (entry 68.6 → 64.2).

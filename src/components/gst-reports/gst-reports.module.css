@@ -207,3 +207,11 @@
 @media (pointer: coarse), (max-width: 640px) {
   .touchSeg > button { min-height: 40px; }
 }
+
+.gapList {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+}

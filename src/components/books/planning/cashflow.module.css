@@ -1,0 +1,156 @@
+/* Cash-flow forecast (6.18) and exchange gain/loss (6.19) tabs. Tokens only. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.estimate {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  font-size: var(--text-base);
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+.estimate svg {
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.pos { color: var(--profit); }
+.neg { color: var(--loss); }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.kpi {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.kpiLabel {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpiValue {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Chart ─────────────────────────────────────────────────── */
+.chartWrap {
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  min-width: 560px;
+  height: auto;
+}
+
+.barIn { fill: var(--profit); opacity: 0.8; }
+.barOut { fill: var(--loss); opacity: 0.75; }
+.line { fill: none; stroke: var(--brand); stroke-width: 2; }
+.dot { fill: var(--brand); }
+.zero { stroke: var(--foreground); stroke-width: 1; opacity: 0.5; }
+.grid { stroke: var(--border); stroke-width: 1; }
+.axisText { fill: var(--muted-foreground); font-size: 10px; font-family: var(--font-body); }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.swIn { background: var(--profit); }
+.swOut { background: var(--loss); }
+.swLine { background: var(--brand); height: 0.2rem; }
+
+.numeric {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rateInput {
+  width: 8rem;
+}
+
+.overdue {
+  font-size: var(--text-xs);
+  color: var(--warning);
+  font-weight: 600;
+  margin-left: 0.375rem;
+}
+
+details.more > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+}
+
+@media (max-width: 640px) {
+  .toolbar { align-items: stretch; }
+}

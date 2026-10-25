@@ -16,8 +16,13 @@ import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { localDb } from './localDb';
 import { KEYS, appDataSize, generateId, getTable, readRaw, setTable, writeRaw } from './storage';
-import { formatCurrency } from './utils';
+import { formatCurrency, formatDate } from './utils';
 import { parseDay } from './dates';
+import { COMPLIANCE_TABLE, FORM_LABELS, pendingReturns, type FiledReturn, type FilerFrequency, type ReturnDue } from './compliance';
+import { todayIso } from './tax-rules';
+import { pdcReminders, validUntil, type PdcKind } from './cheque-reminders';
+import type { Cheque } from '../types/cheques';
+import { receivableBalance } from './rcm';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -45,6 +50,12 @@ export interface NotificationContext {
   lastBackup: string | null;
   storageUsedBytes: number;
   storageQuotaBytes: number;
+  /** Returns marked filed (`compliance` table). */
+  gstFiled?: FiledReturn[];
+  /** Settings `gst_filing_frequency` (absent = monthly). */
+  gstFrequency?: FilerFrequency;
+  /** Cheque register (6.26) — post-dated cheque reminders. */
+  cheques?: Cheque[];
 }
 
 export type NotificationProvider = (ctx: NotificationContext) => AppNotification[];
@@ -96,12 +107,12 @@ function parseDate(value?: string): Date | null {
 
 function outstanding(inv: InvoiceRecord): number {
   const v =
-    typeof inv.balance_due === 'number' ? inv.balance_due : (inv.total ?? 0) - (inv.amount_paid ?? 0);
+    receivableBalance(inv);
   return round2(Math.max(0, v));
 }
 
 const isReceivable = (inv: InvoiceRecord) =>
-  (inv.doc_type === 'INVOICE' || inv.doc_type === 'TAX_INVOICE' || !inv.doc_type) &&
+  (inv.doc_type === 'INVOICE' || inv.doc_type === 'TAX_INVOICE' || inv.doc_type === 'BILL_OF_SUPPLY' || !inv.doc_type) &&
   inv.status !== 'Cancelled';
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -272,6 +283,65 @@ export const missingGstinProvider: NotificationProvider = (ctx) => {
   ];
 };
 
+/** GST returns overdue or due within 3 days (only once the active profile has a GSTIN and a tax invoice exists). */
+export const gstReturnsProvider: NotificationProvider = (ctx) => {
+  const gstin = ctx.profile?.companyGstin?.trim().toUpperCase();
+  if (!gstin) return [];
+  let since = '';
+  for (const i of ctx.invoices) {
+    const d = String(i.issue_date ?? '').slice(0, 10);
+    if ((i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE' || i.doc_type === 'BILL_OF_SUPPLY') && i.status !== 'Draft' && i.status !== 'Cancelled' && d && (!since || d < since)) since = d;
+  }
+  if (!since) return [];
+  const { overdue, soon } = pendingReturns(
+    { frequency: ctx.gstFrequency ?? (ctx.profile?.gst_scheme === 'composition' ? 'composition' : 'monthly'), stateCode: ctx.profile?.stateCode || gstin.slice(0, 2), today: todayIso(ctx.now), since },
+    ctx.gstFiled ?? [],
+    gstin,
+  );
+  const line = (r: ReturnDue) => `${FORM_LABELS[r.form]} ${r.label} (due ${formatDate(r.due)})`;
+  const make = (list: ReturnDue[], kind: 'overdue' | 'soon'): AppNotification[] =>
+    list.length
+      ? [{
+          id: `gst-${kind}:${list.map((r) => r.id).join('|')}`,
+          severity: kind === 'overdue' ? 'critical' : 'warning',
+          title: kind === 'overdue' ? `${plural(list.length, 'GST return')} overdue` : `${plural(list.length, 'GST return')} due within ${DUE_SOON_DAYS} days`,
+          detail: `${list.slice(0, 2).map(line).join('; ')}${list.length > 2 ? ` +${list.length - 2} more` : ''}. ${kind === 'overdue' ? 'Late fee and interest run daily (estimate on the GST page). ' : ''}Already filed? Mark it filed.`,
+          href: '/gst-reports?tab=compliance',
+          cta: 'Open compliance',
+          at: ctx.now.toISOString(),
+        }]
+      : [];
+  return [...make(overdue, 'overdue'), ...make(soon, 'soon')];
+};
+
+const PDC_COPY: Record<PdcKind, { severity: NotificationSeverity; title: (n: number) => string; tail: string }> = {
+  stale: { severity: 'critical', title: (n) => `${plural(n, 'cheque')} about to expire`, tail: 'A cheque is valid for 3 months from its date — deposit it or ask for a fresh one.' },
+  'deposit-now': { severity: 'warning', title: (n) => `${plural(n, 'cheque')} ready to deposit`, tail: 'Deposit them, then mark them deposited.' },
+  'deposit-soon': { severity: 'info', title: (n) => `${plural(n, 'post-dated cheque')} due within ${DUE_SOON_DAYS} days`, tail: 'Keep them ready for deposit on their date.' },
+  'issued-due': { severity: 'warning', title: (n) => `${plural(n, 'issued cheque')} due for presentation`, tail: 'Keep enough balance in the bank so they do not bounce.' },
+};
+
+/** Post-dated / due cheques from the cheque register (6.26). */
+export const chequeProvider: NotificationProvider = (ctx) => {
+  if (!ctx.cheques?.length) return [];
+  const today = todayIso(ctx.now);
+  return pdcReminders(ctx.cheques, today).map((r) => {
+    const copy = PDC_COPY[r.kind];
+    const line = (c: Cheque) =>
+      `No. ${c.number} · ${c.party_name || 'party'} · ${formatCurrency(c.amount)} (${r.kind === 'stale' ? `valid till ${formatDate(validUntil(c.cheque_date))}` : `dated ${formatDate(c.cheque_date)}`})`;
+    const shown = r.cheques.slice(0, 2).map(line).join('; ') + (r.cheques.length > 2 ? ` +${r.cheques.length - 2} more` : '');
+    return {
+      id: `cheque-${r.kind}:${r.cheques.map((c) => `${c.id}@${c.cheque_date}`).join('|')}`,
+      severity: copy.severity,
+      title: copy.title(r.cheques.length),
+      detail: `${shown}. Total ${formatCurrency(r.total)}. ${copy.tail}`,
+      href: `/cheques?dir=${r.kind === 'issued-due' ? 'issued' : 'received'}`,
+      cta: 'Open cheque register',
+      at: ctx.now.toISOString(),
+    };
+  });
+};
+
 export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   overdueProvider,
   dueSoonProvider,
@@ -280,6 +350,8 @@ export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   storageProvider,
   profileProvider,
   missingGstinProvider,
+  gstReturnsProvider,
+  chequeProvider,
 ];
 
 /* ── Registry ───────────────────────────────────────────────── */
@@ -420,6 +492,9 @@ export function buildContext(now: Date = new Date()): NotificationContext {
     invoices: getTable<InvoiceRecord>(KEYS.invoices),
     clients: getTable<Client>(KEYS.clients),
     profile: localDb.settings.activeProfile(),
+    gstFiled: getTable<FiledReturn>(COMPLIANCE_TABLE),
+    gstFrequency: localDb.settings.get().gst_filing_frequency,
+    cheques: getTable<Cheque>('cheques'),
     lastBackup: getLastBackup(),
     storageUsedBytes: appDataSize() * 2,
     storageQuotaBytes: STORAGE_QUOTA_BYTES,

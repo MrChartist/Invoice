@@ -6,10 +6,15 @@
  * through `round2` so totals always re-sum to the paisa.
  */
 
+import { requireAccess } from './access';
 import type { PurchaseLine, PurchaseRecord } from '../types/purchases';
 import type { GstMode, InvoiceItem } from '../types/invoice';
 import { calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
+import { assertUnlocked, type LockAction } from './period-lock';
+import { releaseAttachments, releaseDropped } from './attachments';
+import { supplierPayable } from './purchase-normalize';
+import { assertRemovable, liveRemovalIssues } from './stock-timeline';
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -25,6 +30,15 @@ export interface PurchasePayment {
   method: string;
   reference?: string;
   created_at?: string;
+  /** Additive (multi-account BRS): the bank account it was paid from; missing = the main account. */
+  bank_account_id?: string;
+  /**
+   * Additive (Tally parity): TDS deducted on this payment (bills with `tds_on: 'PAYMENT'`). `amount`
+   * stays the cash paid; the bill's `amount_paid` rises by `amount + tds_amount`.
+   */
+  tds_amount?: number;
+  /** Additive: rows of one multi-bill payment share this id (`vendor_payments.group_id` for any remainder). */
+  group_id?: string;
 }
 
 export type PurchaseStatus = 'Unpaid' | 'Partially paid' | 'Paid' | 'Overdue';
@@ -115,10 +129,28 @@ export const blankPurchaseLine = (taxRate = 18): PurchaseLine => ({
   tax_rate: taxRate,
 });
 
+// ── Pure: billable costs (6.14) ──────────────────────────────────
+
+export type BillableValue = Pick<PurchaseRecord, 'billable_to_client_id' | 'markup_percent' | 'pure_agent'>;
+
+/** Persisted billable fields from a form value: all cleared when not billable; no markup on a pure-agent cost. */
+export function billablePatch(v: BillableValue): BillableValue {
+  if (!v.billable_to_client_id) return { billable_to_client_id: undefined, markup_percent: undefined, pure_agent: undefined };
+  return {
+    billable_to_client_id: v.billable_to_client_id,
+    markup_percent: !v.pure_agent && num(v.markup_percent) > 0 ? num(v.markup_percent) : undefined,
+    pure_agent: v.pure_agent || undefined,
+  };
+}
+
 // ── Pure: status & aggregates ────────────────────────────────────
 
-export function balanceOf(p: Pick<PurchaseRecord, 'total' | 'amount_paid'>): number {
-  return Math.max(round2(num(p.total) - num(p.amount_paid)), 0);
+/**
+ * Still owed to the supplier. Reverse-charge and import bills store `total` = taxable + the GST we
+ * pay to the government ourselves; that tax is never the supplier's (`supplierPayable`).
+ */
+export function balanceOf(p: Pick<PurchaseRecord, 'total' | 'amount_paid'> & Partial<PurchaseRecord>): number {
+  return Math.max(round2(supplierPayable(p) - num(p.amount_paid)), 0);
 }
 
 export function deriveStatus(p: PurchaseRecord, today: string): PurchaseStatus {
@@ -149,25 +181,29 @@ export interface ItcTotals {
   cgst: number;
   sgst: number;
   igst: number;
+  /** Additive (7O, 7.90): compensation cess credit on eligible bills (`cess_amount`) — offsets output cess only. */
+  cess: number;
+  /** CGST + SGST + IGST + cess credit (what GSTR-3B 4A / 4C add up). */
   total: number;
-  /** GST paid on bills not claimed as ITC. */
+  /** GST (and cess) paid on bills not claimed as ITC. */
   ineligible: number;
 }
 
 /** Input tax credit from bills (optionally only one yyyy-mm month). */
 export function itcTotals(purchases: PurchaseRecord[], month?: string): ItcTotals {
-  const out: ItcTotals = { cgst: 0, sgst: 0, igst: 0, total: 0, ineligible: 0 };
+  const out: ItcTotals = { cgst: 0, sgst: 0, igst: 0, cess: 0, total: 0, ineligible: 0 };
   for (const p of purchases) {
     if (month && monthKey(p.date) !== month) continue;
     if (p.itc_eligible) {
       out.cgst = round2(out.cgst + num(p.cgst));
       out.sgst = round2(out.sgst + num(p.sgst));
       out.igst = round2(out.igst + num(p.igst));
+      out.cess = round2(out.cess + Math.max(num(p.cess_amount), 0));
     } else {
-      out.ineligible = round2(out.ineligible + sumTax(p));
+      out.ineligible = round2(out.ineligible + sumTax(p) + Math.max(num(p.cess_amount), 0));
     }
   }
-  out.total = round2(out.cgst + out.sgst + out.igst);
+  out.total = round2(out.cgst + out.sgst + out.igst + out.cess);
   return out;
 }
 
@@ -258,11 +294,12 @@ export function purchasesToCsvRows(rows: PurchaseRecord[], today: string): (stri
   ];
 }
 
-/** Validate a payment against a bill; returns an error message or ''. */
-export function validatePayment(purchase: PurchaseRecord, amount: number, date: string): string {
+/** Validate a payment (plus any TDS deducted on it) against a bill; returns an error message or ''. */
+export function validatePayment(purchase: PurchaseRecord, amount: number, date: string, tds = 0): string {
   if (!(amount > 0)) return 'Enter an amount greater than zero.';
   if (!date) return 'Choose the payment date.';
-  if (round2(amount) > balanceOf(purchase) + 0.004) {
+  if (!(tds >= 0)) return 'TDS cannot be negative.';
+  if (round2(amount + tds) > balanceOf(purchase) + 0.004) {
     return `Amount exceeds the balance of ${balanceOf(purchase).toFixed(2)}.`;
   }
   return '';
@@ -272,30 +309,79 @@ export function validatePayment(purchase: PurchaseRecord, amount: number, date: 
 
 const now = () => new Date().toISOString();
 
+/**
+ * Period lock for bills: a bill dated inside the locked period (a filed GST month)
+ * cannot be created, edited or deleted, because that would change ITC already
+ * claimed. Throws `PeriodLockedError`.
+ */
+function assertBillUnlocked(bill: Pick<PurchaseRecord, 'id' | 'date' | 'bill_number'>, action: LockAction) {
+  assertUnlocked({ id: bill.id, issue_date: bill.date, invoice_number: bill.bill_number || undefined }, action);
+}
+
+/** Supplier payments are locked by their own date (paying an old bill in an open month is fine). */
+function assertPaymentUnlocked(date: string, action: LockAction) {
+  assertUnlocked({ issue_date: date }, action);
+}
+
+/** Write a bill without the lock check (payment roll-ups only touch `amount_paid`). */
+function writeBill(input: Omit<PurchaseRecord, 'id'> & { id?: string }): PurchaseRecord {
+  const rows = purchasesDb.all();
+  const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
+  const record: PurchaseRecord = {
+    ...existing,
+    ...input,
+    id: existing?.id ?? input.id ?? generateId(),
+    amount_paid: round2(num(input.amount_paid)),
+    created_at: existing?.created_at ?? now(),
+    updated_at: now(),
+  };
+  setTable(PURCHASES_TABLE, existing ? rows.map((r) => (r.id === record.id ? record : r)) : [...rows, record]);
+  // Receipts this bill no longer lists (6.12) are deleted unless another record uses them.
+  if (existing) releaseDropped(existing.attachments, record.attachments);
+  return record;
+}
+
 export const purchasesDb = {
   all: (): PurchaseRecord[] => getTable<PurchaseRecord>(PURCHASES_TABLE),
   get: (id: string): PurchaseRecord | undefined => purchasesDb.all().find((p) => p.id === id),
 
-  /** Insert or update (matched by id). Totals must already be computed. */
+  /** Insert or update (matched by id). Totals must already be computed. Respects the period lock. */
   save(input: Omit<PurchaseRecord, 'id'> & { id?: string }): PurchaseRecord {
-    const rows = purchasesDb.all();
-    const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
-    const record: PurchaseRecord = {
-      ...existing,
-      ...input,
-      id: existing?.id ?? input.id ?? generateId(),
-      amount_paid: round2(num(input.amount_paid)),
-      created_at: existing?.created_at ?? now(),
-      updated_at: now(),
-    };
-    setTable(PURCHASES_TABLE, existing ? rows.map((r) => (r.id === record.id ? record : r)) : [...rows, record]);
-    return record;
+    requireAccess('books.edit');
+    const existing = input.id ? purchasesDb.get(input.id) : undefined;
+    if (existing) assertBillUnlocked(existing, 'edit');
+    assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
+    return writeBill(input);
   },
 
-  /** Remove a bill together with its payment history. */
-  remove(id: string): void {
+  /**
+   * Stamp (or clear) the invoice a billable cost was re-billed on. Only this link field changes —
+   * no amount or ITC figure — so, like a payment roll-up, it is allowed inside a locked period.
+   */
+  setRebilled(ids: readonly string[], invoiceId: string | undefined): void {
+    const wanted = new Set(ids);
+    if (!wanted.size) return;
+    setTable(
+      PURCHASES_TABLE,
+      purchasesDb.all().map((p) => (wanted.has(p.id) ? { ...p, rebilled_in: invoiceId } : p)),
+    );
+  },
+
+  /**
+   * Remove a bill together with its payment history. Refused when a later document sold / moved serials
+   * it brought in; when later documents used its quantities, `confirmStock` must be set
+   * (`StockDependencyError`, stock-timeline.ts).
+   */
+  remove(id: string, opts: { confirmStock?: boolean } = {}): void {
+    requireAccess('books.edit');
+    const bill = purchasesDb.get(id);
+    if (bill) assertBillUnlocked(bill, 'delete');
+    // WP-3: a debit note / supplier credit note is adjusted against this bill — delete the note first.
+    if (getTable<{ purchase_id?: string }>('purchase_returns').some((n) => n?.purchase_id === id)) throw new Error('A debit note or supplier credit note is recorded against this bill. Delete the note first.');
+    if (bill) assertRemovable(liveRemovalIssues({ refType: 'purchase', refId: id }), opts.confirmStock);
     setTable(PURCHASES_TABLE, purchasesDb.all().filter((p) => p.id !== id));
     setTable(PAYMENTS_TABLE, paymentsDb.all().filter((p) => p.purchase_id !== id));
+    if (bill?.attachments?.length) releaseAttachments(bill.attachments.map((a) => a.id));
   },
 };
 
@@ -305,18 +391,27 @@ export const paymentsDb = {
     paymentsDb.all().filter((p) => p.purchase_id === id).sort((a, b) => a.date.localeCompare(b.date)),
 
   /** Append a payment and roll it into the bill's `amount_paid`. Throws on invalid input. */
-  record(purchaseId: string, p: { amount: number; date: string; method: string; reference?: string }): PurchasePayment {
+  record(
+    purchaseId: string,
+    p: { amount: number; date: string; method: string; reference?: string; bankAccountId?: string; tdsAmount?: number; groupId?: string },
+  ): PurchasePayment {
+    requireAccess('books.edit');
     const bill = purchasesDb.get(purchaseId);
     if (!bill) throw new Error('Bill not found.');
     const amount = round2(num(p.amount));
-    const problem = validatePayment(bill, amount, p.date);
+    const tds = round2(Math.max(num(p.tdsAmount), 0));
+    const problem = validatePayment(bill, amount, p.date, tds);
     if (problem) throw new Error(problem);
+    assertPaymentUnlocked(p.date, 'pay');
     const payment: PurchasePayment = {
       id: generateId(), purchase_id: purchaseId, amount, date: p.date,
       method: p.method, reference: p.reference?.trim() || undefined, created_at: now(),
+      bank_account_id: p.bankAccountId && p.method.toLowerCase() !== 'cash' ? p.bankAccountId : undefined,
+      ...(tds > 0 ? { tds_amount: tds } : {}),
+      ...(p.groupId ? { group_id: p.groupId } : {}),
     };
     setTable(PAYMENTS_TABLE, [...paymentsDb.all(), payment]);
-    purchasesDb.save({ ...bill, amount_paid: round2(num(bill.amount_paid) + amount) });
+    writeBill({ ...bill, amount_paid: round2(num(bill.amount_paid) + amount + tds) });
     return payment;
   },
 
@@ -324,8 +419,10 @@ export const paymentsDb = {
     const all = paymentsDb.all();
     const target = all.find((p) => p.id === paymentId);
     if (!target) return;
+    requireAccess('books.edit');
+    assertPaymentUnlocked(target.date, 'unpay');
     setTable(PAYMENTS_TABLE, all.filter((p) => p.id !== paymentId));
     const bill = purchasesDb.get(target.purchase_id);
-    if (bill) purchasesDb.save({ ...bill, amount_paid: Math.max(round2(num(bill.amount_paid) - target.amount), 0) });
+    if (bill) writeBill({ ...bill, amount_paid: Math.max(round2(num(bill.amount_paid) - target.amount - Math.max(num(target.tds_amount), 0)), 0) });
   },
 };

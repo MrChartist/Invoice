@@ -1,10 +1,13 @@
 import { RefreshCw, X } from 'lucide-react';
 import { useUpdateAvailable } from '../../lib/pwa';
+import { useT } from '../../i18n';
+import { pwaT } from '../../i18n/areas/pwa';
 import controls from '../../styles/controls.module.css';
 import styles from './Pwa.module.css';
 
 /** "New version ready - Reload". Renders nothing until a new service worker is waiting. */
 export function UpdateToast() {
+  useT(); // re-render on a language switch (5.4)
   const { available, apply, dismiss } = useUpdateAvailable();
   if (!available) return null;
 
@@ -15,18 +18,18 @@ export function UpdateToast() {
           <RefreshCw size={16} />
         </span>
         <div className={styles.text}>
-          <p className={styles.title}>New version ready</p>
-          <p className={styles.desc}>Reload to get the latest features. Your data is not affected.</p>
+          <p className={styles.title}>{pwaT('updateTitle')}</p>
+          <p className={styles.desc}>{pwaT('updateDesc')}</p>
           <div className={styles.actions}>
             <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={apply}>
-              Reload
+              {pwaT('reload')}
             </button>
             <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={dismiss}>
-              Later
+              {pwaT('later')}
             </button>
           </div>
         </div>
-        <button type="button" className={styles.close} onClick={dismiss} aria-label="Dismiss update notice">
+        <button type="button" className={styles.close} onClick={dismiss} aria-label={pwaT('dismissUpdate')}>
           <X size={16} />
         </button>
       </div>

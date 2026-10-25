@@ -4,6 +4,8 @@ import {
   ChevronDown,
   Copy,
   Download,
+  FileText,
+  Globe,
   Link2,
   Mail,
   MessageCircle,
@@ -18,16 +20,24 @@ import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
 import { ReminderModal } from './ReminderModal';
+import { receivableBalance } from '../../lib/rcm';
+import { useT } from '../../i18n';
+import { shareT } from '../../i18n/areas/share';
 
 export interface ShareMenuProps {
   invoice: InvoiceRecord;
   onDownloadPdf?: () => void;
+  /** Share the PDF file through the OS share sheet (only passed where the browser supports it). */
+  onSharePdf?: () => void;
+  /** Send a self-contained HTML copy with a pay button (the preview supplies it). */
+  onClientCopy?: () => void;
   /** Hide the "Payment reminder" entry (e.g. for quotations). */
   hideReminder?: boolean;
   className?: string;
 }
 
-export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: ShareMenuProps) {
+export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onClientCopy, hideReminder, className }: ShareMenuProps) {
+  useT(); // re-render on a language switch (5.4)
   const [open, setOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -67,7 +77,7 @@ export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: S
   const summary = invoiceSummaryText(invoice);
   const payLink = invoiceUpiLink(invoice);
   const client = invoice.client;
-  const unpaid = invoice.balance_due > 0 && invoice.status !== 'Paid' && invoice.status !== 'Cancelled';
+  const unpaid = receivableBalance(invoice) > 0 && invoice.status !== 'Paid' && invoice.status !== 'Cancelled';
   const subject = `${invoice.invoice_number} from ${invoice.sender?.companyName || 'us'}`;
 
   const run = (fn: () => void) => () => {
@@ -78,7 +88,7 @@ export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: S
   const copy = (text: string, done: string) => async () => {
     setOpen(false);
     const ok = await copyText(text);
-    notify(ok ? done : 'Could not copy to the clipboard.', ok ? 'success' : 'error');
+    notify(ok ? done : shareT('copyFailed'), ok ? 'success' : 'error');
   };
 
   return (
@@ -91,11 +101,20 @@ export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: S
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((v) => !v)}
       >
-        <Share2 size={16} /> Share <ChevronDown size={14} aria-hidden="true" />
+        <Share2 size={16} /> {shareT('share')} <ChevronDown size={14} aria-hidden="true" />
       </button>
 
       {open && (
-        <div className={styles.menu} role="menu" id={menuId} aria-label="Share invoice">
+        <div className={styles.menu} role="menu" id={menuId} aria-label={shareT('menu')}>
+          {onSharePdf && (
+            <>
+              <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onSharePdf)}>
+                <FileText size={16} className={styles.menuIcon} /> {shareT('sharePdf')}
+                <span className={styles.menuHint}>{shareT('sharePdfHint')}</span>
+              </button>
+              <div className={styles.menuSep} role="separator" />
+            </>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -110,7 +129,7 @@ export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: S
             className={styles.menuItem}
             onClick={run(() => openLink(mailtoLink({ to: client?.email, subject, body: summary })))}
           >
-            <Mail size={16} className={styles.menuIcon} /> Email
+            <Mail size={16} className={styles.menuIcon} /> {shareT('email')}
           </button>
           <button
             type="button"
@@ -121,23 +140,29 @@ export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: S
             <MessageSquare size={16} className={styles.menuIcon} /> SMS
           </button>
           <div className={styles.menuSep} role="separator" />
-          <button type="button" role="menuitem" className={styles.menuItem} onClick={copy(summary, 'Message copied.')}>
-            <Copy size={16} className={styles.menuIcon} /> Copy message
+          <button type="button" role="menuitem" className={styles.menuItem} onClick={copy(summary, shareT('copied'))}>
+            <Copy size={16} className={styles.menuIcon} /> {shareT('copyMessage')}
           </button>
           <button
             type="button"
             role="menuitem"
             className={styles.menuItem}
             disabled={!payLink}
-            title={payLink ? undefined : 'Add a UPI ID to the sender profile (INR invoices only)'}
-            onClick={copy(payLink ?? '', 'Payment link copied.')}
+            title={payLink ? undefined : shareT('noUpiTitle')}
+            onClick={copy(payLink ?? '', shareT('linkCopied'))}
           >
-            <Link2 size={16} className={styles.menuIcon} /> Copy payment link
-            {!payLink && <span className={styles.menuHint}>no UPI</span>}
+            <Link2 size={16} className={styles.menuIcon} /> {shareT('copyLink')}
+            {!payLink && <span className={styles.menuHint}>{shareT('noUpi')}</span>}
           </button>
+          {onClientCopy && (
+            <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onClientCopy)}>
+              <Globe size={16} className={styles.menuIcon} /> {shareT('clientCopy')}
+              <span className={styles.menuHint}>{shareT('clientCopyHint')}</span>
+            </button>
+          )}
           {onDownloadPdf && (
             <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onDownloadPdf)}>
-              <Download size={16} className={styles.menuIcon} /> Download PDF
+              <Download size={16} className={styles.menuIcon} /> {shareT('downloadPdf')}
             </button>
           )}
           {!hideReminder && unpaid && (
@@ -149,7 +174,7 @@ export function ShareMenu({ invoice, onDownloadPdf, hideReminder, className }: S
                 className={styles.menuItem}
                 onClick={run(() => setReminderOpen(true))}
               >
-                <BellRing size={16} className={styles.menuIcon} /> Payment reminder
+                <BellRing size={16} className={styles.menuIcon} /> {shareT('reminder')}
               </button>
             </>
           )}

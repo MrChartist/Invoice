@@ -10,6 +10,7 @@ import type { InvoiceRecord } from '../types/invoice';
 import { checkGstin } from './gstin';
 import { stateByCode } from './india-states';
 import { round2 } from './invoice-calc';
+import { inrValue } from './fx';
 import {
   DOC_NO_REGEX,
   UQC_CODES,
@@ -32,6 +33,7 @@ import {
   type EwayBill,
   type EwayOptions,
 } from './eway';
+import { rcmTaxOf } from './rcm';
 
 export interface PreflightResult {
   errors: PreflightIssue[];
@@ -112,7 +114,7 @@ function checkParty(
 export function validateEInvoice(
   payload: EInvoicePayload,
   record?: InvoiceRecord,
-  opts: { now?: Date } = {},
+  opts: { now?: Date; units?: EInvoiceOptions['units'] } = {},
 ): PreflightIssue[] {
   const out: PreflightIssue[] = [];
   const now = opts.now ?? new Date();
@@ -122,7 +124,7 @@ export function validateEInvoice(
   // ── Source document ──
   if (record) {
     if (!eInvoiceDocType(record)) {
-      out.push(issue('error', 'DOC_TYPE', 'Document', `${record.doc_type.replace('_', ' ').toLowerCase()} documents are not reported to the IRP. Only tax invoices and credit/debit notes are.`));
+      out.push(issue('error', 'DOC_TYPE', 'Document', `${record.doc_type.replace(/_/g, ' ').toLowerCase()} documents are not reported to the IRP. Only tax invoices and credit/debit notes are.`));
     }
     if (record.status === 'Cancelled') {
       out.push(issue('error', 'CANCELLED', 'Document', 'This invoice is cancelled.'));
@@ -139,11 +141,15 @@ export function validateEInvoice(
       out.push(issue('warning', 'B2C', 'Buyer', 'No buyer GSTIN: this looks like a B2C sale, which does not need an e-Invoice.'));
     }
     for (const [i, raw] of (record.items ?? []).entries()) {
-      if (isUnitGuessed(raw.unit)) {
+      if (isUnitGuessed(raw.unit, opts.units)) {
         out.push(issue('warning', 'ITEM_UNIT_GUESS', `Item ${i + 1}`, `Item ${i + 1}: unit "${raw.unit}" has no standard UQC and is sent as OTH.`));
       }
     }
-    const stored = Number(record.total);
+    // TotInvVal is in rupees; a foreign-currency total is compared at the invoice's exchange rate.
+    // A reverse-charge document saved the current way keeps the recipient's GST out of its total;
+    // TotInvVal still carries it (see einvoice.ts), so add it back before comparing.
+    const raw = Number(record.total) + (record.reverse_charge && record.rcm_tax_excluded ? rcmTaxOf(record) : 0);
+    const stored = Number.isFinite(raw) ? inrValue(raw, record) : NaN;
     if (Number.isFinite(stored) && !near(stored, payload.ValDtls.TotInvVal)) {
       out.push(issue('warning', 'STORED_TOTAL', 'Totals', `Saved invoice total (₹${stored}) differs from the recalculated total (₹${payload.ValDtls.TotInvVal}). Open and re-save the invoice.`));
     }
@@ -307,7 +313,7 @@ export function preflightEInvoice(
   options: EInvoiceOptions & { now?: Date } = {},
 ): PreflightResult & { payload: EInvoicePayload } {
   const { payload, assumptions } = buildEInvoice(record, options);
-  const issues = [...validateEInvoice(payload, record, { now: options.now }), ...assumptions];
+  const issues = [...validateEInvoice(payload, record, { now: options.now, units: options.units }), ...assumptions];
   return { ...splitIssues(issues), payload };
 }
 
@@ -317,8 +323,8 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
   const out: PreflightIssue[] = [];
   const now = opts.now ?? new Date();
 
-  if (record && (record.doc_type === 'QUOTATION' || record.doc_type === 'PROFORMA')) {
-    out.push(issue('error', 'EWB_DOC_TYPE', 'Document', 'Quotations and proforma invoices do not need an e-Way Bill.'));
+  if (record && (record.doc_type === 'QUOTATION' || record.doc_type === 'PROFORMA' || record.doc_type === 'SALES_ORDER')) {
+    out.push(issue('error', 'EWB_DOC_TYPE', 'Document', 'Quotations, proforma invoices and sales orders do not need an e-Way Bill.'));
   }
 
   const sg = checkGstin(bill.fromGstin);

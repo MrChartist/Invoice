@@ -32,6 +32,14 @@ export function currencySymbol(currency: string = 'INR'): string {
   return CURRENCY_MAP.get((currency || 'INR').toUpperCase())?.symbol ?? '';
 }
 
+// Building an Intl formatter costs ~0.1-0.5 ms; long tables call these thousands of times per render,
+// so each distinct (locale, options) formatter is created once and reused.
+const numberFormats: Record<string, Intl.NumberFormat> = {};
+// Throws for an unknown ISO code before anything is cached.
+const numberFormat = (locale: string, options: Intl.NumberFormatOptions) =>
+  (numberFormats[locale + JSON.stringify(options)] ??= new Intl.NumberFormat(locale, options));
+let dayFormat: Intl.DateTimeFormat | undefined;
+
 /**
  * Money with symbol. INR keeps the Indian 2-2-3 grouping (12,34,567.50);
  * every other currency uses its own locale grouping.
@@ -41,7 +49,7 @@ export function formatCurrency(amount: number, currency: string = 'INR') {
   const option = CURRENCY_MAP.get(code);
   const value = Number.isFinite(amount) ? amount : 0;
   try {
-    return new Intl.NumberFormat(option?.locale ?? 'en-IN', {
+    return numberFormat(option?.locale ?? 'en-IN', {
       style: 'currency',
       currency: code,
       minimumFractionDigits: 2,
@@ -56,7 +64,7 @@ export function formatCurrency(amount: number, currency: string = 'INR') {
 /** Grouped number without a currency symbol — for tables, CSV and PDFs. */
 export function formatMoney(amount: number, currency: string = 'INR') {
   const locale = CURRENCY_MAP.get((currency || 'INR').toUpperCase())?.locale ?? 'en-IN';
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number.isFinite(amount) ? amount : 0);
@@ -64,7 +72,7 @@ export function formatMoney(amount: number, currency: string = 'INR') {
 
 /** Quantities: no forced decimals, but keeps up to 3 when present. */
 export function formatQuantity(value: number) {
-  return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 3 }).format(
+  return numberFormat('en-IN', { maximumFractionDigits: 3 }).format(
     Number.isFinite(value) ? value : 0,
   );
 }
@@ -76,11 +84,10 @@ export function formatDate(date: string | Date) {
   if (!date) return '';
   const d = parseDay(date);
   if (Number.isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(d);
+  // The cached formatter works in UTC on the local calendar day, so it is unaffected by a later
+  // time-zone change (a formatter captures the zone at creation).
+  dayFormat ??= new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return dayFormat.format(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
 }
 
 /** "2026-04-01" — the value format every <input type="date"> expects. */

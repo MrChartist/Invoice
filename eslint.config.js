@@ -33,4 +33,10 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'warn',
     },
   },
+  {
+    // Tests poke at schemaless JSON output (GSTR / e-Invoice payloads) by path; typing every
+    // path would add noise without catching anything the assertions don't.
+    files: ['tests/**/*.{ts,tsx}'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
 ])

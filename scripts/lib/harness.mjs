@@ -2,8 +2,8 @@
  * Shared helpers for scripts/verify-offline.mjs and tests/perf/run.mjs.
  * - serve(): tiny static server for dist/ with SPA fallback and the headers from public/_headers
  *   (so the production bundle is exercised under the real CSP / cache headers).
- * - loadPlaywright(): playwright is NOT a project dependency; resolve it from the project,
- *   NODE_PATH, or the global npm prefix.
+ * - loadPlaywright(): `playwright` is a devDependency (pinned); falls back to NODE_PATH or the
+ *   global npm prefix so the scripts also run where only a global copy exists.
  */
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -74,7 +74,7 @@ export async function loadPlaywright() {
       try { return req(join(base, c)); } catch { /* next */ }
     }
   }
-  throw new Error('playwright not found (install globally or `npm i -D playwright` locally; it is intentionally not a project dependency)');
+  throw new Error('playwright not found: run `npm ci`, then `npx playwright install chromium`');
 }
 
 export const AUTH = { name: 'QA', pin: '1234', createdAt: new Date().toISOString() };

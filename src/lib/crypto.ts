@@ -14,7 +14,8 @@
  * use an encrypted backup (with a real passphrase) for anything sensitive.
  */
 
-export const PBKDF2_ITERATIONS = 310_000;
+/** OWASP 2023 guidance for PBKDF2-HMAC-SHA256. Older records (310k) are re-hashed on the next unlock. */
+export const PBKDF2_ITERATIONS = 600_000;
 export const MIN_ITERATIONS = 210_000;
 /** Upper bound accepted when reading an envelope, so a doctored file cannot hang the tab. */
 const MAX_ITERATIONS = 5_000_000;
@@ -149,6 +150,33 @@ export async function encryptString(
   const key = await aesKey(passphrase, salt, iter, 'encrypt');
   const ct = await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: aad(iter) }, key, encoder.encode(plaintext));
   return { v: 1, kdf: KDF_NAME, iter, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) };
+}
+
+/**
+ * A passphrase-derived AES key that can encrypt without the passphrase being typed
+ * again (scheduled backups). `key` is non-extractable and encrypt-only, so it can be
+ * kept in IndexedDB; files it produces are ordinary envelopes that `decryptString`
+ * opens with the original passphrase on any device.
+ */
+export interface StoredEncryptionKey {
+  key: CryptoKey;
+  salt: string;
+  iter: number;
+}
+
+export async function deriveEncryptionKey(passphrase: string, iter: number = PBKDF2_ITERATIONS): Promise<StoredEncryptionKey> {
+  if (!passphrase) throw new CryptoError('A passphrase is required.', 'bad-envelope');
+  if (iter < MIN_ITERATIONS) throw new CryptoError('Too few PBKDF2 iterations.', 'bad-envelope');
+  const salt = randomBytes(SALT_BYTES);
+  const key = await aesKey(passphrase, salt, iter, 'encrypt');
+  return { key, salt: bytesToBase64(salt), iter };
+}
+
+/** Encrypt with a stored key; a fresh IV per call, the key's salt and iterations in the header. */
+export async function encryptWithKey(plaintext: string, stored: StoredEncryptionKey): Promise<CipherEnvelope> {
+  const iv = randomBytes(IV_BYTES);
+  const ct = await subtle().encrypt({ name: 'AES-GCM', iv, additionalData: aad(stored.iter) }, stored.key, encoder.encode(plaintext));
+  return { v: 1, kdf: KDF_NAME, iter: stored.iter, salt: stored.salt, iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) };
 }
 
 export function isCipherEnvelope(value: unknown): value is CipherEnvelope {

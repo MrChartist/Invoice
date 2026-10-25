@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { localDb } from '../lib/localDb';
+import { issuingProfile } from '../lib/sync-device';
 import { DuplicateNumberError, type SeriesGap } from '../lib/invoice-number';
 import { getLockUntil, isPeriodLockedError, lockMessage, lockState, prettyDay } from '../lib/period-lock';
-import { generateId, getJson, removeRaw, setJson, SINGLETON_KEYS } from '../lib/storage';
+import { DB_PREFIX, generateId, getJson, KEYS, removeRaw, setJson, SINGLETON_KEYS } from '../lib/storage';
+import { changedElsewhereSince } from '../lib/cross-tab';
 import {
   calculateInvoice,
   deriveGstMode,
+  effectiveGstMode,
   EMPTY_TOTALS,
   isIgstZeroRated,
   num,
@@ -15,6 +18,7 @@ import {
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
 import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoice-defaults';
+import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import type {
   Client,
   DiscountType,
@@ -81,6 +85,10 @@ export interface InvoiceState extends InvoiceRecord {
   addItem: () => void;
   updateItem: (id: string, field: keyof InvoiceItem, value: string | number) => void;
   applyCatalogItem: (id: string, source: Partial<InvoiceItem>) => void;
+  /** Merge fields into a line; a field set to `undefined` is removed (batch / serial / godown pickers). */
+  patchItem: (id: string, patch: Partial<InvoiceItem>) => void;
+  /** Replace one line by several (FEFO split across batches). */
+  replaceItem: (id: string, lines: InvoiceItem[]) => void;
   duplicateItem: (id: string) => void;
   moveItem: (id: string, direction: -1 | 1) => void;
   removeItem: (id: string) => void;
@@ -95,74 +103,66 @@ export interface InvoiceState extends InvoiceRecord {
   reset: () => void;
 }
 
-/** Field list used to serialise the store back to a persistable record. */
+/**
+ * Every persisted field of `InvoiceRecord`. The compile-time check below fails when a field is
+ * added to the record type but not here — otherwise the editor would silently drop it on save.
+ */
+export const RECORD_KEYS = [
+  'id', 'invoice_number', 'doc_type', 'issue_date', 'due_date', 'status', 'currency', 'template_id',
+  'client', 'sender', 'items', 'gst_mode', 'place_of_supply', 'reverse_charge', 'discount_type',
+  'discount_rate', 'tax_rate', 'shipping', 'other_charges', 'round_off_enabled', 'amount_paid', 'notes',
+  'terms', 'po_number', 'recurring_id', 'recurring_date', 'subtotal', 'discount_amount', 'taxable_value',
+  'cgst_amount', 'sgst_amount', 'igst_amount', 'tax_amount', 'round_off', 'total', 'balance_due',
+  'supply_type', 'lut_number', 'lut_date', 'price_includes_tax', 'round_mode', 'tcs_enabled', 'tcs_rate',
+  'tcs_base', 'tcs_label', 'tds_enabled', 'tds_section', 'tds_rate', 'tds_on_taxable', 'cess_amount',
+  'tcs_amount', 'tds_amount', 'created_at', 'updated_at', 'quote_status', 'ship_to',
+  'charges_taxable', 'exchange_rate', 'shipping_bill_no', 'shipping_bill_date', 'port_code', 'late_fee_for',
+  'sales_order_id', 'order_closed_on',
+  'cost_centre_id',
+  'custom_values', 'attachments',
+  'exempt_kind', 'amends',
+  'pos',
+  'rcm_tax_excluded',
+  'goods_returned',
+  'eco_gstin', 'eco_section', 'challan_purpose',
+  'transport',
+  'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
+] as const satisfies readonly (keyof InvoiceRecord)[];
+
+type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
+// If this line errors, add the named field(s) to RECORD_KEYS.
+const recordKeysComplete: [UnlistedRecordKey] extends [never] ? true : UnlistedRecordKey = true;
+void recordKeysComplete;
+
+/** Serialise the store back to a persistable record (store-only fields and actions are left out). */
 function toRecord(state: InvoiceState): InvoiceRecord {
-  return {
-    id: state.id,
-    invoice_number: state.invoice_number,
-    doc_type: state.doc_type,
-    issue_date: state.issue_date,
-    due_date: state.due_date,
-    status: state.status,
-    currency: state.currency,
-    template_id: state.template_id,
-    client: state.client,
-    sender: state.sender,
-    items: state.items,
-    gst_mode: state.gst_mode,
-    place_of_supply: state.place_of_supply,
-    reverse_charge: state.reverse_charge,
-    discount_type: state.discount_type,
-    discount_rate: state.discount_rate,
-    tax_rate: state.tax_rate,
-    shipping: state.shipping,
-    other_charges: state.other_charges,
-    round_off_enabled: state.round_off_enabled,
-    amount_paid: state.amount_paid,
-    notes: state.notes,
-    terms: state.terms,
-    po_number: state.po_number,
-    recurring_id: state.recurring_id,
-    recurring_date: state.recurring_date,
-    subtotal: state.subtotal,
-    discount_amount: state.discount_amount,
-    taxable_value: state.taxable_value,
-    cgst_amount: state.cgst_amount,
-    sgst_amount: state.sgst_amount,
-    igst_amount: state.igst_amount,
-    tax_amount: state.tax_amount,
-    round_off: state.round_off,
-    total: state.total,
-    balance_due: state.balance_due,
-    supply_type: state.supply_type,
-    lut_number: state.lut_number,
-    lut_date: state.lut_date,
-    price_includes_tax: state.price_includes_tax,
-    round_mode: state.round_mode,
-    tcs_enabled: state.tcs_enabled,
-    tcs_rate: state.tcs_rate,
-    tcs_base: state.tcs_base,
-    tcs_label: state.tcs_label,
-    tds_enabled: state.tds_enabled,
-    tds_section: state.tds_section,
-    tds_rate: state.tds_rate,
-    tds_on_taxable: state.tds_on_taxable,
-    cess_amount: state.cess_amount,
-    tcs_amount: state.tcs_amount,
-    tds_amount: state.tds_amount,
-    created_at: state.created_at,
-    updated_at: state.updated_at,
-  };
+  const out: Record<string, unknown> = {};
+  for (const k of RECORD_KEYS) out[k] = state[k];
+  return out as unknown as InvoiceRecord;
 }
 
-function freshDraft(docType: DocumentType = 'INVOICE'): InvoiceRecord {
+/**
+ * A whole document for `set()`: every persisted key is present (undefined when the record lacks it),
+ * so loading a record can never inherit an optional field (charges_taxable, exchange_rate, ship_to …)
+ * from the document that was open before — zustand's `set` merges.
+ */
+function wholeRecord(rec: InvoiceRecord): InvoiceRecord {
+  const out: Record<string, unknown> = {};
+  for (const k of RECORD_KEYS) out[k] = rec[k];
+  return out as unknown as InvoiceRecord;
+}
+
+function freshDraft(docType?: DocumentType): InvoiceRecord {
   return makeDraft({
     settings: localDb.settings.get(),
-    sender: localDb.settings.activeProfile(),
+    // Folder sync (5.7): a device can issue as its own profile (own number prefix).
+    sender: issuingProfile(localDb.settings.get().profiles, localDb.settings.activeProfile()),
     docType,
     templateId: localDb.template.get(),
   });
 }
+
+const isCompositionSender = (sender: SenderProfile | null | undefined) => sender?.gst_scheme === 'composition';
 
 /**
  * Re-pick CGST+SGST vs IGST after the sender or place of supply changes.
@@ -183,6 +183,12 @@ function refineGstMode(
     taxEnabled: true,
   });
 }
+
+/** When the editor last loaded or saved its document (for the cross-tab stale-copy check). */
+let loadedAt = Date.now();
+
+export const STALE_COPY_MESSAGE =
+  'This document was changed in another tab or window after you opened it. Reopen it to see the latest version before saving.';
 
 let draftTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -230,7 +236,17 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     patch: apply,
 
     setClient: (clientData) => {
-      const client = { ...get().client, ...clientData };
+      // A picked client brings its party custom-field values (6.23): they replace the previous
+      // client's in the document snapshot; the map itself never lives on the invoice's client copy.
+      const { custom_fields: partyMap, ...rest } = clientData;
+      const client = { ...get().client, ...rest };
+      delete client.custom_fields;
+      const partyPatch: Partial<InvoiceRecord> = {};
+      if (partyMap !== undefined) {
+        const own = readValues(get().custom_values).filter((v) => v.scope !== 'party');
+        const merged = mergePartyValues(own, partyMap, customFieldsDb.all());
+        partyPatch.custom_values = merged.length ? merged : undefined;
+      }
       // A client's GSTIN/state decides the place of supply, which decides the split.
       const place_of_supply =
         resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state }) ||
@@ -239,23 +255,47 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         client,
         place_of_supply,
         gst_mode: refineGstMode(get().gst_mode, get().sender, place_of_supply),
+        ...partyPatch,
       });
     },
 
     setSender: (sender) => {
       const place_of_supply = get().place_of_supply || senderStateCode(sender);
+      // A composition dealer cannot issue tax invoices: an unsaved invoice switches to a Bill of Supply.
+      const toBos = isCompositionSender(sender) && !get().id && (get().doc_type === 'INVOICE' || get().doc_type === 'TAX_INVOICE');
       apply({
         sender,
         place_of_supply,
         terms: get().terms || sender.defaultTerms || '',
-        gst_mode: refineGstMode(get().gst_mode, sender, place_of_supply),
+        gst_mode: toBos || get().doc_type === 'BILL_OF_SUPPLY' ? 'NONE' : refineGstMode(get().gst_mode, sender, place_of_supply),
+        ...(toBos ? { doc_type: 'BILL_OF_SUPPLY' as DocumentType, reverse_charge: false, rcm_tax_excluded: undefined } : {}),
       });
     },
 
     setDates: (issue, due) => apply({ issue_date: issue, due_date: due }),
 
     setStatus: (status) => apply({ status }),
-    setDocType: (doc_type) => apply({ doc_type }),
+    setDocType: (doc_type) => {
+      const prev = get().doc_type;
+      if (doc_type === 'BILL_OF_SUPPLY') {
+        // No tax on a Bill of Supply (Rule 49); reverse charge does not arise either.
+        apply({ doc_type, gst_mode: 'NONE', reverse_charge: false, rcm_tax_excluded: undefined });
+      } else if (prev === 'BILL_OF_SUPPLY' && get().gst_mode === 'NONE' && !isCompositionSender(get().sender)) {
+        // Leaving a Bill of Supply on a regular profile: pick the split back up from the states.
+        const sender = get().sender;
+        apply({
+          doc_type,
+          gst_mode: deriveGstMode({
+            senderStateCode: senderStateCode(sender),
+            placeOfSupply: get().place_of_supply,
+            senderHasGstin: Boolean(sender?.companyGstin?.trim()),
+            taxEnabled: true,
+          }),
+        });
+      } else {
+        apply({ doc_type });
+      }
+    },
     setTemplate: (template_id) => {
       localDb.template.set(template_id);
       apply({ template_id });
@@ -272,7 +312,10 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       }),
 
     setGstMode: (gst_mode) => apply({ gst_mode }),
-    setReverseCharge: (reverse_charge) => apply({ reverse_charge }),
+    // Ticking reverse charge calculates the document the current way: the GST is shown as payable by
+    // the recipient and stays out of the total (src/lib/rcm.ts). An older reverse-charge record keeps
+    // its stored figures until the box is ticked again (Critical Rule 3).
+    setReverseCharge: (reverse_charge) => apply({ reverse_charge, rcm_tax_excluded: reverse_charge ? true : undefined }),
 
     setDiscount: (discount_type, value) =>
       apply({ discount_type, discount_rate: Math.max(num(value), 0) }),
@@ -355,15 +398,40 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
           rate: num(source.rate, item.rate),
           tax_rate: typeof source.tax_rate === 'number' ? source.tax_rate : item.tax_rate,
         };
+        // Item custom fields (6.23) flow onto the line with today's labels.
+        const values = snapshotFromMap(source.custom_fields, customFieldsDb.all(), 'item');
+        if (values.length) next.custom_values = values;
+        else delete next.custom_values;
+        // A picked item starts in its catalogue unit (WP-8): any alternate-unit factor of the old line goes.
+        if (num(source.unit_factor) > 0 && num(source.unit_factor) !== 1) next.unit_factor = num(source.unit_factor);
+        else delete next.unit_factor;
         next.amount = round2(num(next.quantity) * num(next.rate));
         return next;
       }),
+
+    patchItem: (id, patch) =>
+      mapItems(id, (item) => {
+        const next = { ...item, ...patch } as InvoiceItem & Record<string, unknown>;
+        for (const k of Object.keys(patch)) if (next[k] === undefined) delete next[k];
+        next.amount = round2(num(next.quantity) * num(next.rate));
+        return next;
+      }),
+
+    replaceItem: (id, lines) => {
+      const items = get().items;
+      const idx = items.findIndex((i) => i.id === id);
+      if (idx < 0 || lines.length === 0) return;
+      apply({ items: [...items.slice(0, idx), ...lines, ...items.slice(idx + 1)] });
+    },
 
     duplicateItem: (id) => {
       const items = get().items;
       const idx = items.findIndex((i) => i.id === id);
       if (idx < 0) return;
-      const copy = { ...items[idx], id: generateId() };
+      // A serial / IMEI can only be on one line: the copy starts without them.
+      const { serials: _serials, ...rest } = items[idx];
+      void _serials;
+      const copy = { ...rest, id: generateId() };
       apply({ items: [...items.slice(0, idx + 1), copy, ...items.slice(idx + 1)] });
     },
 
@@ -385,7 +453,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       const s = get();
       const totals = calculateInvoice({
         items: s.items,
-        gst_mode: s.gst_mode,
+        gst_mode: effectiveGstMode(s.doc_type, s.gst_mode),
         discount_type: s.discount_type,
         discount_rate: s.discount_rate,
         tax_rate: s.tax_rate,
@@ -402,6 +470,8 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         tds_enabled: s.tds_enabled,
         tds_rate: s.tds_rate,
         tds_on_taxable: s.tds_on_taxable,
+        charges_taxable: s.charges_taxable,
+        rcm_exclude_tax: s.reverse_charge && !!s.rcm_tax_excluded && s.doc_type !== 'BILL_OF_SUPPLY',
       });
       set({
         totals,
@@ -460,14 +530,15 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     newDraft: (docType) => {
       cancelDraftSave();
       removeRaw(SINGLETON_KEYS.draft);
-      set({ ...freshDraft(docType), totals: EMPTY_TOTALS, dirty: false });
+      set({ ...wholeRecord(freshDraft(docType)), totals: EMPTY_TOTALS, dirty: false });
       get().recalculate();
     },
 
     loadInvoice: (id) => {
       const found = localDb.invoices.getById(id);
       if (!found) return false;
-      set({ ...normalizeRecord(found, localDb.template.get()), dirty: false });
+      loadedAt = Date.now();
+      set({ ...wholeRecord(normalizeRecord(found, localDb.template.get())), dirty: false });
       get().recalculate();
       return true;
     },
@@ -477,12 +548,29 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       if (errors.length) return { ok: false, errors, locked: errors.some((e) => e.startsWith('Books are locked')) };
 
       const state = get();
+      // Another tab saved this same document after we loaded it: never overwrite it with our stale copy.
+      if (state.id && changedElsewhereSince(DB_PREFIX + KEYS.invoices, loadedAt)) {
+        const stored = localDb.invoices.getById(state.id);
+        if (stored && stored.updated_at !== state.updated_at) return { ok: false, errors: [STALE_COPY_MESSAGE] };
+      }
       // A hand-typed number that skips ahead leaves holes in the series: remember them for the hint.
       const typedNumber = state.invoice_number.trim();
       const gap = typedNumber ? localDb.invoices.checkNumber(typedNumber, state.id || undefined).gap : null;
       const record = toRecord(state);
       // Drop the empty trailing row users leave behind.
       record.items = record.items.filter((i) => i.name.trim() || num(i.rate) > 0);
+      // Custom fields (6.23): normalise values; a first save records today's labels, later saves keep theirs.
+      const defs = customFieldsDb.all();
+      const isNew = !state.id;
+      record.custom_values = finalizeValues(record.custom_values, defs, isNew);
+      record.items = record.items.map((i) => {
+        const values = finalizeValues(i.custom_values, defs, isNew);
+        if (values) return { ...i, custom_values: values };
+        if (!i.custom_values) return i;
+        const rest = { ...i };
+        delete rest.custom_values;
+        return rest;
+      });
       if (!record.invoice_number) {
         // The sender profile's own prefix wins (the creator page previews it); else the global one.
         record.invoice_number = localDb.invoices.nextNumber(
@@ -495,6 +583,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
 
       try {
         const saved = localDb.invoices.save(record);
+        loadedAt = Date.now();
         cancelDraftSave();
         removeRaw(SINGLETON_KEYS.draft);
         set({ ...saved, dirty: false });
@@ -508,7 +597,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     restoreDraft: () => {
       const saved = getJson<InvoiceRecord | null>(SINGLETON_KEYS.draft, null);
       if (!saved || saved.id) return false;
-      set({ ...normalizeRecord(saved, localDb.template.get()), dirty: true });
+      set({ ...wholeRecord(normalizeRecord(saved, localDb.template.get())), dirty: true });
       get().recalculate();
       return true;
     },

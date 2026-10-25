@@ -1,3 +1,4 @@
+import { useDeferredValue, useMemo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { describeShortfall, stockWarningForInvoice } from '../../lib/inventory';
@@ -8,7 +9,9 @@ export function StockWarnings() {
   const items = useInvoiceStore((s) => s.items);
   const docType = useInvoiceStore((s) => s.doc_type);
   const id = useInvoiceStore((s) => s.id);
-  const shortfalls = stockWarningForInvoice({ doc_type: docType, items, id });
+  // Deferred: typing stays responsive; the lib caches positions, so this is cheap anyway.
+  const deferredItems = useDeferredValue(items);
+  const shortfalls = useMemo(() => stockWarningForInvoice({ doc_type: docType, items: deferredItems, id }), [docType, deferredItems, id]);
   if (shortfalls.length === 0) return null;
 
   return (

@@ -1,10 +1,11 @@
 import { QRCodeCanvas } from 'qrcode.react';
 import { cn } from '../../../lib/utils';
 import { amountInWords } from '../../../lib/amount-in-words';
+import { amountInWordsHi } from '../../../lib/amount-in-words-hi';
 import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord, SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
-import { buildUpiUrl, isSingleTax, isTaxed } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isSingleTax, isTaxed } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 
 interface BlockProps {
@@ -142,8 +143,10 @@ export function TaxSummary({ invoice, totals }: Omit<BlockProps, 'sender'>) {
 /** Totals ledger, grand total, amount in words, balance due and signature. */
 export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
   const { t, currency: money, show, bilingual } = usePaper();
-  const taxed = isTaxed(invoice, totals);
-  const singleTax = isSingleTax(invoice, totals);
+  // Reverse charge: the tax goes in the note under the paper (rcmTaxNote), not into these rows.
+  const rcm = isRcmTotals(totals);
+  const taxed = isTaxed(invoice, totals) && !rcm;
+  const singleTax = isSingleTax(invoice, totals) && !rcm;
   const cur = invoice.currency;
   return (
     <div className={styles.keepTogether}>
@@ -170,7 +173,7 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
             </div>
           </>
         )}
-        {!taxed && totals.igst_amount > 0 && !singleTax && (
+        {!taxed && !rcm && totals.igst_amount > 0 && !singleTax && (
           <div className={styles.totalRow}>
             <span>{t('igst')}</span>
             <span>{money(totals.igst_amount, cur)}</span>
@@ -182,7 +185,7 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
             <span>{money(totals.tax_amount, cur)}</span>
           </div>
         )}
-        {totals.cess_amount > 0 && (
+        {totals.cess_amount > 0 && !rcm && (
           <div className={styles.totalRow}>
             <span>Cess</span>
             <span>{money(totals.cess_amount, cur)}</span>
@@ -196,13 +199,13 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
         )}
         {totals.shipping > 0 && (
           <div className={styles.totalRow}>
-            <span>{t('shipping')}</span>
+            <span>{t('shipping')}{totals.charges_line ? ` (${t('taxable')})` : ''}</span>
             <span>{money(totals.shipping, cur)}</span>
           </div>
         )}
         {totals.other_charges !== 0 && (
           <div className={styles.totalRow}>
-            <span>{t('other')}</span>
+            <span>{t('other')}{totals.charges_line ? ` (${t('taxable')})` : ''}</span>
             <span>{money(totals.other_charges, cur)}</span>
           </div>
         )}
@@ -228,6 +231,7 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
           {bilingual ? (
             <>
               {t('words')}: {amountInWords(totals.total, cur)}
+              <span className={styles.biWords} lang="hi">{amountInWordsHi(totals.total, cur)}</span>
             </>
           ) : (
             `Amount in words: ${amountInWords(totals.total, cur)}`

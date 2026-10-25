@@ -8,6 +8,7 @@ import {
   dayDiff,
   dismiss,
   dueSoonProvider,
+  gstReturnsProvider,
   markAllRead,
   markRead,
   missingGstinProvider,
@@ -22,6 +23,7 @@ import {
   type NotificationContext,
 } from '../src/lib/notifications.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
+import { returnsForMonth, setFiled } from '../src/lib/compliance.ts';
 
 const NOW = new Date(2026, 5, 15, 10, 0, 0); // 15 Jun 2026, local
 
@@ -190,4 +192,27 @@ test('state: read, snooze 1/7 days, dismiss, prune — fixed clock', () => {
   const all = markAllRead([], ['a', 'b'], NOW);
   assert.equal(unreadCount(applyState(list, all, NOW)), 1);
   assert.equal(all.length, 2);
+});
+
+test('gstReturnsProvider: overdue and due-soon GST returns, needing a GSTIN and a tax invoice', () => {
+  const profile = { ...(fullProfile as object), companyGstin: '27AAAAA0000A1Z5', stateCode: '27' } as never;
+  const invoices = [inv({ issue_date: '2026-04-05' })];
+  // 17 Jun 2026: April GSTR-1/3B and May GSTR-1 overdue; May GSTR-3B (20 Jun) due in 3 days.
+  const now = new Date(2026, 5, 17, 9);
+  const list = gstReturnsProvider(ctx({ now, profile, invoices }));
+  assert.deepEqual(list.map((n) => n.severity), ['critical', 'warning']);
+  assert.equal(list[0].title, '3 GST returns overdue');
+  assert.ok(list[0].detail.includes('+1 more'));
+  assert.equal(list[0].href, '/gst-reports?tab=compliance');
+  assert.equal(list[1].title, '1 GST return due within 3 days');
+  // Marking a return filed changes the fingerprint and the count.
+  const filed = setFiled([], returnsForMonth(2026, 4, 'monthly')[0], '', '2026-05-11');
+  const after = gstReturnsProvider(ctx({ now, profile, invoices, gstFiled: filed }));
+  assert.equal(after[0].title, '2 GST returns overdue');
+  assert.notEqual(after[0].id, list[0].id);
+  // QRMP filer: nothing mandatory is due yet in Q1.
+  assert.deepEqual(gstReturnsProvider(ctx({ now, profile, invoices, gstFrequency: 'qrmp' })), []);
+  // No GSTIN, or no issued tax invoice: silent.
+  assert.deepEqual(gstReturnsProvider(ctx({ now, invoices, profile: { ...(profile as object), companyGstin: '' } as never })), []);
+  assert.deepEqual(gstReturnsProvider(ctx({ now, profile, invoices: [inv({ status: 'Draft' })] })), []);
 });
