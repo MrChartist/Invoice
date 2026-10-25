@@ -26,6 +26,7 @@ import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKey
 import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
 import { localDb } from '../lib/localDb';
+import { clientToParty } from '../store/invoice-defaults';
 import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
 import { editorStockContext, liveDocTrackingIssues } from '../lib/stock-tracking';
@@ -108,6 +109,15 @@ export function InvoiceCreator() {
     setMissing(false);
     if (id) {
       if (store.id !== id && !store.loadInvoice(id)) setMissing(true);
+      setHasDraft(false);
+      return;
+    }
+    // `/invoice?party=<client id>` (Clients → ₹ Given on a GST profile, 8.2): a new invoice for that party.
+    const partyId = searchParams.get('party');
+    if (partyId) {
+      const client = localDb.clients.getById(partyId);
+      store.newDraft();
+      if (client) store.setClient(clientToParty(client));
       setHasDraft(false);
       return;
     }

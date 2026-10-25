@@ -30,6 +30,8 @@ import {
 } from './stock-tracking';
 import { toCsv } from './csv';
 import { formatCurrency, formatDate } from './utils';
+import { nextPartyBalanceSnapshot } from './party-balance';
+import { partyBalanceSnapshotFor } from './khata-actions';
 import { EXCHANGE_NOTE, applyExchange, openExchange, zReturns, type PosReturn, type ZReturns } from './pos-returns';
 
 export const POS_DAY_CLOSE_TABLE = 'pos_day_close';
@@ -283,6 +285,11 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
   if (!rec.invoice_number) {
     rec.invoice_number = localDb.invoices.nextNumber(rec.issue_date, rec.doc_type, rec.sender?.invoicePrefix || undefined);
   }
+
+  // Party balance on the bill (8.5): a saved customer's previous balance, frozen with what was paid now.
+  const paidNow = round2(credit + summary.payments.reduce((sum, p) => sum + p.amount, 0));
+  const balanceSnap = nextPartyBalanceSnapshot(rec, undefined, () => partyBalanceSnapshotFor(rec, { paid: paidNow }));
+  if (balanceSnap) rec = { ...rec, party_balance_snapshot: balanceSnap };
 
   let saved: InvoiceRecord;
   try {

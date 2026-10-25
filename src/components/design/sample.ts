@@ -77,6 +77,8 @@ export function buildSampleInvoice(extra: Partial<InvoiceRecord> = {}): InvoiceR
     round_off: totals.round_off,
     total: totals.total,
     balance_due: totals.balance_due,
+    // 8.5: so the "Party balance on the bill" toggle has something to show in the preview.
+    party_balance_snapshot: { previous: 4250, bill: totals.total, paid: totals.total, as_of: '2026-04-12' },
     ...extra,
   };
 }

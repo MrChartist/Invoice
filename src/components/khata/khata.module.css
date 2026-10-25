@@ -1,0 +1,105 @@
+/* Daily khata loop (8A): quick entry sheet and the reminder queue. Tokens only. */
+
+.sheet { display: flex; flex-direction: column; gap: 0.875rem; }
+
+.amountInput {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0.5rem 0.75rem;
+}
+
+.balances {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+.balances strong { color: var(--foreground); font-variant-numeric: tabular-nums; }
+
+.alloc {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-inner);
+  padding: 0.625rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.allocHead { font-weight: 600; font-size: var(--text-sm); }
+.allocRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.5rem;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: var(--text-sm);
+}
+.allocRef { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.allocSub { display: block; color: var(--muted-foreground); font-size: var(--text-xs, 0.75rem); }
+.allocInput { text-align: right; font-variant-numeric: tabular-nums; padding: 0.35rem 0.5rem; }
+.onAccount { font-size: var(--text-sm); color: var(--muted-foreground); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+.notice {
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card-inner);
+  font-size: var(--text-sm);
+}
+
+/* Reminder queue: full-screen stepper */
+.queue {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+}
+.queueBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.queueTitle { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); }
+.queueBody {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+}
+.queueCard {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+.progressFill { height: 100%; background: var(--brand-text); transition: width var(--transition-fast); }
+.partyName { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; }
+.partyAmount { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--brand-text); }
+.meta { font-size: var(--text-sm); color: var(--muted-foreground); }
+.message { min-height: 11rem; font-size: var(--text-md); }
+.queueActions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.queueActions > :first-child { flex: 1 1 100%; }
+
+@media (max-width: 640px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .allocRow { grid-template-columns: minmax(0, 1fr) 7rem; }
+  .queueBody { padding: 0.75rem; }
+}

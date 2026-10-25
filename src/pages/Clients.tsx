@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FileUp, Mail, MapPin, Pencil, Phone, Plus, Scale, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { BellRing, FileUp, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { ImportWizard } from '../components/import/ImportWizard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -10,6 +10,7 @@ import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
 import { salesT } from '../i18n/areas/sales';
+import { khataT } from '../i18n/areas/khata';
 import { ClientFormModal } from '../components/modals/ClientFormModal';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
@@ -19,22 +20,35 @@ import { getTable } from '../lib/storage';
 import type { AdvanceRecord } from '../types/advances';
 import { formatCurrency } from '../lib/utils';
 import type { Client } from '../types/invoice';
+import { loadKhataReport } from '../lib/khata-actions';
+import { buildWhatsAppStatement, khataRows, khataTotals, sortKhataRows, type KhataRow, type KhataSort } from '../lib/khata';
+import { whatsappLink } from '../lib/share';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Clients.module.css';
 import { receivableTotal } from '../lib/rcm';
+
+// Daily khata loop (8A): the quick ₹ Received / ₹ Given sheet and the reminder queue load on first use.
+const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
+const RemindQueue = lazy(() => import('../components/khata/RemindQueue'));
 
 export function Clients() {
   const { notify, toastNode } = useToast();
   const { t } = useT();
   // Local roles (6.21): a viewer can look clients up but not change them.
   const edit = can('master.edit');
+  const canReceive = can('payment.record');
+  const canGive = can('doc.create');
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [sort, setSort] = useState<KhataSort>('balance');
   const [editing, setEditing] = useState<Client | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<Client | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [entry, setEntry] = useState<{ mode: 'received' | 'given'; row: KhataRow } | null>(null);
+  const [queue, setQueue] = useState<'overdue' | 'balance' | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // `/clients?new=1` (from the command palette) opens the add dialog directly;
@@ -56,6 +70,13 @@ export function Clients() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const clients = useMemo(() => localDb.clients.getAll(), [version]);
+  const sender = useMemo(() => localDb.settings.activeProfile(), []);
+
+  // Balance per party (8.1): the receivables ledger incl. opening bills, credit notes and advances.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const report = useMemo(() => loadKhataReport().report, [version]);
+  const rows = useMemo(() => khataRows(clients, report), [clients, report]);
+  const totals = useMemo(() => khataTotals(rows), [rows]);
 
   // Billed per client, keyed by lower-cased name (invoices snapshot the client).
   const billed = useMemo(() => {
@@ -91,11 +112,12 @@ export function Clients() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = q
-      ? clients.filter((c) => [c.name, c.company, c.email, c.phone, c.city, c.gstin, c.pan, c.tan].some((f) => f?.toLowerCase().includes(q)))
-      : clients;
-    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [clients, query]);
+    let list = q
+      ? rows.filter(({ client: c }) => c && [c.name, c.company, c.email, c.phone, c.city, c.gstin, c.pan, c.tan].some((f) => f?.toLowerCase().includes(q)))
+      : rows;
+    if (overdueOnly) list = list.filter((r) => r.overdue > 0.004);
+    return sortKhataRows(list, sort);
+  }, [rows, query, overdueOnly, sort]);
 
   const openAdd = () => {
     setEditing(null);
@@ -125,6 +147,30 @@ export function Clients() {
         }
       />
 
+      {clients.length > 0 && (
+        <section className={`${surface.card} ${styles.khata}`} aria-label={khataT('colBalance')}>
+          <div className={styles.totals}>
+            <div className={styles.total}>
+              <span className={styles.totalLabel}>{khataT('youGet')}</span>
+              <strong className={styles.get} data-you-get>{formatCurrency(totals.youGet, 'INR')}</strong>
+            </div>
+            <div className={styles.total}>
+              <span className={styles.totalLabel}>{khataT('youGive')}</span>
+              <strong className={styles.give}>{formatCurrency(totals.youGive, 'INR')}</strong>
+            </div>
+          </div>
+          <div className={styles.khataActions}>
+            <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setQueue('overdue')} disabled={totals.overdueParties === 0}
+              title={totals.overdueParties ? khataT('overdueParties', { n: totals.overdueParties, amount: formatCurrency(totals.overdue, 'INR') }) : khataT('noOverdue')}>
+              <BellRing size={14} /> {khataT('remindAll')}
+            </button>
+            <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => setQueue('balance')} disabled={totals.youGet <= 0}>
+              <Send size={14} /> {khataT('sendBalances')}
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className={surface.card}>
         <div className={styles.toolbar}>
           <label className={styles.search}>
@@ -137,6 +183,19 @@ export function Clients() {
               aria-label={salesT('cl.searchAria')}
             />
           </label>
+          <div className={styles.filters}>
+            <button type="button" className={overdueOnly ? styles.chipOn : styles.chip} aria-pressed={overdueOnly} onClick={() => setOverdueOnly((v) => !v)}>
+              {khataT('overdueOnly')}{totals.overdueParties > 0 ? ` · ${totals.overdueParties}` : ''}
+            </button>
+            <label className={styles.sort}>
+              <span className={surface.srOnly}>{khataT('sort')}</span>
+              <select className={controls.select} value={sort} onChange={(e) => setSort(e.target.value as KhataSort)} aria-label={khataT('sort')}>
+                <option value="balance">{khataT('sortBalance')}</option>
+                <option value="overdue">{khataT('sortOverdue')}</option>
+                <option value="name">{khataT('sortName')}</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         {clients.length === 0 ? (
@@ -163,15 +222,18 @@ export function Clients() {
                   <th>{salesT('cl.colContact')}</th>
                   <th>{salesT('cl.colLocation')}</th>
                   <th>{salesT('cl.colGstin')}</th>
-                  <th className={surface.numeric}>{salesT('cl.colBilled')}</th>
+                  <th className={surface.numeric}>{khataT('colBalance')}</th>
                   <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((c) => {
+                {filtered.map((row) => {
+                  const c = row.client!;
                   const b = billed.get(c.name?.trim().toLowerCase() ?? '');
+                  const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
+                  const waHref = row.party ? whatsappLink(c.phone, buildWhatsAppStatement({ sender, party: row.party })) : null;
                   return (
-                    <tr key={c.id}>
+                    <tr key={c.id ?? c.name} data-client-row={c.name}>
                       <td className={styles.cWho}>
                         <div className={styles.who}>
                           <Avatar name={c.name} size={34} square />
@@ -214,28 +276,48 @@ export function Clients() {
                         )}
                       </td>
                       <td className={`${surface.numeric} ${styles.cBilled}`}>
-                        {b ? (
-                          <>
-                            {formatCurrency(b.total)}
-                            <div className={styles.sub}>
-                              {b.count === 1 ? salesT('cl.invoicesOne') : salesT('cl.invoicesMany', { n: b.count })}
-                            </div>
-                          </>
-                        ) : (
-                          <span className={styles.sub}>—</span>
+                        <span className={row.kind === 'collect' ? styles.collect : row.kind === 'advance' ? styles.advance : styles.settled} data-balance={row.net}>
+                          {row.kind === 'collect'
+                            ? khataT('toCollect', { amount: formatCurrency(row.net, 'INR') })
+                            : row.kind === 'advance'
+                              ? khataT('advance', { amount: formatCurrency(-row.net, 'INR') })
+                              : khataT('settled')}
+                        </span>
+                        {row.overdue > 0.004 && (
+                          <div className={styles.overdue}>{khataT('overdueLine', { amount: formatCurrency(row.overdue, 'INR'), n: row.oldestOverdueDays })}</div>
                         )}
-                        {(() => {
-                          const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
-                          return adv > 0 ? (
-                            <div className={styles.sub}>
-                              <Link to={`/receivables?tab=advances&party=${encodeURIComponent(c.id ?? `name:${c.name.trim().toLowerCase()}`)}`}>{salesT('cl.advance', { amount: formatCurrency(adv) })}</Link>
-                            </div>
-                          ) : null;
-                        })()}
+                        {b && (
+                          <div className={styles.sub}>
+                            {formatCurrency(b.total)} · {b.count === 1 ? salesT('cl.invoicesOne') : salesT('cl.invoicesMany', { n: b.count })}
+                          </div>
+                        )}
+                        {adv > 0 && (
+                          <div className={styles.sub}>
+                            <Link to={`/receivables?tab=advances&party=${encodeURIComponent(c.id ?? `name:${c.name.trim().toLowerCase()}`)}`}>{salesT('cl.advance', { amount: formatCurrency(adv) })}</Link>
+                          </div>
+                        )}
                       </td>
                       <td className={styles.cAct}>
-                        <div className={surface.rowActions}>
-                          <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={salesT('cl.statementFor', { name: c.name })} title={salesT('cl.statement')}>
+                        <div className={`${surface.rowActions} ${styles.acts}`}>
+                          {canReceive && (
+                            <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm} ${styles.money}`}
+                              onClick={() => setEntry({ mode: 'received', row })} aria-label={khataT('receivedFrom', { name: c.name })} title={khataT('receivedFrom', { name: c.name })}>
+                              {khataT('received')}
+                            </button>
+                          )}
+                          {canGive && (
+                            <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm} ${styles.money}`}
+                              onClick={() => setEntry({ mode: 'given', row })} aria-label={khataT('givenTo', { name: c.name })} title={khataT('givenTo', { name: c.name })}>
+                              {khataT('given')}
+                            </button>
+                          )}
+                          {waHref && (
+                            <a href={waHref} target="_blank" rel="noopener noreferrer" className={controls.btnIcon} data-wa-statement
+                              aria-label={khataT('waStatementFor', { name: c.name })} title={khataT('waStatement')}>
+                              <MessageCircle size={16} />
+                            </a>
+                          )}
+                          <Link to={`/receivables?tab=statements&party=${encodeURIComponent(row.key)}`} className={controls.btnIcon} aria-label={salesT('cl.statementFor', { name: c.name })} title={salesT('cl.statement')}>
                             <Scale size={16} />
                           </Link>
                           {edit && (
@@ -259,6 +341,25 @@ export function Clients() {
         )}
       </section>
 
+      {entry && entry.row.client && (
+        <Suspense fallback={null}>
+          <QuickEntrySheet
+            mode={entry.mode}
+            client={entry.row.client}
+            party={entry.row.party}
+            onClose={() => setEntry(null)}
+            onSaved={(message) => {
+              setVersion((v) => v + 1);
+              notify(message);
+            }}
+          />
+        </Suspense>
+      )}
+      {queue && (
+        <Suspense fallback={null}>
+          <RemindQueue kind={queue} onClose={() => setQueue(null)} onChanged={() => setVersion((v) => v + 1)} />
+        </Suspense>
+      )}
       <ImportWizard
         open={importOpen}
         kind="clients"

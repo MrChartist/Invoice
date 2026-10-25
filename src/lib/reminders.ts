@@ -31,6 +31,12 @@ export interface ReminderRecord {
   tone: ReminderStage;
   sent_at: string;
   note?: string;
+  /**
+   * Additive (8.4): a party-level reminder (the "Remind all overdue" queue / monthly balance) is
+   * logged with the party key (client id, else `name:<lower-cased name>`) and an empty `invoice_id`,
+   * so the per-invoice helpers above never count it. See `src/lib/khata.ts`.
+   */
+  party_key?: string;
 }
 
 export const STAGE_LABELS: Record<ReminderStage, string> = {

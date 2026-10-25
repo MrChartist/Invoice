@@ -1215,3 +1215,26 @@
 .paper[data-preprinted] .letterFoot { display: none; }
 .paper[data-preprinted] .gSeller { visibility: hidden; }
 .paper[data-preprinted] .gTitle { background: transparent; color: var(--tpl-ink); }
+
+/* ── Party balance on the bill (8.5): accent variable only ───────── */
+.partyBal {
+  margin: 12px 0 0 auto;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid var(--tpl-accent);
+  border-radius: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  break-inside: avoid;
+}
+.partyBalCompact {
+  margin: 6px 0 0;
+  max-width: none;
+  padding: 4px 0 0;
+  border: 0;
+  border-top: 1px dashed var(--tpl-ink);
+  border-radius: 0;
+}
+.partyBalRow { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; }
+.partyBalTotal { font-weight: 800; border-top: 1px solid var(--tpl-accent); margin-top: 3px; padding-top: 4px; color: var(--tpl-accent); }
+.partyBalCompact .partyBalTotal { color: inherit; border-top-color: var(--tpl-ink); }
