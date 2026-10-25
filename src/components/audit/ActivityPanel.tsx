@@ -17,6 +17,7 @@ import {
 } from '../../types/audit';
 import { AuditChanges } from './AuditChanges';
 import { AuditIntegrity } from './AuditIntegrity';
+import { AuditorExport } from './AuditorExport';
 import { formatWhen, toneOf } from './audit-format';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -115,6 +116,7 @@ export function ActivityPanel() {
         <p className={surface.sectionNote} role="note">{migT('cannotDisable')}</p>
 
         <AuditIntegrity />
+        <AuditorExport />
 
         <div className={styles.toolbar}>
           <label className={`${controls.field} ${styles.searchField}`}>
