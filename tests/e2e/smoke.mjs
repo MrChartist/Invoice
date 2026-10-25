@@ -1094,16 +1094,12 @@ try {
   await step('time tracking: timer pill, manual entry, bill to a draft invoice', async () => {
     await page.goto(srv.origin + '/time');
     await page.locator('#tm-client').selectOption({ label: 'Acme Buyers' });
-    const chosen = await page.locator('#tm-client').inputValue();
     await page.getByRole('button', { name: /Start timer/ }).click();
     const pill = page.getByRole('link', { name: /Timer running for Acme Buyers/ }).first();
-    await pill.waitFor({ timeout: 5000 }).catch(async (err) => {
-      // Diagnose a lost selection (the card remounted between the pick and the click) before failing.
-      const now = await page.locator('#tm-client').inputValue().catch(() => '?');
-      const alert = await page.getByRole('alert').allInnerTexts().catch(() => []);
-      console.log(`      timer: client before click "${chosen}", now "${now}", alerts ${JSON.stringify(alert)}`);
-      throw err;
-    });
+    await pill.waitFor();
+    // Reload only once the running timer has reached IndexedDB (the write is flushed asynchronously; a
+    // reload a few ms after the click can beat it on a fast runner).
+    await readJson(page, 'timer', null, (v) => !!v && v.started_at !== null);
     await page.reload();
     await pill.waitFor();
     check(true, 'timer pill shows in the header and survives a reload');
