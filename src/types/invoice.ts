@@ -317,6 +317,8 @@ export interface SenderProfile {
    * the 30-day IRP reporting window (AATO ≥ ₹10 crore from 1 Apr 2025). Absent = unknown (no window shown).
    */
   einvoice_aato?: number;
+  /** Additive (R2-A1): the seller's Udyam registration number — enables the MSME 45-day (Sec 43B(h)) note on long terms. */
+  msme_udyam?: string;
 }
 
 /** GST registration type of a sender profile. */

@@ -17,6 +17,8 @@ import { getTable } from '../../lib/storage';
 import { linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
 import { useT } from '../../i18n';
 import { remindT } from '../../i18n/areas/reminders';
+import { reminderOptions } from '../../lib/reminder-context';
+import { gradeLookup } from '../../lib/payment-score';
 
 // The dialog (and its strings) loads only when a reminder is opened, off the Dashboard's first paint.
 const ReminderModal = lazy(() => import('./ReminderModal').then((m) => ({ default: m.ReminderModal })));
@@ -60,7 +62,13 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
 
   const pending = useMemo(
     // Credit notes linked to an invoice settle part of it: never chased (src/lib/amount-due.ts).
-    () => pendingReminders(source, today ?? new Date(), log, { credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), source) }),
+    // R2-A4/A5: company schedule, party reminder mode, promises-to-pay (hold / firm).
+    () => pendingReminders(source, today ?? new Date(), log, {
+      credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), source),
+      ...reminderOptions(source, today ?? new Date()),
+      // R2-A7: slow payers (grade C / D) move up the list.
+      gradeOf: gradeLookup(source, today ?? new Date()),
+    }),
     [source, today, log],
   );
   const shown = pending.slice(0, limit);

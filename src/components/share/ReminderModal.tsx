@@ -29,6 +29,7 @@ import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
 import { remindT } from '../../i18n/areas/reminders';
 import { areaNodes } from '../../i18n/areas/nodes';
+import { loadReminderSchedule } from '../../lib/reminder-settings';
 
 export interface ReminderModalProps {
   invoice: InvoiceRecord;
@@ -69,10 +70,12 @@ function ReminderModalBody({
   const [credited] = useState(() =>
     linkedCredits(getTable<CreditLinkRow>('doc_links').filter((l) => l.from_id === invoice.id), localDb.invoices.getAll()).get(invoice.id) ?? 0,
   );
-  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited));
+  // R2-A5: the company schedule decides the suggested stage; edited templates replace the built-in wording.
+  const [schedule] = useState(loadReminderSchedule);
+  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited, schedule));
   const [lang, setLang] = useState<ReminderLanguage>('en');
   const [message, setMessage] = useState(() =>
-    buildReminder(invoice, suggestStage(invoice, new Date(), credited), 'en', new Date(), { interestAccrued: interestForReminder(invoice), credited }),
+    buildReminder(invoice, suggestStage(invoice, new Date(), credited, schedule), 'en', new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
   );
   const [phone, setPhone] = useState(invoice.client?.phone ?? '');
   const [email, setEmail] = useState(invoice.client?.email ?? '');
@@ -87,7 +90,7 @@ function ReminderModalBody({
     setStage(nextStage);
     setLang(nextLang);
     setMessage(
-      buildReminder(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited }),
+      buildReminder(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
     );
   };
 

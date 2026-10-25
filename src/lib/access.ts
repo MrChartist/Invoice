@@ -359,6 +359,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   production_plans: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
+  // R2-A: payment terms (master), collection follow-ups (logged with receipts), bad-debt recoveries (owner, in write-off.ts)
+  payment_terms: 'master.edit',
+  collection_notes: 'payment.record',
+  write_off_recoveries: 'books.edit',
 };
 
 let systemDepth = 0;

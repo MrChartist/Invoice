@@ -34,6 +34,7 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Dashboard.module.css';
 import { amountDue, linkedCredits } from '../lib/amount-due';
+import { reminderOptions } from '../lib/reminder-context';
 
 function greeting(hour: number): MessageKey {
   if (hour < 12) return 'dash.morning';
@@ -109,7 +110,7 @@ export function Dashboard() {
   // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
   // What credit notes settled is never chased (src/lib/amount-due.ts).
   const credits = linkedCredits(links, invoices);
-  const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders'), { credits }).map((p) => p.invoice.id));
+  const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders'), { credits, ...reminderOptions(invoices, now) }).map((p) => p.invoice.id));
   const attention = attentionList(invoices, 50, now, credits)
     .filter((inv) => !chasing.has(inv.id))
     .slice(0, 5);

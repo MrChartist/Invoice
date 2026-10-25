@@ -10,6 +10,7 @@ import { daysOverdue } from './utils';
 import { docCurrency, hasInrValue, inrRecord, missingFxRate } from './fx';
 import { receivableBalance, receivableTotal } from './rcm';
 import { amountDue, isLiveCreditNote, linkedCredits, type CreditMap } from './amount-due';
+import { isFinancialNote } from './financial-note';
 
 /** Only real, issued sales documents count as revenue — not quotes, challans or drafts. A debit note bills extra; a Bill of Supply is revenue with no output tax. */
 export function isRevenueDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {
@@ -79,7 +80,9 @@ export function summarize(
   // A draft credit note is not issued yet: it reduces nothing (src/lib/amount-due.ts).
   const creditTotals = linkedCredits(links, invoices);
   for (const inv of invoices) {
-    if (isLiveCreditNote(inv)) out.credited += receivableTotal(inv);
+    // R2-A2 (documented choice): a financial note (settlement discount / kasar / bad debt) is an expense, not a
+    // reduction of revenue — it still settles the bill through `creditTotals` below.
+    if (isLiveCreditNote(inv) && !isFinancialNote(inv)) out.credited += receivableTotal(inv);
   }
 
   for (const inv of invoices) {
@@ -128,7 +131,7 @@ export function monthlyBilled(all: InvoiceRecord[], months = 6, now: Date = new 
     if (!inv.issue_date) continue;
     // Credit notes reduce what was billed in the month they are issued, exactly as the
     // headline `summarize().billed` does — otherwise the chart and the KPI disagree.
-    const credit = inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft';
+    const credit = inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft' && !isFinancialNote(inv);
     if (!isRevenueDoc(inv) && !credit) continue;
     const bucket = buckets.find((b) => inv.issue_date.startsWith(b.key));
     if (bucket) bucket.billed = round2(bucket.billed + (credit ? -1 : 1) * receivableTotal(inv));
