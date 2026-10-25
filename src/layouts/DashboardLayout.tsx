@@ -261,6 +261,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'g t': () => navigate('/transactions'),
     'g c': () => navigate('/clients'),
     'g s': () => navigate('/settings'),
+    // 8E (8.146): Alt+P opens the POS counter from anywhere (even while typing in a field).
+    'alt+p': { handler: () => navigate('/pos'), allowInInput: true }, // the route itself needs doc.create
   });
   // Tally keys (Phase 7): F2, F4–F9, Ctrl+F8/F9, F11, F12, Alt+G / Ctrl+G, Ctrl+/ — off on /pos and in fields.
   useTallyKeys(navigate, openShortcuts);

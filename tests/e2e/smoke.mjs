@@ -1133,6 +1133,86 @@ try {
     await writeJson(page, 'items_catalog', prevCatalog);
   });
 
+  await step('8E: weighed scale label + qty prefix / short code, shift X report, change strip, WhatsApp href, create item from an unknown EAN', async () => {
+    const ean = (body) => {
+      const s = [...body].reduce((sum, d, i) => sum + Number(d) * (i % 2 ? 3 : 1), 0);
+      return body + ((10 - (s % 10)) % 10);
+    };
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog,
+      { id: 'e2e-tomato', name: 'E2E Tomato', type: 'Product', hsn: '0702', unit: 'KG', quantity: 1, rate: 80, tax_rate: 0, amount: 0, plu: '123', sold_by_weight: true },
+      { id: 'e2e-bar', name: 'E2E Bar', type: 'Product', hsn: '1704', unit: 'PCS', quantity: 1, rate: 10, tax_rate: 0, amount: 0, short_code: 'EB' },
+    ]);
+    await page.evaluate(() => localStorage.setItem('mrchartist_pos_scale', JSON.stringify({ enabled: true, prefixes: ['21'], pluLength: 5, value: 'weight', decimals: 3, checkDigit: true })));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+
+    // Cashier shift with a float (8.142).
+    await page.locator('[data-pos-shift]').click();
+    await page.locator('#shift-float').fill('500');
+    await page.locator('[data-shift-open]').click();
+    await page.locator('[data-x-report]').waitFor();
+    await page.keyboard.press('Escape');
+
+    // Weighing-scale label: PLU 00123, 1.250 kg → qty 1.25 × ₹80.
+    await scan.fill(ean('210012301250'));
+    await scan.press('Enter');
+    const tq = page.getByLabel('Quantity of E2E Tomato (line 1)');
+    await tq.waitFor();
+    check((await tq.inputValue()) === '1.25', `scale label weight → quantity (${await tq.inputValue()})`);
+    // Quantity prefix + short code.
+    await scan.fill('3*EB');
+    await scan.press('Enter');
+    const bq = page.getByLabel('Quantity of E2E Bar (line 2)');
+    await bq.waitFor();
+    check((await bq.inputValue()) === '3', `3*EB adds three of the short-code item (${await bq.inputValue()})`);
+    const total = await page.locator('[data-pos-total]').innerText();
+    check(/130\.00/.test(total), `1.25 kg × 80 + 3 × 10 (${total})`);
+
+    await page.getByLabel('Walk-in phone').fill('9876543210');
+    await page.locator('#pos-Cash').fill('200');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const strip = page.locator('[data-pos-change-strip]');
+    await strip.waitFor({ timeout: 5000 });
+    check(/70\.00/.test(await strip.innerText()), `change strip (${await strip.innerText()})`);
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    check(bill?.total === 130, `scale bill saved (${bill?.total})`);
+    const wa = await page.locator('a[data-pos-whatsapp]').getAttribute('href');
+    check(/^https:\/\/wa\.me\/919876543210\?text=/.test(wa ?? ''), `WhatsApp this bill (${(wa ?? '').slice(0, 40)})`);
+
+    // X report of the shift: the one bill, its cash.
+    await page.locator('[data-pos-shift]').click();
+    await page.locator('[data-x-report]').waitFor();
+    const xNet = await page.locator('[data-x="net"]').innerText();
+    const xBills = await page.locator('[data-x="bills"]').innerText();
+    check(/130\.00/.test(xNet) && /\b1\b/.test(xBills), `shift X report (${xBills.replace(/\s+/g, ' ')}, ${xNet.replace(/\s+/g, ' ')})`);
+    const shifts = await readJson(page, 'pos_shifts', [], (v) => v.length === 1 && v[0].bill_ids?.length === 1);
+    check(shifts[0]?.opening_float === 500 && shifts[0]?.bill_ids?.[0] === bill?.id, 'shift row holds the bill');
+    await page.keyboard.press('Escape');
+
+    // Unknown EAN → create-item sheet → the new item lands on the bill (8.149).
+    const unknown = ean('890103086531');
+    await scan.fill(unknown);
+    await scan.press('Enter');
+    const sheet = page.locator(`[data-quick-item="${unknown}"]`);
+    await sheet.waitFor();
+    await page.locator('#qi-name').fill('E2E New Item');
+    await page.locator('#qi-rate').fill('50');
+    await page.locator('[data-qi-save]').click();
+    await page.getByLabel('Quantity of E2E New Item (line 1)').waitFor();
+    const cat = await readJson(page, 'items_catalog', [], (v) => v.some((i) => i.barcode === unknown));
+    check(cat.some((i) => i.barcode === unknown && i.name === 'E2E New Item'), 'item created with the scanned barcode');
+
+    await page.keyboard.press('F8');
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => t.invoice_id !== bill?.id));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id));
+    await writeJson(page, 'items_catalog', prevCatalog);
+    await writeJson(page, 'pos_shifts', null);
+    await page.evaluate(() => localStorage.removeItem('mrchartist_pos_scale'));
+  });
+
   await step('POS return: bill → return one item → refund cash; Z report shows the return (WP-9)', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const before = await readJson(page, 'invoices', []);

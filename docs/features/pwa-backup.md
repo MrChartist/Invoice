@@ -155,3 +155,7 @@ backups, so the backup has to leave through the OS share sheet.
   feature-detected, hidden elsewhere) and fills blank name / phone / e-mail / address / city / PIN fields only.
 - Tests: `tests/phone-backup-share.test.ts` (owner gate, encryption, `.txt` fallback, cancel, vault), share routing
   and nudge rules in `tests/phone-counter.test.ts`; `npm run verify:offline` passes with the new SW branch.
+
+**8E wiring (8.150).** The "Payment in" shortcut (`/clients?pay=1`) opens a party picker (parties owing money first, type to
+search), then the khata ₹ Received sheet. A shared image / PDF now asks: *Capture as supplier bill (read e-invoice QR)* — kept in
+the documents inbox via `openCaptureFromFile(file, { source: 'share' })` and opened there — or *New expense with this file*.

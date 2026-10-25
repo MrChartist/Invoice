@@ -71,7 +71,7 @@ function reprice(lineId: string, ctx: EditorPricing | null, force = false): void
   const base = list ?? num(cat?.rate);
   // A typed rate (no basis) is the user's choice: leave it, unless asked to re-price.
   if (!force && !line.price_basis && num(line.rate) !== base) return;
-  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs }, num(line.quantity), ctx?.level);
+  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(line.quantity), ctx?.level); // 8E: an MRP level reads the MRP
   const basis = quote.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : quote.basis;
   if (quote.rate !== num(line.rate) || basis !== line.price_basis) {
     st.patchItem(lineId, { rate: quote.rate, price_basis: basis });

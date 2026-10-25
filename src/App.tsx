@@ -37,6 +37,8 @@ const ShareTarget = lazy(() => import('./pages/ShareTarget').then((m) => ({ defa
 // 8F distribution: masters / reports / van / order-pad import, and the salesman order pad.
 const Distribution = lazy(() => import('./pages/Distribution').then((m) => ({ default: m.Distribution })));
 const OrderPad = lazy(() => import('./pages/OrderPad').then((m) => ({ default: m.OrderPad })));
+// 8.143: customer-facing display window (no shell; shows only what the POS tab broadcasts).
+const CustomerDisplay = lazy(() => import('./components/pos-retail/CustomerDisplay').then((m) => ({ default: m.CustomerDisplay })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -94,6 +96,7 @@ function App() {
           <IdleLock onLock={() => setAuthed(false)} />
           <Suspense fallback={<PageFallback />}>
             <Routes>
+              <Route path="/pos-display" element={<CustomerDisplay />} />
               <Route element={<DashboardLayout onLogout={() => setAuthed(false)} />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/invoice" element={<RequireAccess action="doc.create" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />

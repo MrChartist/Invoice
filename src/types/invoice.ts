@@ -177,6 +177,15 @@ export interface InvoiceItem {
   mrp?: number;
   /** Additive (6.9), catalogue rows only: quantity slabs — a line of at least `min_qty` gets `rate`. */
   qty_slabs?: QtySlab[];
+  /* ── Retail speed (8E) — catalogue rows only, never copied to invoice lines ── */
+  /** Additive (8.141): short code typed at the counter / in the editor ("SB" for soap bar); matched exactly. */
+  short_code?: string;
+  /** Additive (8.140): sold loose by weight (rate per kg); a scale label's weight becomes the quantity. */
+  sold_by_weight?: boolean;
+  /** Additive (8.140): PLU number the weighing scale prints in its EAN-13 label (`scale-barcode.ts`). */
+  plu?: string;
+  /** Additive (8.145): "MRP less %" pricing — the rate is MRP less this percent (recomputed when the item is saved). */
+  mrp_less_percent?: number;
   /**
    * Additive (6.9), invoice lines only: why the rate is what it is when it was set automatically
    * (a price level name such as "Wholesale", or "Qty ≥ 10"). Absent = typed or the catalogue's base rate.

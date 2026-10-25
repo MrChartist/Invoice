@@ -10,7 +10,7 @@ import { liveUnits } from '../../lib/units-live';
 import { lineFactor, lineUnitPatch } from '../../lib/units';
 import { unitT } from '../../i18n/areas/units';
 import { cn, formatCurrency } from '../../lib/utils';
-import { lineKeyAction } from './line-keys';
+import { lineKeyAction, shortCodeFirst } from './line-keys';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { LineTracking } from './LineTracking';
@@ -51,11 +51,11 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const salts = useMemo(() => saltIndex(getTable<{ name: string; salt?: string }>('stock_items')), [catalog]); // eslint-disable-line react-hooks/exhaustive-deps
   const itemSuggestions = useCallback(
     (q: string) =>
-      suggest(q, catalog, {
+      shortCodeFirst(q, catalog, suggest(q, catalog, {
         label: (i) => i.name,
-        extra: (i) => [i.hsn, saltOf(salts, i.name)],
+        extra: (i) => [i.hsn, i.short_code, saltOf(salts, i.name)],
         sub: (i) => [i.hsn && `HSN ${i.hsn}`, saltOf(salts, i.name), formatCurrency(i.rate, currency)].filter(Boolean).join(' · '),
-      }),
+      })),
     [catalog, currency, salts],
   );
   const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});

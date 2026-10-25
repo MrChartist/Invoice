@@ -319,6 +319,7 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}expiry_claims`]: 'date',
   [`${DB_PREFIX}expiry_receipts`]: 'date',
   [`${DB_PREFIX}pos_returns`]: 'day',
+  [`${DB_PREFIX}pos_shifts`]: 'day', // 8E cashier shifts
   [`${DB_PREFIX}cheques`]: chequeDay,
   [`${DB_PREFIX}ledger_openings`]: openingDay,
   [`${DB_PREFIX}opening_bills`]: openingDay,

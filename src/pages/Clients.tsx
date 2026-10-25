@@ -31,6 +31,8 @@ import { receivableTotal } from '../lib/rcm';
 // Daily khata loop (8A): the quick ₹ Received / ₹ Given sheet and the reminder queue load on first use.
 const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
 const RemindQueue = lazy(() => import('../components/khata/RemindQueue'));
+// PWA shortcut "Payment in" (`/clients?pay=1`, 8E wiring): pick the party, then the ₹ Received sheet.
+const PartyPicker = lazy(() => import('../components/khata/PartyPicker'));
 
 export function Clients() {
   const { notify, toastNode } = useToast();
@@ -50,6 +52,13 @@ export function Clients() {
   const [entry, setEntry] = useState<{ mode: 'received' | 'given'; row: KhataRow } | null>(null);
   const [queue, setQueue] = useState<'overdue' | 'balance' | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [picking, setPicking] = useState(() => searchParams.get('pay') === '1' && canReceive);
+  useEffect(() => {
+    if (searchParams.get('pay') !== '1') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('pay');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // `/clients?new=1` (from the command palette) opens the add dialog directly;
   // `/clients?edit=<id>` (from the TDS register) opens that client's editor.
@@ -351,6 +360,18 @@ export function Clients() {
             onSaved={(message) => {
               setVersion((v) => v + 1);
               notify(message);
+            }}
+          />
+        </Suspense>
+      )}
+      {picking && (
+        <Suspense fallback={null}>
+          <PartyPicker
+            rows={rows}
+            onClose={() => setPicking(false)}
+            onPick={(row) => {
+              setPicking(false);
+              setEntry({ mode: 'received', row });
             }}
           />
         </Suspense>
