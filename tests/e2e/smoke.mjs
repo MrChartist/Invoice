@@ -987,7 +987,10 @@ try {
     await dlg.getByRole('button', { name: 'Find' }).click();
     await dlg.getByLabel('Return quantity of E2E Return Soap (line 1)').fill('1');
     await page.waitForFunction(() => /118\.00/.test(document.querySelector('[data-ret-total]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
-    check((await dlg.locator('#ret-Cash').inputValue()) === '118', `refund defaults to cash 118 (${await dlg.locator('#ret-Cash').inputValue()})`);
+    // The refund tender fills in after the total settles; wait for it instead of reading it once.
+    await page.waitForFunction(() => document.querySelector('#ret-Cash')?.value === '118', null, { timeout: 5000 }).catch(() => {});
+    const cash = await dlg.locator('#ret-Cash').inputValue();
+    check(cash === '118', `refund defaults to cash 118 (${cash})`);
     await dlg.getByRole('button', { name: 'Save return' }).click();
     await page.getByText(/CRN\/FY\d\d-\d\d\/\d{4} saved — refund/).first().waitFor();
     const cn = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id)))).find((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id));
@@ -1091,9 +1094,16 @@ try {
   await step('time tracking: timer pill, manual entry, bill to a draft invoice', async () => {
     await page.goto(srv.origin + '/time');
     await page.locator('#tm-client').selectOption({ label: 'Acme Buyers' });
+    const chosen = await page.locator('#tm-client').inputValue();
     await page.getByRole('button', { name: /Start timer/ }).click();
     const pill = page.getByRole('link', { name: /Timer running for Acme Buyers/ }).first();
-    await pill.waitFor();
+    await pill.waitFor({ timeout: 5000 }).catch(async (err) => {
+      // Diagnose a lost selection (the card remounted between the pick and the click) before failing.
+      const now = await page.locator('#tm-client').inputValue().catch(() => '?');
+      const alert = await page.getByRole('alert').allInnerTexts().catch(() => []);
+      console.log(`      timer: client before click "${chosen}", now "${now}", alerts ${JSON.stringify(alert)}`);
+      throw err;
+    });
     await page.reload();
     await pill.waitFor();
     check(true, 'timer pill shows in the header and survives a reload');
