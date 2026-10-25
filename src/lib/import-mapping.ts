@@ -83,6 +83,17 @@ export const IMPORT_SCHEMAS: Record<ImportKind, FieldDef[]> = {
       synonyms: ['Notes', 'Remarks', 'Note', 'Comments', 'Narration', 'Description'],
       example: ['', 'Pays on the 10th'],
     },
+    // R2-B4: first contact person and first delivery address (optional columns).
+    { key: 'contact_name', label: 'Contact person', type: 'text', synonyms: ['contact_name', 'Contact Person', 'Contact Person Name', 'Kind Attn'], example: ['R. Iyer', ''] },
+    { key: 'contact_role', label: 'Contact role', type: 'text', synonyms: ['contact_role', 'Contact Designation', 'Contact Role', 'Designation'], example: ['Accounts', ''] },
+    { key: 'contact_phone', label: 'Contact phone', type: 'text', synonyms: ['contact_phone', 'Contact Person Phone', 'Contact Person Mobile'], example: ['9820012345', ''] },
+    { key: 'contact_email', label: 'Contact e-mail', type: 'email', synonyms: ['contact_email', 'Contact Person Email', 'Contact Person E-mail'], example: ['ap@acme.in', ''] },
+    { key: 'address_label', label: 'Ship-to label', type: 'text', synonyms: ['address_label', 'Shipping Address Label', 'Ship To Label', 'Plant'], example: ['Plant 2', ''] },
+    { key: 'address_line', label: 'Ship-to address', type: 'text', synonyms: ['address_line', 'Shipping Address', 'Ship To Address', 'Delivery Address', 'Shipping Street'], example: ['Plot 7, MIDC Chakan', ''] },
+    { key: 'address_city', label: 'Ship-to city', type: 'text', synonyms: ['address_city', 'Shipping City', 'Ship To City', 'Delivery City'], example: ['Pune', ''] },
+    { key: 'address_pin', label: 'Ship-to PIN', type: 'text', synonyms: ['address_pin', 'Shipping Code', 'Shipping PIN', 'Ship To PIN', 'Delivery PIN'], example: ['410501', ''] },
+    { key: 'address_state', label: 'Ship-to state', type: 'state', synonyms: ['address_state', 'Shipping State', 'Ship To State', 'Delivery State'], example: ['Maharashtra', ''] },
+    { key: 'address_gstin', label: 'Ship-to GSTIN', type: 'gstin', synonyms: ['address_gstin', 'Shipping GSTIN', 'Ship To GSTIN', 'Consignee GSTIN'], example: ['', ''] },
   ],
 
   items: [

@@ -4,6 +4,8 @@
  */
 
 import { fold, fuzzyMatch } from './search';
+import { contactSearchFields } from './contacts';
+import type { Client } from '../types/invoice';
 
 export interface Suggestion<T> {
   row: T;
@@ -47,4 +49,12 @@ export function autoHighlight<T>(query: string, list: readonly Suggestion<T>[]):
   if (list[0]?.exact) return 0;
   const q = fold(query.trim());
   return q && list[0] && fold(list[0].label).startsWith(q) ? 0 : -1;
+}
+
+/**
+ * R2-B4: what the client typeahead matches besides the name — company, GSTIN, city, and every contact
+ * person's name / phone / e-mail (so typing "Iyer" or "98200" finds the party).
+ */
+export function clientExtras(c: Pick<Client, 'company' | 'gstin' | 'city' | 'phone' | 'contacts'>): (string | undefined)[] {
+  return [c.company, c.gstin, c.city, c.phone, ...contactSearchFields(c)];
 }

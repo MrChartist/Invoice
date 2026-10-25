@@ -1,0 +1,178 @@
+/* R2-B document panels / dialogs (tokens only). */
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.panel[open] > * + * {
+  margin-top: 0.5rem;
+}
+
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: revert;
+}
+
+.muted {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.sub {
+  margin: 0.25rem 0 0;
+  font-size: var(--text-sm);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.kpis > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.kpis strong {
+  font-size: var(--text-md);
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--secondary);
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.planGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.planRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 2fr) minmax(60px, 0.6fr) minmax(120px, 1fr) auto;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+@media (max-width: 560px) {
+  .planRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  font-weight: 600;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cellInput {
+  width: 6.5rem;
+}
+
+.warn {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--secondary);
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+
+.error {
+  margin: 0;
+  color: var(--destructive);
+  font-size: var(--text-sm);
+}
+
+.linkBtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--brand-text);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.linkBtn[aria-pressed='true'] {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.diffAdded {
+  color: var(--profit);
+}
+
+.diffRemoved {
+  color: var(--loss);
+  text-decoration: line-through;
+}
+
+.diffChanged {
+  color: var(--warning);
+}

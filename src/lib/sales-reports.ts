@@ -41,6 +41,7 @@ import {
 } from './books';
 import type { ItemIndex, StockPosition } from './inventory';
 import type { InvoiceRecord, Payment } from '../types/invoice';
+import type { ProgressReportRow } from './progress-billing';
 
 /* ════════════════════════════════════════════════════════════════
    Documents
@@ -814,6 +815,18 @@ export function sortRows<T>(rows: readonly T[], get: (r: T) => string | number |
       return String(av).localeCompare(String(bv), 'en', { numeric: true, sensitivity: 'base' }) * mult || a.i - b.i;
     })
     .map((x) => x.r);
+}
+
+/**
+ * R2-B2: Progress billing summary (rows from `progressReport` in progress-billing.ts), by party then
+ * quotation / sales order. Taxable values, before GST.
+ */
+export function progressSummaryCsv(rows: readonly ProgressReportRow[]): string {
+  return toCsv([
+    ['Progress billing summary (taxable value, before GST)'],
+    ['Party', 'Document', 'Date', 'Quoted', 'Invoiced', 'Credited', 'Remaining', '% complete', 'Stages', 'Closed'],
+    ...rows.map((r) => [r.party, r.number, r.date, r.quoted, r.invoiced, r.credited, r.remaining, r.percent, r.stages, r.closed ? 'Yes' : 'No']),
+  ]);
 }
 
 export function customersCsv(rep: CustomerReport, period: Period): string {

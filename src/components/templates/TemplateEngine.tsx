@@ -16,6 +16,8 @@ import { CopyBanner } from './parts/CopyBanner';
 import { TransportBlock } from './parts/TransportBlock';
 import { PartyBalanceBlock } from './parts/PartyBalanceBlock';
 import { AcceptanceBlock } from './parts/AcceptanceBlock';
+import { OptionalItemsBlock } from './parts/OptionalItemsBlock';
+import { ProposalSections } from './parts/ProposalSections';
 import { rcmTaxNote } from './paper-helpers';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
@@ -104,9 +106,18 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
 
   const showInitials = !preprinted && (layout === 'corporate' || layout === 'centered') && sender.companyName;
 
-  const body = (() => {
-    if (layout === 'gst') return <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} />;
-    if (layout === 'receipt') return <ReceiptBody invoice={invoice} sender={sender} totals={totals} />;
+  const layoutBody = (() => {
+    // R2-B3: proposal sections and optional items wrap the ruled GST grid / the receipt.
+    if (layout === 'gst' || layout === 'receipt') {
+      return (
+        <>
+          <ProposalSections invoice={invoice} place="before" />
+          {layout === 'gst' ? <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} /> : <ReceiptBody invoice={invoice} sender={sender} totals={totals} />}
+          <OptionalItemsBlock invoice={invoice} />
+          <ProposalSections invoice={invoice} place="after" />
+        </>
+      );
+    }
     return (
       <>
         {preprinted ? (
@@ -124,8 +135,11 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
+        <ProposalSections invoice={invoice} place="before" />
         <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />
         <TaxSummary invoice={invoice} totals={totals} />
+        <OptionalItemsBlock invoice={invoice} />
+        <ProposalSections invoice={invoice} place="after" />
 
         <div className={cn(styles.footer, styles.keepTogether)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -150,6 +164,14 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
       </>
     );
   })();
+
+  // R2-B3: a quotation's proposal cover comes before the header of every layout.
+  const body = (
+    <>
+      <ProposalSections invoice={invoice} place="cover" />
+      {layoutBody}
+    </>
+  );
 
   return (
     <PaperContext.Provider value={cfg}>

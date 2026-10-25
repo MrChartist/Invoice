@@ -14,6 +14,10 @@ import type { Client } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
 import controls from '../../styles/controls.module.css';
+import { ContactsEditor } from '../clients/ContactsEditor';
+import { AddressBookEditor } from '../clients/AddressBookEditor';
+import { normalizeAddresses, normalizeContacts } from '../../lib/contacts';
+import { s2T } from '../../i18n/areas/sales-r2';
 
 const BLANK: Client = {
   name: '',
@@ -77,6 +81,12 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     if (tan && !isValidTan(tan)) return setError(salesT('cf.errTan'));
     const late_fee = fee.mode ? sanitizeClientLateFee({ mode: fee.mode, rate: fee.rate, graceDays: fee.grace }) : undefined;
     if (fee.mode && !late_fee) return setError(salesT('cf.errFee'));
+    // R2-B4: contact persons need a name; e-mails must look like e-mails.
+    if ((form.contacts ?? []).some((c) => !c.name.trim() && (c.phone || c.email || c.role))) return setError(s2T('c.errContact'));
+    const badMail = (form.contacts ?? []).find((c) => c.email && !/^\S+@\S+\.\S+$/.test(c.email.trim()));
+    if (badMail) return setError(s2T('c.errEmail', { email: badMail.email ?? '' }));
+    const contacts = normalizeContacts(form.contacts);
+    const addresses = normalizeAddresses(form.addresses);
     const creditLimit = credit.limit.trim() ? Number(credit.limit) : 0;
     const creditDays = credit.days.trim() ? Number(credit.days) : 0;
     if (!Number.isFinite(creditLimit) || creditLimit < 0) return setError(salesT('cf.errLimit'));
@@ -97,6 +107,9 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         credit_limit: creditLimit > 0 ? Math.round(creditLimit * 100) / 100 : undefined,
         credit_days: creditDays > 0 ? creditDays : undefined,
         price_level: form.price_level && levels.some((l) => l.id === form.price_level) ? form.price_level : undefined,
+        // R2-B4 (keys kept as undefined so clearing the lists overwrites the stored ones)
+        contacts: contacts.length ? contacts : undefined,
+        addresses: addresses.length ? addresses : undefined,
         updated_at: new Date().toISOString(),
       };
       const id = localDb.clients.upsert({ ...payload, id: client?.id });
@@ -271,6 +284,8 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
             <span className={controls.hint}>{salesT('cf.priceHint')}</span>
           </label>
         )}
+        <ContactsEditor value={form.contacts ?? []} onChange={(v) => set('contacts', v)} />
+        <AddressBookEditor value={form.addresses ?? []} onChange={(v) => set('addresses', v)} />
         <label className={controls.field}>
           <span className={controls.label}>{salesT('cf.notes')}</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder={salesT('cf.notesPh')} />

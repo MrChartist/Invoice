@@ -12,6 +12,7 @@ import styles from '../invoice-paper.module.css';
 import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
 import { ItemCustomLine } from './CustomFieldsBlock';
 import { transportRows } from '../../../lib/transport';
+import { AttentionLine } from './AttentionLine';
 
 interface Props {
   invoice: InvoiceRecord;
@@ -133,6 +134,7 @@ export function GstBody({ invoice, sender, totals, skipEway }: Props) {
             {c.email && <>{c.email}<br /></>}
             {c.gstin && <><b>GSTIN/UIN:</b> {c.gstin}</>}
           </div>
+          <AttentionLine invoice={invoice} />
         </div>
         <div className={styles.gCell}>
           {ship && (

@@ -78,6 +78,9 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   pos_returns: { entity: 'invoice', label: 'POS return' },
   doc_links: { entity: 'invoice', label: 'Document link' },
   year_end: { entity: 'settings', label: 'Year-end checklist' },
+  // R2-B: batch invoice runs, proposal section snippets
+  batch_runs: { entity: 'invoice', label: 'Batch invoice run' },
+  proposal_snippets: { entity: 'settings', label: 'Proposal snippet' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

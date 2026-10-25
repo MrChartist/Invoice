@@ -359,6 +359,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   production_plans: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
+  // R2-B: batch invoice runs (written with the invoices they issue), proposal section snippets
+  batch_runs: 'doc.create',
+  proposal_snippets: 'doc.create',
 };
 
 let systemDepth = 0;

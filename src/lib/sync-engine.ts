@@ -324,6 +324,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}ledger_openings`]: openingDay,
   [`${DB_PREFIX}opening_bills`]: openingDay,
   [`${DB_PREFIX}books_begin`]: (r) => (str(r.date) ? openingDayFor(str(r.date)) : undefined),
+  // R2-B: batch invoice runs (issue date of the run's invoices)
+  [`${DB_PREFIX}batch_runs`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

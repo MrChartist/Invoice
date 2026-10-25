@@ -251,6 +251,8 @@ export interface PurchaseOrderLine {
   /** Additive (WP-8): the stock item picked on the line, and base units per line unit (absent = 1). */
   item_id?: string;
   unit_factor?: number;
+  /** Additive (R2-B5): the sales-order line this back-to-back PO line was raised for. */
+  so_line_id?: string;
 }
 
 /**
@@ -279,6 +281,12 @@ export interface PurchaseOrder {
   notes?: string;
   /** yyyy-mm-dd the user closed a partly received order. */
   closed_on?: string;
+  /** Additive (R2-B5): the sales order this back-to-back PO was raised from. */
+  so_id?: string;
+  /** Additive (R2-B5): drop-ship — the supplier delivers straight to the customer at `ship_to`. */
+  drop_ship?: boolean;
+  /** Additive (R2-B5): delivery address printed on a drop-ship PO (the customer's). */
+  ship_to?: { name?: string; address?: string; city?: string; zip?: string; state_code?: string; gstin?: string };
   created_at?: string;
   updated_at?: string;
 }
