@@ -14,6 +14,7 @@ import { daysBetween } from '../compliance';
 import { A, groupOf, type GroupId } from './accounts';
 import type { Ledger } from './postings';
 import { closingBalances, ledgerProfitAndLoss } from './reports';
+import type { StockValuer } from './closing-stock';
 
 export type RatioUnit = 'money' | 'ratio' | 'percent' | 'days' | 'times';
 
@@ -60,17 +61,22 @@ const CL: readonly GroupId[] = ['LOANS_ST', 'TRADE_PAYABLES', 'DUTIES_TAXES', 'O
 const div = (a: number, b: number): number | null => (b === 0 ? null : a / b);
 const r2 = (x: number | null): number | null => (x === null || !Number.isFinite(x) ? null : Math.round(x * 100) / 100);
 
-/** `asOf` defaults to the period end. Balances are taken at the end of `asOf`; flows over `period.start`..`asOf`. */
-export function ratioAnalysis(ledger: Ledger, period: Period, asOf: string = period.end): RatioAnalysis {
+/**
+ * `asOf` defaults to the period end. Balances are taken at the end of `asOf`; flows over `period.start`..`asOf`.
+ * `stock` (WP-2 closing stock, report-time) adds the valued closing stock to stock-in-hand / current assets and
+ * the stock change to gross and net profit.
+ */
+export function ratioAnalysis(ledger: Ledger, period: Period, asOf: string = period.end, stock?: StockValuer): RatioAnalysis {
   const end = asOf < period.end ? asOf : period.end;
   const bal = closingBalances(ledger, end);
-  const pnl = ledgerProfitAndLoss(ledger, { start: period.start, end });
+  const pnl = ledgerProfitAndLoss(ledger, { start: period.start, end }, stock);
+  const valuedStock = stock ? stock.value(end) : 0;
   const ids = (pred: (g: GroupId, id: string) => boolean) => ledger.accounts.filter((a) => pred(a.group, a.id)).map((a) => a.id);
   const sumDr = (list: string[]) => list.reduce((s, id) => s + (bal.get(id) ?? 0), 0);
 
   const caIds = ids((g) => CA.includes(g));
   const clIds = ids((g) => CL.includes(g));
-  const currentAssets = sumDr(caIds);
+  const currentAssets = sumDr(caIds) + valuedStock;
   const currentLiabilities = -sumDr(clIds);
   const workingCapital = currentAssets - currentLiabilities;
   const cashIds = ids((g, id) => g === 'CASH_BANK' && (id === A.cash || /cash/i.test(ledger.byId.get(id)?.name ?? '')));
@@ -89,14 +95,14 @@ export function ratioAnalysis(ledger: Ledger, period: Period, asOf: string = per
   const bankOd = -sumDr(odIds);
   const debtors = sumDr(debtorIds);
   const creditors = -sumDr(creditorIds);
-  const stock = sumDr(stockIds);
+  const stockInHand = sumDr(stockIds) + valuedStock;
   const loans = -sumDr(loanIds);
   const capital = -sumDr(capIds);
   const sales = pnl.income.filter((x) => x.group === 'SALES').reduce((s, x) => s + x.total, 0);
   const purchases = pnl.expenses.filter((x) => x.group === 'PURCHASES').reduce((s, x) => s + x.total, 0);
   const netProfit = pnl.netProfit;
   // Gross profit on the trading account: sales less direct costs (purchases + direct expenses).
-  const grossProfit = sales - pnl.directCosts;
+  const grossProfit = pnl.trading.grossProfit;
   const days = Math.max(daysBetween(period.start, end) + 1, 1);
 
   const money = (id: string, label: string, value: number, formula: string, accounts: string[]): RatioItem => ({ id, label, value, unit: 'money', formula, accounts });
@@ -111,14 +117,14 @@ export function ratioAnalysis(ledger: Ledger, period: Period, asOf: string = per
     money('creditors', 'Sundry creditors', creditors, 'Closing trade payables', creditorIds),
     money('sales', 'Sales accounts', sales, 'Net sales (sales − returns + charges recovered) in the period', salesIds),
     money('purchases', 'Purchase accounts', purchases, 'Purchases in the period', purchaseIds),
-    money('stock', 'Stock-in-hand', stock, 'Closing inventories (as journalised)', stockIds),
+    money('stock', 'Stock-in-hand', stockInHand, stock ? `Closing inventories (journalised + closing stock, ${stock.label})` : 'Closing inventories (as journalised)', stockIds),
     money('netProfit', 'Net profit', netProfit, 'Income − expenses in the period', []),
     item('wcTurnover', 'Working capital turnover', div(sales, workingCapital), 'times', 'Sales ÷ working capital (Tally)'),
-    item('inventoryTurnover', 'Inventory turnover', div(sales, stock), 'times', 'Sales ÷ closing stock (Tally)', stockIds),
+    item('inventoryTurnover', 'Inventory turnover', div(sales, stockInHand), 'times', 'Sales ÷ closing stock (Tally)', stockIds),
   ];
   const ratios: RatioItem[] = [
     item('currentRatio', 'Current ratio', div(currentAssets, currentLiabilities), 'ratio', 'Current assets ÷ current liabilities', [...caIds, ...clIds]),
-    item('quickRatio', 'Quick ratio', div(currentAssets - stock, currentLiabilities), 'ratio', '(Current assets − stock) ÷ current liabilities', [...caIds, ...clIds]),
+    item('quickRatio', 'Quick ratio', div(currentAssets - stockInHand, currentLiabilities), 'ratio', '(Current assets − stock) ÷ current liabilities', [...caIds, ...clIds]),
     item('debtEquity', 'Debt / equity', div(loans, capital + netProfit), 'ratio', 'Loans ÷ (capital + reserves + net profit) (Tally: loans ÷ capital + net profit)', [...loanIds, ...capIds]),
     item('grossProfitPct', 'Gross profit %', div(grossProfit * 100, sales), 'percent', '(Sales − direct costs) ÷ sales × 100', salesIds),
     item('netProfitPct', 'Net profit %', div(netProfit * 100, sales), 'percent', 'Net profit ÷ sales × 100', salesIds),
@@ -134,7 +140,7 @@ export function ratioAnalysis(ledger: Ledger, period: Period, asOf: string = per
     days,
     groups,
     ratios,
-    parts: { currentAssets, currentLiabilities, workingCapital, cash, bank, bankOd, debtors, creditors, sales, purchases, stock, grossProfit, netProfit, loans, capital },
+    parts: { currentAssets, currentLiabilities, workingCapital, cash, bank, bankOd, debtors, creditors, sales, purchases, stock: stockInHand, grossProfit, netProfit, loans, capital },
   };
 }
 

@@ -6,7 +6,7 @@ Schedule III balance sheet with a fixed-asset register, and an AS 3 cash-flow st
 
 | | |
 |---|---|
-| UI | Books page tabs `vch` Vouchers, `ledger` Ledger (`acct`, `party` params), `tb` Trial balance, `bs` Balance sheet, `cf` Cash flow, `coa` Chart of accounts |
+| UI | Books page tabs `day` Day Book, `vch` Vouchers, `ledger` Ledger (`acct`, `party` params), `tb` Trial balance, `pnl` Profit & loss, `bs` Balance sheet, `cf` Cash flow, `rpt` Reports, `coa` Chart of accounts — every statement reads this ledger (reports engine: `docs/features/reports-engine.md`) |
 | Components | `src/components/books/ledger/*` — one lazy chunk (`LedgerPanel`, default export) loaded by `src/pages/Books.tsx` |
 | Lib | `src/lib/ledger/` — `accounts.ts`, `vouchers.ts`, `assets.ts`, `postings.ts`, `reports.ts`, `index.ts` (never import from the shell) |
 | Rates | `DEPRECIATION_RATE_RULES` in `src/lib/tax-rules.ts` (date-keyed by FY) |
@@ -92,17 +92,24 @@ books 40, intangibles 25, energy-saving devices 40 (80 before). Half the rate in
 for fewer than 180 days (put-to-use date to 31 March, inclusive). Per-asset WDV schedule plus a block-wise summary.
 
 ## Consistency with Books
-For the same documents (no manual vouchers, no assets), ledger revenue, direct costs, indirect expenses and net
-profit equal `books.profitAndLoss` (tested). Known, intended differences: manual vouchers and depreciation exist only in
-the ledger; ITC reversals and purchase round-off are expensed in the ledger but not in Books; customer TDS sits in
-TDS receivable rather than receivables.
+The Day Book, Profit & loss, trial balance, balance sheet and cash flow all read this ledger (WP-2), so manual
+vouchers, fixed assets and depreciation appear everywhere and the statements reconcile (`tests/reports-engine.test.ts`).
+The documents-only `books.profitAndLoss` survives as the P&L tab's "Documents view (indicative)": for the same documents
+(no manual vouchers, no assets, no stock) its revenue, direct costs, indirect expenses and net profit equal the ledger's
+(tested); ITC reversals and purchase round-off are expensed only in the ledger; customer TDS sits in TDS receivable.
+
+## Closing stock
+Valued at report time (never posted) from the inventory engine (FIFO / weighted average per the inventory setting) or a
+typed date-wise figure: Trading account opening / closing stock, Inventories in the balance sheet, opening stock as a
+difference in opening balances in capital. See `docs/features/reports-engine.md`.
 
 ## Assumptions to confirm with a CA
 - IT Act WDV rates are used for book depreciation (Companies Act Schedule II useful lives are not applied); per-asset,
   no block-level sale/cessation handling; disposals need a manual journal.
 - Import-of-goods IGST is credited to a customs payable until a payment voucher clears it; customs duty itself is not
   modelled.
-- Closing stock is not valued automatically (post a journal: Dr Stock-in-hand, Cr an income/purchases account).
+- Closing stock is a report-time valuation (inventory engine or typed figure), not a journal; a business that already
+  journals its closing stock should switch valuation off (P&L → Closing stock) to avoid counting it twice.
 - Interest and income-tax are not separated in the cash-flow statement; bank overdraft is treated as financing, not a
   cash equivalent.
 - RCM / import bills: the purchases module, Books and Tally all owe the supplier `supplierPayable(bill)` (total − the

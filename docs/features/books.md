@@ -7,7 +7,7 @@ Tally-style books built read-only from invoices, payments received and (if prese
 | Route | `/books` (tabs via `?tab=day\|cash\|vch\|ledger\|tb\|pnl\|bs\|cf\|coa`; the ledger tab also takes `acct` and `party`) |
 | Nav label / icon | "Books" / `BookOpen` (lucide-react) |
 | Page | `src/pages/Books.tsx` (+ `Books.module.css`), named export `Books` |
-| Components | `src/components/books/*` (PeriodBar, TrendChart, DayBookTab, CashBankTab, ProfitLossTab, OpeningBalanceModal, download.ts; ledger tabs in `ledger/`) |
+| Components | `src/components/books/*` (PeriodBar, TrendChart, CashBankTab, ProfitLossTab — now the P&L tab's "Documents view (indicative)", OpeningBalanceModal, download.ts; ledger tabs in `ledger/`, including the ledger Day Book and Trading / P&L — see `docs/features/reports-engine.md`) |
 | Lib | `src/lib/books.ts` (pure, tested in `tests/books.test.ts`) |
 
 ## Tables

@@ -262,8 +262,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - No direct portal / IRP / bank / payment-gateway connection (by design: no server).
 - Several bank accounts reconcile separately (BRS, statements, receipts and supplier payments name their account), but
   the Books bank book and the ledger keep one Bank total; cheques clear into the main account.
-- The ledger does not value closing stock or handle fixed-asset disposals automatically — post them with a journal
-  voucher. Realised exchange differences are posted automatically when a receipt carries its realised rate;
+- Closing stock is now valued at report time (inventory FIFO / weighted average, or a typed figure) in the Trading
+  account, P&L and balance sheet; it is not posted as a voucher. Fixed-asset disposals are not handled automatically —
+  post them with a journal voucher. Realised exchange differences are posted automatically when a receipt carries its realised rate;
   unrealised (period-end revaluation) differences are reported only — post the reversing journal if your CA wants it.
 - RCM and import bills: the supplier is owed the taxable value only (`supplierPayable`) in purchases, Books, the ledger
   and Tally; the self-assessed tax sits on "GST payable — reverse charge" / "IGST payable on imports" until cleared.
