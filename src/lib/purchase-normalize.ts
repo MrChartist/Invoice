@@ -80,8 +80,13 @@ export interface PurchaseCore {
   /** Total GST on the bill: the larger of the explicit total and the split sum. */
   tax: number;
   total: number;
-  /** total - taxable - tax: rounding, or any inconsistency in an imported row. Signed. */
+  /**
+   * total - taxable - tax: rounding, or any inconsistency in an imported row. Signed.
+   * Cess (below) is NOT taken out, so readers that ignore cess still balance (cess then sits in round-off).
+   */
   roundOff: number;
+  /** Additive (WP-6): compensation cess on the bill (`cess_amount` / `cess`), >= 0; outside `tax`. */
+  cess: number;
   itcEligible: boolean;
   reverseCharge: boolean;
   itcReversed: number;
@@ -185,6 +190,7 @@ export function readPurchase(raw: unknown, vendors: readonly unknown[] = []): Pu
     tax,
     total,
     roundOff: round2(total - round2(taxable) - tax),
+    cess: round2(Math.abs(pickNum(r, ['cess_amount', 'cess']) ?? 0)),
     itcEligible,
     reverseCharge: r.reverse_charge === true || r.rcm === true,
     itcReversed: round2(Math.max(pickNum(r, ['itc_reversed', 'itc_reversal']) ?? 0, 0)),
@@ -307,6 +313,9 @@ export interface PurchaseLineCore {
   godownId: string;
   /** Additive (WP-3): the receipt-note (GRN) line this bill line bills, or ''. */
   grnLineId: string;
+  /** Additive (WP-6): GST rate % of the line (`tax_rate` / `gst_rate`), 0 when absent; unit (`unit`) or ''. */
+  taxRate: number;
+  unit: string;
 }
 
 /** The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. */
@@ -332,6 +341,8 @@ export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
       serials: Array.isArray(line.serials) ? line.serials.map((x) => str(x)).filter(Boolean) : [],
       godownId: pickStr(line, ['godown_id']),
       grnLineId: pickStr(line, ['grn_line_id']),
+      taxRate: Math.max(pickNum(line, ['tax_rate', 'gst_rate']) ?? 0, 0),
+      unit: pickStr(line, ['unit', 'uqc']),
     });
   }
   return out;

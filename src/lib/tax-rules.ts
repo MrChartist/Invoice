@@ -448,3 +448,57 @@ export const DEPRECIATION_HALF_RATE_DAYS = 180;
 export function depreciationRate(block: DepreciationBlock, date?: string): number {
   return ruleAt(DEPRECIATION_RATE_RULES, date)[block] ?? 0;
 }
+
+// ── GST liability set-off order (WP-6, P0-6) ────────────────────────────────
+
+/**
+ * Order in which input tax credit discharges output tax (GSTR-3B Table 6.1 / the set-off journal).
+ * Keyed by the first day of the TAX PERIOD. CGST credit never pays SGST and SGST credit never pays CGST
+ * (Sec 49(5)(c)/(d)); compensation cess credit pays cess only (Sec 11(2) GST (Compensation to States) Act).
+ */
+export interface GstSetOffOrder {
+  /**
+   * IGST credit must be used up in full before any CGST / SGST credit is touched (Sec 49A, from 1 Feb 2019).
+   * false = the original Sec 49(5) practice: each head's own credit first, IGST credit after.
+   */
+  igstFirst: boolean;
+  /**
+   * What is left of IGST credit after IGST: `cgst_then_sgst` = towards CGST, then SGST (Sec 49(5)(a) "in that
+   * order"); `any` = towards CGST and SGST in any order (Rule 88A) — the app then picks the split that leaves
+   * the least cash to pay.
+   */
+  igstRemainder: 'cgst_then_sgst' | 'any';
+}
+
+export const GST_SETOFF_RULES: readonly Versioned<GstSetOffOrder>[] = [
+  { from: '2017-07-01', value: { igstFirst: false, igstRemainder: 'cgst_then_sgst' }, source: 'Sec 49(5) CGST Act as enacted — verify' },
+  {
+    from: '2019-02-01',
+    value: { igstFirst: true, igstRemainder: 'cgst_then_sgst' },
+    source: 'Sec 49(5) and Sec 49A, CGST (Amendment) Act 2018 in force 1 Feb 2019 (Notification 2/2019-CT) — verify',
+  },
+  {
+    from: '2019-03-29',
+    value: { igstFirst: true, igstRemainder: 'any' },
+    source: 'Rule 88A CGST Rules, Notification 16/2019-CT dated 29 Mar 2019; Circular 98/17/2019-GST — verify',
+  },
+];
+
+export function gstSetOffOrder(periodStart?: string): GstSetOffOrder {
+  return ruleAt(GST_SETOFF_RULES, periodStart);
+}
+
+/**
+ * Rule 86B: a registered person whose taxable supplies (other than exempt / zero-rated) exceed `monthlyTaxable`
+ * in a month may use the electronic credit ledger for at most (100 − `cashPct`)% of the output tax — i.e. at least
+ * `cashPct`% in cash. Exceptions (income tax above ₹1 lakh, refunds, government / PSU …) are not modelled: the app
+ * only warns. `null` = no such restriction. Verify with your CA.
+ */
+export const RULE_86B_RULES: readonly Versioned<{ monthlyTaxable: number; cashPct: number } | null>[] = [
+  { from: '2017-07-01', value: null },
+  { from: '2021-01-01', value: { monthlyTaxable: 5e6, cashPct: 1 }, source: 'Rule 86B, Notification 94/2020-CT — verify' },
+];
+
+export function rule86b(periodStart?: string): { monthlyTaxable: number; cashPct: number } | null {
+  return ruleAt(RULE_86B_RULES, periodStart);
+}

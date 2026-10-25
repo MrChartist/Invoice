@@ -100,6 +100,55 @@ export interface EInvExpDtls {
   CntCode?: string;
 }
 
+/** Additive (WP-6): consignee when goods go somewhere other than the buyer's address (from `invoice.ship_to`). */
+export interface EInvShipDtls {
+  Gstin?: string;
+  LglNm: string;
+  TrdNm?: string;
+  Addr1: string;
+  Addr2?: string;
+  Loc: string;
+  Pin: number;
+  Stcd: string;
+}
+
+/** Additive (WP-6): dispatch-from address when goods leave from somewhere other than the seller's address. */
+export interface EInvDispDtls {
+  Nm: string;
+  Addr1: string;
+  Addr2?: string;
+  Loc: string;
+  Pin: number;
+  Stcd: string;
+}
+
+/** Additive (WP-6): payee / payment terms (from the sender's bank details and the due date). */
+export interface EInvPayDtls {
+  Nm?: string;
+  AccDet?: string;
+  Mode?: string;
+  FinInsBr?: string;
+  PayTerm?: string;
+  PayInstr?: string;
+  CrTrn?: string;
+  DirDr?: string;
+  CrDay?: number;
+  PaidAmt?: number;
+  PaymtDue?: number;
+}
+
+/** Additive (WP-6): Part-B e-Way details generated with the IRN (from `invoice.transport`). */
+export interface EInvEwbDtls {
+  TransId?: string;
+  TransName?: string;
+  TransMode?: '1' | '2' | '3' | '4';
+  Distance: number;
+  TransDocNo?: string;
+  TransDocDt?: string;
+  VehNo?: string;
+  VehType?: 'R' | 'O';
+}
+
 export interface EInvoicePayload {
   Version: '1.1';
   TranDtls: {
@@ -115,6 +164,10 @@ export interface EInvoicePayload {
   ValDtls: EInvValDtls;
   PrecDocDtls?: { InvNo: string; InvDt: string }[];
   ExpDtls?: EInvExpDtls;
+  DispDtls?: EInvDispDtls;
+  ShipDtls?: EInvShipDtls;
+  PayDtls?: EInvPayDtls;
+  EwbDtls?: EInvEwbDtls;
 }
 
 export interface EInvoiceOptions {
@@ -131,6 +184,12 @@ export interface EInvoiceOptions {
   preceding?: { no: string; date: string }[];
   /** Export extras. `date` is yyyy-mm-dd. */
   export?: { shipBillNo?: string; shipBillDate?: string; portCode?: string; countryCode?: string; refundClaim?: boolean };
+  /** Additive (WP-6): dispatch-from address (godown / branch) when it is not the seller's address. */
+  dispatch?: { name?: string; address?: string; city?: string; pin?: string | number; state_code?: string };
+  /** Additive (WP-6): leave out PayDtls (default: included when the sender has bank details). */
+  withPayment?: boolean;
+  /** Additive (WP-6): leave out EwbDtls (default: included when `invoice.transport` names a vehicle, transporter or LR). */
+  withEwb?: boolean;
 }
 
 export interface EInvoiceBuild {
@@ -496,6 +555,70 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
       InvNo: clean(p.no).toUpperCase(),
       InvDt: p.date.includes('-') ? toNicDate(p.date) : p.date,
     }));
+  }
+
+  // ── Additive (WP-6): DispDtls / ShipDtls / PayDtls / EwbDtls ──
+  const disp = options.dispatch;
+  if (disp && (clean(disp.address) || clean(disp.state_code))) {
+    const a = splitAddress(clean(disp.address));
+    const stcd = stateByCode(disp.state_code)?.code ?? sellerStcd;
+    const loc = clean(disp.city) || guessLocality(clean(disp.address), stateByCode(stcd)?.name) || (stateByCode(stcd)?.name ?? '');
+    payload.DispDtls = { Nm: (clean(disp.name) || seller.LglNm).slice(0, 100), Addr1: a.addr1, Loc: loc.slice(0, 50), Pin: toPin(disp.pin) || extractPin(disp.address), Stcd: stcd };
+    if (a.addr2) payload.DispDtls.Addr2 = a.addr2;
+    if (!payload.DispDtls.Pin) assumptions.push(issue('warning', 'DISP_PIN', 'Dispatch', 'Dispatch-from address has no 6-digit PIN.'));
+  }
+  const ship = record.ship_to;
+  if (ship && (clean(ship.address) || clean(ship.state_code))) {
+    const a = splitAddress(clean(ship.address));
+    const shipGstin = clean(ship.gstin).toUpperCase();
+    const stcd = (isExport ? FOREIGN_STATE : stateByCode(ship.state_code)?.code) || (shipGstin.length >= 2 ? shipGstin.slice(0, 2) : buyer.Stcd);
+    const loc = clean(ship.city) || guessLocality(clean(ship.address), stateByCode(stcd)?.name) || (stateByCode(stcd)?.name ?? '');
+    const pin = isExport ? FOREIGN_PIN : toPin(ship.zip) || extractPin(ship.address);
+    const sd: EInvShipDtls = { LglNm: (clean(ship.name) || buyer.LglNm).slice(0, 100), Addr1: a.addr1, Loc: loc.slice(0, 50), Pin: pin, Stcd: stcd };
+    if (shipGstin) sd.Gstin = shipGstin;
+    if (a.addr2) sd.Addr2 = a.addr2;
+    payload.ShipDtls = sd;
+    if (!pin) assumptions.push(issue('warning', 'SHIP_PIN', 'Ship to', 'Ship-to address has no 6-digit PIN; add it to the delivery address.'));
+    if (shipGstin && shipGstin.slice(0, 2) !== stcd) assumptions.push(issue('warning', 'SHIP_STATE_MISMATCH', 'Ship to', `Ship-to state ${stcd} differs from the state in its GSTIN (${shipGstin.slice(0, 2)}).`));
+  }
+  const bankAcc = clean(sender?.accountNumber);
+  if (options.withPayment !== false && (bankAcc || clean(sender?.ifsc))) {
+    const pay: EInvPayDtls = {};
+    const nm = clean(sender?.accountName) || seller.LglNm;
+    if (nm) pay.Nm = nm.slice(0, 100);
+    if (bankAcc) pay.AccDet = bankAcc.replace(/\s+/g, '').slice(0, 18);
+    if (clean(sender?.ifsc)) pay.FinInsBr = clean(sender?.ifsc).toUpperCase().slice(0, 11);
+    const terms = clean(record.terms).replace(/\s+/g, ' ');
+    if (terms) pay.PayTerm = terms.slice(0, 100);
+    const di = parseIsoDate(record.issue_date);
+    const dd = parseIsoDate(record.due_date);
+    if (di && dd) {
+      const days = Math.round((Date.UTC(dd.y, dd.m - 1, dd.d) - Date.UTC(di.y, di.m - 1, di.d)) / 86400000);
+      if (days > 0) pay.CrDay = days;
+    }
+    if (docCurrency(record) === 'INR') {
+      const paid = round2(Math.max(Number(record.amount_paid) || 0, 0));
+      if (paid > 0) pay.PaidAmt = paid;
+      const due = round2(Math.max(calc.total - paid, 0));
+      if (due > 0) pay.PaymtDue = due;
+    }
+    if (Object.keys(pay).length) payload.PayDtls = pay;
+  }
+  const t = record.transport;
+  if (options.withEwb !== false && t && (clean(t.vehicle_no) || clean(t.transporter_id) || clean(t.lr_no))) {
+    const modeCode = ({ ROAD: '1', RAIL: '2', AIR: '3', SHIP: '4' } as const)[t.mode ?? 'ROAD'];
+    const ewb: EInvEwbDtls = { Distance: Math.max(Math.round(Number(t.distance_km) || 0), 0) };
+    if (clean(t.transporter_id)) ewb.TransId = clean(t.transporter_id).toUpperCase();
+    if (clean(t.transporter_name)) ewb.TransName = clean(t.transporter_name).slice(0, 100);
+    if (clean(t.vehicle_no) || clean(t.lr_no)) ewb.TransMode = modeCode;
+    if (clean(t.lr_no)) ewb.TransDocNo = clean(t.lr_no).slice(0, 15);
+    if (clean(t.lr_date)) ewb.TransDocDt = toNicDate(t.lr_date);
+    if (clean(t.vehicle_no)) {
+      ewb.VehNo = clean(t.vehicle_no).toUpperCase().replace(/[\s-]/g, '');
+      ewb.VehType = 'R';
+    }
+    payload.EwbDtls = ewb;
+    if (!ewb.Distance) assumptions.push(issue('warning', 'EWB_DISTANCE', 'e-Way', 'Distance is 0: the portal then works out the PIN-to-PIN distance (verify).'));
   }
 
   if (isExport) {

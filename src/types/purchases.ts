@@ -107,6 +107,11 @@ export interface PurchaseRecord {
   sgst: number;
   igst: number;
   /**
+   * Additive (WP-6): GST compensation cess on the bill (₹), inside `total`, outside cgst/sgst/igst. Claimed as cess
+   * credit with the GST when `itc_eligible` (GSTR-3B 4A, cess column); cess credit pays cess only.
+   */
+  cess_amount?: number;
+  /**
    * Whether the GST on this bill is claimed as input tax credit. A blocked credit
    * (Sec 17(5)) is `itc_eligible: false` with `itc_reversal_reason: 'SEC_17_5'`.
    */

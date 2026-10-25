@@ -42,7 +42,7 @@ import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
 import { isNonSupplyCategory, isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
-import { b2clThreshold, b2clThresholdLabel, ecoReporting, hsnMinDigits, hsnTableSplit } from './tax-rules';
+import { b2clThreshold, b2clThresholdLabel, ecoReporting, gstSetOffOrder, hsnMinDigits, hsnTableSplit, type GstSetOffOrder } from './tax-rules';
 import { checkEcoGstin, ecoOf } from './eco';
 import type { EcoSection } from '../types/invoice';
 import type { AdvanceMovement } from './advance-tax';
@@ -404,8 +404,12 @@ export interface SetOffResult {
   cash: { igst: number; cgst: number; sgst: number };
   /** ITC left after set-off (carried forward). */
   itcCarry: { igst: number; cgst: number; sgst: number };
-  /** Additive: cess liability, payable in cash (no ITC is modelled for cess). */
+  /** Additive: cess payable in cash — cess liability less cess credit (WP-6: cess on purchase bills). */
   cess?: number;
+  /** Additive (WP-6): cess liability before credit, cess credit used (cess pays cess only) and cess credit carried. */
+  cessLiability?: number;
+  cessItcUsed?: number;
+  cessItcCarry?: number;
 }
 
 export interface Gstr3bReport {
@@ -1335,6 +1339,8 @@ export interface NormalizedPurchase {
   igst: number;
   cgst: number;
   sgst: number;
+  /** Additive (WP-6): compensation cess on the bill (`cess_amount`), 0 when none. */
+  cess?: number;
   /** ITC reversed against this bill (amount, spread pro-rata over the heads). */
   itcReversed: number;
   /** RULE_42 / RULE_43 / RULE_37 / SEC_17_5 / OTHER, or ''. */
@@ -1373,6 +1379,7 @@ export function normalizePurchase(raw: unknown, filerStateCode: string): Normali
     igst: round2(igst),
     cgst: round2(cgst),
     sgst: round2(sgst),
+    ...(c.cess > 0 ? { cess: c.cess } : {}),
     itcReversed: c.itcReversed,
     itcReversalReason: c.itcReversalReason,
     importType: c.importType,
@@ -1404,6 +1411,8 @@ export function computeSetOff(
   liability: { igst: number; cgst: number; sgst: number },
   credit: { igst: number; cgst: number; sgst: number },
   rcLiability: { igst: number; cgst: number; sgst: number } = { igst: 0, cgst: 0, sgst: 0 },
+  /** Date-keyed utilisation order (`gstSetOffOrder(periodStart)` in tax-rules.ts); default = Rule 88A. */
+  order: GstSetOffOrder = { igstFirst: true, igstRemainder: 'any' },
 ): SetOffResult {
   const L = { igst: Math.max(round2(liability.igst), 0), cgst: Math.max(round2(liability.cgst), 0), sgst: Math.max(round2(liability.sgst), 0) };
   const C = { igst: Math.max(round2(credit.igst), 0), cgst: Math.max(round2(credit.cgst), 0), sgst: Math.max(round2(credit.sgst), 0) };
@@ -1421,6 +1430,17 @@ export function computeSetOff(
     rem[liabHead] = round2(rem[liabHead] - amt);
     (used[credHead] as Record<string, number>)[liabHead] = round2(((used[credHead] as Record<string, number>)[liabHead] ?? 0) + amt);
   };
+  if (!order.igstFirst) {
+    // Original Sec 49(5) (periods before 1 Feb 2019): each head's own credit first, then the cross-utilisation.
+    take('igst', 'igst');
+    take('cgst', 'cgst');
+    take('sgst', 'sgst');
+    take('igst', 'cgst');
+    take('igst', 'sgst');
+    take('cgst', 'igst');
+    take('sgst', 'igst');
+    return result();
+  }
   take('igst', 'igst');
   // Leftover IGST covers the shortfall each head's own credit leaves, then whatever remains.
   const takeUpTo = (liabHead: 'cgst' | 'sgst', cap: number) => {
@@ -1430,15 +1450,21 @@ export function computeSetOff(
     rem[liabHead] = round2(rem[liabHead] - amt);
     used.igst[liabHead] = round2(used.igst[liabHead] + amt);
   };
-  takeUpTo('cgst', L.cgst - C.cgst);
-  takeUpTo('sgst', L.sgst - C.sgst);
+  // Rule 88A ("any order"): pick the split that minimises cash. Before it, Sec 49(5)(a) said CGST, then SGST.
+  if (order.igstRemainder === 'any') {
+    takeUpTo('cgst', L.cgst - C.cgst);
+    takeUpTo('sgst', L.sgst - C.sgst);
+  }
   take('igst', 'cgst');
   take('igst', 'sgst');
   take('cgst', 'cgst');
   take('cgst', 'igst');
   take('sgst', 'sgst');
   take('sgst', 'igst');
-  return {
+  return result();
+
+  function result(): SetOffResult {
+    return {
     liability: L,
     rcLiability: { igst: round2(rcLiability.igst), cgst: round2(rcLiability.cgst), sgst: round2(rcLiability.sgst) },
     itcUsed: used,
@@ -1448,7 +1474,8 @@ export function computeSetOff(
       sgst: round2(rem.sgst + rcLiability.sgst),
     },
     itcCarry: { igst: avail.igst, cgst: avail.cgst, sgst: avail.sgst },
-  };
+    };
+  }
 }
 
 export function buildGstr3b(
@@ -1531,14 +1558,15 @@ export function buildGstr3b(
   const ineligible = zeroHeads();
   const inwardExempt = { inter: 0, intra: 0 };
 
-  const add = (h: ItcHeads, p: { igst: number; cgst: number; sgst: number }, f = 1) => {
+  const add = (h: ItcHeads, p: { igst: number; cgst: number; sgst: number; cess?: number }, f = 1) => {
     h.igst = round2(h.igst + f * p.igst);
     h.cgst = round2(h.cgst + f * p.cgst);
     h.sgst = round2(h.sgst + f * p.sgst);
+    h.cess = round2(h.cess + f * (p.cess ?? 0));
   };
 
   for (const p of purchases) {
-    const tax = round2(p.igst + p.cgst + p.sgst);
+    const tax = round2(p.igst + p.cgst + p.sgst + (p.cess ?? 0));
     // Sec 17(5) blocked credit: shown in 4A (as GSTR-2B auto-fills it) and reversed in full in 4B(1).
     const blocked = !p.itcEligible && p.itcReversalReason === 'SEC_17_5';
     const claim = (bucket: ItcHeads) => {
@@ -1553,10 +1581,12 @@ export function buildGstr3b(
       // Import of services is always reverse charge: liability in 3.1(d), ITC in 4A(2).
       rcm.taxable = round2(rcm.taxable + p.taxable);
       add(rcm, p);
+      rcm.cess = round2(rcm.cess + (p.cess ?? 0));
       claim(impServices);
     } else if (p.reverseCharge) {
       rcm.taxable = round2(rcm.taxable + p.taxable);
       add(rcm, p);
+      rcm.cess = round2(rcm.cess + (p.cess ?? 0));
       claim(availRcm);
     } else if (tax === 0) {
       // Salaries, taxes and other non-supplies are not inward supplies at all: never in Table 5.
@@ -1569,13 +1599,13 @@ export function buildGstr3b(
     }
     if (p.itcReversed > 0 && tax > 0 && p.itcEligible) {
       const ratio = Math.min(p.itcReversed, tax) / tax;
-      add(RULE_REVERSALS.has(p.itcReversalReason) ? reversedRules : reversed, { igst: p.igst * ratio, cgst: p.cgst * ratio, sgst: p.sgst * ratio });
+      add(RULE_REVERSALS.has(p.itcReversalReason) ? reversedRules : reversed, { igst: p.igst * ratio, cgst: p.cgst * ratio, sgst: p.sgst * ratio, cess: (p.cess ?? 0) * ratio });
     }
   }
 
-  const netHead = (k: 'igst' | 'cgst' | 'sgst') =>
+  const netHead = (k: 'igst' | 'cgst' | 'sgst' | 'cess') =>
     Math.max(round2(impGoods[k] + impServices[k] + availRcm[k] + availOther[k] - reversedRules[k] - reversed[k]), 0);
-  const net: ItcHeads = { igst: netHead('igst'), cgst: netHead('cgst'), sgst: netHead('sgst'), cess: 0 };
+  const net: ItcHeads = { igst: netHead('igst'), cgst: netHead('cgst'), sgst: netHead('sgst'), cess: netHead('cess') };
 
   const liab = {
     igst: round2(taxable.igst + zero.igst),
@@ -1587,9 +1617,16 @@ export function buildGstr3b(
     cgst: Math.max(round2(-liab.cgst), 0),
     sgst: Math.max(round2(-liab.sgst), 0),
   };
-  const payment = computeSetOff(liab, net, { igst: rcm.igst, cgst: rcm.cgst, sgst: rcm.sgst });
-  // Cess cannot be settled with IGST/CGST/SGST credit, so the whole (net) liability is cash.
-  payment.cess = Math.max(round2(taxable.cess + zero.cess), 0);
+  const payment = computeSetOff(liab, net, { igst: rcm.igst, cgst: rcm.cgst, sgst: rcm.sgst }, gstSetOffOrder(periodRange(opts.period).from));
+  // Cess is settled only with cess credit (Sec 11(2) Compensation Cess Act); reverse-charge cess is cash only.
+  const cessLiab = Math.max(round2(taxable.cess + zero.cess), 0);
+  const cessUsed = Math.min(cessLiab, net.cess);
+  payment.cess = round2(cessLiab - cessUsed + Math.max(rcm.cess, 0));
+  if (net.cess > 0 || rcm.cess > 0) {
+    payment.cessLiability = cessLiab;
+    payment.cessItcUsed = round2(cessUsed);
+    payment.cessItcCarry = round2(net.cess - cessUsed);
+  }
 
   return {
     outward: { taxable, zeroRated: zero, nilExempt: nil, inwardRcm: rcm, nonGst },

@@ -42,7 +42,9 @@ export type AuditEntity =
   | 'bom'
   | 'manufacturing'
   | 'stock_journal'
-  | 'physical_stock';
+  | 'physical_stock'
+  /** GST set-off journals, PMT-06 challans and the HSN master (WP-6). */
+  | 'gst';
 
 export type AuditAction =
   | 'create'
@@ -195,4 +197,5 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   manufacturing: 'Manufacturing journals',
   stock_journal: 'Stock journals',
   physical_stock: 'Physical stock',
+  gst: 'GST set-off / challan',
 };

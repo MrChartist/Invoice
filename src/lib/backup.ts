@@ -332,6 +332,8 @@ const RECORD_TABLES = [
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   // Manufacturing & stock vouchers (Phase 7): BOMs, Manufacturing / Stock Journals, Physical Stock
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
+  // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
+  'gst_setoffs', 'gst_challans', 'hsn_master',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -348,6 +350,7 @@ const ID_TABLES = new Set([
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
+  'gst_setoffs', 'gst_challans', 'hsn_master',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

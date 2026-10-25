@@ -404,6 +404,8 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
     l.dr(A.inSgst, sgst);
     l.dr(A.inIgst, igst);
   }
+  // WP-6: cess on the bill — input cess credit when ITC is claimed, else part of the cost.
+  if (c.cess > 0) l.dr(n.itcEligible ? A.inCess : expAcc, toPaise(c.cess));
   // Tax we pay ourselves (reverse charge, imports) is owed to the government, not the supplier —
   // as long as the bill total actually includes it (an imported row may carry only the taxable value).
   const selfTax = (c.reverseCharge || c.importType !== '') && gst > 0 ? gst : 0;

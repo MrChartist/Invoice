@@ -151,6 +151,9 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `branches` | branches (WP-9, `src/lib/branch.ts`) | `Branch {id, name, code?, gstin?, state_code?, profile_id?, godown_id?, address?, inactive?}`; additive `branch_id` on invoices / purchases / vouchers |
 | `loyalty_adjustments` | loyalty (WP-9, `src/lib/loyalty.ts`) | manual points corrections; accrual is derived from invoices, redemption is `loyalty_redeem` on the bill. Programme object under the key `loyalty_program` (date-keyed rules) |
 | `amc_contracts` | AMC (WP-9, `src/lib/amc.ts`) | `AmcContract` with `visits` log, `renewed_from` link |
+| `gst_setoffs` | GST set-off (WP-6, `src/lib/gst-setoff.ts`) | `GstSetOffRecord` per 3B period × GSTIN: posted figures by head + the journal it wrote through `saveVoucher` (`docs/features/gst-setoff.md`) |
+| `gst_challans` | GST set-off (WP-6) | `GstChallan` PMT-06: CPIN, CIN / BRN, dates, major × minor head amounts; a paid challan's payment voucher id |
+| `hsn_master` | GST depth (WP-6, `src/lib/hsn-master.ts`) | `HsnMasterRow` code, description, UQC, goods / services, dated `rates` history (append-only by convention) |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the
