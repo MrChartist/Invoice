@@ -87,6 +87,8 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
       ? isRow
         ? `${rc.device_name || 'Another device'} changed a document in a locked period. It was not applied.`
         : `${rc.device_name || 'Another device'} moved the period lock earlier or removed it. It was not applied.`
+      : rc.reason === 'payment'
+        ? `${rc.device_name || 'Another device'} changed the payment details (UPI ID or bank account) printed on invoices. It was not applied: check it with the person who made it before using it.`
       : rc.reason === 'lww'
         ? `Changed on this device and on ${rc.device_name || 'another device'} at the same time. The ${rc.applied === 'remote' ? `version from ${rc.device_name}` : "this device's version"} is in use.`
         : `Changed on this device and on ${rc.device_name || 'another device'} since the last sync. This device's version is kept.`;

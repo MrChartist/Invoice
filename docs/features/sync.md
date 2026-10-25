@@ -156,6 +156,17 @@ pair reviewed. Prevention:
   listing's reason: "Use theirs" on a concurrent edit of a locked document, or switching to a listed settings version
   that removes / moves the lock earlier. Such listings are flagged (`locked`) and the panel asks for the PIN.
 - A remote settings change that moves the lock date earlier or removes it is held the same way.
+
+## Payment details and who may sync (local roles, 6.21)
+- A remote settings change that **alters payment details** — any profile's UPI ID, bank name, account name, account
+  number or IFSC added, changed or removed (`changesPaymentDetails` in `sync-engine.ts`) — is never applied silently,
+  whether the remote version dominates or wins last-writer-wins: it is listed with reason `payment`, this device keeps
+  its version, and the owner chooses (**Use theirs** applies it everywhere at the next sync; **Keep mine** declines it
+  until it changes on the other device). So neither a device synced by someone else nor a doctored sync folder can
+  redirect where customers pay. Other settings fields sync as before.
+- Connecting, disconnecting, re-entering the passphrase and **Sync now** are owner-only (`settings.manage`, library and
+  panel). The config records `connected_by`; automatic runs (SyncRunner) only use a connection the owner made, and a
+  connection from before `connected_by` existed needs one owner run (automatic or Sync now) to vouch for it.
 - Vault mode: files are decrypted in memory; merged rows, `sync_state`, `sync_conflicts` (which hold the other
   version's data) and `sync_audit` are written through the storage layer, so they are sealed at rest like every other
   value. Nothing readable is written outside the vault store (`tests/sync-vault.test.ts`). The folder is encrypted

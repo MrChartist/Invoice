@@ -21,7 +21,7 @@
  * the CSV exports.
  */
 
-import { findHeaderRow, safeText, writeCsv } from './csv';
+import { MAX_TABLE_CELLS, MAX_TABLE_COLUMNS, TableLimitError, findHeaderRow, safeText, tableWidth, tooManyCellsMessage, tooWideMessage, writeCsv } from './csv';
 import { openZip, writeZip, ZipError, type ZipLimits } from './zip';
 import { downloadBlob } from './download';
 
@@ -310,12 +310,15 @@ function parseSheet(xml: string, shared: string[], dateStyles: boolean[], date19
   let skip = 0;
   let inCell = false;
   let stop = false;
+  let cells = 0;
 
   const endRow = () => {
     if (rowHas) {
       // trim trailing blanks
       let w = row.length;
       while (w > 0 && row[w - 1] === '') w--;
+      cells += w;
+      if (cells > MAX_TABLE_CELLS) throw new TableLimitError(tooManyCellsMessage());
       rows.push(row.slice(0, w));
       if (rows.length >= maxRows) stop = true;
     }
@@ -379,6 +382,9 @@ function parseSheet(xml: string, shared: string[], dateStyles: boolean[], date19
         const text = cellText();
         if (cCol >= 0 && cCol < 16384) {
           if (text !== '') {
+            // A row is padded up to its last cell: cap the width before padding (one cell in column
+            // XFD on every row would otherwise make 16,384 cells a row).
+            if (cCol >= MAX_TABLE_COLUMNS) throw new TableLimitError(`${tooWideMessage(cCol + 1)} (data found in column ${columnName(cCol)}).`);
             while (row.length < cCol) row.push('');
             row[cCol] = text;
             rowHas = true;
@@ -484,9 +490,7 @@ export function sheetToTable(sheet: XlsxSheet): XlsxTable {
   const hi = findHeaderRow(rows);
   const headerRow = rows[hi];
   const body = rows.slice(hi + 1);
-  let width = headerRow.length;
-  for (const r of body) width = Math.max(width, r.length);
-  while (width > 0 && (headerRow[width - 1] ?? '') === '' && body.every((r) => (r[width - 1] ?? '') === '')) width--;
+  const width = tableWidth(headerRow, body); // throws TableLimitError past the caps, before padding
   const headers = Array.from({ length: width }, (_, i) => headerRow[i] || `Column ${i + 1}`);
   return { headers, rows: body.map((r) => Array.from({ length: width }, (_, i) => r[i] ?? '')), sheet: sheet.name };
 }

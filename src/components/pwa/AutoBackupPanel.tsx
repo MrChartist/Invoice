@@ -20,6 +20,8 @@ import {
   type BackupResult,
 } from '../../lib/auto-backup';
 import { requestPersistentStorage, type StorageStatus } from '../../lib/pwa';
+import { vaultEnabled } from '../../lib/storage';
+import { VAULT_PLAIN_BACKUP_MESSAGE } from '../../lib/backup';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Pwa.module.css';
@@ -156,6 +158,12 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
         {error && (
           <p className={controls.error} role="alert">
             <AlertTriangle size={13} aria-hidden="true" /> {error}
+          </p>
+        )}
+
+        {encrypted === false && vaultEnabled() && (
+          <p className={controls.error} role="alert">
+            <AlertTriangle size={13} aria-hidden="true" /> {VAULT_PLAIN_BACKUP_MESSAGE} Until then no backup is written.
           </p>
         )}
 

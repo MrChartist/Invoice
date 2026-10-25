@@ -305,7 +305,10 @@ test('users and their lockouts are device-local: never in a backup, kept by eras
 test('forgot-PIN reset (owner path) wipes the users too', async () => {
   await setupTeam();
   auth.logout();
-  assert.equal(auth.resetAllData('DELETE ALL MY DATA'), true);
+  // With other users on the device the reset also asks for the owner's name (security review L2).
+  assert.equal(auth.resetAllData('DELETE ALL MY DATA'), false);
+  assert.equal(auth.listUsers().length, 3, 'nothing erased without it');
+  assert.equal(auth.resetAllData('DELETE ALL MY DATA', { ownerName: 'rohit owner' }), true);
   assert.deepEqual(auth.listUsers(), []);
   assert.equal(dumpStorage().mrchartist_inv_auth_users, undefined);
 });

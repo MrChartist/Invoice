@@ -169,6 +169,8 @@ export const en = {
   'login.errIncorrectMany': 'Incorrect PIN. {n} attempts left before a temporary lock.',
   'login.errGeneric': 'Something went wrong.',
   'login.errPhrase': 'The confirmation phrase does not match.',
+  'login.resetOwnerName': 'This device also has {n} other user(s) (clerks / viewers). The reset erases them and their PINs too. Type the owner’s name to confirm',
+  'login.errOwnerName': 'That is not the owner’s name. Nothing was erased.',
 
   // ── Vault unlock (encrypted device) ───────────────────────────────
   'vault.damagedTitle': 'Some data could not be decrypted',

@@ -59,7 +59,7 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
       setRemap(false);
       setBankLabel('');
     } catch (err) {
-      setReadError(err instanceof Error && err.name === 'ZipError' ? err.message : 'Could not read that file.');
+      setReadError(err instanceof Error && (err.name === 'ZipError' || err.name === 'TableLimitError') ? err.message : 'Could not read that file.');
     }
   };
 

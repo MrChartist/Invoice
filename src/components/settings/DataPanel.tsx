@@ -5,8 +5,10 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
 import {
   backupFilename,
-  buildBackup,
   clearSafetySnapshot,
+  exportPlainBackup,
+  plainBackupAllowed,
+  VAULT_PLAIN_BACKUP_MESSAGE,
   getLastBackup,
   getSafetySnapshot,
   markBackupDone,
@@ -20,6 +22,8 @@ import {
   type SafetySnapshot,
 } from '../../lib/backup';
 import { forgetDeviceData } from '../../lib/auto-backup';
+import { requireAccess } from '../../lib/access';
+import { useCan } from '../../hooks/useCan';
 import { ImportWizard } from '../import/ImportWizard';
 import { SampleDataCard } from '../demo/SampleDataCard';
 import { assessStorage, formatChars, measureStorage } from '../../lib/storage-health';
@@ -53,6 +57,11 @@ export function DataPanel({ notify }: Props) {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [browserQuota, setBrowserQuota] = useState<number | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
+  const { can } = useCan();
+  const mayBackup = can('data.backup');
+  const mayRestore = can('data.restore');
+  // Vault mode (5.8): a readable backup file would undo the encryption at rest.
+  const plainOk = plainBackupAllowed();
 
   useEffect(() => {
     let alive = true;
@@ -86,7 +95,11 @@ export function DataPanel({ notify }: Props) {
   const pct = health.pct;
 
   const exportBackup = () => {
-    downloadText(backupFilename(), JSON.stringify(buildBackup(), null, 2), 'application/json');
+    try {
+      downloadText(backupFilename(), exportPlainBackup(), 'application/json');
+    } catch (err) {
+      return notify((err as Error).message, 'error');
+    }
     markBackupDone();
     notify('Backup downloaded');
   };
@@ -95,12 +108,13 @@ export function DataPanel({ notify }: Props) {
     const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }> }).showSaveFilePicker;
     if (!picker) return notify('Your browser cannot save to a folder. Use “Download backup” instead.', 'info');
     try {
+      const text = exportPlainBackup(); // owner only; refused in vault mode — before any file is created
       const handle = await picker({
         suggestedName: backupFilename(),
         types: [{ description: 'Invoice backup', accept: { 'application/json': ['.json'] } }],
       });
       const writable = await handle.createWritable();
-      await writable.write(new Blob([JSON.stringify(buildBackup(), null, 2)], { type: 'application/json' }));
+      await writable.write(new Blob([text], { type: 'application/json' }));
       await writable.close();
       markBackupDone();
       notify('Backup saved to disk');
@@ -124,9 +138,11 @@ export function DataPanel({ notify }: Props) {
 
   const restore = async () => {
     if (!pending) return;
-    // Keep what is on the device now, so the restore can be undone from this panel.
-    if (!(await saveSafetySnapshot('restore'))) notify('Could not keep an undo copy in this browser; restoring anyway.', 'info');
     try {
+      // Role first (6.21): a refused restore must not replace the owner's undo copy either.
+      requireAccess('data.restore');
+      // Keep what is on the device now, so the restore can be undone from this panel.
+      if (!(await saveSafetySnapshot('restore'))) notify('Could not keep an undo copy in this browser; restoring anyway.', 'info');
       restoreBackup(pending.data);
       notify('Backup restored — reloading…');
       setTimeout(reloadAfterFlush, 700);
@@ -212,22 +228,33 @@ export function DataPanel({ notify }: Props) {
           </span>
         </div>
         <div className={surface.cardBody}>
+          {mayBackup && !plainOk && (
+            <p className={surface.sectionNote} role="note">
+              <AlertTriangle size={14} aria-hidden="true" /> {VAULT_PLAIN_BACKUP_MESSAGE}
+            </p>
+          )}
           <div className={styles.actionGrid}>
-            <button type="button" className={styles.action} onClick={exportBackup}>
-              <strong><Download size={16} /> Download backup</strong>
-              <span>A single JSON file with invoices, clients, catalogue, profiles and settings. Your PIN is not included.</span>
-            </button>
-            <button type="button" className={styles.action} onClick={saveToDisk}>
-              <strong><FolderDown size={16} /> Save to a folder</strong>
-              <span>Chrome &amp; Edge only. Pick a synced folder (Drive, OneDrive) to keep an off-browser copy.</span>
-            </button>
+            {mayBackup && (
+              <>
+                <button type="button" className={styles.action} onClick={exportBackup} disabled={!plainOk}>
+                  <strong><Download size={16} /> Download backup</strong>
+                  <span>A single JSON file with invoices, clients, catalogue, profiles and settings. Your PIN is not included.</span>
+                </button>
+                <button type="button" className={styles.action} onClick={saveToDisk} disabled={!plainOk}>
+                  <strong><FolderDown size={16} /> Save to a folder</strong>
+                  <span>Chrome &amp; Edge only. Pick a synced folder (Drive, OneDrive) to keep an off-browser copy.</span>
+                </button>
+              </>
+            )}
+            {mayRestore && (
             <button type="button" className={styles.action} onClick={() => fileInput.current?.click()}>
               <strong><Upload size={16} /> Restore from file</strong>
               <span>Replaces everything on this device with the contents of a backup file (your PIN is kept).</span>
             </button>
+            )}
           </div>
           <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
-          {safety && (
+          {safety && mayRestore && (
             <div className={styles.actionGrid}>
               <button type="button" className={styles.action} onClick={() => setUndoOpen(true)}>
                 <strong><RotateCcw size={16} /> Undo last {safety.reason === 'wipe' ? 'erase' : 'restore'}</strong>
@@ -360,6 +387,11 @@ export function DataPanel({ notify }: Props) {
         confirmLabel="Erase everything"
         requireText="ERASE"
         onConfirm={async () => {
+          try {
+            requireAccess('data.erase'); // before anything is forgotten (undo copy, backup key, vault)
+          } catch (err) {
+            return notify((err as Error).message, 'error');
+          }
           await forgetDeviceData();
           wipeAppData();
           reloadAfterFlush();

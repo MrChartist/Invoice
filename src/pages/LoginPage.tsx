@@ -14,6 +14,7 @@ import {
   login,
   pinStrength,
   resetAllData,
+  resetNeedsOwnerName,
   unlock,
 } from '../lib/auth';
 import { tNodes, useT } from '../i18n';
@@ -54,6 +55,10 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [phrase, setPhrase] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  // Other users on this device (6.21): the reset erases them too, so it also asks for the owner's name.
+  const otherUsers = users.length - 1;
+  const needOwnerName = resetNeedsOwnerName();
   const [lockedMs, setLockedMs] = useState(() => getLockoutRemaining());
 
   // Lockout is per user: switching user shows that user's own countdown.
@@ -84,6 +89,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
     setPin('');
     setConfirm('');
     setPhrase('');
+    setOwnerName('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,7 +133,8 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     const companies = readRegistry(); // the reset clears the registry
-    if (!resetAllData(phrase)) return setError(t('login.errPhrase'));
+    if (!isResetPhrase(phrase)) return setError(t('login.errPhrase'));
+    if (!resetAllData(phrase, { ownerName })) return setError(t('login.errOwnerName'));
     // Also drop the undo copy, backup key and folder link kept in IndexedDB (security: no way back to the old data).
     const [{ forgetDeviceData }, { eraseOtherCompanies }] = await Promise.all([import('../lib/auto-backup'), import('../lib/companies')]);
     await forgetDeviceData();
@@ -197,11 +204,26 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                   autoFocus
                 />
               </div>
+              {needOwnerName && (
+                <div className={controls.field}>
+                  <label className={controls.label} htmlFor="reset-owner">
+                    {t('login.resetOwnerName', { n: otherUsers })}
+                  </label>
+                  <input
+                    id="reset-owner"
+                    className={controls.input}
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+              )}
               {error && <div className={styles.noticeError} role="alert">{error}</div>}
               <button
                 type="submit"
                 className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock} ${styles.dangerBtn}`}
-                disabled={!isResetPhrase(phrase)}
+                disabled={!isResetPhrase(phrase) || (needOwnerName && !ownerName.trim())}
               >
                 {t('login.eraseButton')}
               </button>

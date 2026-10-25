@@ -21,7 +21,7 @@
 import { ASSET_TABLE, SNAPSHOT_TABLES, decodeRows, encodeRows, parseAssets, serializeAssets, type AssetIndex } from './assets';
 import { DATA_STORE, idbAvailable, idbClear, idbTx, resetIdbConnection } from './idb-kv';
 import { COMPANY_REGISTRY_KEY, DEFAULT_COMPANY_ID, activeCompanyId } from './company-registry';
-import { requireTableWrite } from './access';
+import { requireAccess, requireTableWrite } from './access';
 import {
   VAULT_KEY,
   VaultError,
@@ -418,6 +418,14 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
       installIdbListeners();
       return { backend: 'locked' };
     }
+    // Sealed values but no vault record (deleted, or lost half-way): this is encrypted data that can
+    // never be opened again. Never boot in plain mode over it — that would write readable data next to
+    // (and over) the sealed values. The unavailable screen offers the erase instead.
+    for (const v of stored.data.values()) {
+      if (isSealed(v)) {
+        return { backend: 'unavailable', reason: 'The data on this device is encrypted but its vault record is missing (vault damaged).', vaultDamaged: true };
+      }
+    }
     const lsIsTruth = marked ? !stored.meta : lsData.size > 0 || !stored.meta;
     const target = new Map(lsIsTruth ? lsData : stored.data);
     if (!lsIsTruth) for (const [k, v] of lsData) if (!target.has(k)) target.set(k, v);
@@ -572,6 +580,7 @@ async function readVaultRecord(): Promise<VaultRecord | null> {
  * transaction, then read back and decrypted to confirm. Needs the IndexedDB backend.
  */
 export async function enableVault(passphrase: string): Promise<void> {
+  requireAccess('security.manage'); // roles (6.21): owner only
   if (backend !== 'idb') throw new VaultError('Vault mode needs this browser’s database (IndexedDB), which is not in use.', 'bad-record');
   if (vaultKey) throw new VaultError('Vault mode is already on.', 'bad-record');
   const { record, key } = await createVault(passphrase);
@@ -605,6 +614,7 @@ export async function enableVault(passphrase: string): Promise<void> {
 
 /** Turn vault mode off (needs the passphrase): every value is written back readable and the record removed. */
 export async function disableVault(passphrase: string): Promise<void> {
+  requireAccess('security.manage');
   if (!vaultKey) throw new VaultError('Vault mode is not on.', 'bad-record');
   const record = await readVaultRecord();
   if (!record) throw new VaultError('The vault record is missing.', 'bad-record');
@@ -612,8 +622,17 @@ export async function disableVault(passphrase: string): Promise<void> {
   await unwrapDek(record, passphrase); // wrong passphrase -> throws, nothing changes
   await aroundVaultSwitch(() => exclusive(async () => {
     const snapshot = [...cache];
+    // Sealed values that never decrypted are unreadable for good once the record goes; left behind, the
+    // next boot would (rightly) report a damaged vault. Plain values found in the store stay.
+    const skipped = skippedKeys.filter((k) => !cache.has(k));
+    const reqs = skipped.length ? await idbTx(DATA_STORE, 'readonly', (s) => skipped.map((k) => s.get(k))) : [];
+    const orphans = skipped.filter((_, i) => {
+      const v: unknown = reqs[i].result;
+      return typeof v === 'string' && isSealed(v);
+    });
     await guardedWrite(record.id, (s) => {
       for (const [k, v] of snapshot) s.put(v, k);
+      for (const k of orphans) s.delete(k);
       s.delete(VAULT_KEY);
     });
     const check = await readAllData();
@@ -628,6 +647,7 @@ export async function disableVault(passphrase: string): Promise<void> {
 
 /** New passphrase for the same data key: only the vault record changes. */
 export async function changeVaultPassphrase(current: string, next: string): Promise<void> {
+  requireAccess('security.manage');
   if (!vaultKey) throw new VaultError('Vault mode is not on.', 'bad-record');
   const record = await readVaultRecord();
   if (!record) throw new VaultError('The vault record is missing.', 'bad-record');

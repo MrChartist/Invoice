@@ -8,8 +8,10 @@
  *
  * This module imports nothing, so the data layer (localDb, backup, period-lock, audit) can ask
  * `can()` / `requireAccess()` without import cycles. `auth.ts` registers who is signed in through
- * `setActorProvider()`; with no provider, or nobody signed in, every check passes (single-user
- * installs, tests, and boot code that runs before the PIN screen behave exactly as before).
+ * `setActorProvider()`; with no provider, or with no PIN set up, every check passes (single-user
+ * installs, tests, and boot code such as migrations, which run inside `asSystem`, behave exactly as
+ * before). Once a PIN is set up, a tab whose signed-in user cannot be resolved (locked, or the user was
+ * removed in another tab) is SIGNED OUT: it gets the least privileged role, never the owner's.
  */
 
 export type Role = 'owner' | 'clerk' | 'viewer';
@@ -93,10 +95,15 @@ export interface Actor {
 }
 
 let provider: (() => Actor | null) | null = null;
+let signInRequired: (() => boolean) | null = null;
 
-/** Called once by auth.ts. Tests may pass their own. */
-export function setActorProvider(fn: (() => Actor | null) | null): void {
+/**
+ * Called once by auth.ts. Tests may pass their own. `opts.signInRequired` answers "is a PIN set up on
+ * this device?": when it is and nobody resolves as signed in, checks run as a signed-out viewer.
+ */
+export function setActorProvider(fn: (() => Actor | null) | null, opts: { signInRequired?: () => boolean } = {}): void {
   provider = fn;
+  signInRequired = fn ? (opts.signInRequired ?? null) : null;
 }
 
 /** Who is signed in to this tab, or null (no PIN set up, locked, or no provider). */
@@ -108,9 +115,27 @@ export function currentActor(): Actor | null {
   }
 }
 
-/** The current role. Nobody signed in counts as the owner (see the module comment). */
+/**
+ * True when a PIN is set up but nobody valid is signed in to this tab (locked, or the signed-in user
+ * was removed / the credential replaced elsewhere). The app must show the PIN screen.
+ */
+export function isSignedOut(): boolean {
+  if (!provider || currentActor()) return false;
+  try {
+    return signInRequired ? signInRequired() : false;
+  } catch {
+    return true; // cannot tell: fail closed
+  }
+}
+
+/**
+ * The current role. With no PIN set up (single-user install, tests) nobody signed in counts as the
+ * owner; once a PIN exists, a signed-out tab is a viewer (see the module comment).
+ */
 export function currentRole(): Role {
-  return currentActor()?.role ?? 'owner';
+  const actor = currentActor();
+  if (actor) return actor.role;
+  return isSignedOut() ? 'viewer' : 'owner';
 }
 
 /** May the signed-in user do `action`? */

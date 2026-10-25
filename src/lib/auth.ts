@@ -22,7 +22,7 @@
 
 import { DB_PREFIX, DEVICE_LOCAL_KEYS, SINGLETON_KEYS, collectAppData, readRaw, removeRaw, writeRaw } from './storage';
 import { constantTimeEqualStrings, hashPin, PBKDF2_ITERATIONS, verifyPinHash, type PinHash } from './crypto';
-import { setActorProvider, type Actor, type Role } from './access';
+import { requireAccess, setActorProvider, type Actor, type Role } from './access';
 
 export const AUTH_KEY = SINGLETON_KEYS.auth;
 export const GUARD_KEY = `${DB_PREFIX}auth_guard`;
@@ -207,8 +207,9 @@ export function getCurrentUser(): Actor | null {
   return u ? { id: u.id, name: u.name, role: u.role } : null;
 }
 
-// The data layer asks access.ts who is acting; this is the answer.
-setActorProvider(getCurrentUser);
+// The data layer asks access.ts who is acting; this is the answer. Once a PIN is set up, a tab whose
+// user cannot be resolved (locked, or removed in another tab) is signed out: never the owner (M1).
+setActorProvider(getCurrentUser, { signInRequired: () => readRecord() !== null });
 
 /** True when a credential exists AND this tab has been unlocked by a user that still exists. */
 export function isAuthenticated(): boolean {
@@ -484,6 +485,61 @@ export function onRemoteLock(onLock: () => void): () => void {
   return () => ch.close();
 }
 
+/* ── who-is-signed-in changes (other tabs) ─────────────────────── */
+
+const USERS_CHANNEL = 'mrchartist-inv-users';
+/** Same-tab event fired by {@link announceUserChange}. */
+export const USERS_CHANGED_EVENT = 'mrchartist:users-changed';
+/** localStorage keys whose change (in another tab) can end or change this tab's session. */
+const AUTH_KEYS = new Set<string>([AUTH_KEY, USERS_KEY, SESSION_KEY]);
+
+/**
+ * Tell every open tab that the user list changed (user added / removed, role changed, PIN reset), so
+ * each one re-checks who is signed in: a removed user's tab locks, a changed role applies at once.
+ */
+export function announceUserChange(): void {
+  try {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(USERS_CHANGED_EVENT));
+  } catch {
+    /* non-browser */
+  }
+  try {
+    const ch = new BroadcastChannel(USERS_CHANNEL);
+    ch.postMessage('changed');
+    ch.close();
+  } catch {
+    /* no BroadcastChannel: the storage event and the focus check still cover other tabs */
+  }
+}
+
+/**
+ * Call `check` whenever this tab's session may have changed underneath it: a `storage` event on the
+ * credential / user list / session keys, a user-change broadcast, and the window regaining focus.
+ * The caller re-reads `isAuthenticated()` / `getCurrentUser()`. Returns an unsubscribe.
+ */
+export function onAuthChange(check: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === null || AUTH_KEYS.has(e.key)) check();
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener('focus', check);
+  window.addEventListener(USERS_CHANGED_EVENT, check);
+  let ch: BroadcastChannel | null = null;
+  try {
+    ch = new BroadcastChannel(USERS_CHANNEL);
+    ch.onmessage = () => check();
+  } catch {
+    ch = null;
+  }
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener('focus', check);
+    window.removeEventListener(USERS_CHANGED_EVENT, check);
+    ch?.close();
+  };
+}
+
 export type ChangePinResult =
   | { ok: true }
   | { ok: false; reason: 'locked' | 'wrong-pin' | 'invalid-format' | 'same-pin' | 'no-account'; retryInMs?: number };
@@ -513,6 +569,7 @@ export function getIdleTimeout(): number {
 
 /** Minutes of inactivity before locking; 0 disables. */
 export function setIdleTimeout(minutes: number): void {
+  requireAccess('security.manage'); // roles (6.21): the owner decides how soon a shared device locks
   const n = Number.isFinite(minutes) ? Math.min(24 * 60, Math.max(0, Math.floor(minutes))) : DEFAULT_IDLE_MINUTES;
   writeRaw(IDLE_KEY, String(n));
   try {
@@ -534,13 +591,28 @@ export function isResetPhrase(input: string): boolean {
 }
 
 /**
+ * Forgot-PIN with other users on the device (6.21): anyone at the PIN screen can reach the reset, so
+ * besides the phrase it asks for the owner's name, typed — the person resetting must at least know
+ * whose books they are erasing (and that every clerk / viewer goes too). Not a secret: a deliberate
+ * extra step against a mistaken or casual wipe.
+ */
+export function resetNeedsOwnerName(): boolean {
+  return readUsers().length > 0;
+}
+
+/**
  * Recovery path for a forgotten PIN. The data is local-only, so there is no
  * server reset: the only way back in is to erase every `mrchartist_inv_*` key
- * (invoices, clients, profiles, PIN, lockout) and start fresh. Requires the
- * exact confirmation phrase. Returns false (and erases nothing) otherwise.
+ * (invoices, clients, profiles, PIN, lockout, every other local user) and start fresh.
+ * Requires the exact confirmation phrase, plus the owner's name when other users
+ * exist ({@link resetNeedsOwnerName}). Returns false (and erases nothing) otherwise.
  */
-export function resetAllData(confirmation: string): boolean {
+export function resetAllData(confirmation: string, opts: { ownerName?: string } = {}): boolean {
   if (!isResetPhrase(confirmation)) return false;
+  if (resetNeedsOwnerName()) {
+    const owner = readRecord()?.name ?? '';
+    if (!owner || nameKey(opts.ownerName ?? '') !== nameKey(owner)) return false;
+  }
   endSession();
   try {
     // Data tables (the IndexedDB-backed cache, or localStorage); the caller flushes before reloading.

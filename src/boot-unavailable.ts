@@ -9,9 +9,11 @@ export function showUnavailable(reason: string, opts: { vaultDamaged?: boolean }
   h.textContent = 'Your data could not be opened';
   h.style.fontSize = '1.25rem';
   const p = document.createElement('p');
-  p.textContent =
-    'This browser keeps your invoices in its database (IndexedDB), which is not available right now. ' +
-    'Private windows and some browser settings block it. Close other tabs of this app and try again; nothing has been deleted.';
+  p.textContent = opts.vaultDamaged
+    ? 'The data on this device is encrypted (vault mode), but the record needed to decrypt it is damaged or missing. ' +
+      'Nothing has been changed or deleted. If you cannot fix it, erase this device and restore a backup.'
+    : 'This browser keeps your invoices in its database (IndexedDB), which is not available right now. ' +
+      'Private windows and some browser settings block it. Close other tabs of this app and try again; nothing has been deleted.';
   const detail = document.createElement('p');
   detail.textContent = reason;
   detail.style.cssText = 'opacity:.7;font-size:.85rem';

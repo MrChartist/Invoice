@@ -8,11 +8,11 @@
  */
 
 import { requireAccess } from './access';
-import { backupFilename, buildBackup, buildEncryptedBackupWithKey } from './backup';
+import { VAULT_PLAIN_BACKUP_MESSAGE, backupFilename, buildEncryptedBackupWithKey, buildScheduledBackup, exportPlainBackup, plainBackupAllowed } from './backup';
 import { deriveEncryptionKey, type StoredEncryptionKey } from './crypto';
 import { downloadText } from './download';
 import { idbClear, idbDel, idbGet, idbSet } from './idb-kv';
-import { forgetVault } from './storage';
+import { forgetVault, vaultEnabled } from './storage';
 
 export * from './auto-backup-schedule';
 import { ENC_KEY, HANDLE_KEY, filesToDelete, getConfig, getLastBackup, hasBackupWorthyData, recordBackup, shouldBackup } from './auto-backup-schedule';
@@ -43,6 +43,7 @@ export async function hasBackupEncryption(): Promise<boolean> {
 export async function setBackupPassphrase(passphrase: string): Promise<{ ok: true } | { ok: false; message: string }> {
   if (passphrase.length < 8) return { ok: false, message: 'Use a passphrase of at least 8 characters.' };
   try {
+    requireAccess('data.backup');
     const stored = await deriveEncryptionKey(passphrase);
     if (!(await idbSet(ENC_KEY, stored))) return { ok: false, message: 'This browser could not store the encryption key.' };
     cachedKey = stored;
@@ -63,15 +64,28 @@ export async function forgetDeviceData(): Promise<void> {
   await forgetVault(); // vault mode: the next boot starts fresh instead of asking for a passphrase
 }
 
+/** Owner only. In vault mode scheduled backups then stop (they are never written readable). */
 export async function clearBackupPassphrase(): Promise<void> {
+  requireAccess('data.backup');
   await idbDel(ENC_KEY);
   cachedKey = null;
 }
 
-/** File name and text for a backup, encrypted when a key is stored. */
-export async function backupPayload(now: Date, key: StoredEncryptionKey | null = null): Promise<{ filename: string; text: string }> {
-  if (key) return { filename: backupFilename(now, true), text: await buildEncryptedBackupWithKey(key, now) };
-  return { filename: backupFilename(now), text: JSON.stringify(buildBackup(now), null, 2) };
+/**
+ * File name and text for a backup, encrypted when a key is stored. Owner only, except `scheduled`
+ * (unattended runs into the folder the owner set up). Without a key the file is plain JSON, which is
+ * refused in vault mode (the data is encrypted at rest; a readable copy in a synced folder would undo it).
+ */
+export async function backupPayload(now: Date, key: StoredEncryptionKey | null = null, opts: { scheduled?: boolean } = {}): Promise<{ filename: string; text: string }> {
+  if (key) return { filename: backupFilename(now, true), text: await buildEncryptedBackupWithKey(key, now, opts) };
+  if (!opts.scheduled) return { filename: backupFilename(now), text: exportPlainBackup(now) };
+  if (!plainBackupAllowed()) throw new Error(VAULT_PLAIN_BACKUP_MESSAGE);
+  return { filename: backupFilename(now), text: JSON.stringify(buildScheduledBackup(now), null, 2) };
+}
+
+/** Vault mode is on but no backup passphrase is set: every backup this module writes would be refused. */
+export async function backupNeedsEncryption(): Promise<boolean> {
+  return vaultEnabled() && (await getBackupKey()) === null;
 }
 
 /** True when `readBack` is exactly what was written and parses as one of our backups. */
@@ -111,7 +125,9 @@ export async function getFolderHandle(): Promise<FsDirHandle | null> {
   return h && h.kind === 'directory' ? h : null;
 }
 
+/** Owner only (throws AccessDeniedError): the folder receives full copies of the books. */
 export async function chooseBackupFolder(): Promise<{ ok: true; name: string } | { ok: false; reason: 'unsupported' | 'cancelled' | 'failed' }> {
+  requireAccess('data.backup');
   if (!isFolderBackupSupported()) return { ok: false, reason: 'unsupported' };
   try {
     const picker = (window as unknown as {
@@ -126,6 +142,7 @@ export async function chooseBackupFolder(): Promise<{ ok: true; name: string } |
 }
 
 export async function disconnectFolder(): Promise<void> {
+  requireAccess('data.backup');
   await idbDel(HANDLE_KEY);
 }
 
@@ -139,7 +156,7 @@ export type BackupResult =
       /** Folder backups are read back after writing: true = the file reopened intact. */
       verified?: boolean;
     }
-  | { ok: false; reason: 'unsupported' | 'no-folder' | 'permission' | 'error'; message: string };
+  | { ok: false; reason: 'unsupported' | 'no-folder' | 'permission' | 'denied' | 'encryption' | 'error'; message: string };
 
 /** Manual fallback: normal browser download (encrypted when a key is stored). Counts as a backup. */
 export async function downloadBackupNow(now: Date = new Date()): Promise<BackupResult> {
@@ -147,6 +164,11 @@ export async function downloadBackupNow(now: Date = new Date()): Promise<BackupR
     // Local roles (6.21): handing someone a full copy of the books is owner-only. Automatic folder
     // backups the owner set up keep running whoever is signed in (they go to the owner's folder).
     requireAccess('data.backup');
+  } catch (err) {
+    return { ok: false, reason: 'denied', message: (err as Error).message };
+  }
+  try {
+    if (await backupNeedsEncryption()) return { ok: false, reason: 'encryption', message: VAULT_PLAIN_BACKUP_MESSAGE };
     const { filename, text } = await backupPayload(now, await getBackupKey());
     downloadText(filename, text, 'application/json');
     recordBackup(now);
@@ -164,6 +186,15 @@ export async function downloadBackupNow(now: Date = new Date()): Promise<BackupR
  */
 export async function runAutoBackup(opts: { interactive?: boolean; now?: Date } = {}): Promise<BackupResult> {
   const now = opts.now ?? new Date();
+  // "Back up now" is a person asking for a full copy: owner only (6.21). Unattended runs keep going
+  // whoever is signed in — the owner chose the folder and the schedule (both owner-only to change).
+  if (opts.interactive) {
+    try {
+      requireAccess('data.backup');
+    } catch (err) {
+      return { ok: false, reason: 'denied', message: (err as Error).message };
+    }
+  }
   if (!isFolderBackupSupported()) {
     return { ok: false, reason: 'unsupported', message: 'This browser cannot write to a folder. Use Download backup instead.' };
   }
@@ -179,7 +210,8 @@ export async function runAutoBackup(opts: { interactive?: boolean; now?: Date } 
       return { ok: false, reason: 'permission', message: 'Folder access expired. Click Back up now to re-allow it.' };
     }
 
-    const { filename, text } = await backupPayload(now, await getBackupKey());
+    if (await backupNeedsEncryption()) return { ok: false, reason: 'encryption', message: VAULT_PLAIN_BACKUP_MESSAGE };
+    const { filename, text } = await backupPayload(now, await getBackupKey(), { scheduled: !opts.interactive });
     const file = await dir.getFileHandle(filename, { create: true });
     const writable = await file.createWritable();
     await writable.write(text);

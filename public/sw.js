@@ -1,6 +1,7 @@
 /* Mr. Chartist Invoice — app-shell service worker.
  *
- * - Same-origin only (plus Google Fonts, stale-while-revalidate). No other network calls.
+ * - Same-origin only: fonts are self-hosted (src/fonts.css), and requests to any other origin are
+ *   never intercepted or cached. No other network calls.
  * - Navigations: network-first (3.5s budget) -> cached index.html, so SPA deep links such as
  *   /invoice/abc open offline. The shell is refreshed on every successful navigation.
  * - /assets/* (fingerprinted by Vite): cache-first; discovered at runtime and also precached
@@ -166,8 +167,8 @@ async function staleWhileRevalidate(request, cacheName, max) {
   const hit = await cache.match(request);
   const refresh = fetch(request)
     .then(async (res) => {
-      // Opaque (no-cors) font responses report status 0; cache those, never errors.
-      if (res.ok || res.type === 'opaque') {
+      // Same-origin only (see the fetch handler): cache successful responses, never errors.
+      if (res.ok) {
         await safePut(cache, request, res.clone());
         trim(cache, max);
       }
