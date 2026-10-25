@@ -3,7 +3,9 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import {
   GROUPS,
+  chartOf,
   groupOf,
+  loadUserAccounts,
   MANUAL_VOUCHER_TYPES,
   loadVouchers,
   nextVoucherNumber,
@@ -23,6 +25,10 @@ import styles from './ledger.module.css';
 import { useT } from '../../../i18n';
 import { ledgerT } from '../../../i18n/areas/books-ledger';
 import { VoucherVariantFields, type VariantValue } from '../tally/VoucherVariantFields';
+import { useCreateOnTheFly } from '../../masters/useCreateOnTheFly';
+import { isAltC } from '../../masters/useMasterKeys';
+import { EditLogButton } from '../../audit/EditLogButton';
+import { wireT } from '../../../i18n/areas/wiring';
 import { allocationsOf, openRefsFor, syncVoucherReceipts, validateAllocations, voucherReceipts, type ReceiptAllocation } from '../../../lib/bill-allocation';
 
 // P0-11 (WP-1): bill-wise details on a receipt against a Sundry Debtor, loaded when needed.
@@ -53,9 +59,12 @@ const blank = (): Row => ({ key: ++seq, account_id: '', party: '', dr: '', cr: '
 const toText = (p: number) => (p ? (p / 100).toFixed(2) : '');
 
 /** Mounted per open (by the caller) so the form always starts from the stored voucher. */
-export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved }: Props) {
+export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate, onClose, onSaved }: Props) {
   useT();
   const uid = useId();
+  // Alt+C on an account picker creates a ledger / party on the fly (WP-1); the chart then reloads.
+  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
+  const fly = useCreateOnTheFly();
   const [type, setType] = useState<ManualVoucherType>(voucher?.type ?? 'JOURNAL');
   const [date, setDate] = useState(voucher?.date ?? defaultDate);
   const [number, setNumber] = useState(voucher?.number ?? '');
@@ -91,6 +100,17 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
   const preview = useMemo(() => (voucher && voucher.type === type ? voucher.number : nextVoucherNumber(loadVouchers(), type, date || defaultDate)), [voucher, type, date, defaultDate]);
 
   const patch = (key: number, p: Partial<Row>) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...p } : r)));
+
+  const createLedger = (key: number) => {
+    void fly.open({ kind: 'ledger' }).then((saved) => {
+      if (!saved) return;
+      const chart = chartOf(loadUserAccounts());
+      setAccounts(chart);
+      if (saved.id.startsWith('party:debtor:')) patch(key, { account_id: 'debtors', party: saved.name });
+      else if (saved.id.startsWith('party:creditor:')) patch(key, { account_id: 'creditors', party: saved.name });
+      else if (chart.some((a) => a.id === saved.id)) patch(key, { account_id: saved.id });
+    });
+  };
 
   // The receipt's Sundry Debtors line (credit with a party): bill allocation applies to it.
   const debtorLine = type === 'RECEIPT' ? lines.find((l) => l.cr > 0 && l.party && byId.get(l.account_id)?.group === 'TRADE_RECEIVABLES') : undefined;
@@ -138,6 +158,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
       subtitle={ledgerT('editorSubtitle')}
       footer={
         <>
+          {voucher && <EditLogButton recordId={voucher.id} name={voucher.number} />}
           <button type="button" className={controls.btnOutline} onClick={onClose}>{ledgerT('cancel')}</button>
           <button type="button" className={controls.btnPrimary} onClick={save} disabled={dr === 0 || dr !== cr}>
             {ledgerT('saveVoucher')}
@@ -168,7 +189,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
           {type === 'JOURNAL' && ledgerT('hintJournal')}
           {type === 'CONTRA' && ledgerT('hintContra')}
           {type === 'PAYMENT' && ledgerT('hintPayment')}
-          {type === 'RECEIPT' && ledgerT('hintReceipt')}
+          {type === 'RECEIPT' && ledgerT('hintReceipt')} {wireT('altCHint')}
         </p>
 
         <div className={styles.editorLines} role="group" aria-label={ledgerT('voucherLines')}>
@@ -184,7 +205,18 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
             const needsParty = !!acc && PARTY_GROUPS.has(acc.group);
             return (
               <div key={r.key} className={styles.editorLine}>
-                <select aria-label={ledgerT('lineAccount', { n: i + 1 })} className={controls.select} value={r.account_id} onChange={(e) => patch(r.key, { account_id: e.target.value })}>
+                <select
+                  aria-label={ledgerT('lineAccount', { n: i + 1 })}
+                  aria-keyshortcuts="Alt+C"
+                  className={controls.select}
+                  value={r.account_id}
+                  onChange={(e) => patch(r.key, { account_id: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (!isAltC(e.nativeEvent)) return;
+                    e.preventDefault();
+                    createLedger(r.key);
+                  }}
+                >
                   <option value="">{ledgerT('chooseAccount')}</option>
                   {GROUPS.map((g) => {
                     const list = accounts.filter((a) => a.group === g.id);
@@ -238,6 +270,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
         <VoucherVariantFields type={type} value={variant} onChange={setVariant} />
         {error && <div className={controls.error} role="alert">{error}</div>}
       </div>
+      {fly.node}
     </Modal>
   );
 }

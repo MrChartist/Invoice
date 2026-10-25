@@ -19,6 +19,7 @@ import {
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { wireT } from '../i18n/areas/wiring';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -59,7 +60,7 @@ const InvoicePreviewModal = lazy(() =>
 // Batch PDF / ZIP (WP-4): the PDF stack and template engine load only when used.
 const BatchPdfModal = lazy(() => import('../components/preview/BatchPdfModal').then((m) => ({ default: m.BatchPdfModal })));
 
-type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft';
+type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft' | 'approval';
 
 const FILTERS: { id: Filter; label: () => string }[] = [
   { id: 'all', label: () => salesT('tx.fAll') },
@@ -67,7 +68,11 @@ const FILTERS: { id: Filter; label: () => string }[] = [
   { id: 'overdue', label: () => salesT('tx.fOverdue') },
   { id: 'paid', label: () => salesT('tx.fPaid') },
   { id: 'draft', label: () => salesT('tx.fDraft') },
+  // WP-9 maker-checker: shown only while some document waits for approval (or the filter is chosen).
+  { id: 'approval', label: () => wireT('pendingApproval') },
 ];
+
+const isPendingApproval = (inv: InvoiceRecord) => inv.approval?.state === 'pending';
 
 function matchesFilter(inv: InvoiceRecord, filter: Filter, now: Date): boolean {
   const status = effectiveStatus(inv, now);
@@ -82,6 +87,8 @@ function matchesFilter(inv: InvoiceRecord, filter: Filter, now: Date): boolean {
       return status === 'Paid';
     case 'draft':
       return status === 'Draft';
+    case 'approval':
+      return isPendingApproval(inv);
     default:
       return true;
   }
@@ -386,7 +393,7 @@ export function Transactions() {
             />
           </label>
           <div className={controls.segment} role="group" aria-label={salesT('tx.filterAria')}>
-            {FILTERS.map((f) => (
+            {FILTERS.filter((f) => f.id !== 'approval' || counts.approval > 0 || filter === 'approval').map((f) => (
               <button
                 key={f.id}
                 type="button"
@@ -553,6 +560,10 @@ export function Transactions() {
                             const o = orderStates.get(inv.id) ?? 'Open';
                             return <StatusBadge status={stateLabel(o)} tone={orderTone(o)} />;
                           })()
+                        ) : isPendingApproval(inv) ? (
+                          <StatusBadge status={wireT('pendingApproval')} tone="partial" />
+                        ) : inv.approval?.state === 'rejected' && status === 'Draft' ? (
+                          <StatusBadge status={wireT('rejectedApproval')} tone="overdue" />
                         ) : (
                           <StatusBadge status={status} />
                         )}

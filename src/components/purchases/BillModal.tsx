@@ -24,6 +24,8 @@ import { MAIN_GODOWN_ID } from '../../types/stock';
 import { useT } from '../../i18n';
 import { purT, purCategory } from '../../i18n/areas/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
+import { BranchSelect } from '../branches/BranchSelect';
+import { EditLogButton } from '../audit/EditLogButton';
 import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
@@ -75,6 +77,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const compositionProfile = useMemo(() => localDb.settings.activeProfile()?.gst_scheme === 'composition', []);
   const poId = purchase?.po_id ?? seed?.po_id;
   const [costCentre, setCostCentre] = useState<string | undefined>(purchase?.cost_centre_id);
+  const [branchId, setBranchId] = useState<string | undefined>(purchase?.branch_id);
   const centres = useCostCentres();
   // Advanced GST: reverse charge, imports, ITC reversal, Sec 17(5) blocked credit.
   const [rcm, setRcm] = useState(purchase?.reverse_charge ?? false);
@@ -199,6 +202,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         notes: notes.trim() || undefined,
         ...billablePatch(billable),
         cost_centre_id: costCentre,
+        branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
         ...tdsResolved.fields,
       });
@@ -271,6 +275,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         </div>
       </div>
       <CostCentreSelect id="bill-cost-centre" label={purT('costCentre')} centres={centres} value={costCentre} onChange={setCostCentre} />
+      <BranchSelect id="bill-branch" value={branchId} onChange={setBranchId} />
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={setLines} stock={stock} />
@@ -389,6 +394,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
+        {purchase && <EditLogButton recordId={purchase.id} name={purchase.bill_number} />}
         <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>
         <button type="submit" className={controls.btnPrimary}>{purchase ? purT('saveChanges') : purT('saveBill')}</button>
       </div>
