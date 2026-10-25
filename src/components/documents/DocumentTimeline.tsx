@@ -7,6 +7,9 @@ import { activeCancellation, buildDocumentChain, readLinks, type ChainNode } fro
 import { localDb } from '../../lib/localDb';
 import { DOCUMENT_LABELS } from '../../types/invoice';
 import { cn } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { salesT } from '../../i18n/areas/sales';
+import { docLabel } from '../../i18n/labels';
 import styles from './documents.module.css';
 
 export interface DocumentTimelineProps {
@@ -17,13 +20,6 @@ export interface DocumentTimelineProps {
   className?: string;
 }
 
-const REL_LABEL: Record<ChainNode['relation'], string> = {
-  origin: 'Original',
-  converted: 'Converted',
-  credit_note: 'Credit note',
-  debit_note: 'Debit note',
-  cancelled: 'Cancelled',
-};
 
 function RelIcon({ node }: { node: ChainNode }) {
   const p = { size: 13, 'aria-hidden': true } as const;
@@ -36,6 +32,7 @@ function RelIcon({ node }: { node: ChainNode }) {
 
 /** Vertical timeline of a document and everything derived from it. */
 export function DocumentTimeline({ invoiceId, refreshKey, className }: DocumentTimelineProps) {
+  useT(); // re-render on a language switch (5.4)
   const { chain, links } = useMemo(() => {
     void refreshKey;
     const l = readLinks();
@@ -43,11 +40,11 @@ export function DocumentTimeline({ invoiceId, refreshKey, className }: DocumentT
   }, [invoiceId, refreshKey]);
 
   if (chain.length <= 1 && !activeCancellation(invoiceId, links)) {
-    return <p className={styles.empty}>No linked documents yet.</p>;
+    return <p className={styles.empty}>{salesT('tl.none')}</p>;
   }
 
   return (
-    <ol className={cn(styles.timeline, className)} aria-label="Document history">
+    <ol className={cn(styles.timeline, className)} aria-label={salesT('tl.aria')}>
       {chain.map((node) => {
         const cancel = node.doc.status === 'Cancelled' ? activeCancellation(node.doc.id, links) : undefined;
         const current = node.doc.id === invoiceId;
@@ -66,7 +63,7 @@ export function DocumentTimeline({ invoiceId, refreshKey, className }: DocumentT
             </span>
             <div className={styles.nodeBody}>
               <div className={styles.nodeTitle}>
-                <span className={styles.relTag}>{REL_LABEL[node.relation]}</span>
+                <span className={styles.relTag}>{salesT(`tl.${node.relation}`)}</span>
                 {current ? (
                   <strong aria-current="true">{node.doc.invoice_number}</strong>
                 ) : (
@@ -77,10 +74,10 @@ export function DocumentTimeline({ invoiceId, refreshKey, className }: DocumentT
                 <StatusBadge status={node.doc.status} />
               </div>
               <span className={styles.nodeMeta}>
-                {DOCUMENT_LABELS[node.doc.doc_type]} · {formatDate(node.doc.issue_date)} ·{' '}
+                {node.doc.doc_type in DOCUMENT_LABELS ? docLabel(node.doc.doc_type) : node.doc.doc_type} · {formatDate(node.doc.issue_date)} ·{' '}
                 {formatCurrency(node.doc.total, node.doc.currency || 'INR')}
               </span>
-              {cancel?.reason && <span className={styles.cancelNote}>Cancelled: {cancel.reason}</span>}
+              {cancel?.reason && <span className={styles.cancelNote}>{salesT('tl.cancelledReason', { reason: cancel.reason })}</span>}
             </div>
           </li>
         );

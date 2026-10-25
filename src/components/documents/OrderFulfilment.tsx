@@ -7,6 +7,9 @@ import { readLinks } from '../../lib/documents';
 import { canCloseOrder, orderFulfilment, orderTone } from '../../lib/sales-orders';
 import { localDayOf } from '../../lib/dates';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
+import { useT } from '../../i18n';
+import { salesT, stateLabel } from '../../i18n/areas/sales';
+import { docLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './documents.module.css';
 
@@ -24,6 +27,7 @@ export function OrderFulfilment({
   refreshKey: number;
   onChanged: () => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const { f, docs } = useMemo(() => {
     const all = localDb.invoices.getAll();
     const fulfil = orderFulfilment(order, all, readLinks());
@@ -41,19 +45,19 @@ export function OrderFulfilment({
   };
 
   return (
-    <section aria-label="Order fulfilment" className={styles.stack}>
+    <section aria-label={salesT('of.aria')} className={styles.stack}>
       <div className={controls.row}>
-        <span>Sales order:</span> <StatusBadge status={f.state} tone={orderTone(f.state)} />
-        {order.order_closed_on && f.state === 'Closed' && <span className={styles.itemMeta}>closed {order.order_closed_on}</span>}
+        <span>{salesT('of.salesOrder')}</span> <StatusBadge status={stateLabel(f.state)} tone={orderTone(f.state)} />
+        {order.order_closed_on && f.state === 'Closed' && <span className={styles.itemMeta}>{salesT('of.closedOn', { date: order.order_closed_on })}</span>}
         {canCloseOrder(f) && (
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} onClick={() => setClosed(true)}
-            title="Stop expecting the pending quantity — no more challans or invoices against this order">
-            {locked ? <Lock size={15} /> : <XCircle size={15} />} Close order
+            title={salesT('of.closeTitle')}>
+            {locked ? <Lock size={15} /> : <XCircle size={15} />} {salesT('of.close')}
           </button>
         )}
         {f.state === 'Closed' && (
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} onClick={() => setClosed(false)}>
-            <RotateCcw size={15} /> Reopen
+            <RotateCcw size={15} /> {salesT('of.reopen')}
           </button>
         )}
       </div>
@@ -61,19 +65,19 @@ export function OrderFulfilment({
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Item</th>
-              <th className={styles.num}>Ordered</th>
-              <th className={styles.num}>Delivered</th>
-              <th className={styles.num}>Invoiced</th>
-              <th className={styles.num}>To deliver</th>
-              <th className={styles.num}>To invoice</th>
+              <th>{salesT('item')}</th>
+              <th className={styles.num}>{salesT('of.ordered')}</th>
+              <th className={styles.num}>{salesT('of.delivered')}</th>
+              <th className={styles.num}>{salesT('of.invoiced')}</th>
+              <th className={styles.num}>{salesT('of.toDeliver')}</th>
+              <th className={styles.num}>{salesT('of.toInvoice')}</th>
             </tr>
           </thead>
           <tbody>
             {f.lines.map((l) => (
               <tr key={l.item.id}>
                 <td>
-                  <div className={styles.itemName}>{l.item.name || 'Item'}</div>
+                  <div className={styles.itemName}>{l.item.name || salesT('item')}</div>
                   {l.item.unit && <div className={styles.itemMeta}>{l.item.unit}</div>}
                 </td>
                 <td className={styles.num}>{qty(l.ordered)}</td>
@@ -88,19 +92,18 @@ export function OrderFulfilment({
       </div>
       {docs.length > 0 && (
         <p className={styles.itemMeta}>
-          Raised against this order:{' '}
+          {salesT('of.raised')}{' '}
           {docs.map((d, i) => (
             <span key={d.id}>
               {i > 0 && ', '}
-              <Link to={`/invoice/${d.id}`}>{DOCUMENT_LABELS[d.doc_type]} {d.invoice_number}</Link>
-              {d.status === 'Draft' ? ' (draft)' : ''}
+              <Link to={`/invoice/${d.id}`}>{d.doc_type in DOCUMENT_LABELS ? docLabel(d.doc_type) : d.doc_type} {d.invoice_number}</Link>
+              {d.status === 'Draft' ? salesT('of.draft') : ''}
             </span>
           ))}
         </p>
       )}
       <p className={styles.itemMeta}>
-        Convert creates a challan or invoice for the pending quantity only. A sales order is not a tax document: it never
-        counts as revenue, GST, stock or a receivable.
+        {salesT('of.note')}
       </p>
     </section>
   );

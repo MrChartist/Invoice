@@ -16,6 +16,8 @@ import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import type { AdvanceRecord } from '../../types/advances';
 import type { InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { rcvT } from '../../i18n/areas/receivables';
 import styles from './advances.module.css';
 
 export interface ApplyAdvancePanelProps {
@@ -32,6 +34,7 @@ export interface ApplyAdvancePanelProps {
 
 /** "Apply advance": adjusts an advance against an invoice through the payments API. */
 export function ApplyAdvancePanel({ invoice, advance, version = 0, onApplied, bare }: ApplyAdvancePanelProps) {
+  useT(); // re-render on a language switch (5.4)
   const [tick, setTick] = useState(0);
   // Re-read on every change: the balances move under us.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,12 +80,12 @@ export function ApplyAdvancePanel({ invoice, advance, version = 0, onApplied, ba
   if (invoice && noChoices) return null;
 
   const submit = () => {
-    if (!chosenAdvance || !chosenInvoice) return setError(invoice ? 'Choose an advance.' : 'Choose an invoice.');
+    if (!chosenAdvance || !chosenInvoice) return setError(invoice ? rcvT('apChooseAdv') : rcvT('apChooseInv'));
     try {
       const value = Number(amount);
       applyAdvance({ advanceId: chosenAdvance.id, invoiceId: chosenInvoice.id, amount: value, date });
       setTick((t) => t + 1);
-      onApplied(`${formatCurrency(value, 'INR')} of ${chosenAdvance.number} applied to ${chosenInvoice.invoice_number}`, chosenInvoice.id);
+      onApplied(rcvT('apApplied', { amount: formatCurrency(value, 'INR'), advance: chosenAdvance.number, invoice: chosenInvoice.invoice_number }), chosenInvoice.id);
     } catch (err) {
       setError(err instanceof AdvanceError ? err.message : (err as Error).message);
     }
@@ -92,53 +95,53 @@ export function ApplyAdvancePanel({ invoice, advance, version = 0, onApplied, ba
     <>
       {!bare && (
         <p className={styles.panelTitle}>
-          <HandCoins size={16} aria-hidden="true" /> Apply advance
+          <HandCoins size={16} aria-hidden="true" /> {rcvT('apTitle')}
         </p>
       )}
       {noChoices ? (
-        <p className={controls.hint}>No issued rupee invoice of {advance?.client.name} has a balance to pay. Raise the invoice first, then apply the advance.</p>
+        <p className={controls.hint}>{rcvT('apNone', { client: advance?.client.name ?? '' })}</p>
       ) : (
         <>
           <label className={controls.field}>
-            <span className={controls.label}>{invoice ? 'Advance' : 'Invoice'}</span>
+            <span className={controls.label}>{invoice ? rcvT('apAdvance') : rcvT('apInvoice')}</span>
             <select className={controls.select} value={pick} onChange={(e) => { setPick(e.target.value); setError(''); }}>
               {invoice
                 ? advanceOptions.map((o) => (
                     <option key={o.advance.id} value={o.advance.id}>
-                      {o.advance.number} · {formatDate(o.advance.date)} · unadjusted {formatCurrency(o.balance.open, 'INR')}
+                      {rcvT('apAdvOption', { number: o.advance.number, date: formatDate(o.advance.date), amount: formatCurrency(o.balance.open, 'INR') })}
                     </option>
                   ))
                 : invoiceOptions.map((i) => (
                     <option key={i.id} value={i.id}>
-                      {i.invoice_number} · {formatDate(i.issue_date)} · balance {formatCurrency(invoiceOpen(i), 'INR')}
+                      {rcvT('apInvOption', { number: i.invoice_number, date: formatDate(i.issue_date), amount: formatCurrency(invoiceOpen(i), 'INR') })}
                     </option>
                   ))}
             </select>
           </label>
           <div className={controls.row}>
             <label className={controls.field}>
-              <span className={controls.label}>Amount to apply (₹)</span>
+              <span className={controls.label}>{rcvT('apAmount')}</span>
               <input className={`${controls.input} ${controls.inputNumeric}`} type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>Adjustment date</span>
+              <span className={controls.label}>{rcvT('apDate')}</span>
               <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
             </label>
           </div>
           <span className={controls.hint}>
-            Up to {formatCurrency(Math.min(open, owed), 'INR')} (advance unadjusted {formatCurrency(open, 'INR')}, invoice balance {formatCurrency(owed, 'INR')}). Recorded as a payment on the invoice; GST paid on the advance comes off in GSTR-1 Table 11B for the adjustment month.
+            {rcvT('apHint', { max: formatCurrency(Math.min(open, owed), 'INR'), open: formatCurrency(open, 'INR'), owed: formatCurrency(owed, 'INR') })}
           </span>
           {error && <p className={controls.error} role="alert">{error}</p>}
           <div>
             <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={submit}>
-              Apply advance
+              {rcvT('apTitle')}
             </button>
           </div>
         </>
       )}
     </>
   );
-  return bare ? <div className={styles.form}>{body}</div> : <section className={styles.panel} aria-label="Apply advance">{body}</section>;
+  return bare ? <div className={styles.form}>{body}</div> : <section className={styles.panel} aria-label={rcvT('apTitle')}>{body}</section>;
 }
 
 export default ApplyAdvancePanel;

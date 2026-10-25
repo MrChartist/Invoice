@@ -5,11 +5,14 @@ import { localDb } from '../../lib/localDb';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { checkGstin } from '../../lib/gstin';
 import { GST_SLABS } from '../../lib/tax-rules';
-import { referenceLabel } from '../../lib/receipts';
 import { formatMoney, todayInput } from '../../lib/utils';
 import type { AdvanceRecord, AdvanceSupply } from '../../types/advances';
 import { BankAccountSelect } from '../bank/BankAccountSelect';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { rcvT, refLabel } from '../../i18n/areas/receivables';
+import { methodLabel } from '../../i18n/labels';
+import { areaNodes } from '../../i18n/areas/nodes';
 import styles from './advances.module.css';
 
 const METHODS = ['Bank transfer', 'UPI', 'Cash', 'Cheque', 'Card', 'Other'];
@@ -41,6 +44,7 @@ export interface AdvanceFormModalProps {
 
 /** Record / edit an advance receipt (Rule 50 receipt voucher). */
 export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }: AdvanceFormModalProps) {
+  useT(); // re-render on a language switch (5.4)
   const sender = useMemo(() => (open ? senderSnapshot() : null), [open]);
   const senderState = sender?.stateCode || checkGstin(sender?.companyGstin ?? '').stateCode || '';
   const clients = useMemo(() => (open ? localDb.clients.getAll() : []), [open]);
@@ -130,12 +134,12 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
       open={open}
       onClose={onClose}
       size="md"
-      title={advance ? `Edit advance ${advance.number}` : 'Record an advance'}
-      subtitle="Money received before the invoice. A receipt voucher (Rule 50) is issued in its own series."
+      title={advance ? rcvT('afEdit', { number: advance.number }) : rcvT('afNew')}
+      subtitle={rcvT('afSub')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="submit" form="advance-form" className={controls.btnPrimary}>{advance ? 'Save changes' : 'Save advance'}</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{rcvT('cancel')}</button>
+          <button type="submit" form="advance-form" className={controls.btnPrimary}>{advance ? rcvT('saveChanges') : rcvT('afSave')}</button>
         </>
       }
     >
@@ -143,71 +147,74 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
         {error && <p className={controls.error} role="alert">{error}</p>}
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Received from *</span>
+            <span className={controls.label}>{rcvT('afFrom')}</span>
             <input className={controls.input} list="advance-parties" value={form.party} onChange={(e) => pickParty(e.target.value)} autoFocus />
             <datalist id="advance-parties">
               {clients.map((c) => c.company || c.name).filter(Boolean).map((n) => <option key={n} value={n} />)}
             </datalist>
-            {form.party.trim() && !client && <span className={controls.hint}>Not in your clients; saved with the name only.</span>}
+            {form.party.trim() && !client && <span className={controls.hint}>{rcvT('afNotClient')}</span>}
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Amount received (₹) *</span>
+            <span className={controls.label}>{rcvT('afAmount')}</span>
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={form.amount} onChange={(e) => set('amount', e.target.value.replace(/[^0-9.]/g, ''))} />
           </label>
         </div>
         <div className={controls.row3}>
           <label className={controls.field}>
-            <span className={controls.label}>Date received *</span>
+            <span className={controls.label}>{rcvT('afDate')}</span>
             <input className={controls.input} type="date" value={form.date} max={todayInput()} onChange={(e) => set('date', e.target.value)} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Advance for</span>
+            <span className={controls.label}>{rcvT('afFor')}</span>
             <select className={controls.select} value={form.supply} onChange={(e) => set('supply', e.target.value as AdvanceSupply)}>
-              <option value="services">Services</option>
-              <option value="goods">Goods</option>
+              <option value="services">{rcvT('services')}</option>
+              <option value="goods">{rcvT('goods')}</option>
             </select>
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>GST rate of the supply</span>
+            <span className={controls.label}>{rcvT('afRate')}</span>
             <select className={controls.select} value={form.rate} onChange={(e) => set('rate', e.target.value)}>
               {GST_SLABS.map((r) => <option key={r} value={String(r)}>{r}%</option>)}
             </select>
           </label>
         </div>
         <label className={controls.field}>
-          <span className={controls.label}>Place of supply *</span>
+          <span className={controls.label}>{rcvT('afPos')}</span>
           <select className={controls.select} value={form.pos} onChange={(e) => set('pos', e.target.value)}>
-            <option value="">Choose…</option>
+            <option value="">{rcvT('afChoose')}</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.name}</option>)}
           </select>
         </label>
         <div className={styles.taxBox} role="status" aria-live="polite">
           {preview.applies
-            ? <>GST due on this advance: <strong>₹{formatMoney(tax)}</strong> ({preview.supply_type === 'INTER' ? `IGST ₹${formatMoney(preview.igst)}` : `CGST ₹${formatMoney(preview.cgst)} + SGST ₹${formatMoney(preview.sgst)}`}) on a value of ₹{formatMoney(preview.taxable)}, worked out inside the amount received. It is reported in GSTR-1 Table 11A for this month.</>
+            ? areaNodes(rcvT('afGstDue', {
+                split: preview.supply_type === 'INTER' ? `IGST ₹${formatMoney(preview.igst)}` : `CGST ₹${formatMoney(preview.cgst)} + SGST ₹${formatMoney(preview.sgst)}`,
+                taxable: formatMoney(preview.taxable),
+              }), { tax: <strong>₹{formatMoney(tax)}</strong> })
             : form.supply === 'goods'
-              ? <>No GST on an advance for goods (time of supply is the invoice, Notification 66/2017-CT).</>
-              : <>No GST on this advance (export / zero-rated, or a nil rate).</>}
-          {' '}Verify with your CA.
+              ? rcvT('afNoGstGoods')
+              : rcvT('afNoGst')}
+          {' '}{rcvT('afVerify')}
         </div>
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Method</span>
+            <span className={controls.label}>{rcvT('method')}</span>
             <select className={controls.select} value={form.method} onChange={(e) => set('method', e.target.value)}>
-              {METHODS.map((m) => <option key={m}>{m}</option>)}
+              {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
             </select>
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>{referenceLabel(form.method)} (optional)</span>
+            <span className={controls.label}>{rcvT('optional', { label: refLabel(form.method) })}</span>
             <input className={controls.input} value={form.reference} onChange={(e) => set('reference', e.target.value.trimStart())} />
           </label>
         </div>
-        <BankAccountSelect id="adv-bank-account" label="Received into" method={form.method} value={form.bankAccountId} onChange={(v) => set('bankAccountId', v)} />
+        <BankAccountSelect id="adv-bank-account" label={rcvT('afInto')} method={form.method} value={form.bankAccountId} onChange={(v) => set('bankAccountId', v)} />
         <label className={controls.field}>
-          <span className={controls.label}>Description of supply (printed)</span>
-          <input className={controls.input} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder={form.supply === 'goods' ? 'e.g. Advance for 200 units of item X' : 'e.g. Retainer for statutory audit FY 25-26'} />
+          <span className={controls.label}>{rcvT('afDesc')}</span>
+          <input className={controls.input} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder={form.supply === 'goods' ? rcvT('afDescGoods') : rcvT('afDescServices')} />
         </label>
         <label className={controls.field}>
-          <span className={controls.label}>Note (internal)</span>
+          <span className={controls.label}>{rcvT('afNote')}</span>
           <input className={controls.input} value={form.note} onChange={(e) => set('note', e.target.value)} />
         </label>
       </form>
