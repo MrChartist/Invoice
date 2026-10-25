@@ -1,7 +1,7 @@
 import { isStockDependencyError } from '../lib/stock-timeline';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Download, FilePlus2, Landmark, PiggyBank, Receipt, Search, Tags, Wallet, Zap } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Download, FilePlus2, Landmark, PiggyBank, Receipt, ScanLine, Search, Tags, Wallet, Zap } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -11,6 +11,7 @@ import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
 import { purT, purCategory, purStatus } from '../i18n/areas/purchases';
 import { capT } from '../i18n/areas/capture';
+import { bsT } from '../i18n/areas/bill-scan';
 import { BillModal } from '../components/purchases/BillModal';
 import { BranchFilter } from '../components/branches/BranchFilter';
 import { branchPredicates } from '../lib/branch';
@@ -59,6 +60,8 @@ const PurchaseOrdersTab = lazy(() =>
 const ReturnsTab = lazy(() => import('../components/purchases/ReturnsTab').then((m) => ({ default: m.ReturnsTab })));
 // 8C: capture from the e-invoice QR, documents inbox, draft / recurring bills — on demand.
 const InboxTab = lazy(() => import('../components/capture/InboxTab'));
+// 8I: "Scan bill" chooser (camera QR / photo / file → capture flow) — on demand.
+const ScanBillDialog = lazy(() => import('../components/capture/ScanBillDialog'));
 const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns', 'inbox'];
 
 const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: 'kindAll' | 'kindBills' | 'kindExpenses' }[] = [
@@ -73,6 +76,8 @@ export function Expenses() {
   const { t } = useT();
   const [version, setVersion] = useState(0);
   const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const [scanOpen, setScanOpen] = useState(false);
   const [tab, setTab] = useState<Tab>(() => TAB_PARAMS.find((x) => x === params.get('tab')) ?? 'bills');
   const [seed, setSeed] = useState<BillSeed | null>(null);
   const [filter, setFilter] = useState<PurchaseFilter>({ kind: 'ALL', status: 'ALL', category: 'ALL' });
@@ -197,6 +202,9 @@ export function Expenses() {
                 <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
                   <Zap size={16} /> {purT('quickExpense')}
                 </button>
+                <button type="button" className={controls.btnOutline} onClick={() => setScanOpen(true)} data-testid="scan-bill">
+                  <ScanLine size={16} aria-hidden /> {bsT('scanBill')}
+                </button>
                 <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
                   <FilePlus2 size={16} /> {purT('addBill')}
                 </button>
@@ -205,6 +213,20 @@ export function Expenses() {
           </>
         }
       />
+
+      {scanOpen && (
+        <Suspense fallback={null}>
+          <ScanBillDialog
+            onClose={() => setScanOpen(false)}
+            onDone={(message, tone, route) => {
+              setScanOpen(false);
+              reload();
+              notify(message, tone);
+              if (route) navigate(route);
+            }}
+          />
+        </Suspense>
+      )}
 
       <div className={surface.statGrid}>
         <StatCard label={purT('statPayables')} value={formatCurrency(payables)} icon={Wallet} tone={payables > 0 ? 'warning' : 'default'} hint={purT('statPayablesHint')} />

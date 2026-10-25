@@ -586,6 +586,7 @@ export function Transactions() {
                           {canPay && can('payment.record') && (
                             <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} disabled={locked} title={locked ? lockedTitle : salesT('tx.recordPayment')} aria-label={salesT('tx.recordPaymentFor', num)}>
                               <Banknote size={16} />
+                              <span className={styles.payLabel} aria-hidden>₹ {salesT('tx.received')}</span>
                             </button>
                           )}
                           <button type="button" className={controls.btnIcon} onClick={() => handlePreview(inv)} title={salesT('tx.previewPdf')} aria-label={salesT('tx.previewOf', num)}>

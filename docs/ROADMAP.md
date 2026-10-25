@@ -502,6 +502,18 @@ Competitor parity with Zoho Books / Xero / QuickBooks / Refrens / TallyPrime 7.0
 | 8.45 | ✅ **Bank rules + memory** (`bank_rules`): ALL / ANY of narration contains / starts with / safe regex, counterparty token, amount range, debit / credit, bank account → expense (head, supplier, GST + ITC, cost centre, branch, mode), voucher to a ledger, receipt against a customer's invoices, contra (twin reused), ignore; run after invoice matching; every suggestion labelled Rule / Match / Memory; memory learned from past expense categorisations; "Create rule for similar lines?" after a manual expense; all-or-nothing batches through the existing writers (roles, period lock, approval gate, audit) | `bank-rules.ts`, `bank-rules-apply.ts`, `BankRulesPanel.tsx`, `RuleSuggestions.tsx` | done |
 | 8.46 | ⏳ 8C follow-ups: PDF page rendering for QR reading, a multi-line GST split from the QR (needs the full e-invoice JSON), rule actions with GST on vouchers, memory for receipts / vouchers, payment approval inside the e-payment batch screen, total-JS budget headroom | — | open |
 
+### 8I · Filing & capture UX (`docs/features/gst-reports.md`, `docs/features/bill-capture.md`)
+
+From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Validate report → error report → download", Tally "resolve exceptions → export JSON"). Working papers only — verify with your CA.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.160 | ✅ **Scan bill** button in the Expenses header (books.edit): lazy chooser — live e-invoice QR with the camera (BarcodeDetector, where available), take a photo, or pick a photo / PDF → `openCaptureFromFile`; a camera QR drafts the bill via `captureFromQrText`; ends on the inbox row | `ScanBillDialog.tsx`, `capture-browser.ts`, `Expenses.tsx` | done |
+| 8.161 | ✅ **Check before JSON download**: GSTR-1 / GSTR-3B / IFF JSON first run the GST exceptions, the report's errors / warnings and the Rule 46 series gaps; anything found → lazy dialog grouped by problem with Fix links, "Download anyway" / "Review"; clean → straight download; "· n ⚠" badge on the JSON buttons | `gst-preflight.ts`, `PreflightDialog.tsx`, `GstReports.tsx` | done |
+| 8.162 | ✅ **Filing mode**: steps strip (Period ✓ → Check (n) → Download JSON → Mark filed, marks shared with the Compliance tab) and the 29 GST tabs grouped GSTR-1 / GSTR-3B / Reconcile / Tools (grouped tablists with ←/→ on desktop, a select on phones); every old `?tab=` id still resolves | `gst-tabs.ts`, `GstReports.tsx`, `filing.module.css` | done |
+| 8.163 | ✅ Phones: the record-payment row button in the Invoices list shows a visible "₹ Received" label | `Transactions.tsx` | done |
+| 8.164 | ⏳ 8I follow-ups: per-form preflight rules (3B without HSN checks), "Mark filed" for IFF / CMP-08, remembering the downloaded step across reloads | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |
