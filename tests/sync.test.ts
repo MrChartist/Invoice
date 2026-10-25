@@ -522,3 +522,15 @@ test('a device can issue as its own profile (own number prefix) once sync is on'
   assert.equal(issuingProfile(profiles, profiles[0])?.id, 'p1', 'a removed profile falls back');
   assert.ok(readRaw(SYNC_DEVICE_KEY), 'stored device-locally');
 });
+
+test('duplicate serials are flagged for advance receipt vouchers too', async () => {
+  const adv = (id: string) => ({ id, number: 'ADV/FY26-27/0001', date: '2026-06-01', amount: 500, client: { name: 'Acme' } });
+  await on(A, () => setTable('advances', [adv('a1')]));
+  await on(B, () => setTable('advances', [adv('b1')]));
+  await sync(A);
+  await sync(B);
+  await on(B, () => {
+    const dup = loadConflicts().find((c) => c.kind === 'duplicate');
+    assert.ok(dup && dup.kind === 'duplicate' && dup.key === `${DB_PREFIX}advances` && dup.ids.join() === 'a1,b1');
+  });
+});

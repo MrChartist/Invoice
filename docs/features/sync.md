@@ -102,9 +102,10 @@ sync, and a device that listed the same conflict drops it automatically when the
 listing per row (a newer remote version replaces the stored one).
 
 ## Numbering safety
-Two devices can issue the same `INV/FY26-27/0007`. After every merge the engine groups invoices by the canonical
-number key (`numberKey`): any number used by two documents is listed as a **duplicate** with both documents (links to
-open them). Issued numbers are **never renumbered automatically**; the user renumbers or cancels one and marks the
+Two devices can issue the same `INV/FY26-27/0007`. After every merge the engine groups documents by the canonical
+number key (`numberKey`) — invoices / notes / quotes, advance receipt vouchers (`ADV/…`), manual vouchers (`JV/…`) and
+stock transfers (`STR/…`): any number used by two documents is listed as a **duplicate** with both documents (invoices
+link to the editor). Issued numbers are **never renumbered automatically**; the user renumbers or cancels one and marks the
 pair reviewed. Prevention:
 - **This device issues as**: a device-local choice of business profile (device key `mrchartist_inv_sync_device`); the
   invoice editor's default sender on this device, so each device numbers from its own prefix (`OFF/…`, `LAP/…`).
@@ -113,7 +114,7 @@ pair reviewed. Prevention:
 
 ## Period lock and vault
 - A synced add / edit / delete of a document dated on or before the lock date (`invoices`, `transactions`, `purchases`,
-  `purchase_payments`, `vouchers`, `stock_moves`, `stock_transfers`; the later of the local and remote lock dates) is
+  `purchase_payments`, `vouchers`, `stock_moves`, `stock_transfers`, `advances`; the later of the local and remote lock dates) is
   **not applied**: it is listed as a "locked period" conflict. **Apply with PIN** verifies the PIN and writes an
   `override` audit row; **Keep mine** declines it (it stays on the other device; not offered again until it changes
   there). A remote settings change that moves the lock date earlier or removes it is held the same way.

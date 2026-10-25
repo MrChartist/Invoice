@@ -59,13 +59,13 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
     return (
       <li className={styles.item}>
         <div className={styles.itemHead}>
-          <span className={styles.itemTitle}>Number {c.number} is used by {c.ids.length} documents</span>
+          <span className={styles.itemTitle}>{tableLabel(c.key)}: number {c.number} is used by {c.ids.length} documents</span>
           <span className={styles.meta}>found {when(c.at)}</span>
         </div>
         <ul className={styles.diff}>
           {c.docs.map((d) => (
             <li key={d.id}>
-              <Link to={`/invoice/${d.id}`}>{d.number || d.id}</Link> · {d.client || 'no client'} · {d.date} · {d.total.toLocaleString('en-IN')}
+              {c.key.endsWith('_invoices') ? <Link to={`/invoice/${d.id}`}>{d.number || d.id}</Link> : d.number || d.id} · {d.client || '—'} · {d.date} · {d.total.toLocaleString('en-IN')}
               {d.device ? ` · from ${d.device}` : ''}
             </li>
           ))}

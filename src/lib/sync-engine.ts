@@ -143,6 +143,8 @@ export type SyncConflict =
   | {
       id: string;
       kind: 'duplicate';
+      /** Table the documents are in (invoices, advances, vouchers, stock transfers). */
+      key: string;
       number: string;
       ids: string[];
       sig: string;
@@ -241,6 +243,7 @@ const DATED: Record<string, string> = {
   [`${DB_PREFIX}vouchers`]: 'date',
   [`${DB_PREFIX}stock_moves`]: 'date',
   [`${DB_PREFIX}stock_transfers`]: 'date',
+  [`${DB_PREFIX}advances`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -646,46 +649,56 @@ function safeParse(s: string): unknown {
   }
 }
 
+/** Numbered documents: table → number / date fields. Two devices can issue the same serial in each. */
+const NUMBERED: Record<string, { num: string; date: string }> = {
+  [INVOICES_KEY]: { num: 'invoice_number', date: 'issue_date' },
+  [`${DB_PREFIX}advances`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}vouchers`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}stock_transfers`]: { num: 'transfer_number', date: 'date' },
+};
+
 /** Duplicate document numbers (two devices issuing the same serial): listed, never renumbered. */
 function flagDuplicates(ctx: MergeCtx): void {
-  const w = ctx.work.get(INVOICES_KEY);
-  const groups = new Map<string, string[]>();
-  if (w?.mode === 'rows') {
+  const live = new Set<string>();
+  for (const [table, f] of Object.entries(NUMBERED)) {
+    const w = ctx.work.get(table);
+    if (w?.mode !== 'rows') continue;
+    const groups = new Map<string, string[]>();
     for (const id of w.ids) {
-      const row = w.rows.get(id) as { invoice_number?: string } | undefined;
-      const k = numberKey(row?.invoice_number);
+      const k = numberKey((w.rows.get(id) as Record<string, string> | undefined)?.[f.num]);
       if (!k) continue;
       const g = groups.get(k);
       if (g) g.push(id);
       else groups.set(k, [id]);
     }
-  }
-  const live = new Set<string>();
-  const metaRows = ctx.state.keys[INVOICES_KEY]?.mode === 'rows' ? (ctx.state.keys[INVOICES_KEY] as { rows: Record<string, RowMeta> }).rows : {};
-  for (const [k, ids] of groups) {
-    if (ids.length < 2) continue;
-    const sorted = [...ids].sort();
-    const sig = `${k}|${sorted.join(',')}`;
-    if (ctx.state.dup_ack.includes(sig)) continue;
-    const id = `dup:${k}`;
-    live.add(id);
-    const existing = ctx.conflicts.find((c) => c.id === id);
-    if (existing?.kind === 'duplicate' && existing.sig === sig) continue;
-    const docs = sorted.map((rid) => {
-      const r = ((w as Extract<Work, { mode: 'rows' }>).rows.get(rid) ?? {}) as Record<string, unknown>;
-      return {
-        id: rid,
-        number: String(r.invoice_number ?? ''),
-        client: String((r.client as { name?: string } | undefined)?.name ?? ''),
-        date: String(r.issue_date ?? ''),
-        total: Number(r.total) || 0,
-        device: ctx.state.peers[metaRows[rid]?.o ?? '']?.name ?? (metaRows[rid]?.o === ctx.self ? 'this device' : ''),
-      };
-    });
-    const c: SyncConflict = { id, kind: 'duplicate', number: docs[0].number, ids: sorted, sig, at: ctx.now, docs };
-    if (existing) ctx.conflicts[ctx.conflicts.indexOf(existing)] = c;
-    else ctx.conflicts.push(c);
-    ctx.stats.newConflicts++;
+    const ks = ctx.state.keys[table];
+    const metaRows = ks?.mode === 'rows' ? ks.rows : {};
+    for (const [k, ids] of groups) {
+      if (ids.length < 2) continue;
+      const sorted = [...ids].sort();
+      const sig = `${table}|${k}|${sorted.join(',')}`;
+      if (ctx.state.dup_ack.includes(sig)) continue;
+      const id = `dup:${table}:${k}`;
+      live.add(id);
+      const existing = ctx.conflicts.find((c) => c.id === id);
+      if (existing?.kind === 'duplicate' && existing.sig === sig) continue;
+      const docs = sorted.map((rid) => {
+        const r = (w.rows.get(rid) ?? {}) as Record<string, unknown>;
+        const origin = metaRows[rid]?.o ?? '';
+        return {
+          id: rid,
+          number: String(r[f.num] ?? ''),
+          client: String((r.client as { name?: string } | undefined)?.name ?? ''),
+          date: String(r[f.date] ?? ''),
+          total: Number(r.total ?? r.amount) || 0,
+          device: origin === ctx.self ? 'this device' : (ctx.state.peers[origin]?.name ?? ''),
+        };
+      });
+      const c: SyncConflict = { id, kind: 'duplicate', key: table, number: docs[0].number, ids: sorted, sig, at: ctx.now, docs };
+      if (existing) ctx.conflicts[ctx.conflicts.indexOf(existing)] = c;
+      else ctx.conflicts.push(c);
+      ctx.stats.newConflicts++;
+    }
   }
   ctx.conflicts = ctx.conflicts.filter((c) => c.kind !== 'duplicate' || live.has(c.id));
 }
