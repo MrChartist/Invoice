@@ -27,6 +27,7 @@ import {
 } from '../src/lib/ledger/closing-stock.ts';
 import { loadYearEnd, postClosingStock, stopValuingStock } from '../src/lib/year-end-store.ts';
 import { yearEndChecklist } from '../src/lib/year-end.ts';
+import { buildFrame } from '../src/lib/gateway/drill.ts';
 import { installSettings } from './helpers/world.ts';
 
 const FY = 2025;
@@ -129,4 +130,31 @@ test('yearEndChecklist (pure): valuation off keeps the old journal behaviour', (
   const s = steps.find((x) => x.id === 'closing_stock')!;
   assert.equal(s.status, 'todo');
   assert.equal(s.amount, 700);
+});
+
+test('Gateway Display balance sheet / P&L equal the Books statements with stock valued', () => {
+  // Opening stock too, so both stock rows appear.
+  saveClosingStockConfig({ mode: 'manual', opening: 200000, entries: [{ date: '2026-03-31', value: 1000000 }] });
+  const ledger = buildLedger(loadLedgerInput());
+  const stock = loadStockValuer();
+  const books = ledgerBalanceSheet(ledger, PERIOD.end, stock);
+  const gw = buildFrame(ledger, 'bs', [], PERIOD, '2026-10-01', { stock })!;
+  const cell = (id: string) => gw.rows.find((r) => r.id === id)?.cells[0];
+  assert.equal(cell('t-liab'), books.totalEquityAndLiabilities);
+  assert.equal(cell('t-assets'), books.totalAssets);
+  assert.equal(cell('t-liab'), cell('t-assets'), 'the Gateway sheet ties');
+  assert.equal(cell('pl'), books.profitForYear);
+  assert.equal(cell('stock-close'), 1000000);
+  assert.equal(cell('stock-open'), 200000);
+  const iTotal = gw.rows.findIndex((r) => r.id === 't-liab');
+  const sum = (rows: typeof gw.rows) => rows.filter((r) => !r.heading).reduce((s, r) => s + Number(r.cells[0] ?? 0), 0);
+  assert.equal(sum(gw.rows.slice(0, iTotal)), books.totalEquityAndLiabilities, 'liability rows add up');
+  assert.equal(sum(gw.rows.slice(iTotal + 1)), books.totalAssets, 'asset rows add up');
+
+  const pl = ledgerProfitAndLoss(ledger, PERIOD, stock);
+  const gpl = buildFrame(ledger, 'pl', [], PERIOD, '2026-10-01', { stock })!;
+  assert.equal(gpl.rows.find((r) => r.id === 'net')!.cells[0], Math.abs(pl.netProfit));
+  assert.equal(gpl.rows.find((r) => r.id === 'stock-close')!.cells[0], pl.trading.closingStock);
+  // Without the valuer the Gateway would disagree: proves the stock really flows through.
+  assert.notEqual(buildFrame(ledger, 'pl', [], PERIOD, '2026-10-01')!.rows.find((r) => r.id === 'net')!.cells[0], Math.abs(pl.netProfit));
 });
