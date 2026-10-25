@@ -266,12 +266,15 @@ const RECORD_TABLES = [
   'stock_items', 'stock_moves', 'godowns', 'stock_transfers',
   // Advance receipts (5.3)
   'advances',
+  // Price levels & schemes (6.9), POS day-close records (6.8)
+  'price_levels', 'schemes', 'pos_day_close',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
   'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', 'cheques', 'bank_accounts', ASSET_TABLE, CUSTOM_FIELDS_TABLE,
   'stock_items', 'godowns', 'stock_transfers', 'advances',
+  'price_levels', 'schemes', 'pos_day_close',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

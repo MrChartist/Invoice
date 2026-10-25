@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import { localDb } from '../../lib/localDb';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency } from '../../lib/utils';
+import { pickCatalogItem } from '../creator/pricing-actions';
 import type { InvoiceItem } from '../../types/invoice';
 import styles from './PickerList.module.css';
 
@@ -15,7 +16,6 @@ interface Props {
 }
 
 export function ItemSearchModal({ isOpen, onClose, targetItemId }: Props) {
-  const applyCatalogItem = useInvoiceStore((s) => s.applyCatalogItem);
   const currency = useInvoiceStore((s) => s.currency);
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -29,7 +29,7 @@ export function ItemSearchModal({ isOpen, onClose, targetItemId }: Props) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = q ? items.filter((i) => i.name?.toLowerCase().includes(q) || i.hsn?.toLowerCase().includes(q)) : items;
+    const list = q ? items.filter((i) => i.name?.toLowerCase().includes(q) || i.hsn?.toLowerCase().includes(q) || i.barcode?.toLowerCase() === q || i.sku?.toLowerCase().includes(q)) : items;
     return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [items, query]);
 
@@ -51,7 +51,7 @@ export function ItemSearchModal({ isOpen, onClose, targetItemId }: Props) {
                 type="button"
                 className={styles.item}
                 onClick={() => {
-                  applyCatalogItem(targetItemId, item);
+                  pickCatalogItem(targetItemId, item);
                   onClose();
                 }}
               >

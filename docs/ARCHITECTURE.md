@@ -72,14 +72,14 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 |---|---|---|
 | `invoices` | core | `InvoiceRecord` (`src/types/invoice.ts`) |
 | `clients` | core | `Client` |
-| `items_catalog` | core | `InvoiceItem` |
+| `items_catalog` | core | `InvoiceItem`; additive catalogue-only `barcode` / `sku` / `mrp` (6.7) and `qty_slabs` (6.9) |
 | `transactions` | core | `Payment` (payments received; `advance_id` marks an advance adjusted against the invoice, not new money) |
 | `vendors` | purchases | `Vendor` (`src/types/purchases.ts`) |
 | `purchases` | purchases | `PurchaseRecord` |
 | `recurring` | recurring | defined by that module |
 | `reminders` | reminders-share | defined by that module |
 | `doc_links` | documents | defined by that module |
-| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials` |
+| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7) |
 | `stock_moves` | inventory | `StockMove` (manual adjustments), additive `godown_id` / `batch_no` / `mfg_date` / `expiry_date` / `serials` |
 | `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed) |
 | `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger |
@@ -108,6 +108,9 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `assets` | storage (`src/lib/assets.ts`) | `{id, data}`: logo / signature data URLs stored once, keyed by content hash (schema v3) |
 | `att_<id>` (one key per file) | attachments (6.12, `src/lib/attachments.ts`) | `{id, mime, size, created_at, data}`: a receipt photo / PDF stored once by content hash; referenced by `attachments: AttachmentRef[]` on `invoices` / `purchases` (and the draft). Not a table: one key per file so a write commits only that file (`listKeys` enumerates them) |
 | `custom_fields` | custom fields (6.23, `src/lib/custom-fields.ts`) | `CustomFieldDef` (`src/types/custom-fields.ts`); values live on the records: `custom_fields` map on clients / vendors / catalogue items, `custom_values` snapshot on invoices and their lines |
+| `price_levels` | pricing (6.9, `src/lib/pricing.ts`) | `PriceLevel {id, name, percent_off?, rates?}` (rates keyed by catalogue item id); clients point at one via optional `price_level` |
+| `schemes` | pricing (6.9) | `Scheme` buy-X-get-Y rows (item, buy / free qty, optional date window, `active`); free goods are ₹0 invoice lines (`scheme_id`, `free_of`) |
+| `pos_day_close` | POS (6.8, `src/lib/pos.ts`) | `PosDayClose` cash-drawer count per day (opening float, expected / counted cash, difference, tender totals); POS bills themselves are normal `invoices` with `pos: true` (`docs/features/pos-barcode-pricing.md`) |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the

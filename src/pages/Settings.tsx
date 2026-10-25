@@ -8,6 +8,7 @@ import { useToast } from '../components/ui/useToast';
 import { ProfileEditor } from '../components/settings/ProfileEditor';
 import { DefaultsPanel } from '../components/settings/DefaultsPanel';
 import { CatalogPanel } from '../components/settings/CatalogPanel';
+import { PricingPanel } from '../components/settings/PricingPanel';
 import { LateFeeSettings } from '../components/interest';
 import { DataPanel } from '../components/settings/DataPanel';
 import { SecurityPanel } from '../components/security/SecurityPanel';
@@ -239,7 +240,12 @@ export function Settings() {
         </div>
       )}
 
-      {tab === 'items' && <CatalogPanel notify={notify} />}
+      {tab === 'items' && (
+        <>
+          <CatalogPanel notify={notify} />
+          <PricingPanel notify={notify} />
+        </>
+      )}
       {tab === 'fields' && (
         <Suspense fallback={null}>
           <CustomFieldsPanel notify={notify} />

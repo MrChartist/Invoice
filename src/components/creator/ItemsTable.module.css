@@ -325,3 +325,21 @@
 .trackNote {
   color: var(--warning);
 }
+
+/* Scan box + price level note above the items (6.7 / 6.9). */
+.scanBar {
+  padding: 0.75rem 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.levelNote {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}

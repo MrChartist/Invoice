@@ -56,6 +56,18 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   catalogue items, command palette (Ctrl+K), first-run setup wizard.
 - **Ship-to / consignee address**, taxable freight option (Sec 15), foreign-currency documents with an exchange rate.
 - **Recurring invoices** with schedules, generated in the background.
+- **POS quick bill** (`/pos`): one-screen counter billing — scan or search items, quantity − / +, line discount,
+  walk-in customer by default (place of supply = the business's state) or a saved client; split tender across cash,
+  UPI and card with a change calculator; saving creates a normal invoice (Bill of Supply for composition profiles) with
+  FEFO batch auto-pick, serial prompts and one payment per tender, then prints the 80 mm receipt. F-key shortcuts.
+  Day-end Z report (bills, gross, discounts, GST by rate, tenders) with a cash-drawer count, 80 mm print and CSV.
+- **Barcodes**: barcode / SKU on catalogue and stock items; scanning with a USB / Bluetooth scanner (keyboard wedge) or
+  the camera (`BarcodeDetector`) adds the item or raises its quantity, in the editor and the POS. A4 label sheets
+  (24 / 40 / 65-up) with name, MRP / sale price and a Code 128 or EAN-13 barcode drawn by the app's own encoders;
+  in-store EAN-13 codes can be assigned.
+- **Price levels & schemes**: named price levels (Retail / Wholesale / Distributor …) with per-item rates or a % off,
+  given to clients; quantity slabs per item; buy-X-get-Y schemes billed as a ₹0 line (GST on the price paid for the
+  bundle — verify with your CA). All opt-in; a typed rate always wins.
 - **Credit control**: per-client credit limit and credit days; the editor warns (never blocks) when outstanding + the
   new invoice exceeds the limit, a bill is older than the credit period, or the client's cheques bounced.
 - **Cheque register** (`/cheques`): cheques received / issued with deposit, clearing (records the payment), bounce
@@ -224,6 +236,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   e-Invoice or Tally outputs.
 - Advances: INR only; GST on advances is not in the Tally XML (post it with Tally's advance-receipt feature); refunds are
   reported in GSTR-1 Table 11B and GSTR-3B 3.2 is not adjusted for advances — confirm both with your CA.
+- POS / barcodes / pricing (6.7–6.9): no POS return screen (raise a credit note), no ESC/POS raw printing or cash-drawer
+  kick, camera scanning only where the browser has `BarcodeDetector`; schemes are same-item buy-X-get-Y only; levels and
+  schemes apply in the editor and POS, not to imports, recurring runs or conversions.
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
 - Composition / amendments (5.9): e-commerce Sec 52 / 9(5), export amendments (EXPA), GSTR-9 Part V, CMP-08 / GSTR-4
   interest and late fees and composition eligibility checks are not built; re-amending keeps only the first original.

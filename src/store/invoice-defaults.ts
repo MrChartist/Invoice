@@ -177,6 +177,10 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(Array.isArray(item.serials) && item.serials.length ? { serials: item.serials.map(String) } : {}),
     ...(num(item.warranty_months) > 0 ? { warranty_months: num(item.warranty_months) } : {}),
     ...(item.godown_id ? { godown_id: String(item.godown_id) } : {}),
+    // Pricing (6.9): absent unless a level / slab / scheme set the line.
+    ...(item.price_basis ? { price_basis: String(item.price_basis) } : {}),
+    ...(item.scheme_id ? { scheme_id: String(item.scheme_id) } : {}),
+    ...(item.free_of ? { free_of: String(item.free_of) } : {}),
   };
 }
 
@@ -295,6 +299,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(readRefs(r.attachments).length ? { attachments: readRefs(r.attachments) } : {}),
     ...(r.exempt_kind === 'NIL' || r.exempt_kind === 'EXEMPT' || r.exempt_kind === 'NON_GST' ? { exempt_kind: r.exempt_kind } : {}),
     ...(normalizeAmends(r.amends) ? { amends: normalizeAmends(r.amends) } : {}),
+    ...(r.pos === true ? { pos: true } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

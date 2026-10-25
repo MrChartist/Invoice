@@ -51,6 +51,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     custom_values: [{ id: 'f1', label: 'Vehicle no.', type: 'text', value: 'MH12AB1234', print: true }],
     attachments: [{ id: 'a1', name: 'po.pdf', mime: 'application/pdf', size: 10, added_at: '2026-04-10T00:00:00Z' }],
     exempt_kind: 'NIL',
+    pos: true,
     amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };
@@ -76,4 +77,16 @@ test('stock-tracking line fields survive load → edit → save; untracked lines
   for (const k of ['batch_no', 'batch_expiry', 'batch_mfg', 'serials', 'warranty_months', 'godown_id']) {
     assert.ok(!(k in r.items[1]), `untracked line has no ${k}`);
   }
+});
+
+test('pricing line fields (6.9) survive load → edit → save; plain lines gain none', () => {
+  const priced = { id: 'p1', name: 'Rice 5 kg', type: 'product', quantity: 10, rate: 300, amount: 3000, price_basis: 'Wholesale' };
+  const free = { id: 'p2', name: 'Rice 5 kg', type: 'product', quantity: 1, rate: 0, amount: 0, scheme_id: 'sch1', free_of: 'p1' };
+  const r = normalizeRecord({ ...legacy, gst_mode: 'IGST', items: [priced, free, { id: 'p3', name: 'Plain', quantity: 1, rate: 5, amount: 5 }] });
+  assert.equal(r.items[0].price_basis, 'Wholesale');
+  assert.equal(r.items[1].scheme_id, 'sch1');
+  assert.equal(r.items[1].free_of, 'p1');
+  for (const k of ['price_basis', 'scheme_id', 'free_of']) assert.ok(!(k in r.items[2]), `plain line has no ${k}`);
+  assert.equal(normalizeRecord({ ...legacy, pos: true }).pos, true);
+  assert.ok(!('pos' in normalizeRecord(legacy)), 'a non-POS record gains no pos flag');
 });

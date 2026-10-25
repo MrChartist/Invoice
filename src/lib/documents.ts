@@ -262,6 +262,7 @@ export function buildConvertedDraft(
     order_closed_on: undefined,
     // An amendment marker belongs to the one document that was amended — never to a copy.
     amends: undefined,
+    pos: undefined,
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
   };
@@ -474,6 +475,7 @@ export function buildCreditNote(
     created_at: undefined,
     updated_at: undefined,
     amends: undefined,
+    pos: undefined,
   };
   const rec = recompute(base);
   // A credit note is not receivable; it reduces the original's balance.
@@ -571,6 +573,7 @@ export function buildDebitNote(
     created_at: undefined,
     updated_at: undefined,
     amends: undefined,
+    pos: undefined,
   });
 }
 

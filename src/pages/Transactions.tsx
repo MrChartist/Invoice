@@ -218,6 +218,7 @@ export function Transactions() {
         attachments: undefined,
         // An amendment marker belongs to the amended document only (5.9).
         amends: undefined,
+        pos: undefined,
         created_at: undefined,
         updated_at: undefined,
         // A copy is a fresh document: it fulfils no sales order and is not closed.

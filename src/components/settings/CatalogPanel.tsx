@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Package, Pencil, Percent, Plus, Search, Trash2 } from 'lucide-react';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { Barcode, Package, Pencil, Percent, Plus, Search, Trash2, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
 import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
@@ -16,6 +16,10 @@ import {
   type RoundTo,
 } from '../../lib/catalog';
 import { GST_SLABS, UNITS, type InvoiceItem } from '../../types/invoice';
+import { nextInStoreEan } from '../../lib/barcode';
+import { levelRate, priceLevelsDb } from '../../lib/pricing';
+import { getTable } from '../../lib/storage';
+import { TABLES, type StockItem } from '../../lib/inventory';
 import { cn, formatCurrency } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -23,7 +27,10 @@ import styles from './CatalogPanel.module.css';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
-const BLANK: CatalogDraft = { name: '', type: 'Service', hsn: '', unit: 'NOS', rate: 0, tax_rate: 18 };
+// The label sheet (encoders + print HTML) loads only when opened.
+const LabelSheetModal = lazy(() => import('./LabelSheetModal').then((m) => ({ default: m.LabelSheetModal })));
+
+const BLANK: CatalogDraft = { name: '', type: 'Service', hsn: '', unit: 'NOS', rate: 0, tax_rate: 18, barcode: '', sku: '', mrp: 0, qty_slabs: [] };
 
 const toDraft = (i: InvoiceItem): CatalogDraft => ({
   id: i.id,
@@ -34,6 +41,10 @@ const toDraft = (i: InvoiceItem): CatalogDraft => ({
   rate: i.rate ?? 0,
   tax_rate: typeof i.tax_rate === 'number' ? i.tax_rate : 18,
   custom_fields: i.custom_fields,
+  barcode: i.barcode ?? '',
+  sku: i.sku ?? '',
+  mrp: i.mrp ?? 0,
+  qty_slabs: i.qty_slabs ?? [],
 });
 
 const ROUND_LABELS: Record<RoundTo, string> = {
@@ -54,6 +65,10 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
   const [revise, setRevise] = useState(false);
   const [percent, setPercent] = useState(10);
   const [roundMode, setRoundMode] = useState<RoundTo>('rupee');
+  const [labels, setLabels] = useState(false);
+  // Per-level own rates being edited for the open item (level id → text; blank = use the level's % off).
+  const [levelRates, setLevelRates] = useState<Record<string, string>>({});
+  const [levels, setLevels] = useState(() => priceLevelsDb.all());
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const items = useMemo(() => listCatalog(), [version]);
@@ -66,10 +81,37 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
   const reload = () => setVersion((v) => v + 1);
   const allShownSelected = filtered.length > 0 && filtered.every((i) => selected.has(i.id));
 
+  const openDraft = (d: CatalogDraft) => {
+    setDraft(d);
+    setError(null);
+    const all = priceLevelsDb.all();
+    setLevels(all);
+    const own: Record<string, string> = {};
+    for (const l of all) {
+      const r = d.id ? l.rates?.[d.id] : undefined;
+      own[l.id] = typeof r === 'number' ? String(r) : '';
+    }
+    setLevelRates(own);
+  };
+
+  const generateBarcode = () => {
+    if (!draft) return;
+    const taken = new Set<string>([
+      ...items.map((i) => i.barcode ?? ''),
+      ...getTable<StockItem>(TABLES.items).map((i) => i.barcode ?? ''),
+    ]);
+    setDraft({ ...draft, barcode: nextInStoreEan(taken, items.length + 1) });
+  };
+
   const save = () => {
     if (!draft) return;
     const result = saveCatalogItem({ ...draft, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
     if (!result.ok) return setError(result.error);
+    for (const l of levels) {
+      const text = (levelRates[l.id] ?? '').trim();
+      const n = text === '' ? undefined : Number(text);
+      if (l.rates?.[result.item.id] !== n) priceLevelsDb.setItemRate(l.id, result.item.id, n);
+    }
     notify(draft.id ? `${result.item.name} updated` : `${result.item.name} added`);
     setDraft(null);
     setError(null);
@@ -93,16 +135,16 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
           <Package size={16} /> Items &amp; default rates
         </span>
         <div className={surface.pageActions}>
+          <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setLabels(true)} disabled={items.length === 0}>
+            <Barcode size={14} /> Print labels
+          </button>
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setRevise(true)} disabled={items.length === 0}>
             <Percent size={14} /> Revise rates
           </button>
           <button
             type="button"
             className={cn(controls.btnPrimary, controls.btnSm)}
-            onClick={() => {
-              setDraft({ ...BLANK });
-              setError(null);
-            }}
+            onClick={() => openDraft({ ...BLANK })}
           >
             <Plus size={14} /> Add item
           </button>
@@ -168,7 +210,9 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                     </td>
                     <td>
                       <div className={styles.name}>{i.name}</div>
-                      <div className={styles.sub}>{i.type || 'Service'}</div>
+                      <div className={styles.sub}>
+                        {[i.type || 'Service', i.sku && `SKU ${i.sku}`, i.barcode && `Barcode ${i.barcode}`, i.qty_slabs?.length ? `${i.qty_slabs.length} qty slab${i.qty_slabs.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}
+                      </div>
                     </td>
                     <td className={surface.mono}>{i.hsn || '—'}</td>
                     <td>{i.unit || '—'}</td>
@@ -181,10 +225,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                           className={controls.btnIcon}
                           aria-label={`Edit ${i.name}`}
                           title="Edit"
-                          onClick={() => {
-                            setDraft(toDraft(i));
-                            setError(null);
-                          }}
+                          onClick={() => openDraft(toDraft(i))}
                         >
                           <Pencil size={16} />
                         </button>
@@ -290,6 +331,95 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                 </select>
               </label>
             </div>
+            <div className={controls.row3}>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="catalog-barcode">Barcode</label>
+                <div className={styles.inline}>
+                  <input
+                    id="catalog-barcode"
+                    className={cn(controls.input, controls.inputMono, fieldError('barcode') && controls.inputInvalid)}
+                    value={draft.barcode ?? ''}
+                    onChange={(e) => setDraft({ ...draft, barcode: e.target.value })}
+                    placeholder="Scan or type"
+                    aria-invalid={!!fieldError('barcode')}
+                  />
+                  {!draft.barcode && (
+                    <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={generateBarcode} title="Assign an in-store EAN-13 (starts with 2)">
+                      New
+                    </button>
+                  )}
+                </div>
+                {fieldError('barcode') && <span className={controls.error}>{fieldError('barcode')}</span>}
+              </div>
+              <label className={controls.field}>
+                <span className={controls.label}>SKU / item code</span>
+                <input
+                  className={cn(controls.input, controls.inputMono, fieldError('sku') && controls.inputInvalid)}
+                  value={draft.sku ?? ''}
+                  onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
+                  aria-invalid={!!fieldError('sku')}
+                />
+                {fieldError('sku') && <span className={controls.error}>{fieldError('sku')}</span>}
+              </label>
+              <label className={controls.field}>
+                <span className={controls.label}>MRP (₹)</span>
+                <NumberInput className={cn(controls.input, controls.inputNumeric)} value={draft.mrp ?? 0} onChange={(n) => setDraft({ ...draft, mrp: n })} placeholder="For labels" />
+              </label>
+            </div>
+
+            <fieldset className={styles.group}>
+              <legend className={controls.label}>Quantity slabs (optional)</legend>
+              {(draft.qty_slabs ?? []).map((slab, n) => (
+                <div key={n} className={styles.inline}>
+                  <span className={styles.sub}>Qty ≥</span>
+                  <NumberInput
+                    className={cn(controls.input, controls.inputNumeric, styles.small)}
+                    value={slab.min_qty}
+                    onChange={(v) => setDraft({ ...draft, qty_slabs: (draft.qty_slabs ?? []).map((x, k) => (k === n ? { ...x, min_qty: v } : x)) })}
+                    aria-label={`Slab ${n + 1} minimum quantity`}
+                  />
+                  <span className={styles.sub}>rate ₹</span>
+                  <NumberInput
+                    className={cn(controls.input, controls.inputNumeric, styles.small)}
+                    value={slab.rate}
+                    onChange={(v) => setDraft({ ...draft, qty_slabs: (draft.qty_slabs ?? []).map((x, k) => (k === n ? { ...x, rate: v } : x)) })}
+                    aria-label={`Slab ${n + 1} rate`}
+                  />
+                  <button type="button" className={controls.btnIcon} aria-label={`Remove slab ${n + 1}`} onClick={() => setDraft({ ...draft, qty_slabs: (draft.qty_slabs ?? []).filter((_, k) => k !== n) })}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setDraft({ ...draft, qty_slabs: [...(draft.qty_slabs ?? []), { min_qty: 0, rate: draft.rate }] })}>
+                <Plus size={14} /> Add slab
+              </button>
+              <span className={controls.hint}>A line of at least that quantity gets the slab rate (the lower of a party&apos;s level rate and the slab wins).</span>
+            </fieldset>
+
+            {levels.length > 0 && (
+              <fieldset className={styles.group}>
+                <legend className={controls.label}>Price levels</legend>
+                <div className={controls.row3}>
+                  {levels.map((l) => {
+                    const fromPct = levelRate({ ...l, rates: undefined }, { id: draft.id ?? '', rate: draft.rate });
+                    return (
+                      <label key={l.id} className={controls.field}>
+                        <span className={controls.label}>{l.name} (₹)</span>
+                        <input
+                          className={cn(controls.input, controls.inputNumeric)}
+                          inputMode="decimal"
+                          value={levelRates[l.id] ?? ''}
+                          onChange={(e) => setLevelRates((r) => ({ ...r, [l.id]: e.target.value.replace(/[^\d.]/g, '') }))}
+                          placeholder={fromPct !== undefined ? `${fromPct} (${l.percent_off}% off)` : `${draft.rate} (base)`}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+                <span className={controls.hint}>Leave blank to use the level&apos;s % off the default rate.</span>
+              </fieldset>
+            )}
+
             <CustomFieldInputs scope="item" idPrefix="catalog" value={draft.custom_fields} onChange={(custom_fields) => setDraft({ ...draft, custom_fields })} />
           </form>
         )}
@@ -339,6 +469,12 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
           Use a negative number to lower rates. Free items (rate 0) stay free. Existing invoices are never changed.
         </p>
       </Modal>
+
+      {labels && (
+        <Suspense fallback={null}>
+          <LabelSheetModal open={labels} onClose={() => setLabels(false)} onChanged={reload} preselected={selected} />
+        </Suspense>
+      )}
 
       <ConfirmDialog
         open={!!removing}

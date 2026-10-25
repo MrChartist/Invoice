@@ -19,7 +19,7 @@ export interface ItemFormModalProps {
 }
 
 interface Draft {
-  name: string; sku: string; hsn: string; unit: string; track_stock: boolean;
+  name: string; sku: string; barcode: string; hsn: string; unit: string; track_stock: boolean;
   opening_qty: string; opening_rate: string; reorder_level: string;
   sale_rate: string; tax_rate: string; location: string;
   track_batches: boolean; track_serials: boolean; warranty_months: string; opening_serials: string;
@@ -27,7 +27,7 @@ interface Draft {
 
 function toDraft(i: StockItem): Draft {
   return {
-    name: i.name, sku: i.sku ?? '', hsn: i.hsn ?? '', unit: i.unit || 'NOS', track_stock: i.track_stock,
+    name: i.name, sku: i.sku ?? '', barcode: i.barcode ?? '', hsn: i.hsn ?? '', unit: i.unit || 'NOS', track_stock: i.track_stock,
     opening_qty: String(i.opening_qty || ''), opening_rate: String(i.opening_rate || ''),
     reorder_level: String(i.reorder_level || ''), sale_rate: i.sale_rate ? String(i.sale_rate) : '',
     tax_rate: i.tax_rate !== undefined ? String(i.tax_rate) : '', location: i.location ?? '',
@@ -68,6 +68,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       ...item,
       name,
       sku: d.sku.trim() || undefined,
+      barcode: d.barcode.trim() || undefined,
       hsn: d.hsn.trim() || undefined,
       unit: d.unit,
       track_stock: d.track_stock,
@@ -120,6 +121,10 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-sku`}>SKU</label>
             <input id={`${uid}-sku`} className={controls.input} value={d.sku} onChange={(e) => set('sku', e.target.value)} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor={`${uid}-barcode`}>Barcode</label>
+            <input id={`${uid}-barcode`} className={controls.input} value={d.barcode} onChange={(e) => set('barcode', e.target.value)} placeholder="Scan or type" />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-hsn`}>HSN / SAC</label>

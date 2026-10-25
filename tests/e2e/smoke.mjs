@@ -497,6 +497,58 @@ try {
     await writeJson(page, 'purchases', prevPurchases);
   });
 
+  await step('POS: typed barcode, split cash + UPI, bill saved Paid, Z report shows the totals', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-soap', name: 'E2E Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865275',
+    }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    // A USB scanner is a keyboard: it types the code and presses Enter.
+    await scan.fill('8901030865275');
+    await scan.press('Enter');
+    await page.getByLabel('Quantity of E2E Soap (line 1)').waitFor();
+    await scan.fill('8901030865275');
+    await scan.press('Enter');
+    const qty = page.getByLabel('Quantity of E2E Soap (line 1)');
+    await page.waitForFunction(() => document.querySelector('[aria-label="Quantity of E2E Soap (line 1)"]')?.value === '2', null, { timeout: 5000 }).catch(() => {});
+    check((await qty.inputValue()) === '2', `scanning the same code again raises the quantity (${await qty.inputValue()})`);
+    const total = await page.locator('[data-pos-total]').innerText();
+    check(/236\.00/.test(total), `total with 18% GST (${total})`);
+    await page.locator('#pos-Cash').fill('100');
+    await page.keyboard.press('F6'); // UPI takes the rest
+    await page.waitForFunction(() => document.querySelector('#pos-UPI')?.value === '136', null, { timeout: 5000 }).catch(() => {});
+    check((await page.locator('#pos-UPI').inputValue()) === '136', `F6 fills the rest into UPI (${await page.locator('#pos-UPI').inputValue()})`);
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    check(bill?.status === 'Paid' && bill.total === 236 && bill.client?.name === 'Walk-in customer', `POS bill saved as a paid invoice (${bill?.status}, ${bill?.total})`);
+    const pays = (await readJson(page, 'transactions', [], (v) => v.filter((t) => t.invoice_id === bill?.id).length === 2)).filter((t) => t.invoice_id === bill?.id);
+    check(pays.length === 2 && pays.some((p) => p.method === 'Cash' && p.amount === 100) && pays.some((p) => p.method === 'UPI' && p.amount === 136),
+      `one payment per tender (${pays.map((p) => `${p.method} ${p.amount}`).join(', ')})`);
+    check((await scan.inputValue()) === '' && (await page.getByText('Scan an item or search by name to start the bill.').count()) === 1, 'the counter resets for the next bill');
+
+    await page.getByRole('button', { name: 'Z report' }).click();
+    const z = page.getByRole('dialog', { name: 'Day-end Z report' });
+    await z.waitFor();
+    const net = await z.locator('[data-z="net"]').innerText();
+    const cash = await z.locator('[data-z="cash"]').innerText();
+    const upi = await z.locator('[data-z="upi"]').innerText();
+    check(/236\.00/.test(net) && /100\.00/.test(cash) && /136\.00/.test(upi), `Z report totals (net ${net}, cash ${cash}, UPI ${upi})`);
+    await z.locator('#z-counted').fill('100');
+    await z.getByRole('button', { name: 'Close the day' }).click();
+    const closes = await readJson(page, 'pos_day_close', [], (v) => v.length > 0);
+    check(closes.length === 1 && closes[0].counted_cash === 100 && closes[0].difference === 0, 'day close stored with the drawer count');
+    await z.getByRole('button', { name: 'Close', exact: true }).first().click().catch(() => page.keyboard.press('Escape'));
+
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => t.invoice_id !== bill?.id));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id));
+    await writeJson(page, 'items_catalog', prevCatalog);
+    await writeJson(page, 'pos_day_close', null);
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');

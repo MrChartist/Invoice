@@ -154,6 +154,7 @@ export function buildLateFeeInvoice(
     updated_at: undefined,
     late_fee_for: original.id,
     amends: undefined,
+    pos: undefined,
   };
   const t = calculateInvoice(calcInputFromRecord(rec));
   return {

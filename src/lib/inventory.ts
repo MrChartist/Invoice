@@ -30,6 +30,8 @@ export interface StockItem {
   /** Matches the catalogue / invoice line name (case-insensitive). */
   name: string;
   sku?: string;
+  /** Additive (6.7): barcode on the pack; a scan in the editor / POS finds the item by it. */
+  barcode?: string;
   hsn?: string;
   unit: string;
   track_stock: boolean;
