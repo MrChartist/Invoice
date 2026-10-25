@@ -228,7 +228,7 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.14 | ✅ **Display reports with drill-down**: Balance sheet / P&L / Trial balance / Group summary → ledgers → parties → months → vouchers → voucher or document; Day book; Cash/bank books; Outstandings | `src/lib/gateway/drill.ts`, `DisplayReport.tsx` | M |
 | 7.15 | ✅ **Keyboard help** (Ctrl+/ or ?) with a "Tally keys" group; clickable button bar for mouse / touch | `keymap.ts`, `ButtonBar.tsx` | S |
 | 7.16 | ✅ **"Tally terms" toggle** (Party, Sales voucher, Purchase voucher) on Gateway screens only | device-local preference | S |
-| 7.17 | ⏳ **Stock journal (Alt+F7) / Physical stock (Ctrl+F7)**: key hooks and menu rows ready (shown "not available"); wire them when the manufacturing / stock-count screens land (`GATEWAY_EXTENSIONS`, `TALLY_KEYS`) | — | S |
+| 7.17 | ✅ **Stock journal (Alt+F7) / Physical stock (Ctrl+F7)**: keys and Gateway rows open `/manufacturing?tab=journal` / `?tab=physical` (WIP-B) | `TALLY_KEYS`, `menu.ts` | S |
 | 7.18 | ⏳ **Employee master / payroll vouchers** in Create, **TDS** statutory rows (7.1–7.3), **Ratio analysis** report (7.6) | add through `GATEWAY_EXTENSIONS` when those modules exist | S |
 | 7.19 | ⏳ Bill-wise references (7.5) and voucher classes (7.4) on Gateway voucher entry, single-entry mode | needs a voucher schema addition | M |
 | 7.20 | ✅ **Each bank account as its own ledger** (WP-5, P0-8): main account keeps 3510, others `bank:<id>` under Cash & bank or Bank OD A/c; receipts, supplier payments / advances, advance receipts / refunds, TDS challans and cheques post to their bank; per-bank openings; contra between banks (OD included); Books bank book per account; Tally one ledger per bank | `src/lib/bank-ledgers.ts`, `src/lib/ledger/postings-bank.ts`, `src/lib/tally-bank.ts`, `docs/features/banking.md` | M |
@@ -246,11 +246,28 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.23 | ✅ **Purchase order outstanding** report (GRN-accepted + directly billed vs ordered, overdue days) | Purchase Order Outstandings | done |
 | 7.24 | Job work in / out (Rule 55 challans, 1 / 3-year return clocks, job-worker godowns) + **ITC-04** working paper; Rejections In (customer rejects a challan); sales-order outstanding (WP-8); GSTR-9 Table 6 / 9C use of supplier notes; TDS adjustment on a return of a TDS bill | Job Work Out / In Orders, Material Out / In, ITC-04 | open |
 
+<<<<<<< HEAD
 ### Printing & documents output (WP-4)
 
 | # | Item | Gap ids | Effort |
 |---|------|---------|--------|
 | 7.25 | ✅ **Printing & documents output**: Rule 48 copies in one print job / PDF with a per-profile default, transport details printed (GST dispatch cells + block), voucher printing, batch PDF / ZIP, bulk statements + confirmation-of-accounts letters, pre-printed stationery mode — `docs/features/printing.md` | P0-9, P1-15, P1-24, P1-6 (print), P2 | M |
+=======
+### Manufacturing & stock vouchers (WIP-B)
+
+Details: `docs/features/manufacturing.md`.
+
+| # | Item | Tally equivalent | Status |
+|---|------|------------------|--------|
+| 7.B1 | **Bill of Materials** per stock item: components per unit, scrap %, by-products / co-products / scrap, optional godown, several BOMs with a default (`src/lib/manufacturing.ts`, table `boms`) | Components (BoM) | ✅ |
+| 7.B2 | **Manufacturing Journal** `MFG/FY…`: BOM explosion, FEFO batch consumption, additional costs (₹ / %), produced goods valued at component cost + additional − by-product / scrap; period lock, audit, roles | Alt+F7 Manufacturing Journal | ✅ |
+| 7.B3 | **Stock Journal** `SJ/FY…` for conversion / repacking; godown transfers stay STR (`stock_transfers`) | Alt+F7 Stock Journal | ✅ |
+| 7.B4 | **Physical Stock** `PHY/FY…`: counted vs book, shortage / excess with value, positions after the date follow the count, drift warning | Ctrl+F7 Physical Stock | ✅ |
+| 7.B5 | **Reorder levels + MOQ** (per godown optional), Reorder Status with pending POs and "Create purchase order", bell alert | Reorder Status | ✅ |
+| 7.B6 | **Inventory reports**: Stock Summary drill-down (item → month → vouchers), Movement Analysis by party, Stock Ageing (FIFO layers, by batch), Negative stock exceptions (`src/lib/stock-reports.ts`) | Stock Summary, Movement Analysis, Ageing | ✅ |
+| 7.B7 | Job work out / in orders, material sent / received, ITC-04 | Job Work vouchers | see 7.24 |
+| 7.B8 | Serial-tracked items in manufacturing; production plan / material requirement vs BOM | — | Next step |
+>>>>>>> 4be9db9 (feat(manufacturing): /manufacturing screens, Hindi strings, e2e step and docs)
 
 ### Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
 

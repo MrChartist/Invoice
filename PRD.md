@@ -191,6 +191,14 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   note that names them) with warranty months and a serial lookup (bill, vendor, invoice, client, warranty status).
   **Godowns** appear once a second godown exists: godown per bill / invoice line, stock per godown, stock transfer
   vouchers `STR/FY25-26/0001` (period lock + audit, no books posting). Costing stays company-wide.
+- **Manufacturing & stock vouchers** (`/manufacturing`, Tally parity): Bills of Materials (components per unit,
+  scrap %, by-products / co-products / scrap, several per item with a default), Manufacturing Journal
+  `MFG/FY26-27/0001` (components from the BOM, FEFO batch split, labour / power / overhead as ₹ or %, finished goods
+  valued at component cost + additional − by-product / scrap value), Stock Journal `SJ/…` for conversions and
+  repacking (godown-only moves stay STR transfers), Physical Stock `PHY/…` (counted vs book, shortage / excess posted
+  on the date), reorder levels + minimum order qty (per godown optional) with a Reorder Status that raises a purchase
+  order and a bell alert, and Stock Summary drill-down, Movement Analysis, Stock Ageing and Negative-stock reports.
+  Stock only: nothing posts to Books or the ledger (`docs/features/manufacturing.md`).
 - **Controls**: audit trail of every change with a tamper-evident hash chain and exportable head hash; "lock books up
   to" period lock enforced in the data layer with PIN-guarded, audited overrides.
 
@@ -262,6 +270,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - No direct portal / IRP / bank / payment-gateway connection (by design: no server).
 - Several bank accounts reconcile separately (BRS, statements, receipts and supplier payments name their account), but
   the Books bank book and the ledger keep one Bank total; cheques clear into the main account.
+- Manufacturing / stock journals move stock value only; additional costs are expensed when paid, and the ledger
+  does not value stock (no WIP or stock-in-hand posting). Serial-tracked items cannot be manufactured yet; job work
+  (Tally job work in / out, ITC-04) is not built.
 - The ledger does not value closing stock or handle fixed-asset disposals automatically — post them with a journal
   voucher. Realised exchange differences are posted automatically when a receipt carries its realised rate;
   unrealised (period-end revaluation) differences are reported only — post the reversing journal if your CA wants it.

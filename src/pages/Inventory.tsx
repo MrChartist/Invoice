@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowDownToLine, BookOpen, Boxes, Download, Edit3, PackagePlus, Plus,
   Search, SlidersHorizontal, Trash2, TrendingDown, Warehouse,
@@ -189,6 +189,8 @@ export function Inventory() {
         subtitle={invT('subtitle')}
         actions={
           <>
+            {/* Phase 7: BOM, Manufacturing / Stock Journal, Physical Stock, Reorder Status, stock reports */}
+            <Link to="/manufacturing" className={controls.btnOutline}>{invT('manufacturing')}</Link>
             <button type="button" className={controls.btnOutline} onClick={() => download(`stock-summary-${todayInput()}.csv`, stockSummaryCsv(positions))} disabled={!hasItems}>
               <Download size={16} aria-hidden="true" /> {invT('exportCsv')}
             </button>

@@ -29,8 +29,8 @@ page is not `/pos` (POS owns F2–F10). Entries the signed-in role cannot use ar
 | F9 | Purchase (bill form) | `/expenses?new=bill` |
 | Ctrl+F8 | Credit note | `/invoice?type=CREDIT_NOTE` |
 | Ctrl+F9 | Debit note | `/invoice?type=DEBIT_NOTE` |
-| Alt+F7 | Stock journal | hook ready, no screen yet (does nothing) |
-| Ctrl+F7 | Physical stock | hook ready, no screen yet (does nothing) |
+| Alt+F7 | Stock journal (and Manufacturing journal tab) | `/manufacturing?tab=journal` |
+| Ctrl+F7 | Physical stock | `/manufacturing?tab=physical` |
 | F11 | Features | `/settings?tab=defaults` |
 | F12 | Configure | `/settings` |
 | Alt+G / Ctrl+G | Go To | Gateway with the Go To box focused |
