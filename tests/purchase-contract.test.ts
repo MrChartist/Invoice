@@ -357,3 +357,14 @@ test('TDS-on-payables fields (Tally parity): every reader agrees on what the sup
   // Legacy rows read as no TDS.
   assert.deepEqual([readPurchase(bill)!.tdsAmount, readPurchase(bill)!.tdsOnBill, supplierPayable(bill)], [0, 0, 1180]);
 });
+
+test('WP-1: a vendor placed in a Sundry Creditors sub-group (additive group_id) reads the same everywhere', async () => {
+  const { buildLedger, A, trialBalance } = await import('../src/lib/ledger/index.ts');
+  const { EMPTY_BOOKS } = await import('../src/lib/books.ts');
+  const vendor = { id: 'v1', name: 'Acme Supplies', group_id: 'grp-mumbai-creditors' };
+  const withGroup = { ...bill, vendor_id: 'v1' };
+  assert.equal(booksNormalize(withGroup as never, [vendor] as never)!.total, 1180);
+  const ledger = buildLedger({ ...EMPTY_BOOKS, purchases: [withGroup] as never, vendors: [vendor], userAccounts: [], manual: [], assets: [], today: '2026-04-30' });
+  const tb = trialBalance(ledger, { start: '2026-04-01', end: '2026-04-30' });
+  assert.equal(tb.rows.find((r) => r.account.id === A.creditors)!.credit, 118000);
+});

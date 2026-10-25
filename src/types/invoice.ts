@@ -224,6 +224,12 @@ export interface Client {
   credit_days?: number;
   /** Additive (6.9): id of the `price_levels` row this party buys at (e.g. Wholesale). Absent = base rates. */
   price_level?: string;
+  /**
+   * Additive (WP-1 masters): id of a user sub-group under Sundry Debtors (`groups` table,
+   * `src/lib/ledger/accounts.ts`) this party is placed in. Absent = directly under Sundry Debtors.
+   * The party's opening balance lives in `ledger_openings`, its bill-wise breakup in `opening_bills`.
+   */
+  group_id?: string;
   created_at?: string;
   updated_at?: string;
 }

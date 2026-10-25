@@ -524,6 +524,47 @@ try {
     check(true, 'Esc returns to the Day Book');
   });
 
+  await step('masters: sub-group under Sundry Debtors, party with a ₹10,000 Dr opening bill, seen in ageing and the trial balance', async () => {
+    await page.goto(srv.origin + '/books?tab=coa&m=group-create');
+    const gform = page.getByRole('region', { name: 'Group Creation' });
+    await gform.getByLabel('Name', { exact: true }).fill('Debtors – Mumbai');
+    await gform.getByLabel('Under', { exact: true }).selectOption('TRADE_RECEIVABLES');
+    await gform.getByLabel('Name', { exact: true }).press('Control+a'); // Tally: Ctrl+A accepts
+    const groups = await readJson(page, 'groups', [], (v) => v.length === 1);
+    check(groups.length === 1 && groups[0].parent === 'TRADE_RECEIVABLES', 'group created under Sundry Debtors with Ctrl+A');
+
+    await page.goto(srv.origin + '/books?tab=coa&m=ledger-create');
+    const lform = page.getByRole('region', { name: 'Ledger Creation' });
+    await lform.getByLabel('Name', { exact: true }).fill('Mumbai Mart');
+    await lform.getByLabel('Under', { exact: true }).selectOption(groups[0].id);
+    await lform.getByLabel(/^Opening balance \(on/).first().fill('10000');
+    await lform.getByRole('button', { name: 'Accept (Ctrl+A)' }).click();
+    const bw = page.getByRole('region', { name: 'Bill-wise details for: Mumbai Mart' });
+    await bw.waitFor();
+    // A bill dated before the books begin (1 April of the current FY by default).
+    const now = new Date();
+    const fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    await bw.getByLabel('Bill 1 reference').fill('OB/1');
+    await bw.getByLabel('Bill 1 date', { exact: true }).fill(`${fyStartYear}-02-01`);
+    await bw.getByLabel('Bill 1 due date').fill(`${fyStartYear}-03-03`);
+    await bw.getByRole('button', { name: 'Accept (Ctrl+A)' }).click();
+    const bills = await readJson(page, 'opening_bills', [], (v) => v.length === 1);
+    const clients = await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'Mumbai Mart'));
+    const party = clients.find((c) => c.name === 'Mumbai Mart');
+    check(party?.group_id === groups[0].id, 'the party is a client placed in the sub-group');
+    check(bills.length === 1 && bills[0].amount === 10000 && bills[0].dr_cr === 'Dr' && bills[0].party_id === party?.id, 'opening bill stored (₹10,000 Dr)');
+    const openings = await readJson(page, 'ledger_openings', [], (v) => v.length === 1);
+    check(openings[0]?.dr === 1000000, 'ledger opening stored in paise');
+
+    await page.goto(srv.origin + '/receivables');
+    await page.getByText('Mumbai Mart').first().waitFor();
+    check(await page.getByText(/90\+ days|61–90 days|31–60 days|1–30 days/).first().isVisible(), 'receivables ageing shows the overdue opening bill');
+
+    await page.goto(srv.origin + '/books?tab=tb');
+    await page.getByText('Debits = credits').waitFor();
+    check(await page.getByRole('button', { name: 'Opening balance difference' }).first().isVisible(), 'trial balance carries the difference in opening balances, still balanced');
+  });
+
   await step('sales order converts its pending quantity; purchase orders tab opens', async () => {
     const rows = await readJson(page, 'invoices', [], (v) => v.length > 0);
     const so = {

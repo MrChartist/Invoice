@@ -37,6 +37,11 @@ export interface Vendor {
   tds_lower_rate?: number;
   /** Non-resident payee: TDS goes in Form 27Q (flagged only — not computed by this app). */
   non_resident?: boolean;
+  /**
+   * Additive (WP-1 masters): id of a user sub-group under Sundry Creditors (`groups` table).
+   * Absent = directly under Sundry Creditors. Opening balance: `ledger_openings`; bills: `opening_bills`.
+   */
+  group_id?: string;
 }
 
 export type MsmeCategory = 'MICRO' | 'SMALL' | 'MEDIUM';

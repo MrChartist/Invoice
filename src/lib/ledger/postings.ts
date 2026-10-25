@@ -53,6 +53,7 @@ import type { TdsChallan } from '../tds-payables';
 import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
 import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
+import { openingVouchers } from './postings-openings';
 
 export interface PostingLine {
   account: string;
@@ -267,7 +268,7 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
   const date = toIsoDate(t.date);
   const amount = Math.abs(toPaise(inrValue(num(t.amount), inv)));
   if (!date || amount === 0) return null;
-  const party = inv ? partyOfInvoice(inv) : 'Unknown customer';
+  const party = inv ? partyOfInvoice(inv) : str((t as { client_name?: unknown }).client_name) || 'Unknown customer';
   const cashAcc = accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
   // Realised exchange difference (6.19): the bank gets the realised rupees, the debtor is
   // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
@@ -645,6 +646,7 @@ export function buildLedger(input: LedgerInput): Ledger {
     const rev = reversalOf(m, input.today);
     if (rev) push({ ...manualToLedger(rev), id: `mvrev:${m.id}`, manualId: m.id, narration: rev.narration });
   }
+  for (const v of openingVouchers(input, byId, warnings)) push(v); // WP-1 ledger / party openings
 
   // Openings from the Books "opening balance" dialog: the cash/bank balance AT THE START of
   // `as_of` is what the user typed, whatever came before (same rule as the Books cash book).

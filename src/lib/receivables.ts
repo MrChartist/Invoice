@@ -36,7 +36,27 @@ export type ReceiptRow = Payment & { client_id?: string; client_name?: string; c
 export const AGING_BUCKETS = ['Not due', '1–30 days', '31–60 days', '61–90 days', '90+ days'] as const;
 export type AgingBucketLabel = (typeof AGING_BUCKETS)[number];
 
-export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance';
+export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance' | 'opening';
+
+/**
+ * A bill-wise opening outstanding (WP-1 `opening_bills`, `src/lib/opening-bills.ts`): owed when the
+ * books began, never a document (no GST / revenue). INR only. A Dr bill ages like an invoice and is
+ * settled by payment rows whose `invoice_id` is the bill id; a Cr bill is an opening credit
+ * (advance) of the party.
+ */
+export interface OpeningBillInput {
+  id: string;
+  party_id?: string;
+  party_name: string;
+  ref_no: string;
+  date: string;
+  due_date: string;
+  /** Rupees, > 0. */
+  amount: number;
+  dr_cr: 'Dr' | 'Cr';
+  /** The part of a typed opening balance not split into bills (Tally "On Account"). */
+  on_account?: boolean;
+}
 
 export interface LedgerEntry {
   /** yyyy-mm-dd */
@@ -64,6 +84,8 @@ export interface Bill {
   outstanding: number;
   daysOverdue: number;
   bucket: AgingBucketLabel;
+  /** Additive (WP-1): an opening bill, not an invoice (`invoiceId` is the opening bill id). */
+  opening?: boolean;
 }
 
 export interface PartyReceivable {
@@ -116,6 +138,8 @@ export interface BuildInput {
    * debit. Unadjusted balances count in `advances`.
    */
   advances?: AdvanceRecord[];
+  /** Additive (WP-1): bill-wise opening outstandings (INR), see `OpeningBillInput`. */
+  openingBills?: OpeningBillInput[];
 }
 
 export interface Ledger {
@@ -175,7 +199,7 @@ function emptyBuckets(): Record<AgingBucketLabel, number> {
   return { 'Not due': 0, '1–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
 }
 
-const KIND_ORDER: Record<LedgerEntryKind, number> = { invoice: 0, credit_note: 1, payment: 2, advance: 2 };
+const KIND_ORDER: Record<LedgerEntryKind, number> = { opening: -1, invoice: 0, credit_note: 1, payment: 2, advance: 2 };
 
 function sortEntries(entries: LedgerEntry[]): LedgerEntry[] {
   return entries
@@ -248,12 +272,16 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     return a;
   };
 
+  // Opening bills (WP-1): INR only, keyed like invoices (client id, else the name).
+  const openingBills = currency === 'INR' ? (input.openingBills ?? []).filter((b) => b && b.amount > 0 && b.date) : [];
+  const openingById = new Map(openingBills.map((b) => [b.id, b]));
+
   // Payments grouped by invoice; invoice-less receipts are on-account advances.
   const paidByInvoice = new Map<string, ReceiptRow[]>();
   const onAccount: ReceiptRow[] = [];
   for (const p of input.payments) {
     if (!(num(p.amount) > 0)) continue;
-    if (p.invoice_id && docById.has(p.invoice_id)) {
+    if (p.invoice_id && (docById.has(p.invoice_id) || openingById.has(p.invoice_id))) {
       const list = paidByInvoice.get(p.invoice_id) ?? [];
       list.push(p);
       paidByInvoice.set(p.invoice_id, list);
@@ -343,6 +371,42 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
         total, paid, outstanding,
         daysOverdue: daysOverdue(inv.due_date, now),
         bucket: agingBucket(inv.due_date, now) as AgingBucketLabel,
+      });
+    }
+  }
+
+  for (const b of openingBills) {
+    const key = keyOf({ id: b.party_id, name: b.party_name });
+    const a = acc(key, b.party_name, b.party_id);
+    const amount = round2(b.amount);
+    const label = b.on_account ? 'Opening balance – on account' : `Opening bill ${b.ref_no}`;
+    if (b.dr_cr === 'Cr') {
+      a.entries.push({ date: b.date, kind: 'opening', ref: b.ref_no, particulars: `${label} (credit)`, debit: 0, credit: amount, balance: 0 });
+      a.advances = round2(a.advances + amount);
+      continue;
+    }
+    a.entries.push({ date: b.date, kind: 'opening', ref: b.ref_no, particulars: label, debit: amount, credit: 0, balance: 0, invoiceId: b.id });
+    let paid = 0;
+    for (const p of paidByInvoice.get(b.id) ?? []) {
+      const amt = round2(num(p.amount));
+      paid = round2(paid + amt);
+      a.entries.push({
+        date: dateKey(p.date) || b.date, kind: 'payment', ref: p.reference || b.ref_no,
+        particulars: `Receipt – ${p.method || 'Payment'} (against ${b.ref_no})`,
+        debit: 0, credit: amt, balance: 0, invoiceId: b.id,
+      });
+    }
+    const outstanding = round2(Math.max(amount - paid, 0));
+    const excess = round2(Math.max(paid - amount, 0));
+    if (excess > 0) a.advances = round2(a.advances + excess);
+    if (outstanding > 0.004) {
+      const due = b.due_date || b.date;
+      a.bills.push({
+        invoiceId: b.id, number: b.ref_no, issueDate: b.date, dueDate: due,
+        total: amount, paid, outstanding,
+        daysOverdue: daysOverdue(due, now),
+        bucket: agingBucket(due, now) as AgingBucketLabel,
+        opening: true,
       });
     }
   }
@@ -490,7 +554,7 @@ export function monthlyCollections(report: ReceivablesReport, months = 12, now: 
       if (!r) continue;
       if (e.kind === 'invoice') r.billed = round2(r.billed + e.debit);
       else if (e.kind === 'credit_note') r.credited = round2(r.credited + e.credit);
-      else r.received = round2(r.received + e.credit);
+      else if (e.kind !== 'opening') r.received = round2(r.received + e.credit);
     }
   }
   for (const r of rows) {
