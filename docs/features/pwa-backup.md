@@ -116,3 +116,8 @@ Attachment files (6.12, one `mrchartist_inv_att_<id>` key each) are reported as 
 their count, size and how many no record uses any more; Settings → Data offers **Clean up unused files**
 (`docs/features/attachments-custom-fields.md`). The restore pickers accept backups up to 200 MB (`MAX_BACKUP_BYTES`)
 because receipts travel inside the file.
+
+**Folder sync (5.7)** reuses the same File System Access patterns (handle in the company's IndexedDB `kv` store,
+`queryPermission` / `requestPermission` only on a click, unattended runs report `permission`) and a stored
+non-extractable key derived from a separate sync passphrase; see `docs/features/sync.md`. Sync bookkeeping is never in
+a backup, and a restore removes it so the next sync compares from scratch.

@@ -21,7 +21,7 @@ export function CrossTabNotice({ onRefresh }: { onRefresh: () => void }) {
         </span>
         <div className={styles.text}>
           <p className={styles.title}>Updated in another tab</p>
-          <p className={styles.desc}>Your data was changed in another tab or window. Refresh to see the latest.</p>
+          <p className={styles.desc}>Your data was changed in another tab or window, or by folder sync. Refresh to see the latest.</p>
           <div className={styles.actions}>
             <button
               type="button"

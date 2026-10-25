@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- Folder sync between devices (roadmap 5.7, Chrome/Edge desktop): Settings → Data & backup → Sync folder. One encrypted
+  file per device in a cloud-synced folder (AES-GCM, PBKDF2 sync passphrase; no network calls). Rows merge by id with
+  version vectors; concurrent edits, duplicate invoice numbers and changes into a locked period are listed for you to
+  resolve, never overwritten. Each device can issue from its own number prefix. See `docs/features/sync.md`.
+
 ## [3.1.0] — 2026-10-08
 
 - Fonts are now self-hosted (no Google Fonts); the app makes no third-party requests and PDFs embed fonts offline. CSP tightened accordingly.

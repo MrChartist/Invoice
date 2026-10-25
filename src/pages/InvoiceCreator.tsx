@@ -24,6 +24,7 @@ import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKey
 import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
 import { localDb } from '../lib/localDb';
+import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
 import { editorStockContext, liveDocTrackingIssues } from '../lib/stock-tracking';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -115,7 +116,7 @@ export function InvoiceCreator() {
   // Keep the sender snapshot populated for brand-new documents.
   useEffect(() => {
     const store = useInvoiceStore.getState();
-    if (!store.sender && profiles.length) store.setSender(localDb.settings.activeProfile() ?? profiles[0]);
+    if (!store.sender && profiles.length) store.setSender(issuingProfile(profiles, localDb.settings.activeProfile()) ?? profiles[0]);
   }, [profiles, id]);
 
   const save = useCallback(

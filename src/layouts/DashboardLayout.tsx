@@ -41,6 +41,7 @@ import { UpdateToast } from '../components/pwa/UpdateToast';
 import { BackupNudge } from '../components/pwa/BackupNudge';
 import { CrossTabNotice } from '../components/pwa/CrossTabNotice';
 import { AutoBackupRunner } from '../components/pwa/AutoBackupRunner';
+import { SyncRunner } from '../components/sync/SyncRunner';
 import { TimerPill } from '../components/time/TimerPill';
 import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
@@ -443,6 +444,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
       )}
 
       <AutoBackupRunner />
+      <SyncRunner />
       <UpdateToast />
       <Suspense fallback={null}>
         {loaded.help && <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />}

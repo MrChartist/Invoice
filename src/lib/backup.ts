@@ -17,7 +17,7 @@
  * unrelated site data.
  */
 
-import { DB_PREFIX, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
+import { DB_PREFIX, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
@@ -61,6 +61,12 @@ export class EncryptedBackupError extends Error {
 }
 
 const LOCAL_ONLY = new Set<string>(DEVICE_LOCAL_KEYS);
+/**
+ * Never exported, restored or kept in the undo copy, but removed by a wipe (unlike LOCAL_ONLY): folder-sync
+ * bookkeeping describes what this device last exchanged with the sync folder (docs/features/sync.md).
+ */
+const NOT_BACKED_UP = new Set<string>(SYNC_META_KEYS);
+const leaveOut = (key: string) => LOCAL_ONLY.has(key) || NOT_BACKED_UP.has(key);
 
 export interface BackupFile {
   app: typeof BACKUP_APP_ID;
@@ -100,7 +106,7 @@ export function attachmentRestoreNote(summary: BackupSummary | undefined | null)
 
 export function buildBackup(now: Date = new Date()): BackupFile {
   const data = collectAppData();
-  for (const key of LOCAL_ONLY) delete data[key];
+  for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   return { app: BACKUP_APP_ID, version: 1, exportedAt: now.toISOString(), data };
 }
 
@@ -221,7 +227,7 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
 
   const data: Record<string, string> = {};
   for (const [key, value] of Object.entries(source)) {
-    if (!key.startsWith(DB_PREFIX) || LOCAL_ONLY.has(key)) continue;
+    if (!key.startsWith(DB_PREFIX) || leaveOut(key)) continue;
     if (typeof value === 'string') data[key] = value;
   }
   if (Object.keys(data).length === 0) {
@@ -357,7 +363,7 @@ interface StoredSnapshot {
  */
 export async function saveSafetySnapshot(reason: SafetySnapshot['reason'], now: Date = new Date()): Promise<boolean> {
   const data = collectAppData();
-  for (const key of LOCAL_ONLY) delete data[key];
+  for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   if (Object.keys(data).length === 0) return true; // nothing to protect
   return storeSnapshot({ at: now.toISOString(), reason, data });
 }
