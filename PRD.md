@@ -166,6 +166,12 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   statement. Books are derived from documents and payments: every invoice, note, receipt, bill and supplier payment
   posts automatically (computed on the fly, never stored twice), and manual vouchers cover capital, loans, drawings,
   GST payments and other adjustments (`docs/features/ledger.md`).
+- **Masters & openings ("Accounts Info", Tally parity)**: user groups and sub-groups under the Schedule III primaries
+  (e.g. "Sundry Debtors – Mumbai"; nature and gross-profit effect inherited), Group / Ledger Create · Alter · Display
+  screens with Tally keys, opening balances (Dr / Cr) for every ledger and party on a books-beginning date, an opening
+  trial balance screen that shows "Difference in opening balances" live and posts it to 1090 rather than forcing it,
+  and bill-wise opening outstandings per party that age in receivables and print on statements but never enter GST
+  returns or revenue (`docs/features/masters.md`).
 - **Cost centres / projects & budgets** (Books → Projects / Budgets): tag invoices (or single lines), bills, expenses,
   voucher lines, time and mileage with a project, department or branch; a Project P&L shows income, direct costs,
   margin and net per cost centre plus Unallocated, tying to the P&L. Budgets per Indian FY and income / expense

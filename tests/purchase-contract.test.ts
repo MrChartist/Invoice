@@ -392,3 +392,14 @@ test('WP-3 readers (purchase returns, receipt notes, GRN stock source) understan
   assert.equal(grnCoverage({ notes: [], receipts: [{ id: 'g', kind: 'GRN', number: 'G', date: '2026-04-01', vendor_name: 'A', lines: [{ id: 'gl1', name: 'Paper ream', quantity: 4, rate: 1, tax_rate: 0 }] }] }).take('gl1', 10), 4);
   assert.equal(purchaseOrderOutstanding([], [bill], [], '2026-12-31').length, 0);
 });
+
+test('WP-1: a vendor placed in a Sundry Creditors sub-group (additive group_id) reads the same everywhere', async () => {
+  const { buildLedger, A, trialBalance } = await import('../src/lib/ledger/index.ts');
+  const { EMPTY_BOOKS } = await import('../src/lib/books.ts');
+  const vendor = { id: 'v1', name: 'Acme Supplies', group_id: 'grp-mumbai-creditors' };
+  const withGroup = { ...bill, vendor_id: 'v1' };
+  assert.equal(booksNormalize(withGroup as never, [vendor] as never)!.total, 1180);
+  const ledger = buildLedger({ ...EMPTY_BOOKS, purchases: [withGroup] as never, vendors: [vendor], userAccounts: [], manual: [], assets: [], today: '2026-04-30' });
+  const tb = trialBalance(ledger, { start: '2026-04-01', end: '2026-04-30' });
+  assert.equal(tb.rows.find((r) => r.account.id === A.creditors)!.credit, 118000);
+});

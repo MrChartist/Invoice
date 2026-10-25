@@ -206,6 +206,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   price_levels: 'master.edit',
   schemes: 'master.edit',
   custom_fields: 'master.edit',
+  // Accounts Info (WP-1): groups / sub-groups and ledgers are masters
+  groups: 'master.edit',
+  accounts: 'master.edit',
   // books
   stock_moves: 'books.edit',
   stock_transfers: 'books.edit',
@@ -215,7 +218,6 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   recurring: 'books.edit',
   time_entries: 'books.edit',
   mileage: 'books.edit',
-  accounts: 'books.edit',
   vouchers: 'books.edit',
   fixed_assets: 'books.edit',
   budgets: 'books.edit',
@@ -223,6 +225,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   advances: 'books.edit',
   bank_statements: 'books.edit',
   book_opening: 'books.edit',
+  // Openings (WP-1): ledger opening balances, books-beginning date, bill-wise opening outstandings
+  ledger_openings: 'books.edit',
+  books_begin: 'books.edit',
+  opening_bills: 'books.edit',
   tds_certificates: 'books.edit',
   gstr2b_actions: 'books.edit',
   gstr4_manual: 'books.edit',

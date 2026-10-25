@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import {
@@ -23,6 +23,10 @@ import styles from './ledger.module.css';
 import { useT } from '../../../i18n';
 import { ledgerT } from '../../../i18n/areas/books-ledger';
 import { VoucherVariantFields, type VariantValue } from '../tally/VoucherVariantFields';
+import { allocationsOf, openRefsFor, syncVoucherReceipts, validateAllocations, voucherReceipts, type ReceiptAllocation } from '../../../lib/bill-allocation';
+
+// P0-11 (WP-1): bill-wise details on a receipt against a Sundry Debtor, loaded when needed.
+const BillAllocation = lazy(() => import('../../masters/BillAllocation'));
 
 interface Row {
   key: number;
@@ -62,6 +66,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
       : [blank(), blank()],
   );
   const [error, setError] = useState('');
+  const [alloc, setAlloc] = useState<ReceiptAllocation[]>(() => (voucher ? allocationsOf(voucher.id) : []));
   // Voucher variants (Tally parity): optional / memorandum, post-dated, reversing, class.
   const [variant, setVariant] = useState<VariantValue>({ variant: voucher?.variant, post_dated: voucher?.post_dated, reverse_on: voucher?.reverse_on, voucher_class: voucher?.voucher_class });
   const byId = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
@@ -87,12 +92,26 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
 
   const patch = (key: number, p: Partial<Row>) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...p } : r)));
 
+  // The receipt's Sundry Debtors line (credit with a party): bill allocation applies to it.
+  const debtorLine = type === 'RECEIPT' ? lines.find((l) => l.cr > 0 && l.party && byId.get(l.account_id)?.group === 'TRADE_RECEIVABLES') : undefined;
+  const inBooksNow = !variant.variant && !variant.post_dated;
+
   const save = () => {
     const input = { id: voucher?.id, type, date, number: number.trim() || undefined, narration, lines, ...variant, reverse_on: type === 'JOURNAL' ? variant.reverse_on : undefined };
     const errors = validateVoucher(input, accounts);
     if (errors.length) return setError(errors[0]);
+    const useAlloc = debtorLine && inBooksNow ? alloc.filter((a) => a.amount > 0) : [];
+    if (debtorLine && useAlloc.length) {
+      const problems = validateAllocations(useAlloc, debtorLine.cr / 100, openRefsFor(debtorLine.party!, voucher?.id));
+      if (problems.length) return setError(problems[0]);
+    }
     try {
-      onSaved(saveVoucher(input, accounts));
+      const saved = saveVoucher(input, accounts);
+      if (useAlloc.length || (voucher && voucherReceipts(voucher.id).length)) {
+        const method = lines.some((l) => l.dr > 0 && l.account_id === 'cash') ? 'Cash' : 'Bank Transfer';
+        syncVoucherReceipts(saved, debtorLine?.party ?? '', (debtorLine?.cr ?? 0) / 100, useAlloc, method);
+      }
+      onSaved(saved);
     } catch (err) {
       setError((err as Error).message || ledgerT('saveFailed'));
     }
@@ -211,6 +230,11 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
           <label className={controls.label} htmlFor={`${uid}-narr`}>{ledgerT('narration')}</label>
           <textarea id={`${uid}-narr`} className={controls.textarea} rows={2} value={narration} onChange={(e) => setNarration(e.target.value)} />
         </div>
+        {debtorLine && inBooksNow && (
+          <Suspense fallback={null}>
+            <BillAllocation key={debtorLine.party} party={debtorLine.party!} total={debtorLine.cr / 100} voucherId={voucher?.id} value={alloc} onChange={setAlloc} />
+          </Suspense>
+        )}
         <VoucherVariantFields type={type} value={variant} onChange={setVariant} />
         {error && <div className={controls.error} role="alert">{error}</div>}
       </div>

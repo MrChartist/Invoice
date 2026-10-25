@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, FilePlus2, NotebookPen, Pencil, Trash2 } from 'lucide-react';
 import { deleteVoucher, loadVouchers, type Ledger, type LedgerVoucher, type ManualVoucher } from '../../../lib/ledger';
 import type { Period } from '../../../lib/books';
+import { removeVoucherReceipts } from '../../../lib/bill-allocation';
 import { toCsv } from '../../../lib/csv';
 import { formatDate } from '../../../lib/utils';
 import { todayIso } from '../../../lib/tax-rules';
@@ -59,6 +60,7 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
     if (!deleting) return;
     try {
       deleteVoucher(deleting.id);
+      removeVoucherReceipts(deleting.id); // P0-11: its bill-wise receipt rows go with it
       notify(ledgerT('voucherDeleted', { number: deleting.number }));
       onChanged();
     } catch (err) {

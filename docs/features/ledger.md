@@ -10,10 +10,11 @@ Schedule III balance sheet with a fixed-asset register, and an AS 3 cash-flow st
 | Components | `src/components/books/ledger/*` — one lazy chunk (`LedgerPanel`, default export) loaded by `src/pages/Books.tsx` |
 | Lib | `src/lib/ledger/` — `accounts.ts`, `vouchers.ts`, `assets.ts`, `postings.ts`, `reports.ts`, `index.ts` (never import from the shell) |
 | Rates | `DEPRECIATION_RATE_RULES` in `src/lib/tax-rules.ts` (date-keyed by FY) |
+| Masters & openings | groups / sub-groups, ledger and party opening balances, bill-wise openings: `docs/features/masters.md` (WP-1) |
 | Tests | `tests/ledger.test.ts`, `tests/integration/ledger-year.test.ts`, contract row in `tests/purchase-contract.test.ts`, e2e step in `tests/e2e/smoke.mjs` |
 
 ## Storage (additive, all in backups)
-- `accounts` — user accounts `{id, code, name, group, created_at}`. Default accounts are constants with stable ids (`sales`, `debtors`, `out_cgst` …) and are never stored, so later versions can add accounts without a migration.
+- `accounts` — user accounts `{id, code, name, group, created_at}`; additive (WP-1) `under` (user sub-group; `group` stays the primary), `alias`, `interest`. Default accounts are constants with stable ids (`sales`, `debtors`, `out_cgst` …) and are never stored, so later versions can add accounts without a migration.
 - `vouchers` — manual vouchers `{id, type: JOURNAL|CONTRA|PAYMENT|RECEIPT, number, date, narration, lines: [{account_id, dr, cr, party?}], created_at, updated_at?}`. **Amounts are integer paise**; a voucher saves only when debits equal credits exactly.
 - `fixed_assets` — `{id, name, block, account_id, cost (₹), acquired_on, put_to_use, paid_from, party?, created_at}`.
 - Automatic vouchers are **not stored**: they are rebuilt from the documents every time (`buildLedger`).
@@ -29,6 +30,10 @@ Schedule III balance sheet with a fixed-asset register, and an AS 3 cash-flow st
 6xxx indirect: 6000 Salaries, 6100/6110 Interest / bank charges, 6200 Depreciation, 6300–6390 rent, software, professional fees, travel, utilities, marketing, office supplies, GST input credit reversed, other.
 
 Groups follow Schedule III (Division I) headings; `direct` groups (Purchases, Direct expenses) feed gross profit.
+User groups / sub-groups (WP-1) nest under these 24 primaries and inherit nature and `direct`; an account in a sub-group
+keeps the primary in `group` and the sub-group in `under`, so every statement here is unchanged (`docs/features/masters.md`).
+A receipt row without an invoice now posts to its `client_name` party instead of "Unknown customer"; receipt rows a
+manual voucher allocated bill-wise (`voucher_id`) are not posted again (the voucher posts them).
 
 ## Posting rules (automatic)
 | Source | Debit | Credit |
@@ -45,6 +50,7 @@ Groups follow Schedule III (Division I) headings; `direct` groups (Purchases, Di
 | Advance adjusted (payment row with `advance_id`) | Advances from customers (+ TDS receivable when it settles the TDS); Output heads — its GST share | Sundry debtors (party); GST paid on advances |
 | Advance refunded | Advances from customers; Output heads — its GST share | Cash / Bank; GST paid on advances |
 | Supplier payment | Sundry creditors | Cash / Bank |
+| Ledger / party openings (WP-1, `ledger_openings`, `opening_bills`) — one voucher dated the day before the books-beginning date | each opening's Dr side (party lines on Debtors / Creditors with the party) | each opening's Cr side; the residual to **Opening balance difference** (1090), reported as "Difference in opening balances" |
 | Books opening balance (`book_opening`) | Cash / Bank | Opening balance difference — sized so the ledger balance at the start of `as_of` equals what was typed (entries dated earlier are absorbed, as in the Books cash book) |
 | Fixed asset | Asset account | the "paid from" account (none when "already in the books") |
 | Depreciation (per FY, dated 31 Mar, for every FY that has started) | Depreciation | Accumulated depreciation |

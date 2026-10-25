@@ -54,6 +54,7 @@ import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
 import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
 import { purchaseReturnPostings } from './postings-returns';
+import { openingVouchers } from './postings-openings';
 
 export interface PostingLine {
   account: string;
@@ -268,7 +269,7 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
   const date = toIsoDate(t.date);
   const amount = Math.abs(toPaise(inrValue(num(t.amount), inv)));
   if (!date || amount === 0) return null;
-  const party = inv ? partyOfInvoice(inv) : 'Unknown customer';
+  const party = inv ? partyOfInvoice(inv) : str((t as { client_name?: unknown }).client_name) || 'Unknown customer';
   const cashAcc = accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
   // Realised exchange difference (6.19): the bank gets the realised rupees, the debtor is
   // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
@@ -612,7 +613,9 @@ export function buildLedger(input: LedgerInput): Ledger {
   for (const inv of input.invoices) push(salesVoucher(inv));
   const tds = tdsSettlements(input.invoices, input.transactions);
   // Advance adjustments are journals from "Advances from customers", not cash (below).
-  for (const t of input.transactions) if (!isAdvanceAdjustment(t)) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
+  // WP-1 (P0-11): receipt rows a manual voucher allocated bill-wise are posted by that voucher, not again here.
+  const allocatedBy = new Set(input.manual.map((m) => m.id));
+  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
   for (const m of advanceMovements(input.advances ?? [], input.transactions, input.invoices)) {
     push(advanceVoucher(m, m.invoiceId ? invById.get(m.invoiceId) : undefined, m.kind === 'adjusted' ? tds.get(m.sourceId) ?? 0 : 0));
   }
@@ -647,6 +650,7 @@ export function buildLedger(input: LedgerInput): Ledger {
     const rev = reversalOf(m, input.today);
     if (rev) push({ ...manualToLedger(rev), id: `mvrev:${m.id}`, manualId: m.id, narration: rev.narration });
   }
+  for (const v of openingVouchers(input, byId, warnings)) push(v); // WP-1 ledger / party openings
 
   // Openings from the Books "opening balance" dialog: the cash/bank balance AT THE START of
   // `as_of` is what the user typed, whatever came before (same rule as the Books cash book).

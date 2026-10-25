@@ -322,6 +322,8 @@ const RECORD_TABLES = [
   'gstr4_manual',
   // WP-3: purchase returns / supplier notes, receipt notes (GRN) and rejections out
   'purchase_returns', 'receipt_notes',
+  // Masters & openings (WP-1)
+  'groups', 'ledger_openings', 'books_begin', 'opening_bills',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -333,6 +335,7 @@ const ID_TABLES = new Set([
   'series_counters',
   'gstr4_manual',
   'purchase_returns', 'receipt_notes',
+  'groups', 'ledger_openings', 'books_begin', 'opening_bills',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

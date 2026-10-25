@@ -109,6 +109,10 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `cheques` | cheques (6.26) | `Cheque` (`src/types/cheques.ts`) — received / issued cheques, lifecycle, linked payment ids (`docs/features/cash-planning.md`) |
 | `advances` | advances (5.3) | `AdvanceRecord` (`src/types/advances.ts`) — advance receipt vouchers `ADV/FY…`, GST snapshot, refunds `RFV/FY…`; adjustments are `transactions` rows with `advance_id` (`docs/features/advances.md`) |
 | `cheque_print` | cheques (6.26) | cheque print layout + mm offsets (object, `src/lib/cheque-print.ts`) |
+| `groups` | masters (WP-1) | `UserGroup` rows: user groups / sub-groups under the Schedule III primaries (`src/lib/ledger/accounts.ts`, `docs/features/masters.md`) |
+| `ledger_openings` | masters (WP-1) | `LedgerOpening` `{ledger_id, dr, cr}` in paise, one per account / party ledger (`src/lib/ledger/openings.ts`) |
+| `books_begin` | masters (WP-1) | one row `{id: 'books_begin', date}`: books beginning date of the openings |
+| `opening_bills` | masters (WP-1) | `OpeningBill` bill-wise opening outstandings per party, receivable / payable (`src/lib/opening-bills.ts`) |
 | `fixed_assets` | ledger | `FixedAsset` register rows (`src/lib/ledger/assets.ts`) |
 | `cost_centres` | cost centres (6.16) | `CostCentre` master (`src/lib/cost-centres.ts`); documents point at it via optional `cost_centre_id` (`docs/features/cost-centres-budgets.md`) |
 | `budgets` | budgets (6.17) | `Budget` rows: FY × account × optional cost centre, 12 monthly amounts in paise (`src/lib/ledger/budgets.ts`) |
