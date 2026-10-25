@@ -126,7 +126,8 @@ export function formatCombo(combo: string, apple: boolean = isApplePlatform()): 
 export interface ShortcutInfo {
   combo: string;
   label: string;
-  group: 'General' | 'Go to' | 'Invoice editor';
+  /** Built-in groups, or another screen's own (e.g. the Gateway's "Tally keys"). */
+  group: 'General' | 'Go to' | 'Invoice editor' | (string & {});
   /** Owned and handled elsewhere (listed for reference only). */
   external?: boolean;
 }

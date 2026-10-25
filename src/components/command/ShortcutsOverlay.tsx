@@ -1,5 +1,6 @@
 import { Modal } from '../ui/Modal';
 import { GLOBAL_SHORTCUTS, formatCombo, type ShortcutInfo } from '../../hooks/useHotkeys';
+import { tallyShortcuts } from '../gateway/keymap';
 import styles from './ShortcutsOverlay.module.css';
 
 export interface ShortcutsOverlayProps {
@@ -11,7 +12,7 @@ export interface ShortcutsOverlayProps {
 
 /** Press `?` anywhere (outside inputs) to see every keyboard shortcut. */
 export function ShortcutsOverlay({ open, onClose, extra = [] }: ShortcutsOverlayProps) {
-  const all = [...GLOBAL_SHORTCUTS, ...extra];
+  const all = [...GLOBAL_SHORTCUTS, ...tallyShortcuts(), ...extra];
   const groups = Array.from(new Set(all.map((s) => s.group)));
 
   return (

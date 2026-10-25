@@ -63,7 +63,8 @@ export function Expenses() {
   const [tab, setTab] = useState<Tab>(() => (params.get('tab') === 'orders' ? 'orders' : params.get('tab') === 'vendors' ? 'vendors' : 'bills'));
   const [seed, setSeed] = useState<BillSeed | null>(null);
   const [filter, setFilter] = useState<PurchaseFilter>({ kind: 'ALL', status: 'ALL', category: 'ALL' });
-  const [billOpen, setBillOpen] = useState(false);
+  // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
+  const [billOpen, setBillOpen] = useState(() => params.get('new') === 'bill');
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseRecord | null>(null);
   const [payFor, setPayFor] = useState<string | null>(null);

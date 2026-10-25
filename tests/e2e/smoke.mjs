@@ -486,6 +486,44 @@ try {
     check(await page.getByText(/JV\/FY\d{2}-\d{2}\/0001/).first().isVisible(), 'drill-down opens the capital ledger with the voucher');
   });
 
+  await step('Gateway of Tally: V → F5 payment voucher, Ctrl+A saves, Day Book drills into it, Esc back', async () => {
+    await page.goto(srv.origin + '/gateway');
+    await page.getByRole('heading', { name: 'Gateway of Tally' }).waitFor();
+    await page.getByTestId('gw-create').waitFor();
+    await page.keyboard.press('v');
+    await page.getByTestId('gw-v-payment').waitFor();
+    await page.keyboard.press('F5');
+    await page.getByRole('heading', { name: 'Payment voucher' }).waitFor();
+    await page.getByTestId('vline-1-ledger').fill('Rent');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('vline-1-amount').fill('1500');
+    await page.keyboard.press('Enter');
+    // Line 2 opens on the credit side with the difference pre-filled.
+    await page.getByTestId('vline-2-ledger').fill('Bank account');
+    await page.keyboard.press('Enter');
+    check((await page.getByTestId('vline-2-amount').inputValue()) === '1500.00', 'second line pre-filled with the balancing amount');
+    await page.keyboard.press('Enter');
+    await page.getByText('Balanced', { exact: true }).waitFor();
+    await page.keyboard.type('Office rent');
+    await page.keyboard.press('Control+a');
+    const vouchers = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.type === 'PAYMENT'));
+    const pv = vouchers.find((x) => x.type === 'PAYMENT');
+    check(!!pv && /^PV\/FY\d{2}-\d{2}\/0001$/.test(pv.number) && pv.lines[0].account_id === 'rent' && pv.lines[0].dr === 150000 && pv.lines[1].account_id === 'bank',
+      `Ctrl+A saved the payment voucher Dr Rent / Cr Bank (${pv?.number})`);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/gateway');
+    await page.getByTestId('gw-create').waitFor();
+    await page.keyboard.press('d');
+    await page.getByRole('heading', { name: 'Day book' }).waitFor();
+    const row = page.getByRole('row', { name: new RegExp(pv.number.replace(/\//g, '\\/')) });
+    await row.click();
+    await page.getByRole('heading', { name: `Alter Payment voucher ${pv.number}` }).waitFor();
+    check(true, 'Day Book shows the voucher and Enter/click drills into it');
+    await page.keyboard.press('Escape');
+    await page.getByRole('heading', { name: 'Day book' }).waitFor();
+    check(true, 'Esc returns to the Day Book');
+  });
+
   await step('sales order converts its pending quantity; purchase orders tab opens', async () => {
     const rows = await readJson(page, 'invoices', [], (v) => v.length > 0);
     const so = {
