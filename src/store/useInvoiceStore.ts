@@ -124,6 +124,7 @@ export const RECORD_KEYS = [
   'pos',
   'rcm_tax_excluded',
   'goods_returned',
+  'approval', 'branch_id', 'loyalty_redeem',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

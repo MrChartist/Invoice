@@ -38,6 +38,7 @@ import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { nextReceiptNumber, recordSeries } from './series-counters';
 import { receivableTotal } from './rcm';
+import { holdIfApprovalNeeded } from './approval-gate';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -385,6 +386,9 @@ export const localDb = {
           );
         }
       }
+
+      // WP-9 maker-checker: a clerk's document that needs the owner's approval is held as a pending draft.
+      holdIfApprovalNeeded(toSave, stored);
 
       // GST Rule 46: one number, one document (a document may keep its own legacy number).
       if (toSave.invoice_number && !(stored && numberKey(stored.invoice_number) === numberKey(toSave.invoice_number))) {

@@ -276,6 +276,8 @@ export function buildConvertedDraft(
     // An amendment marker belongs to the one document that was amended — never to a copy.
     amends: undefined,
     pos: undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
   };
@@ -511,6 +513,8 @@ export function buildCreditNote(
     updated_at: undefined,
     amends: undefined,
     pos: undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
     goods_returned: goodsReturned,
   };
   const rec = recompute(base);
@@ -614,6 +618,8 @@ export function buildDebitNote(
     updated_at: undefined,
     amends: undefined,
     pos: undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
   });
 }
 

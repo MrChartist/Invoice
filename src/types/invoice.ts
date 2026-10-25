@@ -485,4 +485,27 @@ export interface InvoiceRecord {
   amends?: AmendmentInfo;
   /** Additive (6.8): billed at the POS counter (counted in that day's Z report). Never copied. */
   pos?: boolean;
+  /**
+   * Additive (WP-9 maker-checker): approval state of a document a clerk issued while approvals are
+   * on. A pending document is stored as a Draft (`src/lib/approval-gate.ts`).
+   */
+  approval?: ApprovalInfo;
+  /** Additive (WP-9): `branches` row id — the branch / location the document belongs to. */
+  branch_id?: string;
+  /** Additive (WP-9): loyalty points redeemed on this bill; `value` (₹) is part of its invoice discount. */
+  loyalty_redeem?: { points: number; value: number };
+}
+
+/** WP-9: maker-checker state kept on the document itself. */
+export interface ApprovalInfo {
+  state: 'pending' | 'approved' | 'rejected';
+  /** The document this decision belongs to (a copied record never carries an approval over). */
+  doc_id: string;
+  /** Status the clerk wanted (normally Sent); restored on approval. */
+  requested_status: InvoiceStatus;
+  requested_by: string;
+  requested_at: string;
+  decided_by?: string;
+  decided_at?: string;
+  note?: string;
 }

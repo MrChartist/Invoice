@@ -242,6 +242,12 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     // Only stored on reverse-charge documents calculated without the tax in the total (src/lib/rcm.ts).
     ...(r.reverse_charge && r.rcm_tax_excluded ? { rcm_tax_excluded: true } : {}),
     ...(typeof r.goods_returned === 'boolean' ? { goods_returned: r.goods_returned } : {}),
+    // WP-9 (additive): approval state, branch, loyalty redemption.
+    ...(r.approval && typeof r.approval === 'object' ? { approval: r.approval as InvoiceRecord['approval'] } : {}),
+    ...(typeof r.branch_id === 'string' && r.branch_id ? { branch_id: r.branch_id } : {}),
+    ...(r.loyalty_redeem && typeof r.loyalty_redeem === 'object' && Number((r.loyalty_redeem as { points?: unknown }).points) > 0
+      ? { loyalty_redeem: { points: Number((r.loyalty_redeem as { points: number }).points), value: Number((r.loyalty_redeem as { value?: number }).value) || 0 } }
+      : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),
