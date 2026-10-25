@@ -10,11 +10,13 @@ import { liveUnits } from '../../lib/units-live';
 import { lineFactor, lineUnitPatch } from '../../lib/units';
 import { unitT } from '../../i18n/areas/units';
 import { cn, formatCurrency } from '../../lib/utils';
-import { lineKeyAction } from './line-keys';
+import { lineKeyAction, shortCodeFirst } from './line-keys';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { LineTracking } from './LineTracking';
 import { editorStockContext } from '../../lib/stock-tracking';
+import { saltIndex, saltOf } from '../../lib/salt-search'; // 8.84 substitutes
+import { getTable } from '../../lib/storage';
 import { afterLineChange, pickCatalogItem, setLineQuantity, setLineRate } from './pricing-actions';
 import { tNodes, useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
@@ -45,14 +47,16 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const { addItem, updateItem, patchItem, duplicateItem, moveItem, removeItem } = useInvoiceStore.getState();
   // Catalogue snapshot, refreshed whenever an item name gains focus.
   const [catalog, setCatalog] = useState<InvoiceItem[]>([]);
+  // 8.84: salt / composition of stock items, re-read with the catalogue (typing a salt lists its substitutes).
+  const salts = useMemo(() => saltIndex(getTable<{ name: string; salt?: string }>('stock_items')), [catalog]); // eslint-disable-line react-hooks/exhaustive-deps
   const itemSuggestions = useCallback(
     (q: string) =>
-      suggest(q, catalog, {
+      shortCodeFirst(q, catalog, suggest(q, catalog, {
         label: (i) => i.name,
-        extra: (i) => [i.hsn],
-        sub: (i) => [i.hsn && `HSN ${i.hsn}`, formatCurrency(i.rate, currency)].filter(Boolean).join(' · '),
-      }),
-    [catalog, currency],
+        extra: (i) => [i.hsn, i.short_code, saltOf(salts, i.name)],
+        sub: (i) => [i.hsn && `HSN ${i.hsn}`, saltOf(salts, i.name), formatCurrency(i.rate, currency)].filter(Boolean).join(' · '),
+      })),
+    [catalog, currency, salts],
   );
   const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});
   const centres = useCostCentres();

@@ -9,6 +9,7 @@ import { KEYS, generateId, getTable, peekTable } from '../../lib/storage';
 import { num } from '../../lib/invoice-calc';
 import { TABLES, type StockItem } from '../../lib/inventory';
 import { addScannedLine, findByCode } from '../../lib/scan';
+import { binForName } from '../../lib/bins';
 import {
   PRICE_LEVELS_TABLE, SCHEMES_TABLE, catalogItemFor, levelForClient, masterClient, pricingInUse, resolvePrice, syncSchemeLines,
   type PriceLevel, type PricingData, type Scheme,
@@ -70,7 +71,7 @@ function reprice(lineId: string, ctx: EditorPricing | null, force = false): void
   const base = list ?? num(cat?.rate);
   // A typed rate (no basis) is the user's choice: leave it, unless asked to re-price.
   if (!force && !line.price_basis && num(line.rate) !== base) return;
-  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs }, num(line.quantity), ctx?.level);
+  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(line.quantity), ctx?.level); // 8E: an MRP level reads the MRP
   const basis = quote.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : quote.basis;
   if (quote.rate !== num(line.rate) || basis !== line.price_basis) {
     st.patchItem(lineId, { rate: quote.rate, price_basis: basis });
@@ -88,6 +89,11 @@ function syncSchemes(ctx: EditorPricing | null): void {
 export function pickCatalogItem(lineId: string, source: Partial<InvoiceItem>): void {
   const st = useInvoiceStore.getState();
   st.applyCatalogItem(lineId, source);
+  // 8.86: a delivery challan line remembers the bin / rack it is picked from (printed on the challan).
+  if (st.doc_type === 'DELIVERY_CHALLAN' && source.name) {
+    const bin = binForName(getTable<StockItem>('stock_items'), source.name);
+    if (bin) st.patchItem(lineId, { bin });
+  }
   const ctx = editorPricing();
   reprice(lineId, ctx, true); // 7S: also applies a selling price list without levels / slabs
   syncSchemes(ctx);

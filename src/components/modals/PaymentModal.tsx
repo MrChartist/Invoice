@@ -6,7 +6,8 @@ import { round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
 import { can } from '../../lib/access';
 import { getLockUntil, isLocked, prettyDay } from '../../lib/period-lock';
-import { readLinks, totalCredited } from '../../lib/documents';
+import { getTable } from '../../lib/storage';
+import { amountDue, linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import { buildReceipt, receiptHtml, referenceLabel } from '../../lib/receipts';
@@ -21,7 +22,6 @@ import '../../i18n/en-pages'; // page strings (5.4)
 import { methodLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
-import { receivableBalance } from '../../lib/rcm';
 
 const METHODS = ['UPI', 'Bank transfer', 'Cash', 'Cheque', 'Card', 'Other'];
 
@@ -80,10 +80,12 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const live = useMemo(() => (invoice ? localDb.invoices.getById(invoice.id) ?? invoice : null), [invoice, version]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const payments = useMemo(() => (invoice ? localDb.payments.listFor(invoice.id) : []), [invoice, version]);
-  // What is really still owed: the stored balance (already net of TDS) less any credit notes issued against it.
-  const credited = live ? totalCredited(live.id, readLinks(), localDb.invoices.getAll()) : 0;
-  // Reverse charge: the recipient's GST is never collected (src/lib/rcm.ts).
-  const balance = live ? Math.max(round2(receivableBalance(live) - credited), 0) : 0;
+  // What is really still owed: the stored balance (already net of TDS, and of the recipient's GST on
+  // reverse charge) less the live credit notes issued against it (src/lib/amount-due.ts).
+  const credited = live
+    ? linkedCredits(getTable<CreditLinkRow>('doc_links').filter((l) => l.from_id === live.id), localDb.invoices.getAll()).get(live.id) ?? 0
+    : 0;
+  const balance = live ? amountDue(live, credited) : 0;
 
   useEffect(() => {
     if (!invoice) return;

@@ -13,7 +13,7 @@
  *
  * Consistency guarantees, verified in tests/receivables.test.ts:
  *   party.net === ledger closing balance over the full history
- *   party.net === Σ open bills - credit notes - advances
+ *   party.net === Σ open bills - credit notes (not allocated to a linked bill) - advances
  */
 
 import type { Client, DocumentType, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
@@ -26,6 +26,7 @@ import { csvCell, toCsv } from './csv';
 import type { AdvanceRecord } from '../types/advances';
 import { advanceMovements } from './advance-tax';
 import { receivableTotal } from './rcm';
+import { linkedCredits, type CreditLinkRow } from './amount-due';
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -86,6 +87,8 @@ export interface Bill {
   bucket: AgingBucketLabel;
   /** Additive (WP-1): an opening bill, not an invoice (`invoiceId` is the opening bill id). */
   opening?: boolean;
+  /** Additive: linked credit notes allocated to this bill (`BuildInput.links`); outstanding is net of it. */
+  credited?: number;
 }
 
 export interface PartyReceivable {
@@ -140,6 +143,13 @@ export interface BuildInput {
   advances?: AdvanceRecord[];
   /** Additive (WP-1): bill-wise opening outstandings (INR), see `OpeningBillInput`. */
   openingBills?: OpeningBillInput[];
+  /**
+   * Additive: `doc_links` rows. A live credit note linked to an invoice of the same party is
+   * allocated to that bill (bill-wise, as Tally does): it lowers the bill's outstanding instead of
+   * sitting as an unallocated credit, and a bill it settles (status Paid) gets no invented receipt.
+   * Only the unallocated part counts in `creditNotes`. Ledger entries and `net` are unchanged.
+   */
+  links?: CreditLinkRow[];
 }
 
 export interface Ledger {
@@ -253,6 +263,16 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   );
   const docById = new Map(docs.map((d) => [d.id, d]));
 
+  // Live credit notes linked to a live invoice of the same party are allocated to that bill.
+  const allocLinks = (input.links ?? []).filter((l) => {
+    if (l.relation !== 'credit_note') return false;
+    const note = docById.get(l.to_id);
+    const bill = docById.get(l.from_id);
+    return !!note && !!bill && isCreditNote(note) && !isCreditNote(bill) && keyOf(note.client) === keyOf(bill.client);
+  });
+  const creditOf = linkedCredits(allocLinks, docs);
+  const allocatedNotes = new Set(allocLinks.map((l) => l.to_id));
+
   interface Acc {
     key: string;
     clientId?: string;
@@ -307,7 +327,8 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
         date: issue, kind: 'credit_note', ref: inv.invoice_number,
         particulars: 'Credit Note', debit: 0, credit: total, balance: 0, invoiceId: inv.id,
       });
-      a.creditNotes = round2(a.creditNotes + total);
+      // An allocated note is settled against its bill below (only an unallocated rest stays a credit).
+      if (!allocatedNotes.has(inv.id)) a.creditNotes = round2(a.creditNotes + total);
       continue;
     }
 
@@ -349,8 +370,12 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       });
       paid = round2(paid + tds);
     }
-    // Legacy rows: amount_paid or a Paid status with no matching payment rows.
-    const claimed = inv.status === 'Paid' ? total : round2(num(inv.amount_paid) + tds);
+    // Legacy rows: amount_paid or a Paid status with no matching payment rows. A Paid bill is
+    // settled by receipts AND its linked credit notes: the credited part is never a receipt.
+    const credited = creditOf.get(inv.id) ?? 0;
+    const claimed = inv.status === 'Paid'
+      ? round2(Math.max(total - credited, num(inv.amount_paid) + tds))
+      : round2(num(inv.amount_paid) + tds);
     const missing = round2(claimed - paid);
     if (missing > 0.004) {
       a.entries.push({
@@ -361,7 +386,11 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       paid = round2(paid + missing);
     }
 
-    const outstanding = round2(Math.max(total - paid, 0));
+    const open = round2(Math.max(total - paid, 0));
+    // Linked credit notes settle what receipts left open; any rest is an unallocated credit.
+    const alloc = round2(Math.min(credited, open));
+    if (credited - alloc > 0.004) a.creditNotes = round2(a.creditNotes + credited - alloc);
+    const outstanding = round2(open - alloc);
     const excess = round2(Math.max(paid - total, 0));
     if (excess > 0) a.advances = round2(a.advances + excess);
     if (outstanding > 0.004) {
@@ -371,6 +400,7 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
         total, paid, outstanding,
         daysOverdue: daysOverdue(inv.due_date, now),
         bucket: agingBucket(inv.due_date, now) as AgingBucketLabel,
+        ...(alloc > 0 ? { credited: alloc } : {}),
       });
     }
   }

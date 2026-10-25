@@ -177,3 +177,9 @@
   .filters { padding: 0 1rem 0.75rem; }
   .bulkBar { margin: 0 1rem 0.75rem; }
 }
+
+/* 8I quick win: phones show a visible label on the record-payment (Banknote) row button. */
+.payLabel { display: none; }
+@media (max-width: 640px) {
+  .payLabel { display: inline; margin-left: 0.25rem; font-weight: 600; white-space: nowrap; }
+}

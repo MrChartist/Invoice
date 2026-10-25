@@ -299,6 +299,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   tds_justifications: 'books.edit',
   // business extras (WP-9)
   pos_returns: 'doc.create',
+  // 8E: cashier shifts — a clerk opens / closes their own shift at the counter
+  pos_shifts: 'doc.create',
   branches: 'master.edit',
   amc_contracts: 'master.edit',
   loyalty_adjustments: 'master.edit',
@@ -311,6 +313,15 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   recurring_bills: 'books.edit',
   bank_rules: 'books.edit',
   payment_requests: 'books.edit',
+  // 8F: distribution masters, van settlements, order pad, breakage / expiry claims and receipts
+  dist_areas: 'master.edit',
+  dist_routes: 'master.edit',
+  dist_beats: 'master.edit',
+  van_settlements: 'books.edit',
+  order_pad_outbox: 'doc.create',
+  order_pad_imports: 'doc.create',
+  expiry_claims: 'books.edit',
+  expiry_receipts: 'books.edit',
   // approvals decision log: only the owner's decision writes it (approvals.ts `decide`); a clerk's
   // request lives on the document itself, so a clerk can never forge a decision row (review L5)
   approvals: 'doc.approve',

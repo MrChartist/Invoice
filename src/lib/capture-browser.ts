@@ -132,3 +132,38 @@ export async function openCaptureFromFile(file: File, opts: { source?: InboxSour
   }
   return { inbox, draft, qr, note, route: `/expenses?tab=inbox&doc=${encodeURIComponent(inbox.id)}` };
 }
+
+const QR_WARN_KEY = { sellerGstin: 'wSeller', buyerGstin: 'wBuyer', docDate: 'wDate', irn: 'wIrn', total: 'wTotal', docType: 'wType' } as const;
+
+/**
+ * 8I (8.160): a QR read live by the camera ("Scan bill" in the Expenses header) — keep it in the inbox and draft
+ * the bill, like the Inbox tab's camera / paste path. Returns the toast text and the inbox route.
+ */
+export function captureFromQrText(text: string, source: 'camera' | 'paste' = 'camera'): { message: string; tone: 'success' | 'error' | 'info'; route?: string } {
+  const res = decodeEinvoiceQr(text);
+  if (res.ok === false) return { message: capT(`e_${res.error}`), tone: 'error' };
+  const preview = draftFromQr(res.data, captureContext());
+  if (preview.creditNote) {
+    const row = inboxDb.add({ source, qr: res.data, note: capT('creditNote') });
+    notifyInbox();
+    return { message: capT('creditNote'), tone: 'info', route: `/expenses?tab=inbox&doc=${encodeURIComponent(row.id)}` };
+  }
+  const row = inboxDb.add({ source, qr: res.data });
+  const d = draftFromQrNow(res.data, { inboxId: row.id });
+  if (d) inboxDb.update(row.id, { draft_id: d.id });
+  notifyInbox();
+  const extra = [...res.warnings.map((w) => capT(QR_WARN_KEY[w])), ...(preview.buyerMismatch ? [capT('warnBuyer', { gstin: res.data.buyerGstin })] : [])];
+  return {
+    message: `${capT('drafted', { no: res.data.docNo || '—' })} ${capT('sigNote')}${extra.length ? ` ${extra.join(' ')}` : ''}`,
+    tone: extra.length ? 'info' : 'success',
+    route: `/expenses?tab=inbox&doc=${encodeURIComponent(row.id)}`,
+  };
+}
+
+function notifyInbox() {
+  try {
+    window.dispatchEvent(new CustomEvent(INBOX_CHANGED_EVENT));
+  } catch {
+    /* no window (tests) */
+  }
+}

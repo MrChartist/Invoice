@@ -9,6 +9,7 @@ import { effectiveStatus } from './invoice-status';
 import { daysOverdue } from './utils';
 import { docCurrency, hasInrValue, inrRecord, missingFxRate } from './fx';
 import { receivableBalance, receivableTotal } from './rcm';
+import { amountDue, isLiveCreditNote, linkedCredits, type CreditMap } from './amount-due';
 
 /** Only real, issued sales documents count as revenue — not quotes, challans or drafts. A debit note bills extra; a Bill of Supply is revenue with no output tax. */
 export function isRevenueDoc(inv: Pick<InvoiceRecord, 'doc_type' | 'status'>): boolean {
@@ -75,17 +76,10 @@ export function summarize(
   const out: Summary = { count: 0, billed: 0, credited: 0, received: 0, outstanding: 0, overdueAmount: 0, overdueCount: 0 };
 
   // Credit notes only count when they are live documents, and are matched to their invoice via links.
-  const creditTotals = new Map<string, number>();
-  const byId = new Map(invoices.map((i) => [i.id, i]));
-  for (const link of links) {
-    if (link.relation !== 'credit_note') continue;
-    const note = byId.get(link.to_id);
-    // A draft credit note is not issued yet: it reduces nothing.
-    if (!note || note.doc_type !== 'CREDIT_NOTE' || note.status === 'Cancelled' || note.status === 'Draft') continue;
-    creditTotals.set(link.from_id, (creditTotals.get(link.from_id) ?? 0) + receivableTotal(note));
-  }
+  // A draft credit note is not issued yet: it reduces nothing (src/lib/amount-due.ts).
+  const creditTotals = linkedCredits(links, invoices);
   for (const inv of invoices) {
-    if (inv.doc_type === 'CREDIT_NOTE' && inv.status !== 'Cancelled' && inv.status !== 'Draft') out.credited += receivableTotal(inv);
+    if (isLiveCreditNote(inv)) out.credited += receivableTotal(inv);
   }
 
   for (const inv of invoices) {
@@ -94,7 +88,7 @@ export function summarize(
     const total = receivableTotal(inv);
     out.billed += total;
     out.received += Math.min(inv.amount_paid ?? 0, total);
-    const due = Math.max(outstandingOf(inv) - (creditTotals.get(inv.id) ?? 0), 0);
+    const due = amountDue(inv, creditTotals.get(inv.id));
     out.outstanding += due;
     if (due > 0 && effectiveStatus(inv, now) === 'Overdue') {
       out.overdueAmount += due;
@@ -142,11 +136,14 @@ export function monthlyBilled(all: InvoiceRecord[], months = 6, now: Date = new 
   return buckets;
 }
 
-/** Unpaid documents, most overdue first — the "needs attention" list. */
-export function attentionList(invoices: InvoiceRecord[], limit = 5, now: Date = new Date()): InvoiceRecord[] {
+/**
+ * Unpaid documents, most overdue first — the "needs attention" list. `credits` (optional,
+ * `linkedCredits`): an invoice its credit notes settle needs no attention.
+ */
+export function attentionList(invoices: InvoiceRecord[], limit = 5, now: Date = new Date(), credits?: CreditMap): InvoiceRecord[] {
   // Overdue days computed once per row, not once per comparison (perf: the sort is n log n).
   return invoices
-    .filter((inv) => isRevenueDoc(inv) && outstandingOf(inv) > 0)
+    .filter((inv) => isRevenueDoc(inv) && outstandingOf(inv) > 0 && (!credits || amountDue(inv, credits.get(inv.id)) > 0))
     .map((inv) => ({ inv, late: daysOverdue(inv.due_date, now), due: inv.due_date || '' }))
     .sort((a, b) => b.late - a.late || a.due.localeCompare(b.due))
     .slice(0, limit)

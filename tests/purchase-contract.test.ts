@@ -657,3 +657,16 @@ test('8C readers (duplicate guard, bank memory, bills due soon) read the real bi
   const due = billsDueSoon([{ ...bill, due_date: '2026-04-15', reverse_charge: true }, { ...bill, id: 'd', due_date: '2026-04-15', status: 'draft' }], [], '2026-04-12', '27');
   assert.deepEqual(due.bills.map((b) => [b.id, b.balance]), [['p1', 1000]]);
 });
+
+test('8F Breakage / Expiry Issue reads the real purchase shape (batch → supplier bill line)', async () => {
+  const { brkExpCandidates } = await import('../src/lib/expiry-ops.ts');
+  const item = { id: 's1', name: 'Paper ream', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, track_batches: true };
+  const withBatch: PurchaseRecord = { ...bill, lines: [{ ...bill.lines[0], batch_no: 'B1', expiry_date: '2026-05-01' }] };
+  const tracking = new Map([['s1', { item, qty: 10, byGodown: { main: 10 }, serials: [], batches: [{ batch: 'B1', expiry: '2026-05-01', firstIn: '2026-04-12', qty: 10, byGodown: { main: 10 } }] }]]);
+  const { rows } = brkExpCandidates(tracking as never, [withBatch, { ...withBatch, id: 'x', status: 'Draft' } as unknown as PurchaseRecord, { ...withBatch, id: 'e', kind: 'EXPENSE' }], '2026-05-10', '2026-06-01');
+  assert.equal(rows.length, 1, 'drafts and expenses are not supplier stock bills');
+  assert.equal(rows[0].billId, 'p1');
+  assert.equal(rows[0].vendorName, 'Acme Supplies');
+  assert.equal(rows[0].unitCost, 100);
+  assert.equal(rows[0].qty, 10);
+});

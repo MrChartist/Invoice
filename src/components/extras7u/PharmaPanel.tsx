@@ -17,6 +17,7 @@ import { cn, formatDate, todayInput } from '../../lib/utils';
 import type { InvoiceRecord } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { x7T } from '../../i18n/areas/extras-7u';
+import { phT } from '../../i18n/areas/pharma-ops';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './x7u.module.css';
@@ -78,6 +79,7 @@ export function PharmaPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
                 <input className={cn(controls.input, controls.inputNumeric)} inputMode="numeric" disabled={!manage} value={String(s.near_expiry_days)} onChange={(e) => setS({ ...s, near_expiry_days: Number(e.target.value.replace(/\D/g, '')) || 0 })} onBlur={() => save(s)} /></label>
             </div>
             <label className={controls.check}><input type="checkbox" checked={s.block_near_expiry} disabled={!manage} onChange={(e) => save({ ...s, block_near_expiry: e.target.checked })} /> {x7T('blockNear')}</label>
+            <label className={controls.check}><input type="checkbox" checked={!!s.block_above_mrp} disabled={!manage} onChange={(e) => save({ ...s, block_above_mrp: e.target.checked })} data-block-mrp /> {phT('blockMrp')}</label>
             <p className={own.muted}>{x7T('licenceHint')}</p>
 
             <p className={own.sub}>{x7T('schedules')}</p>

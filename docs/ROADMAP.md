@@ -502,6 +502,48 @@ Competitor parity with Zoho Books / Xero / QuickBooks / Refrens / TallyPrime 7.0
 | 8.45 | ✅ **Bank rules + memory** (`bank_rules`): ALL / ANY of narration contains / starts with / safe regex, counterparty token, amount range, debit / credit, bank account → expense (head, supplier, GST + ITC, cost centre, branch, mode), voucher to a ledger, receipt against a customer's invoices, contra (twin reused), ignore; run after invoice matching; every suggestion labelled Rule / Match / Memory; memory learned from past expense categorisations; "Create rule for similar lines?" after a manual expense; all-or-nothing batches through the existing writers (roles, period lock, approval gate, audit) | `bank-rules.ts`, `bank-rules-apply.ts`, `BankRulesPanel.tsx`, `RuleSuggestions.tsx` | done |
 | 8.46 | ⏳ 8C follow-ups: PDF page rendering for QR reading, a multi-line GST split from the QR (needs the full e-invoice JSON), rule actions with GST on vouchers, memory for receipts / vouchers, payment approval inside the e-payment batch screen, total-JS budget headroom | — | open |
 
+### 8I · Filing & capture UX (`docs/features/gst-reports.md`, `docs/features/bill-capture.md`)
+
+From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Validate report → error report → download", Tally "resolve exceptions → export JSON"). Working papers only — verify with your CA.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.160 | ✅ **Scan bill** button in the Expenses header (books.edit): lazy chooser — live e-invoice QR with the camera (BarcodeDetector, where available), take a photo, or pick a photo / PDF → `openCaptureFromFile`; a camera QR drafts the bill via `captureFromQrText`; ends on the inbox row | `ScanBillDialog.tsx`, `capture-browser.ts`, `Expenses.tsx` | done |
+| 8.161 | ✅ **Check before JSON download**: GSTR-1 / GSTR-3B / IFF JSON first run the GST exceptions, the report's errors / warnings and the Rule 46 series gaps; anything found → lazy dialog grouped by problem with Fix links, "Download anyway" / "Review"; clean → straight download; "· n ⚠" badge on the JSON buttons | `gst-preflight.ts`, `PreflightDialog.tsx`, `GstReports.tsx` | done |
+| 8.162 | ✅ **Filing mode**: steps strip (Period ✓ → Check (n) → Download JSON → Mark filed, marks shared with the Compliance tab) and the 29 GST tabs grouped GSTR-1 / GSTR-3B / Reconcile / Tools (grouped tablists with ←/→ on desktop, a select on phones); every old `?tab=` id still resolves | `gst-tabs.ts`, `GstReports.tsx`, `filing.module.css` | done |
+| 8.163 | ✅ Phones: the record-payment row button in the Invoices list shows a visible "₹ Received" label | `Transactions.tsx` | done |
+| 8.164 | ⏳ 8I follow-ups: per-form preflight rules (3B without HSN checks), "Mark filed" for IFF / CMP-08, remembering the downloaded step across reloads | — | open |
+
+### 8F · Distribution, pharma, stock depth (`docs/features/distribution.md`)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 8.80 | ✅ **Credit-limit enforcement** (BUSY / Marg / Zoho): policy Off / Warn / Block per company + per party, open sales orders and overdue-beyond-credit-days options; editor and POS (saved customers, unpaid part); Block holds a clerk's document in the approval queue (`reason: 'credit'`), owner override audited (`credit-policy.ts`, `holdIfCreditBlocked` in `approval-gate.ts`) | — | done |
+| 8.81 | ✅ **Distribution masters & reports**: areas / beats / routes, party area / beat / default salesman, sales / outstanding / collections by salesman / beat / area, returns by beat, day-wise beat plan, agent on POS bills; **offline order pad** with HMAC-signed order files (share / file / QR) imported as sales orders with dedupe (`distribution.ts`, `order-pad.ts`) | — | done |
+| 8.82 | ✅ **Van sales**: van godown kind, van load (transfer), van settlement (returns + cash vs bills, `VST/FY…`), pick lists by bin (`van.ts`, `pick-list.ts`) | — | done |
+| 8.83 | ✅ **Fast / slow / non-moving and ABC analysis** (`stock-analysis.ts`) | — | done |
+| 8.84 | ✅ **Pharma operations** (Marg): Breakage / Expiry Issue grouped by supplier with debit notes + claims, claim tracking, Breakage / Expiry Receive into a non-saleable Expiry godown, destruction with an ITC-reversal reminder (verify with your CA), salt / substitute search, block sale above batch MRP (`expiry-ops.ts`, `salt-search.ts`, `saleLimitGate`) | — | done |
+| 8.85 | ✅ **Item variants** (attribute grid → child items with SKUs / barcodes) and **kits** consuming BOM components on sale (`variants.ts`, `events-kits.ts`) | — | done |
+| 8.86 | ✅ **Bin / rack** on items and batches, snapshotted on delivery challan lines and printed on pick lists (`bins.ts`) | — | done |
+| 8.87 | ✅ **Thermal roll labels**: 50×25, 38×25 2-up, 100×50 presets; raw TSPL / EPL / ZPL over Web Serial or file; weighed-goods EAN-13 with embedded price (`label-sheet.ts`, `label-raw.ts`) | — | done |
+| 8.88 | ⏳ 8F follow-ups: one debit note spanning several bills of a supplier, POS decoding of weighed-goods codes, kit shortfall warnings, order-pad partial import / camera QR scan | — | open |
+### 8E · Retail speed (`docs/features/pos-barcode-pricing.md` § 8E)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| 8.140 | ✅ **Weighing-scale barcodes**: device-local profile (prefixes 20–29, PLU length, weight / price, decimals, check digit), item `sold_by_weight` + `plu`; weight × rate or exact embedded price; **live weight over Web Serial** (stable ASCII frame → focused quantity, Alt+W) | `scale-barcode.ts`, `scale-serial.ts`, `RetailSettings.tsx` | done |
+| 8.141 | ✅ **Keyboard speed pack**: `3*code` / `3 code` / `3*` quantity prefix, item `short_code` (POS + editor typeahead), `=500` gross → rate (and "=" in a rate field), Alt+Q last line's quantity, unknown code → search kept + create item, Ctrl+F5 day summary, Shift+F1 help, PgUp / PgDn bill browser, **custom function keys** (device-local keymap) | `pos-keys.ts`, `pos.ts` (`keyCombo`, `posShortcut(e, keymap)`), `PosHelp.tsx`, `DaySummary.tsx`, `BillBrowser.tsx` | done |
+| 8.142 | ✅ **Cashier shifts** (`pos_shifts`): open with float per user, X report, Z per shift with cash count, close blocked while bills are on hold; day close unchanged | `pos-shifts.ts`, `ShiftPanel.tsx` | done |
+| 8.143 | ✅ **Customer-facing display** (`/pos-display` pop-up, BroadcastChannel): lines, total, UPI QR, thank-you / change; nothing stored | `pos-display.ts`, `CustomerDisplay.tsx`, `cross-tab.ts` | done |
+| 8.144 | ✅ **More tenders**: Cheque, Wallet, On account (saved customers, credit-limit check) — each with "fill rest" | `pos.ts`, `Pos.tsx` | done |
+| 8.145 | ✅ **MRP less %** on items and price levels; **selling price lists on the POS** | `pricing.ts`, `catalog.ts`, `Pos.tsx` | done |
+| 8.146 | ✅ **Alt+P** opens the POS from anywhere | `DashboardLayout.tsx`, `useHotkeys.ts` | done |
+| 8.147 | ✅ **Change strip**: full-width "Give change ₹…" for 3 s after saving | `Pos.tsx` | done |
+| 8.148 | ✅ **WhatsApp this bill** (beside Reprint, save toast; prompt when no phone; UPI link for a balance) | `pos-share.ts` | done |
+| 8.149 | ✅ **Create item from an unknown code** (POS + editor scan bar) | `QuickItemSheet.tsx`, `catalog.ts` | done |
+| 8.150 | ✅ Wiring: PWA "Payment in" (`/clients?pay=1`) → party picker → ₹ Received sheet; shared image / PDF → "Capture as supplier bill (read e-invoice QR)" or "New expense" | `PartyPicker.tsx`, `Clients.tsx`, `ShareTarget.tsx` | done |
+| 8.151 | ⏳ 8E follow-ups: scale labels with an embedded price check digit, USB-HID / Bluetooth scales, pole displays over serial (VFD), drawer hand-over between shifts, short codes on stock-only items, Option+P on macOS for the global key | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

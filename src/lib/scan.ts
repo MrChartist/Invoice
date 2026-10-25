@@ -70,6 +70,15 @@ export function findByCode(raw: string, catalog: readonly InvoiceItem[], stock: 
   return null;
 }
 
+/**
+ * 8E (8.141): the item whose `short_code` is exactly `term` (case and leading zeros ignored, like a barcode).
+ * Used by the POS scan box and the editor's item typeahead.
+ */
+export function findByShortCode<T extends Pick<InvoiceItem, 'short_code'>>(term: string, items: readonly T[]): T | undefined {
+  const k = codeKey(term);
+  return k ? items.find((i) => i.short_code && codeKey(i.short_code) === k) : undefined;
+}
+
 const blank = (i: InvoiceItem) => !i.name.trim() && !(num(i.rate) > 0);
 
 export interface ScanResult {

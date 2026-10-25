@@ -1,11 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { History, Keyboard, Minus, Pause, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
+import { Clock, MessageCircle, Monitor, Settings2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { NumberInput } from '../components/ui/NumberInput';
 import { Typeahead } from '../components/ui/Typeahead';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { Modal } from '../components/ui/Modal';
 import { ScanField } from '../components/scan/ScanField';
 import { SerialPicker } from '../components/inventory/SerialPicker';
 import { BankAccountSelect } from '../components/bank/BankAccountSelect';
@@ -15,7 +17,7 @@ import { localDb } from '../lib/localDb';
 import { generateId, getTable } from '../lib/storage';
 import { num, round2 } from '../lib/invoice-calc';
 import { suggest } from '../lib/suggest';
-import { addScannedLine, findByCode } from '../lib/scan';
+import { addScannedLine, findByCode, findByShortCode } from '../lib/scan';
 import { TABLES, findLevel, loadPositions, type StockItem } from '../lib/inventory';
 import { editorStockContext, serialKey, serialsInStock } from '../lib/stock-tracking';
 import { customFieldsDb, snapshotFromMap } from '../lib/custom-fields';
@@ -26,6 +28,19 @@ import {
   POS_SHORTCUTS, buildPosRecord, fillRest, posShortcut, savePosBill, tenderSummary,
   type PosAction, type Tender, type TenderMethod,
 } from '../lib/pos';
+// 8E retail speed pack: entry parsing, keymap, scale labels, shifts, customer display, price lists, WhatsApp.
+import { effectiveKeys, loadKeymap, looksLikeCode, parseCounterEntry, rateFromGross, searchTermOf, type PosKeymap } from '../lib/pos-keys';
+import { findByPlu, loadScaleProfile, parseScaleBarcode, scaleLine, type ScaleProfile, type ScaleRead } from '../lib/scale-barcode';
+import { shiftsDb, type PosShift } from '../lib/pos-shifts';
+import { openBroadcast } from '../lib/cross-tab';
+import { DISPLAY_CHANNEL, DISPLAY_PATH, billMessage, idleMessage, readDisplayMessage, thanksMessage, type DisplayMessage } from '../lib/pos-display';
+import { PRICE_LIST_BASIS, priceListRate } from '../lib/price-list';
+import { upiLink } from '../lib/share';
+import { posWhatsappHref } from '../lib/pos-share';
+import { creditCheck, masterFor } from '../lib/credit-limit';
+import { can } from '../lib/access';
+import { retailT } from '../i18n/areas/retail';
+import retail from '../components/pos-retail/retail.module.css';
 import { holdCart, loadHeld, recallCart, saveHeld, type HeldCart } from '../lib/pos-hold';
 import { stockClass } from '../lib/pos-tiles';
 import { redeemOnBill } from '../lib/loyalty';
@@ -43,6 +58,9 @@ import { returnsT } from '../i18n/areas/extras';
 import { areaNodes } from '../i18n/areas/nodes';
 import { unitT } from '../i18n/areas/units';
 import { cleanAltUnits, lineUnitPatch, roundTypedQty, unitChoices, unitsDb } from '../lib/units';
+import { canOverrideCredit, creditStatus, recordCreditOverride } from '../lib/credit-policy'; // 8.80
+import { saltIndex, saltOf } from '../lib/salt-search'; // 8.84
+import { crT } from '../i18n/areas/credit';
 
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
 // WP-9: return / exchange screen and the exchange-credit banner (own files, loaded on demand).
@@ -52,7 +70,15 @@ const LoyaltyRedeem = lazy(() => import('../components/loyalty/LoyaltyRedeem').t
 const PosPrinterButton = lazy(() => import('../components/extras7u/PosPrinter').then((m) => ({ default: m.PosPrinterButton }))); // 7U ESC/POS
 // 8.22: customer-facing UPI QR (qrcode.react loads only once a UPI amount is typed).
 const PosUpiQr = lazy(() => import('../components/pos/PosUpiQr').then((m) => ({ default: m.PosUpiQr })));
+const PosDistExtras = lazy(() => import('../components/distribution/PosDistExtras')); // 8F agent + credit notice
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
+// 8E: help, day summary, bill browser, counter settings, shifts, create-item sheet (each loads on first use).
+const PosHelp = lazy(() => import('../components/pos-retail/PosHelp').then((m) => ({ default: m.PosHelp })));
+const DaySummary = lazy(() => import('../components/pos-retail/DaySummary').then((m) => ({ default: m.DaySummary })));
+const BillBrowser = lazy(() => import('../components/pos-retail/BillBrowser').then((m) => ({ default: m.BillBrowser })));
+const RetailSettings = lazy(() => import('../components/pos-retail/RetailSettings').then((m) => ({ default: m.RetailSettings })));
+const ShiftPanel = lazy(() => import('../components/pos-retail/ShiftPanel').then((m) => ({ default: m.ShiftPanel })));
+const QuickItemSheet = lazy(() => import('../components/pos/QuickItemSheet').then((m) => ({ default: m.QuickItemSheet })));
 
 interface Party {
   client: Client | null;
@@ -60,7 +86,8 @@ interface Party {
   phone: string;
 }
 const WALK_IN: Party = { client: null, name: '', phone: '' };
-const NO_TENDER = { Cash: 0, UPI: 0, Card: 0 } as Record<TenderMethod, number>;
+const NO_TENDER = { Cash: 0, UPI: 0, Card: 0, Cheque: 0, Wallet: 0 } as Record<TenderMethod, number>;
+const TENDER_KEY: Record<TenderMethod, PosAction> = { Cash: 'cash', UPI: 'upi', Card: 'card', Cheque: 'cheque', Wallet: 'wallet' };
 
 /** Everything the counter reads, loaded once per bill. */
 function loadCounter() {
@@ -83,10 +110,13 @@ function loadCounter() {
     pricing: pricingInUse(pricing) ? pricing : null,
     positions: stock.some((s) => s.track_stock) ? loadPositions() : [],
     units: unitsDb.stored(),
+    salts: saltIndex(stock), // 8.84 substitute search
     ctx: editorStockContext({ doc_type: 'INVOICE', issue_date: todayInput() }),
     // 8.22: quick-item tiles — stock groups and recent POS bills (most sold, when nothing is starred).
     groups: getTable<{ id: string; name: string; parent_id?: string }>('stock_groups'),
     posBills: localDb.invoices.getAll().filter((i) => i.pos),
+    // 8E (8.145): selling price lists (stock items with dated prices) apply on the POS as in the editor.
+    lists: stock.some((s) => s.selling_prices?.length),
   };
 }
 
@@ -126,6 +156,35 @@ export function Pos() {
   const [held, setHeld] = useState<HeldCart[]>(loadHeld);
   const [heldOpen, setHeldOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [agentId, setAgentId] = useState(''); // 8F: sales agent on the bill
+  const [creditAsk, setCreditAsk] = useState(''); // 8.80: owner override prompt
+  const [creditOver, setCreditOver] = useState(false);
+  /* 8E retail speed pack */
+  const [keymap, setKeymap] = useState<PosKeymap>(loadKeymap);
+  const [scale, setScale] = useState<ScaleProfile>(loadScaleProfile);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [dayOpen, setDayOpen] = useState(false);
+  const [browse, setBrowse] = useState<number | null>(null);
+  const [shiftOpen, setShiftOpen] = useState(false);
+  const [shift, setShift] = useState<PosShift | undefined>(() => shiftsDb.current());
+  const [pendingQty, setPendingQty] = useState<number | null>(null);
+  const [grossFor, setGrossFor] = useState<string | null>(null);
+  const [grossText, setGrossText] = useState('');
+  const [unknown, setUnknown] = useState<{ code: string; qty?: number } | null>(null);
+  const [onAccount, setOnAccount] = useState(0);
+  const [chequeRef, setChequeRef] = useState('');
+  const [creditOk, setCreditOk] = useState(false);
+  const [waFor, setWaFor] = useState<InvoiceRecord | null>(null);
+  const [waPhone, setWaPhone] = useState('');
+  const [changeStrip, setChangeStrip] = useState<{ amount: number; key: number } | null>(null);
+  /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
+  const lastLine = useRef<string | null>(null);
+  const focusedQty = useRef<string | null>(null);
+  /** Lines priced by a price-embedded scale label: never re-priced (the label price is final). */
+  const locked = useRef(new Set<string>());
+  const stripSeq = useRef(0);
+  const keys = useMemo(() => effectiveKeys(keymap), [keymap]);
 
   const settings = useMemo(() => localDb.settings.get(), []);
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
@@ -139,14 +198,16 @@ export function Pos() {
   // Loyalty points redeemed as an amount discount (WP-9); a refused redemption leaves the bill as built.
   const redeemed = useMemo(() => (redeemPts > 0 && party.client ? redeemOnBill(built, redeemPts) : null), [built, redeemPts, party.client]);
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
-  const record = useMemo(() => applyBillOffer(redeemed?.record ?? built, data.pricing?.schemes ?? [], { retotalRecord: true }), [redeemed, built, data.pricing]);
+  const offered = useMemo(() => applyBillOffer(redeemed?.record ?? built, data.pricing?.schemes ?? [], { retotalRecord: true }), [redeemed, built, data.pricing]);
+  const record = useMemo(() => (agentId ? { ...offered, agent_id: agentId } : offered), [offered, agentId]);
   const tenders: Tender[] = useMemo(
     () => (Object.keys(tender) as TenderMethod[]).map((m) => ({
       method: m, amount: tender[m],
       ...(m === 'UPI' && upiRef.trim() ? { reference: upiRef.trim() } : {}),
+      ...(m === 'Cheque' && chequeRef.trim() ? { reference: chequeRef.trim() } : {}),
       ...(m !== 'Cash' && bankId ? { bank_account_id: bankId } : {}),
     })),
-    [tender, upiRef, bankId],
+    [tender, upiRef, chequeRef, bankId],
   );
   // An exchange credit (WP-9) pays part of the bill; the tenders cover the rest.
   const credit = exchange ? Math.min(exchange.amount, record.total) : 0;
@@ -169,27 +230,33 @@ export function Pos() {
   const finish = useCallback(
     (next: InvoiceItem[], repriceId?: string, force = false, client: Client | null = party.client): InvoiceItem[] => {
       const p = data.pricing;
-      if (!p) return next;
-      const lvl = client ? levelForClient(client, p.levels) : null;
+      if (!p && !data.lists) return next;
+      const lvl = p && client ? levelForClient(client, p.levels) : null;
       const priced = next.map((l) => {
-        if (l.free_of || (repriceId && l.id !== repriceId)) return l;
-        const cat = catalogItemFor(p.catalog, l.name);
-        if (!cat || (!force && !l.price_basis && num(l.rate) !== num(cat.rate))) return l;
-        const q = resolvePrice(cat, num(l.quantity), lvl);
+        if (l.free_of || locked.current.has(l.id) || (repriceId && l.id !== repriceId)) return l;
+        const cat = catalogItemFor(p?.catalog ?? data.catalog, l.name);
+        // 8E (8.145): a selling price list in force replaces the catalogue's base rate (as in the editor).
+        const list = data.lists ? priceListRate(data.stock, l.name, l.hsn, day) : undefined;
+        if (!cat && list === undefined) return l;
+        const base = list ?? num(cat?.rate);
+        if (!force && !l.price_basis && num(l.rate) !== base) return l;
+        const q = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(l.quantity), lvl);
+        const basis = q.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : q.basis;
         const out = { ...l, rate: q.rate, amount: round2(q.rate * num(l.quantity)) };
-        if (q.basis) out.price_basis = q.basis;
+        if (basis) out.price_basis = basis;
         else delete out.price_basis;
         return out;
       });
-      return syncSchemeLines(priced, p.schemes, day, generateId, p.catalog);
+      return p ? syncSchemeLines(priced, p.schemes, day, generateId, p.catalog) : priced;
     },
-    [data.pricing, party.client, day],
+    [data.pricing, data.lists, data.catalog, data.stock, party.client, day],
   );
 
   const addSource = useCallback(
-    (source: InvoiceItem) => {
+    (source: InvoiceItem, qty?: number) => {
       setItems((cur) => {
-        const r = addScannedLine(cur, source, { newId: generateId, fallbackTaxRate: settings.defaultTaxRate });
+        const r = addScannedLine(cur, source, { newId: generateId, fallbackTaxRate: settings.defaultTaxRate, qty });
+        lastLine.current = r.lineId;
         let next = r.items;
         if (!r.incremented) {
           // Item custom fields travel with the line, as in the editor.
@@ -240,9 +307,35 @@ export function Pos() {
     }), id));
   const removeLine = (id: string) => setItems((cur) => finish(cur.filter((l) => l.id !== id && l.free_of !== id)));
 
+  /** 8E (8.140): a weighing-scale label — always its own line; a price label's amount is final. */
+  const addScaleLine = (item: InvoiceItem, read: ScaleRead) => {
+    const sl = scaleLine(read, num(item.rate));
+    setItems((cur) => {
+      const line = addScannedLine([], { ...item, rate: sl.rate }, { newId: generateId, qty: sl.quantity, fallbackTaxRate: settings.defaultTaxRate }).items[0];
+      lastLine.current = line.id;
+      if (read.kind === 'price') {
+        locked.current.add(line.id);
+        return finish([...cur, line]);
+      }
+      return finish([...cur, line], line.id, true);
+    });
+    setErrors([]);
+  };
+
+  /** 8E (8.141): "=500" / the rate field's "=" key — set a line's amount, the rate is worked back. */
+  const applyGross = (id: string | null, amount: number): boolean => {
+    const line = id ? items.find((l) => l.id === id && !l.free_of) : undefined;
+    if (!line) return false;
+    locked.current.delete(line.id);
+    setRate(line.id, rateFromGross(amount, num(line.quantity), num(line.discount_percent)));
+    return true;
+  };
+
   /** Pick (or clear) the saved customer; a new customer may buy at another level, so automatic lines are re-priced. */
   const chooseClient = (client: Client | null) => {
     setParty(client ? { client, name: '', phone: '' } : WALK_IN);
+    setAgentId(client?.agent_id ?? '');
+    setCreditOver(false);
     setRedeemPts(0);
     setDispatch(false);
     setCustomerText('');
@@ -253,29 +346,71 @@ export function Pos() {
 
   const hits = useMemo(
     () =>
-      suggest(query, data.sources, {
+      suggest(searchTermOf(query), data.sources, {
         label: (i) => i.name,
-        extra: (i) => [i.hsn, i.sku, i.barcode],
-        sub: (i) => [formatCurrency(num(i.rate)), i.sku && `SKU ${i.sku}`].filter(Boolean).join(' · '),
+        extra: (i) => [i.hsn, i.sku, i.barcode, i.short_code, saltOf(data.salts, i.name)],
+        sub: (i) => [formatCurrency(num(i.rate)), i.sku && `SKU ${i.sku}`, saltOf(data.salts, i.name)].filter(Boolean).join(' · '),
         limit: 8,
       }),
-    [query, data.sources],
+    [query, data.sources, data.salts],
   );
 
+  /** 8E: a code, a short code or a scale label → added (with `qty`); null when the term is none of them. */
+  const resolveTerm = (term: string, qty?: number): { ok: boolean; message: string } | null => {
+    const match = findByCode(term, data.catalog, data.stock);
+    const short = match ? null : findByShortCode(term, data.sources);
+    const item = match?.item ?? short;
+    if (item) {
+      addSource(item, qty);
+      return { ok: true, message: posT('added', { name: item.name }) + (qty && qty !== 1 ? ` × ${qty}` : '') };
+    }
+    const read = parseScaleBarcode(term, scale);
+    if (!read) return null;
+    const plu = findByPlu(data.catalog, read.plu);
+    if (!plu) return { ok: false, message: retailT('noPlu', { plu: read.plu }) };
+    addScaleLine(plu, read);
+    return { ok: true, message: retailT('scaleAdded', { name: plu.name, value: read.kind === 'price' ? formatCurrency(read.value) : `${read.value.toFixed(3)} kg` }) };
+  };
+
+  const askUnknown = (code: string, qty?: number) => {
+    if (can('master.edit')) setUnknown({ code, qty });
+  };
+
   const onCode = (code: string) => {
-    const match = findByCode(code, data.catalog, data.stock);
-    if (!match) return { ok: false, message: posT('noCode', { code }) };
-    addSource(match.item);
-    return { ok: true, message: posT('added', { name: match.item.name }) };
+    const r = resolveTerm(code);
+    if (r) return r;
+    askUnknown(code);
+    return { ok: false, message: posT('noCode', { code }) };
   };
 
   const onEnter = (text: string) => {
-    if (!text.trim() || findByCode(text, data.catalog, data.stock)) return false; // a code: let onCode add it
+    const e = parseCounterEntry(text);
+    if (e.kind === 'empty') return true;
+    if (e.kind === 'gross') {
+      return applyGross(lastLine.current ?? items[items.length - 1]?.id ?? null, e.amount)
+        ? { ok: true, message: retailT('grossSet', { amount: formatCurrency(e.amount) }) }
+        : { ok: false, message: retailT('grossNoLine') };
+    }
+    const qty = e.qty ?? pendingQty ?? undefined;
+    if (!e.term && e.qty) {
+      setPendingQty(e.qty);
+      return { ok: true, message: retailT('qtyNext', { n: e.qty }) };
+    }
+    const done = resolveTerm(e.term, qty);
+    if (done) {
+      if (done.ok) setPendingQty(null);
+      return done;
+    }
     const hit = hits[active] ?? hits[0];
-    if (!hit) return false;
-    addSource(hit.row);
-    setActive(0);
-    return true;
+    if (hit) {
+      addSource(hit.row, e.loose ? pendingQty ?? undefined : qty);
+      setPendingQty(null);
+      setActive(0);
+      return { ok: true, message: posT('added', { name: hit.row.name }) };
+    }
+    // Nothing matched: keep the text for a name search, and offer to create the item for a code.
+    if (looksLikeCode(e.term) || e.qty) askUnknown(e.term, qty);
+    return { ok: false, message: posT('noCode', { code: e.term }), keep: true as const };
   };
 
   /* ── Tender ────────────────────────────────────────────────── */
@@ -284,6 +419,19 @@ export function Pos() {
     setTender((t) => ({ ...t, [m]: fillRest(payable, (Object.keys(t) as TenderMethod[]).map((k) => ({ method: k, amount: t[k] })), m) }));
     setTimeout(() => (document.getElementById(`pos-${m}`) as HTMLInputElement | null)?.select(), 0);
   };
+  /** 8E (8.144): On account takes what is still due (saved customers only). */
+  const fillAccount = () => {
+    if (!party.client) return;
+    setOnAccount(summary.due);
+    setTimeout(() => (document.getElementById('pos-Account') as HTMLInputElement | null)?.select(), 0);
+  };
+  // Credit limit (6.25) for what this bill leaves on account.
+  const credit6 = useMemo(() => {
+    if (!party.client || summary.due <= 0.004) return null;
+    const master = masterFor(party.client, data.clients) ?? party.client;
+    const c = creditCheck({ client: master, draft: { doc_type: record.doc_type, total: record.total, amount_paid: round2(record.total - summary.due) }, invoices: localDb.invoices.getAll(), today: day });
+    return c.overBy > 0 ? c : null;
+  }, [party.client, summary.due, record.doc_type, record.total, data.clients, day]);
 
   /* ── Save ──────────────────────────────────────────────────── */
 
@@ -291,18 +439,47 @@ export function Pos() {
     setItems([]);
     setRedeemPts(0);
     setParty(WALK_IN);
+    setAgentId('');
+    setCreditOver(false);
     setDispatch(false);
     setCustomerText('');
     setTender(NO_TENDER);
     setUpiRef('');
+    setChequeRef('');
+    setOnAccount(0);
+    setCreditOk(false);
+    setPendingQty(null);
+    setGrossFor(null);
+    lastLine.current = null;
+    focusedQty.current = null;
+    locked.current.clear();
     setErrors([]);
     setData(loadCounter());
     setTimeout(() => searchRef.current?.focus(), 0);
   };
 
-  const save = (expiredOk = false) => {
+  const save = (expiredOk = false, creditOverride = false) => {
     if (items.length === 0) {
       setErrors([posT('errEmpty')]);
+      return;
+    }
+    // 8E (8.144): an "On account" amount must be what is left unpaid.
+    if (onAccount > 0.004 && Math.abs(onAccount - summary.due) > 0.004) {
+      setErrors([retailT('accountMismatch', { due: formatCurrency(summary.due) })]);
+      return;
+    }
+    // 8.80: a saved customer over the credit limit (Block) — the unpaid part adds credit.
+    const overridden = creditOverride || creditOver;
+    const blocked = party.client && !overridden ? creditStatus(record, { unpaid: summary.due })?.blocked : '';
+    if (blocked) {
+      if (canOverrideCredit()) setCreditAsk(blocked);
+      else setErrors([crT('posBlocked'), blocked]);
+      return;
+    }
+    // 6.25 warn-only limit: the first Save warns, a second Save goes through.
+    if (credit6 && !creditOk && !overridden) {
+      setErrors([credit6.warnings[0] ?? retailT('overLimit'), retailT('overLimitAgain')]);
+      setCreditOk(true);
       return;
     }
     const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client, exchangeReturnId: exchange?.id });
@@ -317,7 +494,12 @@ export function Pos() {
       return;
     }
     const change = res.summary?.change ?? 0;
-    notify(posT('saved', { doc: docName(res.record.doc_type), number: res.record.invoice_number }) + (change > 0 ? posT('change', { amount: formatCurrency(change) }) : ''));
+    const saved = res.record;
+    if (shift) shiftsDb.addBill(shift.id, saved.id); // 8.142: the bill counts in this cashier's shift
+    // 8E (8.147 / 8.148): the change in a big strip for 3 s; WhatsApp the bill from the toast.
+    if (change > 0) setChangeStrip({ amount: change, key: ++stripSeq.current });
+    notify(posT('saved', { doc: docName(saved.doc_type), number: saved.invoice_number }), 'success', { action: { label: retailT('whatsapp'), onClick: () => sendWhatsapp(saved) }, duration: 6000 });
+    postDisplay(thanksMessage(saved.sender?.companyName ?? '', saved.total, change), true);
     setLastBill(res.record);
     setExchange(null);
     if (autoPrint) setPrinting(res.record);
@@ -338,6 +520,16 @@ export function Pos() {
     upi_ref: upiRef,
     total: record.total,
   });
+
+  /** 8.148: WhatsApp a saved bill to its customer's phone; asks for a number when it has none. */
+  const sendWhatsapp = (bill: InvoiceRecord) => {
+    const href = posWhatsappHref(bill);
+    if (href) window.open(href, '_blank', 'noopener');
+    else {
+      setWaPhone('');
+      setWaFor(bill);
+    }
+  };
 
   const storeHeld = (next: HeldCart[]): boolean => {
     try {
@@ -383,7 +575,7 @@ export function Pos() {
     setParty(client ? { client, name: '', phone: '' } : { client: null, name: c.name ?? '', phone: c.phone ?? '' });
     setDispatch(!!c.dispatch && !!client);
     setCustomerText('');
-    setTender(c.tender ?? NO_TENDER);
+    setTender({ ...NO_TENDER, ...(c.tender ?? {}) });
     setUpiRef(c.upi_ref ?? '');
     setRedeemPts(0);
     setErrors([]);
@@ -394,12 +586,93 @@ export function Pos() {
 
   const drop = (id: string) => storeHeld(loadHeld().filter((c) => c.id !== id));
 
+  /* ── 8E: bills to browse, live weight, customer display ───── */
+
+  const posBillsSorted = useMemo(
+    () => [...data.posBills].sort((a, b) => (a.created_at ?? a.issue_date).localeCompare(b.created_at ?? b.issue_date) || a.invoice_number.localeCompare(b.invoice_number, undefined, { numeric: true })),
+    [data.posBills],
+  );
+
+  /** Alt+W: read a stable weight from a serial scale into the focused (or last) line's quantity. */
+  const weigh = async () => {
+    const id = focusedQty.current ?? lastLine.current ?? items[items.length - 1]?.id;
+    if (!id) return notify(retailT('weighNoLine'), 'error');
+    try {
+      const m = await import('../lib/scale-serial');
+      if (!m.scaleSerialSupported()) return notify(retailT('noSerial'), 'error');
+      const w = await m.readScaleWeight(scale.baud);
+      if (!w || !(w.weight > 0)) return notify(retailT('scaleNothing'), 'error');
+      if (!w.stable) return notify(retailT('scaleUnstable', { kg: w.weight.toFixed(3) }), 'error');
+      setQty(id, w.weight);
+      notify(retailT('weighed', { kg: w.weight.toFixed(3) }));
+    } catch (err) {
+      notify((err as Error).message, 'error');
+    }
+  };
+
+  const channel = useRef<BroadcastChannel | null>(null);
+  const lastMsg = useRef<DisplayMessage | null>(null);
+  const thanking = useRef(false);
+  const postDisplay = (m: DisplayMessage, thanks = false) => {
+    lastMsg.current = m;
+    thanking.current = thanks;
+    try {
+      channel.current?.postMessage(m);
+    } catch {
+      /* display closed */
+    }
+  };
+  useEffect(() => {
+    const ch = openBroadcast(DISPLAY_CHANNEL);
+    channel.current = ch;
+    if (!ch) return;
+    ch.onmessage = (e: MessageEvent) => {
+      if (readDisplayMessage(e.data)?.type === 'hello' && lastMsg.current) ch.postMessage(lastMsg.current);
+    };
+    return () => {
+      ch.close();
+      channel.current = null;
+    };
+  }, []);
+  const business = record.sender?.companyName || sender?.companyName || '';
+  const displayUpi = useMemo(
+    () => (tender.UPI > 0 ? upiLink({ pa: record.sender?.upiId || sender?.upiId || '', pn: business, amount: round2(tender.UPI), tr: upiBillNo, note: upiBillNo ? `Bill ${upiBillNo}` : undefined }) : null),
+    [tender.UPI, record.sender?.upiId, sender?.upiId, business, upiBillNo],
+  );
+  useEffect(() => {
+    if (items.length) postDisplay(billMessage(record, { link: displayUpi, amount: round2(tender.UPI) }));
+    else if (!thanking.current) postDisplay(idleMessage(business));
+  }, [record, displayUpi, tender.UPI, items.length, business]);
+  const openDisplay = () => {
+    const w = window.open(DISPLAY_PATH, 'mrchartist-pos-display', 'popup,width=960,height=640');
+    if (!w) notify(retailT('displayBlocked'), 'error');
+  };
+
+  useEffect(() => {
+    if (!changeStrip) return;
+    const t = window.setTimeout(() => setChangeStrip(null), 3000);
+    return () => window.clearTimeout(t);
+  }, [changeStrip]);
+
   /* ── Keyboard ──────────────────────────────────────────────── */
 
   const act = (a: PosAction) => {
     if (a === 'search') searchRef.current?.focus();
     else if (a === 'customer') document.getElementById('pos-customer')?.focus();
     else if (a === 'cash' || a === 'upi' || a === 'card') fill(a === 'cash' ? 'Cash' : a === 'upi' ? 'UPI' : 'Card');
+    else if (a === 'cheque' || a === 'wallet') fill(a === 'cheque' ? 'Cheque' : 'Wallet');
+    else if (a === 'account') fillAccount();
+    else if (a === 'help') setHelpOpen(true);
+    else if (a === 'daySummary') setDayOpen(true);
+    else if (a === 'prevBill') setBrowse(data.posBills.length ? posBillsSorted.length - 1 : 0);
+    else if (a === 'nextBill') searchRef.current?.focus(); // already on the newest (the counter)
+    else if (a === 'lastQty') {
+      const id = lastLine.current ?? items[items.length - 1]?.id;
+      const el = id ? (document.querySelector(`[data-qty-for="${id}"]`) as HTMLInputElement | null) : null;
+      el?.focus();
+      el?.select();
+    } else if (a === 'weigh') void weigh();
+    else if (a === 'display') openDisplay();
     else if (a === 'save') save();
     else if (a === 'new') reset();
     else if (a === 'zreport') setZOpen(true);
@@ -409,6 +682,10 @@ export function Pos() {
       setHeldOpen(true);
     }
   };
+  const keymapRef = useRef(keymap);
+  useEffect(() => {
+    keymapRef.current = keymap;
+  }, [keymap]);
   const actRef = useRef(act);
   useEffect(() => {
     actRef.current = act;
@@ -416,7 +693,7 @@ export function Pos() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (document.querySelector('[role="dialog"]')) return; // a dialog owns the keyboard
-      const a = posShortcut(e);
+      const a = posShortcut(e, keymapRef.current);
       if (!a) return;
       e.preventDefault();
       actRef.current(a);
@@ -446,6 +723,24 @@ export function Pos() {
                 <Printer size={16} /> {posT('reprint', { number: lastBill.invoice_number })}
               </button>
             )}
+            {lastBill && (posWhatsappHref(lastBill) ? (
+              <a className={controls.btnOutline} href={posWhatsappHref(lastBill) ?? undefined} target="_blank" rel="noopener noreferrer" data-pos-whatsapp>
+                <MessageCircle size={16} /> {retailT('whatsapp')}
+              </a>
+            ) : (
+              <button type="button" className={controls.btnOutline} onClick={() => sendWhatsapp(lastBill)} data-pos-whatsapp>
+                <MessageCircle size={16} /> {retailT('whatsapp')}
+              </button>
+            ))}
+            <button type="button" className={controls.btnOutline} onClick={() => setShiftOpen(true)} data-pos-shift>
+              <Clock size={16} /> {shift ? retailT('shiftN', { n: shift.number }) : retailT('shift')}
+            </button>
+            <button type="button" className={controls.btnOutline} onClick={openDisplay} title={keys.display} data-pos-display-open>
+              <Monitor size={16} /> {retailT('display')}
+            </button>
+            <button type="button" className={controls.btnIcon} onClick={() => setSettingsOpen(true)} aria-label={retailT('setTitle')} title={retailT('setTitle')} data-pos-settings>
+              <Settings2 size={16} />
+            </button>
             <button type="button" className={controls.btnOutline} onClick={hold} disabled={items.length === 0} title="Shift+F8" data-pos-hold>
               <Pause size={16} /> {posT('hold')}
             </button>
@@ -483,6 +778,7 @@ export function Pos() {
                 if (e.key === 'Escape') { e.preventDefault(); setQuery(''); }
               }}
             />
+            {pendingQty && <span className={retail.pending} data-pos-pending>{retailT('qtyNext', { n: pendingQty })}</span>}
             {hits.length > 0 && query.trim() && (
               <ul className={styles.hits} role="listbox" aria-label={posT('matching')}>
                 {hits.map((h, n) => {
@@ -535,11 +831,54 @@ export function Pos() {
                       </div>
                       <div role="cell" className={styles.qty}>
                         <button type="button" className={controls.btnIcon} onClick={() => setQty(l.id, num(l.quantity) - 1)} disabled={free || num(l.quantity) <= 1} aria-label={posT('less', { name: l.name })}><Minus size={14} /></button>
-                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.qtyInput)} value={l.quantity} blankZero={false} onChange={(q) => setQty(l.id, q)} disabled={free} aria-label={posT('qtyOf', { name: l.name, n: n + 1 })} />
+                        <NumberInput
+                          className={cn(controls.input, controls.inputNumeric, styles.qtyInput)}
+                          value={l.quantity}
+                          blankZero={false}
+                          onChange={(q) => setQty(l.id, q)}
+                          disabled={free}
+                          aria-label={posT('qtyOf', { name: l.name, n: n + 1 })}
+                          data-qty-for={l.id}
+                          onFocus={() => { focusedQty.current = l.id; }}
+                          onBlur={() => { if (focusedQty.current === l.id) setTimeout(() => { if (focusedQty.current === l.id && document.activeElement?.getAttribute('data-qty-for') !== l.id) focusedQty.current = null; }, 0); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); searchRef.current?.focus(); } }}
+                        />
                         <button type="button" className={controls.btnIcon} onClick={() => setQty(l.id, num(l.quantity) + 1)} disabled={free} aria-label={posT('more', { name: l.name })}><Plus size={14} /></button>
                       </div>
                       <div role="cell" className={styles.r}>
-                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.num)} value={l.rate} onChange={(r) => setRate(l.id, r)} disabled={free} placeholder={posT('rate')} aria-label={posT('rateOf', { name: l.name, n: n + 1 })} />
+                        {grossFor === l.id ? (
+                          <input
+                            className={cn(controls.input, controls.inputNumeric, retail.grossInput)}
+                            value={grossText}
+                            autoFocus
+                            inputMode="decimal"
+                            placeholder={retailT('grossPh')}
+                            aria-label={retailT('grossOf', { name: l.name })}
+                            data-gross-for={l.id}
+                            onChange={(e) => setGrossText(e.target.value.replace(/[^0-9.]/g, ''))}
+                            onBlur={() => setGrossFor(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') { e.preventDefault(); setGrossFor(null); }
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (Number(grossText) > 0) applyGross(l.id, Number(grossText));
+                                setGrossFor(null);
+                                searchRef.current?.focus();
+                              }
+                            }}
+                          />
+                        ) : (
+                          <NumberInput
+                            className={cn(controls.input, controls.inputNumeric, styles.num)}
+                            value={l.rate}
+                            onChange={(r) => { locked.current.delete(l.id); setRate(l.id, r); }}
+                            disabled={free}
+                            placeholder={posT('rate')}
+                            aria-label={posT('rateOf', { name: l.name, n: n + 1 })}
+                            title={retailT('rateEqHint')}
+                            onKeyDown={(e) => { if (e.key === '=') { e.preventDefault(); setGrossText(''); setGrossFor(l.id); } }}
+                          />
+                        )}
                       </div>
                       <div role="cell" className={styles.r}>
                         <NumberInput className={cn(controls.input, controls.inputNumeric, styles.num)} value={l.discount_percent ?? 0} onChange={(d) => setDisc(l.id, d)} disabled={free} placeholder={posT('disc')} aria-label={posT('discOf', { name: l.name, n: n + 1 })} />
@@ -609,6 +948,9 @@ export function Pos() {
                   <LoyaltyRedeem key={party.client.id || party.client.name} customer={party.client.name} points={redeemPts} errors={redeemed?.errors ?? []} onApply={setRedeemPts} />
                 </Suspense>
               )}
+              <Suspense fallback={null}>
+                <PosDistExtras client={party.client} record={record} unpaid={summary.due} agentId={agentId} onAgent={setAgentId} />
+              </Suspense>
               {party.client ? null : (
                 <>
                   <Typeahead
@@ -651,20 +993,31 @@ export function Pos() {
 
           <section className={surface.card} aria-label={posT('payment')}>
             <div className={cn(surface.cardBody, styles.stack)}>
-              {(['Cash', 'UPI', 'Card'] as TenderMethod[]).map((m) => (
+              {(['Cash', 'UPI', 'Card', 'Cheque', 'Wallet'] as TenderMethod[]).map((m) => (
                 <div key={m} className={styles.tender}>
-                  <label htmlFor={`pos-${m}`} className={styles.tenderLabel}>{posT(`m.${m}`)} <kbd className={styles.kbd}>{m === 'Cash' ? 'F4' : m === 'UPI' ? 'F6' : 'F7'}</kbd></label>
+                  <label htmlFor={`pos-${m}`} className={styles.tenderLabel}>{m === 'Cash' || m === 'UPI' || m === 'Card' ? posT(`m.${m}`) : retailT(`t.${m}`)} <kbd className={styles.kbd}>{keys[TENDER_KEY[m]]}</kbd></label>
                   <NumberInput id={`pos-${m}`} className={cn(controls.input, controls.inputNumeric)} value={tender[m]} onChange={(v) => setTender((t) => ({ ...t, [m]: v }))} placeholder="0" />
                   <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => fill(m)}>{posT('rest')}</button>
                 </div>
               ))}
+              {party.client && (
+                <div className={styles.tender}>
+                  <label htmlFor="pos-Account" className={styles.tenderLabel}>{retailT('t.Account')} <kbd className={styles.kbd}>{keys.account}</kbd></label>
+                  <NumberInput id="pos-Account" className={cn(controls.input, controls.inputNumeric)} value={onAccount} onChange={setOnAccount} placeholder="0" />
+                  <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={fillAccount}>{posT('rest')}</button>
+                </div>
+              )}
+              {tender.Cheque > 0 && (
+                <input className={controls.input} value={chequeRef} onChange={(e) => setChequeRef(e.target.value)} placeholder={retailT('chequePh')} aria-label={retailT('chequePh')} id="pos-cheque-ref" />
+              )}
+              {credit6 && <p className={retail.warn} role="status" data-pos-credit>{credit6.warnings[0]}</p>}
               {tender.UPI > 0 && (
                 <Suspense fallback={<input className={controls.input} value={upiRef} onChange={(e) => setUpiRef(e.target.value)} placeholder={posT('upiPh')} aria-label={posT('upiAria')} />}>
                   <PosUpiQr vpa={record.sender?.upiId || sender?.upiId} payee={record.sender?.companyName || sender?.companyName} amount={round2(tender.UPI)} billNo={upiBillNo} utr={upiRef} onUtr={setUpiRef} />
                 </Suspense>
               )}
-              {(tender.UPI > 0 || tender.Card > 0) && (
-                <BankAccountSelect id="pos-bank" label={posT('receivedInto')} method={tender.UPI > 0 ? 'UPI' : 'Card'} value={bankId} onChange={setBankId} />
+              {(tender.UPI > 0 || tender.Card > 0 || tender.Cheque > 0 || tender.Wallet > 0) && (
+                <BankAccountSelect id="pos-bank" label={posT('receivedInto')} method={tender.UPI > 0 ? 'UPI' : tender.Card > 0 ? 'Card' : tender.Cheque > 0 ? 'Cheque' : 'UPI'} value={bankId} onChange={setBankId} />
               )}
               <div className={styles.changeRow}>
                 {summary.change > 0 ? (
@@ -693,7 +1046,8 @@ export function Pos() {
           <details className={styles.keys}>
             <summary><Keyboard size={14} aria-hidden="true" /> {posT('shortcuts')}</summary>
             <ul>
-              {POS_SHORTCUTS.map((s) => <li key={s.keys}><kbd className={styles.kbd}>{s.keys}</kbd> {posT(`sc.${s.action}`)}</li>)}
+              {POS_SHORTCUTS.slice(0, 10).map((s) => <li key={s.keys}><kbd className={styles.kbd}>{keys[s.action]}</kbd> {retailT(`a.${s.action}`)}</li>)}
+              <li><kbd className={styles.kbd}>{keys.help}</kbd> <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setHelpOpen(true)} data-pos-help-open>{retailT('a.help')}</button></li>
               <li><kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>Enter</kbd> {posT('scSave')}</li>
               <li><kbd className={styles.kbd}>↑</kbd>/<kbd className={styles.kbd}>↓</kbd> {areaNodes(posT('scPick'), { enter: <kbd className={styles.kbd}>Enter</kbd> })}</li>
             </ul>
@@ -719,6 +1073,21 @@ export function Pos() {
         }}
       />
       <HeldBills open={heldOpen} list={held} onClose={() => setHeldOpen(false)} onRecall={recall} onDrop={drop} />
+      <ConfirmDialog
+        open={!!creditAsk}
+        destructive
+        title={crT('posOverride')}
+        message={`${crT('posOverrideAsk')} ${creditAsk}`}
+        confirmLabel={crT('posOverride')}
+        cancelLabel={posT('goBack')}
+        onClose={() => setCreditAsk('')}
+        onConfirm={() => {
+          recordCreditOverride(party.client?.name ?? '', creditAsk);
+          setCreditAsk('');
+          setCreditOver(true);
+          save(false, true);
+        }}
+      />
       {zOpen && (
         <Suspense fallback={null}>
           <ZReportModal open={zOpen} onClose={() => setZOpen(false)} notify={notify} />
@@ -745,6 +1114,77 @@ export function Pos() {
         <Suspense fallback={null}>
           <PosReceiptPrint invoice={printing} onDone={() => setPrinting(null)} />
         </Suspense>
+      )}
+      {/* 8E retail speed pack */}
+      {changeStrip && (
+        <div className={retail.changeStrip} role="status" aria-live="assertive" data-pos-change-strip key={changeStrip.key}>
+          {retailT('changeStrip', { amount: formatCurrency(changeStrip.amount) })}
+        </div>
+      )}
+      <Suspense fallback={null}>
+        {helpOpen && <PosHelp open={helpOpen} onClose={() => setHelpOpen(false)} keymap={keymap} onCustomise={() => { setHelpOpen(false); setSettingsOpen(true); }} />}
+        {dayOpen && <DaySummary open={dayOpen} onClose={() => { setDayOpen(false); searchRef.current?.focus(); }} held={held.length} />}
+        {browse !== null && (
+          <BillBrowser
+            bills={posBillsSorted}
+            index={Math.max(Math.min(browse, posBillsSorted.length - 1), 0)}
+            onIndex={(n) => setBrowse(Math.max(n, 0))}
+            onClose={() => { setBrowse(null); searchRef.current?.focus(); }}
+            onReprint={(b) => setPrinting(b)}
+          />
+        )}
+        {settingsOpen && (
+          <RetailSettings
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            keymap={keymap}
+            scale={scale}
+            onSaved={(k, sc) => { setKeymap(k); setScale(sc); notify(retailT('settingsSaved')); }}
+          />
+        )}
+        {shiftOpen && <ShiftPanel open={shiftOpen} onClose={() => setShiftOpen(false)} held={held.length} notify={notify} onChanged={setShift} />}
+        {unknown && (
+          <QuickItemSheet
+            code={unknown.code}
+            defaultTax={settings.defaultTaxRate}
+            onClose={() => setUnknown(null)}
+            onSearch={() => { setUnknown(null); searchRef.current?.focus(); }}
+            onSaved={(item) => {
+              const qty = unknown.qty;
+              setUnknown(null);
+              setData(loadCounter());
+              addSource(item, qty);
+              setPendingQty(null);
+              notify(retailT('qiAdded', { name: item.name }));
+              setTimeout(() => searchRef.current?.focus(), 0);
+            }}
+          />
+        )}
+      </Suspense>
+      {waFor && (
+        <Modal
+          open
+          size="sm"
+          onClose={() => setWaFor(null)}
+          title={retailT('waTitle')}
+          footer={
+            <>
+              <button type="button" className={controls.btnOutline} onClick={() => setWaFor(null)}>{retailT('cancel')}</button>
+              {posWhatsappHref(waFor, waPhone) ? (
+                <a className={controls.btnPrimary} href={posWhatsappHref(waFor, waPhone) ?? undefined} target="_blank" rel="noopener noreferrer" onClick={() => setWaFor(null)} data-pos-wa-link>
+                  <MessageCircle size={16} /> {retailT('waSend')}
+                </a>
+              ) : (
+                <button type="button" className={controls.btnPrimary} disabled>{retailT('waSend')}</button>
+              )}
+            </>
+          }
+        >
+          <label className={controls.field}>
+            <span className={controls.label}>{retailT('waPhone')}</span>
+            <input id="pos-wa-phone" className={controls.input} value={waPhone} inputMode="tel" autoFocus onChange={(e) => setWaPhone(e.target.value)} />
+          </label>
+        </Modal>
       )}
     </div>
   );

@@ -1,0 +1,128 @@
+/* 8F distribution / pharma / stock-depth screens. Tokens only (src/index.css). */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.row > * {
+  min-width: 10rem;
+  flex: 1 1 10rem;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+}
+
+.danger {
+  border-color: color-mix(in srgb, var(--destructive) 50%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.group {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.qr {
+  display: inline-block;
+  padding: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 6rem;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+
+.day {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.day h4 {
+  margin: 0 0 0.25rem;
+  font-size: var(--text-sm);
+}
+
+.day ul {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: var(--text-sm);
+}

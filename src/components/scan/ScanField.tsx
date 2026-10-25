@@ -28,8 +28,11 @@ interface Props {
   continuous?: boolean;
   /** Text typed that is not a code (e.g. an item name in the POS) — called on every change. */
   onText?: (text: string) => void;
-  /** Called on Enter instead of `onCode` when it returns true (POS: pick the highlighted search hit). */
-  onEnter?: (text: string) => boolean;
+  /**
+   * Called on Enter instead of `onCode` when it returns true (POS: pick the highlighted search hit).
+   * 8E: an outcome object is handled too and shown as the status; `keep` handles it but leaves the text in the box.
+   */
+  onEnter?: (text: string) => boolean | ScanOutcome | (ScanOutcome & { keep: true });
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
 }
 
@@ -75,7 +78,16 @@ export function ScanField({ id, label, onCode, placeholder, autoFocus, inputRef,
               const value = text;
               setText('');
               onText?.('');
-              if (onEnter?.(value)) return;
+              const r = onEnter?.(value);
+              if (r && typeof r === 'object') {
+                setStatus({ ok: r.ok, message: r.message });
+                if ('keep' in r && r.keep) {
+                  setText(value);
+                  onText?.(value);
+                }
+                return;
+              }
+              if (r) return;
               handle(value);
             }
           }}

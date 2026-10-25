@@ -39,8 +39,9 @@ export const WALK_IN_NAME = 'Walk-in customer';
 
 /* ── Tender maths ────────────────────────────────────────────── */
 
-export type TenderMethod = 'Cash' | 'UPI' | 'Card';
-export const TENDER_METHODS: TenderMethod[] = ['Cash', 'UPI', 'Card'];
+/** 8E (8.144): Cheque and Wallet (Paytm / PhonePe wallet, gift card) join the counter tenders; non-cash like UPI. */
+export type TenderMethod = 'Cash' | 'UPI' | 'Card' | 'Cheque' | 'Wallet';
+export const TENDER_METHODS: TenderMethod[] = ['Cash', 'UPI', 'Card', 'Cheque', 'Wallet'];
 
 export interface Tender {
   method: TenderMethod;
@@ -70,10 +71,10 @@ export function tenderSummary(total: number, tenders: readonly Tender[]): Tender
   const t = round2(Math.max(num(total), 0));
   const by = (m: TenderMethod) => round2(tenders.filter((x) => x.method === m).reduce((s, x) => s + Math.max(num(x.amount), 0), 0));
   const cash = by('Cash');
-  const nonCash = round2(by('UPI') + by('Card'));
+  const nonCash = round2(by('UPI') + by('Card') + by('Cheque') + by('Wallet'));
   const tendered = round2(cash + nonCash);
   const errors: string[] = [];
-  if (nonCash > t + 0.004) errors.push('UPI and card together are more than the bill — only cash can be given back as change.');
+  if (nonCash > t + 0.004) errors.push('UPI, card, cheque and wallet together are more than the bill — only cash can be given back as change.');
   const change = nonCash > t ? 0 : round2(Math.max(tendered - t, 0));
   const due = round2(Math.max(t - tendered, 0));
   const payments: TenderSummary['payments'] = [];
@@ -537,13 +538,13 @@ const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 /** Script-free 80 mm HTML of the Z report, for a print window (or saving as a file). */
-export function zReportHtml(z: ZReport, opts: { business?: string; close?: PosDayClose; printedAt?: string } = {}): string {
+export function zReportHtml(z: ZReport, opts: { business?: string; close?: PosDayClose; printedAt?: string; /** 8E: "X REPORT" / "SHIFT 2 Z REPORT" */ title?: string } = {}): string {
   const m = (n: number) => esc(formatCurrency(n));
   const row = (k: string, v: string, strong = false) => `<tr${strong ? ' class="b"' : ''}><td>${esc(k)}</td><td class="r">${v}</td></tr>`;
   const c = opts.close;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Z report ${esc(z.day)}</title>
+<title>${esc(opts.title ?? 'Z report')} ${esc(z.day)}</title>
 <style>
 @page { size: 80mm auto; margin: 0; }
 body { width: 72mm; margin: 4mm; font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; color: black; background: white; }
@@ -557,7 +558,7 @@ td { padding: 1px 0; vertical-align: top; }
 h2 { font-size: 12px; margin: 8px 0 0; border-bottom: 1px dashed black; }
 .foot { margin-top: 8px; font-size: 10px; }
 </style></head><body>
-<h1>Z REPORT</h1>
+<h1>${esc((opts.title ?? 'Z report').toUpperCase())}</h1>
 ${opts.business ? `<p>${esc(opts.business)}</p>` : ''}
 <p>${esc(formatDate(z.day))}</p>
 <table>
@@ -611,9 +612,12 @@ ${c.note ? `<tr><td colspan="2">${esc(c.note)}</td></tr>` : ''}
 
 /* ── Keyboard ────────────────────────────────────────────────── */
 
-export type PosAction = 'search' | 'cash' | 'upi' | 'card' | 'customer' | 'save' | 'new' | 'zreport' | 'hold' | 'held';
+export type PosAction =
+  | 'search' | 'cash' | 'upi' | 'card' | 'customer' | 'save' | 'new' | 'zreport' | 'hold' | 'held'
+  // 8E retail speed pack (8.141 / 8.144 / 8.146)
+  | 'help' | 'daySummary' | 'prevBill' | 'nextBill' | 'lastQty' | 'weigh' | 'account' | 'cheque' | 'wallet' | 'display';
 
-/** Counter shortcuts (shown on screen and in docs/features/pos-barcode-pricing.md). */
+/** Counter shortcuts (shown on screen and in docs/features/pos-barcode-pricing.md). Keys can be changed per device (pos-keys.ts). */
 export const POS_SHORTCUTS: { keys: string; action: PosAction; label: string }[] = [
   { keys: 'F2', action: 'search', label: 'Scan / search items' },
   { keys: 'F3', action: 'customer', label: 'Customer' },
@@ -626,14 +630,45 @@ export const POS_SHORTCUTS: { keys: string; action: PosAction; label: string }[]
   // 8.21: park the bill and start a new one; the list of bills on hold (recall).
   { keys: 'Shift+F8', action: 'hold', label: 'Hold & new bill' },
   { keys: 'F1', action: 'held', label: 'Bills on hold (recall)' },
+  // 8E: help, day summary, bill browsing, last line quantity, live weight, more tenders, customer display.
+  { keys: 'Shift+F1', action: 'help', label: 'All POS keys (help)' },
+  { keys: 'Ctrl+F5', action: 'daySummary', label: 'Today so far (sales, returns, tenders)' },
+  { keys: 'PageUp', action: 'prevBill', label: 'Previous bill' },
+  { keys: 'PageDown', action: 'nextBill', label: 'Next bill' },
+  { keys: 'Alt+Q', action: 'lastQty', label: 'Quantity of the last scanned line' },
+  { keys: 'Alt+W', action: 'weigh', label: 'Read the weighing scale' },
+  { keys: 'Shift+F4', action: 'account', label: 'On account (fills the rest)' },
+  { keys: 'Shift+F6', action: 'cheque', label: 'Cheque (fills the rest)' },
+  { keys: 'Shift+F7', action: 'wallet', label: 'Wallet (fills the rest)' },
+  { keys: 'Alt+M', action: 'display', label: 'Customer display' },
 ];
 
-/** The POS action for a key press, or null. Ctrl/⌘+Enter also saves. */
-export function posShortcut(e: { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean }): PosAction | null {
+export interface KeyEventLike { key: string; code?: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean }
+
+/**
+ * A key press as a combo string ("F2", "Shift+F8", "Ctrl+F5", "Alt+Q", "PageUp"); null for a bare
+ * modifier. With Alt, letters / digits come from `code` (macOS types "œ" for Option+Q).
+ */
+export function keyCombo(e: KeyEventLike): string | null {
+  if (['Shift', 'Control', 'Alt', 'Meta', 'AltGraph'].includes(e.key)) return null;
+  let key = e.key;
+  if (e.altKey && e.code && /^(Key[A-Z]|Digit\d)$/.test(e.code)) key = e.code.slice(e.code.startsWith('Key') ? 3 : 5);
+  else if (key.length === 1) key = key.toUpperCase();
+  else if (key === ' ') key = 'Space';
+  const mods = [(e.ctrlKey || e.metaKey) && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean);
+  return [...mods, key].join('+');
+}
+
+/**
+ * The POS action for a key press, or null. Ctrl/⌘+Enter also saves. `keymap` (pos-keys.ts) replaces
+ * the default key of an action on this device.
+ */
+export function posShortcut(e: KeyEventLike, keymap?: Partial<Record<PosAction, string>>): PosAction | null {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') return 'save';
-  if (e.ctrlKey || e.metaKey || e.altKey) return null;
-  if (e.shiftKey && e.key === 'F8') return 'hold';
-  return POS_SHORTCUTS.find((s) => s.keys === e.key)?.action ?? null;
+  const combo = keyCombo(e);
+  if (!combo) return null;
+  for (const s of POS_SHORTCUTS) if ((keymap?.[s.action] || s.keys) === combo) return s.action;
+  return null;
 }
 
 /** Amount for a tender field that "fills the rest": what is still due once the other tenders count. */

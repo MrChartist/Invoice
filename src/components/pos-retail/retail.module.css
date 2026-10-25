@@ -1,0 +1,280 @@
+/* 8E retail speed pack: help, day summary, bill browser, counter settings, shifts, customer display. */
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.keyList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.keyList li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.kbd {
+  display: inline-block;
+  min-width: 2.25rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--card-inner);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--foreground);
+}
+
+.section {
+  margin: 0.25rem 0 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.muted {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.5rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-inner);
+}
+
+.stat span {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.stat strong {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  color: var(--foreground);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table td.r,
+.table th.r {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.capture {
+  min-width: 8rem;
+  font-family: var(--font-mono);
+}
+
+.conflict {
+  color: var(--destructive);
+}
+
+.warn {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--card-inner);
+  border-left: 3px solid var(--warning);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.billHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+}
+
+.next {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.pending {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--card-inner);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+}
+
+.grossInput {
+  width: 6.5rem;
+}
+
+/* Customer-facing display window (`/pos-display`): large type, readable from across the counter. */
+.display {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+@media (min-width: 900px) {
+  .display.withQr {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+  }
+}
+
+.displayHead {
+  grid-column: 1 / -1;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.displayLines {
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.displayLines table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.25rem;
+}
+
+.displayLines td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.displayLines td:last-child,
+.displayLines td.r {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.displayQr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  text-align: center;
+}
+
+.qrBox {
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--primary-foreground);
+  line-height: 0;
+}
+
+.displayTotal {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.displayIdle {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  text-align: center;
+}
+
+.displayIdle small {
+  font-family: var(--font-body);
+  font-size: 1.25rem;
+  color: var(--muted-foreground);
+}
+
+/* 8.147: the change to give, full width for 3 seconds after F9. */
+.changeStrip {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
+  padding: 1.25rem 1rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 5vw, 2.75rem);
+  font-weight: 700;
+  text-align: center;
+  box-shadow: var(--shadow-lg, none);
+}
+
+/* Payment-in party picker */
+.pickList {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pickList button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+  text-align: left;
+}

@@ -17,7 +17,8 @@ import {
 } from '../../lib/catalog';
 import { GST_SLABS, UNITS, type InvoiceItem } from '../../types/invoice';
 import { nextInStoreEan } from '../../lib/barcode';
-import { levelRate, priceLevelsDb } from '../../lib/pricing';
+import { levelRate, mrpLessRate, priceLevelsDb } from '../../lib/pricing';
+import { retailT } from '../../i18n/areas/retail';
 import { getTable } from '../../lib/storage';
 import { TABLES, type StockItem } from '../../lib/inventory';
 import { cn, formatCurrency } from '../../lib/utils';
@@ -47,6 +48,10 @@ const toDraft = (i: InvoiceItem): CatalogDraft => ({
   sku: i.sku ?? '',
   mrp: i.mrp ?? 0,
   qty_slabs: i.qty_slabs ?? [],
+  short_code: i.short_code ?? '',
+  sold_by_weight: !!i.sold_by_weight,
+  plu: i.plu ?? '',
+  mrp_less_percent: i.mrp_less_percent ?? 0,
 });
 
 const ROUNDS: RoundTo[] = ['paise', 'rupee', 'five', 'ten'];
@@ -362,6 +367,52 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
               <label className={controls.field}>
                 <span className={controls.label}>{setT('mrp')}</span>
                 <NumberInput className={cn(controls.input, controls.inputNumeric)} value={draft.mrp ?? 0} onChange={(n) => setDraft({ ...draft, mrp: n })} placeholder={setT('forLabels')} />
+              </label>
+            </div>
+
+            {/* 8E retail speed: short code, scale PLU / sold by weight, MRP less % */}
+            <div className={controls.row3}>
+              <label className={controls.field}>
+                <span className={controls.label}>{retailT('shortCode')}</span>
+                <input
+                  className={cn(controls.input, controls.inputMono, fieldError('short_code') && controls.inputInvalid)}
+                  value={draft.short_code ?? ''}
+                  maxLength={12}
+                  onChange={(e) => setDraft({ ...draft, short_code: e.target.value.replace(/\s/g, '') })}
+                  placeholder={retailT('shortCodePh')}
+                  aria-invalid={!!fieldError('short_code')}
+                  data-catalog-short
+                />
+                {fieldError('short_code') && <span className={controls.error}>{fieldError('short_code')}</span>}
+              </label>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="catalog-plu">{retailT('plu')}</label>
+                <input
+                  id="catalog-plu"
+                  className={cn(controls.input, controls.inputMono, fieldError('plu') && controls.inputInvalid)}
+                  value={draft.plu ?? ''}
+                  inputMode="numeric"
+                  maxLength={6}
+                  onChange={(e) => setDraft({ ...draft, plu: e.target.value.replace(/\D/g, '') })}
+                  aria-invalid={!!fieldError('plu')}
+                />
+                <label className={controls.check}>
+                  <input type="checkbox" checked={!!draft.sold_by_weight} onChange={(e) => setDraft({ ...draft, sold_by_weight: e.target.checked })} /> {retailT('byWeight')}
+                </label>
+                {fieldError('plu') && <span className={controls.error}>{fieldError('plu')}</span>}
+              </div>
+              <label className={controls.field}>
+                <span className={controls.label}>{retailT('mrpLess')}</span>
+                <NumberInput
+                  className={cn(controls.input, controls.inputNumeric, fieldError('mrp_less_percent') && controls.inputInvalid)}
+                  value={draft.mrp_less_percent ?? 0}
+                  onChange={(n) => setDraft({ ...draft, mrp_less_percent: n })}
+                  placeholder="0"
+                />
+                {Number(draft.mrp_less_percent) > 0 && Number(draft.mrp) > 0 && (
+                  <span className={controls.hint}>{retailT('mrpLessRate', { rate: formatCurrency(mrpLessRate({ rate: draft.rate, mrp: draft.mrp, mrp_less_percent: draft.mrp_less_percent })) })}</span>
+                )}
+                {fieldError('mrp_less_percent') && <span className={controls.error}>{fieldError('mrp_less_percent')}</span>}
               </label>
             </div>
 

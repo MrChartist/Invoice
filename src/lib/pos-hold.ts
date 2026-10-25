@@ -16,7 +16,8 @@ import { DB_PREFIX, readRaw, removeRaw, writeRaw } from './storage';
 export const POS_HELD_KEY = `${DB_PREFIX}pos_held`;
 export const MAX_HELD = 9;
 
-export type HeldTender = { Cash: number; UPI: number; Card: number };
+/** 8E: Cheque / Wallet tenders are optional (carts held before them have none). */
+export type HeldTender = { Cash: number; UPI: number; Card: number; Cheque?: number; Wallet?: number };
 
 export interface HeldCart {
   id: string;
@@ -62,7 +63,7 @@ export function parseHeld(raw: string | null | undefined): HeldCart[] {
       ...(typeof r.name === 'string' && r.name ? { name: r.name } : {}),
       ...(typeof r.phone === 'string' && r.phone ? { phone: r.phone } : {}),
       ...(r.dispatch === true ? { dispatch: true } : {}),
-      ...(t ? { tender: { Cash: n(t.Cash), UPI: n(t.UPI), Card: n(t.Card) } } : {}),
+      ...(t ? { tender: { Cash: n(t.Cash), UPI: n(t.UPI), Card: n(t.Card), ...(n(t.Cheque) ? { Cheque: n(t.Cheque) } : {}), ...(n(t.Wallet) ? { Wallet: n(t.Wallet) } : {}) } } : {}),
       ...(typeof r.upi_ref === 'string' && r.upi_ref ? { upi_ref: r.upi_ref } : {}),
       total: n(r.total),
     });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { skT } from '../../i18n/areas/stock-depth';
 import { Edit3, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { godownTree, godownsDb, liveGodownReferences } from '../../lib/godowns';
@@ -27,7 +28,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   onChanged: (message: string) => void;
 }) {
   useT(); // re-render on a language switch (5.4)
-  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string; kind?: Godown['kind'] | '' } | null>(null);
   // WP-8: godowns may sit inside another godown (warehouse → store room); shown as a tree.
   const tree = godownTree(godowns);
   const blocked = editing?.id ? descendantIds(editing.id, godowns) : new Set<string>();
@@ -36,7 +37,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   const save = () => {
     if (!editing) return;
     try {
-      godownsDb.save({ id: editing.id, name: editing.name, address: editing.address, parent_id: editing.parent_id || undefined });
+      godownsDb.save({ id: editing.id, name: editing.name, address: editing.address, parent_id: editing.parent_id || undefined, kind: editing.kind ?? '' });
       onChanged(editing.id ? invT('godownRenamed') : invT('godownAdded', { name: editing.name.trim() }));
       setEditing(null);
       setError('');
@@ -74,11 +75,11 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
           <tbody>
             {tree.map(({ node, depth }) => ({ g: godowns.find((x) => x.id === node.id) ?? { id: node.id, name: node.name }, depth })).map(({ g, depth }) => (
               <tr key={g.id}>
-                <td><span className={depthClass(depth)}>{g.name}</span>{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}</td>
+                <td><span className={depthClass(depth)}>{g.name}</span>{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}{g.kind && <span className={styles.muted}> · {skT(g.kind === 'van' ? 'kindVan' : 'kindExpiry')}</span>}</td>
                 <td className={styles.muted}>{g.address || '—'}</td>
                 <td>
                   <span className={surface.rowActions}>
-                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '' })}>
+                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '', kind: g.kind ?? '' })}>
                       <Edit3 size={16} />
                     </button>
                     {g.id !== MAIN_GODOWN_ID && (
@@ -110,6 +111,14 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
               <select id="gd-parent" className={controls.select} value={editing.parent_id} onChange={(e) => setEditing({ ...editing, parent_id: e.target.value })}>
                 <option value="">{imT('topLevel')}</option>
                 {tree.filter((r) => !blocked.has(r.node.id)).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
+              </select>
+            </div>
+            <div className={controls.field}>
+              <label className={controls.label} htmlFor="gd-kind">{skT('godownKind')}</label>
+              <select id="gd-kind" className={controls.select} value={editing.kind ?? ''} onChange={(e) => setEditing({ ...editing, kind: e.target.value as Godown['kind'] | '' })} disabled={editing.id === MAIN_GODOWN_ID}>
+                <option value="">{skT('kindNormal')}</option>
+                <option value="van">{skT('kindVan')}</option>
+                <option value="expiry">{skT('kindExpiry')}</option>
               </select>
             </div>
             <div className={surface.pageActions}>

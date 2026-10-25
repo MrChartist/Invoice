@@ -22,6 +22,11 @@ export interface Godown {
   job_worker?: boolean;
   /** The job worker (`vendors` row) whose premises this is. */
   vendor_id?: string;
+  /**
+   * Additive (8F): what the godown is for. 'van' = a delivery van (stock loaded by transfer, settled daily);
+   * 'expiry' = non-saleable expired / breakage stock (sales from it are refused). Absent = an ordinary godown.
+   */
+  kind?: 'van' | 'expiry';
   created_at?: string;
   updated_at?: string;
 }

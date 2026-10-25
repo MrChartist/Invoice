@@ -22,7 +22,9 @@ import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
 import { useReminderLog } from './useReminderLog';
-import { receivableBalance } from '../../lib/rcm';
+import { amountDue, linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
+import { localDb } from '../../lib/localDb';
+import { getTable } from '../../lib/storage';
 import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
 import { remindT } from '../../i18n/areas/reminders';
@@ -63,10 +65,14 @@ function ReminderModalBody({
   const [channel, setChannel] = useState<Composer>(() =>
     normalizePhone(invoice.client?.phone) || !isValidEmail(invoice.client?.email) ? 'whatsapp' : 'email',
   );
-  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice));
+  // Credit notes raised against the invoice are never asked for (src/lib/amount-due.ts).
+  const [credited] = useState(() =>
+    linkedCredits(getTable<CreditLinkRow>('doc_links').filter((l) => l.from_id === invoice.id), localDb.invoices.getAll()).get(invoice.id) ?? 0,
+  );
+  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited));
   const [lang, setLang] = useState<ReminderLanguage>('en');
   const [message, setMessage] = useState(() =>
-    buildReminder(invoice, suggestStage(invoice), 'en', new Date(), { interestAccrued: interestForReminder(invoice) }),
+    buildReminder(invoice, suggestStage(invoice, new Date(), credited), 'en', new Date(), { interestAccrued: interestForReminder(invoice), credited }),
   );
   const [phone, setPhone] = useState(invoice.client?.phone ?? '');
   const [email, setEmail] = useState(invoice.client?.email ?? '');
@@ -81,7 +87,7 @@ function ReminderModalBody({
     setStage(nextStage);
     setLang(nextLang);
     setMessage(
-      buildReminder(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice) }),
+      buildReminder(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited }),
     );
   };
 
@@ -166,7 +172,7 @@ function ReminderModalBody({
           <div className={styles.summaryLine}>
             <span><strong>{invoice.client?.name || shareT('rmClient')}</strong></span>
             <span>{invoice.invoice_number}</span>
-            <span>{areaNodes(shareT('rmBalance'), { amount: <strong>{formatCurrency(receivableBalance(invoice), cur)}</strong> })}</span>
+            <span>{areaNodes(shareT('rmBalance'), { amount: <strong>{formatCurrency(amountDue(invoice, credited), cur)}</strong> })}</span>
             <span>{shareT('rmDue', { date: formatDate(invoice.due_date) })}</span>
             {last && <span>{shareT('rmLast', { date: formatDate(last.sent_at), n: history.length })}</span>}
           </div>

@@ -67,6 +67,9 @@ export function isMultiGodown(stored: readonly Godown[]): boolean {
   return godownList(stored).length > 1;
 }
 
+/** 8F: godowns stock may not be sold from (kind 'expiry': expired / breakage stock). */
+export const nonSaleableGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => g.kind === 'expiry').map((g) => g.id));
+
 export function godownName(list: readonly Godown[], id: string | undefined): string {
   const key = id || MAIN_GODOWN_ID;
   return list.find((g) => g.id === key)?.name ?? (key === MAIN_GODOWN_ID ? 'Main' : 'Unknown godown');
@@ -204,7 +207,7 @@ export const godownsDb = {
   isMulti: (): boolean => isMultiGodown(godownsDb.stored()),
 
   /** Add or rename a godown. Names are unique (case-insensitive). */
-  save(input: { id?: string; name: string; address?: string; parent_id?: string; job_worker?: boolean; vendor_id?: string }): Godown {
+  save(input: { id?: string; name: string; address?: string; parent_id?: string; job_worker?: boolean; vendor_id?: string; kind?: Godown['kind'] | '' }): Godown {
     const name = input.name.trim();
     if (!name) throw new Error('Enter a godown name.');
     const rows = godownsDb.stored();
@@ -215,7 +218,7 @@ export const godownsDb = {
     const existing = input.id ? rows.find((g) => g.id === input.id) : undefined;
     const parentIssue = godownParentIssue(input.id, input.parent_id, list);
     if (parentIssue) throw new Error(parentIssue);
-    const { parent_id: _oldParent, job_worker: oldJw, vendor_id: oldVendor, ...base } = existing ?? ({} as Partial<Godown>);
+    const { parent_id: _oldParent, job_worker: oldJw, vendor_id: oldVendor, kind: oldKind, ...base } = existing ?? ({} as Partial<Godown>);
     void _oldParent;
     // 7M: a job worker's premises (absent in the input = unchanged on an edit).
     const jw = input.job_worker ?? oldJw;
@@ -228,6 +231,8 @@ export const godownsDb = {
       ...(input.parent_id ? { parent_id: input.parent_id } : {}),
       ...(jw ? { job_worker: true } : {}),
       ...(vendor ? { vendor_id: vendor } : {}),
+      // 8F: van / expiry godown (absent in the input = unchanged; '' = ordinary).
+      ...((input.kind ?? oldKind) ? { kind: (input.kind ?? oldKind) as Godown['kind'] } : {}),
       created_at: existing?.created_at ?? now(),
       updated_at: now(),
     };

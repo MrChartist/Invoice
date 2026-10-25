@@ -32,6 +32,7 @@ import { MAIN_GODOWN_ID } from '../types/stock';
 import { useT } from '../i18n';
 import { invT } from '../i18n/areas/inventory';
 import { imT } from '../i18n/areas/inventory-masters';
+import { skT } from '../i18n/areas/stock-depth';
 import { itemsUnder, stockCategoriesDb, stockGroupsDb, treeRows } from '../lib/stock-groups';
 import { compoundText } from '../lib/units';
 
@@ -39,13 +40,17 @@ import { compoundText } from '../lib/units';
 const StockGroupsModal = lazy(() => import('../components/inventory/StockGroupsModal').then((m) => ({ default: m.StockGroupsModal })));
 const UnitsModal = lazy(() => import('../components/inventory/UnitsModal').then((m) => ({ default: m.UnitsModal })));
 const StockQueryTab = lazy(() => import('../components/inventory/StockQueryTab').then((m) => ({ default: m.StockQueryTab })));
+// 8F stock depth: analysis, variants / kits / bins, pharma operations (each its own chunk).
+const StockAnalysisTab = lazy(() => import('../components/distribution/StockAnalysisTab'));
+const DepthTab = lazy(() => import('../components/distribution/DepthTab'));
+const ExpiryOpsTab = lazy(() => import('../components/distribution/ExpiryOpsTab'));
 const OrdersOutstandingTab = lazy(() => import('../components/inventory/OrdersOutstandingTab').then((m) => ({ default: m.OrdersOutstandingTab })));
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
 
-type Tab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders';
-const TABS: Tab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders'];
+type Tab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders' | 'analysis' | 'depth' | 'expiry';
+const TABS: Tab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders', 'analysis', 'depth', 'expiry'];
 type Filter = 'all' | 'low' | 'out' | 'negative' | 'untracked';
 
 function download(filename: string, csv: string) {
@@ -119,6 +124,7 @@ export function Inventory() {
     ...(multi ? [['godowns', invT('tabGodowns')], ['transfers', invT('tabTransfers')]] : []),
     ...(showSerials ? [['serials', invT('tabSerials')]] : []),
     ['query', imT('tabQuery')], ['orders', imT('tabOrders')],
+    ['analysis', skT('tabAnalysis')], ['depth', skT('tabDepth')], ...(showBatches ? [['expiry', skT('tabExpiry')]] : []),
   ] as [Tab, string][]);
   // Stock groups / categories (WP-8): filters appear once any exist.
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -280,6 +286,7 @@ export function Inventory() {
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setMastersOpen('units')}>
             <Ruler size={14} aria-hidden="true" /> {imT('unitsBtn')}
           </button>
+          <Link to="/distribution" className={cn(controls.btnOutline, controls.btnSm)}>{skT('distLink')}</Link>
           {catalogueMissing.length > 0 && (
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={importCatalogue}>
               <ArrowDownToLine size={14} /> {invT('importFromCatalogueN', { n: catalogueMissing.length })}
@@ -327,7 +334,7 @@ export function Inventory() {
               )}
             </>
           )}
-          {activeTab === 'movement' && (
+          {(activeTab === 'movement' || activeTab === 'analysis') && (
             <div className={styles.dateRange}>
               <div className={controls.field}><label className={controls.label} htmlFor="inv-from">{invT('from')}</label><input id="inv-from" type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
               <div className={controls.field}><label className={controls.label} htmlFor="inv-to">{invT('to')}</label><input id="inv-to" type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></div>
@@ -499,6 +506,14 @@ export function Inventory() {
               <Suspense fallback={null}>
                 {activeTab === 'query' && <StockQueryTab items={positions.map((p) => p.item)} version={version} today={today} initialId={searchParams.get('item') ?? undefined} />}
                 {activeTab === 'orders' && <OrdersOutstandingTab version={version} today={today} />}
+              </Suspense>
+            )}
+
+            {(activeTab === 'analysis' || activeTab === 'depth' || activeTab === 'expiry') && (
+              <Suspense fallback={null}>
+                {activeTab === 'analysis' && <StockAnalysisTab positions={positions} from={from} to={to} />}
+                {activeTab === 'depth' && <DepthTab items={positions.map((p) => p.item)} tracking={tracking} onChanged={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+                {activeTab === 'expiry' && <ExpiryOpsTab items={positions.map((p) => p.item)} positions={positions} tracking={tracking} today={today} onChanged={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
               </Suspense>
             )}
 

@@ -10,6 +10,8 @@ export interface Suggestion<T> {
   label: string;
   sub?: string;
   score: number;
+  /** 8E: an exact short-code hit; Enter picks it even though the label does not start with the query. */
+  exact?: boolean;
 }
 
 export interface SuggestOptions<T> {
@@ -42,6 +44,7 @@ export function suggest<T>(query: string, rows: readonly T[], opts: SuggestOptio
 
 /** Enter may pick the top suggestion only when it starts with what was typed (never hijacks a new name). */
 export function autoHighlight<T>(query: string, list: readonly Suggestion<T>[]): number {
+  if (list[0]?.exact) return 0;
   const q = fold(query.trim());
   return q && list[0] && fold(list[0].label).startsWith(q) ? 0 : -1;
 }

@@ -160,6 +160,11 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `epay_batches` | banking 7U (`src/lib/epay-confirm.ts`) | Downloaded e-payment batches `EPB/FY<yy-yy>/<seq>`: rows sent / paid / failed, UTR, payment group id (`docs/features/banking.md`) |
 | `sales_agents` | business extras 7U (`src/lib/sales-commission.ts`) | Agent master: flat % / % by stock group, basis on invoice / on receipt |
 | `commission_postings` | business extras 7U (`src/lib/sales-commission.ts`) | Commission payable journals per agent and period (never overlapping) |
+| `dist_areas` / `dist_routes` / `dist_beats` | distribution 8F (`src/lib/distribution.ts`) | Area, route and beat masters (beat: salesman, visiting weekdays); parties carry `area_id` / `beat_id` / `agent_id` |
+| `van_settlements` | distribution 8F (`src/lib/van.ts`) | `VST/FY<yy-yy>/<seq>` day settlement of a van godown: return transfer id, bills, cash counted vs received |
+| `order_pad_outbox` / `order_pad_imports` | distribution 8F (`src/lib/order-pad.ts`) | Salesman's unsent orders; office log of imported order ids (dedupe) → sales order |
+| `expiry_claims` | pharma 8F (`src/lib/expiry-ops.ts`) | Breakage / expiry claim per supplier: its debit notes, pending / credited / rejected |
+| `expiry_receipts` | pharma 8F (`src/lib/expiry-ops.ts`) | `BER/FY<yy-yy>/<seq>` customer returns of expired goods into the expiry godown (+ replacement), with their stock move ids |
 | `cash_tally` | banking (WP-5, `src/lib/cash-tally.ts`) | `CashTally` day-end cash count by denomination vs the Books cash balance, one row per day |
 | `pos_returns` | POS returns (WP-9, `src/lib/pos-returns.ts`) | `PosReturn` per return: bill, credit note, settlement (`refund` / `exchange` / `account`), refunds by tender, voucher id, exchange bill; read by the Z report (`docs/features/business-extras.md`) |
 | `approvals` | approvals (WP-9, `src/lib/approvals.ts`) | `ApprovalLogRow` decision log (approved / rejected, by whom, note); the live state is `approval` on the invoice. Policy object under the key `approval_policy` |
