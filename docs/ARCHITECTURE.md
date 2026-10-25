@@ -49,6 +49,12 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   reload); enable / disable re-write the whole store in one transaction (verified by read-back) and broadcast
   `{ vault: 'changed' }` so other tabs reload. Unsealed values found while unlocking are accepted and re-sealed.
   The restore undo copy in the `kv` store is sealed too; Erase / Forgot-PIN drop the vault (`forgetVault`).
+- **Folder sync (5.7).** Optional, per company (`docs/features/sync.md`): encrypted snapshot files in a
+  user-picked cloud-synced folder, one file per device. Changes are found at sync time by per-row hashes against
+  `sync_state` (nothing on the save path), merged by table + row id with version vectors and Lamport clocks; concurrent
+  edits become conflicts the user resolves. Sync bookkeeping (`SYNC_META_KEYS` in `storage.ts`) lives in the company
+  database (sealed in vault mode) but never in a backup or the undo copy; restore / erase remove it. The device id is
+  the device-local key `sync_device`.
 - **Rule for new code.** No module evaluated before `initStorage()` (i.e. statically imported by `main.tsx` /
   `App.tsx`) may read storage at module level; read inside functions, effects or lazily loaded modules.
 
@@ -107,6 +113,9 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `budgets` | budgets (6.17) | `Budget` rows: FY × account × optional cost centre, 12 monthly amounts in paise (`src/lib/ledger/budgets.ts`) |
 | `assets` | storage (`src/lib/assets.ts`) | `{id, data}`: logo / signature data URLs stored once, keyed by content hash (schema v3) |
 | `att_<id>` (one key per file) | attachments (6.12, `src/lib/attachments.ts`) | `{id, mime, size, created_at, data}`: a receipt photo / PDF stored once by content hash; referenced by `attachments: AttachmentRef[]` on `invoices` / `purchases` (and the draft). Not a table: one key per file so a write commits only that file (`listKeys` enumerates them) |
+| `sync_state` | folder sync (5.7) | object: Lamport clock, per-key row versions `{h,t,d,vv,o,del}`, peers, declined locked-period changes, last report. **Not backed up** (`SYNC_META_KEYS`) |
+| `sync_conflicts` | folder sync (5.7) | `SyncConflict[]` (`src/lib/sync-engine.ts`): both versions of a concurrently edited row / singleton, locked-period changes, duplicate numbers. **Not backed up** |
+| `sync_audit` | folder sync (5.7) | `{ [deviceId]: { name, rows: AuditEntry[] } }`: other devices' audit chains, kept apart so each verifies on its own. **Not backed up** |
 | `custom_fields` | custom fields (6.23, `src/lib/custom-fields.ts`) | `CustomFieldDef` (`src/types/custom-fields.ts`); values live on the records: `custom_fields` map on clients / vendors / catalogue items, `custom_values` snapshot on invoices and their lines |
 | `price_levels` | pricing (6.9, `src/lib/pricing.ts`) | `PriceLevel {id, name, percent_off?, rates?}` (rates keyed by catalogue item id); clients point at one via optional `price_level` |
 | `schemes` | pricing (6.9) | `Scheme` buy-X-get-Y rows (item, buy / free qty, optional date window, `active`); free goods are ₹0 invoice lines (`scheme_id`, `free_of`) |

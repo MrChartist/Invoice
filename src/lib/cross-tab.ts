@@ -13,11 +13,12 @@
  * does not nag the other.
  */
 
-import { DB_PREFIX, DEVICE_LOCAL_KEYS, subscribeStorageChanges } from './storage';
+import { DB_PREFIX, DEVICE_LOCAL_KEYS, SYNC_META_KEYS, subscribeStorageChanges } from './storage';
 
 /** Keys that change often without being shared data (autosave draft, PIN session, bookkeeping). */
 const IGNORED = new Set([
   ...DEVICE_LOCAL_KEYS,
+  ...SYNC_META_KEYS, // folder-sync bookkeeping; the data keys a sync changes are announced on their own
   ...['draft', 'backup_snooze', 'auto_backup', 'notif_state', 'install_dismissed', 'export_prefs'].map((k) => DB_PREFIX + k),
 ]);
 

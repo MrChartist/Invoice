@@ -181,6 +181,10 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   security: anyone with the device and browser developer tools can bypass it (`docs/features/security.md`).
 - **Vault mode** (optional): the whole store encrypted at rest with AES-256 under a passphrase-wrapped key, unlocked
   at start-up; a lost passphrase means lost data (no recovery by design).
+- **Folder sync between devices** (optional, per company; Chrome/Edge desktop): pick a folder your cloud app syncs
+  and a sync passphrase; each device writes one encrypted file there, nothing readable leaves the device and the app
+  makes no network calls. Edits made on two devices at once, duplicate invoice numbers and changes into a locked
+  period are listed for you to resolve, never overwritten; each device can issue from its own number prefix.
 - **Separate companies**: several businesses on one device, each with its own data, numbering, settings, backups
   and vault; switch from the sidebar. The PIN is shared; erase/backup/restore act on the open company.
 - **Erase all data**: requires typing `ERASE`; also clears the undo copy, backup key, backup-folder link and vault.

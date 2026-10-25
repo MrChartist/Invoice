@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { can } from '../lib/access';
+import { afterFirstSync } from '../lib/sync-device';
 import { recurringToastMessage } from '../lib/recurring-message';
 import { todayInput } from '../lib/utils';
 import type { InvoiceRecord } from '../types/invoice';
@@ -10,6 +11,10 @@ const LOCK_NAME = 'mrchartist-recurring-runner';
 async function runOnce(): Promise<InvoiceRecord[]> {
   // A viewer's session never creates documents (6.21); the next owner / clerk session catches up.
   if (!can('doc.create')) return [];
+  // Folder sync (5.7): let the first sync of the session bring in what another device already generated
+  // (and the schedule it advanced) before generating here. Ids are per occurrence, so a race still
+  // collapses into one document.
+  await afterFirstSync(2 * 60_000);
   // Loaded on demand: the schedule engine is not needed for first paint.
   const { runDueSchedules } = await import('../lib/recurring');
   const run = () => {

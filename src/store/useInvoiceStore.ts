@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { localDb } from '../lib/localDb';
+import { issuingProfile } from '../lib/sync-device';
 import { DuplicateNumberError, type SeriesGap } from '../lib/invoice-number';
 import { getLockUntil, isPeriodLockedError, lockMessage, lockState, prettyDay } from '../lib/period-lock';
 import { DB_PREFIX, generateId, getJson, KEYS, removeRaw, setJson, SINGLETON_KEYS } from '../lib/storage';
@@ -149,7 +150,8 @@ function wholeRecord(rec: InvoiceRecord): InvoiceRecord {
 function freshDraft(docType?: DocumentType): InvoiceRecord {
   return makeDraft({
     settings: localDb.settings.get(),
-    sender: localDb.settings.activeProfile(),
+    // Folder sync (5.7): a device can issue as its own profile (own number prefix).
+    sender: issuingProfile(localDb.settings.get().profiles, localDb.settings.activeProfile()),
     docType,
     templateId: localDb.template.get(),
   });

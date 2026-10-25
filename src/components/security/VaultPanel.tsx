@@ -10,6 +10,7 @@ import {
 } from '../../lib/storage';
 import { hasBackupEncryption, getConfig } from '../../lib/auto-backup';
 import '../../lib/backup'; // registers the undo-copy hook for vault switches
+import '../../lib/sync-keystore'; // and the folder-sync key hook (sealed with the vault key)
 import { MIN_PASSPHRASE } from '../../lib/vault';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';

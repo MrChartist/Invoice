@@ -69,7 +69,15 @@ export const DEVICE_LOCAL_KEYS: readonly string[] = [
   `${DB_PREFIX}last_backup`,
   STORAGE_BACKEND_KEY,
   COMPANY_REGISTRY_KEY,
+  `${DB_PREFIX}sync_device`, // folder sync (5.7): this device's id / name / per-company switch
 ];
+
+/**
+ * Folder sync bookkeeping (5.7): per company (IndexedDB, sealed in vault mode) but never in a backup or
+ * the restore undo copy: it describes what THIS device last exchanged with the sync folder. A restore or
+ * erase removes it, so the next sync compares from scratch and surfaces differences as conflicts.
+ */
+export const SYNC_META_KEYS: readonly string[] = [`${DB_PREFIX}sync_state`, `${DB_PREFIX}sync_conflicts`, `${DB_PREFIX}sync_audit`];
 const DEVICE_LOCAL = new Set(DEVICE_LOCAL_KEYS);
 
 /** True for keys that always live in localStorage, whatever the backend. */

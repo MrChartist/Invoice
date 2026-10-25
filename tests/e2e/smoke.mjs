@@ -987,6 +987,36 @@ try {
     await page.locator('#rec-account').waitFor({ state: 'detached' });
     check(true, 'an unused account can be deleted; the picker goes away with one account');
   });
+
+  await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
+    // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
+    await page.goto(srv.origin + '/settings?tab=data');
+    await page.locator('#sync-title').waitFor({ timeout: 15000 });
+    const supported = await page.evaluate(() => typeof window.showDirectoryPicker === 'function');
+    if (supported) {
+      await page.getByRole('button', { name: 'Choose sync folder' }).waitFor({ timeout: 15000 });
+      check(await page.locator('#sync-device-name').inputValue() !== '', 'setup state: device name prefilled, folder picker offered');
+    } else {
+      await page.getByTestId('sync-unsupported').waitFor({ timeout: 15000 });
+      check(true, 'this browser reports folder sync as not supported');
+    }
+    // Last step: the same signed-in tab, reloaded as a browser without the API (Safari / Firefox).
+    const p3 = page;
+    await p3.addInitScript(() => {
+      try {
+        delete window.showDirectoryPicker;
+      } catch {
+        /* fall through */
+      }
+      if (typeof window.showDirectoryPicker === 'function') Object.defineProperty(window, 'showDirectoryPicker', { value: undefined });
+    });
+    await p3.goto(srv.origin + '/settings?tab=data');
+    await p3.getByTestId('sync-unsupported').waitFor({ timeout: 15000 });
+    const text = await p3.getByTestId('sync-unsupported').textContent();
+    check(/not supported/.test(text ?? '') && /backup/.test(text ?? ''), 'without File System Access: "not supported", use backup / restore');
+    const local = await p3.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_sync_device') ?? 'null'));
+    check(typeof local?.id === 'string' && (await idbGet(p3, 'mrchartist_inv_sync_device')) === null, 'the device id lives in localStorage only (never in the data store or a backup)');
+  });
 } catch {
   /* already reported */
 } finally {

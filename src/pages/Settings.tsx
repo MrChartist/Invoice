@@ -25,6 +25,8 @@ import styles from '../components/settings/Settings.module.css';
 
 // The activity log is only needed on its own tab, so it stays out of the Settings chunk.
 const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomFieldsPanel').then((m) => ({ default: m.CustomFieldsPanel })));
+// Folder sync (5.7): the panel brings the whole sync engine, so it loads only on the Data tab.
+const SyncPanel = lazy(() => import('../components/sync/SyncPanel').then((m) => ({ default: m.SyncPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
 
 type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
@@ -264,6 +266,9 @@ export function Settings() {
         <>
           <DataPanel notify={notify} />
           <AutoBackupPanel onNotify={notify} />
+          <Suspense fallback={null}>
+            <SyncPanel notify={notify} />
+          </Suspense>
           <CompaniesPanel notify={notify} />
         </>
       )}

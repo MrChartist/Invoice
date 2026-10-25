@@ -52,6 +52,8 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (convenience access control, not security); new destructive data-layer calls should call `requireAccess`.
 - `mrchartist_inv_companies` — device-local company registry (6.20); each company is its own IndexedDB database
   (`mrchartist_inv_kv`, `mrchartist_inv_kv__<id>`) with the same keys inside.
+- Folder sync (5.7, `docs/features/sync.md`): `mrchartist_inv_sync_device` (device-local id/name), and per company
+  `sync_state` / `sync_conflicts` / `sync_audit` (`SYNC_META_KEYS`: never in a backup, removed by restore/erase).
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express

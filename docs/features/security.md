@@ -104,7 +104,9 @@ Optional, Settings → Security → **Vault mode**. Protects the stored data its
   saved before the vault was turned on (and it is written back readable when the vault is turned off). Device-local
   keys that stay in localStorage (PIN hash, lockout, idle timer, session, last-backup time, backend marker) and the
   theme are not data and are not encrypted. Exported backups are whatever you choose (use an encrypted export);
-  the panel warns when automatic folder backups are unencrypted.
+  the panel warns when automatic folder backups are unencrypted. Folder sync (5.7) files are always encrypted with
+  the separate sync passphrase; what sync merges, its bookkeeping and the other version of a conflict are stored
+  sealed like any other value (`docs/features/sync.md`).
 - **Multiple tabs.** Every write to the store runs in one IndexedDB transaction that first reads the vault record and
   aborts unless it is the one this tab expects (its unlocked vault, or no vault at all). So a tab can never write
   sealed values into a store whose vault was removed or re-created elsewhere, nor readable values into a vault store.
