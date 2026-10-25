@@ -4,7 +4,7 @@
  *    in GSTR-9 (Table 5N);
  *  - Table 7: taxable turnover (5O less exempt / nil / non-GST, zero-rated without tax and outward reverse-charge
  *    supplies) vs GSTR-9 taxable turnover (4N less 4G);
- *  - Table 9: tax paid per head — books vs GSTR-9 Table 9 (rate-wise split not modelled);
+ *  - Table 9: tax paid per head — books vs GSTR-9 Table 9 (rate-wise Table 9 and Table 14: gstr9c-extra.ts, 7R);
  *  - Table 12: ITC as per books (with the earlier-year / later-year adjustments) vs GSTR-9 Table 7J.
  * Since FY 2020-21 GSTR-9C is self-certified (Notifications 29/2021 and 30/2021-CT) and filed only above ₹5 crore
  * aggregate turnover — verify the current threshold and form with your CA. Nothing here is certified or filed.
@@ -51,6 +51,12 @@ export interface Gstr9cBooks {
   tax: { igst: number; cgst: number; sgst: number; cess: number };
   /** 12A: ITC availed as per the audited financial statements. */
   itc: number;
+  /**
+   * Additive (7R, 7.127): ITC given back by supplier notes / purchase returns of the FY (`notesItcForFy`). Books'
+   * ITC (`gstSummary`) is gross of them while GSTR-9 7J nets them (through each month's 3B), so Table 12 shows them
+   * as their own line between 12A and 12D. Absent = not split (pre-7R behaviour).
+   */
+  notesItc?: number;
 }
 
 export interface Gstr9cLine {
@@ -137,11 +143,13 @@ export function buildGstr9c(g9: Gstr9Report, books: Gstr9cBooks, adj: Gstr9cAdju
 
   /* Table 12 — ITC */
   const t12A = round2(n(books.itc));
-  const t12D = round2(t12A + n(adj.itcEarlierFy) - n(adj.itcLaterFy));
+  const t12N = round2(n(books.notesItc));
+  const t12D = round2(t12A - t12N + n(adj.itcEarlierFy) - n(adj.itcLaterFy));
   const t7J = g9.table7.find((r) => r.id === '7J');
   const t12E = round2(heads(t7J));
   const table12: Gstr9cLine[] = [
     { id: '12A', label: 'ITC availed as per audited financial statements', amount: t12A },
+    ...(books.notesItc !== undefined ? [{ id: '12A-N', label: 'ITC reversed by supplier notes / purchase returns of the FY (−)', amount: t12N }] : []),
     { id: '12B', label: 'ITC booked in earlier FYs claimed in this FY (+)', amount: round2(n(adj.itcEarlierFy)) },
     { id: '12C', label: 'ITC booked in this FY to be claimed in later FYs (−)', amount: round2(n(adj.itcLaterFy)) },
     { id: '12D', label: 'ITC availed as per books after adjustments', amount: t12D, total: true },

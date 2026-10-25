@@ -38,6 +38,12 @@ export const TDS_PAYABLE_SECTIONS: readonly TdsPayableSection[] = [
   { code: '194O', family: '194O', section: '194-O', label: '194-O E-commerce operator (participant’s sales)', rpu: '94O' },
   { code: '194R', family: '194R', section: '194R', label: '194R Business perquisite / benefit', rpu: '94R' },
   { code: '194S', family: '194S', section: '194S', label: '194S Virtual digital asset', rpu: '94S' },
+  // 7R (7.120): Sec 195 — payments to non-residents, reported in Form 27Q (not 26Q). Act rate by nature from
+  // `NR_ACT_RATE_RULES` below; RPU section code '195' UNVERIFIED.
+  { code: '195-R', family: '195', section: '195', label: '195 Non-resident — royalty', rpu: '195' },
+  { code: '195-F', family: '195', section: '195', label: '195 Non-resident — fees for technical services', rpu: '195' },
+  { code: '195-I', family: '195', section: '195', label: '195 Non-resident — interest', rpu: '195' },
+  { code: '195-O', family: '195', section: '195', label: '195 Non-resident — other sums', rpu: '195' },
 ];
 
 export function payableSection(code: string | undefined): TdsPayableSection | undefined {
@@ -58,6 +64,7 @@ export const TDS_194A_RATE_RULES: readonly Versioned<number>[] = [
  */
 export function sectionRate(code: string, date?: string, deductee?: DeducteeType): number | null {
   if (code === '194A') return ruleAt(TDS_194A_RATE_RULES, date);
+  if (code.startsWith('195-')) return nrActRate(nrNatureOf(code), date, deductee).rate;
   let c = code;
   if (code === '194C-1' || code === '194C-2') c = deductee === 'INDIVIDUAL' || deductee === 'HUF' ? '194C-1' : deductee ? '194C-2' : code;
   const hit = tdsSections(date).find((s) => s.section === c);
@@ -191,4 +198,56 @@ export function tdsDueDays(periodStart?: string): TdsDueDays {
 export const TCS_27EQ_CODES: readonly { match: RegExp; code: string; label: string }[] = [
   { match: /1H/i, code: '6CR', label: '206C(1H) sale of goods' },
   { match: /1G/i, code: '6CQ', label: '206C(1G) remittance under LRS' },
+];
+
+/* ── 7R (7.120): Form 27Q — payments to non-residents (Sec 195) ───────────── */
+
+/** Nature of a payment to a non-resident (drives the Act rate). */
+export type NrNature = 'ROYALTY' | 'FTS' | 'INTEREST' | 'OTHER';
+
+export const NR_NATURES: readonly NrNature[] = ['ROYALTY', 'FTS', 'INTEREST', 'OTHER'];
+
+/** `195-R` → ROYALTY … (`OTHER` for anything else). */
+export function nrNatureOf(code: string | undefined): NrNature {
+  const c = String(code ?? '');
+  if (c === '195-R') return 'ROYALTY';
+  if (c === '195-F' || c === '194J-T') return 'FTS';
+  if (c === '195-I' || c === '194A') return 'INTEREST';
+  return 'OTHER';
+}
+
+/**
+ * Rates in force under the Act (Part II of the First Schedule / Sec 115A) for TDS u/s 195, % before surcharge,
+ * and the health & education cess added on top (`cessPct`). UNVERIFIED working-paper values — verify with your CA:
+ *  - royalty / FTS (Sec 115A): 10% from 1 Apr 2015; 20% from 1 Apr 2023 (Finance Act 2023);
+ *  - interest (other than Sec 194LB / 194LC / 194LD concessional cases, not modelled): 20%;
+ *  - other sums: 30% (non-company), 40% (foreign company); 35% for a foreign company from 1 Apr 2024
+ *    (Finance (No. 2) Act 2024 — read as applying to TDS of FY 2024-25 on);
+ *  - cess 3% (education + SHE cess) to 31 Mar 2018, 4% health & education cess from 1 Apr 2018.
+ * Surcharge (by income slab) is not modelled. Append new versions; never edit an old one.
+ */
+export interface NrActRates { ROYALTY: number; FTS: number; INTEREST: number; OTHER: number; OTHER_COMPANY: number; cessPct: number }
+
+export const NR_ACT_RATE_RULES: readonly Versioned<NrActRates>[] = [
+  { from: '2017-07-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 3 }, source: 'Sec 115A / First Schedule Part II — verify' },
+  { from: '2018-04-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2018 (health & education cess 4%) — verify' },
+  { from: '2023-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2023 (Sec 115A royalty / FTS 20%) — verify' },
+  { from: '2024-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 35, cessPct: 4 }, source: 'Finance (No. 2) Act 2024 (foreign company 35%) — verify' },
+];
+
+/** Act rate for a non-resident payment: the base rate and the effective rate with cess (2 decimals). */
+export function nrActRate(nature: NrNature, date?: string, deductee?: DeducteeType): { rate: number; base: number; cessPct: number } {
+  const r = ruleAt(NR_ACT_RATE_RULES, date);
+  const base = nature === 'OTHER' && deductee === 'COMPANY' ? r.OTHER_COMPANY : r[nature];
+  return { base, cessPct: r.cessPct, rate: Math.round(base * (100 + r.cessPct)) / 100 };
+}
+
+/**
+ * 194-O (7R, 7.120): the ₹5 lakh FY exemption for an e-commerce participant who is an individual / HUF and has
+ * furnished PAN or Aadhaar (Sec 194-O(2)), and the Sec 206AA rate when no PAN / Aadhaar is furnished (5%, the
+ * Sec 206AA(1A)-type cap for 194-O as understood). From 1 Oct 2020. UNVERIFIED — verify with your CA. Append-only.
+ */
+export const TDS_194O_RULES: readonly Versioned<{ individualExemption: number; noPanRate: number } | null>[] = [
+  { from: '2017-07-01', value: null },
+  { from: '2020-10-01', value: { individualExemption: 500000, noPanRate: 5 }, source: 'Sec 194-O(2) and Sec 206AA for 194-O (Finance Act 2020) — verify' },
 ];

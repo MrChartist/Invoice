@@ -8,6 +8,8 @@ import type { JobWorkGoodsKind, JobWorkReceiptKind } from '../../types/job-work'
 import { blankJwLine, type JwGridLine } from './lines';
 import type { Godown } from '../../types/stock';
 import { jwT } from '../../i18n/areas/job-work';
+import { s7T } from '../../i18n/areas/inventory-7s';
+import { SerialCell } from '../manufacturing/SerialCell';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './job-work.module.css';
@@ -25,6 +27,12 @@ export interface JwGridOptions {
   challans?: { id: string; label: string; item_id: string }[];
   units: readonly UnitMaster[];
   disabled?: boolean;
+  /**
+   * 7S: serial-tracked items list serials. `out` = serials leave a godown (pool offered), `in` = new serials,
+   * `byKind` = Material In receipts (returned → out of the job worker's godown, processed / scrap → in).
+   */
+  serials?: 'out' | 'in' | 'byKind';
+  serialPool?: (itemId: string, line: JwGridLine) => string[];
 }
 
 /** Keyboard-first line grid for job work (Enter on a quantity adds a line); alternate units per stock item. */
@@ -51,6 +59,8 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
   const L = opts.label;
   const kinds: [JobWorkGoodsKind, string][] = [['input', jwT('kindInput')], ['capital_goods', jwT('kindCapital')], ['mould_tool', jwT('kindTool')]];
   const rkinds: [JobWorkReceiptKind, string][] = [['processed', jwT('kindProcessed')], ['scrap', jwT('kindScrap')], ['returned', jwT('kindReturned')]];
+  const anySerial = !!opts.serials && lines.some((l) => byId.get(l.item_id)?.track_serials);
+  const serialDir = (l: JwGridLine) => (opts.serials === 'byKind' ? (l.kind === 'returned' ? 'out' : 'in') : opts.serials);
   const anyAlt = lines.some((l) => {
     const it = byId.get(l.item_id);
     return !!(it && cleanAltUnits(it.alt_units, it.unit || 'NOS'));
@@ -72,6 +82,7 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
             {opts.challans && <th>{jwT('challanNo')}</th>}
             {multi && <th>{opts.value ? jwT('fromGodown') : jwT('toGodown')}</th>}
             {opts.batch && <th>{jwT('batch')}</th>}
+            {anySerial && <th>{s7T('serials')}</th>}
             <th><span className={surface.srOnly}>{jwT('actions')}</span></th>
           </tr>
         </thead>
@@ -87,7 +98,7 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                   <select id={`jw-${l.id}`} className={controls.select} disabled={opts.disabled} aria-label={jwT('lineItem', { label: L, n })} value={l.item_id}
                     onChange={(e) => {
                       const next = byId.get(e.target.value);
-                      patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, ...(opts.value && next ? { hsn: next.hsn, tax_rate: next.tax_rate, rate: l.rate || next.opening_rate || undefined } : {}) });
+                      patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, serials: undefined, ...(opts.value && next ? { hsn: next.hsn, tax_rate: next.tax_rate, rate: l.rate || next.opening_rate || undefined } : {}) });
                     }}>
                     <option value="">{jwT('choose')}</option>
                     {items.map((x) => <option key={x.id} value={x.id}>{x.name}{x.unit ? ` (${x.unit})` : ''}</option>)}
@@ -160,6 +171,18 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                     {it?.track_batches
                       ? <input className={controls.input} disabled={opts.disabled} aria-label={jwT('lineBatch', { label: L, n })} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })} />
                       : <span className={styles.muted}>—</span>}
+                  </td>
+                )}
+                {anySerial && (
+                  <td>
+                    {it?.track_serials ? (
+                      <SerialCell
+                        key={`${l.id}:${l.item_id}:${serialDir(l)}`} serials={l.serials} qty={l.qty} disabled={opts.disabled}
+                        label={s7T('lineSerials', { label: L, n })}
+                        pool={serialDir(l) === 'out' && opts.serialPool ? () => opts.serialPool!(l.item_id, l) : undefined}
+                        onChange={(serials) => patch(l.id, { serials })}
+                      />
+                    ) : <span className={styles.muted}>—</span>}
                   </td>
                 )}
                 <td>

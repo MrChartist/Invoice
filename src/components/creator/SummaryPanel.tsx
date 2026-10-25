@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { NumberInput } from '../ui/NumberInput';
-import { DB_PREFIX, getJson } from '../../lib/storage';
+import { DB_PREFIX, getJson, getTable } from '../../lib/storage';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
@@ -16,6 +16,8 @@ import styles from './SummaryPanel.module.css';
 // WP-9: loyalty redemption, loaded only while the programme is switched on.
 const EditorLoyalty = lazy(() => import('../loyalty/EditorLoyalty'));
 const LOYALTY_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
+// 7U: sales agent, bill-value offer, prescription — loaded only once one of them is in use.
+const EditorExtras = lazy(() => import('../extras7u/EditorExtras'));
 
 const GST_MODES: { id: GstMode; label: MessageKey }[] = [
   { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },
@@ -45,6 +47,10 @@ export function SummaryPanel() {
   const challan = s.doc_type === 'DELIVERY_CHALLAN';
   // Cheap check of the stored programme flag; the loyalty module itself loads only when it is on.
   const loyaltyOn = useMemo(() => getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}loyalty_program`, null)?.enabled === true, []);
+  const extrasOn = useMemo(
+    () => getTable('sales_agents').length > 0 || getTable<{ kind?: string }>('schemes').some((x) => x?.kind === 'bill_value') || getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}pharma_settings`, null)?.enabled === true,
+    [],
+  );
 
   return (
     <div className={styles.panel}>
@@ -72,6 +78,11 @@ export function SummaryPanel() {
       {loyaltyOn && LOYALTY_DOCS.has(s.doc_type) && (
         <Suspense fallback={null}>
           <EditorLoyalty />
+        </Suspense>
+      )}
+      {extrasOn && (
+        <Suspense fallback={null}>
+          <EditorExtras />
         </Suspense>
       )}
       {t.invoice_discount_amount > 0 && (

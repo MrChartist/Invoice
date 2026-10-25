@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fyQuarterOf, loadChallans, loadManualDeductions, loadPayrollTdsChallans, loadReturnMarks, tdsDeductions, type TdsQuarter } from '../lib/tds-payables';
 import { tcsCollections } from '../lib/tds-returns';
@@ -13,17 +13,25 @@ import { useCan } from '../hooks/useCan';
 import { ChallansTab, DeductionsTab, Form16aTab, OverviewTab, ReturnsTab, type TdsData } from '../components/tds/TdsTabs';
 import { useT } from '../i18n';
 import { tdsT, type TdsKey } from '../i18n/areas/tds';
+import { r7T } from '../i18n/areas/gst-tds-7r';
+
+// 7R (7.120): Form 27Q (non-residents) and the TRACES justification import — loaded when their tab opens.
+const Form27qTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => ({ default: m.Form27qTab })));
+const TracesTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => ({ default: m.TracesTab })));
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Books.module.css';
 
-const TABS: readonly { id: string; key: TdsKey }[] = [
+const TABS: readonly { id: string; key?: TdsKey; label?: () => string }[] = [
   { id: 'overview', key: 'tabOverview' },
   { id: 'deductions', key: 'tabDeductions' },
   { id: 'challans', key: 'tabChallans' },
   { id: 'returns', key: 'tabReturns' },
+  { id: '27q', label: () => r7T('tab27q') },
   { id: 'f16a', key: 'tab16a' },
+  { id: 'traces', label: () => r7T('tabTraces') },
 ];
+const tabText = (t: (typeof TABS)[number]) => (t.key ? tdsT(t.key) : t.label?.() ?? t.id);
 
 function loadData(): TdsData {
   return {
@@ -78,7 +86,7 @@ export function Tds() {
             {years.map((y) => <option key={y} value={y}>FY {y}-{String(y + 1).slice(2)}</option>)}
           </select>
         </label>
-        {(tab === 'returns' || tab === 'f16a') && (
+        {(tab === 'returns' || tab === 'f16a' || tab === '27q') && (
           <label className={controls.field}>
             <span className={controls.label}>{tdsT('quarter')}</span>
             <select className={controls.select} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as TdsQuarter)}>
@@ -110,7 +118,7 @@ export function Tds() {
               tabRefs.current[TABS[n].id]?.focus();
             }}
           >
-            {tdsT(t.key)}
+            {tabText(t)}
           </button>
         ))}
       </div>
@@ -121,6 +129,11 @@ export function Tds() {
         {tab === 'challans' && <ChallansTab data={data} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'returns' && <ReturnsTab data={data} fy={fy} quarter={quarter} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'f16a' && <Form16aTab data={data} fy={fy} quarter={quarter} />}
+        {(tab === '27q' || tab === 'traces') && (
+          <Suspense fallback={<p className={controls.hint}>{r7T('loading')}</p>}>
+            {tab === '27q' ? <Form27qTab data={data} fy={fy} quarter={quarter} canEdit={canEdit} onChanged={refresh} notify={notify} /> : <TracesTab data={data} canEdit={canEdit} notify={notify} />}
+          </Suspense>
+        )}
       </div>
       {toastNode}
     </div>

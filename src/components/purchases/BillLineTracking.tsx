@@ -1,4 +1,9 @@
+import { useState } from 'react';
 import type { PurchaseLine } from '../../types/purchases';
+import { godownsDb } from '../../lib/godowns';
+import { useCreateOnTheFly } from '../masters/useCreateOnTheFly';
+import { isAltC } from '../masters/useMasterKeys';
+import { s7mT } from '../../i18n/areas/inventory-7s-mini';
 import type { StockItem } from '../../lib/inventory';
 import type { Godown } from '../../types/stock';
 import { parseSerials } from '../../lib/stock-tracking';
@@ -23,14 +28,19 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
   ctx: BillStockContext;
   onPatch: (change: Partial<PurchaseLine>) => void;
 }) {
+  // 7S (7.84): Alt+C on the godown select creates a godown on the fly (Tally parity).
+  const fly = useCreateOnTheFly();
+  const [added, setAdded] = useState<Godown[]>([]);
   const item = ctx.find(line.name, line.hsn);
   if (!item) return null;
+  const godowns = [...ctx.godowns, ...added.filter((g) => !ctx.godowns.some((x) => x.id === g.id))];
   const n = index + 1;
   const serials = line.serials ?? [];
   const want = num(line.quantity);
   return (
     <div className={styles.trackGrid}>
-      {ctx.godowns.length > 1 && (
+      {fly.node}
+      {godowns.length > 1 && (
         <label className={controls.field}>
           <span className={controls.label}>{purT('godown')}</span>
           <select
@@ -38,8 +48,20 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
             value={line.godown_id || ctx.defaultGodown}
             aria-label={purT('lineGodown', { n })}
             onChange={(e) => onPatch({ godown_id: e.target.value })}
+            aria-keyshortcuts="Alt+C"
+            title={s7mT('godownAltC')}
+            onKeyDown={(e) => {
+              if (!isAltC(e.nativeEvent)) return;
+              e.preventDefault();
+              void fly.open({ kind: 'godown' }).then((g) => {
+                const row = g && godownsDb.list().find((x) => x.id === g.id);
+                if (!row) return;
+                setAdded((a) => [...a, row]);
+                onPatch({ godown_id: row.id });
+              });
+            }}
           >
-            {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </label>
       )}

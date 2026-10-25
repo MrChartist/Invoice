@@ -43,7 +43,7 @@ function ensureExpiryAlerts(onReady: () => void): void {
     // Batch expiry (6.6) and reorder-level (Phase 7) alerts share one lazily loaded provider.
     const wants = (i: (typeof items)[number]) =>
       i.track_batches || Number(i.reorder_level) > 0 || Object.values(i.reorder_by_godown ?? {}).some((v) => Number(v) > 0);
-    if (!items.some((i) => i.track_stock && wants(i))) return;
+    if (!items.some((i) => i.track_stock && wants(i)) && !getTable('job_work_out').length) return; // 7S: job-work clocks
   } catch {
     return;
   }
@@ -70,7 +70,9 @@ function ensureBusinessAlerts(onReady: () => void): void {
     // 7O: TDS deposit / 26Q reminders once TDS is in use (a challan, or a bill / payment carrying TDS).
     const tds = (r: unknown) => Number((r as { tds_amount?: unknown } | null)?.tds_amount) > 0;
     const used = getTable('amc_contracts').length > 0 || getTable('gst_setoffs').length > 0 || getTable('gst_challans').length > 0
-      || getTable('tds_challans').length > 0 || getTable('purchases').some(tds) || getTable('purchase_payments').some(tds);
+      || getTable('tds_challans').length > 0 || getTable('purchases').some(tds) || getTable('purchase_payments').some(tds)
+      // 7R: TCS (27EQ) reminders once an invoice carries TCS.
+      || getTable('invoices').some((r) => Number((r as { tcs_amount?: unknown } | null)?.tcs_amount) > 0);
     if (!used && !(readApprovalPolicy().enabled && can('doc.approve'))) return;
   } catch {
     return;

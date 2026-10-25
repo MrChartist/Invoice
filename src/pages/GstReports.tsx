@@ -8,6 +8,7 @@ import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
 import { stateByCode } from '../lib/india-states';
 import { readLinks } from '../lib/documents';
+import { loadIsdInward } from '../lib/isd';
 import { seriesGaps } from '../lib/invoice-number';
 import {
   buildGstReport,
@@ -74,8 +75,10 @@ const HsnMasterPanel = lazy(() => import('../components/gst-reports/HsnMasterPan
 const Gstr9cView = lazy(() => import('../components/gst-reports/Gstr9cView'));
 // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52); IFF B2B working paper.
 const RcmDocsPanel = lazy(() => import('../components/gst-reports/RcmDocsPanel'));
+// 7R: cash ledger / PMT-09 / refunds, ISD + GSTR-6, consolidated e-Way Bill, GSTR-1 / 3B per GSTIN (one lazy chunk).
+const Gst7rPanel = lazy(() => import('../components/gst-reports/Gst7rPanel'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c' | 'rcmdocs';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c' | 'rcmdocs' | 'cashref' | 'isd' | 'ewbcons' | 'bygstin';
 
 /** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
 const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
@@ -103,6 +106,10 @@ const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
   { id: 'hsnmaster', label: 'HSN master', key: 'tabHsnMaster' },
   { id: 'gstr9c', label: 'GSTR-9C', key: 'tab9c' },
   { id: 'rcmdocs', label: 'RCM self-invoice', key: 'tabRcm' },
+  { id: 'cashref', label: 'Cash ledger & refunds', key: 'tabCashRef' },
+  { id: 'isd', label: 'ISD / GSTR-6', key: 'tabIsd' },
+  { id: 'ewbcons', label: 'Consolidated e-Way', key: 'tabEwbCons' },
+  { id: 'bygstin', label: 'By GSTIN', key: 'tabByGstin' },
 ];
 const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0] } | undefined) => (x?.key ? gstT(x.key) : x?.label);
 
@@ -210,6 +217,8 @@ export function GstReports() {
     return buildGstReport(invoices, purchases, {
       period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover, advances,
       purchaseNotes: getTable<PurchaseReturn>('purchase_returns'),
+      // 7R: ISD credit received by our unit(s) — 3B 4A(4).
+      isdInward: loadIsdInward(),
       // WP-8: user-defined UQCs, and alternate-unit lines summarised in the item's base unit.
       units: unitsDb.stored(),
       items: buildItemIndex(stockDb.items()),
@@ -483,6 +492,15 @@ export function GstReports() {
             {tab === 'gstr9c' && <Gstr9cView fyStart={period.fyStart} gstin={gstin} filerStateCode={filerStateCode} turnover={Number(turnover.curGt) || 0} />}
           </Suspense>
         );
+      case 'cashref':
+      case 'isd':
+      case 'ewbcons':
+      case 'bygstin':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <Gst7rPanel view={tab} period={period} gstin={gstin} g1={g1} g3={g3} invoices={invoices} purchases={purchases} notify={notify} />
+          </Suspense>
+        );
       case 'gstr2b':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
@@ -651,7 +669,7 @@ export function GstReports() {
         </div>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>
           <div className={local.toolbar}>
-            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' || tab === 'rcmdocs' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
+            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' || tab === 'rcmdocs' || tab === 'isd' || tab === 'ewbcons' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>

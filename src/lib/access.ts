@@ -276,17 +276,28 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // Banking (WP-5)
   deposit_slips: 'books.edit',
   cash_tally: 'books.edit',
+  // 7U banking: forex bank moves (revaluation / conversion journals), e-payment batches
+  fx_bank_moves: 'books.edit',
+  epay_batches: 'books.edit',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master
   gst_setoffs: 'books.edit',
   gst_challans: 'books.edit',
   hsn_master: 'master.edit',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   rcm_documents: 'books.edit',
+  // 7R: PMT-09 transfers, GST refund claims, ISD documents, TRACES justification imports
+  gst_pmt09: 'books.edit',
+  gst_refunds: 'books.edit',
+  isd_documents: 'books.edit',
+  tds_justifications: 'books.edit',
   // business extras (WP-9)
   pos_returns: 'doc.create',
   branches: 'master.edit',
   amc_contracts: 'master.edit',
   loyalty_adjustments: 'master.edit',
+  // 7U: sales agents (master) and the commission payable journals posted for them
+  sales_agents: 'master.edit',
+  commission_postings: 'books.edit',
   // approvals decision log: only the owner's decision writes it (approvals.ts `decide`); a clerk's
   // request lives on the document itself, so a clerk can never forge a decision row (review L5)
   approvals: 'doc.approve',
@@ -320,6 +331,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   job_work_in: 'books.edit',
   job_work_principal: 'books.edit',
   rejections_in: 'books.edit',
+  // 7S: production plans (MRP)
+  production_plans: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
 };

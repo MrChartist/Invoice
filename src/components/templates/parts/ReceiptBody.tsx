@@ -50,6 +50,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           <AddressLines sender={sender} />
           {sender.companyPhone && <>Ph: {sender.companyPhone}<br /></>}
           {sender.companyGstin && <>GSTIN: {sender.companyGstin}</>}
+          {sender.drug_licence && <><br />DL No.: {sender.drug_licence}</>}
         </div>
       </div>
 

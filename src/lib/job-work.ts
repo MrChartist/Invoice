@@ -22,7 +22,10 @@ import type {
 import type { Bom } from '../types/manufacturing';
 import type { Godown } from '../types/stock';
 import type { InvoiceItem } from '../types/invoice';
-import type { StockItem } from './inventory';
+import { liveInputs, type StockInputs, type StockItem } from './inventory';
+import { collectEvents } from './inventory';
+import { serialInIssues, serialLineShape, serialOutIssues, serialShapeError, touchesSerials } from './serial-vouchers';
+import { assertRemovable, liveRemovalIssues } from './stock-timeline';
 import { num, round2 } from './invoice-calc';
 import { shiftDay } from './dates';
 import { lineFactor } from './units';
@@ -266,9 +269,10 @@ export function validateMaterialOut(o: Pick<MaterialOut, 'date' | 'party_name' |
     if (!(num(l.qty) > 0)) return `${it.name}: enter a quantity above zero.`;
     if ((l.godown_id || 'main') === o.job_worker_godown) return `${it.name}: send it from one of your own godowns.`;
     if (it.track_batches && !l.batch_no?.trim()) return `${it.name}: choose the batch.`;
-    if (it.track_serials) return `${it.name} tracks serials: job work for serial-tracked items is not supported yet.`;
+    const serialErr = serialLineShape(l, it); // 7S: serial items go by serial
+    if (serialErr) return serialErr;
   }
-  return '';
+  return serialShapeError(lines, items);
 }
 
 /** Problems with a Material In against the open challans (its own saved copy left out). */
@@ -281,7 +285,8 @@ export function validateMaterialIn(v: Pick<MaterialIn, 'id' | 'date' | 'party_na
     const it = tracked(items, l.item_id);
     if (!it) return 'Every line needs a stock item that tracks stock.';
     if (!(num(l.qty) > 0)) return `${it.name}: enter a quantity above zero.`;
-    if (it.track_serials) return `${it.name} tracks serials: job work for serial-tracked items is not supported yet.`;
+    const serialErr = serialLineShape(l, it); // 7S
+    if (serialErr) return serialErr;
   }
   const processed = (v.received ?? []).filter((l) => l.item_id && l.kind === 'processed');
   if (processed.length && !(v.consumed ?? []).some((l) => l.item_id)) return 'Enter the inputs consumed for the processed goods (or fill them from the BOM).';
@@ -294,6 +299,36 @@ export function validateMaterialIn(v: Pick<MaterialIn, 'id' | 'date' | 'party_na
     return `${name}: ${over.qty} more than is pending with this job worker on that date.`;
   }
   return '';
+}
+
+/**
+ * 7S: serial stock checks for a Material Out (serials in the source godown on the challan date) or a Material In
+ * (consumed / returned / supplied / lost serials at the job worker's godown; processed goods and scrap under new
+ * serials). `input` must leave the document's saved copy out. [] when no line is serial-tracked.
+ */
+export function jobWorkSerialIssues(doc: { kind: 'out'; value: Pick<MaterialOut, 'date' | 'job_worker_godown' | 'lines'> } | { kind: 'in'; value: Pick<MaterialIn, 'date' | 'job_worker_godown' | 'consumed' | 'received' | 'losses' | 'supplied'> }, input: StockInputs): string[] {
+  const d = day(doc.value.date);
+  if (doc.kind === 'out') {
+    const lines = doc.value.lines ?? [];
+    if (!touchesSerials(lines, input.items)) return [];
+    const events = collectEvents({ ...input, includeTransfers: true });
+    return serialOutIssues(lines, d, events, input.items, (l) => l.godown_id || 'main');
+  }
+  const v = doc.value;
+  const leaving = [...(v.consumed ?? []), ...(v.losses ?? []), ...(v.supplied ?? []), ...(v.received ?? []).filter((l) => l.kind === 'returned')];
+  const made = (v.received ?? []).filter((l) => l.kind !== 'returned');
+  if (!touchesSerials([...leaving, ...made], input.items)) return [];
+  const shape = serialShapeError([...leaving, ...made], input.items);
+  if (shape) return [shape];
+  const events = collectEvents({ ...input, includeTransfers: true });
+  return [...serialOutIssues(leaving, d, events, input.items, () => v.job_worker_godown || 'main'), ...serialInIssues(made, d, events, input.items)];
+}
+
+/** Live inputs without one job-work document (for the serial checks on save). */
+function inputsWithout(id: string | undefined): StockInputs {
+  const base = liveInputs();
+  const docs = base.jobWorkDocs;
+  return { ...base, jobWorkDocs: docs ? { ...docs, outs: docs.outs.filter((o) => o.id !== id), ins: docs.ins.filter((i) => i.id !== id) } : docs };
 }
 
 /* ── Job Work In side (principal's goods) ─────────────────────── */
@@ -410,6 +445,10 @@ export const materialOutDb = {
     const err = validateMaterialOut(input, items, godowns);
     if (err) throw new Error(err);
     const draft = { ...input, party_name: input.party_name.trim(), lines: cleanLines(input.lines) };
+    if (touchesSerials(draft.lines, items)) {
+      const issue = jobWorkSerialIssues({ kind: 'out', value: draft }, inputsWithout(input.id))[0];
+      if (issue) throw new Error(issue);
+    }
     if (input.id) {
       // An edit must not leave Material In entries settling more than is now sent.
       const others = materialOutDb.all().filter((o) => o.id !== input.id);
@@ -423,6 +462,9 @@ export const materialOutDb = {
     const ins = materialInDb.all();
     const probe = challanBalances(materialOutDb.all().filter((o) => o.id !== id), ins, '9999-12-31');
     if (probe.unmatched.length) throw new Error('Material has already come back against this challan. Delete those Material In entries first.');
+    if (materialOutDb.all().find((o) => o.id === id)?.lines.some((l) => l.serials?.length)) {
+      assertRemovable({ errors: liveRemovalIssues({ refType: 'job_work_out', refId: id }).errors, warnings: [] });
+    }
     removeDoc<MaterialOut>(JOB_WORK_TABLES.out, 'Material out', id);
   },
 };
@@ -440,10 +482,20 @@ export const materialInDb = {
     };
     const err = validateMaterialIn({ ...draft, id: input.id ?? '' }, items, materialOutDb.all(), materialInDb.all(), day(input.date));
     if (err) throw new Error(err);
+    if (touchesSerials([...draft.consumed, ...draft.received, ...(draft.losses ?? []), ...(draft.supplied ?? [])], items)) {
+      const issue = jobWorkSerialIssues({ kind: 'in', value: draft }, inputsWithout(input.id))[0];
+      if (issue) throw new Error(issue);
+    }
     return saveDoc<MaterialIn>(JOB_WORK_TABLES.in, JOB_WORK_PREFIX.in, 'Material in', draft,
       (r) => `${plural(r.received.length, 'line')} received from ${r.party_name}${r.charges ? `, charges ₹${r.charges}` : ''}`);
   },
-  remove: (id: string) => void removeDoc<MaterialIn>(JOB_WORK_TABLES.in, 'Material in', id),
+  remove(id: string): void {
+    const v = materialInDb.all().find((x) => x.id === id);
+    if (v && [...v.consumed, ...v.received, ...(v.losses ?? []), ...(v.supplied ?? [])].some((l) => l.serials?.length)) {
+      assertRemovable({ errors: liveRemovalIssues({ refType: 'job_work_in', refId: id }).errors, warnings: [] });
+    }
+    removeDoc<MaterialIn>(JOB_WORK_TABLES.in, 'Material in', id);
+  },
 };
 
 export const principalDb = {

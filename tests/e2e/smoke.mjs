@@ -908,6 +908,45 @@ try {
     await writeJson(page, 'stock_items', prevStock);
   });
 
+  await step('production plan (7S): 2 tables → MRP buys the missing legs, saves the plan, raises the PO, Manufacture opens a filled journal', async () => {
+    const prev = { stock: await readJson(page, 'stock_items', null), boms: await readJson(page, 'boms', null), vendors: await readJson(page, 'vendors', null), pos: await readJson(page, 'purchase_orders', null) };
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [
+      item('e2e-leg', 'E2E Leg', { opening_qty: 3, opening_rate: 30 }),
+      item('e2e-top', 'E2E Top', { opening_qty: 5, opening_rate: 200 }),
+      item('e2e-table', 'E2E Table'),
+    ]);
+    await writeJson(page, 'boms', [{ id: 'e2e-bom', item_id: 'e2e-table', name: 'Standard', batch_qty: 1, is_default: true, components: [{ id: 'c1', item_id: 'e2e-leg', qty: 4 }, { id: 'c2', item_id: 'e2e-top', qty: 1 }] }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-v', name: 'E2E Timber' }]);
+    await page.goto(srv.origin + '/manufacturing?tab=plan');
+    await page.getByLabel('Finished item 1').selectOption({ label: 'E2E Table ★' });
+    await page.getByLabel('Quantity 1').fill('2');
+    const table = page.getByTestId('mrp-table');
+    const mrpRow = (name) => table.getByRole('row').filter({ hasText: name });
+    await mrpRow('E2E Leg').waitFor();
+    check(/Buy/.test(await mrpRow('E2E Leg').innerText()) && /\b5\b/.test(await mrpRow('E2E Leg').innerText()), 'MRP: 8 legs needed, 3 in stock → buy 5');
+    check(/Covered/.test(await mrpRow('E2E Top').innerText()), 'MRP: tops are covered by stock');
+    await page.getByTestId('mrp-save').click();
+    await page.getByText(/Plan PP\/FY\d\d-\d\d\/0001 saved/).waitFor();
+    await readJson(page, 'production_plans', [], (v) => v.length === 1);
+    await page.getByLabel('Vendor', { exact: true }).selectOption({ label: 'E2E Timber' });
+    await page.getByTestId('mrp-po').click();
+    await page.getByText(/Purchase order PO\/FY\d\d-\d\d\/\d+ created/).waitFor();
+    const pos = await readJson(page, 'purchase_orders', [], (v) => v.some((p) => p.vendor_name === 'E2E Timber'));
+    const po = pos.find((p) => p.vendor_name === 'E2E Timber');
+    check(po?.lines?.length === 1 && po.lines[0].item_id === 'e2e-leg' && po.lines[0].quantity === 5, 'the PO orders 5 legs');
+    await mrpRow('E2E Table').getByRole('link', { name: 'Manufacture' }).click();
+    await page.getByLabel('Component Line 1 quantity').waitFor();
+    check((await page.getByLabel('Component Line 1 quantity').inputValue()) === '8', 'Manufacture opens a journal for 2 tables, components filled from the BOM');
+    await page.keyboard.press('Escape');
+
+    await writeJson(page, 'production_plans', null);
+    await writeJson(page, 'purchase_orders', prev.pos);
+    await writeJson(page, 'vendors', prev.vendors);
+    await writeJson(page, 'boms', prev.boms);
+    await writeJson(page, 'stock_items', prev.stock);
+  });
+
   await step('POS: typed barcode, split cash + UPI, bill saved Paid, Z report shows the totals', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
@@ -1012,6 +1051,44 @@ try {
     await writeJson(page, 'vouchers', prevVouchers.length ? prevVouchers : null);
     await writeJson(page, 'pos_returns', null);
     await writeJson(page, 'items_catalog', prevCatalog);
+  });
+
+  await step('7U: a bill-value offer applies on the POS with its own line; the Forex bank tab opens', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-offer', name: 'E2E Offer Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865299',
+    }]);
+    await writeJson(page, 'schemes', [{ id: 'e2e-bv', kind: 'bill_value', item_id: '', item_name: '', buy_qty: 0, free_qty: 0, label: 'E2E offer', slabs: [{ min_value: 150, percent: 10 }] }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8901030865299');
+    await scan.press('Enter');
+    await page.getByLabel('Quantity of E2E Offer Soap (line 1)').fill('2');
+    const offer = page.locator('[data-pos-offer]');
+    await offer.waitFor({ timeout: 5000 });
+    const offerText = await offer.innerText();
+    const total = await page.locator('[data-pos-total]').innerText();
+    check(/E2E offer: 10% off/.test(offerText) && /20\.00/.test(offerText), `offer line on the POS (${offerText})`);
+    check(/212\.(40|00)/.test(total), `GST on the value after the offer: 180 + 18% (${total})`);
+    await page.keyboard.press('F4');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    check(bill?.offer?.value === 20 && bill.taxable_value === 180 && Math.abs(bill.total - 212.4) < 0.5, `offer saved on the bill (${JSON.stringify(bill?.offer)}, ${bill?.total})`);
+    check((await page.locator('[data-pos-printer]').count()) === 1, 'printer settings button on the POS');
+
+    await page.goto(srv.origin + '/reconcile?tab=documents&doc=forex');
+    await page.getByRole('button', { name: 'Forex bank' }).waitFor();
+    const forex = page.getByText(/main account stays in rupees|EEFC \/ foreign-currency accounts/).first();
+    await forex.waitFor({ timeout: 10000 }).catch(() => {});
+    check((await forex.count()) > 0, 'Forex bank panel renders');
+
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => t.invoice_id !== bill?.id));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id));
+    await writeJson(page, 'items_catalog', prevCatalog);
+    await writeJson(page, 'schemes', null);
   });
 
   let backupPath = '';

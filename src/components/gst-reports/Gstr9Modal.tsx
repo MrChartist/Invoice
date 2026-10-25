@@ -4,6 +4,8 @@ import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
 import { getTable } from '../../lib/storage';
 import { readLinks } from '../../lib/documents';
+import { loadIsdInward } from '../../lib/isd';
+import { todayIso } from '../../lib/tax-rules';
 import { fyPeriod, gstSummary, itcWithCess, loadBooksData } from '../../lib/books';
 import { advanceTaxEvents } from '../../lib/advance-tax';
 import { buildItemIndex, stockDb } from '../../lib/inventory';
@@ -23,6 +25,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './gstr9.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
+import { r7T } from '../../i18n/areas/gst-tds-7r';
 
 export interface Gstr9ModalProps {
   open: boolean;
@@ -151,6 +154,10 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
         units: data.units,
         items: data.items,
         purchaseNotes: data.books.purchaseReturns ?? [],
+        // 7R: ISD credit received (6G) and Part V from the next FY's documents up to the cut-off.
+        isdInward: loadIsdInward(),
+        nextFy: true,
+        today: todayIso(),
         turnover: Number(turnover) || 0,
         books: ((g) => ({ ...g, itc: itcWithCess(g) }))(gstSummary(data.books, fyPeriod(fy))),
         itc2b: { igst: Number(itc2b.igst) || 0, cgst: Number(itc2b.cgst) || 0, sgst: Number(itc2b.sgst) || 0, cess: Number(itc2b.cess) || 0 },
@@ -292,6 +299,8 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
           </div>
           <span className={styles.note}>{gvT('t9Note')}</span>
         </section>
+        {/* 7R (7.128): Part V — this FY's transactions declared in the next FY, up to the cut-off. */}
+        <RowTable title={r7T('g9PartV')} rows={report.partV} />
 
         <p className={surface.sectionNote} style={{ margin: 0 }}>
           {gvT('hsnNote', { out: report.table17.length, in: report.table18.length, missing: report.billsWithoutHsn ? gvT('hsnMissing', { n: report.billsWithoutHsn }) : '' })}

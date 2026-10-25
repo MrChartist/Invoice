@@ -90,6 +90,12 @@ export function GstBody({ invoice, sender, totals, skipEway }: Props) {
                 <br />
               </>
             )}
+            {sender.drug_licence && (
+              <>
+                <b>D.L. No.:</b> {sender.drug_licence}
+                <br />
+              </>
+            )}
             {sender.companyPhone && <>Contact: {sender.companyPhone}<br /></>}
             {sender.companyEmail && <>E-Mail: {sender.companyEmail}<br /></>}
             {sender.regLine}

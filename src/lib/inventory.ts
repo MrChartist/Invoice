@@ -616,7 +616,7 @@ function pushVoucherEvents(vouchers: readonly StockVoucherInput[], byId: Map<str
       if (!tracked(l.item_id) || q <= 0) continue;
       push(l.item_id, {
         ...base, kind: 'consumption', qty: -q, particulars: `${label} (consumed)`, voucher: v.id,
-        godown: l.godown_id, batch: l.batch_no || undefined,
+        godown: l.godown_id, batch: l.batch_no || undefined, serials: cleanSerials(l.serials), // 7S: serial items
       });
     }
     const produce = v.produce.filter((l) => tracked(l.item_id) && num(l.qty) > 0);
@@ -628,6 +628,7 @@ function pushVoucherEvents(vouchers: readonly StockVoucherInput[], byId: Map<str
         ...base, kind: 'production', qty: num(l.qty), particulars: `${label} (produced)`, voucher: v.id,
         rate: shares[i] === undefined ? num(l.rate) : undefined, share: shares[i], pool,
         godown: l.godown_id, batch: l.batch_no || undefined, mfg: l.mfg_date || undefined, expiry: l.expiry_date || undefined,
+        serials: cleanSerials(l.serials), // 7S
       });
     });
     for (const a of v.adjust ?? []) {
@@ -1197,7 +1198,7 @@ export function stockVoucherInputs(
       id: m.id, number: m.number ?? '', date: m.date, type: 'manufacturing',
       consume: (m.components ?? []).map(baseLine),
       produce: [
-        { id: `${m.id}:main`, item_id: m.item_id, qty: num(m.qty), godown_id: m.godown_id, batch_no: m.batch_no, mfg_date: m.mfg_date, expiry_date: m.expiry_date },
+        { id: `${m.id}:main`, item_id: m.item_id, qty: num(m.qty), godown_id: m.godown_id, batch_no: m.batch_no, mfg_date: m.mfg_date, expiry_date: m.expiry_date, serials: m.serials },
         ...(m.outputs ?? []).map(baseLine),
       ],
       ...extraOf(m.costs),

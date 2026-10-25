@@ -338,14 +338,20 @@ const RECORD_TABLES = [
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   // Job work and Rejections In (Phase 7M)
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  // 7S: production plans (MRP)
+  'production_plans',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
   'gst_setoffs', 'gst_challans', 'hsn_master',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   'rcm_documents',
+  // 7R: PMT-09 transfers, GST refund claims, ISD documents, TRACES justification imports
+  'gst_pmt09', 'gst_refunds', 'isd_documents', 'tds_justifications',
   // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
   'year_end',
   // Inventory masters (WP-8): stock groups, stock categories, units of measure
   'stock_groups', 'stock_categories', 'units',
+  // 7U: forex bank moves, e-payment batches, sales agents, commission postings
+  'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -367,10 +373,13 @@ const ID_TABLES = new Set([
   'payroll_relief89', 'actuarial_valuations',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  'production_plans',
   'gst_setoffs', 'gst_challans', 'hsn_master',
   'rcm_documents',
+  'gst_pmt09', 'gst_refunds', 'isd_documents', 'tds_justifications',
   'year_end',
   'stock_groups', 'stock_categories', 'units',
+  'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

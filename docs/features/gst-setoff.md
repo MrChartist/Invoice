@@ -12,6 +12,7 @@ filed or paid from the app, and the GST portal's own set-off screen and PMT-06 a
 | Strings | `src/i18n/areas/gst-setoff.ts` (`soT`, English + Hindi); tab names in `areas/gst.ts`; 3B card in `areas/gst-views.ts`; cess field in `areas/purchases.ts` |
 | 7O | `src/lib/rcm-self-invoice.ts`, `src/lib/iff.ts`, `RcmDocsPanel.tsx`; strings `src/i18n/areas/gst-tds-7o.ts` (`o7T`); tests `tests/gst-tds-7o.test.ts` + a 7O row in `tests/purchase-contract.test.ts` |
 | Tests | `tests/gst-setoff.test.ts` (order, plan, journal, challans, cash ledger, purchase cess in 3B), `tests/gst-depth.test.ts` (HSN master, purchase register, monthly recon, e-Invoice details, 9C), WP-6 row in `tests/purchase-contract.test.ts` |
+| 7R | `src/lib/gst-cash-refunds.ts` (PMT-09, RFD-01, Rule 89(4)), `src/lib/isd.ts` (ISD, GSTR-6), `src/lib/eway-consolidated.ts` (EWB-02), `src/lib/gstr9c-extra.ts` (9C Table 9 rate-wise, Table 14), `src/lib/gst-by-gstin.ts`; lazy tabs "Cash ledger & refunds", "ISD / GSTR-6", "Consolidated e-Way", "By GSTIN" (`Gst7rPanel.tsx`, one chunk); strings `r7T` (`src/i18n/areas/gst-tds-7r.ts`); tests `tests/gst-tds-7r.test.ts` + a 7R row in `tests/purchase-contract.test.ts` |
 
 ## Data (additive only)
 
@@ -153,6 +154,74 @@ not verified against the offline tool.
   4G), Table 9 (tax by head, books vs GSTR-9 Table 9 payable), Table 12 (books ITC ± earlier / later-year ITC vs 7J).
   Books figures come from Books (P&L income, output tax, ITC); adjustments are typed on the tab (not stored).
 
+## Cash ledger depth: PMT-09 and refunds (7R, 7.121)
+
+- `cashLedgerDetail(challans, setoffs, transfers, refunds, asOf?, gstin?)`: the electronic cash ledger by **major ×
+  minor head** — paid PMT-06 challans in; set-offs out (cash tax from "tax", interest from "interest", late fee from
+  "fee"); PMT-09 moves; an EXCESS_CASH refund claim debits "tax" on its filing day and its rejected part comes back
+  (PMT-03) on the last trail date. `detailByHead` sums by major head; the set-off tab's balance now uses it (when
+  PMT-09 / refunds exist), so pre-filled challans account for them.
+- **PMT-09** (`gst_pmt09`, Rule 87(14)): `savePmt09` checks the source head × minor head holds the amount on the day,
+  period lock, books.edit, audit `gst`. Nothing posts: the books keep one cash-ledger account (2360).
+- **Refund claims** (`gst_refunds`): categories excess cash, export / SEZ supply under LUT (accumulated ITC), export
+  of services with IGST, inverted duty structure, other; period, relevant date, filing day, ARN, amounts by head.
+  `advanceRefund` moves the trail FILED (RFD-01) → ACKNOWLEDGED (RFD-02) → DEFICIENCY (RFD-03) → PROVISIONAL (RFD-04)
+  → SANCTIONED / REJECTED (RFD-06) → PAID (RFD-05) / WITHDRAWN, with provisional / sanctioned / rejected amounts.
+  **PAID** with a bank ledger posts a RECEIPT voucher (class "GST refund (RFD)") through `saveVoucher`: Dr bank | Cr
+  GST electronic cash ledger (2360) for cash refunds, Cr Input IGST / CGST / SGST / cess for ITC refunds (other
+  categories credit 2360 — verify the ledger with your CA). `refundDeadline` (Sec 54(1), two years from the relevant
+  date, last day the day before the anniversary) and `refundDelayInterest` (Sec 54(7) 60 days, Sec 56 6% p.a.) come
+  from `REFUND_TIME_RULES` in `gst-penalties.ts` (date-keyed, unverified).
+- **Rule 89(4) working paper** (`rule894Refund`, `rule894Basis`): refund = zero-rated turnover under LUT × net ITC ÷
+  adjusted total turnover, by head in proportion to 4C, capped by the credit ledger (carried) per head; basis from the
+  page period's build (EXP WOPAY + SEZ WOPAY net of their notes; 3B 3.1(a) + (b); 3B 4C). The 1.5 × domestic value cap
+  and capital-goods exclusion are left to the user (note on screen). "Use in a new claim" pre-fills the claim form.
+
+## Input Service Distributor (7R, 7.122)
+
+`isd_documents` (backups, books.edit, sync DATED, audit `gst`): `INWARD` (invoices / supplier credit notes received by
+our ISD registration), `DISTRIBUTION` (ISD invoices / credit notes issued, `ISD/FY<yy-yy>/<seq>` via series-counters,
+never re-issued, tagged with the month they distribute), `RECEIVED` (ISD credit our unit received).
+`planIsdDistribution` (Rule 39): shares by the units' previous-FY turnover (typed), eligible and ineligible pools
+separately, IGST → IGST, CGST / SGST → CGST / SGST in the ISD's State and IGST elsewhere, cess → cess, rounding to the
+last unit; `issueDistribution` saves the documents. `buildGstr6` (Tables 3, 4, 5, 8, undistributed credit, warnings:
+not distributed in the month, documents dated outside the month, invalid GSTINs) with `gstr6DueDate` (13th, date-keyed,
+unverified) and CSV. `isdInwardRows` → `BuildOptions.isdInward` (additive): GSTR-3B **4A(4)** (`itc.isd`; ineligible to
+4D(2)) and into 4C, the 3B JSON `itc_avl` ISD row, GSTR-9 **6G** (sum of the months). Nothing posts to the ledger.
+ISD is mandatory for common input services from 1 Apr 2025 (`ISD_MANDATORY_RULES`, as understood).
+
+## Consolidated e-Way Bill (7R, 7.126)
+
+`buildConsolidatedEway` (EWB-02, Rule 138(9)): generator GSTIN / transporter id, from place and State, mode, vehicle
+(road; same plate check as `eway.ts`) or transport document no. / date (rail / air / ship), the individual 12-digit
+EWB numbers (picked from saved invoices' `einvoice_meta.eway_no` or pasted — `parseEwbList`, capped at 500), expired
+bills flagged. JSON `{ version, tripSheets: [{ userGstin, fromPlace, fromState, transMode, vehicleNo, transDocNo,
+transDocDate, tripSheetEwbBills: [{ ewbNo }] }] }` — **layout unverified** (`CEWB_LAYOUT`).
+
+## GSTR-9C extras, supplier-note cess, exports, 3B JSON (7R)
+
+- **9C Table 9 rate-wise** (`gstr9cRateWise`): 9A–9K (5 / 12 / 18 / 28% with RC rows, 3%, 0.25%, 0.1%, "other rates")
+  from the twelve monthly GSTR-1 HSN summaries (notes netted) and reverse-charge / import-of-services bills by rate,
+  9L–9O typed, 9P = GSTR-9 Table 9 payable, 9Q unreconciled. **Table 14** (`gstr9cTable14`): bills of the FY in the
+  form's expense heads 14A–14Q (imports → 14D, `capital_goods` → 14O, then category keywords, else 14N), value / total
+  ITC / eligible ITC (net of reversals; supplier notes netted in the bill's head), 14R vs GSTR-9 7J (14S) → 14T.
+  **Table 12 split**: `Gstr9cBooks.notesItc` (`notesItcForFy`) shows ITC given back by supplier notes as line 12A-N, so
+  12D compares like with like (books ITC is gross of notes, 7J nets them).
+- **Cess on supplier notes** (`PurchaseReturn.cess_amount`, additive): set on save as the bill's `cess_amount` pro rata
+  to the note's taxable value (`noteCessFor`, capped by earlier notes; inside `total`). Read by 3B (4A cess / 3.1(d)
+  cess come down), GSTR-9 Table 6 / 8F, Books (ITC / self-assessed tax / cost), the ledger (Cr Input cess 2353, or back
+  to cost when ITC was not claimed; reverse-charge cess reversed from GST payable) and the Tally debit note ("Input
+  Cess"). Notes saved before 7R carry none.
+- **Accounting `gst_summary`** has a **Cess** column (sales lines, credit notes, bills) and "Total Tax" includes it.
+- **GSTR-3B JSON** writes Table 4(C) **signed** (`itc.netSigned`) as the portal computes 4(A) − 4(B) — a negative 4(C)
+  is shown and added to the liability on the portal (Circular 170/02/2022-GST as understood). `GSTR3B_JSON_LAYOUT.
+  signedNetItc` switches back to the floored figure if the offline tool rejects it. The 3B CSV shows the same signed 4C.
+- **GSTR-1 / 3B by GSTIN** (`buildByGstin`, tab "By GSTIN"): one column per registration (`gstinColumns`: branches,
+  profiles, invoice snapshots), invoices by sender GSTIN, bills (and their supplier notes) by the receiving branch's
+  GSTIN, else the one registration in the bill's place-of-supply State, else "Not assigned" (listed); ISD credit by
+  unit. Rows: B2B / B2CL / B2CS / notes / exports / documents; 3.1(a) value and tax, 3.1(b), 3.1(d), 4A, 4B, 4C, cash.
+  CSV. Documents without a sender GSTIN are counted under every GSTIN by the builder — warned.
+
 ## Wiring for the lead
 
 Nothing in the shell: the tabs live inside the existing lazy GST reports page (`src/pages/GstReports.tsx`, `TABS` +
@@ -179,6 +248,11 @@ default rate now fills invoice / bill lines when an HSN is typed (`src/lib/hsn-d
   caps by turnover from June 2021) split half CGST / half SGST — QRMP months 1–2 carry none.
 - `GSTR9C_THRESHOLD` ₹5 crore and the self-certified form (Notifications 29/2021 and 30/2021-CT); Table numbering and
   the adjustments list follow the pre-2021 form as best known.
+- 7R: `REFUND_TIME_RULES` (2 years, 90% provisional, 60 days, 6% interest) and the "day before the anniversary" reading
+  of Sec 54(1); refund postings by category; Rule 89(4) formula and its caps; `GSTR6_DUE_RULES` (13th); Rule 39 heads
+  mapping (CGST / SGST → IGST for another State) and the previous-FY turnover basis; `ISD_MANDATORY_RULES` (1 Apr
+  2025); consolidated EWB JSON keys; 9C rate rows / expense heads; the signed 4(C) in the 3B JSON; pro-rata cess on
+  supplier notes.
 - e-Invoice `PayDtls` / `EwbDtls` / `ShipDtls` field names and limits per NIC schema v1.1 as best known; `Mode` /
   `PayInstr` / `CrTrn` / `DirDr` are left empty.
 
@@ -188,10 +262,12 @@ default rate now fills invoice / bill lines when an HSN is typed (`src/lib/hsn-d
   carry-forward, negative 4C, RCM self-invoice + Rule 52 series, IFF JSON, supplier notes in GSTR-9.)
 - Interest / late fee are estimates on the filing date typed on the tab. The carry-forward is the app's view of the
   credit ledger: credit used outside the app, or periods never posted, are not known to it.
-- Electronic cash ledger is tracked by major head only; PMT-09 transfers and refunds (RFD-01) are not modelled.
-- ISD, EXPA, consolidated e-Way — not built. Supplier notes carry no cess field (cess on a returned cess bill is not
-  reversed). The GSTR-3B JSON still writes the floored 4C. The accounting `gst_summary` export has no cess column.
-- GSTR-9C: supplier notes (WP-3) are not separated in Table 12; rate-wise Table 9 and Table 14 (expense-wise ITC)
-  are not generated.
+- (7R closed: PMT-09 and refund claims, ISD / GSTR-6, consolidated e-Way, cess on supplier notes, signed 4C in the 3B
+  JSON, `gst_summary` cess, 9C Table 12 split / rate-wise Table 9 / Table 14. EXPA was built earlier — `gst-reports.md`.)
+- Refund of IGST on exports of goods with payment (shipping bill route) is not an RFD-01 claim and is not tracked;
+  provisional-refund 90% and Sec 56 interest are estimates; the credit ledger is debited for ITC refunds only in the
+  posting when paid (the carried credit in the set-off plan does not yet net filed ITC refund claims).
+- ISD: no ledger postings; the Rule 39 turnover basis is typed; Table 6 / 7 / 9 amendments of GSTR-6 not built.
+- 9C rate-wise Table 9 has no books column (documents vs GSTR-9 only); Table 14 heads are a keyword mapping.
 - HSN master defaults are not yet applied automatically in the invoice / bill line editors (`resolveGstRate` is ready
   for them).
