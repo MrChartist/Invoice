@@ -30,7 +30,8 @@ const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // paint unchanged; this is the one-time offline precache (~1 MB gz for the whole app).
 // Raised to 1400 for the Tally-parity work packages WP-1…WP-9 (masters, returns, printing, banking, business
 // extras, GST depth, migration / audit): every new screen is lazy, so first paint is unchanged.
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 1400);
+// Raised to 1600 for 7M–7P (job work / ITC-04, branch books, GST & TDS follow-ups, payroll depth): all lazy.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 1600);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 // De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.
