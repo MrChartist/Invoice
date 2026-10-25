@@ -9,6 +9,7 @@ import { FileCode2, RotateCcw, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useCan } from '../../hooks/useCan';
 import { useT } from '../../i18n';
+import { vtT } from '../../i18n/areas/voucher-types';
 import { migT } from '../../i18n/areas/migration';
 import { clearSafetySnapshot, getSafetySnapshot, restoreBackup, saveSafetySnapshot } from '../../lib/backup';
 import { reloadAfterFlush } from '../../lib/storage';
@@ -42,8 +43,8 @@ function parseWithDom(text: string): XmlNode {
 const rs = (p: number) => `₹${(Math.abs(p) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const drcr = (p: number) => (p ? `${rs(p)} ${p > 0 ? 'Dr' : 'Cr'}` : '—');
 
-const STATUS_KEY: Record<PlannedVoucherStatus, 'stOk' | 'stDuplicate' | 'stLocked' | 'stCancelled' | 'stBefore' | 'stError'> = {
-  ok: 'stOk', duplicate: 'stDuplicate', locked: 'stLocked', cancelled: 'stCancelled', before_books: 'stBefore', error: 'stError',
+const STATUS_KEY: Record<PlannedVoucherStatus, 'stOk' | 'stDuplicate' | 'stLocked' | 'stCancelled' | 'stBefore' | 'stError' | 'stStockOnly'> = {
+  ok: 'stOk', duplicate: 'stDuplicate', locked: 'stLocked', cancelled: 'stCancelled', before_books: 'stBefore', error: 'stError', stock_only: 'stStockOnly',
 };
 
 export function TallyImport({ open, onClose, notify }: TallyImportProps) {
@@ -138,6 +139,7 @@ export function TallyImport({ open, onClose, notify }: TallyImportProps) {
     body = (
       <div className={styles.stack}>
         <p className={styles.note}>{migT('doneCounts', { groups: r.groups, accounts: r.accounts, clients: r.clients, vendors: r.vendors, openings: r.openings, bills: r.openingBills, stock: r.stockItems, vouchers: r.vouchers })}</p>
+        {r.stockMoves ? <p className={styles.note}>{vtT('stockMoves')}: {r.stockMoves}</p> : null}
         {r.failed.length > 0 && (
           <div className={styles.warnBox}>
             <strong>{migT('refused', { n: r.failed.length })}</strong>
@@ -207,6 +209,7 @@ export function TallyImport({ open, onClose, notify }: TallyImportProps) {
             [migT('sumParties'), `${c.clientsNew + c.vendorsNew} ${migT('newWord')} · ${c.clientsExisting + c.vendorsExisting} ${migT('existingWord')}`],
             [migT('sumOpenings'), `${c.openings} · ${c.openingBills}`],
             [migT('sumStock'), `${c.stockNew} ${migT('newWord')}`],
+            [vtT('stockMoves'), vtT('stockMovesCount', { ok: (plan.stockMoves ?? []).filter((m) => m.status === 'ok').length, skip: (plan.stockMoves ?? []).filter((m) => m.status !== 'ok').length })],
             [migT('sumVouchers'), String(c.vouchersOk)],
             [migT('sumDuplicates'), String(c.vouchersDuplicate)],
             [migT('sumSkipped'), String(c.vouchersSkipped)],

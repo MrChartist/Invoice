@@ -18,6 +18,7 @@ import { restoreBackup } from './backup';
 import { saveCostCentre, loadCostCentres } from './cost-centres';
 import { godownsDb } from './godowns';
 import { stockDb, type StockItem } from './inventory';
+import { applyTallyStockMoves } from './tally-import-stock';
 import { A, chartOf, loadUserAccounts, loadUserGroups, saveUserAccount } from './ledger/accounts';
 import { clientPartyName, partyLedgerId, saveUserGroup } from './ledger/groups';
 import { loadOpenings, saveBooksBegin, saveOpenings, storedBooksBegin, type OpeningEntry } from './ledger/openings';
@@ -52,6 +53,7 @@ export function loadExistingBooks(): ExistingBooks {
     godowns: safe(() => godownsDb.stored(), []),
     costCentres: safe(loadCostCentres, []),
     lockUntil: safe(getLockUntil, ''),
+    stockMoveRefs: safe(() => new Set(stockDb.moves().filter((m) => m.ref_type === 'tally' && m.ref_id).map((m) => m.ref_id as string)), new Set<string>()),
   };
 }
 
@@ -66,6 +68,8 @@ export interface ImportResult {
   godowns: number;
   costCentres: number;
   vouchers: number;
+  /** Additive (7.49): stock moves added from the vouchers' item lines. */
+  stockMoves?: number;
   /** Rows the APIs refused (validation, lock): reported, the rest of the import stands. */
   failed: string[];
   /** Tally ledger name (lower case) → ledger id in this app (account id or party ledger id). */
@@ -319,6 +323,11 @@ function run(plan: ImportPlan, result: ImportResult): void {
       result.failed.push(`${v.rec.vtype} ${v.rec.number || ''} (${v.rec.date}): ${(err as Error).message}`);
     }
   }
+
+  /* 7. Stock quantities of the vouchers (7.49, tally-import-stock.ts): stock moves, never GST documents. */
+  const moves = applyTallyStockMoves(plan.stockMoves ?? [], { items: () => stockDb.items(), godowns: () => godownsDb.list(), addMove: (m) => stockDb.addMove(m), newId: generateId });
+  result.stockMoves = moves.added;
+  result.failed.push(...moves.failed);
 }
 
 /** A GSTIN that fails the check digit is left out (the plan says so); everything else is kept. */
