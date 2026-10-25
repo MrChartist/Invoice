@@ -24,7 +24,11 @@ export type AuditEntity =
   /** Stock transfer voucher between godowns (6.10). */
   | 'stock_transfer'
   /** Advance receipts, refunds and adjustments (5.3). */
-  | 'advance';
+  | 'advance'
+  /** TDS / TCS challans, manual deductions and return-filed marks (Tally parity). */
+  | 'tds'
+  /** Supplier advances / on-account payments and their bill-wise adjustments (Tally parity). */
+  | 'vendor_payment';
 
 export type AuditAction =
   | 'create'
@@ -163,4 +167,6 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   cheque: 'Cheques',
   stock_transfer: 'Stock transfers',
   advance: 'Advances',
+  tds: 'TDS / TCS',
+  vendor_payment: 'Supplier advances',
 };

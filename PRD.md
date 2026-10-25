@@ -146,6 +146,14 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **Purchases & payables**: vendor bills and expenses, ITC tracking, RCM, imports (Bill of Entry), ITC reversal reasons,
   Sec 17(5) blocked credit, period-locked; MSME (Udyam) vendors with 45/15-day limits, Sec 43B(h) disallowance and
   MSMED interest.
+- **TDS & TCS (Tally parity)**: TDS deducted on bills / expenses (on booking or on payment; 194C / 194J / 194I / 194H /
+  194Q / 194A) with date-keyed thresholds (single and FY aggregate), 206AA / 206AB / Sec 197 rates and per-section TDS
+  payable ledgers; ITNS 281 challans linked to deductions; Sec 201(1A) interest estimates; deposit and return due dates;
+  Form 26Q / 27EQ working papers in RPU column order (CSV / Excel / text, unverified) and Form 16A data (`/tds`,
+  `docs/features/tds-payables.md`).
+- **Bill-wise payables & Tally voucher variants**: supplier payments allocated against several bills (Agst Ref) or kept
+  as Advance / On Account / New Ref and adjusted later, ageing and party bill-wise view; optional, memorandum,
+  post-dated and reversing vouchers with their registers; Tally-style ratio analysis (Books tabs, `docs/features/ledger.md`).
 - **Books**: Day Book, Cash Book, Bank Book, Profit & Loss (accrual and cash basis), plus a double-entry ledger:
   Schedule III chart of accounts, journal / contra / payment / receipt vouchers, trial balance, ledger drill-down,
   Schedule III balance sheet with a fixed-asset register (Income-tax Act WDV depreciation) and an AS 3 cash-flow

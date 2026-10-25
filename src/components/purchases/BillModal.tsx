@@ -23,6 +23,8 @@ import { godownsDb } from '../../lib/godowns';
 import { MAIN_GODOWN_ID } from '../../types/stock';
 import { useT } from '../../i18n';
 import { purT, purCategory } from '../../i18n/areas/purchases';
+import { TdsBillPanel } from './TdsBillPanel';
+import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -91,6 +93,19 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
   const [error, setError] = useState('');
+  // TDS deducted by us (Tally parity). Undefined rate / base / amount follow the suggestion.
+  const [tds, setTds] = useState<BillTdsInput>(() => {
+    const v = vendors.find((x) => x.id === init?.vendor_id);
+    return {
+      section: purchase?.tds_section ?? '',
+      on: purchase?.tds_on ?? 'BILL',
+      pan: purchase?.tds_pan ?? v?.pan ?? '',
+      lowerCert: purchase?.tds_cert_no ?? v?.tds_lower_cert,
+      lowerRate: v?.tds_lower_rate,
+      nonFiler: v?.tds_non_filer,
+      ...(purchase?.tds_section ? { rate: purchase.tds_rate, base: purchase.tds_base, amount: purchase.tds_amount } : {}),
+    };
+  });
   // Batch / serial / godown fields appear only for items that opted in, or once a second godown exists.
   const [stock] = useState<BillStockContext | undefined>(() => {
     try {
@@ -118,7 +133,12 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
   // Reverse charge / imports: the GST is paid by us to the government, so the supplier is owed only the taxable value.
   const selfTax = rcm || !!importType;
-  const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total });
+  const tdsResolved = useMemo(
+    () => resolveBillTds(tds, { date, taxable: totals.taxable, prior: priorCreditsFor(purchasesDb.all(), { id: vendor?.id, name: vendor?.name ?? init?.vendor_name, pan: tds.pan }), excludeId: purchase?.id }),
+    [tds, date, totals.taxable, vendor?.id, vendor?.name, init?.vendor_name, purchase?.id],
+  );
+  const tdsOnBill = tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0;
+  const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total, tdsOnBill });
 
   const submit = () => {
     if (!vendor && !init?.vendor_name) return setError(purT('errVendor'));
@@ -176,6 +196,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         ...billablePatch(billable),
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
+        ...tdsResolved.fields,
       });
       onSaved(purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
       onClose();
@@ -203,6 +224,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           const vendorState = v ? resolveStateCode({ code: v.state_code, gstin: v.gstin }) : '';
           if (vendorState) setPos(vendorState);
           if (v) setItc(!!v.gstin);
+          if (v) setTds((t) => ({ ...t, pan: t.pan || v.pan || '', section: t.section || v.tds_section || '', nonFiler: v.tds_non_filer, lowerCert: v.tds_lower_cert, lowerRate: v.tds_lower_rate }));
         }}
       />
 
@@ -340,6 +362,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           </p>
         </div>
       </details>
+
+      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={supplierPayable} nonResident={vendor?.non_resident} />
 
       {itc && !rcm && !importType && totals.tax > 0 && vendor && !vendor.gstin && (
         <p className={styles.note}>{purT('noGstinNote')}</p>

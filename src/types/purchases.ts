@@ -23,6 +23,20 @@ export interface Vendor {
   msme_category?: MsmeCategory;
   /** Additive (6.23): party custom-field values keyed by field id. */
   custom_fields?: Record<string, string>;
+  /* ── TDS on payables (Tally parity) — additive, all optional ── */
+  /** Supplier PAN (10 characters). Missing / invalid → Sec 206AA higher rate. */
+  pan?: string;
+  /** Deductee category (`DeducteeType` in src/lib/tds-rules.ts); derived from the PAN when absent. */
+  deductee_type?: 'COMPANY' | 'INDIVIDUAL' | 'HUF' | 'FIRM' | 'OTHER';
+  /** Default TDS section code for this supplier's bills (e.g. `194J`, `194C-2`). */
+  tds_section?: string;
+  /** Sec 206AB "specified person" (non-filer) — applies only while 206AB was in force. */
+  tds_non_filer?: boolean;
+  /** Sec 197 lower / nil deduction certificate: number and rate (%). */
+  tds_lower_cert?: string;
+  tds_lower_rate?: number;
+  /** Non-resident payee: TDS goes in Form 27Q (flagged only — not computed by this app). */
+  non_resident?: boolean;
 }
 
 export type MsmeCategory = 'MICRO' | 'SMALL' | 'MEDIUM';
@@ -112,6 +126,54 @@ export interface PurchaseRecord {
   cost_centre_id?: string;
   /** Additive (6.12): receipt photos / PDFs (see src/lib/attachments.ts). Ignored by every report. */
   attachments?: AttachmentRef[];
+  /* ── TDS deducted by us (Tally parity) — additive, all optional; absent = no TDS ── */
+  /** Section code (`TDS_PAYABLE_SECTIONS` in src/lib/tds-rules.ts), e.g. `194J`, `194C-2`, `194I-B`. */
+  tds_section?: string;
+  /** Rate applied (%), after 206AA / 206AB / a Sec 197 certificate. */
+  tds_rate?: number;
+  /** Amount TDS is computed on (₹) — normally the taxable value, GST excluded (CBDT Circular 23/2017). */
+  tds_base?: number;
+  /** TDS amount (₹). With `tds_on` 'BILL' it reduces what the supplier is owed (`supplierPayable`). */
+  tds_amount?: number;
+  /** When it is deducted: at booking the bill (Tally's default) or when paying (`purchase_payments.tds_amount`). */
+  tds_on?: 'BILL' | 'PAYMENT';
+  /** Snapshot of the payee's PAN and category used for this deduction. */
+  tds_pan?: string;
+  tds_deductee_type?: 'COMPANY' | 'INDIVIDUAL' | 'HUF' | 'FIRM' | 'OTHER';
+  /**
+   * 26Q "reason" code when the rate is not the normal one: `A` lower / nil deduction certificate
+   * (Sec 197), `C` higher rate — no PAN (206AA) or non-filer (206AB), `Y` threshold not crossed.
+   */
+  tds_reason?: string;
+  /** Sec 197 certificate number snapshot. */
+  tds_cert_no?: string;
+}
+
+/**
+ * Bill-wise payables (Tally parity): money paid to a supplier that is NOT against a bill yet —
+ * Tally's "Advance", "On Account" and "New Ref" allocations. Persisted in table `vendor_payments`.
+ * It is real cash out (Books cash book, ledger Dr Sundry creditors / Cr Cash-Bank). Adjusting it
+ * against a bill later adds an `allocations` row and raises the bill's `amount_paid`; that moves no
+ * money, so no reader counts it as a new payment.
+ */
+export interface VendorPayment {
+  id: string;
+  vendor_id?: string;
+  vendor_name: string;
+  /** yyyy-mm-dd */
+  date: string;
+  amount: number;
+  method: string;
+  reference?: string;
+  bank_account_id?: string;
+  kind: 'ADVANCE' | 'ON_ACCOUNT' | 'NEW_REF';
+  /** Reference name for a New Ref (e.g. the supplier's proforma number). */
+  ref_name?: string;
+  /** Adjustments against bills (Agst Ref), oldest first. */
+  allocations?: { purchase_id: string; amount: number; date: string }[];
+  /** Groups the rows of one multi-bill payment (the `purchase_payments` rows carry the same id). */
+  group_id?: string;
+  created_at?: string;
 }
 
 /** One line of a purchase order. Same shape as a bill line, minus the stock link. */

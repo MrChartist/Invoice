@@ -30,6 +30,8 @@ const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'))
 // Cash-flow forecast (6.18) and exchange gain/loss (6.19): their own small lazy chunks.
 const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'));
 const FxTab = lazy(() => import('../components/books/planning/FxTab'));
+// Tally parity: bill-wise payables, voucher registers, ratio analysis (their own lazy chunk).
+const TallyPanel = lazy(() => import('../components/books/tally/TallyPanel'));
 
 const TABS = [
   { id: 'day', label: 'tabDay' },
@@ -45,6 +47,9 @@ const TABS = [
   { id: 'coa', label: 'tabCoa' },
   { id: 'fcst', label: 'tabFcst' },
   { id: 'fx', label: 'tabFx' },
+  { id: 'billwise', label: 'tabBillwise' },
+  { id: 'vreg', label: 'tabVreg' },
+  { id: 'ratio', label: 'tabRatio' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 const LEDGER_TABS = new Set<TabId>(['vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
@@ -186,6 +191,11 @@ export function Books() {
             ) : (
               <FxTab data={data} period={period} onChanged={() => setData(loadBooksData())} notify={(m) => notify(m)} />
             )}
+          </Suspense>
+        )}
+        {(tab === 'billwise' || tab === 'vreg' || tab === 'ratio') && (
+          <Suspense fallback={<p className={styles.loading} role="status">Loading…</p>}>
+            <TallyPanel tab={tab} data={data} period={period} asOf={asOf} onOpenAccount={openAccount} onChanged={() => setData(loadBooksData())} notify={notify} />
           </Suspense>
         )}
         {LEDGER_TABS.has(tab) && (

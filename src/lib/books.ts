@@ -29,6 +29,7 @@ import { toCsv } from './csv';
 import { isVoidStatus, readPurchase, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
+import type { VendorPayment } from '../types/purchases';
 import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment } from './advance-tax';
 
 /* ════════════════════════════════════════════════════════════════
@@ -105,8 +106,12 @@ export interface BooksData {
     method?: string;
     reference?: string;
     bank_account_id?: string;
+    /** Additive (Tally parity): TDS deducted on this payment — settles the bill with `amount`, owed to the government. */
+    tds_amount?: number;
   }>;
   openings: OpeningBalance[];
+  /** Additive (Tally parity): supplier advances / on-account payments (`vendor_payments`). Optional for older callers. */
+  vendorPayments?: VendorPayment[];
   /** Advance receipts (5.3, `advances` table). Optional so older callers / fixtures stay valid. */
   advances?: AdvanceRecord[];
 }
@@ -342,8 +347,10 @@ export interface NormPurchase {
    * imported goods) when it sits inside `total`. Owed to the government, never to the supplier.
    */
   selfTax: number;
-  /** What the supplier is owed: total − selfTax (`supplierPayable`). */
+  /** What the supplier is owed: total − selfTax − TDS deducted on booking (`supplierPayable`). */
   payable: number;
+  /** Additive: TDS deducted when the bill was booked (owed to the government). */
+  tds: number;
   itcEligible: boolean;
   /** Paid amount recorded on the row itself (fallback when no payment rows). */
   paidOnRow: number;
@@ -373,6 +380,7 @@ export function normalizePurchase(
     total: c.total,
     selfTax: selfAssessedTaxOf(c),
     payable: supplierPayableOf(c),
+    tds: c.tdsOnBill,
     itcEligible: c.itcEligible,
     paidOnRow: c.paid,
   };
@@ -502,6 +510,26 @@ export function buildVouchers(data: BooksData): Voucher[] {
       method: str(pp.method) || 'Bank transfer',
       account: accountForMethod(pp.method),
       bank_account_id: accountForMethod(pp.method) === 'bank' && pp.bank_account_id ? str(pp.bank_account_id) : undefined,
+    });
+  }
+
+  // Supplier advances / on-account payments (bill-wise payables): cash out on the day paid.
+  for (const vp of data.vendorPayments ?? []) {
+    const date = toIsoDate(vp.date);
+    const amount = round2(Math.abs(num(vp.amount)));
+    if (!date || amount === 0) continue;
+    out.push({
+      id: `vpay:${vp.id}`,
+      date,
+      type: 'Payment',
+      number: str(vp.reference) || str(vp.ref_name),
+      party: str(vp.vendor_name) || 'Unknown vendor',
+      narration: vp.kind === 'ADVANCE' ? 'Advance to supplier' : vp.kind === 'NEW_REF' ? `New ref ${str(vp.ref_name)}`.trim() : 'On account',
+      debit: amount,
+      credit: 0,
+      method: str(vp.method) || 'Bank transfer',
+      account: accountForMethod(vp.method),
+      bank_account_id: accountForMethod(vp.method) === 'bank' && vp.bank_account_id ? str(vp.bank_account_id) : undefined,
     });
   }
 
@@ -786,7 +814,8 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
     for (const pp of data.purchasePayments) {
       const p = byId.get(str(pp.purchase_id));
       const date = toIsoDate(pp.date);
-      const paid = round2(Math.abs(num(pp.amount)));
+      // TDS deducted on the payment settles the bill as much as the cash does.
+      const paid = round2(Math.abs(num(pp.amount)) + Math.max(num(pp.tds_amount), 0));
       if (!p || !date || paid === 0) continue;
       paidRows.set(p.id, round2((paidRows.get(p.id) ?? 0) + paid));
       const cost = p.payable > 0 ? round2((paid * purchaseCost(p)) / p.payable) : paid;
@@ -1061,10 +1090,16 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   }
   // Same rule on the payables side: cash that left the bank always reduces payables.
   let paid = 0;
+  // TDS we deducted (on bills and on payments) is owed to the government, not the supplier.
+  let tdsDeducted = 0;
+  for (const p of purchases) tdsDeducted += p.tds;
   for (const pp of data.purchasePayments) {
     if (!upTo(toIsoDate(pp.date))) continue;
-    paid += Math.abs(num(pp.amount));
+    const tds = Math.max(num(pp.tds_amount), 0);
+    paid += Math.abs(num(pp.amount)) + tds;
+    tdsDeducted += tds;
   }
+  for (const vp of data.vendorPayments ?? []) if (upTo(toIsoDate(vp.date))) paid += Math.abs(num(vp.amount));
 
   const vouchers = buildVouchers(data);
   const cash = accountBalanceAt(vouchers, data.openings, 'cash', asOf);
@@ -1088,7 +1123,8 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
   const liabilities = {
     payables: Math.max(ap, 0),
     // GST / cess payable (net of ITC) plus TCS collected and not yet deposited.
-    gstPayable: round2(Math.max(gstNet, 0) + Math.max(round2(tcsCollected), 0)),
+    // TDS deducted from suppliers is added too (deposits are not tracked here; the ledger has them).
+    gstPayable: round2(Math.max(gstNet, 0) + Math.max(round2(tcsCollected), 0) + round2(tdsDeducted)),
     customerAdvances: Math.max(-ar, 0),
     total: 0,
   };
@@ -1137,6 +1173,7 @@ export function loadBooksData(): BooksData {
     purchasePayments: getTable<BooksData['purchasePayments'][number]>('purchase_payments'),
     openings: loadOpenings(),
     advances: getTable<AdvanceRecord>(ADVANCES_TABLE),
+    vendorPayments: getTable<VendorPayment>('vendor_payments'),
   };
 }
 

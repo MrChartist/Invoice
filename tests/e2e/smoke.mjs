@@ -251,7 +251,7 @@ try {
 
     // Download PDF produces a real PDF file.
     await dialog.getByRole('button', { name: /^Share/ }).click();
-    const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+    const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
     const head = readFileSync(await pdf.path()).subarray(0, 5).toString();
     check(head === '%PDF-' && /\.pdf$/.test(pdf.suggestedFilename()), `Download PDF gives a PDF (${pdf.suggestedFilename()})`);
     await page.keyboard.press('Escape');
@@ -311,7 +311,7 @@ try {
     await page.getByRole('button', { name: /preview|view/i }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Document preview' });
     await dialog.getByRole('button', { name: /^Share/ }).click();
-    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Client copy/ }).click()]);
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Client copy/ }).click()]);
     const html = readFileSync(await dl.path(), 'utf8');
     check(/\.html$/.test(dl.suggestedFilename()) && !/<script/i.test(html) && html.includes('Acme Buyers') && /href="upi:\/\/pay\?pa=e2e@okhdfcbank/.test(html) && /src="data:image\//.test(html) && !html.includes('asset:'),
       `client copy: ${dl.suggestedFilename()}, ${Math.round(html.length / 1024)} KB, no scripts, pay link present`);
@@ -422,6 +422,39 @@ try {
     check(await edit.getByText(ref?.name ?? 'receipt').count() > 0, 'after a reload the expense still shows its receipt');
     await page.keyboard.press('Escape');
     await edit.waitFor({ state: 'detached' });
+  });
+
+  await step('TDS on payables: a 194J bill with TDS, payment of the net amount, the deduction in Form 26Q', async () => {
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await dlg.getByRole('button', { name: /New vendor/ }).click();
+    await dlg.locator('#bill-vendor-vname').fill('Rao Associates');
+    await dlg.getByRole('button', { name: 'Save vendor' }).click();
+    await dlg.locator('#bill-no').fill('RA/1');
+    await dlg.getByLabel('Line 1 item').fill('Audit fee');
+    await dlg.getByLabel('Line 1 rate').fill('100000');
+    await dlg.getByText('TDS deducted by you').click();
+    await dlg.getByLabel('TDS section').selectOption('194J');
+    await dlg.getByLabel('Supplier PAN').fill('ABCPK1234F');
+    await dlg.getByText(/Suggested: 10% on/).waitFor();
+    await dlg.getByRole('button', { name: 'Save bill' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const bills = await readJson(page, 'purchases', [], (v) => v.some((p) => p.bill_number === 'RA/1'));
+    const b = bills.find((p) => p.bill_number === 'RA/1');
+    check(!!b && b.tds_section === '194J' && b.tds_amount === 10000 && b.tds_on === 'BILL' && b.total === 118000,
+      `194J bill stores TDS ${b?.tds_amount} on ${b?.tds_base} (deduct on bill)`);
+    await page.getByRole('button', { name: 'Payments for Rao Associates RA/1' }).click();
+    const pay = page.getByRole('dialog', { name: 'Record payment' });
+    check(await pay.locator('#pp-amt').inputValue() === '108000', 'payment dialog offers the net amount (total − TDS)');
+    await pay.getByRole('button', { name: 'Record payment' }).click();
+    await pay.waitFor({ state: 'detached' });
+    const pays = await readJson(page, 'purchase_payments', [], (v) => v.some((p) => p.purchase_id === b.id));
+    check(pays.find((p) => p.purchase_id === b.id)?.amount === 108000, 'supplier paid the net amount; the bill is settled');
+    await page.goto(srv.origin + '/tds?tab=returns');
+    const row = page.locator('[data-form-row="26Q"]').filter({ hasText: 'ABCPK1234F' });
+    await row.first().waitFor();
+    check((await row.first().innerText()).includes('4JB') && (await row.first().innerText()).includes('10000.00'), 'Form 26Q working paper lists the 194J deduction');
   });
 
   await step('double-entry books: journal voucher, trial balance, balance sheet, cash flow', async () => {

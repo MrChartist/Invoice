@@ -59,7 +59,23 @@ export interface ManualVoucher {
   lines: ManualVoucherLine[];
   created_at: string;
   updated_at?: string;
+  /* ── Voucher variants (Tally parity) — additive, all optional; absent = a regular voucher ── */
+  /**
+   * `OPTIONAL`: kept in the Optional vouchers register, never in the books until "Make regular".
+   * `MEMO`: a memorandum voucher — memo register only, never in the books.
+   */
+  variant?: ManualVoucherVariant;
+  /** Post-dated: left out of the books until its date arrives (then it counts automatically). */
+  post_dated?: boolean;
+  /** Reversing journal: an automatic mirror-image journal is posted on this day (YYYY-MM-DD, after `date`). */
+  reverse_on?: string;
+  /** Free-text voucher class (Tally's optional voucher classes) — a register filter only. */
+  voucher_class?: string;
+  /** ISO timestamp an optional voucher was made regular. */
+  regularised_at?: string;
 }
+
+export type ManualVoucherVariant = 'OPTIONAL' | 'MEMO';
 
 export type ManualVoucherInput = Omit<ManualVoucher, 'id' | 'created_at' | 'updated_at' | 'number'> & {
   id?: string;
@@ -108,6 +124,11 @@ export function validateVoucher(v: ManualVoucherInput, chart: readonly Account[]
   const t = voucherTotals(lines);
   if (t.dr === 0) errors.push('The voucher has no amount.');
   else if (t.diff !== 0) errors.push(`Debits and credits differ by ${formatMoney(Math.abs(t.diff) / 100)}.`);
+  if (v.variant !== undefined && v.variant !== 'OPTIONAL' && v.variant !== 'MEMO') errors.push('Unknown voucher variant.');
+  if (v.reverse_on) {
+    if (v.type !== 'JOURNAL') errors.push('Only a journal voucher can reverse itself.');
+    else if (isoDay(v.reverse_on) !== v.reverse_on || !(v.reverse_on > (v.date ?? ''))) errors.push('Choose a reversal date after the voucher date.');
+  }
   const isCashBank = (l: ManualVoucherLine) => byId.get(l.account_id)?.group === 'CASH_BANK';
   if (!errors.length) {
     if (v.type === 'CONTRA' && !lines.every(isCashBank)) errors.push('A contra voucher moves money between cash and bank accounts only.');
@@ -154,8 +175,21 @@ export function normalizeVouchers(rows: unknown[]): ManualVoucher[] {
       lines,
       created_at: typeof o.created_at === 'string' ? o.created_at : '',
       ...(typeof o.updated_at === 'string' ? { updated_at: o.updated_at } : {}),
+      ...variantFields(o),
     });
   }
+  return out;
+}
+
+/** The additive variant fields of a stored / typed voucher, cleaned (absent when not set). */
+export function variantFields(o: Partial<Record<keyof ManualVoucher, unknown>>): Pick<ManualVoucher, 'variant' | 'post_dated' | 'reverse_on' | 'voucher_class' | 'regularised_at'> {
+  const out: Pick<ManualVoucher, 'variant' | 'post_dated' | 'reverse_on' | 'voucher_class' | 'regularised_at'> = {};
+  if (o.variant === 'OPTIONAL' || o.variant === 'MEMO') out.variant = o.variant;
+  if (o.post_dated === true) out.post_dated = true;
+  const rev = isoDay(o.reverse_on);
+  if (rev && o.type === 'JOURNAL') out.reverse_on = rev;
+  if (typeof o.voucher_class === 'string' && o.voucher_class.trim()) out.voucher_class = o.voucher_class.trim();
+  if (typeof o.regularised_at === 'string' && o.regularised_at) out.regularised_at = o.regularised_at;
   return out;
 }
 
@@ -198,6 +232,9 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
   const id = prev?.id ?? generateId();
   if (prev) assertUnlocked({ id, issue_date: prev.date, invoice_number: prev.number }, 'edit');
   const lock = assertUnlocked({ id, issue_date: input.date, invoice_number: number }, prev ? 'edit' : 'create');
+  // A reversing journal also writes into the day it reverses on.
+  if (input.reverse_on && input.type === 'JOURNAL') assertUnlocked({ id, issue_date: input.reverse_on, invoice_number: number }, prev ? 'edit' : 'create');
+  if (prev?.reverse_on) assertUnlocked({ id, issue_date: prev.reverse_on, invoice_number: prev.number }, 'edit');
 
   const now = new Date().toISOString();
   const row: ManualVoucher = {
@@ -209,15 +246,17 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
     lines: cleanLines(input.lines),
     created_at: prev?.created_at ?? now,
     ...(prev ? { updated_at: now } : {}),
+    ...variantFields({ ...input, regularised_at: prev?.regularised_at }),
   };
   setTable(VOUCHERS_TABLE, prev ? all.map((v) => (v.id === id ? row : v)) : [...all, row]);
   const amount = formatMoney(voucherTotals(row.lines).dr / 100);
+  const tag = row.variant === 'OPTIONAL' ? ' (optional)' : row.variant === 'MEMO' ? ' (memorandum)' : row.post_dated ? ' (post-dated)' : row.reverse_on ? ` (reverses on ${row.reverse_on})` : '';
   audit.record({
     entity: 'voucher',
     entity_id: id,
     action: prev ? 'update' : 'create',
     doc_number: number,
-    summary: `${prev ? 'Edited' : 'Recorded'} ${VOUCHER_TYPE_LABELS[row.type].toLowerCase()} voucher ${number} dated ${row.date} for ₹${amount}${lock === 'overridden' ? ' (period lock overridden)' : ''}`,
+    summary: `${prev ? 'Edited' : 'Recorded'} ${VOUCHER_TYPE_LABELS[row.type].toLowerCase()} voucher ${number}${tag} dated ${row.date} for ₹${amount}${lock === 'overridden' ? ' (period lock overridden)' : ''}`,
     ...(prev && prev.date !== row.date ? { changes: [{ field: 'Date', from: prev.date, to: row.date }] } : {}),
   });
   return row;
@@ -230,6 +269,7 @@ export function deleteVoucher(id: string): void {
   if (!row) return;
   requireAccess('books.edit');
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
+  if (row.reverse_on) assertUnlocked({ id, issue_date: row.reverse_on, invoice_number: row.number }, 'delete');
   setTable(VOUCHERS_TABLE, all.filter((v) => v.id !== id));
   audit.record({
     entity: 'voucher',

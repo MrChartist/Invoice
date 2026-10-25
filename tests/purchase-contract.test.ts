@@ -336,3 +336,24 @@ test('supplierPayable: every "what we owe the vendor" reader leaves self-assesse
   const f = buildForecast({ today: '2026-04-15', horizon: 90, opening: 0, invoices: [], payments: [], purchases: [rcm], vendors: [vendor] });
   assert.equal(f.items.find((i) => i.kind === 'payable')!.amount, 1000);
 });
+
+test('TDS-on-payables fields (Tally parity): every reader agrees on what the supplier is owed', async () => {
+  const { supplierPayable } = await import('../src/lib/purchase-normalize.ts');
+  const { tdsDeductions, priorCreditsFor } = await import('../src/lib/tds-payables.ts');
+  const { billwisePayables } = await import('../src/lib/billwise.ts');
+  const withTds: PurchaseRecord = { ...bill, id: 'p-tds', tds_section: '194J', tds_rate: 10, tds_base: 1000, tds_amount: 100, tds_on: 'BILL', tds_pan: 'ABCPK1234F' };
+  const core = readPurchase(withTds)!;
+  assert.deepEqual([core.tdsSection, core.tdsAmount, core.tdsOnBill], ['194J', 100, 100]);
+  assert.equal(supplierPayable(withTds), 1080);
+  assert.equal(booksNormalize(withTds as never)!.payable, 1080);
+  assert.equal(booksNormalize(withTds as never)!.tds, 100);
+  assert.equal(exportNormalize(withTds)!.payable, 1080);
+  assert.equal(exportNormalize(withTds)!.tds, 100);
+  // Deduct on payment: nothing comes off the bill up front.
+  assert.equal(supplierPayable({ ...withTds, tds_on: 'PAYMENT' }), 1180);
+  assert.equal(tdsDeductions({ purchases: [withTds], payments: [] })[0].amount, 100);
+  assert.equal(priorCreditsFor([withTds], { name: 'Acme Supplies' })[0].base, 1000);
+  assert.equal(billwisePayables({ purchases: [withTds], payments: [], vendorPayments: [], asOf: '2026-12-31' })[0].bills[0].balance, 1080);
+  // Legacy rows read as no TDS.
+  assert.deepEqual([readPurchase(bill)!.tdsAmount, readPurchase(bill)!.tdsOnBill, supplierPayable(bill)], [0, 0, 1180]);
+});

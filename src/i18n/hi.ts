@@ -70,6 +70,7 @@ export const hi: Messages = {
   'nav.books': 'बही-खाता',
   'nav.reconcile': 'बैंक मिलान',
   'nav.cheques': 'चेक',
+  'nav.tds': 'TDS और TCS',
   'nav.reports': 'रिपोर्ट',
   'nav.gstReports': 'GST रिपोर्ट',
   'nav.exports': 'डेटा एक्सपोर्ट',

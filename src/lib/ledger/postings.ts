@@ -46,8 +46,11 @@ import { fxNarration, inrValue } from '../fx';
 import { receivableTotal } from '../rcm';
 import { readPurchase } from '../purchase-normalize';
 import { realisedFx } from '../fx-gain';
-import { A, EXPENSE_CATEGORY_ACCOUNTS, chartOf, groupOf, type Account } from './accounts';
+import { A, EXPENSE_CATEGORY_ACCOUNTS, chartOf, groupOf, tdsAccountFor, type Account } from './accounts';
 import { VOUCHER_TYPE_LABELS, type ManualVoucher } from './vouchers';
+import { inBooks, reversalOf } from './voucher-variants';
+import type { TdsChallan } from '../tds-payables';
+import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
 import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
 
@@ -102,6 +105,8 @@ export interface LedgerInput extends BooksData {
   assets: FixedAsset[];
   /** Local today, YYYY-MM-DD — depreciation is generated for every FY that has started by then. */
   today: string;
+  /** Additive (Tally parity): TDS / TCS challans (`tds_challans`), posted as payments. */
+  challans?: TdsChallan[];
 }
 
 export interface Ledger {
@@ -391,7 +396,10 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
   const selfTax = (c.reverseCharge || c.importType !== '') && gst > 0 ? gst : 0;
   const totalIncludesTax = Math.abs(total - (taxable + gst)) <= Math.abs(total - taxable);
   const supplier = selfTax && totalIncludesTax ? total - selfTax : total;
-  l.cr(A.creditors, supplier, party);
+  // TDS deducted on booking the bill (Tally parity): owed to the government, not the supplier.
+  const tds = Math.min(Math.max(toPaise(c.tdsOnBill), 0), supplier);
+  l.cr(A.creditors, supplier - tds, party);
+  l.cr(tdsAccountFor(c.tdsSection), tds);
   if (selfTax) l.cr(c.importType === 'GOODS' ? A.importIgst : A.rcmPayable, selfTax);
   // ITC reversed against the bill (Rules 42/43/37 …): spread over the heads, charged to P&L.
   if (n.itcEligible && c.itcReversed > 0 && gst > 0) {
@@ -409,6 +417,7 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
     c.importType === 'GOODS' && 'import of goods',
     c.importType === 'SERVICES' && 'import of services (RCM)',
     gst > 0 && !n.itcEligible && 'ITC not claimed',
+    tds > 0 && `TDS ${(tds / 100).toFixed(2)} u/s ${c.tdsSection.replace(/-.*/, '') || '—'} deducted`,
   ].filter(Boolean);
   return {
     id: `${n.isExpense ? 'exp' : 'pur'}:${n.id}`,
@@ -425,13 +434,15 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
 
 function supplierPaymentVoucher(
   pp: BooksData['purchasePayments'][number],
-  bill: { number: string; party: string } | undefined,
+  bill: { number: string; party: string; tdsSection?: string } | undefined,
 ): LedgerVoucher | null {
   const date = toIsoDate(pp.date);
   const amount = Math.abs(toPaise(num(pp.amount)));
   if (!date || amount === 0) return null;
   const party = bill?.party ?? 'Unknown vendor';
   const cashAcc = accountForMethod(pp.method) === 'cash' ? A.cash : A.bank;
+  // TDS deducted on payment (Tally parity): the supplier is settled by cash + TDS.
+  const tds = Math.max(toPaise(num(pp.tds_amount)), 0);
   return {
     id: `pay:${pp.id ?? `${pp.purchase_id}-${date}-${amount}`}`,
     source: 'auto',
@@ -439,9 +450,69 @@ function supplierPaymentVoucher(
     date,
     number: str(pp.reference) || bill?.number || '',
     party,
-    narration: [`Against ${bill?.number || 'bill'}`, str(pp.method)].filter(Boolean).join(' · '),
-    lines: new Lines().dr(A.creditors, amount, party).cr(cashAcc, amount).lines,
+    narration: [`Against ${bill?.number || 'bill'}`, str(pp.method), tds > 0 && `TDS ${(tds / 100).toFixed(2)} deducted`].filter(Boolean).join(' · '),
+    lines: new Lines().dr(A.creditors, amount + tds, party).cr(cashAcc, amount).cr(tdsAccountFor(bill?.tdsSection), tds).lines,
     link: '/expenses',
+  };
+}
+
+/** Supplier advance / on-account / new-ref payment (bill-wise payables): Dr Creditors (party) | Cr Cash/Bank. */
+function vendorPaymentVoucher(vp: VendorPayment): LedgerVoucher | null {
+  const date = toIsoDate(vp.date);
+  const amount = Math.abs(toPaise(num(vp.amount)));
+  if (!date || amount === 0) return null;
+  const party = str(vp.vendor_name) || 'Unknown vendor';
+  const cashAcc = accountForMethod(vp.method) === 'cash' ? A.cash : A.bank;
+  return {
+    id: `vpay:${vp.id}`,
+    source: 'auto',
+    kind: 'Payment',
+    date,
+    number: str(vp.reference) || str(vp.ref_name),
+    party,
+    narration: [vp.kind === 'ADVANCE' ? 'Advance to supplier' : vp.kind === 'NEW_REF' ? `New ref ${str(vp.ref_name)}`.trim() : 'On account', str(vp.method)].filter(Boolean).join(' · '),
+    lines: new Lines().dr(A.creditors, amount, party).cr(cashAcc, amount).lines,
+    link: '/books?tab=billwise',
+  };
+}
+
+/**
+ * TDS / TCS challan (ITNS 281): Dr each linked deduction's TDS payable section account (TCS payable for
+ * TCS), the unlinked rest of the tax to 2330 / 2320, interest + fee + others to "Interest & fees on
+ * TDS / TCS" | Cr Cash/Bank.
+ */
+function challanVoucher(ch: TdsChallan, accountOfKey: Map<string, { account: string; amount: number }>): LedgerVoucher | null {
+  const date = toIsoDate(ch.date);
+  const tax = Math.abs(toPaise(num(ch.amount)));
+  if (!date || tax === 0) return null;
+  const extra = Math.abs(toPaise(num(ch.interest))) + Math.abs(toPaise(num(ch.fee))) + Math.abs(toPaise(num(ch.others)));
+  const l = new Lines();
+  let linked = 0;
+  const fallback = ch.kind === 'TCS' ? A.tcsPayable : A.tdsPayable;
+  const byAccount = new Map<string, number>();
+  for (const k of ch.deduction_keys ?? []) {
+    const hit = accountOfKey.get(k);
+    if (!hit) continue;
+    const p = Math.min(Math.max(toPaise(hit.amount), 0), tax - linked);
+    if (p <= 0) continue;
+    const acc = ch.kind === 'TCS' ? A.tcsPayable : hit.account;
+    byAccount.set(acc, (byAccount.get(acc) ?? 0) + p);
+    linked += p;
+  }
+  for (const [acc, p] of byAccount) l.dr(acc, p);
+  l.dr(fallback, tax - linked);
+  l.dr(A.tdsInterest, extra);
+  l.cr(accountForMethod(ch.method) === 'cash' ? A.cash : A.bank, tax + extra);
+  return {
+    id: `tdsch:${ch.id}`,
+    source: 'auto',
+    kind: 'Payment',
+    date,
+    number: `${ch.bsr_code}/${ch.challan_no}`,
+    party: '',
+    narration: [`${ch.kind} challan (ITNS 281)`, `BSR ${ch.bsr_code}`, extra > 0 && `interest / fee ${(extra / 100).toFixed(2)}`].filter(Boolean).join(' · '),
+    lines: l.lines,
+    link: '/tds?tab=challans',
   };
 }
 
@@ -545,16 +616,35 @@ export function buildLedger(input: LedgerInput): Ledger {
     push(advanceVoucher(m, m.invoiceId ? invById.get(m.invoiceId) : undefined, m.kind === 'adjusted' ? tds.get(m.sourceId) ?? 0 : 0));
   }
 
-  const bills = new Map<string, { number: string; party: string }>();
+  const bills = new Map<string, { number: string; party: string; tdsSection?: string }>();
+  // Deduction key → TDS payable account and amount, for challan postings.
+  const tdsKeys = new Map<string, { account: string; amount: number }>();
   for (const raw of input.purchases) {
     const v = purchaseVoucher(raw, input.vendors, accounts);
     const n = v ? normalizePurchase(raw, input.vendors) : null;
-    if (n) bills.set(n.id, { number: n.number, party: n.party });
+    const c = v ? readPurchase(raw, input.vendors) : null;
+    if (n) bills.set(n.id, { number: n.number, party: n.party, tdsSection: c?.tdsSection });
+    if (n && c && c.tdsOnBill > 0) tdsKeys.set(`bill:${c.id}`, { account: tdsAccountFor(c.tdsSection), amount: c.tdsOnBill });
     push(v);
   }
-  for (const pp of input.purchasePayments) push(supplierPaymentVoucher(pp, bills.get(str(pp.purchase_id))));
+  for (const pp of input.purchasePayments) {
+    const bill = bills.get(str(pp.purchase_id));
+    if (num(pp.tds_amount) > 0 && pp.id) tdsKeys.set(`pay:${pp.id}`, { account: tdsAccountFor(bill?.tdsSection), amount: num(pp.tds_amount) });
+    push(supplierPaymentVoucher(pp, bill));
+  }
+  for (const vp of input.vendorPayments ?? []) push(vendorPaymentVoucher(vp));
+  for (const inv of input.invoices) if (num(inv.tcs_amount) > 0) tdsKeys.set(`tcs:${inv.id}`, { account: A.tcsPayable, amount: inrValue(num(inv.tcs_amount), inv) });
+  // Manual register deductions (`man:` keys) are not in this map: their share goes to 2330 TDS payable.
+  for (const ch of input.challans ?? []) push(challanVoucher(ch, tdsKeys));
   for (const v of assetVouchers(input.assets, input.today, byId)) push(v);
-  for (const m of input.manual) push(manualToLedger(m));
+  // Optional / memorandum / not-yet-due post-dated vouchers stay out of the books; reversing journals
+  // add their automatic reversal (voucher-variants.ts).
+  for (const m of input.manual) {
+    if (!inBooks(m, input.today)) continue;
+    push(manualToLedger(m));
+    const rev = reversalOf(m, input.today);
+    if (rev) push({ ...manualToLedger(rev), id: `mvrev:${m.id}`, manualId: m.id, narration: rev.narration });
+  }
 
   // Openings from the Books "opening balance" dialog: the cash/bank balance AT THE START of
   // `as_of` is what the user typed, whatever came before (same rule as the Books cash book).

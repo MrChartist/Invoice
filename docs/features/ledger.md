@@ -102,3 +102,46 @@ TDS receivable rather than receivables.
 - RCM / import bills: the purchases module, Books and Tally all owe the supplier `supplierPayable(bill)` (total − the
   GST we pay ourselves), the same figure the ledger credits to Creditors, so paying the supplier its balance closes the
   creditor exactly. The self-assessed GST stays on 2310 / 2311 until a payment or journal clears it.
+
+## Voucher variants (Tally parity, Phase 7)
+Additive fields on manual vouchers (`vouchers` table), set in the voucher editor (`src/components/books/tally/VoucherVariantFields.tsx`);
+logic in `src/lib/ledger/voucher-variants.ts`; registers on Books → **Voucher registers** (`?tab=vreg`).
+
+| Field | Meaning | In the books |
+|---|---|---|
+| `variant: 'OPTIONAL'` | Optional voucher | never, until **Make regular** (`makeRegular`: period lock on its date, `books.edit`, audited; sets `regularised_at`) |
+| `variant: 'MEMO'` | Memorandum voucher | never (memo register only) |
+| `post_dated: true` | Post-dated voucher | from its date (`today >= date`); listed in the post-dated summary with post-dated cheques from the cheque register (read-only) |
+| `reverse_on` (JOURNAL only, after `date`) | Reversing journal | yes, plus an automatic mirror-image journal `<number>-R` dated `reverse_on` (id `mvrev:<id>`). Saving / deleting checks the period lock on both days |
+| `voucher_class` | free-text class | register filter only |
+
+`buildLedger` skips vouchers that are not `inBooks(v, today)`, so the trial balance and every statement stay balanced by
+construction (tested). Unlike Tally's scenario-only Reversing Journal voucher type, our reversing journal is posted in the
+books on both days (the common provision / accrual use); scenarios are not modelled.
+
+## TDS on payables, challans, supplier advances (Phase 7)
+- Purchase with TDS on booking: Cr Creditors (total − self-assessed GST − TDS), Cr the section's TDS payable account
+  (2331 194C, 2332 194J, 2333 194I, 2334 194H, 2335 194Q, 2336 194A; 2330 otherwise). TDS on payment: the payment
+  voucher debits Creditors with cash + TDS and credits TDS payable. See `docs/features/tds-payables.md`.
+- TDS / TCS challan (`tds_challans`): Dr the linked deductions' TDS accounts (TCS payable for TCS), unlinked rest to
+  2330 / 2320, interest + fee + others to **6380 Interest & fees on TDS / TCS** | Cr Cash / Bank. Ledger-only (not in the
+  Books cash book), like manual vouchers.
+- Supplier advance / on-account / new-ref payment (`vendor_payments`): Dr Creditors (party) | Cr Cash / Bank (also in the
+  Books cash book). Adjusting it against a bill moves nothing in the ledger (bill-wise only).
+
+## Bill-wise payables (Phase 7)
+Books → **Bill-wise payables** (`?tab=billwise`, `src/lib/billwise.ts`): outstanding bills per supplier with Agst Ref
+allocations (payments, advance adjustments), ageing by due date or bill date (not due / 1–30 / 31–60 / 61–90 / 90+),
+unadjusted advances, net payable, MSMED Sec 16 interest for micro / small suppliers (`msme.ts`), "settled bills" party
+ledger view. **Pay bills**: one payment split over several bills (FIFO helper, partial allowed; rows share `group_id`),
+the remainder as On Account / Advance / New Ref; **Adjust** an advance against a bill later. The party's creditor
+balance in the ledger equals its net bill-wise outstanding (tested). Receivables were already bill-wise (payments carry
+`invoice_id`; advances adjust through `advance_id`; ageing in `receivables.ts`).
+
+## Ratio analysis (Phase 7)
+Books → **Ratio analysis** (`?tab=ratio`, `src/lib/ledger/ratios.ts`): Tally's principal groups (working capital,
+cash-in-hand, bank, bank OD, debtors, creditors, sales, purchases, stock-in-hand, net profit, working-capital and
+inventory turnover) and ratios (current, quick, debt / equity, gross / net profit %, operating cost %, receivable and
+payable days, ROI %, return on working capital %). Balances at the period end (capped at today), flows over the period;
+÷ 0 gives "—". Each figure drills to its first account; CSV export. Closing stock counts only when journalised. Ratio
+labels / formulas come from the lib in English.

@@ -93,6 +93,19 @@ export interface PurchaseCore {
   /** Lower-cased raw status ('' when the row has none). */
   status: string;
   notes: string;
+  /** TDS section code we deducted under ('' = none). */
+  tdsSection: string;
+  /** TDS amount on the bill (whether deducted at booking or on payment), >= 0. */
+  tdsAmount: number;
+  /** TDS deducted when the bill was booked (`tds_on` 'BILL', the default): it is never owed to the supplier. */
+  tdsOnBill: number;
+}
+
+/** TDS deducted at booking: `tds_on` 'BILL' or unset, with a positive `tds_amount`, capped at the total. */
+function tdsOnBillOf(r: Rec, total: number): number {
+  const amt = Math.max(pickNum(r, ['tds_amount']) ?? 0, 0);
+  if (!(amt > 0) || str(r.tds_on).toUpperCase() === 'PAYMENT') return 0;
+  return round2(Math.min(amt, total));
 }
 
 const DATE_KEYS = ['date', 'bill_date', 'purchase_date', 'invoice_date', 'issue_date'] as const;
@@ -180,6 +193,9 @@ export function readPurchase(raw: unknown, vendors: readonly unknown[] = []): Pu
     paid: round2(Math.abs(pickNum(r, ['amount_paid', 'paid_amount']) ?? 0)),
     status: pickStr(r, ['status']).toLowerCase(),
     notes: pickStr(r, ['notes', 'narration']),
+    tdsSection: pickStr(r, ['tds_section']),
+    tdsAmount: round2(Math.max(pickNum(r, ['tds_amount']) ?? 0, 0)),
+    tdsOnBill: tdsOnBillOf(r, total),
   };
 }
 
@@ -216,9 +232,12 @@ export function selfAssessedTaxOf(c: Pick<PurchaseCore, 'reverseCharge' | 'impor
   return totalIncludesTax ? round2(c.tax) : 0;
 }
 
-/** What the supplier is owed on a bill: its total less any self-assessed GST inside it. */
-export function supplierPayableOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'>): number {
-  return round2(c.total - selfAssessedTaxOf(c));
+/**
+ * What the supplier is owed on a bill: its total less any self-assessed GST inside it, less TDS we
+ * deducted when booking the bill (that part is owed to the government — TDS payable).
+ */
+export function supplierPayableOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'> & Partial<Pick<PurchaseCore, 'tdsOnBill'>>): number {
+  return round2(c.total - selfAssessedTaxOf(c) - Math.max(c.tdsOnBill ?? 0, 0));
 }
 
 /**

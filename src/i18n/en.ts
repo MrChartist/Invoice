@@ -75,6 +75,7 @@ export const en = {
   'nav.books': 'Books',
   'nav.reconcile': 'Reconcile',
   'nav.cheques': 'Cheques',
+  'nav.tds': 'TDS & TCS',
   'nav.reports': 'Reports',
   'nav.gstReports': 'GST reports',
   'nav.exports': 'Exports',
