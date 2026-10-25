@@ -73,6 +73,8 @@ export interface ManualVoucher {
   voucher_class?: string;
   /** ISO timestamp an optional voucher was made regular. */
   regularised_at?: string;
+  /** Additive (WP-9): `branches` row id of the branch / location. */
+  branch_id?: string;
 }
 
 export type ManualVoucherVariant = 'OPTIONAL' | 'MEMO';
@@ -176,6 +178,7 @@ export function normalizeVouchers(rows: unknown[]): ManualVoucher[] {
       created_at: typeof o.created_at === 'string' ? o.created_at : '',
       ...(typeof o.updated_at === 'string' ? { updated_at: o.updated_at } : {}),
       ...variantFields(o),
+      ...(typeof o.branch_id === 'string' && o.branch_id ? { branch_id: o.branch_id } : {}),
     });
   }
   return out;
@@ -247,6 +250,7 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
     created_at: prev?.created_at ?? now,
     ...(prev ? { updated_at: now } : {}),
     ...variantFields({ ...input, regularised_at: prev?.regularised_at }),
+    ...(input.branch_id ? { branch_id: input.branch_id } : {}),
   };
   setTable(VOUCHERS_TABLE, prev ? all.map((v) => (v.id === id ? row : v)) : [...all, row]);
   const amount = formatMoney(voucherTotals(row.lines).dr / 100);

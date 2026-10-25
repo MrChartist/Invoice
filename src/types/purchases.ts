@@ -73,6 +73,8 @@ export interface PurchaseLine {
 export interface PurchaseRecord {
   id: string;
   kind: PurchaseKind;
+  /** Additive (WP-9): `branches` row id of the branch / location that received the bill. */
+  branch_id?: string;
   vendor_id?: string;
   vendor_name: string;
   vendor_gstin?: string;

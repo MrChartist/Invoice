@@ -368,4 +368,10 @@ test('integrity review: removal checks, godown and cost-centre usage read bills 
   assert.equal(removalIssues({ items: [item], moves: [], invoices: [sale], purchases: [tracked] }, { refType: 'purchase', refId: 'pb' }, false).errors.length, 1);
   assert.deepEqual(godownReferences('g2', { purchases: [tracked] }), ['purchase bills']);
   assert.equal(costCentreUsage('cc', { purchases: [tracked as never] }).purchases, 1);
+test('branches (WP-9) read the real purchase shape: branch_id, then place of supply', async () => {
+  const { branchOfPurchase, branchSummary } = await import('../src/lib/branch.ts');
+  const branches = [{ id: 'mh', name: 'Mumbai', state_code: '27' }];
+  assert.equal(branchOfPurchase(bill, branches), 'mh');
+  assert.equal(branchOfPurchase({ ...bill, branch_id: 'x' }, branches), 'x');
+  assert.equal(branchSummary(branches, [], [bill])[0].purchases, 1000);
 });
