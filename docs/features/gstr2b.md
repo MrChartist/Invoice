@@ -91,3 +91,12 @@ credit notes negative).
 `parseGstr2bJson`, `parseGstr2bWorkbook`, `parse2bDate`, `normBillNo`, `amount`, `bookBills`, `matchGstr2b`,
 `itcEffect`, `worksheetRows`, `billFromLine`, `diffText`, `effectiveAction`, `actionId`, `gstr2bActionsDb`
 (`all/forPeriod/set/clear`), `MATCH_LABELS`, `IMS_LABELS`, `GSTR2B_ACTIONS_TABLE`, and the types.
+
+## 8D: vendor follow-up and ITC pushed to 3B (8.63)
+
+Below the 4A(5) table (`src/components/gst-reports/VendorFollowUp.tsx`, logic `src/lib/gst-followup.ts`):
+
+- `followUps(match)` groups per supplier GSTIN: **in books, not in 2B** (ITC at risk, Sec 16(2)(aa)), **mismatch** (taxable / tax / heads / date / number, with both figures), **in 2B, not in books** (ask for a copy). Imports of goods and ISD lines are left out. Suppliers are sorted by ITC at risk (not-in-2B tax + the shortfall on mismatches).
+- Each supplier gets a note (`followUpText`, active language) sent by **WhatsApp** (`wa.me`, vendor phone from `vendors` by GSTIN), **e-mail** (`mailto:`) or **PDF** (printable HTML → "Save as PDF"). The app only builds links; nothing is sent by it.
+- Sending marks the supplier **followed up** today (editable date, untick to clear): table `gst_followups` `{ id: period|ctin, period (MMYYYY), ctin, followed_on, channel, items, tax_at_risk, updated_at }` — backed up, `books.edit`, not period-locked (a note about a locked month is still allowed).
+- **Push matched ITC to the GSTR-3B view** saves `itcEffect` (books / restricted / at risk / per 2B) for period × GSTIN in table `gstr2b_itc`; the GSTR-3B tab shows it beside the current books 4A(5). Re-push after changes; the 3B report is not altered.

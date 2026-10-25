@@ -1,0 +1,118 @@
+/* 8D GST guards — tokens only, no raw colours. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  min-width: 0;
+}
+
+.head {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.pillOk {
+  composes: pill;
+  background: color-mix(in srgb, var(--profit) 14%, transparent);
+  color: var(--profit);
+}
+
+.pillWarn {
+  composes: pill;
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+}
+
+.pillBad {
+  composes: pill;
+  background: color-mix(in srgb, var(--destructive) 14%, transparent);
+  color: var(--destructive);
+}
+
+.note {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  font-size: var(--text-sm);
+}
+
+.noteBad {
+  composes: note;
+  border-left-color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.noteInfo {
+  composes: note;
+  border-left-color: var(--info);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
+}
+
+.inline {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.narrow {
+  width: 12rem;
+  max-width: 100%;
+}
+
+.supplier {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { getTable, subscribeStorageChanges } from '../../lib/storage';
+import { SINGLETON_KEYS, getJson, getTable, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
 import {
@@ -89,6 +89,33 @@ function ensureBusinessAlerts(onReady: () => void): void {
     });
 }
 
+/**
+ * 8D GST guards (IRP 30-day window, return time bar): lazily, once an AATO is entered on a profile, an IRN /
+ * e-Way Bill is recorded, or a tax invoice is more than two years old.
+ */
+let guardAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureGstGuardAlerts(onReady: () => void): void {
+  if (guardAlerts !== 'off') return;
+  try {
+    const old = `${new Date().getFullYear() - 2}-12-31`;
+    const aato = (getJson<{ profiles?: { einvoice_aato?: number }[] } | null>(SINGLETON_KEYS.settings, null)?.profiles ?? []).some((p) => Number(p?.einvoice_aato) > 0);
+    if (!aato && !getTable('einvoice_meta').length
+      && !getTable<{ issue_date?: string; status?: string }>('invoices').some((i) => i?.status !== 'Draft' && String(i?.issue_date ?? '9') < old)) return;
+  } catch {
+    return;
+  }
+  guardAlerts = 'loading';
+  import('../../lib/gst-guard-alerts')
+    .then((m) => {
+      m.registerGstGuardAlerts();
+      guardAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      guardAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -118,6 +145,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     };
     ensureExpiryAlerts(reload);
     ensureBusinessAlerts(reload);
+    ensureGstGuardAlerts(reload);
   }, []);
 
   useEffect(() => {

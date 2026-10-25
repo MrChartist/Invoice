@@ -711,6 +711,19 @@ export interface EInvoiceMeta {
   /** Approximate distance in km (0 lets the portal calculate it). */
   distance?: number;
   updated_at?: string;
+  /** Additive (8D, 8.64): IRN / e-Way Bill cancellation prepared or done on the portal (`einvoice-cancel.ts`). */
+  irn_cancel?: PortalCancel;
+  ewb_cancel?: PortalCancel;
+}
+
+/** A portal cancellation step (8D cancel flow). */
+export interface PortalCancel {
+  status: 'prepared' | 'done';
+  reason: 'duplicate' | 'data_entry' | 'order_cancelled' | 'other';
+  remark: string;
+  prepared_at: string;
+  /** Day it was cancelled on the portal (status `done`). */
+  done_on?: string;
 }
 
 export function getAllEInvoiceMeta(): EInvoiceMeta[] {

@@ -282,6 +282,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master
   gst_setoffs: 'books.edit',
   gst_challans: 'books.edit',
+  // 8D GST guards
+  gst_followups: 'books.edit',
+  gstr2b_itc: 'books.edit',
+  gstr1_snapshots: 'books.edit',
   hsn_master: 'master.edit',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   rcm_documents: 'books.edit',

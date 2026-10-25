@@ -175,6 +175,9 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `tds_justifications` | TRACES import (7R, `src/lib/traces-justification.ts`) | `JustificationImport`: file name, TAN / FY / quarter / form read from the report, capped findings matched to register keys, resolved flags (`docs/features/tds-payables.md`) |
 | `stock_groups` / `stock_categories` | inventory masters (WP-8, `src/lib/stock-groups.ts`) | `StockTreeNode {id, name, parent_id?}` (nested); items point via `group_id` / `category_id`; `master.edit` (`docs/features/inventory-masters.md`) |
 | `units` | inventory masters (WP-8, `src/lib/units.ts`) | `UnitMaster`: simple unit (symbol, name, UQC, decimals; a built-in symbol is an override) or compound (`first` / `factor` / `second`); `master.edit` |
+| `gst_followups` | GST guards (8D, `src/lib/gst-followup.ts`) | `FollowUpMark` per 2B period × supplier GSTIN: followed-up day, channel (WhatsApp / e-mail / PDF), items, ITC at risk (`docs/features/gstr2b.md`) |
+| `gstr2b_itc` | GST guards (8D) | `Itc2bPush` 2B effect (books / restricted / at risk / per 2B) pushed to the GSTR-3B view per period × GSTIN |
+| `gstr1_snapshots` | GST guards (8D, `src/lib/gst-guards.ts`) | `Gstr1Snapshot` GSTR-1 as filed (docs, B2CS, 3B Table 3.2) per period × GSTIN → GSTR-1A diff (`docs/features/gst-reports.md`) |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the
