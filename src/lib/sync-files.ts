@@ -73,6 +73,11 @@ export interface SyncKey {
   key: CryptoKey;
   salt: string;
   iter: number;
+  /**
+   * Raw key bytes (base64), present only right after derivation so vault mode can store the key sealed
+   * (`sync-keystore.ts`). Never persisted readable.
+   */
+  raw?: string;
 }
 
 /** PBKDF2 → non-extractable AES-GCM key that can encrypt and decrypt (kept in IndexedDB like the backup key). */
@@ -82,6 +87,12 @@ export async function deriveSyncKey(passphrase: string, salt: string, iter: numb
   const base = await subtle().importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveBits']);
   const bits = await subtle().deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: base64ToBytes(salt), iterations: iter }, base, 256);
   const key = await subtle().importKey('raw', bits, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  return { key, salt, iter, raw: bytesToBase64(new Uint8Array(bits)) };
+}
+
+/** Rebuild a non-extractable key from raw bytes (vault mode keeps them sealed). */
+export async function importSyncKey(raw: string, salt: string, iter: number): Promise<SyncKey> {
+  const key = await subtle().importKey('raw', base64ToBytes(raw), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
   return { key, salt, iter };
 }
 
@@ -89,9 +100,30 @@ export async function deriveSyncKey(passphrase: string, salt: string, iter: numb
 
 const canGzip = () => typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' && typeof Response === 'function';
 
-async function pipe(bytes: Uint8Array<ArrayBuffer>, stream: CompressionStream | DecompressionStream): Promise<Uint8Array<ArrayBuffer>> {
-  const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
-  return new Uint8Array(await out.arrayBuffer());
+/** Largest decompressed payload accepted (a doctored file must not exhaust memory). */
+export const MAX_PLAIN_BYTES = 256 * 1024 * 1024;
+
+async function pipe(bytes: Uint8Array<ArrayBuffer>, stream: CompressionStream | DecompressionStream, limit = Infinity): Promise<Uint8Array<ArrayBuffer>> {
+  const reader = new Blob([bytes]).stream().pipeThrough(stream).getReader();
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > limit) {
+      await reader.cancel().catch(() => undefined);
+      throw new SyncFileError('The file is larger than this app accepts.', 'damaged');
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
 }
 
 /* ── Envelopes ─────────────────────────────────────────────────── */
@@ -140,7 +172,7 @@ function isEnvelope(e: unknown): e is SyncEnvelope {
     typeof x.iv === 'string' && typeof x.ct === 'string' && (x.z === undefined || x.z === 'gzip');
 }
 
-export async function openText(k: SyncKey, e: SyncEnvelope, aad: string[]): Promise<string> {
+export async function openText(k: SyncKey, e: SyncEnvelope, aad: string[], limit: number = MAX_PLAIN_BYTES): Promise<string> {
   if (e.salt !== k.salt || e.iter !== k.iter) throw new SyncFileError('This file was written with a different sync passphrase.', 'wrong-key');
   let plain: Uint8Array<ArrayBuffer>;
   try {
@@ -153,7 +185,7 @@ export async function openText(k: SyncKey, e: SyncEnvelope, aad: string[]): Prom
   }
   if (e.z === 'gzip') {
     if (!canGzip()) throw new SyncFileError('This browser cannot read compressed sync files.', 'damaged');
-    plain = await pipe(plain, new DecompressionStream('gzip'));
+    plain = await pipe(plain, new DecompressionStream('gzip'), limit);
   }
   return dec.decode(plain);
 }
@@ -298,6 +330,11 @@ export async function writeSealed(dir: SyncDir, name: string, k: SyncKey, kind: 
 export async function readSealed(dir: SyncDir, name: string, k: SyncKey, kind: 'device' | 'blob', device: string, aad: string[]): Promise<string> {
   const text = await readFileText(dir, name);
   if (text === null) throw new SyncFileError('The file is missing.', 'missing');
+  return openSealed(text, k, kind, device, aad);
+}
+
+/** Decrypt the text of a sealed file (already read). */
+export async function openSealed(text: string, k: SyncKey, kind: 'device' | 'blob', device: string, aad: string[]): Promise<string> {
   let file: SealedFile;
   try {
     file = JSON.parse(text) as SealedFile;

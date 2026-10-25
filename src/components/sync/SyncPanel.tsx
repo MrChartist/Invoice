@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, FolderOpen, FolderSync, KeyRound, RefreshCw, Unplug } from 'lucide-react';
 import { localDb } from '../../lib/localDb';
 import { verifyPin } from '../../lib/auth';
-import { companySyncPrefs, setCompanySyncPrefs, setDeviceName, syncDevice } from '../../lib/sync-device';
+import { companyDevice, companySyncPrefs, setCompanySyncPrefs, setDeviceName, syncDevice } from '../../lib/sync-device';
 import {
   connectSync,
   devicePrefix,
   disconnectSync,
   getSyncConfig,
   isSyncSupported,
+  needsPassphrase,
+  reenterPassphrase,
   pickSyncFolder,
   runSyncNow,
   suggestGroupName,
@@ -92,13 +94,13 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
   const theirsLabel = rc.remote.value === null ? 'Delete it (theirs)' : `Use ${rc.device_name || 'their'} version`;
   const mineLabel = rc.local.value === null ? (rc.local.meta ? 'Keep it deleted' : 'Leave it out') : 'Keep mine';
 
-  const applyLocked = async () => {
+  const withPin = async (choice: 'mine' | 'theirs') => {
     if (!(await verifyPin(pin))) {
       setPinError('Wrong PIN.');
       return;
     }
     setPinError('');
-    await onResolve(rc.id, 'theirs', true);
+    await onResolve(rc.id, choice, true);
   };
 
   return (
@@ -133,9 +135,25 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
             value={pin}
             onChange={(e) => setPin(e.target.value)}
           />
-          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={pin.length < 4} onClick={() => void applyLocked()}>
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={pin.length < 4} onClick={() => void withPin('theirs')}>
             <KeyRound size={14} aria-hidden="true" /> Apply with PIN
           </button>
+          {pinError && <span className={controls.error} role="alert">{pinError}</span>}
+        </div>
+      ) : rc.locked ? (
+        <div className={styles.buttons}>
+          <span className={styles.meta}>One of these versions is inside the locked period (or loosens the lock): enter your PIN to choose.</span>
+          <input
+            type="password"
+            inputMode="numeric"
+            className={`${controls.input} ${styles.pin}`}
+            aria-label="PIN to change books in a locked period"
+            placeholder="PIN"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+          />
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={pin.length < 4} onClick={() => void withPin('mine')}>{mineLabel}</button>
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={pin.length < 4} onClick={() => void withPin('theirs')}>{theirsLabel}</button>
           {pinError && <span className={controls.error} role="alert">{pinError}</span>}
         </div>
       ) : (
@@ -176,9 +194,11 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
     setPrefs(companySyncPrefs());
   }, []);
 
+  const [needPass, setNeedPass] = useState(false);
   useEffect(() => {
     let alive = true;
     void getSyncConfig().then((c) => alive && setConfig(c));
+    void needsPassphrase().then((n) => alive && setNeedPass(n));
     return () => {
       alive = false;
     };
@@ -245,8 +265,7 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
   };
 
   const onResolve = async (id: string, choice: 'mine' | 'theirs' | 'ack', override = false) => {
-    const d = syncDevice();
-    const r = await resolveConflict(id, choice, { id: d.id, name: d.name }, { override });
+    const r = await resolveConflict(id, choice, companyDevice(), { override });
     if (!r.ok) setError(r.message ?? 'Could not resolve that conflict.');
     else {
       setError(null);
@@ -259,7 +278,8 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
   const peers = Object.entries(state.peers).filter(([id]) => id !== self);
   const myPrefix = config ? devicePrefix() : '';
   const samePrefix = peers.filter(([, p]) => p.status === 'ok' && p.prefix && p.prefix === myPrefix).map(([, p]) => p.name);
-  const last = state.last_report;
+  const last = overview.last;
+  const lastSync = [state.last_sync, last?.ok ? last.at : undefined].filter(Boolean).sort().pop();
 
   return (
     <section className={surface.card} aria-labelledby="sync-title">
@@ -372,7 +392,7 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                 <CheckCircle2 size={18} className={styles.ok} aria-hidden="true" />
               )}
               <span className={styles.statusText}>
-                <span>Last sync: <strong>{when(state.last_sync)}</strong></span>
+                <span>Last sync: <strong>{when(lastSync)}</strong></span>
                 <small>
                   {config.folder} / mrchartist-sync / {config.group} · this device: {syncDevice().name}
                   {conflicts.length ? ` · ${conflicts.length} to review` : ''}
@@ -381,6 +401,30 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
               </span>
             </div>
 
+            {needPass && (
+              <div className={styles.warn} role="alert">
+                <p className={controls.hint}>Enter the sync passphrase once to resume syncing (vault mode keeps the sync key sealed, so it is asked again after vault mode was turned on).</p>
+                <div className={styles.buttons}>
+                  <input type="password" className={controls.input} aria-label="Sync passphrase" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
+                  <button
+                    type="button"
+                    className={controls.btnOutline}
+                    disabled={busy || pass.length < 8}
+                    onClick={async () => {
+                      setBusy(true);
+                      const r = await reenterPassphrase(pass);
+                      setBusy(false);
+                      if (!r.ok) return setError(r.message ?? 'That passphrase does not open this sync group.');
+                      setPass('');
+                      setNeedPass(false);
+                      void syncNow();
+                    }}
+                  >
+                    <KeyRound size={15} aria-hidden="true" /> Resume sync
+                  </button>
+                </div>
+              </div>
+            )}
             {samePrefix.length > 0 && (
               <p className={styles.warn} role="alert">
                 This device and {samePrefix.join(', ')} both number invoices as <strong>{myPrefix}/FY…</strong>. Two devices can then

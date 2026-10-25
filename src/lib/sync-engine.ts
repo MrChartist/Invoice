@@ -5,7 +5,7 @@
  *  - Change detection happens at sync time, not on every write: each row's content hash is compared
  *    with the hash recorded at the last sync (`sync_state`). Nothing is added to the save path, so the
  *    5,000-row performance caps are untouched and every writer (localDb, purchases, imports, restore…)
- *    is covered without wiring.
+ *    is covered without wiring. An idle run (no data key and no peer file changed) stops after hashing.
  *  - Every row / singleton version carries a version vector (`vv`: device id → that device's Lamport
  *    counter when it made the change). Merge compares vectors, never wall clocks: remote dominates →
  *    take it; local dominates → keep; neither → concurrent → CONFLICT (rows: keep local, store remote;
@@ -22,7 +22,9 @@ import { numberKey, parseDocNumber } from './invoice-number';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { isDateLocked, normalizeLockDate } from './period-lock';
 import { activeCompanyId } from './company-registry';
+import { requireAccess, type AccessAction } from './access';
 import { SNAPSHOT_TABLES, ASSET_TABLE, parseAssets, referencedAssets } from './assets';
+import { companySyncPrefs, setCompanySyncPrefs, type SyncRunSummary } from './sync-device';
 import {
   DB_PREFIX,
   DEVICE_LOCAL_KEYS,
@@ -41,7 +43,10 @@ import {
   isAttachmentId,
   listDeviceIds,
   openGroup,
+  openSealed,
+  readFileText,
   readSealed,
+  SyncFileError,
   withRetry,
   writeSealed,
   type GroupDirs,
@@ -79,10 +84,12 @@ export interface PeerInfo {
   /** The peer's own clock when it wrote its file (display only; never used for ordering). */
   written_at: string;
   seen_at: string;
-  status: 'ok' | 'unreadable' | 'version';
+  status: 'ok' | 'unreadable' | 'version' | 'stale' | 'skipped';
   message?: string;
   prefix?: string;
   blobs?: string[];
+  /** Hash of the file text last merged: an unchanged file is not decrypted or merged again. */
+  file_hash?: string;
 }
 
 export interface SyncReport {
@@ -98,7 +105,9 @@ export interface SyncReport {
   wrote: boolean;
   blobsIn: number;
   blobsOut: number;
-  reason?: 'permission' | 'no-folder' | 'unsupported' | 'error' | 'busy';
+  /** Nothing changed anywhere: the run stopped after hashing. */
+  idle?: boolean;
+  reason?: 'permission' | 'no-folder' | 'unsupported' | 'error' | 'busy' | 'passphrase';
   message?: string;
 }
 
@@ -112,10 +121,13 @@ export interface SyncState {
   dup_ack: string[];
   /** Locked-period changes the user chose not to take: `key|row id` → remote content hash. */
   declined: Record<string, string>;
+  /** Hash of every synced key's stored text at the end of the last run (idle detection). */
+  key_h?: Record<string, string>;
+  /** Referenced attachment files still missing after the last run. */
+  blobs_missing?: number;
   last_sync?: string;
   last_written?: string;
   last_written_hash?: string;
-  last_report?: SyncReport;
 }
 
 export interface ConflictSide {
@@ -132,6 +144,8 @@ export type SyncConflict =
       row_id?: string;
       /** concurrent edits / a change into a locked period / singleton last-writer-wins. */
       reason: 'concurrent' | 'locked' | 'lww';
+      /** Taking the other version would write into a locked period (or loosen the lock): needs the PIN. */
+      locked?: boolean;
       device: string;
       device_name: string;
       at: string;
@@ -179,6 +193,9 @@ export interface RemoteFile {
 
 /* ── Pure helpers ──────────────────────────────────────────────── */
 
+/** Own-property lookup: row ids such as `constructor` must never resolve to Object.prototype members. */
+const own = <T>(o: Record<string, T>, k: string): T | undefined => (Object.hasOwn(o, k) ? o[k] : undefined);
+
 /** 64-bit non-cryptographic string hash (cyrb53 variant) + length: cheap per-row change detection. */
 export function hashStr(s: string): string {
   let h1 = 0xdeadbeef ^ s.length;
@@ -200,8 +217,8 @@ export function compareVV(a: VV, b: VV): VVOrder {
   let gt = false;
   let lt = false;
   for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
-    const x = a[k] ?? 0;
-    const y = b[k] ?? 0;
+    const x = own(a, k) ?? 0;
+    const y = own(b, k) ?? 0;
     if (x > y) gt = true;
     else if (x < y) lt = true;
     if (gt && lt) return 'cc';
@@ -216,12 +233,15 @@ export const vvCovers = (a: VV, b: VV) => {
 
 export function mergeVV(a: VV, b: VV): VV {
   const out: VV = { ...a };
-  for (const [k, v] of Object.entries(b)) if (v > (out[k] ?? 0)) out[k] = v;
+  for (const [k, v] of Object.entries(b)) if (v > (own(out, k) ?? 0)) out[k] = v;
   return out;
 }
 
 const minStr = (a: string, b: string) => (a && b ? (a < b ? a : b) : a || b);
 const cloneMeta = (m: RowMeta): RowMeta => ({ h: m.h, t: m.t, d: m.d, vv: { ...m.vv }, o: m.o, ...(m.del ? { del: 1 as const } : {}) });
+/** Same content (hash + tombstone flag). */
+const sameVersion = (a: RowMeta | null | undefined, b: RowMeta | null | undefined) =>
+  (!a && !b) || (!!a && !!b && a.h === b.h && !!a.del === !!b.del);
 
 /** Per-device data and bookkeeping that must not travel between devices. */
 const EXCLUDED = new Set<string>([
@@ -244,12 +264,55 @@ const DATED: Record<string, string> = {
   [`${DB_PREFIX}stock_moves`]: 'date',
   [`${DB_PREFIX}stock_transfers`]: 'date',
   [`${DB_PREFIX}advances`]: 'date',
+  [`${DB_PREFIX}fixed_assets`]: 'acquired_on',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
+const PURCHASES_KEY = `${DB_PREFIX}purchases`;
 const BAD_ID = '__proto__';
 
 export const tableLabel = (key: string) => key.slice(DB_PREFIX.length).replace(/_/g, ' ');
+
+function lockOf(value: string | null | undefined): string {
+  if (!value) return '';
+  try {
+    return normalizeLockDate((JSON.parse(value) as { lock_until?: unknown } | null)?.lock_until);
+  } catch {
+    return '';
+  }
+}
+
+/** Taking `after` over `before` (settings text) moves the lock earlier or removes it. */
+const loosensLock = (before: string | null, after: string | null) => {
+  const b = lockOf(before);
+  const a = lockOf(after);
+  return b !== '' && (a === '' || a < b);
+};
+
+const rowDate = (key: string, row: unknown): string | undefined => {
+  const f = own(DATED, key);
+  return f && row && typeof row === 'object' ? ((row as Record<string, unknown>)[f] as string | undefined) : undefined;
+};
+
+/** Bill payment roll-ups touch only these fields; the local layer lets them through a lock (the payment row is checked by its own date). */
+const ROLLUP_FIELDS = new Set(['amount_paid', 'updated_at']);
+function onlyRollup(key: string, before: unknown, after: unknown): boolean {
+  if (key !== PURCHASES_KEY || !before || !after || typeof before !== 'object' || typeof after !== 'object') return false;
+  const a = before as Record<string, unknown>;
+  const b = after as Record<string, unknown>;
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (ROLLUP_FIELDS.has(k)) continue;
+    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+  }
+  return true;
+}
+
+/** Would writing `after` over `before` touch a document inside the locked period? */
+export function touchesLock(lock: string, key: string, before: unknown, after: unknown): boolean {
+  if (!lock || !own(DATED, key)) return false;
+  if (onlyRollup(key, before, after)) return false;
+  return isDateLocked(rowDate(key, before), lock) || isDateLocked(rowDate(key, after), lock);
+}
 
 /* ── Working copy of the local data ────────────────────────────── */
 
@@ -275,9 +338,23 @@ function assignIds(list: unknown[]): { ids: string[]; rows: Map<string, unknown>
   return { ids, rows };
 }
 
+function syncedKeys(): string[] {
+  return listKeys(DB_PREFIX).filter(isSyncedKey).sort();
+}
+
+/** Hash of every synced key's stored text (cheap: no parsing). */
+function keyHashes(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of syncedKeys()) {
+    const raw = readRaw(key);
+    if (raw !== null) out[key] = hashStr(raw);
+  }
+  return out;
+}
+
 function loadWork(): Map<string, Work> {
   const work = new Map<string, Work>();
-  for (const key of listKeys(DB_PREFIX).filter(isSyncedKey).sort()) {
+  for (const key of syncedKeys()) {
     const raw = readRaw(key);
     if (raw === null) continue;
     let parsed: unknown;
@@ -312,21 +389,25 @@ export function emptyState(group: string): SyncState {
   return { v: 1, group, clock: 0, keys: {}, peers: {}, blobs_written: [], dup_ack: [], declined: {} };
 }
 
-export function loadState(group?: string): SyncState {
+/** The stored state, or null when there is none (never synced, or removed by a restore / erase). */
+function readState(): SyncState | null {
   try {
     const raw = readRaw(SYNC_STATE_KEY);
     const s = raw ? (JSON.parse(raw) as SyncState) : null;
     if (s && s.v === 1 && typeof s.clock === 'number' && s.keys && typeof s.keys === 'object') {
-      if (group && s.group !== group) {
-        // Joined another group: forget what was exchanged with the old one (conflicts are kept).
-        return emptyState(group);
-      }
-      return { ...emptyState(s.group), ...s, declined: s.declined ?? {}, dup_ack: s.dup_ack ?? [], blobs_written: s.blobs_written ?? [] };
+      return { ...emptyState(s.group), ...s, declined: s.declined ?? {}, dup_ack: s.dup_ack ?? [], blobs_written: s.blobs_written ?? [], peers: s.peers ?? {} };
     }
   } catch {
     /* damaged: start over (conservative: differences become conflicts, nothing is overwritten) */
   }
-  return emptyState(group ?? '');
+  return null;
+}
+
+export function loadState(group?: string): SyncState {
+  const s = readState();
+  // Joined another group: forget what was exchanged with the old one (conflicts are kept).
+  if (!s || (group && s.group !== group)) return emptyState(group ?? s?.group ?? '');
+  return s;
 }
 
 export function loadConflicts(): SyncConflict[] {
@@ -352,6 +433,34 @@ export function loadDeviceLogs(): Record<string, DeviceLog> {
   }
 }
 
+/** Write only when the text changed (the state can be megabytes). */
+function writeIfChanged(key: string, value: string): void {
+  if (readRaw(key) !== value) writeRaw(key, value);
+}
+
+function saveMeta(state: SyncState, conflicts?: SyncConflict[], logs?: Record<string, DeviceLog>): void {
+  writeIfChanged(SYNC_STATE_KEY, JSON.stringify(state));
+  if (conflicts) writeIfChanged(SYNC_CONFLICTS_KEY, JSON.stringify(conflicts));
+  if (logs) writeIfChanged(SYNC_AUDIT_KEY, JSON.stringify(logs));
+}
+
+/** Highest counter this device has used in the company's group (device-local; survives restore / erase). */
+function highWater(): number | undefined {
+  try {
+    return companySyncPrefs().hw;
+  } catch {
+    return undefined;
+  }
+}
+
+function noteHighWater(clock: number): void {
+  try {
+    if ((highWater() ?? -1) < clock) setCompanySyncPrefs({ hw: clock });
+  } catch {
+    /* the own-file floor still protects */
+  }
+}
+
 /* ── Local change detection ────────────────────────────────────── */
 
 /**
@@ -367,13 +476,13 @@ export function scanLocal(state: SyncState, work: Map<string, Work>, self: strin
     return { h, t, d: self, vv: { ...(prev?.vv ?? {}), [self]: t }, o: prev?.o || self, ...(del ? { del: 1 as const } : {}) };
   };
   for (const [key, w] of work) {
-    let ks = state.keys[key];
+    let ks = own(state.keys, key);
     if (w.mode === 'rows') {
       if (!ks || ks.mode !== 'rows') ks = state.keys[key] = { mode: 'rows', rows: {} };
       const rows = ks.rows;
       for (const id of w.ids) {
         const h = hashStr(JSON.stringify(w.rows.get(id)));
-        const m = rows[id];
+        const m = own(rows, id);
         if (!m || m.del || m.h !== h) rows[id] = stamp(m, h, false);
       }
       for (const [id, m] of Object.entries(rows)) if (!m.del && !w.rows.has(id)) rows[id] = stamp(m, '', true);
@@ -395,19 +504,23 @@ export function scanLocal(state: SyncState, work: Map<string, Work>, self: strin
 
 /* ── Remote file validation ────────────────────────────────────── */
 
-const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+const validVV = (vv: unknown): vv is VV =>
+  !!vv && typeof vv === 'object' && !Array.isArray(vv) && Object.entries(vv).every(([k, v]) => k !== BAD_ID && isInt(v));
 
 function validMeta(m: unknown): m is RowMeta {
   const x = m as RowMeta | null;
   if (!x || typeof x !== 'object' || typeof x.h !== 'string' || !isInt(x.t) || typeof x.d !== 'string' || typeof x.o !== 'string') return false;
   if (x.del !== undefined && x.del !== 1) return false;
-  if (!x.vv || typeof x.vv !== 'object' || Array.isArray(x.vv)) return false;
-  return Object.entries(x.vv).every(([k, v]) => k !== BAD_ID && isInt(v));
+  return validVV(x.vv);
 }
 
 export class SyncDataError extends Error {}
 
-/** Parse + validate a decrypted device file. Throws SyncDataError when anything is off. */
+/**
+ * Parse + validate a decrypted device file. Throws SyncDataError when anything is off. Note: anyone
+ * holding the group key can write a valid file for any device id (there is no per-device signing).
+ */
 export function parseRemoteFile(text: string, deviceId: string, group: string): RemoteFile {
   let f: RemoteFile;
   try {
@@ -423,7 +536,7 @@ export function parseRemoteFile(text: string, deviceId: string, group: string): 
   if (f.group !== group) bad('group mismatch');
   if (!isInt(f.clock) || !isInt(f.schema) || typeof f.written_at !== 'string') bad('header');
   if (!f.keys || typeof f.keys !== 'object' || !Array.isArray(f.audit) || !Array.isArray(f.blobs)) bad('body');
-  if (!f.vv_max || typeof f.vv_max !== 'object') bad('vv_max');
+  if (!validVV(f.vv_max)) bad('vv_max');
   if (!f.blobs.every((b) => typeof b === 'string' && isAttachmentId(b))) bad('blobs');
   if (!f.audit.every((r) => r && typeof r === 'object' && typeof r.id === 'string')) bad('audit');
   for (const [key, k] of Object.entries(f.keys)) {
@@ -454,17 +567,6 @@ interface MergeCtx {
   lock: string;
   now: string;
   stats: { added: number; updated: number; deleted: number; newConflicts: number };
-  changedKeys: Set<string>;
-}
-
-const rowDate = (key: string, row: unknown): string | undefined => {
-  const f = DATED[key];
-  return f && row && typeof row === 'object' ? ((row as Record<string, unknown>)[f] as string | undefined) : undefined;
-};
-
-function touchesLock(ctx: MergeCtx, key: string, before: unknown, after: unknown): boolean {
-  if (!ctx.lock || !DATED[key]) return false;
-  return isDateLocked(rowDate(key, before), ctx.lock) || isDateLocked(rowDate(key, after), ctx.lock);
 }
 
 function sameJson(a: unknown, b: unknown): boolean {
@@ -480,17 +582,27 @@ function putConflict(ctx: MergeCtx, c: RowConflict): void {
   if (i >= 0) {
     const old = ctx.conflicts[i] as RowConflict;
     // Same two versions already listed: keep the original entry (and its time).
-    if (old.remote.meta?.h === c.remote.meta?.h && !!old.remote.meta?.del === !!c.remote.meta?.del && old.local.meta?.h === c.local.meta?.h) return;
+    if (sameVersion(old.remote.meta, c.remote.meta) && sameVersion(old.local.meta, c.local.meta) && old.reason === c.reason) return;
     ctx.conflicts[i] = c;
   } else ctx.conflicts.push(c);
   ctx.stats.newConflicts++;
 }
 
-/** Drop listed conflicts on this row that the current version already supersedes (resolved on another device). */
-function dropResolved(ctx: MergeCtx, id: string, meta: RowMeta): void {
+/**
+ * After the current version of a listed row / singleton changed through a merge: drop the listing when
+ * the new version supersedes both sides (resolved on another device), otherwise point the listing's
+ * "current" side at the new version so a later choice never writes a stale copy.
+ */
+function refreshListing(ctx: MergeCtx, id: string, meta: RowMeta, value: unknown, contentChanged = true): void {
   ctx.conflicts = ctx.conflicts.filter((c) => {
     if (c.kind === 'duplicate' || c.id !== id) return true;
-    return !(vvCovers(meta.vv, c.local.meta?.vv ?? {}) && vvCovers(meta.vv, c.remote.meta?.vv ?? {}));
+    if (vvCovers(meta.vv, c.local.meta?.vv ?? {}) && vvCovers(meta.vv, c.remote.meta?.vv ?? {})) return false;
+    if (!contentChanged) return true;
+    if (c.kind === 'single') {
+      c.applied = 'remote';
+      c.remote = { meta: cloneMeta(meta), value };
+    } else c.local = { meta: cloneMeta(meta), value };
+    return true;
   });
 }
 
@@ -504,7 +616,7 @@ function absorb(lm: RowMeta, rm: RowMeta): void {
 }
 
 function mergeRows(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile): void {
-  let ks = ctx.state.keys[key];
+  let ks = own(ctx.state.keys, key);
   let w = ctx.work.get(key);
   if ((ks && ks.mode !== 'rows') || (w && w.mode !== 'rows')) return; // shape differs between devices: leave it
   if (!ks) ks = ctx.state.keys[key] = { mode: 'rows', rows: {} };
@@ -515,41 +627,42 @@ function mergeRows(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile):
   const rows = (ks as Extract<KeyState, { mode: 'rows' }>).rows;
   const wr = w as Extract<Work, { mode: 'rows' }>;
   for (const [id, [rm, rv]] of Object.entries(rk.rows ?? {})) {
-    const lm = rows[id];
+    const lm = own(rows, id);
     const localVal = wr.rows.get(id);
     const cid = `row:${key}:${id}`;
+    const remoteVal = rm.del ? null : rv;
     const conflict = (reason: 'concurrent' | 'locked') =>
       putConflict(ctx, {
         id: cid, kind: 'row', key, row_id: id, reason, device: from.device.id, device_name: from.device.name, at: ctx.now,
+        ...(reason === 'locked' || touchesLock(ctx.lock, key, localVal, remoteVal ?? undefined) ? { locked: true } : {}),
         local: { meta: lm ? cloneMeta(lm) : null, value: localVal ?? null },
-        remote: { meta: cloneMeta(rm), value: rm.del ? null : rv },
+        remote: { meta: cloneMeta(rm), value: remoteVal },
       });
-    const declined = () => ctx.state.declined[`${key}|${id}`] === (rm.del ? '' : rm.h);
+    const declined = () => own(ctx.state.declined, `${key}|${id}`) === (rm.del ? '' : rm.h);
 
     if (!lm) {
       if (rm.del) {
         rows[id] = cloneMeta(rm);
         continue;
       }
-      if (touchesLock(ctx, key, undefined, rv)) {
+      if (touchesLock(ctx.lock, key, undefined, rv)) {
         if (!declined()) conflict('locked');
         continue;
       }
       upsertRow(wr, id, rv);
       rows[id] = cloneMeta(rm);
       ctx.stats.added++;
-      ctx.changedKeys.add(key);
       continue;
     }
     if ((lm.del && rm.del) || (!lm.del && !rm.del && lm.h === rm.h)) {
       absorb(lm, rm);
-      dropResolved(ctx, cid, lm);
+      refreshListing(ctx, cid, lm, localVal ?? null, false);
       continue;
     }
     const order = compareVV(rm.vv, lm.vv);
     if (order === 'lt') continue;
     if (order === 'gt') {
-      if (touchesLock(ctx, key, localVal, rm.del ? undefined : rv)) {
+      if (touchesLock(ctx.lock, key, localVal, rm.del ? undefined : rv)) {
         if (!declined()) conflict('locked');
         continue;
       }
@@ -561,17 +674,16 @@ function mergeRows(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile):
         else ctx.stats.updated++;
         upsertRow(wr, id, rv);
       }
-      ctx.changedKeys.add(key);
       const next = cloneMeta(rm);
       next.o = minStr(lm.o, rm.o);
       rows[id] = next;
-      dropResolved(ctx, cid, next);
+      refreshListing(ctx, cid, next, remoteVal);
       continue;
     }
     // Concurrent (or the same counter with different content after a lost state): never discard.
     if (!lm.del && !rm.del && sameJson(localVal, rv)) {
       absorb(lm, rm);
-      dropResolved(ctx, cid, lm);
+      refreshListing(ctx, cid, lm, localVal ?? null, false);
       continue;
     }
     conflict('concurrent');
@@ -579,18 +691,18 @@ function mergeRows(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile):
 }
 
 function mergeSingle(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile): void {
-  const ks = ctx.state.keys[key];
+  const ks = own(ctx.state.keys, key);
   const w = ctx.work.get(key);
   if ((ks && ks.mode !== 'single') || (w && w.mode !== 'single')) return;
   const rm = rk.meta!;
   const rv = rm.del ? null : (rk.value ?? null);
   const cid = `single:${key}`;
+  const isSettings = key === SINGLETON_KEYS.settings;
   const apply = () => {
     const cur = ctx.work.get(key) as Extract<Work, { mode: 'single' }> | undefined;
     if ((cur?.value ?? null) === rv) return;
     ctx.work.set(key, { mode: 'single', value: rv, dirty: true });
     ctx.stats.updated++;
-    ctx.changedKeys.add(key);
   };
   const lm = ks?.mode === 'single' ? ks.meta : undefined;
   if (!lm) {
@@ -601,17 +713,17 @@ function mergeSingle(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile
   const lv = w?.mode === 'single' ? w.value : null;
   if ((lm.del && rm.del) || (!lm.del && !rm.del && lm.h === rm.h)) {
     absorb(lm, rm);
-    dropResolved(ctx, cid, lm);
+    refreshListing(ctx, cid, lm, lv, false);
     return;
   }
   const order = compareVV(rm.vv, lm.vv);
   if (order === 'lt') return;
   // Moving the period lock earlier (or removing it) is never taken silently from another device.
-  const loosens = key === SINGLETON_KEYS.settings && lockOf(lv) !== '' && (lockOf(rv) === '' || lockOf(rv) < lockOf(lv));
+  const loosens = isSettings && loosensLock(lv, rv);
   const holdLock = () => {
-    if (ctx.state.declined[`${key}|`] === (rm.del ? '' : rm.h)) return;
+    if (own(ctx.state.declined, `${key}|`) === (rm.del ? '' : rm.h)) return;
     putConflict(ctx, {
-      id: cid, kind: 'single', key, reason: 'locked', device: from.device.id, device_name: from.device.name, at: ctx.now,
+      id: cid, kind: 'single', key, reason: 'locked', locked: true, device: from.device.id, device_name: from.device.name, at: ctx.now,
       local: { meta: cloneMeta(lm), value: lv }, remote: { meta: cloneMeta(rm), value: rv }, applied: 'local',
     });
   };
@@ -620,12 +732,12 @@ function mergeSingle(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile
     apply();
     const next = cloneMeta(rm);
     ctx.state.keys[key] = { mode: 'single', meta: next };
-    dropResolved(ctx, cid, next);
+    refreshListing(ctx, cid, next, rv);
     return;
   }
   if (lv !== null && rv !== null && sameJson(safeParse(lv), safeParse(rv))) {
     absorb(lm, rm);
-    dropResolved(ctx, cid, lm);
+    refreshListing(ctx, cid, lm, lv, false);
     return;
   }
   // Concurrent: last writer by Lamport time (device id breaks ties) wins; the other version is listed.
@@ -633,6 +745,8 @@ function mergeSingle(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile
   if (remoteWins && loosens) return holdLock();
   putConflict(ctx, {
     id: cid, kind: 'single', key, reason: 'lww', device: from.device.id, device_name: from.device.name, at: ctx.now,
+    // Switching to the listed (losing) version later must not loosen the lock without the PIN.
+    ...(isSettings && (remoteWins ? loosensLock(rv, lv) : loosensLock(lv, rv)) ? { locked: true } : {}),
     local: { meta: cloneMeta(lm), value: lv }, remote: { meta: cloneMeta(rm), value: rv }, applied: remoteWins ? 'remote' : 'local',
   });
   if (remoteWins) {
@@ -671,7 +785,7 @@ function flagDuplicates(ctx: MergeCtx): void {
       if (g) g.push(id);
       else groups.set(k, [id]);
     }
-    const ks = ctx.state.keys[table];
+    const ks = own(ctx.state.keys, table);
     const metaRows = ks?.mode === 'rows' ? ks.rows : {};
     for (const [k, ids] of groups) {
       if (ids.length < 2) continue;
@@ -684,14 +798,14 @@ function flagDuplicates(ctx: MergeCtx): void {
       if (existing?.kind === 'duplicate' && existing.sig === sig) continue;
       const docs = sorted.map((rid) => {
         const r = (w.rows.get(rid) ?? {}) as Record<string, unknown>;
-        const origin = metaRows[rid]?.o ?? '';
+        const origin = own(metaRows, rid)?.o ?? '';
         return {
           id: rid,
           number: String(r[f.num] ?? ''),
           client: String((r.client as { name?: string } | undefined)?.name ?? ''),
           date: String(r[f.date] ?? ''),
           total: Number(r.total ?? r.amount) || 0,
-          device: origin === ctx.self ? 'this device' : (ctx.state.peers[origin]?.name ?? ''),
+          device: origin === ctx.self ? 'this device' : (own(ctx.state.peers, origin)?.name ?? ''),
         };
       });
       const c: SyncConflict = { id, kind: 'duplicate', key: table, number: docs[0].number, ids: sorted, sig, at: ctx.now, docs };
@@ -716,7 +830,7 @@ export function mergeDeviceLog(stored: AuditEntry[], incoming: AuditEntry[]): Au
 function vvMax(state: SyncState): VV {
   const out: VV = {};
   const see = (m: RowMeta) => {
-    for (const [k, v] of Object.entries(m.vv)) if (v > (out[k] ?? 0)) out[k] = v;
+    for (const [k, v] of Object.entries(m.vv)) if (v > (own(out, k) ?? 0)) out[k] = v;
   };
   for (const ks of Object.values(state.keys)) {
     if (ks.mode === 'rows') for (const m of Object.values(ks.rows)) see(m);
@@ -787,20 +901,28 @@ function checkMerged(data: Record<string, string>): void {
   }
 }
 
-/** Write every changed key (assets first, so an invoice never points at a missing logo). All-or-nothing. */
-function commit(work: Map<string, Work>): string[] {
+/** Serialised changed keys (plus what the checks need), checked; throws when the result would be damaged. */
+function project(work: Map<string, Work>): { dirty: string[]; projected: Record<string, string> } {
   const dirty = [...work].filter(([, w]) => w.dirty).map(([k]) => k);
   dirty.sort((a, b) => Number(b === DB_PREFIX + ASSET_TABLE) - Number(a === DB_PREFIX + ASSET_TABLE));
-  if (!dirty.length) return [];
-  // A merge that would leave damaged settings or dangling logo references writes nothing.
   const projected: Record<string, string> = {};
+  if (!dirty.length) return { dirty, projected };
   const needAssets = dirty.some((k) => SNAPSHOT_TABLES.has(k.slice(DB_PREFIX.length)));
   for (const [k, w] of work) {
     if (!w.dirty && !(needAssets && (k === DB_PREFIX + ASSET_TABLE || SNAPSHOT_TABLES.has(k.slice(DB_PREFIX.length))))) continue;
     const v = serializeWork(w);
     if (v !== null) projected[k] = v;
   }
+  // A merge that would leave damaged settings or dangling logo references writes nothing.
   checkMerged(projected);
+  return { dirty, projected };
+}
+
+/** Write every changed key (assets first, so an invoice never points at a missing logo). All-or-nothing. */
+function commit(work: Map<string, Work>, pre?: { dirty: string[]; projected: Record<string, string> }): { changed: string[]; texts: Record<string, string | null> } {
+  const { dirty, projected } = pre ?? project(work);
+  const texts: Record<string, string | null> = {};
+  if (!dirty.length) return { changed: [], texts };
   const written: [string, string | null][] = [];
   try {
     for (const k of dirty) {
@@ -808,6 +930,7 @@ function commit(work: Map<string, Work>): string[] {
       const v = k in projected ? projected[k] : serializeWork(work.get(k)!);
       if (v === null) removeRaw(k);
       else writeRaw(k, v);
+      texts[k] = v;
       written.push([k, before]);
     }
   } catch (err) {
@@ -821,22 +944,7 @@ function commit(work: Map<string, Work>): string[] {
     }
     throw err;
   }
-  return dirty;
-}
-
-function saveMeta(state: SyncState, conflicts?: SyncConflict[], logs?: Record<string, DeviceLog>): void {
-  writeRaw(SYNC_STATE_KEY, JSON.stringify(state));
-  if (conflicts) writeRaw(SYNC_CONFLICTS_KEY, JSON.stringify(conflicts));
-  if (logs) writeRaw(SYNC_AUDIT_KEY, JSON.stringify(logs));
-}
-
-function lockOf(value: string | null | undefined): string {
-  if (!value) return '';
-  try {
-    return normalizeLockDate((JSON.parse(value) as { lock_until?: unknown } | null)?.lock_until);
-  } catch {
-    return '';
-  }
+  return { changed: dirty, texts };
 }
 
 /* ── One-at-a-time ─────────────────────────────────────────────── */
@@ -851,6 +959,8 @@ function exclusive<T>(fn: () => Promise<T>): Promise<T> {
   chain = p.catch(() => undefined);
   return p;
 }
+
+const yieldToUi = () => new Promise<void>((r) => setTimeout(r, 0));
 
 /* ── Sync run ──────────────────────────────────────────────────── */
 
@@ -870,7 +980,59 @@ export interface SyncRunOptions {
 const blobDirName = (device: string) => device;
 
 export function runSync(o: SyncRunOptions): Promise<SyncReport> {
-  return exclusive(() => runSyncInner(o));
+  return exclusive(async () => {
+    const r = await runSyncInner(o);
+    recordReport(r);
+    return r;
+  });
+}
+
+interface PeerRead {
+  id: string;
+  hash: string;
+  file?: RemoteFile;
+  /** Unchanged since the last merge: not decrypted. */
+  same?: boolean;
+  error?: string;
+  version?: boolean;
+  stale?: boolean;
+}
+
+interface MergeResult {
+  ctx: MergeCtx;
+  logs: Record<string, DeviceLog>;
+  names: string[];
+}
+
+/** One merge attempt from a fresh copy of everything (re-run without a peer whose data cannot be applied). */
+function mergeAttempt(o: SyncRunOptions, files: RemoteFile[], floor: number, at: string): MergeResult {
+  const self = o.device.id;
+  const state = loadState(o.group);
+  state.group = o.group;
+  const logs = loadDeviceLogs();
+  const work = loadWork();
+  // A device whose sync state was lost (restore, erase) must never reuse its old counters.
+  state.clock = Math.max(state.clock, floor);
+  scanLocal(state, work, self);
+  // This device's own lock date protects this device's books. (Another device's lock is not applied to
+  // rows it already had: a fresh device must receive the locked history; the lock date itself arrives
+  // with the settings, and loosening it is held for the PIN.)
+  const settingsW = work.get(SINGLETON_KEYS.settings);
+  const lock = lockOf(settingsW?.mode === 'single' ? settingsW.value : null);
+  const ctx: MergeCtx = { state, work, conflicts: loadConflicts(), self, lock, now: at, stats: { added: 0, updated: 0, deleted: 0, newConflicts: 0 } };
+  const names: string[] = [];
+  for (const f of [...files].sort((a, b) => (a.device.id < b.device.id ? -1 : 1))) {
+    for (const [key, rk] of Object.entries(f.keys)) {
+      if (!isSyncedKey(key)) continue;
+      if (rk.mode === 'rows') mergeRows(ctx, key, rk, f);
+      else mergeSingle(ctx, key, rk, f);
+    }
+    state.clock = Math.max(state.clock, f.clock); // Lamport: later local edits sort after everything seen
+    if (f.audit.length) logs[f.device.id] = { name: f.device.name, rows: mergeDeviceLog(own(logs, f.device.id)?.rows ?? [], f.audit) };
+    names.push(f.device.name);
+  }
+  flagDuplicates(ctx);
+  return { ctx, logs, names };
 }
 
 async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
@@ -881,74 +1043,126 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
   const dirs: GroupDirs = await openGroup(o.root, o.group, false);
   const attempts = o.attempts ?? 3;
   const delay = o.retryDelayMs ?? 1500;
+  const stored = readState();
+  const stateLost = !stored || stored.group !== o.group;
+  const prev = stateLost ? emptyState(o.group) : stored;
 
-  // 1. Read every other device's file (retrying files the cloud client may be half-way through writing).
+  // 1. Read the files. Unchanged ones (same text as last merged) are not decrypted again.
   const present = await listDeviceIds(dirs);
-  const files: RemoteFile[] = [];
-  const failed: { id: string; message: string; version?: boolean }[] = [];
+  const reads: PeerRead[] = [];
   const schema = localSchema();
+  let floor = highWater() ?? 0;
+  let ownUnreadable = false;
   for (const id of present) {
-    if (id === self) continue;
-    try {
-      const f = await withRetry(async () => {
-        const text = await readSealed(dirs.devices, deviceFileName(id), o.key, 'device', id, [o.group, 'device', id]);
-        return parseRemoteFile(text, id, o.group);
-      }, attempts, delay);
-      if (f.schema !== schema) {
-        failed.push({ id, version: true, message: f.schema > schema ? 'uses a newer version of the app: update this device' : 'uses an older version of the app: update it' });
-        continue;
+    const read = async () => {
+      const text = await readFileText(dirs.devices, deviceFileName(id));
+      if (text === null) throw new SyncFileError('The file is missing.', 'missing');
+      const hash = hashStr(text);
+      const p = own(prev.peers, id);
+      if (id !== self && !stateLost && p?.status === 'ok' && p.file_hash === hash) return { id, hash, same: true } as PeerRead;
+      const plain = await openSealed(text, o.key, 'device', id, [o.group, 'device', id]);
+      return { id, hash, file: parseRemoteFile(plain, id, o.group) } as PeerRead;
+    };
+    if (id === self) {
+      // Our own file: only needed as a counter floor when our sync state was lost.
+      if (!stateLost) continue;
+      try {
+        const r = await withRetry(read, attempts, delay);
+        if (r.file) floor = Math.max(floor, r.file.clock, own(r.file.vv_max, self) ?? 0);
+      } catch {
+        ownUnreadable = true;
       }
-      files.push(f);
+      continue;
+    }
+    try {
+      const r = await withRetry(read, attempts, delay);
+      if (r.file) {
+        const p = own(prev.peers, id);
+        if (r.file.schema !== schema) {
+          r.version = true;
+          r.error = r.file.schema > schema ? 'uses a newer version of the app: update this device' : 'uses an older version of the app: update it';
+        } else if (p && p.clock > 0 && r.file.clock < p.clock) {
+          r.stale = true;
+          r.error = 'its file is older than one already read (a replayed or restored copy); skipped';
+        }
+      }
+      reads.push(r);
     } catch (err) {
-      failed.push({ id, message: (err as Error)?.message || 'unreadable' });
+      reads.push({ id, hash: '', error: (err as Error)?.message || 'unreadable' });
     }
+    await yieldToUi();
+  }
+  if (stateLost && ownUnreadable && highWater() === undefined) {
+    return { ...report, ok: false, reason: 'error', message: "This device's sync history was reset and its own file in the folder cannot be read yet, so it cannot safely number its changes. Try again in a minute." };
+  }
+  const fresh = reads.filter((r) => r.file && !r.error);
+  for (const r of fresh) floor = Math.max(floor, own(r.file!.vv_max, self) ?? 0);
+
+  // 2. Idle: no peer file and no local data changed since the last run → nothing to merge or write.
+  const hashes = keyHashes();
+  const prevH = prev.key_h ?? {};
+  const keysSame = !stateLost && Object.keys(hashes).length === Object.keys(prevH).length && Object.entries(hashes).every(([k, h]) => own(prevH, k) === h);
+  const peersSame = reads.every((r) => r.same);
+  const blobsSettled = !prev.blobs_missing && storedAttachmentIds().every((id) => prev.blobs_written.includes(id));
+  if (keysSame && peersSame && blobsSettled && prev.last_written_hash && present.includes(self)) {
+    return { ...report, idle: true, peers: reads.length, conflicts: loadConflicts().length };
   }
 
-  // 2. Merge synchronously: no other code can write between reading local data and writing the result.
-  const state = loadState(o.group);
-  state.group = o.group;
-  const conflicts = loadConflicts();
-  const logs = loadDeviceLogs();
-  const work = loadWork();
-  // A device whose sync state was lost (restore, erase) must never reuse its old counters.
-  for (const f of files) state.clock = Math.max(state.clock, f.vv_max[self] ?? 0);
-  scanLocal(state, work, self);
-  const settingsW = work.get(SINGLETON_KEYS.settings);
-  let lock = lockOf(settingsW?.mode === 'single' ? settingsW.value : null);
-  for (const f of files) {
-    const l = lockOf(f.keys[SINGLETON_KEYS.settings]?.value ?? null);
-    if (l > lock) lock = l;
-  }
-  const ctx: MergeCtx = { state, work, conflicts, self, lock, now: at, stats: { added: 0, updated: 0, deleted: 0, newConflicts: 0 }, changedKeys: new Set() };
-  const names: string[] = [];
-  for (const f of files.sort((a, b) => (a.device.id < b.device.id ? -1 : 1))) {
-    for (const [key, rk] of Object.entries(f.keys)) {
-      if (!isSyncedKey(key)) continue;
-      if (rk.mode === 'rows') mergeRows(ctx, key, rk, f);
-      else mergeSingle(ctx, key, rk, f);
+  // 3. Merge synchronously: no other code can write between reading local data and writing the result.
+  //    If applying a peer's data would leave a damaged table, that peer is left out and the rest applies.
+  const excluded = new Map<string, string>();
+  let result: MergeResult;
+  let proj: ReturnType<typeof project>;
+  for (;;) {
+    const use = fresh.filter((r) => !excluded.has(r.id)).map((r) => r.file!);
+    result = mergeAttempt(o, use, floor, at);
+    try {
+      proj = project(result.ctx.work);
+      break;
+    } catch (err) {
+      let culprit: string | undefined;
+      for (let i = 1; i <= use.length && !culprit; i++) {
+        try {
+          project(mergeAttempt(o, use.slice(0, i), floor, at).ctx.work);
+        } catch {
+          culprit = use[i - 1].device.id;
+        }
+      }
+      if (!culprit) {
+        return { ...report, ok: false, reason: 'error', message: `Sync could not apply the changes, so nothing was changed: ${(err as Error)?.message ?? err}` };
+      }
+      excluded.set(culprit, `its changes could not be applied (${(err as Error)?.message ?? err}); nothing from it was changed`);
     }
-    state.clock = Math.max(state.clock, f.clock); // Lamport: later local edits sort after everything seen
-    if (f.audit.length) logs[f.device.id] = { name: f.device.name, rows: mergeDeviceLog(logs[f.device.id]?.rows ?? [], f.audit) };
-    state.peers[f.device.id] = { name: f.device.name, clock: f.clock, written_at: f.written_at, seen_at: at, status: 'ok', ...(f.prefix ? { prefix: f.prefix } : {}), blobs: f.blobs };
-    names.push(f.device.name);
   }
-  for (const x of failed) {
-    const prev = state.peers[x.id];
-    state.peers[x.id] = { ...(prev ?? { name: '', clock: 0, written_at: '' }), seen_at: prev?.seen_at ?? '', status: x.version ? 'version' : 'unreadable', message: x.message };
-    report.unreadable.push({ device: x.id, name: prev?.name, message: x.message });
-  }
-  flagDuplicates(ctx);
-
-  let changed: string[];
+  const { ctx, logs, names } = result;
+  const state = ctx.state;
+  let committed: { changed: string[]; texts: Record<string, string | null> };
   try {
-    changed = commit(work);
+    committed = commit(ctx.work, proj);
   } catch (err) {
-    const message = `Sync could not apply the changes, so nothing was changed: ${(err as Error)?.message ?? err}`;
-    const failedRun: SyncReport = { ...report, ok: false, reason: 'error', message };
-    recordReport(failedRun);
-    return failedRun;
+    return { ...report, ok: false, reason: 'error', message: `Sync could not apply the changes, so nothing was changed: ${(err as Error)?.message ?? err}` };
   }
-  Object.assign(report, ctx.stats, { peers: files.length, conflicts: ctx.conflicts.length });
+
+  // Peer bookkeeping (only peers whose data was applied get the "unchanged" fingerprint).
+  for (const r of reads) {
+    const p = own(state.peers, r.id);
+    if (r.same && p) {
+      p.seen_at = at;
+      state.clock = Math.max(state.clock, p.clock);
+      continue;
+    }
+    const why = r.error ?? excluded.get(r.id);
+    if (r.file && !why) {
+      const f = r.file;
+      state.peers[r.id] = { name: f.device.name, clock: f.clock, written_at: f.written_at, seen_at: at, status: 'ok', ...(f.prefix ? { prefix: f.prefix } : {}), blobs: f.blobs, file_hash: r.hash };
+      continue;
+    }
+    const status: PeerInfo['status'] = r.version ? 'version' : r.stale ? 'stale' : excluded.has(r.id) ? 'skipped' : 'unreadable';
+    // Keep the last good fingerprint-free info: the file is read in full again next time.
+    state.peers[r.id] = { ...(p ?? { name: r.file?.device.name ?? '', clock: 0, written_at: '' }), seen_at: p?.seen_at ?? '', status, message: why, file_hash: undefined };
+    report.unreadable.push({ device: r.id, name: p?.name ?? r.file?.device.name, message: why ?? 'unreadable' });
+  }
+  Object.assign(report, ctx.stats, { peers: reads.length, conflicts: ctx.conflicts.length });
   if (ctx.stats.added + ctx.stats.updated + ctx.stats.deleted + ctx.stats.newConflicts > 0) {
     const parts = [`${ctx.stats.added} added`, `${ctx.stats.updated} changed`, `${ctx.stats.deleted} deleted`];
     audit.record({
@@ -958,31 +1172,42 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
     });
   }
   // Payload is taken now, from the exact state that was just committed.
-  const payload = buildPayload(state, work, o.device, o.prefix);
+  const payload = buildPayload(state, ctx.work, o.device, o.prefix);
   const payloadText = JSON.stringify(payload);
-  const payloadHash = hashStr(payloadText);
+  const keyH = { ...hashes };
+  for (const [k, v] of Object.entries(committed.texts)) {
+    if (v === null) delete keyH[k];
+    else keyH[k] = hashStr(v);
+  }
+  state.key_h = keyH;
   state.last_sync = at;
+  noteHighWater(state.clock);
   saveMeta(state, ctx.conflicts, logs);
-  for (const k of changed) noteExternalChange(k);
+  for (const k of committed.changed) noteExternalChange(k);
 
-  // 3. Attachment files: fetch the ones records now point at, upload this device's new ones.
+  // 4. Attachment files: fetch the ones records now point at, upload this device's new ones.
+  const peerBlobs = Object.entries(state.peers).filter(([, p]) => p.status === 'ok' && p.blobs?.length);
   const have = new Set(storedAttachmentIds());
+  let missing = 0;
   for (const id of referencedAttachmentIds()) {
     if (have.has(id) || !isAttachmentId(id)) continue;
-    for (const f of files) {
-      if (!f.blobs.includes(id)) continue;
+    let got = false;
+    for (const [dev, p] of peerBlobs) {
+      if (!p.blobs!.includes(id)) continue;
       try {
-        const dir = await dirs.blobs.getDirectoryHandle(blobDirName(f.device.id));
-        const raw = await withRetry(() => readSealed(dir, `${id}${BLOB_EXT}`, o.key, 'blob', f.device.id, [o.group, 'blob', f.device.id, id]), attempts, delay);
+        const dir = await dirs.blobs.getDirectoryHandle(blobDirName(dev));
+        const raw = await withRetry(() => readSealed(dir, `${id}${BLOB_EXT}`, o.key, 'blob', dev, [o.group, 'blob', dev, id]), attempts, delay);
         if (parseStoredAttachment(raw)?.id !== id) continue;
         writeRaw(attachmentKey(id), raw);
         have.add(id);
         report.blobsIn++;
+        got = true;
         break;
       } catch {
         /* try another device / next sync */
       }
     }
+    if (!got) missing++;
   }
   const written = new Set(state.blobs_written);
   let mine: SyncDir | null = null;
@@ -1000,15 +1225,12 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
     }
   }
 
-  // 4. Own file: only when something changed (or it is missing), then read back to prove it opens.
+  // 5. Own file: only when something changed (or it is missing), then read back to prove it opens.
   const blobsChanged = written.size !== state.blobs_written.length;
   state.blobs_written = [...written].sort();
-  let finalText = payloadText;
-  let finalHash = payloadHash;
-  if (blobsChanged) {
-    finalText = JSON.stringify({ ...payload, blobs: state.blobs_written });
-    finalHash = hashStr(finalText);
-  }
+  state.blobs_missing = missing;
+  const finalText = blobsChanged ? JSON.stringify({ ...payload, blobs: state.blobs_written }) : payloadText;
+  const finalHash = hashStr(finalText);
   if (finalHash !== state.last_written_hash || !present.includes(self)) {
     const full = `${finalText.slice(0, -1)},"written_at":${JSON.stringify(at)}}`;
     try {
@@ -1024,18 +1246,16 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
       report.message = `Could not write this device's sync file: ${(err as Error)?.message ?? err}`;
     }
   }
-  state.last_report = { ...report, unreadable: report.unreadable.slice(0, 10) };
+  if (report.ok && report.unreadable.length) report.message = `${report.unreadable.length} device file${report.unreadable.length === 1 ? '' : 's'} could not be used this time.`;
   saveMeta(state);
   return report;
 }
 
-/** Keep a run that stopped before syncing (permission, missing folder) visible in the panel. */
+/** Keep the outcome of every run (also idle and refused ones) for the panel, device-locally. */
 export function recordReport(r: SyncReport): void {
   try {
-    if (!readRaw(SYNC_STATE_KEY)) return;
-    const state = loadState();
-    state.last_report = r;
-    saveMeta(state);
+    const last: SyncRunSummary = { at: r.at, ok: r.ok, ...(r.reason ? { reason: r.reason } : {}), ...(r.message ? { message: r.message } : {}), conflicts: r.conflicts };
+    setCompanySyncPrefs({ last });
   } catch {
     /* display only */
   }
@@ -1045,28 +1265,66 @@ export function recordReport(r: SyncReport): void {
 
 export type Resolution = 'mine' | 'theirs' | 'ack';
 
+export interface ResolveResult {
+  ok: boolean;
+  message?: string;
+  /** The current version changed since the conflict was listed; the listing was refreshed. */
+  stale?: boolean;
+  /** Writing this version needs the PIN override (locked period or a looser lock). */
+  needsOverride?: boolean;
+}
+
 /**
  * Resolve one listed conflict. Rows / singletons: the chosen version becomes a new version that
- * dominates both (so every device converges on it at its next sync). A locked-period change taken with
- * `override` is written to the audit log; declined ("mine") it stays on the other device only.
- * Duplicates: 'ack' marks the pair reviewed (renumber by hand; issued numbers are never changed).
+ * dominates both (so every device converges on it at its next sync), but only when the current version
+ * is still the one that was listed — otherwise the listing is refreshed and nothing is written. Anything
+ * that writes into a locked period or loosens the lock needs `override` (PIN verified by the caller,
+ * `period.override` permission) and is written to the audit log. Declining a locked-period change keeps
+ * it on the other device only. Duplicates: 'ack' marks the pair reviewed (renumber by hand).
  */
-export function resolveConflict(id: string, choice: Resolution, device: { id: string; name: string }, opts: { override?: boolean } = {}): Promise<{ ok: boolean; message?: string }> {
+export function resolveConflict(id: string, choice: Resolution, device: { id: string; name: string }, opts: { override?: boolean } = {}): Promise<ResolveResult> {
   return exclusive(async () => {
     const conflicts = loadConflicts();
     const c = conflicts.find((x) => x.id === id);
     if (!c) return { ok: false, message: 'That conflict is no longer listed.' };
+    const need = (action: AccessAction): string | null => {
+      try {
+        requireAccess(action);
+        return null;
+      } catch (err) {
+        return (err as Error)?.message || 'You do not have permission to do that.';
+      }
+    };
     const state = loadState();
     const rest = conflicts.filter((x) => x.id !== id);
     if (c.kind === 'duplicate') {
+      const denied = need('doc.edit');
+      if (denied) return { ok: false, message: denied };
       if (!state.dup_ack.includes(c.sig)) state.dup_ack.push(c.sig);
       saveMeta(state, rest);
       return { ok: true };
     }
+    const denied = need(c.kind === 'single' ? 'settings.manage' : 'doc.edit');
+    if (denied) return { ok: false, message: denied };
     const self = device.id;
     const work = loadWork();
+    state.clock = Math.max(state.clock, highWater() ?? 0);
     scanLocal(state, work, self);
-    const pick = choice === 'theirs' ? c.remote : c.local;
+
+    // Is the current version still the one that was listed?
+    const ks = own(state.keys, c.key);
+    const w = work.get(c.key);
+    const curMeta = c.kind === 'row' ? (ks?.mode === 'rows' ? own(ks.rows, c.row_id!) ?? null : null) : ks?.mode === 'single' ? ks.meta : null;
+    const curValue = c.kind === 'row' ? (w?.mode === 'rows' ? (w.rows.get(c.row_id!) ?? null) : null) : w?.mode === 'single' ? w.value : null;
+    const listed = c.kind === 'single' && c.applied === 'remote' ? c.remote.meta : c.local.meta;
+    const current = curMeta && curMeta.del && c.kind === 'row' && !listed ? null : curMeta;
+    if (!sameVersion(current, listed)) {
+      const side: ConflictSide = { meta: curMeta ? cloneMeta(curMeta) : null, value: curValue };
+      if (c.kind === 'single' && c.applied === 'remote') c.remote = side;
+      else c.local = side;
+      saveMeta(state, conflicts);
+      return { ok: false, stale: true, message: 'This changed since it was listed. Check both versions again, then choose.' };
+    }
 
     if (c.reason === 'locked' && choice === 'mine') {
       // Declined: stays on the other device only; not offered again until it changes there.
@@ -1074,51 +1332,65 @@ export function resolveConflict(id: string, choice: Resolution, device: { id: st
       saveMeta(state, rest);
       return { ok: true };
     }
-    if (c.reason === 'locked' && !opts.override) return { ok: false, message: 'Enter your PIN to change books in a locked period.' };
+    const pick = choice === 'theirs' ? c.remote : c.local;
+    const settingsW = work.get(SINGLETON_KEYS.settings);
+    const lock = lockOf(settingsW?.mode === 'single' ? settingsW.value : null);
+    const writesData = c.kind === 'row'
+      ? !sameJson(curValue, pick.value)
+      : ((curValue as string | null) ?? null) !== ((pick.value as string | null) ?? null);
+    const locked = c.reason === 'locked' || (writesData && (c.kind === 'row'
+      ? touchesLock(lock, c.key, curValue ?? undefined, pick.value ?? undefined)
+      : c.key === SINGLETON_KEYS.settings && loosensLock(curValue as string | null, pick.value as string | null)));
+    if (locked) {
+      if (!opts.override) return { ok: false, needsOverride: true, message: 'Enter your PIN to change books in a locked period.' };
+      const deniedLock = need('period.override');
+      if (deniedLock) return { ok: false, message: deniedLock };
+    }
+
     if (c.kind === 'row') {
       const rowId = c.row_id!;
-      let w = work.get(c.key);
-      if (!w) {
-        w = { mode: 'rows', ids: [], rows: new Map(), dirty: false };
-        work.set(c.key, w);
+      let wr = w;
+      if (!wr) {
+        wr = { mode: 'rows', ids: [], rows: new Map(), dirty: false };
+        work.set(c.key, wr);
       }
-      if (w.mode !== 'rows') return { ok: false, message: 'This table changed shape; resolve it by restoring a backup.' };
-      let ks = state.keys[c.key];
-      if (!ks || ks.mode !== 'rows') ks = state.keys[c.key] = { mode: 'rows', rows: {} };
-      const lm = ks.rows[rowId];
-      if (pick.value === null) removeRow(w, rowId);
-      else upsertRow(w, rowId, pick.value);
+      if (wr.mode !== 'rows') return { ok: false, message: 'This table changed shape; resolve it by restoring a backup.' };
+      let rks = own(state.keys, c.key);
+      if (!rks || rks.mode !== 'rows') rks = state.keys[c.key] = { mode: 'rows', rows: {} };
+      const lm = own(rks.rows, rowId);
+      if (writesData) {
+        if (pick.value === null) removeRow(wr, rowId);
+        else upsertRow(wr, rowId, pick.value);
+      }
       const t = ++state.clock;
       const vv = { ...mergeVV(mergeVV(lm?.vv ?? {}, c.remote.meta?.vv ?? {}), c.local.meta?.vv ?? {}), [self]: t };
       const h = pick.value === null ? '' : hashStr(JSON.stringify(pick.value));
-      ks.rows[rowId] = { h, t, d: self, vv, o: minStr(lm?.o ?? '', c.remote.meta?.o ?? '') || self, ...(pick.value === null ? { del: 1 as const } : {}) };
-      // A version identical to what is stored needs no write.
-      if (pick.value !== null && lm && !lm.del && lm.h === h) w.dirty = false;
+      rks.rows[rowId] = { h, t, d: self, vv, o: minStr(lm?.o ?? '', c.remote.meta?.o ?? '') || self, ...(pick.value === null ? { del: 1 as const } : {}) };
     } else {
       const t = ++state.clock;
-      const ks = state.keys[c.key];
       const lm = ks?.mode === 'single' ? ks.meta : null;
       const value = (pick.value as string | null) ?? null;
-      const cur = work.get(c.key);
-      if ((cur?.mode === 'single' ? cur.value : null) !== value) work.set(c.key, { mode: 'single', value, dirty: true });
+      if (writesData) work.set(c.key, { mode: 'single', value, dirty: true });
       const vv = { ...mergeVV(mergeVV(lm?.vv ?? {}, c.remote.meta?.vv ?? {}), c.local.meta?.vv ?? {}), [self]: t };
       state.keys[c.key] = { mode: 'single', meta: { h: value === null ? '' : hashStr(value), t, d: self, vv, o: lm?.o || self, ...(value === null ? { del: 1 as const } : {}) } };
     }
     let changed: string[];
     try {
-      changed = commit(work);
+      changed = commit(work).changed;
     } catch (err) {
       return { ok: false, message: (err as Error)?.message || 'Could not apply that version.' };
     }
     const label = c.kind === 'row' ? `${tableLabel(c.key)} row` : tableLabel(c.key);
     audit.record({
-      entity: 'system', entity_id: 'sync', action: c.reason === 'locked' ? 'override' : 'update',
-      summary: c.reason === 'locked'
-        ? (c.kind === 'row'
-          ? `Applied a synced change from ${c.device_name || 'another device'} to a ${label} in a locked period`
-          : `Took the period-lock change from ${c.device_name || 'another device'}`)
+      entity: 'system', entity_id: 'sync', action: locked ? 'override' : 'update',
+      summary: locked
+        ? c.kind === 'row'
+          ? `Applied a synced version from ${choice === 'theirs' ? c.device_name || 'another device' : 'this device'} to a ${label} in a locked period`
+          : `Took the period-lock change from ${choice === 'theirs' ? c.device_name || 'another device' : 'this device'}`
         : `Sync conflict on ${label}: kept ${choice === 'theirs' ? `the version from ${c.device_name || 'another device'}` : "this device's version"}`,
     });
+    noteHighWater(state.clock);
+    state.last_written_hash = ''; // the new version must be written out even if no data text changed
     saveMeta(state, rest);
     for (const k of changed) noteExternalChange(k);
     return { ok: true };
@@ -1134,7 +1406,7 @@ export interface NumberingWarning {
 
 /** Number series (prefix/FY) that documents introduced by more than one device share. */
 export function sharedSeries(state: SyncState = loadState(), self?: string): NumberingWarning[] {
-  const ks = state.keys[INVOICES_KEY];
+  const ks = own(state.keys, INVOICES_KEY);
   if (!ks || ks.mode !== 'rows') return [];
   let rows: Map<string, unknown> | null = null;
   const raw = readRaw(INVOICES_KEY);
@@ -1155,6 +1427,6 @@ export function sharedSeries(state: SyncState = loadState(), self?: string): Num
     set.add(m.o);
     bySeries.set(s, set);
   }
-  const name = (d: string) => (d === self ? 'this device' : state.peers[d]?.name || 'another device');
+  const name = (d: string) => (d === self ? 'this device' : own(state.peers, d)?.name || 'another device');
   return [...bySeries].filter(([, s]) => s.size > 1).map(([series, s]) => ({ series, devices: [...s].map(name) }));
 }

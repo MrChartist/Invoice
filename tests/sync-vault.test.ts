@@ -72,3 +72,47 @@ test('vault on: synced rows are decrypted only in memory and stored sealed', asy
     uninstallFakeIdb();
   }
 });
+
+test('vault on: the sync key is stored sealed, opens only after unlock, and follows vault on/off', async () => {
+  const { storeSyncKey, loadSyncKey, hasStoredSyncKey, SYNC_KEY_KEY } = await import('../src/lib/sync-keystore.ts');
+  const { deriveSyncKey, sealText, openText } = await import('../src/lib/sync-files.ts');
+  const { disableVault } = await import('../src/lib/storage.ts');
+  resetStorageBackend();
+  resetIdbConnection();
+  fakeIdb.reset();
+  installFakeIdb();
+  resetStorage();
+  try {
+    assert.equal((await initStorage({ timeoutMs: 500 })).backend, 'idb');
+    const k = await deriveSyncKey('sync passphrase', 'c2FsdHNhbHRzYWx0c2FsdA==', 210_000);
+    const env = await sealText(k, 'hello folder', ['t']);
+    // Vault off: a non-extractable CryptoKey.
+    assert.ok(await storeSyncKey(k));
+    const kv = () => fakeIdb.store('mrchartist_inv_kv', KV_STORE).get(SYNC_KEY_KEY) as Record<string, unknown>;
+    assert.ok(kv().key && !('raw' in kv()) && !('sealed' in kv()), 'no raw bytes stored readable');
+    // Turning the vault on drops the unsealable key: the panel asks for the passphrase once.
+    await enableVault(PASS);
+    assert.equal(await hasStoredSyncKey(), false);
+    assert.equal(await loadSyncKey(), null);
+    // Re-entered passphrase with the vault on: stored sealed, no CryptoKey, nothing readable.
+    assert.ok(await storeSyncKey(await deriveSyncKey('sync passphrase', 'c2FsdHNhbHRzYWx0c2FsdA==', 210_000)));
+    assert.ok(isSealed(kv().sealed as string) && !kv().key, 'sealed with the vault key');
+    assert.equal(await openText((await loadSyncKey())!, env, ['t']), 'hello folder');
+    // Locked vault: no key.
+    await flushStorage();
+    resetStorageBackend();
+    resetIdbConnection();
+    assert.equal((await initStorage({ timeoutMs: 500 })).backend, 'locked');
+    assert.equal(await loadSyncKey(), null, 'a locked vault keeps the folder closed');
+    await unlockStorage(PASS);
+    assert.equal(await openText((await loadSyncKey())!, env, ['t']), 'hello folder');
+    // Vault off again: the sealed bytes come back as a non-extractable key.
+    await disableVault(PASS);
+    assert.ok(kv().key && !kv().sealed);
+    assert.equal(await openText((await loadSyncKey())!, env, ['t']), 'hello folder');
+  } finally {
+    resetStorageBackend();
+    resetIdbConnection();
+    uninstallFakeIdb();
+  }
+});

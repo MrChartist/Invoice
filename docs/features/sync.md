@@ -42,12 +42,19 @@ files). The group folder name and the random device ids are the only plain text;
 ## Encryption
 - Key: PBKDF2-SHA-256, 600,000 iterations, over the sync passphrase with the group's random salt (stored in
   `manifest.json`), imported as a **non-extractable** AES-GCM-256 key. The passphrase is never stored; the key is kept
-  in the company's IndexedDB `kv` store like the backup key, so unattended syncs work after a reload.
+  in the company's IndexedDB `kv` store like the backup key, so unattended syncs work after a reload
+  (`src/lib/sync-keystore.ts`). **Vault mode:** the key bytes are stored sealed with the vault key instead, so a locked
+  vault also keeps the folder closed; the key is rebuilt in memory after unlock. Turning the vault off re-imports the
+  bytes as a non-extractable key; turning it on drops the (unsealable) non-extractable key and the panel asks for the
+  sync passphrase once.
 - Files: `{ app, kind, v, device, envelope: { v, kdf, iter, salt, iv, ct, z } }` — the same envelope fields as encrypted
   backups, fresh 12-byte IV per write, payload gzip-compressed before encryption (`CompressionStream`). The AES-GCM
   additional data is `mcsync1|<group>|<kind>|<deviceId>[|<attachmentId>]`, so a file copied or renamed to pose as
   another device or group fails to decrypt.
 - `manifest.json` carries a sealed check text: a wrong passphrase is refused when joining.
+- No per-device signing: anyone who holds the group passphrase can write a valid file under any device id. The
+  passphrase is the trust boundary of a group.
+- Decompressed payloads are capped at 256 MB; `vv_max` / clock values must be non-negative safe integers.
 - Tests assert that no client name, GSTIN, invoice number, amount, device name, table name or attachment bytes appear in
   any file in the folder.
 
@@ -67,8 +74,16 @@ blobs (below).
 Nothing is added to the save path. At each sync the engine hashes every row (64-bit cyrb53 over its JSON) and compares
 with the hash recorded at the last sync in `sync_state`: changed or new → a new version; gone → a tombstone. This
 covers every writer (localDb, purchases, imports, the ledger, restore…) without wiring, leaves `tests/perf.test.ts`
-untouched, and costs ~0.3–0.6 s for 10,000 rows per sync (`tests/sync.test.ts` perf case). Two edits between syncs
-collapse into one version, which is all a state-based merge needs.
+untouched, and costs ~0.3–0.6 s for 10,000 rows when something changed (`tests/sync.test.ts` perf case; the first merge of
+a large peer file can take 1–2 s once). Two edits between syncs collapse into one version, which is all a state-based
+merge needs.
+
+**Idle runs** (the 5-minute timer, most of the time): every peer file whose text hash equals the one last merged is not
+decrypted or merged again, and when no synced key's stored text changed either (hash per key, `key_h` in the state), the
+run stops there — no parsing, no state rewrite, no file write (~40 ms for 10,000 invoices, `tests/sync-review.test.ts`).
+The large state is written only when its text changed. A peer file whose data cannot be applied (it would leave a
+dangling logo reference or damaged settings) is left out of that run and reported; the other peers still apply and this
+device still writes its own file.
 
 ## Versions and clocks
 Each row / singleton version carries `{ h, t, d, vv, o, del? }`: content hash, Lamport time, editing device, a
@@ -78,8 +93,15 @@ introduced the row, and the tombstone flag.
 - Ordering never trusts wall clocks (two PCs can be minutes or days apart). Each device keeps a Lamport counter in
   `sync_state`; local changes are stamped first, then the counter jumps past every peer's counter it has read, so
   later local edits sort after everything seen. `written_at` is shown in the panel ("by its clock") but not used.
-- A device whose sync state was lost (restore, erase) restarts its counter above the highest value peers have
-  recorded for it, so it can never reuse old counters (a reused counter could otherwise make a new edit look old).
+- Counters never go backwards for a device, even when its sync state is lost (restore, erase): the floor is the
+  highest of (a) a device-local high-water counter per company in `mrchartist_inv_sync_device` (a restore or erase of
+  the company data does not touch it), (b) this device's own file in the folder, (c) what peers recorded for it. When
+  the state is lost, the own file exists but cannot be read and there is no high-water mark, the run refuses instead of
+  guessing. A reused counter could otherwise make a new edit look old and lose it silently.
+- Each company on a device uses its **own device id** in its group, so two companies can never write the same file; a
+  second company on the same device cannot join a group another company there already uses.
+- A peer file whose clock is lower than one already read from that device (a replayed or restored copy) is skipped
+  and shown as "older than one already read"; the stored copy of its audit log is not truncated.
 
 ## Merge rules
 For every row id in another device's file:
@@ -99,7 +121,14 @@ switch to it.
 
 Resolving creates a new version whose vector covers both sides, so every device converges on the choice at its next
 sync, and a device that listed the same conflict drops it automatically when the resolved version arrives. One
-listing per row (a newer remote version replaces the stored one).
+listing per row (a newer concurrent remote version replaces the stored one).
+
+**Listings never go stale.** When a merge changes the current version of a listed row / singleton (a newer version
+from the same or a third device), the listing's "current" side is updated to it (or the listing is dropped when the new
+version supersedes both sides). A resolution first re-scans local data: if the current version is no longer the one
+that was listed (e.g. you edited the record after it was listed), nothing is written, the listing is refreshed and you
+are asked to choose again. So neither choice can bring back an older copy over a newer edit. Resolving needs the
+`doc.edit` permission (rows, duplicates) or `settings.manage` (singletons) of the local roles (6.21).
 
 ## Numbering safety
 Two devices can issue the same `INV/FY26-27/0007`. After every merge the engine groups documents by the canonical
@@ -113,11 +142,18 @@ pair reviewed. Prevention:
   (`prefix/FY`) were introduced by more than one device.
 
 ## Period lock and vault
-- A synced add / edit / delete of a document dated on or before the lock date (`invoices`, `transactions`, `purchases`,
-  `purchase_payments`, `vouchers`, `stock_moves`, `stock_transfers`, `advances`; the later of the local and remote lock dates) is
-  **not applied**: it is listed as a "locked period" conflict. **Apply with PIN** verifies the PIN and writes an
-  `override` audit row; **Keep mine** declines it (it stays on the other device; not offered again until it changes
-  there). A remote settings change that moves the lock date earlier or removes it is held the same way.
+- A synced add / edit / delete of a document dated on or before **this device's** lock date (`invoices`,
+  `transactions`, `purchases`, `purchase_payments`, `vouchers`, `stock_moves`, `stock_transfers`, `advances`,
+  `fixed_assets` by `acquired_on`) is **not applied**: it is listed as a "locked period" conflict. **Apply with PIN**
+  verifies the PIN (and the `period.override` permission) and writes an `override` audit row; **Keep mine** declines it
+  (it stays on the other device; not offered again until it changes there). Another device's lock date is not applied
+  to rows it already had, so a fresh device receives the locked history.
+- Bill payment roll-ups (a change to a bill that touches only `amount_paid` / `updated_at`) pass, as they do in the
+  local data layer; the payment row is checked by its own date.
+- **Every resolution** that would write into a locked period or loosen the lock needs the PIN override, whatever the
+  listing's reason: "Use theirs" on a concurrent edit of a locked document, or switching to a listed settings version
+  that removes / moves the lock earlier. Such listings are flagged (`locked`) and the panel asks for the PIN.
+- A remote settings change that moves the lock date earlier or removes it is held the same way.
 - Vault mode: files are decrypted in memory; merged rows, `sync_state`, `sync_conflicts` (which hold the other
   version's data) and `sync_audit` are written through the storage layer, so they are sealed at rest like every other
   value. Nothing readable is written outside the vault store (`tests/sync-vault.test.ts`). The folder is encrypted
@@ -140,8 +176,16 @@ close in Chromium) and are read back and decrypted before the state records them
 is not rewritten (no cloud upload churn every 5 minutes). Files from a device on another schema version are skipped
 with "update the app".
 
+## Recurring invoices on several devices
+The recurring runner generates due occurrences on whichever device is open. With sync on it first waits (up to 2
+minutes) for the session's first successful sync, so an occurrence another device already generated — and the schedule
+it advanced — arrive before this device looks. If both still generate it (both opened before either synced), the
+document id is deterministic per schedule + occurrence (`rec-<scheduleId>-<occurrence>`, line ids likewise), so the
+two copies merge into **one** document (at worst listed as a conflict), never two invoices with two numbers.
+
 ## When it runs
-On app start (after 4 s), every 5 minutes while the tab is visible, and on **Sync now**. Runs are serialised in the
+On app start (after 4 s), when sync is switched on (no reload needed), every 5 minutes while the tab is visible, and
+on **Sync now**. Runs are serialised in the
 tab and across tabs (Web Locks). Unattended runs never prompt: if the browser dropped folder permission, the panel
 shows **Allow access and sync** (a click is a user gesture). Changed tables raise the usual "Updated in another tab
 … or by folder sync" banner, and the editor's stale-copy guard refuses to save over a document that sync changed.
@@ -149,8 +193,8 @@ shows **Allow access and sync** (a click is a user gesture). Changed tables rais
 ## Storage
 | key | where | backed up? |
 |---|---|---|
-| `mrchartist_inv_sync_device` | localStorage (device-local) | never |
-| `mrchartist_inv_sync_state` (versions, Lamport clock, peers, declined, last report) | company IndexedDB (sealed in vault) | **no** |
+| `mrchartist_inv_sync_device` (name; per company: switch, device id, group, high-water counter, issuing profile, last run) | localStorage (device-local) | never |
+| `mrchartist_inv_sync_state` (versions, Lamport clock, peers + file fingerprints, key hashes, declined) | company IndexedDB (sealed in vault) | **no** |
 | `mrchartist_inv_sync_conflicts` | company IndexedDB | **no** |
 | `mrchartist_inv_sync_audit` | company IndexedDB | **no** |
 | `sync-dir-handle`, `sync-key`, `sync-config` | company IndexedDB `kv` store | no |
@@ -172,7 +216,9 @@ clear the `kv` store, which disconnects sync.
   for records that reference them.
 - Rows from another device are applied as stored there; data-layer side effects (catalogue learning, client upsert)
   are not re-run.
-- A non-extractable sync key in IndexedDB lets this browser profile read the folder without the passphrase (same
-  trade-off as scheduled encrypted backups). Disconnect sync on a device you give away; changing the passphrase means
-  starting a new group.
+- Without vault mode, a non-extractable sync key in IndexedDB lets this browser profile read the folder without the
+  passphrase (same trade-off as scheduled encrypted backups); with vault mode it is sealed. Disconnect sync on a device
+  you give away; changing the passphrase means starting a new group.
+- A peer file that has not changed is not merged again, so a locked-period change you could now accept (after moving
+  the lock date) is offered again only when that device writes its file next.
 - Two devices with the same device id (a copied browser profile) are not detected.

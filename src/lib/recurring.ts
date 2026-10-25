@@ -421,6 +421,9 @@ export function createSchedule(input: {
 }
 
 /** Pure: one invoice for one occurrence. No storage access. */
+/** Id of the document generated for one occurrence of a schedule (stable across devices). */
+export const recurringDocId = (scheduleId: string, occurrence: string): string => `rec-${scheduleId}-${occurrence}`;
+
 export function buildInvoiceFromSchedule(
   s: RecurringSchedule,
   occurrence: string,
@@ -428,17 +431,20 @@ export function buildInvoiceFromSchedule(
 ): GeneratedInvoice {
   const t = s.template;
   const issue = opts.issueDate || occurrence;
+  // Deterministic ids per (schedule, occurrence): with folder sync (5.7) two devices generating the same
+  // occurrence produce ONE document (merged by id), never two invoices with two numbers.
+  const docId = recurringDocId(s.id, occurrence);
   const raw = {
     ...t,
-    id: '',
+    id: docId,
     invoice_number: opts.invoiceNumber,
     issue_date: issue,
     due_date: addDays(issue, s.due_in_days),
     status: s.mode === 'issue' ? 'Sent' : 'Draft',
     amount_paid: 0,
-    items: t.items.map((i) => ({
+    items: t.items.map((i, n) => ({
       ...i,
-      id: generateId(),
+      id: `${docId}-l${n + 1}`,
       name: applyTokens(i.name, occurrence),
       description: applyTokens(i.description, occurrence),
     })),
