@@ -22,6 +22,7 @@ import type {
 } from '../../types/payroll';
 import type { DepthData } from './depth';
 import { PAYROLL_TABLES, day, isMonth, obj, opt, str } from './records';
+import { loadRelief89 } from './followups-records';
 
 const n2 = (v: unknown) => round2(num(v));
 
@@ -37,6 +38,9 @@ function normalizeArrearsMonth(v: unknown): ArrearsMonth | null {
   }));
   const m: ArrearsMonth = { month: o.month, earnings, gross: 0, taxable: 0, pf_wages: 0, pf_ee: 0, eps: 0, epf_er: 0, edli: 0, pf_admin: 0, esi_wages: 0, esi_ee: 0, esi_er: 0 };
   for (const k of ['gross', 'taxable', 'pf_wages', 'pf_ee', 'eps', 'epf_er', 'edli', 'pf_admin', 'esi_wages', 'esi_ee', 'esi_er'] as const) m[k] = n2(o[k]);
+  // 7T (additive): EPS / EDLI wage differences, absent on older records.
+  if (o.eps_wages !== undefined && o.eps_wages !== null) m.eps_wages = n2(o.eps_wages);
+  if (o.edli_wages !== undefined && o.edli_wages !== null) m.edli_wages = n2(o.edli_wages);
   return m;
 }
 
@@ -146,7 +150,7 @@ export function normalizeAdjustments(rows: unknown[]): PayrollAdjustment[] {
   return out;
 }
 
-const PERQ_KINDS: PerquisiteKind[] = ['accommodation', 'car', 'other'];
+const PERQ_KINDS: PerquisiteKind[] = ['accommodation', 'car', 'other', 'meals', 'gift'];
 
 export function normalizePerquisites(rows: unknown[]): Perquisite[] {
   const out: Perquisite[] = [];
@@ -161,6 +165,7 @@ export function normalizePerquisites(rows: unknown[]): Perquisite[] {
       from_month: o.from_month,
       ...(isMonth(o.to_month) ? { to_month: o.to_month } : {}),
       monthly_value: n2(o.monthly_value),
+      ...(opt(o.basis) ? { basis: opt(o.basis) } : {}),
       created_at: str(o.created_at),
     });
   }
@@ -219,5 +224,6 @@ export function loadDepth(): DepthData {
     adjustments: loadAdjustments(),
     perquisites: loadPerquisites(),
     fnf: loadFnf(),
+    relief89: loadRelief89(),
   };
 }

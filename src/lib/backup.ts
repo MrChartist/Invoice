@@ -332,6 +332,8 @@ const RECORD_TABLES = [
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
   'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
+  // Payroll follow-ups (7T): relief u/s 89 (Form 10E) workings, actuarial valuations
+  'payroll_relief89', 'actuarial_valuations',
   // Manufacturing & stock vouchers (Phase 7): BOMs, Manufacturing / Stock Journals, Physical Stock
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   // Job work and Rejections In (Phase 7M)
@@ -361,6 +363,8 @@ const ID_TABLES = new Set([
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
   'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
+  // Payroll follow-ups (7T): relief u/s 89 (Form 10E) workings, actuarial valuations
+  'payroll_relief89', 'actuarial_valuations',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
   'gst_setoffs', 'gst_challans', 'hsn_master',

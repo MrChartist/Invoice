@@ -137,6 +137,7 @@ export function normalizePayHeads(rows: unknown[]): PayHead[] {
     if (str(o.account_id)) h.account_id = str(o.account_id);
     if (o.order !== undefined) h.order = num(o.order);
     if (o.nps === true && h.kind === 'employer') h.nps = true;
+    if (o.superannuation === true && h.kind === 'employer') h.superannuation = true;
     out.push(h);
   }
   return out;
@@ -414,10 +415,12 @@ export interface PayrollData {
   runs: PayrollRun[];
   /** Additive (7P): arrears, loans, leave, adjustments, perquisites, F&F. Absent = none. */
   depth?: DepthData;
+  /** Additive (7T): PT states whose rule adds arrears / one-off salary items to the month's gross. */
+  ptExtraStates?: readonly string[];
 }
 
 export function loadPayrollData(): PayrollData {
-  return { employees: loadEmployees(), heads: loadPayHeads(), structures: loadStructures(), attendance: loadAttendance(), runs: loadRuns(), depth: loadDepth() };
+  return { employees: loadEmployees(), heads: loadPayHeads(), structures: loadStructures(), attendance: loadAttendance(), runs: loadRuns(), depth: loadDepth(), ptExtraStates: loadPayrollSettings().pt_extra_states ?? [] };
 }
 
 /**
@@ -471,6 +474,7 @@ export function computeRun(month: string, data: PayrollData, overrides: Record<s
         overrides: overrides[e.id],
         extras: extrasFor(e, month, depth, data),
         esiPeriodCovered: esiPeriodDecision(e, month, data),
+        ...(e.state && data.ptExtraStates?.includes(e.state) ? { ptOnExtras: true } : {}),
       });
       if (line) lines.push(line);
     } catch (err) {
@@ -488,18 +492,22 @@ export interface PayrollSettings {
   pf_code?: string;
   esi_code?: string;
   tan?: string;
+  /** Additive (7T): GST state codes whose PT rule charges arrears / one-off salary items with the month. */
+  pt_extra_states?: string[];
 }
 
 export function loadPayrollSettings(): PayrollSettings {
   const o = obj(getJson<unknown>(PAYROLL_SETTINGS_KEY, {})) ?? {};
-  return { pf_code: opt(o.pf_code), esi_code: opt(o.esi_code), tan: opt(o.tan) };
+  const pt = Array.isArray(o.pt_extra_states) ? (o.pt_extra_states as unknown[]).map(str).filter((x) => /^\d{2}$/.test(x)) : [];
+  return { pf_code: opt(o.pf_code), esi_code: opt(o.esi_code), tan: opt(o.tan), ...(pt.length ? { pt_extra_states: pt } : {}) };
 }
 
 export function savePayrollSettings(input: PayrollSettings): void {
   guard();
   const tan = str(input.tan).toUpperCase();
   if (tan && !/^[A-Z]{4}\d{5}[A-Z]$/.test(tan)) throw new PayrollError('TAN must look like MUMA12345B.');
-  setJson(PAYROLL_SETTINGS_KEY, { pf_code: str(input.pf_code).toUpperCase(), esi_code: str(input.esi_code), tan });
+  const prev = obj(getJson<unknown>(PAYROLL_SETTINGS_KEY, {})) ?? {};
+  setJson(PAYROLL_SETTINGS_KEY, { ...prev, pf_code: str(input.pf_code).toUpperCase(), esi_code: str(input.esi_code), tan });
   audit.record({ entity: 'payroll', entity_id: 'settings', action: 'update', summary: 'Payroll registration numbers (PF / ESI / TAN) updated' });
 }
 

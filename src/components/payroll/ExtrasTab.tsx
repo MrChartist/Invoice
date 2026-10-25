@@ -15,7 +15,7 @@ import { Out } from './Out';
 import { inr, parseAmount, runAction, type TabProps } from './shared';
 
 const TAG_KEY = { reimb: 'ext.tag.reimb', bonus: 'ext.tag.bonus', adjust: 'ext.tag.adjust' } as const;
-const PERQ_KEY = { accommodation: 'ext.perq.accommodation', car: 'ext.perq.car', other: 'ext.perq.other' } as const;
+const PERQ_KEY = { accommodation: 'ext.perq.accommodation', car: 'ext.perq.car', meals: 'ext.perq.meals', gift: 'ext.perq.gift', other: 'ext.perq.other' } as const;
 
 /** Reimbursements & one-off items, perquisites (s. 17(2)) and the statutory bonus working (7P). */
 export function ExtrasTab({ month, version, refresh, notify }: TabProps) {
@@ -213,7 +213,7 @@ export function ExtrasTab({ month, version, refresh, notify }: TabProps) {
                 {perqs.map((p) => (
                   <tr key={p.id}>
                     <td>{name.get(p.employee_id) ?? ''}</td>
-                    <td>{pT(PERQ_KEY[p.kind])}{p.description ? <span className={styles.sub}>{p.description}</span> : null}</td>
+                    <td>{pT(PERQ_KEY[p.kind])}{p.description ? <span className={styles.sub}>{p.description}</span> : null}{p.basis ? <span className={styles.sub}>{p.basis}</span> : null}</td>
                     <td>{monthLabel(p.from_month)}</td>
                     <td>{p.to_month ? monthLabel(p.to_month) : '—'}</td>
                     <td className={styles.num}>{inr(p.monthly_value)}</td>
