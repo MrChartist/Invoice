@@ -212,6 +212,7 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // Accounts Info (WP-1): groups / sub-groups and ledgers are masters
   groups: 'master.edit',
   accounts: 'master.edit',
+  boms: 'master.edit',
   // books
   stock_moves: 'books.edit',
   stock_transfers: 'books.edit',
@@ -257,6 +258,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   loyalty_adjustments: 'master.edit',
   // approvals: a clerk's save files a request (doc.create); deciding needs doc.approve (approvals.ts)
   approvals: 'doc.create',
+  // Phase 7 (Tally parity): manufacturing and stock vouchers
+  manufacturing_vouchers: 'books.edit',
+  stock_journals: 'books.edit',
+  physical_stock: 'books.edit',
 };
 
 let systemDepth = 0;

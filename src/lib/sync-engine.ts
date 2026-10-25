@@ -266,6 +266,9 @@ const DATED: Record<string, string> = {
   [`${DB_PREFIX}vouchers`]: 'date',
   [`${DB_PREFIX}stock_moves`]: 'date',
   [`${DB_PREFIX}stock_transfers`]: 'date',
+  [`${DB_PREFIX}manufacturing_vouchers`]: 'date',
+  [`${DB_PREFIX}stock_journals`]: 'date',
+  [`${DB_PREFIX}physical_stock`]: 'date',
   [`${DB_PREFIX}advances`]: 'date',
   [`${DB_PREFIX}fixed_assets`]: 'acquired_on',
 };
@@ -803,6 +806,9 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}advances`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}vouchers`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}stock_transfers`]: { num: 'transfer_number', date: 'date' },
+  [`${DB_PREFIX}manufacturing_vouchers`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}stock_journals`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}physical_stock`]: { num: 'number', date: 'date' },
 };
 
 /** Duplicate document numbers (two devices issuing the same serial): listed, never renumbered. */
