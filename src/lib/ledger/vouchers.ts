@@ -21,6 +21,7 @@ import type { Payment } from '../../types/invoice';
 import { formatMoney } from '../utils';
 import { chartOf, loadUserAccounts, type Account } from './accounts';
 import { isCashOrBankLedger } from '../bank-ledgers';
+import { recordTypedNumber, seriesTypeFor, typedNumber } from '../voucher-series';
 
 export const VOUCHERS_TABLE = 'vouchers';
 
@@ -79,6 +80,8 @@ export interface ManualVoucher {
   regularised_at?: string;
   /** Additive (WP-9): `branches` row id of the branch / location. */
   branch_id?: string;
+  /** Additive (P1-13): user voucher type (`voucher_types`, same base as `type`) that numbered it; absent = `JV/…` etc. */
+  voucher_type_id?: string;
 }
 
 export type ManualVoucherVariant = 'OPTIONAL' | 'MEMO';
@@ -183,6 +186,7 @@ export function normalizeVouchers(rows: unknown[]): ManualVoucher[] {
       ...(typeof o.updated_at === 'string' ? { updated_at: o.updated_at } : {}),
       ...variantFields(o),
       ...(typeof o.branch_id === 'string' && o.branch_id ? { branch_id: o.branch_id } : {}),
+      ...(typeof o.voucher_type_id === 'string' && o.voucher_type_id ? { voucher_type_id: o.voucher_type_id } : {}),
     });
   }
   return out;
@@ -232,7 +236,10 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
   const prev = input.id ? all.find((v) => v.id === input.id) : undefined;
   const others = all.filter((v) => v.id !== prev?.id);
 
-  const number = (input.number ?? '').trim() || (prev && prev.type === input.type ? prev.number : nextVoucherNumber(others, input.type, input.date));
+  // P1-13: a user voucher type numbers its own series; a voucher keeps its number while type and series stay.
+  const vt = seriesTypeFor(input.voucher_type_id, input.type);
+  const sameSeries = prev && prev.type === input.type && (prev.voucher_type_id ?? '') === (input.voucher_type_id ?? '');
+  const number = (input.number ?? '').trim() || (sameSeries ? prev.number : vt ? typedNumber(vt, input.date, others.map((v) => v.number)) : nextVoucherNumber(others, input.type, input.date));
   if (others.some((v) => v.number.toLowerCase() === number.toLowerCase())) throw new VoucherError(`Voucher number ${number} is already used.`);
 
   requireAccess('books.edit');
@@ -259,8 +266,11 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
     ...(prev ? { updated_at: now } : {}),
     ...variantFields({ ...input, regularised_at: prev?.regularised_at }),
     ...(input.branch_id ? { branch_id: input.branch_id } : {}),
+    // An inactive type keeps the vouchers it already numbered.
+    ...(vt ? { voucher_type_id: vt.id } : sameSeries && prev.voucher_type_id ? { voucher_type_id: prev.voucher_type_id } : {}),
   };
   setTable(VOUCHERS_TABLE, prev ? all.map((v) => (v.id === id ? row : v)) : [...all, row]);
+  if (vt) recordTypedNumber(vt, row.date, row.number);
   if (receipts.length && prev && prev.number !== number) {
     setTable('transactions', getTable<VoucherReceiptRow>('transactions').map((r) => (r.voucher_id === id ? { ...r, reference: number } : r)));
   }

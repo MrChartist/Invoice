@@ -531,6 +531,7 @@ export function generateInvoiceFromSchedule(
     issue,
     s.template.doc_type,
     s.template.sender?.invoicePrefix || undefined,
+    (s.template as { voucher_type_id?: string }).voucher_type_id, // P1-13: the template's voucher type series
   );
   let built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
   // Issuing straight away skips the editor, so run its stock checks here; a tracked item that needs a

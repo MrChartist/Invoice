@@ -33,7 +33,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
   const { money, currency, date, col, show, footerText, headerNote } = usePaper();
   const cur = invoice.currency;
   const c = invoice.client;
-  const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
+  const title = invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice');
   // Reverse charge: the tax is printed in the recipient-pays note, never added up here.
   const rcm = isRcmTotals(totals);
   const cgstSgst = isTaxed(invoice, totals) && !rcm;

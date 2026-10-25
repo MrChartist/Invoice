@@ -18,6 +18,7 @@ import {
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
 import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoice-defaults';
+import { baseOfDoc } from '../lib/voucher-series';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import type {
   Client,
@@ -127,6 +128,7 @@ export const RECORD_KEYS = [
   'eco_gstin', 'eco_section', 'challan_purpose',
   'transport',
   'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
+  'voucher_type_id', 'print_title',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -295,6 +297,8 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       } else {
         apply({ doc_type });
       }
+      // P1-13: a voucher type belongs to one base (sales / credit / debit note); another base drops it.
+      if (get().voucher_type_id && baseOfDoc(prev) !== baseOfDoc(doc_type)) apply({ voucher_type_id: undefined, print_title: undefined });
     },
     setTemplate: (template_id) => {
       localDb.template.set(template_id);
@@ -577,6 +581,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
           record.issue_date,
           record.doc_type,
           record.sender?.invoicePrefix || undefined,
+          record.voucher_type_id,
         );
       }
       if (record.status === 'Draft' && !opts?.asDraft) record.status = 'Sent';

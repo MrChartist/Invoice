@@ -37,6 +37,7 @@ import {
 import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { nextReceiptNumber, recordSeries } from './series-counters';
+import { baseOfDoc, recordTypedNumber, seriesTypeFor, typedNumber } from './voucher-series';
 import { receivableTotal } from './rcm';
 import { assertNotPendingApproval, holdIfApprovalNeeded } from './approval-gate';
 import {
@@ -328,13 +329,13 @@ export const localDb = {
     getById: (id: string) => getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id),
 
     /** Next number in the series, derived from the highest one already issued. */
-    nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string) =>
-      nextInvoiceNumber({
-        existingNumbers: getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
-        dateStr,
-        docType,
-        customPrefix: prefix ?? readSettings().invoicePrefix,
-      }),
+    nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string, voucherTypeId?: string) => {
+      const existingNumbers = getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number);
+      // P1-13: a user voucher type numbers its own series; without one the Indian-FY default applies.
+      const vt = seriesTypeFor(voucherTypeId, baseOfDoc(docType));
+      if (vt) return typedNumber(vt, dateStr, existingNumbers);
+      return nextInvoiceNumber({ existingNumbers, dateStr, docType, customPrefix: prefix ?? readSettings().invoicePrefix });
+    },
 
     /**
      * Is `number` free for document `selfId`? Also reports the series gap a skipped-ahead
@@ -383,6 +384,7 @@ export const localDb = {
             toSave.issue_date,
             toSave.doc_type,
             toSave.sender?.invoicePrefix || undefined,
+            toSave.voucher_type_id,
           );
         }
       }
@@ -409,6 +411,8 @@ export const localDb = {
         invoices.push(toSave);
       }
       setTable(KEYS.invoices, invoices);
+      const vt = seriesTypeFor(toSave.voucher_type_id, baseOfDoc(toSave.doc_type));
+      if (vt) recordTypedNumber(vt, toSave.issue_date, toSave.invoice_number); // never reuse a type's number
       // Files this document no longer lists (6.12) are deleted unless another record uses them.
       if (stored) releaseDropped(stored.attachments, toSave.attachments);
 

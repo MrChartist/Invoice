@@ -4,7 +4,7 @@
  * addressed by `MasterScreen` + optional item id; see docs/features/masters.md for the URL form
  * `/books?tab=coa&m=<screen>&mid=<id>`.
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { can } from '../../lib/access';
 import { useT } from '../../i18n';
 import { mastersT } from '../../i18n/areas/masters';
@@ -19,6 +19,9 @@ import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
 
 export type { MasterScreen } from './screens';
+
+// P1-13: Voucher Types master, its own lazy chunk.
+const VoucherTypesScreen = lazy(() => import('../voucher-types/VoucherTypesScreen'));
 
 export interface MastersPanelProps {
   /** Controlled screen (e.g. from the URL); omit to let the panel keep its own. */
@@ -67,6 +70,12 @@ export default function MastersPanel({ screen: screenProp, itemId: itemProp, onN
       return <LedgerForm key={`l-${itemId}`} mode={screen === 'ledger-alter' ? 'alter' : 'display'} ledgerId={itemId} onDone={done} onBack={() => go(screen)} onBillwise={billwise} notify={notify} />;
     case 'opening-tb':
       return <OpeningTrialBalance onDone={done} onBack={menu} onBillwise={billwise} notify={notify} />;
+    case 'voucher-types':
+      return (
+        <Suspense fallback={null}>
+          <VoucherTypesScreen onBack={menu} notify={notify} startCreate={itemId === 'new'} />
+        </Suspense>
+      );
     case 'billwise':
       return itemId ? <BillwiseOpening key={itemId} ledgerId={itemId} onDone={done} onBack={menu} notify={notify} /> : <MastersMenu go={go} onClose={onClose} />;
     default:
@@ -105,6 +114,15 @@ function MastersMenu({ go, onClose }: { go: (s: MasterScreen) => void; onClose?:
           <div className={styles.menu}>
             {block(mastersT('groups'), 'group')}
             {block(mastersT('ledgers'), 'ledger')}
+            <div className={styles.menuBlock}>
+              <h3 className={styles.menuTitle}>{mastersT('voucherTypes')}</h3>
+              <p className={styles.note}>{mastersT('voucherTypesHint')}</p>
+              <div className={styles.menuLinks}>
+                <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => go('voucher-types')} data-testid="masters-voucher-types">
+                  {mastersT('voucherTypes')}
+                </button>
+              </div>
+            </div>
             <div className={styles.menuBlock}>
               <h3 className={styles.menuTitle}>{mastersT('openingTb')}</h3>
               <p className={styles.note}>{mastersT('openingTbHint')}</p>

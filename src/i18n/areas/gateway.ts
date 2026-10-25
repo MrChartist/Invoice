@@ -56,6 +56,7 @@ export const gwT = defineArea(
     costCentre: 'Cost centre',
     priceLevel: 'Price levels',
     employee: 'Employee',
+    voucherTypes: 'Voucher type',
 
     contra: 'Contra',
     payment: 'Payment',
@@ -285,6 +286,7 @@ export const gwT = defineArea(
     costCentre: 'कॉस्ट सेंटर',
     priceLevel: 'मूल्य स्तर',
     employee: 'कर्मचारी',
+    voucherTypes: 'वाउचर प्रकार',
 
     contra: 'कॉन्ट्रा',
     payment: 'भुगतान',

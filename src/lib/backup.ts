@@ -344,6 +344,8 @@ const RECORD_TABLES = [
   'year_end',
   // Inventory masters (WP-8): stock groups, stock categories, units of measure
   'stock_groups', 'stock_categories', 'units',
+  // Voucher types master (P1-13, 7Q)
+  'voucher_types',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -367,6 +369,7 @@ const ID_TABLES = new Set([
   'rcm_documents',
   'year_end',
   'stock_groups', 'stock_categories', 'units',
+  'voucher_types',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

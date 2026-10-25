@@ -11,9 +11,11 @@ export type MasterScreen =
   | 'ledger-alter'
   | 'ledger-display'
   | 'opening-tb'
-  | 'billwise';
+  | 'billwise'
+  /** P1-13: Voucher Types master (`src/components/voucher-types/VoucherTypesScreen.tsx`, own lazy chunk). */
+  | 'voucher-types';
 
-export const MASTER_SCREENS: readonly MasterScreen[] = ['menu', 'group-create', 'group-alter', 'group-display', 'ledger-create', 'ledger-alter', 'ledger-display', 'opening-tb', 'billwise'];
+export const MASTER_SCREENS: readonly MasterScreen[] = ['menu', 'group-create', 'group-alter', 'group-display', 'ledger-create', 'ledger-alter', 'ledger-display', 'opening-tb', 'billwise', 'voucher-types'];
 
 export function isMasterScreenParam(v: unknown): v is MasterScreen {
   return typeof v === 'string' && (MASTER_SCREENS as readonly string[]).includes(v);

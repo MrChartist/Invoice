@@ -224,6 +224,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   stock_groups: 'master.edit',
   stock_categories: 'master.edit',
   units: 'master.edit',
+  // Voucher types master (P1-13): numbering series and defaults per user voucher type
+  voucher_types: 'master.edit',
   // books
   stock_moves: 'books.edit',
   stock_transfers: 'books.edit',
