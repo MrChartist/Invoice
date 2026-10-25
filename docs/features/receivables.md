@@ -140,8 +140,13 @@ the live client master by id and falls back to the invoice's client snapshot. No
 
 ## Receipts and the paid-in-full step
 
-`src/lib/receipts.ts` builds payment receipts: `receiptNumber` derives `RCPT/FY<yy-yy>/<seq>` from the date order of
-all payments in that financial year (nothing new is stored), `buildReceipt` adds the amount in words and the
+`src/lib/receipts.ts` builds payment receipts. `RCPT/FY<yy-yy>/<seq>` is **stamped** on the payment when it is recorded
+(`Payment.receipt_number`, additive; `localDb.payments.record` → `nextReceiptNumber`): one above the highest stamped
+number of that FY, the count of older unstamped payments in that FY and the `series_counters` high-water mark, so a
+deleted payment or a bounced cheque never renumbers another receipt and no number is issued twice. Payments recorded
+before stamping keep a derived number — their date-order position among the *unstamped* payments of the FY — so their
+printed numbers do not change, and new stamps start above them (decision: derive for legacy rows, continue after the
+max for new ones; nothing is migrated). Advance adjustments take no RCPT number. `buildReceipt` adds the amount in words and the
 balance left after that payment (net of TDS), and `receiptHtml` renders a script-free page that prints from a plain
 window under the CSP (a blocked pop-up saves it as HTML instead). Each payment in the payment dialog has a Receipt
 button; a payment that clears the balance shows **Paid in full** with Receipt and **Send thank-you** (the existing

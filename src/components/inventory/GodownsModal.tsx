@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Edit3, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
-import { godownsDb } from '../../lib/godowns';
+import { godownsDb, liveGodownReferences } from '../../lib/godowns';
 import { godownInUse, type TrackingMap } from '../../lib/stock-tracking';
 import { MAIN_GODOWN_ID, type Godown } from '../../types/stock';
 import { useT } from '../../i18n';
@@ -41,6 +41,10 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
 
   const remove = (g: Godown) => {
     try {
+      // Anything that names it counts: drafts, quotations, cancelled documents, untracked lines,
+      // recurring templates and the default-godown setting too.
+      const refs = liveGodownReferences(g.id);
+      if (refs.length) throw new Error(`${g.name} is still used by ${refs.join(', ')}, so it cannot be deleted.`);
       godownsDb.remove(g.id, godownInUse(tracking, g.id) || transfersUse.has(g.id));
       onChanged(invT('godownDeleted', { name: g.name }));
       setError('');

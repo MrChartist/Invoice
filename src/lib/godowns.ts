@@ -14,9 +14,11 @@
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer } from '../types/stock';
 import { buildInvoiceNumber, getIndianFY, highestSequence } from './invoice-number';
 import { num } from './invoice-calc';
-import { generateId, getTable, setTable } from './storage';
+import { DB_PREFIX, generateId, getTable, readRaw, setTable } from './storage';
 import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
+import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
+import { assertRemovable, liveRemovalIssues } from './stock-timeline';
 
 export const GODOWNS_TABLE = 'godowns';
 export const TRANSFERS_TABLE = 'stock_transfers';
@@ -69,6 +71,58 @@ const lockSubject = (t: Pick<StockTransfer, 'id' | 'date' | 'transfer_number'>) 
   invoice_number: t.transfer_number,
 });
 
+function logGodown(id: string, action: 'create' | 'update' | 'delete', summary: string): void {
+  try {
+    audit.record({ entity: 'godown', entity_id: id, action, summary });
+  } catch {
+    /* logging never breaks a save */
+  }
+}
+
+/**
+ * Everything that names a godown (any status, any document type, untracked items too): stock moves,
+ * bill / invoice / recurring-template lines, transfers and the default-godown setting. Pure over raw rows.
+ */
+export function godownReferences(
+  id: string,
+  t: {
+    moves?: readonly { godown_id?: string }[];
+    invoices?: readonly { items?: readonly { godown_id?: string }[] }[];
+    purchases?: readonly { lines?: readonly { godown_id?: string }[] }[];
+    transfers?: readonly Pick<StockTransfer, 'from_godown' | 'to_godown'>[];
+    recurring?: readonly { template?: { items?: readonly { godown_id?: string }[] } }[];
+    defaultGodown?: string;
+  },
+): string[] {
+  const out: string[] = [];
+  const lines = (rows: readonly { godown_id?: string }[] | undefined) => (rows ?? []).some((l) => l?.godown_id === id);
+  if ((t.moves ?? []).some((m) => m?.godown_id === id)) out.push('stock adjustments');
+  if ((t.purchases ?? []).some((p) => lines(p?.lines))) out.push('purchase bills');
+  if ((t.invoices ?? []).some((d) => lines(d?.items))) out.push('documents (including drafts, quotations and cancelled ones)');
+  if ((t.transfers ?? []).some((x) => x?.from_godown === id || x?.to_godown === id)) out.push('stock transfers');
+  if ((t.recurring ?? []).some((r) => lines(r?.template?.items))) out.push('recurring templates');
+  if (t.defaultGodown === id) out.push('the default-godown setting');
+  return out;
+}
+
+/** `godownReferences` over the stored data. */
+export function liveGodownReferences(id: string): string[] {
+  let defaultGodown: string | undefined;
+  try {
+    defaultGodown = (JSON.parse(readRaw(`${DB_PREFIX}inventory_settings`) || '{}') as { defaultGodown?: string }).defaultGodown;
+  } catch {
+    defaultGodown = undefined;
+  }
+  return godownReferences(id, {
+    moves: getTable('stock_moves'),
+    invoices: getTable('invoices'),
+    purchases: getTable('purchases'),
+    transfers: getTable<StockTransfer>(TRANSFERS_TABLE),
+    recurring: getTable('recurring'),
+    defaultGodown,
+  });
+}
+
 export const godownsDb = {
   stored: (): Godown[] => getTable<Godown>(GODOWNS_TABLE),
   list: (): Godown[] => godownList(godownsDb.stored()),
@@ -93,6 +147,7 @@ export const godownsDb = {
       updated_at: now(),
     };
     setTable(GODOWNS_TABLE, existing ? rows.map((g) => (g.id === row.id ? row : g)) : [...rows, row]);
+    logGodown(row.id, existing ? 'update' : 'create', existing ? `Godown "${existing.name}" ${existing.name !== name ? `renamed to "${name}"` : 'edited'}` : `Godown "${name}" added`);
     return row;
   },
 
@@ -100,14 +155,17 @@ export const godownsDb = {
   remove(id: string, inUse: boolean): void {
     if (id === MAIN_GODOWN_ID) throw new Error('The main godown cannot be deleted.');
     if (inUse) throw new Error('Stock, bills, invoices or transfers still use this godown, so it cannot be deleted.');
+    const row = godownsDb.stored().find((g) => g.id === id);
     setTable(GODOWNS_TABLE, godownsDb.stored().filter((g) => g.id !== id));
+    logGodown(id, 'delete', `Godown "${row?.name ?? id}" deleted`);
   },
 };
 
 export const transfersDb = {
   all: (): StockTransfer[] => getTable<StockTransfer>(TRANSFERS_TABLE),
   get: (id: string): StockTransfer | undefined => transfersDb.all().find((t) => t.id === id),
-  nextNumber: (date?: string): string => nextTransferNumber(transfersDb.all().map((t) => t.transfer_number), date),
+  /** Above every existing number and the series high-water mark (a deleted latest number is not reused). */
+  nextNumber: (date?: string): string => nextSeriesNumberFor(TRANSFER_PREFIX, date, transfersDb.all().map((t) => t.transfer_number)),
 
   /**
    * Insert or update (by id). A new transfer without a number gets the next one in its FY.
@@ -119,7 +177,10 @@ export const transfersDb = {
     const rows = transfersDb.all();
     const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
     if (existing) assertUnlocked(lockSubject(existing), 'edit');
-    const number = (input.transfer_number ?? '').trim() || existing?.transfer_number || transfersDb.nextNumber(input.date);
+    const asked = (input.transfer_number ?? '').trim();
+    // An edit that moves the date into another FY takes a number from that FY's series (as advances do).
+    const keep = existing && numberFitsFy(existing.transfer_number, input.date) ? existing.transfer_number : '';
+    const number = (asked && asked !== existing?.transfer_number ? asked : '') || keep || transfersDb.nextNumber(input.date);
     const id = existing?.id ?? input.id ?? generateId();
     const state = assertUnlocked(lockSubject({ id, date: input.date, transfer_number: number }), existing ? 'edit' : 'create');
     if (rows.some((r) => r.id !== id && r.transfer_number.toUpperCase() === number.toUpperCase())) {
@@ -135,6 +196,7 @@ export const transfersDb = {
       updated_at: now(),
     };
     setTable(TRANSFERS_TABLE, existing ? rows.map((r) => (r.id === id ? record : r)) : [...rows, record]);
+    recordSeries(number);
     const units = record.lines.reduce((s, l) => s + num(l.qty), 0);
     audit.record({
       entity: 'stock_transfer',
@@ -146,11 +208,15 @@ export const transfersDb = {
     return record;
   },
 
-  /** Delete a transfer (period lock respected; audited). */
-  remove(id: string): void {
+  /**
+   * Delete a transfer (period lock respected; audited). Refused when a later document took serials it
+   * moved; when later documents used the moved quantity, `confirmStock` must be set (StockDependencyError).
+   */
+  remove(id: string, opts: { confirmStock?: boolean } = {}): void {
     const t = transfersDb.get(id);
     if (!t) return;
     assertUnlocked(lockSubject(t), 'delete');
+    assertRemovable(liveRemovalIssues({ refType: 'transfer', refId: id }), opts.confirmStock);
     setTable(TRANSFERS_TABLE, transfersDb.all().filter((r) => r.id !== id));
     audit.record({
       entity: 'stock_transfer',

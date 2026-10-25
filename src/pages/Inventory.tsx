@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { cn, formatMoney, formatDate, todayInput, addDaysInput } from '../lib/utils';
 import { localDb } from '../lib/localDb';
-import { StorageWriteError } from '../lib/storage';
 import {
   blankStockItem, deadStock, loadPositions, loadSettings, marginReport, movementSummary,
   saveSettings, stockDb, stockSummaryCsv, summarize,
@@ -15,6 +14,7 @@ import {
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/useToast';
+import { can } from '../lib/access';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { ItemFormModal } from '../components/inventory/ItemFormModal';
@@ -113,17 +113,20 @@ export function Inventory() {
       refresh();
       notify(okMsg);
     } catch (err) {
-      notify(err instanceof StorageWriteError ? err.message : invT('saveFailed'), 'error');
+      // Storage, period-lock and role refusals carry a readable message.
+      notify(err instanceof Error && err.message ? err.message : invT('saveFailed'), 'error');
     }
   };
 
+  // Valuation settings are owner-only (6.21); the lib refuses too.
+  const canSettings = can('settings.manage');
   const updateSettings = (next: InventorySettings) => {
     try {
       saveSettings(next);
-    } catch {
-      notify(invT('settingsFailed'), 'error');
+      setSettings(next);
+    } catch (err) {
+      notify(err instanceof Error && err.message ? err.message : invT('settingsFailed'), 'error');
     }
-    setSettings(next);
   };
 
   const filtered = useMemo(() => {
@@ -210,14 +213,14 @@ export function Inventory() {
             <select
               className={cn(controls.select, styles.methodSelect)} value={settings.method}
               onChange={(e) => updateSettings({ ...settings, method: e.target.value as CostingMethod })}
-              aria-label={invT('costingMethod')}
+              aria-label={invT('costingMethod')} disabled={!canSettings}
             >
               <option value="WEIGHTED_AVG">{invT('weightedAvg')}</option>
               <option value="FIFO">FIFO</option>
             </select>
           </label>
           <label className={controls.check}>
-            <input type="checkbox" checked={settings.includeChallans} onChange={(e) => updateSettings({ ...settings, includeChallans: e.target.checked })} />
+            <input type="checkbox" checked={settings.includeChallans} disabled={!canSettings} onChange={(e) => updateSettings({ ...settings, includeChallans: e.target.checked })} />
             {invT('challans')}
           </label>
           {showBatches && (
@@ -225,7 +228,7 @@ export function Inventory() {
               <span className={controls.label}>{invT('expiryAlert')}</span>
               <input
                 type="number" min={1} max={3650} className={cn(controls.input, controls.inputNumeric)} style={{ width: '5.5rem' }}
-                value={expiryDays} aria-label={invT('expiryAlertAria')}
+                value={expiryDays} aria-label={invT('expiryAlertAria')} disabled={!canSettings}
                 onChange={(e) => updateSettings({ ...settings, expiryAlertDays: Math.min(3650, Math.max(1, Math.round(Number(e.target.value) || DEFAULT_EXPIRY_ALERT_DAYS))) })}
               />
             </label>
@@ -235,7 +238,7 @@ export function Inventory() {
               <span className={controls.label}>{invT('defaultGodown')}</span>
               <select
                 className={cn(controls.select, styles.methodSelect)} value={godowns.some((g) => g.id === settings.defaultGodown) ? settings.defaultGodown : MAIN_GODOWN_ID}
-                aria-label={invT('defaultGodownAria')}
+                aria-label={invT('defaultGodownAria')} disabled={!canSettings}
                 onChange={(e) => updateSettings({ ...settings, defaultGodown: e.target.value === MAIN_GODOWN_ID ? undefined : e.target.value })}
               >
                 {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}

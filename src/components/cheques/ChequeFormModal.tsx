@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { ChequeError, saveCheque, validateCheque, type ChequeInput } from '../../lib/cheques';
+import { BankAccountSelect } from '../bank/BankAccountSelect';
+import { DEFAULT_BANK_ID } from '../../lib/bank-accounts';
 import { isPostDated, validUntil } from '../../lib/cheque-reminders';
 import { localDb } from '../../lib/localDb';
 import { purchasesDb, balanceOf } from '../../lib/purchases';
@@ -30,9 +32,10 @@ interface Form {
   link: string;
   account_payee: boolean;
   notes: string;
+  bank_account_id: string;
 }
 
-const blank = (): Form => ({ number: '', bank: '', branch: '', cheque_date: todayInput(), amount: '', party_name: '', link: '', account_payee: true, notes: '' });
+const blank = (): Form => ({ number: '', bank: '', branch: '', cheque_date: todayInput(), amount: '', party_name: '', link: '', account_payee: true, notes: '', bank_account_id: '' });
 const norm = (s: string | undefined) => (s ?? '').trim().toLowerCase();
 
 /** Add / edit a received or issued cheque (6.26). */
@@ -58,6 +61,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
             link: cheque.invoice_id ?? cheque.purchase_id ?? '',
             account_payee: cheque.account_payee !== false,
             notes: cheque.notes ?? '',
+            bank_account_id: cheque.bank_account_id ?? '',
           }
         : blank(),
     );
@@ -119,6 +123,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
       purchase_id: !received ? form.link || undefined : undefined,
       account_payee: received ? undefined : form.account_payee,
       notes: form.notes.trim() || undefined,
+      bank_account_id: form.bank_account_id && form.bank_account_id !== DEFAULT_BANK_ID ? form.bank_account_id : undefined,
     };
   };
 
@@ -220,6 +225,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
             <input className={controls.input} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
           </label>
         </div>
+        <BankAccountSelect id="cheque-bank-account" label={received ? 'Deposit into' : 'Drawn on (our account)'} method="Cheque" value={form.bank_account_id} onChange={(v) => set('bank_account_id', v)} />
       </form>
     </Modal>
   );

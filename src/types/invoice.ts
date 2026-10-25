@@ -137,6 +137,12 @@ export interface InvoiceItem {
   amount: number;
   /** Additive (6.16): cost centre for this line, overriding the document's `cost_centre_id`. */
   cost_centre_id?: string;
+  /**
+   * Additive (integrity review): ids of the time entries / mileage trips / re-billed purchase rows this
+   * line bills (Time -> "Bill client"). Billing state is derived from these (`timesheets.ts`), so
+   * deleting the line frees them and a duplicate keeps billing them.
+   */
+  bill_refs?: string[];
   created_at?: string;
   /**
    * Additive: id of the Sales Order line this line fulfils (set when a challan / invoice is converted from a
@@ -320,6 +326,12 @@ export interface Payment {
    * bank matching skip it — the cash came in on the advance's own date.
    */
   advance_id?: string;
+  /**
+   * Additive (integrity review): receipt voucher number `RCPT/FY<yy-yy>/<seq>`, stamped when the payment is
+   * recorded (never re-derived, so a later delete / bounce cannot renumber it). Older rows without it keep
+   * the date-order number (`receipts.ts`). Absent on advance adjustments.
+   */
+  receipt_number?: string;
 }
 
 /** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */

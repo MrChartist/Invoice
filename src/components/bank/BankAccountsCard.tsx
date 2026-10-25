@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Landmark, Plus } from 'lucide-react';
-import { DEFAULT_BANK_ID, bankAccountsDb, type BankAccount } from '../../lib/bank-accounts';
+import { DEFAULT_BANK_ID, bankAccountsDb, type BankAccount, liveBankAccountUsage } from '../../lib/bank-accounts';
 import type { BankStatement } from '../../lib/bank-recon';
 import { generateId } from '../../lib/storage';
 import { formatMoney } from '../../lib/utils';
@@ -43,7 +43,8 @@ const toDraft = (a?: BankAccount): Draft => ({
 export function BankAccountsCard({ accounts, statements, payments, onChange, notify }: Props) {
   useT(); // re-render on a language switch (5.4)
   const [draft, setDraft] = useState<Draft | null>(null);
-  const inUse = (id: string) => statements.some((s) => s.bank_account_id === id) || payments.some((p) => p.bank_account_id === id);
+  // Advances, refunds, cheques and supplier payments count too (liveBankAccountUsage).
+  const inUse = (id: string) => statements.some((s) => s.bank_account_id === id) || payments.some((p) => p.bank_account_id === id) || liveBankAccountUsage(id).length > 0;
 
   const save = (e: React.FormEvent) => {
     e.preventDefault();

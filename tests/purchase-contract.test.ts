@@ -357,3 +357,15 @@ test('TDS-on-payables fields (Tally parity): every reader agrees on what the sup
   // Legacy rows read as no TDS.
   assert.deepEqual([readPurchase(bill)!.tdsAmount, readPurchase(bill)!.tdsOnBill, supplierPayable(bill)], [0, 0, 1180]);
 });
+
+test('integrity review: removal checks, godown and cost-centre usage read bills through the contract', async () => {
+  const { removalIssues } = await import('../src/lib/stock-timeline.ts');
+  const { godownReferences } = await import('../src/lib/godowns.ts');
+  const { costCentreUsage } = await import('../src/lib/cost-centres.ts');
+  const item = { id: 'w', name: 'Widget', hsn: '8471', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, track_serials: true };
+  const tracked: PurchaseRecord = { ...bill, id: 'pb', cost_centre_id: 'cc', lines: [{ id: 'l', name: 'Widget', hsn: '8471', quantity: 1, rate: 10, tax_rate: 0, serials: ['S1'], godown_id: 'g2' }] };
+  const sale = { id: 's', invoice_number: 'INV/1', doc_type: 'INVOICE' as const, status: 'Sent' as const, issue_date: '2099-01-01', items: [{ id: 'x', name: 'Widget', hsn: '8471', type: 'Goods', quantity: 1, rate: 1, amount: 1, serials: ['S1'] }] };
+  assert.equal(removalIssues({ items: [item], moves: [], invoices: [sale], purchases: [tracked] }, { refType: 'purchase', refId: 'pb' }, false).errors.length, 1);
+  assert.deepEqual(godownReferences('g2', { purchases: [tracked] }), ['purchase bills']);
+  assert.equal(costCentreUsage('cc', { purchases: [tracked as never] }).purchases, 1);
+});

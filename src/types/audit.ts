@@ -28,7 +28,12 @@ export type AuditEntity =
   /** TDS / TCS challans, manual deductions and return-filed marks (Tally parity). */
   | 'tds'
   /** Supplier advances / on-account payments and their bill-wise adjustments (Tally parity). */
-  | 'vendor_payment';
+  | 'vendor_payment'
+  /** Integrity review: godown masters, purchase orders, manual stock adjustments, POS day-close counts. */
+  | 'godown'
+  | 'purchase_order'
+  | 'stock_adjustment'
+  | 'pos_day_close';
 
 export type AuditAction =
   | 'create'
@@ -169,4 +174,8 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   advance: 'Advances',
   tds: 'TDS / TCS',
   vendor_payment: 'Supplier advances',
+  godown: 'Godowns',
+  purchase_order: 'Purchase orders',
+  stock_adjustment: 'Stock adjustments',
+  pos_day_close: 'POS day close',
 };

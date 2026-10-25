@@ -55,6 +55,40 @@ function clean(rows: unknown[]): BankAccount[] {
   return out;
 }
 
+/**
+ * Where a bank account id is used: receipts, supplier payments, advances and their refunds, cheques
+ * and imported statements. Pure over raw rows (`bankAccountUsage`) / live (`liveBankAccountUsage`).
+ */
+export function bankAccountUsage(
+  id: string,
+  t: {
+    payments?: readonly { bank_account_id?: string }[];
+    purchasePayments?: readonly { bank_account_id?: string }[];
+    advances?: readonly { bank_account_id?: string; refunds?: readonly { bank_account_id?: string }[] }[];
+    cheques?: readonly { bank_account_id?: string }[];
+    statements?: readonly { bank_account_id?: string }[];
+  },
+): string[] {
+  const uses = (rows?: readonly { bank_account_id?: string }[]) => (rows ?? []).some((r) => r?.bank_account_id === id);
+  const out: string[] = [];
+  if (uses(t.payments)) out.push('receipts');
+  if (uses(t.purchasePayments)) out.push('supplier payments');
+  if ((t.advances ?? []).some((a) => a?.bank_account_id === id || uses(a?.refunds))) out.push('advances / refunds');
+  if (uses(t.cheques)) out.push('cheques');
+  if (uses(t.statements)) out.push('bank statements');
+  return out;
+}
+
+export function liveBankAccountUsage(id: string): string[] {
+  return bankAccountUsage(id, {
+    payments: getTable('transactions'),
+    purchasePayments: getTable('purchase_payments'),
+    advances: getTable('advances'),
+    cheques: getTable('cheques'),
+    statements: getTable('bank_statements'),
+  });
+}
+
 export const bankAccountsDb = {
   all: (): BankAccount[] => clean(getTable<unknown>(BANK_ACCOUNTS_TABLE)),
   active: (): BankAccount[] => bankAccountsDb.all().filter((a) => a.active !== false),

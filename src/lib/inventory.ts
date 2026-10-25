@@ -14,11 +14,14 @@
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
 import { round2, num } from './invoice-calc';
-import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from './storage';
+import { DB_PREFIX, generateId, getJson, getTable, readRaw, setJson, setTable } from './storage';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv } from './csv';
 import { creditNoteReturnsGoods } from './credit-restock';
 import { MAIN_GODOWN_ID, type StockTransfer } from '../types/stock';
+import { requireAccess } from './access';
+import { assertUnlocked } from './period-lock';
+import { audit } from './audit';
 
 /* ── Types ───────────────────────────────────────────────────── */
 
@@ -52,6 +55,11 @@ export interface StockItem {
   warranty_months?: number;
   /** Serials of the opening quantity (serial-tracked items). */
   opening_serials?: string[];
+  /**
+   * Additive (integrity review): earlier names of this item, recorded on rename, so documents saved
+   * under an old name still match it (`buildItemIndex`). A current name always wins over an alias.
+   */
+  aliases?: string[];
 }
 
 export interface StockMove {
@@ -196,27 +204,70 @@ export interface ItemIndex {
   find(name: string, hsn?: string): StockItem | undefined;
 }
 
-/** Name (case-insensitive) is primary; HSN breaks ties and rejects conflicting codes. */
+/** HSN / SAC digits only ("8517 13 00" → "85171300"); lower-cased text when it has no digits. */
+export const hsnDigits = (s: unknown) => {
+  const t = norm(s);
+  const d = t.replace(/\D/g, '');
+  return d || t;
+};
+
+/**
+ * Two HSN codes name the same goods when one is the other with more digits (a 4-digit heading
+ * and its 8-digit tariff line). So refining an item's HSN from 8517 to 85171300 keeps its history.
+ */
+export function hsnCompatible(a: unknown, b: unknown): boolean {
+  const x = hsnDigits(a);
+  const y = hsnDigits(b);
+  if (!x || !y) return true;
+  return x.startsWith(y) || y.startsWith(x);
+}
+
+/**
+ * Name (case-insensitive) is primary, then an item's earlier names (`aliases`); HSN breaks ties and
+ * rejects conflicting codes (a code that only adds digits to the other is not a conflict).
+ */
 export function buildItemIndex(items: StockItem[]): ItemIndex {
   const byName = new Map<string, StockItem[]>();
+  const byAlias = new Map<string, StockItem[]>();
+  const add = (map: Map<string, StockItem[]>, k: string, it: StockItem) => {
+    if (!k) return;
+    const list = map.get(k);
+    if (list) {
+      if (!list.includes(it)) list.push(it);
+    } else map.set(k, [it]);
+  };
   for (const it of items) {
-    const k = norm(it.name);
-    if (!k) continue;
-    const list = byName.get(k);
-    if (list) list.push(it);
-    else byName.set(k, [it]);
+    add(byName, norm(it.name), it);
+    for (const a of it.aliases ?? []) add(byAlias, norm(a), it);
   }
+  const pick = (list: StockItem[] | undefined, hsn?: string) => {
+    if (!list) return undefined;
+    const h = hsnDigits(hsn);
+    if (!h) return list[0];
+    return list.find((i) => hsnDigits(i.hsn) === h)
+      ?? list.find((i) => !!hsnDigits(i.hsn) && hsnCompatible(i.hsn, h))
+      ?? list.find((i) => !hsnDigits(i.hsn));
+  };
   return {
     find(name, hsn) {
-      const list = byName.get(norm(name));
-      if (!list) return undefined;
-      const h = norm(hsn);
-      if (!h) return list[0];
-      const exact = list.find((i) => norm(i.hsn) === h);
-      if (exact) return exact;
-      return list.find((i) => !norm(i.hsn));
+      const k = norm(name);
+      return pick(byName.get(k), hsn) ?? pick(byAlias.get(k), hsn);
     },
   };
+}
+
+/** `aliases` after renaming `prev` to `next.name`: the old name is kept, the current one never listed. */
+export function aliasesAfterRename(prev: Pick<StockItem, 'name' | 'aliases'> | undefined, next: Pick<StockItem, 'name' | 'aliases'>): string[] | undefined {
+  const list = [...(next.aliases ?? prev?.aliases ?? [])];
+  if (prev && norm(prev.name) && norm(prev.name) !== norm(next.name)) list.push(prev.name.trim());
+  const seen = new Set<string>([norm(next.name)]);
+  const out = list.filter((a) => {
+    const k = norm(a);
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return out.length ? out : undefined;
 }
 
 /* ── Events ──────────────────────────────────────────────────── */
@@ -808,7 +859,11 @@ export function shortfallsFor(
   inputs: Omit<StockInputs, 'excludeInvoiceId'>,
 ): StockShortfall[] {
   if (invoiceEffect(doc.doc_type, 'Sent', !!inputs.includeChallans) !== 'out') return [];
-  const positions = computeStock({ ...inputs, excludeInvoiceId: doc.id });
+  return shortfallsFromPositions(doc, computeStock({ ...inputs, excludeInvoiceId: doc.id }));
+}
+
+/** `shortfallsFor` over positions already computed without the document. */
+export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, positions: StockPosition[]): StockShortfall[] {
   const index = buildItemIndex(positions.map((p) => p.item).filter((i) => i.track_stock));
   const byId = new Map(positions.map((p) => [p.item.id, p]));
   const wanted = new Map<string, number>();
@@ -874,8 +929,40 @@ export function loadSettings(): InventorySettings {
   };
 }
 
+/**
+ * Costing method, challan stock, expiry window and default godown change how stock is valued and
+ * moved, so they are a settings change (owner only, 6.21) and audited. `setJson` skips the table guard.
+ */
 export function saveSettings(s: InventorySettings): void {
+  requireAccess('settings.manage');
+  const prev = loadSettings();
   setJson(SETTINGS_KEY, s);
+  const changes: string[] = [];
+  if (prev.method !== s.method) changes.push(`costing ${prev.method === 'FIFO' ? 'FIFO' : 'weighted average'} → ${s.method === 'FIFO' ? 'FIFO' : 'weighted average'}`);
+  if (!!prev.includeChallans !== !!s.includeChallans) changes.push(`challans ${s.includeChallans ? 'now reduce' : 'no longer reduce'} stock`);
+  if ((prev.expiryAlertDays ?? 0) !== (s.expiryAlertDays ?? 0)) changes.push(`expiry alert ${s.expiryAlertDays ?? DEFAULT_EXPIRY_ALERT_DAYS} days`);
+  if ((prev.defaultGodown ?? '') !== (s.defaultGodown ?? '')) changes.push('default godown changed');
+  if (changes.length) {
+    try {
+      audit.record({ entity: 'settings', entity_id: 'inventory_settings', action: 'update', summary: `Inventory settings: ${changes.join(', ')}` });
+    } catch {
+      /* logging never breaks a save */
+    }
+  }
+}
+
+/** Lock subject + audit for a manual stock adjustment (its date is the books date it changes). */
+const moveSubject = (m: StockMove) => ({ id: m.id, issue_date: m.date });
+function logMove(m: StockMove, action: 'create' | 'delete', item?: StockItem, overridden = false): void {
+  try {
+    const dir = m.qty >= 0 ? 'added' : 'removed';
+    audit.record({
+      entity: 'stock_adjustment', entity_id: m.id, action,
+      summary: `${action === 'create' ? 'Stock adjustment' : 'Deleted stock adjustment'}: ${Math.abs(m.qty)} ${item?.unit ?? ''} of ${item?.name ?? 'an item'} ${dir} on ${m.date}${m.note ? ` (${m.note})` : ''}${overridden ? ' (period lock overridden)' : ''}`,
+    });
+  } catch {
+    /* logging never breaks a save */
+  }
 }
 
 export const stockDb = {
@@ -884,8 +971,13 @@ export const stockDb = {
   saveItem(item: StockItem): void {
     const all = getTable<StockItem>(TABLES.items);
     const i = all.findIndex((x) => x.id === item.id);
-    if (i >= 0) all[i] = item;
-    else all.push(item);
+    // A rename keeps the old name as an alias, so sales / bills saved under it stay attached.
+    const aliases = aliasesAfterRename(i >= 0 ? all[i] : undefined, item);
+    const row: StockItem = { ...item };
+    if (aliases) row.aliases = aliases;
+    else delete row.aliases;
+    if (i >= 0) all[i] = row;
+    else all.push(row);
     setTable(TABLES.items, all);
   },
   /** Deleting an item also removes its manual moves. */
@@ -893,11 +985,20 @@ export const stockDb = {
     setTable(TABLES.items, getTable<StockItem>(TABLES.items).filter((x) => x.id !== id));
     setTable(TABLES.moves, getTable<StockMove>(TABLES.moves).filter((m) => m.item_id !== id));
   },
+  /** Period lock (by the adjustment's date) and audit, like every other dated entry. */
   addMove(move: StockMove): void {
+    requireAccess('books.edit');
+    const state = assertUnlocked(moveSubject(move), 'create');
     setTable(TABLES.moves, [...getTable<StockMove>(TABLES.moves), move]);
+    logMove(move, 'create', stockDb.items().find((i) => i.id === move.item_id), state === 'overridden');
   },
   deleteMove(id: string): void {
+    const move = getTable<StockMove>(TABLES.moves).find((m) => m.id === id);
+    if (!move) return;
+    requireAccess('books.edit');
+    const state = assertUnlocked(moveSubject(move), 'delete');
     setTable(TABLES.moves, getTable<StockMove>(TABLES.moves).filter((m) => m.id !== id));
+    logMove(move, 'delete', stockDb.items().find((i) => i.id === move.item_id), state === 'overridden');
   },
 };
 
@@ -965,12 +1066,39 @@ export function lowStockCount(): number {
   }
 }
 
-/** Shortfall lines for a draft/saved document, using live data. [] when all is well. */
+/** Positions without one document, re-computed only when a stock input changed (the editor asks per keystroke). */
+let positionsCache: { key: (string | null)[]; positions: StockPosition[] } | null = null;
+
+function cachedPositionsWithout(docId: string | undefined): StockPosition[] {
+  const key = [
+    docId ?? '',
+    ...['invoices', 'purchases', TABLES.items, TABLES.moves, 'doc_links'].map((t) => readRaw(DB_PREFIX + t)),
+    readRaw(SETTINGS_KEY),
+  ];
+  if (positionsCache && positionsCache.key.length === key.length && positionsCache.key.every((k, i) => k === key[i])) {
+    return positionsCache.positions;
+  }
+  const positions = computeStock({ ...liveInputs(), excludeInvoiceId: docId });
+  positionsCache = { key, positions };
+  return positions;
+}
+
+/**
+ * Shortfall lines for a draft/saved document, using live data. [] when all is well. Cheap on every
+ * keystroke: nothing is read beyond the stock items unless the type moves stock and a line names a
+ * tracked item, and positions are cached until a stock input changes.
+ */
 export function stockWarningForInvoice(
   invoice: Pick<InvoiceRecord, 'doc_type' | 'items'> & Partial<Pick<InvoiceRecord, 'id'>>,
 ): StockShortfall[] {
   try {
-    return shortfallsFor(invoice, liveInputs());
+    if (invoiceEffect(invoice.doc_type, 'Sent', true) !== 'out') return [];
+    const tracked = stockDb.items().filter((i) => i.track_stock);
+    if (!tracked.length) return [];
+    const index = buildItemIndex(tracked);
+    if (!(invoice.items ?? []).some((l) => num(l.quantity) > 0 && index.find(l.name, l.hsn))) return [];
+    if (invoice.doc_type === 'DELIVERY_CHALLAN' && !loadSettings().includeChallans) return [];
+    return shortfallsFromPositions(invoice, cachedPositionsWithout(invoice.id));
   } catch {
     return [];
   }

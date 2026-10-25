@@ -96,9 +96,10 @@ test('ADV numbering follows the Indian FY: 31 Mar stays in FY25-26, 1 Apr starts
   assert.equal(a3.number, 'ADV/FY26-27/0001');
   // Deleting the highest never hands its number out again.
   deleteAdvance(a2.id);
-  assert.equal(nextAdvanceNumber('2026-01-10'), 'ADV/FY25-26/0002', 'derived from the highest left');
+  // Integrity review: the series high-water mark keeps a deleted LATEST number from coming back.
+  assert.equal(nextAdvanceNumber('2026-01-10'), 'ADV/FY25-26/0003', 'above the high-water mark');
   const a4 = saveAdvance(adv({ date: '2025-08-01' }), { today: TODAY });
-  assert.equal(a4.number, 'ADV/FY25-26/0002');
+  assert.equal(a4.number, 'ADV/FY25-26/0003');
 });
 
 test('validation refuses a future date, no client, zero amount, bad POS or GSTIN', () => {
@@ -155,7 +156,7 @@ test('partial adjustment records a payment through the payments API; the invoice
   assert.equal(inv.amount_paid, 5900);
   assert.equal(inv.balance_due, 17700);
   const bal = advanceBalance(a, localDb.payments.getAll(), localDb.invoices.getAll());
-  assert.deepEqual(bal, { amount: 11800, adjusted: 5900, refunded: 0, open: 5900 });
+  assert.deepEqual(bal, { amount: 11800, adjusted: 5900, refunded: 0, open: 5900, over: 0 });
   assert.equal(openAdvancesFor(CLIENT, loadAdvances(), localDb.payments.getAll(), localDb.invoices.getAll())[0].balance.open, 5900);
   // Over-apply, wrong client, draft invoice, before the advance: refused.
   assert.throws(() => applyAdvance({ advanceId: a.id, invoiceId: 'I1', amount: 6000 }, { today: TODAY }), /Only ₹5,900\.00/);

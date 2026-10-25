@@ -1,3 +1,4 @@
+import { isStockDependencyError } from '../../lib/stock-timeline';
 import { useMemo, useState } from 'react';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -88,12 +89,16 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
         onClose={() => setDeleting(null)}
         onConfirm={() => {
           if (!deleting) return;
-          try {
-            transfersDb.remove(deleting.id);
-            onChanged(invT('transferDeleted', { number: deleting.transfer_number }));
-          } catch (err) {
-            onError(isPeriodLockedError(err) ? (err as Error).message : invT('transferDeleteFailed'));
-          }
+          const del = (confirmStock: boolean): void => {
+            try {
+              transfersDb.remove(deleting.id, { confirmStock });
+              onChanged(invT('transferDeleted', { number: deleting.transfer_number }));
+            } catch (err) {
+              if (isStockDependencyError(err) && err.confirmable && window.confirm(err.message)) return del(true);
+              onError(isPeriodLockedError(err) || isStockDependencyError(err) ? (err as Error).message : invT('transferDeleteFailed'));
+            }
+          };
+          del(false);
         }}
       />
     </>

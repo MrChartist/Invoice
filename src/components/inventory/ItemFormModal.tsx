@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { UNITS, GST_SLABS } from '../../types/invoice';
 import { num } from '../../lib/invoice-calc';
-import type { StockItem } from '../../lib/inventory';
+import { hsnCompatible, type StockItem } from '../../lib/inventory';
 import { duplicateSerials, parseSerials } from '../../lib/stock-tracking';
 import { useT } from '../../i18n';
 import { invT } from '../../i18n/areas/inventory';
@@ -118,6 +118,9 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
             autoComplete="off"
           />
           {touched && nameError && <span className={controls.error} role="alert">{nameError}</span>}
+          {!isNew && name && item.name.trim() && name.toLowerCase() !== item.name.trim().toLowerCase() && (
+            <span className={controls.hint}>Documents saved as “{item.name.trim()}” stay linked: the old name is kept as an alias.</span>
+          )}
         </div>
 
         <div className={controls.row3}>
@@ -135,6 +138,9 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
               id={`${uid}-hsn`} className={controls.input} inputMode="numeric" value={d.hsn}
               onChange={(e) => set('hsn', e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
             />
+            {!isNew && !hsnCompatible(d.hsn, item.hsn) && (
+              <span className={controls.hint} role="alert">Bills and invoices with HSN {item.hsn} will stop matching this item (its stock history detaches).</span>
+            )}
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-unit`}>{invT('unit')}</label>

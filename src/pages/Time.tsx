@@ -7,7 +7,7 @@ import {
   entryAmount,
   expenseLine,
   formatMinutes,
-  isBilled,
+  billedBy,
   liveInvoiceIds,
   mileageAmount,
   mileageDb,
@@ -34,6 +34,7 @@ import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { can } from '../lib/access';
 import { TimerCard } from '../components/time/TimerCard';
 import { EntryModal, MileageModal } from '../components/time/TimeForms';
 import { BillClientModal } from '../components/time/BillClientModal';
@@ -147,10 +148,11 @@ export function Time() {
     };
   }, [grid, unbilled, trips]);
 
-  const status = (ref: string | undefined, billable = true) => {
+  const status = (row: { id: string; invoiced_in?: string }, billable = true) => {
     if (!billable) return <span className={surface.badge}>{timeT('nonBillable')}</span>;
-    if (isBilled(ref, live)) {
-      return <Link to={`/invoice/${ref}`} className={cn(surface.badge, surface.badgePaid)}>{timeT('billed', { number: numbers.get(ref!) ?? '' })}</Link>;
+    const by = billedBy(row.invoiced_in, live, row.id);
+    if (by) {
+      return <Link to={`/invoice/${by}`} className={cn(surface.badge, surface.badgePaid)}>{timeT('billed', { number: numbers.get(by) ?? '' })}</Link>;
     }
     return <span className={cn(surface.badge, surface.badgeDraft)}>{timeT('unbilled')}</span>;
   };
@@ -178,10 +180,16 @@ export function Time() {
     saved(confirm.kind === 'entry' ? timeT('entryDeleted') : timeT('tripDeleted'));
   };
 
+  // Time preferences change every bill's rates / SAC / GST: same role gate as the time books (6.21).
+  const canPrefs = can('books.edit');
   const updatePrefs = (patch: Partial<TimePrefs>) => {
     const next = { ...prefs, ...patch };
-    setPrefs(next);
-    saveTimePrefs(next);
+    try {
+      saveTimePrefs(next);
+      setPrefs(next);
+    } catch (err) {
+      notify((err as Error).message, 'error');
+    }
   };
 
   return (
@@ -279,7 +287,7 @@ export function Time() {
                       <td>{[e.project, e.description].filter(Boolean).join(' — ') || '–'}</td>
                       <td className={surface.numeric}>{formatMinutes(e.minutes)}</td>
                       <td className={surface.numeric}>{formatCurrency(entryAmount(e, prefs))}</td>
-                      <td>{status(e.invoiced_in, e.billable)}</td>
+                      <td>{status(e, e.billable)}</td>
                       <td className={surface.rowActions}>
                         <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setEditEntry(e)} aria-label={timeT('editEntry')}><Pencil size={14} /></button>
                         <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setConfirm({ kind: 'entry', id: e.id })} aria-label={timeT('deleteEntry')}><Trash2 size={14} /></button>
@@ -314,7 +322,7 @@ export function Time() {
                       <td>{t.purpose || '–'}</td>
                       <td className={surface.numeric}>{t.km}</td>
                       <td className={surface.numeric}>{formatCurrency(mileageAmount(t))}</td>
-                      <td>{status(t.invoiced_in)}</td>
+                      <td>{status(t)}</td>
                       <td className={surface.rowActions}>
                         <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setEditTrip(t)} aria-label={timeT('editTrip')}><Pencil size={14} /></button>
                         <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setConfirm({ kind: 'trip', id: t.id })} aria-label={timeT('deleteTrip')}><Trash2 size={14} /></button>
@@ -364,6 +372,7 @@ export function Time() {
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>
+          <fieldset disabled={!canPrefs} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="tp-round">{timeT('roundTo')}</label>
@@ -405,6 +414,7 @@ export function Time() {
           <p className={styles.muted}>
             {timeT('prefsNote')}
           </p>
+          </fieldset>
         </section>
       )}
 

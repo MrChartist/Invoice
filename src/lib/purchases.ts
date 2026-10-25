@@ -14,6 +14,7 @@ import { generateId, getTable, setTable } from './storage';
 import { assertUnlocked, type LockAction } from './period-lock';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { supplierPayable } from './purchase-normalize';
+import { assertRemovable, liveRemovalIssues } from './stock-timeline';
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -362,11 +363,16 @@ export const purchasesDb = {
     );
   },
 
-  /** Remove a bill together with its payment history. */
-  remove(id: string): void {
+  /**
+   * Remove a bill together with its payment history. Refused when a later document sold / moved serials
+   * it brought in; when later documents used its quantities, `confirmStock` must be set
+   * (`StockDependencyError`, stock-timeline.ts).
+   */
+  remove(id: string, opts: { confirmStock?: boolean } = {}): void {
     requireAccess('books.edit');
     const bill = purchasesDb.get(id);
     if (bill) assertBillUnlocked(bill, 'delete');
+    if (bill) assertRemovable(liveRemovalIssues({ refType: 'purchase', refId: id }), opts.confirmStock);
     setTable(PURCHASES_TABLE, purchasesDb.all().filter((p) => p.id !== id));
     setTable(PAYMENTS_TABLE, paymentsDb.all().filter((p) => p.purchase_id !== id));
     if (bill?.attachments?.length) releaseAttachments(bill.attachments.map((a) => a.id));

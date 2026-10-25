@@ -97,10 +97,10 @@ test('godowns appear only after a second one is created; transfers move stock an
   const tr = loadTracking();
   assert.deepEqual(tr.get('syr')!.byGodown, { main: 12, [shop.id]: 3 });
   assert.deepEqual(serialsInStock(tr.get('ph'), shop.id), ['IMEI222']);
-  // Deleting never reuses a number.
+  // Deleting never reuses a number — not even the latest one (series high-water mark).
   transfersDb.remove(t3.id);
-  assert.equal(transfersDb.nextNumber('2026-05-01'), 'STR/FY26-27/0002');
-  assert.equal(transfersDb.save({ date: '2026-05-01', from_godown: 'main', to_godown: shop.id, lines: [{ id: 'q', item_id: 'syr', qty: 1, batch_no: 'SOON' }] }).transfer_number, 'STR/FY26-27/0002');
+  assert.equal(transfersDb.nextNumber('2026-05-01'), 'STR/FY26-27/0003');
+  assert.equal(transfersDb.save({ date: '2026-05-01', from_godown: 'main', to_godown: shop.id, lines: [{ id: 'q', item_id: 'syr', qty: 1, batch_no: 'SOON' }] }).transfer_number, 'STR/FY26-27/0003');
   // In use → cannot delete.
   assert.throws(() => godownsDb.remove(shop.id, true), /cannot be deleted/);
   // Audited.

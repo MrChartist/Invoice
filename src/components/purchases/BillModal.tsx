@@ -157,7 +157,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     let saveLines = real;
     if (stock) {
       const live = liveTrackingInputs();
-      const issues = billTrackingIssues(real, { ...live, purchases: (live.purchases ?? []).filter((p) => p.id !== purchase?.id) });
+      const issues = billTrackingIssues(real, { ...live, purchases: (live.purchases ?? []).filter((p) => p.id !== purchase?.id) }, date);
       if (issues.length) return setError(issues[0]);
       // Tracked lines left on the godown picker's default are stored with it.
       if (stock.godowns.length > 1) {

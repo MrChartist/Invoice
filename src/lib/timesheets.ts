@@ -5,9 +5,13 @@
  * `mrchartist_inv_time_prefs`. Re-billable costs are ordinary `purchases` rows carrying
  * `billable_to_client_id` / `markup_percent` / `pure_agent` / `rebilled_in`.
  *
- * Billing state is DERIVED: a row is billed only while the invoice id it points at still exists
- * and is not cancelled, so deleting (or cancelling) that invoice frees the time, trips and costs
- * for the next bill without any clean-up pass.
+ * Billing state is DERIVED from the invoice LINES: each generated line lists the rows it bills in
+ * `bill_refs`, and a row is billed while some existing, non-cancelled invoice has a line naming it.
+ * So deleting (or cancelling) that invoice, or deleting the line from the draft, frees the time,
+ * trips and costs for the next bill; a duplicate keeps the lines (and their refs), so deleting the
+ * original never frees rows the copy still bills. `invoiced_in` / `rebilled_in` are kept as a
+ * pointer for display and for invoices made before line refs existed (legacy: billed while that
+ * invoice is live).
  *
  * Everything above the "Storage" divider is pure and unit-tested.
  */
@@ -19,6 +23,7 @@ import { parseDay, shiftDay, localDayOf } from './dates';
 import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from './storage';
 import { resolveStateCode } from './india-states';
 import { localDb } from './localDb';
+import { requireAccess } from './access';
 import { purchasesDb } from './purchases';
 import { blankClient, makeDraft, senderStateCode } from '../store/invoice-defaults';
 import { hoistCostCentre, loadCostCentres, matchCostCentre, type CostCentre } from './cost-centres';
@@ -71,12 +76,47 @@ export function parseDuration(text: string): number {
 
 // ── Pure: billed state ───────────────────────────────────────────
 
-/** Ids of invoices that still hold billed work (existing and not cancelled). */
-export function liveInvoiceIds(invoices: Pick<InvoiceRecord, 'id' | 'status'>[]): Set<string> {
-  return new Set(invoices.filter((i) => i.id && i.status !== 'Cancelled').map((i) => i.id));
+/**
+ * Ids of invoices that still hold billed work (existing and not cancelled), plus which rows their
+ * lines bill (`bill_refs`). A plain `Set` of ids is still accepted everywhere (legacy rule only).
+ */
+export class LiveBilling extends Set<string> {
+  /** Row id (time entry / trip / re-billed purchase) -> live invoices whose lines bill it. */
+  readonly byRow = new Map<string, string[]>();
+  /** Live invoices that carry line refs: a row they do not name is no longer billed by them. */
+  readonly withRefs = new Set<string>();
 }
 
-export const isBilled = (ref: string | undefined, live: Set<string>): boolean => !!ref && live.has(ref);
+type BillingDoc = Pick<InvoiceRecord, 'id' | 'status'> & { items?: readonly Pick<InvoiceItem, 'bill_refs'>[] };
+
+export function liveInvoiceIds(invoices: readonly BillingDoc[], excludeId?: string): LiveBilling {
+  const out = new LiveBilling();
+  for (const inv of invoices) {
+    if (!inv.id || inv.status === 'Cancelled' || inv.id === excludeId) continue;
+    out.add(inv.id);
+    for (const it of inv.items ?? []) {
+      for (const ref of it.bill_refs ?? []) {
+        out.withRefs.add(inv.id);
+        const list = out.byRow.get(ref);
+        if (!list) out.byRow.set(ref, [inv.id]);
+        else if (!list.includes(inv.id)) list.push(inv.id);
+      }
+    }
+  }
+  return out;
+}
+
+/** The live invoice billing a row (`rowId` + its `invoiced_in` / `rebilled_in` pointer), if any. */
+export function billedBy(ref: string | undefined, live: Set<string>, rowId?: string): string | undefined {
+  if (live instanceof LiveBilling && rowId) {
+    const by = live.byRow.get(rowId);
+    if (by?.length) return by.includes(ref ?? '') ? ref : by[0];
+    if (ref && live.withRefs.has(ref)) return undefined; // the line was removed from that invoice
+  }
+  return ref && live.has(ref) ? ref : undefined;
+}
+
+export const isBilled = (ref: string | undefined, live: Set<string>, rowId?: string): boolean => !!billedBy(ref, live, rowId);
 
 /** Stable key for "the same client": the CRM id, else the lower-cased name. */
 export function clientKey(row: { client_id?: string; client_name?: string }): string {
@@ -84,13 +124,37 @@ export function clientKey(row: { client_id?: string; client_name?: string }): st
 }
 
 export const unbilledTime = (entries: TimeEntry[], live: Set<string>): TimeEntry[] =>
-  entries.filter((e) => e.billable && !isBilled(e.invoiced_in, live));
+  entries.filter((e) => e.billable && !isBilled(e.invoiced_in, live, e.id));
 
 export const unbilledMileage = (trips: MileageEntry[], live: Set<string>): MileageEntry[] =>
-  trips.filter((t) => !isBilled(t.invoiced_in, live));
+  trips.filter((t) => !isBilled(t.invoiced_in, live, t.id));
 
 export const unbilledExpenses = (purchases: PurchaseRecord[], live: Set<string>): PurchaseRecord[] =>
-  purchases.filter((p) => !!p.billable_to_client_id && !isBilled(p.rebilled_in, live));
+  purchases.filter((p) => !!p.billable_to_client_id && !isBilled(p.rebilled_in, live, p.id));
+
+/**
+ * Rows an invoice bills that another live invoice bills too (reinstating it would bill them twice).
+ * `doc` is the invoice being restored; `live` must leave it out (`liveInvoiceIds(all, doc.id)`).
+ */
+export function doubleBilledRows(
+  doc: Pick<InvoiceRecord, 'id'> & { items?: readonly Pick<InvoiceItem, 'bill_refs'>[] },
+  rows: { time: readonly TimeEntry[]; mileage: readonly MileageEntry[]; expenses: readonly PurchaseRecord[] },
+  live: Set<string>,
+): { kind: 'time' | 'mileage' | 'expense'; id: string; by: string }[] {
+  const refs = new Set((doc.items ?? []).flatMap((i) => i.bill_refs ?? []));
+  const hasRefs = refs.size > 0;
+  const out: { kind: 'time' | 'mileage' | 'expense'; id: string; by: string }[] = [];
+  const check = (kind: 'time' | 'mileage' | 'expense', id: string, ref: string | undefined) => {
+    // Billed by this invoice: named on one of its lines, or (older invoices) pointing at it.
+    if (!(refs.has(id) || (!hasRefs && ref === doc.id))) return;
+    const by = billedBy(ref, live, id);
+    if (by && by !== doc.id) out.push({ kind, id, by });
+  };
+  for (const e of rows.time) check('time', e.id, e.invoiced_in);
+  for (const t of rows.mileage) check('mileage', t.id, t.invoiced_in);
+  for (const p of rows.expenses) check('expense', p.id, p.rebilled_in);
+  return out;
+}
 
 // ── Pure: weeks & totals ─────────────────────────────────────────
 
@@ -251,6 +315,7 @@ export function timeLines(entries: TimeEntry[], prefs: TimePrefs, centres: reado
       rate: num(first.hourly_rate),
       tax_rate: num(prefs.gst_rate),
       ...(ccOf(first) ? { cost_centre_id: ccOf(first) } : {}),
+      bill_refs: group.map((e) => e.id),
     }));
   }
   return out;
@@ -279,6 +344,7 @@ export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
       rate: round2(num(p.total)),
       tax_rate: 0,
       ...cc,
+      bill_refs: [p.id],
     });
   }
   const markup = Math.max(num(p.markup_percent), 0);
@@ -291,6 +357,7 @@ export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
     rate: round2(rebillCost(p) * (1 + markup / 100)),
     tax_rate: num(prefs.gst_rate),
     ...cc,
+    bill_refs: [p.id],
   });
 }
 
@@ -315,6 +382,7 @@ export function mileageLines(trips: MileageEntry[], prefs: TimePrefs): InvoiceIt
       rate,
       tax_rate: num(prefs.gst_rate),
       ...(cc ? { cost_centre_id: cc } : {}),
+      bill_refs: group.map((t) => t.id),
     }));
   }
   return out;
@@ -377,12 +445,12 @@ export function timeEntriesToRows(
     ...[...entries]
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((e) => {
-        const billed = isBilled(e.invoiced_in, live);
+        const by = billedBy(e.invoiced_in, live, e.id);
         return [
           e.date, e.client_name, e.project ?? '', e.description, num(e.minutes),
           e.billable ? toHours(billableMinutes(e, prefs)) : 0, num(e.hourly_rate), entryAmount(e, prefs),
-          !e.billable ? 'Non-billable' : billed ? 'Billed' : 'Unbilled',
-          billed ? invoiceNumbers.get(e.invoiced_in!) ?? '' : '',
+          !e.billable ? 'Non-billable' : by ? 'Billed' : 'Unbilled',
+          by ? invoiceNumbers.get(by) ?? '' : '',
         ];
       }),
   ];
@@ -393,7 +461,7 @@ export function mileageToRows(trips: MileageEntry[], live: Set<string>): (string
     ['Date', 'Client', 'From', 'To', 'Purpose', 'Km', 'Rate per km', 'Amount', 'Status'],
     ...[...trips]
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map((t) => [t.date, t.client_name, t.from, t.to, t.purpose, num(t.km), num(t.rate_per_km), mileageAmount(t), isBilled(t.invoiced_in, live) ? 'Billed' : 'Unbilled']),
+      .map((t) => [t.date, t.client_name, t.from, t.to, t.purpose, num(t.km), num(t.rate_per_km), mileageAmount(t), isBilled(t.invoiced_in, live, t.id) ? 'Billed' : 'Unbilled']),
   ];
 }
 
@@ -406,7 +474,9 @@ export function readTimePrefs(): TimePrefs {
   return { ...DEFAULT_TIME_PREFS, ...(stored && typeof stored === 'object' ? stored : {}) };
 }
 
+/** Role-gated like the time tables (`setJson` skips the table guard). */
 export function saveTimePrefs(prefs: TimePrefs): void {
+  requireAccess('books.edit');
   setJson(TIME_PREFS_KEY, prefs);
 }
 
@@ -434,7 +504,7 @@ function crud<T extends { id: string; created_at?: string; updated_at?: string; 
 export const timeDb = crud<TimeEntry>(TIME_TABLE);
 export const mileageDb = crud<MileageEntry>(MILEAGE_TABLE);
 
-export const currentLiveInvoiceIds = (): Set<string> => liveInvoiceIds(localDb.invoices.getAll());
+export const currentLiveInvoiceIds = (): LiveBilling => liveInvoiceIds(localDb.invoices.getAll());
 
 /** Everything still unbilled for one client (by `clientKey`). */
 export function unbilledFor(key: string, live = currentLiveInvoiceIds()): BillSelection {
@@ -461,8 +531,13 @@ export function billUnbilled(key: string, sel: BillSelection, prefs = readTimePr
   if (!lines.length) throw new NothingToBillError();
   // One shared cost centre becomes the document's; mixed ones stay as line overrides.
   const { costCentreId, items } = hoistCostCentre(lines);
-  const name = sel.time[0]?.client_name ?? sel.mileage[0]?.client_name ?? '';
-  const client: Client = localDb.clients.getById(key) ?? { ...blankClient(), name };
+  const master = localDb.clients.getById(key);
+  // Expense-only bills have no name snapshot: the key is the expense's billable client (an id, or `name:...`).
+  const name = (sel.time[0]?.client_name || sel.mileage[0]?.client_name || (key.startsWith('name:') ? key.slice(5) : '')).trim();
+  if (!master && !name) {
+    throw new Error('This client is no longer in your client list. Add the client again (or change the billable client on the expense) before billing.');
+  }
+  const client: Client = master ?? { ...blankClient(), name };
   const settings = localDb.settings.get();
   const sender = localDb.settings.activeProfile() ?? null;
   const base = makeDraft({ settings, sender, docType: 'INVOICE', templateId: localDb.template.get() });

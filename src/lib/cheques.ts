@@ -138,13 +138,29 @@ export class ChequeError extends Error {
   }
 }
 
+/**
+ * The payment a cheque points at is gone (the linked invoice / bill — and with it the payment — was
+ * deleted). Such a cheque is treated as having no payment: it can be edited or deleted again.
+ */
+export function linkedPaymentMissing(
+  c: Pick<Cheque, 'payment_id' | 'purchase_payment_id'>,
+  payments: readonly { id: string }[] = localDb.payments.getAll(),
+  purchasePayments: readonly { id: string }[] = paymentsDb.all(),
+): boolean {
+  if (c.payment_id) return !payments.some((p) => p.id === c.payment_id);
+  if (c.purchase_payment_id) return !purchasePayments.some((p) => p.id === c.purchase_payment_id);
+  return false;
+}
+
 /** Add or edit a cheque's details. Money-relevant fields are frozen once a payment was recorded from it. */
 export function saveCheque(input: ChequeInput, now: Date = new Date()): Cheque {
   requireAccess('books.edit'); // local roles (6.21)
   const rows = loadCheques();
   const errors = validateCheque(input, rows);
   if (errors.length) throw new ChequeError(errors[0]);
-  const prev = input.id ? rows.find((c) => c.id === input.id) : undefined;
+  let prev = input.id ? rows.find((c) => c.id === input.id) : undefined;
+  // A dangling payment link (its invoice / bill was deleted) no longer freezes anything.
+  if (prev && linkedPaymentMissing(prev)) prev = { ...prev, payment_id: undefined, purchase_payment_id: undefined };
   if (prev && (prev.payment_id || prev.purchase_payment_id)) {
     const changed = prev.amount !== round2(num(input.amount)) || prev.invoice_id !== input.invoice_id || prev.purchase_id !== input.purchase_id;
     if (changed) throw new ChequeError('A payment was recorded from this cheque. Bounce or cancel it before changing the amount or the linked document.');
@@ -176,7 +192,7 @@ export function deleteCheque(id: string): void {
   const rows = loadCheques();
   const c = rows.find((r) => r.id === id);
   if (!c) return;
-  if (c.payment_id || c.purchase_payment_id) throw new ChequeError('A payment was recorded from this cheque. Bounce or cancel it first.');
+  if ((c.payment_id || c.purchase_payment_id) && !linkedPaymentMissing(c)) throw new ChequeError('A payment was recorded from this cheque. Bounce or cancel it first.');
   writeAll(rows.filter((r) => r.id !== id));
   log(c, 'delete', `Deleted ${describe(c)}`);
 }
@@ -235,6 +251,7 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
             reference: c.number,
             note: `Cheque ${c.number} · ${c.bank}`,
             date,
+            bankAccountId: c.bank_account_id,
           });
           next.payment_id = payment.id;
           const pid = payment.id;
@@ -245,7 +262,7 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
         const bill = purchasesDb.get(c.purchase_id);
         if (!bill) note = 'The linked bill no longer exists, so no payment was recorded.';
         else {
-          const pp = paymentsDb.record(bill.id, { amount: c.amount, date, method: 'Cheque', reference: c.number });
+          const pp = paymentsDb.record(bill.id, { amount: c.amount, date, method: 'Cheque', reference: c.number, bankAccountId: c.bank_account_id });
           next.purchase_payment_id = pp.id;
           undo = () => paymentsDb.remove(pp.id);
           note = `Supplier payment of ${money(c.amount)} recorded against bill ${bill.bill_number || ''}.`.replace(' .', '.');
@@ -260,10 +277,13 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
     next.bounce_reason = opts.reason?.trim() || undefined;
     next.cleared_on = undefined;
     if (c.payment_id) {
+      const gone = linkedPaymentMissing(c);
       // Reverse the receipt (the lock is checked inside; if it refuses, nothing changes).
-      localDb.payments.remove(c.payment_id);
+      if (!gone) localDb.payments.remove(c.payment_id);
       next.payment_id = undefined;
-      note = 'The payment recorded from this cheque was reversed; the invoice is open again.';
+      note = gone
+        ? 'The payment recorded from this cheque no longer exists (its invoice was deleted), so there was nothing to reverse.'
+        : 'The payment recorded from this cheque was reversed; the invoice is open again.';
     }
   }
 
@@ -271,9 +291,10 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
     next.cancelled_on = date;
     next.bounce_reason = opts.reason?.trim() || c.bounce_reason;
     if (c.purchase_payment_id) {
-      paymentsDb.remove(c.purchase_payment_id);
+      const gone = linkedPaymentMissing(c);
+      if (!gone) paymentsDb.remove(c.purchase_payment_id);
       next.purchase_payment_id = undefined;
-      note = 'The supplier payment recorded from this cheque was reversed.';
+      note = gone ? 'The supplier payment recorded from this cheque no longer exists (its bill was deleted).' : 'The supplier payment recorded from this cheque was reversed.';
     }
   }
 

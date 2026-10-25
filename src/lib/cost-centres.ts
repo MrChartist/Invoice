@@ -189,6 +189,8 @@ export interface CostCentreUsage {
   mileage: number;
   budgets: number;
   children: number;
+  /** Recurring templates (document-level or line overrides) — they would issue documents pointing at it. */
+  recurring: number;
 }
 
 type Row = Record<string, unknown>;
@@ -196,22 +198,26 @@ type Row = Record<string, unknown>;
 /** Pure usage count over raw table rows. */
 export function costCentreUsage(
   id: string,
-  t: { invoices?: Row[]; purchases?: Row[]; vouchers?: Row[]; time?: Row[]; mileage?: Row[]; budgets?: Row[]; centres?: readonly CostCentre[] },
+  t: { invoices?: Row[]; purchases?: Row[]; vouchers?: Row[]; time?: Row[]; mileage?: Row[]; budgets?: Row[]; centres?: readonly CostCentre[]; recurring?: Row[] },
 ): CostCentreUsage {
   const has = (r: Row) => r.cost_centre_id === id;
   const lines = (r: Row, key: string) => (Array.isArray(r[key]) ? (r[key] as Row[]) : []);
   return {
     invoices: (t.invoices ?? []).filter((r) => has(r) || lines(r, 'items').some(has)).length,
-    purchases: (t.purchases ?? []).filter(has).length,
+    purchases: (t.purchases ?? []).filter((r) => has(r) || lines(r, 'lines').some(has)).length,
     vouchers: (t.vouchers ?? []).filter((r) => lines(r, 'lines').some(has)).length,
     time: (t.time ?? []).filter(has).length,
     mileage: (t.mileage ?? []).filter(has).length,
     budgets: (t.budgets ?? []).filter(has).length,
     children: (t.centres ?? []).filter((c) => c.parent_id === id).length,
+    recurring: (t.recurring ?? []).filter((r) => {
+      const tpl = (r.template && typeof r.template === 'object' ? r.template : {}) as Row;
+      return has(r) || has(tpl) || lines(tpl, 'items').some(has);
+    }).length,
   };
 }
 
-export const usageTotal = (u: CostCentreUsage) => u.invoices + u.purchases + u.vouchers + u.time + u.mileage + u.budgets + u.children;
+export const usageTotal = (u: CostCentreUsage) => u.invoices + u.purchases + u.vouchers + u.time + u.mileage + u.budgets + u.children + (u.recurring ?? 0);
 
 export function readCostCentreUsage(id: string): CostCentreUsage {
   return costCentreUsage(id, {
@@ -222,6 +228,7 @@ export function readCostCentreUsage(id: string): CostCentreUsage {
     mileage: getTable<Row>('mileage'),
     budgets: getTable<Row>('budgets'),
     centres: loadCostCentres(),
+    recurring: getTable<Row>('recurring'),
   });
 }
 
@@ -234,7 +241,7 @@ export function deleteCostCentre(id: string): void {
   const row = all.find((c) => c.id === id);
   if (!row) return;
   if (usageTotal(readCostCentreUsage(id)) > 0) {
-    throw new CostCentreError(`"${row.name}" is used by documents, budgets or other cost centres — mark it inactive instead.`);
+    throw new CostCentreError(`"${row.name}" is used by documents, recurring templates, budgets or other cost centres — mark it inactive instead.`);
   }
   setTable(COST_CENTRES_TABLE, all.filter((c) => c.id !== id));
   audit.record({ entity: 'cost_centre', entity_id: id, action: 'delete', summary: `Deleted ${COST_CENTRE_KIND_LABELS[row.kind].toLowerCase()} "${row.name}"` });

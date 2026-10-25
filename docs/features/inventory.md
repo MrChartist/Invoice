@@ -16,7 +16,13 @@ Tally/Vyapar-style stock. Stock is **derived on read** from opening balance + ma
   reason on its `doc_links` row / "Reason: …" sentence — Discount, Rate difference, GST correction and Cancellation of
   service move no stock; a custom reason or an unknown note does (the old behaviour). Profitability follows the same
   rule: a value-only note reduces revenue with no cost and no quantity; QUOTATION / PROFORMA never touch stock; DELIVERY_CHALLAN reduces stock only when the "Delivery challans reduce stock" toggle is on. Draft and Cancelled documents are excluded.
-- Lines match a stock item by name (case-insensitive); if both sides carry an HSN they must agree. Only `track_stock` items participate.
+- Lines match a stock item by name (case-insensitive), then by an earlier name (`aliases`, recorded by `stockDb.saveItem`
+  on rename); if both sides carry an HSN they must agree, where a code that only adds digits to the other agrees
+  (8517 ↔ 85171300, digits compared after stripping spaces — `hsnCompatible`). So renaming an item or refining its HSN
+  keeps its history (and opening serials are not "resurrected"); the item form warns before a rename / an HSN change that
+  would detach history. Only `track_stock` items participate.
+- Bill of Supply (and a row with no type) is a sale everywhere: costing, the editor's picker context, issue checks, POS
+  and stock warnings (`isOutgoingDoc`).
 - Purchases: any row in the `purchases` table with `lines` (or `items`) of `{name, hsn, quantity, rate}`; date from `bill_date | date | issue_date | invoice_date`; Draft/Cancelled skipped. Field names are read defensively because `src/types/purchases.ts` did not exist in this worktree. If the real `PurchaseRecord` differs, adjust `PurchaseLike` / `PurchaseLineLike` and `purchaseDate` in `src/lib/inventory.ts`.
 - Same-day ordering: opening, then receipts, then issues, then sales returns (a same-day credit note follows the sale it reverses).
 - Costing: weighted average (default) or FIFO, switchable on the page. COGS is costed at issue time; returns re-enter at the last issue unit cost; negative stock is valued at the last known cost and (FIFO) is covered by the next receipt.
@@ -129,13 +135,18 @@ A simple user (no tracked items, one godown) sees no new field anywhere; the edi
 
 ### Godowns (6.10)
 
-- `godownsDb` (`src/lib/godowns.ts`): add / rename (unique names) / delete (refused while anything uses it).
+- `godownsDb` (`src/lib/godowns.ts`): add / rename (unique names) / delete, all audited (entity `godown`). Delete is
+  refused while anything names it (`liveGodownReferences`): stock adjustments, bill lines, document lines of any type
+  and status (drafts, quotations, cancelled) and untracked items, transfers, recurring templates, the default godown.
 - Stock per godown: `ItemTracking.byGodown`, `godownSummary`.
-- **Stock transfer voucher** (`transfersDb`): `STR/FY<yy-yy>/<seq>` per Indian FY of its date (highest issued + 1, so
-  a deleted number is never reused); lines of item × qty (+ batch / serials). Create / edit / delete go through
+- **Stock transfer voucher** (`transfersDb`): `STR/FY<yy-yy>/<seq>` per Indian FY of its date (highest issued or the
+  `series_counters` high-water mark + 1, so a deleted number — even the latest — is never reused; an edit that moves the
+  date into another FY takes that FY's next number, as advances do; purchase orders follow the same rules); lines of item × qty (+ batch / serials). Create / edit / delete go through
   `assertUnlocked` (period lock, PIN override) and are written to the audit log (`entity: 'stock_transfer'`).
-  `transferIssues` refuses moving more than the source godown holds on that date, a missing batch, or serials that are
-  not in the source godown.
+  `transferIssues` refuses moving more than the source godown holds on that date **or than later documents leave**
+  (lowest running balance from the date onwards), a missing batch, or serials that are not in the source godown then /
+  leave it later. Deleting a transfer whose moved serials were sold from the destination is refused; when later
+  documents used the moved quantity it needs an explicit confirmation (`StockDependencyError`).
 - A transfer moves **quantity only**: no value, GST, Books voucher or ledger posting (tested in
   `tests/integration/stock-tracking.test.ts`).
 
@@ -146,17 +157,39 @@ A simple user (no tracked items, one godown) sees no new field anywhere; the edi
 - A serial is in stock after its last receipt / return and out after its last sale. Issuing refuses a serial that is
   not in stock (`sold on INV/…`), was never received, is in another godown, or appears twice.
 - **Returns**: a credit note that returns goods and lists the serial puts it back in stock. "Raise credit note" copies
-  the invoice line's serials (none when the note returns no goods); a partial credit keeps the first N (edit the credit
-  note to choose others). A credit note can only name serials that are currently sold; a value-only note is not checked.
+  the invoice line's serials not already returned by an earlier live credit note (none when the note returns no goods);
+  a partial credit keeps the first N of those (edit the credit note to choose others). A credit note can only name serials that are currently sold; a value-only note is not checked.
 - Warranty: `warranty_months` is snapshotted on the sale line; valid until the day before the same date N months later
   (`warrantyUntil('2026-05-10', 12) = '2027-05-09'`).
 - Lookup (Inventory → *Serial lookup*, `/inventory?tab=serials&serial=…`): purchase bill + vendor, sale invoice +
   client, return, current godown and warranty status (`lookupSerial`).
 
+### Point-in-time checks (integrity review, `src/lib/stock-timeline.ts`)
+
+Every check runs on the dated event list, never on the end state:
+- **Issuing** (invoice, tax invoice, Bill of Supply, challan): a serial must be in stock at the end of the document's day
+  *and* no later document may depend on it (lowest running balance from that day ≥ what the document takes) — so a
+  back-dated sale of a serial received later, or a sale that pulls a serial out from under a later sale, is refused.
+  Batches warn on the same rule. Credit notes may only take back a serial sold as of their date.
+- **Bills** (`billTrackingIssues(lines, input, date)`): a serial already in stock on the bill date, or received again
+  later, is refused.
+- **Removing** a purchase bill (`purchasesDb.remove`), a transfer (`transfersDb.remove`) or a goods-returning credit
+  note (delete from the list, or cancel): if a later document sold / moved a serial it provided the removal is refused;
+  if later documents used its quantities or batch (stock would go below zero) the user must confirm (`confirmStock` /
+  `acknowledgeStock`; screens ask with a confirm box).
+- **Manual adjustments** respect the period lock (by their date) and are audited (`stock_adjustment`); inventory
+  settings are owner-only (`settings.manage`) and audited.
+- **Editor cost**: `stockWarningForInvoice` returns before reading documents unless the type moves stock and a line
+  names a tracked item, and caches positions (without the open document) until a stock input changes;
+  `StockWarnings` defers the items, so a keystroke with 10k invoices stays cheap (`tests/integrity-review.test.ts`).
+- Issue-mode recurring schedules run the same checks; an invoice with tracked items that need a serial / batch is
+  saved as a **Draft** and the run reports why (`GenerateResult.heldAsDraft`).
+
 ### Limitations
 
-- Checks run in the editor's issue path and the bill / transfer forms; importers, recurring runs and the API-less
-  data layer do not re-validate serials or batches. Recurring templates drop serials and batches (each occurrence is a
+- Checks run in the editor's issue path, POS, credit notes, reinstating, recurring issue runs and the bill / transfer
+  forms; importers and the API-less data layer do not re-validate serials or batches. Deleting a stock adjustment is not
+  dependency-checked yet. Recurring templates drop serials and batches (each occurrence is a
   new sale), so auto-issued recurring invoices of batch items reduce the unbatched bucket.
 - Bill lines still match stock items by name + HSN (`PurchaseLine.item_id` is not set).
 - **Tally XML does not export batch or godown allocations** (`BATCHALLOCATIONS.LIST` / `GODOWNNAME` need godown and

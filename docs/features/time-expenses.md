@@ -34,9 +34,19 @@ the `storage` event.
 
 ## Billing (`src/lib/timesheets.ts`)
 
-**Derived billing state.** A row is billed only while the invoice id in `invoiced_in` / `rebilled_in` still exists and
-is not cancelled (`liveInvoiceIds`, `isBilled`). Deleting or cancelling the invoice frees every row on it — no clean-up
-code. Editing lines on the invoice does not unlink rows.
+**Derived billing state (line model, integrity review).** Each generated line lists the rows it bills in the additive
+`InvoiceItem.bill_refs` (time entry / trip / re-billed purchase ids). A row is billed while some existing, non-cancelled
+invoice has a line naming it (`liveInvoiceIds` → `LiveBilling.byRow`, `billedBy`, `isBilled(ref, live, rowId)`):
+- deleting or cancelling the invoice frees every row on it — no clean-up code;
+- deleting a line from the generated draft frees exactly the rows that line billed;
+- **Duplicate** copies the lines with their refs, so the copy bills the same rows: deleting the original does not free
+  them (the copy still bills them). While both are live the rows count once; reinstating a cancelled invoice whose rows
+  were billed elsewhere meanwhile is refused (`doubleBilledRows`, used by `documents.reinstateIssues`).
+- `invoiced_in` / `rebilled_in` stay as a pointer (display, and invoices made before `bill_refs`: such a legacy invoice
+  bills a row while it is live and the row points at it).
+
+Time preferences (`saveTimePrefs`) need `books.edit` and the preferences form is disabled for viewers. `billUnbilled`
+refuses (with a message) to bill expenses whose billable client is no longer in the client list and no name is known.
 
 `billUnbilled(clientKey, selection)` builds lines, creates a fresh draft from the active sender profile (`makeDraft`),
 sets the client from the CRM, picks place of supply and CGST+SGST / IGST, recomputes totals (`calculateInvoice`),
