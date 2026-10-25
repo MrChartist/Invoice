@@ -14,6 +14,7 @@ import { readValues } from '../lib/custom-fields';
 import { readRefs } from '../lib/attachments';
 import { normalizeTransport } from '../lib/transport';
 import { sanitizePartyBalance } from '../lib/party-balance';
+import { normalizeSchedule, sanitizeAcceptance } from '../lib/doc-snapshots';
 import type { AppSettings } from '../lib/localDb';
 import type {
   AmendmentInfo,
@@ -273,6 +274,15 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
       const snap = sanitizePartyBalance(r.party_balance_snapshot);
       return snap ? { party_balance_snapshot: snap } : {};
     })(),
+    // 8G (additive): instalments and the quote acceptance snapshot.
+    ...(() => {
+      const sched = normalizeSchedule(r.payment_schedule);
+      return sched.length ? { payment_schedule: sched } : {};
+    })(),
+    ...(() => {
+      const acc = sanitizeAcceptance(r.acceptance);
+      return acc ? { acceptance: acc } : {};
+    })(),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),
@@ -337,6 +347,10 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.pos === true ? { pos: true } : {}),
     ...ecoFields(r.eco_gstin, r.eco_section),
     ...(CHALLAN_PURPOSES.has(String(r.challan_purpose)) ? { challan_purpose: r.challan_purpose as ChallanPurpose } : {}),
+    // 8H delivery challan toggles (additive).
+    ...(r.challan_hide_amounts === true ? { challan_hide_amounts: true } : {}),
+    ...(r.challan_returnable === true ? { challan_returnable: true } : {}),
+    ...(typeof r.challan_return_by === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.challan_return_by) ? { challan_return_by: r.challan_return_by } : {}),
     ...(() => {
       const transport = normalizeTransport(r.transport);
       return transport ? { transport } : {};

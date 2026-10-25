@@ -7,6 +7,8 @@ import { localDb } from '../../lib/localDb';
 import { suggest } from '../../lib/suggest';
 import { clientToParty } from '../../store/invoice-defaults';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
+import { WALK_IN_NAME } from '../../lib/counter-receipt';
+import { uxT } from '../../i18n/areas/invoicing-ux';
 import { INDIAN_STATES, formatPlaceOfSupply, stateByCode } from '../../lib/india-states';
 import type { Client, SenderProfile } from '../../types/invoice';
 import { useT } from '../../i18n';
@@ -42,6 +44,14 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
   );
 
   const missingSender = !sender?.companyName?.trim();
+  // A5: address, company, e-mail and ship-to sit behind "More details" (open when a ship-to is set).
+  const [more, setMore] = useState(() => !!shipTo);
+  // A6: walk-in cash sale — the POS walk-in name, no address, fully paid in cash.
+  const cashSale = () => {
+    setClient({ id: undefined, name: WALK_IN_NAME, company: '', address: '', city: '', zip: '', gstin: '', email: '', phone: '' });
+    useInvoiceStore.setState({ pay_mode: 'Cash', fully_paid: true });
+    setMore(false);
+  };
 
   return (
     <div className={styles.grid}>
@@ -115,6 +125,22 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             placeholder={t('parties.clientNamePh')}
             aria-label={t('parties.clientName')}
           />
+          {/* A6: walk-in counter sale — no address, paid in cash in full. */}
+          <div className={controls.row}>
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-pressed={client.name === WALK_IN_NAME} onClick={cashSale} data-cash-sale>
+              {uxT('cashSale')}
+            </button>
+          </div>
+          <div className={controls.field}>
+            <GstinInput value={client.gstin ?? ''} onChange={(v) => setClient({ gstin: v })} placeholder={t('parties.clientGstinPh')} ariaLabel={t('parties.clientGstinPh')} />
+          </div>
+          <input className={controls.input} type="tel" value={client.phone ?? ''} onChange={(e) => setClient({ phone: e.target.value })} placeholder={t('parties.phone')} aria-label={t('parties.clientPhone')} />
+          {/* A5: name, GSTIN and phone first; the rest behind "More details". */}
+          <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-expanded={more} onClick={() => setMore((m) => !m)} data-party-more>
+            {more ? uxT('lessDetails') : uxT('moreDetails')}
+          </button>
+          {more && (
+            <>
           <input className={controls.input} value={client.company ?? ''} onChange={(e) => setClient({ company: e.target.value })} placeholder={t('parties.companyPh')} aria-label={t('parties.company')} />
           <textarea className={controls.textarea} rows={2} value={client.address} onChange={(e) => setClient({ address: e.target.value })} placeholder={t('parties.billingAddress')} aria-label={t('parties.billingAddress')} />
           <div className={controls.row}>
@@ -133,13 +159,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
               ))}
             </select>
           </div>
-          <div className={controls.field}>
-            <GstinInput value={client.gstin ?? ''} onChange={(v) => setClient({ gstin: v })} placeholder={t('parties.clientGstinPh')} ariaLabel={t('parties.clientGstinPh')} />
-          </div>
-          <div className={controls.row}>
-            <input className={controls.input} type="email" value={client.email} onChange={(e) => setClient({ email: e.target.value })} placeholder={t('parties.email')} aria-label={t('parties.clientEmail')} />
-            <input className={controls.input} type="tel" value={client.phone ?? ''} onChange={(e) => setClient({ phone: e.target.value })} placeholder={t('parties.phone')} aria-label={t('parties.clientPhone')} />
-          </div>
+          <input className={controls.input} type="email" value={client.email} onChange={(e) => setClient({ email: e.target.value })} placeholder={t('parties.email')} aria-label={t('parties.clientEmail')} />
           <label className={styles.shipToggle}>
             <input
               type="checkbox"
@@ -167,6 +187,8 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
               </select>
               <GstinInput value={shipTo.gstin ?? ''} onChange={(v) => setShip({ gstin: v })} placeholder={t('parties.consigneeGstinPh')} />
             </fieldset>
+          )}
+            </>
           )}
         </div>
       </div>

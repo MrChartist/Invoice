@@ -16,15 +16,19 @@ import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { downloadBlob } from '../../lib/download';
 import { canShareFiles, invoiceSummaryText, invoiceUpiLink, shareFile } from '../../lib/share';
 import { buildClientCopyHtml } from '../../lib/client-copy';
+import { responseLinks } from '../../lib/quote-acceptance';
 import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
 import { receivableBalance } from '../../lib/rcm';
+import { canDocRight } from '../../lib/user-rights';
 
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** A1 / A4: run Print or Share PDF once the paper has rendered (post-save sheet, Save & print). */
+  autoAction?: 'print' | 'share';
 }
 
 /** Full-screen, scale-to-fit A4 preview with print and multi-page PDF export. */
@@ -33,7 +37,7 @@ export const InvoicePreviewModal = (props: InvoicePreviewModalProps) =>
   // editor does not re-render a closed preview.
   props.isOpen ? <PreviewBody {...props} /> : null;
 
-const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
+const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) => {
   const invoice = useInvoiceStore();
   const paperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -132,7 +136,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // (PreviewBody is only mounted while open — see InvoicePreviewModal.)
 
   const idx = Math.max(0, TEMPLATES.findIndex((t) => t.id === invoice.template_id));
   const meta = templateById(invoice.template_id);
@@ -211,6 +215,8 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
       business: rec.sender?.companyName ?? '',
       pay: due > 0 && rec.doc_type !== 'QUOTATION' && rec.doc_type !== 'SALES_ORDER' ? { amountText: formatCurrency(due, rec.currency), upiLink: invoiceUpiLink(rec), upiId: rec.sender?.upiId, qrDataUrl } : null,
       generatedOn: formatDate(new Date()),
+      // 8.101: a quotation's copy carries pre-filled "Accept" / "Request changes" replies.
+      respond: responseLinks(rec, formatCurrency(rec.total, rec.currency)),
     });
     const name = pdfFilename().replace(/\.pdf$/, '.html');
     const file = new File([html], name, { type: 'text/html' });
@@ -244,6 +250,19 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
       setBusy(false);
     }
   };
+
+  // A1 / A4: one automatic Print / Share PDF after the paper has laid out.
+  const autoDone = useRef(false);
+  useEffect(() => {
+    if (!autoAction || autoDone.current) return;
+    autoDone.current = true;
+    const id = setTimeout(() => {
+      if (autoAction === 'print') window.print();
+      else void handleSharePDF();
+    }, 350);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAction]);
 
   return createPortal(
     <div ref={overlayRef} className={cn(styles.overlay, 'print-host')} role="dialog" aria-modal="true" aria-label="Document preview">
@@ -303,10 +322,10 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
             onPreprinted={setPreprinted}
             onSaveDefault={saveJobDefaults}
           />
-          <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
+          <button type="button" className={controls.btnOutline} onClick={() => window.print()} disabled={!canDocRight(invoice.doc_type ?? '', 'print')}>
             <Printer size={16} /> <span className={styles.hideSm}>Print</span>
           </button>
-          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy}>
+          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy || !canDocRight(invoice.doc_type ?? '', 'print')}>
             {busy ? <Loader2 size={16} className={styles.spin} /> : <Download size={16} />} PDF
           </button>
           <button type="button" className={controls.btnIcon} onClick={onClose} aria-label="Close preview">

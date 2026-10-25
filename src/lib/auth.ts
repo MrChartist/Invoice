@@ -23,6 +23,7 @@
 import { DB_PREFIX, DEVICE_LOCAL_KEYS, SINGLETON_KEYS, collectAppData, readRaw, removeRaw, writeRaw } from './storage';
 import { constantTimeEqualStrings, hashPin, PBKDF2_ITERATIONS, verifyPinHash, type PinHash } from './crypto';
 import { requireAccess, setActorProvider, type Actor, type Role } from './access';
+import type { UserRights } from './rights';
 
 export const AUTH_KEY = SINGLETON_KEYS.auth;
 export const GUARD_KEY = `${DB_PREFIX}auth_guard`;
@@ -91,6 +92,8 @@ export interface StoredUser extends PinHash {
   v: 2;
   /** Additive (7T): actions the owner granted on top of the role (only `GRANTABLE_ACTIONS` count). */
   grants?: string[];
+  /** Additive (8H): finer rights that narrow the role (`rights.ts`). */
+  rights?: UserRights;
 }
 
 /** What the login screen and Settings may see about a user (never secrets). */
@@ -101,6 +104,8 @@ export interface UserSummary {
   createdAt: string;
   /** Additive (7T): owner's per-user grants (e.g. `payroll.view`). */
   grants?: string[];
+  /** Additive (8H): finer rights (`rights.ts`). */
+  rights?: UserRights;
 }
 
 const cleanGrants = (g: unknown): string[] | undefined => {
@@ -127,6 +132,8 @@ export function readUsers(): StoredUser[] {
       const row: StoredUser = { ...(u as StoredUser), role: u.role === 'clerk' ? 'clerk' : 'viewer' };
       if (grants) row.grants = grants;
       else delete row.grants;
+      // Finer rights (8H) are validated when saved (user-rights.ts); here only their shape is checked.
+      if (!u.rights || typeof u.rights !== 'object' || Array.isArray(u.rights)) delete row.rights;
       out.push(row);
     }
     return out;
@@ -147,7 +154,7 @@ export function listUsers(): UserSummary[] {
   if (!owner) return [];
   return [
     { id: OWNER_ID, name: owner.name, role: 'owner', createdAt: owner.createdAt },
-    ...readUsers().map((u) => ({ id: u.id, name: u.name, role: u.role, createdAt: u.createdAt, ...(u.grants ? { grants: u.grants } : {}) })),
+    ...readUsers().map((u) => ({ id: u.id, name: u.name, role: u.role, createdAt: u.createdAt, ...(u.grants ? { grants: u.grants } : {}), ...(u.rights ? { rights: u.rights } : {}) })),
   ];
 }
 
@@ -217,7 +224,7 @@ export function getCurrentUser(): Actor | null {
   const id = sessionUserId();
   if (!id) return null;
   const u = findUser(id);
-  return u ? { id: u.id, name: u.name, role: u.role, ...(u.grants ? { grants: u.grants } : {}) } : null;
+  return u ? { id: u.id, name: u.name, role: u.role, ...(u.grants ? { grants: u.grants } : {}), ...(u.rights ? { rights: u.rights } : {}) } : null;
 }
 
 // The data layer asks access.ts who is acting; this is the answer. Once a PIN is set up, a tab whose

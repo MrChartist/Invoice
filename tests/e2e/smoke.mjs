@@ -47,6 +47,16 @@ const LOGO_PNG = (() => {
  * app's BroadcastChannel so open tabs refresh their cache. Reads poll until `ok(value)` holds,
  * because the app commits its writes a moment after the screen updates.
  */
+/** 8G A1: close the post-save success sheet when a step goes on working in the editor. */
+async function closeSendSheet(p) {
+  const sheet = p.locator('[data-send-sheet]');
+  await sheet.waitFor({ timeout: 10000 }).catch(() => {});
+  if (await sheet.count()) {
+    await p.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+  }
+}
+
 async function idbGet(p, key) {
   return p.evaluate((k) => new Promise((resolve, reject) => {
     const open = indexedDB.open('mrchartist_inv_kv');
@@ -134,6 +144,11 @@ try {
   });
 
   await step('first-run setup wizard', async () => {
+    // 8H step 0: language + "What do you do?" (CA / full accounting keeps every module for the journey).
+    const start = page.getByRole('dialog', { name: 'What do you do?' });
+    await start.waitFor();
+    await start.getByRole('radio', { name: /CA \/ full accounting/ }).click();
+    await page.getByRole('button', { name: /Next/ }).click();
     const wizard = page.getByRole('dialog', { name: 'Your business' });
     await wizard.waitFor();
     await page.getByRole('button', { name: /Next/ }).click();
@@ -196,6 +211,45 @@ try {
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');
   });
 
+  await step('8H: Marathi interface, shop-mode sidebar (Kirana) and the phone "+" quick-create sheet', async () => {
+    const nav = page.getByRole('navigation', { name: /Primary|मुख्य/ });
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('mr');
+    await nav.getByRole('link', { name: 'डॅशबोर्ड' }).waitFor();
+    await nav.getByRole('link', { name: 'ग्राहक' }).waitFor();
+    check((await page.evaluate(() => document.documentElement.lang)) === 'mr', 'Marathi sets <html lang="mr"> and the sidebar is in Marathi');
+    await page.getByLabel('Language / भाषा').first().selectOption('en');
+    await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
+
+    // Shop mode: Kirana hides Books / Payroll from the sidebar, keeps POS; "Show all features" brings them back.
+    await page.goto(srv.origin + '/settings?tab=defaults');
+    await page.getByLabel('Business type').selectOption('kirana');
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'POS' }).waitFor();
+    await nav.getByRole('link', { name: 'Books' }).waitFor({ state: 'detached' });
+    const hidden = (await nav.getByRole('link', { name: 'Payroll' }).count()) === 0 && (await nav.getByRole('link', { name: 'GST reports' }).count()) === 0;
+    check(hidden, 'Kirana shop mode narrows the sidebar (no Books, Payroll, GST reports; POS shown)');
+    await page.getByRole('button', { name: 'Show all features' }).click();
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'Books' }).waitFor();
+    check(true, '"Show all features" restores every module');
+
+    // Phone "+" opens the quick-create sheet; Expense opens the quick-expense form.
+    await page.setViewportSize({ width: 390, height: 844 });
+    try {
+      await page.goto(srv.origin + '/');
+      await page.getByRole('navigation', { name: 'Quick navigation' }).getByRole('button', { name: 'New' }).click();
+      const sheet = page.getByRole('dialog', { name: 'Create new' });
+      await sheet.waitFor();
+      await sheet.getByRole('link', { name: 'Expense' }).click();
+      await page.waitForURL(/\/expenses\?new=expense/);
+      await page.getByRole('dialog', { name: 'Quick add expense' }).waitFor();
+      check(true, '390 px: "+" → Create new → Expense opens the quick-expense form');
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
+  });
+
   await step('beta: badge next to the logo; Help -> Report a problem builds a local diagnostic', async () => {
     await page.goto(srv.origin + '/');
     const badge = page.getByRole('img', { name: 'Beta version (private test build)' }).first();
@@ -228,6 +282,15 @@ try {
     check(/^INV\/FY\d{2}-\d{2}\/0001$/.test(stored[0]?.invoice_number ?? ''), `Indian-FY number (${stored[0]?.invoice_number})`);
     check(stored[0]?.status === 'Sent', `Save issues the document (${stored[0]?.status})`);
     check(Math.abs((stored[0]?.total ?? 0) - 3540) < 0.01, `total with 18% GST = 3540 (${stored[0]?.total})`);
+    // A1: the post-save sheet stays (no 10 s timeout) and its WhatsApp link carries the UPI pay link.
+    const sheet = page.locator('[data-send-sheet]');
+    await sheet.waitFor();
+    await page.waitForTimeout(12000);
+    check(await sheet.isVisible(), 'post-save success sheet is still open after 12 s');
+    const wa = (await sheet.locator('[data-send-whatsapp]').getAttribute('href')) ?? '';
+    check(wa.includes('wa.me') && wa.includes('upi%3A'), `sheet WhatsApp link has wa.me + the UPI link (${wa.slice(0, 60)}…)`);
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
     const assets = await readJson(page, 'assets', []);
     const lsData = await page.evaluate(() => Object.keys(localStorage).filter((k) => /^mrchartist_inv_(invoices|settings|clients|assets)$/.test(k)));
     const marker = await page.evaluate(() => localStorage.getItem('mrchartist_inv_storage_backend'));
@@ -292,6 +355,7 @@ try {
     await page.goto(srv.origin + '/invoice/' + id);
     await page.getByLabel(/^Vehicle no\./).fill('MH12AB1234');
     await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
     const inv = (await readJson(page, 'invoices', [], (v) => v[0]?.custom_values?.length === 1))[0];
     check(inv.custom_values?.[0]?.label === 'Vehicle no.' && inv.custom_values[0].value === 'MH12AB1234',
       `the invoice snapshots label + value (${inv.custom_values?.[0]?.label}: ${inv.custom_values?.[0]?.value})`);
@@ -309,10 +373,12 @@ try {
   await step('transport details print; preview with 3 copies downloads a PDF with 3x the pages', async () => {
     const id = (await readJson(page, 'invoices', []))[0].id;
     await page.goto(srv.origin + '/invoice/' + id);
+    await page.locator('[data-meta-edit]').click(); // A5: transport sits in the document details
     await page.getByText('Transport / dispatch details').click();
     await page.getByLabel('Vehicle number').fill('ka01ab0001');
     await page.getByLabel('Transporter name').fill('Speedy Roadways');
     await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
     const inv = (await readJson(page, 'invoices', [], (v) => v[0]?.transport?.vehicle_no))[0];
     check(/^KA01AB0001$/i.test(inv.transport?.vehicle_no ?? ''), `transport details are saved on the invoice (${inv.transport?.vehicle_no})`);
     await page.getByRole('button', { name: /Preview & download PDF/ }).click();
@@ -1354,6 +1420,7 @@ try {
     check(s.profiles?.find((p) => p.id === s.activeProfileId)?.gst_scheme === 'composition', 'profile switched to the composition scheme');
 
     await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-meta-edit]').click(); // A5: document details are one line until edited
     const type = await page.getByRole('combobox', { name: /^Type/ }).first().inputValue();
     check(type === 'BILL_OF_SUPPLY', `a composition profile opens a Bill of Supply (${type})`);
     await page.getByLabel('Client name').fill('Corner Shop');
@@ -1363,6 +1430,7 @@ try {
     check((await page.getByLabel('Item 1 GST rate').count()) === 0, 'no GST rate column on a Bill of Supply');
     await page.keyboard.press('Control+s');
     await page.getByText(/saved/i).first().waitFor();
+    await closeSendSheet(page);
     const bos = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'BILL_OF_SUPPLY'))).find((i) => i.doc_type === 'BILL_OF_SUPPLY');
     check(!!bos && /^BOS\/FY\d{2}-\d{2}\/0001$/.test(bos.invoice_number) && bos.tax_amount === 0 && Math.abs(bos.total - 1000) < 0.01 && bos.sender?.gst_scheme === 'composition',
       `bill of supply ${bos?.invoice_number}: total ${bos?.total}, tax ${bos?.tax_amount}, scheme snapshotted (${bos?.sender?.gst_scheme})`);
@@ -1429,6 +1497,7 @@ try {
     check(centres.length === 1 && centres[0].kind === 'project', `cost centre stored (${centres.length})`);
 
     await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-meta-edit]').click();
     await page.locator('#doc-cost-centre').selectOption({ label: 'Website revamp · Project' });
     await page.getByLabel('Client name').fill('Acme Buyers');
     await page.getByLabel('Item 1 name').fill('Design sprint');
@@ -1664,6 +1733,48 @@ try {
     // The adjustment is in the current month: 11B is empty in the previous month's view.
     await page.getByText('No advances adjusted or refunded in this period.').waitFor();
     check(true, 'Table 11B is reported in the month of adjustment, not the month received');
+  });
+
+  await step('8G: 390 px editor layout, Record payment in the editor, palette finds by amount, insights tile', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(srv.origin + '/invoice');
+    // A5: document details as one line, party extras behind "More details".
+    await page.locator('[data-meta-summary]').waitFor();
+    check((await page.locator('#due-date').count()) === 0, 'document details are collapsed to one line at 390 px');
+    check((await page.getByLabel('Billing address').count()) === 0 && (await page.locator('[data-party-more]').count()) === 1, 'billing address sits behind More details');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    check(overflow <= 1, `no horizontal scroll in the editor at 390 px (${overflow})`);
+    await page.getByLabel('Client name').fill('Gamma Eight');
+    await page.getByLabel('Item 1 name').fill('Audit 8G');
+    await page.getByLabel('Item 1 quantity').fill('1');
+    await page.getByLabel('Item 1 rate').fill('1000');
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    // A2: Record payment from the editor settles the invoice.
+    await page.locator('[data-record-payment]').click();
+    const dlg = page.getByRole('dialog', { name: 'Record payment' });
+    await dlg.waitFor();
+    const amount = dlg.getByLabel('Amount');
+    if (!(await amount.inputValue())) await amount.fill('1180');
+    await dlg.getByRole('button', { name: 'Record payment' }).click();
+    const paid = (await readJson(page, 'invoices', [], (v) => v.some((x) => x.client?.name === 'Gamma Eight' && x.status === 'Paid'))).find((x) => x.client?.name === 'Gamma Eight');
+    check(paid?.status === 'Paid', `Record payment in the editor marks it Paid (${paid?.status})`);
+    await page.keyboard.press('Escape');
+    // 8.103 SmartFind: an amount range finds it in the palette.
+    await page.goto(srv.origin + '/transactions');
+    await page.getByText('Every document you have issued').first().waitFor();
+    await page.getByRole('button', { name: /Search invoices/ }).first().click();
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('gamma 1.1k-1.2k');
+    await palette.getByRole('option', { name: new RegExp(paid?.invoice_number.replace(/[/]/g, '\\/') ?? 'INV') }).first().waitFor();
+    check(true, 'palette finds the invoice by party + amount range');
+    await page.keyboard.press('Escape');
+    // 8.108 insights tile on the dashboard.
+    await page.goto(srv.origin + '/');
+    await page.locator('[data-tile="insights"] [data-insight="revenue"]').waitFor({ timeout: 15000 });
+    check(true, 'dashboard shows the offline insights tile');
   });
 
   await step('an existing localStorage user moves to IndexedDB on first load', async () => {

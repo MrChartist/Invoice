@@ -8,6 +8,7 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', dark ? '#000000' : '#f6f6f7');
     // Interface language (5.4, device-local): set <html lang> before the app boots.
-    if (localStorage.getItem('mrchartist_inv_lang') === 'hi') document.documentElement.lang = 'hi';
+    var lang = localStorage.getItem('mrchartist_inv_lang');
+    if (lang && /^(hi|mr|gu|ta|bn|te|kn)$/.test(lang)) document.documentElement.lang = lang;
   } catch (e) {}
 })();

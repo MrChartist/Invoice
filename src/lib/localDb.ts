@@ -17,7 +17,9 @@ import type {
 } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { localDayOf } from './dates';
-import { requireAccess } from './access';
+import { currentActor, requireAccess } from './access';
+import type { BusinessType, ModuleId } from './shop-mode';
+import { checkDocRight } from './rights';
 import {
   DuplicateNumberError,
   findNumberClash,
@@ -85,6 +87,10 @@ export interface AppSettings {
    * Additive field — absent means monthly.
    */
   gst_filing_frequency?: 'monthly' | 'qrmp' | 'composition';
+  /** Additive (8H shop mode, `shop-mode.ts`): what the business does. */
+  business_type?: BusinessType;
+  /** Additive (8H): modules shown in the sidebar / dashboard. Absent = everything (existing companies). */
+  modules?: ModuleId[];
 }
 
 export const DEFAULT_TERMS =
@@ -367,6 +373,8 @@ export const localDb = {
       const stored = idx >= 0 ? invoices[idx] : undefined;
       // Local roles (6.21): a viewer cannot write documents.
       requireAccess(stored ? 'doc.edit' : 'doc.create');
+      // Finer user rights (8H): per-document right, back-dated window, discount cap (clerks / viewers only).
+      checkDocRight(currentActor(), invoice.doc_type, stored ? 'alter' : 'create', invoice.issue_date, invoice);
       const now = new Date().toISOString();
       const toSave: InvoiceRecord = { ...invoice, updated_at: now };
 
@@ -380,6 +388,9 @@ export const localDb = {
 
       if (stored) {
         toSave.created_at = stored.created_at ?? now;
+        // 8.101: a signed acceptance is a snapshot — an edit of the quote never rewrites or drops it.
+        if (stored.acceptance) toSave.acceptance = stored.acceptance;
+        else delete toSave.acceptance;
       } else {
         toSave.id = invoice.id || generateId();
         toSave.created_at = now;
@@ -444,6 +455,7 @@ export const localDb = {
       const stored = all.find((i) => i.id === id);
       // Local roles (6.21): only the owner deletes an issued document; a clerk may delete drafts.
       if (stored) requireAccess(isIssued(stored) ? 'doc.deleteIssued' : 'doc.deleteDraft');
+      if (stored) checkDocRight(currentActor(), stored.doc_type, 'delete');
       const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
       const payments = getTable<Payment>(KEYS.transactions);
       const mine = payments.filter((t) => t.invoice_id === id).length;
@@ -521,8 +533,9 @@ export const localDb = {
       ),
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
-    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string; advanceId?: string }): Payment => {
+    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string; advanceId?: string; writeOff?: boolean }): Payment => {
       requireAccess('payment.record');
+      checkDocRight(currentActor(), 'payment', 'create', input.date);
       const amount = round2(Number(input.amount) || 0);
       // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
       if (!(amount > 0)) throw new Error('Enter a payment amount above zero.');
@@ -541,6 +554,8 @@ export const localDb = {
       if (input.bankAccountId && (input.method || '').toLowerCase() !== 'cash') payment.bank_account_id = input.bankAccountId;
       // An advance adjusted against the invoice (5.3): settles the bill, but is not new money.
       if (input.advanceId) payment.advance_id = input.advanceId;
+      // 8.106: a bad-debt write-off settles the bill without money (no receipt number).
+      if (input.writeOff) payment.write_off = true;
       // Read-only lookup: the payment never changes this row (syncPaymentState writes a copy).
       const target = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
       // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
@@ -552,7 +567,7 @@ export const localDb = {
       assertNotPendingApproval(target, 'record payments');
       const before = getTable<Payment>(KEYS.transactions);
       // Receipt voucher number, fixed at record time (never reused after a delete / cheque bounce).
-      if (!payment.advance_id) payment.receipt_number = nextReceiptNumber(payment.date, before);
+      if (!payment.advance_id && !payment.write_off) payment.receipt_number = nextReceiptNumber(payment.date, before);
       setTable(KEYS.transactions, [...before, payment]);
       try {
         syncPaymentState(input.invoiceId, payment.amount);

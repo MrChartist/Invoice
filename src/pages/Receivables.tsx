@@ -1,14 +1,16 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { mailtoLink, whatsappLink } from '../lib/share';
+import { messageLangOf } from '../lib/message-langs';
 import { buildWhatsAppStatement } from '../lib/khata';
 import { khataT } from '../i18n/areas/khata';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, BellRing, ChevronRight, Clock, Copy, Download, FileStack, FileText, Mail, MessageCircle, Percent, Printer, Scale, Send, Wallet,
+  AlertTriangle, BellRing, ChevronRight, Clock, Copy, Download, FileStack, FileText, ListChecks, Mail, MessageCircle, Percent, Printer, Scale, Send, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
+import { uxT } from '../i18n/areas/invoicing-ux';
 import { getTable } from '../lib/storage';
 import type { CreditLinkRow } from '../lib/amount-due';
 import type { AdvanceRecord } from '../types/advances';
@@ -46,6 +48,8 @@ const AdvancesTab = lazy(() => import('../components/advances/AdvancesTab'));
 // Daily khata loop (8A): quick ₹ Received / ₹ Given and the party reminder queue, loaded on first use.
 const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
 const RemindQueue = lazy(() => import('../components/khata/RemindQueue'));
+// 8.106: bulk remind / write-off on the filtered ageing list.
+const ReceivablesBulk = lazy(() => import('../components/invoicing-ux/ReceivablesBulk'));
 
 type Tab = 'aging' | 'statements' | 'collections' | 'advances' | 'tds';
 const TABS: { id: Tab; label: () => string }[] = [
@@ -97,6 +101,7 @@ export function Receivables() {
   const currencies = useMemo(() => currenciesIn(data.invoices), [data.invoices]);
   const [currencyPick, setCurrencyPick] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkAct, setBulkAct] = useState(false);
   const [queue, setQueue] = useState<'overdue' | 'balance' | null>(null);
   const currency = currencyPick || currencies[0] || 'INR';
 
@@ -179,9 +184,19 @@ export function Receivables() {
             <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setQueue('balance')} disabled={report.totals.net <= 0}>
               <Send size={16} /> {khataT('sendBalances')}
             </button>
+            {can('payment.record') && (
+              <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setBulkAct(true)} disabled={report.totals.billCount === 0} data-receivables-bulk-open>
+                <ListChecks size={16} /> {uxT('bkOpenBtn')}
+              </button>
+            )}
           </>
         )}
       </Header>
+      {bulkAct && (
+        <Suspense fallback={null}>
+          <ReceivablesBulk report={report} invoices={data.invoices} onClose={() => setBulkAct(false)} onDone={(m) => { notify(m, 'success'); setData(loadData()); }} />
+        </Suspense>
+      )}
       {queue && (
         <Suspense fallback={null}>
           <RemindQueue kind={queue} onClose={() => setQueue(null)} />
@@ -309,7 +324,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
   // WhatsApp statement per party row (8.3): wa.me with open bills, net due and a upi:// link.
   const waHref = (p: PartyReceivable) => {
     const c = clients.find((x) => (p.clientId && x.id === p.clientId) || x.name?.trim().toLowerCase() === p.name.trim().toLowerCase());
-    return whatsappLink(c?.phone, buildWhatsAppStatement({ sender, party: p }));
+    return whatsappLink(c?.phone, buildWhatsAppStatement({ sender, party: p, lang: messageLangOf(c) }));
   };
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const top = topDebtors(report, 5);
@@ -594,7 +609,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
             )}
             {currency === 'INR' && (
               <a className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} target="_blank" rel="noopener noreferrer" data-wa-statement
-                href={whatsappLink(client?.phone, buildWhatsAppStatement({ sender, party }))}>
+                href={whatsappLink(client?.phone, buildWhatsAppStatement({ sender, party, lang: messageLangOf(client) }))}>
                 <MessageCircle size={14} /> {khataT('waStatement')}
               </a>
             )}

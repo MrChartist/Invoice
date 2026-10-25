@@ -27,6 +27,10 @@ import type { AdvanceRecord } from '../types/advances';
 import { advanceMovements } from './advance-tax';
 import { receivableTotal } from './rcm';
 import { linkedCredits, type CreditLinkRow } from './amount-due';
+import { effectiveDueDate } from './payment-schedule';
+
+/** 8.100: ageing follows the earliest unpaid instalment of a payment schedule (else the due date). */
+const dueOf = (inv: InvoiceRecord): string => effectiveDueDate(inv);
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -396,10 +400,10 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     if (outstanding > 0.004) {
       a.bills.push({
         invoiceId: inv.id, number: inv.invoice_number,
-        issueDate: issue, dueDate: dateKey(inv.due_date) || issue,
+        issueDate: issue, dueDate: dateKey(dueOf(inv)) || issue,
         total, paid, outstanding,
-        daysOverdue: daysOverdue(inv.due_date, now),
-        bucket: agingBucket(inv.due_date, now) as AgingBucketLabel,
+        daysOverdue: daysOverdue(dueOf(inv), now),
+        bucket: agingBucket(dueOf(inv), now) as AgingBucketLabel,
         ...(alloc > 0 ? { credited: alloc } : {}),
       });
     }

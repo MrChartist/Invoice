@@ -28,7 +28,16 @@ export interface ClientCopyInput {
   generatedOn: string;
   /** Optional line under the paper (e.g. "Statement as of 25 Oct 2026"). */
   note?: string;
+  /**
+   * 8.101 (quotations): "Accept" / "Request changes" links — pre-filled wa.me or mailto: links built by
+   * `responseLinks` (quote-acceptance.ts). Anything else is dropped; no script is ever added.
+   */
+  respond?: { accept: string; changes: string } | null;
 }
+
+/** Only wa.me and mailto: links may be written as response buttons. */
+const safeRespond = (u: string | undefined) =>
+  u && (/^https:\/\/wa\.me\/\d{6,15}\?text=[^"'<>\s]*$/.test(u) || /^mailto:[^"'<>\s]+$/.test(u)) ? u : null;
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
@@ -56,6 +65,15 @@ export function buildClientCopyHtml(input: ClientCopyInput): string {
   ${qr ? `<img class="cc-qr" src="${qr}" alt="UPI payment QR code" width="132" height="132">` : ''}
 </section>`
     : '';
+  const acceptHref = safeRespond(input.respond?.accept);
+  const changesHref = safeRespond(input.respond?.changes);
+  const respondPanel = acceptHref && changesHref
+    ? `<section class="cc-pay" aria-label="Respond to this quotation">
+  <div><div class="cc-label">Happy with this quotation?</div><div class="cc-label">Tap to reply: your message opens ready to send.</div></div>
+  <a class="cc-btn" href="${esc(acceptHref)}">Accept</a>
+  <a class="cc-btn cc-alt" href="${esc(changesHref)}">Request changes</a>
+</section>`
+    : '';
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -73,11 +91,13 @@ export function buildClientCopyHtml(input: ClientCopyInput): string {
   .cc-amount { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0 6px; }
   .cc-btn { display: inline-block; background: #1a4d94; color: #fff; text-decoration: none; font-weight: 700;
     padding: 12px 20px; border-radius: 8px; font-size: 16px; }
+  .cc-alt { background: #fff; color: #1a4d94; border: 2px solid #1a4d94; }
   .cc-foot { font: 12px system-ui, sans-serif; color: #666; text-align: center; margin: 12px 0 24px; }
   @media print { html, body { background: #fff; } .cc-wrap { padding: 0; max-width: none; } .cc-pay, .cc-foot { display: none; } .cc-page { box-shadow: none; } }
 </style></head>
 <body><main class="cc-wrap">
 ${payPanel}
+${respondPanel}
 <div class="cc-page">${sanitizePaper(input.paperHtml)}</div>
 ${input.note ? `<p class="cc-foot">${esc(input.note)}</p>` : ''}
 <p class="cc-foot">Sent by ${esc(input.business)} · generated ${esc(input.generatedOn)} · print this page for a paper copy</p>

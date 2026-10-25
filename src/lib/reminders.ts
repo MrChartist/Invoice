@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from './utils';
 import { invoiceUpiLink } from './share';
 import { receivableTotal } from './rcm';
 import { amountDue, type CreditMap } from './amount-due';
+import { effectiveDueDate } from './payment-schedule';
 
 export const REMINDERS_TABLE = 'reminders';
 
@@ -93,7 +94,7 @@ export function stageForDays(daysToDue: number): ReminderStage | null {
 /** `credited`: live credit notes linked to the invoice (`linkedCredits`, src/lib/amount-due.ts). */
 export function suggestStage(invoice: InvoiceRecord, today: Date = new Date(), credited = 0): ReminderStage {
   if (amountDue(invoice, credited) <= 0) return 'thank_you';
-  return stageForDays(daysUntil(invoice.due_date, today)) ?? 'upcoming';
+  return stageForDays(daysUntil(effectiveDueDate(invoice), today)) ?? 'upcoming';
 }
 
 /* ── Templates ────────────────────────────────────────────────── */
@@ -412,7 +413,8 @@ export function pendingReminders(
     // What is still owed after receipts AND linked credit notes (src/lib/amount-due.ts).
     const balance = amountDue(invoice, opts.credits?.get(invoice.id));
     if (!(balance > 0)) continue;
-    const daysToDue = daysUntil(invoice.due_date, today);
+    // 8.100: a payment schedule's earliest unpaid instalment is the date to chase.
+    const daysToDue = daysUntil(effectiveDueDate(invoice), today);
     if (daysToDue < 0) overdueByClient.set(clientKey(invoice), (overdueByClient.get(clientKey(invoice)) ?? 0) + 1);
     const stage = stageForDays(daysToDue);
     if (!stage) continue;

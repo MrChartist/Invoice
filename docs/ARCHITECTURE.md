@@ -165,6 +165,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `order_pad_outbox` / `order_pad_imports` | distribution 8F (`src/lib/order-pad.ts`) | Salesman's unsent orders; office log of imported order ids (dedupe) → sales order |
 | `expiry_claims` | pharma 8F (`src/lib/expiry-ops.ts`) | Breakage / expiry claim per supplier: its debit notes, pending / credited / rejected |
 | `expiry_receipts` | pharma 8F (`src/lib/expiry-ops.ts`) | `BER/FY<yy-yy>/<seq>` customer returns of expired goods into the expiry godown (+ replacement), with their stock move ids |
+| `business_loans` | loans 8H (`src/lib/loans.ts`) | `BusinessLoan` `LOAN/FY<yy-yy>/<seq>`: lender, principal, rate, tenure, first EMI, loan ledger id, disbursement voucher id and `payments` (EMI n, principal, interest, voucher id) (`docs/features/loans.md`) |
+| `currency_rates` | currency master 8H (`src/lib/currency-rates.ts`) | `CurrencyRate {id, currency, date, rate, source}` — ₹ per unit by date; FX documents pick the latest on or before their date |
 | `cash_tally` | banking (WP-5, `src/lib/cash-tally.ts`) | `CashTally` day-end cash count by denomination vs the Books cash balance, one row per day |
 | `pos_returns` | POS returns (WP-9, `src/lib/pos-returns.ts`) | `PosReturn` per return: bill, credit note, settlement (`refund` / `exchange` / `account`), refunds by tender, voucher id, exchange bill; read by the Z report (`docs/features/business-extras.md`) |
 | `approvals` | approvals (WP-9, `src/lib/approvals.ts`) | `ApprovalLogRow` decision log (approved / rejected, by whom, note); the live state is `approval` on the invoice. Policy object under the key `approval_policy` |

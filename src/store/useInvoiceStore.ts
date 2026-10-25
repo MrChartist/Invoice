@@ -1,3 +1,4 @@
+import { cleanReference, fullyPaidAmount, splitCounterReceipt, type PayMode } from '../lib/counter-receipt';
 import { create } from 'zustand';
 import { localDb } from '../lib/localDb';
 import { issuingProfile } from '../lib/sync-device';
@@ -47,6 +48,8 @@ export interface SaveResult {
   locked?: boolean;
   /** A hand-typed number that skipped ahead of the series: the numbers left unused (a hint, not an error). */
   gap?: SeriesGap | null;
+  /** Saved, but something after the save did not go through (e.g. the counter receipt). */
+  warning?: string;
 }
 
 export interface InvoiceState extends InvoiceRecord {
@@ -54,6 +57,12 @@ export interface InvoiceState extends InvoiceRecord {
   totals: CalcTotals;
   /** True once the user has edited an unsaved draft. */
   dirty: boolean;
+  /** Store-only (A3): how "Amount received" came in; on save the unbacked part becomes a receipt row. */
+  pay_mode?: PayMode | null;
+  /** Store-only (A3): UTR / reference for a UPI or bank receipt. */
+  pay_ref?: string;
+  /** Store-only (A3 / A6): keep "Amount received" equal to total − TDS until saved. */
+  fully_paid?: boolean;
 
   patch: (patch: Partial<InvoiceRecord>) => void;
   setClient: (client: Partial<Client>) => void;
@@ -126,11 +135,12 @@ export const RECORD_KEYS = [
   'pos',
   'rcm_tax_excluded',
   'goods_returned',
-  'eco_gstin', 'eco_section', 'challan_purpose',
+  'eco_gstin', 'eco_section', 'challan_purpose', 'challan_hide_amounts', 'challan_returnable', 'challan_return_by',
   'transport',
   'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
   'agent_id', 'offer', 'rx',
   'party_balance_snapshot',
+  'payment_schedule', 'acceptance',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -542,7 +552,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     newDraft: (docType) => {
       cancelDraftSave();
       removeRaw(SINGLETON_KEYS.draft);
-      set({ ...wholeRecord(freshDraft(docType)), totals: EMPTY_TOTALS, dirty: false });
+      set({ ...wholeRecord(freshDraft(docType)), totals: EMPTY_TOTALS, dirty: false, pay_mode: null, pay_ref: '', fully_paid: false });
       get().recalculate();
     },
 
@@ -550,7 +560,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       const found = localDb.invoices.getById(id);
       if (!found) return false;
       loadedAt = Date.now();
-      set({ ...wholeRecord(normalizeRecord(found, localDb.template.get())), dirty: false });
+      set({ ...wholeRecord(normalizeRecord(found, localDb.template.get())), dirty: false, pay_mode: null, pay_ref: '', fully_paid: false });
       get().recalculate();
       return true;
     },
@@ -598,14 +608,30 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       if (snapshot) record.party_balance_snapshot = snapshot;
       else delete record.party_balance_snapshot;
 
+      // A3 / A6: "Fully paid" follows the final total (lines may have changed after it was ticked).
+      if (state.fully_paid) {
+        record.amount_paid = fullyPaidAmount(record);
+        record.balance_due = 0;
+      }
+      // A3: the part of "Amount received" not yet in the ledger becomes a receipt with the chosen mode.
+      const split = splitCounterReceipt(record, state.id ? localDb.payments.totalFor(state.id) : 0, state.pay_mode);
       try {
-        const saved = localDb.invoices.save(record);
+        let saved = localDb.invoices.save(split.record);
+        let warning: string | undefined;
+        if (split.amount > 0 && state.pay_mode) {
+          try {
+            localDb.payments.record({ invoiceId: saved.id, amount: split.amount, method: state.pay_mode, reference: cleanReference(state.pay_mode, state.pay_ref), date: saved.issue_date, note: 'Received at billing' });
+            saved = localDb.invoices.getById(saved.id) ?? saved;
+          } catch (err) {
+            warning = (err as Error).message;
+          }
+        }
         loadedAt = Date.now();
         cancelDraftSave();
         removeRaw(SINGLETON_KEYS.draft);
-        set({ ...saved, dirty: false });
+        set({ ...saved, dirty: false, pay_ref: '', fully_paid: false });
         get().recalculate();
-        return { ok: true, errors: [], record: saved, gap };
+        return { ok: true, errors: [], record: saved, gap, warning };
       } catch (err) {
         return { ok: false, errors: [(err as Error).message], locked: isPeriodLockedError(err) };
       }

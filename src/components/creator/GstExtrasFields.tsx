@@ -5,6 +5,7 @@ import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
 import { ECO_SECTION_LABELS, ecoWarnings } from '../../lib/eco';
 import type { ChallanPurpose, EcoSection } from '../../types/invoice';
+import { reachT } from '../../i18n/areas/reach';
 import controls from '../../styles/controls.module.css';
 import styles from './SupplyNotice.module.css';
 
@@ -24,7 +25,7 @@ const CHALLAN_PURPOSE_LABELS: Record<ChallanPurpose, string> = {
  */
 export function GstExtrasFields() {
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['doc_type', 'eco_gstin', 'eco_section', 'challan_purpose', 'issue_date', 'sender', 'items', 'gst_mode', 'patch'])),
+    useShallow((st) => pick(st, ['doc_type', 'eco_gstin', 'eco_section', 'challan_purpose', 'challan_hide_amounts', 'challan_returnable', 'challan_return_by', 'issue_date', 'sender', 'items', 'gst_mode', 'patch'])),
   );
   const [ecoOpen, setEcoOpen] = useState(false);
 
@@ -46,6 +47,25 @@ export function GstExtrasFields() {
             ))}
           </select>
         </label>
+        {/* 8H: print without amounts; returnable challan (with an expected return date). */}
+        <label className={styles.kind}>
+          <input type="checkbox" checked={!!s.challan_hide_amounts} onChange={(e) => s.patch({ challan_hide_amounts: e.target.checked || undefined })} />
+          <span>{reachT('chHide')}</span>
+        </label>
+        <label className={styles.kind}>
+          <input
+            type="checkbox"
+            checked={!!s.challan_returnable}
+            onChange={(e) => s.patch({ challan_returnable: e.target.checked || undefined, ...(e.target.checked ? {} : { challan_return_by: undefined }) })}
+          />
+          <span>{reachT('chReturnable')}</span>
+        </label>
+        {s.challan_returnable && (
+          <label className={styles.kind}>
+            <span>{reachT('chReturnBy')}</span>
+            <input className={controls.input} type="date" value={s.challan_return_by ?? ''} onChange={(e) => s.patch({ challan_return_by: e.target.value || undefined })} />
+          </label>
+        )}
       </div>
     );
   }

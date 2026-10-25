@@ -75,3 +75,6 @@ backgrounds, watermark and letterhead footer, and offsets the content by a top s
 - Bills on the confirmation letter ignore advance adjustments dated before the closing date (their amount is not on
   the ledger entry); the reconciling line keeps the closing balance correct.
 - Dot-matrix text mode is not built.
+
+## 8G additions
+- `AcceptanceBlock` prints a document's own payment schedule and a quotation's acceptance snapshot (signer, time, amount, signature) — accent variable only, legacy documents print nothing.

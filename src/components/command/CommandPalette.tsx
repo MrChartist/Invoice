@@ -9,10 +9,9 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, CornerDownLeft, FileText, History, Package, Search, Users, Zap } from 'lucide-react';
+import { ArrowRight, Banknote, BookOpen, Building2, CornerDownLeft, FileText, History, Package, Receipt, Search, Truck, Users, Zap } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { KEYS, getTable } from '../../lib/storage';
-import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
+import { companyDbName, readRegistry } from '../../lib/company-registry';
 import {
   GROUP_LABELS,
   clearRecentSearches,
@@ -20,6 +19,8 @@ import {
   groupResults,
   pushRecentSearch,
   searchAll,
+  searchIndex,
+  searchPeek,
   type Range,
   type SearchGroup,
   type SearchResult,
@@ -28,6 +29,7 @@ import {
 import { formatCombo } from '../../hooks/useHotkeys';
 import { tallyDestinations } from './tally-destinations';
 import { distDestinations } from './dist-destinations';
+import { sfT } from '../../i18n/areas/smart-find';
 import styles from './CommandPalette.module.css';
 
 export interface PaletteAction {
@@ -98,6 +100,17 @@ function iconFor(r: SearchResult, action?: PaletteAction, nav?: PaletteNavItem):
       return <Package size={16} />;
     case 'action':
       return <Zap size={16} />;
+    case 'bill':
+      return <Receipt size={16} />;
+    case 'vendor':
+      return <Truck size={16} />;
+    case 'payment':
+    case 'cheque':
+      return <Banknote size={16} />;
+    case 'voucher':
+      return <BookOpen size={16} />;
+    case 'company':
+      return <Building2 size={16} />;
     default:
       return <ArrowRight size={16} />;
   }
@@ -115,15 +128,24 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   const listId = `${uid}-list`;
   const optionId = (i: number) => `${uid}-opt-${i}`;
 
-  // Snapshot the data once per open — typing must not re-parse localStorage.
-  const data = useMemo(() => {
-    if (!open) return null;
-    return {
-      invoices: getTable<InvoiceRecord>(KEYS.invoices),
-      clients: getTable<Client>(KEYS.clients),
-      items: getTable<Partial<InvoiceItem>>(KEYS.items),
+  // 8.103: the SmartFind index is built once per storage version (cached in search.ts) — typing never
+  // re-parses storage. Warm it on open so the first keystroke is instant.
+  useMemo(() => (open ? searchIndex() : null), [open]);
+  // All companies (read-only peek), offered only when the device has more than one company.
+  const multiCompany = useMemo(() => open && readRegistry().list.length > 1, [open]);
+  const [allCompanies, setAllCompanies] = useState(false);
+  const [peeked, setPeeked] = useState<{ id: string; name: string; data: Parameters<typeof searchPeek>[2] }[] | null>(null);
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (!allCompanies || peeked) return;
+    let live = true;
+    import('../../lib/company-peek').then((m) => m.peekOtherCompanies(readRegistry(), companyDbName)).then((rows) => {
+      if (live) setPeeked(rows);
+    }).catch(() => live && setPeeked([]));
+    return () => {
+      live = false;
     };
-  }, [open]);
+  }, [allCompanies, peeked]);
 
   const pageEntries = useMemo<StaticEntry[]>(
     () =>
@@ -166,14 +188,15 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       return [...base, ...staticRows.map((r) => ({ key: r.id, kind: 'result' as const, result: r }))];
     }
     const found = searchAll(q, {
-      data: { ...data, pages: [...pageEntries, ...tallyEntries], actions: actionEntries },
+      data: { pages: [...pageEntries, ...tallyEntries], actions: actionEntries },
       perGroup: 6,
     });
+    if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
     // Render order follows group relevance, so flatten through groupResults.
     return groupResults(found).flatMap((g) =>
       g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
     );
-  }, [open, query, recents, data, pageEntries, tallyEntries, actionEntries]);
+  }, [open, query, recents, pageEntries, tallyEntries, actionEntries, allCompanies, peeked]);
 
   // Reset on open; remember and restore focus.
   useEffect(() => {
@@ -209,6 +232,12 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       }
       const r = opt.result!;
       if (query.trim()) pushRecentSearch(query);
+      if (r.company) {
+        // Read-only peek: another company's record cannot open here.
+        const name = readRegistry().list.find((c) => c.id === r.company)?.name ?? '';
+        setNotice(sfT('switchTo', { name }));
+        return;
+      }
       if (r.actionId) {
         const action = actionById.get(r.actionId);
         onClose();
@@ -308,8 +337,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
             aria-controls={listId}
             aria-autocomplete="list"
             aria-activedescendant={options.length ? optionId(clampedActive) : undefined}
-            aria-label="Search invoices, clients, pages and actions"
-            placeholder="Search invoices, clients, pages, actions…"
+            aria-label="Search invoices, bills, parties, payments, amounts, pages and actions"
+            placeholder="Find anything: invoices, bills, parties, UTR, ₹12.5k, >50k…"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
@@ -321,13 +350,19 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
           />
           <kbd className={styles.kbd}>Esc</kbd>
         </div>
+        {multiCompany && (
+          <label className={styles.emptyHint} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.25rem 1rem' }}>
+            <input type="checkbox" checked={allCompanies} onChange={(e) => setAllCompanies(e.target.checked)} /> {sfT('allCompanies')}
+          </label>
+        )}
+        {notice && <p className={styles.emptyHint} role="status" style={{ padding: '0 1rem' }}>{notice}</p>}
 
         <div ref={listRef} id={listId} className={styles.list} role="listbox" aria-label="Results">
           {options.length === 0 && (
             <div className={styles.empty} role="presentation">
               <p className={styles.emptyTitle}>No matches for “{query.trim()}”</p>
               <p className={styles.emptyHint}>
-                Try an invoice number like <code>0007</code>, a client name, a GSTIN or an HSN code.
+                Try an invoice number like <code>0007</code>, a party, a GSTIN / PAN / UTR, an amount like <code>12.5k</code> or <code>&gt;50k</code>.
               </p>
             </div>
           )}

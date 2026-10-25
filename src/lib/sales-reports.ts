@@ -628,7 +628,7 @@ export function paymentModes(payments: readonly Payment[], invoices: readonly In
     const date = isoDay(p.date);
     const amount = round2(Math.abs(num(p.amount)));
     // Advance adjustments (5.3) are not money received in the period.
-    if (!date || amount === 0 || !inPeriod(date, period) || foreign.has(p.invoice_id) || p.advance_id) continue;
+    if (!date || amount === 0 || !inPeriod(date, period) || foreign.has(p.invoice_id) || p.advance_id || p.write_off) continue; // 8.106: a write-off is not money
     const method = canonicalMethod(p.method);
     const r = map.get(method) ?? { method, count: 0, amount: 0, share: 0 };
     r.count++;

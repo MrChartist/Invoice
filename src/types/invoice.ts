@@ -175,6 +175,10 @@ export interface InvoiceItem {
   sku?: string;
   /** Additive (6.7), catalogue rows only: maximum retail price printed on shelf labels. */
   mrp?: number;
+  /** Additive (8H catalogue v2), catalogue rows only: photo as an `asset:<id>` reference (assets table). */
+  image?: string;
+  /** Additive (8H), catalogue rows only: `stock_groups` row shown as the catalogue category. */
+  group_id?: string;
   /** Additive (6.9), catalogue rows only: quantity slabs — a line of at least `min_qty` gets `rate`. */
   qty_slabs?: QtySlab[];
   /* ── Retail speed (8E) — catalogue rows only, never copied to invoice lines ── */
@@ -248,6 +252,11 @@ export interface Client {
   credit_limit?: number;
   /** Additive (6.25): credit period in days; bills older than this with a balance raise the same warning. */
   credit_days?: number;
+  /**
+   * Additive (8H): language for reminders and WhatsApp statements to this party
+   * (`src/lib/message-langs.ts`). Absent = the interface language.
+   */
+  message_lang?: 'en' | 'hinglish' | 'hi' | 'mr' | 'gu' | 'ta';
   /** Additive (6.9): id of the `price_levels` row this party buys at (e.g. Wholesale). Absent = base rates. */
   price_level?: string;
   /**
@@ -388,6 +397,12 @@ export interface Payment {
    * the date-order number (`receipts.ts`). Absent on advance adjustments.
    */
   receipt_number?: string;
+  /**
+   * Additive (8G, 8.106): the balance was written off as a bad debt, not received. Settles the bill like
+   * a payment, but cash books, receipts numbering and bank matching skip it; the ledger debits
+   * "Other expenses" (bad debts) instead of cash / bank (`src/lib/write-off.ts`).
+   */
+  write_off?: boolean;
 }
 
 /** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */
@@ -459,6 +474,12 @@ export interface InvoiceRecord {
    * correction notes move no stock and take no cost of goods back.
    */
   goods_returned?: boolean;
+  /** Additive (8H), delivery challans: print without rates, amounts, tax or totals (quantities only). */
+  challan_hide_amounts?: boolean;
+  /** Additive (8H), delivery challans: goods sent to come back (job work, approval, repair) — printed as returnable. */
+  challan_returnable?: boolean;
+  /** Additive (8H): expected return date of a returnable challan (YYYY-MM-DD). */
+  challan_return_by?: string;
 
   /* ── Money knobs ───────────────────────────────────────────── */
   discount_type: DiscountType;
@@ -593,6 +614,40 @@ export interface InvoiceRecord {
    * Absent on legacy documents (nothing is printed). See `src/lib/party-balance.ts`.
    */
   party_balance_snapshot?: PartyBalanceSnapshot;
+  /**
+   * Additive (8G, 8.100): deposit / milestone instalments (quote, proforma, sales order, invoice). Feeds
+   * reminders, ageing and the cash forecast through `src/lib/payment-schedule.ts`. Absent = one due date.
+   */
+  payment_schedule?: PaymentInstalment[];
+  /**
+   * Additive (8G, 8.101): the client's acceptance of a quotation, snapshotted once (signature, signer,
+   * timestamp) and printed on the quote. Never rewritten by later edits (`src/lib/quote-acceptance.ts`).
+   */
+  acceptance?: QuoteAcceptance;
+}
+
+/** 8.100: one instalment. Exactly one of `percent` (of the document total) or `amount` is used. */
+export interface PaymentInstalment {
+  id: string;
+  /** e.g. "Deposit", "On delivery". */
+  label?: string;
+  /** Local day (YYYY-MM-DD). */
+  due_date: string;
+  percent?: number;
+  amount?: number;
+}
+
+/** 8.101: acceptance snapshot. `signature` is a PNG data URL drawn on the counter (absent for a remote "Accept"). */
+export interface QuoteAcceptance {
+  signer: string;
+  /** ISO timestamp. */
+  signed_at: string;
+  signature?: string;
+  /** `counter` = signed on this device; `remote` = the client accepted by WhatsApp / e-mail. */
+  method: 'counter' | 'remote';
+  /** Total accepted (document currency), frozen with the signature. */
+  amount: number;
+  note?: string;
 }
 
 /** 8.5: rupee figures frozen on the bill at issue (INR only). Total due = previous + bill − paid. */

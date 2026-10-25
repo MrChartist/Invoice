@@ -176,6 +176,10 @@ export type PeriodPreset =
   | 'this_quarter'
   | 'this_fy'
   | 'last_fy'
+  /** 8.107: month / FY quarter / FY to date (start of the period → today). */
+  | 'mtd'
+  | 'qtd'
+  | 'ytd'
   | 'custom';
 
 export const PERIOD_PRESET_LABELS: Record<PeriodPreset, string> = {
@@ -184,6 +188,9 @@ export const PERIOD_PRESET_LABELS: Record<PeriodPreset, string> = {
   this_quarter: 'This quarter',
   this_fy: 'This FY',
   last_fy: 'Last FY',
+  mtd: 'Month to date',
+  qtd: 'Quarter to date',
+  ytd: 'Year to date',
   custom: 'Custom',
 };
 
@@ -216,6 +223,12 @@ export function periodForPreset(preset: PeriodPreset, today: Date = new Date()):
         end: isoOf(endYear, endCal, daysInMonth(endYear, endCal)),
       };
     }
+    case 'mtd':
+      return { start: isoOf(y, m, 1), end: todayIso };
+    case 'qtd':
+      return { start: periodForPreset('this_quarter', today).start, end: todayIso };
+    case 'ytd':
+      return { start: fyPeriod(fyStartYearOf(todayIso)).start, end: todayIso };
     case 'this_fy':
       return fyPeriod(fyStartYearOf(todayIso));
     case 'last_fy':
@@ -470,7 +483,8 @@ export function buildVouchers(data: BooksData): Voucher[] {
 
   for (const t of data.transactions) {
     // An advance adjusted against an invoice moved no money: the cash came in on the advance.
-    if (isAdvanceAdjustment(t)) continue;
+    // 8.106: neither did a bad-debt write-off.
+    if (isAdvanceAdjustment(t) || t.write_off) continue;
     const date = toIsoDate(t.date);
     const inv = invById.get(t.invoice_id);
     // A receipt against a foreign-currency invoice is booked at the rupees actually realised
@@ -813,8 +827,20 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
     }
   }
 
+  // 8.106: a bad-debt write-off is an (indirect) expense on its date — accrual only; on cash basis the
+  // income was never recognised, so there is nothing to write off.
+  if (basis === 'accrual') {
+    for (const t of data.transactions) {
+      if (!t.write_off) continue;
+      const date = toIsoDate(t.date);
+      const amount = round2(Math.abs(inrValue(num(t.amount), invById.get(t.invoice_id))));
+      if (date && amount) events.push({ date, kind: 'expense', amount, category: 'Bad debts written off', direct: false, ref: t.id });
+    }
+  }
+
   if (basis === 'cash') {
     for (const t of data.transactions) {
+      if (t.write_off) continue;
       const date = toIsoDate(t.date);
       const inv = invById.get(t.invoice_id);
       const paid = round2(Math.abs(inrValue(num(t.amount), inv)));
