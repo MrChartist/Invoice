@@ -14,6 +14,7 @@ import { loadBooksBegin, loadOpenings } from './openings';
 import { buildLedger, type Ledger, type LedgerInput } from './postings';
 import type { OpeningsInput } from './postings-openings';
 import { loadVouchers } from './vouchers';
+import { loadPayrollPayments, loadRuns } from '../payroll/records';
 
 export * from './accounts';
 export * from './assets';
@@ -43,6 +44,8 @@ export function loadLedgerInput(books: BooksData = loadBooksData(), today: strin
     openingBills: loadOpeningBills(),
     booksBegin: loadBooksBegin(today),
     clients: getTable<Client>('clients'),
+    payrollRuns: loadRuns(),
+    payrollPayments: loadPayrollPayments(),
   };
 }
 

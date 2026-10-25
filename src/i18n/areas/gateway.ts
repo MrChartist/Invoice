@@ -68,6 +68,8 @@ export const gwT = defineArea(
     creditNote: 'Credit note',
     debitNote: 'Debit note',
     stockJournal: 'Stock journal',
+    payrollVoucher: 'Payroll voucher',
+    payrollReports: 'Payroll (PF / ESI / PT / 24Q)',
     physicalStock: 'Physical stock',
 
     brs: 'Bank reconciliation',
@@ -274,6 +276,8 @@ export const gwT = defineArea(
     creditNote: 'क्रेडिट नोट',
     debitNote: 'डेबिट नोट',
     stockJournal: 'स्टॉक जर्नल',
+    payrollVoucher: 'पेरोल वाउचर',
+    payrollReports: 'पेरोल (PF / ESI / PT / 24Q)',
     physicalStock: 'भौतिक स्टॉक',
 
     brs: 'बैंक मिलान',

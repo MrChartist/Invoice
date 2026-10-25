@@ -277,7 +277,13 @@ export const GATEWAY_SCREENS: readonly MenuScreen[] = [
 ];
 
 /** Entries added by other modules (payroll's Employee, manufacturing's Stock journal …). */
-export const GATEWAY_EXTENSIONS: Array<{ screen: ScreenId; section: number; entry: MenuEntry }> = [];
+export const GATEWAY_EXTENSIONS: Array<{ screen: ScreenId; section: number; entry: MenuEntry }> = [
+  // Payroll (Phase 7, docs/features/payroll.md) — owner only (`payroll.view`).
+  { screen: 'create', section: 0, entry: { id: 'employee', label: 'employee', accel: 'm', target: go('/payroll?tab=employees'), need: 'payroll.view', keywords: 'employee staff payroll salary' } },
+  { screen: 'alter', section: 0, entry: { id: 'employee', label: 'employee', accel: 'm', target: go('/payroll?tab=employees'), need: 'payroll.view', keywords: 'employee staff payroll salary' } },
+  { screen: 'vouchers', section: 0, entry: { id: 'v-payroll', label: 'payrollVoucher', accel: 'l', target: go('/payroll?tab=run'), need: 'payroll.view', keywords: 'payroll salary attendance' } },
+  { screen: 'statutory', section: 0, entry: { id: 'sr-payroll', label: 'payrollReports', accel: 'p', target: go('/payroll?tab=reports'), need: 'payroll.view', keywords: 'pf esi ecr pt 24q form 16 payroll' } },
+];
 
 export type Can = (action: AccessAction) => boolean;
 

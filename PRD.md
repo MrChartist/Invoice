@@ -191,6 +191,13 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   note that names them) with warranty months and a serial lookup (bill, vendor, invoice, client, warranty status).
   **Godowns** appear once a second godown exists: godown per bill / invoice line, stock per godown, stock transfer
   vouchers `STR/FY25-26/0001` (period lock + audit, no books posting). Costing stays company-wide.
+- **Payroll** (Tally parity, `/payroll`, owner only): employees (PAN, UAN, ESI IP, bank, PT state, tax regime),
+  employee groups, Tally-style pay heads (flat / on attendance / % of other heads / on production / computed slabs /
+  user-defined), salary structures with effective dates, monthly LOP / overtime / production entry, Auto fill run with
+  an editable review grid, PF (EPS / EPF split, ₹15,000 ceiling), ESI (₹21,000 coverage), Professional Tax (7 states,
+  Maharashtra February rule) and TDS u/s 192 projections (both regimes) from date-keyed rules; finalizing posts a
+  Payroll voucher (`PRL/FY/…`) to the ledger, salary / statutory payments clear the payables; payslips, pay sheet,
+  attendance register, PF ECR, ESI, PT, Form 24Q and Form 16 Part B working papers (`docs/features/payroll.md`).
 - **Controls**: audit trail of every change with a tamper-evident hash chain and exportable head hash; "lock books up
   to" period lock enforced in the data layer with PIN-guarded, audited overrides.
 

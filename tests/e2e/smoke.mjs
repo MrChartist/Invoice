@@ -1018,6 +1018,32 @@ try {
     check(true, 'forecast, FX gain/loss and party-profit screens render');
   });
 
+  await step('payroll: add an employee with a salary structure, run the month, see the payslip net pay', async () => {
+    await page.goto(srv.origin + '/payroll');
+    await page.getByRole('button', { name: 'Add employee' }).click();
+    const dlg = page.getByRole('dialog', { name: 'New employee' });
+    await dlg.getByLabel('Name *').fill('Payroll Tester');
+    await dlg.getByRole('button', { name: 'Save employee' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    await page.getByRole('tab', { name: 'Salary structures' }).click();
+    await page.getByRole('button', { name: 'Create structure' }).click();
+    await page.getByLabel('Monthly amount for Basic').fill('20000');
+    await page.getByLabel('Monthly amount for Basic').press('Enter');
+    await page.getByRole('button', { name: 'Save structure' }).click();
+    await page.getByText('Salary structure saved').waitFor();
+    await page.getByRole('tab', { name: 'Payroll run' }).click();
+    await page.getByRole('button', { name: 'Auto fill' }).click();
+    await page.getByRole('button', { name: 'Payslip for Payroll Tester' }).click();
+    const slip = page.getByRole('dialog', { name: /Payslip · Payroll Tester/ });
+    // Basic 20,000 − PF 12% (1,800) − ESI 0.75% (150) = 18,050
+    await slip.getByText('Net pay: ₹18,050.00').waitFor();
+    check(true, 'payslip shows net pay after PF and ESI');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Finalize & post' }).click();
+    const runs = await readJson(page, 'payroll_runs', [], (v) => v[0]?.status === 'final');
+    check(runs[0]?.status === 'final' && /^PRL\/FY/.test(runs[0].number), `payroll finalized with a PRL number (${runs[0]?.number})`);
+  });
+
   await step('local roles: the owner adds a viewer, who sees a read-only app, then the owner signs back in', async () => {
     await page.goto(srv.origin + '/settings?tab=security');
     await page.getByText('Users on this device').waitFor();
