@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { CalendarCheck, Plus, RefreshCw } from 'lucide-react';
+import { Check, Plus, RefreshCw } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { useCan } from '../../hooks/useCan';
 import { amcDb, amcReminders, contractStatus, renewContract, addDaysIso } from '../../lib/amc';
@@ -51,7 +51,7 @@ export function AmcPanel({ notify, icon }: { notify: (m: string, tone?: 'success
                 <span>{r.text} · {formatDate(r.date)}</span>
                 {edit && r.kind === 'visit' && (
                   <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => run(() => amcDb.recordVisit(r.contract_id, { date: today }), amcT('visitDone'))}>
-                    <CalendarCheck size={14} /> {amcT('markVisit')}
+                    <Check size={14} /> {amcT('markVisit')}
                   </button>
                 )}
                 {edit && r.kind === 'renewal' && (

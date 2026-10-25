@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Boxes, Download, IndianRupee, LayoutGrid, Landmark, PackageOpen, Receipt, Store, TrendingUp, Wallet } from 'lucide-react';
+import { Boxes, Download, IndianRupee, Landmark, Receipt, Store, TrendingUp, Wallet } from 'lucide-react';
 import { useCan } from '../../hooks/useCan';
 import { useToast } from '../ui/useToast';
 import { ALL_TILES, computeTiles, forBranch, loadTilePrefs, saveTilePrefs, type TileId } from '../../lib/dashboard-tiles';
@@ -103,7 +103,7 @@ export function DashboardTiles() {
   return (
     <section className={own.wrap} aria-label={tilesT('title')}>
       <div className={own.head}>
-        <h2 className={own.title}><LayoutGrid size={16} /> {tilesT('title')}</h2>
+        <h2 className={own.title}><Boxes size={16} /> {tilesT('title')}</h2>
         <div className={own.tools}>
           {branches.length > 0 && (
             <select className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={tilesT('branchFilter')}>
@@ -152,7 +152,7 @@ export function DashboardTiles() {
         )}
         {on('lowStock') && (
           <div className={surface.card} data-tile="lowStock">
-            <div className={surface.cardHead}><span className={surface.cardHeadIcon}><PackageOpen size={16} /> {tilesT('lowStock')}</span></div>
+            <div className={surface.cardHead}><span className={surface.cardHeadIcon}><Boxes size={16} /> {tilesT('lowStock')}</span></div>
             <div className={surface.cardBody}>
               {v.lowStock.length === 0 ? <p className={controls.hint}>{tilesT('stockOk')}</p> : (
                 <ul className={own.list}>
