@@ -1,3 +1,4 @@
+import { isStockDependencyError } from '../lib/stock-timeline';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, FilePlus2, Landmark, PiggyBank, Receipt, Search, Tags, Wallet, Zap } from 'lucide-react';
@@ -113,12 +114,14 @@ export function Expenses() {
     notify(purT(rows.length === 1 ? 'exportedOne' : 'exportedMany', { n: rows.length }));
   };
 
-  const remove = (p: PurchaseRecord) => {
+  const remove = (p: PurchaseRecord, confirmStock = false) => {
     try {
-      purchasesDb.remove(p.id);
+      purchasesDb.remove(p.id, { confirmStock });
       reload();
       notify(purT('entryDeleted'));
     } catch (err) {
+      // Later sales used this bill's stock: ask before letting it go negative (serial conflicts never confirm).
+      if (isStockDependencyError(err) && err.confirmable && window.confirm(`${err.message}\n\nDelete the bill anyway?`)) return remove(p, true);
       notify((err as Error).message, 'error');
     }
   };

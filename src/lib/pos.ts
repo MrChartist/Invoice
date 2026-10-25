@@ -22,6 +22,7 @@ import { resolveStateCode } from './india-states';
 import { customFieldsDb, finalizeValues } from './custom-fields';
 import { isPeriodLockedError } from './period-lock';
 import { requireAccess } from './access';
+import { audit } from './audit';
 import { generateId, getTable, setTable } from './storage';
 import {
   batchOptions, editorStockContext, liveDocTrackingIssues, withBatch,
@@ -434,6 +435,14 @@ export const dayCloseDb = {
       closed_at: new Date().toISOString(),
     };
     setTable(POS_DAY_CLOSE_TABLE, [...all.filter((d) => d.day !== z.day), row].sort((a, b) => a.day.localeCompare(b.day)));
+    try {
+      audit.record({
+        entity: 'pos_day_close', entity_id: row.id, action: prev ? 'update' : 'create',
+        summary: `${prev ? 'Re-counted' : 'Closed'} POS day ${z.day}: counted ₹${row.counted_cash}, expected ₹${row.expected_cash}, difference ₹${row.difference}${prev ? ` (was counted ₹${prev.counted_cash})` : ''}`,
+      });
+    } catch {
+      /* logging never breaks a save */
+    }
     return row;
   },
 };

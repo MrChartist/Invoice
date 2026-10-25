@@ -75,6 +75,11 @@ export interface AdvanceBalance {
   refunded: number;
   /** Still available to apply or refund. */
   open: number;
+  /**
+   * Adjusted + refunded beyond the advance (0 when fine). `open` is clamped at zero, so this is what shows
+   * an over-adjustment (e.g. one made while an invoice was cancelled, then the invoice reinstated).
+   */
+  over: number;
 }
 
 export function advanceBalance(
@@ -85,7 +90,7 @@ export function advanceBalance(
   const amount = round2(num(adv.amount));
   const adjusted = round2(liveAdjustments(adv.id, payments, invoices).reduce((s, p) => s + num(p.amount), 0));
   const refunded = round2((adv.refunds ?? []).reduce((s, r) => s + num(r.amount), 0));
-  return { amount, adjusted, refunded, open: round2(Math.max(amount - adjusted - refunded, 0)) };
+  return { amount, adjusted, refunded, open: round2(Math.max(amount - adjusted - refunded, 0)), over: round2(Math.max(adjusted + refunded - amount, 0)) };
 }
 
 /* ── Movements ────────────────────────────────────────────────── */

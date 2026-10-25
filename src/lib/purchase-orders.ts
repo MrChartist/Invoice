@@ -16,6 +16,9 @@ import { num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { computePurchaseTotals } from './purchases';
 import { formatCurrency, formatDate } from './utils';
+import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
+import { audit } from './audit';
+import { requireAccess } from './access';
 
 export const PURCHASE_ORDERS_TABLE = 'purchase_orders';
 export const PO_PREFIX = 'PO';
@@ -200,17 +203,30 @@ export function poHtml(po: PurchaseOrder, buyer: PoBuyer, vendor?: { address?: s
 
 const now = () => new Date().toISOString();
 
+function logPo(id: string, action: 'create' | 'update' | 'delete', number: string, summary: string): void {
+  try {
+    audit.record({ entity: 'purchase_order', entity_id: id, action, doc_number: number, summary });
+  } catch {
+    /* logging never breaks a save */
+  }
+}
+
 export const purchaseOrdersDb = {
   all: (): PurchaseOrder[] => getTable<PurchaseOrder>(PURCHASE_ORDERS_TABLE),
   get: (id: string): PurchaseOrder | undefined => purchaseOrdersDb.all().find((p) => p.id === id),
 
-  nextNumber: (date?: string): string => nextPoNumber(purchaseOrdersDb.all().map((p) => p.po_number), date),
+  /** Above every existing number and the series high-water mark (a deleted latest number is not reused). */
+  nextNumber: (date?: string): string => nextSeriesNumberFor(PO_PREFIX, date, purchaseOrdersDb.all().map((p) => p.po_number)),
 
   /** Insert or update (matched by id). A new PO without a number gets the next one in its FY. */
   save(input: Omit<PurchaseOrder, 'id' | 'po_number'> & { id?: string; po_number?: string }): PurchaseOrder {
+    requireAccess('books.edit');
     const rows = purchaseOrdersDb.all();
     const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
-    const number = (input.po_number ?? '').trim() || existing?.po_number || purchaseOrdersDb.nextNumber(input.date);
+    const asked = (input.po_number ?? '').trim();
+    // An edit that moves the date into another FY takes a number from that FY's series.
+    const keep = existing && numberFitsFy(existing.po_number, input.date) ? existing.po_number : '';
+    const number = (asked && asked !== existing?.po_number ? asked : '') || keep || purchaseOrdersDb.nextNumber(input.date);
     if (rows.some((r) => r.id !== existing?.id && r.po_number.toUpperCase() === number.toUpperCase())) {
       throw new Error(`Purchase order number ${number} is already used.`);
     }
@@ -223,12 +239,17 @@ export const purchaseOrdersDb = {
       updated_at: now(),
     };
     setTable(PURCHASE_ORDERS_TABLE, existing ? rows.map((r) => (r.id === record.id ? record : r)) : [...rows, record]);
+    recordSeries(number);
+    logPo(record.id, existing ? 'update' : 'create', number, `${existing ? 'Edited' : 'Created'} purchase order ${number} to ${record.vendor_name}${existing && existing.po_number !== number ? ` (was ${existing.po_number})` : ''}`);
     return record;
   },
 
   /** Close (on `closedOn`, yyyy-mm-dd) or reopen (`undefined`) an order. */
   setClosed(id: string, closedOn: string | undefined): void {
+    requireAccess('books.edit');
     const rows = purchaseOrdersDb.all();
+    const po = rows.find((r) => r.id === id);
+    if (po) logPo(id, 'update', po.po_number, `Purchase order ${po.po_number} ${closedOn ? `closed on ${closedOn}` : 'reopened'}`);
     setTable(
       PURCHASE_ORDERS_TABLE,
       rows.map((r) => {
@@ -246,6 +267,9 @@ export const purchaseOrdersDb = {
     if (purchases.some((p) => p.po_id === id)) {
       throw new Error('Bills are recorded against this purchase order. Close it instead of deleting it.');
     }
+    requireAccess('books.edit');
+    const po = purchaseOrdersDb.get(id);
     setTable(PURCHASE_ORDERS_TABLE, purchaseOrdersDb.all().filter((p) => p.id !== id));
+    if (po) logPo(id, 'delete', po.po_number, `Deleted purchase order ${po.po_number} (the number is not reused)`);
   },
 };

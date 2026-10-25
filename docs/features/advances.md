@@ -27,8 +27,12 @@ verify with your CA**.
 
 ## Numbering
 - Receipt vouchers `ADV/FY25-26/0001`, refund vouchers `RFV/FY25-26/0001`: one series each per Indian FY (1 Apr – 31 Mar,
-  bare dates parsed as local days), derived from the highest number already issued, so a deleted voucher's number is
-  never reused once a later one exists. Editing an advance into another FY gives it the next number of that FY.
+  bare dates parsed as local days): the highest number already issued or the `series_counters` high-water mark,
+  whichever is higher, + 1 — so a deleted voucher's number is never reused, not even the latest one. Editing an
+  advance into another FY gives it the next number of that FY.
+- `advanceBalance` also returns `over` (adjusted + refunded beyond the advance; `open` is clamped at zero, so `over`
+  is what reveals an over-adjustment). Reinstating a cancelled invoice whose adjustment would over-adjust its advance
+  is refused (`documents.reinstateIssues`).
 - Adjustment rows take **no** `RCPT/…` payment-receipt number (`receiptNumber` skips `advance_id`), because the advance
   already has its own receipt voucher.
 

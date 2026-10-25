@@ -33,6 +33,7 @@ import { todayIso } from './tax-rules';
 import { formatCurrency, formatDate } from './utils';
 import { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, liveAdjustments, taxTotal, type AdvanceBalance } from './advance-tax';
 import { receivableTotal } from './rcm';
+import { recordSeries, seriesHigh } from './series-counters';
 
 export { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, isAdvanceAdjustment, liveAdjustments } from './advance-tax';
 export type { AdvanceBalance } from './advance-tax';
@@ -50,21 +51,24 @@ export class AdvanceError extends Error {
 
 /* ── Numbering ──────────────────────────────────────────────── */
 
-/** Next number in `<prefix>/FY<yy-yy>/<0001>` for the FY of `date`. */
-export function nextSeriesNumber(prefix: string, date: string, existing: readonly string[]): string {
+/** Next number in `<prefix>/FY<yy-yy>/<0001>` for the FY of `date` (above `floor`, the series high-water mark). */
+export function nextSeriesNumber(prefix: string, date: string, existing: readonly string[], floor = 0): string {
   const fy = getIndianFY(isoDay(date) || undefined);
   const taken = new Set(existing.map((n) => String(n ?? '').trim().toUpperCase()));
-  let seq = highestSequence([...existing], prefix, fy.label) + 1;
+  let seq = Math.max(highestSequence([...existing], prefix, fy.label), floor) + 1;
   while (taken.has(buildInvoiceNumber(prefix, fy.label, seq))) seq++;
   return buildInvoiceNumber(prefix, fy.label, seq);
 }
 
+const highWater = (prefix: string, date: string) => seriesHigh(prefix, getIndianFY(isoDay(date) || undefined).label);
+
+/** A deleted latest voucher's number is never reused (`series-counters.ts`). */
 export function nextAdvanceNumber(date: string, advances: readonly AdvanceRecord[] = loadAdvances()): string {
-  return nextSeriesNumber(ADVANCE_PREFIX, date, advances.map((a) => a.number));
+  return nextSeriesNumber(ADVANCE_PREFIX, date, advances.map((a) => a.number), highWater(ADVANCE_PREFIX, date));
 }
 
 export function nextRefundNumber(date: string, advances: readonly AdvanceRecord[] = loadAdvances()): string {
-  return nextSeriesNumber(REFUND_PREFIX, date, advances.flatMap((a) => (a.refunds ?? []).map((r) => r.number)));
+  return nextSeriesNumber(REFUND_PREFIX, date, advances.flatMap((a) => (a.refunds ?? []).map((r) => r.number)), highWater(REFUND_PREFIX, date));
 }
 
 /* ── Storage ────────────────────────────────────────────────── */
@@ -213,6 +217,7 @@ export function saveAdvance(input: AdvanceInput, ctx: Ctx = {}): AdvanceRecord {
     ...(prev ? { updated_at: nowIso } : {}),
   };
   writeAll(prev ? rows.map((a) => (a.id === id ? row : a)) : [...rows, row]);
+  recordSeries(number);
   const tax = row.tax.applies ? `, GST ${money(taxTotal(row.tax))}` : ', no GST on this advance';
   log(id, prev ? 'update' : 'create', number, `${prev ? 'Edited advance' : 'Advance'} ${number} from ${row.client.name}: ${money(amount)}${tax}`);
   return row;
@@ -367,6 +372,7 @@ export function refundAdvance(advanceId: string, input: RefundInput, ctx: Ctx = 
   };
   rows[idx] = { ...adv, refunds: [...(adv.refunds ?? []), refund], updated_at: refund.created_at };
   writeAll(rows);
+  recordSeries(refund.number);
   log(adv.id, 'update', adv.number, `Advance ${adv.number}: ${money(amount)} refunded (${refund.number})`);
   return refund;
 }

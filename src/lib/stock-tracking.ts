@@ -19,12 +19,13 @@ import type { AppNotification } from './notifications';
 import { num, round2 } from './invoice-calc';
 import { shiftDay } from './dates';
 import {
-  buildItemIndex, cleanSerials, collectEvents, liveInputs, loadSettings,
+  buildItemIndex, cleanSerials, collectEvents, invoiceEffect, liveInputs, loadSettings,
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
 import { getTable } from './storage';
 import { creditNoteReturnsGoods } from './credit-restock';
 import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList } from './godowns';
+import { batchDelta, dayWindow, eventLabel, firstShortAfter, godownDelta, serialDelta } from './stock-timeline';
 
 const EPS = 1e-9;
 const roundQty = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
@@ -316,6 +317,15 @@ export interface TrackingIssues {
   warnings: string[];
 }
 
+/**
+ * Documents that take goods out for batch / serial / godown purposes: every type the stock engine
+ * treats as a sale (`invoiceEffect`: invoice, tax invoice, Bill of Supply, a row with no type) plus
+ * delivery challans (checked whether or not challans move stock).
+ */
+export function isOutgoingDoc(docType: string | undefined): boolean {
+  return invoiceEffect(docType, 'Sent', true) === 'out';
+}
+
 type DocInput = Pick<InvoiceRecord, 'doc_type' | 'items' | 'issue_date'> & Partial<Pick<InvoiceRecord, 'id' | 'status' | 'goods_returned' | 'notes'>>;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -330,7 +340,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown = false): TrackingIssues {
   const issues: TrackingIssues = { errors: [], expired: [], warnings: [] };
   const docType = doc.doc_type;
-  const outgoing = docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'DELIVERY_CHALLAN';
+  const outgoing = isOutgoingDoc(docType);
   // Only a credit note that returns goods takes serials / batches back (same rule as the stock engine).
   const incoming = docType === 'CREDIT_NOTE' && creditNoteReturnsGoods(doc, input.links);
   if (!outgoing && !incoming) return issues;
@@ -340,6 +350,9 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
   if (tracked.length === 0) return issues;
   const index = buildItemIndex(input.items.filter((i) => i.track_stock));
   const tracking = computeTracking({ ...input, excludeInvoiceId: doc.id });
+  // Point-in-time checks run on the dated events (stock-timeline.ts): availability at the end of
+  // the document's day AND no later document depending on the same units.
+  const events = collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id });
   // Serials taken out by the challan this invoice was made from belong to this sale.
   const sourceRefs = new Set(
     doc.id ? (input.links ?? []).filter((l) => l.relation === 'converted' && l.to_id === doc.id).map((l) => l.from_id) : [],
@@ -369,21 +382,30 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
           continue;
         }
         seen.set(k, label);
-        const st = t?.serials.find((x) => serialKey(x.serial) === k);
+        const evs = events.get(item.id) ?? [];
+        const w = dayWindow(evs, day, serialDelta(s));
         if (outgoing) {
-          if (!st) issues.errors.push(`${label}: serial ${s} was never received into stock.`);
-          else if (!st.inStock) {
-            const last = [...st.history].reverse().find((h) => h.dir === -1);
-            if (!(last?.refId && sourceRefs.has(last.refId))) {
-              issues.errors.push(`${label}: serial ${s} is not in stock${last?.refNumber ? ` (sold on ${last.refNumber})` : ''}.`);
-            }
-          } else if (multiGodown && st.godown !== godown) {
-            issues.errors.push(`${label}: serial ${s} is in another godown — transfer it first or change the line's godown.`);
+          if (w.before.length === 0 && w.later.length === 0) {
+            issues.errors.push(`${label}: serial ${s} was never received into stock.`);
+          } else if (w.at < 1) {
+            const last = [...w.before].reverse().find((ev) => ev.qty < 0);
+            const firstIn = w.later.find((r) => r.ev.qty > 0)?.ev;
+            if (last?.refId && sourceRefs.has(last.refId)) continue;
+            if (!last && firstIn) issues.errors.push(`${label}: serial ${s} is not in stock on ${day} (it was received on ${firstIn.date}).`);
+            else issues.errors.push(`${label}: serial ${s} is not in stock${last?.refNumber ? ` (sold on ${last.refNumber})` : ''}.`);
+          } else if (w.lowest < 1) {
+            issues.errors.push(`${label}: serial ${s} is sold or moved later on ${eventLabel(firstShortAfter(w, 1))}, so it cannot leave stock on ${day}.`);
+          } else if (multiGodown) {
+            const g = dayWindow(evs, day, serialDelta(s, godown));
+            if (g.at < 1) issues.errors.push(`${label}: serial ${s} is in another godown — transfer it first or change the line's godown.`);
+            else if (g.lowest < 1) issues.errors.push(`${label}: serial ${s} leaves this godown later on ${eventLabel(firstShortAfter(g, 1))}.`);
           }
-        } else if (st?.inStock) {
+        } else if (w.at >= 1) {
           issues.errors.push(`${label}: serial ${s} is already in stock, so it cannot be returned.`);
-        } else if (!st) {
+        } else if (w.before.length === 0) {
           issues.errors.push(`${label}: serial ${s} was never sold.`);
+        } else if (w.later.some((r) => r.bal + 1 > 1)) {
+          issues.errors.push(`${label}: serial ${s} comes back into stock again on ${eventLabel(w.later.find((r) => r.bal + 1 > 1)?.ev)}.`);
         }
       }
     }
@@ -403,9 +425,12 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
         const key = `${item.id}|${batch.toUpperCase()}|${multiGodown ? godown : ''}`;
         const used = (batchUse.get(key) ?? 0) + q;
         batchUse.set(key, used);
-        const have = info ? (multiGodown ? (info.byGodown[godown] ?? 0) : info.qty) : 0;
+        // As of the sale date, and never below what later documents already take from the batch.
+        const w = dayWindow(events.get(item.id) ?? [], day, batchDelta(batch, multiGodown ? godown : undefined));
+        const have = Math.min(w.at, w.lowest);
         if (used > have + EPS) {
-          issues.warnings.push(`${label}: only ${roundQty(Math.max(have, 0))} ${item.unit} left in batch ${batch}.`);
+          const later = w.lowest < w.at - EPS ? ` on ${day} (later documents use the rest)` : '';
+          issues.warnings.push(`${label}: only ${roundQty(Math.max(have, 0))} ${item.unit} left in batch ${batch}${later}.`);
         }
       }
     }
@@ -419,11 +444,11 @@ export function transferIssues(
   input: StockInputs,
 ): string[] {
   const errors: string[] = [];
-  const tracking = computeTracking({
-    ...input,
-    asOf: tr.date || undefined,
-    transfers: (input.transfers ?? []).filter((x) => x.id !== tr.id),
-  });
+  const others = { ...input, transfers: (input.transfers ?? []).filter((x) => x.id !== tr.id) };
+  const tracking = computeTracking(others);
+  // As of the transfer date AND never below what later documents take from the source godown.
+  const events = collectEvents({ ...others, includeTransfers: true });
+  const day = tr.date || '9999-12-31';
   const want = new Map<string, number>();
   const seen = new Set<string>();
   for (const l of tr.lines ?? []) {
@@ -438,12 +463,14 @@ export function transferIssues(
       const batch = l.batch_no?.trim();
       if (!batch) errors.push(`${label}: choose the batch to transfer.`);
       else {
-        const have = t.batches.find((b) => b.batch.toUpperCase() === batch.toUpperCase())?.byGodown[tr.from_godown] ?? 0;
-        if (total > have + EPS) errors.push(`${label}: only ${roundQty(Math.max(have, 0))} ${t.item.unit} of batch ${batch} in the source godown.`);
+        const w = dayWindow(events.get(l.item_id) ?? [], day, batchDelta(batch, tr.from_godown));
+        const have = Math.min(w.at, w.lowest);
+        if (total > have + EPS) errors.push(`${label}: only ${roundQty(Math.max(have, 0))} ${t.item.unit} of batch ${batch} in the source godown${w.lowest < w.at - EPS ? ' (later documents use the rest)' : ''}.`);
       }
     } else {
-      const have = t.byGodown[tr.from_godown] ?? 0;
-      if (total > have + EPS) errors.push(`${label}: only ${roundQty(Math.max(have, 0))} ${t.item.unit} in the source godown.`);
+      const w = dayWindow(events.get(l.item_id) ?? [], day, godownDelta(tr.from_godown));
+      const have = Math.min(w.at, w.lowest);
+      if (total > have + EPS) errors.push(`${label}: only ${roundQty(Math.max(have, 0))} ${t.item.unit} in the source godown${w.lowest < w.at - EPS ? ` (later documents use the rest, e.g. ${eventLabel(firstShortAfter(w, total))})` : ''}.`);
     }
     if (t.item.track_serials) {
       const list = cleanSerials(l.serials) ?? [];
@@ -452,8 +479,9 @@ export function transferIssues(
         const k = serialKey(s);
         if (seen.has(k)) errors.push(`Serial ${s} appears twice on this transfer.`);
         seen.add(k);
-        const st = t.serials.find((x) => serialKey(x.serial) === k);
-        if (!st || !st.inStock || st.godown !== tr.from_godown) errors.push(`${label}: serial ${s} is not in stock in the source godown.`);
+        const w = dayWindow(events.get(l.item_id) ?? [], day, serialDelta(s, tr.from_godown));
+        if (w.at < 1) errors.push(`${label}: serial ${s} is not in stock in the source godown.`);
+        else if (w.lowest < 1) errors.push(`${label}: serial ${s} leaves the source godown later on ${eventLabel(firstShortAfter(w, 1))}.`);
       }
     }
   }
@@ -468,10 +496,13 @@ export function transferIssues(
 export function billTrackingIssues(
   lines: readonly { name: string; hsn?: string; quantity: number; batch_no?: string; mfg_date?: string; expiry_date?: string; serials?: string[] }[],
   input: StockInputs,
+  /** Bill date: when given, a serial is checked as of that day and against later receipts. */
+  date?: string,
 ): string[] {
   const errors: string[] = [];
   const index = buildItemIndex(input.items.filter((i) => i.track_stock));
   let tracking: TrackingMap | null = null;
+  let events: Map<string, StockEvent[]> | null = null;
   const seen = new Set<string>();
   for (const l of lines) {
     const item = index.find(l.name, l.hsn);
@@ -490,7 +521,13 @@ export function billTrackingIssues(
         const k = serialKey(s);
         if (seen.has(k)) errors.push(`Serial ${s} is listed twice on this bill.`);
         seen.add(k);
-        if (t?.serials.some((x) => x.inStock && serialKey(x.serial) === k)) errors.push(`${item.name}: serial ${s} is already in stock.`);
+        if (date) {
+          events ??= collectEvents({ ...input, includeTransfers: true });
+          const w = dayWindow(events.get(item.id) ?? [], date, serialDelta(s));
+          const again = w.later.find((r) => r.bal + 1 > 1)?.ev;
+          if (w.at >= 1) errors.push(`${item.name}: serial ${s} is already in stock.`);
+          else if (again) errors.push(`${item.name}: serial ${s} is received again later on ${eventLabel(again)}.`);
+        } else if (t?.serials.some((x) => x.inStock && serialKey(x.serial) === k)) errors.push(`${item.name}: serial ${s} is already in stock.`);
       }
     }
   }
@@ -656,7 +693,7 @@ export interface EditorStockContext {
  * document type never moves stock.
  */
 export function editorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string; goods_returned?: boolean }): EditorStockContext | null {
-  const outgoing = doc.doc_type === 'INVOICE' || doc.doc_type === 'TAX_INVOICE' || doc.doc_type === 'DELIVERY_CHALLAN';
+  const outgoing = isOutgoingDoc(doc.doc_type);
   const incoming = doc.doc_type === 'CREDIT_NOTE' && doc.goods_returned !== false;
   if (!outgoing && !incoming) return null;
   try {

@@ -15,8 +15,8 @@ paper: verify with your CA**.
 ## Storage (additive, all in backups)
 - `cost_centres`: `{id, name, kind: project|department|branch, client_id?, active, parent_id?, notes?, created_at, updated_at?}`.
   Names are unique (case-insensitive). One level of grouping: a parent must be top level, and a centre that already
-  groups others cannot get a parent. A centre that is referenced anywhere (documents, bills, vouchers, time, mileage,
-  budgets, child centres) cannot be deleted; mark it **inactive** instead (hidden from pickers, kept in reports).
+  groups others cannot get a parent. A centre that is referenced anywhere (documents and their line overrides, bills
+  and bill lines, vouchers, time, mileage, budgets, child centres, recurring templates and their lines) cannot be deleted; mark it **inactive** instead (hidden from pickers, kept in reports).
 - `budgets`: `{id, fy_start_year, account_id, cost_centre_id?, months: [12 integer paise, April → March], notes?, created_at, updated_at?}`.
   One row per FY × account × cost centre (no cost centre = account level). Income and expense accounts only.
 - New optional fields (never renamed, absent on old rows):

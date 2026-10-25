@@ -263,7 +263,18 @@ export function Transactions() {
     if (pendingRef.current.size) flushDeletes(pendingRef.current);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDelete = (docs: InvoiceRecord[]) => {
+  const handleDelete = async (docs: InvoiceRecord[]) => {
+    // Deleting a goods-returning credit note takes its goods out of stock again: refuse when a later
+    // document resold its serials, and ask when later documents used its quantities.
+    const notes = docs.filter((d) => d.doc_type === 'CREDIT_NOTE' && d.status !== 'Draft' && d.status !== 'Cancelled');
+    if (notes.length) {
+      const { liveRemovalIssues } = await import('../lib/stock-timeline');
+      for (const n of notes) {
+        const issues = liveRemovalIssues({ refType: 'invoice', refId: n.id });
+        if (issues.errors.length) return notify(`${n.invoice_number}: ${issues.errors[0]}`, 'error');
+        if (issues.warnings.length && !window.confirm(`${n.invoice_number}: ${issues.warnings.join(' ')}\n\nDelete anyway?`)) return;
+      }
+    }
     const ids = new Set([...pendingDelete, ...docs.map((d) => d.id)]);
     clearTimeout(deleteTimer.current);
     setPendingDelete(ids);

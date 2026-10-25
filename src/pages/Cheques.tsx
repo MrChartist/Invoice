@@ -7,6 +7,7 @@ import {
   deleteCheque,
   filterCheques,
   loadCheques,
+  linkedPaymentMissing,
   nextStatuses,
   type ChequeFilter,
 } from '../lib/cheques';
@@ -71,6 +72,8 @@ export function Cheques() {
   const all = useMemo(() => loadCheques(), [version]);
   const rows = useMemo(() => filterCheques(all, { direction, status, query }, today), [all, direction, status, query, today]);
   const summary = useMemo(() => chequeSummary(all, today), [all, today]);
+  // Cheques whose recorded payment was deleted with its invoice / bill: shown, and editable / deletable again.
+  const missing = useMemo(() => new Set(all.filter((c) => (c.payment_id || c.purchase_payment_id) && linkedPaymentMissing(c)).map((c) => c.id)), [all]);
   const bouncedParties = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of all) if (c.direction === 'received' && (c.bounce_count ?? 0) > 0) m.set(c.client_id || c.party_name.toLowerCase(), (m.get(c.client_id || c.party_name.toLowerCase()) ?? 0) + (c.bounce_count ?? 0));
@@ -207,6 +210,7 @@ export function Cheques() {
                         <span className={`${surface.badge} ${STATUS_TONE[c.status]}`}>{chqT(`st.${c.status}`)}</span>
                         {c.status === 'bounced' && c.bounce_reason && <span className={styles.sub}>{c.bounce_reason}</span>}
                         {c.cleared_on && c.status === 'cleared' && <span className={styles.sub}>{chqT('clearedOn', { date: formatDate(c.cleared_on) })}</span>}
+                        {missing.has(c.id) && <span className={styles.sub} role="note">Linked payment no longer exists (its document was deleted)</span>}
                       </td>
                       <td>
                         <div className={styles.actions}>
@@ -223,7 +227,7 @@ export function Cheques() {
                           <button type="button" className={controls.btnIcon} onClick={() => setForm({ open: true, direction: c.direction, cheque: c })} aria-label={chqT('editOf', { number: c.number })} title={chqT('edit')}>
                             <Pencil size={15} />
                           </button>
-                          <button type="button" className={controls.btnDanger} disabled={!!(c.payment_id || c.purchase_payment_id)} onClick={() => setDeleting(c)} aria-label={chqT('deleteOf', { number: c.number })} title={chqT('delete')}>
+                          <button type="button" className={controls.btnDanger} disabled={!!(c.payment_id || c.purchase_payment_id) && !missing.has(c.id)} onClick={() => setDeleting(c)} aria-label={chqT('deleteOf', { number: c.number })} title={chqT('delete')}>
                             <Trash2 size={15} />
                           </button>
                         </div>

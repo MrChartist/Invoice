@@ -64,7 +64,12 @@ outputs keep the "working paper — verify with your CA" wording.
 ## 6.26 Cheque register & PDC
 - Table `cheques` (`Cheque`, `src/types/cheques.ts`): direction received/issued, 6-digit number, bank, cheque date,
   amount, party, client/vendor id, linked `invoice_id` / `purchase_id`, status, lifecycle dates, bounce reason/count,
-  `payment_id` / `purchase_payment_id`, `account_payee`.
+  `payment_id` / `purchase_payment_id`, `account_payee`, additive `bank_account_id` (our account it is deposited into /
+  drawn on; "Deposit into" / "Drawn on" picker in the form once a second bank account exists). Clearing passes it to
+  the recorded receipt / supplier payment, so multi-account BRS sees the money in the right account.
+- **Dangling payment**: deleting the linked invoice / bill deletes its payments. `linkedPaymentMissing` detects this;
+  the register shows "Linked payment no longer exists", the cheque can be edited or deleted again, and a later bounce /
+  cancel has nothing to reverse (it says so).
 - Flow — received: in hand → deposited → cleared | bounced (bounced → deposited again; cleared → bounced for a return
   after credit). Issued: issued → presented → cleared | cancelled.
 - No deposit / presentation / clearing before the cheque date or in the future; received cheques expire 3 months after

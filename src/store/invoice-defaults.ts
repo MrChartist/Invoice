@@ -169,6 +169,7 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     amount: num(item.amount, quantity * rate),
     ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
     ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
+    ...(Array.isArray(item.bill_refs) && item.bill_refs.length ? { bill_refs: item.bill_refs.map(String) } : {}),
     ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
     // Stock tracking (6.6 / 6.10 / 6.11): absent on untracked lines so their snapshots never change.
     ...(item.batch_no ? { batch_no: String(item.batch_no) } : {}),

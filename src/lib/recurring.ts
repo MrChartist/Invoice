@@ -18,6 +18,7 @@ import { localDb } from './localDb';
 import { generateId, getTable, setTable } from './storage';
 import { isPeriodLockedError } from './period-lock';
 import { normalizeRecord } from '../store/invoice-defaults';
+import { liveDocTrackingIssues } from './stock-tracking';
 
 export const RECURRING_TABLE = 'recurring';
 /** Most missed occurrences materialised in a single catch-up. */
@@ -503,6 +504,11 @@ export interface GenerateResult {
   invoice: InvoiceRecord;
   /** False when the occurrence had already been generated (idempotent hit). */
   created: boolean;
+  /**
+   * 'issue' schedules only: why the invoice was saved as a Draft instead (batch / serial / godown checks
+   * failed — recurring templates carry no serials or batches, so tracked items must be picked by hand).
+   */
+  heldAsDraft?: string[];
 }
 
 /**
@@ -526,9 +532,20 @@ export function generateInvoiceFromSchedule(
     s.template.doc_type,
     s.template.sender?.invoicePrefix || undefined,
   );
-  const built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
+  let built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
+  // Issuing straight away skips the editor, so run its stock checks here; a tracked item that needs a
+  // serial / batch (or an expired batch) keeps the invoice a Draft for the user to complete.
+  let heldAsDraft: string[] | undefined;
+  if (built.status !== 'Draft') {
+    const issues = liveDocTrackingIssues(built);
+    const problems = [...issues.errors, ...issues.expired];
+    if (problems.length) {
+      heldAsDraft = problems;
+      built = { ...built, status: 'Draft' };
+    }
+  }
   const saved = localDb.invoices.save(built);
-  return { invoice: saved, created: true };
+  return { invoice: saved, created: true, ...(heldAsDraft ? { heldAsDraft } : {}) };
 }
 
 /** Pure: schedule after consuming occurrences (generated and/or skipped). */
@@ -588,9 +605,10 @@ export function runDueSchedules(today: string): RunReport {
       }
       for (const occurrence of due.dates) {
         try {
-          const { invoice, created } = generateInvoiceFromSchedule(current, occurrence);
+          const { invoice, created, heldAsDraft } = generateInvoiceFromSchedule(current, occurrence);
           current = recordGenerated(current, occurrence, invoice);
           if (created) report.generated.push(invoice);
+          if (heldAsDraft) report.errors.push(`${listed.name}: ${invoice.invoice_number} saved as a draft — ${heldAsDraft[0]}`);
         } catch (err) {
           // An occurrence inside the locked period is skipped (counted), never forced in.
           if (!isPeriodLockedError(err)) throw err;

@@ -232,6 +232,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   tds_deductions: 'books.edit',
   tds_returns: 'books.edit',
   vendor_payments: 'books.edit',
+  // Number high-water marks: written alongside a payment / transfer / PO / advance save (integrity review).
+  series_counters: 'books.edit',
 };
 
 let systemDepth = 0;

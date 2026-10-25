@@ -45,6 +45,11 @@ export interface Cheque {
   payment_id?: string;
   /** `purchase_payments` row recorded when an issued cheque cleared against `purchase_id`. */
   purchase_payment_id?: string;
+  /**
+   * Additive (integrity review): our bank account the cheque is deposited into (received) or drawn on
+   * (issued) — multi-account BRS. Carried onto the payment recorded at clearing; missing = main account.
+   */
+  bank_account_id?: string;
   /** Issued: print the "A/C Payee" crossing. Defaults to true. */
   account_payee?: boolean;
   notes?: string;

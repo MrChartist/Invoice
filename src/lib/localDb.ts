@@ -36,6 +36,7 @@ import {
 } from './audit';
 import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
+import { nextReceiptNumber, recordSeries } from './series-counters';
 import { receivableTotal } from './rcm';
 import {
   PeriodLockedError,
@@ -526,6 +527,8 @@ export const localDb = {
       }
       const overridden = target ? assertUnlocked(target, 'pay') === 'overridden' : false;
       const before = getTable<Payment>(KEYS.transactions);
+      // Receipt voucher number, fixed at record time (never reused after a delete / cheque bounce).
+      if (!payment.advance_id) payment.receipt_number = nextReceiptNumber(payment.date, before);
       setTable(KEYS.transactions, [...before, payment]);
       try {
         syncPaymentState(input.invoiceId, payment.amount);
@@ -534,6 +537,13 @@ export const localDb = {
         // would be recorded again on retry.
         setTable(KEYS.transactions, before);
         throw err;
+      }
+      if (payment.receipt_number) {
+        try {
+          recordSeries(payment.receipt_number);
+        } catch {
+          /* the stamped number itself is what keeps receipts stable */
+        }
       }
       logSafe(() => {
         const row = paymentLogged('payment_add', payment, target);

@@ -1,10 +1,11 @@
 /**
  * Payment receipts (receipt vouchers for money received against an invoice).
  *
- * Numbers are derived, not stored: every payment in an Indian financial year, in date
- * order (ties by id), gets RCPT/FY<yy-yy>/<seq> (advance adjustments excluded). Deriving keeps old data valid and needs
- * no migration; deleting a payment can renumber later receipts in that year, which the
- * receipt notes. The HTML is self-contained (inline styles, no scripts) so it prints from
+ * Numbers are STAMPED on the payment when it is recorded (`receipt_number`, highest + 1 per Indian FY
+ * with a high-water mark — `series-counters.ts`), so deleting a payment or bouncing a cheque never
+ * renumbers another receipt. Older payments recorded before stamping keep their derived number: their
+ * position, in date order (ties by id), among the UNSTAMPED payments of that FY; new stamps start above
+ * that count, so the two never collide (advance adjustments take no RCPT number). The HTML is self-contained (inline styles, no scripts) so it prints from
  * a plain window under the app's CSP and can be saved as a file.
  */
 
@@ -15,12 +16,17 @@ import { formatCurrency, formatDate } from './utils';
 import { round2 } from './invoice-calc';
 import { receivableTotal } from './rcm';
 
-export function receiptNumber(payment: Pick<Payment, 'id' | 'date'>, all: readonly Pick<Payment, 'id' | 'date' | 'advance_id'>[]): string {
+export function receiptNumber(
+  payment: Pick<Payment, 'id' | 'date'> & Partial<Pick<Payment, 'receipt_number'>>,
+  all: readonly (Pick<Payment, 'id' | 'date' | 'advance_id'> & Partial<Pick<Payment, 'receipt_number'>>)[],
+): string {
+  const stamped = payment.receipt_number || all.find((p) => p.id === payment.id)?.receipt_number;
+  if (stamped) return stamped;
   const fy = getIndianFY(payment.date);
   // An advance adjusted against an invoice (5.3) is not new money: it already has its own
-  // receipt voucher (ADV/…), so it takes no RCPT number.
+  // receipt voucher (ADV/…), so it takes no RCPT number. Stamped rows are numbered already.
   const sameYear = all
-    .filter((p) => !p.advance_id && getIndianFY(p.date).label === fy.label)
+    .filter((p) => !p.advance_id && !p.receipt_number && getIndianFY(p.date).label === fy.label)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
   const seq = Math.max(1, sameYear.findIndex((p) => p.id === payment.id) + 1);
   return `RCPT/FY${fy.label}/${String(seq).padStart(4, '0')}`;
@@ -117,7 +123,7 @@ export function receiptHtml(r: ReceiptData): string {
     ${row('Balance after this payment', money(r.balanceAfter))}
   </table>
   <div class="sign">For ${esc(r.business)}<br><br><br>Authorised signatory</div>
-  <div class="note">Receipt numbers follow the date order of payments in the financial year. This receipt was produced on the issuer's device.</div>
+  <div class="note">This receipt was produced on the issuer's device.</div>
 </div></body></html>`;
 }
 

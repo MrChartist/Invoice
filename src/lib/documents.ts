@@ -22,6 +22,12 @@ import { getLockUntil, isPeriodLockedError } from './period-lock';
 import { amendmentCheck, buildAmendment, canAmend } from './amendments';
 import { loadFiled } from './compliance';
 import { orderConversionBlocked, orderFulfilment, pendingQuantities } from './sales-orders';
+import { liveDocTrackingIssues } from './stock-tracking';
+import { liveRemovalIssues, assertRemovable } from './stock-timeline';
+import { ADVANCES_TABLE, advanceBalance } from './advance-tax';
+import { doubleBilledRows, liveInvoiceIds, mileageDb, timeDb } from './timesheets';
+import { purchasesDb } from './purchases';
+import type { AdvanceRecord } from '../types/advances';
 import {
   DOCUMENT_LABELS,
   type DocumentType,
@@ -429,6 +435,15 @@ export function buildCreditNote(
   if (!input.reason?.trim()) errors.push('Choose a reason for the credit note.');
 
   const status = creditableLines(invoice, links, allInvoices);
+  // Serials already taken back by earlier live credit notes against this invoice (per line).
+  const returnedSerials = new Map<string, Set<string>>();
+  for (const cn of creditNotesFor(invoice.id, links, allInvoices)) {
+    for (const it of cn.items ?? []) {
+      const set = returnedSerials.get(it.id) ?? new Set<string>();
+      for (const s of it.serials ?? []) set.add(s.trim().toUpperCase());
+      returnedSerials.set(it.id, set);
+    }
+  }
   const picked: InvoiceItem[] = [];
   for (const req of input.lines) {
     const qty = round2(num(req.quantity));
@@ -449,8 +464,11 @@ export function buildCreditNote(
       ...line.item,
       quantity: qty,
       amount: round2(qty * num(line.item.rate)),
-      // A partial credit returns only as many serials as units (the first ones; edit the note to choose others).
-      ...(line.item.serials?.length ? { serials: line.item.serials.slice(0, Math.floor(qty)) } : {}),
+      // A partial credit returns only as many serials as units: the first ones NOT already returned on an
+      // earlier credit note against this line (edit the note to choose others).
+      ...(line.item.serials?.length
+        ? { serials: line.item.serials.filter((s) => !returnedSerials.get(line.item.id)?.has(s.trim().toUpperCase())).slice(0, Math.floor(qty)) }
+        : {}),
     });
   }
   if (picked.length === 0 && errors.length === 0) {
@@ -529,6 +547,9 @@ export function createCreditNote(invoice: InvoiceRecord, input: CreditInput): In
     today,
   });
   if (!record) throw new DocumentError(errors.join(' '));
+  // Same serial / batch checks as issuing from the editor (the note is saved as Sent straight away).
+  const stock = liveDocTrackingIssues(record);
+  if (stock.errors.length) throw new DocumentError(stock.errors.join(' '));
   const saved = localDb.invoices.save(record);
   addLink({ from_id: invoice.id, to_id: saved.id, relation: 'credit_note', reason: input.reason.trim() });
   return saved;
@@ -644,6 +665,11 @@ export function activeCancellation(id: string, links: DocLink[]): DocLink | unde
 export interface CancelOptions {
   /** Required to cancel a document that already has payments recorded. */
   acknowledgePayments?: boolean;
+  /**
+   * Cancelling a goods-returning credit note takes its goods out of stock again. When later documents
+   * already used those quantities (not serials — those always refuse), the user must confirm.
+   */
+  acknowledgeStock?: boolean;
 }
 
 export function cancelBlockedReason(invoice: InvoiceRecord, opts: CancelOptions = {}): string | null {
@@ -663,6 +689,8 @@ export function cancelDocument(
   const fresh = localDb.invoices.getById(invoice.id) ?? invoice;
   const blocked = cancelBlockedReason(fresh, opts);
   if (blocked) throw new DocumentError(blocked);
+  // A credit note's returned goods may since have been sold again (stock-timeline.ts).
+  if (fresh.doc_type === 'CREDIT_NOTE') assertRemovable(liveRemovalIssues({ refType: 'invoice', refId: fresh.id }), opts.acknowledgeStock);
   const saved = localDb.invoices.save({ ...fresh, status: 'Cancelled' });
   addLink({
     from_id: fresh.id,
@@ -685,13 +713,86 @@ export function restoredStatus(
   return 'Sent';
 }
 
-/** Undo a cancellation: restores the pre-cancel status and retires the link. */
+const money2 = (n: number) => `₹${round2(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Why a cancelled document cannot come back with `status`: while it was cancelled its effects were
+ * released, and something else may have used them since —
+ *  - serials resold / batches used (the issue checks, as of its date and against later documents);
+ *  - an advance adjusted against it was applied elsewhere, so it would be over-adjusted;
+ *  - time entries, trips or re-billed costs it billed were billed on another invoice;
+ *  - its sales order was fulfilled by other documents.
+ * Pure over the given data except the stock check (live).
+ */
+export function reinstateIssues(
+  fresh: InvoiceRecord,
+  status: InvoiceStatus,
+  ctx: {
+    links: DocLink[];
+    invoices: InvoiceRecord[];
+    payments: { invoice_id: string; amount: number; advance_id?: string }[];
+    advances: AdvanceRecord[];
+    time: Parameters<typeof doubleBilledRows>[1];
+  },
+): string[] {
+  const errors: string[] = [];
+  const restored: InvoiceRecord = { ...fresh, status };
+  const all = ctx.invoices.map((i) => (i.id === fresh.id ? restored : i));
+
+  if (status !== 'Draft') errors.push(...liveDocTrackingIssues(restored).errors);
+
+  const advIds = new Set(ctx.payments.filter((p) => p.invoice_id === fresh.id && p.advance_id).map((p) => p.advance_id as string));
+  for (const adv of ctx.advances.filter((a) => advIds.has(a.id))) {
+    const bal = advanceBalance(adv, ctx.payments as never, all);
+    const over = round2(bal.adjusted + bal.refunded - bal.amount);
+    if (over > 0.005) {
+      errors.push(`Advance ${adv.number} was used elsewhere while this document was cancelled: reinstating it would adjust ${money2(bal.adjusted + bal.refunded)} against an advance of ${money2(bal.amount)}. Remove the advance adjustment from this document (or the other one) first.`);
+    }
+  }
+
+  const twice = doubleBilledRows(fresh, ctx.time, liveInvoiceIds(ctx.invoices, fresh.id));
+  if (twice.length) {
+    const numbers = [...new Set(twice.map((t) => ctx.invoices.find((i) => i.id === t.by)?.invoice_number || 'another invoice'))];
+    const kinds = [...new Set(twice.map((t) => (t.kind === 'time' ? 'time entries' : t.kind === 'mileage' ? 'mileage trips' : 're-billed expenses')))];
+    errors.push(`${twice.length} ${kinds.join(' / ')} on this document ${twice.length === 1 ? 'has' : 'have'} since been billed on ${numbers.join(', ')}. Remove ${twice.length === 1 ? 'it' : 'them'} from one of the invoices first.`);
+  }
+
+  if (fresh.sales_order_id) {
+    const so = ctx.invoices.find((i) => i.id === fresh.sales_order_id);
+    if (so) {
+      const before = orderFulfilment(so, ctx.invoices, ctx.links);
+      const after = orderFulfilment(so, all, ctx.links);
+      const mine = new Set((fresh.items ?? []).map((i) => i.order_line_id).filter(Boolean));
+      for (const l of after.lines) {
+        if (!mine.has(l.item.id)) continue;
+        const prev = before.lines.find((b) => b.item.id === l.item.id);
+        const overD = l.delivered > l.ordered + 1e-6 && l.delivered > (prev?.delivered ?? 0);
+        const overI = l.invoiced > l.ordered + 1e-6 && l.invoiced > (prev?.invoiced ?? 0);
+        if (overD || overI) {
+          errors.push(`"${l.item.name || 'Item'}" on sales order ${so.invoice_number}: ${overI ? `${l.invoiced} would be invoiced` : `${l.delivered} would be delivered`} against ${l.ordered} ordered — other documents fulfilled it meanwhile.`);
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+/** Undo a cancellation: restores the pre-cancel status and retires the link (refused when `reinstateIssues` finds a conflict). */
 export function reinstateDocument(invoice: InvoiceRecord): InvoiceRecord {
   const fresh = localDb.invoices.getById(invoice.id) ?? invoice;
   if (fresh.status !== 'Cancelled') throw new DocumentError('This document is not cancelled.');
   const links = readLinks();
   const link = activeCancellation(fresh.id, links);
-  const saved = localDb.invoices.save({ ...fresh, status: restoredStatus(fresh, link?.prev_status) });
+  const status = restoredStatus(fresh, link?.prev_status);
+  const problems = reinstateIssues(fresh, status, {
+    links,
+    invoices: localDb.invoices.getAll(),
+    payments: localDb.payments.getAll(),
+    advances: getTable<AdvanceRecord>(ADVANCES_TABLE),
+    time: { time: timeDb.all(), mileage: mileageDb.all(), expenses: purchasesDb.all() },
+  });
+  if (problems.length) throw new DocumentError(`Cannot reinstate ${fresh.invoice_number}: ${problems.join(' ')}`);
+  const saved = localDb.invoices.save({ ...fresh, status });
   if (link) setTable(DOC_LINKS_TABLE, links.filter((l) => l.id !== link.id));
   return saved;
 }

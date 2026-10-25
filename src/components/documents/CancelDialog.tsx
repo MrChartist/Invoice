@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import { formatCurrency } from '../../lib/utils';
 import { num } from '../../lib/invoice-calc';
 import { DocumentError, cancelDocument, reinstateDocument } from '../../lib/documents';
+import { isStockDependencyError } from '../../lib/stock-timeline';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
@@ -34,14 +35,16 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const label = docLabel(invoice.doc_type in DOCUMENT_LABELS ? invoice.doc_type : 'INVOICE');
 
-  const submit = () => {
+  const submit = (acknowledgeStock = false): void => {
     try {
       const rec = isCancelled
         ? reinstateDocument(invoice)
-        : cancelDocument(invoice, reason, { acknowledgePayments: ack });
+        : cancelDocument(invoice, reason, { acknowledgePayments: ack, acknowledgeStock });
       onDone(rec);
       onClose();
     } catch (err) {
+      // A credit note whose returned goods were partly used since: confirm before taking them out again.
+      if (isStockDependencyError(err) && err.confirmable && window.confirm(`${err.message}\n\n${salesT('cn.cancelDoc')}?`)) return submit(true);
       setError(err instanceof DocumentError || err instanceof Error ? err.message : salesT('somethingWrong'));
     }
   };
@@ -64,7 +67,7 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
             type="button"
             className={controls.btnPrimary}
             style={isCancelled ? undefined : { backgroundColor: 'var(--destructive)' }}
-            onClick={submit}
+            onClick={() => submit()}
             disabled={disabled}
           >
             {isCancelled ? salesT('cn.reinstate') : salesT('cn.cancelDoc')}

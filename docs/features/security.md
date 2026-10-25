@@ -157,6 +157,12 @@ Security.
 | `data.restore`, `data.erase` | ✓ | | |
 | `period.override` — unlock a locked document / move the lock date earlier | ✓ | | |
 
+Inventory settings (costing method, "challans reduce stock", expiry window, default godown) are `settings.manage`
+(owner only; `inventory.saveSettings` refuses and audits, the controls are disabled for others). Time preferences need
+`books.edit`. Both are `setJson` keys, which the table guard does not see, so the lib setters check themselves. Godown
+add / rename / delete, purchase orders (create / edit / close / delete), manual stock adjustments and POS day-close
+re-counts are audited (entities `godown`, `purchase_order`, `stock_adjustment`, `pos_day_close`).
+
 Decisions: a clerk cannot download full backups (a backup is every table, so it is an owner decision); automatic
 folder backups the owner set up keep running whoever is signed in, because they go to the owner's folder. There is
 exactly one owner (the account in `mrchartist_inv_auth`); added users are clerks or viewers and the owner can switch
