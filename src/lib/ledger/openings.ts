@@ -18,6 +18,7 @@
 
 import { requireAccess } from '../access';
 import { audit } from '../audit';
+import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { formatMoney } from '../utils';
 
@@ -114,10 +115,32 @@ export function ensureBooksBegin(today: string = localToday()): string {
   return date;
 }
 
+/** The opening voucher's day: the day before `booksBegin` (local calendar, YYYY-MM-DD). */
+export function openingDayFor(booksBegin: string): string {
+  const [y, m, d] = booksBegin.split('-').map(Number);
+  const dt = new Date(y, m - 1, d - 1);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
+
+/**
+ * Openings post on the day before the books begin, so they follow the period lock of that day
+ * (security review M2): refused while it is locked unless a PIN override on scope
+ * `ledger_openings` is active. Returns 'overridden' for the audit note.
+ */
+export function assertOpeningsUnlocked(booksBegin: string = loadBooksBegin(localToday())): 'open' | 'overridden' {
+  return assertUnlocked({ id: 'ledger_openings', issue_date: openingDayFor(booksBegin), invoice_number: 'Opening' }, 'edit');
+}
+
 export function saveBooksBegin(date: string): void {
   if (!isRealDay(date)) throw new Error('Choose the books beginning date.');
   requireAccess('books.edit');
   const prev = storedBooksBegin();
+  // Moving the date moves the opening voucher out of one day and into another: both must be open.
+  if (prev !== date) {
+    if (prev) assertOpeningsUnlocked(prev);
+    assertOpeningsUnlocked(date);
+  }
   setTable(BOOKS_BEGIN_TABLE, [{ id: 'books_begin', date }]);
   if (prev !== date) {
     audit.record({ entity: 'voucher', entity_id: 'books_begin', action: prev ? 'update' : 'create', doc_number: 'Opening', summary: `Books beginning date set to ${date}${prev ? ` (was ${prev})` : ''}` });
@@ -192,6 +215,7 @@ export function saveOpenings(entries: readonly OpeningEntry[]): LedgerOpening[] 
     changed++;
   }
   if (!changed) return rows;
+  const lock = assertOpeningsUnlocked();
   ensureBooksBegin();
   const next = [...byLedger.values()];
   setTable(LEDGER_OPENINGS_TABLE, next);
@@ -201,7 +225,7 @@ export function saveOpenings(entries: readonly OpeningEntry[]): LedgerOpening[] 
     entity_id: 'ledger_openings',
     action: 'update',
     doc_number: 'Opening',
-    summary: `Opening balances changed for ${changed} ledger${changed === 1 ? '' : 's'}${diff ? ` · ${openingDifferenceText(diff)}` : ''}`,
+    summary: `Opening balances changed for ${changed} ledger${changed === 1 ? '' : 's'}${diff ? ` · ${openingDifferenceText(diff)}` : ''}${lock === 'overridden' ? ' (period lock overridden)' : ''}`,
   });
   return next;
 }

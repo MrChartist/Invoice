@@ -31,7 +31,9 @@ import { toCsv } from './csv';
 import { isoDay } from './dates';
 import { num, round2 } from './invoice-calc';
 import { localDb } from './localDb';
-import { paymentsDb, purchasesDb } from './purchases';
+import { PAYMENTS_TABLE, PURCHASES_TABLE, paymentsDb, purchasesDb } from './purchases';
+import { assertUnlocked } from './period-lock';
+import { withTablesRollback } from './table-txn';
 import { generateId, getTable, setTable } from './storage';
 import { todayIso } from './tax-rules';
 import { isPostDated, validUntil } from './cheque-reminders';
@@ -429,7 +431,17 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
           : 'The payment recorded from this cheque was reversed; the invoice is open again.';
       }
       if (c.payment_ids?.length) {
-        for (const pid of c.payment_ids) localDb.payments.remove(pid);
+        const ids = c.payment_ids;
+        // Every receipt or none (M4): check each invoice's lock first, and put back whatever was
+        // reversed if a later one is still refused.
+        for (const pid of ids) {
+          const row = localDb.payments.getAll().find((p) => p.id === pid);
+          const inv = row ? localDb.invoices.getById(row.invoice_id) : undefined;
+          if (inv) assertUnlocked(inv, 'unpay');
+        }
+        withTablesRollback(['transactions', 'invoices'], () => {
+          for (const pid of ids) localDb.payments.remove(pid);
+        });
         next.payment_ids = undefined;
         note = c.payment_ids.length > 1 ? `The ${c.payment_ids.length} payments recorded from this cheque were reversed; the invoices are open again.` : 'The payment recorded from this cheque was reversed; the invoice is open again.';
       }
@@ -450,7 +462,11 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
       note = gone ? 'The supplier payment recorded from this cheque no longer exists (its bill was deleted).' : 'The supplier payment recorded from this cheque was reversed.';
     }
     if (c.purchase_payment_ids?.length) {
-      for (const pid of c.purchase_payment_ids) paymentsDb.remove(pid);
+      const ids = c.purchase_payment_ids;
+      // Every supplier payment or none (M4).
+      withTablesRollback([PAYMENTS_TABLE, PURCHASES_TABLE], () => {
+        for (const pid of ids) paymentsDb.remove(pid);
+      });
       next.purchase_payment_ids = undefined;
       note = 'The supplier payments recorded from this cheque were reversed.';
     }

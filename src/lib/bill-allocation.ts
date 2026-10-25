@@ -10,13 +10,24 @@
  * `buildLedger` skips transactions rows whose `voucher_id` names a stored voucher (an orphaned row,
  * whose voucher was deleted elsewhere, posts as a plain receipt so no money disappears).
  */
-import type { Client, Payment } from '../types/invoice';
+import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import { requireAccess } from './access';
 import { round2 } from './invoice-calc';
+import type { Account } from './ledger/accounts';
+import {
+  VOUCHERS_TABLE,
+  assertReceiptRowsRemovable,
+  removeVoucherReceiptRows,
+  saveVoucher,
+  type ManualVoucher,
+  type ManualVoucherInput,
+} from './ledger/vouchers';
 import { localDb } from './localDb';
 import { loadReceivableOpeningBills } from './opening-bills';
+import { assertUnlocked } from './period-lock';
 import { buildReceivables, type ReceiptRow } from './receivables';
 import { generateId, getTable, setTable } from './storage';
+import { withTablesRollback } from './table-txn';
 
 export type VoucherReceipt = Payment & { voucher_id?: string; client_id?: string; client_name?: string };
 
@@ -92,9 +103,14 @@ export function validateAllocations(allocations: readonly ReceiptAllocation[], t
   return errors;
 }
 
+
 /**
  * Replace the receipt rows of a voucher with `allocations` (+ On Account for the remainder).
  * An empty allocation list removes the rows (the voucher then stays a ledger-only receipt).
+ *
+ * All or nothing (security review H2): every bill is checked first (role, period lock 'pay' /
+ * 'unpay', approval), and if a write still fails half-way the transactions and invoices are put
+ * back — an untagged row would otherwise post a second time next to the voucher.
  */
 export function syncVoucherReceipts(
   voucher: { id: string; number: string; date: string },
@@ -104,31 +120,71 @@ export function syncVoucherReceipts(
   method: string,
 ): VoucherReceipt[] {
   requireAccess('payment.record');
-  removeVoucherReceipts(voucher.id);
   const used = allocations.filter((a) => a.amount > 0);
-  if (!used.length) return [];
-  const client = clientForParty(party, localDb.clients.getAll());
-  const tag = { voucher_id: voucher.id, ...(client?.id ? { client_id: client.id } : {}), client_name: party };
-  const ids = new Set<string>();
+  assertReceiptRowsRemovable(voucher.id);
   for (const a of used) {
-    const p = localDb.payments.record({ invoiceId: a.bill_id, amount: round2(a.amount), method, reference: voucher.number, date: voucher.date });
-    ids.add(p.id);
+    const target = localDb.invoices.getById(a.bill_id);
+    if (target) assertCanReceive(target);
   }
-  const rows = getTable<VoucherReceipt>('transactions').map((r) => (ids.has(r.id) ? { ...r, ...tag } : r));
-  const rest = round2(total - used.reduce((s, a) => s + a.amount, 0));
-  if (rest > 0.004) rows.push({ id: generateId(), invoice_id: '', amount: rest, method, reference: voucher.number, note: 'On account', date: voucher.date, ...tag });
-  setTable('transactions', rows);
-  return voucherReceipts(voucher.id, rows);
+  return withTablesRollback(['transactions', 'invoices'], () => {
+    removeVoucherReceiptRows(voucher.id);
+    if (!used.length) return [];
+    const client = clientForParty(party, localDb.clients.getAll());
+    const tag = { voucher_id: voucher.id, ...(client?.id ? { client_id: client.id } : {}), client_name: party };
+    const ids = new Set<string>();
+    for (const a of used) {
+      const p = localDb.payments.record({ invoiceId: a.bill_id, amount: round2(a.amount), method, reference: voucher.number, date: voucher.date });
+      ids.add(p.id);
+    }
+    const rows = getTable<VoucherReceipt>('transactions').map((r) => (ids.has(r.id) ? { ...r, ...tag } : r));
+    const rest = round2(total - used.reduce((s, a) => s + a.amount, 0));
+    if (rest > 0.004) rows.push({ id: generateId(), invoice_id: '', amount: rest, method, reference: voucher.number, note: 'On account', date: voucher.date, ...tag });
+    setTable('transactions', rows);
+    return voucherReceipts(voucher.id, rows);
+  });
 }
 
 /** Remove every receipt row of a voucher (voucher deleted, or allocations cleared). */
 export function removeVoucherReceipts(voucherId: string): void {
-  const mine = voucherReceipts(voucherId);
-  if (!mine.length) return;
+  removeVoucherReceiptRows(voucherId);
+}
+
+export interface VoucherReceiptsInput {
+  /** The party on the receipt's Sundry Debtors line. */
+  party: string;
+  /** Rupees credited to that party. */
+  total: number;
+  allocations: readonly ReceiptAllocation[];
+  method: string;
+}
+
+/**
+ * Save a manual voucher and its bill-wise receipt rows as ONE change (H2): the bills are checked
+ * before anything is written, and if the voucher or any receipt is refused the voucher, the
+ * transactions and the invoices are put back as they were. `receipts` null / empty allocations on
+ * a voucher that had rows removes them.
+ */
+export function saveReceiptVoucher(input: ManualVoucherInput, chart: readonly Account[] | undefined, receipts: VoucherReceiptsInput | null): ManualVoucher {
+  const hadRows = input.id ? voucherReceipts(input.id).length > 0 : false;
+  const allocations = receipts?.allocations.filter((a) => a.amount > 0) ?? [];
+  if (!hadRows && !allocations.length) return saveVoucher(input, chart);
   requireAccess('payment.record');
-  for (const r of mine) {
-    if (r.invoice_id) localDb.payments.remove(r.id);
+  if (input.id) assertReceiptRowsRemovable(input.id);
+  for (const a of allocations) {
+    const target = localDb.invoices.getById(a.bill_id);
+    if (target) assertCanReceive(target);
   }
-  const left = getTable<VoucherReceipt>('transactions');
-  if (left.some((r) => r.voucher_id === voucherId)) setTable('transactions', left.filter((r) => r.voucher_id !== voucherId));
+  return withTablesRollback([VOUCHERS_TABLE, 'transactions', 'invoices'], () => {
+    // Old rows go first, so `saveVoucher` sees a voucher free to change date / party / amount.
+    if (input.id) removeVoucherReceiptRows(input.id);
+    const saved = saveVoucher(input, chart);
+    if (allocations.length && receipts) syncVoucherReceipts(saved, receipts.party, receipts.total, allocations, receipts.method);
+    return saved;
+  });
+}
+
+/** A receipt against this document may be recorded now (period lock 'pay'; not held for approval). */
+function assertCanReceive(target: InvoiceRecord): void {
+  assertUnlocked(target, 'pay');
+  if (target.approval?.state === 'pending') throw new Error(`${target.invoice_number || 'This document'} is waiting for approval; record receipts after it is approved.`);
 }

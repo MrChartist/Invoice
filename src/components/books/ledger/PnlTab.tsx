@@ -16,6 +16,7 @@ import {
   type StockValuer,
 } from '../../../lib/ledger';
 import type { BooksData, Period } from '../../../lib/books';
+import { can } from '../../../lib/access';
 import { toCsv } from '../../../lib/csv';
 import { formatDate } from '../../../lib/utils';
 import { reportsT } from '../../../i18n/areas/reports-engine';
@@ -203,9 +204,11 @@ function PnlRoot({ ledger, period, stock, onStockChanged, notify }: Props) {
           <input type="checkbox" checked={compare} onChange={(e) => setPrefs({ columns: e.target.checked ? 'previous' : 'none' })} />
           <span>{reportsT('comparePrevious')}</span>
         </label>
-        <button type="button" className={controls.btnOutline} onClick={() => setStockOpen(true)}>
-          <Package size={16} /> {reportsT('closingStockSettings')}
-        </button>
+        {can('books.edit') && (
+          <button type="button" className={controls.btnOutline} onClick={() => setStockOpen(true)}>
+            <Package size={16} /> {reportsT('closingStockSettings')}
+          </button>
+        )}
       </StatementToolbar>
       <PrintTitle title={reportsT('profitLoss')} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
 

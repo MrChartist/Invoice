@@ -38,7 +38,7 @@ import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { nextReceiptNumber, recordSeries } from './series-counters';
 import { receivableTotal } from './rcm';
-import { holdIfApprovalNeeded } from './approval-gate';
+import { assertNotPendingApproval, holdIfApprovalNeeded } from './approval-gate';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -456,7 +456,12 @@ export const localDb = {
             ? 'reinstate'
             : 'edit';
       const overridden = assertUnlocked(before, action) === 'overridden';
-      invoices[idx] = { ...before, status, updated_at: new Date().toISOString() };
+      // WP-9 / H3: a pending document is issued only by the owner's decision; a draft issued from
+      // here passes the same gate as a save (held as a pending draft when it needs approval).
+      if (status !== 'Draft' && status !== 'Cancelled') assertNotPendingApproval(before, 'it can be issued or marked paid');
+      const next: InvoiceRecord = { ...before, status, updated_at: new Date().toISOString() };
+      holdIfApprovalNeeded(next, before);
+      invoices[idx] = next;
       setTable(KEYS.invoices, invoices);
       logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
     },
@@ -530,6 +535,7 @@ export const localDb = {
         payment.realised_rate = realised;
       }
       const overridden = target ? assertUnlocked(target, 'pay') === 'overridden' : false;
+      assertNotPendingApproval(target, 'record payments');
       const before = getTable<Payment>(KEYS.transactions);
       // Receipt voucher number, fixed at record time (never reused after a delete / cheque bounce).
       if (!payment.advance_id) payment.receipt_number = nextReceiptNumber(payment.date, before);

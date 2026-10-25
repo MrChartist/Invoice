@@ -15,7 +15,7 @@ import { amountInWords } from './amount-in-words';
 import { DEFAULT_BANK_ID, type BankAccount } from './bank-accounts';
 import { isoDay } from './dates';
 import { num, round2 } from './invoice-calc';
-import { buildInvoiceNumber, getIndianFY, highestSequence } from './invoice-number';
+import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { isPostDated, validUntil } from './cheque-reminders';
 import { cashTotal, denominationRows, normalizeCounts, type DenominationCounts, type DenominationRow } from './denominations';
 import { generateId, getTable, setTable } from './storage';
@@ -90,9 +90,9 @@ export function validateDepositSlip(input: { date: string; cheques: readonly Che
   return [...new Set(errors)];
 }
 
+/** Next pay-in slip number: above every existing number and the series high-water mark (never reused). */
 export function nextSlipNumber(existing: readonly Pick<DepositSlip, 'number'>[], date: string): string {
-  const fy = getIndianFY(date).label;
-  return buildInvoiceNumber('PIS', fy, highestSequence(existing.map((s) => s.number), 'PIS', fy) + 1);
+  return nextSeriesNumberFor('PIS', date, existing.map((s) => s.number));
 }
 
 /** The printable slip (pure). `cheques` are the slip's cheques in print order. */
@@ -169,6 +169,7 @@ export function saveDepositSlip(input: { date: string; bank_account_id?: string;
     created_at: new Date().toISOString(),
   };
   setTable(DEPOSIT_SLIPS_TABLE, [...slips, slip]);
+  recordSeries(slip.number);
   try {
     audit.record({ entity: 'cheque', entity_id: slip.id, action: 'create', doc_number: slip.number, summary: `Deposit slip ${slip.number} dated ${slip.date}: ${picked.length} cheque(s) ₹${chequeTotal.toFixed(2)} + cash ₹${ct.toFixed(2)}` });
   } catch {

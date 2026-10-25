@@ -9,8 +9,8 @@ import { resetStorage } from './helpers/shim.ts';
 import { TALLY_FIXTURE } from './tally-fixture.ts';
 import { setActorProvider } from '../src/lib/access.ts';
 import { audit } from '../src/lib/audit.ts';
-import { getTable } from '../src/lib/storage.ts';
-import { A, loadOpenings, loadUserAccounts, loadUserGroups, loadVouchers, openingDifference, partyLedgerId } from '../src/lib/ledger/index.ts';
+import { getTable, readRaw, writeRaw } from '../src/lib/storage.ts';
+import { A, ledgerBalanceSheet, loadLedger, loadStockValuer, loadOpenings, loadUserAccounts, loadUserGroups, loadVouchers, openingDifference, partyLedgerId } from '../src/lib/ledger/index.ts';
 import { loadOpeningBills } from '../src/lib/opening-bills.ts';
 import { decodeTallyBytes, parseXmlLite, sanitizeTallyXml, TallyXmlError, xmlNodeFromDom } from '../src/lib/tally-xml-read.ts';
 import { parseTallyXml, planTallyImport, suggestBooksBegin, tallyDay, tallyPaise, voucherTag } from '../src/lib/tally-import.ts';
@@ -174,6 +174,22 @@ test('apply: masters via WP-1 APIs, openings match Tally to the paisa, vouchers 
   assert.ok(rows.some((r) => r.entity === 'voucher' && r.action === 'create'));
 });
 
+test('H1: imported opening stock is counted once on the balance sheet (stock items + Stock-in-hand opening)', () => {
+  applyTallyImport(plan());
+  const bs = ledgerBalanceSheet(loadLedger(), '2025-04-30', loadStockValuer());
+  const inv = bs.assets.flatMap((s) => s.items).find((i) => i.label === 'Inventories');
+  assert.equal(inv?.amount, 2000000, JSON.stringify(inv));
+  assert.equal(bs.difference, 0);
+});
+
+test('H1: at the year end the imported opening stock is still counted once', () => {
+  applyTallyImport(plan());
+  const bs = ledgerBalanceSheet(loadLedger(), '2026-03-31', loadStockValuer());
+  const inv = bs.assets.flatMap((s) => s.items).find((i) => i.label === 'Inventories');
+  assert.equal(inv?.amount, 2000000);
+  assert.equal(bs.difference, 0);
+});
+
 test('re-import: everything is recognised, nothing is added twice', async () => {
   applyTallyImport(plan());
   await Promise.resolve();
@@ -218,4 +234,36 @@ test('roles: only the owner may import (data.restore)', () => {
     setActorProvider(null);
   }
   assert.equal(loadVouchers().length, 0);
+});
+
+test('L2: Tally names like "constructor" / "__proto__" / "toString" are plain names, never object keys', () => {
+  const extra = `
+    <TALLYMESSAGE><GROUP NAME="constructor" ACTION="Create"><PARENT>Indirect Expenses</PARENT></GROUP></TALLYMESSAGE>
+    <TALLYMESSAGE><LEDGER NAME="toString" ACTION="Create"><PARENT>constructor</PARENT></LEDGER></TALLYMESSAGE>
+    <TALLYMESSAGE><LEDGER NAME="__proto__" ACTION="Create"><PARENT>Indirect Expenses</PARENT></LEDGER></TALLYMESSAGE>`;
+  const xml = TALLY_FIXTURE.replace('</REQUESTDATA>', `${extra}</REQUESTDATA>`);
+  const pl = planTallyImport(parseTallyXml(xml), loadExistingBooks(), { booksBegin: BOOKS });
+  assert.ok(pl.groups.some((g) => g.name === 'constructor' && g.primary === 'INDIRECT_EXPENSES'), JSON.stringify(pl.groups));
+  const ts = pl.ledgers.find((l) => l.rec.name === 'toString')!;
+  assert.equal(ts.primary, 'INDIRECT_EXPENSES');
+  const res = applyTallyImport(pl);
+  assert.deepEqual(res.failed, []);
+  assert.equal(typeof res.ledgerIds['__proto__'], 'string');
+  assert.ok(Object.hasOwn(res.ledgerIds, '__proto__'));
+  assert.equal(typeof res.ledgerIds['tostring'], 'string');
+  assert.equal(res.ledgerIds['constructor'], undefined, 'no inherited value for a name that was not imported');
+  assert.ok(loadUserAccounts().some((a) => a.name === '__proto__'));
+  assert.ok(openingCheck(pl, res.ledgerIds).matches);
+});
+
+test('L3: a failed import rolls back the books but keeps this company’s folder-sync state', () => {
+  writeRaw('mrchartist_inv_sync_state', '{"keys":{},"clock":7}');
+  writeRaw('mrchartist_inv_sync_conflicts', '[{"id":"c1"}]');
+  const pl = plan();
+  // Make the import fail half-way with an unexpected error (a ledger master write that throws).
+  const broken = { ...pl, groups: [...pl.groups, { name: '', parent: 'nope', parentIsPrimary: false, primary: 'INDIRECT_EXPENSES' }] } as typeof pl;
+  assert.throws(() => applyTallyImport(broken));
+  assert.equal(getTable('accounts').length, 0, 'books rolled back');
+  assert.equal(readRaw('mrchartist_inv_sync_state'), '{"keys":{},"clock":7}');
+  assert.equal(readRaw('mrchartist_inv_sync_conflicts'), '[{"id":"c1"}]');
 });

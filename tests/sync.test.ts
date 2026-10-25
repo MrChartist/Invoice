@@ -534,3 +534,22 @@ test('duplicate serials are flagged for advance receipt vouchers too', async () 
     assert.ok(dup && dup.kind === 'duplicate' && dup.key === `${DB_PREFIX}advances` && dup.ids.join() === 'a1,b1');
   });
 });
+
+test('M5: duplicate serials are flagged for debit notes and payroll runs too', async () => {
+  const dn = (id: string) => ({ id, note_number: 'DN/FY26-27/0001', date: '2026-06-01', vendor_name: 'V', lines: [] });
+  const run = (id: string) => ({ id, number: 'PRL/FY26-27/0001', date: '2026-06-30', month: '2026-06', lines: [] });
+  await on(A, () => {
+    setTable('purchase_returns', [dn('a1')]);
+    setTable('payroll_runs', [run('ra')]);
+  });
+  await on(B, () => {
+    setTable('purchase_returns', [dn('b1')]);
+    setTable('payroll_runs', [run('rb')]);
+  });
+  await sync(A);
+  await sync(B);
+  await on(B, () => {
+    const keys = loadConflicts().filter((c) => c.kind === 'duplicate').map((c) => c.key).sort();
+    assert.deepEqual(keys, [`${DB_PREFIX}payroll_runs`, `${DB_PREFIX}purchase_returns`]);
+  });
+});

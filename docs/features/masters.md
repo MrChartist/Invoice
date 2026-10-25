@@ -22,6 +22,10 @@ Everything is a **working paper — verify with your CA**.
 | `opening_bills` | `{id, party_id?, party_name, side: receivable\|payable, ref_no, date, due_date?, amount (₹ > 0), dr_cr, created_at, updated_at?}` | `books.edit` |
 | `clients` / `vendors` (existing) | additive `group_id?` — sub-group under Sundry Debtors / Creditors | `master.edit` |
 
+Openings, opening bills and the books-beginning date post on the opening day (the day before the books begin), so they
+follow that day's period lock (`assertOpeningsUnlocked`; moving the books-beginning date checks the old and the new
+opening day; PIN override scope `ledger_openings`) — security review M2.
+
 No migration was needed: nothing stored changes shape. `normalizeUserAccounts(rows, userGroups)` also accepts a row whose
 `group` is a user group id (written by newer code / other packages) and maps it to `{group: primary, under: id}` at read
 time; a dangling `under` falls back to the primary. All normalisers are idempotent (tested).

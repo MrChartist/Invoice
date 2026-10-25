@@ -25,7 +25,7 @@ import { loadVouchers, saveVoucher, type ManualVoucherLine } from './ledger/vouc
 import { localDb } from './localDb';
 import { saveOpeningBillsFor, type OpeningBillDraft } from './opening-bills';
 import { getLockUntil } from './period-lock';
-import { DB_PREFIX, SYNC_META_KEYS, collectAppData, generateId, getTable } from './storage';
+import { DB_PREFIX, SYNC_META_KEYS, collectAppData, generateId, getTable, readRaw, writeRaw } from './storage';
 import { DEVICE_LOCAL_KEYS } from './auth';
 import { stateCodeOf, type ExistingBooks, type ImportPlan, type PlannedLedger } from './tally-import';
 import { vendorsDb } from './vendors';
@@ -90,7 +90,8 @@ export function applyTallyImport(plan: ImportPlan): ImportResult {
   const before = localBackupCopy();
   const result: ImportResult = {
     groups: 0, accounts: 0, clients: 0, vendors: 0, openings: 0, openingBills: 0, stockItems: 0, godowns: 0, costCentres: 0, vouchers: 0,
-    failed: [], ledgerIds: {},
+    // Keys are Tally ledger names (untrusted): no prototype, so "__proto__" / "constructor" are plain keys (L2).
+    failed: [], ledgerIds: Object.create(null) as Record<string, string>,
   };
   const importId = generateId();
   audit.record({
@@ -101,7 +102,17 @@ export function applyTallyImport(plan: ImportPlan): ImportResult {
   try {
     run(plan, result);
   } catch (err) {
+    // restoreBackup wipes every company key first; this internal rollback must not cost the
+    // company its folder-sync state (clocks, conflicts, sync log), so put that back as it was (L3).
+    const syncMeta = SYNC_META_KEYS.map((k) => [k, readRaw(k)] as const);
     restoreBackup(before);
+    for (const [k, v] of syncMeta) {
+      try {
+        if (v !== null) writeRaw(k, v);
+      } catch {
+        /* best effort: the import error below is what the user needs */
+      }
+    }
     audit.record({
       entity: 'system', entity_id: 'tally_import', action: 'import',
       summary: `Tally import stopped and rolled back: ${(err as Error)?.message ?? String(err)}`,
@@ -170,7 +181,13 @@ function run(plan: ImportPlan, result: ImportResult): void {
   /* 3. Openings + bill-wise openings. */
   const hasOpenings = plan.ledgers.some((l) => l.rec.opening !== 0) || plan.stockOpening > 0;
   if (hasOpenings && plan.counts.openings > 0) {
-    if (storedBooksBegin() !== plan.booksBegin) saveBooksBegin(plan.booksBegin);
+    if (storedBooksBegin() !== plan.booksBegin) {
+      try {
+        saveBooksBegin(plan.booksBegin);
+      } catch (err) {
+        result.failed.push(`Books beginning date: ${(err as Error).message}`);
+      }
+    }
     // Two Tally ledgers mapped onto one account (e.g. "CGST" and "Output CGST") add up.
     const byLedger = new Map<string, OpeningEntry>();
     const add = (ledger_id: string, amount: number, party_name?: string) => {
@@ -183,8 +200,13 @@ function run(plan: ImportPlan, result: ImportResult): void {
     }
     if (plan.stockOpening > 0) add(A.stock, plan.stockOpening);
     const entries = [...byLedger.values()].filter((e) => e.amount !== 0);
-    saveOpenings(entries);
-    result.openings = entries.length;
+    try {
+      saveOpenings(entries);
+      result.openings = entries.length;
+    } catch (err) {
+      // The opening day is in a locked period (M2): reported like any other refusal.
+      result.failed.push(`Opening balances: ${(err as Error).message}`);
+    }
     for (const l of plan.ledgers) {
       if (!l.rec.bills.length || (l.target.kind !== 'client' && l.target.kind !== 'vendor')) continue;
       const id = ids[lower(l.rec.name)];
@@ -343,24 +365,25 @@ export interface OpeningCheckRow {
   books: number;
 }
 
-export function openingCheck(plan: ImportPlan, ledgerIds: Record<string, string>): { rows: OpeningCheckRow[]; matches: boolean } {
+export function openingCheck(plan: ImportPlan, idsByName: Record<string, string>): { rows: OpeningCheckRow[]; matches: boolean } {
+  const idOf = (name: string): string | undefined => (Object.hasOwn(idsByName, name) ? idsByName[name] : undefined);
   const books = new Map(loadOpenings().map((o) => [o.ledger_id, o.dr - o.cr]));
   const rows: OpeningCheckRow[] = [];
   const perLedger = new Map<string, number>();
   for (const l of plan.ledgers) {
-    const id = ledgerIds[lower(l.rec.name)];
+    const id = idOf(lower(l.rec.name));
     if (id && l.rec.opening) perLedger.set(id, (perLedger.get(id) ?? 0) + l.rec.opening);
   }
   for (const l of plan.ledgers) {
     if (!l.rec.opening) continue;
-    const id = ledgerIds[lower(l.rec.name)];
+    const id = idOf(lower(l.rec.name));
     rows.push({ ledger: l.rec.name, tally: l.rec.opening, books: id ? (books.get(id) ?? 0) : 0 });
   }
   if (plan.stockOpening) rows.push({ ledger: 'Stock-in-hand (stock items)', tally: plan.stockOpening, books: books.get(A.stock) ?? 0 });
   // Two Tally ledgers mapped onto one account: compare the account against their sum.
   const matches = rows.every((r) => {
     const l = plan.ledgers.find((x) => x.rec.name === r.ledger);
-    const id = l ? ledgerIds[lower(l.rec.name)] : A.stock;
+    const id = l ? idOf(lower(l.rec.name)) : A.stock;
     const expected = l && id ? perLedger.get(id)! : r.tally;
     return r.books === expected;
   });

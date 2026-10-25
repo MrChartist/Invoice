@@ -15,6 +15,9 @@ import { round2 } from '../invoice-calc';
 import { buildInvoiceNumber, getIndianFY, highestSequence } from '../invoice-number';
 import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
+import { localDb } from '../localDb';
+import { withTablesRollback } from '../table-txn';
+import type { Payment } from '../../types/invoice';
 import { formatMoney } from '../utils';
 import { chartOf, loadUserAccounts, type Account } from './accounts';
 import { isCashOrBankLedger } from '../bank-ledgers';
@@ -240,6 +243,10 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
   if (input.reverse_on && input.type === 'JOURNAL') assertUnlocked({ id, issue_date: input.reverse_on, invoice_number: number }, prev ? 'edit' : 'create');
   if (prev?.reverse_on) assertUnlocked({ id, issue_date: prev.reverse_on, invoice_number: prev.number }, 'edit');
 
+  // Bill-wise receipt rows (P0-11) must stay in step with the voucher they settle bills for.
+  const receipts = prev ? voucherReceiptRows(prev.id) : [];
+  if (prev && receipts.length) assertReceiptsInStep(prev, input, chart, receipts);
+
   const now = new Date().toISOString();
   const row: ManualVoucher = {
     id,
@@ -254,6 +261,9 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
     ...(input.branch_id ? { branch_id: input.branch_id } : {}),
   };
   setTable(VOUCHERS_TABLE, prev ? all.map((v) => (v.id === id ? row : v)) : [...all, row]);
+  if (receipts.length && prev && prev.number !== number) {
+    setTable('transactions', getTable<VoucherReceiptRow>('transactions').map((r) => (r.voucher_id === id ? { ...r, reference: number } : r)));
+  }
   const amount = formatMoney(voucherTotals(row.lines).dr / 100);
   const tag = row.variant === 'OPTIONAL' ? ' (optional)' : row.variant === 'MEMO' ? ' (memorandum)' : row.post_dated ? ' (post-dated)' : row.reverse_on ? ` (reverses on ${row.reverse_on})` : '';
   audit.record({
@@ -275,7 +285,12 @@ export function deleteVoucher(id: string): void {
   requireAccess('books.edit');
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
   if (row.reverse_on) assertUnlocked({ id, issue_date: row.reverse_on, invoice_number: row.number }, 'delete');
-  setTable(VOUCHERS_TABLE, all.filter((v) => v.id !== id));
+  // Its bill-wise receipt rows go with it, whichever screen deletes it (M3): all or nothing.
+  const receipts = voucherReceiptRows(id);
+  withTablesRollback(receipts.length ? [VOUCHERS_TABLE, 'transactions', 'invoices'] : [VOUCHERS_TABLE], () => {
+    removeVoucherReceiptRows(id);
+    setTable(VOUCHERS_TABLE, all.filter((v) => v.id !== id));
+  });
   audit.record({
     entity: 'voucher',
     entity_id: id,
@@ -283,4 +298,55 @@ export function deleteVoucher(id: string): void {
     doc_number: row.number,
     summary: `Deleted ${VOUCHER_TYPE_LABELS[row.type].toLowerCase()} voucher ${row.number} dated ${row.date} (₹${formatMoney(voucherTotals(row.lines).dr / 100)})${lock === 'overridden' ? ' (period lock overridden)' : ''}`,
   });
+}
+
+/* ── Bill-wise receipt rows of a voucher (P0-11; `bill-allocation.ts` writes them) ────────────── */
+
+/** A `transactions` row recorded for a receipt voucher's bill allocation. */
+export type VoucherReceiptRow = Payment & { voucher_id?: string; client_id?: string; client_name?: string };
+
+export function voucherReceiptRows(voucherId: string, rows: readonly VoucherReceiptRow[] = getTable<VoucherReceiptRow>('transactions')): VoucherReceiptRow[] {
+  return rows.filter((r) => r.voucher_id === voucherId);
+}
+
+/**
+ * Throws (nothing written) unless every receipt row of the voucher may be removed: role
+ * `payment.record` and the period lock of each settled bill ('unpay').
+ */
+export function assertReceiptRowsRemovable(voucherId: string): void {
+  const mine = voucherReceiptRows(voucherId);
+  if (!mine.length) return;
+  requireAccess('payment.record');
+  for (const r of mine) {
+    const target = r.invoice_id ? localDb.invoices.getById(r.invoice_id) : undefined;
+    if (target) assertUnlocked(target, 'unpay');
+  }
+}
+
+/** Remove every receipt row of a voucher (pre-checked first, so a refusal removes nothing). */
+export function removeVoucherReceiptRows(voucherId: string): void {
+  if (!voucherReceiptRows(voucherId).length) return;
+  assertReceiptRowsRemovable(voucherId);
+  withTablesRollback(['transactions', 'invoices'], () => {
+    for (const r of voucherReceiptRows(voucherId)) if (r.invoice_id) localDb.payments.remove(r.id);
+    const left = getTable<VoucherReceiptRow>('transactions');
+    if (left.some((r) => r.voucher_id === voucherId)) setTable('transactions', left.filter((r) => r.voucher_id !== voucherId));
+  });
+}
+
+/**
+ * An edit of a receipt voucher that carries bill-wise rows may change its number, narration or the
+ * other side of the entry, but not what the rows record (type, date, in-books state, the party and
+ * the amount credited to it). Those edits go through `saveReceiptVoucher` (`bill-allocation.ts`),
+ * which re-does the rows in the same step.
+ */
+function assertReceiptsInStep(prev: ManualVoucher, input: ManualVoucherInput, chart: readonly Account[], rows: readonly VoucherReceiptRow[]): void {
+  const party = (rows[0].client_name ?? '').trim().toLowerCase();
+  const debtors = new Set(chart.filter((a) => a.group === 'TRADE_RECEIVABLES').map((a) => a.id));
+  const credited = input.lines.reduce((s, l) => s + (debtors.has(l.account_id) && (l.party ?? '').trim().toLowerCase() === party ? l.cr - l.dr : 0), 0);
+  const recorded = Math.round(rows.reduce((s, r) => s + (Number(r.amount) || 0), 0) * 100);
+  const inStep = input.type === 'RECEIPT' && input.date === prev.date && !input.variant && !input.post_dated && credited === recorded;
+  if (!inStep) {
+    throw new VoucherError(`Voucher ${prev.number} has bill-wise receipts: change its date, party or amount in Books → Vouchers, where the bill allocations are done again.`);
+  }
 }
