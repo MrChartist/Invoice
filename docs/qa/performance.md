@@ -330,3 +330,10 @@ reminder composer was tried and reverted: it shares `useReminderLog` with the Da
 entry ↔ chunk import cycle for a ~3 kB gain. `check-bundle-size.mjs` now de-duplicates the initial list (Vite emits
 the entry twice when a cycle exists). The total (offline precache) budget is 900 kB; the 185 kB initial budget is
 unchanged.
+
+## Notification bell after first paint (Phase 6)
+
+`NotificationBellSlot` lazy-loads the bell (notification engine, compliance calendar, cheque / interest reminders)
+right after first paint, showing a same-sized inert bell meanwhile; the Dashboard imports `RemindersPanel` directly
+instead of through the `components/share` barrel (which pulled `ShareMenu` and the share helpers into the entry).
+Initial JS 178.3 → 173.3 kB gz (entry 68.6 → 64.2).

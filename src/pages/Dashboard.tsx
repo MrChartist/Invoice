@@ -17,7 +17,7 @@ import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
-import { RemindersPanel } from '../components/share';
+import { RemindersPanel } from '../components/share/RemindersPanel';
 import { localDb } from '../lib/localDb';
 import { shouldShowWizard } from '../lib/onboarding';
 import { getTable } from '../lib/storage';

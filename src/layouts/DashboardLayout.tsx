@@ -35,7 +35,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/useToast';
 import { storageFailure, subscribeStorageFailure } from '../lib/storage';
 import type { PaletteAction } from '../components/command/CommandPalette';
-import { NotificationBell } from '../components/command/NotificationBell';
+import { NotificationBellSlot } from '../components/command/NotificationBellSlot';
 import { InstallPrompt } from '../components/pwa/InstallPrompt';
 import { UpdateToast } from '../components/pwa/UpdateToast';
 import { BackupNudge } from '../components/pwa/BackupNudge';
@@ -318,7 +318,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           <button type="button" className={styles.iconBtn} aria-label={t('shell.search')} onClick={() => openPalette()}>
             <Search size={18} />
           </button>
-          <NotificationBell onNavigate={navigate} />
+          <NotificationBellSlot onNavigate={navigate} />
         </div>
       </header>
 
@@ -411,7 +411,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <button type="button" className={styles.iconBtn} onClick={toggle} aria-label={themeLabel} title={themeLabel}>
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <NotificationBell onNavigate={navigate} />
+            <NotificationBellSlot onNavigate={navigate} />
           </div>
         </div>
         <div className={styles.content} key={`${location.pathname.startsWith('/invoice') ? 'invoice' : location.pathname}#${refreshKey}`}>
