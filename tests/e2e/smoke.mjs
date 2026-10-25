@@ -100,9 +100,11 @@ const step = async (name, fn) => {
     await fn();
   } catch (err) {
     check(false, `${name}: ${err?.message?.split('\n')[0] ?? err}`);
+    // Always print where the page was, so a CI-only failure can be diagnosed from the log alone.
+    const seen = await page.evaluate(() => (document.body?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 600)).catch(() => '');
+    console.log(`      url: ${page.url()}\n      ${(err?.message ?? '').split('\n').slice(0, 8).join('\n      ')}\n      page: ${seen}`);
     if (process.env.E2E_SHOTS) {
       await page.screenshot({ path: join(process.env.E2E_SHOTS, `${name.replace(/\W+/g, '-')}.png`), fullPage: true }).catch(() => {});
-      console.log(`      url: ${page.url()}\n      ${(err?.message ?? '').split('\n').slice(0, 6).join('\n      ')}`);
     }
     throw err;
   }
