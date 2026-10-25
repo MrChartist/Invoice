@@ -3,6 +3,7 @@
  * The heavy libraries (html-to-image, jspdf) are imported dynamically so they
  * only load when the user actually exports a PDF.
  */
+import { ensureDevanagariFont } from '../../lib/fonts-ready';
 
 export function downloadTextFile(filename: string, text: string, mime = 'text/csv;charset=utf-8'): void {
   // BOM so Excel opens UTF-8 (₹, en dashes) correctly.
@@ -36,6 +37,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  */
 export async function exportNodeToPdf(node: HTMLElement, filename: string): Promise<void> {
   const [{ toPng }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
+  await ensureDevanagariFont(node.textContent);
   const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true, backgroundColor: 'white' });
   const img = await loadImage(dataUrl);
 

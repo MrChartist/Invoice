@@ -5,14 +5,17 @@ import { useShallow } from 'zustand/react/shallow';
 import { amountInWords } from '../../lib/amount-in-words';
 import { cn, currencySymbol, formatCurrency } from '../../lib/utils';
 import type { GstMode } from '../../types/invoice';
+import { amountInWordsHi } from '../../lib/amount-in-words-hi';
+import { useT, type MessageKey } from '../../i18n';
+import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
 import styles from './SummaryPanel.module.css';
 
-const GST_MODES: { id: GstMode; label: string }[] = [
-  { id: 'CGST_SGST', label: 'CGST + SGST' },
-  { id: 'IGST', label: 'IGST' },
-  { id: 'SINGLE', label: 'Single tax line' },
-  { id: 'NONE', label: 'No tax' },
+const GST_MODES: { id: GstMode; label: MessageKey }[] = [
+  { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },
+  { id: 'IGST', label: 'summary.modeIgst' },
+  { id: 'SINGLE', label: 'summary.modeSingle' },
+  { id: 'NONE', label: 'summary.modeNone' },
 ];
 
 function Row({ label, children, tone, strong }: { label: React.ReactNode; children: React.ReactNode; tone?: 'good' | 'muted'; strong?: boolean }) {
@@ -25,6 +28,7 @@ function Row({ label, children, tone, strong }: { label: React.ReactNode; childr
 }
 
 export function SummaryPanel() {
+  const { t: tr, lang } = useT();
   const s = useInvoiceStore(
     useShallow((st) => pick(st, ['amount_paid', 'charges_taxable', 'patch', 'currency', 'discount_rate', 'discount_type', 'doc_type', 'gst_mode', 'other_charges', 'round_off_enabled', 'setAmountPaid', 'setDiscount', 'setGstMode', 'setOtherCharges', 'setRoundOff', 'setShipping', 'shipping', 'tcs_label', 'tds_section', 'totals'])),
   );
@@ -36,15 +40,15 @@ export function SummaryPanel() {
 
   return (
     <div className={styles.panel}>
-      <Row label="Subtotal">{money(t.subtotal)}</Row>
+      <Row label={tr('summary.subtotal')}>{money(t.subtotal)}</Row>
       {t.line_discount_total > 0 && (
-        <Row label="Line discounts" tone="good">
+        <Row label={tr('summary.lineDiscounts')} tone="good">
           −{money(t.line_discount_total)}
         </Row>
       )}
 
       <div className={styles.inputRow}>
-        <span>Extra discount</span>
+        <span>{tr('summary.extraDiscount')}</span>
         <div className={styles.inline}>
           <div className={controls.segment}>
             <button type="button" className={s.discount_type === 'PERCENT' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => s.setDiscount('PERCENT', s.discount_rate)} aria-pressed={s.discount_type === 'PERCENT'}>
@@ -54,27 +58,27 @@ export function SummaryPanel() {
               {sym || '₹'}
             </button>
           </div>
-          <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.discount_rate} onChange={(n) => s.setDiscount(s.discount_type, n)} placeholder="0" aria-label="Extra discount" />
+          <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.discount_rate} onChange={(n) => s.setDiscount(s.discount_type, n)} placeholder="0" aria-label={tr('summary.extraDiscount')} />
         </div>
       </div>
       {t.invoice_discount_amount > 0 && (
-        <Row label="Discount applied" tone="good">
+        <Row label={tr('summary.discountApplied')} tone="good">
           −{money(t.invoice_discount_amount)}
         </Row>
       )}
 
-      <Row label="Taxable value" tone="muted">
+      <Row label={tr('summary.taxable')} tone="muted">
         {money(t.taxable_value)}
       </Row>
 
-      {s.doc_type === 'BILL_OF_SUPPLY' && <Row label="GST" tone="muted">Not charged (Bill of Supply)</Row>}
+      {s.doc_type === 'BILL_OF_SUPPLY' && <Row label={tr('summary.gst')} tone="muted">{tr('summary.notCharged')}</Row>}
       {!challan && s.doc_type !== 'BILL_OF_SUPPLY' && (
         <div className={styles.inputRow}>
-          <span>GST treatment</span>
-          <select className={cn(controls.select, styles.gstSelect)} value={s.gst_mode} onChange={(e) => s.setGstMode(e.target.value as GstMode)} aria-label="GST treatment">
+          <span>{tr('summary.gstTreatment')}</span>
+          <select className={cn(controls.select, styles.gstSelect)} value={s.gst_mode} onChange={(e) => s.setGstMode(e.target.value as GstMode)} aria-label={tr('summary.gstTreatment')}>
             {GST_MODES.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.label}
+                {tr(m.label)}
               </option>
             ))}
           </select>
@@ -88,52 +92,53 @@ export function SummaryPanel() {
         </>
       )}
       {s.gst_mode === 'IGST' && <Row label="IGST">{money(t.igst_amount)}</Row>}
-      {s.gst_mode === 'SINGLE' && <Row label="Tax">{money(t.tax_amount)}</Row>}
+      {s.gst_mode === 'SINGLE' && <Row label={tr('summary.tax')}>{money(t.tax_amount)}</Row>}
 
-      {t.cess_amount > 0 && <Row label="Cess">{money(t.cess_amount)}</Row>}
+      {t.cess_amount > 0 && <Row label={tr('summary.cess')}>{money(t.cess_amount)}</Row>}
       {t.tcs_amount > 0 && <Row label={s.tcs_label || 'TCS'}>{money(t.tcs_amount)}</Row>}
 
       <div className={styles.inputRow}>
-        <span>Shipping</span>
-        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.shipping} onChange={s.setShipping} placeholder="0.00" aria-label="Shipping" />
+        <span>{tr('summary.shipping')}</span>
+        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.shipping} onChange={s.setShipping} placeholder="0.00" aria-label={tr('summary.shipping')} />
       </div>
       <div className={styles.inputRow}>
-        <span>Other charges</span>
-        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.other_charges} onChange={s.setOtherCharges} placeholder="0.00" aria-label="Other charges" />
+        <span>{tr('summary.otherCharges')}</span>
+        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.other_charges} onChange={s.setOtherCharges} placeholder="0.00" aria-label={tr('summary.otherCharges')} />
       </div>
       {!challan && (s.shipping !== 0 || s.other_charges !== 0 || s.charges_taxable) && (
-        <label className={cn(controls.check, styles.checkRow)} title="CGST Act s.15(2)(c): freight, packing and other charges billed by you are part of the value of supply. Taxed at the highest GST rate on this document.">
+        <label className={cn(controls.check, styles.checkRow)} title={tr('summary.chargesTitle')}>
           <input type="checkbox" checked={Boolean(s.charges_taxable)} onChange={(e) => s.patch({ charges_taxable: e.target.checked || undefined })} />
-          Charge GST on shipping &amp; other charges
+          {tr('summary.chargesGst')}
           {t.charges_line && <span className={styles.roundVal}>@ {t.charges_line.tax_rate}%</span>}
         </label>
       )}
 
       <label className={cn(controls.check, styles.checkRow)}>
         <input type="checkbox" checked={s.round_off_enabled} onChange={(e) => s.setRoundOff(e.target.checked)} />
-        Round off to the nearest rupee
+        {tr('summary.roundOff')}
         {t.round_off !== 0 && <span className={styles.roundVal}>{t.round_off > 0 ? '+' : '−'}{Math.abs(t.round_off).toFixed(2)}</span>}
       </label>
 
       {!challan && (
         <>
           <div className={styles.total}>
-            <span>Total</span>
+            <span>{tr('editor.total')}</span>
             <span>{money(t.total)}</span>
           </div>
           <p className={styles.words}>{amountInWords(t.total, cur)}</p>
+          {lang === 'hi' && <p className={styles.words} lang="hi">{amountInWordsHi(t.total, cur)}</p>}
 
           <div className={styles.inputRow}>
-            <span>Amount received</span>
-            <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.amount_paid} onChange={s.setAmountPaid} placeholder="0.00" aria-label="Amount received" />
+            <span>{tr('summary.amountReceived')}</span>
+            <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.amount_paid} onChange={s.setAmountPaid} placeholder="0.00" aria-label={tr('summary.amountReceived')} />
           </div>
           {t.tds_amount > 0 && (
-            <Row label={`Less: TDS${s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${s.tds_section})` : ''}`} tone="good">
+            <Row label={tr('summary.lessTds', { section: s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${s.tds_section})` : '' })} tone="good">
               −{money(t.tds_amount)}
             </Row>
           )}
           {(s.amount_paid > 0 || t.tds_amount > 0) && (
-            <Row label="Balance due" strong>
+            <Row label={tr('summary.balanceDue')} strong>
               {money(t.balance_due)}
             </Row>
           )}

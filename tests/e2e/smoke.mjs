@@ -158,6 +158,28 @@ try {
       `wizard saves the profile (${p.companyName}, state ${p.stateCode}, ${p.upiId}) and opens the editor`);
   });
 
+  await step('interface language: switch to Hindi, see the Hindi shell and Dashboard, switch back', async () => {
+    const nav = page.getByRole('navigation', { name: /Primary|मुख्य मेन्यू/ });
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('hi');
+    await nav.getByRole('link', { name: 'डैशबोर्ड' }).waitFor();
+    await nav.getByRole('link', { name: 'नया इनवॉइस' }).waitFor();
+    check((await page.evaluate(() => document.documentElement.lang)) === 'hi', 'Hindi sets <html lang="hi">');
+    // A reload keeps the device's choice; the Dashboard opens in Hindi before first paint.
+    await page.goto(srv.origin + '/');
+    await page.getByText('हाल के दस्तावेज़').waitFor();
+    const stored = await page.evaluate(() => localStorage.getItem('mrchartist_inv_lang'));
+    const fontOk = await page.evaluate(async () => {
+      await document.fonts.load("16px 'Noto Sans Devanagari'", 'क');
+      return document.fonts.check("16px 'Noto Sans Devanagari'", 'क');
+    });
+    check(stored === 'hi' && fontOk, `the choice is kept on this device (${stored}) and the self-hosted Devanagari font loads (${fontOk})`);
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('en');
+    await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
+    check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');
+  });
+
   await step('create and save an invoice', async () => {
     await page.goto(srv.origin + '/invoice');
     await page.getByLabel('Client name').fill('Acme Buyers');

@@ -56,7 +56,9 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   const effMeta = layout === meta.layout ? meta : { ...meta, layout };
 
   const accent = design?.accent ?? meta.accent;
-  const fontFamily = cfg.fontOverride ?? meta.fontFamily;
+  // Hindi text (bilingual labels, Devanagari item names) always uses the self-hosted Noto Sans
+  // Devanagari, so the PDF looks the same on every device; its unicode-range leaves Latin alone.
+  const fontFamily = `'Noto Sans Devanagari', ${cfg.fontOverride ?? meta.fontFamily}`;
   const size = paperSize(design);
   const plainParties = layout === 'minimal' || layout === 'ink' || layout === 'letterhead';
 

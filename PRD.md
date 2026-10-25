@@ -20,7 +20,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 1. **Data privacy**: 100% of data lives on the user's device (`localStorage` / IndexedDB). No telemetry, no cloud
    database, no tracking, no third-party requests (fonts are self-hosted; a strict CSP blocks remote origins).
 2. **Professional documents**: 26 templates plus a Design Studio, A4 / A5 / 80 mm thermal paper, UPI QR codes, and a
-   bilingual (English + Hindi) layout.
+   bilingual (English + Hindi) layout with the amount in words in both languages; Hindi text uses a self-hosted Noto Sans
+   Devanagari font, so PDFs look the same on every device. The interface itself can be switched to Hindi per device
+   (Settings, login screen) — see `docs/features/i18n.md`.
 3. **Historical integrity (snapshotting)**: each saved document embeds the sender profile it was issued with, so
    editing your business details or bank account never alters past invoices.
 4. **Offline-first PWA**: precached app shell, folder backups (Chrome/Edge File System Access API), works with no
@@ -198,6 +200,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **State**: Zustand (`src/store/useInvoiceStore.ts`) for the editor; storage layer in `src/lib/storage.ts` with
   versioned migrations (`src/lib/migrations.ts`).
 - **Styling**: vanilla CSS + CSS Modules with tokens in `src/index.css`. No Tailwind.
+- **Language**: dependency-free i18n (`src/i18n/`): English built in, Hindi catalogue lazy-loaded only on devices that
+  choose it; the choice is device-local and never part of a backup. Amounts keep Latin digits with Indian grouping.
 - **PDF**: `html-to-image` + `jspdf` (multi-page, client-side). **QR**: `qrcode.react`. **Icons**: `lucide-react`.
 - **Quality**: node:test unit and integration tests, Playwright end-to-end journey and offline/service-worker checks in
   CI, bundle-size budgets.
@@ -244,6 +248,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   kick, camera scanning only where the browser has `BarcodeDetector`; schemes are same-item buy-X-get-Y only; levels and
   schemes apply in the editor and POS, not to imports, recurring runs or conversions.
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
+- Hindi interface (5.4) is partial: the shell, login, Dashboard, the editor's main surface, the payment dialog and list
+  empty states are translated; other screens, validation messages and printed receipts / statements are still in
+  English, and GST working papers keep their English statutory wording ("verify with your CA").
 - Composition / amendments (5.9): e-commerce Sec 52 / 9(5), export amendments (EXPA), GSTR-9 Part V, CMP-08 / GSTR-4
   interest and late fees and composition eligibility checks are not built; re-amending keeps only the first original.
 

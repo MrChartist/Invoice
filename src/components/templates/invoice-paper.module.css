@@ -634,6 +634,14 @@
   line-height: 1.3;
 }
 
+/* Amount in words, Hindi line (5.4): "रुपये … मात्र" under the English words. */
+.biWords {
+  display: block;
+  font-family: 'Noto Sans Devanagari', var(--font-body), sans-serif;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
 .biTitle {
   font-family: 'Noto Sans Devanagari', 'Mukta', var(--font-body), sans-serif;
   font-size: 15px;

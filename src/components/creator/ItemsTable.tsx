@@ -13,10 +13,13 @@ import { useCostCentres } from '../cost-centres/useCostCentres';
 import { LineTracking } from './LineTracking';
 import { editorStockContext } from '../../lib/stock-tracking';
 import { afterLineChange, pickCatalogItem, setLineQuantity, setLineRate } from './pricing-actions';
+import { tNodes, useT } from '../../i18n';
+import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
 import styles from './ItemsTable.module.css';
 
 export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) => void }) {
+  const { t } = useT();
   const items = useInvoiceStore((s) => s.items);
   const totals = useInvoiceStore((s) => s.totals);
   const gstMode = useInvoiceStore((s) => s.gst_mode);
@@ -87,14 +90,14 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   return (
     <div className={styles.wrap} ref={wrapRef}>
       <div className={cn(styles.row, styles.head)} aria-hidden="true">
-        <span>Item / service</span>
-        <span>HSN / SAC</span>
-        <span className={styles.r}>Qty</span>
-        <span>Unit</span>
-        {priced && <span className={styles.r}>Rate</span>}
-        {priced && <span className={styles.r}>Disc %</span>}
-        {priced && showTax && <span className={styles.r}>GST</span>}
-        {priced && <span className={styles.r}>Amount</span>}
+        <span>{t('items.colItem')}</span>
+        <span>{t('items.colHsn')}</span>
+        <span className={styles.r}>{t('items.colQty')}</span>
+        <span>{t('items.colUnit')}</span>
+        {priced && <span className={styles.r}>{t('items.colRate')}</span>}
+        {priced && <span className={styles.r}>{t('items.colDisc')}</span>}
+        {priced && showTax && <span className={styles.r}>{t('items.colGst')}</span>}
+        {priced && <span className={styles.r}>{t('items.colAmount')}</span>}
         <span />
       </div>
 
@@ -103,7 +106,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
         const amount = line ? line.gross - line.line_discount : 0;
         return (
           <div key={item.id} data-line={item.id} className={cn(styles.row, styles.body)} onKeyDown={(e) => onRowKeyDown(e, item.id, index)}>
-            <div className={cn(styles.cell, styles.cName)} data-label="Item / service">
+            <div className={cn(styles.cell, styles.cName)} data-label={t('items.colItem')}>
               <div className={styles.nameWrap}>
                 <Typeahead
                   className={controls.ghost}
@@ -117,10 +120,10 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   getSuggestions={itemSuggestions}
                   onBlur={afterLineChange}
                   onPick={(c) => pickCatalogItem(item.id, c)}
-                  placeholder={`Item ${index + 1}`}
-                  aria-label={`Item ${index + 1} name`}
+                  placeholder={t('items.itemPh', { n: index + 1 })}
+                  aria-label={t('items.itemName', { n: index + 1 })}
                 />
-                <button type="button" className={styles.catalogBtn} onClick={() => onPickCatalog(item.id)} title="Pick from catalogue" aria-label="Pick from catalogue">
+                <button type="button" className={styles.catalogBtn} onClick={() => onPickCatalog(item.id)} title={t('items.pickCatalog')} aria-label={t('items.pickCatalog')}>
                   <Library size={15} />
                 </button>
               </div>
@@ -129,8 +132,8 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 data-field="description"
                 value={item.description ?? ''}
                 onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                placeholder="Description (optional)"
-                aria-label={`Item ${index + 1} description`}
+                placeholder={t('items.descPh')}
+                aria-label={t('items.itemDesc', { n: index + 1 })}
               />
               {item.price_basis || item.free_of ? (
                 <div className={styles.customLine} title={item.free_of ? 'Free under a scheme' : 'Rate set by the price level / quantity slab — type a rate to override'}>
@@ -169,7 +172,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
               )}
             </div>
 
-            <div className={styles.cell} data-label="HSN / SAC">
+            <div className={styles.cell} data-label={t('items.colHsn')}>
               <input
                 className={cn(controls.ghost, styles.mono)}
                 data-field="hsn"
@@ -178,16 +181,16 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 maxLength={8}
                 onChange={(e) => updateItem(item.id, 'hsn', e.target.value.replace(/\D/g, ''))}
                 placeholder="—"
-                aria-label={`Item ${index + 1} HSN or SAC`}
+                aria-label={t('items.itemHsn', { n: index + 1 })}
               />
             </div>
 
-            <div className={styles.cell} data-label="Qty">
-              <NumberInput className={controls.ghostNumeric} data-field="quantity" value={item.quantity} blankZero={false} onChange={(n) => setLineQuantity(item.id, n)} aria-label={`Item ${index + 1} quantity`} />
+            <div className={styles.cell} data-label={t('items.colQty')}>
+              <NumberInput className={controls.ghostNumeric} data-field="quantity" value={item.quantity} blankZero={false} onChange={(n) => setLineQuantity(item.id, n)} aria-label={t('items.itemQty', { n: index + 1 })} />
             </div>
 
-            <div className={styles.cell} data-label="Unit">
-              <select className={cn(controls.ghost, styles.unit)} data-field="unit" value={item.unit || 'NOS'} onChange={(e) => updateItem(item.id, 'unit', e.target.value)} aria-label={`Item ${index + 1} unit`}>
+            <div className={styles.cell} data-label={t('items.colUnit')}>
+              <select className={cn(controls.ghost, styles.unit)} data-field="unit" value={item.unit || 'NOS'} onChange={(e) => updateItem(item.id, 'unit', e.target.value)} aria-label={t('items.itemUnit', { n: index + 1 })}>
                 {UNITS.map((u) => (
                   <option key={u}>{u}</option>
                 ))}
@@ -195,25 +198,25 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
             </div>
 
             {priced && (
-              <div className={styles.cell} data-label="Rate">
-                <NumberInput className={controls.ghostNumeric} data-field="rate" value={item.rate} onChange={(n) => setLineRate(item.id, n)} placeholder="0.00" aria-label={`Item ${index + 1} rate`} />
+              <div className={styles.cell} data-label={t('items.colRate')}>
+                <NumberInput className={controls.ghostNumeric} data-field="rate" value={item.rate} onChange={(n) => setLineRate(item.id, n)} placeholder="0.00" aria-label={t('items.itemRate', { n: index + 1 })} />
               </div>
             )}
 
             {priced && (
-              <div className={styles.cell} data-label="Disc %">
-                <NumberInput className={controls.ghostNumeric} data-field="discount" value={item.discount_percent ?? 0} onChange={(n) => updateItem(item.id, 'discount_percent', Math.min(n, 100))} placeholder="0" aria-label={`Item ${index + 1} discount percent`} />
+              <div className={styles.cell} data-label={t('items.colDisc')}>
+                <NumberInput className={controls.ghostNumeric} data-field="discount" value={item.discount_percent ?? 0} onChange={(n) => updateItem(item.id, 'discount_percent', Math.min(n, 100))} placeholder="0" aria-label={t('items.itemDisc', { n: index + 1 })} />
               </div>
             )}
 
             {priced && showTax && (
-              <div className={styles.cell} data-label="GST">
+              <div className={styles.cell} data-label={t('items.colGst')}>
                 <select
                   className={cn(controls.ghost, styles.rate)}
                   data-field="gst"
                   value={item.tax_rate ?? 0}
                   onChange={(e) => updateItem(item.id, 'tax_rate', Number(e.target.value))}
-                  aria-label={`Item ${index + 1} GST rate`}
+                  aria-label={t('items.itemGst', { n: index + 1 })}
                 >
                   {GST_SLABS.map((r) => (
                     <option key={r} value={r}>
@@ -225,22 +228,22 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
             )}
 
             {priced && (
-              <div className={cn(styles.cell, styles.amount)} data-label="Amount">
+              <div className={cn(styles.cell, styles.amount)} data-label={t('items.colAmount')}>
                 {formatCurrency(amount, currency)}
               </div>
             )}
 
             <div className={cn(styles.cell, styles.actions)}>
-              <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, -1)} disabled={index === 0} aria-label="Move up">
+              <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, -1)} disabled={index === 0} aria-label={t('items.moveUp')}>
                 <ArrowUp size={14} />
               </button>
-              <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, 1)} disabled={index === items.length - 1} aria-label="Move down">
+              <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, 1)} disabled={index === items.length - 1} aria-label={t('items.moveDown')}>
                 <ArrowDown size={14} />
               </button>
-              <button type="button" className={controls.btnIcon} onClick={() => duplicateItem(item.id)} aria-label="Duplicate line">
+              <button type="button" className={controls.btnIcon} onClick={() => duplicateItem(item.id)} aria-label={t('items.duplicate')}>
                 <Copy size={14} />
               </button>
-              <button type="button" className={controls.btnDanger} onClick={() => { removeItem(item.id); afterLineChange(); }} aria-label="Remove line">
+              <button type="button" className={controls.btnDanger} onClick={() => { removeItem(item.id); afterLineChange(); }} aria-label={t('items.remove')}>
                 <Trash2 size={14} />
               </button>
             </div>
@@ -250,10 +253,10 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
 
       <div className={styles.footer}>
         <button type="button" className={controls.btnOutline} onClick={addItem}>
-          <Plus size={16} /> Add line
+          <Plus size={16} /> {t('items.addLine')}
         </button>
         <span className={styles.keyHint}>
-          <kbd>Enter</kbd> on the last field adds a line · <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> moves a line · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> saves
+          {tNodes('items.keyHint', { enter: <kbd>Enter</kbd>, alt: <kbd>Alt</kbd>, arrows: <><kbd>↑</kbd>/<kbd>↓</kbd></>, ctrl: <kbd>Ctrl</kbd> })}
         </span>
       </div>
     </div>

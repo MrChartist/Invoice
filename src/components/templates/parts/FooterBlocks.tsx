@@ -1,6 +1,7 @@
 import { QRCodeCanvas } from 'qrcode.react';
 import { cn } from '../../../lib/utils';
 import { amountInWords } from '../../../lib/amount-in-words';
+import { amountInWordsHi } from '../../../lib/amount-in-words-hi';
 import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord, SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
@@ -228,6 +229,7 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
           {bilingual ? (
             <>
               {t('words')}: {amountInWords(totals.total, cur)}
+              <span className={styles.biWords} lang="hi">{amountInWordsHi(totals.total, cur)}</span>
             </>
           ) : (
             `Amount in words: ${amountInWords(totals.total, cur)}`

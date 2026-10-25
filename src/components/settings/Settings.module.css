@@ -316,3 +316,16 @@
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
+
+/* Interface language (5.4) in the page header: device-level, visible to every role. */
+.langBox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.langLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}

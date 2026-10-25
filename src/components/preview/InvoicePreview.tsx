@@ -11,6 +11,7 @@ import { pageSlices, paperSize, resolve as resolveDesign } from '../../lib/desig
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
 import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { downloadBlob } from '../../lib/download';
+import { ensureDevanagariFont } from '../../lib/fonts-ready';
 import { canShareFiles, invoiceSummaryText, invoiceUpiLink, shareFile } from '../../lib/share';
 import { buildClientCopyHtml } from '../../lib/client-copy';
 import { FOCUSABLE } from '../ui/Modal';
@@ -127,6 +128,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
     // Loaded on demand — the PDF stack is ~200 KB gzipped and most sessions never export.
     const [{ toJpeg }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
     const node = paperRef.current;
+    await ensureDevanagariFont(node.textContent);
     const height = Math.max(node.offsetHeight, PAPER_H);
     const dataUrl = await toJpeg(node, {
       quality: 0.92,

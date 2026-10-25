@@ -23,6 +23,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
+import { useT } from '../i18n';
+import '../i18n/en-pages'; // page strings (5.4)
 import { Modal } from '../components/ui/Modal';
 import { VirtualGap } from '../components/ui/VirtualGap';
 import { useVirtualRows } from '../hooks/useVirtualRows';
@@ -83,6 +85,7 @@ export function Transactions() {
   const navigate = useNavigate();
   const loadInvoice = useInvoiceStore((s) => s.loadInvoice);
   const { notify, toastNode } = useToast();
+  const { t } = useT();
 
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
@@ -447,18 +450,18 @@ export function Transactions() {
         {invoices.length === 0 ? (
           <EmptyState
             icon={FileText}
-            title="Nothing issued yet"
-            text="Invoices, quotations and credit notes you save will be listed here, with payment tracking."
+            title={t('list.txEmptyTitle')}
+            text={t('list.txEmptyText')}
             action={
               can('doc.create') ? (
                 <Link to="/invoice" className={controls.btnPrimary}>
-                  <FilePlus2 size={16} /> Create an invoice
+                  <FilePlus2 size={16} /> {t('common.createInvoice')}
                 </Link>
               ) : undefined
             }
           />
         ) : rows.length === 0 ? (
-          <EmptyState icon={Search} title="No matches" text="Try a different search or filter." />
+          <EmptyState icon={Search} title={t('common.noMatches')} text={t('common.tryOtherSearchFilter')} />
         ) : (
           <div className={surface.tableWrap}>
             <table className={cn(surface.table, styles.ledger)} aria-rowcount={virtual.ariaRowCount(1)}>

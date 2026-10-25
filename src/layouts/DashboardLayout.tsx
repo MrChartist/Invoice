@@ -47,10 +47,12 @@ import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
 import { cn } from '../lib/utils';
 import { getCurrentUser, getUser, logout } from '../lib/auth';
-import { ROLE_LABELS, type AccessAction } from '../lib/access';
+import type { AccessAction } from '../lib/access';
 import { useCan } from '../hooks/useCan';
 import type { DeniedState } from '../components/security/RequireAccess';
 import { useTheme } from '../hooks/useTheme';
+import { getLanguage, setLanguage, useT, type MessageKey } from '../i18n';
+import { roleLabel } from '../i18n/labels';
 import styles from './DashboardLayout.module.css';
 
 // Overlays that only appear on demand are split out of the entry chunk and mounted on first use.
@@ -59,7 +61,8 @@ const ShortcutsOverlay = lazy(() => import('../components/command/ShortcutsOverl
 const CommandPalette = lazy(() => import('../components/command/CommandPalette').then((m) => ({ default: m.CommandPalette })));
 
 interface NavEntry {
-  label: string;
+  /** Catalogue key of the label (5.4). */
+  label: MessageKey;
   path: string;
   icon: LucideIcon;
   end?: boolean;
@@ -69,46 +72,46 @@ interface NavEntry {
   need?: AccessAction;
 }
 
-const NAV_GROUPS: { title?: string; items: NavEntry[] }[] = [
-  { items: [{ label: 'Dashboard', path: '/', icon: LayoutDashboard, end: true }] },
+const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
+  { items: [{ label: 'nav.dashboard', path: '/', icon: LayoutDashboard, end: true }] },
   {
-    title: 'Sales',
+    title: 'nav.groupSales',
     items: [
-      { label: 'New invoice', path: '/invoice', icon: FilePlus2, end: true, need: 'doc.create' },
-      { label: 'POS', path: '/pos', icon: ScanBarcode, need: 'doc.create' },
-      { label: 'Invoices', path: '/transactions', icon: FileText, match: (p) => p.startsWith('/transactions') || /^\/invoice\/.+/.test(p) },
-      { label: 'Clients', path: '/clients', icon: Users },
-      { label: 'Recurring', path: '/recurring', icon: Repeat, need: 'books.edit' },
-      { label: 'Time', path: '/time', icon: Timer, need: 'books.edit' },
-      { label: 'Receivables', path: '/receivables', icon: Scale },
+      { label: 'nav.newInvoice', path: '/invoice', icon: FilePlus2, end: true, need: 'doc.create' },
+      { label: 'nav.pos', path: '/pos', icon: ScanBarcode, need: 'doc.create' },
+      { label: 'nav.invoices', path: '/transactions', icon: FileText, match: (p) => p.startsWith('/transactions') || /^\/invoice\/.+/.test(p) },
+      { label: 'nav.clients', path: '/clients', icon: Users },
+      { label: 'nav.recurring', path: '/recurring', icon: Repeat, need: 'books.edit' },
+      { label: 'nav.time', path: '/time', icon: Timer, need: 'books.edit' },
+      { label: 'nav.receivables', path: '/receivables', icon: Scale },
     ],
   },
   {
-    title: 'Purchases & stock',
+    title: 'nav.groupPurchases',
     items: [
-      { label: 'Expenses', path: '/expenses', icon: Receipt },
-      { label: 'Inventory', path: '/inventory', icon: Boxes },
+      { label: 'nav.expenses', path: '/expenses', icon: Receipt },
+      { label: 'nav.inventory', path: '/inventory', icon: Boxes },
     ],
   },
   {
-    title: 'Accounts & GST',
+    title: 'nav.groupAccounts',
     items: [
-      { label: 'Books', path: '/books', icon: BookOpen },
-      { label: 'Reconcile', path: '/reconcile', icon: Landmark, need: 'books.edit' },
-      { label: 'Cheques', path: '/cheques', icon: Banknote, need: 'books.edit' },
-      { label: 'Reports', path: '/reports', icon: BarChart3 },
-      { label: 'GST reports', path: '/gst-reports', icon: FileSpreadsheet },
-      { label: 'Exports', path: '/exports', icon: FileDown },
+      { label: 'nav.books', path: '/books', icon: BookOpen },
+      { label: 'nav.reconcile', path: '/reconcile', icon: Landmark, need: 'books.edit' },
+      { label: 'nav.cheques', path: '/cheques', icon: Banknote, need: 'books.edit' },
+      { label: 'nav.reports', path: '/reports', icon: BarChart3 },
+      { label: 'nav.gstReports', path: '/gst-reports', icon: FileSpreadsheet },
+      { label: 'nav.exports', path: '/exports', icon: FileDown },
     ],
   },
   {
-    title: 'Setup',
-    items: [{ label: 'Design studio', path: '/design', icon: Palette, need: 'settings.manage' }],
+    title: 'nav.groupSetup',
+    items: [{ label: 'nav.designStudio', path: '/design', icon: Palette, need: 'settings.manage' }],
   },
 ];
 
 // Settings is pinned beside the profile card so it is reachable at any window height.
-const SETTINGS_ENTRY: NavEntry = { label: 'Settings', path: '/settings', icon: Settings };
+const SETTINGS_ENTRY: NavEntry = { label: 'nav.settings', path: '/settings', icon: Settings };
 
 const NAV_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), SETTINGS_ENTRY];
 
@@ -125,6 +128,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     [role],
   );
   const { theme, toggle } = useTheme();
+  const { t, lang } = useT();
   const { notify, toastNode } = useToast();
   const [helpOpen, setHelpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -212,7 +216,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     () =>
       subscribeStorageFailure(() => {
         const failure = storageFailure();
-        if (failure) notify(`Not saved: ${failure.message}`, 'error', { duration: 60_000 });
+        if (failure) notify(t('common.notSaved', { message: failure.message }), 'error', { duration: 60_000 });
       }),
     [notify],
   );
@@ -252,65 +256,66 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
   const actions = useMemo<PaletteAction[]>(
     () => ([
-      { id: 'new-invoice', title: 'New invoice', keywords: ['create', 'bill', 'sale'], run: () => navigate('/invoice'), need: 'doc.create' },
-      { id: 'new-quotation', title: 'New quotation', keywords: ['estimate', 'quote'], run: () => navigate('/invoice?type=QUOTATION'), need: 'doc.create' },
-      { id: 'new-sales-order', title: 'New sales order', keywords: ['order', 'so', 'booking'], run: () => navigate('/invoice?type=SALES_ORDER'), need: 'doc.create' },
-      { id: 'sales-orders', title: 'Open sales orders', keywords: ['order', 'pending', 'backorder'], run: () => navigate('/transactions?type=SALES_ORDER') },
-      { id: 'purchase-orders', title: 'Purchase orders', keywords: ['po', 'order', 'vendor', 'supplier'], run: () => navigate('/expenses?tab=orders') },
-      { id: 'add-client', title: 'Add client', keywords: ['customer', 'party'], run: () => navigate('/clients?new=1'), need: 'master.edit' },
-      { id: 'add-expense', title: 'Add expense or purchase bill', keywords: ['bill', 'vendor'], run: () => navigate('/expenses'), need: 'books.edit' },
-      { id: 'record-payment', title: 'Record a payment', keywords: ['receipt', 'received'], run: () => navigate('/transactions?filter=unpaid&pay=1'), need: 'payment.record' },
-      { id: 'gst', title: 'Open GST reports', keywords: ['gstr', 'return'], run: () => navigate('/gst-reports') },
-      { id: 'brs', title: 'Bank reconciliation statement', keywords: ['bank', 'brs', 'reconcile', 'statement'], run: () => navigate('/reconcile?tab=brs'), need: 'books.edit' },
-      { id: 'top-customers', title: 'Top customers report', keywords: ['sales', 'customers', 'concentration'], run: () => navigate('/reports?tab=top') },
-      { id: 'settings', title: 'Go to Settings', run: () => navigate('/settings') },
-      { id: 'theme', title: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', keywords: ['dark', 'light', 'theme'], run: toggle },
+      { id: 'new-invoice', title: t('palette.newInvoice'), keywords: ['create', 'bill', 'sale'], run: () => navigate('/invoice'), need: 'doc.create' },
+      { id: 'new-quotation', title: t('palette.newQuotation'), keywords: ['estimate', 'quote'], run: () => navigate('/invoice?type=QUOTATION'), need: 'doc.create' },
+      { id: 'new-sales-order', title: t('palette.newSalesOrder'), keywords: ['order', 'so', 'booking'], run: () => navigate('/invoice?type=SALES_ORDER'), need: 'doc.create' },
+      { id: 'sales-orders', title: t('palette.salesOrders'), keywords: ['order', 'pending', 'backorder'], run: () => navigate('/transactions?type=SALES_ORDER') },
+      { id: 'purchase-orders', title: t('palette.purchaseOrders'), keywords: ['po', 'order', 'vendor', 'supplier'], run: () => navigate('/expenses?tab=orders') },
+      { id: 'add-client', title: t('palette.addClient'), keywords: ['customer', 'party'], run: () => navigate('/clients?new=1'), need: 'master.edit' },
+      { id: 'add-expense', title: t('palette.addExpense'), keywords: ['bill', 'vendor'], run: () => navigate('/expenses'), need: 'books.edit' },
+      { id: 'record-payment', title: t('palette.recordPayment'), keywords: ['receipt', 'received'], run: () => navigate('/transactions?filter=unpaid&pay=1'), need: 'payment.record' },
+      { id: 'gst', title: t('palette.gst'), keywords: ['gstr', 'return'], run: () => navigate('/gst-reports') },
+      { id: 'brs', title: t('palette.brs'), keywords: ['bank', 'brs', 'reconcile', 'statement'], run: () => navigate('/reconcile?tab=brs'), need: 'books.edit' },
+      { id: 'top-customers', title: t('palette.topCustomers'), keywords: ['sales', 'customers', 'concentration'], run: () => navigate('/reports?tab=top') },
+      { id: 'settings', title: t('palette.settings'), run: () => navigate('/settings') },
+      { id: 'language', title: t('palette.language'), keywords: ['language', 'hindi', 'english', 'भाषा', 'हिन्दी'], run: () => void setLanguage(getLanguage() === 'hi' ? 'en' : 'hi').catch(() => undefined) },
+      { id: 'theme', title: theme === 'dark' ? t('shell.switchLight') : t('shell.switchDark'), keywords: ['dark', 'light', 'theme'], run: toggle },
       {
         id: 'backup',
-        title: 'Download backup',
+        title: t('palette.backup'),
         keywords: ['export', 'save'],
         need: 'data.backup',
         run: async () => {
           // Same path as Settings → Automatic backups, so a stored backup passphrase is honoured.
           const { downloadBackupNow } = await import('../lib/auto-backup');
           const r = await downloadBackupNow();
-          notify(r.ok ? 'Backup downloaded' : r.message, r.ok ? 'success' : 'error');
+          notify(r.ok ? t('shell.backupDownloaded') : r.message, r.ok ? 'success' : 'error');
         },
       },
-      { id: 'lock', title: 'Lock app', run: handleLock },
+      { id: 'lock', title: t('shell.lock'), run: handleLock },
     ] as Array<PaletteAction & { need?: AccessAction }>)
       // Local roles (6.21): the palette offers only what this role may do.
       .filter((a) => !a.need || can(a.need))
       .map(({ need: _need, ...a }) => a),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [navigate, theme, role],
+    [navigate, theme, role, lang],
   );
 
-  const themeLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  const themeLabel = theme === 'dark' ? t('shell.switchLight') : t('shell.switchDark');
 
   return (
     <div className={styles.layout}>
       <a href="#main" className={cn(styles.skipLink, 'no-print')} onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>
-        Skip to content
+        {t('shell.skip')}
       </a>
       <header className={cn(styles.topbar, 'no-print')}>
         <button
           ref={menuBtnRef}
           type="button"
           className={styles.iconBtn}
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-label={menuOpen ? t('shell.closeMenu') : t('shell.openMenu')}
           aria-expanded={menuOpen}
           aria-controls="app-sidebar"
           onClick={() => setMenuOpen((o) => !o)}
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <Link to="/" aria-label="Mr. Chartist Invoice home">
+        <Link to="/" aria-label={t('shell.home')}>
           <Logo height={30} product={false} />
         </Link>
         <div className={styles.topActions}>
           <TimerPill />
-          <button type="button" className={styles.iconBtn} aria-label="Search" onClick={() => openPalette()}>
+          <button type="button" className={styles.iconBtn} aria-label={t('shell.search')} onClick={() => openPalette()}>
             <Search size={18} />
           </button>
           <NotificationBell onNavigate={navigate} />
@@ -325,15 +330,15 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         className={cn(styles.sidebar, menuOpen && styles.sidebarOpen, 'no-print')}
         inert={isMobile && !menuOpen}
       >
-        <Link to="/" className={styles.brand} aria-label="Mr. Chartist Invoice home">
+        <Link to="/" className={styles.brand} aria-label={t('shell.home')}>
           <Logo height={40} />
         </Link>
         <CompanySwitcher />
 
-        <nav className={styles.nav} aria-label="Primary">
+        <nav className={styles.nav} aria-label={t('nav.primary')}>
           {navGroups.map((group, gi) => (
             <div key={group.title ?? gi} className={styles.group}>
-              {group.title && <div className={styles.groupTitle}>{group.title}</div>}
+              {group.title && <div className={styles.groupTitle}>{t(group.title)}</div>}
               {group.items.map((item) => (
                 <NavLink
                   key={item.path}
@@ -344,7 +349,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
                   }
                 >
                   <item.icon className={styles.navIcon} size={18} />
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                 </NavLink>
               ))}
             </div>
@@ -357,31 +362,31 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             className={({ isActive }) => cn(styles.navItem, isActive && styles.navItemActive)}
           >
             <SETTINGS_ENTRY.icon className={styles.navIcon} size={18} />
-            <span>{SETTINGS_ENTRY.label}</span>
+            <span>{t(SETTINGS_ENTRY.label)}</span>
           </NavLink>
           <InstallPrompt variant="button" />
           <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={toggle}>
             {theme === 'dark' ? <Sun className={styles.navIcon} size={18} /> : <Moon className={styles.navIcon} size={18} />}
-            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+            <span>{theme === 'dark' ? t('shell.lightMode') : t('shell.darkMode')}</span>
           </button>
           <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => openHelp()}>
             <HelpCircle className={styles.navIcon} size={18} />
-            <span>Help &amp; about</span>
+            <span>{t('shell.help')}</span>
           </button>
           <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={() => openShortcuts()}>
             <Keyboard className={styles.navIcon} size={18} />
-            <span>Keyboard shortcuts</span>
+            <span>{t('shell.shortcuts')}</span>
           </button>
 
           <div className={styles.userCard}>
-            <Avatar name={user?.name || 'User'} size={34} />
+            <Avatar name={user?.name || t('shell.user')} size={34} />
             <div className={styles.userMeta}>
-              <span className={styles.userName}>{user?.name || 'User'}</span>
+              <span className={styles.userName}>{user?.name || t('shell.user')}</span>
               <span className={styles.userSub}>
-                {!current || current.role === 'owner' ? 'Stored on this device' : `${ROLE_LABELS[current.role]} · shared device`}
+                {!current || current.role === 'owner' ? t('shell.storedOnDevice') : t('shell.sharedDevice', { role: roleLabel(current.role) })}
               </span>
             </div>
-            <button type="button" className={styles.iconBtn} onClick={handleLock} aria-label="Lock app" title="Lock app">
+            <button type="button" className={styles.iconBtn} onClick={handleLock} aria-label={t('shell.lock')} title={t('shell.lock')}>
               <Lock size={16} />
             </button>
           </div>
@@ -392,15 +397,15 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         <div className={cn(styles.utilBar, 'no-print')}>
           <button type="button" className={styles.searchBtn} onClick={() => openPalette()}>
             <Search size={15} />
-            <span>Search invoices, clients, pages…</span>
+            <span>{t('shell.searchPlaceholder')}</span>
             <kbd>{formatCombo('mod+k')}</kbd>
           </button>
           <div className={styles.utilActions}>
             <TimerPill />
-            <button type="button" className={styles.iconBtn} onClick={() => openHelp()} aria-label="Help and about" title="Help & about">
+            <button type="button" className={styles.iconBtn} onClick={() => openHelp()} aria-label={t('shell.helpAria')} title={t('shell.help')}>
               <HelpCircle size={18} />
             </button>
-            <button type="button" className={styles.iconBtn} onClick={() => openShortcuts()} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+            <button type="button" className={styles.iconBtn} onClick={() => openShortcuts()} aria-label={t('shell.shortcuts')} title={t('shell.shortcutsTitle')}>
               <Keyboard size={18} />
             </button>
             <button type="button" className={styles.iconBtn} onClick={toggle} aria-label={themeLabel} title={themeLabel}>
@@ -411,34 +416,34 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         </div>
         <div className={styles.content} key={`${location.pathname.startsWith('/invoice') ? 'invoice' : location.pathname}#${refreshKey}`}>
           <CrossTabNotice onRefresh={() => setRefreshKey((k) => k + 1)} />
-          {can('data.backup') && <BackupNudge onResult={(r) => notify(r.ok ? `Backup saved (${r.filename})` : r.message, r.ok ? 'success' : 'error')} />}
+          {can('data.backup') && <BackupNudge onResult={(r) => notify(r.ok ? t('shell.backupSaved', { file: r.filename }) : r.message, r.ok ? 'success' : 'error')} />}
           <Outlet />
         </div>
       </main>
 
       {showTabs && (
-        <nav className={cn(styles.tabBar, 'no-print')} aria-label="Quick navigation">
+        <nav className={cn(styles.tabBar, 'no-print')} aria-label={t('shell.quickNav')}>
           <NavLink to="/" end className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
             <LayoutDashboard size={20} aria-hidden="true" />
-            <span>Home</span>
+            <span>{t('shell.tabHome')}</span>
           </NavLink>
           <NavLink to="/transactions" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
             <FileText size={20} aria-hidden="true" />
-            <span>Invoices</span>
+            <span>{t('nav.invoices')}</span>
           </NavLink>
           {can('doc.create') && (
-            <Link to="/invoice" className={cn(styles.tab, styles.tabNew)} aria-label="New invoice">
+            <Link to="/invoice" className={cn(styles.tab, styles.tabNew)} aria-label={t('nav.newInvoice')}>
               <FilePlus2 size={22} aria-hidden="true" />
-              <span>New</span>
+              <span>{t('shell.tabNew')}</span>
             </Link>
           )}
           <NavLink to="/clients" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
             <Users size={20} aria-hidden="true" />
-            <span>Clients</span>
+            <span>{t('nav.clients')}</span>
           </NavLink>
           <button type="button" className={styles.tab} onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} aria-controls="app-sidebar">
             <Menu size={20} aria-hidden="true" />
-            <span>More</span>
+            <span>{t('shell.tabMore')}</span>
           </button>
         </nav>
       )}
@@ -453,7 +458,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           <CommandPalette
             open={paletteOpen}
             onClose={() => setPaletteOpen(false)}
-            navItems={NAV_ITEMS.filter((n) => !n.need || can(n.need)).map((n) => ({ label: n.label, to: n.path, icon: n.icon }))}
+            navItems={NAV_ITEMS.filter((n) => !n.need || can(n.need)).map((n) => ({ label: t(n.label), to: n.path, icon: n.icon }))}
             actions={actions}
             onNavigate={navigate}
           />
