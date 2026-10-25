@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { gwT, type GwKey } from '../../i18n/areas/gateway';
@@ -9,7 +9,27 @@ import { vendorsDb } from '../../lib/vendors';
 import { loadBranches } from '../../lib/branch';
 import { wireT } from '../../i18n/areas/wiring';
 import { chartOf, groupOf, loadUserAccounts, type Account } from '../../lib/ledger/accounts';
-import { deleteVoucher, loadVouchers, nextVoucherNumber, saveVoucher, validateVoucher, type ManualVoucherType } from '../../lib/ledger/vouchers';
+import { deleteVoucher, loadVouchers, nextVoucherNumber, validateVoucher, type ManualVoucherType } from '../../lib/ledger/vouchers';
+import { allocationsOf, saveReceiptVoucher, voucherReceipts } from '../../lib/bill-allocation';
+import { isCashOrBankLedger } from '../../lib/bank-ledgers';
+import { getTable } from '../../lib/storage';
+import { VOUCHER_TYPES_TABLE, seriesTypeFor, typedNumber, type VoucherSeries } from '../../lib/voucher-series';
+import { vtT } from '../../i18n/areas/voucher-types';
+import {
+  SINGLE_ENTRY_TYPES,
+  billwiseLine,
+  fifoRefs,
+  knownClasses,
+  linesToSingle,
+  particularsSide,
+  receiptRefsInput,
+  singleToLines,
+  supplierPaymentFrom,
+  validateRefs,
+  type BillRefRow,
+  type OpenBill,
+  type RefKind,
+} from '../../lib/gateway/voucher-refs';
 import { costCentreLabel, loadCostCentres, pickableCentres } from '../../lib/cost-centres';
 import { getVoucherDate, isCalendarDay } from '../../lib/gateway/period';
 import {
@@ -47,6 +67,30 @@ let seq = 0;
 const nextKey = () => ++seq;
 const blankLine = (side: EntrySide): EntryLine => ({ key: nextKey(), side, account_id: '', amount: '' });
 const money = (p: number) => formatMoney(p / 100);
+// P1-13: voucher-type picker, loaded only when a user type of this base exists.
+const VoucherTypeSelect = lazy(() => import('../voucher-types/VoucherTypeSelect'));
+const MODE_KEY = 'mrchartist_gw_entry_mode';
+const readMode = (): 'single' | 'double' => {
+  try {
+    return sessionStorage.getItem(MODE_KEY) === 'single' ? 'single' : 'double';
+  } catch {
+    return 'double';
+  }
+};
+const REF_KINDS: RefKind[] = ['agst', 'new', 'advance', 'onacc'];
+const REF_LABEL: Record<RefKind, 'agstRef' | 'newRef' | 'advance' | 'onAccount'> = { agst: 'agstRef', new: 'newRef', advance: 'advance', onacc: 'onAccount' };
+
+/** Saved receipt rows of a voucher as editable references (Agst Ref + the labelled remainder). */
+function refsOfVoucher(id: string): BillRefRow[] {
+  const out: BillRefRow[] = allocationsOf(id).map((a) => ({ key: nextKey(), kind: 'agst', bill_id: a.bill_id, amount: a.amount.toFixed(2) }));
+  const rest = voucherReceipts(id).find((r) => !r.invoice_id);
+  if (rest) {
+    const note = String(rest.note ?? '');
+    const kind: RefKind = /^advance/i.test(note) ? 'advance' : /^new ref/i.test(note) ? 'new' : 'onacc';
+    out.push({ key: nextKey(), kind, ...(kind === 'new' ? { name: note.replace(/^new ref\s*/i, '') } : {}), amount: (Number(rest.amount) || 0).toFixed(2) });
+  }
+  return out;
+}
 
 type Confirm = null | 'quit' | 'delete';
 
@@ -84,6 +128,15 @@ export function VoucherEntry() {
   const [narration, setNarration] = useState(existing?.narration ?? '');
   const [branchId, setBranchId] = useState(existing?.branch_id ?? '');
   const [lines, setLines] = useState<EntryLine[]>(initialLines);
+  // 7Q (P1-13 / 7.19): voucher type, voucher class, single-entry mode, bill-wise references.
+  const [voucherTypeId, setVoucherTypeId] = useState<string | undefined>(existing?.voucher_type_id);
+  const [voucherClass, setVoucherClass] = useState(existing?.voucher_class ?? '');
+  const [mode, setMode] = useState<'single' | 'double'>(() => (SINGLE_ENTRY_TYPES.includes(type) && readMode() === 'single' && !existing ? 'single' : 'double'));
+  const [accountId, setAccountId] = useState('');
+  const [accountKey] = useState(() => nextKey());
+  const [refs, setRefs] = useState<BillRefRow[]>(() => (existing ? refsOfVoucher(existing.id) : []));
+  const [bills, setBills] = useState<{ party: string; list: OpenBill[] } | null>(null);
+  const classes = useMemo(() => knownClasses(loadVouchers()), []);
   const [queries, setQueries] = useState<Record<number, string>>({});
   const [suggest, setSuggest] = useState<{ key: number; index: number } | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -103,7 +156,17 @@ export function VoucherEntry() {
     setBranchId(existing?.branch_id ?? '');
     setLines(existing ? linesFromVoucher(existing, nextKey) : [blankLine(firstSide(type))]);
     setQueries({});
+    setVoucherTypeId(existing?.voucher_type_id);
+    setVoucherClass(existing?.voucher_class ?? '');
+    setRefs(existing ? refsOfVoucher(existing.id) : []);
+    setMode('double');
   }
+  const single = mode === 'single' && SINGLE_ENTRY_TYPES.includes(type);
+  /** Double-entry lines of what is on screen (single-entry mode adds the Account line). */
+  const effective = (ls: readonly EntryLine[] = lines) => (single ? singleToLines(type, { accountId, rows: [...ls] }, accountKey) : [...ls]);
+  const cashBank = useMemo(() => chart.filter((a) => isCashOrBankLedger(a)), [chart]);
+  const vtId = !existing || existing.type === type ? voucherTypeId : undefined;
+  const hasTypes = useMemo(() => !!vtId || getTable<VoucherSeries>(VOUCHER_TYPES_TABLE).some((t) => t?.base === type && !t.inactive), [type, vtId]);
 
   const field = (name: string) => rootRef.current?.querySelector<HTMLElement>(`[data-field="${name}"]`) ?? null;
   const [, bump] = useState(0);
@@ -123,21 +186,44 @@ export function VoucherEntry() {
     field(first ? `${first.key}:ledger` : 'date')?.focus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totals = entryTotals(lines);
+  const totals = entryTotals(effective());
+  const partyLine = billwiseLine(type, effective());
+  const payableNew = partyLine?.side === 'payable' && !existing;
+  const showRefs = !!partyLine && partyLine.paise > 0 && (partyLine.side === 'receivable' || payableNew);
+  const billsKey = showRefs && partyLine ? `${partyLine.side}|${partyLine.party}` : '';
+  useEffect(() => {
+    if (!billsKey || !partyLine) return;
+    let live = true;
+    void import('../../lib/gateway/voucher-refs-save').then((m) => {
+      if (live) setBills({ party: billsKey, list: m.openBillsFor(partyLine.side, partyLine.party, existing?.id) });
+    });
+    return () => {
+      live = false;
+    };
+  }, [billsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const openBills = bills && bills.party === billsKey ? bills.list : [];
   const isPnl = (accountId: string) => {
     const a = byId.get(accountId);
     const n = a ? groupOf(a.group).nature : undefined;
     return n === 'income' || n === 'expense';
   };
   const showCc = centres.length > 0;
-  const preview = useMemo(
-    () => (existing && existing.type === type ? existing.number : nextVoucherNumber(loadVouchers(), type, isCalendarDay(date) ? date : getVoucherDate())),
-    [existing, type, date, version], // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  const draftInput = () => ({ ...toVoucherInput({ id: existing?.id, type, date, narration, number: number.trim() || undefined }, lines, chart), ...(branchId ? { branch_id: branchId } : {}) });
+  const preview = useMemo(() => {
+    if (existing && existing.type === type && (existing.voucher_type_id ?? '') === (vtId ?? '')) return existing.number;
+    const day = isCalendarDay(date) ? date : getVoucherDate();
+    const others = loadVouchers().filter((v) => v.id !== existing?.id);
+    const vt = seriesTypeFor(vtId, type);
+    return vt ? typedNumber(vt, day, others.map((v) => v.number)) : nextVoucherNumber(others, type, day);
+  }, [existing, type, date, version, vtId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const draftInput = () => ({
+    ...toVoucherInput({ id: existing?.id, type, date, narration, number: number.trim() || undefined }, effective(), chart),
+    ...(branchId ? { branch_id: branchId } : {}),
+    ...(vtId ? { voucher_type_id: vtId } : {}),
+    ...(voucherClass.trim() ? { voucher_class: voucherClass.trim() } : {}),
+  });
   const dirty = existing
     ? JSON.stringify({ date, narration, lines: draftInput().lines }) !== baseline
-    : filledLines(lines).length > 0 || narration.trim() !== '';
+    : filledLines(lines).length > 0 || narration.trim() !== '' || !!accountId;
 
   const patch = (key: number, p: Partial<EntryLine>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...p } : l)));
 
@@ -164,11 +250,21 @@ export function VoucherEntry() {
   };
 
   const reset = () => {
-    setLines([blankLine(firstSide(type))]);
+    setLines([blankLine(single ? particularsSide(type) : firstSide(type))]);
+    setRefs([]);
     setNarration('');
     setNumber('');
     setQueries({});
     setError('');
+  };
+
+  const done = () => {
+    setVersion((v) => v + 1);
+    if (existing) leave();
+    else {
+      reset();
+      focus('date');
+    }
   };
 
   const accept = () => {
@@ -176,18 +272,80 @@ export function VoucherEntry() {
     const input = draftInput();
     const errors = validateVoucher(input, chart);
     if (errors.length) return setError(errors[0]);
+    // 7.19: bill-wise references on the party line.
+    const usedRefs = showRefs && partyLine ? refs.filter((r) => Number(r.amount.replace(/,/g, '')) > 0) : [];
+    if (usedRefs.length && partyLine) {
+      const problems = validateRefs(usedRefs, partyLine.paise / 100, openBills);
+      if (problems.length) return setError(problems[0]);
+    }
     try {
-      const saved = saveVoucher(input, chart);
-      notify(gwT('vSaved', { number: saved.number }));
-      setVersion((v) => v + 1);
-      if (existing) leave();
-      else {
-        reset();
-        focus('date');
+      if (usedRefs.length && partyLine?.side === 'payable') {
+        const sp = supplierPaymentFrom(effective(), usedRefs, { date, reference: number.trim() || narration.trim(), vendors });
+        if (typeof sp === 'string') return setError(vtT('billwisePayableShape'));
+        void import('../../lib/gateway/voucher-refs-save').then((m) => {
+          try {
+            m.saveSupplierPayment(sp);
+            notify(vtT('supplierPaid', { amount: formatMoney(sp.amount), party: sp.vendorName }));
+            done();
+          } catch (err) {
+            setError((err as Error).message);
+          }
+        });
+        return;
       }
+      // Receipt: the voucher and its bill-wise receipt rows in one step (all or nothing).
+      const method = effective().some((l) => l.side === 'dr' && l.account_id === 'cash') ? 'Cash' : 'Bank Transfer';
+      const receipts = partyLine?.side === 'receivable' && showRefs ? receiptRefsInput(usedRefs, partyLine.party, partyLine.paise / 100, openBills, method) : null;
+      const saved = saveReceiptVoucher(input, chart, receipts);
+      notify(gwT('vSaved', { number: saved.number }));
+      done();
     } catch (err) {
       setError((err as Error).message || 'Could not save the voucher.');
     }
+  };
+
+  const toggleMode = () => {
+    setError('');
+    if (single) {
+      setLines(effective().length ? effective() : [blankLine(firstSide(type))]);
+      setAccountId('');
+      setMode('double');
+      try {
+        sessionStorage.setItem(MODE_KEY, 'double');
+      } catch {
+        /* preference only */
+      }
+      return;
+    }
+    const view = linesToSingle(type, lines, byId);
+    if (!view) return setError(vtT('singleNotPossible'));
+    setAccountId(view.accountId || (seriesDefaultBank() ?? ''));
+    setLines(view.rows.length ? view.rows : [blankLine(particularsSide(type))]);
+    setMode('single');
+    try {
+      sessionStorage.setItem(MODE_KEY, 'single');
+    } catch {
+      /* preference only */
+    }
+  };
+
+  /** Default cash / bank ledger of the chosen voucher type (P1-13). */
+  const seriesDefaultBank = (id = vtId) => {
+    const t = id ? getTable<VoucherSeries & { bank_account_id?: string }>(VOUCHER_TYPES_TABLE).find((x) => x?.id === id) : undefined;
+    return t?.bank_account_id && byId.has(t.bank_account_id) ? t.bank_account_id : undefined;
+  };
+
+  const chooseType = (id: string | undefined) => {
+    setVoucherTypeId(id);
+    const bank = seriesDefaultBank(id);
+    if (!bank || existing) return;
+    if (single) {
+      if (!accountId) setAccountId(bank);
+      return;
+    }
+    if (lines.some((l) => isCashOrBankLedger(byId.get(l.account_id)))) return;
+    const side: EntrySide = type === 'RECEIPT' ? 'dr' : 'cr';
+    setLines((ls) => [...ls, { key: nextKey(), side, account_id: bank, amount: '' }]);
   };
 
   const remove = () => {
@@ -203,6 +361,12 @@ export function VoucherEntry() {
 
   const switchType = (t: ManualVoucherType) => {
     if (t === type) return;
+    if (single && !SINGLE_ENTRY_TYPES.includes(t)) {
+      setLines(effective());
+      setAccountId('');
+      setMode('double');
+    }
+    setVoucherTypeId(undefined);
     if (!existing || existing.type !== t) setNumber('');
     navigate(`/gateway/voucher/${typeRoute(t)}${id ? `?id=${encodeURIComponent(id)}` : ''}`, { replace: true });
   };
@@ -210,7 +374,7 @@ export function VoucherEntry() {
   /** Enter: move to the next field the way Tally does. */
   const onEnter = (field: string): boolean => {
     if (field === 'number') return focus('date'), true;
-    if (field === 'date') return focus(lines[0] ? `${lines[0].key}:side` : 'narration'), true;
+    if (field === 'date') return focus(lines[0] ? `${lines[0].key}:${single ? 'ledger' : 'side'}` : 'narration'), true;
     if (field === 'narration') return accept(), true;
     const [k, part] = field.split(':');
     const key = Number(k);
@@ -227,7 +391,7 @@ export function VoucherEntry() {
       }
       if (!line.account_id) {
         // Enter on an empty last line ends the particulars when the voucher balances.
-        if (idx === lines.length - 1 && filledLines(lines).length >= 2 && totals.diff === 0) {
+        if (idx === lines.length - 1 && (single ? filledLines(lines).length >= 1 && !!accountId : filledLines(lines).length >= 2 && totals.diff === 0)) {
           setLines(lines.filter((l) => l.key !== key));
           focus('narration');
         }
@@ -245,7 +409,7 @@ export function VoucherEntry() {
         focus(`${filled[idx + 1].key}:ledger`);
         return true;
       }
-      const add = nextLine(filled, nextKey(), type, true);
+      const add = single ? blankLine(particularsSide(type)) : nextLine(filled, nextKey(), type, true);
       if (add) {
         setLines([...filled, add]);
         focus(`${add.key}:ledger`);
@@ -384,8 +548,42 @@ export function VoucherEntry() {
               {gwT('vDate')}
               <input data-field="date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} aria-keyshortcuts="F2" />
             </label>
+            {hasTypes && (
+              <label className={styles.vField}>
+                {vtT('voucherType')}
+                <Suspense fallback={null}>
+                  <VoucherTypeSelect id="gw-v-vtype" base={type} value={vtId} compact disabled={!!existing} onChange={(t) => chooseType(t?.id)} />
+                </Suspense>
+              </label>
+            )}
+            <label className={styles.vField} title={vtT('classHint')}>
+              {vtT('voucherClass')}
+              <input data-field="class" className={controls.input} list="gw-v-classes" value={voucherClass} onChange={(e) => setVoucherClass(e.target.value)} size={14} data-testid="gw-v-class" />
+              <datalist id="gw-v-classes">
+                {classes.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </label>
+            {SINGLE_ENTRY_TYPES.includes(type) && (
+              <span className={styles.vField}>
+                {vtT('modeLabel')}
+                <button type="button" className={controls.btnOutline} onClick={toggleMode} aria-pressed={single} data-testid="gw-v-mode">
+                  {single ? vtT('singleEntry') : vtT('doubleEntry')}
+                </button>
+              </span>
+            )}
           </div>
         </div>
+
+        {single && (
+          <label className={styles.vField}>
+            {vtT('account')}
+            <select data-field="account" className={controls.select} value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="gw-v-account" aria-describedby="gw-v-account-hint">
+              <option value="">—</option>
+              {cashBank.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <span id="gw-v-account-hint" className={styles.hint}>{vtT('accountHint')}</span>
+          </label>
+        )}
 
         <div className={styles.tableWrap}>
           <table className={cn(styles.grid, styles.vLines)}>
@@ -410,7 +608,7 @@ export function VoucherEntry() {
                 return (
                   <tr key={l.key}>
                     <td>
-                      <select
+                      {single ? <span className={styles.hint}>{sideLabel(l.side)}</span> : <select
                         data-field={`${l.key}:side`}
                         className={cn(controls.select, styles.sideSel)}
                         value={l.side}
@@ -419,7 +617,7 @@ export function VoucherEntry() {
                       >
                         <option value="dr">{sideLabel('dr')}</option>
                         <option value="cr">{sideLabel('cr')}</option>
-                      </select>
+                      </select>}
                     </td>
                     <td className={styles.ledgerCell}>
                       <input
@@ -524,13 +722,45 @@ export function VoucherEntry() {
           type="button"
           className={controls.btnGhost}
           onClick={() => {
-            const add = nextLine(lines, nextKey(), type) ?? blankLine(firstSide(type));
+            const add = single ? blankLine(particularsSide(type)) : nextLine(lines, nextKey(), type) ?? blankLine(firstSide(type));
             setLines([...lines, add]);
             focus(`${add.key}:ledger`);
           }}
         >
           + {gwT('vAddLine')}
         </button>
+
+        {showRefs && partyLine && (
+          <fieldset className={styles.refs} data-testid="gw-billwise">
+            <legend className={styles.hint}>{vtT('billwise', { party: partyLine.party })}</legend>
+            {partyLine.side === 'payable' && <p className={styles.hint}>{vtT('billwisePayableHint')}</p>}
+            {!openBills.length && <p className={styles.hint}>{vtT('noOpenBills')}</p>}
+            {refs.map((r, i) => (
+              <div key={r.key} className={styles.refRow}>
+                <select className={controls.select} value={r.kind} aria-label={`${vtT('refType')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, kind: e.target.value as RefKind } : x)))} data-testid={`gw-ref-${i + 1}-kind`}>
+                  {REF_KINDS.map((k) => <option key={k} value={k}>{vtT(REF_LABEL[k])}</option>)}
+                </select>
+                {r.kind === 'agst' ? (
+                  <select className={controls.select} value={r.bill_id ?? ''} aria-label={`${vtT('bill')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, bill_id: e.target.value || undefined } : x)))} data-testid={`gw-ref-${i + 1}-bill`}>
+                    <option value="">—</option>
+                    {openBills.map((b) => <option key={b.id} value={b.id}>{`${b.ref} · ${vtT('due', { amount: formatMoney(b.outstanding) })}`}</option>)}
+                  </select>
+                ) : r.kind === 'new' ? (
+                  <input className={controls.input} value={r.name ?? ''} placeholder={vtT('refName')} aria-label={`${vtT('refName')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, name: e.target.value } : x)))} />
+                ) : <span />}
+                <input className={cn(controls.input, styles.amountInput)} inputMode="decimal" value={r.amount} aria-label={`${vtT('amount')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, amount: e.target.value.replace(/[^0-9.,]/g, '') } : x)))} data-testid={`gw-ref-${i + 1}-amount`} />
+                <button type="button" className={controls.btnIcon} aria-label={vtT('removeRef', { n: i + 1 })} onClick={() => setRefs((rs) => rs.filter((x) => x.key !== r.key))}>
+                  <Trash2 size={15} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <div className={styles.refActions}>
+              <button type="button" className={controls.btnGhost} onClick={() => setRefs((rs) => [...rs, { key: nextKey(), kind: openBills.length ? 'agst' : 'onacc', amount: '' }])} data-testid="gw-ref-add">{vtT('addRef')}</button>
+              {openBills.length > 0 && <button type="button" className={controls.btnGhost} onClick={() => setRefs(fifoRefs(openBills, partyLine.paise / 100, nextKey))} data-testid="gw-ref-fifo">{vtT('fifo')}</button>}
+              <span className={styles.hint} role="status">{vtT('allocated', { allocated: formatMoney(refs.reduce((sum, r) => sum + (Number(r.amount.replace(/,/g, '')) || 0), 0)), total: formatMoney(partyLine.paise / 100) })}</span>
+            </div>
+          </fieldset>
+        )}
 
         <label className={styles.narration}>
           <span className={styles.hint}>{gwT('vNarration')}</span>

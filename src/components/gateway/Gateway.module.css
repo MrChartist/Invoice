@@ -525,3 +525,34 @@
   align-items: center;
   justify-content: space-between;
 }
+
+/* 7.19: bill-wise references on Gateway voucher entry. */
+.refs {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  min-width: 0;
+}
+
+.refRow {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr) minmax(6rem, 9rem) auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.refActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .refRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}

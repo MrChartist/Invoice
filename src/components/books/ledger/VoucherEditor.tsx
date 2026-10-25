@@ -30,9 +30,13 @@ import { EditLogButton } from '../../audit/EditLogButton';
 import { wireT } from '../../../i18n/areas/wiring';
 import { BranchSelect } from '../../branches/BranchSelect';
 import { allocationsOf, openRefsFor, saveReceiptVoucher, validateAllocations, type ReceiptAllocation } from '../../../lib/bill-allocation';
+import { getTable } from '../../../lib/storage';
+import { VOUCHER_TYPES_TABLE, seriesTypeFor, typedNumber, type VoucherSeries } from '../../../lib/voucher-series';
 
 // P0-11 (WP-1): bill-wise details on a receipt against a Sundry Debtor, loaded when needed.
 const BillAllocation = lazy(() => import('../../masters/BillAllocation'));
+// P1-13: voucher-type picker, only once a user voucher type of this base exists.
+const VoucherTypeSelect = lazy(() => import('../../voucher-types/VoucherTypeSelect'));
 
 interface Row {
   key: number;
@@ -71,6 +75,7 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
   const [narration, setNarration] = useState(voucher?.narration ?? '');
   // WP-9: branch / location of the voucher (shown once a branch exists; drives branch-wise books).
   const [branchId, setBranchId] = useState<string | undefined>(voucher?.branch_id);
+  const [voucherTypeId, setVoucherTypeId] = useState<string | undefined>(voucher?.voucher_type_id);
   const [rows, setRows] = useState<Row[]>(() =>
     voucher
       ? voucher.lines.map((l) => ({ key: ++seq, account_id: l.account_id, party: l.party ?? '', cc: l.cost_centre_id, dr: toText(l.dr), cr: toText(l.cr) }))
@@ -99,7 +104,14 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
     }));
   const dr = lines.reduce((s, l) => s + l.dr, 0);
   const cr = lines.reduce((s, l) => s + l.cr, 0);
-  const preview = useMemo(() => (voucher && voucher.type === type ? voucher.number : nextVoucherNumber(loadVouchers(), type, date || defaultDate)), [voucher, type, date, defaultDate]);
+  const vtId = voucher?.type === type || !voucher ? voucherTypeId : undefined;
+  const hasTypes = useMemo(() => !!vtId || getTable<VoucherSeries>(VOUCHER_TYPES_TABLE).some((t) => t?.base === type && !t.inactive), [type, vtId]);
+  const preview = useMemo(() => {
+    if (voucher && voucher.type === type && (voucher.voucher_type_id ?? '') === (vtId ?? '')) return voucher.number;
+    const vt = seriesTypeFor(vtId, type);
+    const others = loadVouchers().filter((v) => v.id !== voucher?.id);
+    return vt ? typedNumber(vt, date || defaultDate, others.map((v) => v.number)) : nextVoucherNumber(others, type, date || defaultDate);
+  }, [voucher, type, date, defaultDate, vtId]);
 
   const patch = (key: number, p: Partial<Row>) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...p } : r)));
 
@@ -119,7 +131,7 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
   const inBooksNow = !variant.variant && !variant.post_dated;
 
   const save = () => {
-    const input = { id: voucher?.id, type, date, number: number.trim() || undefined, narration, lines, ...variant, reverse_on: type === 'JOURNAL' ? variant.reverse_on : undefined, ...(branchId ? { branch_id: branchId } : {}) };
+    const input = { id: voucher?.id, type, date, number: number.trim() || undefined, narration, lines, ...variant, reverse_on: type === 'JOURNAL' ? variant.reverse_on : undefined, ...(branchId ? { branch_id: branchId } : {}), ...(vtId ? { voucher_type_id: vtId } : {}) };
     const errors = validateVoucher(input, accounts);
     if (errors.length) return setError(errors[0]);
     const useAlloc = debtorLine && inBooksNow ? alloc.filter((a) => a.amount > 0) : [];
@@ -185,6 +197,11 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
             <input id={`${uid}-no`} className={`${controls.input} ${controls.inputMono}`} value={number} placeholder={preview} onChange={(e) => setNumber(e.target.value)} />
           </div>
           <BranchSelect id={`${uid}-branch`} value={branchId} onChange={setBranchId} />
+          {hasTypes && (
+            <Suspense fallback={null}>
+              <VoucherTypeSelect id={`${uid}-vtype`} base={type} value={vtId} onChange={(t) => setVoucherTypeId(t?.id)} />
+            </Suspense>
+          )}
         </div>
         <p className={controls.hint}>
           {type === 'JOURNAL' && ledgerT('hintJournal')}
