@@ -78,6 +78,7 @@ export const en = {
   'nav.reports': 'Reports',
   'nav.gstReports': 'GST reports',
   'nav.exports': 'Exports',
+  'nav.gateway': 'Gateway',
   'nav.designStudio': 'Design studio',
   'nav.settings': 'Settings',
   'nav.groupSales': 'Sales',

@@ -45,6 +45,7 @@ import { SyncRunner } from '../components/sync/SyncRunner';
 import { TimerPill } from '../components/time/TimerPill';
 import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
+import { useTallyKeys } from '../hooks/useTallyKeys';
 import { cn } from '../lib/utils';
 import { getCurrentUser, getUser, logout } from '../lib/auth';
 import type { AccessAction } from '../lib/access';
@@ -96,6 +97,7 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
   {
     title: 'nav.groupAccounts',
     items: [
+      { label: 'nav.gateway', path: '/gateway', icon: Keyboard },
       { label: 'nav.books', path: '/books', icon: BookOpen },
       { label: 'nav.reconcile', path: '/reconcile', icon: Landmark, need: 'books.edit' },
       { label: 'nav.cheques', path: '/cheques', icon: Banknote, need: 'books.edit' },
@@ -253,6 +255,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'g c': () => navigate('/clients'),
     'g s': () => navigate('/settings'),
   });
+  // Tally keys (Phase 7): F2, F4–F9, Ctrl+F8/F9, F11, F12, Alt+G / Ctrl+G, Ctrl+/ — off on /pos and in fields.
+  useTallyKeys(navigate, openShortcuts);
 
   const actions = useMemo<PaletteAction[]>(
     () => ([

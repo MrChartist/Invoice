@@ -28,6 +28,7 @@ const Recurring = lazy(() => import('./pages/Recurring').then((m) => ({ default:
 const Time = lazy(() => import('./pages/Time').then((m) => ({ default: m.Time })));
 const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.Cheques })));
 const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
+const Gateway = lazy(() => import('./pages/Gateway').then((m) => ({ default: m.Gateway })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -77,6 +78,7 @@ function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/gst-reports" element={<GstReports />} />
                 <Route path="/exports" element={<Exports />} />
+                <Route path="/gateway/*" element={<Gateway />} />
                 <Route path="/design" element={<RequireAccess action="settings.manage"><DesignStudio /></RequireAccess>} />
                 {/* Settings opens for every role and shows each role only the tabs it may use (6.21). */}
                 <Route path="/settings" element={<Settings />} />

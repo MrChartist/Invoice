@@ -199,6 +199,23 @@ Share, static catalogue HTML.
 **Recommended order:** 6.1–6.4 (unlock 6.16, 6.17, 6.19) → 5.1 + 6.22 → 6.5 → 6.12 → 6.6–6.9 (retail) → 6.13–6.15
 (freelancers); 6.20/6.21/5.4 in parallel.
 
+## Phase 7: Tally parity — keyboard-first accounting
+
+For users coming from TallyPrime: the same keyboard conventions on top of the existing ledger. Full key map:
+`docs/features/gateway-keyboard.md`.
+
+| # | Item | Notes | Effort |
+|---|------|-------|--------|
+| 7.1 | ✅ **Gateway of Tally** (`/gateway`, lazy): Masters (Create / Alter), Transactions, Utilities, Reports, Display more reports; highlighted accelerator letters, ↑ ↓ Enter, Esc back, Go To search (Alt+G / Ctrl+G) | `src/lib/gateway/menu.ts`, `src/components/gateway/GatewayMenu.tsx` | M |
+| 7.2 | ✅ **Global F-keys**: F2 date, Alt+F2 period, F4 Contra, F5 Payment, F6 Receipt, F7 Journal, F8 Sales, F9 Purchase, Ctrl+F8 Credit note, Ctrl+F9 Debit note, F11 / F12 Settings; off in fields, on `/pos` and under dialogs | `src/lib/tally-keys.ts` (shell, ~1 kB) | S |
+| 7.3 | ✅ **Single-screen voucher entry** (Contra / Payment / Receipt / Journal): Dr/Cr (By/To) lines, type-ahead ledgers + parties, Alt+C create inline, auto-balancing last line, cost centres, Ctrl+A accept, Esc quit, Alt+D delete | `src/lib/gateway/voucher-entry.ts`, `VoucherEntry.tsx`; period lock / audit / roles via `saveVoucher` | M |
+| 7.4 | ✅ **Display reports with drill-down**: Balance sheet / P&L / Trial balance / Group summary → ledgers → parties → months → vouchers → voucher or document; Day book; Cash/bank books; Outstandings | `src/lib/gateway/drill.ts`, `DisplayReport.tsx` | M |
+| 7.5 | ✅ **Keyboard help** (Ctrl+/ or ?) with a "Tally keys" group; clickable button bar for mouse / touch | `keymap.ts`, `ButtonBar.tsx` | S |
+| 7.6 | ✅ **"Tally terms" toggle** (Party, Sales voucher, Purchase voucher) on Gateway screens only | device-local preference | S |
+| 7.7 | ⏳ **Stock journal (Alt+F7) / Physical stock (Ctrl+F7)**: key hooks and menu rows ready (shown "not available"); wire them when the manufacturing / stock-count screens land (`GATEWAY_EXTENSIONS`, `TALLY_KEYS`) | — | S |
+| 7.8 | ⏳ **Employee master / payroll vouchers** in Create, **TDS** statutory rows, **Ratio analysis** report | add through `GATEWAY_EXTENSIONS` when those modules exist | S |
+| 7.9 | ⏳ Bill-wise references on manual vouchers (Agst Ref / New Ref), voucher-class presets, single-entry mode | needs a voucher schema addition | M |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

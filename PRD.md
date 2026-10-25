@@ -169,6 +169,12 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **Controls**: audit trail of every change with a tamper-evident hash chain and exportable head hash; "lock books up
   to" period lock enforced in the data layer with PIN-guarded, audited overrides.
 
+- **Gateway of Tally & keyboard-first entry (Phase 7).** `/gateway` mirrors TallyPrime's Gateway (accelerator
+  letters, Go To search, Esc back); global F-keys open vouchers (F4 Contra, F5 Payment, F6 Receipt, F7 Journal,
+  F8 Sales, F9 Purchase, Ctrl+F8/F9 credit/debit note); a single-screen voucher form (Ctrl+A accept, Alt+C create
+  ledger); Display reports drill from Balance sheet / P&L / Trial balance to the voucher. Optional "Tally terms"
+  labels. Key map: `docs/features/gateway-keyboard.md`.
+
 ### 3.4 Data Portability & Accountant Handoff
 - **Tally Prime XML**: sales, credit notes, receipts (with TDS receivable), purchases, freight and export conversions.
 - **CSV registers**: generic sales / purchase / receipt registers that import into Zoho Books, Vyapar or Busy with
