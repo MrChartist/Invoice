@@ -4,6 +4,9 @@ import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { ScanField } from '../scan/ScanField';
 import { addScannedCode, editorPricing, hasCodes, repriceAll } from './pricing-actions';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
+import { areaNodes } from '../../i18n/areas/nodes';
 import styles from './ItemsTable.module.css';
 
 /**
@@ -12,6 +15,7 @@ import styles from './ItemsTable.module.css';
  * "Scan barcode" button for users who use neither.
  */
 export function ScanBar({ disabled }: { disabled?: boolean }) {
+  useT(); // re-render on a language switch (5.4)
   const clientName = useInvoiceStore((s) => s.client.name);
   const clientId = useInvoiceStore((s) => s.client.id);
   const docType = useInvoiceStore((s) => s.doc_type);
@@ -28,27 +32,27 @@ export function ScanBar({ disabled }: { disabled?: boolean }) {
   return (
     <div className={styles.scanBar}>
       {show ? (
-        <ScanField id="editor-scan" label="Scan barcode or SKU" onCode={addScannedCode} autoFocus={open} />
+        <ScanField id="editor-scan" label={edT('sbLabel')} onCode={addScannedCode} autoFocus={open} />
       ) : (
         !disabled && (
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setOpen(true)}>
-            <ScanBarcode size={14} /> Scan barcode
+            <ScanBarcode size={14} /> {edT('sbScan')}
           </button>
         )
       )}
       {level && (
         <p className={styles.levelNote}>
-          <Tags size={14} aria-hidden="true" /> {clientName} buys at <strong>{level.name}</strong> prices.
+          <Tags size={14} aria-hidden="true" /> {areaNodes(edT('sbLevel', { client: clientName }), { level: <strong>{level.name}</strong> })}
           <button
             type="button"
             className={`${controls.btnGhost} ${controls.btnSm}`}
             disabled={disabled}
             onClick={() => {
               const n = repriceAll();
-              setNote(n ? `Re-priced ${n} line${n === 1 ? '' : 's'}.` : 'No catalogue lines to re-price.');
+              setNote(n ? (n === 1 ? edT('sbRepricedOne') : edT('sbRepricedMany', { n })) : edT('sbNone'));
             }}
           >
-            Re-price lines
+            {edT('sbReprice')}
           </button>
           {note && <span role="status">{note}</span>}
         </p>

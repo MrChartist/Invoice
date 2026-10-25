@@ -3,6 +3,8 @@ import { Modal } from '../ui/Modal';
 import { makeDetector } from './camera';
 import controls from '../../styles/controls.module.css';
 import styles from './scan.module.css';
+import { useT } from '../../i18n';
+import { scanT } from '../../i18n/areas/scan';
 
 interface Props {
   open: boolean;
@@ -18,6 +20,7 @@ interface Props {
  * The same code is ignored for 1.5 s so one pack held in front of the camera adds one unit.
  */
 export function CameraScanner({ open, onClose, onCode, continuous }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState('');
   const [last, setLast] = useState('');
@@ -71,8 +74,8 @@ export function CameraScanner({ open, onClose, onCode, continuous }: Props) {
         const name = (err as Error)?.name;
         setError(
           name === 'NotAllowedError' || name === 'SecurityError'
-            ? 'Camera access was refused. Allow the camera for this site in the browser settings, or use a USB scanner / type the code.'
-            : 'The camera could not be started. Use a USB scanner or type the code instead.',
+            ? scanT('refused')
+            : scanT('failed'),
         );
       }
     })();
@@ -88,11 +91,11 @@ export function CameraScanner({ open, onClose, onCode, continuous }: Props) {
       open={open}
       onClose={onClose}
       size="md"
-      title="Scan with camera"
-      subtitle="Hold the barcode inside the frame"
+      title={scanT('withCamera')}
+      subtitle={scanT('sub')}
       footer={
         <button type="button" className={controls.btnOutline} onClick={onClose}>
-          {continuous ? 'Done' : 'Cancel'}
+          {continuous ? scanT('done') : scanT('cancel')}
         </button>
       }
     >
@@ -100,12 +103,12 @@ export function CameraScanner({ open, onClose, onCode, continuous }: Props) {
         <p role="alert" className={styles.statusError}>{error}</p>
       ) : (
         <div className={styles.camWrap}>
-          <video ref={videoRef} className={styles.video} muted playsInline aria-label="Camera preview" />
+          <video ref={videoRef} className={styles.video} muted playsInline aria-label={scanT('preview')} />
           <div className={styles.aim} aria-hidden="true" />
         </div>
       )}
       <p className={styles.note} role="status">
-        {last ? `Read ${last}` : 'Nothing is uploaded — the image is read on this device.'}
+        {last ? scanT('read', { code: last }) : scanT('local')}
       </p>
     </Modal>
   );

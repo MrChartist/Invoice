@@ -12,6 +12,8 @@ import {
   revokeOverride,
 } from '../../lib/period-lock';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from '../audit/audit.module.css';
 
 export interface LockBannerProps {
@@ -28,6 +30,7 @@ export interface LockBannerProps {
  * "Unlock" path. Renders nothing for open documents.
  */
 export function LockBanner({ docId, docNumber, issueDate, onChange }: LockBannerProps) {
+  useT(); // re-render on a language switch (5.4)
   const [pinOpen, setPinOpen] = useState(false);
   const [, force] = useState(0);
   const lockUntil = getLockUntil();
@@ -52,9 +55,9 @@ export function LockBanner({ docId, docNumber, issueDate, onChange }: LockBanner
       <div className={`${styles.lockBanner} ${styles.overrideBanner}`} role="status">
         <LockOpen size={18} aria-hidden="true" />
         <div className={styles.lockText}>
-          <strong>Lock overridden for this document</strong>
+          <strong>{edT('lbOverridden')}</strong>
           <span>
-            Books are locked up to {prettyDay(lockUntil)}. You can edit {docNumber || 'this document'} for about {mins} more minute{mins === 1 ? '' : 's'}; every change is logged.
+            {edT(mins === 1 ? 'lbOverrideOne' : 'lbOverrideMany', { date: prettyDay(lockUntil), doc: docNumber || edT('lbThisDoc'), n: mins })}
           </span>
         </div>
         <div className={styles.lockActions}>
@@ -67,7 +70,7 @@ export function LockBanner({ docId, docNumber, issueDate, onChange }: LockBanner
               onChange?.();
             }}
           >
-            <Lock size={14} /> Re-lock now
+            <Lock size={14} /> {edT('lbRelock')}
           </button>
         </div>
       </div>
@@ -82,33 +85,33 @@ export function LockBanner({ docId, docNumber, issueDate, onChange }: LockBanner
       <div className={styles.lockBanner} role="alert">
         <Lock size={18} aria-hidden="true" />
         <div className={styles.lockText}>
-          <strong>{isNew ? 'This date is in a locked period' : 'This document is locked (read-only)'}</strong>
+          <strong>{isNew ? edT('lbNewTitle') : edT('lbDocTitle')}</strong>
           <span>
             {isNew
-              ? `Books are locked up to ${prettyDay(lockUntil)}. Pick an issue date after that to save this document.`
-              : `Books are locked up to ${prettyDay(lockUntil)}, and ${docNumber || 'this document'} is dated ${prettyDay(issueDate)}. It cannot be edited, cancelled, deleted or paid.`}
+              ? edT('lbNewText', { date: prettyDay(lockUntil) })
+              : edT('lbDocText', { date: prettyDay(lockUntil), doc: docNumber || edT('lbThisDoc'), issued: prettyDay(issueDate) })}
           </span>
         </div>
         <div className={styles.lockActions}>
           {!isNew && owner && (
             <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setPinOpen(true)}>
-              <LockOpen size={14} /> Unlock with PIN
+              <LockOpen size={14} /> {edT('lbUnlockPin')}
             </button>
           )}
           {owner ? (
             <Link to="/settings?tab=defaults" className={`${controls.btnGhost} ${controls.btnSm}`}>
-              Lock settings
+              {edT('lbSettings')}
             </Link>
           ) : (
-            <span className={controls.hint}>Only the owner can unlock it.</span>
+            <span className={controls.hint}>{edT('lbOwnerOnly')}</span>
           )}
         </div>
       </div>
       <PinConfirmModal
         open={pinOpen}
-        title="Unlock this document"
-        message={`Enter your PIN to edit ${docNumber || 'this document'} even though the books are locked. The override lasts 10 minutes for this document only and is recorded in the activity log.`}
-        confirmLabel="Unlock"
+        title={edT('lbPinTitle')}
+        message={edT('lbPinMsg', { doc: docNumber || edT('lbThisDoc') })}
+        confirmLabel={edT('lbUnlock')}
         onClose={() => setPinOpen(false)}
         onSubmit={async (pin) => {
           const ok = await grantOverride(pin, { scope: docId, docNumber });

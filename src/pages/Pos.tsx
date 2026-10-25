@@ -21,7 +21,7 @@ import {
   catalogItemFor, levelForClient, loadPricing, pricingInUse, resolvePrice, syncSchemeLines,
 } from '../lib/pricing';
 import {
-  POS_SHORTCUTS, WALK_IN_NAME, buildPosRecord, fillRest, posShortcut, savePosBill, tenderSummary,
+  POS_SHORTCUTS, buildPosRecord, fillRest, posShortcut, savePosBill, tenderSummary,
   type PosAction, type Tender, type TenderMethod,
 } from '../lib/pos';
 import { DOCUMENT_LABELS, type Client, type InvoiceItem, type InvoiceRecord } from '../types/invoice';
@@ -29,6 +29,10 @@ import { cn, formatCurrency, todayInput } from '../lib/utils';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/pos/pos.module.css';
+import { useT } from '../i18n';
+import { docLabel as docName } from '../i18n/labels';
+import { posT } from '../i18n/areas/pos';
+import { areaNodes } from '../i18n/areas/nodes';
 
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
@@ -67,6 +71,7 @@ function loadCounter() {
 
 /** One-screen counter billing (6.8): scan / search, tender, save as an invoice, print the 80 mm bill. */
 export function Pos() {
+  useT(); // re-render on a language switch (5.4)
   const { notify, toastNode } = useToast();
   const [data, setData] = useState(loadCounter);
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -189,9 +194,9 @@ export function Pos() {
 
   const onCode = (code: string) => {
     const match = findByCode(code, data.catalog, data.stock);
-    if (!match) return { ok: false, message: `No item has the code ${code}.` };
+    if (!match) return { ok: false, message: posT('noCode', { code }) };
     addSource(match.item);
-    return { ok: true, message: `Added ${match.item.name}` };
+    return { ok: true, message: posT('added', { name: match.item.name }) };
   };
 
   const onEnter = (text: string) => {
@@ -226,7 +231,7 @@ export function Pos() {
 
   const save = (expiredOk = false) => {
     if (items.length === 0) {
-      setErrors(['Scan or add at least one item.']);
+      setErrors([posT('errEmpty')]);
       return;
     }
     const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client });
@@ -236,12 +241,12 @@ export function Pos() {
     }
     if (!res.ok || !res.record) {
       setErrors(res.errors);
-      notify(res.errors[0] ?? 'Could not save the bill.', 'error');
+      notify(res.errors[0] ?? posT('saveFailed'), 'error');
       if (res.record) reset(); // invoice saved, a payment failed: never bill twice
       return;
     }
     const change = res.summary?.change ?? 0;
-    notify(`${DOCUMENT_LABELS[res.record.doc_type]} ${res.record.invoice_number} saved${change > 0 ? ` — give ${formatCurrency(change)} change` : ''}`);
+    notify(posT('saved', { doc: docName(res.record.doc_type), number: res.record.invoice_number }) + (change > 0 ? posT('change', { amount: formatCurrency(change) }) : ''));
     setLastBill(res.record);
     if (autoPrint) setPrinting(res.record);
     reset();
@@ -280,34 +285,34 @@ export function Pos() {
     [data.clients],
   );
   const stockOf = (l: InvoiceItem) => (data.positions.length ? findLevel(data.positions, l.name, l.hsn) : null);
-  const docLabel = DOCUMENT_LABELS[record.doc_type];
+  const docLabel = record.doc_type in DOCUMENT_LABELS ? docName(record.doc_type) : DOCUMENT_LABELS.INVOICE;
 
   return (
     <div className={cn(surface.page, styles.page)}>
       <PageHeader
-        title="POS quick bill"
-        subtitle={`${docLabel} · ${sender?.companyName || 'Set up your business in Settings'} · works offline`}
+        title={posT('title')}
+        subtitle={posT('subtitle', { doc: docLabel, business: sender?.companyName || posT('setUp') })}
         actions={
           <>
             {lastBill && (
               <button type="button" className={controls.btnOutline} onClick={() => setPrinting(lastBill)}>
-                <Printer size={16} /> Reprint {lastBill.invoice_number}
+                <Printer size={16} /> {posT('reprint', { number: lastBill.invoice_number })}
               </button>
             )}
             <button type="button" className={controls.btnOutline} onClick={() => setZOpen(true)}>
-              <ReceiptText size={16} /> Z report
+              <ReceiptText size={16} /> {posT('zReport')}
             </button>
           </>
         }
       />
 
       <div className={styles.layout}>
-        <section className={cn(surface.card, styles.cart)} aria-label="Bill items">
+        <section className={cn(surface.card, styles.cart)} aria-label={posT('billItems')}>
           <div className={styles.scan}>
             <ScanField
               id="pos-scan"
-              label="Scan barcode or search items"
-              placeholder="Scan a barcode or type an item / SKU (F2)"
+              label={posT('scanLabel')}
+              placeholder={posT('scanPh')}
               autoFocus
               continuous
               inputRef={searchRef}
@@ -322,14 +327,14 @@ export function Pos() {
               }}
             />
             {hits.length > 0 && query.trim() && (
-              <ul className={styles.hits} role="listbox" aria-label="Matching items">
+              <ul className={styles.hits} role="listbox" aria-label={posT('matching')}>
                 {hits.map((h, n) => {
                   const lvl = stockOf(h.row);
                   return (
                     <li key={h.row.id} role="option" aria-selected={n === active}>
                       <button type="button" className={cn(styles.hit, n === active && styles.hitActive)} onMouseDown={(e) => e.preventDefault()} onClick={() => { addSource(h.row); setQuery(''); searchRef.current?.focus(); }}>
                         <span>{h.label}</span>
-                        <span className={styles.muted}>{h.sub}{lvl ? ` · ${lvl.qty} in stock` : ''}</span>
+                        <span className={styles.muted}>{h.sub}{lvl ? posT('inStock', { n: lvl.qty }) : ''}</span>
                       </button>
                     </li>
                   );
@@ -339,16 +344,16 @@ export function Pos() {
           </div>
 
           {items.length === 0 ? (
-            <p className={styles.empty}>Scan an item or search by name to start the bill.</p>
+            <p className={styles.empty}>{posT('empty')}</p>
           ) : (
-            <div className={styles.lines} role="table" aria-label="Lines">
+            <div className={styles.lines} role="table" aria-label={posT('lines')}>
               <div className={cn(styles.line, styles.lineHead)} role="row">
-                <span role="columnheader">Item</span>
-                <span role="columnheader">Qty</span>
-                <span role="columnheader" className={styles.r}>Rate</span>
-                <span role="columnheader" className={styles.r}>Disc %</span>
-                <span role="columnheader" className={styles.r}>Amount</span>
-                <span role="columnheader"><span className={surface.srOnly}>Remove</span></span>
+                <span role="columnheader">{posT('item')}</span>
+                <span role="columnheader">{posT('qty')}</span>
+                <span role="columnheader" className={styles.r}>{posT('rate')}</span>
+                <span role="columnheader" className={styles.r}>{posT('disc')}</span>
+                <span role="columnheader" className={styles.r}>{posT('amount')}</span>
+                <span role="columnheader"><span className={surface.srOnly}>{posT('remove')}</span></span>
               </div>
               {items.map((l, n) => {
                 const calc = record.items.find((x) => x.id === l.id);
@@ -361,32 +366,32 @@ export function Pos() {
                       <div role="cell" className={styles.name}>
                         <strong>{l.name}</strong>
                         <span className={styles.muted}>
-                          {[l.hsn && `HSN ${l.hsn}`, typeof l.tax_rate === 'number' && record.gst_mode !== 'NONE' && `GST ${l.tax_rate}%`, lvl && `${lvl.qty} ${lvl.unit} in stock`].filter(Boolean).join(' · ')}
+                          {[l.hsn && `HSN ${l.hsn}`, typeof l.tax_rate === 'number' && record.gst_mode !== 'NONE' && `GST ${l.tax_rate}%`, lvl && posT('lineStock', { n: lvl.qty, unit: lvl.unit })].filter(Boolean).join(' · ')}
                         </span>
-                        {(l.price_basis || free) && <span className={styles.chip}><Tags size={12} aria-hidden="true" /> {free ? 'Free (scheme)' : `${l.price_basis} price`}</span>}
+                        {(l.price_basis || free) && <span className={styles.chip}><Tags size={12} aria-hidden="true" /> {free ? posT('free') : posT('basisPrice', { basis: l.price_basis ?? '' })}</span>}
                       </div>
                       <div role="cell" className={styles.qty}>
-                        <button type="button" className={controls.btnIcon} onClick={() => setQty(l.id, num(l.quantity) - 1)} disabled={free || num(l.quantity) <= 1} aria-label={`Less ${l.name}`}><Minus size={14} /></button>
-                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.qtyInput)} value={l.quantity} blankZero={false} onChange={(q) => setQty(l.id, q)} disabled={free} aria-label={`Quantity of ${l.name} (line ${n + 1})`} />
-                        <button type="button" className={controls.btnIcon} onClick={() => setQty(l.id, num(l.quantity) + 1)} disabled={free} aria-label={`More ${l.name}`}><Plus size={14} /></button>
+                        <button type="button" className={controls.btnIcon} onClick={() => setQty(l.id, num(l.quantity) - 1)} disabled={free || num(l.quantity) <= 1} aria-label={posT('less', { name: l.name })}><Minus size={14} /></button>
+                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.qtyInput)} value={l.quantity} blankZero={false} onChange={(q) => setQty(l.id, q)} disabled={free} aria-label={posT('qtyOf', { name: l.name, n: n + 1 })} />
+                        <button type="button" className={controls.btnIcon} onClick={() => setQty(l.id, num(l.quantity) + 1)} disabled={free} aria-label={posT('more', { name: l.name })}><Plus size={14} /></button>
                       </div>
                       <div role="cell" className={styles.r}>
-                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.num)} value={l.rate} onChange={(r) => setRate(l.id, r)} disabled={free} placeholder="Rate" aria-label={`Rate of ${l.name} (line ${n + 1})`} />
+                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.num)} value={l.rate} onChange={(r) => setRate(l.id, r)} disabled={free} placeholder={posT('rate')} aria-label={posT('rateOf', { name: l.name, n: n + 1 })} />
                       </div>
                       <div role="cell" className={styles.r}>
-                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.num)} value={l.discount_percent ?? 0} onChange={(d) => setDisc(l.id, d)} disabled={free} placeholder="Disc %" aria-label={`Discount % of ${l.name} (line ${n + 1})`} />
+                        <NumberInput className={cn(controls.input, controls.inputNumeric, styles.num)} value={l.discount_percent ?? 0} onChange={(d) => setDisc(l.id, d)} disabled={free} placeholder={posT('disc')} aria-label={posT('discOf', { name: l.name, n: n + 1 })} />
                       </div>
                       <div role="cell" className={cn(styles.r, styles.amount)}>{formatCurrency(calc ? round2(num(calc.quantity) * num(calc.rate) * (1 - num(calc.discount_percent) / 100)) : 0)}</div>
                       <div role="cell">
                         {!free && (
-                          <button type="button" className={controls.btnDanger} onClick={() => removeLine(l.id)} aria-label={`Remove ${l.name}`}><Trash2 size={14} /></button>
+                          <button type="button" className={controls.btnDanger} onClick={() => removeLine(l.id)} aria-label={posT('removeOf', { name: l.name })}><Trash2 size={14} /></button>
                         )}
                       </div>
                     </div>
                     {stockItem?.track_serials && (
                       <div className={styles.serials}>
                         <SerialPicker
-                          label={`Serial / IMEI for ${l.name}`}
+                          label={posT('serialFor', { name: l.name })}
                           options={(() => {
                             const base = serialsInStock(data.ctx?.tracking.get(stockItem.id), data.ctx?.multi ? l.godown_id || data.ctx.defaultGodown : undefined);
                             const taken = new Set(items.filter((x) => x.id !== l.id).flatMap((x) => x.serials ?? []).map(serialKey));
@@ -406,23 +411,23 @@ export function Pos() {
         </section>
 
         <aside className={styles.side}>
-          <section className={surface.card} aria-label="Customer">
-            <div className={surface.cardHead}><span className={surface.cardHeadIcon}><UserRound size={16} /> Customer <kbd className={styles.kbd}>F3</kbd></span></div>
+          <section className={surface.card} aria-label={posT('customer')}>
+            <div className={surface.cardHead}><span className={surface.cardHeadIcon}><UserRound size={16} /> {posT('customer')} <kbd className={styles.kbd}>F3</kbd></span></div>
             <div className={cn(surface.cardBody, styles.stack)}>
               {party.client ? (
                 <div className={styles.picked}>
                   <div>
                     <strong>{party.client.name}</strong>
-                    <span className={styles.muted}>{[party.client.phone, party.client.gstin].filter(Boolean).join(' · ') || 'Saved customer'}</span>
-                    {level && <span className={styles.chip}><Tags size={12} aria-hidden="true" /> {level.name} prices</span>}
+                    <span className={styles.muted}>{[party.client.phone, party.client.gstin].filter(Boolean).join(' · ') || posT('savedCustomer')}</span>
+                    {level && <span className={styles.chip}><Tags size={12} aria-hidden="true" /> {posT('levelPrices', { level: level.name })}</span>}
                   </div>
-                  <button type="button" className={controls.btnIcon} onClick={() => chooseClient(null)} aria-label="Back to walk-in customer"><X size={16} /></button>
+                  <button type="button" className={controls.btnIcon} onClick={() => chooseClient(null)} aria-label={posT('walkInBack')}><X size={16} /></button>
                 </div>
               ) : null}
               {party.client && (
-                <label className={controls.check} title="Over the counter the place of supply is your own state (Sec 10(1) IGST Act). Tick only when the goods are dispatched to the customer's state. Verify with your CA.">
+                <label className={controls.check} title={posT('dispatchTitle')}>
                   <input type="checkbox" checked={dispatch} onChange={(e) => setDispatch(e.target.checked)} />
-                  Deliver to the customer&apos;s state (dispatch)
+                  {posT('dispatch')}
                 </label>
               )}
               {party.client ? null : (
@@ -434,51 +439,51 @@ export function Pos() {
                     onChange={setCustomerText}
                     getSuggestions={clientSuggestions}
                     onPick={(c) => chooseClient(c)}
-                    placeholder={`${WALK_IN_NAME} — or search saved customers`}
-                    aria-label="Saved customer"
+                    placeholder={posT('customerPh')}
+                    aria-label={posT('customerAria')}
                   />
                   <div className={controls.row}>
-                    <input className={controls.input} value={party.name} onChange={(e) => setParty({ ...party, name: e.target.value })} placeholder="Name (optional)" aria-label="Walk-in name" />
-                    <input className={controls.input} value={party.phone} inputMode="tel" onChange={(e) => setParty({ ...party, phone: e.target.value })} placeholder="Phone (optional)" aria-label="Walk-in phone" />
+                    <input className={controls.input} value={party.name} onChange={(e) => setParty({ ...party, name: e.target.value })} placeholder={posT('namePh')} aria-label={posT('nameAria')} />
+                    <input className={controls.input} value={party.phone} inputMode="tel" onChange={(e) => setParty({ ...party, phone: e.target.value })} placeholder={posT('phonePh')} aria-label={posT('phoneAria')} />
                   </div>
                 </>
               )}
             </div>
           </section>
 
-          <section className={surface.card} aria-label="Totals">
+          <section className={surface.card} aria-label={posT('totals')}>
             <div className={cn(surface.cardBody, styles.totals)}>
-              <div><span>Items</span><span>{formatCurrency(record.subtotal)}</span></div>
-              {record.discount_amount > 0 && <div><span>Discount</span><span>−{formatCurrency(record.discount_amount)}</span></div>}
+              <div><span>{posT('items')}</span><span>{formatCurrency(record.subtotal)}</span></div>
+              {record.discount_amount > 0 && <div><span>{posT('discount')}</span><span>−{formatCurrency(record.discount_amount)}</span></div>}
               {record.cgst_amount > 0 && <div><span>CGST</span><span>{formatCurrency(record.cgst_amount)}</span></div>}
               {record.sgst_amount > 0 && <div><span>SGST</span><span>{formatCurrency(record.sgst_amount)}</span></div>}
               {record.igst_amount > 0 && <div><span>IGST</span><span>{formatCurrency(record.igst_amount)}</span></div>}
-              {(record.cess_amount ?? 0) > 0 && <div><span>Cess</span><span>{formatCurrency(record.cess_amount ?? 0)}</span></div>}
-              {record.round_off !== 0 && <div><span>Round-off</span><span>{formatCurrency(record.round_off)}</span></div>}
-              <div className={styles.grand}><span>Total</span><span data-pos-total>{formatCurrency(record.total)}</span></div>
+              {(record.cess_amount ?? 0) > 0 && <div><span>{posT('cess')}</span><span>{formatCurrency(record.cess_amount ?? 0)}</span></div>}
+              {record.round_off !== 0 && <div><span>{posT('roundOff')}</span><span>{formatCurrency(record.round_off)}</span></div>}
+              <div className={styles.grand}><span>{posT('total')}</span><span data-pos-total>{formatCurrency(record.total)}</span></div>
             </div>
           </section>
 
-          <section className={surface.card} aria-label="Payment">
+          <section className={surface.card} aria-label={posT('payment')}>
             <div className={cn(surface.cardBody, styles.stack)}>
               {(['Cash', 'UPI', 'Card'] as TenderMethod[]).map((m) => (
                 <div key={m} className={styles.tender}>
-                  <label htmlFor={`pos-${m}`} className={styles.tenderLabel}>{m} <kbd className={styles.kbd}>{m === 'Cash' ? 'F4' : m === 'UPI' ? 'F6' : 'F7'}</kbd></label>
+                  <label htmlFor={`pos-${m}`} className={styles.tenderLabel}>{posT(`m.${m}`)} <kbd className={styles.kbd}>{m === 'Cash' ? 'F4' : m === 'UPI' ? 'F6' : 'F7'}</kbd></label>
                   <NumberInput id={`pos-${m}`} className={cn(controls.input, controls.inputNumeric)} value={tender[m]} onChange={(v) => setTender((t) => ({ ...t, [m]: v }))} placeholder="0" />
-                  <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => fill(m)}>Rest</button>
+                  <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => fill(m)}>{posT('rest')}</button>
                 </div>
               ))}
-              {tender.UPI > 0 && <input className={controls.input} value={upiRef} onChange={(e) => setUpiRef(e.target.value)} placeholder="UPI reference / UTR (optional)" aria-label="UPI reference" />}
+              {tender.UPI > 0 && <input className={controls.input} value={upiRef} onChange={(e) => setUpiRef(e.target.value)} placeholder={posT('upiPh')} aria-label={posT('upiAria')} />}
               {(tender.UPI > 0 || tender.Card > 0) && (
-                <BankAccountSelect id="pos-bank" label="Received into" method={tender.UPI > 0 ? 'UPI' : 'Card'} value={bankId} onChange={setBankId} />
+                <BankAccountSelect id="pos-bank" label={posT('receivedInto')} method={tender.UPI > 0 ? 'UPI' : 'Card'} value={bankId} onChange={setBankId} />
               )}
               <div className={styles.changeRow}>
                 {summary.change > 0 ? (
-                  <><span>Change to give</span><strong data-pos-change>{formatCurrency(summary.change)}</strong></>
+                  <><span>{posT('changeToGive')}</span><strong data-pos-change>{formatCurrency(summary.change)}</strong></>
                 ) : summary.due > 0 && record.total > 0 ? (
-                  <><span>{party.client ? 'Left on account' : 'Still to pay'}</span><strong className={styles.due}>{formatCurrency(summary.due)}</strong></>
+                  <><span>{party.client ? posT('onAccount') : posT('stillToPay')}</span><strong className={styles.due}>{formatCurrency(summary.due)}</strong></>
                 ) : (
-                  <><span>Paid in full</span><strong>{formatCurrency(summary.tendered)}</strong></>
+                  <><span>{posT('paidFull')}</span><strong>{formatCurrency(summary.tendered)}</strong></>
                 )}
               </div>
               {errors.length > 0 && (
@@ -487,24 +492,24 @@ export function Pos() {
                 </ul>
               )}
               <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()} disabled={items.length === 0}>
-                <Save size={18} /> Save bill <kbd className={styles.kbdOn}>F9</kbd>
+                <Save size={18} /> {posT('saveBill')} <kbd className={styles.kbdOn}>F9</kbd>
               </button>
               <label className={controls.check}>
-                <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} /> Print the 80 mm bill after saving
+                <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} /> {posT('autoPrint')}
               </label>
-              <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={reset}>New bill (F8)</button>
+              <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={reset}>{posT('newBill')}</button>
             </div>
           </section>
 
           <details className={styles.keys}>
-            <summary><Keyboard size={14} aria-hidden="true" /> Keyboard shortcuts</summary>
+            <summary><Keyboard size={14} aria-hidden="true" /> {posT('shortcuts')}</summary>
             <ul>
-              {POS_SHORTCUTS.map((s) => <li key={s.keys}><kbd className={styles.kbd}>{s.keys}</kbd> {s.label}</li>)}
-              <li><kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>Enter</kbd> Save</li>
-              <li><kbd className={styles.kbd}>↑</kbd>/<kbd className={styles.kbd}>↓</kbd> pick a search result, <kbd className={styles.kbd}>Enter</kbd> adds it</li>
+              {POS_SHORTCUTS.map((s) => <li key={s.keys}><kbd className={styles.kbd}>{s.keys}</kbd> {posT(`sc.${s.action}`)}</li>)}
+              <li><kbd className={styles.kbd}>Ctrl</kbd>+<kbd className={styles.kbd}>Enter</kbd> {posT('scSave')}</li>
+              <li><kbd className={styles.kbd}>↑</kbd>/<kbd className={styles.kbd}>↓</kbd> {areaNodes(posT('scPick'), { enter: <kbd className={styles.kbd}>Enter</kbd> })}</li>
             </ul>
             <p className={styles.muted}>
-              Bills are saved as normal invoices (see <Link to="/transactions">Invoices</Link>), numbered in the {docLabel} series and paid by the tenders above.
+              {areaNodes(posT('savedAs', { doc: docLabel }), { link: <Link to="/transactions">{posT('invoices')}</Link> })}
             </p>
           </details>
         </aside>
@@ -514,10 +519,10 @@ export function Pos() {
       <ConfirmDialog
         open={!!expiredAsk}
         destructive
-        title="Sell an expired batch?"
-        message={`${expiredAsk?.join(' ') ?? ''} Selling expired goods is usually not allowed.`}
-        confirmLabel="Sell anyway"
-        cancelLabel="Go back"
+        title={posT('expiredTitle')}
+        message={posT('expiredMsg', { lines: expiredAsk?.join(' ') ?? '' })}
+        confirmLabel={posT('sellAnyway')}
+        cancelLabel={posT('goBack')}
         onClose={() => setExpiredAsk(null)}
         onConfirm={() => {
           setExpiredAsk(null);

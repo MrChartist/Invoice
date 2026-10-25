@@ -6,6 +6,8 @@ import { cn } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './scan.module.css';
+import { useT } from '../../i18n';
+import { scanT } from '../../i18n/areas/scan';
 
 const CameraScanner = lazy(() => import('./CameraScanner').then((m) => ({ default: m.CameraScanner })));
 
@@ -36,6 +38,7 @@ interface Props {
  * button reads codes with BarcodeDetector where the browser has it. Shows what happened below.
  */
 export function ScanField({ id, label, onCode, placeholder, autoFocus, inputRef, continuous, onText, onEnter, onKeyDown }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const [text, setText] = useState('');
   const [status, setStatus] = useState<ScanOutcome | null>(null);
   const [camera, setCamera] = useState(false);
@@ -59,7 +62,7 @@ export function ScanField({ id, label, onCode, placeholder, autoFocus, inputRef,
           autoFocus={autoFocus}
           autoComplete="off"
           spellCheck={false}
-          placeholder={placeholder ?? 'Scan or type a barcode / SKU, then Enter'}
+          placeholder={placeholder ?? scanT('placeholder')}
           onChange={(e) => {
             setText(e.target.value);
             onText?.(e.target.value);
@@ -83,12 +86,12 @@ export function ScanField({ id, label, onCode, placeholder, autoFocus, inputRef,
         className={controls.btnOutline}
         onClick={() => {
           if (cameraScanSupported()) setCamera(true);
-          else setStatus({ ok: false, message: 'Camera scanning needs a browser with barcode detection (Chrome or Edge on Android, ChromeOS, macOS). Use a USB scanner or type the code.' });
+          else setStatus({ ok: false, message: scanT('noCamera') });
         }}
-        aria-label="Scan with camera"
-        title="Scan with camera"
+        aria-label={scanT('withCamera')}
+        title={scanT('withCamera')}
       >
-        <Camera size={16} /> <span>Camera</span>
+        <Camera size={16} /> <span>{scanT('camera')}</span>
       </button>
       <p className={cn(styles.status, status && (status.ok ? styles.statusOk : styles.statusError))} role="status" aria-live="polite">
         {status?.message ?? ''}

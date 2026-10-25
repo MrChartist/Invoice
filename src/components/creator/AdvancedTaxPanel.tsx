@@ -7,15 +7,13 @@ import {
   type RoundMode,
   type SupplyType,
 } from '../../types/invoice';
+
+const ROUND_MODES: RoundMode[] = ['nearest', 'up', 'down', 'none'];
 import { tcsPresets, tdsSections } from '../../lib/tax-rules';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from './AdvancedTaxPanel.module.css';
 
-const ROUND_LABELS: Record<RoundMode, string> = {
-  nearest: 'Nearest rupee',
-  up: 'Round up',
-  down: 'Round down',
-  none: 'No rounding',
-};
 
 /**
  * Collapsible "Advanced tax" block (supply type, tax-inclusive pricing, TCS, TDS,
@@ -23,6 +21,7 @@ const ROUND_LABELS: Record<RoundMode, string> = {
  * Mount under the totals in the creator: <AdvancedTaxPanel />.
  */
 export function AdvancedTaxPanel() {
+  useT(); // re-render on a language switch (5.4)
   const s = useInvoiceStore(
     useShallow((st) => pick(st, ['currency', 'issue_date', 'lut_date', 'lut_number', 'price_includes_tax', 'round_mode', 'round_off_enabled', 'setLut', 'setPriceIncludesTax', 'setRoundMode', 'setSupplyType', 'setTcs', 'setTds', 'supply_type', 'tcs_base', 'tcs_enabled', 'tcs_label', 'tcs_rate', 'tds_enabled', 'tds_on_taxable', 'tds_rate', 'tds_section', 'totals'])),
   );
@@ -36,59 +35,59 @@ export function AdvancedTaxPanel() {
 
   return (
     <details className={styles.wrap} open={active || undefined}>
-      <summary className={styles.summary}>Advanced tax (TCS, TDS, export, cess)</summary>
+      <summary className={styles.summary}>{edT('atSummary')}</summary>
       <div className={styles.body}>
         <div className={styles.group}>
-          <div className={styles.groupTitle}>Nature of supply</div>
+          <div className={styles.groupTitle}>{edT('atNature')}</div>
           <select
             className={styles.field}
-            aria-label="Nature of supply"
+            aria-label={edT('atNature')}
             value={s.supply_type ?? 'B2B'}
             onChange={(e) => s.setSupplyType(e.target.value as SupplyType)}
           >
             {(Object.keys(SUPPLY_TYPE_LABELS) as SupplyType[]).map((k) => (
-              <option key={k} value={k}>{SUPPLY_TYPE_LABELS[k]}</option>
+              <option key={k} value={k}>{edT(`supply.${k}`)}</option>
             ))}
           </select>
           {(s.supply_type === 'EXPORT_LUT' || s.supply_type === 'SEZ_WITHOUT_PAYMENT') && (
             <div className={styles.row}>
-              <input className={styles.field} aria-label="LUT / bond number" placeholder="LUT / bond number" value={s.lut_number ?? ''}
+              <input className={styles.field} aria-label={edT('atLut')} placeholder={edT('atLut')} value={s.lut_number ?? ''}
                 onChange={(e) => s.setLut(e.target.value, s.lut_date ?? '')} />
-              <input className={styles.field} type="date" aria-label="LUT date" value={s.lut_date ?? ''}
+              <input className={styles.field} type="date" aria-label={edT('atLutDate')} value={s.lut_date ?? ''}
                 onChange={(e) => s.setLut(s.lut_number ?? '', e.target.value)} />
             </div>
           )}
           <p className={styles.hint}>
-            Supply without payment charges no GST. With payment charges IGST (refundable).
+            {edT('atLutHint')}
           </p>
         </div>
 
         <label className={styles.check}>
           <input type="checkbox" checked={Boolean(s.price_includes_tax)}
             onChange={(e) => s.setPriceIncludesTax(e.target.checked)} />
-          Rates include GST (tax-inclusive pricing)
+          {edT('atInclusive')}
         </label>
 
         <div className={styles.group}>
           <label className={styles.check}>
             <input type="checkbox" checked={Boolean(s.tcs_enabled)}
               onChange={(e) => s.setTcs({ enabled: e.target.checked })} />
-            Collect TCS (Tax Collected at Source)
+            {edT('atTcs')}
           </label>
           {s.tcs_enabled && (
             <div className={styles.row}>
-              <select className={styles.field} aria-label="TCS preset" value="" onChange={(e) => e.target.value && s.setTcs({ rate: Number(e.target.value) })}>
-                <option value="">Preset…</option>
+              <select className={styles.field} aria-label={edT('atTcsPreset')} value="" onChange={(e) => e.target.value && s.setTcs({ rate: Number(e.target.value) })}>
+                <option value="">{edT('atPreset')}</option>
                 {TCS_PRESETS.map((p) => <option key={p.label} value={p.rate}>{p.label}</option>)}
               </select>
               <input className={styles.field} type="number" min={0} step="0.01" value={s.tcs_rate ?? 0}
-                aria-label="TCS rate %" onChange={(e) => s.setTcs({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
-              <select className={styles.field} aria-label="TCS base" value={s.tcs_base ?? 'total'}
+                aria-label={edT('atTcsRate')} onChange={(e) => s.setTcs({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
+              <select className={styles.field} aria-label={edT('atTcsBase')} value={s.tcs_base ?? 'total'}
                 onChange={(e) => s.setTcs({ base: e.target.value as 'taxable' | 'total' })}>
-                <option value="total">On invoice value (incl. GST)</option>
-                <option value="taxable">On taxable value</option>
+                <option value="total">{edT('atOnTotal')}</option>
+                <option value="taxable">{edT('atOnTaxable')}</option>
               </select>
-              <input className={styles.field} value={s.tcs_label ?? 'TCS'} aria-label="TCS label"
+              <input className={styles.field} value={s.tcs_label ?? 'TCS'} aria-label={edT('atTcsLabel')}
                 onChange={(e) => s.setTcs({ label: e.target.value })} />
             </div>
           )}
@@ -98,12 +97,12 @@ export function AdvancedTaxPanel() {
           <label className={styles.check}>
             <input type="checkbox" checked={Boolean(s.tds_enabled)}
               onChange={(e) => s.setTds({ enabled: e.target.checked })} />
-            Customer deducts TDS
+            {edT('atTds')}
           </label>
           {s.tds_enabled && (
             <>
               <div className={styles.row}>
-                <select className={styles.field} aria-label="TDS section" value={s.tds_section ?? '194J'}
+                <select className={styles.field} aria-label={edT('atTdsSection')} value={s.tds_section ?? '194J'}
                   onChange={(e) => {
                     const sec = TDS_SECTIONS.find((x) => x.section === e.target.value);
                     s.setTds({ section: e.target.value, ...(sec && sec.section !== 'CUSTOM' ? { rate: sec.rate } : {}) });
@@ -111,34 +110,33 @@ export function AdvancedTaxPanel() {
                   {TDS_SECTIONS.map((x) => <option key={x.section} value={x.section}>{x.label}</option>)}
                 </select>
                 <input className={styles.field} type="number" min={0} step="0.01" value={s.tds_rate ?? 0}
-                  aria-label="TDS rate %" onChange={(e) => s.setTds({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)), section: 'CUSTOM' })} />
+                  aria-label={edT('atTdsRate')} onChange={(e) => s.setTds({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)), section: 'CUSTOM' })} />
               </div>
               <label className={styles.check}>
                 <input type="checkbox" checked={s.tds_on_taxable !== false}
                   onChange={(e) => s.setTds({ onTaxable: e.target.checked })} />
-                Compute on taxable value (before GST)
+                {edT('atTdsTaxable')}
               </label>
               <p className={styles.hint}>
-                TDS does not change the invoice total; it reduces the balance you collect and is
-                tracked as a tax credit.
+                {edT('atTdsHint')}
               </p>
             </>
           )}
         </div>
 
         <div className={styles.group}>
-          <div className={styles.groupTitle}>Rounding</div>
-          <select className={styles.field} aria-label="Rounding" value={roundMode} onChange={(e) => s.setRoundMode(e.target.value as RoundMode)}>
-            {(Object.keys(ROUND_LABELS) as RoundMode[]).map((k) => <option key={k} value={k}>{ROUND_LABELS[k]}</option>)}
+          <div className={styles.groupTitle}>{edT('atRounding')}</div>
+          <select className={styles.field} aria-label={edT('atRounding')} value={roundMode} onChange={(e) => s.setRoundMode(e.target.value as RoundMode)}>
+            {ROUND_MODES.map((k) => <option key={k} value={k}>{edT(`round.${k}`)}</option>)}
           </select>
         </div>
 
         {(t.cess_amount > 0 || t.tcs_amount > 0 || t.tds_amount > 0) && (
           <div className={styles.group}>
-            {t.cess_amount > 0 && <div className={styles.result}><span>Cess</span><span>{money(t.cess_amount)}</span></div>}
+            {t.cess_amount > 0 && <div className={styles.result}><span>{edT('atCess')}</span><span>{money(t.cess_amount)}</span></div>}
             {t.tcs_amount > 0 && <div className={styles.result}><span>{s.tcs_label || 'TCS'}</span><span>{money(t.tcs_amount)}</span></div>}
             {t.tds_amount > 0 && <div className={styles.result}><span>TDS ({s.tds_section})</span><span>-{money(t.tds_amount)}</span></div>}
-            <div className={`${styles.result} ${styles.resultStrong}`}><span>Net payable</span><span>{money(t.payable)}</span></div>
+            <div className={`${styles.result} ${styles.resultStrong}`}><span>{edT('atNet')}</span><span>{money(t.payable)}</span></div>
           </div>
         )}
       </div>

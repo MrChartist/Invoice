@@ -11,6 +11,8 @@ import {
 } from '../../lib/stock-tracking';
 import { SerialPicker } from '../inventory/SerialPicker';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from './ItemsTable.module.css';
 
 /**
@@ -18,6 +20,7 @@ import styles from './ItemsTable.module.css';
  * Renders nothing unless the line is a stock item that opted into tracking, or several godowns exist.
  */
 export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: number; ctx: EditorStockContext }) {
+  useT(); // re-render on a language switch (5.4)
   const stock = item.name.trim() ? ctx.find(item.name, item.hsn) : undefined;
   const { patchItem, replaceItem } = useInvoiceStore.getState();
   const autoFilled = useRef(false);
@@ -52,11 +55,11 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
     <div className={styles.trackRow}>
       {ctx.multi && (
         <label className={styles.trackField}>
-          <span>{ctx.outgoing ? 'From godown' : 'Return to'}</span>
+          <span>{ctx.outgoing ? edT('ltFrom') : edT('ltReturn')}</span>
           <select
             className={controls.ghost}
             value={godown}
-            aria-label={`Item ${n} godown`}
+            aria-label={edT('ltGodown', { n })}
             onChange={(e) => {
               // Batch and serials belong to a godown: re-pick after moving the line.
               patchItem(item.id, { godown_id: e.target.value, ...(ctx.outgoing ? { serials: undefined, batch_no: undefined, batch_expiry: undefined, batch_mfg: undefined } : {}) });
@@ -70,21 +73,21 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
 
       {stock.track_batches && ctx.outgoing && (
         <label className={styles.trackField}>
-          <span>Batch</span>
+          <span>{edT('ltBatch')}</span>
           <select
             className={controls.ghost}
             value={item.batch_no ?? ''}
-            aria-label={`Item ${n} batch`}
+            aria-label={edT('ltBatchAria', { n })}
             onChange={(e) => {
               const pick = options.find((o) => o.batch === e.target.value);
               patchItem(item.id, withBatch(item, pick ?? (e.target.value ? { batch: e.target.value } : undefined)));
             }}
           >
-            <option value="">{options.length ? 'Choose batch…' : 'No batch in stock'}</option>
-            {item.batch_no && !current && <option value={item.batch_no}>{item.batch_no} (not in stock)</option>}
+            <option value="">{options.length ? edT('ltChoose') : edT('ltNoBatch')}</option>
+            {item.batch_no && !current && <option value={item.batch_no}>{edT('ltNotInStock', { batch: item.batch_no })}</option>}
             {options.map((o) => (
               <option key={o.batch} value={o.batch}>
-                {o.batch}{o.expiry ? ` · exp ${formatDate(o.expiry)}` : ''} · {o.qty} left{o.expired ? ' · EXPIRED' : o.batch === fefo?.batch ? ' · FEFO' : ''}
+                {o.batch}{o.expiry ? edT('ltExp', { date: formatDate(o.expiry) }) : ''}{edT('ltLeft', { n: o.qty })}{o.expired ? edT('ltExpired') : o.batch === fefo?.batch ? ' · FEFO' : ''}
               </option>
             ))}
           </select>
@@ -92,11 +95,11 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
       )}
       {stock.track_batches && ctx.incoming && (
         <label className={styles.trackField}>
-          <span>Batch</span>
+          <span>{edT('ltBatch')}</span>
           <input
             className={controls.ghost}
             value={item.batch_no ?? ''}
-            aria-label={`Item ${n} batch`}
+            aria-label={edT('ltBatchAria', { n })}
             onChange={(e) => patchItem(item.id, { batch_no: e.target.value || undefined })}
           />
         </label>
@@ -105,7 +108,7 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
       {stock.track_serials && (
         <div className={styles.trackWide}>
           <SerialPicker
-            label={ctx.outgoing ? `Serial / IMEI for item ${n}` : `Serials returned on item ${n}`}
+            label={ctx.outgoing ? edT('ltSerialOut', { n }) : edT('ltSerialIn', { n })}
             options={serialOptions}
             value={item.serials ?? []}
             want={num(item.quantity)}
@@ -123,18 +126,18 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
 
       {expired && (
         <p className={styles.trackAlert} role="alert">
-          <AlertTriangle size={14} aria-hidden="true" /> Batch {item.batch_no} expired on {formatDate(expiry as string)} — saving will ask you to confirm.
+          <AlertTriangle size={14} aria-hidden="true" /> {edT('ltExpiredAlert', { batch: item.batch_no ?? '', date: formatDate(expiry as string) })}
         </p>
       )}
       {short && (
         <p className={styles.trackNote}>
-          Only {current.qty} left in batch {current.batch}.
+          {edT('ltShort', { n: current.qty, batch: current.batch })}
           <button
             type="button"
             className={`${controls.btnGhost} ${controls.btnSm}`}
             onClick={() => replaceItem(item.id, splitLineByFefo({ ...withBatch(item, undefined), ...(ctx.multi ? { godown_id: godown } : {}) }, t, ctx.day, generateId))}
           >
-            <Split size={14} aria-hidden="true" /> Split across batches (FEFO)
+            <Split size={14} aria-hidden="true" /> {edT('ltSplit')}
           </button>
         </p>
       )}

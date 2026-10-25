@@ -2,15 +2,18 @@ import { Check } from 'lucide-react';
 import { TEMPLATES, TEMPLATE_CATEGORIES } from '../templates/registry';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { cn } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from './TemplatePicker.module.css';
 
 /** Compact gallery grouped by category; the live look is shown in Preview. */
 export function TemplatePicker() {
+  useT(); // re-render on a language switch (5.4)
   const templateId = useInvoiceStore((s) => s.template_id);
   const setTemplate = useInvoiceStore((s) => s.setTemplate);
 
   return (
-    <div className={styles.wrap} role="radiogroup" aria-label="Invoice template">
+    <div className={styles.wrap} role="radiogroup" aria-label={edT('tpAria')}>
       {TEMPLATE_CATEGORIES.map((category) => (
         <div key={category}>
           <div className={styles.cat}>{category}</div>

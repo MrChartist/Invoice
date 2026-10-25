@@ -4,12 +4,15 @@ import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency } from '../../lib/utils';
 import { inrValue } from '../../lib/fx';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 
 /**
  * Exchange rate (shown when the document currency is not INR) and, for exports, the
  * shipping-bill details GSTR-1 (EXP) and the e-Invoice carry.
  */
 export function ForexFields() {
+  useT(); // re-render on a language switch (5.4)
   const s = useInvoiceStore(
     useShallow((st) => ({
       currency: st.currency,
@@ -34,34 +37,34 @@ export function ForexFields() {
     <>
       {foreign && (
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="fx-rate">Exchange rate (₹ per {cur})</label>
+          <label className={controls.label} htmlFor="fx-rate">{edT('fxRate', { currency: cur })}</label>
           <NumberInput
             id="fx-rate"
             className={`${controls.input} ${controls.inputNumeric}`}
             value={rate}
             onChange={(n) => s.patch({ exchange_rate: n > 0 ? n : undefined })}
-            placeholder="e.g. 83.25"
+            placeholder={edT('fxRatePh')}
           />
           <span className={controls.hint}>
             {rate > 0
-              ? `Total ≈ ${formatCurrency(inrValue(s.total, { currency: cur, exchange_rate: rate }))} for GST returns, e-Invoice, Books and Tally.`
-              : 'Use the rate notified by CBIC (the shipping-bill rate) for the invoice date. Without it this document is left out of rupee totals and GST returns flag it.'}
+              ? edT('fxTotal', { amount: formatCurrency(inrValue(s.total, { currency: cur, exchange_rate: rate })) })
+              : edT('fxHint')}
           </span>
         </div>
       )}
       {exportSupply && (
         <div className={controls.row3}>
           <label className={controls.field}>
-            <span className={controls.label}>Shipping bill no.</span>
-            <input className={controls.input} value={s.shipping_bill_no ?? ''} onChange={(e) => s.patch({ shipping_bill_no: e.target.value || undefined })} placeholder="Optional" />
+            <span className={controls.label}>{edT('fxBill')}</span>
+            <input className={controls.input} value={s.shipping_bill_no ?? ''} onChange={(e) => s.patch({ shipping_bill_no: e.target.value || undefined })} placeholder={edT('fxOptional')} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Shipping bill date</span>
+            <span className={controls.label}>{edT('fxBillDate')}</span>
             <input className={controls.input} type="date" value={s.shipping_bill_date ?? ''} onChange={(e) => s.patch({ shipping_bill_date: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Port code</span>
-            <input className={controls.input} maxLength={6} value={s.port_code ?? ''} onChange={(e) => s.patch({ port_code: e.target.value.toUpperCase() || undefined })} placeholder="e.g. INNSA1" />
+            <span className={controls.label}>{edT('fxPort')}</span>
+            <input className={controls.input} maxLength={6} value={s.port_code ?? ''} onChange={(e) => s.patch({ port_code: e.target.value.toUpperCase() || undefined })} placeholder={edT('fxPortPh')} />
           </label>
         </div>
       )}

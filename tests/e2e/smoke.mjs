@@ -174,6 +174,11 @@ try {
       return document.fonts.check("16px 'Noto Sans Devanagari'", 'क');
     });
     check(stored === 'hi' && fontOk, `the choice is kept on this device (${stored}) and the self-hosted Devanagari font loads (${fontOk})`);
+    // Round 2 area catalogues: the Clients list (sales area) is translated too.
+    await page.goto(srv.origin + '/clients');
+    await page.getByRole('button', { name: 'ग्राहक जोड़ें' }).first().waitFor();
+    await page.getByRole('searchbox', { name: 'ग्राहक खोजें' }).waitFor();
+    check(true, 'Clients page shows Hindi (sales area catalogue)');
     await page.goto(srv.origin + '/settings');
     await page.getByLabel('Language / भाषा').first().selectOption('en');
     await nav.getByRole('link', { name: 'Dashboard' }).waitFor();

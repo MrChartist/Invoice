@@ -6,6 +6,8 @@ import { customFieldsDb, fieldsFor, readValues, setSnapshotValue, type CustomFie
 import type { CustomFieldDef } from '../../types/custom-fields';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from './CustomFieldsCard.module.css';
 
 type Row = Pick<CustomFieldDef, 'id' | 'label' | 'type' | 'print'> & { scope?: 'party'; stored?: CustomFieldValue };
@@ -16,6 +18,7 @@ type Row = Pick<CustomFieldDef, 'id' | 'label' | 'type' | 'print'> & { scope?: '
  * field was since deleted stay visible so they can still be edited or cleared.
  */
 export function CustomFieldsCard({ refreshKey = 0 }: { refreshKey?: number }) {
+  useT(); // re-render on a language switch (5.4)
   const values = useInvoiceStore((s) => s.custom_values);
   const patch = useInvoiceStore((s) => s.patch);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -36,8 +39,8 @@ export function CustomFieldsCard({ refreshKey = 0 }: { refreshKey?: number }) {
   return (
     <section className={surface.card}>
       <div className={surface.cardHead}>
-        <span>5 · More details</span>
-        <Link to="/settings?tab=fields" className={styles.manage}>Manage fields</Link>
+        <span>{edT('cfTitle')}</span>
+        <Link to="/settings?tab=fields" className={styles.manage}>{edT('cfManage')}</Link>
       </div>
       <div className={surface.cardBody}>
         <div className={styles.grid}>
@@ -49,8 +52,8 @@ export function CustomFieldsCard({ refreshKey = 0 }: { refreshKey?: number }) {
               <div key={row.id} className={controls.field}>
                 <label className={controls.label} htmlFor={id}>
                   {label}
-                  {print && <Printer size={12} className={styles.printIcon} aria-label="(printed)" />}
-                  {row.scope === 'party' && <span className={styles.tag}>client</span>}
+                  {print && <Printer size={12} className={styles.printIcon} aria-label={edT('cfPrinted')} />}
+                  {row.scope === 'party' && <span className={styles.tag}>{edT('cfClient')}</span>}
                 </label>
                 <input
                   id={id}

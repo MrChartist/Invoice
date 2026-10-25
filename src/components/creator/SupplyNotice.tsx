@@ -12,6 +12,8 @@ import {
 import { amendmentLabel } from '../../lib/amendments';
 import type { ExemptKind } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from './SupplyNotice.module.css';
 
 /**
@@ -20,6 +22,7 @@ import styles from './SupplyNotice.module.css';
  * Supply), the Table 8 column of a regular taxpayer's Bill of Supply, and the amendment marker.
  */
 export function SupplyNotice() {
+  useT(); // re-render on a language switch (5.4)
   const s = useInvoiceStore(useShallow((st) => pick(st, ['amends', 'doc_type', 'exempt_kind', 'issue_date', 'items', 'patch', 'place_of_supply', 'sender'])));
   const composition = isComposition(s.sender);
   const bos = s.doc_type === 'BILL_OF_SUPPLY';
@@ -33,24 +36,24 @@ export function SupplyNotice() {
         <p className={styles.line}>
           <Info size={14} aria-hidden="true" />
           <span>
-            Composition scheme{rate !== null ? ` (${rate}% of turnover, paid in CMP-08)` : ''}: no GST is charged and the document prints “{COMPOSITION_DECLARATION}”.
+            {edT('snComposition', { rate: rate !== null ? edT('snRate', { rate }) : '', declaration: COMPOSITION_DECLARATION })}
           </span>
         </p>
       )}
       {!composition && bos && (
         <label className={styles.kind}>
-          <span>Bill of Supply for</span>
+          <span>{edT('snBosFor')}</span>
           <select
             className={controls.select}
             value={s.exempt_kind ?? 'EXEMPT'}
             onChange={(e) => s.patch({ exempt_kind: e.target.value as ExemptKind })}
-            aria-label="Kind of untaxed supply (GSTR-1 Table 8)"
+            aria-label={edT('snKindAria')}
           >
             {(Object.keys(EXEMPT_KIND_LABELS) as ExemptKind[]).map((k) => (
-              <option key={k} value={k}>{EXEMPT_KIND_LABELS[k]}</option>
+              <option key={k} value={k}>{edT(`exempt.${k}`)}</option>
             ))}
           </select>
-          <span className={styles.muted}>Reported in GSTR-1 Table 8 and GSTR-3B 3.1(c) / (e).</span>
+          <span className={styles.muted}>{edT('snReported')}</span>
         </label>
       )}
       {warnings.map((w) => (
@@ -62,7 +65,7 @@ export function SupplyNotice() {
       {s.amends && (
         <p className={styles.line}>
           <FileClock size={14} aria-hidden="true" />
-          <span>{amendmentLabel(s.amends)} The original stays in its own return unchanged.</span>
+          <span>{amendmentLabel(s.amends)} {edT('snOriginal')}</span>
         </p>
       )}
     </div>
