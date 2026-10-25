@@ -298,6 +298,12 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // 7U: sales agents (master) and the commission payable journals posted for them
   sales_agents: 'master.edit',
   commission_postings: 'books.edit',
+  // 8C: documents inbox, draft bills (out of the books), recurring bills, bank rules, payment requests
+  doc_inbox: 'books.edit',
+  purchase_drafts: 'books.edit',
+  recurring_bills: 'books.edit',
+  bank_rules: 'books.edit',
+  payment_requests: 'books.edit',
   // approvals decision log: only the owner's decision writes it (approvals.ts `decide`); a clerk's
   // request lives on the document itself, so a clerk can never forge a decision row (review L5)
   approvals: 'doc.approve',

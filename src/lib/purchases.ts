@@ -15,6 +15,7 @@ import { assertUnlocked, type LockAction } from './period-lock';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { supplierPayable } from './purchase-normalize';
 import { assertRemovable, liveRemovalIssues } from './stock-timeline';
+import { assertBillApproval } from './purchase-approval-gate';
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -351,7 +352,13 @@ export const purchasesDb = {
     const existing = input.id ? purchasesDb.get(input.id) : undefined;
     if (existing) assertBillUnlocked(existing, 'edit');
     assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
-    return writeBill(input);
+    assertBillApproval(input, existing); // 8.44: a clerk's bill above the threshold waits in purchase_drafts
+    // A posted draft (8C) never carries its draft envelope into the books.
+    const { draft: _draft, ...rest } = input as typeof input & { draft?: unknown };
+    void _draft;
+    const bill = { ...rest };
+    if ((bill as { status?: unknown }).status === 'draft') delete bill.status; // other legacy statuses (cancelled) are kept
+    return writeBill(bill);
   },
 
   /**

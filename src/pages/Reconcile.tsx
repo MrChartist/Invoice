@@ -49,10 +49,16 @@ import bank from '../components/bank/reconcile.module.css';
 import styles from './Reconcile.module.css';
 import { bnkT } from '../i18n/areas/banking';
 import type { BankDoc } from '../components/bank/docs/BankingDocs';
+import type { RulePrompt } from '../components/bank/rules/RuleSuggestions';
+import { capT } from '../i18n/areas/capture';
+import { paymentsDb, purchasesDb } from '../lib/purchases';
 
 // WP-5: deposit slip, payment advice, e-payments, cash tally — loaded only when the tab opens.
 const BankingDocs = lazy(() => import('../components/bank/docs/BankingDocs'));
 const BANK_DOCS: readonly BankDoc[] = ['deposit', 'advice', 'epay', 'cash', 'forex'];
+// 8.45: bank rules + memory — the rule list and the suggestions strip load on demand.
+const BankRulesPanel = lazy(() => import('../components/bank/rules/BankRulesPanel'));
+const RuleSuggestions = lazy(() => import('../components/bank/rules/RuleSuggestions'));
 
 const TABS = [
   { id: 'reconcile', label: 'tabReconcile' },
@@ -60,6 +66,7 @@ const TABS = [
   { id: 'statements', label: 'tabStatements' },
   { id: 'import', label: 'tabImport' },
   { id: 'documents', label: 'tabDocuments' },
+  { id: 'rules', label: 'tabRules' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -89,6 +96,7 @@ export function Reconcile() {
   const [receiptLine, setReceiptLine] = useState<BankLine | null>(null);
   const [expenseLine, setExpenseLine] = useState<BankLine | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [rulePrompt, setRulePrompt] = useState<RulePrompt | null>(null);
   const { notify, toastNode } = useToast();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -168,6 +176,9 @@ export function Reconcile() {
     return m;
   }, [suggestionList]);
   const confirmable = useMemo(() => confirmableAll(suggestionList), [suggestionList]);
+  // Rules / memory run after invoice matching: open lines only, minus those with a Match suggestion.
+  const openLines = useMemo(() => lines.filter((l) => { const st = lineState(l, index); return st === 'unmatched' || st === 'orphan'; }).map((l) => (l.matched_to ? { ...l, matched_to: undefined } : l)), [lines, index]);
+  const matchedIds = useMemo(() => new Set(suggestions.keys()), [suggestions]);
 
   const closing = useMemo(() => closingAcross(scoped), [scoped]);
   const vouchers = useMemo(() => buildVouchers(books), [books]);
@@ -273,7 +284,7 @@ export function Reconcile() {
     />
   );
 
-  if (statements.length === 0 && tab !== 'documents') {
+  if (statements.length === 0 && tab !== 'documents' && tab !== 'rules') {
     return (
       <div className={surface.page}>
         {header}
@@ -337,7 +348,7 @@ export function Reconcile() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {t.id === 'documents' ? bnkT('tabDocuments') : bankT(t.label as Exclude<typeof t.label, 'tabDocuments'>)}
+            {t.id === 'documents' ? bnkT('tabDocuments') : t.id === 'rules' ? capT('tabRules') : bankT(t.label as Exclude<typeof t.label, 'tabDocuments' | 'tabRules'>)}
           </button>
         ))}
       </div>
@@ -380,6 +391,26 @@ export function Reconcile() {
                 </button>
               </div>
             </div>
+            {openLines.length > 0 && (
+              <Suspense fallback={null}>
+                <RuleSuggestions
+                  statements={statements}
+                  lines={openLines}
+                  matched={matchedIds}
+                  purchases={books.purchases}
+                  purchasePayments={books.purchasePayments}
+                  prompt={rulePrompt}
+                  onPromptDone={() => setRulePrompt(null)}
+                  onApplied={(next, message) => {
+                    setStatements(next);
+                    refreshBooks();
+                    notify(message);
+                  }}
+                  notify={notify}
+                  onManage={() => selectTab('rules')}
+                />
+              </Suspense>
+            )}
             <div className={surface.card}>
               {items.length === 0 ? (
                 <EmptyState
@@ -427,6 +458,11 @@ export function Reconcile() {
 
         {tab === 'import' && <ImportPanel existing={statements} onImport={importStatement} onCancel={() => selectTab('reconcile')} />}
         {tab === 'import' && multi && account && <p className={surface.sectionNote}>{bankT('importsInto', { name: account.name })}</p>}
+        {tab === 'rules' && (
+          <Suspense fallback={null}>
+            <BankRulesPanel notify={notify} />
+          </Suspense>
+        )}
         {tab === 'documents' && (
           <Suspense fallback={null}>
             <BankingDocs
@@ -464,6 +500,12 @@ export function Reconcile() {
         onSettled={(line, paymentId) => {
           matchTo(line, 'purchase_payment', [paymentId]);
           notify(bankT('paymentMatched'));
+          // 8.45: offer a rule for similar lines, pre-filled from this categorisation.
+          const bill = purchasesDb.get(paymentsDb.all().find((p) => p.id === paymentId)?.purchase_id ?? '');
+          if (bill?.kind === 'EXPENSE') {
+            const st = statements.find((x) => x.lines.some((l) => l.id === line.id));
+            setRulePrompt({ line, bankAccountId: st?.bank_account_id, action: { kind: 'expense', category: bill.category, vendor_id: bill.vendor_id, vendor_name: bill.vendor_name, gst_rate: bill.lines.length === 1 ? bill.lines[0].tax_rate : 0, itc: bill.itc_eligible } });
+          }
         }}
       />
       <ConfirmDialog

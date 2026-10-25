@@ -108,6 +108,32 @@ day-end cash tally. Everything is local: files are generated in the browser, not
   vouchers, so they reach Tally too.
 - Tests: `tests/banking-7u.test.ts`; contract row in `tests/purchase-contract.test.ts`.
 
+## Bank rules + memory (8C, roadmap 8.45)
+Zoho Books banking rules / Xero bank rules + JAX-style suggestions for imported statements. Reconcile → **Rules** tab
+(lazy `components/bank/rules/BankRulesPanel.tsx`) and a suggestions strip above the line list (lazy `RuleSuggestions.tsx`).
+Lib: `src/lib/bank-rules.ts` (pure matching, memory, storage), `src/lib/bank-rules-apply.ts` (writes). Strings `capT`.
+Tests: `tests/capture-bank-rules.test.ts`.
+
+- **Rule** (table `bank_rules`): conditions joined by ALL / ANY — narration contains / starts with / regex (≤ 120 chars,
+  no back-references, lookbehind or quantified groups containing a quantifier / alternation; narrations capped at 500
+  chars), counterparty token (`counterpartyToken` = `nameTokens(guessCounterparty(…))`), amount range, debit / credit, bank
+  account; priority (lower first). Action: **expense** (head, supplier, GST slab included in the amount + ITC — e.g. bank
+  charges 18% with ITC — cost centre, branch, mode), **voucher** (Payment / Receipt voucher to a ledger, party for control
+  ledgers), **receipt** against a customer's open invoices (oldest first), **contra** to another cash / bank ledger (an
+  existing contra of the same amount between the same ledgers within ±3 days is reused, so importing both banks never
+  posts twice), **ignore**.
+- **Order**: suggestions run after invoice matching — a line already matched / ignored or carrying a Match suggestion
+  gets none. First matching rule wins; **Memory** only for lines no rule caught. Each suggestion is labelled **Rule** or
+  **Memory** in the strip; the engine's matches stay labelled in the line list (Match).
+- **Memory** is derived, never stored: debit lines matched to a payment of an expense teach counterparty token → expense
+  head / supplier / GST rate (most frequent wins). Categorising a line by hand ("Create expense") therefore teaches it,
+  and the screen offers **"Create a rule for similar lines?"** pre-filled from that line (`ruleDraftFromLine`).
+- **Apply** (`applyBankBatch`): every item is checked first (direction, GST rate gives the amount, ledger exists,
+  approval threshold, receipt within the open balance), then written through `purchasesDb.save` + `paymentsDb.record`,
+  `saveVoucher` or `localDb.payments.record` inside `withTablesRollback` — roles, period lock, approval gate and audit
+  apply, and one refusal undoes the whole batch. One audit row summarises the batch. A clerk's expense above the bill
+  approval limit is refused (record it from the expense form to send it for approval).
+
 ## Known gaps
 Gateway / VoucherEditor show bank ledgers through the chart but have no account picker of their own; dashboard
 per-bank tiles (P1-17); supplier payments in a foreign currency from an EEFC account (bills are rupee-only); bank

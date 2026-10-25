@@ -39,8 +39,8 @@ export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 /** Largest photo accepted for downscaling (phone cameras produce 5–12 MB). */
 export const MAX_IMAGE_INPUT_BYTES = 20 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_RECORD = 10;
-/** Tables whose rows carry `attachments`. */
-export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases'] as const;
+/** Tables whose rows carry `attachments` (8C: draft bills and the unprocessed-documents inbox too). */
+export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases', 'purchase_drafts', 'doc_inbox'] as const;
 
 export const ACCEPTED_MIMES: readonly AttachmentMime[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 /** `accept` attribute for file inputs (a hint only; content is checked by magic bytes). */

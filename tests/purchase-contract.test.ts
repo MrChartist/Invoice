@@ -609,3 +609,47 @@ test('7U reader (e-payment confirmation: open bills of a supplier) reads the rea
   assert.equal(openBillsOf([{ ...bill, amount_paid: 1180 }], { name: 'Acme Supplies' }).length, 0);
   assert.equal(openBillsOf([{ ...bill, status: 'Cancelled' } as never], { name: 'Acme Supplies' }).length, 0);
 });
+
+test('8C: draft bills (status draft, purchase_drafts) are skipped by every reader; capture fields change no figure', async () => {
+  const { isVoidStatus } = await import('../src/lib/purchase-normalize.ts');
+  const draft = { ...bill, id: 'd1', status: 'draft', draft: { source: 'capture', created_at: '' } } as never;
+  // If a draft row ever reached `purchases`, the books, GST papers, exports and stock skip it.
+  assert.equal(isVoidStatus(readPurchase(draft)!.status), true);
+  assert.equal(booksNormalize(draft), null);
+  assert.equal(gstNormalize(draft, '27'), null);
+  const stock = collectEvents({
+    items: [{ id: 's1', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }] as never,
+    moves: [],
+    invoices: [],
+    purchases: [draft] as never,
+  });
+  assert.equal([...stock.values()].flat().length, 0, 'no stock-in from a draft');
+  // e-invoice IRN / recurring links are additive and leave every money figure alone.
+  const captured: PurchaseRecord = { ...bill, id: 'c1', einvoice_irn: 'f'.repeat(64), einvoice_irn_date: '2026-04-12', recurring_bill_id: 'rb1', recurring_date: '2026-04-01' };
+  assert.equal(booksNormalize(captured as never)!.total, 1180);
+  assert.equal(gstNormalize(captured, '27')!.cgst, 90);
+  assert.equal(exportNormalize(captured)!.taxable, 1000);
+  // Posting strips the draft envelope.
+  const { billOfDraft } = await import('../src/lib/purchase-drafts.ts');
+  const posted = billOfDraft(draft) as unknown as Record<string, unknown>;
+  assert.equal(posted.status, undefined);
+  assert.equal(posted.draft, undefined);
+  assert.equal(posted.total, 1180);
+});
+
+test('8C readers (duplicate guard, bank memory, bills due soon) read the real bill shape and skip drafts', async () => {
+  const { findBillDuplicates } = await import('../src/lib/bill-duplicates.ts');
+  const { buildMemory } = await import('../src/lib/bank-rules.ts');
+  const { billsDueSoon } = await import('../src/lib/recurring-bills.ts');
+  assert.equal(findBillDuplicates({ ...bill, id: undefined, bill_number: 'as-22' }, [bill]).exact.length, 1);
+  assert.equal(findBillDuplicates({ ...bill, id: undefined }, [{ ...bill, status: 'draft' }]).exact.length, 0);
+  const expense: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE', category: 'Rent' };
+  const st = [{ id: 's', imported_at: '', bank_label: '', file_name: '', lines: [{ id: 'l', date: '2026-04-12', narration: 'NEFT ACME SUPPLIES RENT', ref: '', debit: 1180, credit: 0, matched_to: { type: 'purchase_payment' as const, id: 'pp' } }] }];
+  const mem = buildMemory(st, [expense], [{ id: 'pp', purchase_id: 'e1' }]);
+  assert.equal([...mem.values()][0]?.category, 'Rent');
+  assert.equal([...mem.values()][0]?.gst_rate, 18);
+  assert.equal(buildMemory(st, [{ ...expense, status: 'draft' }], [{ id: 'pp', purchase_id: 'e1' }]).size, 0);
+  // Bills due: what the SUPPLIER is owed (supplierPayable via balanceOf), drafts skipped.
+  const due = billsDueSoon([{ ...bill, due_date: '2026-04-15', reverse_charge: true }, { ...bill, id: 'd', due_date: '2026-04-15', status: 'draft' }], [], '2026-04-12', '27');
+  assert.deepEqual(due.bills.map((b) => [b.id, b.balance]), [['p1', 1000]]);
+});

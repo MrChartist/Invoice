@@ -2,7 +2,7 @@
  * Exception reports (WP-2, P1-5): negative ledgers (cash / bank below zero on any day, debtors in
  * credit, creditors in debit, assets with credit and liabilities with debit balances), negative
  * stock, overdue receivables, post-dated vouchers (dated after today) and vouchers the ledger left
- * out. Memorandum / optional / reversing registers appear here once WIP-C's voucher classes exist
+ * out, and possible duplicate supplier bills (8.42). Memorandum / optional / reversing registers appear here once WIP-C's voucher classes exist
  * (any ledger voucher kind the caller passes in `extraKinds`).
  * Pure. Working papers — verify with your CA.
  */
@@ -13,6 +13,7 @@ import type { Ledger, LedgerVoucher } from './postings';
 import { closingBalances } from './reports';
 import { partyFigures } from './group-summary';
 import { accountGroupId, natureOfGroup } from './report-groups';
+import type { DuplicatePair } from '../bill-duplicates';
 
 export interface NegativeLedger {
   accountId: string;
@@ -50,6 +51,8 @@ export interface ExceptionReport {
   overdue: OverdueBill[];
   postDated: LedgerVoucher[];
   warnings: string[];
+  /** 8.42: supplier bills that may be entered twice (same bill no. in the FY, or same amount ±3 days). */
+  duplicateBills: DuplicatePair[];
 }
 
 const CONTROL = new Set(['TRADE_RECEIVABLES', 'TRADE_PAYABLES']);
@@ -128,7 +131,7 @@ export function exceptionReport(
   ledger: Ledger,
   period: Period,
   today: string,
-  extra: { positions?: readonly StockPosition[]; overdue?: readonly OverdueBill[] } = {},
+  extra: { positions?: readonly StockPosition[]; overdue?: readonly OverdueBill[]; duplicateBills?: readonly DuplicatePair[] } = {},
 ): ExceptionReport {
   return {
     period,
@@ -138,5 +141,7 @@ export function exceptionReport(
     // The automatic year-end depreciation is dated 31 March of the running FY: not a post-dated entry.
     postDated: ledger.vouchers.filter((v) => v.date > today && v.kind !== 'Depreciation'),
     warnings: [...ledger.warnings],
+    // Pairs whose later bill falls in the period (`duplicateBillPairs` in bill-duplicates.ts).
+    duplicateBills: (extra.duplicateBills ?? []).filter((d) => d.b.date >= period.start && d.b.date <= period.end),
   };
 }

@@ -19,6 +19,9 @@ import type { BooksData, Period } from '../../../lib/books';
 import type { StockPosition } from '../../../lib/inventory';
 import { formatDate } from '../../../lib/utils';
 import { reportsT } from '../../../i18n/areas/reports-engine';
+import { capT } from '../../../i18n/areas/capture';
+import { duplicateBillPairs } from '../../../lib/bill-duplicates';
+import type { PurchaseRecord } from '../../../types/purchases';
 import { useT } from '../../../i18n';
 import { DrillStack } from './DrillStack';
 import { useDrill, useDrillRows } from './drill-hooks';
@@ -184,7 +187,7 @@ function ExceptionsView({ period, data, today, positions }: Props) {
     const overdue = rec.parties.flatMap((p) =>
       p.bills.filter((b) => b.daysOverdue > 0).map((b) => ({ party: p.name, number: b.number, dueDate: b.dueDate, outstanding: Math.round(b.outstanding * 100), daysOverdue: b.daysOverdue, invoiceId: b.invoiceId })),
     );
-    return exceptionReport(ledger, period, today, { positions: positions(), overdue });
+    return exceptionReport(ledger, period, today, { positions: positions(), overdue, duplicateBills: duplicateBillPairs(data.purchases as unknown as PurchaseRecord[]) });
   }, [ledger, period, today, data, positions]);
   const reasons: Record<string, string> = {
     cash_negative: reportsT('exCash'),
@@ -251,6 +254,20 @@ function ExceptionsView({ period, data, today, positions }: Props) {
                 <td>{formatDate(v.date)}</td>
                 <td><button type="button" className={styles.rowButton} onClick={() => openVoucher(v)}>{v.kind} {v.number}</button></td>
                 <td>{v.narration}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ))}
+      {section(capT('exDupTitle'), ex.duplicateBills.length, (
+        <table className={surface.table}>
+          <tbody>
+            {ex.duplicateBills.slice(0, 200).map((d) => (
+              <tr key={`${d.a.id}-${d.b.id}`}>
+                <td>{d.b.vendor_name}</td>
+                <td className={surface.mono}>{d.a.bill_number || '—'} / {d.b.bill_number || '—'}</td>
+                <td>{formatDate(d.a.date)} / {formatDate(d.b.date)} · {d.kind === 'exact' ? capT('exDupExact') : capT('exDupNear')}</td>
+                <td className={surface.numeric}>{money(Math.round(d.b.total * 100))}</td>
               </tr>
             ))}
           </tbody>

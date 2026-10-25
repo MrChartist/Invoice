@@ -198,6 +198,18 @@ export interface PurchaseRecord {
   tds_reason?: string;
   /** Sec 197 certificate number snapshot. */
   tds_cert_no?: string;
+  /* ── Capture, recurring bills, approvals (8C) — additive, all optional ── */
+  /**
+   * 'draft' only on rows of `purchase_drafts` (captured / recurring / held-for-approval bills). A bill in
+   * `purchases` never carries it; if one ever did, every reader skips it (`isVoidStatus`).
+   */
+  status?: 'draft';
+  /** IRN (64 hex) and IRN date of the supplier's e-invoice, from its signed QR (signature not verified). */
+  einvoice_irn?: string;
+  einvoice_irn_date?: string;
+  /** `recurring_bills` schedule and occurrence day this bill was drafted from. */
+  recurring_bill_id?: string;
+  recurring_date?: string;
 }
 
 /**

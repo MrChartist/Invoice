@@ -11,6 +11,8 @@ import { Modal } from '../../ui/Modal';
 import { useCan } from '../../../hooks/useCan';
 import { useT } from '../../../i18n';
 import { tallyT } from '../../../i18n/areas/tally';
+import { paymentNeedsApproval } from '../../../lib/purchase-approval-gate';
+import { capT } from '../../../i18n/areas/capture';
 import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
@@ -206,6 +208,8 @@ function PayBillsModal({ parties, onClose, onSaved }: { parties: PartyPayables[]
     setAlloc(Object.fromEntries(plan.lines.map((l) => [l.purchaseId, String(l.amount)])));
   };
   const save = () => {
+    // 8.44: above the owner's limit a clerk asks for approval per bill (bill's payment dialog) instead.
+    if (paymentNeedsApproval(paid)) return setError(capT('payBillwiseHeld'));
     try {
       recordSupplierPayment({
         vendorId: vendor?.id,
