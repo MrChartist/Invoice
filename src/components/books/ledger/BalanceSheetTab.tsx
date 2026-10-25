@@ -7,10 +7,17 @@ import {
   depreciationSchedule,
   fyLabelOf,
   ledgerBalanceSheet,
+  type BsItem,
   type BsSection,
   type FixedAsset,
   type Ledger,
+  type StockValuer,
 } from '../../../lib/ledger';
+import type { Period } from '../../../lib/books';
+import { reportsT } from '../../../i18n/areas/reports-engine';
+import { DrillStack } from './DrillStack';
+import { useDrill, useDrillRows } from './drill-hooks';
+import { groupFrame, ledgerFrame } from './report-frames';
 import { fyStartYearOf } from '../../../lib/books';
 import { DEPRECIATION_BLOCK_LABELS } from '../../../lib/tax-rules';
 import { formatDate } from '../../../lib/utils';
@@ -28,15 +35,26 @@ import { ledgerT } from '../../../i18n/areas/books-ledger';
 interface Props {
   ledger: Ledger;
   asOf: string;
+  /** Period whose end is `asOf` (drill-down screens use it). */
+  period: Period;
+  stock?: StockValuer;
   assets: FixedAsset[];
   today: string;
   onChanged: () => void;
-  onOpenAccount: (id: string) => void;
   notify: (msg: string, tone?: 'success' | 'error') => void;
 }
 
-function Side({ title, sections, total, onOpenAccount }: { title: string; sections: BsSection[]; total: number; onOpenAccount: (id: string) => void }) {
-  useT();
+function Side({ title, sections, total, index, row, onItem, onAccount }: {
+  title: string;
+  sections: BsSection[];
+  total: number;
+  /** Position of this side's first item in the keyboard list. */
+  index: number;
+  row: (i: number) => Record<string, unknown>;
+  onItem: (i: BsItem) => void;
+  onAccount: (accountId: string, party?: string) => void;
+}) {
+  let k = index;
   return (
     <div className={surface.card}>
       <div className={surface.cardHead}>{title}</div>
@@ -45,15 +63,19 @@ function Side({ title, sections, total, onOpenAccount }: { title: string; sectio
           <li key={s.key} className={books.statement}>
             <div className={books.stmtHead}><span>{s.label}</span><span /></div>
             {s.items.map((i) => (
-              <details key={i.label}>
+              <details key={i.label} {...row(k++)}>
                 <summary className={`${books.stmtRow} ${styles.summary}`}>
-                  <span>{i.label}</span>
+                  {i.groupId ? (
+                    <button type="button" className={styles.rowButton} onClick={(e) => { e.preventDefault(); onItem(i); }}>{i.label}</button>
+                  ) : (
+                    <span>{i.label}</span>
+                  )}
                   <span className={books.amt}>{money(i.amount)}</span>
                 </summary>
                 {i.detail.map((d, n) => (
                   <div key={n} className={books.stmtSub}>
                     {d.accountId ? (
-                      <button type="button" className={styles.rowButton} onClick={() => onOpenAccount(d.accountId!)}>{d.label}</button>
+                      <button type="button" className={styles.rowButton} onClick={() => onAccount(d.accountId!, d.party)}>{d.label}</button>
                     ) : (
                       <span>{d.label}</span>
                     )}
@@ -74,9 +96,32 @@ function Side({ title, sections, total, onOpenAccount }: { title: string; sectio
   );
 }
 
-export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpenAccount, notify }: Props) {
+export function BalanceSheetTab(props: Props) {
   useT();
-  const bs = useMemo(() => ledgerBalanceSheet(ledger, asOf), [ledger, asOf]);
+  return (
+    <DrillStack rootTitle={reportsT('balanceSheet')} resetKey={props.asOf}>
+      <BalanceSheetRoot {...props} />
+    </DrillStack>
+  );
+}
+
+function BalanceSheetRoot({ ledger, asOf, period, stock, assets, today, onChanged, notify }: Props) {
+  useT();
+  const drill = useDrill();
+  const bs = useMemo(() => ledgerBalanceSheet(ledger, asOf, stock), [ledger, asOf, stock]);
+  // The drill period runs to the balance-sheet date so ledgers show their closing as at that date.
+  const drillPeriod = useMemo(() => ({ start: period.start <= asOf ? period.start : asOf, end: asOf }), [period.start, asOf]);
+  const items = useMemo(() => [...bs.equityAndLiabilities, ...bs.assets].flatMap((s) => s.items), [bs]);
+  const onItem = (i: BsItem) => i.groupId && drill.push(groupFrame(ledger, i.groupId, drillPeriod));
+  const onAccount = (id: string, party?: string) => drill.push(ledgerFrame(ledger, id, drillPeriod, party));
+  const nav = useDrillRows(items.length, (n) => onItem(items[n]));
+  const liabCount = bs.equityAndLiabilities.reduce((s, x) => s + x.items.length, 0);
+  // Clicking a line toggles its break-up (the label button drills); Enter on the selected line drills.
+  const rowProps = (i: number) => {
+    const { onClick, ...rest } = nav.row(i);
+    void onClick;
+    return rest;
+  };
   const fy = fyStartYearOf(asOf);
   const blocks = useMemo(() => blockSummary(assets, fy, today), [assets, fy, today]);
   const [editing, setEditing] = useState<FixedAsset | null | 'new'>(null);
@@ -105,13 +150,17 @@ export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpen
 
       <div className={books.notice} role="note">
         <Info size={16} className={books.noticeIcon} aria-hidden="true" />
-        <span>{ledgerT('bsNotice', { date: formatDate(asOf), profit: money(bs.profitForYear) })}</span>
+        <span>
+          {ledgerT('bsNotice', { date: formatDate(asOf), profit: money(bs.profitForYear) })}{' '}
+          {stock ? reportsT('bsStockNote', { method: stock.label }) : reportsT('bsNoStockNote')}
+        </span>
       </div>
 
-      <div className={books.twoCol}>
-        <Side title={ledgerT('bsEquity')} sections={bs.equityAndLiabilities} total={bs.totalEquityAndLiabilities} onOpenAccount={onOpenAccount} />
-        <Side title={ledgerT('bsAssets')} sections={bs.assets} total={bs.totalAssets} onOpenAccount={onOpenAccount} />
+      <div className={`${books.twoCol} ${styles.drillTable}`} tabIndex={0} onKeyDown={nav.table.onKeyDown} id={nav.bodyId}>
+        <Side title={ledgerT('bsEquity')} sections={bs.equityAndLiabilities} total={bs.totalEquityAndLiabilities} index={0} row={rowProps} onItem={onItem} onAccount={onAccount} />
+        <Side title={ledgerT('bsAssets')} sections={bs.assets} total={bs.totalAssets} index={liabCount} row={rowProps} onItem={onItem} onAccount={onAccount} />
       </div>
+      <p className={books.muted}>{reportsT('drillHint')}</p>
 
       <div className={surface.card}>
         <div className={`${surface.cardHead} ${books.toolbar}`}>

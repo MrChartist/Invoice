@@ -517,9 +517,59 @@ try {
     await page.getByText('Reconciles to cash & bank').waitFor();
     check(true, 'cash-flow statement reconciles');
     await page.getByRole('tab', { name: 'Trial balance' }).click();
-    await page.getByRole('button', { name: 'Capital account' }).click();
-    await page.getByRole('tab', { name: 'Ledger', selected: true }).waitFor();
+    // The group row and the ledger row are both called "Capital account": the ledger is the second.
+    await page.getByRole('button', { name: 'Capital account', exact: true }).last().click();
+    await page.getByText('Ledger Monthly Summary: Capital account').first().waitFor();
+    await page.getByRole('button', { name: 'All vouchers' }).click();
     check(await page.getByText(/JV\/FY\d{2}-\d{2}\/0001/).first().isVisible(), 'drill-down opens the capital ledger with the voucher');
+  });
+
+  await step('reports engine: a journal shows in Day Book, P&L and TB; BS drills to the voucher; Esc goes back', async () => {
+    await page.goto(srv.origin + '/books?tab=vch');
+    await page.getByRole('button', { name: 'New voucher' }).click();
+    const dlg = page.getByRole('dialog', { name: 'New voucher' });
+    await dlg.getByLabel('Line 1 account').selectOption('rent');
+    await dlg.getByLabel('Line 1 debit').fill('1234');
+    await dlg.getByLabel('Line 2 account').selectOption('bank');
+    await dlg.getByLabel('Line 2 credit').fill('1234');
+    await dlg.getByText('Balanced').waitFor();
+    await dlg.getByRole('button', { name: 'Save voucher' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const jv2 = /JV\/FY\d{2}-\d{2}\/0002/;
+    await page.getByRole('tab', { name: 'Day book' }).click();
+    await page.getByRole('button', { name: jv2 }).first().waitFor();
+    check(true, 'the manual journal is in the ledger Day Book');
+    await page.getByRole('tab', { name: 'Profit & loss' }).click();
+    await page.getByRole('button', { name: 'Other (indirect) expenses' }).first().click();
+    await page.getByText('Group Summary: Other (indirect) expenses').first().waitFor();
+    await page.getByRole('button', { name: 'Rent', exact: true }).first().waitFor();
+    check(true, 'P&L → group drill shows the Rent ledger from the journal');
+    await page.keyboard.press('Escape');
+    await page.getByText('Trading account').first().waitFor();
+    check(true, 'Esc goes back to the Trading / P&L account');
+    await page.getByRole('tab', { name: 'Trial balance' }).click();
+    await page.getByText('Debits = credits').waitFor();
+    await page.getByRole('button', { name: 'Rent', exact: true }).first().waitFor();
+    check(true, 'the journal is in the trial balance');
+    await page.getByRole('tab', { name: 'Balance sheet' }).click();
+    await page.getByText('Assets = liabilities + equity').waitFor();
+    await page.getByRole('button', { name: 'Cash & cash equivalents' }).click();
+    await page.getByText('Group Summary: Cash & bank').first().waitFor();
+    await page.getByRole('button', { name: 'Bank account', exact: true }).first().click();
+    await page.getByText('Ledger Monthly Summary: Bank account').first().waitFor();
+    await page.getByRole('button', { name: 'All vouchers' }).click();
+    await page.getByRole('button', { name: jv2 }).first().click();
+    const edit = page.getByRole('dialog', { name: /Edit voucher/ });
+    await edit.waitFor();
+    check(true, 'BS → group → ledger → vouchers → voucher opens the voucher editor');
+    await page.keyboard.press('Escape');
+    await edit.waitFor({ state: 'detached' });
+    await page.keyboard.press('Escape');
+    await page.getByText('Ledger Monthly Summary: Bank account').first().waitFor();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await page.getByText('Assets = liabilities + equity').waitFor();
+    check(await page.getByRole('navigation', { name: 'Drill-down path' }).count() === 0, 'Esc walks back level by level to the balance sheet');
   });
 
   await step('Gateway of Tally: V → F5 payment voucher, Ctrl+A saves, Day Book drills into it, Esc back', async () => {

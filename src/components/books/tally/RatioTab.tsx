@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Download, Info, Printer } from 'lucide-react';
-import { ratioAnalysis, ratioText, type Ledger, type RatioItem } from '../../../lib/ledger';
+import { loadStockValuer, ratioAnalysis, ratioText, type Ledger, type RatioItem } from '../../../lib/ledger';
 import type { Period } from '../../../lib/books';
 import { toCsv } from '../../../lib/csv';
 import { formatDate, formatMoney } from '../../../lib/utils';
@@ -17,7 +17,8 @@ const show = (r: RatioItem) => (r.unit === 'money' ? (r.value === null ? '—' :
 /** Tally's Ratio Analysis from the ledger, with drill-down to the accounts behind each figure. */
 export function RatioTab({ ledger, period, asOf, onOpenAccount }: { ledger: Ledger; period: Period; asOf: string; onOpenAccount: (id: string) => void }) {
   useT();
-  const r = useMemo(() => ratioAnalysis(ledger, period, asOf), [ledger, period, asOf]);
+  // Closing stock (WP-2 reports engine) per the company setting, so stock ratios use the valued stock.
+  const r = useMemo(() => ratioAnalysis(ledger, period, asOf, loadStockValuer()), [ledger, period, asOf]);
   const csv = () => toCsv([['Item', 'Value', 'Formula'], ...[...r.groups, ...r.ratios].map((x) => [x.label, x.unit === 'money' && x.value !== null ? (x.value / 100).toFixed(2) : ratioText(x), x.formula])]);
   const table = (title: string, items: RatioItem[]) => (
     <div className={surface.card}>

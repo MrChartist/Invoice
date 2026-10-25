@@ -114,6 +114,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `books_begin` | masters (WP-1) | one row `{id: 'books_begin', date}`: books beginning date of the openings |
 | `opening_bills` | masters (WP-1) | `OpeningBill` bill-wise opening outstandings per party, receivable / payable (`src/lib/opening-bills.ts`) |
 | `fixed_assets` | ledger | `FixedAsset` register rows (`src/lib/ledger/assets.ts`) |
+| `closing_stock` | reports engine | closing-stock source `{mode?, opening?, entries}` — one JSON object, not rows (`src/lib/ledger/closing-stock.ts`); report prefs / period are device-local outside the prefix |
 | `cost_centres` | cost centres (6.16) | `CostCentre` master (`src/lib/cost-centres.ts`); documents point at it via optional `cost_centre_id` (`docs/features/cost-centres-budgets.md`) |
 | `budgets` | budgets (6.17) | `Budget` rows: FY × account × optional cost centre, 12 monthly amounts in paise (`src/lib/ledger/budgets.ts`) |
 | `assets` | storage (`src/lib/assets.ts`) | `{id, data}`: logo / signature data URLs stored once, keyed by content hash (schema v3) |

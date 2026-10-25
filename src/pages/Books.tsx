@@ -3,21 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import {
   buildVouchers,
   loadBooksData,
-  periodForPreset,
   saveOpening,
   toIsoDate,
   type BooksData,
   type CashAccount,
-  type Period,
-  type PeriodPreset,
 } from '../lib/books';
+import { setPeriodContext, usePeriodContext } from '../lib/period-context';
 import { StorageWriteError } from '../lib/storage';
 import { useToast } from '../components/ui/useToast';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PeriodBar } from '../components/books/PeriodBar';
-import { DayBookTab } from '../components/books/DayBookTab';
 import { CashBankTab } from '../components/books/CashBankTab';
-import { ProfitLossTab } from '../components/books/ProfitLossTab';
 import { OpeningBalanceModal } from '../components/books/OpeningBalanceModal';
 import type { LedgerTabId } from '../components/books/ledger/LedgerPanel';
 import surface from '../styles/surface.module.css';
@@ -42,6 +38,7 @@ const TABS = [
   { id: 'pnl', label: 'tabPnl' },
   { id: 'bs', label: 'tabBs' },
   { id: 'cf', label: 'tabCf' },
+  { id: 'rpt', label: 'tabRpt' },
   { id: 'proj', label: 'tabProj' },
   { id: 'budget', label: 'tabBudget' },
   { id: 'coa', label: 'tabCoa' },
@@ -52,7 +49,8 @@ const TABS = [
   { id: 'ratio', label: 'tabRatio' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
-const LEDGER_TABS = new Set<TabId>(['vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
+// Day book and P&L read the ledger too (WP-2: one accounting truth); `rpt` = group summary, ratios, registers …
+const LEDGER_TABS = new Set<TabId>(['day', 'pnl', 'rpt', 'vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
 
 export function Books() {
   useT();
@@ -60,8 +58,8 @@ export function Books() {
   const tabParam = params.get('tab');
   const tab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : 'day';
 
-  const [preset, setPreset] = useState<PeriodPreset>('this_fy');
-  const [period, setPeriod] = useState<Period>(() => periodForPreset('this_fy'));
+  // Shared report period (Alt+F2), remembered on this device for every ledger report.
+  const { preset, period } = usePeriodContext();
   const [data, setData] = useState<BooksData>(() => loadBooksData());
   const [openingOpen, setOpeningOpen] = useState(false);
   const { notify, toastNode } = useToast();
@@ -138,10 +136,7 @@ export function Books() {
       <PeriodBar
         preset={preset}
         period={period}
-        onChange={(p, range) => {
-          setPreset(p);
-          setPeriod(range);
-        }}
+        onChange={(p, range) => setPeriodContext(p, range)}
       />
       </div>
 
@@ -174,7 +169,6 @@ export function Books() {
         tabIndex={0}
         className={styles.panel}
       >
-        {tab === 'day' && <DayBookTab vouchers={vouchers} period={period} />}
         {tab === 'cash' && (
           <CashBankTab
             vouchers={vouchers}
@@ -183,7 +177,6 @@ export function Books() {
             onEditOpening={() => setOpeningOpen(true)}
           />
         )}
-        {tab === 'pnl' && <ProfitLossTab data={data} period={period} />}
         {(tab === 'fcst' || tab === 'fx') && (
           <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>
             {tab === 'fcst' ? (

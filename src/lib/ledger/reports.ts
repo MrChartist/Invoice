@@ -10,10 +10,12 @@
  * Pure. Working papers — verify with your CA.
  */
 
-import { fyPeriod, fyStartYearOf, type Period } from '../books';
+import { dayBefore, fyPeriod, fyStartYearOf, type Period } from '../books';
 import { toCsv } from '../csv';
 import { A, groupOf, type Account, type GroupId } from './accounts';
 import type { Ledger, LedgerVoucher } from './postings';
+import { stockChange, type StockValuer } from './closing-stock';
+import { isDirectGroup } from './report-groups';
 
 const isPnl = (a: Account) => {
   const n = groupOf(a.group).nature;
@@ -208,6 +210,22 @@ export interface PnlSection {
   total: number;
 }
 
+/**
+ * Tally's Trading account (WP-2): Opening stock + Purchases + Direct expenses − Closing stock against
+ * Sales + Direct incomes → "Gross Profit c/o". The P&L proper then takes Gross profit b/f + indirect
+ * incomes − indirect expenses = Nett profit. `trading.grossProfit + indirectIncome − indirectExpenses = netProfit`.
+ */
+export interface TradingAccount {
+  /** Income in direct groups (Sales accounts). */
+  sales: number;
+  openingStock: number;
+  /** Purchase accounts (the PURCHASES group) and the other direct expense groups. */
+  purchases: number;
+  directExpenses: number;
+  closingStock: number;
+  grossProfit: number;
+}
+
 export interface LedgerProfitLoss {
   period: Period;
   income: PnlSection[];
@@ -217,12 +235,20 @@ export interface LedgerProfitLoss {
   /** Books-compatible figures (src/lib/books.ts ProfitLoss), in paise. */
   revenue: number;
   directCosts: number;
+  /** All income − direct costs ± stock change (equals books.ts when there is no stock). */
   grossProfit: number;
   indirectExpenses: number;
+  /** Includes the stock change (closing − opening stock). */
   netProfit: number;
+  /** Tally layout: direct sections, stock, gross profit (indirect income excluded). */
+  trading: TradingAccount;
+  /** Income in indirect groups (Other income). */
+  indirectIncome: number;
+  /** Closing-stock source used ('' when stock is not valued). */
+  stockLabel: string;
 }
 
-export function ledgerProfitAndLoss(ledger: Ledger, period: Period): LedgerProfitLoss {
+export function ledgerProfitAndLoss(ledger: Ledger, period: Period, stock?: StockValuer): LedgerProfitLoss {
   const mv = sums(ledger, (v) => v.date >= period.start && v.date <= period.end);
   const sections = new Map<GroupId, PnlSection>();
   for (const a of ledger.accounts) {
@@ -241,7 +267,12 @@ export function ledgerProfitAndLoss(ledger: Ledger, period: Period): LedgerProfi
   const expenses = ordered.filter((s) => groupOf(s.group).nature === 'expense');
   const totalIncome = income.reduce((x, s) => x + s.total, 0);
   const totalExpenses = expenses.reduce((x, s) => x + s.total, 0);
-  const directCosts = expenses.filter((s) => groupOf(s.group).direct).reduce((x, s) => x + s.total, 0);
+  const directCosts = expenses.filter((s) => isDirectGroup(s.group)).reduce((x, s) => x + s.total, 0);
+  const purchases = expenses.filter((s) => s.group === 'PURCHASES').reduce((x, s) => x + s.total, 0);
+  const sales = income.filter((s) => isDirectGroup(s.group)).reduce((x, s) => x + s.total, 0);
+  const st = stockChange(stock, period.end, dayBefore(period.start));
+  const stockDelta = st.closing - st.opening;
+  const tradingGross = sales + st.closing - st.opening - directCosts;
   return {
     period,
     income,
@@ -250,9 +281,19 @@ export function ledgerProfitAndLoss(ledger: Ledger, period: Period): LedgerProfi
     totalExpenses,
     revenue: totalIncome,
     directCosts,
-    grossProfit: totalIncome - directCosts,
+    grossProfit: totalIncome - directCosts + stockDelta,
     indirectExpenses: totalExpenses - directCosts,
-    netProfit: totalIncome - totalExpenses,
+    netProfit: totalIncome - totalExpenses + stockDelta,
+    trading: {
+      sales,
+      openingStock: st.opening,
+      purchases,
+      directExpenses: directCosts - purchases,
+      closingStock: st.closing,
+      grossProfit: tradingGross,
+    },
+    indirectIncome: totalIncome - sales,
+    stockLabel: stock?.label ?? '',
   };
 }
 
@@ -262,7 +303,9 @@ export interface BsItem {
   label: string;
   amount: number;
   /** Accounts / parties that make up the line, for drill-down. */
-  detail: Array<{ label: string; amount: number; accountId?: string }>;
+  detail: Array<{ label: string; amount: number; accountId?: string; party?: string }>;
+  /** Group the line drills into (Group Summary). */
+  groupId?: GroupId;
 }
 
 export interface BsSection {
@@ -283,6 +326,10 @@ export interface LedgerBalanceSheet {
   profitForYear: number;
   profitBroughtForward: number;
   fixedAssets: { gross: number; accumulatedDepreciation: number; net: number };
+  /** Report-time stock line (0 when stock is not valued). */
+  closingStock: number;
+  /** Opening stock credited to capital as a difference in opening balances. */
+  openingStock: number;
 }
 
 type ItemKey =
@@ -346,17 +393,35 @@ const GROUP_ITEM: Partial<Record<GroupId, ItemKey>> = {
   OTHER_CA: 'otherCa',
 };
 
+const ITEM_GROUP: Record<ItemKey, GroupId> = {
+  capital: 'CAPITAL',
+  reserves: 'RESERVES',
+  ltBorrowings: 'LOANS_LT',
+  stBorrowings: 'LOANS_ST',
+  tradePayables: 'TRADE_PAYABLES',
+  otherCl: 'OTHER_CL',
+  provisions: 'PROVISIONS',
+  ppe: 'FIXED_ASSETS',
+  investments: 'INVESTMENTS',
+  ltAdvances: 'LOANS_ADV_LT',
+  inventories: 'INVENTORIES',
+  receivables: 'TRADE_RECEIVABLES',
+  cash: 'CASH_BANK',
+  stAdvances: 'LOANS_ADV_ST',
+  otherCa: 'OTHER_CA',
+};
+
 const LIAB_KEYS = new Set<ItemKey>(['capital', 'reserves', 'ltBorrowings', 'stBorrowings', 'tradePayables', 'otherCl', 'provisions']);
 
-export function ledgerBalanceSheet(ledger: Ledger, asOf: string): LedgerBalanceSheet {
+export function ledgerBalanceSheet(ledger: Ledger, asOf: string, stock?: StockValuer): LedgerBalanceSheet {
   const bal = closingBalances(ledger, asOf);
   const items = new Map<ItemKey, BsItem>();
-  const add = (key: ItemKey, label: string, debitBalance: number, accountId?: string) => {
+  const add = (key: ItemKey, label: string, debitBalance: number, accountId?: string, party?: string) => {
     if (!debitBalance) return;
     const amount = LIAB_KEYS.has(key) ? -debitBalance : debitBalance;
-    const it = items.get(key) ?? { label: ITEM_LABELS[key], amount: 0, detail: [] };
+    const it = items.get(key) ?? { label: ITEM_LABELS[key], amount: 0, detail: [], groupId: ITEM_GROUP[key] };
     it.amount += amount;
-    it.detail.push({ label, amount, accountId });
+    it.detail.push({ label, amount, accountId, ...(party ? { party } : {}) });
     items.set(key, it);
   };
 
@@ -366,8 +431,16 @@ export function ledgerBalanceSheet(ledger: Ledger, asOf: string): LedgerBalanceS
   // `closingBalances` folded prior years' profit into the reserves balance; split it back out for display.
   const fyStart = fyStartOf(asOf);
   const prior = sums(ledger, (v) => v.date < fyStart);
-  let profitBroughtForward = 0;
-  for (const a of ledger.accounts) if (isPnl(a)) profitBroughtForward -= net(prior.get(a.id));
+  let ledgerBf = 0;
+  for (const a of ledger.accounts) if (isPnl(a)) ledgerBf -= net(prior.get(a.id));
+  // Stock (report-time): this year's change is profit; earlier years' change is surplus b/f; opening
+  // stock is a difference in opening balances. Together they equal the closing stock, so the sheet ties.
+  const lastFyEnd = dayBefore(fyStart);
+  const st = stockChange(stock, asOf, lastFyEnd);
+  profitForYear += st.closing - st.opening;
+  const stockBf = stock ? stock.value(lastFyEnd) - stock.openingIn(lastFyEnd) : 0;
+  const openingStock = stock ? stock.openingIn(asOf) : 0;
+  const profitBroughtForward = ledgerBf + stockBf;
 
   let gross = 0;
   let accDep = 0;
@@ -375,7 +448,7 @@ export function ledgerBalanceSheet(ledger: Ledger, asOf: string): LedgerBalanceS
     if (isPnl(a)) continue;
     const b = bal.get(a.id) ?? 0;
     if (a.id === A.reserves) {
-      add('reserves', 'Reserves (direct entries)', b + profitBroughtForward, a.id);
+      add('reserves', 'Reserves (direct entries)', b + ledgerBf, a.id);
       continue;
     }
     if (a.group === 'FIXED_ASSETS') {
@@ -386,8 +459,8 @@ export function ledgerBalanceSheet(ledger: Ledger, asOf: string): LedgerBalanceS
       // Party-wise: a customer in credit is an advance received; a supplier in debit is an advance paid.
       for (const [p, pb] of partyBalances(ledger, a.id, asOf)) {
         if (!pb) continue;
-        if (a.group === 'TRADE_RECEIVABLES') add(pb > 0 ? 'receivables' : 'otherCl', pb > 0 ? `${a.name}: ${p}` : `Advance from ${p}`, pb, a.id);
-        else add(pb < 0 ? 'tradePayables' : 'stAdvances', pb < 0 ? `${a.name}: ${p}` : `Advance to ${p}`, pb, a.id);
+        if (a.group === 'TRADE_RECEIVABLES') add(pb > 0 ? 'receivables' : 'otherCl', pb > 0 ? `${a.name}: ${p}` : `Advance from ${p}`, pb, a.id, p);
+        else add(pb < 0 ? 'tradePayables' : 'stAdvances', pb < 0 ? `${a.name}: ${p}` : `Advance to ${p}`, pb, a.id, p);
       }
       continue;
     }
@@ -401,6 +474,10 @@ export function ledgerBalanceSheet(ledger: Ledger, asOf: string): LedgerBalanceS
   }
   add('reserves', 'Surplus brought forward (earlier years)', -profitBroughtForward);
   add('reserves', 'Profit / (loss) for the year', -profitForYear);
+  if (stock) {
+    add('inventories', `Closing stock (${stock.label.toLowerCase()})`, st.closing);
+    add('capital', 'Opening stock (difference in opening balances)', -openingStock);
+  }
 
   const build = (spec: typeof LIAB_ITEMS): BsSection[] =>
     spec.map((s) => {
@@ -421,6 +498,8 @@ export function ledgerBalanceSheet(ledger: Ledger, asOf: string): LedgerBalanceS
     profitForYear,
     profitBroughtForward,
     fixedAssets: { gross, accumulatedDepreciation: -accDep, net: gross + accDep },
+    closingStock: st.closing,
+    openingStock,
   };
 }
 
@@ -466,7 +545,7 @@ const FINANCING_LABELS: Partial<Record<GroupId, string>> = {
   LOANS_ST: 'Short-term borrowings raised / (repaid)',
 };
 
-export function cashFlowStatement(ledger: Ledger, period: Period): CashFlowStatement {
+export function cashFlowStatement(ledger: Ledger, period: Period, stock?: StockValuer): CashFlowStatement {
   const mv = sums(ledger, (v) => v.date >= period.start && v.date <= period.end);
   // −movement of an account = the cash it released (a debit to a non-cash account used cash).
   const released = (a: Account) => -net(mv.get(a.id));
@@ -483,6 +562,12 @@ export function cashFlowStatement(ledger: Ledger, period: Period): CashFlowState
     else if (WC_LABELS[a.group]) addTo(buckets.wc, WC_LABELS[a.group]!, r);
     else if (INVESTING_LABELS[a.group]) addTo(buckets.inv, INVESTING_LABELS[a.group]!, r);
     else if (FINANCING_LABELS[a.group]) addTo(buckets.fin, FINANCING_LABELS[a.group]!, r);
+  }
+  // Report-time stock: the profit it adds is exactly offset by the increase in inventories.
+  const st = stockChange(stock, period.end, dayBefore(period.start));
+  if (st.closing !== st.opening) {
+    netProfit += st.closing - st.opening;
+    addTo(buckets.wc, WC_LABELS.INVENTORIES!, st.opening - st.closing);
   }
   const lines = (m: Map<string, number>) => [...m.entries()].map(([label, amount]) => ({ label, amount }));
   const adjustments = depreciation ? [{ label: 'Add: depreciation (non-cash)', amount: depreciation }] : [];
@@ -570,3 +655,14 @@ export function cashFlowCsv(c: CashFlowStatement): string {
     ['Cash & cash equivalents at the end', r(c.closingCash)],
   ]);
 }
+
+/* ── Reports engine (WP-2): re-exported so callers (Books tabs, the Gateway viewer) import one module ── */
+
+export * from './closing-stock';
+export * from './report-groups';
+export * from './group-summary';
+export * from './columns';
+export * from './registers';
+export * from './exceptions';
+export * from './funds-flow';
+export * from './drill';

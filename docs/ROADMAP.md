@@ -263,6 +263,15 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.9e | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
 | 7.9f | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
 
+### Reports engine & Tally report grammar (WP-2)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.25 | ✅ **One accounting truth**: Day Book and P&L from the ledger (manual vouchers, fixed assets, depreciation included); Trading account with **closing stock** from the inventory (FIFO / weighted average) or a typed figure; balance-sheet inventories — `docs/features/reports-engine.md` | P0-3 | done |
+| 7.26 | ✅ **Group Summary + drill-down everywhere** (BS / P&L / TB → group → ledger → months → vouchers → voucher; reusable DrillStack, Enter / Esc), Alt+F1, F12 options, Alt+F2 shared period context | P0-4, P1-3, P1-26 | done |
+| 7.27 | ✅ **Comparative columns** (previous period, month / quarter-wise), month-wise voucher registers with columnar view, exception reports, statistics, funds flow; closing stock in ratio analysis (7.6) | P1-1, P1-2, P1-4, P1-5, P2 | done |
+
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

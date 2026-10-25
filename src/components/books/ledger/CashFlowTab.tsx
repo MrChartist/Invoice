@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Info } from 'lucide-react';
-import { cashFlowCsv, cashFlowStatement, type CashFlowLine, type Ledger } from '../../../lib/ledger';
+import { cashFlowCsv, cashFlowStatement, type CashFlowLine, type Ledger, type StockValuer } from '../../../lib/ledger';
 import type { Period } from '../../../lib/books';
 import { formatDate } from '../../../lib/utils';
 import { money } from './format';
@@ -11,9 +11,9 @@ import styles from './ledger.module.css';
 import { useT } from '../../../i18n';
 import { ledgerT } from '../../../i18n/areas/books-ledger';
 
-export function CashFlowTab({ ledger, period }: { ledger: Ledger; period: Period }) {
+export function CashFlowTab({ ledger, period, stock }: { ledger: Ledger; period: Period; stock?: StockValuer }) {
   useT();
-  const cf = useMemo(() => cashFlowStatement(ledger, period), [ledger, period]);
+  const cf = useMemo(() => cashFlowStatement(ledger, period, stock), [ledger, period, stock]);
   const row = (l: CashFlowLine, sub = true) => (
     <li key={l.label} className={sub ? books.stmtSub : books.stmtRow}>
       <span>{l.label}</span>
