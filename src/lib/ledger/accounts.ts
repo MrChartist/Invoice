@@ -308,9 +308,33 @@ export function normalizeUserAccounts(rows: unknown[]): Account[] {
   return out;
 }
 
-/** Defaults + user accounts, ordered by code. */
+/* ── Synthesised ledgers (WP-5 hook) ─────────────────────────────
+ * The ONE registration point for modules that derive ledgers from their own masters instead of the
+ * `accounts` table (bank accounts → one ledger each, `src/lib/bank-ledgers.ts`). A source is a
+ * fail-soft read returning system accounts; a row whose id is a default account only renames it. */
+const ledgerSources: Array<() => readonly Account[]> = [];
+export function registerLedgerSource(source: () => readonly Account[]): void {
+  if (!ledgerSources.includes(source)) ledgerSources.push(source);
+}
+function synthesisedLedgers(): Account[] {
+  const out: Account[] = [];
+  for (const src of ledgerSources) {
+    try {
+      out.push(...src());
+    } catch {
+      /* a broken source never hides the chart */
+    }
+  }
+  return out;
+}
+
+/** Defaults + synthesised ledgers + user accounts, ordered by code. */
 export function chartOf(userAccounts: readonly Account[] = []): Account[] {
-  return [...DEFAULT_ACCOUNTS, ...userAccounts].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }) || a.name.localeCompare(b.name));
+  const extra = synthesisedLedgers();
+  const rename = new Map(extra.map((a) => [a.id, a.name]));
+  const defaults = DEFAULT_ACCOUNTS.map((a) => (rename.has(a.id) ? { ...a, name: rename.get(a.id)! } : a));
+  const own = extra.filter((a) => !DEFAULT_ACCOUNTS.some((d) => d.id === a.id) && !userAccounts.some((u) => u.id === a.id));
+  return [...defaults, ...own, ...userAccounts].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }) || a.name.localeCompare(b.name));
 }
 
 export function loadUserAccounts(): Account[] {

@@ -50,4 +50,30 @@ export interface Cheque {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  /* ── WP-5 banking — additive, all optional ── */
+  /** Our bank account (`bank_accounts`) a received cheque is deposited into / an issued cheque is drawn on. Missing = the main account. */
+  bank_account_id?: string;
+  /**
+   * One cheque against several invoices (received) or bills (issued). When present (non-empty) it is
+   * used instead of `invoice_id` / `purchase_id`; any unallocated rest records no payment.
+   */
+  allocations?: ChequeAllocation[];
+  /** `transactions` rows recorded per allocation when a received cheque cleared. */
+  payment_ids?: string[];
+  /** `purchase_payments` rows recorded per allocation when an issued cheque cleared. */
+  purchase_payment_ids?: string[];
+  /** Bank charges levied on the latest bounce (₹) and the manual payment vouchers that posted them. */
+  bounce_charges?: number;
+  bounce_voucher_ids?: string[];
+  /** Deposit slip (`deposit_slips`) the cheque was paid in with. */
+  deposit_slip_id?: string;
+}
+
+export interface ChequeAllocation {
+  /** Received cheques: the sales invoice. */
+  invoice_id?: string;
+  /** Issued cheques: the purchase bill. */
+  purchase_id?: string;
+  /** Rupees. */
+  amount: number;
 }

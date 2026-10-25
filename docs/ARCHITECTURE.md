@@ -124,6 +124,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `tds_deductions` | TDS on payables (Phase 7) | `ManualTdsDeduction` register-only deductions booked outside bills (not posted to the ledger) |
 | `tds_returns` | TDS on payables (Phase 7) | `TdsReturnMark` filed marks `26Q:<fy>-Q<n>` / `27EQ:…` with filing date and token |
 | `vendor_payments` | bill-wise payables (Phase 7, `src/lib/billwise.ts`) | `VendorPayment` (`src/types/purchases.ts`): supplier Advance / On Account / New Ref money not yet against a bill, with `allocations` adjusting it against bills later |
+| `deposit_slips` | banking (WP-5, `src/lib/deposit-slip.ts`) | `DepositSlip` pay-in slips `PIS/FY<yy-yy>/<seq>`: cheque ids, cash denomination counts, totals (`docs/features/banking.md`) |
+| `cash_tally` | banking (WP-5, `src/lib/cash-tally.ts`) | `CashTally` day-end cash count by denomination vs the Books cash balance, one row per day |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the

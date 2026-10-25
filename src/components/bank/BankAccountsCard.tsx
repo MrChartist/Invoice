@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Landmark, Plus } from 'lucide-react';
-import { DEFAULT_BANK_ID, bankAccountsDb, type BankAccount } from '../../lib/bank-accounts';
+import { DEFAULT_BANK_ID, bankAccountsDb, maskAccountNo, type BankAccount } from '../../lib/bank-accounts';
+import { bnkT } from '../../i18n/areas/banking';
 import type { BankStatement } from '../../lib/bank-recon';
 import { generateId } from '../../lib/storage';
 import { formatMoney } from '../../lib/utils';
@@ -26,6 +27,11 @@ interface Draft {
   number: string;
   opening: string;
   opening_as_of: string;
+  od: boolean;
+  od_limit: string;
+  account_no: string;
+  ifsc: string;
+  branch: string;
 }
 
 const toDraft = (a?: BankAccount): Draft => ({
@@ -34,6 +40,11 @@ const toDraft = (a?: BankAccount): Draft => ({
   number: a?.number ?? '',
   opening: a?.opening === undefined ? '' : String(a.opening),
   opening_as_of: a?.opening_as_of ?? '',
+  od: !!a?.od,
+  od_limit: a?.od_limit === undefined ? '' : String(a.od_limit),
+  account_no: a?.account_no ?? '',
+  ifsc: a?.ifsc ?? '',
+  branch: a?.branch ?? '',
 });
 
 /**
@@ -60,6 +71,11 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
         number: draft.number.trim() || undefined,
         opening,
         opening_as_of: opening === undefined ? undefined : draft.opening_as_of,
+        od: draft.id !== DEFAULT_BANK_ID && draft.od ? true : undefined,
+        od_limit: draft.od && Number(draft.od_limit) > 0 ? Number(draft.od_limit) : undefined,
+        account_no: draft.account_no.replace(/\s+/g, '') || undefined,
+        ifsc: draft.ifsc.trim().toUpperCase() || undefined,
+        branch: draft.branch.trim() || undefined,
       });
       onChange(bankAccountsDb.all());
       setDraft(null);
@@ -100,14 +116,15 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
       </div>
       <div className={surface.cardBody}>
         <p className={surface.sectionNote} style={{ marginTop: 0 }}>
-          {bankT('accountsNote')}
+          {bankT('accountsNote')} {bnkT('ledgerNote')}
         </p>
         <div className={bank.stack}>
           {accounts.map((a) => (
             <div key={a.id} className={bank.toolbar}>
               <span>
                 <strong>{a.name}</strong>
-                {a.number ? ` · ${a.number}` : ''}
+                {a.number ? ` · ${a.number}` : a.account_no ? ` · ${maskAccountNo(a.account_no)}` : ''}
+                {a.od ? bnkT('odTag') : ''}
                 {a.opening !== undefined && a.opening_as_of ? bankT('openingOn', { amount: `₹${formatMoney(a.opening)}`, date: a.opening_as_of }) : ''}
                 {a.active === false ? bankT('inactive') : ''}
               </span>
@@ -146,6 +163,33 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
                 <input id="ba-asof" type="date" className={controls.input} value={draft.opening_as_of} onChange={(e) => setDraft({ ...draft, opening_as_of: e.target.value })} />
               </div>
             </div>
+            <div className={controls.row}>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="ba-accno">{bnkT('fullAccountNo')}</label>
+                <input id="ba-accno" className={`${controls.input} ${controls.inputMono}`} autoComplete="off" value={draft.account_no} onChange={(e) => setDraft({ ...draft, account_no: e.target.value.replace(/[^0-9A-Za-z ]/g, '') })} />
+              </div>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="ba-ifsc">{bnkT('ifsc')}</label>
+                <input id="ba-ifsc" className={`${controls.input} ${controls.inputMono}`} maxLength={11} value={draft.ifsc} onChange={(e) => setDraft({ ...draft, ifsc: e.target.value.toUpperCase() })} />
+              </div>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="ba-branch">{bnkT('branch')}</label>
+                <input id="ba-branch" className={controls.input} value={draft.branch} onChange={(e) => setDraft({ ...draft, branch: e.target.value })} />
+              </div>
+            </div>
+            {draft.id !== DEFAULT_BANK_ID && (
+              <div className={controls.row}>
+                <label className={controls.check}>
+                  <input type="checkbox" checked={draft.od} onChange={(e) => setDraft({ ...draft, od: e.target.checked })} /> {bnkT('od')}
+                </label>
+                {draft.od && (
+                  <div className={controls.field}>
+                    <label className={controls.label} htmlFor="ba-odlimit">{bnkT('odLimit')}</label>
+                    <input id="ba-odlimit" className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={draft.od_limit} onChange={(e) => setDraft({ ...draft, od_limit: e.target.value.replace(/[^0-9.]/g, '') })} />
+                  </div>
+                )}
+              </div>
+            )}
             <div className={bank.toolbarGroup}>
               <button type="submit" className={controls.btnPrimary}>{bankT('saveAccount')}</button>
               <button type="button" className={controls.btnOutline} onClick={() => setDraft(null)}>{bankT('cancel')}</button>

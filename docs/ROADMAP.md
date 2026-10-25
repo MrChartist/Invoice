@@ -230,6 +230,10 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.17 | ⏳ **Stock journal (Alt+F7) / Physical stock (Ctrl+F7)**: key hooks and menu rows ready (shown "not available"); wire them when the manufacturing / stock-count screens land (`GATEWAY_EXTENSIONS`, `TALLY_KEYS`) | — | S |
 | 7.18 | ⏳ **Employee master / payroll vouchers** in Create, **TDS** statutory rows (7.1–7.3), **Ratio analysis** report (7.6) | add through `GATEWAY_EXTENSIONS` when those modules exist | S |
 | 7.19 | ⏳ Bill-wise references (7.5) and voucher classes (7.4) on Gateway voucher entry, single-entry mode | needs a voucher schema addition | M |
+| 7.20 | ✅ **Each bank account as its own ledger** (WP-5, P0-8): main account keeps 3510, others `bank:<id>` under Cash & bank or Bank OD A/c; receipts, supplier payments / advances, advance receipts / refunds, TDS challans and cheques post to their bank; per-bank openings; contra between banks (OD included); Books bank book per account; Tally one ledger per bank | `src/lib/bank-ledgers.ts`, `src/lib/ledger/postings-bank.ts`, `src/lib/tally-bank.ts`, `docs/features/banking.md` | M |
+| 7.21 | ✅ **Banking documents** (WP-5, P1-14): deposit / pay-in slip with cheques + cash denominations (`PIS/FY…`), payment advice (bills settled + TDS), bulk e-payment file (generic NEFT / RTGS CSV + HDFC / ICICI / SBI presets — check the format with your bank), cheque against several invoices / bills, vendor bank details | `deposit-slip.ts`, `payment-advice.ts`, `bank-upload.ts`, `cheques.ts`, `BankingDocs.tsx` | M |
+| 7.22 | ✅ **Bounce charges posting** and **day-end cash tally by denomination** (WP-5, P2) | `cheques.ts`, `cash-tally.ts` | S |
+| 7.23 | ⏳ Banking follow-ups: forex bank ledgers, vendor-form UI for bank details (only in e-Payments now), record payments from an e-payment file after bank confirmation, supplier payments in the Tally export, Contra voucher from a deposit slip's cash | — | M |
 
 ## Summary timeline
 

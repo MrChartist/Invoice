@@ -17,6 +17,7 @@ import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { formatMoney } from '../utils';
 import { chartOf, loadUserAccounts, type Account } from './accounts';
+import { isCashOrBankLedger } from '../bank-ledgers';
 
 export const VOUCHERS_TABLE = 'vouchers';
 
@@ -129,7 +130,7 @@ export function validateVoucher(v: ManualVoucherInput, chart: readonly Account[]
     if (v.type !== 'JOURNAL') errors.push('Only a journal voucher can reverse itself.');
     else if (isoDay(v.reverse_on) !== v.reverse_on || !(v.reverse_on > (v.date ?? ''))) errors.push('Choose a reversal date after the voucher date.');
   }
-  const isCashBank = (l: ManualVoucherLine) => byId.get(l.account_id)?.group === 'CASH_BANK';
+  const isCashBank = (l: ManualVoucherLine) => isCashOrBankLedger(byId.get(l.account_id)); // bank OD ledgers too (WP-5)
   if (!errors.length) {
     if (v.type === 'CONTRA' && !lines.every(isCashBank)) errors.push('A contra voucher moves money between cash and bank accounts only.');
     if (v.type === 'PAYMENT' && !lines.some((l) => l.cr > 0 && isCashBank(l))) errors.push('A payment voucher must credit a cash or bank account.');

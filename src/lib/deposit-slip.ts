@@ -1,0 +1,178 @@
+/**
+ * Deposit slip / pay-in slip (WP-5, gap P1-14): the cheques in hand and the cash notes counted by
+ * denomination, printed for the bank counter, numbered `PIS/FY<yy-yy>/<seq>` (Indian FY of the slip
+ * date) and kept in table `deposit_slips` for a reprint. Saving a slip marks its cheques deposited
+ * (through `transitionCheque`, so the cheque register, reminders and audit behave as usual) into the
+ * chosen bank account. The cash on a slip is printed only — record the cash deposit itself as a
+ * Contra voucher (Dr the bank | Cr Cash); the Books cash book is not changed by a slip.
+ *
+ * The slip prints the full account number: the bank needs it. Lists elsewhere mask it.
+ * Pure above the "Storage" divider.
+ */
+
+import type { Cheque } from '../types/cheques';
+import { amountInWords } from './amount-in-words';
+import { DEFAULT_BANK_ID, type BankAccount } from './bank-accounts';
+import { isoDay } from './dates';
+import { num, round2 } from './invoice-calc';
+import { buildInvoiceNumber, getIndianFY, highestSequence } from './invoice-number';
+import { isPostDated, validUntil } from './cheque-reminders';
+import { cashTotal, denominationRows, normalizeCounts, type DenominationCounts, type DenominationRow } from './denominations';
+import { generateId, getTable, setTable } from './storage';
+import { requireAccess } from './access';
+import { CHEQUES_TABLE, loadCheques, transitionCheque } from './cheques';
+import { audit } from './audit';
+
+export { DENOMINATIONS, cashTotal, denominationRows, normalizeCounts, type DenominationCounts, type DenominationRow } from './denominations';
+
+/** Received cheques that can go on a slip today: in hand, dated today or earlier, still valid (3 months). */
+export function depositableCheques(cheques: readonly Cheque[], today: string): Cheque[] {
+  return cheques
+    .filter((c) => c.direction === 'received' && c.status === 'received' && !isPostDated(c, today) && validUntil(c.cheque_date) >= today)
+    .sort((a, b) => a.cheque_date.localeCompare(b.cheque_date) || a.number.localeCompare(b.number));
+}
+
+export interface DepositSlip {
+  id: string;
+  /** `PIS/FY<yy-yy>/<seq>`. */
+  number: string;
+  /** YYYY-MM-DD. */
+  date: string;
+  /** Our bank account; missing = the main account. */
+  bank_account_id?: string;
+  cheque_ids: string[];
+  cash: DenominationCounts;
+  cheque_total: number;
+  cash_total: number;
+  total: number;
+  /** Depositor name printed on the slip. */
+  depositor?: string;
+  created_at: string;
+}
+
+export interface SlipChequeRow {
+  number: string;
+  bank: string;
+  branch: string;
+  date: string;
+  party: string;
+  amount: number;
+}
+
+export interface DepositSlipView {
+  number: string;
+  date: string;
+  accountName: string;
+  /** Full number: the bank needs it on the slip. */
+  accountNo: string;
+  ifsc: string;
+  branch: string;
+  depositor: string;
+  cheques: SlipChequeRow[];
+  chequeTotal: number;
+  cash: DenominationRow[];
+  cashTotal: number;
+  total: number;
+  words: string;
+}
+
+/** Problems with a slip about to be saved (empty = fine). */
+export function validateDepositSlip(input: { date: string; cheques: readonly Cheque[]; cash: DenominationCounts }, today: string): string[] {
+  const errors: string[] = [];
+  const day = isoDay(input.date);
+  if (!day) errors.push('Choose the deposit date.');
+  else if (day > today) errors.push('The deposit date cannot be in the future.');
+  if (!input.cheques.length && !(cashTotal(input.cash) > 0)) errors.push('Pick at least one cheque or count some cash.');
+  for (const c of input.cheques) {
+    if (c.direction !== 'received' || c.status !== 'received') errors.push(`Cheque ${c.number} is not in hand.`);
+    else if (day && c.cheque_date > day) errors.push(`Cheque ${c.number} is dated ${c.cheque_date}: it cannot be deposited before then.`);
+  }
+  return [...new Set(errors)];
+}
+
+export function nextSlipNumber(existing: readonly Pick<DepositSlip, 'number'>[], date: string): string {
+  const fy = getIndianFY(date).label;
+  return buildInvoiceNumber('PIS', fy, highestSequence(existing.map((s) => s.number), 'PIS', fy) + 1);
+}
+
+/** The printable slip (pure). `cheques` are the slip's cheques in print order. */
+export function depositSlipView(slip: Pick<DepositSlip, 'number' | 'date' | 'cash' | 'depositor'>, cheques: readonly Cheque[], account: BankAccount | undefined): DepositSlipView {
+  const rows = cheques.map((c) => ({ number: c.number, bank: c.bank, branch: c.branch ?? '', date: c.cheque_date, party: c.party_name, amount: round2(num(c.amount)) }));
+  const chequeTotal = round2(rows.reduce((s, r) => s + r.amount, 0));
+  const cash = denominationRows(slip.cash);
+  const ct = cashTotal(slip.cash);
+  const total = round2(chequeTotal + ct);
+  return {
+    number: slip.number,
+    date: slip.date,
+    accountName: account?.name ?? 'Main bank account',
+    accountNo: account?.account_no ?? account?.number ?? '',
+    ifsc: account?.ifsc ?? '',
+    branch: account?.branch ?? '',
+    depositor: slip.depositor ?? '',
+    cheques: rows,
+    chequeTotal,
+    cash,
+    cashTotal: ct,
+    total,
+    words: total > 0 ? amountInWords(total, 'INR') : '',
+  };
+}
+
+/* ── Storage ──────────────────────────────────────────────────── */
+
+export const DEPOSIT_SLIPS_TABLE = 'deposit_slips';
+
+export class DepositSlipError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DepositSlipError';
+  }
+}
+
+export function loadDepositSlips(): DepositSlip[] {
+  return getTable<DepositSlip>(DEPOSIT_SLIPS_TABLE).filter((s) => s && typeof s.id === 'string');
+}
+
+/**
+ * Save a slip and mark its cheques deposited into the account on the slip date. If a cheque cannot
+ * be moved (e.g. a period lock), the cheques already moved stay deposited and the error is thrown
+ * before the slip is stored, so nothing claims a deposit that did not happen.
+ */
+export function saveDepositSlip(input: { date: string; bank_account_id?: string; cheque_ids: string[]; cash: DenominationCounts; depositor?: string }, today: string): DepositSlip {
+  requireAccess('books.edit');
+  const all = loadCheques();
+  const picked = input.cheque_ids.map((id) => all.find((c) => c.id === id)).filter((c): c is Cheque => !!c);
+  const cash = normalizeCounts(input.cash);
+  const errors = validateDepositSlip({ date: input.date, cheques: picked, cash }, today);
+  if (errors.length) throw new DepositSlipError(errors[0]);
+  const slips = getTable<DepositSlip>(DEPOSIT_SLIPS_TABLE);
+  const id = generateId();
+  const bankId = input.bank_account_id && input.bank_account_id !== DEFAULT_BANK_ID ? input.bank_account_id : undefined;
+  // Tag the cheques with the account and slip first (in hand: no payment recorded yet), then deposit them.
+  const ids = new Set(picked.map((c) => c.id));
+  setTable(CHEQUES_TABLE, all.map((c) => (ids.has(c.id) ? { ...c, bank_account_id: bankId, deposit_slip_id: id } : c)));
+  for (const c of picked) transitionCheque(c.id, 'deposited', { date: input.date, today });
+  const chequeTotal = round2(picked.reduce((s, c) => s + num(c.amount), 0));
+  const ct = cashTotal(cash);
+  const slip: DepositSlip = {
+    id,
+    number: nextSlipNumber(slips, input.date),
+    date: input.date,
+    ...(bankId ? { bank_account_id: bankId } : {}),
+    cheque_ids: picked.map((c) => c.id),
+    cash,
+    cheque_total: chequeTotal,
+    cash_total: ct,
+    total: round2(chequeTotal + ct),
+    ...(input.depositor?.trim() ? { depositor: input.depositor.trim() } : {}),
+    created_at: new Date().toISOString(),
+  };
+  setTable(DEPOSIT_SLIPS_TABLE, [...slips, slip]);
+  try {
+    audit.record({ entity: 'cheque', entity_id: slip.id, action: 'create', doc_number: slip.number, summary: `Deposit slip ${slip.number} dated ${slip.date}: ${picked.length} cheque(s) ₹${chequeTotal.toFixed(2)} + cash ₹${ct.toFixed(2)}` });
+  } catch {
+    /* logging never breaks a save */
+  }
+  return slip;
+}

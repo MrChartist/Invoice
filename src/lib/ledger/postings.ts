@@ -53,6 +53,7 @@ import type { TdsChallan } from '../tds-payables';
 import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
 import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
+import { applyBankLedgers } from './postings-bank';
 
 export interface PostingLine {
   account: string;
@@ -669,5 +670,6 @@ export function buildLedger(input: LedgerInput): Ledger {
     });
   }
 
+  for (const v of applyBankLedgers(out, input, byId)) push(v); // WP-5: one ledger per bank account (postings-bank.ts)
   return { accounts, byId, vouchers: sortVouchers(out), warnings };
 }

@@ -357,3 +357,16 @@ test('TDS-on-payables fields (Tally parity): every reader agrees on what the sup
   // Legacy rows read as no TDS.
   assert.deepEqual([readPurchase(bill)!.tdsAmount, readPurchase(bill)!.tdsOnBill, supplierPayable(bill)], [0, 0, 1180]);
 });
+
+test('payment advice (WP-5) reads the real purchase shape', async () => {
+  const { buildPaymentAdvice } = await import('../src/lib/payment-advice.ts');
+  const adv = buildPaymentAdvice('pp:pay1', {
+    purchases: [{ ...bill, tds_amount: 100, tds_on: 'BILL' }],
+    payments: [{ id: 'pay1', purchase_id: 'p1', amount: 1080, date: '2026-04-20', method: 'NEFT' }],
+    vendorPayments: [],
+  });
+  assert.ok(adv);
+  assert.equal(adv!.vendor, 'Acme Supplies');
+  assert.equal(adv!.vendorGstin, '27AAPFU0939F1ZV');
+  assert.deepEqual(adv!.lines.map((l) => [l.billNo, l.billDate, l.billAmount, l.tdsOnBill, l.paid, l.balance]), [['AS/22', '2026-04-12', 1180, 100, 1080, 0]]);
+});
