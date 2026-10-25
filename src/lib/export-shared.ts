@@ -8,6 +8,7 @@
 
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
+import type { TallyBooksSource } from './tally-books';
 import type { PurchaseReturn } from '../types/purchases';
 import { chargesAreTaxed, num, round2 } from './invoice-calc';
 import { inrRecord } from './fx';
@@ -102,6 +103,11 @@ export interface ExportSource {
   advances?: AdvanceRecord[];
   /** Additive (WP-3): purchase returns / supplier credit notes (`purchase_returns`). Optional. */
   purchaseReturns?: PurchaseReturn[];
+  /**
+   * Additive (WP-7, P0-12 / P1-22): the rest of the books for the Tally export — supplier payments,
+   * manual vouchers, fixed assets, stock transfers, user groups, openings, cost centres. Optional.
+   */
+  books?: TallyBooksSource;
 }
 
 export function emptySource(): ExportSource {

@@ -33,8 +33,10 @@ Also in this wave: Tally-style keyboard entry in the editor (see the last sectio
 
 ## 2. Audit trail
 
-Table **`audit_log`** (`mrchartist_inv_audit_log`, part of backups). Rows oldest → newest; capped at
-**5,000** (`AUDIT_MAX_ROWS`; past it the oldest are trimmed to 4,500 and a `truncate` anchor records it, §2a).
+Table **`audit_log`** (`mrchartist_inv_audit_log`, part of backups). Rows oldest → newest; the live log holds
+**5,000** (`AUDIT_MAX_ROWS`). Since WP-7 the oldest rows past it move to an **archive segment**
+(`audit_archive_0001`, …) recorded by an `archive` anchor — kept, chained, in backups — instead of being
+trimmed (`docs/features/migration-audit.md` §2).
 
 ```ts
 interface AuditEntry {
@@ -198,8 +200,10 @@ rows, detectable. It is tamper-*evident*, not tamper-*proof*.
   stays consistent because each write re-reads the table.
 * A restore keeps the backup's log plus a marker; the replaced device log survives only as its head hash in
   the marker (and in the safety snapshot).
-* Only localDb-mediated changes are logged individually; direct table writers (purchases, inventory, recurring
-  schedule edits, importers' per-row writes) are not, unless they call `audit.record`.
+* Since WP-7 every `setTable` write to a books / masters table is diffed by row and logged with before → after
+  (`src/lib/audit-edits.ts`, one `onTableWrite` storage hook); raw `writeRaw` paths (restore, sync merges,
+  migrations) are not row-logged — restore writes its own marker.
 * Payments are locked by the **document's** date, not the receipt date.
-* 5,000-row cap; each write rewrites the table (fine at this size; ~1 MB at the cap counts toward the browser quota).
+* Live log of up to 5,000 rows, each write rewrites it (~1 MB at the limit); older rows sit in archive segments
+  (uncompressed; they count toward the browser quota).
 * Lock overrides live in memory: a page reload re-locks.

@@ -44,7 +44,13 @@ export type AuditEntity =
   | 'stock_journal'
   | 'physical_stock'
   /** GST set-off journals, PMT-06 challans and the HSN master (WP-6). */
-  | 'gst';
+  | 'gst'
+  /** WP-7 (P0-10): rows the table-write edit log records for tables without a module-level entity. */
+  | 'vendor'
+  | 'purchase_payment'
+  | 'recurring'
+  | 'opening'
+  | 'bank_statement';
 
 export type AuditAction =
   | 'create'
@@ -61,7 +67,9 @@ export type AuditAction =
   | 'import'
   /** Integrity anchors (4.5): written by the app itself, never by a user action. */
   | 'chain_start'
-  | 'truncate';
+  | 'truncate'
+  /** WP-7 (P0-10): older rows moved to an archive segment (kept, still chained, still in backups). */
+  | 'archive';
 
 export interface AuditChange {
   field: string;
@@ -104,7 +112,10 @@ export interface AuditSeal {
   /** Unchained rows immediately before this anchor (chain_start) or at the start of the log (truncate). */
   legacy?: { count: number; digest: string };
   /** truncate: why older rows were removed, how many, and the `prev` of the first chained row kept. */
-  reason?: 'storage' | 'cap';
+  reason?: 'storage' | 'cap' | 'archive';
+  /** archive (WP-7): table name of the segment the rows went to (`audit_archive_0001`) and its last hash. */
+  segment?: string;
+  archived_head?: string | null;
   dropped?: number;
   cut?: string;
   /** restore: chain head + row count of the backup's own log, and of the log it replaced. */
@@ -130,8 +141,25 @@ export const AUDIT_ENTITIES: AuditEntity[] = [
   'budget',
   'cheque',
   'advance',
+  'stock_transfer',
+  'tds',
+  'vendor_payment',
+  'godown',
+  'purchase_order',
+  'stock_adjustment',
+  'pos_day_close',
+  'vendor',
+  'purchase_payment',
+  'recurring',
+  'opening',
+  'bank_statement',
   'employee',
   'payroll',
+  'bom',
+  'manufacturing',
+  'stock_journal',
+  'physical_stock',
+  'gst',
 ];
 
 export const AUDIT_ACTIONS: AuditAction[] = [
@@ -149,6 +177,7 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   'import',
   'chain_start',
   'truncate',
+  'archive',
 ];
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -166,6 +195,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   import: 'Imported',
   chain_start: 'Chain started',
   truncate: 'Older entries removed',
+  archive: 'Older entries archived',
 };
 
 export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
@@ -198,4 +228,9 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   stock_journal: 'Stock journals',
   physical_stock: 'Physical stock',
   gst: 'GST set-off / challan',
+  vendor: 'Suppliers',
+  purchase_payment: 'Supplier payments',
+  recurring: 'Recurring schedules',
+  opening: 'Opening balances',
+  bank_statement: 'Bank statements',
 };

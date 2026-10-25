@@ -282,6 +282,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   manufacturing_vouchers: 'books.edit',
   stock_journals: 'books.edit',
   physical_stock: 'books.edit',
+  // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
+  year_end: 'books.edit',
 };
 
 let systemDepth = 0;

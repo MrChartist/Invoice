@@ -459,3 +459,23 @@ test('WP-6 readers: cess on bills, purchase HSN register and the monthly 1-vs-3B
   assert.equal(rows.length, 1);
   assert.equal(rows[0].itc3b, 230);
 });
+
+test('WP-7 readers (Tally supplier payments, books integrity) read the real purchase shape', async () => {
+  const { booksVouchers } = await import('../src/lib/tally-books.ts');
+  const { tallyBankResolver } = await import('../src/lib/tally-bank.ts');
+  const names = {
+    range: {}, salesLedger: 'Sales', purchaseLedger: 'Purchases', bankLedger: 'Bank Account', cashLedger: 'Cash', roundOffLedger: 'Round Off',
+    otherChargesLedger: 'Freight', outputCgst: 'Output CGST', outputSgst: 'Output SGST', outputIgst: 'Output IGST', outputGst: 'Output GST',
+    outputCess: 'Output Cess', tcsLedger: 'TCS Payable', tdsLedger: 'TDS Receivable', inputCgst: 'Input CGST', inputSgst: 'Input SGST',
+    inputIgst: 'Input IGST', rcmPayableLedger: 'RCM', customsIgstLedger: 'Customs IGST',
+  };
+  const vs = booksVouchers({ purchasePayments: [{ id: 'pay1', purchase_id: 'p1', amount: 1180, date: '2026-04-20', method: 'NEFT' }] }, { purchases: [bill], vendors: [] }, names, () => {}, tallyBankResolver('Bank Account', 'Cash', []), []);
+  assert.deepEqual(vs.map((v) => [v.type, v.party, v.entries[0].bill?.name, v.entries[0].paise]), [['Payment', 'Acme Supplies', 'AS/22', 118000]]);
+  const { checkBooksIntegrity } = await import('../src/lib/books-integrity.ts');
+  const r = checkBooksIntegrity({
+    ledger: { accounts: [], byId: new Map(), vouchers: [], warnings: [] },
+    invoices: [], transactions: [], purchases: [bill], docLinks: [], openingBills: [], manualVoucherIds: [], clientIds: [], vendorIds: [], openingSum: 0,
+    purchasePayments: [{ id: 'pay1', purchase_id: 'p1', amount: 1180, date: '2026-04-20' }],
+  });
+  assert.equal(r.ok, true, 'a payment against the real bill is not orphaned');
+});

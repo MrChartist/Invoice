@@ -24,6 +24,11 @@
  *                advance to an invoice is bill-wise matching inside Tally, so no voucher is sent for
  *                it; GST on advances (Tally's advance receipt / stat adjustment) is not exported (5.3).
  *
+ *   Books (WP-7, P0-12 / P1-22, `tally-books.ts`): supplier payments and advances, manual Journal /
+ *                Contra / Payment / Receipt vouchers (with cost-centre allocations), fixed-asset and
+ *                depreciation journals, stock transfers as Stock Journal; masters for user groups,
+ *                cost centres, godowns and ledger opening balances with bill-wise opening bills.
+ *
  * Any difference between the invoice's stored total and the sum of its
  * component amounts (rounding, legacy rows) is posted to the Round Off ledger,
  * so a voucher can never be rejected by Tally as "Debit and Credit totals differ".
@@ -42,6 +47,7 @@ import { receivableTotal } from './rcm';
 import { advanceMovements } from './advance-tax';
 import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
+import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
 import {
   clean,
   emptySource,
@@ -212,7 +218,7 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
 
 /* ── Voucher model (pure data — what the tests assert on) ─────── */
 
-export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase' | 'Payment' | 'Debit Note';
+export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase' | 'Payment' | 'Debit Note' | 'Journal' | 'Contra' | 'Stock Journal';
 export type Side = 'Dr' | 'Cr';
 
 export interface TallyEntry {
@@ -222,6 +228,8 @@ export interface TallyEntry {
   paise: number;
   /** Bill allocation (party ledgers only). */
   bill?: { name: string; type: 'New Ref' | 'Agst Ref' | 'Advance' };
+  /** Additive (WP-7, P1-22): cost-centre allocation of this entry (amounts sum to `paise`). */
+  costCentres?: Array<{ name: string; paise: number }>;
 }
 
 export interface TallyInventoryLine {
@@ -248,6 +256,8 @@ export interface TallyVoucher {
   inventory: TallyInventoryLine[];
   /** Ledger name of the entry the inventory lines allocate to. */
   inventoryLedger: string;
+  /** Additive (WP-7): Stock Journal (stock transfer) — quantity out of `from`, into `to`. */
+  stock?: { from: string; to: string; lines: Array<{ item: string; unit: string; qty: number; batch?: string }> };
 }
 
 /** Signed paise: debit negative, credit positive. */
@@ -269,6 +279,11 @@ interface LedgerDef {
   phone?: string;
   duty?: 'Central Tax' | 'State Tax' | 'Integrated Tax' | 'Cess';
   billwise?: boolean;
+  /** Additive (WP-7): opening balance, debit-positive paise, and bill-wise opening bills. */
+  opening?: number;
+  bills?: Array<{ name: string; date: string; paise: number }>;
+  /** Additive (WP-7): cost centres are applicable (an entry allocates to one). */
+  costCentres?: boolean;
 }
 
 export interface TallyBuild {
@@ -276,6 +291,10 @@ export interface TallyBuild {
   ledgers: LedgerDef[];
   stockItems: Array<{ name: string; unit: string; hsn: string; gstRate: number }>;
   warnings: string[];
+  /** Additive (WP-7): user group masters (parents first), cost centres and godowns the vouchers use. */
+  groups?: Array<{ name: string; parent: string }>;
+  costCentres?: string[];
+  godowns?: string[];
 }
 
 export interface TallyCounts {
@@ -285,6 +304,11 @@ export interface TallyCounts {
   creditNotes: number;
   receipts: number;
   purchases: number;
+  /** Additive (WP-7). */
+  payments?: number;
+  journals?: number;
+  contras?: number;
+  stockJournals?: number;
 }
 
 /** Push an entry; zero amounts are dropped. */
@@ -343,6 +367,9 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
   const std = (name: string, parent: string, duty?: LedgerDef['duty']) =>
     addLedger({ name, parent, ...(duty ? { duty } : {}) });
   const bankOf = tallyBankResolver(o.bankLedger, o.cashLedger);
+  const centreName = new Map((source.books?.costCentres ?? []).map((c) => [c.id, c.name]));
+  const ccLedgers = new Set<string>();
+  const allocatedBy = new Set((source.books?.manualVouchers ?? []).map((v) => v.id));
 
   const registerParty = (inv: InvoiceRecord, name: string) => {
     const c = inv.client ?? ({} as InvoiceRecord['client']);
@@ -399,6 +426,13 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       ? inventory.reduce((s, l) => s + l.paise, 0)
       : Math.abs(toPaise(a.chargesTaxed ? round2(a.taxable - a.charges) : a.taxable));
     push(entries, salesLedger, credit ? 'Dr' : 'Cr', taxable);
+    // WP-7 (P1-22): the document's cost centre on its sales entry.
+    const cc = inv.cost_centre_id ? centreName.get(inv.cost_centre_id) : undefined;
+    const salesEntry = entries.find((e) => e.ledger === salesLedger && !e.bill);
+    if (cc && salesEntry) {
+      salesEntry.costCentres = [{ name: cc, paise: salesEntry.paise }];
+      ccLedgers.add(salesLedger);
+    }
     taxLedgers(inv, absA, credit, entries);
     push(entries, o.otherChargesLedger, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.charges)));
     // Cess and TCS get their own ledgers: left out they would be swallowed by Round Off.
@@ -476,6 +510,8 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     for (const p of filterPayments(source.payments, sales, o.range)) {
       // Applying an advance (5.3) is bill-wise matching in Tally: the money came in on the advance.
       if (p.advance_id) continue;
+      // WP-7: a receipt row a manual voucher allocated bill-wise (P0-11) goes out with that voucher, not twice.
+      if (allocatedBy.has(String((p as { voucher_id?: unknown }).voucher_id ?? ''))) continue;
       const inv = byId.get(p.invoice_id)!;
       const party = partyNameOf(inv.client);
       registerParty(inv, party);
@@ -628,21 +664,31 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     vouchers.push(...debitNoteVouchers(source.purchaseReturns, o, addLedger)); // WP-3: purchase returns (tally-debit-notes.ts)
   }
 
-  // Only keep tax/std ledgers that vouchers actually use.
+  // WP-7 (P0-12 / P1-22): supplier payments, manual vouchers, asset journals, stock journals, openings.
+  if (source.books) {
+    vouchers.push(...booksVouchers(source.books, { purchases: o.includePurchases ? source.purchases : [], vendors: source.vendors }, o, addLedger, bankOf, warnings));
+    openingLedgers(source.books, source.clients, source.vendors, o, addLedger);
+  }
+  for (const name of ccLedgers) addLedger({ name, parent: '', costCentres: true });
+
+  // Only keep tax/std ledgers that vouchers actually use (and ledgers carrying an opening balance).
   const used = new Set(vouchers.flatMap((v) => v.entries.map((e) => e.ledger)));
   const ledgers = [...ledgerMap.values()]
-    .filter((l) => used.has(l.name))
+    .filter((l) => used.has(l.name) || !!l.opening)
     .sort((a, b) => a.parent.localeCompare(b.parent) || a.name.localeCompare(b.name));
   const stockItems = [...stockMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const costCentres = [...new Set(vouchers.flatMap((v) => v.entries.flatMap((e) => (e.costCentres ?? []).map((c) => c.name))))].sort();
+  const godowns = [...new Set(vouchers.flatMap((v) => (v.stock ? [v.stock.from, v.stock.to] : [])))].filter((g) => g !== 'Main Location').sort();
+  const groups = source.books ? groupMasters(source.books) : [];
 
-  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, 'Debit Note': 2.5, Receipt: 3, Payment: 4 };
+  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, 'Debit Note': 2.5, Receipt: 3, Payment: 4, Contra: 4.5, Journal: 5, 'Stock Journal': 6 };
   vouchers.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
       typeOrder[a.type] - typeOrder[b.type] ||
       a.number.localeCompare(b.number),
   );
-  return { vouchers, ledgers, stockItems, warnings };
+  return { vouchers, ledgers, stockItems, warnings, ...(groups.length ? { groups } : {}), ...(costCentres.length ? { costCentres } : {}), ...(godowns.length ? { godowns } : {}) };
 }
 
 function stripEmpty<T extends object>(o: T): Partial<T> {
@@ -663,6 +709,10 @@ export function countTally(build: TallyBuild): TallyCounts {
     creditNotes: c('Credit Note'),
     receipts: c('Receipt'),
     purchases: c('Purchase'),
+    payments: c('Payment'),
+    journals: c('Journal'),
+    contras: c('Contra'),
+    stockJournals: c('Stock Journal'),
   };
 }
 
@@ -680,7 +730,18 @@ function ledgerXml(l: LedgerDef): Lines {
   const body: Lines = [];
   body.push(...el('PARENT', l.parent));
   body.push(...el('ISBILLWISEON', yn(!!l.billwise)));
-  body.push(...el('ISCOSTCENTRESON', 'No'));
+  body.push(...el('ISCOSTCENTRESON', yn(!!l.costCentres)));
+  if (l.opening) {
+    // Tally's sign: a debit opening is negative.
+    body.push(...el('OPENINGBALANCE', tallyAmount(-l.opening)));
+    for (const b of l.bills ?? []) {
+      body.push(...el('BILLALLOCATIONS.LIST', [
+        ...el('NAME', b.name),
+        ...(b.date ? el('BILLDATE', tallyDate(b.date)) : []),
+        ...el('OPENINGBALANCE', tallyAmount(-b.paise)),
+      ]));
+    }
+  }
   if (l.duty) {
     body.push(...el('TAXTYPE', 'GST'));
     body.push(...el('GSTDUTYHEAD', l.duty));
@@ -778,6 +839,15 @@ function entryXml(e: TallyEntry, tag = 'ALLLEDGERENTRIES.LIST', withBills = true
       ]),
     );
   }
+  if (e.costCentres?.length) {
+    body.push(
+      ...el('CATEGORYALLOCATIONS.LIST', [
+        ...el('CATEGORY', 'Primary Cost Category'),
+        ...el('ISDEEMEDPOSITIVE', yn(debit)),
+        ...e.costCentres.flatMap((c) => el('COSTCENTREALLOCATIONS.LIST', [...el('NAME', c.name), ...el('AMOUNT', tallyAmount(debit ? -c.paise : c.paise))])),
+      ]),
+    );
+  }
   return el(tag, body);
 }
 
@@ -796,7 +866,7 @@ function qtyText(n: number): string {
 function voucherXml(v: TallyVoucher): Lines {
   const isInv = v.inventory.length > 0;
   const credit = v.type === 'Credit Note';
-  const isParty = v.type !== 'Receipt' && v.type !== 'Payment';
+  const isParty = v.type === 'Sales' || v.type === 'Credit Note' || v.type === 'Purchase' || v.type === 'Debit Note';
   const header: Lines = [
     ...el('DATE', tallyDate(v.date)),
     ...el('EFFECTIVEDATE', tallyDate(v.date)),
@@ -850,6 +920,28 @@ function voucherXml(v: TallyVoucher): Lines {
     if (isInv && e === inventoryEntry) continue;
     body.push(...entryXml(e));
   }
+  if (v.stock) {
+    // Stock Journal (WP-7): consumption out of one godown, production into the other, quantity only.
+    for (const [tag, godown, inward] of [['INVENTORYENTRIESOUT.LIST', v.stock.from, false], ['INVENTORYENTRIESIN.LIST', v.stock.to, true]] as const) {
+      for (const l of v.stock.lines) {
+        const q = `${qtyText(l.qty)} ${l.unit}`;
+        body.push(...el(tag, [
+          ...el('STOCKITEMNAME', l.item),
+          ...el('ISDEEMEDPOSITIVE', yn(inward)),
+          ...el('ACTUALQTY', q),
+          ...el('BILLEDQTY', q),
+          ...el('AMOUNT', '0.00'),
+          ...el('BATCHALLOCATIONS.LIST', [
+            ...el('GODOWNNAME', godown),
+            ...el('BATCHNAME', l.batch || 'Primary Batch'),
+            ...el('ACTUALQTY', q),
+            ...el('BILLEDQTY', q),
+            ...el('AMOUNT', '0.00'),
+          ]),
+        ]));
+      }
+    }
+  }
   return el('TALLYMESSAGE', el('VOUCHER', body, {
     VCHTYPE: v.type,
     ACTION: 'Create',
@@ -884,10 +976,26 @@ function applicableFromOf(build: TallyBuild): string {
   return `${m >= 4 ? y : y - 1}0401`;
 }
 
+function groupXml(g: { name: string; parent: string }): Lines {
+  return el('TALLYMESSAGE', el('GROUP', [...el('PARENT', g.parent), ...ledgerNameList(g.name)], { NAME: g.name, ACTION: 'Create' }), { 'xmlns:UDF': 'TallyUDF' });
+}
+
+function costCentreXml(name: string): Lines {
+  return el('TALLYMESSAGE', el('COSTCENTRE', [...el('CATEGORY', 'Primary Cost Category'), ...el('PARENT', ''), ...ledgerNameList(name)], { NAME: name, ACTION: 'Create' }), { 'xmlns:UDF': 'TallyUDF' });
+}
+
+function godownXml(name: string): Lines {
+  return el('TALLYMESSAGE', el('GODOWN', [...el('PARENT', ''), ...ledgerNameList(name)], { NAME: name, ACTION: 'Create' }), { 'xmlns:UDF': 'TallyUDF' });
+}
+
 function mastersMessages(build: TallyBuild): Lines {
   const units = [...new Set(build.stockItems.map((s) => s.unit))].sort();
   const from = applicableFromOf(build);
   return cat(
+    // WP-7: groups first (ledgers name them as parent), then cost centres and godowns.
+    ...(build.groups ?? []).map(groupXml),
+    ...(build.costCentres ?? []).map(costCentreXml),
+    ...(build.godowns ?? []).map(godownXml),
     ...build.ledgers.map(ledgerXml),
     ...units.map(unitXml),
     ...build.stockItems.map((s) => stockItemXml(s, from)),

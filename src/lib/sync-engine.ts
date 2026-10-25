@@ -254,7 +254,8 @@ const EXCLUDED = new Set<string>([
 ]);
 
 export function isSyncedKey(key: string): boolean {
-  return key.startsWith(DB_PREFIX) && !EXCLUDED.has(key) && !key.startsWith(ATTACHMENT_KEY_PREFIX) && !isLocalOnlyKey(key);
+  // Audit archive segments (WP-7) belong to this device's own chain, like `audit_log`.
+  return key.startsWith(DB_PREFIX) && !EXCLUDED.has(key) && !key.startsWith(ATTACHMENT_KEY_PREFIX) && !key.startsWith(`${DB_PREFIX}audit_archive_`) && !isLocalOnlyKey(key);
 }
 
 /** Tables whose rows carry a document date that the period lock protects. */

@@ -334,6 +334,8 @@ const RECORD_TABLES = [
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
   'gst_setoffs', 'gst_challans', 'hsn_master',
+  // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
+  'year_end',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -351,6 +353,7 @@ const ID_TABLES = new Set([
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'gst_setoffs', 'gst_challans', 'hsn_master',
+  'year_end',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -385,6 +388,17 @@ export function validateBackupData(data: Record<string, string>): void {
     const bad = rows.findIndex((r) => !isPlainObject(r) || (needsId && !hasId(r)));
     if (bad >= 0) throw new Error(`Row ${bad + 1} of the "${table}" table in this backup is damaged.`);
   }
+  // Audit archive segments (WP-7, `audit_archive_<n>`): lists of rows like `audit_log` itself.
+  for (const key of Object.keys(data)) {
+    if (!key.startsWith(`${DB_PREFIX}audit_archive_`)) continue;
+    let rows: unknown;
+    try {
+      rows = JSON.parse(data[key]);
+    } catch {
+      rows = null;
+    }
+    if (!Array.isArray(rows) || rows.some((r) => !isPlainObject(r))) throw new Error(`The audit archive "${key.slice(DB_PREFIX.length)}" in this backup is damaged.`);
+  }
   // Backups are self-contained: every logo/signature reference must resolve inside the file.
   const refs = new Set<string>();
   for (const table of SNAPSHOT_TABLES) {
@@ -414,7 +428,8 @@ const SAFETY_KEY = 'safety-snapshot';
 
 export interface SafetySnapshot {
   at: string;
-  reason: 'restore' | 'wipe';
+  /** Additive (WP-7): 'import' — taken before a Tally import, undone like a restore. */
+  reason: 'restore' | 'wipe' | 'import';
   data: Record<string, string>;
 }
 
@@ -435,6 +450,7 @@ export async function saveSafetySnapshot(reason: SafetySnapshot['reason'], now: 
   // Roles (6.21): only someone allowed to restore / erase may replace the owner's undo copy.
   requireAccess(reason === 'wipe' ? 'data.erase' : 'data.restore');
   const data = collectAppData();
+  // Audit archive segments (WP-7) are app keys like any other: they ride along in backups and this copy.
   for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   if (Object.keys(data).length === 0) return true; // nothing to protect
   return storeSnapshot({ at: now.toISOString(), reason, data });

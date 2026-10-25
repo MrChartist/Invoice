@@ -55,6 +55,9 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   edits become conflicts the user resolves. Sync bookkeeping (`SYNC_META_KEYS` in `storage.ts`) lives in the company
   database (sealed in vault mode) but never in a backup or the undo copy; restore / erase remove it. The device id is
   the device-local key `sync_device`.
+- **Table-write hook (WP-7).** `setTable` reports each successful write to ONE observer installed with
+  `onTableWrite(hook)` — `(name, prevRaw, rows)`; `writeRaw` does not report. Only the audit edit log
+  (`src/lib/audit-edits.ts`) uses it; errors in the observer are swallowed so it never breaks a save.
 - **Rule for new code.** No module evaluated before `initStorage()` (i.e. statically imported by `main.tsx` /
   `App.tsx`) may read storage at module level; read inside functions, effects or lazily loaded modules.
 
@@ -97,7 +100,9 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `design_prefs` | templates-studio | defined by that module |
 | `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}`; additive `tds_amount` (TDS deducted on the payment) and `group_id` (multi-bill payment) (Phase 7) |
 | `purchase_orders` | purchases (POs) | `PurchaseOrder` (`src/types/purchases.ts`); received qty derived from bills with `po_id` (`src/lib/purchase-orders.ts`) |
-| `audit_log` | audit | `AuditEntry` (`src/types/audit.ts`) — written by `localDb` mutations, capped at 5,000 rows |
+| `audit_log` | audit | `AuditEntry` (`src/types/audit.ts`) — written by module calls and, for every books / masters table, by the `onTableWrite` edit log (WP-7, `src/lib/audit-edits.ts`); past 5,000 live rows the oldest move to an archive segment |
+| `audit_archive_<nnnn>` (one key per segment) | audit (WP-7) | `AuditEntry[]`: archived oldest rows, still hash-chained with the live log (`audit.fullRows()`), in backups, not synced (`docs/features/migration-audit.md`) |
+| `year_end` | year-end (WP-7, `src/lib/year-end.ts`) | `YearEndRecord {id: 'FY25-26', marks}`: reviewed year-end checklist steps per FY |
 | `bank_statements` | reconcile | imported statement lines + match state (`docs/features/reconcile-reports.md`) |
 | `book_opening` | books | opening cash/bank balances |
 | `export_prefs` | exports | last-used export options |

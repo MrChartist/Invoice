@@ -27,6 +27,7 @@ import {
   type ExportSource,
 } from '../../lib/accounting-export';
 import { generateTallyExport, DEFAULT_LEDGER_NAMES, type TallyOptions } from '../../lib/tally-xml';
+import { loadTallyBooksSource } from '../../lib/tally-books';
 import { useToast } from '../ui/useToast';
 import { downloadFile, downloadSequentially } from './download';
 import { useT } from '../../i18n';
@@ -100,6 +101,8 @@ function loadSource(): ExportSource {
     vendors: getTable<unknown>('vendors'),
     advances: getTable<AdvanceRecord>('advances'),
     purchaseReturns: getTable<PurchaseReturn>('purchase_returns'),
+    // WP-7 (P0-12 / P1-22): supplier payments, manual vouchers, asset journals, stock transfers, openings.
+    books: loadTallyBooksSource(isoDate(new Date())),
   };
 }
 
@@ -230,7 +233,7 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
 
   const noCompany = !prefs.companyName.trim();
   const c = tally.counts;
-  const voucherTotal = c.sales + c.creditNotes + c.receipts + c.purchases;
+  const voucherTotal = c.sales + c.creditNotes + c.receipts + c.purchases + (c.payments ?? 0) + (c.journals ?? 0) + (c.contras ?? 0) + (c.stockJournals ?? 0);
 
   return (
     <div className={styles.grid}>
@@ -343,6 +346,7 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
               {[
                 [expT('cLedgers'), c.ledgers], [expT('cSales'), c.sales], [expT('cCreditNotes'), c.creditNotes],
                 [expT('cReceipts'), c.receipts], [expT('cPurchases'), c.purchases], [expT('cStockItems'), c.stockItems],
+                [expT('cPayments'), c.payments ?? 0], [expT('cJournals'), (c.journals ?? 0) + (c.contras ?? 0)], [expT('cStockJournals'), c.stockJournals ?? 0],
               ].map(([k, v]) => (
                 <div key={k} className={styles.mini} role="listitem">
                   <span className={styles.miniValue}>{v}</span>

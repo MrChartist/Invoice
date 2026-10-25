@@ -1,6 +1,6 @@
 import { reloadAfterFlush, storageBackend } from '../../lib/storage';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, DatabaseBackup, Download, FileUp, FolderDown, FolderUp, HardDrive, Info, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, CalendarCheck, DatabaseBackup, Download, FileCode2, FileUp, FolderDown, FolderUp, HardDrive, Info, Package, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
 import {
@@ -35,6 +35,11 @@ import { formatCurrency } from '../../lib/utils';
 import type { InvoiceItem } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
+import { migT } from '../../i18n/areas/migration';
+
+// WP-7: Tally import and the year-end wizard are separate lazy chunks, loaded on first open.
+const TallyImport = lazy(() => import('../import/TallyImport').then((m) => ({ default: m.TallyImport })));
+const YearEndWizard = lazy(() => import('../year-end/YearEndWizard').then((m) => ({ default: m.YearEndWizard })));
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
@@ -56,6 +61,7 @@ export function DataPanel({ notify }: Props) {
   const [pending, setPending] = useState<PendingRestore | null>(null);
   const [wipeOpen, setWipeOpen] = useState(false);
   const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
+  const [wp7, setWp7] = useState<'tally' | 'yearEnd' | null>(null);
   const [safety, setSafety] = useState<SafetySnapshot | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [browserQuota, setBrowserQuota] = useState<number | null>(null);
@@ -293,6 +299,38 @@ export function DataPanel({ notify }: Props) {
           </div>
         </div>
       </section>
+
+      <section className={surface.card}>
+        <div className={surface.cardHead}>
+          <span className={surface.cardHeadIcon}>
+            <CalendarCheck size={16} /> {migT('cardTitle')}
+          </span>
+        </div>
+        <div className={surface.cardBody}>
+          <p className={surface.sectionNote}>{migT('cardText')}</p>
+          <div className={styles.actionGrid}>
+            {mayRestore && (
+              <button type="button" className={styles.action} onClick={() => setWp7('tally')}>
+                <strong><FileCode2 size={16} /> {migT('openImport')}</strong>
+                <span>{migT('openImportText')}</span>
+              </button>
+            )}
+            <button type="button" className={styles.action} onClick={() => setWp7('yearEnd')}>
+              <strong><CalendarCheck size={16} /> {migT('openYearEnd')}</strong>
+              <span>{migT('openYearEndText')}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+      {wp7 && (
+        <Suspense fallback={null}>
+          {wp7 === 'tally' ? (
+            <TallyImport open onClose={() => setWp7(null)} notify={notify} />
+          ) : (
+            <YearEndWizard open onClose={() => setWp7(null)} notify={notify} />
+          )}
+        </Suspense>
+      )}
 
       <SampleDataCard notify={notify} />
 

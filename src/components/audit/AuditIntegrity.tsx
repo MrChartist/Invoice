@@ -19,7 +19,8 @@ export function AuditIntegrity() {
   const notedOk = noted.trim() === '' || HEX64.test(noted.trim());
 
   const run = () => {
-    setReport(verifyAuditChain(audit.rows(), { notedHead: noted.trim() || undefined }));
+    // WP-7: the whole chain — archive segments + live log — verifies as one.
+    setReport(verifyAuditChain(audit.fullRows(), { notedHead: noted.trim() || undefined }));
   };
 
   const copy = async () => {
@@ -41,7 +42,7 @@ export function AuditIntegrity() {
       [
         'Mr. Chartist Invoice: activity log chain head',
         `Head hash (SHA-256): ${head}`,
-        `Entries in the log:  ${audit.count()}`,
+        `Entries in the log:  ${audit.count()}${audit.archivedCount() ? ` (+ ${audit.archivedCount()} in archive segments)` : ''}`,
         `Noted at:            ${now.toISOString()}`,
         '',
         'Keep this file (or send it to your CA). Later, paste the hash into Settings > Activity >',
@@ -53,7 +54,7 @@ export function AuditIntegrity() {
     );
   };
 
-  const brokenRow = report?.broken && report.broken.index < report.total ? audit.rows()[report.broken.index] : undefined;
+  const brokenRow = report?.broken && report.broken.index < report.total ? audit.fullRows()[report.broken.index] : undefined;
 
   return (
     <div className={styles.integrity}>
