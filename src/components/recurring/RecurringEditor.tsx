@@ -22,6 +22,9 @@ import { cn, formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import { GST_SLABS, type InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import styles from './recurring.module.css';
+import { dateLocale, getLanguage, useT } from '../../i18n';
+import { recT } from '../../i18n/areas/recurring';
+import { areaNodes } from '../../i18n/areas/nodes';
 
 export interface RecurringEditorProps {
   open: boolean;
@@ -75,6 +78,7 @@ function EditorBody({
   sourceInvoice,
   onSaved,
 }: Omit<RecurringEditorProps, 'open'>) {
+  useT(); // re-render on a language switch (5.4)
   const today = todayInput();
   const savedInvoices = useMemo(
     () => localDb.invoices.getAll().filter((i) => i.doc_type !== 'QUOTATION' && i.doc_type !== 'DELIVERY_CHALLAN' && i.doc_type !== 'SALES_ORDER'),
@@ -154,15 +158,15 @@ function EditorBody({
 
   const validate = (): string[] => {
     const out: string[] = [];
-    if (!name.trim()) out.push('Give the schedule a name.');
-    if (!template.client.name.trim()) out.push('Choose a client.');
+    if (!name.trim()) out.push(recT('eName'));
+    if (!template.client.name.trim()) out.push(recT('eClient'));
     if (!template.items.some((i) => (i.name.trim() || num(i.rate) > 0) && num(i.quantity) > 0)) {
-      out.push('Add at least one priced line item.');
+      out.push(recT('eLine'));
     }
-    if (totals.total <= 0) out.push('The invoice total is zero — check the rates.');
-    if (!startValid) out.push('Choose a valid start date.');
-    if (endDate && startDate && endDate < startDate) out.push('End date cannot be before the start date.');
-    if (!(num(interval) >= 1)) out.push('Repeat interval must be at least 1.');
+    if (totals.total <= 0) out.push(recT('eZero'));
+    if (!startValid) out.push(recT('eStart'));
+    if (endDate && startDate && endDate < startDate) out.push(recT('eEnd'));
+    if (!(num(interval) >= 1)) out.push(recT('eInterval'));
     return out;
   };
 
@@ -216,15 +220,15 @@ function EditorBody({
       open
       onClose={onClose}
       size="lg"
-      title={schedule ? 'Edit recurring invoice' : 'New recurring invoice'}
-      subtitle="Invoices are created automatically when each date arrives — the next time you open the app."
+      title={schedule ? recT('editTitle') : recT('newTitle')}
+      subtitle={recT('editorSub')}
       footer={
         <>
           <button type="button" className={controls.btnOutline} onClick={onClose}>
-            Cancel
+            {recT('cancel')}
           </button>
           <button type="button" className={controls.btnPrimary} onClick={save}>
-            {schedule ? 'Save changes' : 'Create schedule'}
+            {schedule ? recT('saveChanges') : recT('create')}
           </button>
         </>
       }
@@ -246,20 +250,20 @@ function EditorBody({
         )}
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>What to bill</h3>
+          <h3 className={styles.sectionTitle}>{recT('whatToBill')}</h3>
           {!schedule && (
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-source">Start from</label>
+              <label className={controls.label} htmlFor="rec-source">{recT('startFrom')}</label>
               <select
                 id="rec-source"
                 className={controls.select}
                 value={sourceId}
                 onChange={(e) => pickInvoice(e.target.value)}
               >
-                <option value="">{sourceInvoice && !sourceId ? 'Current invoice' : 'Blank — pick a client below'}</option>
+                <option value="">{sourceInvoice && !sourceId ? recT('currentInvoice') : recT('blank')}</option>
                 {savedInvoices.map((i) => (
                   <option key={i.id} value={i.id}>
-                    {i.invoice_number || 'Unnumbered'} · {i.client.name || 'No client'} · {formatCurrency(i.total, i.currency)}
+                    {i.invoice_number || recT('unnumbered')} · {i.client.name || recT('noClient')} · {formatCurrency(i.total, i.currency)}
                   </option>
                 ))}
               </select>
@@ -268,12 +272,12 @@ function EditorBody({
 
           <div className={controls.row}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-name">Schedule name</label>
+              <label className={controls.label} htmlFor="rec-name">{recT('name')}</label>
               <input
                 id="rec-name"
                 className={controls.input}
                 value={name}
-                placeholder="e.g. Acme — monthly research plan"
+                placeholder={recT('namePh')}
                 onChange={(e) => {
                   setName(e.target.value);
                   setNameTouched(true);
@@ -281,7 +285,7 @@ function EditorBody({
               />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-client">Client</label>
+              <label className={controls.label} htmlFor="rec-client">{recT('client')}</label>
               {hasClientName && !clients.some((c) => c.id === template.client.id) ? (
                 <input id="rec-client" className={controls.input} value={template.client.name} readOnly />
               ) : (
@@ -291,7 +295,7 @@ function EditorBody({
                   value={template.client.id ?? ''}
                   onChange={(e) => pickClient(e.target.value)}
                 >
-                  <option value="">Select a client…</option>
+                  <option value="">{recT('selectClient')}</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -300,27 +304,27 @@ function EditorBody({
             </div>
           </div>
 
-          <div role="group" aria-label="Line items" className={styles.section}>
+          <div role="group" aria-label={recT('lineItems')} className={styles.section}>
             <div className={styles.itemHead} aria-hidden="true">
-              <span>Item</span>
-              <span>Qty</span>
-              <span>Rate</span>
-              <span>GST %</span>
+              <span>{recT('item')}</span>
+              <span>{recT('qty')}</span>
+              <span>{recT('rate')}</span>
+              <span>{recT('gstPct')}</span>
               <span />
             </div>
             {template.items.map((item, idx) => (
               <div className={styles.itemRow} key={item.id}>
                 <input
                   className={controls.input}
-                  aria-label={`Item ${idx + 1} name`}
+                  aria-label={recT('itemName', { n: idx + 1 })}
                   value={item.name}
                   placeholder="Service — {month} {year}"
                   onChange={(e) => patchItem(item.id, { name: e.target.value })}
                 />
                 <input
                   className={cn(controls.input, controls.inputNumeric)}
-                  aria-label={`Item ${idx + 1} quantity`}
-                  placeholder="Qty"
+                  aria-label={recT('itemQty', { n: idx + 1 })}
+                  placeholder={recT('qty')}
                   type="number"
                   min="0"
                   step="any"
@@ -329,8 +333,8 @@ function EditorBody({
                 />
                 <input
                   className={cn(controls.input, controls.inputNumeric)}
-                  aria-label={`Item ${idx + 1} rate`}
-                  placeholder="Rate (₹)"
+                  aria-label={recT('itemRate', { n: idx + 1 })}
+                  placeholder={recT('ratePh')}
                   type="number"
                   min="0"
                   step="any"
@@ -339,7 +343,7 @@ function EditorBody({
                 />
                 <select
                   className={controls.select}
-                  aria-label={`Item ${idx + 1} GST rate`}
+                  aria-label={recT('itemGst', { n: idx + 1 })}
                   value={item.tax_rate ?? 0}
                   onChange={(e) => patchItem(item.id, { tax_rate: num(e.target.value) })}
                 >
@@ -350,7 +354,7 @@ function EditorBody({
                 <button
                   type="button"
                   className={controls.btnDanger}
-                  aria-label={`Remove item ${idx + 1}`}
+                  aria-label={recT('removeItem', { n: idx + 1 })}
                   disabled={template.items.length <= 1}
                   onClick={() => patchTemplate({ items: template.items.filter((i) => i.id !== item.id) })}
                 >
@@ -364,25 +368,24 @@ function EditorBody({
                 className={cn(controls.btnGhost, controls.btnSm)}
                 onClick={() => patchTemplate({ items: [...template.items, blankItem(template.tax_rate)] })}
               >
-                <Plus size={14} /> Add item
+                <Plus size={14} /> {recT('addItem')}
               </button>
             </div>
             <p className={controls.hint}>
-              Tip: <code>{'{month}'}</code>, <code>{'{year}'}</code> and <code>{'{period}'}</code> in an item name
-              become that run&apos;s month and year.
+              {areaNodes(recT('tip'), { month: <code>{'{month}'}</code>, year: <code>{'{year}'}</code>, period: <code>{'{period}'}</code> })}
             </p>
             <div className={styles.totalLine}>
-              <span>Total per invoice</span>
+              <span>{recT('totalPer')}</span>
               <span>{formatCurrency(totals.total, template.currency)}</span>
             </div>
           </div>
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Schedule</h3>
+          <h3 className={styles.sectionTitle}>{recT('schedule')}</h3>
           <div className={controls.row}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-freq">Repeats</label>
+              <label className={controls.label} htmlFor="rec-freq">{recT('repeats')}</label>
               <select
                 id="rec-freq"
                 className={controls.select}
@@ -390,13 +393,13 @@ function EditorBody({
                 onChange={(e) => setFrequency(e.target.value as Frequency)}
               >
                 {FREQUENCIES.map((f) => (
-                  <option key={f} value={f}>{FREQUENCY_LABELS[f]}</option>
+                  <option key={f} value={f}>{recT(`freq.${f}`)}</option>
                 ))}
               </select>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-interval">
-                Every {frequency === 'custom-days' ? 'N days' : 'N periods'}
+                {frequency === 'custom-days' ? recT('everyNDays') : recT('everyNPeriods')}
               </label>
               <input
                 id="rec-interval"
@@ -411,11 +414,11 @@ function EditorBody({
           </div>
           <div className={controls.row}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-start">First invoice date</label>
+              <label className={controls.label} htmlFor="rec-start">{recT('firstDate')}</label>
               <input id="rec-start" className={controls.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-due">Payment due after (days)</label>
+              <label className={controls.label} htmlFor="rec-due">{recT('dueAfter')}</label>
               <input
                 id="rec-due"
                 className={cn(controls.input, controls.inputNumeric)}
@@ -429,18 +432,18 @@ function EditorBody({
           </div>
           <div className={controls.row}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-end">End date (optional)</label>
+              <label className={controls.label} htmlFor="rec-end">{recT('endDate')}</label>
               <input id="rec-end" className={controls.input} type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="rec-max">Stop after N invoices (optional)</label>
+              <label className={controls.label} htmlFor="rec-max">{recT('stopAfter')}</label>
               <input
                 id="rec-max"
                 className={cn(controls.input, controls.inputNumeric)}
                 type="number"
                 min="1"
                 step="1"
-                placeholder="Unlimited"
+                placeholder={recT('unlimited')}
                 value={maxRuns}
                 onChange={(e) => setMaxRuns(e.target.value)}
               />
@@ -448,7 +451,7 @@ function EditorBody({
           </div>
 
           <div className={controls.field}>
-            <span className={controls.label} id="rec-mode-label">When an invoice is due</span>
+            <span className={controls.label} id="rec-mode-label">{recT('whenDue')}</span>
             <div className={controls.segment} role="radiogroup" aria-labelledby="rec-mode-label">
               <button
                 type="button"
@@ -457,7 +460,7 @@ function EditorBody({
                 className={mode === 'draft' ? controls.segmentBtnActive : controls.segmentBtn}
                 onClick={() => setMode('draft')}
               >
-                Create a Draft to review
+                {recT('modeDraft')}
               </button>
               <button
                 type="button"
@@ -466,24 +469,24 @@ function EditorBody({
                 className={mode === 'issue' ? controls.segmentBtnActive : controls.segmentBtn}
                 onClick={() => setMode('issue')}
               >
-                Issue as Sent
+                {recT('modeIssue')}
               </button>
             </div>
           </div>
         </section>
 
         <section className={styles.section} aria-live="polite">
-          <h3 className={styles.sectionTitle}>Next {dates.length || 6} dates</h3>
+          <h3 className={styles.sectionTitle}>{recT('nextDates', { n: dates.length || 6 })}</h3>
           {dates.length === 0 ? (
-            <p className={controls.hint}>No upcoming dates — check the start date, end date and limits.</p>
+            <p className={controls.hint}>{recT('noDates')}</p>
           ) : (
             <ol className={styles.preview}>
               {dates.map((d, i) => (
                 <li key={d} className={i === 0 ? styles.previewFirst : styles.previewItem}>
                   {formatDate(d)}
                   <span className={styles.previewDay}>
-                    {new Intl.DateTimeFormat('en-IN', { weekday: 'long' }).format(new Date(`${d}T12:00:00`))}
-                    {i === 0 ? ' · first' : ''}
+                    {new Intl.DateTimeFormat(dateLocale(), { weekday: 'long' }).format(new Date(`${d}T12:00:00`))}
+                    {i === 0 ? recT('first') : ''}
                   </span>
                 </li>
               ))}
@@ -491,7 +494,7 @@ function EditorBody({
           )}
           {parseYmd(startDate) && Number(startDate.slice(8, 10)) > 28 && frequency !== 'weekly' && frequency !== 'custom-days' && (
             <p className={controls.hint}>
-              Started on the {ordinal(Number(startDate.slice(8, 10)))}: shorter months use their last day, then it returns to the {ordinal(Number(startDate.slice(8, 10)))}.
+              {recT('monthEnd', { day: getLanguage() === 'hi' ? Number(startDate.slice(8, 10)) : ordinal(Number(startDate.slice(8, 10))) })}
             </p>
           )}
         </section>

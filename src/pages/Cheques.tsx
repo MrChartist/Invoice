@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, CalendarClock, Download, Pencil, Printer, Trash2, Wallet } from 'lucide-react';
 import {
-  STATUS_LABELS,
   chequeSummary,
   chequesCsv,
   deleteCheque,
@@ -28,14 +27,11 @@ import { ChequePrintModal } from '../components/cheques/ChequePrintModal';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/cheques/Cheques.module.css';
+import { useT } from '../i18n';
+import { chqT } from '../i18n/areas/cheques';
 
-const ACTION_LABELS: Partial<Record<ChequeStatus, string>> = {
-  deposited: 'Deposit',
-  presented: 'Presented',
-  cleared: 'Clear',
-  bounced: 'Bounced',
-  cancelled: 'Cancel',
-};
+const actionLabel = (s: ChequeStatus): string =>
+  s === 'deposited' || s === 'presented' || s === 'cleared' || s === 'bounced' || s === 'cancelled' ? chqT(`act.${s}`) : chqT(`st.${s}`);
 
 const STATUS_TONE: Record<ChequeStatus, string> = {
   received: surface.badgeSent,
@@ -51,6 +47,7 @@ const inr = (n: number) => `₹${formatMoney(n)}`;
 
 /** Cheque register & PDC tracking, cheque printing (roadmap 6.26). */
 export function Cheques() {
+  useT(); // re-render on a language switch (5.4)
   const [params, setParams] = useSearchParams();
   const dirParam = params.get('dir');
   const direction: ChequeDirection | 'all' = dirParam === 'received' || dirParam === 'issued' ? dirParam : 'all';
@@ -81,10 +78,10 @@ export function Cheques() {
   }, [all]);
   const docLabel = useMemo(() => {
     const inv = new Map(localDb.invoices.getAll().map((i) => [i.id, i.invoice_number]));
-    const bills = new Map(purchasesDb.all().map((b) => [b.id, b.bill_number || 'Bill']));
+    const bills = new Map(purchasesDb.all().map((b) => [b.id, b.bill_number || chqT('billWord')]));
     return (c: Cheque) =>
-      c.invoice_id ? { text: inv.get(c.invoice_id) ?? 'deleted invoice', to: inv.has(c.invoice_id) ? `/invoice/${c.invoice_id}` : undefined }
-      : c.purchase_id ? { text: bills.get(c.purchase_id) ?? 'deleted bill', to: bills.has(c.purchase_id) ? '/expenses' : undefined }
+      c.invoice_id ? { text: inv.get(c.invoice_id) ?? chqT('deletedInvoice'), to: inv.has(c.invoice_id) ? `/invoice/${c.invoice_id}` : undefined }
+      : c.purchase_id ? { text: bills.get(c.purchase_id) ?? chqT('deletedBill'), to: bills.has(c.purchase_id) ? '/expenses' : undefined }
       : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
@@ -101,7 +98,7 @@ export function Cheques() {
     try {
       deleteCheque(c.id);
       refresh();
-      notify(`Cheque ${c.number} deleted`);
+      notify(chqT('deleted', { number: c.number }));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -110,76 +107,76 @@ export function Cheques() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Cheques"
-        subtitle="Cheques received and issued, post-dated cheque reminders, bounces — and printing on CTS-2010 leaves."
+        title={chqT('title')}
+        subtitle={chqT('subtitle')}
         actions={
           <>
             <button type="button" className={controls.btnOutline} disabled={!all.length} onClick={() => downloadText(`cheque-register-${today}.csv`, chequesCsv(rows), 'text/csv')}>
               <Download size={16} /> CSV
             </button>
             <button type="button" className={controls.btnOutline} onClick={() => setForm({ open: true, direction: 'issued', cheque: null })}>
-              <ArrowUpRight size={16} /> Issue cheque
+              <ArrowUpRight size={16} /> {chqT('issue')}
             </button>
             <button type="button" className={controls.btnPrimary} onClick={() => setForm({ open: true, direction: 'received', cheque: null })}>
-              <ArrowDownLeft size={16} /> Cheque received
+              <ArrowDownLeft size={16} /> {chqT('receivedBtn')}
             </button>
           </>
         }
       />
 
       <div className={surface.statGrid}>
-        <StatCard label="In hand" icon={Wallet} value={inr(summary.inHand.amount)} hint={`${summary.inHand.count} to deposit`} />
-        <StatCard label="Post-dated (PDC)" icon={CalendarClock} tone="warning" value={inr(summary.postDatedIn.amount)} hint={`${summary.postDatedIn.count} received, dated ahead`} />
-        <StatCard label="In clearing" icon={Banknote} tone="brand" value={inr(summary.inClearing.amount)} hint={`${summary.inClearing.count} deposited`} />
-        <StatCard label="Issued, not cleared" icon={ArrowUpRight} tone="loss" value={inr(summary.issuedOpen.amount)} hint={`${summary.issuedOpen.count} cheque${summary.issuedOpen.count === 1 ? '' : 's'}`} />
-        {summary.bounced.count > 0 && <StatCard label="Bounced" icon={AlertTriangle} tone="loss" value={inr(summary.bounced.amount)} hint={`${summary.bounced.count} to follow up`} />}
+        <StatCard label={chqT('inHand')} icon={Wallet} value={inr(summary.inHand.amount)} hint={chqT('toDeposit', { n: summary.inHand.count })} />
+        <StatCard label={chqT('pdc')} icon={CalendarClock} tone="warning" value={inr(summary.postDatedIn.amount)} hint={chqT('pdcHint', { n: summary.postDatedIn.count })} />
+        <StatCard label={chqT('inClearing')} icon={Banknote} tone="brand" value={inr(summary.inClearing.amount)} hint={chqT('nDeposited', { n: summary.inClearing.count })} />
+        <StatCard label={chqT('issuedOpen')} icon={ArrowUpRight} tone="loss" value={inr(summary.issuedOpen.amount)} hint={summary.issuedOpen.count === 1 ? chqT('nChequesOne') : chqT('nChequesMany', { n: summary.issuedOpen.count })} />
+        {summary.bounced.count > 0 && <StatCard label={chqT('bounced')} icon={AlertTriangle} tone="loss" value={inr(summary.bounced.amount)} hint={chqT('followUp', { n: summary.bounced.count })} />}
       </div>
 
       <section className={surface.card}>
         <div className={styles.filters}>
-          <div className={controls.segment} role="radiogroup" aria-label="Direction">
+          <div className={controls.segment} role="radiogroup" aria-label={chqT('direction')}>
             {(['all', 'received', 'issued'] as const).map((d) => (
               <button key={d} type="button" role="radio" aria-checked={direction === d} className={direction === d ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setParam('dir', d === 'all' ? '' : d)}>
-                {d === 'all' ? 'All' : d === 'received' ? 'Received' : 'Issued'}
+                {d === 'all' ? chqT('all') : d === 'received' ? chqT('received') : chqT('issued')}
               </button>
             ))}
           </div>
           <label className={controls.field}>
-            <span className={controls.label}>Show</span>
+            <span className={controls.label}>{chqT('show')}</span>
             <select className={controls.select} value={status} onChange={(e) => setParam('status', e.target.value === 'open' ? '' : e.target.value)}>
-              <option value="open">Open (not cleared)</option>
-              <option value="pdc">Post-dated only</option>
-              <option value="all">All cheques</option>
+              <option value="open">{chqT('open')}</option>
+              <option value="pdc">{chqT('pdcOnly')}</option>
+              <option value="all">{chqT('allCheques')}</option>
               {(['received', 'deposited', 'cleared', 'bounced', 'issued', 'presented', 'cancelled'] as ChequeStatus[]).map((s) => (
-                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                <option key={s} value={s}>{chqT(`st.${s}`)}</option>
               ))}
             </select>
           </label>
           <label className={`${controls.field} ${styles.search}`}>
-            <span className={controls.label}>Search</span>
-            <input className={controls.input} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Number, bank or party" />
+            <span className={controls.label}>{chqT('search')}</span>
+            <input className={controls.input} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={chqT('searchPh')} />
           </label>
         </div>
 
         {rows.length === 0 ? (
           <EmptyState
             icon={Banknote}
-            title={all.length ? 'No cheques match' : 'No cheques yet'}
-            text={all.length ? 'Change the filters to see more.' : 'Record cheques you receive (including post-dated ones) and cheques you issue. Post-dated cheques show up in the notification bell near their date.'}
+            title={all.length ? chqT('noMatch') : chqT('none')}
+            text={all.length ? chqT('noMatchText') : chqT('noneText')}
           />
         ) : (
           <div className={surface.tableWrap}>
             <table className={surface.table}>
-              <caption className={surface.srOnly}>Cheque register</caption>
+              <caption className={surface.srOnly}>{chqT('caption')}</caption>
               <thead>
                 <tr>
-                  <th>Cheque date</th>
-                  <th>No. / bank</th>
-                  <th>Party</th>
-                  <th>Against</th>
-                  <th className={styles.numeric}>Amount</th>
-                  <th>Status</th>
-                  <th className={styles.numeric}>Actions</th>
+                  <th>{chqT('chequeDate')}</th>
+                  <th>{chqT('noBank')}</th>
+                  <th>{chqT('party')}</th>
+                  <th>{chqT('against')}</th>
+                  <th className={styles.numeric}>{chqT('amount')}</th>
+                  <th>{chqT('status')}</th>
+                  <th className={styles.numeric}>{chqT('actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -193,8 +190,8 @@ export function Cheques() {
                       <td>
                         {formatDate(c.cheque_date)}
                         {pdc && <span className={`${surface.badge} ${styles.pdc}`} style={{ marginLeft: '0.375rem' }}>PDC</span>}
-                        {expired && <span className={`${surface.badge} ${styles.flag}`} style={{ marginLeft: '0.375rem' }}>Expired</span>}
-                        <span className={styles.sub}>{c.direction === 'received' ? 'Received' : 'Issued'} · valid till {formatDate(validUntil(c.cheque_date))}</span>
+                        {expired && <span className={`${surface.badge} ${styles.flag}`} style={{ marginLeft: '0.375rem' }}>{chqT('expired')}</span>}
+                        <span className={styles.sub}>{chqT('validTill', { dir: c.direction === 'received' ? chqT('received') : chqT('issued'), date: formatDate(validUntil(c.cheque_date)) })}</span>
                       </td>
                       <td>
                         <span className={surface.mono}>{c.number}</span>
@@ -202,31 +199,31 @@ export function Cheques() {
                       </td>
                       <td>
                         {c.party_name}
-                        {bounces > 0 && <span className={`${surface.badge} ${styles.flag}`} style={{ marginLeft: '0.375rem' }} title="Cheques from this party have bounced">{bounces} bounced</span>}
+                        {bounces > 0 && <span className={`${surface.badge} ${styles.flag}`} style={{ marginLeft: '0.375rem' }} title={chqT('partyBounced')}>{chqT('nBounced', { n: bounces })}</span>}
                       </td>
                       <td>{doc ? (doc.to ? <Link to={doc.to}>{doc.text}</Link> : doc.text) : <span className={styles.sub}>—</span>}</td>
                       <td className={styles.numeric}>{formatMoney(c.amount)}</td>
                       <td>
-                        <span className={`${surface.badge} ${STATUS_TONE[c.status]}`}>{STATUS_LABELS[c.status]}</span>
+                        <span className={`${surface.badge} ${STATUS_TONE[c.status]}`}>{chqT(`st.${c.status}`)}</span>
                         {c.status === 'bounced' && c.bounce_reason && <span className={styles.sub}>{c.bounce_reason}</span>}
-                        {c.cleared_on && c.status === 'cleared' && <span className={styles.sub}>on {formatDate(c.cleared_on)}</span>}
+                        {c.cleared_on && c.status === 'cleared' && <span className={styles.sub}>{chqT('clearedOn', { date: formatDate(c.cleared_on) })}</span>}
                       </td>
                       <td>
                         <div className={styles.actions}>
                           {nextStatuses(c).map((to) => (
-                            <button key={to} type="button" className={`${to === 'bounced' || to === 'cancelled' ? controls.btnOutline : controls.btnPrimary} ${controls.btnSm}`} onClick={() => setAction({ cheque: c, to })} aria-label={`${ACTION_LABELS[to]} cheque ${c.number}`}>
-                              {ACTION_LABELS[to]}
+                            <button key={to} type="button" className={`${to === 'bounced' || to === 'cancelled' ? controls.btnOutline : controls.btnPrimary} ${controls.btnSm}`} onClick={() => setAction({ cheque: c, to })} aria-label={chqT('actionAria', { action: actionLabel(to), number: c.number })}>
+                              {actionLabel(to)}
                             </button>
                           ))}
                           {c.direction === 'issued' && c.status !== 'cancelled' && (
-                            <button type="button" className={controls.btnIcon} onClick={() => setPrinting(c)} aria-label={`Print cheque ${c.number}`} title="Print cheque">
+                            <button type="button" className={controls.btnIcon} onClick={() => setPrinting(c)} aria-label={chqT('printOf', { number: c.number })} title={chqT('printCheque')}>
                               <Printer size={15} />
                             </button>
                           )}
-                          <button type="button" className={controls.btnIcon} onClick={() => setForm({ open: true, direction: c.direction, cheque: c })} aria-label={`Edit cheque ${c.number}`} title="Edit">
+                          <button type="button" className={controls.btnIcon} onClick={() => setForm({ open: true, direction: c.direction, cheque: c })} aria-label={chqT('editOf', { number: c.number })} title={chqT('edit')}>
                             <Pencil size={15} />
                           </button>
-                          <button type="button" className={controls.btnDanger} disabled={!!(c.payment_id || c.purchase_payment_id)} onClick={() => setDeleting(c)} aria-label={`Delete cheque ${c.number}`} title="Delete">
+                          <button type="button" className={controls.btnDanger} disabled={!!(c.payment_id || c.purchase_payment_id)} onClick={() => setDeleting(c)} aria-label={chqT('deleteOf', { number: c.number })} title={chqT('delete')}>
                             <Trash2 size={15} />
                           </button>
                         </div>
@@ -239,8 +236,7 @@ export function Cheques() {
           </div>
         )}
         <p className={styles.note}>
-          Clearing a cheque linked to an invoice records the payment there (the period lock applies); a bounce reverses it. A cheque is
-          valid for 3 months from its date and cannot be deposited before it.
+          {chqT('note')}
         </p>
       </section>
 
@@ -251,7 +247,7 @@ export function Cheques() {
         onClose={() => setForm((f) => ({ ...f, open: false }))}
         onSaved={(c, isNew) => {
           refresh();
-          notify(isNew ? `Cheque ${c.number} saved${isPostDated(c, today) ? ' — post-dated, you will be reminded' : ''}` : `Cheque ${c.number} updated`);
+          notify(isNew ? chqT(isPostDated(c, today) ? 'savedPdc' : 'saved', { number: c.number }) : chqT('updated', { number: c.number }));
         }}
       />
       <ChequeActionModal
@@ -260,15 +256,15 @@ export function Cheques() {
         onClose={() => setAction(null)}
         onDone={(r) => {
           refresh();
-          notify(`Cheque ${r.cheque.number} ${STATUS_LABELS[r.cheque.status].toLowerCase()}${r.note ? ` — ${r.note}` : ''}`);
+          notify(chqT('moved', { number: r.cheque.number, status: chqT(`st.${r.cheque.status}`).toLowerCase() }) + (r.note ? ` — ${r.note}` : ''));
         }}
       />
       <ChequePrintModal key={printing?.id ?? 'none'} cheque={printing} onClose={() => setPrinting(null)} />
       <ConfirmDialog
         open={!!deleting}
-        title="Delete this cheque?"
-        message={deleting ? `Cheque ${deleting.number} from the register. This cannot be undone.` : ''}
-        confirmLabel="Delete"
+        title={chqT('delTitle')}
+        message={deleting ? chqT('delMsg', { number: deleting.number }) : ''}
+        confirmLabel={chqT('delete')}
         destructive
         onConfirm={() => {
           if (deleting) remove(deleting);
