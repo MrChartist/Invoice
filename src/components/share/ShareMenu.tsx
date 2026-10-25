@@ -20,6 +20,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
 import { ReminderModal } from './ReminderModal';
+import { receivableBalance } from '../../lib/rcm';
 
 export interface ShareMenuProps {
   invoice: InvoiceRecord;
@@ -73,7 +74,7 @@ export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onClientCopy, hi
   const summary = invoiceSummaryText(invoice);
   const payLink = invoiceUpiLink(invoice);
   const client = invoice.client;
-  const unpaid = invoice.balance_due > 0 && invoice.status !== 'Paid' && invoice.status !== 'Cancelled';
+  const unpaid = receivableBalance(invoice) > 0 && invoice.status !== 'Paid' && invoice.status !== 'Cancelled';
   const subject = `${invoice.invoice_number} from ${invoice.sender?.companyName || 'us'}`;
 
   const run = (fn: () => void) => () => {

@@ -36,6 +36,7 @@ import {
 } from './audit';
 import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
+import { receivableTotal } from './rcm';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -605,7 +606,9 @@ export const localDb = {
  */
 function withPaid(inv: InvoiceRecord, paidRaw: number): InvoiceRecord {
   const paid = round2(Math.max(paidRaw, 0));
-  const total = Math.max((Number(inv.total) || 0) - (Number(inv.tds_amount) || 0), 0);
+  // Outward reverse charge: the GST is the recipient's to pay, so it is never part of what is owed
+  // (an older record's stored total includes it — src/lib/rcm.ts).
+  const total = Math.max(receivableTotal(inv) - (Number(inv.tds_amount) || 0), 0);
   let status = inv.status;
   if (status !== 'Cancelled') {
     if (paid >= total && total > 0) status = 'Paid';

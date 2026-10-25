@@ -153,7 +153,8 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const t = options.transport ?? {};
 
   // The portal takes rupees: a foreign-currency invoice is converted at its exchange rate.
-  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record)), record);
+  // The e-Way bill's invoice value includes the GST shown on the document, reverse charge or not.
+  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record, { rcm_exclude_tax: false })), record);
 
   const sellerGstin = (sender?.companyGstin ?? '').trim().toUpperCase();
   const gstinStateFrom = sellerGstin.slice(0, 2);

@@ -21,6 +21,7 @@ import type { Client } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Clients.module.css';
+import { receivableTotal } from '../lib/rcm';
 
 export function Clients() {
   const { notify, toastNode } = useToast();
@@ -62,7 +63,7 @@ export function Clients() {
       const key = inv.client?.name?.trim().toLowerCase();
       if (!key || !isRevenueDoc(inv)) continue;
       const row = map.get(key) ?? { total: 0, count: 0 };
-      row.total += inv.total ?? 0;
+      row.total += receivableTotal(inv);
       row.count += 1;
       map.set(key, row);
     }

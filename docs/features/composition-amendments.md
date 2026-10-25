@@ -59,8 +59,10 @@ verification; add new versions, never edit old ones.
   **Composition (CMP-08 / GSTR-4)** tab (`CompositionView`, lazy).
 - **CMP-08** (`buildCmp08`, `src/lib/composition-returns.ts`): Table 3(1) outward value incl. exempt = every live Bill
   of Supply / invoice / debit note less credit notes of composition profiles in the quarter (taxable value + untaxed
-  freight, INR); tax = base × rate on the document date, per category of the snapshot. A trader (from 1 Jan 2018) pays
-  only on taxable supplies: lines whose catalogue GST rate is 0 are treated as exempt. 3(2) reverse charge = purchases
+  freight, INR); tax = base × rate on the document date, per category of the snapshot. A trader (from 1 Jan 2018) and a
+  service provider under Sec 10(2A) (6%, Notification 2/2019-CT(R)) pay only on taxable supplies: lines whose
+  catalogue GST rate is 0 are treated as exempt (supplies exempt under 12/2017-CT(R) stay exempt). Manufacturers and
+  restaurants pay on the whole turnover. The service-provider base is a CA-judgment item: verify with your CA. 3(2) reverse charge = purchases
   flagged reverse charge + imports of services (tax as on the bill). 3(3) = 1 + 2. GST on ordinary purchase bills is
   reported as **not claimable** (`ITC_NOT_CLAIMABLE`), never credited. A tax invoice with GST from a composition profile
   raises `TAX_COLLECTED`. Interest / late fee not computed.
@@ -110,7 +112,7 @@ date (amending the number/date itself is possible by editing them). CSV: GST pag
   latest revision (one level of history). There is no "undo amendment" button (edit the values back).
 - Composition eligibility (turnover limits, notified goods, inter-state bar) is warned about, not enforced; mixed
   supplies of a composition dealer, CMP-02/03/04 transitions, interest and late fees on CMP-08 / GSTR-4 are not computed.
-- A trader's exempt goods are recognised only by a 0% catalogue rate on the line.
+- A trader's exempt goods (and a service provider's exempt services) are recognised only by a 0% catalogue rate on the line.
 
 ## Files
 `src/lib/bill-of-supply.ts`, `src/lib/composition-returns.ts`, `src/lib/amendments.ts`, `src/lib/tax-rules.ts`,

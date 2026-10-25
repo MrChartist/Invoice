@@ -313,7 +313,9 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   // Full record in: supply type, tax-inclusive pricing, cess, TCS and round mode all change ValDtls.
   // The IRP takes rupees only: a foreign-currency invoice is converted at its exchange rate
   // (ExpDtls.ForCur then names the original currency).
-  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record)), record);
+  // Reverse charge (RegRev 'Y'): the schema's value totals still include the tax shown on the invoice
+  // (NIC adds AssVal + tax heads), so the recipient-pays tax is kept in TotInvVal here.
+  const calc = inrTotals(calculateInvoice(calcInputFromRecord(record, { rcm_exclude_tax: false })), record);
   if (missingFxRate(record)) {
     assumptions.push(issue('error', 'FX_RATE_MISSING', 'Currency', `Amounts are in ${docCurrency(record)} but the invoice has no exchange rate. The IRP needs INR values — add the CBIC / shipping-bill rate on the invoice.`));
   }

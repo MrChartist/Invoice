@@ -308,3 +308,31 @@ test('composition returns (CMP-08 / GSTR-4) read the real purchase shape: RCM ta
   const g4 = buildGstr4([], [bill, { ...bill, id: 'd', status: 'Draft' }], 2026, { filerStateCode: '27' });
   assert.equal(g4.inward.registered.value, 1000);
 });
+
+test('supplierPayable: every "what we owe the vendor" reader leaves self-assessed GST out (RCM, imports)', async () => {
+  const { supplierPayable } = await import('../src/lib/purchase-normalize.ts');
+  const { balanceOf, deriveStatus, payablesOutstanding, validatePayment } = await import('../src/lib/purchases.ts');
+  const { msmeBills } = await import('../src/lib/msme.ts');
+  const { vendorBalances } = await import('../src/lib/vendors.ts');
+  const { buildForecast } = await import('../src/lib/cash-forecast.ts');
+  const rcm: PurchaseRecord = { ...bill, id: 'p-rcm', vendor_id: 'v1', reverse_charge: true, due_date: '2026-05-12' };
+  const impGoods: PurchaseRecord = { ...bill, id: 'p-imp', cgst: 0, sgst: 0, igst: 180, import_type: 'GOODS', boe_number: '1', boe_date: '2026-04-12', port_code: 'INNSA1' };
+  const impSvc: PurchaseRecord = { ...bill, id: 'p-svc', cgst: 0, sgst: 0, igst: 180, import_type: 'SERVICES' };
+  assert.deepEqual([rcm, impGoods, impSvc, bill].map((b) => supplierPayable(b)), [1000, 1000, 1000, 1180]);
+  assert.equal(balanceOf(rcm), 1000);
+  assert.equal(balanceOf({ ...rcm, amount_paid: 1000 }), 0);
+  assert.equal(deriveStatus({ ...rcm, amount_paid: 1000 }, '2026-06-01'), 'Paid');
+  assert.equal(payablesOutstanding([rcm, impGoods, bill]), 3180);
+  assert.match(validatePayment(rcm, 1001, '2026-04-20'), /exceeds the balance of 1000/);
+  // Books / exports / ledger-facing readers expose the same figure; the bill total is unchanged.
+  const b = booksNormalize(rcm as never)!;
+  assert.deepEqual([b.payable, b.selfTax, b.total], [1000, 180, 1180]);
+  assert.deepEqual([exportNormalize(impGoods)!.payable, exportNormalize(impGoods)!.selfTaxKind], [1000, 'CUSTOMS']);
+  // MSME tracker, vendor balances and the cash forecast.
+  const vendor = { id: 'v1', name: 'Acme Supplies', msme_udyam: 'UDYAM-MH-00-0000001', msme_category: 'MICRO' as const };
+  assert.equal(msmeBills([rcm], [vendor], [], '2026-06-30')[0].total, 1000);
+  const vb = vendorBalances([rcm]).get('v1')!;
+  assert.deepEqual([vb.billed, vb.outstanding], [1000, 1000]);
+  const f = buildForecast({ today: '2026-04-15', horizon: 90, opening: 0, invoices: [], payments: [], purchases: [rcm], vendors: [vendor] });
+  assert.equal(f.items.find((i) => i.kind === 'payable')!.amount, 1000);
+});

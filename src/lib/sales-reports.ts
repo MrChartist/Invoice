@@ -28,6 +28,7 @@ import {
   type CalcLine,
 } from './invoice-calc';
 import { isoDay, localDayOf } from './dates';
+import { isOutwardRcm, supplierView } from './rcm';
 import { toCsv } from './csv';
 import {
   inPeriod,
@@ -105,7 +106,9 @@ export function customerOf(inv: InvoiceRecord): { key: string; name: string; id?
 }
 
 /** Same arithmetic as books.invoiceAmounts (kept in lock-step by tests/sales-reports.test.ts). */
-function amountsOf(inv: InvoiceRecord) {
+function amountsOf(source: InvoiceRecord) {
+  // Outward reverse charge: no output tax and only the taxable value billed (src/lib/rcm.ts).
+  const inv = supplierView(source);
   const total = Math.abs(num(inv.total));
   const tax = Math.abs(num(inv.tax_amount));
   const cess = Math.abs(num(inv.cess_amount));
@@ -139,11 +142,14 @@ function linesOf(inv: InvoiceRecord, sign: 1 | -1, amounts: ReturnType<typeof am
   try {
     const calc = calculateInvoice(calcInputFromRecord(inv, { amount_paid: 0 }));
     lines = taxLinesOf(calc).map((l) => toSalesLine(l, sign));
+    // Reverse charge: the recipient pays the GST — none of it is the supplier's output tax.
+    if (isOutwardRcm(inv)) lines = lines.map((l) => ({ ...l, cgst: 0, sgst: 0, igst: 0, cess: 0, tax: 0 }));
   } catch {
     lines = [];
   }
   const wantTaxable = sign * amounts.taxable;
-  const wantTax = sign * round2(Math.max(num(inv.cgst_amount) + num(inv.sgst_amount) + num(inv.igst_amount), amounts.tax));
+  const heads = supplierView(inv);
+  const wantTax = sign * round2(Math.max(num(heads.cgst_amount) + num(heads.sgst_amount) + num(heads.igst_amount), amounts.tax));
   if (lines.length === 0) {
     return [
       {

@@ -7,6 +7,7 @@
 import type { InvoiceRecord } from '../types/invoice';
 import { DOCUMENT_LABELS } from '../types/invoice';
 import { formatCurrency, formatDate } from './utils';
+import { receivableBalance, receivableTotal } from './rcm';
 
 /** Encoded-URL budget. WhatsApp/browsers cope with ~2k; stay well inside. */
 export const MAX_URL_LENGTH = 1900;
@@ -178,7 +179,7 @@ export function invoiceUpiLink(invoice: InvoiceRecord): string | null {
   return upiLink({
     pa: s.upiId,
     pn: s.companyName,
-    amount: invoice.balance_due > 0 ? invoice.balance_due : invoice.total,
+    amount: receivableBalance(invoice) > 0 ? receivableBalance(invoice) : receivableTotal(invoice),
     note: `Payment for ${invoice.invoice_number}`,
   });
 }
@@ -201,9 +202,10 @@ export function invoiceSummaryText(invoice: InvoiceRecord): string {
   lines.push('');
   lines.push(`Total: ${formatCurrency(invoice.total, cur)}`);
   if ((invoice.amount_paid ?? 0) > 0) lines.push(`Paid: ${formatCurrency(invoice.amount_paid, cur)}`);
-  if (invoice.balance_due > 0) lines.push(`Balance due: ${formatCurrency(invoice.balance_due, cur)}`);
+  const due = receivableBalance(invoice);
+  if (due > 0) lines.push(`Balance due: ${formatCurrency(due, cur)}`);
   const s = invoice.sender;
-  if (s?.upiId && invoice.balance_due > 0) lines.push(`UPI: ${s.upiId}`);
+  if (s?.upiId && due > 0) lines.push(`UPI: ${s.upiId}`);
   if (s?.companyName) lines.push('', `Thank you, ${s.companyName}`);
   return lines.join('\n');
 }

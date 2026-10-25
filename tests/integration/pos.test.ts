@@ -39,8 +39,8 @@ const line = (id: string, name: string, quantity: number, rate: number, tax_rate
   id, name, type: 'Product', hsn: extra.hsn ?? '3401', unit: 'PCS', quantity, rate, tax_rate, discount_percent: 0, amount: quantity * rate, ...extra,
 });
 
-const build = (items: InvoiceItem[], party = {}) =>
-  buildPosRecord({ items, party, settings: localDb.settings.get(), sender: localDb.settings.activeProfile(), templateId: 'classic_orange', day: DAY });
+const build = (items: InvoiceItem[], party = {}, deliverToClientState = false) =>
+  buildPosRecord({ items, party, settings: localDb.settings.get(), sender: localDb.settings.activeProfile(), templateId: 'classic_orange', day: DAY, deliverToClientState });
 
 test('tender maths: split cash + UPI, change only from cash, short and over-paid non-cash', () => {
   const t = tenderSummary(1180, [{ method: 'Cash', amount: 1000 }, { method: 'UPI', amount: 200, reference: 'UTR1' }]);
@@ -94,13 +94,19 @@ test('a walk-in bill saves as a normal invoice: FY number, home-state GST, payme
   assert.equal(localDb.payments.listFor(again.record!.id)[0].amount, 56);
 });
 
-test('walk-ins pay in full; a saved client may leave a balance; another state is IGST', () => {
+test('walk-ins pay in full; a saved client may leave a balance; dispatch to another state is IGST', () => {
   const short = savePosBill({ record: build([line('a', 'Comb', 2, 50, 12)]), tenders: [{ method: 'Cash', amount: 50 }] });
   assert.equal(short.ok, false);
   assert.match(short.errors[0], /still unpaid/);
   assert.equal(localDb.invoices.getAll().length, 0, 'nothing written');
 
-  const rec = build([line('a', 'Comb', 2, 50, 12)], { client: clientKA });
+  // Over the counter the place of supply is the shop's state, even for an out-of-state saved client
+  // (Sec 10(1)(a)/(c) IGST Act: location of delivery).
+  const counter = build([line('a', 'Comb', 2, 50, 12)], { client: clientKA });
+  assert.equal(counter.place_of_supply, '27');
+  assert.equal(counter.gst_mode, 'CGST_SGST');
+  // Only an explicit dispatch to the client's state makes it inter-state.
+  const rec = build([line('a', 'Comb', 2, 50, 12)], { client: clientKA }, true);
   assert.equal(rec.place_of_supply, '29');
   assert.equal(rec.gst_mode, 'IGST');
   const ok = savePosBill({ record: rec, tenders: [{ method: 'Card', amount: 50 }], allowCredit: true });

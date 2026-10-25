@@ -184,6 +184,56 @@ export function readPurchase(raw: unknown, vendors: readonly unknown[] = []): Pu
 }
 
 /**
+ * Expense categories that are NOT a supply at all, so they never belong in GSTR-3B Table 5
+ * (inward exempt / nil / non-GST supplies):
+ *  - salaries, wages, payroll, bonus, gratuity, director's remuneration — services by an employee
+ *    to the employer (Schedule III, entry 1);
+ *  - PF / ESI / professional-tax / income-tax / TDS / GST payments — taxes and statutory dues;
+ *  - depreciation — a book entry, not a purchase.
+ * Bank interest on loans stays IN Table 5: it is an exempt supply (12/2017-CT(R) entry 27), not a
+ * non-supply. Matched on the lower-cased category name. Verify unusual heads with your CA.
+ */
+export const NON_SUPPLY_CATEGORY_PATTERNS: readonly RegExp[] = [
+  /salar/, /wage/, /payroll/, /\bbonus\b/, /gratuity/, /remuneration/,
+  /provident fund/, /\bp\.?f\.?\b/, /\besic?\b/, /professional tax/, /income[- ]tax/, /\btds\b/, /gst (paid|payment)/,
+  /depreciation/,
+];
+
+export function isNonSupplyCategory(category: string | undefined | null): boolean {
+  const c = String(category ?? '').trim().toLowerCase();
+  return !!c && NON_SUPPLY_CATEGORY_PATTERNS.some((re) => re.test(c));
+}
+
+/**
+ * GST on the bill that WE pay to the government ourselves — reverse charge (Sec 9(3)/(4)), import
+ * of services (RCM) and IGST on imported goods (paid at customs with the Bill of Entry) — when the
+ * stored total actually includes it (an imported row may carry only the taxable value). That tax is
+ * never owed to the supplier.
+ */
+export function selfAssessedTaxOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'>): number {
+  if (!(c.reverseCharge || c.importType !== '') || !(c.tax > 0)) return 0;
+  const totalIncludesTax = Math.abs(c.total - (c.taxable + c.tax)) <= Math.abs(c.total - c.taxable);
+  return totalIncludesTax ? round2(c.tax) : 0;
+}
+
+/** What the supplier is owed on a bill: its total less any self-assessed GST inside it. */
+export function supplierPayableOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'>): number {
+  return round2(c.total - selfAssessedTaxOf(c));
+}
+
+/**
+ * `supplierPayable(bill)` — the one definition of the supplier's side of a purchases row, for every
+ * reader that needs "what we owe the vendor" (balance, status, payment checks, MSME tracker, payables
+ * aging, cash forecast, cheques, bank matching, Books payables, Tally / ledger creditor). Stored bills
+ * are never rewritten: an RCM / import bill keeps `total` = taxable + tax, and this takes the tax out.
+ */
+export function supplierPayable(raw: unknown): number {
+  const c = readPurchase(raw);
+  if (c) return supplierPayableOf(c);
+  return round2(Math.abs(num(asRec(raw).total)));
+}
+
+/**
  * GST heads for a row that carries only a lump tax figure (or just a rate) and no
  * cgst/sgst/igst split — older or imported data. The lump is split by supplier state vs
  * the buyer's (filer's) state: different → IGST, same or unknown → CGST + SGST.

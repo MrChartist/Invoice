@@ -122,6 +122,8 @@ export const RECORD_KEYS = [
   'custom_values', 'attachments',
   'exempt_kind', 'amends',
   'pos',
+  'rcm_tax_excluded',
+  'goods_returned',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -263,7 +265,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         place_of_supply,
         terms: get().terms || sender.defaultTerms || '',
         gst_mode: toBos || get().doc_type === 'BILL_OF_SUPPLY' ? 'NONE' : refineGstMode(get().gst_mode, sender, place_of_supply),
-        ...(toBos ? { doc_type: 'BILL_OF_SUPPLY' as DocumentType, reverse_charge: false } : {}),
+        ...(toBos ? { doc_type: 'BILL_OF_SUPPLY' as DocumentType, reverse_charge: false, rcm_tax_excluded: undefined } : {}),
       });
     },
 
@@ -274,7 +276,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       const prev = get().doc_type;
       if (doc_type === 'BILL_OF_SUPPLY') {
         // No tax on a Bill of Supply (Rule 49); reverse charge does not arise either.
-        apply({ doc_type, gst_mode: 'NONE', reverse_charge: false });
+        apply({ doc_type, gst_mode: 'NONE', reverse_charge: false, rcm_tax_excluded: undefined });
       } else if (prev === 'BILL_OF_SUPPLY' && get().gst_mode === 'NONE' && !isCompositionSender(get().sender)) {
         // Leaving a Bill of Supply on a regular profile: pick the split back up from the states.
         const sender = get().sender;
@@ -307,7 +309,10 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       }),
 
     setGstMode: (gst_mode) => apply({ gst_mode }),
-    setReverseCharge: (reverse_charge) => apply({ reverse_charge }),
+    // Ticking reverse charge calculates the document the current way: the GST is shown as payable by
+    // the recipient and stays out of the total (src/lib/rcm.ts). An older reverse-charge record keeps
+    // its stored figures until the box is ticked again (Critical Rule 3).
+    setReverseCharge: (reverse_charge) => apply({ reverse_charge, rcm_tax_excluded: reverse_charge ? true : undefined }),
 
     setDiscount: (discount_type, value) =>
       apply({ discount_type, discount_rate: Math.max(num(value), 0) }),
@@ -460,6 +465,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         tds_rate: s.tds_rate,
         tds_on_taxable: s.tds_on_taxable,
         charges_taxable: s.charges_taxable,
+        rcm_exclude_tax: s.reverse_charge && !!s.rcm_tax_excluded && s.doc_type !== 'BILL_OF_SUPPLY',
       });
       set({
         totals,

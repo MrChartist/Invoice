@@ -23,6 +23,7 @@ import {
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
 import { getTable } from './storage';
+import { creditNoteReturnsGoods } from './credit-restock';
 import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList } from './godowns';
 
 const EPS = 1e-9;
@@ -315,7 +316,7 @@ export interface TrackingIssues {
   warnings: string[];
 }
 
-type DocInput = Pick<InvoiceRecord, 'doc_type' | 'items' | 'issue_date'> & Partial<Pick<InvoiceRecord, 'id' | 'status'>>;
+type DocInput = Pick<InvoiceRecord, 'doc_type' | 'items' | 'issue_date'> & Partial<Pick<InvoiceRecord, 'id' | 'status' | 'goods_returned' | 'notes'>>;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -330,7 +331,8 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
   const issues: TrackingIssues = { errors: [], expired: [], warnings: [] };
   const docType = doc.doc_type;
   const outgoing = docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'DELIVERY_CHALLAN';
-  const incoming = docType === 'CREDIT_NOTE';
+  // Only a credit note that returns goods takes serials / batches back (same rule as the stock engine).
+  const incoming = docType === 'CREDIT_NOTE' && creditNoteReturnsGoods(doc, input.links);
   if (!outgoing && !incoming) return issues;
   if (doc.status === 'Draft' || doc.status === 'Cancelled') return issues;
 
@@ -653,9 +655,9 @@ export interface EditorStockContext {
  * there is nothing to pick (no item tracks batches / serials and only one godown exists), or the
  * document type never moves stock.
  */
-export function editorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string }): EditorStockContext | null {
+export function editorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string; goods_returned?: boolean }): EditorStockContext | null {
   const outgoing = doc.doc_type === 'INVOICE' || doc.doc_type === 'TAX_INVOICE' || doc.doc_type === 'DELIVERY_CHALLAN';
-  const incoming = doc.doc_type === 'CREDIT_NOTE';
+  const incoming = doc.doc_type === 'CREDIT_NOTE' && doc.goods_returned !== false;
   if (!outgoing && !incoming) return null;
   try {
     const godowns = godownList(getTable<Godown>(GODOWNS_TABLE));

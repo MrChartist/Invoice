@@ -22,6 +22,7 @@ import { COMPLIANCE_TABLE, FORM_LABELS, pendingReturns, type FiledReturn, type F
 import { todayIso } from './tax-rules';
 import { pdcReminders, validUntil, type PdcKind } from './cheque-reminders';
 import type { Cheque } from '../types/cheques';
+import { receivableBalance } from './rcm';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -106,7 +107,7 @@ function parseDate(value?: string): Date | null {
 
 function outstanding(inv: InvoiceRecord): number {
   const v =
-    typeof inv.balance_due === 'number' ? inv.balance_due : (inv.total ?? 0) - (inv.amount_paid ?? 0);
+    receivableBalance(inv);
   return round2(Math.max(0, v));
 }
 

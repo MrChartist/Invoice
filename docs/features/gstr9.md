@@ -28,7 +28,8 @@ An offline working paper for the GSTR-9 annual return, built from the app's own 
 | 4F | Advances: not modelled, 0 |
 | 4G | GSTR-3B 3.1(d): purchases under reverse charge and imports of services |
 | 4I / 4J | CDNR + CDNUR (EXPWP) credit / debit notes on 4B-4E |
-| 4K / 4L, 5J / 5K, Pt V (10-14) | Amendments: not modelled, 0 with a note |
+| 4K / 4L, 5J / 5K | In-year amendments (`gstr1.amendments.effects`): revised − original of each amendment made in the FY, the same deltas GSTR-3B takes — an increase goes to 4K / 5J, a decrease to 4L / 5K (5J / 5K: zero-rated-without-payment, reverse-charge and nil lines). 4M = −I + J + K − L and 5L = −H + I + J − K, so 4N agrees with Table 9 |
+| Pt V (10-14) | Amendments of this FY's supplies made in the next FY: not modelled, 0 with a note |
 | 5C | Outward invoices flagged reverse charge (value only) |
 | 5D / 5E / 5F | GSTR-1 Table 8: exempt (always 0, the app has no exempt flag) / nil / non-GST |
 | 5H / 5I | Notes on SEWOP / EXPWOP / reverse-charge supplies |
@@ -70,4 +71,4 @@ GSTR-9 is optional for a registered person whose aggregate turnover in the FY is
 
 ## Limits
 
-Built from the app's monthly papers, not from the returns actually filed. Advances (Table 11), amendments, ISD, TRAN credit, 8C/8E, Pt VI Tables 15-16, interest and late fee are not modelled. A month whose credit notes exceed its sales is not carried to later months in Table 9.
+Built from the app's monthly papers, not from the returns actually filed. Advances (Table 11), Part V amendments, ISD, TRAN credit, 8C/8E, Pt VI Tables 15-16, interest and late fee are not modelled. A month whose credit notes exceed its sales is not carried to later months in Table 9.

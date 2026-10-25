@@ -95,6 +95,11 @@ export function SummaryPanel() {
       {s.gst_mode === 'SINGLE' && <Row label={tr('summary.tax')}>{money(t.tax_amount)}</Row>}
 
       {t.cess_amount > 0 && <Row label={tr('summary.cess')}>{money(t.cess_amount)}</Row>}
+      {t.rcm_tax > 0 && (
+        <Row label={tr('summary.rcmTax')} tone="muted">
+          {tr('summary.rcmTaxValue', { amount: money(t.rcm_tax) })}
+        </Row>
+      )}
       {t.tcs_amount > 0 && <Row label={s.tcs_label || 'TCS'}>{money(t.tcs_amount)}</Row>}
 
       <div className={styles.inputRow}>

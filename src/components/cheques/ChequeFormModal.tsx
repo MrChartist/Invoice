@@ -8,6 +8,7 @@ import { vendorsDb } from '../../lib/vendors';
 import { formatDate, formatMoney, todayInput } from '../../lib/utils';
 import type { Cheque, ChequeDirection } from '../../types/cheques';
 import controls from '../../styles/controls.module.css';
+import { receivableBalance } from '../../lib/rcm';
 
 export interface ChequeFormModalProps {
   open: boolean;
@@ -73,9 +74,9 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
     if (received) {
       return invoices
         .filter((i) => ['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY'].includes(i.doc_type ?? 'INVOICE') && i.status !== 'Draft' && i.status !== 'Cancelled')
-        .filter((i) => (i.currency || 'INR').toUpperCase() === 'INR' && ((i.balance_due ?? 0) > 0 || i.id === cheque?.invoice_id))
+        .filter((i) => (i.currency || 'INR').toUpperCase() === 'INR' && (receivableBalance(i) > 0 || i.id === cheque?.invoice_id))
         .filter((i) => !party || norm(i.client?.name) === party || norm(i.client?.company) === party || (client?.id && i.client?.id === client.id) || i.id === cheque?.invoice_id)
-        .map((i) => ({ id: i.id, label: `${i.invoice_number} · ${i.client?.name ?? ''} · balance ₹${formatMoney(i.balance_due ?? 0)}` }));
+        .map((i) => ({ id: i.id, label: `${i.invoice_number} · ${i.client?.name ?? ''} · balance ₹${formatMoney(receivableBalance(i))}` }));
     }
     return bills
       .filter((b) => balanceOf(b) > 0 || b.id === cheque?.purchase_id)
@@ -90,7 +91,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
     if (!id) return;
     if (received) {
       const inv = invoices.find((i) => i.id === id);
-      if (inv) setForm((f) => ({ ...f, link: id, party_name: f.party_name || inv.client?.company || inv.client?.name || '', amount: f.amount || String(inv.balance_due ?? '') }));
+      if (inv) setForm((f) => ({ ...f, link: id, party_name: f.party_name || inv.client?.company || inv.client?.name || '', amount: f.amount || String(receivableBalance(inv)) }));
     } else {
       const b = bills.find((x) => x.id === id);
       if (b) setForm((f) => ({ ...f, link: id, party_name: f.party_name || b.vendor_name, amount: f.amount || String(balanceOf(b)) }));

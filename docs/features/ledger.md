@@ -34,6 +34,7 @@ Groups follow Schedule III (Division I) headings; `direct` groups (Purchases, Di
 | Source | Debit | Credit |
 |---|---|---|
 | Sales invoice / debit note (not Draft/Cancelled) | Sundry debtors (party) — total | Sales (items' taxable), Freight & charges (taxed or untaxed), Output CGST/SGST/IGST (+ unsplit legacy GST), Output cess, TCS payable; residual to Round off |
+| … outward reverse charge (`reverse_charge`) | Sundry debtors — what the customer owes (`receivableTotal`: taxable + untaxed charges + TCS ± round off; an older record's stored total minus the GST in it) | Sales / Freight / TCS only — **no output-tax lines**: the recipient pays the GST (Sec 9(3)/(4)); the narration notes "reverse charge: GST … payable by the recipient" |
 | Credit note | exact mirror; Sales side goes to **Sales returns** | Sundry debtors |
 | Receipt | Cash (method `Cash`) or Bank — amount; **TDS receivable** — the invoice's TDS, on the receipt that takes receipts past total − TDS | Sundry debtors — amount + TDS |
 | Purchase / expense | Purchases (bill) or expense account (category → account; a user account named like the category wins); cost = taxable, + GST when ITC is not available; Input CGST/SGST/IGST when ITC is available | Sundry creditors (party) — total |
@@ -98,5 +99,6 @@ TDS receivable rather than receivables.
 - Closing stock is not valued automatically (post a journal: Dr Stock-in-hand, Cr an income/purchases account).
 - Interest and income-tax are not separated in the cash-flow statement; bank overdraft is treated as financing, not a
   cash equivalent.
-- Purchases module balances for RCM/import bills include the tax; if the full bill total is paid to the supplier the
-  creditor shows a debit (advance) balance in the ledger.
+- RCM / import bills: the purchases module, Books and Tally all owe the supplier `supplierPayable(bill)` (total − the
+  GST we pay ourselves), the same figure the ledger credits to Creditors, so paying the supplier its balance closes the
+  creditor exactly. The self-assessed GST stays on 2310 / 2311 until a payment or journal clears it.

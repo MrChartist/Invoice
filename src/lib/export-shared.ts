@@ -10,9 +10,10 @@ import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
 import { chargesAreTaxed, num, round2 } from './invoice-calc';
 import { inrRecord } from './fx';
+import { rcmTaxOf, supplierView } from './rcm';
 import { resolveStateCode, stateByCode } from './india-states';
 import { isoDay } from './dates';
-import { isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
+import { isVoidStatus, readPurchase, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 
 /* ── Dates ────────────────────────────────────────────────────── */
 
@@ -140,9 +141,15 @@ export interface InvoiceAmounts {
   cess: number;
   /** TCS collected on the invoice: a liability to the government, not income. */
   tcs: number;
+  /** What the customer owes (an outward reverse-charge document's tax is NOT in it). */
   total: number;
   /** total - (taxable + tax + untaxed charges + cess + tcs): rounding plus any legacy inconsistency. Signed. */
   roundOff: number;
+  /**
+   * Outward reverse charge: GST + cess shown on the document as payable by the RECIPIENT. The heads
+   * above (cgst / sgst / igst / tax / cess) are then 0 — the supplier neither collects nor owes it.
+   */
+  rcmTax: number;
 }
 
 /**
@@ -151,7 +158,10 @@ export interface InvoiceAmounts {
  * a rate stays at face value.
  */
 export function invoiceAmounts(source: InvoiceRecord): InvoiceAmounts {
-  const inv = inrRecord(source);
+  const converted = inrRecord(source);
+  const rcmTax = rcmTaxOf(converted);
+  // Outward reverse charge: no output tax, and only the taxable value is receivable (src/lib/rcm.ts).
+  const inv = supplierView(converted);
   let taxable = round2(num(inv.taxable_value));
   if (!taxable && num(inv.subtotal) > 0) taxable = round2(num(inv.subtotal) - num(inv.discount_amount));
   const cgst = round2(num(inv.cgst_amount));
@@ -167,7 +177,7 @@ export function invoiceAmounts(source: InvoiceRecord): InvoiceAmounts {
   const tcs = round2(num(inv.tcs_amount));
   const parts = round2(taxable + tax + (chargesTaxed ? 0 : charges) + cess + tcs);
   const total = round2(num(inv.total) !== 0 ? num(inv.total) : parts + num(inv.round_off));
-  return { taxable, cgst, sgst, igst, otherTax, tax, charges, chargesTaxed, cess, tcs, total, roundOff: round2(total - parts) };
+  return { taxable, cgst, sgst, igst, otherTax, tax, charges, chargesTaxed, cess, tcs, total, roundOff: round2(total - parts), rcmTax };
 }
 
 export function invoiceStateCode(inv: InvoiceRecord): string {
@@ -231,6 +241,14 @@ export interface NormalPurchase {
   notes: string;
   /** Additive: false when the GST on this bill is NOT claimed as input credit. */
   itcEligible: boolean;
+  /**
+   * Additive: GST inside `total` that WE pay to the government (reverse charge / import of services
+   * → 'RCM'; IGST on imported goods paid at customs → 'CUSTOMS'). Never owed to the supplier.
+   */
+  selfTax: number;
+  selfTaxKind: '' | 'RCM' | 'CUSTOMS';
+  /** Additive: what the supplier is owed — total − selfTax (`supplierPayable`). */
+  payable: number;
 }
 
 type Rec = Record<string, unknown>;
@@ -267,6 +285,9 @@ export function normalizePurchase(raw: unknown, vendors: unknown[] = []): Normal
     status: clean(r.status),
     notes: c.notes,
     itcEligible: c.itcEligible,
+    selfTax: selfAssessedTaxOf(c),
+    selfTaxKind: selfAssessedTaxOf(c) > 0 ? (c.importType === 'GOODS' ? 'CUSTOMS' : 'RCM') : '',
+    payable: supplierPayableOf(c),
   };
 }
 

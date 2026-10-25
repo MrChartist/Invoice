@@ -47,6 +47,7 @@ import { DOCUMENT_LABELS, type DocumentType, type InvoiceRecord } from '../types
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
+import { receivableBalance, receivableTotal } from '../lib/rcm';
 
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
@@ -215,7 +216,9 @@ export function Transactions() {
         issue_date: issue,
         due_date: addDaysInput(localDb.settings.get().defaultDueDays, issue),
         amount_paid: 0,
-        balance_due: inv.total,
+        // A duplicate is a new document: on reverse charge its tax stays out of the total (src/lib/rcm.ts).
+        ...(inv.reverse_charge ? { rcm_tax_excluded: true, total: receivableTotal(inv) } : {}),
+        balance_due: receivableTotal(inv),
         late_fee_for: undefined,
         // Files stay with the original document (6.12); custom field values are copied like any other field.
         attachments: undefined,
@@ -302,7 +305,7 @@ export function Transactions() {
       i.igst_amount,
       i.total,
       i.amount_paid,
-      i.balance_due,
+      receivableBalance(i),
       effectiveStatus(i, now),
     ]);
     return [header, ...body];
@@ -489,7 +492,7 @@ export function Transactions() {
                   if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={8} />;
                   const inv = rows[slot.index];
                   const status = effectiveStatus(inv, now);
-                  const canPay = isRevenueDoc(inv) && (inv.balance_due ?? inv.total) > 0;
+                  const canPay = isRevenueDoc(inv) && receivableBalance(inv) > 0;
                   const locked = isLocked(inv); // period lock: read-only, no edit / delete / payment
                   const lockedTitle = 'Locked period — open the document to view or unlock it';
                   return (
@@ -533,7 +536,7 @@ export function Transactions() {
                       </td>
                       <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
                       <td className={cn(surface.numeric, styles.cBal)}>
-                        {isRevenueDoc(inv) ? formatCurrency(inv.balance_due ?? inv.total, inv.currency) : '—'}
+                        {isRevenueDoc(inv) ? formatCurrency(receivableBalance(inv), inv.currency) : '—'}
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
@@ -598,7 +601,7 @@ export function Transactions() {
         onClose={() => setBulkPay(null)}
         size="sm"
         title={`Mark ${visibleSelected.filter(canMarkPaid).length} as paid`}
-        subtitle={`Records the full balance of each (${formatCurrency(visibleSelected.filter(canMarkPaid).reduce((s, i) => s + (Number(i.balance_due ?? i.total) || 0), 0))}).`}
+        subtitle={`Records the full balance of each (${formatCurrency(visibleSelected.filter(canMarkPaid).reduce((s, i) => s + (Number(receivableBalance(i)) || 0), 0))}).`}
         footer={
           <>
             <button type="button" className={controls.btnOutline} onClick={() => setBulkPay(null)}>Cancel</button>

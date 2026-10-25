@@ -10,7 +10,12 @@ Tally/Vyapar-style stock. Stock is **derived on read** from opening balance + ma
 
 ## Rules implemented
 
-- INVOICE / TAX_INVOICE reduce stock; CREDIT_NOTE returns stock; QUOTATION / PROFORMA never touch stock; DELIVERY_CHALLAN reduces stock only when the "Delivery challans reduce stock" toggle is on. Draft and Cancelled documents are excluded.
+- INVOICE / TAX_INVOICE reduce stock; a CREDIT_NOTE returns stock **only when goods actually came back**
+  (`creditNoteReturnsGoods`, `src/lib/credit-restock.ts`): the note's `goods_returned` flag (the "Goods returned to
+  stock" box on the credit-note form, ticked by default only for the "Sales return" reason), else for older notes the
+  reason on its `doc_links` row / "Reason: …" sentence — Discount, Rate difference, GST correction and Cancellation of
+  service move no stock; a custom reason or an unknown note does (the old behaviour). Profitability follows the same
+  rule: a value-only note reduces revenue with no cost and no quantity; QUOTATION / PROFORMA never touch stock; DELIVERY_CHALLAN reduces stock only when the "Delivery challans reduce stock" toggle is on. Draft and Cancelled documents are excluded.
 - Lines match a stock item by name (case-insensitive); if both sides carry an HSN they must agree. Only `track_stock` items participate.
 - Purchases: any row in the `purchases` table with `lines` (or `items`) of `{name, hsn, quantity, rate}`; date from `bill_date | date | issue_date | invoice_date`; Draft/Cancelled skipped. Field names are read defensively because `src/types/purchases.ts` did not exist in this worktree. If the real `PurchaseRecord` differs, adjust `PurchaseLike` / `PurchaseLineLike` and `purchaseDate` in `src/lib/inventory.ts`.
 - Same-day ordering: opening, then receipts, then issues, then sales returns (a same-day credit note follows the sale it reverses).
@@ -140,9 +145,9 @@ A simple user (no tracked items, one godown) sees no new field anywhere; the edi
   (`billTrackingIssues`). Sales lines pick from in-stock serials (in the line's godown); the quantity follows the count.
 - A serial is in stock after its last receipt / return and out after its last sale. Issuing refuses a serial that is
   not in stock (`sold on INV/…`), was never received, is in another godown, or appears twice.
-- **Returns**: a credit note that lists the serial puts it back in stock. "Raise credit note" copies the invoice
-  line's serials; a partial credit keeps the first N (edit the credit note to choose others). A credit note can only
-  name serials that are currently sold.
+- **Returns**: a credit note that returns goods and lists the serial puts it back in stock. "Raise credit note" copies
+  the invoice line's serials (none when the note returns no goods); a partial credit keeps the first N (edit the credit
+  note to choose others). A credit note can only name serials that are currently sold; a value-only note is not checked.
 - Warranty: `warranty_months` is snapshotted on the sale line; valid until the day before the same date N months later
   (`warrantyUntil('2026-05-10', 12) = '2027-05-09'`).
 - Lookup (Inventory → *Serial lookup*, `/inventory?tab=serials&serial=…`): purchase bill + vendor, sale invoice +

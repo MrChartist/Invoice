@@ -71,8 +71,15 @@ All optional and additive on `PurchaseRecord`, so old rows read as domestic, for
 | `itc_eligible: false` + `itc_reversal_reason: 'SEC_17_5'` | blocked credit | full tax in 4A and in 4B(1) |
 
 `itc_eligible: false` without a 17(5) reason keeps its old meaning (4D(2) ineligible).
-The bill's `total` still includes the GST for RCM and import bills (same convention as every bill, so Books
-and Tally stay balanced); the supplier balance therefore includes tax that is really paid to the government.
+The bill's `total` still includes the GST for RCM and import bills (same convention as every bill; stored bills are
+never rewritten). What the **supplier** is owed is `supplierPayable(bill)` (`purchase-normalize.ts`): the total less the
+GST we pay to the government ourselves — reverse charge, import of services, and IGST on imported goods (paid at customs
+with the Bill of Entry) — when the total includes it. Every "owed to the vendor" reader uses it: `balanceOf` (so status,
+payment validation and `amount_paid` roll-ups), `payablesOutstanding`, vendor balances, the MSME tracker (43B(h)),
+the cash forecast, cheque and bank-match pickers, Books payables (`NormPurchase.payable` / `selfTax`; Books
+`gstSummary.rcmPayable` adds the reverse-charge tax to the net GST payable), the ledger (Creditors = total − GST,
+GST to 2310 / 2311) and Tally (party Cr = payable, the GST to "GST Payable on Reverse Charge" / "IGST Payable on
+Imports"). The bill form shows "Payable to the supplier" under the total. `tests/purchase-contract.test.ts` guards it.
 
 ## MSME payments (Roadmap 3.8)
 
@@ -89,6 +96,9 @@ Vendors carry optional `msme_udyam` (`UDYAM-XX-00-0000000`, validated by `valida
   `amount_paid` not backed by payment rows (legacy / imported) is treated as paid on the bill date.
 
 Statutory values (`MSME_PAYMENT_DAYS`, `MSME_43BH_FROM`, `RBI_BANK_RATE_RULES`) live in `src/lib/tax-rules.ts`.
+**TODO (owner / CA):** `RBI_BANK_RATE_RULES` ends with the June 2025 entry (5.75%). Any later RBI policy change has not
+been added because it could not be verified offline — confirm the current Bank Rate and append a dated entry (never edit
+an old one).
 `MsmeCard` shows open MSE bills and the 43B(h) totals for the current and previous FY on the Expenses
 page; it renders nothing until a vendor is marked micro or small. Estimates — verify with your CA.
 

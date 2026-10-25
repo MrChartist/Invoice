@@ -21,6 +21,7 @@ import { num, round2 } from './invoice-calc';
 import { readPurchase, isVoidStatus } from './purchase-normalize';
 import { generateId, getTable, setTable } from './storage';
 import type { InvoiceRecord, Payment } from '../types/invoice';
+import { receivableBalance } from './rcm';
 
 /* ════════════════════════════════════════════════════════════════
    Types
@@ -981,7 +982,7 @@ export interface InvoiceSuggestion {
 export function openBalance(inv: InvoiceRecord): number {
   const live = inv.status !== 'Draft' && inv.status !== 'Cancelled' && (inv.doc_type === 'INVOICE' || inv.doc_type === 'TAX_INVOICE' || inv.doc_type === 'BILL_OF_SUPPLY' || !inv.doc_type);
   if (!live) return 0;
-  const owing = typeof inv.balance_due === 'number' ? inv.balance_due : num(inv.total) - num(inv.amount_paid);
+  const owing = receivableBalance(inv);
   return Math.max(round2(owing), 0);
 }
 

@@ -8,6 +8,7 @@ import type { InvoiceRecord } from '../types/invoice';
 import { DOCUMENT_LABELS } from '../types/invoice';
 import { formatCurrency, formatDate } from './utils';
 import { invoiceUpiLink } from './share';
+import { receivableBalance, receivableTotal } from './rcm';
 
 export const REMINDERS_TABLE = 'reminders';
 
@@ -83,7 +84,7 @@ export function stageForDays(daysToDue: number): ReminderStage | null {
 }
 
 export function suggestStage(invoice: InvoiceRecord, today: Date = new Date()): ReminderStage {
-  if (invoice.status === 'Paid' || invoice.balance_due <= 0) return 'thank_you';
+  if (invoice.status === 'Paid' || receivableBalance(invoice) <= 0) return 'thank_you';
   return stageForDays(daysUntil(invoice.due_date, today)) ?? 'upcoming';
 }
 
@@ -222,8 +223,9 @@ export function reminderVars(
     client: invoice.client?.name?.trim() || 'there',
     number: invoice.invoice_number,
     document: DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice',
-    amount: formatCurrency(invoice.total, cur),
-    balance: formatCurrency(invoice.balance_due > 0 ? invoice.balance_due : invoice.total, cur),
+    // Reverse charge: the GST is the recipient's to pay, never asked for (src/lib/rcm.ts).
+    amount: formatCurrency(receivableTotal(invoice), cur),
+    balance: formatCurrency(receivableBalance(invoice) > 0 ? receivableBalance(invoice) : receivableTotal(invoice), cur),
     due: invoice.due_date ? formatDate(invoice.due_date) : 'the due date',
     days: daysPhrase(daysUntil(invoice.due_date, today), lang),
     upi,
@@ -368,7 +370,7 @@ function clientKey(inv: InvoiceRecord): string {
 }
 
 function balanceInr(inv: InvoiceRecord): number {
-  const bal = Number(inv.balance_due) || 0;
+  const bal = receivableBalance(inv) || 0;
   const cur = (inv.currency || 'INR').toUpperCase();
   const fx = Number(inv.exchange_rate);
   return cur !== 'INR' && fx > 0 ? bal * fx : bal;
@@ -393,7 +395,7 @@ export function pendingReminders(
   for (const invoice of invoices) {
     if (!COLLECTIBLE.has(invoice.doc_type)) continue;
     if (invoice.status === 'Paid' || invoice.status === 'Cancelled' || invoice.status === 'Draft') continue;
-    if (!(invoice.balance_due > 0)) continue;
+    if (!(receivableBalance(invoice) > 0)) continue;
     const daysToDue = daysUntil(invoice.due_date, today);
     if (daysToDue < 0) overdueByClient.set(clientKey(invoice), (overdueByClient.get(clientKey(invoice)) ?? 0) + 1);
     const stage = stageForDays(daysToDue);

@@ -17,6 +17,8 @@ import { isoDay } from '../lib/dates';
 import { round2 } from '../lib/invoice-calc';
 import { loadPositions, type StockPosition } from '../lib/inventory';
 import { localDb } from '../lib/localDb';
+import { getTable } from '../lib/storage';
+import type { RestockLink } from '../lib/credit-restock';
 import {
   concentration,
   expenseReport,
@@ -89,7 +91,7 @@ export function Reports() {
   const modes = useMemo(() => paymentModes(books.transactions, invoices, period), [books.transactions, invoices, period]);
   const expenses = useMemo(() => expenseReport(books.purchases, books.vendors, period), [books, period]);
   const profitInput = useMemo(
-    () => ({ invoices, purchases: books.purchases, vendors: books.vendors, positions, clients: localDb.clients.getAll() }),
+    () => ({ invoices, purchases: books.purchases, vendors: books.vendors, positions, clients: localDb.clients.getAll(), links: getTable<RestockLink>('doc_links') }),
     [invoices, books, positions],
   );
   const itemProfit = useMemo(() => itemProfitability(profitInput, period), [profitInput, period]);

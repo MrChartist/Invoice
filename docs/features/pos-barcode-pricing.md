@@ -58,8 +58,10 @@ and a small "Scan barcode" button above the editor's items.
   quantity − / +, rate (typing drops the automatic level / slab basis), line discount %, remove. Customer: walk-in by
   default (optional name and phone, printed on the bill), or a saved client (search by name / phone / GSTIN), whose
   price level then applies. Totals come from the existing `calculateInvoice` (no new tax maths).
-- **Place of supply**: the business's own state for a walk-in (an over-the-counter sale); a saved client's state
-  otherwise (IGST when it differs).
+- **Place of supply**: the business's own state for every counter sale — walk-in or a saved client from another state:
+  goods handed over at the counter are supplied where delivery happens (Sec 10(1)(a)/(c) IGST Act), so the bill is
+  intra-state. When a saved client is picked, a **"Deliver to the customer's state (dispatch)"** box makes that
+  client's state the place of supply (IGST when it differs) for goods sent out. Verify with your CA.
 - **Doc type**: `makeDraft` decides, as in the editor — `INVOICE` normally, `BILL_OF_SUPPLY` (BOS series, no tax) for a
   composition profile.
 - **Split tender** (`tenderSummary`): cash, UPI (+ optional UTR) and card amounts; *Rest* / F4 / F6 / F7 fills what is

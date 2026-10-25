@@ -71,6 +71,8 @@ export function Pos() {
   const [data, setData] = useState(loadCounter);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [party, setParty] = useState<Party>(WALK_IN);
+  // Counter sale by default (place of supply = the shop's state); tick to dispatch to the client's state.
+  const [dispatch, setDispatch] = useState(false);
   const [customerText, setCustomerText] = useState('');
   const [tender, setTender] = useState(NO_TENDER);
   const [upiRef, setUpiRef] = useState('');
@@ -91,8 +93,8 @@ export function Pos() {
   const level = data.pricing && party.client ? levelForClient(party.client, data.pricing.levels) : null;
 
   const record = useMemo(
-    () => buildPosRecord({ items, party: { client: party.client, name: party.name, phone: party.phone }, settings, sender, templateId: localDb.template.get(), day }),
-    [items, party, settings, sender, day],
+    () => buildPosRecord({ items, party: { client: party.client, name: party.name, phone: party.phone }, settings, sender, templateId: localDb.template.get(), day, deliverToClientState: dispatch }),
+    [items, party, settings, sender, day, dispatch],
   );
   const tenders: Tender[] = useMemo(
     () => (Object.keys(tender) as TenderMethod[]).map((m) => ({
@@ -167,6 +169,7 @@ export function Pos() {
   /** Pick (or clear) the saved customer; a new customer may buy at another level, so automatic lines are re-priced. */
   const chooseClient = (client: Client | null) => {
     setParty(client ? { client, name: '', phone: '' } : WALK_IN);
+    setDispatch(false);
     setCustomerText('');
     setItems((cur) => (cur.length ? finish(cur, undefined, false, client) : cur));
   };
@@ -212,6 +215,7 @@ export function Pos() {
   const reset = () => {
     setItems([]);
     setParty(WALK_IN);
+    setDispatch(false);
     setCustomerText('');
     setTender(NO_TENDER);
     setUpiRef('');
@@ -414,7 +418,14 @@ export function Pos() {
                   </div>
                   <button type="button" className={controls.btnIcon} onClick={() => chooseClient(null)} aria-label="Back to walk-in customer"><X size={16} /></button>
                 </div>
-              ) : (
+              ) : null}
+              {party.client && (
+                <label className={controls.check} title="Over the counter the place of supply is your own state (Sec 10(1) IGST Act). Tick only when the goods are dispatched to the customer's state. Verify with your CA.">
+                  <input type="checkbox" checked={dispatch} onChange={(e) => setDispatch(e.target.checked)} />
+                  Deliver to the customer&apos;s state (dispatch)
+                </label>
+              )}
+              {party.client ? null : (
                 <>
                   <Typeahead
                     id="pos-customer"

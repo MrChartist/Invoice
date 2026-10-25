@@ -67,9 +67,37 @@ const TDS_BASE: TdsSection[] = [
 
 const withSection = (list: TdsSection[], section: string, patch: Partial<TdsSection>) =>
   list.map((s) => (s.section === section ? { ...s, ...patch } : s));
+const withoutSection = (list: TdsSection[], section: string) => list.filter((s) => s.section !== section);
+const patchAll = (list: TdsSection[], patches: Record<string, Partial<TdsSection>>) =>
+  list.map((s) => (patches[s.section] ? { ...s, ...patches[s.section] } : s));
+
+/**
+ * History (verify with your CA):
+ *  - 1 Jul 2017: 194J had one 10% rate for professional AND technical fees; 194Q did not exist.
+ *  - 1 Apr 2020: 194J technical services 2% (Finance Act 2020).
+ *  - 14 May 2020 – 31 Mar 2021: rates for non-salaried payments cut by 25% (Govt press release of
+ *    13 May 2020; Taxation and Other Laws (Relaxation and Amendment of Certain Provisions) Act 2020).
+ *  - 1 Jul 2021: 194Q purchase of goods 0.1% (Finance Act 2021).
+ *  - 1 Oct 2024: 194H 2% (Finance (No. 2) Act 2024).
+ */
+const TDS_2017 = withoutSection(withSection(TDS_BASE, '194J-T', { label: '194J Technical services 10%', rate: 10 }), '194Q');
+const TDS_2020 = withoutSection(TDS_BASE, '194Q');
+const TDS_COVID = patchAll(TDS_2020, {
+  '194C-1': { label: '194C Contractor (individual/HUF) 0.75%', rate: 0.75 },
+  '194C-2': { label: '194C Contractor (others) 1.5%', rate: 1.5 },
+  '194H': { label: '194H Commission / brokerage 3.75%', rate: 3.75 },
+  '194I-A': { label: '194I Rent (plant/machinery) 1.5%', rate: 1.5 },
+  '194I-B': { label: '194I Rent (land/building) 7.5%', rate: 7.5 },
+  '194J-T': { label: '194J Technical services 1.5%', rate: 1.5 },
+  '194J': { label: '194J Professional fees 7.5%', rate: 7.5 },
+});
 
 export const TDS_SECTION_RULES: readonly Versioned<TdsSection[]>[] = [
-  { from: '2017-07-01', value: TDS_BASE },
+  { from: '2017-07-01', value: TDS_2017, source: 'Income-tax Act as in force (194J 10%; no 194Q yet)' },
+  { from: '2020-04-01', value: TDS_2020, source: 'Finance Act 2020 (194J technical services 2%)' },
+  { from: '2020-05-14', value: TDS_COVID, source: 'Press release 13 May 2020: rates cut by 25% to 31 Mar 2021' },
+  { from: '2021-04-01', value: TDS_2020, source: 'Reduced rates ended 31 Mar 2021' },
+  { from: '2021-07-01', value: TDS_BASE, source: 'Finance Act 2021 (194Q from 1 Jul 2021)' },
   {
     from: '2024-10-01',
     value: withSection(TDS_BASE, '194H', { label: '194H Commission / brokerage 2%', rate: 2 }),
@@ -89,10 +117,24 @@ const TCS_1H: TcsPreset[] = [
   { label: '206C(1H) sale of goods 0.1%', rate: 0.1 },
   { label: '206C(1H) no PAN 1%', rate: 1 },
 ];
+const TCS_1H_COVID: TcsPreset[] = [
+  { label: '206C(1H) sale of goods 0.075%', rate: 0.075 },
+  { label: '206C(1H) no PAN 1%', rate: 1 },
+];
 const TCS_1G: TcsPreset = { label: '206C(1G) overseas remittance 20%', rate: 20 };
+const TCS_1G_2020: TcsPreset = { label: '206C(1G) overseas remittance 5%', rate: 5 };
 
+/**
+ * 206C(1H) and 206C(1G) both start on 1 Oct 2020 (Finance Act 2020) — before that neither applies (no
+ * preset). 1H was 0.075% until 31 Mar 2021 (the 25% relief), 0.1% after, and is withdrawn for sales
+ * from 1 Apr 2025. 1G (LRS remittances above the threshold) went from 5% to 20% on 1 Oct 2023.
+ * Verify with your CA.
+ */
 export const TCS_PRESET_RULES: readonly Versioned<TcsPreset[]>[] = [
-  { from: '2017-07-01', value: [...TCS_1H, TCS_1G] },
+  { from: '2017-07-01', value: [], source: '206C(1H) / (1G) not yet in force' },
+  { from: '2020-10-01', value: [...TCS_1H_COVID, TCS_1G_2020], source: 'Finance Act 2020; 25% relief to 31 Mar 2021' },
+  { from: '2021-04-01', value: [...TCS_1H, TCS_1G_2020], source: 'Finance Act 2020' },
+  { from: '2023-10-01', value: [...TCS_1H, TCS_1G], source: 'Finance Act 2023 (206C(1G) 20%)' },
   // 206C(1H) withdrawn for sales from 1 Apr 2025 (Finance Act 2025).
   { from: '2025-04-01', value: [TCS_1G], source: 'Finance Act 2025' },
 ];

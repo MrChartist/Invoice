@@ -38,6 +38,27 @@ export function isTaxed(invoice: InvoiceRecord, totals: CalcTotals): boolean {
   return invoice.gst_mode === 'CGST_SGST' && totals.tax_amount > 0;
 }
 
+/**
+ * Outward reverse charge calculated the current way (`rcm_tax_excluded`): the GST is printed as
+ * "payable by the recipient" in its own note, never as a row that adds up to the total. Older
+ * reverse-charge documents (tax inside their stored total) render exactly as they always did.
+ */
+export function isRcmTotals(totals: CalcTotals): boolean {
+  return (totals.rcm_tax ?? 0) > 0;
+}
+
+/** Rule 46(p): the tax payable on reverse charge, printed under the totals. */
+export function rcmTaxNote(totals: CalcTotals, money: (amount: number) => string): string {
+  if (!isRcmTotals(totals)) return '';
+  const heads = [
+    totals.cgst_amount > 0 && `CGST ${money(totals.cgst_amount)}`,
+    totals.sgst_amount > 0 && `SGST ${money(totals.sgst_amount)}`,
+    totals.igst_amount > 0 && `IGST ${money(totals.igst_amount)}`,
+    totals.cess_amount > 0 && `Cess ${money(totals.cess_amount)}`,
+  ].filter(Boolean);
+  return `Tax payable by the recipient under reverse charge (Sec 9(3)/9(4) CGST Act, Rule 46(p)): ${heads.join(', ')} — total ${money(totals.rcm_tax)}. Not included in the amount payable.`;
+}
+
 /** Legacy single "Tax" line. */
 export function isSingleTax(invoice: InvoiceRecord, totals: CalcTotals): boolean {
   return invoice.gst_mode === 'SINGLE' && totals.tax_amount > 0;

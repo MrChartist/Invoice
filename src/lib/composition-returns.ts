@@ -105,7 +105,11 @@ export function documentTurnover(rec: InvoiceRecord, fallback: CompositionKind =
   const kind = rec.sender?.composition_category ?? fallback;
   // The base is the value of supply WITHOUT tax, so compute untaxed (a wrongly taxed invoice is flagged separately).
   const calc = calculateInvoice(calcInputFromRecord(rec, { gst_mode: 'NONE', amount_paid: 0, tcs_enabled: false, tds_enabled: false }));
-  const taxableOnly = kind === 'trader' && date >= COMPOSITION_TRADER_TAXABLE_ONLY_FROM;
+  // Exempt supplies stay out of the base for traders (Rule 7 as amended from 1 Jan 2018) and for
+  // service providers under Sec 10(2A) / 2/2019-CT(R), whose rate applies to taxable supplies only
+  // (supplies exempt under 12/2017-CT(R) stay exempt). Manufacturers and restaurants pay on the whole
+  // turnover. CA-judgment item: verify with your CA.
+  const taxableOnly = (kind === 'trader' && date >= COMPOSITION_TRADER_TAXABLE_ONLY_FROM) || kind === 'service';
   let exempt = 0;
   let base = 0;
   for (const l of calc.lines) {

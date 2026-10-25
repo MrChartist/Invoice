@@ -13,6 +13,7 @@ import { calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
 import { assertUnlocked, type LockAction } from './period-lock';
 import { releaseAttachments, releaseDropped } from './attachments';
+import { supplierPayable } from './purchase-normalize';
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -136,8 +137,12 @@ export function billablePatch(v: BillableValue): BillableValue {
 
 // ── Pure: status & aggregates ────────────────────────────────────
 
-export function balanceOf(p: Pick<PurchaseRecord, 'total' | 'amount_paid'>): number {
-  return Math.max(round2(num(p.total) - num(p.amount_paid)), 0);
+/**
+ * Still owed to the supplier. Reverse-charge and import bills store `total` = taxable + the GST we
+ * pay to the government ourselves; that tax is never the supplier's (`supplierPayable`).
+ */
+export function balanceOf(p: Pick<PurchaseRecord, 'total' | 'amount_paid'> & Partial<PurchaseRecord>): number {
+  return Math.max(round2(supplierPayable(p) - num(p.amount_paid)), 0);
 }
 
 export function deriveStatus(p: PurchaseRecord, today: string): PurchaseStatus {

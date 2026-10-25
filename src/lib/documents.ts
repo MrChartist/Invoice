@@ -15,6 +15,8 @@
 
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { generateId, getTable, setTable } from './storage';
+import { receivableTotal } from './rcm';
+import { reasonReturnsGoods } from './credit-restock';
 import { localDb } from './localDb';
 import { getLockUntil, isPeriodLockedError } from './period-lock';
 import { amendmentCheck, buildAmendment, canAmend } from './amendments';
@@ -133,7 +135,12 @@ export function addDays(isoDate: string, days: number): string {
   return localIsoDate(dt);
 }
 
-function recompute(rec: InvoiceRecord): InvoiceRecord {
+function recompute(input: InvoiceRecord): InvoiceRecord {
+  // A NEW document (conversion, credit / debit note) on reverse charge is calculated the current way:
+  // the tax is payable by the recipient and stays out of its total (src/lib/rcm.ts).
+  const rec: InvoiceRecord = input.reverse_charge && input.doc_type !== 'BILL_OF_SUPPLY'
+    ? { ...input, rcm_tax_excluded: true }
+    : { ...input, rcm_tax_excluded: undefined };
   // The FULL record goes in (supply type, tax-inclusive pricing, cess, TCS/TDS,
   // round mode): a credit note against an export/LUT invoice must stay zero-rated.
   const t = calculateInvoice(calcInputFromRecord(rec));
@@ -384,12 +391,17 @@ export function totalCredited(
   links: DocLink[],
   allInvoices: InvoiceRecord[],
 ): number {
-  return round2(creditNotesFor(invoiceId, links, allInvoices).reduce((s, c) => s + num(c.total), 0));
+  return round2(creditNotesFor(invoiceId, links, allInvoices).reduce((s, c) => s + receivableTotal(c), 0));
 }
 
 export interface CreditInput {
   lines: CreditLineRequest[];
   reason: string;
+  /**
+   * Goods come back into stock (the form's "Goods returned to stock" box). Defaults to the reason:
+   * on for a sales return, off for a discount / rate difference / GST correction / cancelled service.
+   */
+  goodsReturned?: boolean;
 }
 
 export interface CreditDraftResult {
@@ -445,6 +457,11 @@ export function buildCreditNote(
     errors.push('Enter a quantity to credit on at least one line.');
   }
   if (errors.length) return { record: null, errors };
+  const goodsReturned = input.goodsReturned ?? reasonReturnsGoods(input.reason);
+  // No goods come back: no serials are returned either (stock tracking follows the same flag).
+  if (!goodsReturned) {
+    for (const p of picked) delete p.serials;
+  }
 
   // Re-express the original invoice-level discount as an equivalent percent so
   // a partial credit gets a proportional share of it.
@@ -476,6 +493,7 @@ export function buildCreditNote(
     updated_at: undefined,
     amends: undefined,
     pos: undefined,
+    goods_returned: goodsReturned,
   };
   const rec = recompute(base);
   // A credit note is not receivable; it reduces the original's balance.
@@ -484,7 +502,8 @@ export function buildCreditNote(
   // Compare BEFORE whole-rupee round-off: every credit note is rounded on its own,
   // so two part-credits that together cover the invoice can each round up and sum
   // to a rupee more than the (also rounded) invoice — which must not block them.
-  const preRound = (r: Pick<InvoiceRecord, 'total' | 'round_off'>) => num(r.total) - num(r.round_off);
+  // Reverse charge: compare what the customer owes (an older invoice's stored total includes the tax).
+  const preRound = (r: InvoiceRecord) => receivableTotal(r) - num(r.round_off);
   const already = round2(
     creditNotesFor(invoice.id, links, allInvoices).reduce((s, c) => s + preRound(c), 0),
   );
@@ -612,7 +631,7 @@ export function effectiveOutstanding(
   // TDS the customer withholds is never collectable from them (it is settled with the tax office).
   return Math.max(
     0,
-    round2(num(invoice.total) - num(invoice.tds_amount) - num(invoice.amount_paid) - credit),
+    round2(receivableTotal(invoice) - num(invoice.tds_amount) - num(invoice.amount_paid) - credit),
   );
 }
 
@@ -657,12 +676,12 @@ export function cancelDocument(
 }
 
 export function restoredStatus(
-  inv: Pick<InvoiceRecord, 'amount_paid' | 'total'>,
+  inv: Pick<InvoiceRecord, 'amount_paid' | 'total'> & Partial<InvoiceRecord>,
   prev?: InvoiceStatus,
 ): InvoiceStatus {
   if (prev && prev !== 'Cancelled') return prev;
   const paid = num(inv.amount_paid);
-  if (paid > 0) return paid >= num(inv.total) ? 'Paid' : 'Partially Paid';
+  if (paid > 0) return paid >= receivableTotal(inv) ? 'Paid' : 'Partially Paid';
   return 'Sent';
 }
 

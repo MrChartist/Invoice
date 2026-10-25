@@ -98,7 +98,10 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 ### 3.2 GST & Compliance Engine
 - **Intra- vs inter-state tax**: automatic CGST + SGST vs IGST from place of supply and GSTIN state code.
 - **Advanced tax**: cess, TCS, TDS (date-keyed section rates), reverse charge, SEZ / export / LUT / deemed export,
-  exact paise rounding. Statutory values that change over time live in `src/lib/tax-rules.ts`, keyed by effective date.
+  exact paise rounding. On an outward reverse-charge invoice the GST is printed as "Tax payable by the recipient under
+  reverse charge" and is not part of the total or what the customer owes (older records are read the same way without
+  being rewritten). A credit note moves stock only when goods are returned ("Goods returned to stock", on by default for
+  a sales return). A POS bill is intra-state unless the goods are dispatched to the customer's state. Statutory values that change over time live in `src/lib/tax-rules.ts`, keyed by effective date.
 - **e-Invoice & e-Way**: offline IRP v1.1 e-Invoice JSON (INV / CRN / DBN, preceding-document details filled from the
   linked invoice, export details) and e-Way Bill JSON generators, with pre-flight validation. The IRN, Ack No and signed
   QR returned by the IRP are entered back and printed on every template. Bulk: one IRP / e-Way JSON for many invoices
@@ -218,8 +221,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - The ledger does not value closing stock or handle fixed-asset disposals automatically — post them with a journal
   voucher. Realised exchange differences are posted automatically when a receipt carries its realised rate;
   unrealised (period-end revaluation) differences are reported only — post the reversing journal if your CA wants it.
-- RCM and import bills: the ledger credits the tax to "GST payable — reverse charge" / "IGST payable on imports";
-  the purchases module and Tally export still carry the bill total (including that tax) as the supplier balance.
+- RCM and import bills: the supplier is owed the taxable value only (`supplierPayable`) in purchases, Books, the ledger
+  and Tally; the self-assessed tax sits on "GST payable — reverse charge" / "IGST payable on imports" until cleared.
 - Exchange gain/loss is computed only for receipts where the realised rate is entered (no automatic FX rates — no
   server). GST always uses the invoice-date rate; exchange differences never change GST figures.
 - Cheques link to a single invoice / bill; clearing does not auto-record against foreign-currency invoices. The

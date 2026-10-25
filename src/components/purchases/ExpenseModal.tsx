@@ -4,6 +4,7 @@ import { PURCHASE_CATEGORIES } from '../../types/purchases';
 import { GST_SLABS } from '../../types/invoice';
 import { computePurchaseTotals, expenseLine, paymentsDb, purchasesDb, PAYMENT_METHODS } from '../../lib/purchases';
 import { formatCurrency, todayInput } from '../../lib/utils';
+import { supplierPayable } from '../../lib/purchase-normalize';
 import { Modal } from '../ui/Modal';
 import { BillableFields } from './BillableFields';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
@@ -102,7 +103,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
       });
-      if (!expense && paidNow) paymentsDb.record(saved.id, { amount: saved.total, date, method });
+      if (!expense && paidNow) paymentsDb.record(saved.id, { amount: supplierPayable(saved), date, method });
       onSaved(expense ? 'Expense updated' : `Expense of ${formatCurrency(saved.total)} added`);
       onClose();
     } catch (err) {

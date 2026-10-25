@@ -3,7 +3,9 @@
 All fields are optional and additive; absent = legacy behaviour (golden tests in `tests/invoice-calc.test.ts` and `tests/invoice-store.test.ts`).
 
 ## Order of operations
-gross -> line discount -> invoice discount (on tax-inclusive net when `price_includes_tax`) -> taxable -> GST + cess -> + shipping/other (taxed at the highest line rate when `charges_taxable`, see `freight-fx.md`) -> + TCS -> round (`round_mode`) = **total** (invoice value). TDS never changes `total`: `payable = total - tds_amount`, `balance_due = payable - amount_paid`.
+gross -> line discount -> invoice discount (on tax-inclusive net when `price_includes_tax`) -> taxable -> GST + cess -> + shipping/other (taxed at the highest line rate when `charges_taxable`, see `freight-fx.md`) -> + TCS -> round (`round_mode`) = **total** (invoice value). TDS never changes `total`: `payable = total - tds_amount`, `balance_due = payable - amount_paid`. Outward reverse charge (`rcm_exclude_tax`, from `reverse_charge && rcm_tax_excluded`): GST + cess are computed per line but left out of the total (and of the TCS base) and returned as `rcm_tax` — see `src/lib/rcm.ts` and `gst-reports.md`.
+
+TDS / TCS presets are dated in `tax-rules.ts` (verify with your CA): 194J technical 10% until 31 Mar 2020, 2% after; the 25% relief 14 May 2020 – 31 Mar 2021 (194C 0.75 / 1.5, 194H 3.75, 194I 1.5 / 7.5, 194J 1.5 / 7.5); 194Q from 1 Jul 2021; 194H 2% from 1 Oct 2024. 206C(1H) and 206C(1G) start 1 Oct 2020 (no preset before): 1H 0.075% to 31 Mar 2021, 0.1% after, withdrawn from 1 Apr 2025; 1G 5%, 20% from 1 Oct 2023.
 
 ## Fields
 - Item: `cess_rate` (% of taxable), `cess_per_unit` (fixed per qty). Cess is a single bucket (not split CGST/SGST), zero when GST mode is NONE.

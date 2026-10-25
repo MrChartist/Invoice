@@ -23,6 +23,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
 import { useReminderLog } from './useReminderLog';
+import { receivableBalance } from '../../lib/rcm';
 
 export interface ReminderModalProps {
   invoice: InvoiceRecord;
@@ -159,7 +160,7 @@ function ReminderModalBody({
           <div className={styles.summaryLine}>
             <span><strong>{invoice.client?.name || 'Client'}</strong></span>
             <span>{invoice.invoice_number}</span>
-            <span>Balance <strong>{formatCurrency(invoice.balance_due, cur)}</strong></span>
+            <span>Balance <strong>{formatCurrency(receivableBalance(invoice), cur)}</strong></span>
             <span>Due {formatDate(invoice.due_date)}</span>
             {last && <span>Last reminded {formatDate(last.sent_at)} ({history.length}x)</span>}
           </div>

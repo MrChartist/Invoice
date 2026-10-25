@@ -238,6 +238,9 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
       resolveStateCode({ gstin: client.gstin, name: client.state }) ??
       '',
     reverse_charge: Boolean(r.reverse_charge),
+    // Only stored on reverse-charge documents calculated without the tax in the total (src/lib/rcm.ts).
+    ...(r.reverse_charge && r.rcm_tax_excluded ? { rcm_tax_excluded: true } : {}),
+    ...(typeof r.goods_returned === 'boolean' ? { goods_returned: r.goods_returned } : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

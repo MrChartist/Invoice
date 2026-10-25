@@ -3,7 +3,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord } from '../../../types/invoice';
 import type { TemplateTableStyle } from '../registry';
 import { usePaper } from '../paper-context';
-import { trackingText } from '../paper-helpers';
+import { isRcmTotals, trackingText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { ItemCustomLine } from './CustomFieldsBlock';
 
@@ -89,7 +89,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
               )}
               {showGst && <td className={cn(styles.right, styles.num)}>{line.tax_rate}%</td>}
               <td className={cn(styles.right, styles.num)} style={{ fontWeight: 700 }}>
-                {money(taxed ? line.total : line.taxable, invoice.currency)}
+                {money(taxed && !isRcmTotals(totals) ? line.total : line.taxable, invoice.currency)}
               </td>
             </tr>
           );

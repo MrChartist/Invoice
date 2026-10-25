@@ -105,6 +105,11 @@ export interface PosBuildInput {
   /** Bill date (YYYY-MM-DD local day). */
   day: string;
   docType?: DocumentType;
+  /**
+   * The goods are dispatched to the saved client's state instead of being handed over at the counter.
+   * Only then is the client's state the place of supply (IGST when it differs from the business's).
+   */
+  deliverToClientState?: boolean;
 }
 
 /** Copy the calculator's totals onto the record (as the editor store does after every edit). */
@@ -145,8 +150,11 @@ export function buildPosRecord(input: PosBuildInput): InvoiceRecord {
   delete client.credit_limit;
   delete client.credit_days;
   delete client.price_level;
-  // Walk-in: the sale happens at the counter, so the place of supply is the business's state.
-  const place = c ? resolveStateCode({ code: c.state_code, gstin: c.gstin, name: c.state }) || home : home;
+  // Goods handed over at the counter: the place of supply is where delivery happens — the shop's state
+  // (Sec 10(1)(a)/(c) IGST Act), even for a saved out-of-state client. Only an explicit dispatch to the
+  // client's state makes that state the place of supply. Verify with your CA.
+  const clientState = c ? resolveStateCode({ code: c.state_code, gstin: c.gstin, name: c.state }) : '';
+  const place = c && input.deliverToClientState ? clientState || home : home;
   let gst_mode = draft.gst_mode;
   if (gst_mode === 'CGST_SGST' || gst_mode === 'IGST') gst_mode = place && home && place !== home ? 'IGST' : 'CGST_SGST';
   const items = input.items.filter((i) => i.name.trim() && num(i.quantity) > 0).map((i) => ({ ...i, amount: round2(num(i.quantity) * num(i.rate)) }));
