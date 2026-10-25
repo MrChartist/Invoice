@@ -225,8 +225,15 @@ export type TimelineKind = 'reminder' | 'followup' | 'promise' | 'receipt';
 export interface TimelineItem {
   date: string;
   kind: TimelineKind;
-  text: string;
+  /** Follow-up outcome text (follow-ups only). */
+  text?: string;
+  /** Follow-up kind (call / visit …) or the reminder stage. */
+  sub?: string;
+  /** Reminder channel. */
+  channel?: string;
   amount?: number;
+  /** Promise: promised by. */
+  until?: string;
 }
 
 /** Party timeline (statement screen): reminders sent, follow-ups, promises and receipts, newest first. */
@@ -238,14 +245,14 @@ export function partyTimeline(
   for (const r of input.reminders) {
     if (r.channel === 'snooze') continue;
     if (r.party_key !== partyKey && !(r.invoice_id && input.invoiceIds?.has(r.invoice_id))) continue;
-    out.push({ date: isoDay(r.sent_at), kind: 'reminder', text: `${r.tone.replace(/_/g, ' ')} · ${r.channel}` });
+    out.push({ date: isoDay(r.sent_at), kind: 'reminder', sub: r.tone, channel: r.channel });
   }
   for (const n of input.notes) {
     if (n.party_key !== partyKey) continue;
-    out.push({ date: n.date, kind: 'followup', text: `${n.kind}: ${n.outcome}`.trim() });
-    if (n.promise) out.push({ date: n.date, kind: 'promise', text: `promised by ${n.promise.date}`, amount: n.promise.amount });
+    out.push({ date: n.date, kind: 'followup', sub: n.kind, text: n.outcome });
+    if (n.promise) out.push({ date: n.date, kind: 'promise', until: n.promise.date, amount: n.promise.amount });
   }
-  for (const r of input.receipts) if (r.party_key === partyKey) out.push({ date: r.date, kind: 'receipt', text: 'received', amount: r.amount });
+  for (const r of input.receipts) if (r.party_key === partyKey) out.push({ date: r.date, kind: 'receipt', amount: r.amount });
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 

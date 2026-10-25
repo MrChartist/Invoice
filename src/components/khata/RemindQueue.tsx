@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BellOff, Copy, MessageCircle, SkipForward, X } from 'lucide-react';
+import { BellOff, Copy, MessageCircle, NotebookPen, SkipForward, X } from 'lucide-react';
 import { localDb } from '../../lib/localDb';
 import {
   buildPartyReminder, makePartyLogEntry, makePartySnooze, partyReminderQueue, partyStage,
@@ -14,6 +14,15 @@ import { getLanguage, useT } from '../../i18n';
 import { khataT } from '../../i18n/areas/khata';
 import controls from '../../styles/controls.module.css';
 import styles from './khata.module.css';
+import { can } from '../../lib/access';
+import { loadReminderSchedule } from '../../lib/reminder-settings';
+import { loadCollectionNotes, openPromises, receiptsByParty } from '../../lib/collections';
+import { localDayOf } from '../../lib/dates';
+import { colT } from '../../i18n/areas/collections';
+import type { ReminderMode } from '../../types/invoice';
+
+// R2-A4: "Log follow-up" from the queue (promise to pay / next action), loaded on first use.
+const FollowUpDialog = lazy(() => import('../collections/FollowUpDialog'));
 
 export interface RemindQueueProps {
   /** `overdue`: "Remind all overdue". `balance`: the monthly "send everyone their balance". */
@@ -32,10 +41,18 @@ export interface RemindQueueProps {
 export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
   useT();
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
+  const schedule = useMemo(loadReminderSchedule, []);
   const queue = useMemo(() => {
     const { input, report } = loadKhataReport();
-    return partyReminderQueue(report, input.clients ?? [], loadReminderLog(), { kind });
+    // R2-A4: a party with an open promise to pay is not reminded until the promised date.
+    const notes = loadCollectionNotes();
+    const heldParties = notes.some((n) => n.promise)
+      ? new Set(openPromises(notes, receiptsByParty(input.invoices, input.payments, input.clients ?? []), localDayOf(new Date())).keys())
+      : undefined;
+    return partyReminderQueue(report, input.clients ?? [], loadReminderLog(), { kind, heldParties });
   }, [kind]);
+  const [logging, setLogging] = useState(false);
+  const [modes, setModes] = useState<Record<string, ReminderMode | undefined>>({});
   const [index, setIndex] = useState(0);
   const [lang, setLang] = useState<PartyReminderLang>(() => (getLanguage() === 'hi' ? 'hi' : 'en'));
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -62,7 +79,7 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
   const log = (channel: 'whatsapp' | 'copy') => {
     if (!item) return;
     try {
-      appendReminders([makePartyLogEntry(newId(), item.party.key, channel, partyStage(item.party), new Date(), kind)]);
+      appendReminders([makePartyLogEntry(newId(), item.party.key, channel, partyStage(item.party, schedule), new Date(), kind)]);
       onChanged?.();
     } catch {
       /* the log is a convenience; never block the reminder itself */
@@ -91,6 +108,7 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
             </div>
           )}
           {(queue.snoozed > 0 || queue.recent > 0) && <p className={styles.meta}>{khataT('hidden', { snoozed: queue.snoozed, recent: queue.recent })}</p>}
+          {((queue.muted ?? 0) > 0 || (queue.promised ?? 0) > 0) && <p className={styles.meta}>{colT('rmQueueMuted', { muted: queue.muted ?? 0, promised: queue.promised ?? 0 })}</p>}
           {!item ? (
             <>
               <p className={styles.notice} role="status">
@@ -112,6 +130,23 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
                 </div>
               </div>
               {!item.phone && <p className={controls.hint}>{khataT('noPhone')}</p>}
+              {item.client?.id && can('master.edit') && (
+                <label className={controls.field}>
+                  <span className={controls.label}>{colT('rmSetMode', { name: item.party.name })}</span>
+                  <select className={controls.select} value={(item.party.key in modes ? modes[item.party.key] : item.client.reminder_mode) ?? 'auto'}
+                    onChange={(e) => {
+                      const mode = e.target.value === 'auto' ? undefined : (e.target.value as ReminderMode);
+                      try {
+                        localDb.clients.upsert({ ...item.client!, reminder_mode: mode });
+                        setModes((m) => ({ ...m, [item.party.key]: mode }));
+                      } catch { /* role / storage: the select simply does not change */ }
+                    }}>
+                    <option value="auto">{colT('rmAuto')}</option>
+                    <option value="manual">{colT('rmManual')}</option>
+                    <option value="never">{colT('rmNever')}</option>
+                  </select>
+                </label>
+              )}
               <div className={controls.field}>
                 <span className={controls.label}>{khataT('language')}</span>
                 <div className={controls.segment} role="radiogroup" aria-label={khataT('language')}>
@@ -151,12 +186,24 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
                   onClick={async () => { if (await copyText(body)) { setCopied(true); log('copy'); } }}>
                   <Copy size={16} /> {copied ? khataT('copied') : khataT('copy')}
                 </button>
+                {can('payment.record') && (
+                  <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setLogging(true)} data-queue-followup>
+                    <NotebookPen size={16} /> {colT('fuLog')}
+                  </button>
+                )}
               </div>
               <p className={styles.meta}>{khataT('limit')}</p>
             </>
           )}
         </div>
       </div>
+      {logging && item && (
+        <Suspense fallback={null}>
+          <FollowUpDialog partyKey={item.party.key} partyName={item.party.name}
+            bills={item.party.bills.filter((b) => !b.opening).map((b) => ({ id: b.invoiceId, number: b.number, outstanding: b.outstanding }))}
+            onClose={() => setLogging(false)} onSaved={() => onChanged?.()} />
+        </Suspense>
+      )}
     </div>,
     document.body,
   );

@@ -23,6 +23,8 @@ import styles from '../../pages/InvoiceCreator.module.css';
 
 // WP-9: branch picker, loaded only once a branch exists (single-location users never download it).
 const BranchSelect = lazy(() => import('../branches/BranchSelect').then((m) => ({ default: m.BranchSelect })));
+// R2-A1: payment terms picker (loads the terms master and the collections strings on its own).
+const TermsPicker = lazy(() => import('../collections/TermsPicker'));
 
 const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
 const DUE_PRESETS = [0, 7, 15, 30, 45];
@@ -37,7 +39,7 @@ interface Props {
 export function DocumentMetaCard({ editing, saveTick }: Props) {
   const { t } = useT();
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
+    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'payment_terms', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
   );
 
   const nextNumber = useMemo(
@@ -55,6 +57,11 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
   );
   const numberTaken = numberCheck && !numberCheck.ok ? numberCheck.clash : undefined;
   const centres = useCostCentres();
+  // R2-A1: a due date typed by hand turns the payment term into "Custom".
+  const setDue = (due: string) => {
+    s.setDates(s.issue_date, due);
+    if (s.payment_terms) s.patch({ payment_terms: undefined });
+  };
   const hasBranches = useMemo(() => {
     try {
       return getTable('branches').length > 0;
@@ -126,7 +133,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
           </label>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="due-date">{s.doc_type === 'SALES_ORDER' ? t('meta.deliveryBy') : t('meta.dueDate')}</label>
-            <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
+            <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => setDue(e.target.value)} />
             {/* 8.6: an unpaid bill with no credit period nudges for a due date (ageing / reminders use it). */}
             {(s.doc_type === 'INVOICE' || s.doc_type === 'TAX_INVOICE' || s.doc_type === 'BILL_OF_SUPPLY') &&
               s.status !== 'Paid' && s.status !== 'Cancelled' && (Number(s.balance_due) || 0) > 0.004 &&
@@ -135,11 +142,14 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
               )}
             <div className={styles.chips}>
               {DUE_PRESETS.map((d) => (
-                <button key={d} type="button" aria-label={d === 0 ? t('meta.dueOnReceipt') : t('meta.dueInDays', { n: d })} className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>
+                <button key={d} type="button" aria-label={d === 0 ? t('meta.dueOnReceipt') : t('meta.dueInDays', { n: d })} className={styles.chip} onClick={() => setDue(addDaysInput(d, s.issue_date))}>
                   {d === 0 ? t('meta.now') : t('meta.daysShort', { n: d })}
                 </button>
               ))}
             </div>
+            <Suspense fallback={null}>
+              <TermsPicker />
+            </Suspense>
           </div>
           <div className={styles.pair}>
             <label className={controls.field}>

@@ -11,6 +11,7 @@ import { isValidPan, isValidTan } from '../../lib/validators';
 import { MAX_FLAT_FEE, sanitizeClientLateFee, type ClientLateFeeMode } from '../../lib/late-fee-rule';
 import { priceLevelsDb } from '../../lib/pricing';
 import type { Client } from '../../types/invoice';
+import { ReminderModeField } from '../collections/ReminderModeField'; // R2-A
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
 import controls from '../../styles/controls.module.css';
@@ -261,6 +262,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           </div>
           <span className={controls.hint}>{salesT('cf.creditHint')}</span>
         </fieldset>
+        <ReminderModeField client={form} onChange={(p) => setForm((f) => ({ ...f, ...p }))} /> {/* R2-A: payment term + reminder mode */}
         {levels.length > 0 && (
           <label className={controls.field}>
             <span className={controls.label}>{salesT('cf.priceLevel')}</span>

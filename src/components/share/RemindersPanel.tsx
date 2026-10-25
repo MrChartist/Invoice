@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { BellRing, CheckCircle2 } from 'lucide-react';
 import type { InvoiceRecord } from '../../types/invoice';
 import { localDb } from '../../lib/localDb';
@@ -17,8 +17,7 @@ import { getTable } from '../../lib/storage';
 import { linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
 import { useT } from '../../i18n';
 import { remindT } from '../../i18n/areas/reminders';
-import { reminderOptions } from '../../lib/reminder-context';
-import { gradeLookup } from '../../lib/payment-score';
+import type { PendingOptions } from '../../lib/reminders';
 
 // The dialog (and its strings) loads only when a reminder is opened, off the Dashboard's first paint.
 const ReminderModal = lazy(() => import('./ReminderModal').then((m) => ({ default: m.ReminderModal })));
@@ -59,17 +58,29 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
   const [active, setActive] = useState<InvoiceRecord | null>(null);
   const [all] = useState<InvoiceRecord[]>(() => invoices ?? (localDb.invoices.getAll() as InvoiceRecord[]));
   const source = invoices ?? all;
+  // R2-A4/A5/A7: company schedule, party reminder mode, promises-to-pay (hold / firm) and payment grades.
+  // Loaded after first paint (the Dashboard is in the shell), then the list re-sorts.
+  const [extra, setExtra] = useState<Partial<PendingOptions>>({});
+  useEffect(() => {
+    let live = true;
+    void Promise.all([import('../../lib/reminder-context'), import('../../lib/payment-score')]).then(([ctx, score]) => {
+      if (!live) return;
+      const day = today ?? new Date();
+      try {
+        setExtra({ ...ctx.reminderOptions(source, day), gradeOf: score.gradeLookup(source, day) });
+      } catch {
+        /* the panel still works with the default schedule */
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [source, today, log]);
 
   const pending = useMemo(
     // Credit notes linked to an invoice settle part of it: never chased (src/lib/amount-due.ts).
-    // R2-A4/A5: company schedule, party reminder mode, promises-to-pay (hold / firm).
-    () => pendingReminders(source, today ?? new Date(), log, {
-      credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), source),
-      ...reminderOptions(source, today ?? new Date()),
-      // R2-A7: slow payers (grade C / D) move up the list.
-      gradeOf: gradeLookup(source, today ?? new Date()),
-    }),
-    [source, today, log],
+    () => pendingReminders(source, today ?? new Date(), log, { credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), source), ...extra }),
+    [source, today, log, extra],
   );
   const shown = pending.slice(0, limit);
   const outstanding = pending.reduce((sum, p) => sum + p.balance, 0);

@@ -29,6 +29,7 @@ import {
 import { formatCombo } from '../../hooks/useHotkeys';
 import { tallyDestinations } from './tally-destinations';
 import { distDestinations } from './dist-destinations';
+import { collectionsDestinations } from './collections-destinations'; // R2-A
 import { sfT } from '../../i18n/areas/smart-find';
 import styles from './CommandPalette.module.css';
 
@@ -173,6 +174,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   );
   // Tally-parity screens (Phase 7): searchable, not listed on the empty palette.
   const tallyEntries = useMemo<StaticEntry[]>(() => (open ? [...tallyDestinations(), ...distDestinations()] : []), [open]); // + 8F
+  // R2-A: collections & settlement destinations (follow-ups, write-off register, payment terms, reminder schedule).
+  const r2aEntries = useMemo<StaticEntry[]>(() => (open ? collectionsDestinations() : []), [open]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
@@ -188,7 +191,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       return [...base, ...staticRows.map((r) => ({ key: r.id, kind: 'result' as const, result: r }))];
     }
     const found = searchAll(q, {
-      data: { pages: [...pageEntries, ...tallyEntries], actions: actionEntries },
+      data: { pages: [...pageEntries, ...tallyEntries, ...r2aEntries], actions: actionEntries },
       perGroup: 6,
     });
     if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
@@ -196,7 +199,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     return groupResults(found).flatMap((g) =>
       g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
     );
-  }, [open, query, recents, pageEntries, tallyEntries, actionEntries, allCompanies, peeked]);
+  }, [open, query, recents, pageEntries, tallyEntries, r2aEntries, actionEntries, allCompanies, peeked]);
 
   // Reset on open; remember and restore focus.
   useEffect(() => {

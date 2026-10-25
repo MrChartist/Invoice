@@ -32,6 +32,9 @@ const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomF
 // Folder sync (5.7): the panel brings the whole sync engine, so it loads only on the Data tab.
 const SyncPanel = lazy(() => import('../components/sync/SyncPanel').then((m) => ({ default: m.SyncPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
+// R2-A: payment terms / settlement settings and the reminder schedule, loaded with the Defaults tab.
+const PaymentTermsPanel = lazy(() => import('../components/settings/PaymentTermsPanel'));
+const ReminderSchedulePanel = lazy(() => import('../components/settings/ReminderSchedulePanel'));
 
 type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
@@ -267,6 +270,11 @@ export function Settings() {
             profileId={settings.activeProfileId}
             profileName={settings.profiles.find((p) => p.id === settings.activeProfileId)?.companyName}
           />
+          {/* R2-A: payment terms master + settlement settings, reminder schedule & templates */}
+          <Suspense fallback={null}>
+            <PaymentTermsPanel notify={notify} />
+            <ReminderSchedulePanel notify={notify} />
+          </Suspense>
         </>
       )}
       {tab === 'data' && (

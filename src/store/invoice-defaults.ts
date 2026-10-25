@@ -283,6 +283,13 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
       const acc = sanitizeAcceptance(r.acceptance);
       return acc ? { acceptance: acc } : {};
     })(),
+    // Round 2 (R2-A, additive): financial credit notes and the payment-term snapshot.
+    ...(r.note_kind === 'financial' ? { note_kind: 'financial' as const } : {}),
+    ...(typeof r.financial_reason === 'string' && r.financial_reason ? { financial_reason: r.financial_reason as InvoiceRecord['financial_reason'] } : {}),
+    ...(typeof r.financial_account === 'string' && r.financial_account ? { financial_account: r.financial_account } : {}),
+    ...(r.payment_terms && typeof r.payment_terms === 'object' && typeof (r.payment_terms as { name?: unknown }).name === 'string'
+      ? { payment_terms: r.payment_terms as InvoiceRecord['payment_terms'] }
+      : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),
