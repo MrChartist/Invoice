@@ -47,6 +47,8 @@ const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').th
 // approvals, AMC, loyalty) — their own chunk, mounted after first paint.
 const DashboardTiles = lazy(() => import('../components/dashboard/DashboardTiles').then((m) => ({ default: m.DashboardTiles })));
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
+// 8.20: "Backed up 2 h ago ✓ / Not backed up — tap to save" where folder backups cannot run (phones).
+const BackupStatusLine = lazy(() => import('../components/pwa/BackupStatusLine').then((m) => ({ default: m.BackupStatusLine })));
 
 /** "2026-10" → "Oct" / "अक्टू॰" in the interface language (5.4). */
 function monthName(key: string): string {
@@ -140,6 +142,7 @@ export function Dashboard() {
       <Suspense fallback={null}>
         <DemoNotice />
       </Suspense>
+      <Suspense fallback={null}>{can('data.backup') && !('showDirectoryPicker' in window) && <BackupStatusLine />}</Suspense>
 
       {wizardOpen && (
         <Suspense fallback={null}>

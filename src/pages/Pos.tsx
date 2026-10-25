@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Keyboard, Minus, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
+import { History, Keyboard, Minus, Pause, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { NumberInput } from '../components/ui/NumberInput';
@@ -9,6 +9,8 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { ScanField } from '../components/scan/ScanField';
 import { SerialPicker } from '../components/inventory/SerialPicker';
 import { BankAccountSelect } from '../components/bank/BankAccountSelect';
+import { HeldBills } from '../components/pos/HeldBills';
+import { PosTiles } from '../components/pos/PosTiles';
 import { localDb } from '../lib/localDb';
 import { generateId, getTable } from '../lib/storage';
 import { num, round2 } from '../lib/invoice-calc';
@@ -24,6 +26,8 @@ import {
   POS_SHORTCUTS, buildPosRecord, fillRest, posShortcut, savePosBill, tenderSummary,
   type PosAction, type Tender, type TenderMethod,
 } from '../lib/pos';
+import { holdCart, loadHeld, recallCart, saveHeld, type HeldCart } from '../lib/pos-hold';
+import { stockClass } from '../lib/pos-tiles';
 import { redeemOnBill } from '../lib/loyalty';
 import { applyBillOffer } from '../lib/offers';
 import { DOCUMENT_LABELS, type Client, type InvoiceItem, type InvoiceRecord } from '../types/invoice';
@@ -31,6 +35,7 @@ import { cn, formatCurrency, todayInput } from '../lib/utils';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/pos/pos.module.css';
+import counter from '../components/pos/counter.module.css';
 import { useT } from '../i18n';
 import { docLabel as docName } from '../i18n/labels';
 import { posT } from '../i18n/areas/pos';
@@ -45,6 +50,8 @@ const PosReturnModal = lazy(() => import('../components/pos-returns/PosReturnMod
 const ExchangeCredit = lazy(() => import('../components/pos-returns/ExchangeCredit').then((m) => ({ default: m.ExchangeCredit })));
 const LoyaltyRedeem = lazy(() => import('../components/loyalty/LoyaltyRedeem').then((m) => ({ default: m.LoyaltyRedeem })));
 const PosPrinterButton = lazy(() => import('../components/extras7u/PosPrinter').then((m) => ({ default: m.PosPrinterButton }))); // 7U ESC/POS
+// 8.22: customer-facing UPI QR (qrcode.react loads only once a UPI amount is typed).
+const PosUpiQr = lazy(() => import('../components/pos/PosUpiQr').then((m) => ({ default: m.PosUpiQr })));
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 
 interface Party {
@@ -77,6 +84,9 @@ function loadCounter() {
     positions: stock.some((s) => s.track_stock) ? loadPositions() : [],
     units: unitsDb.stored(),
     ctx: editorStockContext({ doc_type: 'INVOICE', issue_date: todayInput() }),
+    // 8.22: quick-item tiles — stock groups and recent POS bills (most sold, when nothing is starred).
+    groups: getTable<{ id: string; name: string; parent_id?: string }>('stock_groups'),
+    posBills: localDb.invoices.getAll().filter((i) => i.pos),
   };
 }
 
@@ -112,6 +122,9 @@ export function Pos() {
   }
   const [exchange, setExchange] = useState<{ id: string; amount: number; number: string } | null>(null);
   const [redeemPts, setRedeemPts] = useState(0);
+  // 8.21: bills on hold (this device, this company).
+  const [held, setHeld] = useState<HeldCart[]>(loadHeld);
+  const [heldOpen, setHeldOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const settings = useMemo(() => localDb.settings.get(), []);
@@ -139,6 +152,16 @@ export function Pos() {
   const credit = exchange ? Math.min(exchange.amount, record.total) : 0;
   const payable = round2(record.total - credit);
   const summary = tenderSummary(payable, tenders);
+  // 8.22: the number this bill will take, for the UPI QR's transaction reference (tr).
+  const upiOn = tender.UPI > 0;
+  const prefix = record.sender?.invoicePrefix;
+  const upiBillNo = useMemo(
+    () => (upiOn ? localDb.invoices.nextNumber(record.issue_date, record.doc_type, prefix || undefined) : ''),
+    [upiOn, record.issue_date, record.doc_type, prefix],
+  );
+  // Stock on hand by item name (tracked items), for red zero / negative stock in search and tiles.
+  const qtyByName = useMemo(() => new Map(data.positions.filter((p) => p.item.track_stock).map((p) => [p.item.name.trim().toLowerCase(), p.qty])), [data.positions]);
+  const qtyOf = useCallback((i: InvoiceItem) => qtyByName.get(i.name.trim().toLowerCase()) ?? null, [qtyByName]);
 
   /* ── Lines ─────────────────────────────────────────────────── */
 
@@ -301,6 +324,76 @@ export function Pos() {
     reset();
   };
 
+  /* ── Hold & recall (8.21) ──────────────────────────────────── */
+
+  const currentCart = (): HeldCart => ({
+    id: generateId(),
+    held_at: new Date().toISOString(),
+    items,
+    client: party.client,
+    name: party.name,
+    phone: party.phone,
+    dispatch,
+    tender,
+    upi_ref: upiRef,
+    total: record.total,
+  });
+
+  const storeHeld = (next: HeldCart[]): boolean => {
+    try {
+      saveHeld(next);
+    } catch (err) {
+      notify(posT('holdFailed', { reason: (err as Error).message }), 'error');
+      return false;
+    }
+    setHeld(next);
+    return true;
+  };
+
+  const hold = () => {
+    if (!items.length) {
+      setErrors([posT('errEmpty')]);
+      return;
+    }
+    const r = holdCart(loadHeld(), currentCart());
+    if (!r.ok) {
+      notify(posT('heldFull'), 'error');
+      setHeldOpen(true);
+      return;
+    }
+    if (!storeHeld(r.list)) return;
+    notify(posT('heldSaved', { n: r.list.length }));
+    reset();
+  };
+
+  const recall = (id: string) => {
+    const r = recallCart(loadHeld(), id);
+    let next = r.list;
+    if (!r.cart) {
+      setHeld(next);
+      return;
+    }
+    // The bill on the counter is parked first, so recalling never loses it (there is room: one just left).
+    const parked = items.length ? holdCart(next, currentCart()) : null;
+    if (parked?.ok) next = parked.list;
+    if (!storeHeld(next)) return;
+    const c = r.cart;
+    const client = c.client ? (data.clients.find((x) => (c.client?.id && x.id === c.client.id) || x.name === c.client?.name) ?? c.client) : null;
+    setItems(c.items);
+    setParty(client ? { client, name: '', phone: '' } : { client: null, name: c.name ?? '', phone: c.phone ?? '' });
+    setDispatch(!!c.dispatch && !!client);
+    setCustomerText('');
+    setTender(c.tender ?? NO_TENDER);
+    setUpiRef(c.upi_ref ?? '');
+    setRedeemPts(0);
+    setErrors([]);
+    setHeldOpen(false);
+    notify(parked?.ok ? `${posT('heldRecalled')}. ${posT('heldReplace')}` : posT('heldRecalled'));
+    setTimeout(() => searchRef.current?.focus(), 0);
+  };
+
+  const drop = (id: string) => storeHeld(loadHeld().filter((c) => c.id !== id));
+
   /* ── Keyboard ──────────────────────────────────────────────── */
 
   const act = (a: PosAction) => {
@@ -310,6 +403,11 @@ export function Pos() {
     else if (a === 'save') save();
     else if (a === 'new') reset();
     else if (a === 'zreport') setZOpen(true);
+    else if (a === 'hold') hold();
+    else if (a === 'held') {
+      setHeld(loadHeld());
+      setHeldOpen(true);
+    }
   };
   const actRef = useRef(act);
   useEffect(() => {
@@ -348,6 +446,12 @@ export function Pos() {
                 <Printer size={16} /> {posT('reprint', { number: lastBill.invoice_number })}
               </button>
             )}
+            <button type="button" className={controls.btnOutline} onClick={hold} disabled={items.length === 0} title="Shift+F8" data-pos-hold>
+              <Pause size={16} /> {posT('hold')}
+            </button>
+            <button type="button" className={controls.btnOutline} onClick={() => act('held')} title="F1" data-pos-held>
+              <History size={16} /> {posT('heldBills')} {held.length > 0 && <span className={counter.badge}>{held.length}</span>}
+            </button>
             <button type="button" className={controls.btnOutline} onClick={() => setRetOpen(true)}>
               <RotateCcw size={16} /> {returnsT('title')}
             </button>
@@ -383,9 +487,10 @@ export function Pos() {
               <ul className={styles.hits} role="listbox" aria-label={posT('matching')}>
                 {hits.map((h, n) => {
                   const lvl = stockOf(h.row);
+                  const cls = stockClass(lvl ? lvl.qty : null);
                   return (
                     <li key={h.row.id} role="option" aria-selected={n === active}>
-                      <button type="button" className={cn(styles.hit, n === active && styles.hitActive)} onMouseDown={(e) => e.preventDefault()} onClick={() => { addSource(h.row); setQuery(''); searchRef.current?.focus(); }}>
+                      <button type="button" className={cn(styles.hit, n === active && styles.hitActive, (cls === 'zero' || cls === 'neg') && counter.noStock)} onMouseDown={(e) => e.preventDefault()} onClick={() => { addSource(h.row); setQuery(''); searchRef.current?.focus(); }}>
                         <span>{h.label}</span>
                         <span className={styles.muted}>{h.sub}{lvl ? posT('inStock', { n: lvl.qty }) : ''}</span>
                       </button>
@@ -466,6 +571,17 @@ export function Pos() {
               })}
             </div>
           )}
+          <PosTiles
+            sources={data.sources}
+            stock={data.stock}
+            groups={data.groups}
+            invoices={data.posBills}
+            qtyOf={qtyOf}
+            onPick={(item) => {
+              addSource(item);
+              searchRef.current?.focus();
+            }}
+          />
         </section>
 
         <aside className={styles.side}>
@@ -542,7 +658,11 @@ export function Pos() {
                   <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => fill(m)}>{posT('rest')}</button>
                 </div>
               ))}
-              {tender.UPI > 0 && <input className={controls.input} value={upiRef} onChange={(e) => setUpiRef(e.target.value)} placeholder={posT('upiPh')} aria-label={posT('upiAria')} />}
+              {tender.UPI > 0 && (
+                <Suspense fallback={<input className={controls.input} value={upiRef} onChange={(e) => setUpiRef(e.target.value)} placeholder={posT('upiPh')} aria-label={posT('upiAria')} />}>
+                  <PosUpiQr vpa={record.sender?.upiId || sender?.upiId} payee={record.sender?.companyName || sender?.companyName} amount={round2(tender.UPI)} billNo={upiBillNo} utr={upiRef} onUtr={setUpiRef} />
+                </Suspense>
+              )}
               {(tender.UPI > 0 || tender.Card > 0) && (
                 <BankAccountSelect id="pos-bank" label={posT('receivedInto')} method={tender.UPI > 0 ? 'UPI' : 'Card'} value={bankId} onChange={setBankId} />
               )}
@@ -598,6 +718,7 @@ export function Pos() {
           save(true);
         }}
       />
+      <HeldBills open={heldOpen} list={held} onClose={() => setHeldOpen(false)} onRecall={recall} onDrop={drop} />
       {zOpen && (
         <Suspense fallback={null}>
           <ZReportModal open={zOpen} onClose={() => setZOpen(false)} notify={notify} />

@@ -21,6 +21,7 @@ import {
   type SnoozeDays,
   type VisibleNotification,
 } from '../../lib/notifications';
+import { BackupStatusLine } from '../pwa/BackupStatusLine';
 import styles from './NotificationBell.module.css';
 
 export interface NotificationBellProps {
@@ -167,7 +168,8 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      // A dialog opened from the panel (Share backup) is portalled outside it: keep the panel open.
+      if (!rootRef.current?.contains(e.target as Node) && !(e.target as Element | null)?.closest?.('[aria-modal="true"]')) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -248,6 +250,8 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
               </button>
             )}
           </div>
+          {/* 8.20: persistent backup line for whoever may back up (owner). */}
+          {can('data.backup') && <BackupStatusLine compact />}
 
           {items.length === 0 ? (
             <div className={styles.empty}>

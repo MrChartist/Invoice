@@ -10,13 +10,20 @@
  *   scripts/gen-precache.mjs), so every route, including lazy chunks never visited online,
  *   works offline after one visit. Without the manifest it falls back to discovering assets
  *   from index.html.
+ * - Share target (8.20 / 8.23): a POST to /share-target (the installed app picked in the phone's share
+ *   sheet) is answered here: each file goes into the `mci-share` cache on this device and the page
+ *   is redirected to /share-target, which reads and clears them (src/lib/share-inbox.ts). Nothing is
+ *   sent anywhere.
  * - Updates: a new worker waits until the page posts {type:'SKIP_WAITING'} (UpdateToast).
  *   BUILD_ID is stamped at build time so sw.js changes bytes on every deploy.
  */
 const BUILD_ID = '__BUILD_ID__';
 const SHELL_CACHE = `mci-shell-${BUILD_ID}`;
 const ASSET_CACHE = 'mci-assets'; // fingerprinted files never collide, so it survives versions
-const KEEP = [SHELL_CACHE, ASSET_CACHE];
+const SHARE_CACHE = 'mci-share'; // files shared into the app, until /share-target reads them
+const KEEP = [SHELL_CACHE, ASSET_CACHE, SHARE_CACHE];
+const MAX_SHARED_FILES = 10;
+const MAX_SHARED_BYTES = 200 * 1024 * 1024;
 const MAX_ASSETS = 160;
 const NAV_TIMEOUT_MS = 3500;
 const SHELL_URL = '/index.html';
@@ -179,11 +186,33 @@ async function staleWhileRevalidate(request, cacheName, max) {
   return (await refresh) || Response.error();
 }
 
+/** Web Share Target: keep the shared files on the device, then open /share-target. */
+async function receiveShare(request) {
+  let n = 0;
+  try {
+    const form = await request.formData();
+    const cache = await caches.open(SHARE_CACHE);
+    for (const old of await cache.keys()) await cache.delete(old);
+    for (const f of form.getAll('file')) {
+      if (n >= MAX_SHARED_FILES || typeof f === 'string' || !f || f.size > MAX_SHARED_BYTES) continue;
+      const headers = { 'content-type': f.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(f.name || 'shared-file') };
+      await cache.put(`/__share/${n}`, new Response(f, { headers }));
+      n++;
+    }
+  } catch {
+    /* unreadable form / storage full: the page says nothing was received */
+  }
+  return Response.redirect(new URL(`/share-target?n=${n}`, self.location.origin).href, 303);
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET' || request.headers.has('range')) return;
-
   const url = new URL(request.url);
+  if (request.method === 'POST' && url.origin === self.location.origin && url.pathname === '/share-target') {
+    event.respondWith(receiveShare(request));
+    return;
+  }
+  if (request.method !== 'GET' || request.headers.has('range')) return;
 
   if (url.origin !== self.location.origin) return; // never touch other origins
   if (url.pathname === '/sw.js' || url.pathname === '/precache-manifest.json') return;

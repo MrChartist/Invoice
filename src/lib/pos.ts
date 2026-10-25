@@ -611,7 +611,7 @@ ${c.note ? `<tr><td colspan="2">${esc(c.note)}</td></tr>` : ''}
 
 /* ── Keyboard ────────────────────────────────────────────────── */
 
-export type PosAction = 'search' | 'cash' | 'upi' | 'card' | 'customer' | 'save' | 'new' | 'zreport';
+export type PosAction = 'search' | 'cash' | 'upi' | 'card' | 'customer' | 'save' | 'new' | 'zreport' | 'hold' | 'held';
 
 /** Counter shortcuts (shown on screen and in docs/features/pos-barcode-pricing.md). */
 export const POS_SHORTCUTS: { keys: string; action: PosAction; label: string }[] = [
@@ -623,12 +623,16 @@ export const POS_SHORTCUTS: { keys: string; action: PosAction; label: string }[]
   { keys: 'F8', action: 'new', label: 'New bill' },
   { keys: 'F9', action: 'save', label: 'Save & print' },
   { keys: 'F10', action: 'zreport', label: 'Day-end Z report' },
+  // 8.21: park the bill and start a new one; the list of bills on hold (recall).
+  { keys: 'Shift+F8', action: 'hold', label: 'Hold & new bill' },
+  { keys: 'F1', action: 'held', label: 'Bills on hold (recall)' },
 ];
 
 /** The POS action for a key press, or null. Ctrl/⌘+Enter also saves. */
-export function posShortcut(e: { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean }): PosAction | null {
+export function posShortcut(e: { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean }): PosAction | null {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') return 'save';
   if (e.ctrlKey || e.metaKey || e.altKey) return null;
+  if (e.shiftKey && e.key === 'F8') return 'hold';
   return POS_SHORTCUTS.find((s) => s.keys === e.key)?.action ?? null;
 }
 

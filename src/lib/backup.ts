@@ -17,7 +17,7 @@
  * unrelated site data.
  */
 
-import { DB_PREFIX, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
+import { DB_PREFIX, DEVICE_DRAFT_KEYS, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
@@ -65,7 +65,7 @@ const LOCAL_ONLY = new Set<string>(DEVICE_LOCAL_KEYS);
  * Never exported, restored or kept in the undo copy, but removed by a wipe (unlike LOCAL_ONLY): folder-sync
  * bookkeeping describes what this device last exchanged with the sync folder (docs/features/sync.md).
  */
-const NOT_BACKED_UP = new Set<string>(SYNC_META_KEYS);
+const NOT_BACKED_UP = new Set<string>([...SYNC_META_KEYS, ...DEVICE_DRAFT_KEYS]); // + POS bills on hold (8.21)
 const leaveOut = (key: string) => LOCAL_ONLY.has(key) || NOT_BACKED_UP.has(key);
 
 export interface BackupFile {

@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
 import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { GstinInput } from '../ui/GstinInput';
+import { ContactPickButton } from './ContactPickButton';
 import { INDIAN_STATES, resolveStateCode, stateByCode } from '../../lib/india-states';
 import { checkGstin } from '../../lib/gstin';
 import { localDb } from '../../lib/localDb';
@@ -129,6 +130,20 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           <p className={controls.error} role="alert" ref={(el) => el?.scrollIntoView?.({ block: 'nearest' })}>
             {error}
           </p>
+        )}
+        {!client && (
+          // 8.24: Android Chrome — fill name / phone / e-mail / address from the phone's contacts (blank fields only).
+          <ContactPickButton
+            onPick={(c) => setForm((f) => ({
+              ...f,
+              name: f.name || c.name,
+              phone: f.phone || c.phone,
+              email: f.email || c.email,
+              address: f.address || c.address,
+              city: f.city || c.city || '',
+              zip: f.zip || c.zip || '',
+            }))}
+          />
         )}
         <div className={controls.row}>
           <label className={controls.field}>

@@ -126,6 +126,9 @@ Optional, Settings → Security → **Vault mode**. Protects the stored data its
   sealed (`mcv1:`) values are still in the store (`initStorage` → `unavailable`, `vaultDamaged`): the app never boots
   in plain mode over sealed data. Turning the vault off removes sealed values that never decrypted, so it cannot
   leave such orphans behind.
+- **Phone share (8.20).** "Share backup" follows the same rule: encrypted with the backup key or a typed passphrase;
+  a readable file only on explicit request and never while the vault is on (`shareBackupGate`). POS bills on hold
+  (`DEVICE_DRAFT_KEYS`) live in the data store, so they are sealed too, and are never backed up or synced.
 - **Owner only.** `enableVault`, `disableVault` and `changeVaultPassphrase` call `requireAccess('security.manage')`.
 - **Limits.** Not a defence against malware or someone using the unlocked app; data is decrypted in memory while the
   tab is open. Passphrase attempts are not rate-limited beyond the cost of PBKDF2 (an attacker with a copy of the

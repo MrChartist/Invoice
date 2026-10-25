@@ -261,7 +261,7 @@ export function DataPanel({ notify }: Props) {
             </button>
             )}
           </div>
-          <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+          <input ref={fileInput} type="file" accept="application/json,.json,text/plain,.txt" hidden onChange={(e) => onFile(e.target.files?.[0])} />
           {safety && mayRestore && (
             <div className={styles.actionGrid}>
               <button type="button" className={styles.action} onClick={() => setUndoOpen(true)}>
