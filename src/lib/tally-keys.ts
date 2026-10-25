@@ -86,5 +86,9 @@ export function resolveTallyKey(e: KeyLike, ctx: TallyKeyContext): TallyKey | nu
   if (!hit) return null;
   if (hit.need && ctx.can && !ctx.can(hit.need)) return null;
   if (hit.id !== 'help' && !hit.to) return null;
+  // On the purchase side Ctrl+F9 is Tally's purchase-return Debit Note (WP-3), not the sales debit note.
+  if (hit.id === 'debitNote' && ctx.pathname.startsWith('/expenses')) {
+    return ctx.can && !ctx.can('books.edit') ? null : { ...hit, to: '/expenses?tab=returns&new=dn', need: 'books.edit' };
+  }
   return hit;
 }

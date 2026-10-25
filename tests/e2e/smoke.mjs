@@ -610,6 +610,51 @@ try {
     check(true, 'Esc returns to the Day Book');
   });
 
+  await step('integration: the Gateway reaches Accounts Info, banking documents, ratio analysis and the year-end wizard', async () => {
+    const gateway = async () => {
+      await page.goto(srv.origin + '/gateway');
+      await page.getByTestId('gw-create').waitFor();
+    };
+    await gateway();
+    await page.keyboard.press('o');
+    await page.getByText('Groups, ledgers and opening balances', { exact: false }).first().waitFor();
+    check(/\/books\?tab=coa&m=menu/.test(page.url()), 'O opens Accounts Info (WP-1 masters menu)');
+    await gateway();
+    await page.keyboard.press('n');
+    await page.getByTestId('gw-b-deposit').waitFor();
+    await page.keyboard.press('d');
+    await page.waitForURL(/\/reconcile\?tab=documents&doc=deposit/);
+    await page.getByText('Deposit slip').first().waitFor();
+    check(true, 'Banking → D opens the deposit slip (WP-5)');
+    await gateway();
+    await page.keyboard.press('m');
+    await page.getByTestId('gw-m-ratio').waitFor();
+    await page.keyboard.press('o');
+    await page.getByRole('tab', { name: 'Ratio analysis', selected: true }).waitFor();
+    check(true, 'Display more reports → O opens Ratio analysis');
+    await gateway();
+    await page.keyboard.press('y');
+    const wizard = page.getByRole('dialog', { name: /Start new year/ });
+    await wizard.waitFor();
+    await wizard.getByText('Closing stock', { exact: false }).first().waitFor();
+    check(true, 'Y opens the year-end wizard (WP-7) from the Gateway');
+    await page.keyboard.press('Escape');
+    await wizard.waitFor({ state: 'hidden' });
+    // Phone width: the Tally-parity screens must not scroll the page sideways (tables scroll inside their wrapper).
+    await page.setViewportSize({ width: 360, height: 780 });
+    try {
+      for (const path of ['/gateway', '/books?tab=coa&m=menu', '/reconcile?tab=documents&doc=deposit', '/books?tab=ratio', '/expenses?tab=returns', '/tds', '/gst-reports?tab=setoff', '/manufacturing']) {
+        await page.goto(srv.origin + path);
+        await page.locator('h1').first().waitFor();
+        await page.waitForTimeout(300);
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        check(over <= 1, `${path}: no horizontal page scroll at 360 px (${over} px over)`);
+      }
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
+  });
+
   await step('masters: sub-group under Sundry Debtors, party with a ₹10,000 Dr opening bill, seen in ageing and the trial balance', async () => {
     await page.goto(srv.origin + '/books?tab=coa&m=group-create');
     const gform = page.getByRole('region', { name: 'Group Creation' });

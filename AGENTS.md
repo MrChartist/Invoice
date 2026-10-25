@@ -56,6 +56,16 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   `sync_state` / `sync_conflicts` / `sync_audit` (`SYNC_META_KEYS`: never in a backup, removed by restore/erase).
 - `mrchartist_inv_lang` — device-local interface language (`en` default / `hi`, 5.4); never in backups. UI strings go
   through `t()` / `useT()` (`src/i18n/`, how-to + Hindi glossary in `docs/features/i18n.md`).
+- Phase 7 company data (backed up and synced like every `mrchartist_inv_*` key):
+  `mrchartist_inv_audit_archive_<0001…>` — MCA edit-log archive segments (WP-7, `AUDIT_ARCHIVE_PREFIX` in `audit.ts`;
+  validated on restore, never edited in place); `mrchartist_inv_year_end` — reviewed year-end checklist steps per FY
+  (WP-7); `mrchartist_inv_closing_stock` — report-time closing-stock source `{mode?, opening?, entries}` (WP-2). When
+  valuation is on, closing-stock journals (year-end wizard class "Year-end closing stock") are netted off it in every
+  statement (`loadStockValuer` → `netOfStockJournals`), so stock is never counted twice; use `loadStockValuer()` for
+  any P&L / balance sheet so Books, the Gateway and ratios agree.
+- Device-local viewing preferences, outside the `mrchartist_inv_` prefix (never backed up or synced):
+  `mrchartist_report_prefs` (F12 report options per report) and `mrchartist_report_period` (shared report period,
+  Alt+F2); `mrchartist_tally_terms` (Gateway "Tally terms").
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express

@@ -69,15 +69,15 @@ day-end cash tally. Everything is local: files are generated in the browser, not
 - `vendors`: `bank_account_no`, `bank_ifsc`, `bank_name`, `beneficiary_name`.
 - New tables `deposit_slips`, `cash_tally`: in backups (`RECORD_TABLES` / `ID_TABLES`), clerk+ write (`TABLE_ACTIONS` books.edit).
 
-## Wiring for the lead
-- Banking menu entries → `/reconcile?tab=documents&doc=deposit` · `…&doc=advice` · `…&doc=epay` · `…&doc=cash`
-  (the tab works with no statements imported).
+## Wiring
+- Gateway Banking rows **D / A / E / T** and palette destinations → `/reconcile?tab=documents&doc=deposit` · `…&doc=advice`
+  · `…&doc=epay` · `…&doc=cash` (the tab works with no statements imported). Vendor form: bank account no., IFSC
+  (validated), bank, beneficiary (integration pass).
 - Hot files touched (one line / one hook each): `ledger/postings.ts` (import + `applyBankLedgers` call before `return`),
   `ledger/accounts.ts` (`registerLedgerSource` + `chartOf` merge), `tally-xml.ts` (import, `bankOf` resolver, two 2-line
   call sites), `ledger/vouchers.ts` + `gateway/voucher-entry.ts` (`isCashOrBankLedger` in the cash/bank check),
   `types/purchases.ts` (Vendor fields), `backup.ts`, `access.ts`.
 
 ## Known gaps
-Forex bank ledgers; supplier payments in Tally XML; recording payments back from an e-payment file; vendor-form UI for bank
-details (e-Payments screen only); Gateway / VoucherEditor show bank ledgers through the chart but have no account
+Forex bank ledgers; supplier payments in Tally XML; recording payments back from an e-payment file; Gateway / VoucherEditor show bank ledgers through the chart but have no account
 picker of their own; dashboard per-bank tiles (P1-17).

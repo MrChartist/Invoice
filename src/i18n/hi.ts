@@ -76,6 +76,7 @@ export const hi: Messages = {
   'nav.gstReports': 'GST रिपोर्ट',
   'nav.exports': 'डेटा एक्सपोर्ट',
   'nav.gateway': 'गेटवे',
+  'nav.accountsInfo': 'खाता जानकारी',
   'nav.designStudio': 'डिज़ाइन स्टूडियो',
   'nav.settings': 'सेटिंग्स',
   'nav.groupSales': 'बिक्री',

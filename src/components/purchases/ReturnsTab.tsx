@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, FilePlus2, PackageCheck, PackageX, Pencil, ReceiptText, RotateCcw, Trash2, Undo2, XCircle } from 'lucide-react';
 import type { PurchaseOrder, PurchaseRecord, PurchaseReturn, ReceiptNote, Vendor } from '../../types/purchases';
 import { notesToCsvRows, purchaseReturnsDb } from '../../lib/purchase-returns';
@@ -39,9 +40,13 @@ const GRN_TONE: Record<GrnState, string> = { Pending: 'sent', 'Partly billed': '
 export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCreated, onChanged }: ReturnsTabProps) {
   useT();
   const [version, setVersion] = useState(0);
-  const [section, setSection] = useState<Section>('notes');
-  const [noteKind, setNoteKind] = useState<PurchaseReturn['kind'] | null>(null);
-  const [grnMode, setGrnMode] = useState<GrnModalProps['mode']>(null);
+  // Deep links (Gateway / palette / Ctrl+F9 on the purchase side): `new=dn` opens a debit note,
+  // `new=grn` a receipt note; read once on mount.
+  const [params] = useSearchParams();
+  const deepNew = can('books.edit') ? params.get('new') : null;
+  const [section, setSection] = useState<Section>(deepNew === 'grn' ? 'grn' : 'notes');
+  const [noteKind, setNoteKind] = useState<PurchaseReturn['kind'] | null>(deepNew === 'dn' ? 'DEBIT_NOTE' : null);
+  const [grnMode, setGrnMode] = useState<GrnModalProps['mode']>(deepNew === 'grn' ? { kind: 'GRN' } : null);
   const [deleting, setDeleting] = useState<{ kind: 'note'; row: PurchaseReturn } | { kind: 'receipt'; row: ReceiptNote } | null>(null);
   const [supFor, setSupFor] = useState<PurchaseReturn | null>(null);
   const [asOf, setAsOf] = useState(todayInput());

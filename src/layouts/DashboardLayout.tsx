@@ -10,6 +10,7 @@ import {
   FilePlus2,
   FileSpreadsheet,
   FileText,
+  FolderTree,
   HelpCircle,
   IdCard,
   Keyboard,
@@ -70,7 +71,7 @@ interface NavEntry {
   icon: LucideIcon;
   end?: boolean;
   /** Overrides route matching, e.g. editing an existing invoice belongs under "Invoices". */
-  match?: (pathname: string) => boolean;
+  match?: (pathname: string, search: string) => boolean;
   /** Local roles (6.21): hidden unless the signed-in user may do this. */
   need?: AccessAction;
 }
@@ -100,7 +101,9 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
     title: 'nav.groupAccounts',
     items: [
       { label: 'nav.gateway', path: '/gateway', icon: Keyboard },
-      { label: 'nav.books', path: '/books', icon: BookOpen },
+      // WP-1 "Accounts Info" (masters menu inside Books → Chart of accounts).
+      { label: 'nav.accountsInfo', path: '/books?tab=coa&m=menu', icon: FolderTree, match: (p, s) => p === '/books' && /[?&]m=/.test(s) },
+      { label: 'nav.books', path: '/books', icon: BookOpen, match: (p, s) => p.startsWith('/books') && !/[?&]m=/.test(s) },
       { label: 'nav.reconcile', path: '/reconcile', icon: Landmark, need: 'books.edit' },
       { label: 'nav.cheques', path: '/cheques', icon: Banknote, need: 'books.edit' },
       { label: 'nav.tds', path: '/tds', icon: Percent },
@@ -353,7 +356,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
                   to={item.path}
                   end={item.end}
                   className={({ isActive }) =>
-                    cn(styles.navItem, (item.match ? item.match(location.pathname) : isActive) && styles.navItemActive)
+                    cn(styles.navItem, (item.match ? item.match(location.pathname, location.search) : isActive) && styles.navItemActive)
                   }
                 >
                   <item.icon className={styles.navIcon} size={18} />

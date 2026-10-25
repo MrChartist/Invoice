@@ -48,8 +48,16 @@ A report-time line, never a stored voucher, so `postings.ts` is untouched.
 Statements call `stockChange(stock, end, dayBeforeStart)` → `{opening: value(start − 1) + openings inside, closing: value(end)}`;
 opening stock never becomes profit. Config is stored in **`mrchartist_inv_closing_stock`** (one JSON object
 `{mode?, opening?, entries: [{date, value (paise)}]}`, company data, backed up and synced like every `mrchartist_inv_*`
-key; additive, no migration). Edit it from P&L → **Closing stock**. If you earlier posted closing stock by journal to
-Stock-in-hand, choose **Do not value stock** (or reverse those journals) so it is not counted twice.
+key; additive, no migration). Edit it from P&L → **Closing stock**.
+
+**No double count with closing-stock journals (integration pass).** A journal that books closing stock into
+Stock-in-hand (the year-end wizard's class "Year-end closing stock", or any journal narrated "closing stock" touching
+Stock-in-hand) already carries the stock in the ledger. `loadStockValuer()` therefore returns the valuation **net of
+those journals and their 1 April reversals** (`netOfStockJournals` / `stockJournalPostings`): on any date the report-time
+line is `value(d) − Stock-in-hand carried by those journals`, so P&L, BS, cash flow and ratios hold the stock exactly
+once. P&L and BS show a warning naming the journal with a one-click **Use the journal only (stop valuing stock)**; the
+year-end wizard shows the valued figure and posts no journal while valuation is on (tests:
+`tests/closing-stock-yearend.test.ts`).
 
 ## P0-4: Group Summary and drill-down
 - `groupSummary(ledger, period, groupId | null, {showZero, parties})` → rows (sub-groups, ledgers and, for debtors /
@@ -134,6 +142,6 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
 - Comparative columns: Group Summary and P&L only; TB / BS read one period.
 - Keys: Alt+F2 (period), Alt+F1 and F12 are handled in the capture phase on Books report screens, so they win over the
   global Tally keys (`src/lib/tally-keys.ts`: Alt+F2 → Gateway period, F12 → Settings) there; elsewhere the global keys apply.
-- The Gateway's own Display viewer (`src/lib/gateway/drill.ts`, `DisplayReport.tsx`) predates this engine; pointing it
-  at `DrillStack` + `ReportViews` (and passing `loadStockValuer()` to its BS / P&L calls) is left to the lead.
+- The Gateway Display viewer now builds its BS / P&L from `ledgerBalanceSheet` / `ledgerProfitAndLoss` with
+  `loadStockValuer()` (same figures as Books, tested); it still uses its own frame model rather than `DrillStack`.
 - Closing stock per godown / cost centre and "lower of cost or NRV" are not modelled.

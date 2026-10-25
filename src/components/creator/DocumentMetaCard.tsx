@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo } from 'react';
+import { lazy, Suspense, useDeferredValue, useMemo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,6 +8,7 @@ import { TransportFields } from './TransportFields';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { localDb } from '../../lib/localDb';
+import { getTable } from '../../lib/storage';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
 import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceStatus } from '../../types/invoice';
@@ -17,6 +18,9 @@ import { docLabel, statusLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../../pages/InvoiceCreator.module.css';
+
+// WP-9: branch picker, loaded only once a branch exists (single-location users never download it).
+const BranchSelect = lazy(() => import('../branches/BranchSelect').then((m) => ({ default: m.BranchSelect })));
 
 const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
 const DUE_PRESETS = [0, 7, 15, 30, 45];
@@ -31,7 +35,7 @@ interface Props {
 export function DocumentMetaCard({ editing, saveTick }: Props) {
   const { t } = useT();
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
+    useShallow((st) => pick(st, ['branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
   );
 
   const nextNumber = useMemo(
@@ -49,6 +53,13 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
   );
   const numberTaken = numberCheck && !numberCheck.ok ? numberCheck.clash : undefined;
   const centres = useCostCentres();
+  const hasBranches = useMemo(() => {
+    try {
+      return getTable('branches').length > 0;
+    } catch {
+      return false;
+    }
+  }, []);
 
   return (
     <section className={surface.card}>
@@ -155,6 +166,11 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
           onChange={(v) => s.patch({ cost_centre_id: v })}
           hint={t('meta.costCentreHint')}
         />
+        {hasBranches && (
+          <Suspense fallback={null}>
+            <BranchSelect id="doc-branch" value={s.branch_id} onChange={(v) => s.patch({ branch_id: v })} />
+          </Suspense>
+        )}
         <ForexFields />
         <TransportFields />
       </div>

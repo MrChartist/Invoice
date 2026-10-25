@@ -22,6 +22,12 @@
 
 import type { StockPosition } from '../inventory';
 import { getJson, setJson, DB_PREFIX } from '../storage';
+import type { ManualVoucher } from './vouchers';
+
+/** Voucher class of the year-end wizard's closing-stock journal (re-exported by `year-end.ts`). */
+export const CLOSING_STOCK_CLASS = 'Year-end closing stock';
+/** Stock-in-hand account id (`A.stock` in `accounts.ts`; repeated here to keep this module dependency-free). */
+const STOCK_ACCOUNT = 'stock';
 
 export type ClosingStockMode = 'inventory' | 'manual' | 'none';
 
@@ -47,6 +53,8 @@ export interface StockValuer {
   label: string;
   value(date: string): number;
   openingIn(date: string): number;
+  /** Closing-stock journals this valuation is netted against (`netOfStockJournals`), for a warning. */
+  netted?: readonly StockJournalPosting[];
 }
 
 export const CLOSING_STOCK_KEY = `${DB_PREFIX}closing_stock`;
@@ -158,4 +166,74 @@ export function stockChange(stock: StockValuer | undefined, end: string, dayBefo
   if (!stock) return { opening: 0, closing: 0 };
   const openingsInside = stock.openingIn(end) - stock.openingIn(dayBeforeStart);
   return { opening: stock.value(dayBeforeStart) + openingsInside, closing: stock.value(end) };
+}
+
+/* ── Posted closing-stock journals vs report-time valuation (no double count) ─────────────────── */
+
+export interface StockJournalPosting {
+  /** Manual voucher id of the journal. */
+  id: string;
+  /** Voucher number (`-R` suffix for the automatic reversal). */
+  number: string;
+  /** Day the journal (or its automatic reversal) moves Stock-in-hand. */
+  date: string;
+  /** Debit-positive paise on Stock-in-hand from this entry. */
+  delta: number;
+}
+
+/**
+ * A manual journal that books closing stock into Stock-in-hand: the year-end wizard's class, or any
+ * journal whose narration says "closing stock" and that touches Stock-in-hand.
+ */
+export function isClosingStockJournal(v: Pick<ManualVoucher, 'type' | 'voucher_class' | 'narration' | 'lines'>): boolean {
+  if (v.type !== 'JOURNAL') return false;
+  if (!v.lines.some((l) => l.account_id === STOCK_ACCOUNT)) return false;
+  return v.voucher_class === CLOSING_STOCK_CLASS || /closing\s*stock/i.test(v.narration ?? '');
+}
+
+/**
+ * Stock-in-hand movements of the closing-stock journals that are in the books on `today` (optional /
+ * memo / future post-dated vouchers are not), plus their automatic reversals (`reverse_on`).
+ */
+export function stockJournalPostings(manual: readonly ManualVoucher[], today: string): StockJournalPosting[] {
+  const out: StockJournalPosting[] = [];
+  for (const v of manual) {
+    if (!isClosingStockJournal(v)) continue;
+    if (v.variant === 'MEMO' || v.variant === 'OPTIONAL' || (v.post_dated && v.date > today)) continue;
+    const delta = v.lines.reduce((s, l) => s + (l.account_id === STOCK_ACCOUNT ? l.dr - l.cr : 0), 0);
+    if (!delta) continue;
+    out.push({ id: v.id, number: v.number, date: v.date, delta });
+    if (v.reverse_on && v.reverse_on > v.date) out.push({ id: v.id, number: `${v.number}-R`, date: v.reverse_on, delta: -delta });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Report-time valuation NET of what closing-stock journals already put into Stock-in-hand.
+ *
+ * A journal Dr Stock-in-hand | Cr Purchases on 31 March already carries the closing stock in the
+ * ledger (and its 1 April reversal carries the opening stock as a purchase). Adding the valuation on
+ * top would count the stock twice, so on any date the report-time line is
+ *   value(d) − (Stock-in-hand carried by those journals at the end of d).
+ * Gross profit, the balance sheet and cash flow then hold the valuation exactly once, whichever way
+ * the stock got in. With no such journal the valuer is returned unchanged.
+ */
+export function netOfStockJournals(stock: StockValuer | undefined, postings: readonly StockJournalPosting[]): StockValuer | undefined {
+  if (!stock || !postings.length) return stock;
+  const sorted = [...postings].sort((a, b) => a.date.localeCompare(b.date));
+  const carried = (date: string) => {
+    let s = 0;
+    for (const p of sorted) {
+      if (p.date > date) break;
+      s += p.delta;
+    }
+    return s;
+  };
+  return {
+    mode: stock.mode,
+    label: `${stock.label}, net of closing-stock journals`,
+    value: (date) => stock.value(date) - carried(date),
+    openingIn: (date) => stock.openingIn(date),
+    netted: sorted.filter((p) => p.delta > 0),
+  };
 }

@@ -6,6 +6,7 @@ import { pick } from '../store/pick';
 import { useShallow } from 'zustand/react/shallow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
+import { useHsnDefaultRate } from '../hooks/useHsnDefaultRate';
 import { ItemsTable } from '../components/creator/ItemsTable';
 import { ScanBar } from '../components/creator/ScanBar';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
@@ -50,6 +51,8 @@ const DocumentActions = lazy(() =>
 );
 
 // Unadjusted advances of the client (5.3): the advances maths stays out of the editor chunk.
+// WP-9 maker-checker: banner for a document pending / rejected approval (chunk loads only then).
+const ApprovalBanner = lazy(() => import('../components/approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalBanner })));
 const AdvanceNotice = lazy(() => import('../components/creator/AdvanceNotice').then((m) => ({ default: m.AdvanceNotice })));
 
 // The pickers start closed: they load right after the editor renders, off the first-paint path.
@@ -66,9 +69,10 @@ export function InvoiceCreator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
+  useHsnDefaultRate(); // WP-6: HSN master rate on lines whose HSN is typed
   const { t, lang } = useT();
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['attachments', 'currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'patch', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),
+    useShallow((st) => pick(st, ['approval', 'attachments', 'currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'patch', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),
   );
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -255,6 +259,12 @@ export function InvoiceCreator() {
           <LockBanner docId="" issueDate={s.issue_date} onChange={() => setLockTick((t) => t + 1)} />
         </Suspense>
       ) : null}
+
+      {s.approval && s.approval.state !== 'approved' && (
+        <Suspense fallback={null}>
+          <ApprovalBanner approval={s.approval} />
+        </Suspense>
+      )}
 
       {errors.length > 0 && (
         <div className={styles.errors} role="alert">

@@ -54,7 +54,7 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
     let cache: StockPosition[] | undefined;
     return () => (cache ??= loadStockPositions());
   }, [data, version]);
-  const stock = useMemo(() => loadStockValuer(undefined, positions), [positions]);
+  const stock = useMemo(() => loadStockValuer(undefined, positions, input.manual), [positions, input.manual]);
   const getPositions = useCallback(() => positions(), [positions]);
 
   const openVoucher = (v: LedgerVoucher) => {

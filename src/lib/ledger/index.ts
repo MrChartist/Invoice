@@ -13,9 +13,9 @@ import { loadAssets } from './assets';
 import { loadBooksBegin, loadOpenings } from './openings';
 import { buildLedger, type Ledger, type LedgerInput } from './postings';
 import type { OpeningsInput } from './postings-openings';
-import { loadVouchers } from './vouchers';
+import { loadVouchers, type ManualVoucher } from './vouchers';
 import { loadSettings, loadPositions, type StockPosition } from '../inventory';
-import { loadClosingStockConfig, stockValuerFor, type StockValuer } from './closing-stock';
+import { effectiveMode, loadClosingStockConfig, netOfStockJournals, stockJournalPostings, stockValuerFor, type StockJournalPosting, type StockValuer } from './closing-stock';
 import { loadPayrollPayments, loadRuns } from '../payroll/records';
 
 export * from './accounts';
@@ -62,10 +62,24 @@ export function loadStockPositions(): StockPosition[] {
 
 /**
  * Closing-stock valuer per the company setting (inventory FIFO / weighted average, typed figures, or
- * none). Positions are only computed in inventory mode.
+ * none). Positions are only computed in inventory mode. Closing-stock journals already posted to
+ * Stock-in-hand (year-end wizard, or a typed "closing stock" journal) are netted off, so a statement
+ * never counts the stock twice (`netOfStockJournals`). Every statement screen (Books, Gateway Display,
+ * ratios) must use this one function so they agree.
  */
-export function loadStockValuer(positions?: StockPosition[], lazy?: () => StockPosition[]): StockValuer | undefined {
+export function loadStockValuer(positions?: StockPosition[], lazy?: () => StockPosition[], manual: readonly ManualVoucher[] = loadVouchers()): StockValuer | undefined {
   let cached = positions;
   const get = () => (cached ??= lazy ? lazy() : loadPositions());
-  return stockValuerFor(loadClosingStockConfig(), get, loadSettings().method);
+  const raw = stockValuerFor(loadClosingStockConfig(), get, loadSettings().method);
+  return netOfStockJournals(raw, stockJournalPostings(manual, toIsoDate(new Date())));
+}
+
+/**
+ * Closing-stock journals that overlap report-time valuation (for the warning on P&L / BS and the
+ * year-end wizard). Empty when valuation is off or no such journal is in the books.
+ */
+export function stockJournalConflicts(manual: readonly ManualVoucher[] = loadVouchers(), positions?: () => StockPosition[]): StockJournalPosting[] {
+  const postings = stockJournalPostings(manual, toIsoDate(new Date())).filter((p) => p.delta > 0);
+  if (!postings.length) return [];
+  return effectiveMode(loadClosingStockConfig(), positions ?? (() => loadPositions())) === 'none' ? [] : postings;
 }

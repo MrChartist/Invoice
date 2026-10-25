@@ -79,8 +79,9 @@ Screens are addressed by `MasterScreen` (`src/components/masters/screens.ts`, ti
   `useMasterKeys.ts`. Inside the masters forms, Alt+C on a field marked `data-create` calls `onCreate`.
 - **Keys** (`useMasterKeys`): Enter → next field (Enter on the last field accepts), Ctrl+A accept, Esc back.
 
-Lead wiring suggestions: a nav / Gateway entry "Accounts Info" → `mastersHref('menu')`; the voucher editor's account
-picker can call `useCreateOnTheFly` on Alt+C.
+Wired (integration pass): sidebar item and Gateway root row **O** "Accounts Info" → `mastersHref('menu')`, a palette
+destination, and Alt+C on the Books voucher editor's account pickers (`useCreateOnTheFly`; the chart reloads and a new
+party lands on Debtors / Creditors with its name).
 
 ## APIs for other packages
 

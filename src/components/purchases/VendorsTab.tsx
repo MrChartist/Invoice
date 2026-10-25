@@ -13,6 +13,8 @@ import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
 import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { useT } from '../../i18n';
 import { purT } from '../../i18n/areas/purchases';
+import { wireT } from '../../i18n/areas/wiring';
+import { isValidIfsc } from '../../lib/validators';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -150,8 +152,15 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
   const submit = () => {
     const problem = validateVendor(draft);
     if (problem) return setError(problem);
+    if (draft.bank_ifsc?.trim() && !isValidIfsc(draft.bank_ifsc.trim().toUpperCase())) return setError(wireT('ifscInvalid'));
     try {
-      const saved = vendorsDb.save({ ...draft, id: vendor?.id, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
+      const bank = {
+        bank_account_no: draft.bank_account_no?.replace(/\s+/g, '') || undefined,
+        bank_ifsc: draft.bank_ifsc?.trim().toUpperCase() || undefined,
+        bank_name: draft.bank_name?.trim() || undefined,
+        beneficiary_name: draft.beneficiary_name?.trim() || undefined,
+      };
+      const saved = vendorsDb.save({ ...draft, ...bank, id: vendor?.id, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
       onSaved(vendor ? purT('updated', { name: saved.name }) : purT('added', { name: saved.name }));
       onClose();
     } catch (err) {
@@ -212,6 +221,29 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           <input id="v-udyam" className={controls.input} placeholder="UDYAM-MH-01-0000001" value={draft.msme_udyam ?? ''} onChange={(e) => set({ msme_udyam: e.target.value })} />
         </div>
       </div>
+      <fieldset className={tabStyles.bankSet}>
+        <legend className={controls.label}>{wireT('vendorBank')}</legend>
+        <div className={controls.row}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-bank-ac">{wireT('bankAccountNo')}</label>
+            <input id="v-bank-ac" className={`${controls.input} ${controls.inputMono}`} inputMode="numeric" autoComplete="off" value={draft.bank_account_no ?? ''} onChange={(e) => set({ bank_account_no: e.target.value })} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-bank-ifsc">{wireT('bankIfsc')}</label>
+            <input id="v-bank-ifsc" className={`${controls.input} ${controls.inputMono}`} placeholder="HDFC0001234" maxLength={11} autoComplete="off" value={draft.bank_ifsc ?? ''} onChange={(e) => set({ bank_ifsc: e.target.value.toUpperCase() })} />
+          </div>
+        </div>
+        <div className={controls.row}>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-bank-name">{wireT('bankName')}</label>
+            <input id="v-bank-name" className={controls.input} value={draft.bank_name ?? ''} onChange={(e) => set({ bank_name: e.target.value })} />
+          </div>
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="v-bank-ben">{wireT('beneficiary')}</label>
+            <input id="v-bank-ben" className={controls.input} value={draft.beneficiary_name ?? ''} onChange={(e) => set({ beneficiary_name: e.target.value })} />
+          </div>
+        </div>
+      </fieldset>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="v-addr">{purT('address')}</label>
         <textarea id="v-addr" className={controls.textarea} value={draft.address ?? ''} onChange={(e) => set({ address: e.target.value })} />

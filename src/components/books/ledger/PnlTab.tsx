@@ -26,6 +26,7 @@ import { useDrill, useDrillRows, useReportPrefs } from './drill-hooks';
 import { ReportOptions } from './ReportToolbar';
 import { groupFrame, ledgerFrame } from './report-frames';
 import { ClosingStockDialog } from './ClosingStockDialog';
+import { StockJournalNotice } from './StockJournalNotice';
 import { money } from './format';
 import { PrintTitle, StatementToolbar } from './shared';
 import surface from '../../../styles/surface.module.css';
@@ -215,6 +216,8 @@ function PnlRoot({ ledger, period, stock, onStockChanged, notify }: Props) {
           {compare && ` ${reportsT('prevColumnNote', { from: formatDate(prevPeriod.start), to: formatDate(prevPeriod.end) })}`}
         </span>
       </div>
+
+      <StockJournalNotice stock={stock} onChanged={onStockChanged} notify={notify} />
 
       <div className={surface.statGrid}>
         <div className={surface.stat}>

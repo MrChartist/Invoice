@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { gwT, type GwKey } from '../../i18n/areas/gateway';
 import { useT } from '../../i18n';
 import { toIsoDate } from '../../lib/books';
-import { loadLedger } from '../../lib/ledger';
+import { loadLedger, loadStockValuer } from '../../lib/ledger';
 import { buildFrame, decodePath, encodePath, isReportId, type Cell, type ColKey, type DisplayFrame, type DisplayRow, type ReportId, type Seg } from '../../lib/gateway/drill';
 import { isScreenId } from '../../lib/gateway/menu';
 import { cn, formatDate, formatMoney } from '../../lib/utils';
@@ -72,15 +72,18 @@ export function DisplayReport() {
   const from = params.get('from');
 
   const ledger = useMemo(() => loadLedger(), []);
+  // Same closing-stock-aware statements as Books (only the BS / P&L frames need the valuer).
+  const needsStock = report === 'bs' || report === 'pl';
+  const stock = useMemo(() => (needsStock ? loadStockValuer() : undefined), [needsStock]);
   const today = toIsoDate(new Date());
   // A path that no longer resolves (deleted account …) falls back to its deepest valid frame.
   const frame = useMemo(() => {
     for (let n = path.length; n >= 0; n--) {
-      const f = buildFrame(ledger, report, path.slice(0, n), period, today, { account });
+      const f = buildFrame(ledger, report, path.slice(0, n), period, today, { account, stock });
       if (f) return f;
     }
     return null;
-  }, [ledger, report, path, period, today, account]);
+  }, [ledger, report, path, period, today, account, stock]);
 
   const rows = frame?.rows ?? [];
   const focusable = rows.map((r, i) => (r.heading ? -1 : i)).filter((i) => i >= 0);

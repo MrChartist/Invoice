@@ -122,15 +122,15 @@ unit, SKU, price incl. GST (or + GST), MRP strike-through, stock status for trac
 (`wa.me/<phone>?text=Order: …` from the profile phone, else `mailto:`). The app makes no network call; the file is
 downloaded for sharing / hosting.
 
-## Wiring for the lead (shared files not edited)
+## Wiring
 
-- Editor / preview: mount `ApprovalBanner` (from `components/approvals/ApprovalsPanel`) with `invoice.approval`, and
-  optionally `LoyaltyRedeem` next to the discount field (apply with `redeemOnBill` from `src/lib/loyalty.ts`).
-- Transactions list: show "Pending approval" for `approval.state === 'pending'` and add a branch filter using
-  `matchesBranch(branchOfInvoice(inv, branches), filter)`; purchase list likewise with `branchOfPurchase`.
-- Editor / bill / voucher forms: a branch select writing `branch_id` (optional — inference covers multi-profile users).
-- Notification bell: pending approvals (owner) and `amcReminders`.
-- Command palette: "Return / exchange" → `/pos` with the dialog open.
+Done in the integration pass: `ApprovalBanner` in the invoice editor (lazy, only for pending / rejected documents);
+Transactions "Pending approval" filter (shown while any is pending) and badge; branch select (`BranchSelect`, shown once
+a branch exists) on the invoice editor and the purchase bill form; bell notices for pending approvals (approver only)
+and `amcReminders` (`src/lib/business-alerts.ts`, loaded lazily); palette destination "POS return / exchange" → `/pos`.
+
+Still open: `LoyaltyRedeem` in the editor, branch filter on the Transactions / purchase lists, branch select on manual
+vouchers, opening the POS return dialog straight from the palette.
 
 ## Not built / gaps
 

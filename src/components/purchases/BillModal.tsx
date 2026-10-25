@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { getTable } from '../../lib/storage';
+import type { HsnMasterRow } from '../../lib/hsn-master';
 import type { ImportType, ItcReversalReason, PurchaseRecord, Vendor } from '../../types/purchases';
 import { ITC_REVERSAL_REASONS, PURCHASE_CATEGORIES } from '../../types/purchases';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
@@ -26,6 +28,8 @@ import { MAIN_GODOWN_ID } from '../../types/stock';
 import { useT } from '../../i18n';
 import { purT, purCategory } from '../../i18n/areas/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
+import { BranchSelect } from '../branches/BranchSelect';
+import { EditLogButton } from '../audit/EditLogButton';
 import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
@@ -72,6 +76,26 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [pos, setPos] = useState(init?.place_of_supply ?? businessState);
   const [category, setCategory] = useState(purchase?.category ?? 'Purchases');
   const [lines, setLines] = useState(init?.lines?.length ? init.lines : [blankPurchaseLine()]);
+  // WP-6: a line's GST rate follows the HSN master when its HSN is typed (LineItemsEditor untouched).
+  const hsn = useRef<{ master: HsnMasterRow[]; mod: typeof import('../../lib/hsn-defaults') } | null>(null);
+  useEffect(() => {
+    let live = true;
+    try {
+      if (!getTable('hsn_master').length) return;
+    } catch {
+      return;
+    }
+    void import('../../lib/hsn-defaults').then((mod) => {
+      if (live) hsn.current = { master: mod.loadHsnMaster(), mod };
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const changeLines = (next: typeof lines) => {
+    const h = hsn.current;
+    setLines((prev) => (h ? h.mod.withHsnDefaults(next, h.mod.hsnDefaultPatches(prev, next, h.master, date, 18), false) : next));
+  };
   const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
   const [notes, setNotes] = useState(init?.notes ?? '');
   // WP-8: landed cost (freight, loading …) loads the goods' stock cost only.
@@ -82,6 +106,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const compositionProfile = useMemo(() => localDb.settings.activeProfile()?.gst_scheme === 'composition', []);
   const poId = purchase?.po_id ?? seed?.po_id;
   const [costCentre, setCostCentre] = useState<string | undefined>(purchase?.cost_centre_id);
+  const [branchId, setBranchId] = useState<string | undefined>(purchase?.branch_id);
   const centres = useCostCentres();
   // Advanced GST: reverse charge, imports, ITC reversal, Sec 17(5) blocked credit.
   const [rcm, setRcm] = useState(purchase?.reverse_charge ?? false);
@@ -208,6 +233,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         landed_basis: landed.basis === 'qty' && landed.costs.length ? 'qty' : undefined,
         ...billablePatch(billable),
         cost_centre_id: costCentre,
+        branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
         ...tdsResolved.fields,
       });
@@ -280,9 +306,10 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         </div>
       </div>
       <CostCentreSelect id="bill-cost-centre" label={purT('costCentre')} centres={centres} value={costCentre} onChange={setCostCentre} />
+      <BranchSelect id="bill-branch" value={branchId} onChange={setBranchId} />
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
-      <LineItemsEditor lines={lines} onChange={setLines} stock={stock} />
+      <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} />
       <LandedCostFields value={landed} onChange={setLanded} />
 
       <div className={styles.totals} aria-live="polite">
@@ -399,6 +426,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
+        {purchase && <EditLogButton recordId={purchase.id} name={purchase.bill_number} />}
         <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>
         <button type="submit" className={controls.btnPrimary}>{purchase ? purT('saveChanges') : purT('saveBill')}</button>
       </div>

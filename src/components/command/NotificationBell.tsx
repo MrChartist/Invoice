@@ -2,6 +2,8 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getTable, subscribeStorageChanges } from '../../lib/storage';
+import { readApprovalPolicy } from '../../lib/approval-gate';
+import { can } from '../../lib/access';
 import {
   dismiss,
   loadNotifState,
@@ -57,6 +59,31 @@ function ensureExpiryAlerts(onReady: () => void): void {
     });
 }
 
+/**
+ * Phase 7 notices (pending approvals, AMC reminders, GST set-off due): their provider loads lazily and
+ * only once approvals are on for an approver, an AMC contract exists or the GST set-off screen was used.
+ */
+let businessAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureBusinessAlerts(onReady: () => void): void {
+  if (businessAlerts !== 'off') return;
+  try {
+    const used = getTable('amc_contracts').length > 0 || getTable('gst_setoffs').length > 0 || getTable('gst_challans').length > 0;
+    if (!used && !(readApprovalPolicy().enabled && can('doc.approve'))) return;
+  } catch {
+    return;
+  }
+  businessAlerts = 'loading';
+  import('../../lib/business-alerts')
+    .then((m) => {
+      m.registerBusinessAlerts();
+      businessAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      businessAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -77,13 +104,15 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     } catch {
       setItems([]);
     }
-    ensureExpiryAlerts(() => {
+    const reload = () => {
       try {
         setItems(loadVisibleNotifications(new Date()));
       } catch {
         /* keep what is shown */
       }
-    });
+    };
+    ensureExpiryAlerts(reload);
+    ensureBusinessAlerts(reload);
   }, []);
 
   useEffect(() => {

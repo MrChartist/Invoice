@@ -1,7 +1,8 @@
 /**
  * Display reports with Tally-style drill-down (Phase 7): Balance sheet / P&L / Trial balance group →
  * ledgers of the group → (parties of a control account) → monthly summary → vouchers of the month →
- * the voucher or its document. Built on the ledger statements in src/lib/ledger/reports.ts; pure.
+ * the voucher or its document. Built on the ledger statements in src/lib/ledger/reports.ts (the same
+ * closing-stock-aware P&L / balance sheet as Books when `opts.stock` is passed); pure.
  *
  * A drill path is a list of segments, kept in the URL (`d=g:CASH_BANK/a:bank/m:2026-04`) so the
  * browser's Back and Esc walk up the same path. Amounts are integer paise; a `balance` cell is
@@ -11,15 +12,16 @@ import { fyPeriod, fyStartYearOf, monthLabel, monthsIn, type Period } from '../b
 import {
   GROUPS,
   accountStatement,
-  closingBalances,
   groupOf,
   isGroupId,
+  ledgerBalanceSheet,
   ledgerProfitAndLoss,
   partiesOf,
   trialBalance,
   type GroupId,
   type Ledger,
   type LedgerVoucher,
+  type StockValuer,
 } from '../ledger/index';
 
 export type ReportId = 'bs' | 'pl' | 'tb' | 'groups' | 'daybook' | 'cash' | 'ledgers' | 'acct';
@@ -39,7 +41,19 @@ export interface DisplayColumn {
 export type Cell = string | number | null;
 
 /** Label keys the screen translates (the rest of the text is data: account, group and party names). */
-export type RowLabel = 'liabilities' | 'assets' | 'income' | 'expenses' | 'plRow' | 'netProfit' | 'netLoss' | 'total' | 'openingBalance' | 'noParty';
+export type RowLabel =
+  | 'liabilities'
+  | 'assets'
+  | 'income'
+  | 'expenses'
+  | 'plRow'
+  | 'netProfit'
+  | 'netLoss'
+  | 'total'
+  | 'openingBalance'
+  | 'noParty'
+  | 'closingStockRow'
+  | 'openingStockRow';
 
 export interface DisplayRow {
   id: string;
@@ -103,14 +117,6 @@ export function isReportId(v: unknown): v is ReportId {
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
-const isPnlGroup = (g: GroupId) => {
-  const n = groupOf(g).nature;
-  return n === 'income' || n === 'expense';
-};
-const isCreditSide = (g: GroupId) => {
-  const n = groupOf(g).nature;
-  return n === 'liability' || n === 'equity' || n === 'income';
-};
 const CONTROL = new Set<GroupId>(['TRADE_RECEIVABLES', 'TRADE_PAYABLES']);
 
 /** The window every frame of a report uses. The balance sheet works FY-to-date up to "as at" (capped at today). */
@@ -142,45 +148,56 @@ const BAL_COLS: DisplayColumn[] = [
   { key: 'closing', kind: 'balance' },
 ];
 
-function balanceSheetFrame(ledger: Ledger, period: Period, asOf: string): DisplayFrame {
-  const bal = closingBalances(ledger, asOf);
-  const byGroup = new Map<GroupId, number>();
-  let profit = 0;
-  for (const a of ledger.accounts) {
-    const b = bal.get(a.id) ?? 0;
-    if (isPnlGroup(a.group)) profit -= b;
-    else if (b) byGroup.set(a.group, (byGroup.get(a.group) ?? 0) + b);
-  }
+/**
+ * Balance sheet root: the SAME statement as Books → Balance sheet (`ledgerBalanceSheet` with the
+ * closing-stock valuer from `loadStockValuer()`), laid out Tally-style: one row per head (drills into
+ * its group), the year's result as the "Profit & loss A/c" row, and the report-time stock lines
+ * (closing stock under assets, opening stock in capital) as their own rows that open the stock summary.
+ * Totals therefore equal Books by construction.
+ */
+function balanceSheetFrame(ledger: Ledger, period: Period, asOf: string, stock?: StockValuer): DisplayFrame {
+  const bs = ledgerBalanceSheet(ledger, asOf, stock);
   const rows: DisplayRow[] = [];
-  let liab = 0;
-  let assets = 0;
+  const split = new Set<string>(['RESERVES', 'CAPITAL', 'INVENTORIES']);
+  const side = (sections: typeof bs.assets, liabilities: boolean) => {
+    for (const sec of sections) {
+      for (const it of sec.items) {
+        let amount = it.amount;
+        if (liabilities && it.groupId === 'RESERVES') amount -= bs.profitForYear;
+        if (liabilities && it.groupId === 'CAPITAL') amount -= bs.openingStock;
+        if (!liabilities && it.groupId === 'INVENTORIES') amount -= bs.closingStock;
+        if (amount || !split.has(it.groupId ?? '')) {
+          const drill: Seg | undefined = it.groupId && isGroupId(it.groupId) ? { t: 'g', v: it.groupId } : undefined;
+          rows.push({ id: `g-${it.groupId ?? it.label}`, label: it.label, cells: [amount], level: 1, ...(drill ? { drill } : {}) });
+        }
+        if (liabilities && it.groupId === 'CAPITAL' && bs.openingStock) {
+          rows.push({ id: 'stock-open', label: { key: 'openingStockRow' }, cells: [bs.openingStock], level: 1, open: '/inventory' });
+        }
+        if (!liabilities && it.groupId === 'INVENTORIES' && bs.closingStock) {
+          rows.push({ id: 'stock-close', label: { key: 'closingStockRow' }, cells: [bs.closingStock], level: 1, open: '/inventory' });
+        }
+      }
+    }
+  };
   rows.push({ id: 'h-liab', label: { key: 'liabilities' }, cells: [null], level: 0, heading: true });
-  for (const g of GROUPS) {
-    if (!isCreditSide(g.id) || isPnlGroup(g.id) || !byGroup.has(g.id)) continue;
-    const amt = -(byGroup.get(g.id) ?? 0);
-    liab += amt;
-    rows.push({ id: `g-${g.id}`, label: g.label, cells: [amt], level: 1, drill: { t: 'g', v: g.id } });
-  }
-  liab += profit;
-  rows.push({ id: 'pl', label: { key: 'plRow' }, cells: [profit], level: 1, drill: { t: 'pl' } });
-  rows.push({ id: 't-liab', label: { key: 'total' }, cells: [liab], level: 0, heading: true });
+  side(bs.equityAndLiabilities, true);
+  rows.push({ id: 'pl', label: { key: 'plRow' }, cells: [bs.profitForYear], level: 1, drill: { t: 'pl' } });
+  rows.push({ id: 't-liab', label: { key: 'total' }, cells: [bs.totalEquityAndLiabilities], level: 0, heading: true });
   rows.push({ id: 'h-assets', label: { key: 'assets' }, cells: [null], level: 0, heading: true });
-  for (const g of GROUPS) {
-    if (isCreditSide(g.id) || isPnlGroup(g.id) || !byGroup.has(g.id)) continue;
-    const amt = byGroup.get(g.id) ?? 0;
-    assets += amt;
-    rows.push({ id: `g-${g.id}`, label: g.label, cells: [amt], level: 1, drill: { t: 'g', v: g.id } });
-  }
-  rows.push({ id: 't-assets', label: { key: 'total' }, cells: [assets], level: 0, heading: true });
+  side(bs.assets, false);
+  rows.push({ id: 't-assets', label: { key: 'total' }, cells: [bs.totalAssets], level: 0, heading: true });
   return { title: { report: 'bs' }, period, asOf, columns: [{ key: 'particulars', kind: 'text' }, { key: 'amount', kind: 'amount' }], rows };
 }
 
-function profitLossFrame(ledger: Ledger, period: Period, root: boolean): DisplayFrame {
-  const pl = ledgerProfitAndLoss(ledger, period);
+/** P&L: the same `ledgerProfitAndLoss` (with the stock valuer) as Books; stock lines open the stock summary. */
+function profitLossFrame(ledger: Ledger, period: Period, root: boolean, stock?: StockValuer): DisplayFrame {
+  const pl = ledgerProfitAndLoss(ledger, period, stock);
   const rows: DisplayRow[] = [];
   rows.push({ id: 'h-inc', label: { key: 'income' }, cells: [null], level: 0, heading: true });
   for (const s of pl.income) rows.push({ id: `g-${s.group}`, label: s.label, cells: [s.total], level: 1, drill: { t: 'g', v: s.group } });
+  if (pl.trading.closingStock) rows.push({ id: 'stock-close', label: { key: 'closingStockRow' }, cells: [pl.trading.closingStock], level: 1, open: '/inventory' });
   rows.push({ id: 'h-exp', label: { key: 'expenses' }, cells: [null], level: 0, heading: true });
+  if (pl.trading.openingStock) rows.push({ id: 'stock-open', label: { key: 'openingStockRow' }, cells: [pl.trading.openingStock], level: 1, open: '/inventory' });
   for (const s of pl.expenses) rows.push({ id: `g-${s.group}`, label: s.label, cells: [s.total], level: 1, drill: { t: 'g', v: s.group } });
   rows.push({ id: 'net', label: { key: pl.netProfit >= 0 ? 'netProfit' : 'netLoss' }, cells: [Math.abs(pl.netProfit)], level: 0, heading: true });
   return {
@@ -352,6 +369,11 @@ const min = (a: string, b: string) => (a < b ? a : b);
 export interface FrameOptions {
   /** `acct` report: the account it opens on (e.g. `debtors` for receivables outstandings). */
   account?: string;
+  /**
+   * Closing-stock valuer for the balance sheet / P&L frames: pass `loadStockValuer()` so the Gateway
+   * shows exactly the Books statements (absent = stock not valued).
+   */
+  stock?: StockValuer;
 }
 
 /**
@@ -368,9 +390,9 @@ export function buildFrame(ledger: Ledger, report: ReportId, path: readonly Seg[
   if (!path.length) {
     switch (report) {
       case 'bs':
-        return balanceSheetFrame(ledger, p, eff.asOf ?? p.end);
+        return balanceSheetFrame(ledger, p, eff.asOf ?? p.end, opts.stock);
       case 'pl':
-        return profitLossFrame(ledger, p, true);
+        return profitLossFrame(ledger, p, true, opts.stock);
       case 'tb':
       case 'groups':
         return groupsFrame(ledger, p, report);
@@ -392,7 +414,7 @@ export function buildFrame(ledger: Ledger, report: ReportId, path: readonly Seg[
     const s = steps[i];
     const lastStep = i === steps.length - 1;
     if (s.t === 'pl') {
-      frame = lastStep ? profitLossFrame(ledger, p, false) : null;
+      frame = lastStep ? profitLossFrame(ledger, p, false, opts.stock) : null;
       continue;
     }
     if (s.t === 'g') {
