@@ -611,7 +611,8 @@ try {
   });
 
   await step('branch-wise books: a voucher tagged to a branch; Books TB, Gateway TB and Transactions filter by branch (P1-19)', async () => {
-    await writeJson(page, 'branches', [{ id: 'br-e2e', name: 'Pune branch', code: 'PUN', state_code: '27' }]);
+    // No state / GSTIN / profile: nothing is inferred to it, so only the tagged voucher belongs to the branch.
+    await writeJson(page, 'branches', [{ id: 'br-e2e', name: 'Pune branch', code: 'PUN' }]);
     await page.goto(srv.origin + '/books?tab=vch');
     await page.getByRole('button', { name: 'New voucher' }).click();
     const dlg = page.getByRole('dialog', { name: 'New voucher' });
@@ -631,12 +632,14 @@ try {
     await page.getByText('Branch view:', { exact: false }).first().waitFor();
     await page.getByText('Debits = credits').waitFor();
     const rentRow = page.getByRole('row', { name: /Rent/ }).first();
-    check(/777\.00/.test(await rentRow.innerText()) && !/2,?011/.test(await rentRow.innerText()), 'Books trial balance for the branch shows only its ₹777 rent');
+    const rentText = await rentRow.innerText();
+    check(/777\.00/.test(rentText) && !/1,234|2,734|1,500/.test(rentText), `Books trial balance for the branch shows only its ₹777 rent (${rentText.replace(/\s+/g, ' ')})`);
     await page.goto(srv.origin + '/gateway/display?r=tb&b=br-e2e');
     await page.getByRole('heading', { name: 'Trial balance' }).waitFor();
     check((await page.getByTestId('gw-branch').inputValue()) === 'br-e2e', 'the Gateway trial balance keeps the branch from the URL');
     await page.getByTestId('gw-row-g-INDIRECT_EXPENSES').waitFor();
-    check(/777\.00/.test(await page.getByTestId('gw-row-g-INDIRECT_EXPENSES').innerText()), 'Gateway branch TB: indirect expenses = the branch voucher');
+    const gwText = await page.getByTestId('gw-row-g-INDIRECT_EXPENSES').innerText();
+    check(/777\.00/.test(gwText), `Gateway branch TB: indirect expenses = the branch voucher (${gwText.replace(/\s+/g, ' ')})`);
     await page.goto(srv.origin + '/transactions');
     await page.getByTestId('tx-branch').waitFor();
     await page.locator('tbody tr').first().waitFor();
