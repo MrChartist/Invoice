@@ -22,7 +22,7 @@ reports Tally users expect. Stock only: nothing here posts to Books or the doubl
 | `stock_journals` | `books.edit` | `SJ/FY<yy-yy>/<seq>` |
 | `physical_stock` | `books.edit` | `PHY/FY<yy-yy>/<seq>` |
 
-Numbers follow the Indian FY of the voucher date, highest issued + 1 (same rule as STR transfers). Every save / delete
+Numbers follow the Indian FY of the voucher date and the `series_counters` high-water mark (as for STR / PO): a deleted latest number is never issued again, and an edit that moves the date into another FY takes that FY's next number. Every save / delete
 checks the period lock (PIN override is tagged in the audit row) and writes an audit entry (`bom`, `manufacturing`,
 `stock_journal`, `physical_stock`). Stock item additions: `min_order_qty`, `reorder_by_godown` (optional, additive).
 
@@ -106,4 +106,6 @@ A WIP / stock-in-hand posting arrives with the closing-stock work in `docs/GAP_A
 - Job work out / in (Tally job work vouchers, material sent / received, ITC-04) — not built.
 - Serial-tracked items cannot be consumed or produced by vouchers (use stock adjustments).
 - Ageing bucket labels come from the lib in English.
+- Deleting a stock item does not yet check BOMs / vouchers that use it (their lines for that item are then ignored);
+  godown deletion does check them (`godownReferences`).
 - No production plan / material requirement report yet; no "kit" sale that consumes components automatically.

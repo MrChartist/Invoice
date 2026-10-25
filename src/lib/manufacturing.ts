@@ -31,6 +31,7 @@ import { generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
 import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
+import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 
 export const BOMS_TABLE = VOUCHER_TABLES.boms;
 export const MFG_TABLE = VOUCHER_TABLES.manufacturing;
@@ -45,7 +46,7 @@ const roundQty = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 |
 
 /* ── Numbering ────────────────────────────────────────────────── */
 
-/** Next `<prefix>/FY<yy-yy>/<seq>` for a voucher dated `date` (highest issued + 1, as for STR transfers). */
+/** Next `<prefix>/FY<yy-yy>/<seq>` from existing numbers alone (pure). Storage adds the series high-water mark. */
 export function nextVoucherNumber(prefix: string, existing: readonly string[], date?: string): string {
   const fy = getIndianFY(date).label;
   return buildInvoiceNumber(prefix, fy, highestSequence([...existing], prefix, fy) + 1);
@@ -434,12 +435,16 @@ function saveVoucher<T extends { id: string; number: string; date: string; creat
   const rows = getTable<T>(table);
   const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
   if (existing) assertUnlocked(lockOf(existing), 'edit');
-  const number = (input.number ?? '').trim() || existing?.number || nextVoucherNumber(prefix, rows.map((r) => r.number), input.date);
+  // A deleted latest number is never reissued (series high-water mark); an edit that moves the date into
+  // another FY takes a number from that FY's series.
+  const kept = (input.number ?? '').trim() || existing?.number || '';
+  const number = kept && numberFitsFy(kept, input.date) ? kept : nextSeriesNumberFor(prefix, input.date, rows.map((r) => r.number));
   const id = existing?.id ?? input.id ?? generateId();
   const state = assertUnlocked(lockOf({ id, date: input.date, number }), existing ? 'edit' : 'create');
   if (rows.some((r) => r.id !== id && r.number.toUpperCase() === number.toUpperCase())) throw new Error(`${label} number ${number} is already used.`);
   const record = { ...existing, ...input, id, number, created_at: existing?.created_at ?? now(), updated_at: now() } as T;
   setTable(table, existing ? rows.map((r) => (r.id === id ? record : r)) : [...rows, record]);
+  recordSeries(number);
   audit.record({
     entity, entity_id: id, action: existing ? 'update' : 'create', doc_number: number,
     summary: `${existing ? 'Edited' : 'Created'} ${label.toLowerCase()} ${number}: ${describe(record)}${tag(state)}`,
@@ -462,7 +467,7 @@ function removeVoucher<T extends { id: string; number: string; date: string }>(
 export const manufacturingDb = {
   all: (): ManufacturingVoucher[] => getTable<ManufacturingVoucher>(MFG_TABLE),
   get: (id: string) => manufacturingDb.all().find((v) => v.id === id),
-  nextNumber: (date?: string) => nextVoucherNumber(MFG_PREFIX, manufacturingDb.all().map((v) => v.number), date),
+  nextNumber: (date?: string) => nextSeriesNumberFor(MFG_PREFIX, date, manufacturingDb.all().map((v) => v.number)),
 
   /** Validates, snapshots the cost roll-up on live stock, saves (period lock, audit). */
   save(input: Omit<ManufacturingVoucher, 'id' | 'number'> & { id?: string; number?: string }, items: readonly StockItem[], inputs?: StockInputs): ManufacturingVoucher {
@@ -488,7 +493,7 @@ export const manufacturingDb = {
 
 export const stockJournalsDb = {
   all: (): StockJournal[] => getTable<StockJournal>(SJ_TABLE),
-  nextNumber: (date?: string) => nextVoucherNumber(SJ_PREFIX, stockJournalsDb.all().map((v) => v.number), date),
+  nextNumber: (date?: string) => nextSeriesNumberFor(SJ_PREFIX, date, stockJournalsDb.all().map((v) => v.number)),
 
   save(input: Omit<StockJournal, 'id' | 'number'> & { id?: string; number?: string }, items: readonly StockItem[], inputs?: StockInputs): StockJournal {
     const err = validateStockJournal(input, items);
@@ -512,7 +517,7 @@ export const stockJournalsDb = {
 
 export const physicalStockDb = {
   all: (): PhysicalStockVoucher[] => getTable<PhysicalStockVoucher>(PHYSICAL_TABLE),
-  nextNumber: (date?: string) => nextVoucherNumber(PHYSICAL_PREFIX, physicalStockDb.all().map((v) => v.number), date),
+  nextNumber: (date?: string) => nextSeriesNumberFor(PHYSICAL_PREFIX, date, physicalStockDb.all().map((v) => v.number)),
 
   /** Computes book quantity and difference on live stock for the date, then saves. */
   save(

@@ -92,6 +92,13 @@ export function godownReferences(
     transfers?: readonly Pick<StockTransfer, 'from_godown' | 'to_godown'>[];
     recurring?: readonly { template?: { items?: readonly { godown_id?: string }[] } }[];
     defaultGodown?: string;
+    /** Phase 7: BOMs, manufacturing journals, stock journals, physical stock counts. */
+    boms?: readonly { components?: readonly { godown_id?: string }[]; outputs?: readonly { godown_id?: string }[] }[];
+    stockVouchers?: readonly {
+      godown_id?: string;
+      components?: readonly { godown_id?: string }[]; outputs?: readonly { godown_id?: string }[];
+      consume?: readonly { godown_id?: string }[]; produce?: readonly { godown_id?: string }[]; lines?: readonly { godown_id?: string }[];
+    }[];
   },
 ): string[] {
   const out: string[] = [];
@@ -101,6 +108,10 @@ export function godownReferences(
   if ((t.invoices ?? []).some((d) => lines(d?.items))) out.push('documents (including drafts, quotations and cancelled ones)');
   if ((t.transfers ?? []).some((x) => x?.from_godown === id || x?.to_godown === id)) out.push('stock transfers');
   if ((t.recurring ?? []).some((r) => lines(r?.template?.items))) out.push('recurring templates');
+  if ((t.boms ?? []).some((b) => lines(b?.components) || lines(b?.outputs))) out.push('bills of materials');
+  if ((t.stockVouchers ?? []).some((v) => v?.godown_id === id || lines(v?.components) || lines(v?.outputs) || lines(v?.consume) || lines(v?.produce) || lines(v?.lines))) {
+    out.push('manufacturing / stock journals or physical stock counts');
+  }
   if (t.defaultGodown === id) out.push('the default-godown setting');
   return out;
 }
@@ -120,6 +131,8 @@ export function liveGodownReferences(id: string): string[] {
     transfers: getTable<StockTransfer>(TRANSFERS_TABLE),
     recurring: getTable('recurring'),
     defaultGodown,
+    boms: getTable('boms'),
+    stockVouchers: [...getTable<{ godown_id?: string }>('manufacturing_vouchers'), ...getTable<{ godown_id?: string }>('stock_journals'), ...getTable<{ godown_id?: string }>('physical_stock')],
   });
 }
 

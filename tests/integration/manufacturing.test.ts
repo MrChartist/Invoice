@@ -67,11 +67,9 @@ test('BOM → manufacture 2 units: finished +2, components reduced, cost snapsho
   // Deleting the voucher reverses its stock effect.
   manufacturingDb.remove(v.id);
   assert.equal(loadPositions().find((p) => p.item.id === 'chair')!.qty, 0);
-  // Highest issued + 1 (same rule as STR transfers): only the last number can come back after a delete.
-  const v2 = make('2026-05-11', 1);
-  make('2026-05-12', 1);
-  manufacturingDb.remove(v2.id);
-  assert.equal(manufacturingDb.nextNumber('2026-05-12'), 'MFG/FY26-27/0003');
+  // Series high-water mark (as for STR / PO): a deleted latest number is never issued again.
+  assert.equal(manufacturingDb.nextNumber('2026-05-12'), 'MFG/FY26-27/0002');
+  assert.equal(make('2026-05-12', 1).number, 'MFG/FY26-27/0002');
 });
 
 test('numbering across the financial year and the period lock', () => {
@@ -141,4 +139,11 @@ test('manufacturing never posts to the double-entry ledger; the trial balance st
   const tb = trialBalance(after, { start: '2026-04-01', end: '2027-03-31' });
   assert.equal(tb.totals.debit, tb.totals.credit);
   assert.equal(tb.totals.closingDr, tb.totals.closingCr);
+});
+
+test('a godown used by a voucher or BOM cannot be deleted', async () => {
+  const { godownReferences } = await import('../../src/lib/godowns.ts');
+  assert.deepEqual(godownReferences('g2', { boms: [{ components: [{ godown_id: 'g2' }] }] }), ['bills of materials']);
+  assert.deepEqual(godownReferences('g2', { stockVouchers: [{ godown_id: 'g2' }] }), ['manufacturing / stock journals or physical stock counts']);
+  assert.deepEqual(godownReferences('g2', { stockVouchers: [{ lines: [{ godown_id: 'g3' }] }] }), []);
 });
