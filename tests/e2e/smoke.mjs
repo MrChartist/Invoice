@@ -175,6 +175,9 @@ try {
     });
     check(stored === 'hi' && fontOk, `the choice is kept on this device (${stored}) and the self-hosted Devanagari font loads (${fontOk})`);
     await page.goto(srv.origin + '/settings');
+    // Round 2 area catalogues: the Settings tabs follow the language too.
+    await page.getByRole('tab', { name: 'डेटा और बैकअप' }).waitFor();
+    check(true, 'Settings tabs are in Hindi (डेटा और बैकअप)');
     await page.getByLabel('Language / भाषा').first().selectOption('en');
     await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');

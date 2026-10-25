@@ -21,6 +21,8 @@ import { buildItemIndex, loadSettings, stockDb } from '../../lib/inventory';
 import { billTrackingIssues, liveTrackingInputs } from '../../lib/stock-tracking';
 import { godownsDb } from '../../lib/godowns';
 import { MAIN_GODOWN_ID } from '../../types/stock';
+import { useT } from '../../i18n';
+import { purT, purCategory } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -40,14 +42,15 @@ export interface BillModalProps {
 
 /** Supplier bill with line items, GST split by place of supply, and ITC flag. */
 export function BillModal({ open, onClose, purchase, seed, ...rest }: BillModalProps) {
+  useT(); // re-render on a language switch (5.4)
   // Re-mount the form per bill so state initialises from props without effects.
   return (
     <Modal
       open={open}
       onClose={onClose}
       size="xl"
-      title={purchase ? 'Edit purchase bill' : 'Add purchase bill'}
-      subtitle={seed && !purchase ? 'Pre-filled with what is still to be received on the purchase order — adjust to match the supplier bill.' : 'Record a supplier bill. GST is split automatically by place of supply.'}
+      title={purchase ? purT('billEditTitle') : purT('billAddTitle')}
+      subtitle={seed && !purchase ? purT('billSeedSub') : purT('billSub')}
     >
       <BillForm key={purchase?.id ?? (seed ? `po-${seed.po_id}` : 'new')} purchase={purchase ?? undefined} seed={purchase ? undefined : seed ?? undefined} onClose={onClose} {...rest} />
     </Modal>
@@ -118,18 +121,18 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total });
 
   const submit = () => {
-    if (!vendor && !init?.vendor_name) return setError('Choose or create a vendor.');
-    if (!billNumber.trim()) return setError("Enter the supplier's bill number.");
-    if (!date) return setError('Choose the bill date.');
-    if (dueDate && dueDate < date) return setError('Due date cannot be before the bill date.');
+    if (!vendor && !init?.vendor_name) return setError(purT('errVendor'));
+    if (!billNumber.trim()) return setError(purT('errBillNo'));
+    if (!date) return setError(purT('errBillDate'));
+    if (dueDate && dueDate < date) return setError(purT('errDueBefore'));
     const real = lines.filter((l) => l.name.trim() || l.rate > 0);
-    if (real.length === 0 || real.some((l) => !l.name.trim())) return setError('Every line needs an item name.');
-    if (totals.total <= 0) return setError('The bill total must be greater than zero.');
-    if (importType === 'GOODS' && !boeNumber.trim()) return setError('Enter the Bill of Entry number for an import of goods.');
-    if (portCode.trim() && !/^[A-Z0-9]{6}$/i.test(portCode.trim())) return setError('Port code is 6 letters / digits, e.g. INNSA1.');
-    if (reversed < 0 || reversed > totals.tax + 0.004) return setError('ITC reversed cannot exceed the GST on the bill.');
+    if (real.length === 0 || real.some((l) => !l.name.trim())) return setError(purT('errLineName'));
+    if (totals.total <= 0) return setError(purT('errBillTotal'));
+    if (importType === 'GOODS' && !boeNumber.trim()) return setError(purT('errBoe'));
+    if (portCode.trim() && !/^[A-Z0-9]{6}$/i.test(portCode.trim())) return setError(purT('errPort'));
+    if (reversed < 0 || reversed > totals.tax + 0.004) return setError(purT('errReversed'));
     if (purchase && supplierPayable < purchase.amount_paid) {
-      return setError(`The amount payable to the supplier cannot drop below the ${formatCurrency(purchase.amount_paid)} already paid.`);
+      return setError(purT('errPayableBelowPaid', { amount: formatCurrency(purchase.amount_paid) }));
     }
     let saveLines = real;
     if (stock) {
@@ -174,7 +177,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
       });
-      onSaved(purchase ? 'Bill updated' : `Bill ${billNumber.trim()} saved`);
+      onSaved(purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -205,49 +208,49 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <div className={controls.row3}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="bill-no">Bill number</label>
+          <label className={controls.label} htmlFor="bill-no">{purT('billNumber')}</label>
           <input id="bill-no" className={controls.input} value={billNumber} onChange={(e) => setBillNumber(e.target.value)} />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="bill-date">Bill date</label>
+          <label className={controls.label} htmlFor="bill-date">{purT('billDate')}</label>
           <input id="bill-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="bill-due">Due date</label>
+          <label className={controls.label} htmlFor="bill-due">{purT('dueDate')}</label>
           <input id="bill-due" type="date" className={controls.input} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </div>
       </div>
 
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="bill-pos">Place of supply</label>
+          <label className={controls.label} htmlFor="bill-pos">{purT('placeOfSupply')}</label>
           <select id="bill-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
-            <option value="">Not specified</option>
+            <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
             ))}
           </select>
           <span className={controls.hint}>
-            {interState ? 'Inter-state: IGST applies.' : 'Intra-state: CGST + SGST apply.'}
-            {!businessState && ' Set your GSTIN in Settings to detect this accurately.'}
+            {interState ? purT('interState') : purT('intraState')}
+            {!businessState && purT('setGstinHint')}
           </span>
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="bill-cat">Category</label>
+          <label className={controls.label} htmlFor="bill-cat">{purT('category')}</label>
           <select id="bill-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
             {PURCHASE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c}>{purCategory(c)}</option>
             ))}
           </select>
         </div>
       </div>
-      <CostCentreSelect id="bill-cost-centre" label="Cost centre / project" centres={centres} value={costCentre} onChange={setCostCentre} />
+      <CostCentreSelect id="bill-cost-centre" label={purT('costCentre')} centres={centres} value={costCentre} onChange={setCostCentre} />
 
-      <h3 className={styles.sectionTitle}>Line items</h3>
+      <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={setLines} stock={stock} />
 
       <div className={styles.totals} aria-live="polite">
-        <div className={styles.totalRow}><span>Taxable value</span><span>{formatCurrency(totals.taxable)}</span></div>
+        <div className={styles.totalRow}><span>{purT('taxable')}</span><span>{formatCurrency(totals.taxable)}</span></div>
         {interState ? (
           <div className={styles.totalRow}><span>IGST</span><span>{formatCurrency(totals.igst)}</span></div>
         ) : (
@@ -256,10 +259,10 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
             <div className={styles.totalRow}><span>SGST</span><span>{formatCurrency(totals.sgst)}</span></div>
           </>
         )}
-        <div className={styles.totalGrand}><span>Bill total</span><span>{formatCurrency(totals.total)}</span></div>
+        <div className={styles.totalGrand}><span>{purT('billTotal')}</span><span>{formatCurrency(totals.total)}</span></div>
         {selfTax && totals.tax > 0 && (
           <div className={styles.totalRow}>
-            <span>Payable to the supplier (the GST is paid by you {importType === 'GOODS' ? 'at customs' : 'under reverse charge'})</span>
+            <span>{importType === 'GOODS' ? purT('payableCustoms') : purT('payableRcm')}</span>
             <span>{formatCurrency(supplierPayable)}</span>
           </div>
         )}
@@ -267,95 +270,94 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <label className={controls.check}>
         <input type="checkbox" checked={itc} onChange={(e) => setItc(e.target.checked)} />
-        Claim input tax credit on this bill
+        {purT('claimItcBill')}
       </label>
       {compositionProfile && (
         <p className={controls.hint} style={{ margin: 0 }}>
-          The active profile is under the composition scheme: input tax credit is not available (Sec 10(4)). The flag is kept for your records only;
-          composition returns never claim it. Reverse-charge bills are still taxed in CMP-08.
+          {purT('compositionNote')}
         </p>
       )}
       <details className={styles.advanced} open={advancedSet}>
-        <summary>Advanced GST: reverse charge, import, ITC reversal</summary>
+        <summary>{purT('advancedSummary')}</summary>
         <div className={styles.advancedBody}>
           <div className={controls.row}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="bill-import">Import</label>
+              <label className={controls.label} htmlFor="bill-import">{purT('import')}</label>
               <select id="bill-import" className={controls.select} value={importType} onChange={(e) => {
                   const t = e.target.value as ImportType | '';
                   setImportType(t);
                   // Foreign suppliers have no GSTIN, which unticks ITC on vendor pick; imports carry ITC.
                   if (t) setItc(true);
                 }}>
-                <option value="">Domestic purchase</option>
-                <option value="GOODS">Import of goods (Bill of Entry)</option>
-                <option value="SERVICES">Import of services (reverse charge)</option>
+                <option value="">{purT('domestic')}</option>
+                <option value="GOODS">{purT('importGoods')}</option>
+                <option value="SERVICES">{purT('importServices')}</option>
               </select>
             </div>
             <label className={controls.check}>
               <input type="checkbox" checked={rcm || importType === 'SERVICES'} disabled={!!importType} onChange={(e) => setRcm(e.target.checked)} />
-              Reverse charge: GST payable by us
+              {purT('rcmCheck')}
             </label>
           </div>
           {importType === 'GOODS' && (
             <div className={controls.row3}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="bill-boe">Bill of Entry no.</label>
+                <label className={controls.label} htmlFor="bill-boe">{purT('boeNo')}</label>
                 <input id="bill-boe" className={controls.input} value={boeNumber} onChange={(e) => setBoeNumber(e.target.value)} />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="bill-boe-date">BoE date</label>
+                <label className={controls.label} htmlFor="bill-boe-date">{purT('boeDate')}</label>
                 <input id="bill-boe-date" type="date" className={controls.input} value={boeDate} onChange={(e) => setBoeDate(e.target.value)} />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="bill-port">Port code</label>
+                <label className={controls.label} htmlFor="bill-port">{purT('portCode')}</label>
                 <input id="bill-port" className={controls.input} placeholder="INNSA1" maxLength={6} value={portCode} onChange={(e) => setPortCode(e.target.value)} />
               </div>
             </div>
           )}
           <label className={controls.check}>
             <input type="checkbox" checked={blocked} onChange={(e) => setBlocked(e.target.checked)} />
-            Blocked credit under Sec 17(5) (no ITC; shown in 3B 4A and reversed in 4B(1))
+            {purT('blockedCheck')}
           </label>
           {!blocked && itc && (
             <div className={controls.row}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="bill-rev">ITC reversed (₹)</label>
+                <label className={controls.label} htmlFor="bill-rev">{purT('itcReversed')}</label>
                 <input id="bill-rev" type="number" min={0} step="0.01" className={controls.input} value={reversed || ''} onChange={(e) => setReversed(Math.max(Number(e.target.value) || 0, 0))} />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="bill-rev-reason">Reason</label>
+                <label className={controls.label} htmlFor="bill-rev-reason">{purT('reason')}</label>
                 <select id="bill-rev-reason" className={controls.select} value={reason} onChange={(e) => setReason(e.target.value as ItcReversalReason)}>
                   {ITC_REVERSAL_REASONS.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                    <option key={r.value} value={r.value}>{purT(`rr.${r.value}`)}</option>
                   ))}
                 </select>
               </div>
             </div>
           )}
           <p className={styles.note}>
-            Feeds GSTR-3B: reverse charge in 3.1(d) and 4A(3), imports in 4A(1) / 4A(2), reversals in 4B. Working papers — verify with your CA.
+            {purT('advancedNote')}
           </p>
         </div>
       </details>
 
       {itc && !rcm && !importType && totals.tax > 0 && vendor && !vendor.gstin && (
-        <p className={styles.note}>This vendor has no GSTIN — ITC generally cannot be claimed on unregistered purchases.</p>
+        <p className={styles.note}>{purT('noGstinNote')}</p>
       )}
 
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="bill-notes">Notes</label>
+        <label className={controls.label} htmlFor="bill-notes">{purT('notes')}</label>
         <textarea id="bill-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
       <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
 
-      <AttachmentsPanel value={attachments} onChange={setAttachments} label="Receipts & attachments" />
+      <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-        <button type="submit" className={controls.btnPrimary}>{purchase ? 'Save changes' : 'Save bill'}</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>
+        <button type="submit" className={controls.btnPrimary}>{purchase ? purT('saveChanges') : purT('saveBill')}</button>
       </div>
     </form>
   );

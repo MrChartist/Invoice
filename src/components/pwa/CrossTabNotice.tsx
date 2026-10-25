@@ -1,6 +1,8 @@
 import { useState, useSyncExternalStore } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { externalVersion, subscribeExternal } from '../../lib/cross-tab';
+import { useT } from '../../i18n';
+import { pwaT } from '../../i18n/areas/pwa';
 import controls from '../../styles/controls.module.css';
 import styles from './Pwa.module.css';
 
@@ -9,19 +11,20 @@ import styles from './Pwa.module.css';
  * (that would drop half-typed input); Refresh remounts the current page with fresh data.
  */
 export function CrossTabNotice({ onRefresh }: { onRefresh: () => void }) {
+  useT(); // re-render on a language switch (5.4)
   const version = useSyncExternalStore(subscribeExternal, externalVersion, externalVersion);
   const [seen, setSeen] = useState(version);
   if (version === seen) return null;
 
   return (
     <div className={styles.dock}>
-      <section className={styles.banner} role="status" aria-label="Data changed in another tab">
+      <section className={styles.banner} role="status" aria-label={pwaT('crossRegion')}>
         <span className={styles.icon} aria-hidden="true">
           <RefreshCw size={16} />
         </span>
         <div className={styles.text}>
-          <p className={styles.title}>Updated in another tab</p>
-          <p className={styles.desc}>Your data was changed in another tab or window, or by folder sync. Refresh to see the latest.</p>
+          <p className={styles.title}>{pwaT('crossTitle')}</p>
+          <p className={styles.desc}>{pwaT('crossDesc')}</p>
           <div className={styles.actions}>
             <button
               type="button"
@@ -31,11 +34,11 @@ export function CrossTabNotice({ onRefresh }: { onRefresh: () => void }) {
                 onRefresh();
               }}
             >
-              Refresh
+              {pwaT('refresh')}
             </button>
           </div>
         </div>
-        <button type="button" className={styles.close} aria-label="Dismiss" onClick={() => setSeen(version)}>
+        <button type="button" className={styles.close} aria-label={pwaT('dismiss')} onClick={() => setSeen(version)}>
           <X size={16} />
         </button>
       </section>

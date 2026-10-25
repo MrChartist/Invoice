@@ -24,6 +24,8 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
+import { useT } from '../../i18n';
+import { purT, poStateLabel } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -63,6 +65,7 @@ function printPo(po: PurchaseOrder, vendors: Vendor[]) {
 
 /** Purchase orders: raise, print, receive against bills (pending quantities), close. */
 export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, onConvert, onVendorCreated, onChanged }: PurchaseOrdersTabProps) {
+  useT(); // re-render on a language switch (5.4)
   const [stateFilter, setStateFilter] = useState<PoState | ''>('');
   const [editing, setEditing] = useState<PurchaseOrder | 'new' | null>(null);
   const [deleting, setDeleting] = useState<PurchaseOrder | null>(null);
@@ -85,12 +88,12 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
   };
   const setClosed = (po: PurchaseOrder, closed: boolean) => {
     purchaseOrdersDb.setClosed(po.id, closed ? todayInput() : undefined);
-    onChanged(closed ? `${po.po_number} closed` : `${po.po_number} reopened`);
+    onChanged(closed ? purT('poClosed', { number: po.po_number }) : purT('poReopened', { number: po.po_number }));
   };
   const remove = (po: PurchaseOrder) => {
     try {
       purchaseOrdersDb.remove(po.id, purchases);
-      onChanged(`${po.po_number} deleted`);
+      onChanged(purT('deleted', { name: po.po_number }));
     } catch (err) {
       onChanged((err as Error).message, 'error');
     }
@@ -99,37 +102,37 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
   return (
     <section className={surface.card}>
       <div className={styles.poBar}>
-        <select className={controls.select} value={stateFilter} onChange={(e) => setStateFilter(e.target.value as PoState | '')} aria-label="Filter purchase orders by status">
-          <option value="">All purchase orders</option>
+        <select className={controls.select} value={stateFilter} onChange={(e) => setStateFilter(e.target.value as PoState | '')} aria-label={purT('poFilter')}>
+          <option value="">{purT('poAll')}</option>
           {PO_STATES.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>{poStateLabel(s)}</option>
           ))}
         </select>
         <button type="button" className={controls.btnPrimary} onClick={() => setEditing('new')}>
-          <FilePlus2 size={16} /> New purchase order
+          <FilePlus2 size={16} /> {purT('poNew')}
         </button>
       </div>
 
       {orders.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          title="No purchase orders yet"
-          text="Raise a PO to a supplier, print it, then convert it to a bill as goods arrive — part deliveries are tracked line by line."
+          title={purT('poEmpty')}
+          text={purT('poEmptyText')}
         />
       ) : rows.length === 0 ? (
-        <EmptyState icon={ClipboardList} title="No matches" text="No purchase order has this status." />
+        <EmptyState icon={ClipboardList} title={purT('noMatches')} text={purT('poNoStatus')} />
       ) : (
         <div className={surface.tableWrap}>
           <table className={surface.table}>
             <thead>
               <tr>
-                <th>PO</th>
-                <th>Vendor</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th className={surface.numeric}>Received</th>
-                <th className={surface.numeric}>Total</th>
-                <th aria-label="Actions" />
+                <th>{purT('thPo')}</th>
+                <th>{purT('thVendor')}</th>
+                <th>{purT('thDate')}</th>
+                <th>{purT('thStatus')}</th>
+                <th className={surface.numeric}>{purT('thReceived')}</th>
+                <th className={surface.numeric}>{purT('thTotal')}</th>
+                <th aria-label={purT('thActions')} />
               </tr>
             </thead>
             <tbody>
@@ -141,40 +144,40 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
                   <tr key={po.id}>
                     <td>
                       <div className={tabStyles.name}>{po.po_number}</div>
-                      {f.bills.length > 0 && <div className={tabStyles.sub}>{f.bills.length} bill{f.bills.length === 1 ? '' : 's'}: {f.bills.map((b) => b.bill_number).join(', ')}</div>}
+                      {f.bills.length > 0 && <div className={tabStyles.sub}>{purT(f.bills.length === 1 ? 'poBillsOne' : 'poBillsMany', { n: f.bills.length, list: f.bills.map((b) => b.bill_number).join(', ') })}</div>}
                     </td>
                     <td>{po.vendor_name || '—'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {formatDate(po.date)}
-                      {po.expected_date && <div className={tabStyles.sub}>Expected {formatDate(po.expected_date)}</div>}
+                      {po.expected_date && <div className={tabStyles.sub}>{purT('expected', { date: formatDate(po.expected_date) })}</div>}
                     </td>
-                    <td><StatusBadge status={f.state} tone={poTone(f.state)} /></td>
+                    <td><StatusBadge status={poStateLabel(f.state)} tone={poTone(f.state)} /></td>
                     <td className={surface.numeric}>{ordered > 0 ? `${Math.round((received / ordered) * 100)}%` : '—'}</td>
                     <td className={surface.numeric}>{formatCurrency(po.total)}</td>
                     <td>
                       <div className={surface.rowActions}>
                         {open && (
-                          <button type="button" className={controls.btnIcon} title="Convert to bill (pending quantities)" aria-label={`Convert ${po.po_number} to bill`} onClick={() => convert(po)}>
+                          <button type="button" className={controls.btnIcon} title={purT('poConvert')} aria-label={purT('poConvertNamed', { number: po.po_number })} onClick={() => convert(po)}>
                             <ReceiptText size={16} />
                           </button>
                         )}
-                        <button type="button" className={controls.btnIcon} title="Print / save" aria-label={`Print ${po.po_number}`} onClick={() => printPo(po, vendors)}>
+                        <button type="button" className={controls.btnIcon} title={purT('poPrint')} aria-label={purT('poPrintNamed', { number: po.po_number })} onClick={() => printPo(po, vendors)}>
                           <Printer size={16} />
                         </button>
-                        <button type="button" className={controls.btnIcon} title="Edit" aria-label={`Edit ${po.po_number}`} onClick={() => setEditing(po)}>
+                        <button type="button" className={controls.btnIcon} title={purT('edit')} aria-label={purT('editNamed', { name: po.po_number })} onClick={() => setEditing(po)}>
                           <Pencil size={16} />
                         </button>
                         {open && (
-                          <button type="button" className={controls.btnIcon} title="Close order (stop expecting the rest)" aria-label={`Close ${po.po_number}`} onClick={() => setClosed(po, true)}>
+                          <button type="button" className={controls.btnIcon} title={purT('poCloseOrder')} aria-label={purT('poCloseNamed', { number: po.po_number })} onClick={() => setClosed(po, true)}>
                             <XCircle size={16} />
                           </button>
                         )}
                         {f.state === 'Closed' && (
-                          <button type="button" className={controls.btnIcon} title="Reopen" aria-label={`Reopen ${po.po_number}`} onClick={() => setClosed(po, false)}>
+                          <button type="button" className={controls.btnIcon} title={purT('poReopen')} aria-label={purT('poReopenNamed', { number: po.po_number })} onClick={() => setClosed(po, false)}>
                             <RotateCcw size={16} />
                           </button>
                         )}
-                        <button type="button" className={controls.btnDanger} title="Delete" aria-label={`Delete ${po.po_number}`} onClick={() => setDeleting(po)}>
+                        <button type="button" className={controls.btnDanger} title={purT('delete')} aria-label={purT('deleteNamed', { name: po.po_number })} onClick={() => setDeleting(po)}>
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -187,15 +190,15 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
         </div>
       )}
       <p className={styles.poNote}>
-        A purchase order is not a tax document: GST, ITC, books and stock move only when the supplier&apos;s bill is recorded.
+        {purT('poNotTax')}
       </p>
 
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
         size="xl"
-        title={editing && editing !== 'new' ? `Edit ${editing.po_number}` : 'New purchase order'}
-        subtitle="Order goods or services from a supplier. Received quantities come from the bills you convert it to."
+        title={editing && editing !== 'new' ? purT('poEditTitle', { number: editing.po_number }) : purT('poNew')}
+        subtitle={purT('poSub')}
       >
         {editing !== null && (
           <PoForm
@@ -215,9 +218,9 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this purchase order?"
-        message={`${deleting?.po_number ?? ''} (${deleting?.vendor_name ?? ''}) will be removed from this device. Orders with bills recorded against them can only be closed.`}
-        confirmLabel="Delete"
+        title={purT('poDeleteTitle')}
+        message={purT('poDeleteMessage', { number: deleting?.po_number ?? '', vendor: deleting?.vendor_name ?? '' })}
+        confirmLabel={purT('delete')}
         onConfirm={() => deleting && remove(deleting)}
         onClose={() => setDeleting(null)}
       />
@@ -275,7 +278,7 @@ function PoForm({
         total: totals.total,
         notes: notes.trim() || undefined,
       });
-      onSaved(po ? `${saved.po_number} updated` : `Purchase order ${saved.po_number} saved`);
+      onSaved(po ? purT('updated', { name: saved.po_number }) : purT('poSaved', { number: saved.po_number }));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -303,18 +306,18 @@ function PoForm({
       />
       <div className={controls.row3}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="po-date">Order date</label>
+          <label className={controls.label} htmlFor="po-date">{purT('orderDate')}</label>
           <input id="po-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
-          {!po && <span className={controls.hint}>Number: {purchaseOrdersDb.nextNumber(date)}</span>}
+          {!po && <span className={controls.hint}>{purT('poNumber', { number: purchaseOrdersDb.nextNumber(date) })}</span>}
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="po-expected">Expected by</label>
+          <label className={controls.label} htmlFor="po-expected">{purT('expectedBy')}</label>
           <input id="po-expected" type="date" className={controls.input} value={expected} onChange={(e) => setExpected(e.target.value)} />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="po-pos">Place of supply</label>
+          <label className={controls.label} htmlFor="po-pos">{purT('placeOfSupply')}</label>
           <select id="po-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
-            <option value="">Not specified</option>
+            <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
             ))}
@@ -322,11 +325,11 @@ function PoForm({
         </div>
       </div>
 
-      <h3 className={styles.sectionTitle}>Line items</h3>
+      <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={setLines} />
 
       <div className={styles.totals} aria-live="polite">
-        <div className={styles.totalRow}><span>Taxable value</span><span>{formatCurrency(totals.taxable)}</span></div>
+        <div className={styles.totalRow}><span>{purT('taxable')}</span><span>{formatCurrency(totals.taxable)}</span></div>
         {interState ? (
           <div className={styles.totalRow}><span>IGST</span><span>{formatCurrency(totals.igst)}</span></div>
         ) : (
@@ -335,18 +338,18 @@ function PoForm({
             <div className={styles.totalRow}><span>SGST</span><span>{formatCurrency(totals.sgst)}</span></div>
           </>
         )}
-        <div className={styles.totalGrand}><span>Order total</span><span>{formatCurrency(totals.total)}</span></div>
+        <div className={styles.totalGrand}><span>{purT('orderTotal')}</span><span>{formatCurrency(totals.total)}</span></div>
       </div>
 
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="po-notes">Notes / terms for the supplier</label>
+        <label className={controls.label} htmlFor="po-notes">{purT('poNotes')}</label>
         <textarea id="po-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-        <button type="submit" className={controls.btnPrimary}>{po ? 'Save changes' : 'Save purchase order'}</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>
+        <button type="submit" className={controls.btnPrimary}>{po ? purT('saveChanges') : purT('poSave')}</button>
       </div>
     </form>
   );

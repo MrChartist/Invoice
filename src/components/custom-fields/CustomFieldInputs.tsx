@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { customFieldsDb, fieldsFor, type CustomFieldScope } from '../../lib/custom-fields';
+import { useT } from '../../i18n';
+import { fldT } from '../../i18n/areas/fields';
 import controls from '../../styles/controls.module.css';
 import styles from './custom-fields.module.css';
 
@@ -17,12 +19,13 @@ interface Props {
  * (`cleanValueMap`), so half-typed numbers are kept while typing.
  */
 export function CustomFieldInputs({ scope, value, onChange, idPrefix }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const defs = useMemo(() => fieldsFor(customFieldsDb.all(), scope), [scope]);
   if (defs.length === 0) return null;
   const map = value ?? {};
   return (
     <fieldset className={styles.group}>
-      <legend className={styles.legend}>More details</legend>
+      <legend className={styles.legend}>{fldT('moreDetails')}</legend>
       <div className={styles.grid}>
         {defs.map((d) => {
           const id = `${idPrefix}-cf-${d.id}`;
@@ -30,7 +33,7 @@ export function CustomFieldInputs({ scope, value, onChange, idPrefix }: Props) {
             <div key={d.id} className={controls.field}>
               <label className={controls.label} htmlFor={id}>
                 {d.label}
-                {d.print && <Printer size={12} className={styles.printIcon} aria-label="(printed)" />}
+                {d.print && <Printer size={12} className={styles.printIcon} aria-label={fldT('printed')} />}
               </label>
               <input
                 id={id}

@@ -13,6 +13,9 @@ import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { NumberInput } from '../ui/NumberInput';
 import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
 import type { AttachmentRef } from '../../types/attachments';
+import { useT } from '../../i18n';
+import { methodLabel } from '../../i18n/labels';
+import { purT, purCategory } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -27,13 +30,14 @@ export interface ExpenseModalProps {
 
 /** Quick-add for day-to-day spends: amount + category + optional GST, no line items. */
 export function ExpenseModal({ open, onClose, expense, ...rest }: ExpenseModalProps) {
+  useT(); // re-render on a language switch (5.4)
   return (
     <Modal
       open={open}
       onClose={onClose}
       size="md"
-      title={expense ? 'Edit expense' : 'Quick add expense'}
-      subtitle="Rent, subscriptions, travel — no line items needed."
+      title={expense ? purT('expEditTitle') : purT('expAddTitle')}
+      subtitle={purT('expSub')}
     >
       <ExpenseForm key={expense?.id ?? 'new'} expense={expense ?? undefined} onClose={onClose} {...rest} />
     </Modal>
@@ -73,10 +77,10 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
   );
 
   const submit = () => {
-    if (!(amount > 0)) return setError('Enter the expense amount.');
-    if (!date) return setError('Choose the date.');
+    if (!(amount > 0)) return setError(purT('errExpAmount'));
+    if (!date) return setError(purT('errDate'));
     if (expense && totals.total < expense.amount_paid) {
-      return setError(`Total cannot drop below the ${formatCurrency(expense.amount_paid)} already paid.`);
+      return setError(purT('errTotalBelowPaid', { amount: formatCurrency(expense.amount_paid) }));
     }
     try {
       const saved = purchasesDb.save({
@@ -104,7 +108,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         attachments: attachments.length ? attachments : undefined,
       });
       if (!expense && paidNow) paymentsDb.record(saved.id, { amount: supplierPayable(saved), date, method });
-      onSaved(expense ? 'Expense updated' : `Expense of ${formatCurrency(saved.total)} added`);
+      onSaved(expense ? purT('expUpdated') : purT('expAdded', { amount: formatCurrency(saved.total) }));
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -121,29 +125,29 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
     >
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="exp-cat">Category</label>
+          <label className={controls.label} htmlFor="exp-cat">{purT('category')}</label>
           <select id="exp-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
             {PURCHASE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c}>{purCategory(c)}</option>
             ))}
           </select>
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="exp-date">Date</label>
+          <label className={controls.label} htmlFor="exp-date">{purT('date')}</label>
           <input id="exp-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
       </div>
 
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="exp-amt">Amount (₹)</label>
+          <label className={controls.label} htmlFor="exp-amt">{purT('amountRs')}</label>
           <NumberInput id="exp-amt" className={controls.inputNumeric} value={amount} placeholder="0.00" onChange={setAmount} autoFocus />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="exp-tax">GST rate</label>
+          <label className={controls.label} htmlFor="exp-tax">{purT('gstRate')}</label>
           <select id="exp-tax" className={controls.select} value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))}>
             {GST_SLABS.map((s) => (
-              <option key={s} value={s}>{s === 0 ? 'No GST' : `${s}%`}</option>
+              <option key={s} value={s}>{s === 0 ? purT('noGst') : `${s}%`}</option>
             ))}
           </select>
         </div>
@@ -153,25 +157,25 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         <>
           <label className={controls.check}>
             <input type="checkbox" checked={inclusive} onChange={(e) => setInclusive(e.target.checked)} />
-            Amount already includes GST
+            {purT('inclusive')}
           </label>
           <label className={controls.check}>
             <input type="checkbox" checked={itc} onChange={(e) => setItc(e.target.checked)} />
-            Claim input tax credit
+            {purT('claimItc')}
           </label>
         </>
       )}
 
       <div className={styles.totals} aria-live="polite">
-        <div className={styles.totalRow}><span>Taxable value</span><span>{formatCurrency(totals.taxable)}</span></div>
+        <div className={styles.totalRow}><span>{purT('taxable')}</span><span>{formatCurrency(totals.taxable)}</span></div>
         <div className={styles.totalRow}><span>GST</span><span>{formatCurrency(totals.tax)}</span></div>
-        <div className={styles.totalGrand}><span>Total</span><span>{formatCurrency(totals.total)}</span></div>
+        <div className={styles.totalGrand}><span>{purT('total')}</span><span>{formatCurrency(totals.total)}</span></div>
       </div>
 
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="exp-vendor">Paid to (optional)</label>
+        <label className={controls.label} htmlFor="exp-vendor">{purT('paidTo')}</label>
         <select id="exp-vendor" className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
-          <option value="">Not linked to a vendor</option>
+          <option value="">{purT('notLinked')}</option>
           {vendors.map((v) => (
             <option key={v.id} value={v.id}>{v.name}</option>
           ))}
@@ -181,8 +185,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
             className={controls.input}
             value={vendorName}
             onChange={(e) => setVendorName(e.target.value)}
-            placeholder="Payee name, e.g. Landlord"
-            aria-label="Payee name"
+            placeholder={purT('payeePh')}
+            aria-label={purT('payee')}
           />
         )}
       </div>
@@ -191,33 +195,33 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         <div className={controls.row}>
           <label className={controls.check}>
             <input type="checkbox" checked={paidNow} onChange={(e) => setPaidNow(e.target.checked)} />
-            Already paid
+            {purT('alreadyPaid')}
           </label>
           {paidNow && (
-            <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)} aria-label="Payment method">
+            <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)} aria-label={purT('paymentMethod')}>
               {PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>{methodLabel(m)}</option>
               ))}
             </select>
           )}
         </div>
       )}
 
-      <CostCentreSelect id="exp-cost-centre" label="Cost centre / project" centres={centres} value={costCentre} onChange={setCostCentre} />
+      <CostCentreSelect id="exp-cost-centre" label={purT('costCentre')} centres={centres} value={costCentre} onChange={setCostCentre} />
 
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="exp-notes">Notes</label>
+        <label className={controls.label} htmlFor="exp-notes">{purT('notes')}</label>
         <textarea id="exp-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
       <BillableFields idPrefix="exp" value={billable} onChange={setBillable} rebilledIn={expense?.rebilled_in} />
 
-      <AttachmentsPanel value={attachments} onChange={setAttachments} label="Receipts & attachments" />
+      <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-        <button type="submit" className={controls.btnPrimary}>{expense ? 'Save changes' : 'Add expense'}</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>
+        <button type="submit" className={controls.btnPrimary}>{expense ? purT('saveChanges') : purT('addExpense')}</button>
       </div>
     </form>
   );

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Info, KeyRound, Trash2, UserPlus, Users } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { ROLE_HINTS, ROLE_LABELS } from '../../lib/access';
 import { OWNER_ID, isValidPinFormat, listUsers, type UserSummary } from '../../lib/auth';
-import { ASSIGNABLE_ROLES, USER_ERRORS, addUser, removeUser, resetUserPin, setUserRole, type AssignableRole, type UserResult } from '../../lib/users';
+import { ASSIGNABLE_ROLES, MAX_NAME, MAX_USERS, addUser, removeUser, resetUserPin, setUserRole, type AssignableRole, type UserResult } from '../../lib/users';
+import { useT } from '../../i18n';
+import { secT } from '../../i18n/areas/security';
+import { roleLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Security.module.css';
@@ -13,13 +15,14 @@ interface Props {
 }
 
 const digits = (v: string) => v.replace(/\D/g, '').slice(0, 6);
-const problem = (r: UserResult) => (r.ok ? '' : USER_ERRORS[r.reason]);
+const problem = (r: UserResult) => (r.ok ? '' : secT(`ue.${r.reason}`, { n: r.reason === 'too-many' ? MAX_USERS : MAX_NAME }));
 
 /**
  * Settings → Security → Users (owner only, roadmap 6.21): add clerks and viewers with their own
  * PINs, change a role, reset a forgotten PIN, remove a user.
  */
 export function UsersPanel({ notify }: Props) {
+  useT(); // re-render on a language switch (5.4)
   const [users, setUsers] = useState<UserSummary[]>(listUsers);
   const refresh = () => setUsers(listUsers());
 
@@ -37,12 +40,12 @@ export function UsersPanel({ notify }: Props) {
     e.preventDefault();
     if (busy) return;
     setFormError('');
-    if (!isValidPinFormat(pin)) return setFormError(USER_ERRORS['invalid-pin']);
+    if (!isValidPinFormat(pin)) return setFormError(secT('ue.invalid-pin'));
     setBusy(true);
     try {
       const r = await addUser(name, role, pin);
       if (!r.ok) return setFormError(problem(r));
-      notify(`${r.user.name} added as ${ROLE_LABELS[r.user.role].toLowerCase()}`);
+      notify(secT('userAdded', { name: r.user.name, role: roleLabel(r.user.role).toLowerCase() }));
       setName('');
       setPin('');
       refresh();
@@ -57,7 +60,7 @@ export function UsersPanel({ notify }: Props) {
     try {
       const r = setUserRole(u.id, next);
       if (!r.ok) return notify(problem(r), 'error');
-      notify(`${u.name} is now a ${ROLE_LABELS[next].toLowerCase()}`);
+      notify(secT('roleChanged', { name: u.name, role: roleLabel(next).toLowerCase() }));
       refresh();
     } catch (err) {
       notify((err as Error).message, 'error');
@@ -71,7 +74,7 @@ export function UsersPanel({ notify }: Props) {
     try {
       const r = await resetUserPin(resetFor.id, resetPin);
       if (!r.ok) return notify(problem(r), 'error');
-      notify(`New PIN set for ${resetFor.name}`);
+      notify(secT('newPinSet', { name: resetFor.name }));
       setResetFor(null);
       setResetPin('');
     } catch (err) {
@@ -85,42 +88,38 @@ export function UsersPanel({ notify }: Props) {
     <section className={surface.card}>
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon}>
-          <Users size={16} /> Users on this device
+          <Users size={16} /> {secT('usersTitle')}
         </span>
       </div>
       <div className={surface.cardBody}>
         <div className={styles.note} role="note">
           <Info size={16} aria-hidden="true" />
-          <span>
-            Roles are a convenience for a shared computer, not security: they hide and refuse actions in this app, but anyone
-            with the device and the browser&apos;s developer tools can get around them. For real protection use vault mode
-            (below) and a separate operating-system account per person.
-          </span>
+          <span>{secT('rolesNote')}</span>
         </div>
 
-        <ul className={styles.userList} aria-label="Users">
+        <ul className={styles.userList} aria-label={secT('users')}>
           {users.map((u) => (
             <li key={u.id} className={styles.userRow}>
               <div className={styles.rowText}>
                 <strong>{u.name}</strong>
-                <span>{u.id === OWNER_ID ? `${ROLE_LABELS.owner} — ${ROLE_HINTS.owner}` : ROLE_HINTS[u.role]}</span>
+                <span>{u.id === OWNER_ID ? `${roleLabel('owner')} — ${secT('hint.owner')}` : secT(`hint.${u.role}`)}</span>
               </div>
               {u.id !== OWNER_ID && (
                 <div className={styles.buttons}>
                   <select
                     className={controls.select}
-                    aria-label={`Role for ${u.name}`}
+                    aria-label={secT('roleFor', { name: u.name })}
                     value={u.role}
                     onChange={(e) => changeRole(u, e.target.value as AssignableRole)}
                   >
                     {ASSIGNABLE_ROLES.map((r) => (
-                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                      <option key={r} value={r}>{roleLabel(r)}</option>
                     ))}
                   </select>
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => { setResetFor(u); setResetPin(''); }}>
-                    <KeyRound size={14} /> Reset PIN
+                    <KeyRound size={14} /> {secT('resetPin')}
                   </button>
-                  <button type="button" className={controls.btnDanger} onClick={() => setRemoving(u)} aria-label={`Remove ${u.name}`}>
+                  <button type="button" className={controls.btnDanger} onClick={() => setRemoving(u)} aria-label={secT('removeNamed', { name: u.name })}>
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -130,9 +129,9 @@ export function UsersPanel({ notify }: Props) {
         </ul>
 
         {resetFor && (
-          <form className={styles.form} onSubmit={doReset} aria-label={`New PIN for ${resetFor.name}`}>
+          <form className={styles.form} onSubmit={doReset} aria-label={secT('newPinFor', { name: resetFor.name })}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="user-reset-pin">New PIN for {resetFor.name} (4–6 digits)</label>
+              <label className={controls.label} htmlFor="user-reset-pin">{secT('newPinForLabel', { name: resetFor.name })}</label>
               <input
                 id="user-reset-pin"
                 className={controls.input}
@@ -146,33 +145,33 @@ export function UsersPanel({ notify }: Props) {
               />
             </div>
             <div className={styles.buttons}>
-              <button type="submit" className={controls.btnPrimary} disabled={busy || !isValidPinFormat(resetPin)}>Set new PIN</button>
-              <button type="button" className={controls.btnOutline} onClick={() => setResetFor(null)}>Cancel</button>
+              <button type="submit" className={controls.btnPrimary} disabled={busy || !isValidPinFormat(resetPin)}>{secT('setNewPin')}</button>
+              <button type="button" className={controls.btnOutline} onClick={() => setResetFor(null)}>{secT('cancel')}</button>
             </div>
           </form>
         )}
 
         <hr className={styles.divider} />
 
-        <form className={styles.form} onSubmit={add} aria-label="Add a user">
-          <strong>Add a user</strong>
+        <form className={styles.form} onSubmit={add} aria-label={secT('addUser')}>
+          <strong>{secT('addUser')}</strong>
           <div className={styles.passRow}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="user-name">Name</label>
+              <label className={controls.label} htmlFor="user-name">{secT('name')}</label>
               <input id="user-name" className={controls.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoComplete="off" />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="user-role">Role</label>
+              <label className={controls.label} htmlFor="user-role">{secT('role')}</label>
               <select id="user-role" className={controls.select} value={role} onChange={(e) => setRole(e.target.value as AssignableRole)}>
                 {ASSIGNABLE_ROLES.map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  <option key={r} value={r}>{roleLabel(r)}</option>
                 ))}
               </select>
             </div>
           </div>
-          <span className={controls.hint}>{ROLE_HINTS[role]}</span>
+          <span className={controls.hint}>{secT(`hint.${role}`)}</span>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="user-pin">Their PIN (4–6 digits)</label>
+            <label className={controls.label} htmlFor="user-pin">{secT('theirPin')}</label>
             <input
               id="user-pin"
               className={controls.input}
@@ -187,7 +186,7 @@ export function UsersPanel({ notify }: Props) {
           {formError && <div className={controls.error} role="alert">{formError}</div>}
           <div className={styles.buttons}>
             <button type="submit" className={controls.btnPrimary} disabled={busy || !name.trim() || pin.length < 4}>
-              <UserPlus size={16} /> {busy ? 'Adding…' : 'Add user'}
+              <UserPlus size={16} /> {busy ? secT('adding') : secT('addUserBtn')}
             </button>
           </div>
         </form>
@@ -196,15 +195,15 @@ export function UsersPanel({ notify }: Props) {
       <ConfirmDialog
         open={!!removing}
         destructive
-        title="Remove this user?"
-        message={`${removing?.name ?? 'This user'} will no longer be able to sign in on this device. Their past changes stay in the activity log.`}
-        confirmLabel="Remove user"
+        title={secT('removeUserTitle')}
+        message={secT('removeUserMsg', { name: removing?.name ?? secT('thisUser') })}
+        confirmLabel={secT('removeUser')}
         onConfirm={() => {
           if (!removing) return;
           try {
             const r = removeUser(removing.id);
             if (!r.ok) notify(problem(r), 'error');
-            else notify(`${removing.name} removed`);
+            else notify(secT('removed', { name: removing.name }));
           } catch (err) {
             notify((err as Error).message, 'error');
           }

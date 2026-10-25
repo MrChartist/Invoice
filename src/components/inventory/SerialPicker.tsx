@@ -1,6 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { serialKey } from '../../lib/stock-tracking';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
@@ -20,6 +22,7 @@ export interface SerialPickerProps {
  * the list. Only listed serials can be picked, so a sold or unknown number never gets on a line.
  */
 export function SerialPicker({ label, options, value, onChange, want, disabled }: SerialPickerProps) {
+  useT(); // re-render on a language switch (5.4)
   const [query, setQuery] = useState('');
   const [miss, setMiss] = useState('');
   const uid = useId();
@@ -40,7 +43,7 @@ export function SerialPicker({ label, options, value, onChange, want, disabled }
     if (!q) return;
     const hit = options.find((s) => serialKey(s) === q);
     if (!hit) {
-      setMiss(`${query.trim()} is not available here.`);
+      setMiss(invT('notAvailable', { serial: query.trim() }));
       return;
     }
     if (!picked.has(q)) onChange([...value, hit]);
@@ -53,7 +56,7 @@ export function SerialPicker({ label, options, value, onChange, want, disabled }
       <div className={styles.serialHead}>
         <label className={controls.label} htmlFor={`${uid}-scan`}>{label}</label>
         <span className={want !== undefined && value.length !== want ? styles.out : styles.muted}>
-          {want !== undefined ? `${value.length} of ${want}` : `${value.length} picked`}
+          {want !== undefined ? invT('nOfWant', { n: value.length, want }) : invT('nPicked', { n: value.length })}
         </span>
       </div>
       {value.length > 0 && (
@@ -61,7 +64,7 @@ export function SerialPicker({ label, options, value, onChange, want, disabled }
           {value.map((s) => (
             <span key={s} className={styles.serialChip}>
               {s}
-              <button type="button" onClick={() => toggle(s)} aria-label={`Remove serial ${s}`} disabled={disabled}>
+              <button type="button" onClick={() => toggle(s)} aria-label={invT('removeSerial', { serial: s })} disabled={disabled}>
                 <X size={12} aria-hidden="true" />
               </button>
             </span>
@@ -73,7 +76,7 @@ export function SerialPicker({ label, options, value, onChange, want, disabled }
         className={controls.input}
         value={query}
         disabled={disabled}
-        placeholder={options.length ? 'Scan or type a serial, then Enter' : 'No serials available'}
+        placeholder={options.length ? invT('pickerPh') : invT('noSerials')}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -86,7 +89,7 @@ export function SerialPicker({ label, options, value, onChange, want, disabled }
       />
       {miss && <span className={controls.error} role="alert">{miss}</span>}
       {shown.length > 0 && (
-        <div className={styles.serialList} role="group" aria-label={`${label}: available serials`}>
+        <div className={styles.serialList} role="group" aria-label={invT('availableSerials', { label })}>
           {shown.map((s) => (
             <label key={s} className={controls.check}>
               <input type="checkbox" checked={picked.has(serialKey(s))} onChange={() => toggle(s)} disabled={disabled} />

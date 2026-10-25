@@ -11,6 +11,8 @@ import { GstinInput } from '../ui/GstinInput';
 import { Modal } from '../ui/Modal';
 import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
 import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
+import { useT } from '../../i18n';
+import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -23,6 +25,7 @@ export interface VendorsTabProps {
 }
 
 export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
+  useT(); // re-render on a language switch (5.4)
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Vendor | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Vendor | null>(null);
@@ -39,30 +42,30 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, GSTIN or phone"
-            aria-label="Search vendors"
+            placeholder={purT('vSearchPh')}
+            aria-label={purT('vSearch')}
           />
         </label>
         <button type="button" className={controls.btnPrimary} onClick={() => setEditing('new')}>
-          <Plus size={16} /> Add vendor
+          <Plus size={16} /> {purT('addVendor')}
         </button>
       </div>
 
       {vendors.length === 0 ? (
-        <EmptyState icon={Store} title="No vendors yet" text="Add the suppliers you buy from to track what you owe each of them." />
+        <EmptyState icon={Store} title={purT('noVendors')} text={purT('noVendorsText')} />
       ) : rows.length === 0 ? (
-        <EmptyState icon={Search} title="No matches" text="Try a different search." />
+        <EmptyState icon={Search} title={purT('noMatches')} text={purT('tryOtherSearch')} />
       ) : (
         <div className={surface.tableWrap}>
           <table className={surface.table}>
             <thead>
               <tr>
-                <th>Vendor</th>
-                <th className={tabStyles.hideSm}>GSTIN</th>
-                <th className={tabStyles.hideSm}>State</th>
-                <th className={`${surface.numeric} ${tabStyles.hideSm}`}>Bills</th>
-                <th className={surface.numeric}>Outstanding</th>
-                <th aria-label="Actions" />
+                <th>{purT('thVendor')}</th>
+                <th className={tabStyles.hideSm}>{purT('thGstin')}</th>
+                <th className={tabStyles.hideSm}>{purT('thState')}</th>
+                <th className={`${surface.numeric} ${tabStyles.hideSm}`}>{purT('thBills')}</th>
+                <th className={surface.numeric}>{purT('thOutstanding')}</th>
+                <th aria-label={purT('thActions')} />
               </tr>
             </thead>
             <tbody>
@@ -77,7 +80,7 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
                           <div>{v.name}</div>
                           {(v.phone || v.email || v.msme_category) && (
                             <div className={tabStyles.sub}>
-                              {[v.msme_category && `MSME · ${v.msme_category.toLowerCase()}`, v.phone || v.email].filter(Boolean).join(' · ')}
+                              {[v.msme_category && purT('msmeTag', { category: purT(v.msme_category === 'MICRO' ? 'msmeMicro' : v.msme_category === 'SMALL' ? 'msmeSmall' : 'msmeMedium').toLowerCase() }), v.phone || v.email].filter(Boolean).join(' · ')}
                             </div>
                           )}
                         </div>
@@ -89,10 +92,10 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
                     <td className={surface.numeric}>{formatCurrency(b?.outstanding ?? 0)}</td>
                     <td>
                       <div className={surface.rowActions}>
-                        <button type="button" className={controls.btnIcon} title="Edit" aria-label={`Edit ${v.name}`} onClick={() => setEditing(v)}>
+                        <button type="button" className={controls.btnIcon} title={purT('edit')} aria-label={purT('editNamed', { name: v.name })} onClick={() => setEditing(v)}>
                           <Pencil size={16} />
                         </button>
-                        <button type="button" className={controls.btnDanger} title="Delete" aria-label={`Delete ${v.name}`} onClick={() => setDeleting(v)}>
+                        <button type="button" className={controls.btnDanger} title={purT('delete')} aria-label={purT('deleteNamed', { name: v.name })} onClick={() => setDeleting(v)}>
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -108,7 +111,7 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
-        title={editing === 'new' ? 'Add vendor' : 'Edit vendor'}
+        title={editing === 'new' ? purT('addVendor') : purT('editVendor')}
         size="md"
       >
         {editing !== null && (
@@ -124,13 +127,13 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this vendor?"
-        message={`${deleting?.name ?? ''} will be removed from your vendor list. Existing bills keep the vendor's name and GSTIN.`}
-        confirmLabel="Delete"
+        title={purT('vDeleteTitle')}
+        message={purT('vDeleteMessage', { name: deleting?.name ?? '' })}
+        confirmLabel={purT('delete')}
         onConfirm={() => {
           if (deleting) {
             vendorsDb.remove(deleting.id);
-            onChanged(`${deleting.name} deleted`);
+            onChanged(purT('deleted', { name: deleting.name }));
           }
         }}
         onClose={() => setDeleting(null)}
@@ -149,7 +152,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
     if (problem) return setError(problem);
     try {
       const saved = vendorsDb.save({ ...draft, id: vendor?.id, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
-      onSaved(vendor ? `${saved.name} updated` : `${saved.name} added`);
+      onSaved(vendor ? purT('updated', { name: saved.name }) : purT('added', { name: saved.name }));
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -165,18 +168,18 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
       }}
     >
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="v-name">Vendor name</label>
+        <label className={controls.label} htmlFor="v-name">{purT('vendorName')}</label>
         <input id="v-name" className={controls.input} value={draft.name} onChange={(e) => set({ name: e.target.value })} autoFocus />
       </div>
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="v-gstin">GSTIN</label>
+          <label className={controls.label} htmlFor="v-gstin">{purT('thGstin')}</label>
           <GstinInput id="v-gstin" value={draft.gstin ?? ''} onChange={(gstin) => set({ gstin })} onStateCode={(state_code) => set({ state_code })} />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="v-state">State</label>
+          <label className={controls.label} htmlFor="v-state">{purT('state')}</label>
           <select id="v-state" className={controls.select} value={draft.state_code ?? ''} onChange={(e) => set({ state_code: e.target.value })}>
-            <option value="">Not specified</option>
+            <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
             ))}
@@ -185,43 +188,43 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
       </div>
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="v-phone">Phone</label>
+          <label className={controls.label} htmlFor="v-phone">{purT('phone')}</label>
           <input id="v-phone" type="tel" className={controls.input} value={draft.phone ?? ''} onChange={(e) => set({ phone: e.target.value })} />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="v-email">Email</label>
+          <label className={controls.label} htmlFor="v-email">{purT('email')}</label>
           <input id="v-email" type="email" className={controls.input} value={draft.email ?? ''} onChange={(e) => set({ email: e.target.value })} />
         </div>
       </div>
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="v-msme">MSME category</label>
+          <label className={controls.label} htmlFor="v-msme">{purT('msmeCategory')}</label>
           <select id="v-msme" className={controls.select} value={draft.msme_category ?? ''} onChange={(e) => set({ msme_category: (e.target.value || undefined) as MsmeCategory | undefined })}>
-            <option value="">Not MSME / unknown</option>
-            <option value="MICRO">Micro</option>
-            <option value="SMALL">Small</option>
-            <option value="MEDIUM">Medium</option>
+            <option value="">{purT('notMsme')}</option>
+            <option value="MICRO">{purT('msmeMicro')}</option>
+            <option value="SMALL">{purT('msmeSmall')}</option>
+            <option value="MEDIUM">{purT('msmeMedium')}</option>
           </select>
-          <span className={controls.hint}>Micro and small suppliers must be paid within 45 days (Sec 43B(h)).</span>
+          <span className={controls.hint}>{purT('msmeHint')}</span>
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="v-udyam">Udyam number</label>
+          <label className={controls.label} htmlFor="v-udyam">{purT('udyam')}</label>
           <input id="v-udyam" className={controls.input} placeholder="UDYAM-MH-01-0000001" value={draft.msme_udyam ?? ''} onChange={(e) => set({ msme_udyam: e.target.value })} />
         </div>
       </div>
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="v-addr">Address</label>
+        <label className={controls.label} htmlFor="v-addr">{purT('address')}</label>
         <textarea id="v-addr" className={controls.textarea} value={draft.address ?? ''} onChange={(e) => set({ address: e.target.value })} />
       </div>
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="v-notes">Notes</label>
+        <label className={controls.label} htmlFor="v-notes">{purT('notes')}</label>
         <textarea id="v-notes" className={controls.textarea} value={draft.notes ?? ''} onChange={(e) => set({ notes: e.target.value })} />
       </div>
       <CustomFieldInputs scope="party" idPrefix="vendor" value={draft.custom_fields} onChange={(custom_fields) => set({ custom_fields })} />
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-        <button type="submit" className={controls.btnPrimary}>{vendor ? 'Save changes' : 'Add vendor'}</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>
+        <button type="submit" className={controls.btnPrimary}>{vendor ? purT('saveChanges') : purT('addVendor')}</button>
       </div>
     </form>
   );

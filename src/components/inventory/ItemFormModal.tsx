@@ -4,6 +4,8 @@ import { UNITS, GST_SLABS } from '../../types/invoice';
 import { num } from '../../lib/invoice-calc';
 import type { StockItem } from '../../lib/inventory';
 import { duplicateSerials, parseSerials } from '../../lib/stock-tracking';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
@@ -43,6 +45,7 @@ export function ItemFormModal(props: ItemFormModalProps) {
 }
 
 function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormModalProps & { item: StockItem }) {
+  useT(); // re-render on a language switch (5.4)
   const [d, setD] = useState<Draft>(() => toDraft(item));
   const [touched, setTouched] = useState(false);
   const uid = useId();
@@ -50,14 +53,14 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
   const name = d.name.trim();
   const dup = takenNames.includes(name.toLowerCase());
-  const nameError = !name ? 'Item name is required.' : dup ? 'A stock item with this name already exists.' : '';
+  const nameError = !name ? invT('errName') : dup ? invT('errDupName') : '';
   const negative = [d.opening_qty, d.opening_rate, d.reorder_level, d.sale_rate].some((v) => num(v) < 0);
   const taxBad = d.tax_rate !== '' && (num(d.tax_rate) < 0 || num(d.tax_rate) > 100);
   const openingSerials = d.track_stock && d.track_serials ? parseSerials(d.opening_serials) : [];
   const dupSerials = duplicateSerials(openingSerials);
   const serialError = !d.track_stock || !d.track_serials ? ''
-    : dupSerials.length ? `Serial ${dupSerials[0]} is listed twice.`
-    : openingSerials.length && openingSerials.length !== num(d.opening_qty) ? `List one serial per opening unit (${openingSerials.length} listed, opening qty ${num(d.opening_qty)}).`
+    : dupSerials.length ? invT('errSerialTwice', { serial: dupSerials[0] })
+    : openingSerials.length && openingSerials.length !== num(d.opening_qty) ? invT('errOpeningSerials', { listed: openingSerials.length, qty: num(d.opening_qty) })
     : '';
   const valid = !nameError && !negative && !taxBad && !serialError && num(d.warranty_months) >= 0;
 
@@ -91,26 +94,26 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       open={open}
       onClose={onClose}
       size="md"
-      title={isNew ? 'Add stock item' : 'Edit stock item'}
-      subtitle="Name must match the item name used on invoices so sales reduce this stock."
+      title={isNew ? invT('addStockItem') : invT('editStockItem')}
+      subtitle={invT('itemSub')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{invT('cancel')}</button>
           <button type="button" className={controls.btnPrimary} onClick={submit}>
-            {isNew ? 'Add item' : 'Save changes'}
+            {isNew ? invT('addItem') : invT('saveChanges')}
           </button>
         </>
       }
     >
       <form className={styles.form} onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor={`${uid}-name`}>Item name *</label>
+          <label className={controls.label} htmlFor={`${uid}-name`}>{invT('itemName')}</label>
           <input
             id={`${uid}-name`}
             className={`${controls.input} ${touched && nameError ? controls.inputInvalid : ''}`}
             value={d.name}
             onChange={(e) => set('name', e.target.value)}
-            placeholder="e.g. Wireless Mouse"
+            placeholder={invT('itemNamePh')}
             aria-invalid={touched && !!nameError}
             autoComplete="off"
           />
@@ -119,22 +122,22 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
 
         <div className={controls.row3}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-sku`}>SKU</label>
+            <label className={controls.label} htmlFor={`${uid}-sku`}>{invT('sku')}</label>
             <input id={`${uid}-sku`} className={controls.input} value={d.sku} onChange={(e) => set('sku', e.target.value)} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-barcode`}>Barcode</label>
-            <input id={`${uid}-barcode`} className={controls.input} value={d.barcode} onChange={(e) => set('barcode', e.target.value)} placeholder="Scan or type" />
+            <label className={controls.label} htmlFor={`${uid}-barcode`}>{invT('barcode')}</label>
+            <input id={`${uid}-barcode`} className={controls.input} value={d.barcode} onChange={(e) => set('barcode', e.target.value)} placeholder={invT('scanOrType')} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-hsn`}>HSN / SAC</label>
+            <label className={controls.label} htmlFor={`${uid}-hsn`}>{invT('hsn')}</label>
             <input
               id={`${uid}-hsn`} className={controls.input} inputMode="numeric" value={d.hsn}
               onChange={(e) => set('hsn', e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
             />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-unit`}>Unit</label>
+            <label className={controls.label} htmlFor={`${uid}-unit`}>{invT('unit')}</label>
             <select id={`${uid}-unit`} className={controls.select} value={d.unit} onChange={(e) => set('unit', e.target.value)}>
               {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
@@ -143,44 +146,44 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
 
         <div className={controls.row3}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-sale`}>Sale rate</label>
+            <label className={controls.label} htmlFor={`${uid}-sale`}>{invT('saleRate')}</label>
             <input id={`${uid}-sale`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={d.sale_rate} onChange={(e) => set('sale_rate', e.target.value)} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-gst`}>GST %</label>
+            <label className={controls.label} htmlFor={`${uid}-gst`}>{invT('gstPct')}</label>
             <input
               id={`${uid}-gst`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal"
               list={`${uid}-slabs`} value={d.tax_rate} onChange={(e) => set('tax_rate', e.target.value)}
               aria-invalid={taxBad}
             />
             <datalist id={`${uid}-slabs`}>{GST_SLABS.map((s) => <option key={s} value={s} />)}</datalist>
-            {taxBad && <span className={controls.error} role="alert">GST must be between 0 and 100.</span>}
+            {taxBad && <span className={controls.error} role="alert">{invT('errGst')}</span>}
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-loc`}>Location</label>
-            <input id={`${uid}-loc`} className={controls.input} value={d.location} onChange={(e) => set('location', e.target.value)} placeholder="Rack / godown" />
+            <label className={controls.label} htmlFor={`${uid}-loc`}>{invT('location')}</label>
+            <input id={`${uid}-loc`} className={controls.input} value={d.location} onChange={(e) => set('location', e.target.value)} placeholder={invT('locationPh')} />
           </div>
         </div>
 
         <label className={controls.check}>
           <input type="checkbox" checked={d.track_stock} onChange={(e) => set('track_stock', e.target.checked)} />
-          Track stock for this item (turn off for services)
+          {invT('trackStock')}
         </label>
 
         {d.track_stock && (
           <>
-            <p className={styles.sectionLabel}>Opening balance and reorder</p>
+            <p className={styles.sectionLabel}>{invT('openingSection')}</p>
             <div className={controls.row3}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor={`${uid}-oq`}>Opening qty</label>
+                <label className={controls.label} htmlFor={`${uid}-oq`}>{invT('openingQty')}</label>
                 <input id={`${uid}-oq`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={d.opening_qty} onChange={(e) => set('opening_qty', e.target.value)} />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor={`${uid}-or`}>Opening rate (cost)</label>
+                <label className={controls.label} htmlFor={`${uid}-or`}>{invT('openingRate')}</label>
                 <input id={`${uid}-or`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={d.opening_rate} onChange={(e) => set('opening_rate', e.target.value)} />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor={`${uid}-rl`}>Reorder level</label>
+                <label className={controls.label} htmlFor={`${uid}-rl`}>{invT('reorderLevel')}</label>
                 <input id={`${uid}-rl`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={d.reorder_level} onChange={(e) => set('reorder_level', e.target.value)} />
               </div>
             </div>
@@ -188,24 +191,24 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
         )}
         {d.track_stock && (
           <>
-            <p className={styles.sectionLabel}>Tracking (optional)</p>
+            <p className={styles.sectionLabel}>{invT('trackingSection')}</p>
             <label className={controls.check}>
               <input type="checkbox" checked={d.track_batches} onChange={(e) => set('track_batches', e.target.checked)} />
-              Track batches with MFG / expiry dates (medicines, food, cosmetics) — sales pick the batch that expires first
+              {invT('trackBatches')}
             </label>
             <label className={controls.check}>
               <input type="checkbox" checked={d.track_serials} onChange={(e) => set('track_serials', e.target.checked)} />
-              Track serial / IMEI numbers (one per unit) and warranty
+              {invT('trackSerials')}
             </label>
             {d.track_serials && (
               <div className={controls.row}>
                 <div className={controls.field}>
-                  <label className={controls.label} htmlFor={`${uid}-wm`}>Warranty (months)</label>
-                  <input id={`${uid}-wm`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="numeric" value={d.warranty_months} onChange={(e) => set('warranty_months', e.target.value.replace(/[^0-9]/g, ''))} placeholder="0 = none" />
+                  <label className={controls.label} htmlFor={`${uid}-wm`}>{invT('warranty')}</label>
+                  <input id={`${uid}-wm`} className={`${controls.input} ${controls.inputNumeric}`} inputMode="numeric" value={d.warranty_months} onChange={(e) => set('warranty_months', e.target.value.replace(/[^0-9]/g, ''))} placeholder={invT('warrantyPh')} />
                 </div>
                 {num(d.opening_qty) > 0 && (
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor={`${uid}-os`}>Opening serials (one per line)</label>
+                    <label className={controls.label} htmlFor={`${uid}-os`}>{invT('openingSerials')}</label>
                     <textarea id={`${uid}-os`} className={controls.textarea} rows={3} value={d.opening_serials} onChange={(e) => set('opening_serials', e.target.value)} aria-invalid={touched && !!serialError} />
                   </div>
                 )}
@@ -214,7 +217,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
             {touched && serialError && <span className={controls.error} role="alert">{serialError}</span>}
           </>
         )}
-        {touched && negative && <span className={controls.error} role="alert">Quantities and rates cannot be negative.</span>}
+        {touched && negative && <span className={controls.error} role="alert">{invT('errNegative')}</span>}
         <button type="submit" hidden />
       </form>
     </Modal>

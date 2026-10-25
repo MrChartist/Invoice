@@ -4,6 +4,8 @@ import { Modal } from '../ui/Modal';
 import { godownsDb } from '../../lib/godowns';
 import { godownInUse, type TrackingMap } from '../../lib/stock-tracking';
 import { MAIN_GODOWN_ID, type Godown } from '../../types/stock';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './inventory.module.css';
@@ -21,6 +23,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   onClose: () => void;
   onChanged: (message: string) => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const [editing, setEditing] = useState<{ id?: string; name: string; address: string } | null>(null);
   const [error, setError] = useState('');
 
@@ -28,7 +31,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
     if (!editing) return;
     try {
       godownsDb.save({ id: editing.id, name: editing.name, address: editing.address });
-      onChanged(editing.id ? 'Godown renamed' : `Godown ${editing.name.trim()} added`);
+      onChanged(editing.id ? invT('godownRenamed') : invT('godownAdded', { name: editing.name.trim() }));
       setEditing(null);
       setError('');
     } catch (err) {
@@ -39,7 +42,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   const remove = (g: Godown) => {
     try {
       godownsDb.remove(g.id, godownInUse(tracking, g.id) || transfersUse.has(g.id));
-      onChanged(`Godown ${g.name} deleted`);
+      onChanged(invT('godownDeleted', { name: g.name }));
       setError('');
     } catch (err) {
       setError((err as Error).message);
@@ -51,25 +54,25 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
       open={open}
       onClose={onClose}
       size="md"
-      title="Godowns"
-      subtitle="Stock locations. Costing stays company-wide; transfers move quantity only."
-      footer={<button type="button" className={controls.btnOutline} onClick={onClose}>Done</button>}
+      title={invT('godowns')}
+      subtitle={invT('godownsSub')}
+      footer={<button type="button" className={controls.btnOutline} onClick={onClose}>{invT('done')}</button>}
     >
       <div className={styles.form}>
         <table className={surface.table}>
-          <thead><tr><th>Name</th><th>Address</th><th><span className={surface.srOnly}>Actions</span></th></tr></thead>
+          <thead><tr><th>{invT('thName')}</th><th>{invT('thAddress')}</th><th><span className={surface.srOnly}>{invT('thActions')}</span></th></tr></thead>
           <tbody>
             {godowns.map((g) => (
               <tr key={g.id}>
-                <td>{g.name}{g.id === MAIN_GODOWN_ID && <span className={styles.muted}> (default)</span>}</td>
+                <td>{g.name}{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}</td>
                 <td className={styles.muted}>{g.address || '—'}</td>
                 <td>
                   <span className={surface.rowActions}>
-                    <button type="button" className={controls.btnIcon} aria-label={`Rename ${g.name}`} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '' })}>
+                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '' })}>
                       <Edit3 size={16} />
                     </button>
                     {g.id !== MAIN_GODOWN_ID && (
-                      <button type="button" className={controls.btnDanger} aria-label={`Delete ${g.name}`} onClick={() => remove(g)}>
+                      <button type="button" className={controls.btnDanger} aria-label={invT('deleteNamed', { name: g.name })} onClick={() => remove(g)}>
                         <Trash2 size={16} />
                       </button>
                     )}
@@ -84,22 +87,22 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
           <form className={styles.form} onSubmit={(e) => { e.preventDefault(); save(); }}>
             <div className={controls.row}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="gd-name">Godown name</label>
+                <label className={controls.label} htmlFor="gd-name">{invT('godownName')}</label>
                 <input id="gd-name" className={controls.input} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus />
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="gd-addr">Address (optional)</label>
+                <label className={controls.label} htmlFor="gd-addr">{invT('addressOptional')}</label>
                 <input id="gd-addr" className={controls.input} value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} />
               </div>
             </div>
             <div className={surface.pageActions}>
-              <button type="button" className={controls.btnOutline} onClick={() => { setEditing(null); setError(''); }}>Cancel</button>
-              <button type="submit" className={controls.btnPrimary}>{editing.id ? 'Save' : 'Add godown'}</button>
+              <button type="button" className={controls.btnOutline} onClick={() => { setEditing(null); setError(''); }}>{invT('cancel')}</button>
+              <button type="submit" className={controls.btnPrimary}>{editing.id ? invT('save') : invT('addGodown')}</button>
             </div>
           </form>
         ) : (
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setEditing({ name: '', address: '' })}>
-            <Plus size={14} aria-hidden="true" /> Add godown
+            <Plus size={14} aria-hidden="true" /> {invT('addGodown')}
           </button>
         )}
         {error && <span className={controls.error} role="alert">{error}</span>}

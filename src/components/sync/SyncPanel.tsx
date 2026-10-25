@@ -20,16 +20,18 @@ import {
 } from '../../lib/sync-folder';
 import { GROUP_RE, type SyncDir } from '../../lib/sync-files';
 import { resolveConflict, tableLabel, type RowConflict, type SyncConflict, type SyncReport } from '../../lib/sync-engine';
+import { useT } from '../../i18n';
+import { syncT } from '../../i18n/areas/sync';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Sync.module.css';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
-const when = (iso?: string) => (iso && !Number.isNaN(Date.parse(iso)) ? new Date(iso).toLocaleString('en-IN') : 'never');
+const when = (iso?: string) => (iso && !Number.isNaN(Date.parse(iso)) ? new Date(iso).toLocaleString('en-IN') : syncT('never'));
 
 function describeRow(key: string, v: unknown): string {
-  if (!v || typeof v !== 'object') return 'deleted';
+  if (!v || typeof v !== 'object') return syncT('deleted');
   const r = v as Record<string, unknown>;
   const client = (r.client as { name?: string } | undefined)?.name;
   const parts = [r.invoice_number, r.bill_number, r.number, r.name, r.vendor_name, client, r.title]
@@ -55,48 +57,49 @@ function changedFields(a: unknown, b: unknown): { field: string; mine: string; t
 }
 
 function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: string, choice: 'mine' | 'theirs' | 'ack', override?: boolean) => Promise<void> }) {
+  useT(); // re-render on a language switch (5.4)
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   if (c.kind === 'duplicate') {
     return (
       <li className={styles.item}>
         <div className={styles.itemHead}>
-          <span className={styles.itemTitle}>{tableLabel(c.key)}: number {c.number} is used by {c.ids.length} documents</span>
-          <span className={styles.meta}>found {when(c.at)}</span>
+          <span className={styles.itemTitle}>{syncT('dupTitle', { table: tableLabel(c.key), number: c.number, n: c.ids.length })}</span>
+          <span className={styles.meta}>{syncT('found', { date: when(c.at) })}</span>
         </div>
         <ul className={styles.diff}>
           {c.docs.map((d) => (
             <li key={d.id}>
               {c.key.endsWith('_invoices') ? <Link to={`/invoice/${d.id}`}>{d.number || d.id}</Link> : d.number || d.id} · {d.client || '—'} · {d.date} · {d.total.toLocaleString('en-IN')}
-              {d.device ? ` · from ${d.device}` : ''}
+              {d.device ? syncT('fromDevice', { device: d.device }) : ''}
             </li>
           ))}
         </ul>
-        <p className={controls.hint}>Issued numbers are never changed automatically. Renumber the one issued by mistake (or cancel it and issue a credit note), then mark this reviewed.</p>
+        <p className={controls.hint}>{syncT('dupHint')}</p>
         <div className={styles.buttons}>
-          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void onResolve(c.id, 'ack')}>Mark reviewed</button>
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void onResolve(c.id, 'ack')}>{syncT('markReviewed')}</button>
         </div>
       </li>
     );
   }
   const rc = c as RowConflict;
   const isRow = rc.kind === 'row';
-  const title = isRow ? `${tableLabel(rc.key)}: ${describeRow(rc.key, rc.local.value ?? rc.remote.value)}` : `${tableLabel(rc.key)} (setting)`;
+  const title = isRow ? `${tableLabel(rc.key)}: ${describeRow(rc.key, rc.local.value ?? rc.remote.value)}` : syncT('settingSuffix', { table: tableLabel(rc.key) });
   const reason =
     rc.reason === 'locked'
       ? isRow
-        ? `${rc.device_name || 'Another device'} changed a document in a locked period. It was not applied.`
-        : `${rc.device_name || 'Another device'} moved the period lock earlier or removed it. It was not applied.`
+        ? syncT('lockedRow', { device: rc.device_name || syncT('anotherDevice') })
+        : syncT('lockedSetting', { device: rc.device_name || syncT('anotherDevice') })
       : rc.reason === 'lww'
-        ? `Changed on this device and on ${rc.device_name || 'another device'} at the same time. The ${rc.applied === 'remote' ? `version from ${rc.device_name}` : "this device's version"} is in use.`
-        : `Changed on this device and on ${rc.device_name || 'another device'} since the last sync. This device's version is kept.`;
+        ? syncT(rc.applied === 'remote' ? 'lwwRemote' : 'lwwLocal', { device: rc.device_name || syncT('anotherDeviceLc') })
+        : syncT('keptLocal', { device: rc.device_name || syncT('anotherDeviceLc') });
   const diff = isRow ? changedFields(rc.local.value, rc.remote.value) : [];
-  const theirsLabel = rc.remote.value === null ? 'Delete it (theirs)' : `Use ${rc.device_name || 'their'} version`;
-  const mineLabel = rc.local.value === null ? (rc.local.meta ? 'Keep it deleted' : 'Leave it out') : 'Keep mine';
+  const theirsLabel = rc.remote.value === null ? syncT('deleteTheirs') : syncT('useTheirs', { device: rc.device_name || syncT('their') });
+  const mineLabel = rc.local.value === null ? (rc.local.meta ? syncT('keepDeleted') : syncT('leaveOut')) : syncT('keepMine');
 
   const withPin = async (choice: 'mine' | 'theirs') => {
     if (!(await verifyPin(pin))) {
-      setPinError('Wrong PIN.');
+      setPinError(syncT('wrongPin'));
       return;
     }
     setPinError('');
@@ -107,16 +110,16 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
     <li className={styles.item}>
       <div className={styles.itemHead}>
         <span className={styles.itemTitle}>{title}</span>
-        <span className={styles.meta}>found {when(rc.at)}</span>
+        <span className={styles.meta}>{syncT('found', { date: when(rc.at) })}</span>
       </div>
       <span className={styles.meta}>{reason}</span>
-      {rc.local.value === null && isRow && <span className={styles.meta}>This device: {rc.local.meta ? 'deleted' : 'not present'}.</span>}
-      {rc.remote.value === null && isRow && <span className={styles.meta}>{rc.device_name || 'Other device'}: deleted.</span>}
+      {rc.local.value === null && isRow && <span className={styles.meta}>{rc.local.meta ? syncT('thisDeviceDeleted') : syncT('thisDeviceAbsent')}</span>}
+      {rc.remote.value === null && isRow && <span className={styles.meta}>{syncT('otherDeleted', { device: rc.device_name || syncT('otherDevice') })}</span>}
       {diff.length > 0 && (
         <ul className={styles.diff}>
           {diff.map((d) => (
             <li key={d.field}>
-              <b>{d.field}</b>: mine {d.mine} → theirs {d.theirs}
+              <b>{d.field}</b>: {syncT('mineTheirs', { mine: d.mine, theirs: d.theirs })}
             </li>
           ))}
         </ul>
@@ -124,30 +127,30 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
       {rc.reason === 'locked' ? (
         <div className={styles.buttons}>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void onResolve(rc.id, 'mine')}>
-            {mineLabel} (keep my books)
+            {syncT('keepBooks', { label: mineLabel })}
           </button>
           <input
             type="password"
             inputMode="numeric"
             className={`${controls.input} ${styles.pin}`}
-            aria-label="PIN to apply a change in a locked period"
+            aria-label={syncT('pinLockedAria')}
             placeholder="PIN"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
           />
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={pin.length < 4} onClick={() => void withPin('theirs')}>
-            <KeyRound size={14} aria-hidden="true" /> Apply with PIN
+            <KeyRound size={14} aria-hidden="true" /> {syncT('applyPin')}
           </button>
           {pinError && <span className={controls.error} role="alert">{pinError}</span>}
         </div>
       ) : rc.locked ? (
         <div className={styles.buttons}>
-          <span className={styles.meta}>One of these versions is inside the locked period (or loosens the lock): enter your PIN to choose.</span>
+          <span className={styles.meta}>{syncT('lockedChoose')}</span>
           <input
             type="password"
             inputMode="numeric"
             className={`${controls.input} ${styles.pin}`}
-            aria-label="PIN to change books in a locked period"
+            aria-label={syncT('pinBooksAria')}
             placeholder="PIN"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
@@ -177,6 +180,7 @@ interface SetupState {
  * Settings → Data & backup → Sync folder (roadmap 5.7). Lazily loaded with the sync code.
  */
 export function SyncPanel({ notify }: { notify?: Notify }) {
+  useT(); // re-render on a language switch (5.4)
   const supported = isSyncSupported();
   const [config, setConfig] = useState<SyncConfig | null | undefined>(undefined);
   const [overview, setOverview] = useState(() => syncOverview());
@@ -209,8 +213,9 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
     if (r.ok) {
       setError(null);
       const moved = r.added + r.updated + r.deleted;
+      const result = `${moved ? syncT('changesApplied', { n: moved }) : syncT('upToDate')}${r.newConflicts ? syncT('toReviewSuffix', { n: r.newConflicts }) : ''}`;
       notify?.(
-        `Synced${r.peers ? ` with ${r.peers} device${r.peers === 1 ? '' : 's'}` : ''}: ${moved ? `${moved} change${moved === 1 ? '' : 's'} applied` : 'up to date'}${r.newConflicts ? `, ${r.newConflicts} to review` : ''}.`,
+        r.peers ? syncT('syncedWith', { n: r.peers, result }) : syncT('synced', { result }),
         r.newConflicts ? 'info' : 'success',
       );
     } else if (r.message) {
@@ -232,17 +237,17 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
     setError(null);
     const r = await pickSyncFolder();
     if (!r.ok) {
-      if (r.reason !== 'cancelled') setError(r.message || 'Could not open that folder.');
+      if (r.reason !== 'cancelled') setError(r.message || syncT('openFolderFail'));
       return;
     }
-    const company = localDb.settings.activeProfile()?.companyName || 'my books';
+    const company = localDb.settings.activeProfile()?.companyName || syncT('myBooks');
     setSetup({ handle: r.handle, groups: r.groups, mode: r.groups.length ? 'join' : 'create', group: r.groups[0] ?? suggestGroupName(company) });
   };
 
   const turnOn = async () => {
     if (!setup) return;
-    if (setup.mode === 'create' && pass !== pass2) return setError('The two passphrases do not match.');
-    if (!GROUP_RE.test(setup.group)) return setError('Use 2–40 lower-case letters, digits or dashes for the group name.');
+    if (setup.mode === 'create' && pass !== pass2) return setError(syncT('passMismatch'));
+    if (!GROUP_RE.test(setup.group)) return setError(syncT('groupRule'));
     setBusy(true);
     setDeviceName(name);
     const r = await connectSync({ handle: setup.handle, group: setup.group, passphrase: pass });
@@ -252,24 +257,24 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
     setPass2('');
     setSetup(null);
     setConfig(await getSyncConfig());
-    notify?.(r.created ? 'Sync group created. Set up your other devices with the same folder and passphrase.' : 'Joined the sync group.', 'success');
+    notify?.(r.created ? syncT('groupCreated') : syncT('joined'), 'success');
     report(r.report);
   };
 
   const turnOff = async () => {
-    if (!window.confirm('Stop syncing this company on this device? Files in the folder and other devices are not touched; conflicts stay listed.')) return;
+    if (!window.confirm(syncT('confirmOff'))) return;
     await disconnectSync();
     setConfig(null);
     refresh();
-    notify?.('Sync turned off on this device', 'info');
+    notify?.(syncT('syncOff'), 'info');
   };
 
   const onResolve = async (id: string, choice: 'mine' | 'theirs' | 'ack', override = false) => {
     const r = await resolveConflict(id, choice, companyDevice(), { override });
-    if (!r.ok) setError(r.message ?? 'Could not resolve that conflict.');
+    if (!r.ok) setError(r.message ?? syncT('resolveFail'));
     else {
       setError(null);
-      notify?.('Conflict resolved. Other devices pick it up at their next sync.', 'success');
+      notify?.(syncT('resolved'), 'success');
     }
     refresh();
   };
@@ -285,43 +290,39 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
     <section className={surface.card} aria-labelledby="sync-title">
       <header className={surface.cardHead}>
         <span className={surface.cardHeadIcon} id="sync-title">
-          <FolderSync size={16} aria-hidden="true" /> Sync folder
+          <FolderSync size={16} aria-hidden="true" /> {syncT('syncFolder')}
         </span>
       </header>
       <div className={`${surface.cardBody} ${styles.body}`}>
         {!supported ? (
           <p className={controls.hint} data-testid="sync-unsupported">
-            Folder sync is not supported in this browser. It needs Chrome or Edge on a computer (File System Access). To move your
-            data to another device, download a backup here and restore it there.
+            {syncT('unsupported')}
           </p>
         ) : config === undefined ? null : !config ? (
           <>
             <p className={controls.hint}>
-              Keep this company in step across your computers through a folder your cloud app already syncs (Google Drive, Dropbox,
-              OneDrive or iCloud for desktop). The app only reads and writes encrypted files in that folder; your cloud app moves
-              them. Each device writes its own file, and edits made on two devices at once are listed for you to choose, never
-              overwritten.
+              {syncT('intro')}
             </p>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="sync-device-name">This device’s name</label>
+              <label className={controls.label} htmlFor="sync-device-name">{syncT('deviceName')}</label>
               <input id="sync-device-name" className={controls.input} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             {!setup ? (
               <div className={styles.buttons}>
                 <button type="button" className={controls.btnOutline} onClick={() => void choose()}>
-                  <FolderOpen size={15} aria-hidden="true" /> Choose sync folder
+                  <FolderOpen size={15} aria-hidden="true" /> {syncT('chooseFolder')}
                 </button>
               </div>
             ) : (
               <>
-                <p className={controls.hint}>Folder: <strong>{setup.handle.name}</strong></p>
+                <p className={controls.hint}>{syncT('folderN')} <strong>{setup.handle.name}</strong></p>
                 {setup.groups.length > 0 && (
                   <fieldset className={controls.field}>
-                    <legend className={controls.label}>Sync group</legend>
+                    <legend className={controls.label}>{syncT('group')}</legend>
                     {setup.groups.map((g) => (
                       <label key={g} className={styles.radio}>
                         <input type="radio" name="sync-group" checked={setup.mode === 'join' && setup.group === g} onChange={() => setSetup({ ...setup, mode: 'join', group: g })} />
-                        Join “{g}”
+                        {syncT('joinGroup', { group: g })}
                       </label>
                     ))}
                     <label className={styles.radio}>
@@ -329,15 +330,15 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                         type="radio"
                         name="sync-group"
                         checked={setup.mode === 'create'}
-                        onChange={() => setSetup({ ...setup, mode: 'create', group: suggestGroupName(localDb.settings.activeProfile()?.companyName || 'my books') })}
+                        onChange={() => setSetup({ ...setup, mode: 'create', group: suggestGroupName(localDb.settings.activeProfile()?.companyName || syncT('myBooks')) })}
                       />
-                      Start a new group
+                      {syncT('newGroup')}
                     </label>
                   </fieldset>
                 )}
                 {setup.mode === 'create' && (
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor="sync-group-name">New group name</label>
+                    <label className={controls.label} htmlFor="sync-group-name">{syncT('newGroupName')}</label>
                     <input
                       id="sync-group-name"
                       className={`${controls.input} ${controls.inputMono}`}
@@ -345,15 +346,15 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                       value={setup.group}
                       onChange={(e) => setSetup({ ...setup, group: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
                     />
-                    <span className={controls.hint}>Shown as a folder name in your cloud drive (the contents are encrypted). Use the same group on every device of this company.</span>
+                    <span className={controls.hint}>{syncT('groupHint')}</span>
                   </div>
                 )}
                 <div className={controls.row}>
                   <input
                     type="password"
                     className={controls.input}
-                    aria-label="Sync passphrase"
-                    placeholder={setup.mode === 'create' ? 'New sync passphrase (8+ characters)' : 'Sync passphrase'}
+                    aria-label={syncT('passAria')}
+                    placeholder={setup.mode === 'create' ? syncT('newPassPh') : syncT('passPh')}
                     autoComplete={setup.mode === 'create' ? 'new-password' : 'current-password'}
                     value={pass}
                     onChange={(e) => setPass(e.target.value)}
@@ -362,8 +363,8 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                     <input
                       type="password"
                       className={controls.input}
-                      aria-label="Repeat sync passphrase"
-                      placeholder="Repeat passphrase"
+                      aria-label={syncT('repeatAria')}
+                      placeholder={syncT('repeatPh')}
                       autoComplete="new-password"
                       value={pass2}
                       onChange={(e) => setPass2(e.target.value)}
@@ -371,14 +372,13 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                   )}
                 </div>
                 <p className={controls.hint}>
-                  Separate from your PIN and vault passphrase. Every device needs it once; it is not stored (a key derived from it
-                  is), and a lost passphrase means the folder cannot be read. Join only with this company’s data or a fresh company.
+                  {syncT('passHint')}
                 </p>
                 <div className={styles.buttons}>
                   <button type="button" className={controls.btnPrimary} disabled={busy || pass.length < 8} onClick={() => void turnOn()}>
-                    <FolderSync size={15} aria-hidden="true" /> {busy ? 'Setting up…' : setup.mode === 'create' ? 'Create group and sync' : 'Join and sync'}
+                    <FolderSync size={15} aria-hidden="true" /> {busy ? syncT('settingUp') : setup.mode === 'create' ? syncT('createSync') : syncT('joinSync')}
                   </button>
-                  <button type="button" className={controls.btnGhost} onClick={() => setSetup(null)}>Cancel</button>
+                  <button type="button" className={controls.btnGhost} onClick={() => setSetup(null)}>{syncT('cancel')}</button>
                 </div>
               </>
             )}
@@ -392,10 +392,10 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                 <CheckCircle2 size={18} className={styles.ok} aria-hidden="true" />
               )}
               <span className={styles.statusText}>
-                <span>Last sync: <strong>{when(lastSync)}</strong></span>
+                <span>{syncT('lastSync')} <strong>{when(lastSync)}</strong></span>
                 <small>
-                  {config.folder} / mrchartist-sync / {config.group} · this device: {syncDevice().name}
-                  {conflicts.length ? ` · ${conflicts.length} to review` : ''}
+                  {config.folder} / mrchartist-sync / {config.group} · {syncT('thisDevice', { name: syncDevice().name })}
+                  {conflicts.length ? syncT('toReview', { n: conflicts.length }) : ''}
                 </small>
                 {last && !last.ok && last.message && <small>{last.message}</small>}
               </span>
@@ -403,9 +403,9 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
 
             {needPass && (
               <div className={styles.warn} role="alert">
-                <p className={controls.hint}>Enter the sync passphrase once to resume syncing (vault mode keeps the sync key sealed, so it is asked again after vault mode was turned on).</p>
+                <p className={controls.hint}>{syncT('reenter')}</p>
                 <div className={styles.buttons}>
-                  <input type="password" className={controls.input} aria-label="Sync passphrase" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
+                  <input type="password" className={controls.input} aria-label={syncT('passAria')} autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
                   <button
                     type="button"
                     className={controls.btnOutline}
@@ -414,38 +414,36 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                       setBusy(true);
                       const r = await reenterPassphrase(pass);
                       setBusy(false);
-                      if (!r.ok) return setError(r.message ?? 'That passphrase does not open this sync group.');
+                      if (!r.ok) return setError(r.message ?? syncT('badPass'));
                       setPass('');
                       setNeedPass(false);
                       void syncNow();
                     }}
                   >
-                    <KeyRound size={15} aria-hidden="true" /> Resume sync
+                    <KeyRound size={15} aria-hidden="true" /> {syncT('resume')}
                   </button>
                 </div>
               </div>
             )}
             {samePrefix.length > 0 && (
               <p className={styles.warn} role="alert">
-                This device and {samePrefix.join(', ')} both number invoices as <strong>{myPrefix}/FY…</strong>. Two devices can then
-                issue the same number. Give each device its own business profile with a different prefix and pick it below.
+                {syncT('samePrefix', { devices: samePrefix.join(', '), prefix: myPrefix })}
               </p>
             )}
             {shared.map((w) => (
               <p key={w.series} className={styles.warn}>
-                Documents in the series <strong>{w.series}</strong> were issued on {w.devices.join(' and ')}. Keep one series per device to
-                avoid duplicate numbers.
+                {syncT('sharedSeries', { series: w.series, devices: w.devices.join(syncT('and')) })}
               </p>
             ))}
             {!peers.length && (
               <p className={controls.hint}>
-                No other device has synced yet. On your other computer open this company, choose the same folder and join “{config.group}”.
+                {syncT('noPeers', { group: config.group })}
               </p>
             )}
 
             <div className={controls.row}>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="sync-profile">This device issues as</label>
+                <label className={controls.label} htmlFor="sync-profile">{syncT('issuesAs')}</label>
                 <select
                   id="sync-profile"
                   className={controls.select}
@@ -455,17 +453,17 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                     refresh();
                   }}
                 >
-                  <option value="">The active profile</option>
+                  <option value="">{syncT('activeProfile')}</option>
                   {settings.profiles.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.companyName || 'Untitled'} ({p.invoicePrefix || settings.invoicePrefix || 'INV'})
+                      {p.companyName || syncT('untitled')} ({p.invoicePrefix || settings.invoicePrefix || 'INV'})
                     </option>
                   ))}
                 </select>
-                <span className={controls.hint}>New invoices on this device number as {myPrefix}/FY…/0001.</span>
+                <span className={controls.hint}>{syncT('numberAs', { prefix: myPrefix })}</span>
               </div>
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="sync-device-name">This device’s name</label>
+                <label className={controls.label} htmlFor="sync-device-name">{syncT('deviceName')}</label>
                 <input
                   id="sync-device-name"
                   className={controls.input}
@@ -484,9 +482,9 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
               <table className={styles.peers}>
                 <thead>
                   <tr>
-                    <th scope="col">Device</th>
-                    <th scope="col">Its last file</th>
-                    <th scope="col">Status</th>
+                    <th scope="col">{syncT('thDevice')}</th>
+                    <th scope="col">{syncT('thLastFile')}</th>
+                    <th scope="col">{syncT('thStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -494,7 +492,7 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                     <tr key={id}>
                       <td>{p.name || id.slice(0, 8)}</td>
                       <td>{when(p.written_at)}</td>
-                      <td>{p.status === 'ok' ? 'OK' : p.message || 'could not be read'}</td>
+                      <td>{p.status === 'ok' ? syncT('ok') : p.message || syncT('unreadable')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -503,7 +501,7 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
 
             {conflicts.length > 0 && (
               <>
-                <span className={controls.label}>To review ({conflicts.length})</span>
+                <span className={controls.label}>{syncT('toReviewN', { n: conflicts.length })}</span>
                 <ul className={styles.list}>
                   {conflicts.map((c) => (
                     <ConflictItem key={c.id} c={c} onResolve={onResolve} />
@@ -514,15 +512,14 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
 
             <div className={styles.buttons}>
               <button type="button" className={controls.btnPrimary} disabled={busy} onClick={() => void syncNow()}>
-                <RefreshCw size={15} aria-hidden="true" /> {busy ? 'Syncing…' : last?.reason === 'permission' ? 'Allow access and sync' : 'Sync now'}
+                <RefreshCw size={15} aria-hidden="true" /> {busy ? syncT('syncing') : last?.reason === 'permission' ? syncT('allowSync') : syncT('syncNow')}
               </button>
               <button type="button" className={controls.btnGhost} onClick={() => void turnOff()}>
-                <Unplug size={15} aria-hidden="true" /> Turn off sync
+                <Unplug size={15} aria-hidden="true" /> {syncT('turnOff')}
               </button>
             </div>
             <p className={controls.hint}>
-              Syncs when the app opens and every 5 minutes while it is open. After a browser restart the browser may ask to allow the
-              folder again: click Sync now once.
+              {syncT('footHint')}
             </p>
           </>
         )}

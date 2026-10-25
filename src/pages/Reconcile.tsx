@@ -41,30 +41,33 @@ import { CreateReceiptModal } from '../components/bank/CreateReceiptModal';
 import { CreateExpenseModal } from '../components/bank/CreateExpenseModal';
 import { BrsView } from '../components/bank/BrsView';
 import { StatementsPanel } from '../components/bank/StatementsPanel';
+import { useT } from '../i18n';
+import { bankT } from '../i18n/areas/bank';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import bank from '../components/bank/reconcile.module.css';
 import styles from './Reconcile.module.css';
 
 const TABS = [
-  { id: 'reconcile', label: 'Reconcile' },
-  { id: 'brs', label: 'BRS statement' },
-  { id: 'statements', label: 'Statements' },
-  { id: 'import', label: 'Import' },
+  { id: 'reconcile', label: 'tabReconcile' },
+  { id: 'brs', label: 'tabBrs' },
+  { id: 'statements', label: 'tabStatements' },
+  { id: 'import', label: 'tabImport' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
 type Filter = 'review' | 'matched' | 'ignored' | 'all';
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'review', label: 'To review' },
-  { id: 'matched', label: 'Matched' },
-  { id: 'ignored', label: 'Ignored' },
-  { id: 'all', label: 'All' },
+const FILTERS: { id: Filter; label: 'fReview' | 'fMatched' | 'fIgnored' | 'fAll' }[] = [
+  { id: 'review', label: 'fReview' },
+  { id: 'matched', label: 'fMatched' },
+  { id: 'ignored', label: 'fIgnored' },
+  { id: 'all', label: 'fAll' },
 ];
 
 const rupees = (n: number) => `₹${formatMoney(n)}`;
 
 export function Reconcile() {
+  useT(); // re-render on a language switch (5.4)
   const [params, setParams] = useSearchParams();
   const [statements, setStatements] = useState<BankStatement[]>(() => bankDb.all());
   const [books, setBooks] = useState<BooksData>(() => loadBooksData());
@@ -118,7 +121,7 @@ export function Reconcile() {
         bankDb.saveAll(next);
         setStatements(next);
       } catch (err) {
-        notify(err instanceof StorageWriteError ? err.message : 'Could not save — browser storage may be full.', 'error');
+        notify(err instanceof StorageWriteError ? err.message : bankT('saveFailed'), 'error');
       }
     },
     [notify],
@@ -217,23 +220,23 @@ export function Reconcile() {
     persist([...statements, multi && accountId !== DEFAULT_BANK_ID ? { ...st, bank_account_id: accountId } : st]);
     setScope('all');
     selectTab('reconcile');
-    notify(`Imported ${st.lines.length} transactions${info.duplicates ? ` (${info.duplicates} duplicates skipped)` : ''}`);
+    notify(info.duplicates ? bankT('importedDup', { n: st.lines.length, dup: info.duplicates }) : bankT('imported', { n: st.lines.length }));
   };
 
   const confirmAll = () => {
     persist(applySuggestions(statements, confirmable));
     setBulkOpen(false);
-    notify(`Confirmed ${confirmable.length} match${confirmable.length === 1 ? '' : 'es'}`);
+    notify(bankT(confirmable.length === 1 ? 'confirmedOne' : 'confirmedMany', { n: confirmable.length }));
   };
 
   const header = (
     <PageHeader
-      title="Bank reconciliation"
-      subtitle="Match your bank statement to the receipts and payments in your books, then print the BRS."
+      title={bankT('title')}
+      subtitle={bankT('subtitle')}
       actions={
         statements.length > 0 && (
           <button type="button" className={controls.btnPrimary} onClick={() => selectTab('import')}>
-            <Upload size={16} /> Import statement
+            <Upload size={16} /> {bankT('importStatement')}
           </button>
         )
       }
@@ -242,7 +245,7 @@ export function Reconcile() {
 
   const accountPicker = multi && (
     <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
-      <label className={controls.label} htmlFor="rec-account">Bank account</label>
+      <label className={controls.label} htmlFor="rec-account">{bankT('bankAccount')}</label>
       <select id="rec-account" className={controls.select} value={accountId} onChange={(e) => { setAccountId(e.target.value); setScope('all'); }}>
         {accounts.filter((a) => a.active !== false || a.id === accountId).map((a) => (
           <option key={a.id} value={a.id}>{a.name}{a.number ? ` (${a.number})` : ''}</option>
@@ -283,34 +286,34 @@ export function Reconcile() {
 
       <div className={surface.statGrid}>
         <StatCard
-          label="Balance per statement"
+          label={bankT('statBalStatement')}
           icon={Landmark}
           value={closing.balance === null ? '—' : rupees(closing.balance)}
-          hint={closing.balance === null ? 'Enter it under Statements' : `as on ${formatDate(closing.asOf)}`}
+          hint={closing.balance === null ? bankT('enterUnderStatements') : bankT('asOn', { date: formatDate(closing.asOf) })}
         />
         <StatCard
-          label="Balance per books"
+          label={bankT('statBalBooks')}
           icon={BookOpen}
           value={rupees(booksBalance)}
-          hint={multi && account ? (openingMissing ? `No opening balance for ${account.name} (Statements tab)` : account.name) : openingMissing ? 'No bank opening balance set in Books' : 'bank account in Books'}
+          hint={multi && account ? (openingMissing ? bankT('noOpeningFor', { name: account.name }) : account.name) : openingMissing ? bankT('noBankOpening') : bankT('bankInBooks')}
         />
         <StatCard
-          label="Difference"
+          label={bankT('statDiff')}
           icon={Scale}
           tone={diff === null ? 'default' : Math.abs(diff) <= 0.01 ? 'profit' : 'warning'}
           value={diff === null ? '—' : rupees(diff)}
-          hint="statement − books, before timing differences"
+          hint={bankT('diffHint')}
         />
         <StatCard
-          label="Unreconciled"
+          label={bankT('statUnrec')}
           icon={ListChecks}
           tone={summary.unreconciled ? 'warning' : 'profit'}
-          value={`${summary.unreconciled} line${summary.unreconciled === 1 ? '' : 's'}`}
-          hint={summary.unreconciled ? `+${rupees(summary.unreconciledCredits)} in · −${rupees(summary.unreconciledDebits)} out` : `${summary.pctReconciled}% reconciled`}
+          value={bankT(summary.unreconciled === 1 ? 'linesOne' : 'linesMany', { n: summary.unreconciled })}
+          hint={summary.unreconciled ? bankT('unrecHint', { inAmt: rupees(summary.unreconciledCredits), outAmt: rupees(summary.unreconciledDebits) }) : bankT('pctReconciled', { n: summary.pctReconciled })}
         />
       </div>
 
-      <div className={styles.tabs} role="tablist" aria-label="Reconciliation views">
+      <div className={styles.tabs} role="tablist" aria-label={bankT('views')}>
         {TABS.map((t, i) => (
           <button
             key={t.id}
@@ -327,7 +330,7 @@ export function Reconcile() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {t.label}
+            {bankT(t.label)}
           </button>
         ))}
       </div>
@@ -336,9 +339,9 @@ export function Reconcile() {
         {accountPicker}
         {tab !== 'import' && tab !== 'statements' && acctStatements.length > 1 && (
           <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
-            <label className={controls.label} htmlFor="rec-scope">Statement</label>
+            <label className={controls.label} htmlFor="rec-scope">{bankT('statement')}</label>
             <select id="rec-scope" className={controls.select} value={scope} onChange={(e) => setScope(e.target.value)}>
-              <option value="all">All statements ({acctStatements.length})</option>
+              <option value="all">{bankT('allStatements', { n: acctStatements.length })}</option>
               {acctStatements.map((s) => (
                 <option key={s.id} value={s.id}>{s.bank_label} — {s.file_name}</option>
               ))}
@@ -349,10 +352,10 @@ export function Reconcile() {
         {tab === 'reconcile' && (
           <div className={bank.stack}>
             <div className={bank.toolbar}>
-              <div className={bank.toolbarGroup} role="group" aria-label="Show lines">
+              <div className={bank.toolbarGroup} role="group" aria-label={bankT('showLines')}>
                 {FILTERS.map((f) => (
                   <button key={f.id} type="button" aria-pressed={filter === f.id} className={filter === f.id ? bank.chipActive : bank.chip} onClick={() => setFilter(f.id)}>
-                    {f.label} <span className={bank.count}>{counts[f.id]}</span>
+                    {bankT(f.label)} <span className={bank.count}>{counts[f.id]}</span>
                   </button>
                 ))}
               </div>
@@ -360,13 +363,13 @@ export function Reconcile() {
                 <input
                   type="search"
                   className={`${controls.input} ${bank.search}`}
-                  placeholder="Search narration, amount, date"
-                  aria-label="Search statement lines"
+                  placeholder={bankT('searchPh')}
+                  aria-label={bankT('searchAria')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
                 <button type="button" className={controls.btnOutline} disabled={confirmable.length === 0} onClick={() => setBulkOpen(true)}>
-                  <CheckCheck size={16} /> Confirm all ≥ {BULK_CONFIRM_THRESHOLD}% ({confirmable.length})
+                  <CheckCheck size={16} /> {bankT('confirmAll', { pct: BULK_CONFIRM_THRESHOLD, n: confirmable.length })}
                 </button>
               </div>
             </div>
@@ -374,8 +377,8 @@ export function Reconcile() {
               {items.length === 0 ? (
                 <EmptyState
                   icon={CheckCheck}
-                  title={filter === 'review' ? 'Nothing left to review' : 'No lines here'}
-                  text={filter === 'review' ? 'Every line is matched, ignored or reconciled. Open the BRS statement to print it.' : 'Try another filter or clear the search.'}
+                  title={filter === 'review' ? bankT('nothingToReview') : bankT('noLines')}
+                  text={filter === 'review' ? bankT('nothingToReviewText') : bankT('noLinesText')}
                 />
               ) : (
                 <LineList
@@ -410,13 +413,13 @@ export function Reconcile() {
             onRemove={(id) => {
               persist(removeStatement(statements, id));
               setScope('all');
-              notify('Statement deleted');
+              notify(bankT('statementDeleted'));
             }}
           />
         )}
 
         {tab === 'import' && <ImportPanel existing={statements} onImport={importStatement} onCancel={() => selectTab('reconcile')} />}
-        {tab === 'import' && multi && account && <p className={surface.sectionNote}>Imports into: {account.name}</p>}
+        {tab === 'import' && multi && account && <p className={surface.sectionNote}>{bankT('importsInto', { name: account.name })}</p>}
       </div>
 
       <MatchPicker
@@ -431,7 +434,7 @@ export function Reconcile() {
         onChanged={refreshBooks}
         onSettled={(line, payments) => {
           matchTo(line, 'payment', payments.map((p) => p.id));
-          notify(`Receipt${payments.length > 1 ? 's' : ''} recorded and matched`);
+          notify(bankT(payments.length > 1 ? 'receiptMany' : 'receiptOne'));
         }}
       />
       <CreateExpenseModal
@@ -440,14 +443,14 @@ export function Reconcile() {
         onChanged={refreshBooks}
         onSettled={(line, paymentId) => {
           matchTo(line, 'purchase_payment', [paymentId]);
-          notify('Payment recorded and matched');
+          notify(bankT('paymentMatched'));
         }}
       />
       <ConfirmDialog
         open={bulkOpen}
-        title={`Confirm ${confirmable.length} high-confidence match${confirmable.length === 1 ? '' : 'es'}?`}
-        message={`Only unambiguous matches scoring ${BULK_CONFIRM_THRESHOLD}% or more are applied — same amount, close date and a matching UTR, invoice number or party name. Nothing is written to your invoices; you can unmatch any line afterwards.`}
-        confirmLabel="Confirm matches"
+        title={bankT(confirmable.length === 1 ? 'bulkTitleOne' : 'bulkTitleMany', { n: confirmable.length })}
+        message={bankT('bulkMessage', { pct: BULK_CONFIRM_THRESHOLD })}
+        confirmLabel={bankT('confirmMatches')}
         onConfirm={confirmAll}
         onClose={() => setBulkOpen(false)}
       />

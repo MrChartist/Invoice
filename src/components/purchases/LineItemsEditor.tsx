@@ -7,6 +7,8 @@ import { blankPurchaseLine as blankLine } from '../../lib/purchases';
 import { round2 } from '../../lib/invoice-calc';
 import { formatCurrency } from '../../lib/utils';
 import { NumberInput } from '../ui/NumberInput';
+import { useT } from '../../i18n';
+import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -27,6 +29,7 @@ function needsTracking(line: PurchaseLine, ctx: BillStockContext | undefined): b
 
 /** Editable bill lines: item, HSN/SAC, qty, rate, GST%. */
 export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps) {
+  useT(); // re-render on a language switch (5.4)
   const patch = (id: string, change: Partial<PurchaseLine>) =>
     onChange(lines.map((l) => (l.id === id ? { ...l, ...change } : l)));
 
@@ -36,61 +39,61 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
         <table className={styles.lines}>
           <thead>
             <tr>
-              <th className={styles.colName}>Item</th>
-              <th className={styles.colHsn}>HSN / SAC</th>
-              <th className={styles.colQty}>Qty</th>
-              <th className={styles.colRate}>Rate</th>
-              <th className={styles.colTax}>GST %</th>
-              <th className={styles.colAmt}>Amount</th>
-              <th className={styles.colAct}><span className={surface.srOnly}>Remove</span></th>
+              <th className={styles.colName}>{purT('thItem')}</th>
+              <th className={styles.colHsn}>{purT('thHsn')}</th>
+              <th className={styles.colQty}>{purT('thQty')}</th>
+              <th className={styles.colRate}>{purT('thRate')}</th>
+              <th className={styles.colTax}>{purT('thGstPct')}</th>
+              <th className={styles.colAmt}>{purT('thAmount')}</th>
+              <th className={styles.colAct}><span className={surface.srOnly}>{purT('remove')}</span></th>
             </tr>
           </thead>
           <tbody>
             {lines.map((l, i) => (
               <Fragment key={l.id}>
               <tr>
-                <td data-label="Item">
+                <td data-label={purT('thItem')}>
                   <input
                     className={controls.ghost}
                     value={l.name}
-                    placeholder="Item or service"
-                    aria-label={`Line ${i + 1} item`}
+                    placeholder={purT('itemPh')}
+                    aria-label={purT('lineItem', { n: i + 1 })}
                     onChange={(e) => patch(l.id, { name: e.target.value })}
                   />
                 </td>
-                <td data-label="HSN / SAC">
+                <td data-label={purT('thHsn')}>
                   <input
                     className={controls.ghost}
                     value={l.hsn ?? ''}
                     inputMode="numeric"
                     placeholder="HSN"
-                    aria-label={`Line ${i + 1} HSN or SAC`}
+                    aria-label={purT('lineHsn', { n: i + 1 })}
                     onChange={(e) => patch(l.id, { hsn: e.target.value.replace(/[^0-9]/g, '').slice(0, 8) })}
                   />
                 </td>
-                <td data-label="Qty">
+                <td data-label={purT('thQty')}>
                   <NumberInput
                     className={controls.ghostNumeric}
                     value={l.quantity}
                     blankZero={false}
-                    aria-label={`Line ${i + 1} quantity`}
+                    aria-label={purT('lineQty', { n: i + 1 })}
                     onChange={(quantity) => patch(l.id, { quantity })}
                   />
                 </td>
-                <td data-label="Rate">
+                <td data-label={purT('thRate')}>
                   <NumberInput
                     className={controls.ghostNumeric}
                     value={l.rate}
                     placeholder="0.00"
-                    aria-label={`Line ${i + 1} rate`}
+                    aria-label={purT('lineRate', { n: i + 1 })}
                     onChange={(rate) => patch(l.id, { rate })}
                   />
                 </td>
-                <td data-label="GST %">
+                <td data-label={purT('thGstPct')}>
                   <select
                     className={controls.ghost}
                     value={l.tax_rate}
-                    aria-label={`Line ${i + 1} GST rate`}
+                    aria-label={purT('lineGst', { n: i + 1 })}
                     onChange={(e) => patch(l.id, { tax_rate: Number(e.target.value) })}
                   >
                     {GST_SLABS.map((s) => (
@@ -98,12 +101,12 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
                     ))}
                   </select>
                 </td>
-                <td className={styles.lineAmount} data-label="Amount">{formatCurrency(round2(l.quantity * l.rate))}</td>
+                <td className={styles.lineAmount} data-label={purT('thAmount')}>{formatCurrency(round2(l.quantity * l.rate))}</td>
                 <td>
                   <button
                     type="button"
                     className={controls.btnDanger}
-                    aria-label={`Remove line ${i + 1}`}
+                    aria-label={purT('removeLine', { n: i + 1 })}
                     disabled={lines.length === 1}
                     onClick={() => onChange(lines.filter((x) => x.id !== l.id))}
                   >
@@ -129,7 +132,7 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
         style={{ marginTop: '0.5rem' }}
         onClick={() => onChange([...lines, blankLine(lines[lines.length - 1]?.tax_rate ?? 18)])}
       >
-        <Plus size={15} /> Add line
+        <Plus size={15} /> {purT('addLine')}
       </button>
     </div>
   );

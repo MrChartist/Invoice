@@ -8,6 +8,9 @@ import { PURCHASE_CATEGORIES, type PurchaseRecord } from '../../types/purchases'
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { recordBillPaymentFromLine, recordExpenseFromLine } from './actions';
+import { useT } from '../../i18n';
+import { bankT } from '../../i18n/areas/bank';
+import { purCategory } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './reconcile.module.css';
 
@@ -22,13 +25,14 @@ export interface CreateExpenseModalProps {
 const GST_RATES = [0, 5, 12, 18, 28];
 
 export function CreateExpenseModal({ line, onClose, onChanged, onSettled }: CreateExpenseModalProps) {
+  useT(); // re-render on a language switch (5.4)
   return (
     <Modal
       open={!!line}
       onClose={onClose}
       size="lg"
-      title="Record this debit"
-      subtitle="Create the expense, or pay a supplier bill — either one is booked on the bank date."
+      title={bankT('expenseTitle')}
+      subtitle={bankT('expenseSub')}
     >
       {line && <Body key={line.id} line={line} onClose={onClose} onChanged={onChanged} onSettled={onSettled} />}
     </Modal>
@@ -48,7 +52,7 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateExpenseModalPr
   return (
     <div className={styles.stack}>
       {brief}
-      <div className={styles.tabs2} role="tablist" aria-label="How to record this debit">
+      <div className={styles.tabs2} role="tablist" aria-label={bankT('howRecord')}>
         {(['expense', 'bill'] as const).map((m) => (
           <button
             key={m}
@@ -61,7 +65,7 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateExpenseModalPr
               setError('');
             }}
           >
-            {m === 'expense' ? 'New expense' : 'Pay a supplier bill'}
+            {m === 'expense' ? bankT('newExpense') : bankT('payBill')}
           </button>
         ))}
       </div>
@@ -91,7 +95,7 @@ function NewExpense({ line, onError, onChanged, onSettled, onClose }: PartProps)
       onSettled(line, payment.id);
       onClose();
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Could not record the expense.');
+      onError(err instanceof Error ? err.message : bankT('errExpense'));
     }
   };
 
@@ -99,31 +103,31 @@ function NewExpense({ line, onError, onChanged, onSettled, onClose }: PartProps)
     <div className={styles.stack}>
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="ex-cat">Category</label>
+          <label className={controls.label} htmlFor="ex-cat">{bankT('category')}</label>
           <select id="ex-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
-            {PURCHASE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {PURCHASE_CATEGORIES.map((c) => <option key={c} value={c}>{purCategory(c)}</option>)}
           </select>
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="ex-vendor">Paid to</label>
-          <input id="ex-vendor" className={controls.input} value={vendor} placeholder="Vendor name" onChange={(e) => setVendor(e.target.value)} />
+          <label className={controls.label} htmlFor="ex-vendor">{bankT('paidTo')}</label>
+          <input id="ex-vendor" className={controls.input} value={vendor} placeholder={bankT('vendorPh')} onChange={(e) => setVendor(e.target.value)} />
         </div>
       </div>
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="ex-gst">GST included in ₹{formatMoney(line.debit)}</label>
+          <label className={controls.label} htmlFor="ex-gst">{bankT('gstIncluded', { amount: `₹${formatMoney(line.debit)}` })}</label>
           <select id="ex-gst" className={controls.select} value={rate} onChange={(e) => setRate(+e.target.value)}>
-            {GST_RATES.map((r) => <option key={r} value={r}>{r === 0 ? 'No GST' : `${r}%`}</option>)}
+            {GST_RATES.map((r) => <option key={r} value={r}>{r === 0 ? bankT('noGst') : `${r}%`}</option>)}
           </select>
         </div>
         <label className={controls.check} style={{ alignSelf: 'end', minHeight: 40 }}>
           <input type="checkbox" checked={itc} disabled={rate === 0} onChange={(e) => setItc(e.target.checked)} />
-          <span>Claim GST as input tax credit</span>
+          <span>{bankT('claimItc')}</span>
         </label>
       </div>
       <div className={styles.toolbarGroup} style={{ justifyContent: 'flex-end' }}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-        <button type="button" className={controls.btnPrimary} onClick={submit}>Create expense &amp; match</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{bankT('cancel')}</button>
+        <button type="button" className={controls.btnPrimary} onClick={submit}>{bankT('createExpenseMatch')}</button>
       </div>
     </div>
   );
@@ -168,31 +172,31 @@ function PayBill({ line, onError, onChanged, onSettled, onClose }: PartProps) {
       if (round2(amount) >= round2(line.debit) - 0.01) onSettled(line, pay.id);
       onClose();
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Could not record the payment.');
+      onError(err instanceof Error ? err.message : bankT('errPayment'));
     }
   };
 
   return (
     <div className={styles.stack}>
-      <p className={styles.muted}>Reference recorded: <strong>{referenceFor(line) || '—'}</strong>. Bills that look like this debit are listed first.</p>
+      <p className={styles.muted}>{bankT('refRecorded')} <strong>{referenceFor(line) || '—'}</strong>. {bankT('billsFirst')}</p>
       <div className={controls.field}>
-        <label className={controls.label} htmlFor="pb-q">Search bills</label>
-        <input id="pb-q" className={controls.input} placeholder="Vendor or bill no.…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <label className={controls.label} htmlFor="pb-q">{bankT('searchBills')}</label>
+        <input id="pb-q" className={controls.input} placeholder={bankT('searchBillsPh')} value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
       {bills.length === 0 ? (
-        <p className={styles.muted}>No unpaid supplier bills. Use “New expense” instead.</p>
+        <p className={styles.muted}>{bankT('noUnpaid')}</p>
       ) : (
-        <ul className={styles.pickList} aria-label="Unpaid supplier bills">
+        <ul className={styles.pickList} aria-label={bankT('unpaidBills')}>
           {bills.map(({ p, name, owing }) => (
             <li key={p.id}>
               <label className={styles.pickItem}>
                 <input type="radio" name="pb-bill" checked={billId === p.id} onChange={() => choose(p)} />
                 <span className={styles.pickBody}>
-                  <span className={styles.pickTitle}>{name || 'Vendor'} {p.bill_number ? `· ${p.bill_number}` : ''}</span>
+                  <span className={styles.pickTitle}>{name || bankT('vendor')} {p.bill_number ? `· ${p.bill_number}` : ''}</span>
                   <br />
-                  <span className={styles.pickSub}>{formatDate(p.date)} · total ₹{formatMoney(p.total)}</span>
+                  <span className={styles.pickSub}>{bankT('dateTotal', { date: formatDate(p.date), amount: `₹${formatMoney(p.total)}` })}</span>
                 </span>
-                <span className={styles.amt}>₹{formatMoney(owing)} due</span>
+                <span className={styles.amt}>{bankT('dueN', { amount: `₹${formatMoney(owing)}` })}</span>
               </label>
             </li>
           ))}
@@ -200,13 +204,13 @@ function PayBill({ line, onError, onChanged, onSettled, onClose }: PartProps) {
       )}
       {billId && (
         <div className={controls.field} style={{ maxWidth: 260 }}>
-          <label className={controls.label} htmlFor="pb-amt">Amount to record</label>
+          <label className={controls.label} htmlFor="pb-amt">{bankT('amountToRecord')}</label>
           <NumberInput id="pb-amt" className={`${controls.input} ${controls.inputNumeric}`} value={amount} onChange={setAmount} />
         </div>
       )}
       <div className={styles.toolbarGroup} style={{ justifyContent: 'flex-end' }}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-        <button type="button" className={controls.btnPrimary} disabled={!billId || !(amount > 0)} onClick={submit}>Record payment</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{bankT('cancel')}</button>
+        <button type="button" className={controls.btnPrimary} disabled={!billId || !(amount > 0)} onClick={submit}>{bankT('recordPayment')}</button>
       </div>
     </div>
   );

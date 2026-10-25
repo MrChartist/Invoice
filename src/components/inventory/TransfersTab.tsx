@@ -13,6 +13,8 @@ import {
 import type { StockInputs, StockItem } from '../../lib/inventory';
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine } from '../../types/stock';
 import { SerialPicker } from './SerialPicker';
+import { useT } from '../../i18n';
+import { invT } from '../../i18n/areas/inventory';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
@@ -27,6 +29,7 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
   onChanged: (message: string) => void;
   onError: (message: string) => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<StockTransfer | null>(null);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -35,14 +38,14 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
   return (
     <>
       <div className={styles.lookupHead} style={{ padding: '0 0 0.75rem', justifyContent: 'space-between' }}>
-        <span className={styles.muted}>Moves quantity between godowns. No value, GST or books entry.</span>
+        <span className={styles.muted}>{invT('transfersNote')}</span>
         <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} onClick={() => setCreating(true)}>
-          <Plus size={14} aria-hidden="true" /> New transfer
+          <Plus size={14} aria-hidden="true" /> {invT('newTransfer')}
         </button>
       </div>
       <table className={surface.table}>
         <thead>
-          <tr><th>Number</th><th>Date</th><th>From → To</th><th>Items</th><th><span className={surface.srOnly}>Actions</span></th></tr>
+          <tr><th>{invT('thNumber')}</th><th>{invT('thDate')}</th><th>{invT('thFromTo')}</th><th>{invT('thItems')}</th><th><span className={surface.srOnly}>{invT('thActions')}</span></th></tr>
         </thead>
         <tbody>
           {sorted.map((t) => (
@@ -51,16 +54,16 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
               <td>{formatDate(t.date)}</td>
               <td>{godownName(godowns, t.from_godown)} → {godownName(godowns, t.to_godown)}</td>
               <td>
-                {t.lines.map((l) => `${byId.get(l.item_id)?.name ?? 'Deleted item'} × ${l.qty}${l.batch_no ? ` (${l.batch_no})` : ''}`).join(', ')}
+                {t.lines.map((l) => `${byId.get(l.item_id)?.name ?? invT('deletedItem')} × ${l.qty}${l.batch_no ? ` (${l.batch_no})` : ''}`).join(', ')}
               </td>
               <td>
-                <button type="button" className={controls.btnDanger} aria-label={`Delete ${t.transfer_number}`} onClick={() => setDeleting(t)}>
+                <button type="button" className={controls.btnDanger} aria-label={invT('deleteNamed', { name: t.transfer_number })} onClick={() => setDeleting(t)}>
                   <Trash2 size={16} />
                 </button>
               </td>
             </tr>
           ))}
-          {sorted.length === 0 && <tr><td colSpan={5} className={styles.muted}>No transfers yet.</td></tr>}
+          {sorted.length === 0 && <tr><td colSpan={5} className={styles.muted}>{invT('noTransfers')}</td></tr>}
         </tbody>
       </table>
 
@@ -72,24 +75,24 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
           onClose={() => setCreating(false)}
           onSaved={(t) => {
             setCreating(false);
-            onChanged(`Transfer ${t.transfer_number} saved`);
+            onChanged(invT('transferSaved', { number: t.transfer_number }));
           }}
         />
       )}
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete transfer?"
-        message={`${deleting?.transfer_number ?? ''} will be removed and the stock goes back to ${deleting ? godownName(godowns, deleting.from_godown) : ''}. The number is not reused.`}
-        confirmLabel="Delete"
+        title={invT('transferDeleteTitle')}
+        message={invT('transferDeleteMsg', { number: deleting?.transfer_number ?? '', godown: deleting ? godownName(godowns, deleting.from_godown) : '' })}
+        confirmLabel={invT('delete')}
         onClose={() => setDeleting(null)}
         onConfirm={() => {
           if (!deleting) return;
           try {
             transfersDb.remove(deleting.id);
-            onChanged(`Transfer ${deleting.transfer_number} deleted`);
+            onChanged(invT('transferDeleted', { number: deleting.transfer_number }));
           } catch (err) {
-            onError(isPeriodLockedError(err) ? (err as Error).message : 'Could not delete the transfer.');
+            onError(isPeriodLockedError(err) ? (err as Error).message : invT('transferDeleteFailed'));
           }
         }}
       />
@@ -132,13 +135,13 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
       open
       onClose={onClose}
       size="lg"
-      title="New stock transfer"
-      subtitle={`Number ${transfersDb.nextNumber(date)} (Indian FY of the date)`}
+      title={invT('newStockTransfer')}
+      subtitle={invT('transferSub', { number: transfersDb.nextNumber(date) })}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{invT('cancel')}</button>
           <button type="button" className={controls.btnPrimary} onClick={submit}>
-            <ArrowLeftRight size={16} aria-hidden="true" /> Save transfer
+            <ArrowLeftRight size={16} aria-hidden="true" /> {invT('saveTransfer')}
           </button>
         </>
       }
@@ -146,19 +149,19 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
       <form className={styles.form} onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
         <div className={controls.row3}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="tr-date">Date</label>
+            <label className={controls.label} htmlFor="tr-date">{invT('date')}</label>
             <input id="tr-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="tr-from">From godown</label>
+            <label className={controls.label} htmlFor="tr-from">{invT('fromGodown')}</label>
             <select id="tr-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>
               {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="tr-to">To godown</label>
+            <label className={controls.label} htmlFor="tr-to">{invT('toGodown')}</label>
             <select id="tr-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)}>
-              <option value="">Choose…</option>
+              <option value="">{invT('choose')}</option>
               {godowns.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
@@ -172,20 +175,20 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
             <div key={l.id} className={styles.serialBox}>
               <div className={styles.lineRow}>
                 <div className={controls.field}>
-                  <label className={controls.label} htmlFor={`tr-item-${l.id}`}>Item {i + 1}</label>
+                  <label className={controls.label} htmlFor={`tr-item-${l.id}`}>{invT('itemN', { n: i + 1 })}</label>
                   <select
                     id={`tr-item-${l.id}`}
                     className={controls.select}
                     value={l.item_id}
                     onChange={(e) => patch(l.id, { item_id: e.target.value, batch_no: undefined, serials: undefined })}
                   >
-                    <option value="">Choose item…</option>
+                    <option value="">{invT('chooseItem')}</option>
                     {sortedItems.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                   </select>
-                  {item && <span className={controls.hint}>{available} {item.unit} in the source godown</span>}
+                  {item && <span className={controls.hint}>{invT('inSource', { qty: available, unit: item.unit })}</span>}
                 </div>
                 <div className={controls.field}>
-                  <label className={controls.label} htmlFor={`tr-qty-${l.id}`}>Quantity</label>
+                  <label className={controls.label} htmlFor={`tr-qty-${l.id}`}>{invT('quantity')}</label>
                   <input
                     id={`tr-qty-${l.id}`}
                     className={`${controls.input} ${controls.inputNumeric}`}
@@ -197,22 +200,22 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
                 </div>
                 {item?.track_batches ? (
                   <div className={controls.field}>
-                    <label className={controls.label} htmlFor={`tr-batch-${l.id}`}>Batch</label>
+                    <label className={controls.label} htmlFor={`tr-batch-${l.id}`}>{invT('batch')}</label>
                     <select id={`tr-batch-${l.id}`} className={controls.select} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })}>
-                      <option value="">Choose…</option>
+                      <option value="">{invT('choose')}</option>
                       {batchOptions(t, date, from).map((b) => (
-                        <option key={b.batch} value={b.batch}>{b.batch}{b.expiry ? ` · exp ${b.expiry}` : ''} · {b.qty}{b.expired ? ' · EXPIRED' : ''}</option>
+                        <option key={b.batch} value={b.batch}>{b.batch}{b.expiry ? ` · ${invT('exp', { date: b.expiry })}` : ''} · {b.qty}{b.expired ? ` · ${invT('expired')}` : ''}</option>
                       ))}
                     </select>
                   </div>
                 ) : <span />}
-                <button type="button" className={controls.btnDanger} aria-label={`Remove line ${i + 1}`} disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}>
+                <button type="button" className={controls.btnDanger} aria-label={invT('removeLine', { n: i + 1 })} disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}>
                   <Trash2 size={15} />
                 </button>
               </div>
               {item?.track_serials && (
                 <SerialPicker
-                  label={`Serials for item ${i + 1}`}
+                  label={invT('serialsForItem', { n: i + 1 })}
                   options={serialsInStock(t, from)}
                   value={l.serials ?? []}
                   onChange={(next) => patch(l.id, { serials: next.length ? next : undefined, qty: next.length })}
@@ -222,12 +225,12 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
           );
         })}
         <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setLines((ls) => [...ls, blankTransferLine(generateId())])}>
-          <Plus size={14} aria-hidden="true" /> Add line
+          <Plus size={14} aria-hidden="true" /> {invT('addLine')}
         </button>
 
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="tr-notes">Notes</label>
-          <input id="tr-notes" className={controls.input} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Vehicle no., reason…" />
+          <label className={controls.label} htmlFor="tr-notes">{invT('notes')}</label>
+          <input id="tr-notes" className={controls.input} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={invT('notesPh')} />
         </div>
         {error && <p className={controls.error} role="alert">{error}</p>}
         <button type="submit" hidden />

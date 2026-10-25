@@ -11,6 +11,8 @@ import { formatDate, formatMoney } from '../../lib/utils';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { NumberInput } from '../ui/NumberInput';
 import { downloadCsv } from '../books/download';
+import { useT } from '../../i18n';
+import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './reconcile.module.css';
@@ -23,21 +25,22 @@ export interface StatementsPanelProps {
 }
 
 export function StatementsPanel({ statements, index, onClosingBalance, onRemove }: StatementsPanelProps) {
+  useT(); // re-render on a language switch (5.4)
   const [deleting, setDeleting] = useState<BankStatement | null>(null);
 
   return (
     <div className={surface.card}>
       <div className={surface.tableWrap}>
         <table className={surface.table}>
-          <caption className={surface.srOnly}>Imported bank statements</caption>
+          <caption className={surface.srOnly}>{bankT('importedStatements')}</caption>
           <thead>
             <tr>
-              <th scope="col">Statement</th>
-              <th scope="col">Period</th>
-              <th scope="col" className={surface.numeric}>Lines</th>
-              <th scope="col" className={surface.numeric}>Reconciled</th>
-              <th scope="col" className={surface.numeric}>Closing balance</th>
-              <th scope="col"><span className={surface.srOnly}>Actions</span></th>
+              <th scope="col">{bankT('thStatement')}</th>
+              <th scope="col">{bankT('thPeriod')}</th>
+              <th scope="col" className={surface.numeric}>{bankT('thLines')}</th>
+              <th scope="col" className={surface.numeric}>{bankT('thReconciled')}</th>
+              <th scope="col" className={surface.numeric}>{bankT('thClosing')}</th>
+              <th scope="col"><span className={surface.srOnly}>{bankT('thActions')}</span></th>
             </tr>
           </thead>
           <tbody>
@@ -50,22 +53,22 @@ export function StatementsPanel({ statements, index, onClosingBalance, onRemove 
                 <tr key={s.id}>
                   <td>
                     <strong>{s.bank_label}</strong>
-                    <div className={styles.muted}>{s.file_name} · imported {formatDate(s.imported_at.slice(0, 10))}</div>
+                    <div className={styles.muted}>{bankT('importedOn', { file: s.file_name, date: formatDate(s.imported_at.slice(0, 10)) })}</div>
                   </td>
                   <td>{dates.length ? `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}` : '—'}</td>
                   <td className={surface.numeric}>{sum.total}</td>
                   <td className={surface.numeric}>{sum.pctReconciled}%</td>
                   <td className={surface.numeric}>
                     {fromFile ? (
-                      <span title="Taken from the balance column of the file">{closing === null ? '—' : `₹${formatMoney(closing)}`}</span>
+                      <span title={bankT('fromFile')}>{closing === null ? '—' : `₹${formatMoney(closing)}`}</span>
                     ) : (
                       <NumberInput
-                        aria-label={`Closing balance for ${s.file_name}`}
+                        aria-label={bankT('closingFor', { file: s.file_name })}
                         className={`${controls.input} ${controls.inputNumeric}`}
                         style={{ maxWidth: 150 }}
                         blankZero
                         value={s.closing_balance ?? 0}
-                        placeholder="Enter balance"
+                        placeholder={bankT('enterBalance')}
                         onChange={(v) => onClosingBalance(s.id, v === 0 ? undefined : v)}
                       />
                     )}
@@ -75,12 +78,12 @@ export function StatementsPanel({ statements, index, onClosingBalance, onRemove 
                       <button
                         type="button"
                         className={controls.btnIcon}
-                        aria-label={`Download ${s.file_name} with reconciliation status`}
+                        aria-label={bankT('downloadWithStatus', { file: s.file_name })}
                         onClick={() => downloadCsv(`${s.file_name.replace(/\.[a-z]+$/i, '')}-reconciliation.csv`, statementLinesCsv(s.lines, index))}
                       >
                         <Download size={16} />
                       </button>
-                      <button type="button" className={controls.btnIcon} aria-label={`Delete statement ${s.file_name}`} onClick={() => setDeleting(s)}>
+                      <button type="button" className={controls.btnIcon} aria-label={bankT('deleteStatementNamed', { file: s.file_name })} onClick={() => setDeleting(s)}>
                         <Trash2 size={16} />
                       </button>
                     </span>
@@ -93,9 +96,9 @@ export function StatementsPanel({ statements, index, onClosingBalance, onRemove 
       </div>
       <ConfirmDialog
         open={!!deleting}
-        title="Delete this statement?"
-        message={`Removes ${deleting?.lines.length ?? 0} lines of ${deleting?.file_name ?? ''} and their match status from this device. Receipts and payments already in your books are not touched.`}
-        confirmLabel="Delete statement"
+        title={bankT('deleteStatementTitle')}
+        message={bankT('deleteStatementMsg', { n: deleting?.lines.length ?? 0, file: deleting?.file_name ?? '' })}
+        confirmLabel={bankT('deleteStatement')}
         destructive
         onConfirm={() => {
           if (deleting) onRemove(deleting.id);
