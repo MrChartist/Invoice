@@ -15,6 +15,9 @@ import { downloadCsv } from './download';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './books.module.css';
+import { useT } from '../../i18n';
+import { booksT, voucherTypeLabel } from '../../i18n/areas/books';
+import { methodLabel } from '../../i18n/labels';
 
 export interface CashBankTabProps {
   vouchers: Voucher[];
@@ -24,21 +27,22 @@ export interface CashBankTabProps {
 }
 
 export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashBankTabProps) {
+  useT();
   const [account, setAccount] = useState<CashAccount>('cash');
   const book = useMemo(() => cashBook(vouchers, openings, account, period), [vouchers, openings, account, period]);
-  const name = account === 'cash' ? 'Cash book' : 'Bank book';
+  const name = account === 'cash' ? booksT('cashBook') : booksT('bankBook');
 
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
-        <div className={controls.segment} role="group" aria-label="Book">
+        <div className={controls.segment} role="group" aria-label={booksT('book')}>
           <button
             type="button"
             className={account === 'cash' ? controls.segmentBtnActive : controls.segmentBtn}
             aria-pressed={account === 'cash'}
             onClick={() => setAccount('cash')}
           >
-            Cash book
+            {booksT('cashBook')}
           </button>
           <button
             type="button"
@@ -46,19 +50,19 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
             aria-pressed={account === 'bank'}
             onClick={() => setAccount('bank')}
           >
-            Bank book
+            {booksT('bankBook')}
           </button>
         </div>
         <div className={styles.toolbarGroup}>
           <button type="button" className={controls.btnOutline} onClick={onEditOpening}>
-            <Scale size={16} /> Opening balances
+            <Scale size={16} /> {booksT('openingBalances')}
           </button>
           <button
             type="button"
             className={controls.btnOutline}
             onClick={() => downloadCsv(`${account}-book-${period.start}_to_${period.end}.csv`, cashBookCsv(book))}
           >
-            <Download size={16} /> Export CSV
+            <Download size={16} /> {booksT('exportCsv')}
           </button>
         </div>
       </div>
@@ -67,10 +71,10 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
         <div className={styles.noticeWarn} role="note">
           <AlertTriangle size={16} className={styles.noticeIcon} aria-hidden="true" />
           <span>
-            No opening balance is set for {account === 'cash' ? 'cash in hand' : 'the bank'}, so the book starts at zero.
+            {account === 'cash' ? booksT('noOpeningCash') : booksT('noOpeningBank')}
             {' '}
             <button type="button" className={styles.link} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={onEditOpening}>
-              Set opening balance
+              {booksT('setOpening')}
             </button>
           </span>
         </div>
@@ -79,35 +83,35 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
       <div className={surface.statGrid}>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Opening</span>
+            <span className={surface.statLabel}>{booksT('statOpening')}</span>
             <span className={surface.statIcon}>{account === 'cash' ? <Wallet size={15} /> : <Landmark size={15} />}</span>
           </div>
           <div className={surface.statValue}>{formatMoney(book.opening)}</div>
-          <div className={surface.statHint}>on {formatDate(period.start)}</div>
+          <div className={surface.statHint}>{booksT('statOn', { date: formatDate(period.start) })}</div>
         </div>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Receipts</span>
+            <span className={surface.statLabel}>{booksT('statReceipts')}</span>
             <span className={surface.statIcon}><ArrowDownLeft size={15} color="var(--profit)" /></span>
           </div>
           <div className={`${surface.statValue} ${styles.pos}`}>{formatMoney(book.totalReceipts)}</div>
-          <div className={surface.statHint}>money in</div>
+          <div className={surface.statHint}>{booksT('moneyIn')}</div>
         </div>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Payments</span>
+            <span className={surface.statLabel}>{booksT('statPayments')}</span>
             <span className={surface.statIcon}><ArrowUpRight size={15} color="var(--loss)" /></span>
           </div>
           <div className={`${surface.statValue} ${styles.neg}`}>{formatMoney(book.totalPayments)}</div>
-          <div className={surface.statHint}>money out</div>
+          <div className={surface.statHint}>{booksT('moneyOut')}</div>
         </div>
         <div className={surface.stat}>
           <div className={surface.statTop}>
-            <span className={surface.statLabel}>Closing</span>
+            <span className={surface.statLabel}>{booksT('statClosing')}</span>
             <span className={surface.statIcon}><Scale size={15} /></span>
           </div>
           <div className={surface.statValue}>{formatMoney(book.closing)}</div>
-          <div className={surface.statHint}>on {formatDate(period.end)}</div>
+          <div className={surface.statHint}>{booksT('statOn', { date: formatDate(period.end) })}</div>
         </div>
       </div>
 
@@ -116,11 +120,11 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
         {book.rows.length === 0 ? (
           <EmptyState
             icon={account === 'cash' ? Wallet : Landmark}
-            title={`No ${account} movements`}
+            title={account === 'cash' ? booksT('noCashMovements') : booksT('noBankMovements')}
             text={
               account === 'cash'
-                ? 'Receipts and payments made in cash show up here.'
-                : 'UPI, bank transfer, cheque and card receipts and payments show up here.'
+                ? booksT('noCashText')
+                : booksT('noBankText')
             }
           />
         ) : (
@@ -129,18 +133,18 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
               <caption className={surface.srOnly}>{name}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Particulars</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Method</th>
-                  <th scope="col" className={surface.numeric}>Receipt</th>
-                  <th scope="col" className={surface.numeric}>Payment</th>
-                  <th scope="col" className={surface.numeric}>Balance</th>
+                  <th scope="col">{booksT('colDate')}</th>
+                  <th scope="col">{booksT('colParticulars')}</th>
+                  <th scope="col">{booksT('colType')}</th>
+                  <th scope="col">{booksT('colMethod')}</th>
+                  <th scope="col" className={surface.numeric}>{booksT('colReceipt')}</th>
+                  <th scope="col" className={surface.numeric}>{booksT('colPayment')}</th>
+                  <th scope="col" className={surface.numeric}>{booksT('colBalance')}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className={styles.dayRow}>
-                  <td colSpan={6}>Opening balance</td>
+                  <td colSpan={6}>{booksT('openingBalance')}</td>
                   <td className={surface.numeric}>{formatMoney(book.opening)}</td>
                 </tr>
                 {book.rows.map((r) => (
@@ -158,15 +162,15 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
                         </div>
                       )}
                     </td>
-                    <td>{r.voucher.type}</td>
-                    <td>{r.voucher.method}</td>
+                    <td>{voucherTypeLabel(r.voucher.type)}</td>
+                    <td>{r.voucher.method ? methodLabel(r.voucher.method) : r.voucher.method}</td>
                     <td className={`${surface.numeric} ${r.receipt ? styles.pos : ''}`}>{r.receipt ? formatMoney(r.receipt) : ''}</td>
                     <td className={`${surface.numeric} ${r.payment ? styles.neg : ''}`}>{r.payment ? formatMoney(r.payment) : ''}</td>
                     <td className={surface.numeric}>{formatMoney(r.balance)}</td>
                   </tr>
                 ))}
                 <tr className={styles.totalRow}>
-                  <td colSpan={4}>Closing balance</td>
+                  <td colSpan={4}>{booksT('closingBalance')}</td>
                   <td className={surface.numeric}>{formatMoney(book.totalReceipts)}</td>
                   <td className={surface.numeric}>{formatMoney(book.totalPayments)}</td>
                   <td className={surface.numeric}>{formatMoney(book.closing)}</td>

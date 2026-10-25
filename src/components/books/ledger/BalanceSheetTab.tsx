@@ -22,6 +22,8 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { useT } from '../../../i18n';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
 
 interface Props {
   ledger: Ledger;
@@ -34,6 +36,7 @@ interface Props {
 }
 
 function Side({ title, sections, total, onOpenAccount }: { title: string; sections: BsSection[]; total: number; onOpenAccount: (id: string) => void }) {
+  useT();
   return (
     <div className={surface.card}>
       <div className={surface.cardHead}>{title}</div>
@@ -59,11 +62,11 @@ function Side({ title, sections, total, onOpenAccount }: { title: string; sectio
                 ))}
               </details>
             ))}
-            <div className={books.stmtRow}><span className={books.muted}>Total {s.label.toLowerCase()}</span><span className={books.amt}>{money(s.total)}</span></div>
+            <div className={books.stmtRow}><span className={books.muted}>{ledgerT('sectionTotal', { section: s.label.toLowerCase() })}</span><span className={books.amt}>{money(s.total)}</span></div>
           </li>
         ))}
         <li className={books.stmtTotal}>
-          <span>TOTAL</span>
+          <span>{ledgerT('TOTAL')}</span>
           <span className={books.amt}>{money(total)}</span>
         </li>
       </ul>
@@ -72,6 +75,7 @@ function Side({ title, sections, total, onOpenAccount }: { title: string; sectio
 }
 
 export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpenAccount, notify }: Props) {
+  useT();
   const bs = useMemo(() => ledgerBalanceSheet(ledger, asOf), [ledger, asOf]);
   const fy = fyStartYearOf(asOf);
   const blocks = useMemo(() => blockSummary(assets, fy, today), [assets, fy, today]);
@@ -82,7 +86,7 @@ export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpen
     if (!deleting) return;
     try {
       deleteAsset(deleting.id);
-      notify(`${deleting.name} removed from the register`);
+      notify(ledgerT('assetRemoved', { name: deleting.name }));
       onChanged();
     } catch (err) {
       notify((err as Error).message, 'error');
@@ -94,50 +98,46 @@ export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpen
     <div className={books.stack}>
       <StatementToolbar csv={() => balanceSheetLedgerCsv(bs)} filename={`balance-sheet-${asOf}.csv`}>
         <span className={bs.difference === 0 ? styles.tieOk : styles.tieBad}>
-          {bs.difference === 0 ? 'Assets = liabilities + equity' : `Difference ${money(bs.difference)}`}
+          {bs.difference === 0 ? ledgerT('bsTie') : ledgerT('difference', { amount: money(bs.difference) })}
         </span>
       </StatementToolbar>
-      <PrintTitle title="Balance sheet (Schedule III format)" sub={`As at ${formatDate(asOf)}`} />
+      <PrintTitle title={ledgerT('bsTitle')} sub={ledgerT('asAt', { date: formatDate(asOf) })} />
 
       <div className={books.notice} role="note">
         <Info size={16} className={books.noticeIcon} aria-hidden="true" />
-        <span>
-          Balance sheet as at {formatDate(asOf)} from the double-entry ledger: documents post automatically, and capital, loans,
-          drawings, GST payments and other adjustments come from your vouchers. Profit for the year ({money(bs.profitForYear)}) flows to
-          reserves. Closing stock is not valued automatically — post it with a journal. Verify with your CA.
-        </span>
+        <span>{ledgerT('bsNotice', { date: formatDate(asOf), profit: money(bs.profitForYear) })}</span>
       </div>
 
       <div className={books.twoCol}>
-        <Side title="I. Equity and liabilities" sections={bs.equityAndLiabilities} total={bs.totalEquityAndLiabilities} onOpenAccount={onOpenAccount} />
-        <Side title="II. Assets" sections={bs.assets} total={bs.totalAssets} onOpenAccount={onOpenAccount} />
+        <Side title={ledgerT('bsEquity')} sections={bs.equityAndLiabilities} total={bs.totalEquityAndLiabilities} onOpenAccount={onOpenAccount} />
+        <Side title={ledgerT('bsAssets')} sections={bs.assets} total={bs.totalAssets} onOpenAccount={onOpenAccount} />
       </div>
 
       <div className={surface.card}>
         <div className={`${surface.cardHead} ${books.toolbar}`}>
-          <span>Fixed-asset register &amp; depreciation ({fyLabelOf(fy)})</span>
+          <span>{ledgerT('registerTitle', { fy: fyLabelOf(fy) })}</span>
           <button type="button" className={`${controls.btnOutline} no-print`} onClick={() => setEditing('new')}>
-            <Plus size={16} /> Add asset
+            <Plus size={16} /> {ledgerT('addAsset')}
           </button>
         </div>
         {assets.length === 0 ? (
           <p className={surface.cardBody}>
-            <span className={books.muted}>No fixed assets yet. Add laptops, furniture, vehicles and so on to depreciate them every year.</span>
+            <span className={books.muted}>{ledgerT('noAssets')}</span>
           </p>
         ) : (
           <div className={`${surface.tableWrap} ${styles.wrap}`}>
             <table className={surface.table}>
-              <caption className={surface.srOnly}>Fixed-asset register</caption>
+              <caption className={surface.srOnly}>{ledgerT('registerCaption')}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Asset</th>
-                  <th scope="col">Block</th>
-                  <th scope="col">Put to use</th>
-                  <th scope="col" className={surface.numeric}>Cost</th>
-                  <th scope="col" className={surface.numeric}>Rate</th>
-                  <th scope="col" className={surface.numeric}>Depreciation {fyLabelOf(fy)}</th>
-                  <th scope="col" className={surface.numeric}>WDV 31 Mar</th>
-                  <th scope="col" className="no-print"><span className={surface.srOnly}>Actions</span></th>
+                  <th scope="col">{ledgerT('colAsset')}</th>
+                  <th scope="col">{ledgerT('colBlock')}</th>
+                  <th scope="col">{ledgerT('colPutToUse')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colCost')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colRate')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colDepFy', { fy: fyLabelOf(fy) })}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colWdv')}</th>
+                  <th scope="col" className="no-print"><span className={surface.srOnly}>{ledgerT('actions')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -149,13 +149,13 @@ export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpen
                       <td>{DEPRECIATION_BLOCK_LABELS[a.block]}</td>
                       <td>{formatDate(a.put_to_use)}</td>
                       <td className={surface.numeric}>{money(Math.round(a.cost * 100))}</td>
-                      <td className={surface.numeric}>{row ? `${row.ratePct}%${row.halfRate ? ' (half)' : ''}` : '—'}</td>
+                      <td className={surface.numeric}>{row ? `${row.ratePct}%${row.halfRate ? ledgerT('half') : ''}` : '—'}</td>
                       <td className={surface.numeric}>{row ? money(row.depreciation) : '—'}</td>
                       <td className={surface.numeric}>{row ? money(row.closingWdv) : '—'}</td>
                       <td className="no-print">
                         <div className={books.toolbarGroup}>
-                          <button type="button" className={controls.btnIcon} aria-label={`Edit ${a.name}`} onClick={() => setEditing(a)}><Pencil size={16} /></button>
-                          <button type="button" className={controls.btnIcon} aria-label={`Delete ${a.name}`} onClick={() => setDeleting(a)}><Trash2 size={16} /></button>
+                          <button type="button" className={controls.btnIcon} aria-label={ledgerT('editName', { name: a.name })} onClick={() => setEditing(a)}><Pencil size={16} /></button>
+                          <button type="button" className={controls.btnIcon} aria-label={ledgerT('deleteName', { name: a.name })} onClick={() => setDeleting(a)}><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -168,15 +168,15 @@ export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpen
         {blocks.length > 0 && (
           <div className={`${surface.tableWrap} ${styles.wrap}`}>
             <table className={surface.table}>
-              <caption className={styles.sectionTitle}>Block-wise summary (Income-tax Act) — {fyLabelOf(fy)}</caption>
+              <caption className={styles.sectionTitle}>{ledgerT('blockSummary', { fy: fyLabelOf(fy) })}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Block</th>
-                  <th scope="col" className={surface.numeric}>Rate</th>
-                  <th scope="col" className={surface.numeric}>Opening WDV</th>
-                  <th scope="col" className={surface.numeric}>Additions</th>
-                  <th scope="col" className={surface.numeric}>Depreciation</th>
-                  <th scope="col" className={surface.numeric}>Closing WDV</th>
+                  <th scope="col">{ledgerT('colBlock')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colRate')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colOpeningWdv')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colAdditions')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colDepreciation')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colClosingWdv')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,16 +204,16 @@ export function BalanceSheetTab({ ledger, asOf, assets, today, onChanged, onOpen
           onClose={() => setEditing(null)}
           onSaved={(a) => {
             setEditing(null);
-            notify(`${a.name} saved`);
+            notify(ledgerT('assetSaved', { name: a.name }));
             onChanged();
           }}
         />
       )}
       <ConfirmDialog
         open={!!deleting}
-        title={`Remove ${deleting?.name ?? 'asset'}?`}
-        message="Its purchase entry and depreciation are removed from every statement. This is recorded in the activity log."
-        confirmLabel="Remove asset"
+        title={ledgerT('removeAssetTitle', { name: deleting?.name ?? ledgerT('assetWord') })}
+        message={ledgerT('removeAssetMsg')}
+        confirmLabel={ledgerT('removeAsset')}
         destructive
         onConfirm={remove}
         onClose={() => setDeleting(null)}

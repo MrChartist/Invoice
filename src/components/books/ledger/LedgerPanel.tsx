@@ -15,6 +15,7 @@ import { CashFlowTab } from './CashFlowTab';
 import { VoucherEditor } from './VoucherEditor';
 import { ProjectsTab } from '../planning/ProjectsTab';
 import { BudgetsTab } from '../planning/BudgetsTab';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
 
 export type LedgerTabId = 'coa' | 'vch' | 'tb' | 'ledger' | 'bs' | 'cf' | 'proj' | 'budget';
 
@@ -66,7 +67,7 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
           onClose={() => setEditing(null)}
           onSaved={(v) => {
             setEditing(null);
-            notify(`Voucher ${v.number} saved`);
+            notify(ledgerT('voucherSaved', { number: v.number }));
             changed();
           }}
         />

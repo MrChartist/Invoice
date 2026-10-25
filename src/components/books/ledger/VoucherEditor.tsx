@@ -5,7 +5,6 @@ import {
   GROUPS,
   groupOf,
   MANUAL_VOUCHER_TYPES,
-  VOUCHER_TYPE_LABELS,
   loadVouchers,
   nextVoucherNumber,
   rupeesToPaise,
@@ -21,6 +20,8 @@ import { useCostCentres } from '../../cost-centres/useCostCentres';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { useT } from '../../../i18n';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
 
 interface Row {
   key: number;
@@ -48,6 +49,7 @@ const toText = (p: number) => (p ? (p / 100).toFixed(2) : '');
 
 /** Mounted per open (by the caller) so the form always starts from the stored voucher. */
 export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved }: Props) {
+  useT();
   const uid = useId();
   const [type, setType] = useState<ManualVoucherType>(voucher?.type ?? 'JOURNAL');
   const [date, setDate] = useState(voucher?.date ?? defaultDate);
@@ -89,7 +91,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
     try {
       onSaved(saveVoucher(input, accounts));
     } catch (err) {
-      setError((err as Error).message || 'Could not save the voucher.');
+      setError((err as Error).message || ledgerT('saveFailed'));
     }
   };
 
@@ -110,13 +112,13 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
       open
       onClose={onClose}
       size="xl"
-      title={voucher ? `Edit voucher ${voucher.number}` : 'New voucher'}
-      subtitle="Debits must equal credits to the paisa. Dated entries inside the period lock cannot be saved."
+      title={voucher ? ledgerT('editVoucher', { number: voucher.number }) : ledgerT('newVoucher')}
+      subtitle={ledgerT('editorSubtitle')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{ledgerT('cancel')}</button>
           <button type="button" className={controls.btnPrimary} onClick={save} disabled={dr === 0 || dr !== cr}>
-            Save voucher
+            {ledgerT('saveVoucher')}
           </button>
         </>
       }
@@ -124,35 +126,35 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
       <div className={books.stack}>
         <div className={styles.formGrid}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-type`}>Type</label>
+            <label className={controls.label} htmlFor={`${uid}-type`}>{ledgerT('type')}</label>
             <select id={`${uid}-type`} className={controls.select} value={type} onChange={(e) => setType(e.target.value as ManualVoucherType)}>
               {MANUAL_VOUCHER_TYPES.map((t) => (
-                <option key={t} value={t}>{VOUCHER_TYPE_LABELS[t]}</option>
+                <option key={t} value={t}>{ledgerT(`vt${t}`)}</option>
               ))}
             </select>
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-date`}>Date</label>
+            <label className={controls.label} htmlFor={`${uid}-date`}>{ledgerT('date')}</label>
             <input id={`${uid}-date`} type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-no`}>Number</label>
+            <label className={controls.label} htmlFor={`${uid}-no`}>{ledgerT('number')}</label>
             <input id={`${uid}-no`} className={`${controls.input} ${controls.inputMono}`} value={number} placeholder={preview} onChange={(e) => setNumber(e.target.value)} />
           </div>
         </div>
         <p className={controls.hint}>
-          {type === 'JOURNAL' && 'Journal: adjustments with no cash — depreciation, provisions, GST set-off, opening balances, corrections.'}
-          {type === 'CONTRA' && 'Contra: money moved between cash and bank accounts (cash deposited, withdrawn).'}
-          {type === 'PAYMENT' && 'Payment: money paid out — credit a cash or bank account.'}
-          {type === 'RECEIPT' && 'Receipt: money received — debit a cash or bank account.'}
+          {type === 'JOURNAL' && ledgerT('hintJournal')}
+          {type === 'CONTRA' && ledgerT('hintContra')}
+          {type === 'PAYMENT' && ledgerT('hintPayment')}
+          {type === 'RECEIPT' && ledgerT('hintReceipt')}
         </p>
 
-        <div className={styles.editorLines} role="group" aria-label="Voucher lines">
+        <div className={styles.editorLines} role="group" aria-label={ledgerT('voucherLines')}>
           <div className={styles.editorHead} aria-hidden="true">
-            <span>Account</span>
-            <span>{centres.length ? 'Party / cost centre' : 'Party (debtors / creditors)'}</span>
-            <span>Debit ₹</span>
-            <span>Credit ₹</span>
+            <span>{ledgerT('account')}</span>
+            <span>{centres.length ? ledgerT('partyCc') : ledgerT('partyDebtors')}</span>
+            <span>{ledgerT('debitRs')}</span>
+            <span>{ledgerT('creditRs')}</span>
             <span />
           </div>
           {rows.map((r, i) => {
@@ -160,8 +162,8 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
             const needsParty = !!acc && PARTY_GROUPS.has(acc.group);
             return (
               <div key={r.key} className={styles.editorLine}>
-                <select aria-label={`Line ${i + 1} account`} className={controls.select} value={r.account_id} onChange={(e) => patch(r.key, { account_id: e.target.value })}>
-                  <option value="">Choose account…</option>
+                <select aria-label={ledgerT('lineAccount', { n: i + 1 })} className={controls.select} value={r.account_id} onChange={(e) => patch(r.key, { account_id: e.target.value })}>
+                  <option value="">{ledgerT('chooseAccount')}</option>
                   {GROUPS.map((g) => {
                     const list = accounts.filter((a) => a.group === g.id);
                     return list.length ? (
@@ -174,13 +176,13 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
                   })}
                 </select>
                 {!needsParty && centres.length > 0 && isPnl(r.account_id) ? (
-                  <CostCentreSelect id={`${uid}-cc-${r.key}`} ariaLabel={`Line ${i + 1} cost centre`} centres={centres} value={r.cc} onChange={(v) => patch(r.key, { cc: v })} />
+                  <CostCentreSelect id={`${uid}-cc-${r.key}`} ariaLabel={ledgerT('lineCc', { n: i + 1 })} centres={centres} value={r.cc} onChange={(v) => patch(r.key, { cc: v })} />
                 ) : (
-                  <input aria-label={`Line ${i + 1} party`} className={controls.input} value={r.party} disabled={!needsParty} placeholder={needsParty ? 'Party name' : '—'} onChange={(e) => patch(r.key, { party: e.target.value })} />
+                  <input aria-label={ledgerT('lineParty', { n: i + 1 })} className={controls.input} value={r.party} disabled={!needsParty} placeholder={needsParty ? ledgerT('partyName') : '—'} onChange={(e) => patch(r.key, { party: e.target.value })} />
                 )}
-                <input aria-label={`Line ${i + 1} debit`} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.dr} placeholder="0.00" onChange={(e) => patch(r.key, { dr: e.target.value, ...(e.target.value ? { cr: '' } : {}) })} />
-                <input aria-label={`Line ${i + 1} credit`} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.cr} placeholder="0.00" onChange={(e) => patch(r.key, { cr: e.target.value, ...(e.target.value ? { dr: '' } : {}) })} />
-                <button type="button" className={controls.btnIcon} aria-label={`Remove line ${i + 1}`} disabled={rows.length <= 2} onClick={() => setRows((list) => list.filter((x) => x.key !== r.key))}>
+                <input aria-label={ledgerT('lineDebit', { n: i + 1 })} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.dr} placeholder="0.00" onChange={(e) => patch(r.key, { dr: e.target.value, ...(e.target.value ? { cr: '' } : {}) })} />
+                <input aria-label={ledgerT('lineCredit', { n: i + 1 })} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.cr} placeholder="0.00" onChange={(e) => patch(r.key, { cr: e.target.value, ...(e.target.value ? { dr: '' } : {}) })} />
+                <button type="button" className={controls.btnIcon} aria-label={ledgerT('removeLine', { n: i + 1 })} disabled={rows.length <= 2} onClick={() => setRows((list) => list.filter((x) => x.key !== r.key))}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -190,20 +192,20 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
         <div className={books.toolbar}>
           <div className={books.toolbarGroup}>
             <button type="button" className={controls.btnOutline} onClick={() => setRows((list) => [...list, blank()])}>
-              <Plus size={16} /> Add line
+              <Plus size={16} /> {ledgerT('addLine')}
             </button>
-            <button type="button" className={controls.btnGhost} onClick={balance} disabled={dr === cr}>Balance last line</button>
+            <button type="button" className={controls.btnGhost} onClick={balance} disabled={dr === cr}>{ledgerT('balanceLast')}</button>
           </div>
           <div className={styles.editorTotals} aria-live="polite">
             <span>Dr {money(dr)}</span>
             <span>Cr {money(cr)}</span>
             <span className={dr === cr && dr > 0 ? styles.balanced : styles.unbalanced}>
-              {dr === cr ? (dr > 0 ? 'Balanced' : 'Enter amounts') : `Difference ${money(Math.abs(dr - cr))}`}
+              {dr === cr ? (dr > 0 ? ledgerT('balanced') : ledgerT('enterAmounts')) : ledgerT('difference', { amount: money(Math.abs(dr - cr)) })}
             </span>
           </div>
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor={`${uid}-narr`}>Narration</label>
+          <label className={controls.label} htmlFor={`${uid}-narr`}>{ledgerT('narration')}</label>
           <textarea id={`${uid}-narr`} className={controls.textarea} rows={2} value={narration} onChange={(e) => setNarration(e.target.value)} />
         </div>
         {error && <div className={controls.error} role="alert">{error}</div>}

@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { Boxes, Users } from 'lucide-react';
 import type { Period } from '../../lib/books';
 import {
-  costSourceLabel,
   itemProfitCsv,
   partyProfitCsv,
   type ItemProfitRow,
@@ -16,33 +15,38 @@ import { money } from './fmt';
 import { SortableTable, type Column } from './SortableTable';
 import surface from '../../styles/surface.module.css';
 import styles from './reports.module.css';
+import { useT } from '../../i18n';
+import { repT } from '../../i18n/areas/reports';
+import { plural } from '../../i18n/areas/plural';
 
 const slug = (p: Period) => `${p.start}_to_${p.end}`;
 const pct = (m: number | null) => (m === null ? '—' : `${m.toFixed(1)}%`);
+const SOURCE_KEY = { stock: 'srcStock', purchases: 'srcPurchases', none: 'srcNone', mixed: 'srcMixed' } as const;
+const costSourceLabel = (s: ItemProfitRow['source']) => repT(SOURCE_KEY[s]);
 const signed = (n: number) => <span className={n < 0 ? styles.neg : styles.pos}>{money(n)}</span>;
 
 function Basis({ excluded }: { excluded: number }) {
+  useT();
   return (
     <p className={styles.muted}>
-      Sales are the taxable value (excl. GST). Cost: stock-tracked items at the inventory cost issued for that invoice;
-      other goods at the average purchase cost of bills with the same name (and HSN); services and items never bought
-      are not costed. A management estimate, not a statutory figure.
-      {excluded > 0 && ` ${excluded} foreign-currency document${excluded === 1 ? '' : 's'} without an exchange rate left out.`}
+      {repT('basis')}
+      {excluded > 0 && ` ${plural(repT, 'basisForeignOne', 'basisForeignMany', excluded)}`}
     </p>
   );
 }
 
 export function ItemProfitTab({ rep, period }: { rep: ReturnType<typeof itemProfitability>; period: Period }) {
+  useT();
   const t = rep.totals;
   const cols: Column<ItemProfitRow>[] = [
-    { id: 'name', label: 'Item', sort: (r) => r.name, cell: (r) => r.name, total: 'Total' },
+    { id: 'name', label: repT('colItemOnly'), sort: (r) => r.name, cell: (r) => r.name, total: repT('total') },
     { id: 'hsn', label: 'HSN/SAC', sort: (r) => r.hsn, cell: (r) => <span className={surface.mono}>{r.hsn || '—'}</span> },
-    { id: 'qty', label: 'Qty', numeric: true, sort: (r) => r.quantity, cell: (r) => `${r.quantity}${r.unit ? ` ${r.unit}` : ''}` },
-    { id: 'rev', label: 'Sales (excl. GST)', numeric: true, sort: (r) => r.revenue, cell: (r) => money(r.revenue), total: money(t.revenue) },
-    { id: 'cost', label: 'Cost', numeric: true, sort: (r) => r.cost, cell: (r) => money(r.cost), total: money(t.cost) },
-    { id: 'profit', label: 'Profit', numeric: true, sort: (r) => r.profit, cell: (r) => signed(r.profit), total: money(t.profit) },
-    { id: 'margin', label: 'Margin', numeric: true, sort: (r) => r.margin, cell: (r) => pct(r.margin), total: pct(t.margin) },
-    { id: 'basis', label: 'Cost basis', sort: (r) => r.source, cell: (r) => <span className={r.source === 'none' ? styles.muted : undefined}>{costSourceLabel(r.source)}</span> },
+    { id: 'qty', label: repT('colQty'), numeric: true, sort: (r) => r.quantity, cell: (r) => `${r.quantity}${r.unit ? ` ${r.unit}` : ''}` },
+    { id: 'rev', label: repT('colSalesExcl'), numeric: true, sort: (r) => r.revenue, cell: (r) => money(r.revenue), total: money(t.revenue) },
+    { id: 'cost', label: repT('colCost'), numeric: true, sort: (r) => r.cost, cell: (r) => money(r.cost), total: money(t.cost) },
+    { id: 'profit', label: repT('colProfit'), numeric: true, sort: (r) => r.profit, cell: (r) => signed(r.profit), total: money(t.profit) },
+    { id: 'margin', label: repT('colMargin'), numeric: true, sort: (r) => r.margin, cell: (r) => pct(r.margin), total: pct(t.margin) },
+    { id: 'basis', label: repT('colCostBasis'), sort: (r) => r.source, cell: (r) => <span className={r.source === 'none' ? styles.muted : undefined}>{costSourceLabel(r.source)}</span> },
   ];
   return (
     <div className={styles.stack}>
@@ -52,7 +56,7 @@ export function ItemProfitTab({ rep, period }: { rep: ReturnType<typeof itemProf
       </div>
       <div className={surface.card}>
         <SortableTable
-          caption="Profitability by item"
+          caption={repT('capItemProfit')}
           rows={rep.rows}
           columns={cols}
           rowKey={(r) => r.key}
@@ -60,9 +64,9 @@ export function ItemProfitTab({ rep, period }: { rep: ReturnType<typeof itemProf
           empty={
             <EmptyState
               icon={Boxes}
-              title="No sales in this period"
-              text="Items sold in the period, with their cost and margin, appear here."
-              action={<Link to="/inventory" className={styles.link}>Track stock costs in Inventory</Link>}
+              title={repT('noSalesTitle')}
+              text={repT('itemProfitEmpty')}
+              action={<Link to="/inventory" className={styles.link}>{repT('trackStock')}</Link>}
             />
           }
         />
@@ -72,22 +76,23 @@ export function ItemProfitTab({ rep, period }: { rep: ReturnType<typeof itemProf
 }
 
 export function PartyProfitTab({ rep, period }: { rep: ReturnType<typeof partyProfitability>; period: Period }) {
+  useT();
   const t = rep.totals;
   const cols: Column<PartyProfitRow>[] = [
     {
       id: 'name',
-      label: 'Customer',
+      label: repT('colCustomer'),
       sort: (r) => r.name,
       cell: (r) => <Link className={styles.link} to={`/receivables?tab=statements&party=${encodeURIComponent(r.partyKey)}`}>{r.name}</Link>,
-      total: 'Total',
+      total: repT('total'),
     },
-    { id: 'docs', label: 'Docs', numeric: true, sort: (r) => r.docs, cell: (r) => r.docs },
-    { id: 'rev', label: 'Sales (excl. GST)', numeric: true, sort: (r) => r.revenue, cell: (r) => money(r.revenue), total: money(t.revenue) },
-    { id: 'cogs', label: 'Cost of goods', numeric: true, sort: (r) => r.cogs, cell: (r) => money(r.cogs), total: money(t.cogs) },
-    { id: 'exp', label: 'Billable expenses', numeric: true, sort: (r) => r.expenses, cell: (r) => money(r.expenses), total: money(t.expenses) },
-    { id: 'profit', label: 'Profit', numeric: true, sort: (r) => r.profit, cell: (r) => signed(r.profit), total: money(t.profit) },
-    { id: 'margin', label: 'Margin', numeric: true, sort: (r) => r.margin, cell: (r) => pct(r.margin), total: pct(t.margin) },
-    { id: 'unc', label: 'Not costed', numeric: true, sort: (r) => r.uncosted, cell: (r) => (r.uncosted ? money(r.uncosted) : '—'), total: money(t.uncosted) },
+    { id: 'docs', label: repT('colDocs'), numeric: true, sort: (r) => r.docs, cell: (r) => r.docs },
+    { id: 'rev', label: repT('colSalesExcl'), numeric: true, sort: (r) => r.revenue, cell: (r) => money(r.revenue), total: money(t.revenue) },
+    { id: 'cogs', label: repT('colCogs'), numeric: true, sort: (r) => r.cogs, cell: (r) => money(r.cogs), total: money(t.cogs) },
+    { id: 'exp', label: repT('colBillable'), numeric: true, sort: (r) => r.expenses, cell: (r) => money(r.expenses), total: money(t.expenses) },
+    { id: 'profit', label: repT('colProfit'), numeric: true, sort: (r) => r.profit, cell: (r) => signed(r.profit), total: money(t.profit) },
+    { id: 'margin', label: repT('colMargin'), numeric: true, sort: (r) => r.margin, cell: (r) => pct(r.margin), total: pct(t.margin) },
+    { id: 'unc', label: repT('colNotCosted'), numeric: true, sort: (r) => r.uncosted, cell: (r) => (r.uncosted ? money(r.uncosted) : '—'), total: money(t.uncosted) },
   ];
   return (
     <div className={styles.stack}>
@@ -95,15 +100,15 @@ export function PartyProfitTab({ rep, period }: { rep: ReturnType<typeof partyPr
         <Basis excluded={rep.excluded} />
         <ExportButton filename={`party-profitability-${slug(period)}.csv`} csv={() => partyProfitCsv(rep, period)} />
       </div>
-      <p className={styles.muted}>Billable expenses are costs recorded against the client (Expenses → billable), whether or not re-billed yet.</p>
+      <p className={styles.muted}>{repT('billableNote')}</p>
       <div className={surface.card}>
         <SortableTable
-          caption="Profitability by customer"
+          caption={repT('capPartyProfit')}
           rows={rep.rows}
           columns={cols}
           rowKey={(r) => r.key}
           initialSort={{ id: 'profit', dir: 'desc' }}
-          empty={<EmptyState icon={Users} title="No sales in this period" text="Each customer's sales, costs and margin appear here." />}
+          empty={<EmptyState icon={Users} title={repT('noSalesTitle')} text={repT('partyProfitEmpty')} />}
         />
       </div>
     </div>

@@ -17,6 +17,8 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { useT } from '../../../i18n';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
 
 interface Props {
   ledger: Ledger;
@@ -27,6 +29,7 @@ interface Props {
 }
 
 export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Props) {
+  useT();
   const uid = useId();
   const [form, setForm] = useState({ code: '', name: '', group: 'INDIRECT_EXPENSES' as GroupId });
   const [error, setError] = useState('');
@@ -43,7 +46,7 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
       setForm({ code: '', name: '', group: form.group });
       setError('');
       onChanged();
-      notify(`Account ${a.code} ${a.name} added`);
+      notify(ledgerT('accountAdded', { code: a.code, name: a.name }));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -53,7 +56,7 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
     try {
       deleteUserAccount(id, used.has(id));
       onChanged();
-      notify('Account deleted');
+      notify(ledgerT('accountDeleted'));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -69,22 +72,22 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
   return (
     <div className={books.stack}>
       <StatementToolbar csv={csv} filename={`chart-of-accounts-${asOf}.csv`} />
-      <PrintTitle title="Chart of accounts" sub={`Balances as at ${formatDate(asOf)}`} />
+      <PrintTitle title={ledgerT('coaTitle')} sub={ledgerT('balancesAsAt', { date: formatDate(asOf) })} />
 
       <div className={`${surface.card} no-print`}>
-        <div className={surface.cardHead}>Add an account</div>
+        <div className={surface.cardHead}>{ledgerT('addAccountHead')}</div>
         <div className={surface.cardBody}>
           <div className={styles.formGrid}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-code`}>Code</label>
-              <input id={`${uid}-code`} className={`${controls.input} ${controls.inputMono}`} value={form.code} placeholder="e.g. 6400" onChange={(e) => setForm({ ...form, code: e.target.value })} />
+              <label className={controls.label} htmlFor={`${uid}-code`}>{ledgerT('code')}</label>
+              <input id={`${uid}-code`} className={`${controls.input} ${controls.inputMono}`} value={form.code} placeholder={ledgerT('codePh')} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-name`}>Name</label>
-              <input id={`${uid}-name`} className={controls.input} value={form.name} placeholder="e.g. HDFC current account" onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <label className={controls.label} htmlFor={`${uid}-name`}>{ledgerT('name')}</label>
+              <input id={`${uid}-name`} className={controls.input} value={form.name} placeholder={ledgerT('namePh')} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor={`${uid}-group`}>Group</label>
+              <label className={controls.label} htmlFor={`${uid}-group`}>{ledgerT('group')}</label>
               <select id={`${uid}-group`} className={controls.select} value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value as GroupId })}>
                 {GROUPS.map((g) => (
                   <option key={g.id} value={g.id}>{g.label}</option>
@@ -92,13 +95,12 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
               </select>
             </div>
             <button type="button" className={controls.btnPrimary} onClick={add}>
-              <Plus size={16} /> Add account
+              <Plus size={16} /> {ledgerT('addAccount')}
             </button>
           </div>
           {error && <div className={controls.error} role="alert">{error}</div>}
           <p className={controls.hint}>
-            Expense bills whose category matches an account name post to that account. Bank accounts you add here can be used in contra,
-            payment and receipt vouchers.
+            {ledgerT('coaHint')}
           </p>
         </div>
       </div>
@@ -106,13 +108,13 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
       <div className={surface.card}>
         <div className={`${surface.tableWrap} ${styles.wrap}`}>
           <table className={surface.table}>
-            <caption className={surface.srOnly}>Chart of accounts with balances as at {asOf}</caption>
+            <caption className={surface.srOnly}>{ledgerT('coaCaption', { date: asOf })}</caption>
             <thead>
               <tr>
-                <th scope="col">Code</th>
-                <th scope="col">Account</th>
-                <th scope="col" className={surface.numeric}>Balance</th>
-                <th scope="col" className="no-print"><span className={surface.srOnly}>Actions</span></th>
+                <th scope="col">{ledgerT('colCode')}</th>
+                <th scope="col">{ledgerT('colAccount')}</th>
+                <th scope="col" className={surface.numeric}>{ledgerT('colBalance')}</th>
+                <th scope="col" className="no-print"><span className={surface.srOnly}>{ledgerT('actions')}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -129,12 +131,12 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
                         <td className={styles.code}>{a.code}</td>
                         <td>
                           <button type="button" className={styles.rowButton} onClick={() => onOpenAccount(a.id)}>{a.name}</button>
-                          {!a.system && <> <span className={styles.badgeManual}>Yours</span></>}
+                          {!a.system && <> <span className={styles.badgeManual}>{ledgerT('yours')}</span></>}
                         </td>
                         <td className={surface.numeric}>{drCr(balances.get(a.id) ?? 0)}</td>
                         <td className="no-print">
                           {!a.system && !used.has(a.id) && (
-                            <button type="button" className={controls.btnIcon} aria-label={`Delete ${a.name}`} onClick={() => remove(a.id)}>
+                            <button type="button" className={controls.btnIcon} aria-label={ledgerT('deleteName', { name: a.name })} onClick={() => remove(a.id)}>
                               <Trash2 size={16} />
                             </button>
                           )}

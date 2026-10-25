@@ -179,6 +179,11 @@ try {
     await page.getByRole('button', { name: 'ग्राहक जोड़ें' }).first().waitFor();
     await page.getByRole('searchbox', { name: 'ग्राहक खोजें' }).waitFor();
     check(true, 'Clients page shows Hindi (sales area catalogue)');
+    // Round 2 areas: the GST page (lazy chunk + its area catalogue) opens in Hindi too.
+    await page.goto(srv.origin + '/gst-reports');
+    await page.getByRole('heading', { name: 'GST रिपोर्ट' }).first().waitFor();
+    await page.getByText('दाख़िल करने से पहले अपने CA से जाँच करवाएँ।').first().waitFor();
+    check(true, 'GST page shows Hindi (gst area catalogue)');
     await page.goto(srv.origin + '/settings');
     await page.getByLabel('Language / भाषा').first().selectOption('en');
     await nav.getByRole('link', { name: 'Dashboard' }).waitFor();

@@ -2,6 +2,8 @@ import type { MonthRow } from '../../lib/sales-reports';
 import { compactInr } from '../../lib/stats';
 import { formatMoney } from '../../lib/utils';
 import styles from './reports.module.css';
+import { useT } from '../../i18n';
+import { repT } from '../../i18n/areas/reports';
 
 const W = 720;
 const H = 260;
@@ -9,6 +11,7 @@ const PAD = { top: 14, right: 12, bottom: 30, left: 52 };
 
 /** Pure-SVG grouped bars: this period beside the same month a year earlier. */
 export function MonthlyChart({ rows, metric }: { rows: MonthRow[]; metric: 'taxable' | 'total' }) {
+  useT();
   if (rows.length === 0) return null;
   const cur = (r: MonthRow) => (metric === 'taxable' ? r.taxable : r.total);
   const prev = (r: MonthRow) => (metric === 'taxable' ? r.prevTaxable : r.prevTotal);
@@ -25,15 +28,15 @@ export function MonthlyChart({ rows, metric }: { rows: MonthRow[]; metric: 'taxa
   const barW = Math.min(slot * 0.34, 26);
   const ticks = [...new Set([max, max - span / 2, min].map((t) => Math.round(t)))];
 
-  const summary = `Monthly sales ${metric === 'taxable' ? 'excluding GST' : 'including GST'}, this period against last year. ${rows
-    .map((r) => `${r.label}: ${formatMoney(cur(r))} against ${formatMoney(prev(r))}`)
+  const summary = `${repT(metric === 'taxable' ? 'chartSummaryExcl' : 'chartSummaryIncl')} ${rows
+    .map((r) => repT('chartPoint', { month: r.label, cur: formatMoney(cur(r)), prev: formatMoney(prev(r)) }))
     .join('. ')}`;
 
   return (
     <div>
       <div className={styles.legend} aria-hidden="true">
-        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchCur}`} />This period</span>
-        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchPrev}`} />Same month last year</span>
+        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchCur}`} />{repT('legendThis')}</span>
+        <span className={styles.legendItem}><span className={`${styles.swatch} ${styles.swatchPrev}`} />{repT('legendPrev')}</span>
       </div>
       <div className={styles.chartWrap}>
         <svg className={styles.chart} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary}>
@@ -54,7 +57,7 @@ export function MonthlyChart({ rows, metric }: { rows: MonthRow[]; metric: 'taxa
                 {bar(prev(r), cx - barW - 1, styles.barPrev)}
                 {bar(cur(r), cx + 1, styles.barCur)}
                 <text className={styles.axisText} x={cx} y={H - 10} textAnchor="middle">{r.label.split(' ')[0]}</text>
-                <title>{`${r.label}: ${formatMoney(cur(r))} (last year ${formatMoney(prev(r))})`}</title>
+                <title>{repT('chartTitle', { month: r.label, cur: formatMoney(cur(r)), prev: formatMoney(prev(r)) })}</title>
               </g>
             );
           })}

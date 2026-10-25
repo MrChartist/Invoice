@@ -19,6 +19,8 @@ import {
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './gstr9.module.css';
+import { useT } from '../../i18n';
+import { gvT } from '../../i18n/areas/gst-views';
 
 export interface Gstr9ModalProps {
   open: boolean;
@@ -56,6 +58,7 @@ function storedFor(fy: number, stored: { gt: number; curGt: number }): number {
 }
 
 function RowTable({ title, rows }: { title: string; rows: Gstr9Row[] }) {
+  useT();
   const showTaxable = rows.some((r) => r.hasTaxable);
   return (
     <section className={styles.section} aria-label={title}>
@@ -64,13 +67,13 @@ function RowTable({ title, rows }: { title: string; rows: Gstr9Row[] }) {
         <table className={surface.table}>
           <thead>
             <tr>
-              <th scope="col">Row</th>
-              <th scope="col">Description</th>
-              {showTaxable && <th scope="col" className={surface.numeric}>Taxable</th>}
+              <th scope="col">{gvT('colRow')}</th>
+              <th scope="col">{gvT('colDescription')}</th>
+              {showTaxable && <th scope="col" className={surface.numeric}>{gvT('colTaxable')}</th>}
               <th scope="col" className={surface.numeric}>IGST</th>
               <th scope="col" className={surface.numeric}>CGST</th>
               <th scope="col" className={surface.numeric}>SGST</th>
-              <th scope="col" className={surface.numeric}>Cess</th>
+              <th scope="col" className={surface.numeric}>{gvT('colCess')}</th>
             </tr>
           </thead>
           <tbody>
@@ -114,6 +117,7 @@ export default function Gstr9Modal(props: Gstr9ModalProps) {
 }
 
 function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerName, storedTurnover }: Gstr9ModalProps) {
+  useT();
   const { notify, toastNode } = useToast();
   const [fy, setFy] = useState(fyStart);
   const [turnover, setTurnover] = useState(() => {
@@ -159,7 +163,7 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
     const url = URL.createObjectURL(new Blob([buildGstr9Html(report, filerName)], { type: 'text/html' }));
     const w = window.open(url, '_blank');
     if (w) w.addEventListener('load', () => w.print());
-    else notify('Your browser blocked the print window — allow pop-ups for this site and try again', 'error');
+    else notify(gvT('popupBlocked'), 'error');
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
@@ -171,21 +175,21 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
       open
       onClose={onClose}
       size="xl"
-      title={<><CalendarRange size={18} aria-hidden="true" /> GSTR-9 annual working paper</>}
-      subtitle={`${report.fyLabel} · ${gstin || 'all GSTINs'} · ${report.documents} documents, ${report.bills} purchase bills · prepared offline`}
+      title={<><CalendarRange size={18} aria-hidden="true" /> {gvT('g9Title')}</>}
+      subtitle={gvT('g9Subtitle', { fy: report.fyLabel, gstin: gstin || gvT('allGstins'), docs: report.documents, bills: report.bills })}
       footer={
         <div className={styles.actions}>
           <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} onClick={() => download(`${base}.csv`, 'text/csv', gstr9Csv(report))}>
-            <Download size={16} aria-hidden="true" /> CSV
+            <Download size={16} aria-hidden="true" /> {gvT('csv')}
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => download(`${base}_working_paper.json`, 'application/json', JSON.stringify(gstr9WorkingPaper(report), null, 2))}>
-            <FileJson size={16} aria-hidden="true" /> Working paper JSON
+            <FileJson size={16} aria-hidden="true" /> {gvT('wpJson')}
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={print}>
-            <Printer size={16} aria-hidden="true" /> Print
+            <Printer size={16} aria-hidden="true" /> {gvT('print')}
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={onClose}>
-            Close
+            {gvT('close')}
           </button>
         </div>
       }
@@ -194,25 +198,22 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
         <div className={styles.banner} role="note">
           <ShieldAlert size={16} className={styles.bannerIcon} aria-hidden="true" />
           <span>
-            <strong>Verify with your CA before filing.</strong> Built from this app&rsquo;s 12 monthly GSTR-1 / GSTR-3B
-            papers and your purchase bills, not from what was filed on the portal. {report.turnover.optional
-              ? `Turnover ${formatMoney(report.turnover.used)} is up to ₹2 crore, so GSTR-9 is optional for this FY.`
-              : `Turnover ${formatMoney(report.turnover.used)} is above ₹2 crore, so GSTR-9 is mandatory (GSTR-9C too above ₹5 crore).`}
-            {' '}The JSON is a readable working paper, not the portal&rsquo;s upload schema.
+            <strong>{gvT('verifyStrong')}</strong> {gvT('g9Built')} {gvT(report.turnover.optional ? 'g9Optional' : 'g9Mandatory', { amount: formatMoney(report.turnover.used) })}
+            {' '}{gvT('g9JsonNote')}
           </span>
         </div>
 
         <div className={styles.controls}>
-          <Field label="Financial year">
+          <Field label={gvT('financialYear')}>
             <select className={controls.select} value={fy} onChange={(e) => pickFy(Number(e.target.value))}>
               {options.map((y) => <option key={y} value={y}>{fyText(y)}</option>)}
             </select>
           </Field>
-          <Field label="Aggregate turnover of the FY (₹)">
+          <Field label={gvT('aggTurnover')}>
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={turnover} placeholder={String(report.turnover.computed)}
               onChange={(e) => setTurnover(num(e.target.value))} />
           </Field>
-          <Field label="8A: ITC as per GSTR-2B — IGST">
+          <Field label={gvT('itc8a')}>
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={itc2b.igst} placeholder="0" onChange={(e) => setItc2b({ ...itc2b, igst: num(e.target.value) })} />
           </Field>
           <Field label="8A — CGST">
@@ -226,20 +227,19 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
           </Field>
         </div>
         <p className={controls.hint} style={{ margin: 0 }}>
-          Turnover defaults to the figure on the GST page (this FY so far, or last FY&rsquo;s); blank uses the total worked out
-          here ({formatMoney(report.turnover.computed)}). Enter 8A from your annual GSTR-2B.
+          {gvT('turnoverHint', { amount: formatMoney(report.turnover.computed) })}
         </p>
 
-        <section className={styles.section} aria-label="Differences">
-          <h3 className={styles.sectionTitle}>Differences — GSTR-1 vs GSTR-3B vs books</h3>
+        <section className={styles.section} aria-label={gvT('differences')}>
+          <h3 className={styles.sectionTitle}>{gvT('diffHead')}</h3>
           <div className={surface.tableWrap}>
             <table className={surface.table}>
               <thead>
                 <tr>
-                  <th scope="col">Item</th><th scope="col">Head</th>
+                  <th scope="col">{gvT('colItem')}</th><th scope="col">{gvT('colHead')}</th>
                   <th scope="col" className={surface.numeric}>GSTR-1</th><th scope="col" className={surface.numeric}>GSTR-3B</th>
-                  <th scope="col" className={surface.numeric}>Books</th><th scope="col" className={surface.numeric}>1 − 3B</th>
-                  <th scope="col" className={surface.numeric}>3B − books</th>
+                  <th scope="col" className={surface.numeric}>{gvT('colBooks')}</th><th scope="col" className={surface.numeric}>1 − 3B</th>
+                  <th scope="col" className={surface.numeric}>{gvT('colBooksDiff')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -256,19 +256,19 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
           </div>
         </section>
 
-        <RowTable title="Pt II · Table 4 — outward supplies on which tax is payable" rows={report.table4} />
-        <RowTable title="Pt II · Table 5 — outward supplies on which tax is not payable" rows={report.table5} />
-        <RowTable title="Pt III · Table 6 — ITC availed" rows={report.table6} />
-        <RowTable title="Pt III · Table 7 — ITC reversed and ineligible" rows={report.table7} />
-        <RowTable title="Pt III · Table 8 — other ITC information" rows={report.table8} />
+        <RowTable title={gvT('t4')} rows={report.table4} />
+        <RowTable title={gvT('t5')} rows={report.table5} />
+        <RowTable title={gvT('t6')} rows={report.table6} />
+        <RowTable title={gvT('t7')} rows={report.table7} />
+        <RowTable title={gvT('t8')} rows={report.table8} />
 
         <section className={styles.section} aria-label="Table 9">
-          <h3 className={styles.sectionTitle}>Pt IV · Table 9 — tax paid</h3>
+          <h3 className={styles.sectionTitle}>{gvT('t9')}</h3>
           <div className={surface.tableWrap}>
             <table className={surface.table}>
               <thead>
                 <tr>
-                  <th scope="col">Head</th><th scope="col" className={surface.numeric}>Payable</th><th scope="col" className={surface.numeric}>Cash</th>
+                  <th scope="col">{gvT('colHead')}</th><th scope="col" className={surface.numeric}>{gvT('colPayable')}</th><th scope="col" className={surface.numeric}>{gvT('colCash')}</th>
                   <th scope="col" className={surface.numeric}>ITC IGST</th><th scope="col" className={surface.numeric}>ITC CGST</th><th scope="col" className={surface.numeric}>ITC SGST</th>
                 </tr>
               </thead>
@@ -283,12 +283,11 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
               </tbody>
             </table>
           </div>
-          <span className={styles.note}>Interest, late fee and penalty are not tracked (0). Pt V (Tables 10–14, amendments) is not modelled and shows 0.</span>
+          <span className={styles.note}>{gvT('t9Note')}</span>
         </section>
 
         <p className={surface.sectionNote} style={{ margin: 0 }}>
-          Pt VI: Table 17 has {report.table17.length} outward HSN row(s); Table 18 has {report.table18.length} inward HSN row(s)
-          {report.billsWithoutHsn ? ` (${report.billsWithoutHsn} bill(s) without HSN-coded lines are left out)` : ''}. Both are in the CSV and the printout.
+          {gvT('hsnNote', { out: report.table17.length, in: report.table18.length, missing: report.billsWithoutHsn ? gvT('hsnMissing', { n: report.billsWithoutHsn }) : '' })}
         </p>
 
         <ul className={styles.notes}>

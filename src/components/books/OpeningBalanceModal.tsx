@@ -3,6 +3,8 @@ import { Modal } from '../ui/Modal';
 import { toIsoDate, type CashAccount, type OpeningBalance } from '../../lib/books';
 import controls from '../../styles/controls.module.css';
 import styles from './books.module.css';
+import { useT } from '../../i18n';
+import { booksT } from '../../i18n/areas/books';
 
 export interface OpeningBalanceModalProps {
   open: boolean;
@@ -27,6 +29,7 @@ export function OpeningBalanceModal(props: OpeningBalanceModalProps) {
 }
 
 function OpeningBalanceForm({ onClose, openings, onSave, defaultAsOf }: OpeningBalanceModalProps) {
+  useT();
   const uid = useId();
   const init = (a: CashAccount) => {
     const o = latest(openings, a);
@@ -44,11 +47,11 @@ function OpeningBalanceForm({ onClose, openings, onSave, defaultAsOf }: OpeningB
       const amount = form[a].amount.trim() === '' ? 0 : Number(form[a].amount);
       const asOf = toIsoDate(form[a].as_of);
       if (!Number.isFinite(amount)) {
-        setError(`Enter a valid amount for ${a === 'cash' ? 'Cash in hand' : 'Bank'}.`);
+        setError(a === 'cash' ? booksT('errAmountCash') : booksT('errAmountBank'));
         return;
       }
       if (!asOf) {
-        setError(`Choose an "as of" date for ${a === 'cash' ? 'Cash in hand' : 'Bank'}.`);
+        setError(a === 'cash' ? booksT('errDateCash') : booksT('errDateBank'));
         return;
       }
       out[a] = { amount, as_of: asOf };
@@ -61,7 +64,7 @@ function OpeningBalanceForm({ onClose, openings, onSave, defaultAsOf }: OpeningB
       <legend className={controls.label} style={{ marginBottom: '0.5rem' }}>{title}</legend>
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor={`${uid}-${a}-amt`}>Opening amount (₹)</label>
+          <label className={controls.label} htmlFor={`${uid}-${a}-amt`}>{booksT('openingAmount')}</label>
           <input
             id={`${uid}-${a}-amt`}
             className={`${controls.input} ${styles.numInput}`}
@@ -74,7 +77,7 @@ function OpeningBalanceForm({ onClose, openings, onSave, defaultAsOf }: OpeningB
           />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor={`${uid}-${a}-date`}>As of</label>
+          <label className={controls.label} htmlFor={`${uid}-${a}-date`}>{booksT('asOf')}</label>
           <input
             id={`${uid}-${a}-date`}
             className={controls.input}
@@ -92,18 +95,18 @@ function OpeningBalanceForm({ onClose, openings, onSave, defaultAsOf }: OpeningB
       open
       onClose={onClose}
       size="md"
-      title="Opening balances"
-      subtitle="Balance on the date you start recording in this app. Transactions dated earlier are left out of the books."
+      title={booksT('openingBalances')}
+      subtitle={booksT('openingSubtitle')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="button" className={controls.btnPrimary} onClick={submit}>Save balances</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{booksT('cancel')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={submit}>{booksT('saveBalances')}</button>
         </>
       }
     >
       <div className={styles.stack}>
-        {block('cash', 'Cash in hand')}
-        {block('bank', 'Bank (UPI, transfer, cheque, card)')}
+        {block('cash', booksT('cashInHand'))}
+        {block('bank', booksT('bankBlock'))}
         {error && (
           <div className={controls.error} role="alert">{error}</div>
         )}

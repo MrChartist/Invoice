@@ -9,33 +9,36 @@ import { PrintTitle, StatementToolbar } from './shared';
 import surface from '../../../styles/surface.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { useT } from '../../../i18n';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
 
 export function TrialBalanceTab({ ledger, period, onOpenAccount }: { ledger: Ledger; period: Period; onOpenAccount: (id: string) => void }) {
+  useT();
   const tb = useMemo(() => trialBalance(ledger, period), [ledger, period]);
   const ok = tb.totals.debit === tb.totals.credit && tb.totals.closingDr === tb.totals.closingCr;
 
   return (
     <div className={books.stack}>
       <StatementToolbar csv={() => trialBalanceCsv(tb)} filename={`trial-balance-${period.start}_to_${period.end}.csv`}>
-        <span className={ok ? styles.tieOk : styles.tieBad}>{ok ? 'Debits = credits' : 'Out of balance — check the warnings in Vouchers'}</span>
+        <span className={ok ? styles.tieOk : styles.tieBad}>{ok ? ledgerT('tbTie') : ledgerT('tbOut')}</span>
       </StatementToolbar>
-      <PrintTitle title="Trial balance" sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
+      <PrintTitle title={ledgerT('tbTitle')} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
 
       <div className={surface.card}>
         {tb.rows.length === 0 ? (
-          <EmptyState icon={Scale} title="Nothing posted in this period" text="Record an invoice, bill or voucher, or widen the period." />
+          <EmptyState icon={Scale} title={ledgerT('tbEmptyTitle')} text={ledgerT('tbEmptyText')} />
         ) : (
           <div className={`${surface.tableWrap} ${styles.wrap}`}>
             <table className={surface.table}>
-              <caption className={surface.srOnly}>Trial balance</caption>
+              <caption className={surface.srOnly}>{ledgerT('tbTitle')}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Code</th>
-                  <th scope="col">Account</th>
-                  <th scope="col" className={surface.numeric}>Opening</th>
-                  <th scope="col" className={surface.numeric}>Debit</th>
-                  <th scope="col" className={surface.numeric}>Credit</th>
-                  <th scope="col" className={surface.numeric}>Closing</th>
+                  <th scope="col">{ledgerT('colCode')}</th>
+                  <th scope="col">{ledgerT('colAccount')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colOpening')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colDebit')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colCredit')}</th>
+                  <th scope="col" className={surface.numeric}>{ledgerT('colClosing')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -63,7 +66,7 @@ export function TrialBalanceTab({ ledger, period, onOpenAccount }: { ledger: Led
                   );
                 })}
                 <tr className={books.totalRow}>
-                  <td colSpan={2}>Total</td>
+                  <td colSpan={2}>{ledgerT('total')}</td>
                   <td className={surface.numeric}>{money(tb.totals.openingDr)} Dr / {money(tb.totals.openingCr)} Cr</td>
                   <td className={surface.numeric}>{money(tb.totals.debit)}</td>
                   <td className={surface.numeric}>{money(tb.totals.credit)}</td>
@@ -75,7 +78,7 @@ export function TrialBalanceTab({ ledger, period, onOpenAccount }: { ledger: Led
         )}
       </div>
       <p className={books.muted}>
-        Income and expense accounts start afresh each 1 April; earlier years’ profit sits in Reserves &amp; surplus. Click an account for its ledger.
+        {ledgerT('tbNote')}
       </p>
     </div>
   );

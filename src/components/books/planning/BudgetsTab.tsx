@@ -44,25 +44,29 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './planning.module.css';
+import { useT } from '../../../i18n';
+import { planT } from '../../../i18n/areas/books-planning';
+import { plural } from '../../../i18n/areas/plural';
 
 interface Props {
   ledger: Ledger;
   notify: (msg: string, tone?: 'success' | 'error') => void;
 }
 
-const MODES: Array<{ id: RangeMode; label: string }> = [
-  { id: 'month', label: 'Month' },
-  { id: 'quarter', label: 'Quarter' },
-  { id: 'ytd', label: 'Year to date' },
-  { id: 'year', label: 'Full year' },
-];
+const MODES = [
+  { id: 'month', label: 'modeMonth' },
+  { id: 'quarter', label: 'modeQuarter' },
+  { id: 'ytd', label: 'modeYtd' },
+  { id: 'year', label: 'modeYear' },
+] as const satisfies ReadonlyArray<{ id: RangeMode; label: string }>;
 
 const signed = (paise: number) => (paise < 0 ? `−${money(-paise)}` : paise > 0 ? `+${money(paise)}` : money(0));
 const tone = (v: Variance) => (v.variance === 0 ? '' : v.favourable ? styles.fav : styles.adv);
-const toneWord = (v: Variance) => (v.variance === 0 ? 'on budget' : v.favourable ? 'favourable' : 'adverse');
+const toneWord = (v: Variance) => planT(v.variance === 0 ? 'onBudget' : v.favourable ? 'favourable' : 'adverse');
 const pct = (v: Variance) => (v.percent === null ? '—' : `${v.percent > 0 ? '+' : ''}${v.percent}%`);
 
 export function BudgetsTab({ ledger, notify }: Props) {
+  useT();
   const today = todayIso();
   const currentFy = fyStartYearOf(today);
   const [version, setVersion] = useState(0);
@@ -101,7 +105,7 @@ export function BudgetsTab({ ledger, notify }: Props) {
   const remove = (b: Budget) => {
     deleteBudget(b.id);
     setVersion((v) => v + 1);
-    notify('Budget line deleted');
+    notify(planT('budgetDeleted'));
   };
 
   return (
@@ -110,36 +114,36 @@ export function BudgetsTab({ ledger, notify }: Props) {
         <div className={surface.cardBody}>
           <div className={styles.controls}>
             <div className={controls.field}>
-              <label className={controls.label} htmlFor="bud-fy">Financial year</label>
+              <label className={controls.label} htmlFor="bud-fy">{planT('financialYear')}</label>
               <select id="bud-fy" className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
-                {fyOptions.map((y) => <option key={y} value={y}>{fyLabelOf(y)} (Apr {y} – Mar {y + 1})</option>)}
+                {fyOptions.map((y) => <option key={y} value={y}>{planT('fyOption', { fy: fyLabelOf(y), from: y, to: y + 1 })}</option>)}
               </select>
             </div>
             <div className={controls.field}>
-              <span className={controls.label} id="bud-view">View</span>
+              <span className={controls.label} id="bud-view">{planT('view')}</span>
               <div className={controls.segment} role="group" aria-labelledby="bud-view">
                 {MODES.map((m) => (
                   <button key={m.id} type="button" aria-pressed={mode === m.id} className={mode === m.id ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setMode(m.id)}>
-                    {m.label}
+                    {planT(m.label)}
                   </button>
                 ))}
               </div>
             </div>
             {mode !== 'year' && (
               <div className={controls.field}>
-                <label className={controls.label} htmlFor="bud-month">{mode === 'ytd' ? 'Up to' : mode === 'quarter' ? 'Quarter of' : 'Month'}</label>
+                <label className={controls.label} htmlFor="bud-month">{mode === 'ytd' ? planT('upTo') : mode === 'quarter' ? planT('quarterOf') : planT('modeMonth')}</label>
                 <select id="bud-month" className={controls.select} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
                   {MONTH_LABELS.map((m, i) => <option key={m} value={i}>{m} {i <= 8 ? fy : fy + 1}</option>)}
                 </select>
               </div>
             )}
             {centres.length > 0 && (
-              <CostCentreSelect id="bud-scope" label="Budgets for" centres={centres} value={scope} onChange={setScope} emptyLabel="Whole business (account level)" />
+              <CostCentreSelect id="bud-scope" label={planT('budgetsFor')} centres={centres} value={scope} onChange={setScope} emptyLabel={planT('wholeBusiness')} />
             )}
           </div>
           <div className={styles.actionsBar}>
-            <button type="button" className={controls.btnPrimary} onClick={() => setEditing('new')}><Plus size={16} /> Add budget line</button>
-            <button type="button" className={controls.btnOutline} onClick={() => setCopying(true)}><Copy size={16} /> Copy {fyLabelOf(fy - 1)} actuals</button>
+            <button type="button" className={controls.btnPrimary} onClick={() => setEditing('new')}><Plus size={16} /> {planT('addBudgetLine')}</button>
+            <button type="button" className={controls.btnOutline} onClick={() => setCopying(true)}><Copy size={16} /> {planT('copyActuals', { fy: fyLabelOf(fy - 1) })}</button>
           </div>
         </div>
       </section>
@@ -147,27 +151,27 @@ export function BudgetsTab({ ledger, notify }: Props) {
       <StatementToolbar csv={() => budgetReportCsv(report, scopeName)} xlsx={() => void exportXlsx()} filename={`${fileBase}.csv`}>
         <span className={books.muted}>{rangeLabel(fy, range)}{scopeName ? ` · ${scopeName}` : ''}</span>
       </StatementToolbar>
-      <PrintTitle title="Budget vs actual" sub={`${rangeLabel(fy, range)}${scopeName ? ` · ${scopeName}` : ''}`} />
+      <PrintTitle title={planT('budgetVsActual')} sub={`${rangeLabel(fy, range)}${scopeName ? ` · ${scopeName}` : ''}`} />
 
-      <section className={surface.card} aria-label="Budget vs actual">
+      <section className={surface.card} aria-label={planT('budgetVsActual')}>
         {report.rows.length === 0 ? (
           <EmptyState
             icon={Target}
-            title={`No budget for ${fyLabelOf(fy)}${scopeName ? ` · ${scopeName}` : ''}`}
-            text="Add a budget line for an income or expense account, or copy last year's actuals as a starting point."
+            title={planT('noBudgetTitle', { fy: `${fyLabelOf(fy)}${scopeName ? ` · ${scopeName}` : ''}` })}
+            text={planT('noBudgetText')}
           />
         ) : (
           <div className={surface.tableWrap}>
             <table className={surface.table} data-testid="budget-report">
-              <caption className={surface.srOnly}>Budget vs actual, {rangeLabel(fy, range)}</caption>
+              <caption className={surface.srOnly}>{planT('budgetCaption', { range: rangeLabel(fy, range) })}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Account</th>
-                  <th scope="col" className={surface.numeric}>Budget</th>
-                  <th scope="col" className={surface.numeric}>Actual</th>
-                  <th scope="col" className={surface.numeric}>Variance ₹</th>
-                  <th scope="col" className={surface.numeric}>Variance %</th>
-                  <th scope="col" className="no-print"><span className={surface.srOnly}>Actions</span></th>
+                  <th scope="col">{planT('colAccount')}</th>
+                  <th scope="col" className={surface.numeric}>{planT('colBudget')}</th>
+                  <th scope="col" className={surface.numeric}>{planT('colActual')}</th>
+                  <th scope="col" className={surface.numeric}>{planT('colVarianceRs')}</th>
+                  <th scope="col" className={surface.numeric}>{planT('colVariancePct')}</th>
+                  <th scope="col" className="no-print"><span className={surface.srOnly}>{planT('actions')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -177,7 +181,7 @@ export function BudgetsTab({ ledger, notify }: Props) {
                   const t = income ? report.income : report.expense;
                   return (
                     <Fragment key={String(income)}>
-                      <tr><th scope="rowgroup" colSpan={6}>{income ? 'Income' : 'Expenses'}</th></tr>
+                      <tr><th scope="rowgroup" colSpan={6}>{income ? planT('income') : planT('expenses')}</th></tr>
                       {rows.map((r) => (
                         <tr key={r.budgetRow.id}>
                           <td>{r.account.code} · {r.account.name}</td>
@@ -187,25 +191,24 @@ export function BudgetsTab({ ledger, notify }: Props) {
                           <td className={`${surface.numeric} ${tone(r)}`}>{pct(r)}</td>
                           <td className="no-print">
                             <div className={surface.rowActions}>
-                              <button type="button" className={controls.btnIcon} onClick={() => setEditing(r.budgetRow)} aria-label={`Edit budget for ${r.account.name}`}><Pencil size={16} /></button>
-                              <button type="button" className={controls.btnDanger} onClick={() => remove(r.budgetRow)} aria-label={`Delete budget for ${r.account.name}`}><Trash2 size={16} /></button>
+                              <button type="button" className={controls.btnIcon} onClick={() => setEditing(r.budgetRow)} aria-label={planT('editBudgetFor', { name: r.account.name })}><Pencil size={16} /></button>
+                              <button type="button" className={controls.btnDanger} onClick={() => remove(r.budgetRow)} aria-label={planT('deleteBudgetFor', { name: r.account.name })}><Trash2 size={16} /></button>
                             </div>
                           </td>
                         </tr>
                       ))}
-                      <TotalRow label={income ? 'Total income' : 'Total expenses'} t={t} />
+                      <TotalRow label={income ? planT('totalIncome') : planT('totalExpenses')} t={t} />
                     </Fragment>
                   );
                 })}
-                <TotalRow label="Net (income − expenses)" t={report.net} />
+                <TotalRow label={planT('netIncomeExpenses')} t={report.net} />
               </tbody>
             </table>
           </div>
         )}
       </section>
       <p className={books.muted}>
-        Actuals come from the ledger (invoices, notes, bills, expenses, vouchers, depreciation). Income above budget and expenses
-        below it are favourable. A budget for a cost centre compares only with entries tagged to it.
+        {planT('budgetNote')}
       </p>
 
       {editing && (
@@ -220,7 +223,7 @@ export function BudgetsTab({ ledger, notify }: Props) {
           onSaved={() => {
             setEditing(null);
             setVersion((v) => v + 1);
-            notify('Budget saved');
+            notify(planT('budgetSaved'));
           }}
         />
       )}
@@ -265,6 +268,7 @@ function BudgetEditor({ budget, fy, scope, accounts, allAccounts, centres, onClo
   onClose: () => void;
   onSaved: () => void;
 }) {
+  useT();
   const [accountId, setAccountId] = useState(budget?.account_id ?? '');
   const [cc, setCc] = useState<string | undefined>(budget ? budget.cost_centre_id : scope);
   const evenStart = !budget || spreadEvenly(sumMonths(budget.months)).every((m, i) => m === budget.months[i]);
@@ -289,21 +293,21 @@ function BudgetEditor({ budget, fy, scope, accounts, allAccounts, centres, onClo
       open
       onClose={onClose}
       size="lg"
-      title={budget ? 'Edit budget line' : 'New budget line'}
-      subtitle={`${fyLabelOf(budget?.fy_start_year ?? fy)} · April to March`}
+      title={budget ? planT('editBudgetLine') : planT('newBudgetLine')}
+      subtitle={planT('aprToMar', { fy: fyLabelOf(budget?.fy_start_year ?? fy) })}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="button" className={controls.btnPrimary} onClick={save}>Save budget</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{planT('cancel')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={save}>{planT('saveBudget')}</button>
         </>
       }
     >
       <form className={styles.formStack} onSubmit={(e) => { e.preventDefault(); save(); }}>
         <div className={controls.row}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="bud-acct">Account</label>
+            <label className={controls.label} htmlFor="bud-acct">{planT('colAccount')}</label>
             <select id="bud-acct" className={controls.select} value={accountId} onChange={(e) => setAccountId(e.target.value)} autoFocus>
-              <option value="">Choose an income or expense account…</option>
+              <option value="">{planT('chooseAccount')}</option>
               {GROUPS.map((g) => {
                 const list = accounts.filter((a) => a.group === g.id);
                 return list.length ? (
@@ -314,10 +318,10 @@ function BudgetEditor({ budget, fy, scope, accounts, allAccounts, centres, onClo
               })}
             </select>
           </div>
-          <CostCentreSelect id="bud-cc" label="Cost centre (optional)" centres={centres} value={cc} onChange={setCc} emptyLabel="Whole business (account level)" />
+          <CostCentreSelect id="bud-cc" label={planT('ccOptional')} centres={centres} value={cc} onChange={setCc} emptyLabel={planT('wholeBusiness')} />
         </div>
-        <div className={controls.segment} role="group" aria-label="How to enter the budget">
-          <button type="button" aria-pressed={!monthly} className={!monthly ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setMonthly(false)}>Annual, spread evenly</button>
+        <div className={controls.segment} role="group" aria-label={planT('howToEnter')}>
+          <button type="button" aria-pressed={!monthly} className={!monthly ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setMonthly(false)}>{planT('annualEven')}</button>
           <button
             type="button"
             aria-pressed={monthly}
@@ -327,14 +331,14 @@ function BudgetEditor({ budget, fy, scope, accounts, allAccounts, centres, onClo
               setMonthly(true);
             }}
           >
-            Month by month
+            {planT('monthByMonth')}
           </button>
         </div>
         {!monthly ? (
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="bud-annual">Annual budget (₹)</label>
+            <label className={controls.label} htmlFor="bud-annual">{planT('annualBudget')}</label>
             <input id="bud-annual" className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={annual} onChange={(e) => setAnnual(e.target.value)} placeholder="0.00" />
-            <span className={controls.hint}>Spread as {money(resolved[0])} a month{resolved[0] !== resolved[11] ? ` (the first months carry the odd paise)` : ''}.</span>
+            <span className={controls.hint}>{planT(resolved[0] !== resolved[11] ? 'spreadAsOdd' : 'spreadAs', { amount: money(resolved[0]) })}</span>
           </div>
         ) : (
           <div className={styles.months}>
@@ -353,7 +357,7 @@ function BudgetEditor({ budget, fy, scope, accounts, allAccounts, centres, onClo
             ))}
           </div>
         )}
-        <p className={books.muted}>Total for the year: <strong>{money(sumMonths(resolved))}</strong></p>
+        <p className={books.muted}>{planT('totalForYear')} <strong>{money(sumMonths(resolved))}</strong></p>
         {error && <div className={controls.error} role="alert">{error}</div>}
       </form>
     </Modal>
@@ -368,6 +372,7 @@ function CopyActualsModal({ ledger, fy, hasCentres, existing, onClose, onDone }:
   onClose: () => void;
   onDone: (msg: string) => void;
 }) {
+  useT();
   const [uplift, setUplift] = useState('0');
   const [byCc, setByCc] = useState(false);
   const [replace, setReplace] = useState(false);
@@ -375,7 +380,7 @@ function CopyActualsModal({ ledger, fy, hasCentres, existing, onClose, onDone }:
 
   const run = () => {
     const r = saveBudgets(rows, { replace });
-    onDone(`${r.added} budget line${r.added === 1 ? '' : 's'} added${r.replaced ? `, ${r.replaced} replaced` : ''}${r.skipped ? `, ${r.skipped} kept as they were` : ''}`);
+    onDone(`${plural(planT, 'copiedLinesOne', 'copiedLinesMany', r.added)}${r.replaced ? planT('copiedReplaced', { n: r.replaced }) : ''}${r.skipped ? planT('copiedKept', { n: r.skipped }) : ''}`);
   };
 
   return (
@@ -383,34 +388,34 @@ function CopyActualsModal({ ledger, fy, hasCentres, existing, onClose, onDone }:
       open
       onClose={onClose}
       size="md"
-      title={`Copy ${fyLabelOf(fy - 1)} actuals to ${fyLabelOf(fy)}`}
-      subtitle="Each month of last year's actual income and expenses becomes this year's budget for the same month."
+      title={planT('copyTitle', { from: fyLabelOf(fy - 1), to: fyLabelOf(fy) })}
+      subtitle={planT('copySubtitle')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="button" className={controls.btnPrimary} onClick={run} disabled={!rows.length}>Copy {rows.length} line{rows.length === 1 ? '' : 's'}</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{planT('cancel')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={run} disabled={!rows.length}>{plural(planT, 'copyLinesOne', 'copyLinesMany', rows.length)}</button>
         </>
       }
     >
       <div className={styles.formStack}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="bud-uplift">Adjust by (%)</label>
+          <label className={controls.label} htmlFor="bud-uplift">{planT('adjustBy')}</label>
           <input id="bud-uplift" className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={uplift} onChange={(e) => setUplift(e.target.value)} />
-          <span className={controls.hint}>e.g. 10 for 10% growth, −5 for a 5% cut. Amounts are rounded to the rupee.</span>
+          <span className={controls.hint}>{planT('adjustHint')}</span>
         </div>
         {hasCentres && (
           <label className={controls.check}>
             <input type="checkbox" checked={byCc} onChange={(e) => setByCc(e.target.checked)} />
-            One line per cost centre (entries without a cost centre are left out)
+            {planT('perCc')}
           </label>
         )}
         {existing > 0 && (
           <label className={controls.check}>
             <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-            Replace budget lines that already exist for {fyLabelOf(fy)} (otherwise they are kept)
+            {planT('replaceExisting', { fy: fyLabelOf(fy) })}
           </label>
         )}
-        {!rows.length && <p className={books.muted}>No income or expense was posted in {fyLabelOf(fy - 1)}{byCc ? ' against a cost centre' : ''}.</p>}
+        {!rows.length && <p className={books.muted}>{planT(byCc ? 'noActualsCc' : 'noActuals', { fy: fyLabelOf(fy - 1) })}</p>}
       </div>
     </Modal>
   );

@@ -11,6 +11,9 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { useT } from '../../../i18n';
+import { ledgerT } from '../../../i18n/areas/books-ledger';
+import { voucherTypeLabel } from '../../../i18n/areas/books';
 
 interface Props {
   ledger: Ledger;
@@ -22,6 +25,7 @@ interface Props {
 }
 
 export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVoucher }: Props) {
+  useT();
   const uid = useId();
   const account = ledger.byId.get(accountId) ?? ledger.byId.get('bank')!;
   const parties = useMemo(() => partiesOf(ledger, account.id), [ledger, account.id]);
@@ -31,7 +35,7 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
     <div className={books.stack}>
       <div className={`${styles.filters} no-print`}>
         <div className={`${controls.field} ${styles.filterField}`}>
-          <label className={controls.label} htmlFor={`${uid}-acct`}>Account</label>
+          <label className={controls.label} htmlFor={`${uid}-acct`}>{ledgerT('account')}</label>
           <select id={`${uid}-acct`} className={controls.select} value={account.id} onChange={(e) => onSelect(e.target.value)}>
             {GROUPS.map((g) => {
               const list = ledger.accounts.filter((a) => a.group === g.id);
@@ -47,9 +51,9 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
         </div>
         {parties.length > 0 && (
           <div className={`${controls.field} ${styles.filterField}`}>
-            <label className={controls.label} htmlFor={`${uid}-party`}>Party</label>
+            <label className={controls.label} htmlFor={`${uid}-party`}>{ledgerT('party')}</label>
             <select id={`${uid}-party`} className={controls.select} value={party} onChange={(e) => onSelect(account.id, e.target.value)}>
-              <option value="">All parties</option>
+              <option value="">{ledgerT('allParties')}</option>
               {parties.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
@@ -61,28 +65,28 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
       {st && (
         <>
           <StatementToolbar csv={() => accountStatementCsv(st)} filename={`ledger-${account.code}-${period.start}_to_${period.end}.csv`} />
-          <PrintTitle title={`Ledger: ${account.code} ${account.name}${party ? ` — ${party}` : ''}`} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
+          <PrintTitle title={ledgerT('ledgerTitle', { account: `${account.code} ${account.name}${party ? ` — ${party}` : ''}` })} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
           <div className={surface.card}>
             {st.rows.length === 0 && !st.opening ? (
-              <EmptyState icon={BookText} title="No entries in this period" text="Pick another account or widen the period." />
+              <EmptyState icon={BookText} title={ledgerT('ledgerEmptyTitle')} text={ledgerT('ledgerEmptyText')} />
             ) : (
               <div className={`${surface.tableWrap} ${styles.wrap}`}>
                 <table className={surface.table}>
-                  <caption className={surface.srOnly}>Ledger of {account.name}</caption>
+                  <caption className={surface.srOnly}>{ledgerT('ledgerOf', { name: account.name })}</caption>
                   <thead>
                     <tr>
-                      <th scope="col">Date</th>
-                      <th scope="col">Particulars</th>
-                      <th scope="col">Voucher</th>
-                      <th scope="col" className={surface.numeric}>Debit</th>
-                      <th scope="col" className={surface.numeric}>Credit</th>
-                      <th scope="col" className={surface.numeric}>Balance</th>
+                      <th scope="col">{ledgerT('colDate')}</th>
+                      <th scope="col">{ledgerT('colParticulars')}</th>
+                      <th scope="col">{ledgerT('colVoucher')}</th>
+                      <th scope="col" className={surface.numeric}>{ledgerT('colDebit')}</th>
+                      <th scope="col" className={surface.numeric}>{ledgerT('colCredit')}</th>
+                      <th scope="col" className={surface.numeric}>{ledgerT('colBalance')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className={styles.groupRow}>
                       <td>{formatDate(period.start)}</td>
-                      <td colSpan={4}>Opening balance</td>
+                      <td colSpan={4}>{ledgerT('openingBalance')}</td>
                       <td className={surface.numeric}>{drCr(st.opening)}</td>
                     </tr>
                     {st.rows.map((r) => (
@@ -93,9 +97,9 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
                           <div className={books.narration}>{[r.voucher.party, r.voucher.narration].filter(Boolean).join(' · ')}</div>
                         </td>
                         <td>
-                          <span className={r.voucher.source === 'manual' ? styles.badgeManual : styles.badge}>{r.voucher.kind}</span>{' '}
+                          <span className={r.voucher.source === 'manual' ? styles.badgeManual : styles.badge}>{voucherTypeLabel(r.voucher.kind)}</span>{' '}
                           {r.voucher.link ? (
-                            <Link className={books.link} to={r.voucher.link}>{r.voucher.number || 'Open'}</Link>
+                            <Link className={books.link} to={r.voucher.link}>{r.voucher.number || ledgerT('open')}</Link>
                           ) : r.voucher.source === 'manual' ? (
                             <button type="button" className={styles.rowButton} onClick={() => onOpenVoucher(r.voucher)}>{r.voucher.number}</button>
                           ) : (
@@ -108,7 +112,7 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
                       </tr>
                     ))}
                     <tr className={books.totalRow}>
-                      <td colSpan={3}>Closing balance</td>
+                      <td colSpan={3}>{ledgerT('closingBalance')}</td>
                       <td className={surface.numeric}>{money(st.totalDebit)}</td>
                       <td className={surface.numeric}>{money(st.totalCredit)}</td>
                       <td className={surface.numeric}>{drCr(st.closing)}</td>

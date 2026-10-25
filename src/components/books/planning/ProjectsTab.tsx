@@ -6,7 +6,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import { FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
-  CC_SECTION_LABELS,
   costCentrePnl,
   costCentrePnlCsv,
   costCentrePnlRows,
@@ -18,7 +17,6 @@ import {
 } from '../../../lib/ledger';
 import {
   COST_CENTRE_KINDS,
-  COST_CENTRE_KIND_LABELS,
   deleteCostCentre,
   loadCostCentres,
   saveCostCentre,
@@ -37,6 +35,14 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './planning.module.css';
+import { useT } from '../../../i18n';
+import { planT } from '../../../i18n/areas/books-planning';
+
+const SECTION_KEY = { income: 'secIncome', direct: 'secDirect', indirect: 'secIndirect' } as const;
+const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch' } as const;
+const kindLabel = (k: CostCentreKind) => planT(KIND_KEY[k]);
+/** Engine column labels: centre names pass through; the two fixed columns are translated. */
+const columnLabel = (label: string) => (label === 'Unallocated' ? planT('unallocated') : label === 'Deleted cost centre' ? planT('deletedCc') : label);
 
 interface Props {
   ledger: Ledger;
@@ -49,6 +55,7 @@ const SECTIONS: CcSection[] = ['income', 'direct', 'indirect'];
 const signed = (paise: number) => (paise < 0 ? `(${money(-paise)})` : money(paise));
 
 export function ProjectsTab({ ledger, period, notify }: Props) {
+  useT();
   const [version, setVersion] = useState(0);
   const centres = useMemo(() => {
     void version;
@@ -66,7 +73,7 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
     try {
       deleteCostCentre(c.id);
       setVersion((v) => v + 1);
-      notify(`Deleted ${c.name}`);
+      notify(planT('deletedName', { name: c.name }));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -93,41 +100,41 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
     <div className={books.stack}>
       <section className={`${surface.card} no-print`}>
         <div className={surface.cardHead}>
-          <span className={surface.cardHeadIcon}><FolderKanban size={16} aria-hidden="true" /> Cost centres &amp; projects</span>
+          <span className={surface.cardHeadIcon}><FolderKanban size={16} aria-hidden="true" /> {planT('ccHead')}</span>
           <button type="button" className={controls.btnPrimary} onClick={() => setEditing('new')}>
-            <Plus size={16} /> Add cost centre
+            <Plus size={16} /> {planT('addCc')}
           </button>
         </div>
         {centres.length === 0 ? (
           <EmptyState
             icon={FolderKanban}
-            title="No cost centres yet"
-            text="Add a project, department or branch. A picker then appears on invoices, bills, expenses, vouchers and time entries, and this tab shows a P&L per cost centre."
+            title={planT('noCcTitle')}
+            text={planT('noCcText')}
           />
         ) : (
           <div className={surface.tableWrap}>
             <table className={surface.table}>
-              <caption className={surface.srOnly}>Cost centres</caption>
+              <caption className={surface.srOnly}>{planT('ccCaption')}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Kind</th>
-                  <th scope="col">Client</th>
-                  <th scope="col">Status</th>
-                  <th scope="col"><span className={surface.srOnly}>Actions</span></th>
+                  <th scope="col">{planT('colName')}</th>
+                  <th scope="col">{planT('colKind')}</th>
+                  <th scope="col">{planT('colClient')}</th>
+                  <th scope="col">{planT('colStatus')}</th>
+                  <th scope="col"><span className={surface.srOnly}>{planT('actions')}</span></th>
                 </tr>
               </thead>
               <tbody>
                 {sortCostCentres(centres).map((c) => (
                   <tr key={c.id}>
                     <td className={c.parent_id ? styles.child : undefined}>{c.parent_id ? '↳ ' : ''}{c.name}</td>
-                    <td>{COST_CENTRE_KIND_LABELS[c.kind]}</td>
+                    <td>{kindLabel(c.kind)}</td>
                     <td>{clients.find((x) => x.id === c.client_id)?.name ?? '—'}</td>
-                    <td className={c.active ? undefined : styles.inactive}>{c.active ? 'Active' : 'Inactive'}</td>
+                    <td className={c.active ? undefined : styles.inactive}>{c.active ? planT('active') : planT('inactive')}</td>
                     <td>
                       <div className={surface.rowActions}>
-                        <button type="button" className={controls.btnIcon} onClick={() => setEditing(c)} aria-label={`Edit ${c.name}`}><Pencil size={16} /></button>
-                        <button type="button" className={controls.btnDanger} onClick={() => remove(c)} aria-label={`Delete ${c.name}`}><Trash2 size={16} /></button>
+                        <button type="button" className={controls.btnIcon} onClick={() => setEditing(c)} aria-label={planT('editName', { name: c.name })}><Pencil size={16} /></button>
+                        <button type="button" className={controls.btnDanger} onClick={() => remove(c)} aria-label={planT('deleteName', { name: c.name })}><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -141,30 +148,30 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
       {centres.length > 0 && (
         <>
           <StatementToolbar csv={() => costCentrePnlCsv(pnl)} xlsx={() => void exportXlsx()} filename={`${fileBase}.csv`}>
-            <span className={reconciles ? books.pos : books.neg}>{reconciles ? 'Ties to the P&L' : 'Does not tie to the P&L — check the Vouchers warnings'}</span>
+            <span className={reconciles ? books.pos : books.neg}>{reconciles ? planT('ties') : planT('notTies')}</span>
             {hasGroups && (
               <label className={controls.check}>
                 <input type="checkbox" checked={rollUp} onChange={(e) => setRollUp(e.target.checked)} />
-                Group under parent
+                {planT('groupUnderParent')}
               </label>
             )}
           </StatementToolbar>
-          <PrintTitle title="Project P&L" sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
-          <section className={surface.card} aria-label="Project P&L">
-            <div className={surface.cardHead}>Project P&amp;L · {formatDate(period.start)} – {formatDate(period.end)}</div>
+          <PrintTitle title={planT('projectPnl')} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
+          <section className={surface.card} aria-label={planT('projectPnl')}>
+            <div className={surface.cardHead}>{planT('projectPnlHead', { start: formatDate(period.start), end: formatDate(period.end) })}</div>
             {pnl.rows.length === 0 ? (
-              <EmptyState icon={FolderKanban} title="Nothing posted in this period" text="Tag invoices, bills or expenses with a cost centre, or widen the period." />
+              <EmptyState icon={FolderKanban} title={planT('nothingPosted')} text={planT('nothingPostedText')} />
             ) : (
               <div className={surface.tableWrap}>
                 <table className={surface.table} data-testid="project-pnl">
-                  <caption className={surface.srOnly}>Income, direct costs and margin per cost centre</caption>
+                  <caption className={surface.srOnly}>{planT('pnlCaption')}</caption>
                   <thead>
                     <tr>
-                      <th scope="col" className={styles.sticky}>Account</th>
+                      <th scope="col" className={styles.sticky}>{planT('colAccount')}</th>
                       {pnl.columns.map((c) => (
-                        <th key={c.key} scope="col" className={`${surface.numeric} ${styles.nowrap}`}>{c.label}</th>
+                        <th key={c.key} scope="col" className={`${surface.numeric} ${styles.nowrap}`}>{columnLabel(c.label)}</th>
                       ))}
-                      <th scope="col" className={surface.numeric}>Total</th>
+                      <th scope="col" className={surface.numeric}>{planT('total')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -174,7 +181,7 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                       return (
                         <Fragment key={sec}>
                           <tr>
-                            <th scope="rowgroup" colSpan={pnl.columns.length + 2} className={styles.sticky}>{CC_SECTION_LABELS[sec]}</th>
+                            <th scope="rowgroup" colSpan={pnl.columns.length + 2} className={styles.sticky}>{planT(SECTION_KEY[sec])}</th>
                           </tr>
                           {rows.map((r) => (
                             <tr key={r.account.id}>
@@ -188,27 +195,26 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                         </Fragment>
                       );
                     })}
-                    {totalsRow('Income', (t) => t.income)}
-                    {totalsRow('Direct costs', (t) => t.directCosts)}
-                    {totalsRow('Margin', (t) => t.margin, true)}
+                    {totalsRow(planT('secIncome'), (t) => t.income)}
+                    {totalsRow(planT('secDirect'), (t) => t.directCosts)}
+                    {totalsRow(planT('margin'), (t) => t.margin, true)}
                     <tr>
-                      <td className={styles.sticky}>Margin %</td>
+                      <td className={styles.sticky}>{planT('marginPct')}</td>
                       {pnl.columns.map((c) => {
                         const m = marginPercent(pnl.totals[c.key]);
                         return <td key={c.key} className={surface.numeric}>{m === null ? '—' : `${m}%`}</td>;
                       })}
                       <td className={surface.numeric}>{marginPercent(pnl.grand) === null ? '—' : `${marginPercent(pnl.grand)}%`}</td>
                     </tr>
-                    {totalsRow('Indirect expenses', (t) => t.indirectExpenses)}
-                    {totalsRow('Net profit / (loss)', (t) => t.netProfit, true)}
+                    {totalsRow(planT('secIndirect'), (t) => t.indirectExpenses)}
+                    {totalsRow(planT('netProfitLoss'), (t) => t.netProfit, true)}
                   </tbody>
                 </table>
               </div>
             )}
           </section>
           <p className={books.muted}>
-            Income and costs follow the cost centre on each invoice line, bill, expense and voucher line; anything untagged (and
-            depreciation) is Unallocated, so the columns add up to the Profit &amp; loss for the same period.
+            {planT('projectNote')}
           </p>
         </>
       )}
@@ -222,7 +228,7 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
           onSaved={(c) => {
             setEditing(null);
             setVersion((v) => v + 1);
-            notify(`${c.name} saved`);
+            notify(planT('savedName', { name: c.name }));
           }}
         />
       )}
@@ -237,6 +243,7 @@ function CostCentreForm({ centre, centres, clients, onClose, onSaved }: {
   onClose: () => void;
   onSaved: (c: CostCentre) => void;
 }) {
+  useT();
   const [name, setName] = useState(centre?.name ?? '');
   const [kind, setKind] = useState<CostCentreKind>(centre?.kind ?? 'project');
   const [parent, setParent] = useState(centre?.parent_id ?? '');
@@ -259,49 +266,49 @@ function CostCentreForm({ centre, centres, clients, onClose, onSaved }: {
       open
       onClose={onClose}
       size="md"
-      title={centre ? `Edit ${centre.name}` : 'New cost centre'}
+      title={centre ? planT('editName', { name: centre.name }) : planT('newCc')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="button" className={controls.btnPrimary} onClick={save}>Save</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{planT('cancel')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={save}>{planT('save')}</button>
         </>
       }
     >
       <form className={styles.formStack} onSubmit={(e) => { e.preventDefault(); save(); }}>
         <div className={controls.row}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="cc-name">Name</label>
-            <input id="cc-name" className={controls.input} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="e.g. Website revamp" />
+            <label className={controls.label} htmlFor="cc-name">{planT('colName')}</label>
+            <input id="cc-name" className={controls.input} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={planT('ccNamePh')} />
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="cc-kind">Kind</label>
+            <label className={controls.label} htmlFor="cc-kind">{planT('colKind')}</label>
             <select id="cc-kind" className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as CostCentreKind)}>
-              {COST_CENTRE_KINDS.map((k) => <option key={k} value={k}>{COST_CENTRE_KIND_LABELS[k]}</option>)}
+              {COST_CENTRE_KINDS.map((k) => <option key={k} value={k}>{kindLabel(k)}</option>)}
             </select>
           </div>
         </div>
         <div className={controls.row}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="cc-parent">Group under (optional)</label>
+            <label className={controls.label} htmlFor="cc-parent">{planT('groupUnder')}</label>
             <select id="cc-parent" className={controls.select} value={parent} onChange={(e) => setParent(e.target.value)}>
-              <option value="">— Top level —</option>
+              <option value="">{planT('topLevel')}</option>
               {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor="cc-client">Client (optional)</label>
+            <label className={controls.label} htmlFor="cc-client">{planT('clientOptional')}</label>
             <select id="cc-client" className={controls.select} value={client} onChange={(e) => setClient(e.target.value)}>
-              <option value="">— None —</option>
+              <option value="">{planT('none')}</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
         </div>
         <label className={controls.check}>
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-          Active (inactive cost centres are hidden from pickers but stay in reports)
+          {planT('activeHint')}
         </label>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="cc-notes">Notes</label>
+          <label className={controls.label} htmlFor="cc-notes">{planT('notes')}</label>
           <textarea id="cc-notes" className={controls.textarea} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
         {error && <div className={controls.error} role="alert">{error}</div>}
