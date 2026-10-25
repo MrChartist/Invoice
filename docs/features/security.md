@@ -156,6 +156,7 @@ Security.
 | `data.backup` — download a full backup, encrypted export, backup folder / schedule / passphrase, "Back up now" | ✓ | | |
 | `data.restore`, `data.erase` | ✓ | | |
 | `period.override` — unlock a locked document / move the lock date earlier | ✓ | | |
+| `payroll.view` — Payroll screen, employees, salaries, payroll runs and payments (Phase 7; salaries are confidential) | ✓ | | |
 
 Inventory settings (costing method, "challans reduce stock", expiry window, default godown) are `settings.manage`
 (owner only; `inventory.saveSettings` refuses and audits, the controls are disabled for others). Time preferences need

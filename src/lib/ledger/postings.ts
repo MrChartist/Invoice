@@ -31,6 +31,8 @@
  *   Opening (Books)     Dr Cash/Bank | Cr Opening balance difference — sized so the ledger's
  *                       cash/bank balance from that day equals the Books cash/bank book.
  *   Fixed assets        Dr asset | Cr paid-from account; yearly Dr Depreciation | Cr Accumulated depreciation.
+ *   Payroll (Phase 7)   Dr salary / allowance / employer-contribution expenses | Cr Salary payable,
+ *                       PF / ESI / PT / TDS (192) payable; payments clear the payables (payroll/postings.ts).
  * Foreign-currency documents post in rupees at their `exchange_rate`; receipts clear the debtor
  * at the invoice's rate and, when the receipt carries a `realised_rate`, the exchange difference
  * goes to the FX gain/loss account (`fx-gain.ts`).
@@ -56,6 +58,8 @@ import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../
 import { purchaseReturnPostings } from './postings-returns';
 import { openingVouchers } from './postings-openings';
 import { applyBankLedgers } from './postings-bank';
+import { payrollVouchers } from '../payroll/postings';
+import type { PayrollPayment, PayrollRun } from '../../types/payroll';
 
 export interface PostingLine {
   account: string;
@@ -84,7 +88,9 @@ export type LedgerVoucherKind =
   | 'Journal'
   | 'Contra'
   | 'Fixed Asset'
-  | 'Depreciation';
+  | 'Depreciation'
+  /** Payroll voucher of a finalized payroll run (Phase 7). */
+  | 'Payroll';
 
 export interface LedgerVoucher {
   /** `<kind>:<source id>` for automatic vouchers, `mv:<id>` for manual ones. */
@@ -110,6 +116,9 @@ export interface LedgerInput extends BooksData {
   today: string;
   /** Additive (Tally parity): TDS / TCS challans (`tds_challans`), posted as payments. */
   challans?: TdsChallan[];
+  /** Payroll (Phase 7): finalized runs post a Payroll voucher; payments clear the payables. */
+  payrollRuns?: PayrollRun[];
+  payrollPayments?: PayrollPayment[];
 }
 
 export interface Ledger {
@@ -172,6 +181,7 @@ const KIND_ORDER: Record<LedgerVoucherKind, number> = {
   Contra: 9,
   Journal: 10,
   Depreciation: 11,
+  Payroll: 7.5,
 };
 
 function str(v: unknown): string {
@@ -652,6 +662,7 @@ export function buildLedger(input: LedgerInput): Ledger {
     if (rev) push({ ...manualToLedger(rev), id: `mvrev:${m.id}`, manualId: m.id, narration: rev.narration });
   }
   for (const v of openingVouchers(input, byId, warnings)) push(v); // WP-1 ledger / party openings
+  for (const v of payrollVouchers(input.payrollRuns ?? [], input.payrollPayments ?? [])) push(v);
 
   // Openings from the Books "opening balance" dialog: the cash/bank balance AT THE START of
   // `as_of` is what the user typed, whatever came before (same rule as the Books cash book).

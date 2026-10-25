@@ -126,6 +126,13 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `price_levels` | pricing (6.9, `src/lib/pricing.ts`) | `PriceLevel {id, name, percent_off?, rates?}` (rates keyed by catalogue item id); clients point at one via optional `price_level` |
 | `schemes` | pricing (6.9) | `Scheme` buy-X-get-Y rows (item, buy / free qty, optional date window, `active`); free goods are ₹0 invoice lines (`scheme_id`, `free_of`) |
 | `series_counters` | numbering (`src/lib/series-counters.ts`) | `SeriesCounter {id: 'STR/FY26-27', seq}`: highest sequence ever issued per voucher series × FY (STR / PO / ADV / RFV / RCPT), so a deleted latest number is never reused. Backed up (`RECORD_TABLES` / `ID_TABLES`); written alongside a guarded save (`TABLE_ACTIONS`: `books.edit`) |
+| `employees` / `employee_groups` | payroll (Phase 7, `src/lib/payroll/store.ts`) | `Employee` / `EmployeeGroup` (`src/types/payroll.ts`); owner-only (`payroll.view`) — `docs/features/payroll.md` |
+| `pay_heads` | payroll | `PayHead` (Tally calculation types; starter set `ph_*` used until the first save) |
+| `salary_structures` | payroll | `SalaryStructure` per employee or group with `effective_from` |
+| `attendance_types` / `attendance` | payroll | production types; monthly LOP days + units per employee |
+| `payroll_runs` | payroll | `PayrollRun` with a payslip snapshot per employee; final runs post a Payroll voucher (`PRL/FY…`) to the ledger, derived on the fly |
+| `payroll_payments` | payroll | `PayrollPayment` salary / PF / ESI / PT / TDS payments (`PYP/FY…`) clearing the payables |
+| `payroll_settings` (object) | payroll | PF establishment code, ESI employer code, TAN |
 | `pos_day_close` | POS (6.8, `src/lib/pos.ts`) | `PosDayClose` cash-drawer count per day (opening float, expected / counted cash, difference, tender totals); POS bills themselves are normal `invoices` with `pos: true` (`docs/features/pos-barcode-pricing.md`) |
 | `tds_challans` | TDS on payables (Phase 7, `src/lib/tds-payables.ts`) | `TdsChallan` ITNS 281 challan (TDS / TCS, BSR code, serial, date, tax / interest / fee / others, `deduction_keys` it deposits); posted to the ledger as a payment (`docs/features/tds-payables.md`) |
 | `tds_deductions` | TDS on payables (Phase 7) | `ManualTdsDeduction` register-only deductions booked outside bills (not posted to the ledger) |

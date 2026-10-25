@@ -22,7 +22,7 @@
 ## Architecture / Key files
 - `index.html` → `src/main.tsx` → `src/App.tsx` (PIN gate + React Router shell).
 - `src/pages/` — one file per route (Dashboard, InvoiceCreator, Transactions, Clients, Settings, LoginPage,
-  Expenses, Receivables, Books, GstReports, Exports, Inventory, Recurring). Design Studio lives in
+  Expenses, Receivables, Books, GstReports, Exports, Inventory, Recurring, Payroll). Design Studio lives in
   `src/components/design/`. Every page except Dashboard and Login is `React.lazy` in `src/App.tsx`; the editor chunk is prefetched on idle.
 - `src/store/useInvoiceStore.ts` — Zustand store (current invoice + actions).
 - `src/lib/localDb.ts` — data layer (over `src/lib/storage.ts`) + Indian-FY invoice numbering.
@@ -101,7 +101,8 @@ build-time config must use Vite's `VITE_` prefix.
 - Statutory values that change over time (B2CL threshold, GST slabs, TDS/TCS presets) live in
   `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones.
   Exception: GST interest / late-fee tables live in `src/lib/gst-penalties.ts` (same date-keyed shape) so they
-  stay out of the early-loading notifications chunk.
+  stay out of the early-loading notifications chunk, and payroll statutory values (EPF / ESI / PT / TDS u/s 192) live in
+  `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle.
 - `PurchaseLine.item_id` is not set by the bill form yet, so inventory matches purchases by name + HSN.
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.

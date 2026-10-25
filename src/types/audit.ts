@@ -33,7 +33,11 @@ export type AuditEntity =
   | 'godown'
   | 'purchase_order'
   | 'stock_adjustment'
-  | 'pos_day_close';
+  | 'pos_day_close'
+  /** Payroll masters: employees, groups, pay heads, salary structures, production types (Phase 7). */
+  | 'employee'
+  /** Payroll runs, attendance, salary / statutory payments (Phase 7). */
+  | 'payroll';
 
 export type AuditAction =
   | 'create'
@@ -119,6 +123,8 @@ export const AUDIT_ENTITIES: AuditEntity[] = [
   'budget',
   'cheque',
   'advance',
+  'employee',
+  'payroll',
 ];
 
 export const AUDIT_ACTIONS: AuditAction[] = [
@@ -178,4 +184,6 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   purchase_order: 'Purchase orders',
   stock_adjustment: 'Stock adjustments',
   pos_day_close: 'POS day close',
+  employee: 'Payroll masters',
+  payroll: 'Payroll',
 };

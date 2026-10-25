@@ -328,6 +328,8 @@ const RECORD_TABLES = [
   'deposit_slips', 'cash_tally',
   // Business extras (WP-9): POS returns, approvals, branches, loyalty, AMC contracts
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
+  // Payroll (Phase 7)
+  'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -342,6 +344,7 @@ const ID_TABLES = new Set([
   'groups', 'ledger_openings', 'books_begin', 'opening_bills',
   'deposit_slips', 'cash_tally',
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
+  'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

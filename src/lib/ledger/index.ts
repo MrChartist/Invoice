@@ -16,6 +16,7 @@ import type { OpeningsInput } from './postings-openings';
 import { loadVouchers } from './vouchers';
 import { loadSettings, loadPositions, type StockPosition } from '../inventory';
 import { loadClosingStockConfig, stockValuerFor, type StockValuer } from './closing-stock';
+import { loadPayrollPayments, loadRuns } from '../payroll/records';
 
 export * from './accounts';
 export * from './assets';
@@ -45,6 +46,8 @@ export function loadLedgerInput(books: BooksData = loadBooksData(), today: strin
     openingBills: loadOpeningBills(),
     booksBegin: loadBooksBegin(today),
     clients: getTable<Client>('clients'),
+    payrollRuns: loadRuns(),
+    payrollPayments: loadPayrollPayments(),
   };
 }
 

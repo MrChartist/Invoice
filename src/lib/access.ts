@@ -26,7 +26,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const ROLE_HINTS: Record<Role, string> = {
   owner: 'Everything, including settings, users, backups, erase and the period lock.',
-  clerk: 'Creates and edits documents, payments, purchases and expenses. Cannot delete issued documents, change settings or restore / erase data.',
+  clerk: 'Creates and edits documents, payments, purchases and expenses. Cannot delete issued documents, see payroll, change settings or restore / erase data.',
   viewer: 'Read-only: can view, print, download PDFs and export reports.',
 };
 
@@ -63,7 +63,13 @@ export type AccessAction =
   /** Export reports (CSV / Excel / GST papers). */
   | 'report.export'
   /** Approve / reject a document a clerk issued while approvals are on (WP-9 maker-checker). Owner only. */
-  | 'doc.approve';
+  | 'doc.approve'
+  /**
+   * See and run payroll (Phase 7): employees, salaries, payslips, statutory returns. Salaries are
+   * confidential, so this is owner-only — clerks and viewers do not see the Payroll screen and the
+   * payroll tables refuse their writes. (The ledger still shows the month's Payroll voucher totals.)
+   */
+  | 'payroll.view';
 
 const CLERK: ReadonlySet<AccessAction> = new Set<AccessAction>([
   'doc.create',
@@ -160,6 +166,7 @@ const DENIED_TEXT: Partial<Record<AccessAction, string>> = {
   'data.erase': 'erase data',
   'period.override': 'override the period lock',
   'doc.approve': 'approve or reject documents',
+  'payroll.view': 'view or run payroll',
 };
 
 export function deniedMessage(action: AccessAction, role: Role = currentRole()): string {
@@ -257,6 +264,15 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   loyalty_adjustments: 'master.edit',
   // approvals: a clerk's save files a request (doc.create); deciding needs doc.approve (approvals.ts)
   approvals: 'doc.create',
+  // payroll (Phase 7): owner-only, salaries are confidential
+  employees: 'payroll.view',
+  employee_groups: 'payroll.view',
+  pay_heads: 'payroll.view',
+  salary_structures: 'payroll.view',
+  attendance_types: 'payroll.view',
+  attendance: 'payroll.view',
+  payroll_runs: 'payroll.view',
+  payroll_payments: 'payroll.view',
 };
 
 let systemDepth = 0;
