@@ -106,6 +106,8 @@ export const hi: Messages = {
   'shell.tabHome': 'होम',
   'shell.tabNew': 'नया',
   'shell.tabMore': 'और',
+  'shell.beta': 'बीटा',
+  'shell.betaAria': 'बीटा वर्ज़न (निजी टेस्ट बिल्ड)',
   'shell.backupSaved': 'बैकअप सेव हुआ ({file})',
   'shell.backupDownloaded': 'बैकअप डाउनलोड हुआ',
   'palette.newInvoice': 'नया इनवॉइस',

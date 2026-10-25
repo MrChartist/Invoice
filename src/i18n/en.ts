@@ -111,6 +111,8 @@ export const en = {
   'shell.tabHome': 'Home',
   'shell.tabNew': 'New',
   'shell.tabMore': 'More',
+  'shell.beta': 'Beta',
+  'shell.betaAria': 'Beta version (private test build)',
   'shell.backupSaved': 'Backup saved ({file})',
   'shell.backupDownloaded': 'Backup downloaded',
   'palette.newInvoice': 'New invoice',

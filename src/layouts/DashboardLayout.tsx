@@ -303,6 +303,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   );
 
   const themeLabel = theme === 'dark' ? t('shell.switchLight') : t('shell.switchDark');
+  // Private beta marker next to the logo (the visible word is short; the label says what it means).
+  const beta = (
+    <span className={styles.beta} role="img" aria-label={t('shell.betaAria')} title={t('shell.betaAria')}>
+      {t('shell.beta')}
+    </span>
+  );
 
   return (
     <div className={styles.layout}>
@@ -321,9 +327,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <Link to="/" aria-label={t('shell.home')}>
-          <Logo height={30} product={false} />
-        </Link>
+        <span className={styles.brandRow}>
+          <Link to="/" aria-label={t('shell.home')}>
+            <Logo height={30} product={false} />
+          </Link>
+          {beta}
+        </span>
         <div className={styles.topActions}>
           <TimerPill />
           <button type="button" className={styles.iconBtn} aria-label={t('shell.search')} onClick={() => openPalette()}>
@@ -341,9 +350,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         className={cn(styles.sidebar, menuOpen && styles.sidebarOpen, 'no-print')}
         inert={isMobile && !menuOpen}
       >
-        <Link to="/" className={styles.brand} aria-label={t('shell.home')}>
-          <Logo height={40} />
-        </Link>
+        <div className={styles.brandRow}>
+          <Link to="/" className={styles.brand} aria-label={t('shell.home')}>
+            <Logo height={40} />
+          </Link>
+          {beta}
+        </div>
         <CompanySwitcher />
 
         <nav className={styles.nav} aria-label={t('nav.primary')}>

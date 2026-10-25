@@ -196,6 +196,25 @@ try {
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');
   });
 
+  await step('beta: badge next to the logo; Help -> Report a problem builds a local diagnostic', async () => {
+    await page.goto(srv.origin + '/');
+    const badge = page.getByRole('img', { name: 'Beta version (private test build)' }).first();
+    await badge.waitFor();
+    check(/^beta$/i.test((await badge.innerText()).trim()), 'Beta badge next to the logo, with an accessible label');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.getByRole('button', { name: /Report a problem/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Report a problem' });
+    await dlg.waitFor();
+    await page.waitForFunction(() => /Recent errors/.test(document.querySelector('[data-report-problem]')?.value ?? ''));
+    const text = await dlg.locator('[data-report-problem]').inputValue();
+    check(
+      /Version: \d+\.\d+\.\d+/.test(text) && /\[Storage health\]/.test(text) && /Screen: \/$/m.test(text) && !/E2E Trader|e2e@okhdfcbank/.test(text),
+      `diagnostic report: version, screen, storage health, no business data (${text.split('\n')[5]})`,
+    );
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+  });
+
   await step('create and save an invoice', async () => {
     await page.goto(srv.origin + '/invoice');
     await page.getByLabel('Client name').fill('Acme Buyers');

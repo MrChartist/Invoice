@@ -6,8 +6,12 @@ import { runMigrations } from './lib/migrations';
 import { initCrossTab } from './lib/cross-tab';
 import { initStorage } from './lib/storage';
 import { initI18n } from './i18n';
+import { installErrorRing } from './lib/error-ring';
 import './fonts.css';
 import './index.css';
+
+// Beta: keep the last console errors in memory for Help → Report a problem (never stored or sent).
+installErrorRing();
 
 function start(root: Root): void {
   // Bring stored data up to the current schema before anything reads it.
