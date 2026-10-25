@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BookOpen, CheckCheck, Landmark, ListChecks, Scale, Upload } from 'lucide-react';
 import {
@@ -47,12 +47,19 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import bank from '../components/bank/reconcile.module.css';
 import styles from './Reconcile.module.css';
+import { bnkT } from '../i18n/areas/banking';
+import type { BankDoc } from '../components/bank/docs/BankingDocs';
+
+// WP-5: deposit slip, payment advice, e-payments, cash tally — loaded only when the tab opens.
+const BankingDocs = lazy(() => import('../components/bank/docs/BankingDocs'));
+const BANK_DOCS: readonly BankDoc[] = ['deposit', 'advice', 'epay', 'cash'];
 
 const TABS = [
   { id: 'reconcile', label: 'tabReconcile' },
   { id: 'brs', label: 'tabBrs' },
   { id: 'statements', label: 'tabStatements' },
   { id: 'import', label: 'tabImport' },
+  { id: 'documents', label: 'tabDocuments' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -266,7 +273,7 @@ export function Reconcile() {
     />
   );
 
-  if (statements.length === 0) {
+  if (statements.length === 0 && tab !== 'documents') {
     return (
       <div className={surface.page}>
         {header}
@@ -330,13 +337,13 @@ export function Reconcile() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {bankT(t.label)}
+            {t.id === 'documents' ? bnkT('tabDocuments') : bankT(t.label as Exclude<typeof t.label, 'tabDocuments'>)}
           </button>
         ))}
       </div>
 
       <div role="tabpanel" id={`rec-panel-${tab}`} aria-labelledby={`rec-tab-${tab}`} tabIndex={0} className={styles.panel}>
-        {accountPicker}
+        {tab !== 'documents' && accountPicker}
         {tab !== 'import' && tab !== 'statements' && acctStatements.length > 1 && (
           <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
             <label className={controls.label} htmlFor="rec-scope">{bankT('statement')}</label>
@@ -420,6 +427,19 @@ export function Reconcile() {
 
         {tab === 'import' && <ImportPanel existing={statements} onImport={importStatement} onCancel={() => selectTab('reconcile')} />}
         {tab === 'import' && multi && account && <p className={surface.sectionNote}>{bankT('importsInto', { name: account.name })}</p>}
+        {tab === 'documents' && (
+          <Suspense fallback={null}>
+            <BankingDocs
+              doc={BANK_DOCS.includes(params.get('doc') as BankDoc) ? (params.get('doc') as BankDoc) : 'deposit'}
+              onDoc={(d) => {
+                const next = new URLSearchParams(params);
+                next.set('doc', d);
+                setParams(next, { replace: true });
+              }}
+              notify={notify}
+            />
+          </Suspense>
+        )}
       </div>
 
       <MatchPicker

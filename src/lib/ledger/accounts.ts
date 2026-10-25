@@ -545,7 +545,27 @@ export function normalizeUserAccounts(rows: unknown[], userGroups: readonly User
   return out;
 }
 
-/* ── Synthesised ledgers (hook for other packages, e.g. WP-5 bank ledgers) ── */
+/* ── Synthesised ledgers (WP-5 hook) ─────────────────────────────
+ * Sources merged straight into `chartOf` for modules that derive ledgers from their own masters instead of the
+ * `accounts` table (bank accounts → one ledger each, `src/lib/bank-ledgers.ts`). A source is a
+ * fail-soft read returning system accounts; a row whose id is a default account only renames it. */
+const ledgerSources: Array<() => readonly Account[]> = [];
+export function registerLedgerSource(source: () => readonly Account[]): void {
+  if (!ledgerSources.includes(source)) ledgerSources.push(source);
+}
+function synthesisedLedgers(): Account[] {
+  const out: Account[] = [];
+  for (const src of ledgerSources) {
+    try {
+      out.push(...src());
+    } catch {
+      /* a broken source never hides the chart */
+    }
+  }
+  return out;
+}
+
+/* ── Provided ledgers (WP-1 API: added to `loadUserAccounts`, not to `chartOf`) ── */
 
 const providers = new Map<string, () => Account[]>();
 
@@ -574,10 +594,16 @@ export function providedAccounts(): Account[] {
   return out;
 }
 
-/** Defaults + user accounts, ordered by code (a duplicate id keeps the first). */
+/**
+ * Defaults + synthesised ledgers (WP-5 `registerLedgerSource`) + user accounts, ordered by code.
+ * A synthesised row whose id is a default account only renames it; a duplicate id keeps the first.
+ */
 export function chartOf(userAccounts: readonly Account[] = []): Account[] {
+  const extra = synthesisedLedgers();
+  const rename = new Map(extra.map((a) => [a.id, a.name]));
+  const defaults = DEFAULT_ACCOUNTS.map((a) => (rename.has(a.id) ? { ...a, name: rename.get(a.id)! } : a));
   const seen = new Set<string>();
-  const list = [...DEFAULT_ACCOUNTS, ...userAccounts].filter((a) => {
+  const list = [...defaults, ...extra, ...userAccounts].filter((a) => {
     if (seen.has(a.id)) return false;
     seen.add(a.id);
     return true;

@@ -244,6 +244,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // WP-3: purchase returns / supplier notes, receipt notes (GRN) and rejections out
   purchase_returns: 'books.edit',
   receipt_notes: 'books.edit',
+  // Banking (WP-5)
+  deposit_slips: 'books.edit',
+  cash_tally: 'books.edit',
 };
 
 let systemDepth = 0;

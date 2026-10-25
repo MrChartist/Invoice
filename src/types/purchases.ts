@@ -42,6 +42,14 @@ export interface Vendor {
    * Absent = directly under Sundry Creditors. Opening balance: `ledger_openings`; bills: `opening_bills`.
    */
   group_id?: string;
+  /* ── Banking (WP-5) — additive, all optional: payee bank details for e-payment files / payment advice ── */
+  /** Beneficiary account number (digits as given by the supplier; screens show it masked). */
+  bank_account_no?: string;
+  /** IFSC, 11 characters (`HDFC0001234`). */
+  bank_ifsc?: string;
+  bank_name?: string;
+  /** Name on the bank account, if different from the vendor name. */
+  beneficiary_name?: string;
 }
 
 export type MsmeCategory = 'MICRO' | 'SMALL' | 'MEDIUM';

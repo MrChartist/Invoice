@@ -9,6 +9,7 @@ import type { Cheque, ChequeStatus } from '../../types/cheques';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { chqT, reasonLabel } from '../../i18n/areas/cheques';
+import { bnkT } from '../../i18n/areas/banking';
 
 const BOUNCE_REASONS = ['Funds insufficient', 'Signature differs', 'Payment stopped by drawer', 'Account closed', 'Exceeds arrangement', 'Alterations / overwriting', 'Other'];
 
@@ -29,6 +30,8 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
   const [record, setRecord] = useState(true);
   const [reason, setReason] = useState(BOUNCE_REASONS[0]);
   const [error, setError] = useState('');
+  const [charges, setCharges] = useState('');
+  const [chargesTo, setChargesTo] = useState<'expense' | 'party'>('expense');
 
   useEffect(() => {
     if (!cheque || !to) return;
@@ -37,19 +40,22 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
     setRecord(true);
     setReason(BOUNCE_REASONS[0]);
     setError('');
+    setCharges('');
+    setChargesTo('expense');
   }, [cheque, to]);
 
   if (!cheque || !to) return null;
   const linkedInvoice = cheque.direction === 'received' && cheque.invoice_id && !cheque.payment_id ? localDb.invoices.getById(cheque.invoice_id) : undefined;
   const linkedBill = cheque.direction === 'issued' && cheque.purchase_id && !cheque.purchase_payment_id ? purchasesDb.get(cheque.purchase_id) : undefined;
-  const willRecord = to === 'cleared' && (linkedInvoice || linkedBill);
+  const multi = !!cheque.allocations?.length;
+  const willRecord = to === 'cleared' && (linkedInvoice || linkedBill || (multi && !cheque.payment_ids?.length && !cheque.purchase_payment_ids?.length));
   const problems = validateTransition(cheque, to, date);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (problems.length) return setError(problems[0]);
     try {
-      const r = transitionCheque(cheque.id, to, { date, recordPayment: record, reason: to === 'bounced' || to === 'cancelled' ? reason : undefined });
+      const r = transitionCheque(cheque.id, to, { date, recordPayment: record, reason: to === 'bounced' || to === 'cancelled' ? reason : undefined, ...(to === 'bounced' && Number(charges) > 0 ? { charges: Number(charges), chargesTo } : {}) });
       onDone(r);
       onClose();
     } catch (err) {
@@ -81,7 +87,9 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
         {willRecord && (
           <label className={controls.check}>
             <input type="checkbox" checked={record} onChange={(e) => setRecord(e.target.checked)} />
-            {linkedInvoice
+            {multi
+              ? bnkT('severalDocs')
+              : linkedInvoice
               ? chqT('aRecordInv', { amount: formatMoney(cheque.amount), number: linkedInvoice.invoice_number })
               : chqT('aRecordBill', { number: linkedBill?.bill_number ?? '' })}
           </label>
@@ -97,8 +105,23 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
           </label>
         )}
         {to === 'bounced' && (
+          <div className={controls.row}>
+            <label className={controls.field}>
+              <span className={controls.label}>{bnkT('bounceCharges')}</span>
+              <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={charges} onChange={(e) => setCharges(e.target.value.replace(/[^0-9.]/g, ''))} />
+            </label>
+            <label className={controls.field}>
+              <span className={controls.label}>{bnkT('chargesTo')}</span>
+              <select className={controls.select} value={chargesTo} onChange={(e) => setChargesTo(e.target.value as 'expense' | 'party')}>
+                <option value="expense">{bnkT('chargesExpense')}</option>
+                <option value="party">{bnkT('chargesParty')}</option>
+              </select>
+            </label>
+          </div>
+        )}
+        {to === 'bounced' && (
           <p className={controls.hint}>
-            {cheque.payment_id ? chqT('aReversed') : ''}
+            {cheque.payment_id || cheque.payment_ids?.length ? chqT('aReversed') : ''}
             {chqT('aFlagged')}
           </p>
         )}

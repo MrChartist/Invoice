@@ -664,6 +664,19 @@ export function bankAccountBalanceAt(
   return { balance: bal, openingMissing: missing };
 }
 
+/**
+ * Bank book of ONE bank account (WP-5): the vouchers tagged to it, opened with its own opening, or —
+ * for the main account without one — the Books bank opening. Same rule as `bankAccountBalanceAt` and
+ * the ledger's per-bank openings (`ledger/postings-bank.ts`).
+ */
+export function bankAccountBook(vouchers: readonly Voucher[], openings: OpeningBalance[], account: BankAccount, period: Period): CashBook {
+  const tagged = vouchers.filter((v) => v.account === 'bank' && accountIdOf(v) === account.id);
+  const own: OpeningBalance[] =
+    account.opening !== undefined && account.opening_as_of ? [{ id: `own:${account.id}`, account: 'bank', amount: account.opening, as_of: account.opening_as_of }] : [];
+  const ops = own.length ? own : account.id === DEFAULT_BANK_ID ? openings.filter((o) => o.account === 'bank') : [];
+  return cashBook(tagged, ops, 'bank', period);
+}
+
 export interface BookRow {
   date: string;
   voucher: Voucher;

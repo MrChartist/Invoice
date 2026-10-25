@@ -1,0 +1,35 @@
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+.denoms { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; }
+.denom { display: flex; align-items: center; gap: 0.5rem; }
+.denomLabel { min-width: 3.5rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+.totals { display: flex; flex-wrap: wrap; gap: 1.25rem; font-variant-numeric: tabular-nums; }
+.totals strong { font-family: var(--font-display); }
+.muted { color: var(--muted-foreground); font-size: var(--text-sm); }
+.warn { color: var(--loss); font-size: var(--text-sm); }
+.ok { color: var(--profit); }
+.bad { color: var(--loss); }
+.list { display: flex; flex-direction: column; gap: 0.375rem; margin: 0; padding: 0; list-style: none; }
+.listItem { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+.rowEdit { display: grid; grid-template-columns: 2fr 1fr 0.8fr 1.5fr auto; gap: 0.5rem; align-items: end; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Printed document (portal into <body>) */
+.printRoot { display: none; }
+.doc { font-size: 11pt; color: var(--foreground); }
+.doc h1 { font-size: 15pt; margin: 0 0 0.25rem; }
+.doc table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+.doc th, .doc td { border: 1px solid var(--border); padding: 4px 6px; text-align: left; }
+.doc td.num, .doc th.num { text-align: right; }
+.docMeta { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 1rem; margin: 0.5rem 0; }
+
+@media print {
+  :global(body.bank-doc-printing) :global(#root) { display: none !important; }
+  .printRoot { display: block; padding: 14mm 12mm; background: white; color: black; }
+  .printRoot .doc th, .printRoot .doc td { border-color: #888; color: black; }
+}
+
+@media (max-width: 760px) {
+  .rowEdit { grid-template-columns: 1fr 1fr; }
+}

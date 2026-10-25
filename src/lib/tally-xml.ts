@@ -41,6 +41,7 @@ import { fxNarration, inrTotals, inrValue } from './fx';
 import { receivableTotal } from './rcm';
 import { advanceMovements } from './advance-tax';
 import { debitNoteVouchers } from './tally-debit-notes';
+import { tallyBankResolver } from './tally-bank';
 import {
   clean,
   emptySource,
@@ -341,6 +342,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
   };
   const std = (name: string, parent: string, duty?: LedgerDef['duty']) =>
     addLedger({ name, parent, ...(duty ? { duty } : {}) });
+  const bankOf = tallyBankResolver(o.bankLedger, o.cashLedger);
 
   const registerParty = (inv: InvoiceRecord, name: string) => {
     const c = inv.client ?? ({} as InvoiceRecord['client']);
@@ -477,9 +479,8 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const inv = byId.get(p.invoice_id)!;
       const party = partyNameOf(inv.client);
       registerParty(inv, party);
-      const isCash = /^\s*cash\s*$/i.test(String(p.method ?? ''));
-      const bank = isCash ? o.cashLedger : o.bankLedger;
-      std(bank, isCash ? 'Cash-in-Hand' : 'Bank Accounts');
+      const { ledger: bank, parent: bankParent } = bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
+      std(bank, bankParent);
       const paise = toPaise(inrValue(num(p.amount), inv));
       const invNo = clean(inv.invoice_number) || String(inv.id);
       const entries: TallyEntry[] = [];
@@ -527,9 +528,8 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         address: [clean(adv?.client?.address)].filter(Boolean),
         email: clean(adv?.client?.email),
       });
-      const isCash = /^\s*cash\s*$/i.test(String(m.method ?? ''));
-      const bank = isCash ? o.cashLedger : o.bankLedger;
-      std(bank, isCash ? 'Cash-in-Hand' : 'Bank Accounts');
+      const { ledger: bank, parent: bankParent } = bankOf(m);
+      std(bank, bankParent);
       const paise = toPaise(m.gross);
       const entries: TallyEntry[] = [];
       const received = m.kind === 'received';

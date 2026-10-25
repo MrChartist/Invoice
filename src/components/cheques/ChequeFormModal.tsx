@@ -13,6 +13,8 @@ import controls from '../../styles/controls.module.css';
 import { receivableBalance } from '../../lib/rcm';
 import { useT } from '../../i18n';
 import { chqT } from '../../i18n/areas/cheques';
+import { bnkT } from '../../i18n/areas/banking';
+import { allocatedTotal } from '../../lib/cheques';
 
 export interface ChequeFormModalProps {
   open: boolean;
@@ -32,10 +34,13 @@ interface Form {
   link: string;
   account_payee: boolean;
   notes: string;
+  /** WP-5: our bank account, and several documents with an amount each. */
   bank_account_id: string;
+  multi: boolean;
+  allocs: Record<string, string>;
 }
 
-const blank = (): Form => ({ number: '', bank: '', branch: '', cheque_date: todayInput(), amount: '', party_name: '', link: '', account_payee: true, notes: '', bank_account_id: '' });
+const blank = (): Form => ({ number: '', bank: '', branch: '', cheque_date: todayInput(), amount: '', party_name: '', link: '', account_payee: true, notes: '', bank_account_id: '', multi: false, allocs: {} });
 const norm = (s: string | undefined) => (s ?? '').trim().toLowerCase();
 
 /** Add / edit a received or issued cheque (6.26). */
@@ -62,6 +67,8 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
             account_payee: cheque.account_payee !== false,
             notes: cheque.notes ?? '',
             bank_account_id: cheque.bank_account_id ?? '',
+            multi: !!cheque.allocations?.length,
+            allocs: Object.fromEntries((cheque.allocations ?? []).map((a) => [a.invoice_id ?? a.purchase_id ?? '', String(a.amount)])),
           }
         : blank(),
     );
@@ -83,12 +90,12 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
         .filter((i) => ['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY'].includes(i.doc_type ?? 'INVOICE') && i.status !== 'Draft' && i.status !== 'Cancelled')
         .filter((i) => (i.currency || 'INR').toUpperCase() === 'INR' && (receivableBalance(i) > 0 || i.id === cheque?.invoice_id))
         .filter((i) => !party || norm(i.client?.name) === party || norm(i.client?.company) === party || (client?.id && i.client?.id === client.id) || i.id === cheque?.invoice_id)
-        .map((i) => ({ id: i.id, label: chqT('fOption', { number: i.invoice_number, party: i.client?.name ?? '', amount: formatMoney(receivableBalance(i)) }) }));
+        .map((i) => ({ id: i.id, due: receivableBalance(i), label: chqT('fOption', { number: i.invoice_number, party: i.client?.name ?? '', amount: formatMoney(receivableBalance(i)) }) }));
     }
     return bills
       .filter((b) => balanceOf(b) > 0 || b.id === cheque?.purchase_id)
       .filter((b) => !party || norm(b.vendor_name) === party || b.id === cheque?.purchase_id)
-      .map((b) => ({ id: b.id, label: chqT('fOption', { number: b.bill_number || chqT('billWord'), party: b.vendor_name, amount: formatMoney(balanceOf(b)) }) }));
+      .map((b) => ({ id: b.id, due: balanceOf(b), label: chqT('fOption', { number: b.bill_number || chqT('billWord'), party: b.vendor_name, amount: formatMoney(balanceOf(b)) }) }));
   }, [received, invoices, bills, party, client, cheque]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -106,7 +113,10 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
   };
 
   const toInput = (): ChequeInput => {
-    const linkedInvoice = received && form.link ? invoices.find((i) => i.id === form.link) : undefined;
+    const linkedInvoice = received && form.link && !form.multi ? invoices.find((i) => i.id === form.link) : undefined;
+    const allocations = form.multi
+      ? Object.entries(form.allocs).filter(([, v]) => Number(v) > 0).map(([id, v]) => (received ? { invoice_id: id, amount: Number(v) } : { purchase_id: id, amount: Number(v) }))
+      : undefined;
     return {
       ...(cheque ?? {}),
       id: cheque?.id,
@@ -119,8 +129,9 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
       party_name: form.party_name.trim(),
       client_id: received ? client?.id ?? linkedInvoice?.client?.id : undefined,
       vendor_id: !received ? vendor?.id : undefined,
-      invoice_id: received ? form.link || undefined : undefined,
-      purchase_id: !received ? form.link || undefined : undefined,
+      invoice_id: received && !form.multi ? form.link || undefined : undefined,
+      purchase_id: !received && !form.multi ? form.link || undefined : undefined,
+      allocations: allocations?.length ? allocations : undefined,
       account_payee: received ? undefined : form.account_payee,
       notes: form.notes.trim() || undefined,
       bank_account_id: form.bank_account_id && form.bank_account_id !== DEFAULT_BANK_ID ? form.bank_account_id : undefined,
@@ -143,7 +154,8 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
 
   const today = todayInput();
   const pdc = form.cheque_date && isPostDated({ cheque_date: form.cheque_date }, today);
-  const frozen = !!(cheque?.payment_id || cheque?.purchase_payment_id);
+  const frozen = !!(cheque?.payment_id || cheque?.purchase_payment_id || cheque?.payment_ids?.length || cheque?.purchase_payment_ids?.length);
+  const allocSum = allocatedTotal(Object.values(form.allocs).map((v) => ({ amount: Number(v) || 0 })));
 
   return (
     <Modal
@@ -196,6 +208,33 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
             {chqT('fValid', { date: formatDate(validUntil(form.cheque_date)) })}
           </span>
         )}
+        <BankAccountSelect id="cheque-bank-account" label={bnkT('intoAccount')} method="Cheque" value={form.bank_account_id} onChange={(id) => set('bank_account_id', id)} />
+        <label className={controls.check}>
+          <input type="checkbox" checked={form.multi} disabled={frozen} onChange={(e) => set('multi', e.target.checked)} /> {bnkT('severalDocs')}
+        </label>
+        {form.multi && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+            {options.map((o) => (
+              <div key={o.id} className={controls.row}>
+                <label className={controls.check} style={{ flex: 2 }}>
+                  <input type="checkbox" checked={o.id in form.allocs} disabled={frozen}
+                    onChange={(e) => setForm((f) => {
+                      const allocs = { ...f.allocs };
+                      if (e.target.checked) allocs[o.id] = String(o.due);
+                      else delete allocs[o.id];
+                      return { ...f, allocs };
+                    })} /> {o.label}
+                </label>
+                {o.id in form.allocs && (
+                  <input className={`${controls.input} ${controls.inputNumeric}`} style={{ flex: 1 }} inputMode="decimal" aria-label={o.label} disabled={frozen} value={form.allocs[o.id]}
+                    onChange={(e) => setForm((f) => ({ ...f, allocs: { ...f.allocs, [o.id]: e.target.value.replace(/[^0-9.]/g, '') } }))} />
+                )}
+              </div>
+            ))}
+            <span className={controls.hint}>{bnkT('allocated', { amount: formatMoney(allocSum), total: formatMoney(Number(form.amount) || 0) })}</span>
+          </div>
+        )}
+        {!form.multi && (
         <label className={controls.field}>
           <span className={controls.label}>{received ? chqT('fAgainstInv') : chqT('fAgainstBill')}</span>
           <select className={controls.select} value={form.link} disabled={frozen} onChange={(e) => pickLink(e.target.value)}>
@@ -210,6 +249,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
               : chqT('fHintIssued')}
           </span>
         </label>
+        )}
         {!received && (
           <label className={controls.check}>
             <input type="checkbox" checked={form.account_payee} onChange={(e) => set('account_payee', e.target.checked)} /> {chqT('fCrossing')}
@@ -225,7 +265,6 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
             <input className={controls.input} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
           </label>
         </div>
-        <BankAccountSelect id="cheque-bank-account" label={received ? 'Deposit into' : 'Drawn on (our account)'} method="Cheque" value={form.bank_account_id} onChange={(v) => set('bank_account_id', v)} />
       </form>
     </Modal>
   );

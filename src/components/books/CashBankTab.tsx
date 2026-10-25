@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Download, Landmark, Scale, Wallet } from 'lucide-react';
 import {
+  bankAccountBook,
   cashBook,
   cashBookCsv,
   type CashAccount,
@@ -18,6 +19,8 @@ import styles from './books.module.css';
 import { useT } from '../../i18n';
 import { booksT, voucherTypeLabel } from '../../i18n/areas/books';
 import { methodLabel } from '../../i18n/labels';
+import { bankAccountsDb } from '../../lib/bank-accounts';
+import { bnkT } from '../../i18n/areas/banking';
 
 export interface CashBankTabProps {
   vouchers: Voucher[];
@@ -29,8 +32,15 @@ export interface CashBankTabProps {
 export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashBankTabProps) {
   useT();
   const [account, setAccount] = useState<CashAccount>('cash');
-  const book = useMemo(() => cashBook(vouchers, openings, account, period), [vouchers, openings, account, period]);
-  const name = account === 'cash' ? booksT('cashBook') : booksT('bankBook');
+  // WP-5: with several bank accounts the bank book can show one account ('' = all accounts, the combined book).
+  const [banks] = useState(() => bankAccountsDb.all());
+  const [bankId, setBankId] = useState('');
+  const bankAcc = account === 'bank' && bankId ? banks.find((b) => b.id === bankId) : undefined;
+  const book = useMemo(
+    () => (bankAcc ? bankAccountBook(vouchers, openings, bankAcc, period) : cashBook(vouchers, openings, account, period)),
+    [vouchers, openings, account, period, bankAcc],
+  );
+  const name = account === 'cash' ? booksT('cashBook') : bankAcc ? `${booksT('bankBook')} — ${bankAcc.name}` : booksT('bankBook');
 
   return (
     <div className={styles.stack}>
@@ -53,6 +63,14 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
             {booksT('bankBook')}
           </button>
         </div>
+        {account === 'bank' && banks.length > 1 && (
+          <select className={controls.select} style={{ width: 'auto' }} aria-label={bnkT('bankAccount')} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+            <option value="">{bnkT('allBanks')}</option>
+            {banks.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        )}
         <div className={styles.toolbarGroup}>
           <button type="button" className={controls.btnOutline} onClick={onEditOpening}>
             <Scale size={16} /> {booksT('openingBalances')}

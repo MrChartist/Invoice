@@ -7,6 +7,7 @@
 import type { Client } from '../../types/invoice';
 import type { Vendor } from '../../types/purchases';
 import { A, chartOf, groupOf, loadUserAccounts, saveUserAccount, type Account, type GroupId } from '../ledger/accounts';
+import { isCashOrBankLedger } from '../bank-ledgers';
 import { rupeesToPaise, type ManualVoucher, type ManualVoucherInput, type ManualVoucherType } from '../ledger/vouchers';
 import { localDb } from '../localDb';
 import { vendorsDb } from '../vendors';
@@ -153,7 +154,7 @@ export const optionKey = (account_id: string, party?: string) => (party ? `${acc
  * creditors) as a party sub-ledger. A contra voucher offers cash & bank accounts only.
  */
 export function ledgerOptions(chart: readonly Account[], clients: readonly Pick<Client, 'name'>[], vendors: readonly Pick<Vendor, 'name'>[], type: ManualVoucherType): LedgerOption[] {
-  const accounts = type === 'CONTRA' ? chart.filter((a) => a.group === 'CASH_BANK') : chart;
+  const accounts = type === 'CONTRA' ? chart.filter((a) => isCashOrBankLedger(a)) : chart;
   const out: LedgerOption[] = accounts.map((a) => ({ key: a.id, account_id: a.id, name: a.name, sub: `${a.code} · ${groupOf(a.group).label}`, kind: 'account' }));
   if (type === 'CONTRA') return out;
   const debtors = chart.find((a) => a.id === A.debtors);
