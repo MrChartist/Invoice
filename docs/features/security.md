@@ -63,7 +63,7 @@ const d = daysSinceBackup(); // null = never backed up
 5 consecutive wrong PINs -> 30 s lock; each further lockout doubles (30 s, 60 s, 120 s ... capped at 1 h). State is persisted in `mrchartist_inv_auth_guard`, so a reload does not reset it; a correct PIN resets it. Correct PINs are refused while locked. `changePin` shares the same counter.
 
 ## Forgot PIN
-There is no server, so the only recovery is erasing the device: `resetAllData(phrase)` requires the exact phrase `DELETE ALL MY DATA` (case/spacing-insensitive) and removes every `mrchartist_inv_*` key (plus the session). Keys outside the prefix (e.g. `theme`) are untouched. The login page offers it behind "Forgot PIN?".
+There is no server, so the only recovery is erasing the device: `resetAllData(phrase, { ownerName })` requires the exact phrase `DELETE ALL MY DATA` (case/spacing-insensitive) and removes every `mrchartist_inv_*` key (plus the session). Keys outside the prefix (e.g. `theme`) are untouched. The login page offers it behind "Forgot PIN?" (owner selected only; a clerk / viewer is sent to the owner). When clerks / viewers exist on the device (`resetNeedsOwnerName()`), the reset also needs the owner's name typed, and the screen says that every other user and their PIN go too: anyone at the PIN screen can reach it, so it is a deliberate extra step (not a secret) against a casual or mistaken wipe. It stays a full reset: nothing is preserved.
 
 ## Encrypted backup file format
 ```json
@@ -103,8 +103,10 @@ Optional, Settings → Security → **Vault mode**. Protects the stored data its
 - **What else is covered.** The restore undo copy (IndexedDB `kv` store) is sealed with the same key, including one
   saved before the vault was turned on (and it is written back readable when the vault is turned off). Device-local
   keys that stay in localStorage (PIN hash, lockout, idle timer, session, last-backup time, backend marker) and the
-  theme are not data and are not encrypted. Exported backups are whatever you choose (use an encrypted export);
-  the panel warns when automatic folder backups are unencrypted. Folder sync (5.7) files are always encrypted with
+  theme are not data and are not encrypted. **Backups follow the vault:** while it is on, plain JSON backups are
+  refused — Data → "Download backup" / "Save to a folder" are disabled with a warning, `exportPlainBackup` and
+  `downloadBackupNow` refuse, and scheduled folder backups write nothing (reason `encryption`, shown in Automatic
+  backups) until a backup passphrase is set; encrypted exports work as before. Folder sync (5.7) files are always encrypted with
   the separate sync passphrase; what sync merges, its bookkeeping and the other version of a conflict are stored
   sealed like any other value (`docs/features/sync.md`).
 - **Multiple tabs.** Every write to the store runs in one IndexedDB transaction that first reads the vault record and
@@ -120,7 +122,11 @@ Optional, Settings → Security → **Vault mode**. Protects the stored data its
   Values that do not decrypt are reported and left untouched; Erase removes them too.
 - **No recovery.** A lost passphrase means the data cannot be decrypted. The unlock screen's "Forgot the passphrase?"
   erases everything this app stored on the device (typed `ERASE`), after which a backup can be restored. A damaged
-  vault record shows "Your data could not be opened" with the same erase option.
+  vault record shows "Your data could not be opened" with the same erase option. So does a **missing** record while
+  sealed (`mcv1:`) values are still in the store (`initStorage` → `unavailable`, `vaultDamaged`): the app never boots
+  in plain mode over sealed data. Turning the vault off removes sealed values that never decrypted, so it cannot
+  leave such orphans behind.
+- **Owner only.** `enableVault`, `disableVault` and `changeVaultPassphrase` call `requireAccess('security.manage')`.
 - **Limits.** Not a defence against malware or someone using the unlocked app; data is decrypted in memory while the
   tab is open. Passphrase attempts are not rate-limited beyond the cost of PBKDF2 (an attacker with a copy of the
   data can guess offline, so use a long passphrase; the minimum is 10 characters). Needs IndexedDB and a secure page.
@@ -146,7 +152,8 @@ Security.
 | `books.edit` — purchases, expenses, vouchers, cheques, recurring, time, reconcile | ✓ | ✓ | |
 | `settings.manage` — business profiles, custom fields, defaults, lock date, Design studio, add / rename / delete companies | ✓ | | |
 | `security.manage` — users, idle timeout, vault mode | ✓ | | |
-| `data.backup` — download a full backup, encrypted export | ✓ | | |
+| `settings.manage` also covers folder sync: connect, disconnect, re-enter passphrase, "Sync now" | ✓ | | |
+| `data.backup` — download a full backup, encrypted export, backup folder / schedule / passphrase, "Back up now" | ✓ | | |
 | `data.restore`, `data.erase` | ✓ | | |
 | `period.override` — unlock a locked document / move the lock date earlier | ✓ | | |
 
@@ -177,7 +184,13 @@ Users are device-wide (the PIN screen comes before any company is opened): every
 - Session (`sessionStorage`): `'1'` = owner (what older builds wrote, so an open tab stays signed in after the
   upgrade), `'u:<id>'` = another user. Only the id is stored; name and role are read from the users list each time,
   so a role change applies at once and a removed user is signed out on the next check.
-- With no session (single-user installs before the PIN screen, boot code, tests) every check passes, as before.
+- With **no PIN set up** (single-user installs, tests) or no actor provider, every check passes, as before; boot
+  code (migrations) runs inside `asSystem`. Once a PIN exists, a tab where no valid user resolves — locked, or **the
+  signed-in user was removed** in another tab — is *signed out*: `currentRole()` is `viewer`, never the owner
+  (`isSignedOut()` in `access.ts`). `App.tsx` re-checks `isAuthenticated()` on `storage` events for the auth / users /
+  session keys, on the user-change broadcast (`announceUserChange`, sent by `users.ts` on add / remove / role change /
+  PIN reset), on window focus and on every idle-lock tick, and locks when it is false; a changed role remounts the
+  shell so every screen re-reads its permissions.
 - Registering a fresh owner (after Forgot PIN) clears any users left behind. The owner's Forgot PIN still erases
   everything (users included); a clerk / viewer who forgets their PIN is pointed to the owner, who resets it in
   Settings → Security (this also lifts that user's lockout). Nothing is erased.
@@ -200,8 +213,22 @@ session it is).
   / remove` (issued vs draft), `localDb.payments.record / remove`, `localDb.clients.remove`, `purchasesDb.save /
   remove`, purchase `paymentsDb.record / remove`, `saveVoucher` / `deleteVoucher`, `saveCheque` / `deleteCheque` / `transitionCheque`, `vendorsDb.remove`,
   `createCompany` / `renameCompany` / `deleteCompany`,
-  `restoreBackup`, `applyBackup`, `wipeAppData`, `downloadBackupNow`, `grantOverride` (period lock; also verifies the
-  signed-in user's PIN). The viewer's recurring runner does not generate invoices.
+  `restoreBackup`, `applyBackup`, `wipeAppData`, `saveSafetySnapshot` (restore → `data.restore`, wipe → `data.erase`,
+  so a refused restore cannot replace the owner's undo copy), `grantOverride` (period lock; also verifies the
+  signed-in user's PIN), `setIdleTimeout`, the vault switches. The viewer's recurring runner does not generate invoices.
+- **Backups (owner only):** `buildBackup`, `buildEncryptedBackup`, `exportPlainBackup`, `backupPayload`,
+  `downloadBackupNow`, `runAutoBackup({ interactive: true })`, `chooseBackupFolder`, `disconnectFolder`, `saveConfig`,
+  `setBackupPassphrase` / `clearBackupPassphrase`. Unattended scheduled runs (`runDueBackup`) use
+  `buildScheduledBackup` and keep running whoever is signed in — the owner chose the folder and the schedule. The
+  Automatic backups card and the download buttons are hidden without `data.backup`.
+- **Folder sync (owner only):** `connectSync`, `reenterPassphrase`, `disconnectSync` and interactive `runSyncNow` need
+  `settings.manage`; the Sync card is hidden otherwise. The connection records `connected_by`; automatic runs refuse a
+  connection not made by the owner, and a connection from before this was recorded runs automatically only after
+  the owner's first run vouches for it. Merges still run `asSystem` (another device's changes are not a user edit),
+  but a settings change from another device that **alters payment details** (any profile's UPI ID, bank name,
+  account name / number, IFSC) is never applied silently: it is listed as a sync conflict (reason `payment`, this
+  device keeps its version) for the owner to accept or decline (`resolveConflict` on settings needs
+  `settings.manage`; declining is remembered like a declined locked-period change). See `docs/features/sync.md`.
 
 ### Audit
 `AuditEntry.by` (additive) holds the signed-in user's name, set by `audit.record` from `currentActor()`. It is part
@@ -219,6 +246,21 @@ compliance marks stay writable because the app writes them while viewing. Writes
 merges, migrations) run inside `asSystem()`. Settings saves are hidden
 from non-owners but not refused in `localDb.settings.save` (setup and GST-frequency flows call it). Tests:
 `tests/roles.test.ts`, `tests/roles-tables.test.ts`, e2e step "local roles" in `tests/e2e/smoke.mjs`.
+
+## Import parser caps
+
+Any file parsed into a table (CSV `parseTable` / `parseCsv`, `.xlsx` `readXlsx` / `sheetToTable`, bank statements,
+26AS, IRP responses) is capped at **1,000 columns** (`MAX_TABLE_COLUMNS`) and **5,000,000 cells** (`MAX_TABLE_CELLS`,
+counted while scanning, before any padding) in `src/lib/csv.ts`. Beyond either, a `TableLimitError` with a readable
+message is shown instead of padding a tiny file (one cell in column XFD on every row, a 4,000-column header over
+one-cell rows) into a grid that freezes the tab. Trailing blank columns never count toward the width.
+
+## Security review fixes (roles, backups, sync, parsers)
+
+Tests: `tests/security-review.test.ts` (removed-user lock M1, owner-only backups M2, undo copy L3, idle timeout L6,
+forgot-PIN L2, payment-detail sync hold M3, parser caps L1) and `tests/security-review-idb.test.ts` (vault damaged
+boot L5, vault switches L6, vault + plain backups L4, folder-sync gates M3). `dompurify` (a `jspdf` dependency) is
+pinned to a fixed release through `overrides` in `package.json`.
 
 ## Review fixes (Phase 4)
 

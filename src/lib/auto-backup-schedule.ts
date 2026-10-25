@@ -6,6 +6,7 @@
  */
 
 import { DB_PREFIX, readRaw, removeRaw, writeRaw } from './storage';
+import { requireAccess } from './access';
 
 export type BackupFrequency = 'daily' | 'weekly' | 'on-close';
 
@@ -135,7 +136,9 @@ export function getConfig(): AutoBackupConfig {
   return parseConfig(readRaw(CONFIG_KEY));
 }
 
+/** Owner only (6.21): the schedule decides when full copies of the books are written out. */
 export function saveConfig(config: AutoBackupConfig): void {
+  requireAccess('data.backup');
   try {
     writeRaw(CONFIG_KEY, JSON.stringify(parseConfig(JSON.stringify(config))));
   } catch {

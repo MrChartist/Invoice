@@ -166,6 +166,8 @@ export const hi: Messages = {
   'login.errIncorrectMany': 'गलत PIN। अस्थायी लॉक से पहले {n} प्रयास बाकी हैं।',
   'login.errGeneric': 'कुछ गड़बड़ हो गई।',
   'login.errPhrase': 'पुष्टि वाक्य मेल नहीं खाता।',
+  'login.resetOwnerName': 'इस डिवाइस पर {n} अन्य उपयोगकर्ता (क्लर्क / व्यूअर) भी हैं। रीसेट उन्हें और उनके PIN भी मिटा देगा। पुष्टि के लिए मालिक का नाम टाइप करें',
+  'login.errOwnerName': 'यह मालिक का नाम नहीं है। कुछ भी नहीं मिटाया गया।',
 
   // ── Vault unlock (encrypted device) ───────────────────────────────
   'vault.damagedTitle': 'कुछ डेटा डिक्रिप्ट नहीं हो सका',

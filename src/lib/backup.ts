@@ -104,10 +104,46 @@ export function attachmentRestoreNote(summary: BackupSummary | undefined | null)
   return parts.join(' ');
 }
 
-export function buildBackup(now: Date = new Date()): BackupFile {
+function collectBackup(now: Date): BackupFile {
   const data = collectAppData();
   for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   return { app: BACKUP_APP_ID, version: 1, exportedAt: now.toISOString(), data };
+}
+
+/**
+ * A full backup (every table). Local roles (6.21): handing someone a copy of the books is owner-only,
+ * so this throws AccessDeniedError for a clerk / viewer. Scheduled folder backups the owner set up use
+ * {@link buildScheduledBackup} instead and keep running whoever is signed in.
+ */
+export function buildBackup(now: Date = new Date()): BackupFile {
+  requireAccess('data.backup');
+  return collectBackup(now);
+}
+
+/**
+ * @internal Scheduled backups only (auto-backup.ts, unattended runs into the folder the owner chose):
+ * no role check, by design — the owner configured them, and the file goes to the owner's folder.
+ */
+export function buildScheduledBackup(now: Date = new Date()): BackupFile {
+  return collectBackup(now);
+}
+
+/**
+ * Vault mode (5.8) encrypts the data at rest, so a readable backup file would undo it: plain JSON
+ * exports are refused while the vault is on (use a passphrase-encrypted backup instead).
+ */
+export function plainBackupAllowed(): boolean {
+  return !vaultEnabled();
+}
+
+export const VAULT_PLAIN_BACKUP_MESSAGE =
+  'Vault mode is on, so backups must be encrypted: set a backup passphrase (Settings → Data → Automatic backups) or use Encrypted backup in Settings → Security.';
+
+/** Text of a plain (unencrypted) full backup for a manual download. Owner only; refused in vault mode. */
+export function exportPlainBackup(now: Date = new Date()): string {
+  requireAccess('data.backup');
+  if (!plainBackupAllowed()) throw new Error(VAULT_PLAIN_BACKUP_MESSAGE);
+  return JSON.stringify(collectBackup(now), null, 2);
 }
 
 export function backupFilename(now: Date = new Date(), encrypted = false): string {
@@ -149,14 +185,18 @@ export async function buildEncryptedBackup(passphrase: string, now: Date = new D
   return JSON.stringify(file, null, 2);
 }
 
-/** Same file format as `buildEncryptedBackup`, encrypted with a stored passphrase-derived key. */
-export async function buildEncryptedBackupWithKey(stored: StoredEncryptionKey, now: Date = new Date()): Promise<string> {
+/**
+ * Same file format as `buildEncryptedBackup`, encrypted with a stored passphrase-derived key. Owner only,
+ * except `scheduled` runs (unattended folder backups the owner set up, see auto-backup.ts).
+ */
+export async function buildEncryptedBackupWithKey(stored: StoredEncryptionKey, now: Date = new Date(), opts: { scheduled?: boolean } = {}): Promise<string> {
+  const backup = opts.scheduled ? buildScheduledBackup(now) : buildBackup(now);
   const file: EncryptedBackupFile = {
     app: BACKUP_APP_ID,
     encrypted: true,
     version: 1,
     exportedAt: now.toISOString(),
-    envelope: await encryptWithKey(JSON.stringify(buildBackup(now)), stored),
+    envelope: await encryptWithKey(JSON.stringify(backup), stored),
   };
   return JSON.stringify(file, null, 2);
 }
@@ -365,6 +405,8 @@ interface StoredSnapshot {
  * browser cannot store it; callers decide whether to continue.
  */
 export async function saveSafetySnapshot(reason: SafetySnapshot['reason'], now: Date = new Date()): Promise<boolean> {
+  // Roles (6.21): only someone allowed to restore / erase may replace the owner's undo copy.
+  requireAccess(reason === 'wipe' ? 'data.erase' : 'data.restore');
   const data = collectAppData();
   for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   if (Object.keys(data).length === 0) return true; // nothing to protect

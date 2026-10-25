@@ -107,7 +107,7 @@ export interface SyncReport {
   blobsOut: number;
   /** Nothing changed anywhere: the run stopped after hashing. */
   idle?: boolean;
-  reason?: 'permission' | 'no-folder' | 'unsupported' | 'error' | 'busy' | 'passphrase';
+  reason?: 'permission' | 'no-folder' | 'unsupported' | 'error' | 'busy' | 'passphrase' | 'denied';
   message?: string;
 }
 
@@ -142,8 +142,11 @@ export type SyncConflict =
       kind: 'row' | 'single';
       key: string;
       row_id?: string;
-      /** concurrent edits / a change into a locked period / singleton last-writer-wins. */
-      reason: 'concurrent' | 'locked' | 'lww';
+      /**
+       * concurrent edits / a change into a locked period / singleton last-writer-wins / a settings
+       * change to the payment details printed on invoices (UPI, bank account), held for the owner.
+       */
+      reason: 'concurrent' | 'locked' | 'lww' | 'payment';
       /** Taking the other version would write into a locked period (or loosen the lock): needs the PIN. */
       locked?: boolean;
       device: string;
@@ -288,6 +291,34 @@ const loosensLock = (before: string | null, after: string | null) => {
   const a = lockOf(after);
   return b !== '' && (a === '' || a < b);
 };
+
+/** Payment details printed on invoices (and in the UPI QR): who gets paid. */
+const PAYMENT_FIELDS = ['bankName', 'accountName', 'accountNumber', 'ifsc', 'upiId'] as const;
+
+/** Every profile's payment details, by profile id (settings text → comparable string). */
+function paymentPrint(value: string | null): string {
+  if (!value) return '';
+  try {
+    const s = JSON.parse(value) as { profiles?: unknown } | null;
+    const profiles = Array.isArray(s?.profiles) ? (s!.profiles as Array<Record<string, unknown> | null>) : [];
+    const out: Record<string, string[]> = {};
+    profiles.forEach((p, i) => {
+      if (!p || typeof p !== 'object') return;
+      const id = typeof p.id === 'string' && p.id ? p.id : `#${i}`;
+      out[id] = PAYMENT_FIELDS.map((f) => (typeof p[f] === 'string' ? (p[f] as string).trim() : ''));
+    });
+    return JSON.stringify(Object.keys(out).sort().map((k) => [k, out[k]]));
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Taking `after` over `before` (settings text) changes where customers are told to pay (a UPI ID or
+ * bank detail added, changed or removed). Never taken silently from another device: a device synced
+ * by someone else (or a doctored sync folder) must not be able to redirect payments; the owner reviews it.
+ */
+export const changesPaymentDetails = (before: string | null, after: string | null): boolean => paymentPrint(before) !== paymentPrint(after);
 
 const rowDate = (key: string, row: unknown): string | undefined => {
   const f = own(DATED, key);
@@ -718,17 +749,20 @@ function mergeSingle(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile
   }
   const order = compareVV(rm.vv, lm.vv);
   if (order === 'lt') return;
-  // Moving the period lock earlier (or removing it) is never taken silently from another device.
+  // Moving the period lock earlier (or removing it), or changing the payment details, is never taken
+  // silently from another device: it is listed for the owner, and this device keeps its version.
   const loosens = isSettings && loosensLock(lv, rv);
+  const payment = isSettings && lv !== null && changesPaymentDetails(lv, rv);
   const holdLock = () => {
     if (own(ctx.state.declined, `${key}|`) === (rm.del ? '' : rm.h)) return;
     putConflict(ctx, {
-      id: cid, kind: 'single', key, reason: 'locked', locked: true, device: from.device.id, device_name: from.device.name, at: ctx.now,
+      id: cid, kind: 'single', key, device: from.device.id, device_name: from.device.name, at: ctx.now,
+      ...(loosens ? { reason: 'locked' as const, locked: true } : { reason: 'payment' as const }),
       local: { meta: cloneMeta(lm), value: lv }, remote: { meta: cloneMeta(rm), value: rv }, applied: 'local',
     });
   };
   if (order === 'gt') {
-    if (loosens) return holdLock();
+    if (loosens || payment) return holdLock();
     apply();
     const next = cloneMeta(rm);
     ctx.state.keys[key] = { mode: 'single', meta: next };
@@ -742,7 +776,7 @@ function mergeSingle(ctx: MergeCtx, key: string, rk: RemoteKey, from: RemoteFile
   }
   // Concurrent: last writer by Lamport time (device id breaks ties) wins; the other version is listed.
   const remoteWins = rm.t > lm.t || (rm.t === lm.t && rm.d > lm.d);
-  if (remoteWins && loosens) return holdLock();
+  if (remoteWins && (loosens || payment)) return holdLock();
   putConflict(ctx, {
     id: cid, kind: 'single', key, reason: 'lww', device: from.device.id, device_name: from.device.name, at: ctx.now,
     // Switching to the listed (losing) version later must not loosen the lock without the PIN.
@@ -1336,7 +1370,7 @@ export function resolveConflict(id: string, choice: Resolution, device: { id: st
       return { ok: false, stale: true, message: 'This changed since it was listed. Check both versions again, then choose.' };
     }
 
-    if (c.reason === 'locked' && choice === 'mine') {
+    if ((c.reason === 'locked' || c.reason === 'payment') && choice === 'mine') {
       // Declined: stays on the other device only; not offered again until it changes there.
       state.declined[`${c.key}|${c.row_id ?? ''}`] = c.remote.meta?.del ? '' : (c.remote.meta?.h ?? '');
       saveMeta(state, rest);

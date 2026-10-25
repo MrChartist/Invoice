@@ -15,7 +15,7 @@
  * optional fields.
  */
 
-import { parseCsvDetailed, toCsv } from './csv';
+import { TableLimitError, parseCsvDetailed, toCsv } from './csv';
 import { isoDay } from './dates';
 import { num, round2 } from './invoice-calc';
 import { readPurchase, isVoidStatus } from './purchase-normalize';
@@ -295,7 +295,14 @@ function clean(s: string): string {
 
 /** Parse a bank statement CSV. Never throws: an unreadable file yields no lines plus a warning. */
 export function parseBankStatement(text: string, options: ParseOptions = {}): ParsedStatement {
-  const { rows } = parseCsvDetailed(text ?? '');
+  let rows: string[][];
+  try {
+    rows = parseCsvDetailed(text ?? '').rows;
+  } catch (err) {
+    // Too many cells to parse safely: report it like any other unusable file (never a crash).
+    if (!(err instanceof TableLimitError)) throw err;
+    return { lines: [], bankLabel: 'Bank statement', columns: {}, headers: [], headerRow: -1, skipped: 0, warnings: [err.message], rawRows: [] };
+  }
   const warnings: string[] = [];
   const empty = (w: string, columns: ColumnMap = {}, headers: string[] = [], headerRow = -1): ParsedStatement => ({
     lines: [],

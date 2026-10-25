@@ -8,6 +8,28 @@
  */
 
 export type Delimiter = ',' | ';' | '\t' | '|';
+
+/**
+ * Size caps for anything parsed into a table (CSV here, .xlsx in xlsx.ts). A small file can describe a
+ * huge grid (a 4,000-column header over thousands of one-cell rows, or one cell in column XFD on every
+ * row); padding that grid out would freeze or crash the tab. Real imports are far below both caps.
+ */
+export const MAX_TABLE_COLUMNS = 1000;
+export const MAX_TABLE_CELLS = 5_000_000;
+
+/** A file whose table would be too wide or too large to import. The message is shown to the user. */
+export class TableLimitError extends Error {
+  readonly code = 'TABLE_LIMIT';
+  constructor(message: string) {
+    super(message);
+    this.name = 'TableLimitError';
+  }
+}
+
+export const tooWideMessage = (columns: number): string =>
+  `This file has ${columns.toLocaleString('en-IN')} columns; up to ${MAX_TABLE_COLUMNS.toLocaleString('en-IN')} can be imported. Delete the unused columns and try again.`;
+export const tooManyCellsMessage = (): string =>
+  `This file is too large to import (more than ${MAX_TABLE_CELLS.toLocaleString('en-IN')} cells). Split it into smaller files and try again.`;
 const CANDIDATES: Delimiter[] = [',', ';', '\t', '|'];
 
 export function stripBom(text: string): string {
@@ -28,9 +50,11 @@ function scan(text: string, delimiter: string, maxRows = Infinity): string[][] {
   let inQuotes = false;
   let fieldStart = true; // a quote only opens a quoted field at the very start
   let i = 0;
+  let cells = 0;
   const n = text.length;
 
   const endField = () => {
+    if (++cells > MAX_TABLE_CELLS) throw new TableLimitError(tooManyCellsMessage());
     row.push(field);
     field = '';
     fieldStart = true;
@@ -174,23 +198,35 @@ export interface CsvTable {
   headerIndex: number;
 }
 
-/** Parse + locate headers + pad ragged rows to the header width. */
+/**
+ * Width of a table after dropping trailing columns that are empty in the header AND every data row,
+ * checked against the caps before anything is padded. Shared with `sheetToTable` in xlsx.ts.
+ */
+export function tableWidth(headerRow: string[], body: string[][]): number {
+  // Last non-empty cell of each row: trailing blanks never widen the table.
+  const filled = (r: string[]) => {
+    let w = r.length;
+    while (w > 0 && (r[w - 1] ?? '') === '') w--;
+    return w;
+  };
+  let width = filled(headerRow);
+  for (const r of body) width = Math.max(width, filled(r));
+  if (width > MAX_TABLE_COLUMNS) throw new TableLimitError(tooWideMessage(width));
+  if (width * (body.length + 1) > MAX_TABLE_CELLS) throw new TableLimitError(tooManyCellsMessage());
+  return width;
+}
+
+/**
+ * Parse + locate headers + pad ragged rows to the header width. Throws `TableLimitError` (readable
+ * message) for a table wider than MAX_TABLE_COLUMNS or larger than MAX_TABLE_CELLS.
+ */
 export function parseTable(input: string, options: ParseOptions = {}): CsvTable {
   const { rows, delimiter } = parseCsvDetailed(input, options);
   if (rows.length === 0) return { headers: [], rows: [], delimiter, headerIndex: 0 };
   const hi = findHeaderRow(rows);
   const headerRow = rows[hi];
   const body = rows.slice(hi + 1);
-  let width = headerRow.length;
-  for (const r of body) width = Math.max(width, r.length);
-  // Drop trailing columns that are empty in the header AND in every data row.
-  while (
-    width > 0 &&
-    (headerRow[width - 1] ?? '') === '' &&
-    body.every((r) => (r[width - 1] ?? '') === '')
-  ) {
-    width--;
-  }
+  const width = tableWidth(headerRow, body);
   const headers = Array.from({ length: width }, (_, i) => headerRow[i] || `Column ${i + 1}`);
   const padded = body.map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ''));
   return { headers, rows: padded, delimiter, headerIndex: hi + 1 };

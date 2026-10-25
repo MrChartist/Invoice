@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { NotFound } from './components/layout/NotFound';
 import { DashboardLayout } from './layouts/DashboardLayout';
@@ -7,7 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { IdleLock } from './components/security/IdleLock';
 import { RequireAccess } from './components/security/RequireAccess';
-import { isAuthenticated, onRemoteLock } from './lib/auth';
+import { getCurrentUser, isAuthenticated, onAuthChange, onRemoteLock } from './lib/auth';
 
 // Heavier report/ledger pages load on first visit so the editor opens fast.
 // The editor is code-split too, then prefetched once the first screen is idle (see App).
@@ -40,10 +40,36 @@ function PageFallback() {
   );
 }
 
+/** Who is signed in and with which role: a change remounts the shell so every screen re-reads it. */
+const actorSignature = () => {
+  const u = getCurrentUser();
+  return u ? `${u.id}:${u.role}` : '';
+};
+
 function App() {
   const [authed, setAuthed] = useState(isAuthenticated());
+  const [shellKey, setShellKey] = useState(0);
+  const signature = useRef('');
   // Locking in one tab locks them all.
   useEffect(() => onRemoteLock(() => setAuthed(false)), []);
+  // Roles (6.21): the session is re-checked whenever it may have changed in another tab (user removed,
+  // role changed, PIN reset, owner credential replaced), on focus and on the idle-lock tick. A user who
+  // no longer exists is locked out; a changed role remounts the shell with the new permissions.
+  useEffect(() => {
+    signature.current = authed ? actorSignature() : '';
+  }, [authed]);
+  useEffect(() => {
+    const check = () => {
+      if (!isAuthenticated()) {
+        setAuthed(false);
+        return;
+      }
+      const next = actorSignature();
+      if (signature.current && next !== signature.current) setShellKey((k) => k + 1);
+      signature.current = next;
+    };
+    return onAuthChange(check);
+  }, []);
   // Warm the editor chunk after first paint so "New invoice" still opens instantly.
   useEffect(() => {
     if (!authed) return;
@@ -57,7 +83,7 @@ function App() {
   return (
     <ErrorBoundary>
       {authed ? (
-        <BrowserRouter>
+        <BrowserRouter key={shellKey}>
           <IdleLock onLock={() => setAuthed(false)} />
           <Suspense fallback={<PageFallback />}>
             <Routes>

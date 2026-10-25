@@ -90,6 +90,8 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
       ? isRow
         ? syncT('lockedRow', { device: rc.device_name || syncT('anotherDevice') })
         : syncT('lockedSetting', { device: rc.device_name || syncT('anotherDevice') })
+      : rc.reason === 'payment'
+        ? syncT('paymentHeld', { device: rc.device_name || syncT('anotherDevice') })
       : rc.reason === 'lww'
         ? syncT(rc.applied === 'remote' ? 'lwwRemote' : 'lwwLocal', { device: rc.device_name || syncT('anotherDeviceLc') })
         : syncT('keptLocal', { device: rc.device_name || syncT('anotherDeviceLc') });

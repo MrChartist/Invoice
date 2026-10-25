@@ -87,6 +87,8 @@ test('encrypted backup: round-trips, hides content, and never carries device-loc
   store.set('mrchartist_inv_auth', '{"name":"x","hash":"h"}');
   store.set('mrchartist_inv_auth_guard', '{}');
   store.set('mrchartist_inv_last_backup', '2026-01-01T00:00:00Z');
+  // A PIN is set up (the auth record above), so the owner must be signed in: full backups are owner-only.
+  Object.assign(globalThis, { sessionStorage: { getItem: (k: string) => (k === 'mrchartist_inv_session' ? '1' : null), setItem() {}, removeItem() {} } });
   const text = await buildEncryptedBackup('a long passphrase');
   assert.ok(isEncryptedBackup(text));
   assert.ok(!text.includes('Secret Client'));

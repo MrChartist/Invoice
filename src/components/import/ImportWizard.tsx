@@ -116,8 +116,9 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
           return;
         }
         loadText(await file.text(), file.name);
-      } catch {
-        dispatch({ type: 'loadFailed', message: 'Could not read that file.' });
+      } catch (err) {
+        // TableLimitError (too many columns / cells) carries a message meant for the user.
+        dispatch({ type: 'loadFailed', message: err instanceof Error && err.name === 'TableLimitError' ? err.message : 'Could not read that file.' });
       }
     },
     [loadText],

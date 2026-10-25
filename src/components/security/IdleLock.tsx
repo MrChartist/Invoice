@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { IDLE_CHANGED_EVENT, getIdleTimeout, isIdleExpired, logout } from '../../lib/auth';
+import { IDLE_CHANGED_EVENT, getIdleTimeout, isAuthenticated, isIdleExpired, logout } from '../../lib/auth';
 
 interface Props {
   /** Called after the session has been cleared — typically `() => setAuthed(false)`. */
@@ -34,7 +34,8 @@ export function IdleLock({ onLock }: Props) {
       last.current = Date.now();
     };
     const check = () => {
-      if (isIdleExpired(last.current, Date.now(), minutes.current)) {
+      // Also catches a session that ended elsewhere (user removed in another tab) without an event.
+      if (!isAuthenticated() || isIdleExpired(last.current, Date.now(), minutes.current)) {
         logout();
         onLockRef.current();
       }

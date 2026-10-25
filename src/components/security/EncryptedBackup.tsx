@@ -107,9 +107,9 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
 
   const restore = async () => {
     if (!summary) return;
-    // Undo copy for Settings → Data → "Undo last restore".
-    await saveSafetySnapshot('restore');
     try {
+      // Undo copy for Settings → Data → "Undo last restore" (owner only: checked before it is replaced).
+      await saveSafetySnapshot('restore');
       restoreBackup(summary.data);
       notify(secT('restored'));
       setTimeout(reloadAfterFlush, 700);

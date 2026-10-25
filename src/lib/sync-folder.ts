@@ -8,6 +8,7 @@
  * which disconnects sync.
  */
 
+import { currentActor, currentRole, deniedMessage, requireAccess, roleCan } from './access';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { localDb } from './localDb';
 import { resolvePrefix } from './invoice-number';
@@ -23,6 +24,23 @@ export interface SyncConfig {
   group: string;
   folder: string;
   connected_at: string;
+  /**
+   * Who connected this device to the group (roles, 6.21). Automatic runs only use a connection the
+   * owner made. Absent on connections made before this was recorded: the owner's next run fills it in.
+   */
+  connected_by?: { id: string; name: string; role: string };
+}
+
+/** Folder sync merges other devices' changes into every table: connecting / running it is owner-only. */
+const SYNC_ACTION = 'settings.manage' as const;
+
+function connectedBy(): NonNullable<SyncConfig['connected_by']> {
+  const a = currentActor();
+  return a ? { id: a.id, name: a.name, role: a.role } : { id: 'owner', name: '', role: currentRole() };
+}
+
+function denied(): string | null {
+  return roleCan(currentRole(), SYNC_ACTION) ? null : deniedMessage(SYNC_ACTION);
 }
 
 export function isSyncSupported(): boolean {
@@ -69,6 +87,8 @@ export function suggestGroupName(name: string): string {
  * against its manifest), remember everything, and run the first sync.
  */
 export async function connectSync(opts: { handle: SyncDir; group: string; passphrase: string }): Promise<{ ok: true; created: boolean; report: SyncReport } | { ok: false; message: string }> {
+  const refused = denied(); // owner only (6.21): sync can send every table out and bring changes in
+  if (refused) return { ok: false, message: refused };
   if (opts.passphrase.length < 8) return { ok: false, message: 'Use a sync passphrase of at least 8 characters.' };
   if (companiesUsingGroup(opts.group).length) {
     return { ok: false, message: 'Another company on this device already syncs with that group. Use a separate group for each company.' };
@@ -77,7 +97,7 @@ export async function connectSync(opts: { handle: SyncDir; group: string; passph
     const dirs = await openGroup(opts.handle, opts.group, true);
     const { key, created } = await createOrJoinGroup(dirs, opts.group, opts.passphrase);
     const saved = (await idbSet(HANDLE_KEY, opts.handle)) && (await storeSyncKey(key)) &&
-      (await idbSet(CONFIG_KEY, { group: opts.group, folder: opts.handle.name, connected_at: new Date().toISOString() } satisfies SyncConfig));
+      (await idbSet(CONFIG_KEY, { group: opts.group, folder: opts.handle.name, connected_at: new Date().toISOString(), connected_by: connectedBy() } satisfies SyncConfig));
     if (!saved) return { ok: false, message: 'This browser could not remember the sync folder.' };
     companyDevice(); // allocate this company's device id before the first run
     setCompanySyncPrefs({ enabled: true, group: opts.group });
@@ -91,6 +111,8 @@ export async function connectSync(opts: { handle: SyncDir; group: string; passph
 
 /** Type the sync passphrase again (the key was dropped when vault mode was turned on). */
 export async function reenterPassphrase(passphrase: string): Promise<{ ok: boolean; message?: string }> {
+  const refused = denied();
+  if (refused) return { ok: false, message: refused };
   const [config, handle] = await Promise.all([getSyncConfig(), getHandle()]);
   if (!config || !handle) return { ok: false, message: 'No sync folder is connected.' };
   try {
@@ -108,6 +130,7 @@ export async function reenterPassphrase(passphrase: string): Promise<{ ok: boole
 
 /** Stop syncing on this device. The folder and other devices are untouched; conflicts stay listed. */
 export async function disconnectSync(): Promise<void> {
+  requireAccess(SYNC_ACTION);
   await idbDel(HANDLE_KEY);
   await forgetSyncKey();
   await idbDel(CONFIG_KEY);
@@ -135,12 +158,25 @@ const fail = (reason: NonNullable<SyncReport['reason']>, message: string): SyncR
  * Unattended runs (start-up, timer) report `permission` instead of prompting.
  */
 export async function runSyncNow(opts: { interactive?: boolean } = {}): Promise<SyncReport> {
+  // "Sync now" is owner-only (6.21); automatic runs go on whoever is signed in, but only over a
+  // connection the owner made (checked below).
+  if (opts.interactive) {
+    const refused = denied();
+    if (refused) return fail('denied', refused);
+  }
   if (!isSyncSupported()) return fail('unsupported', 'This browser cannot use a sync folder.');
   if (!companySyncPrefs().enabled) return fail('no-folder', 'Sync is off for this company on this device.');
   const [config, handle] = await Promise.all([getSyncConfig(), getHandle()]);
   if (!config || !handle) {
     setCompanySyncPrefs({ enabled: false }); // erased / forgotten elsewhere
     return fail('no-folder', 'No sync folder is connected.');
+  }
+  if (!config.connected_by) {
+    // Connected before this was recorded: only the owner may run it, and that run vouches for it.
+    if (denied()) return fail('denied', 'The owner needs to run Sync now once on this device before sync runs automatically.');
+    await idbSet(CONFIG_KEY, { ...config, connected_by: connectedBy() } satisfies SyncConfig);
+  } else if (config.connected_by.role !== 'owner') {
+    return fail('denied', 'This sync connection was not set up by the owner. The owner must disconnect it and connect again.');
   }
   const key = await loadSyncKey();
   if (!key) {

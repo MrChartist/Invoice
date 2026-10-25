@@ -272,10 +272,13 @@ export function Settings() {
       {tab === 'data' && (
         <>
           <DataPanel notify={notify} />
-          <AutoBackupPanel onNotify={notify} />
-          <Suspense fallback={null}>
-            <SyncPanel notify={notify} />
-          </Suspense>
+          {/* Roles (6.21): full backups and folder sync are owner-only (the library checks too). */}
+          {canDo('data.backup') && <AutoBackupPanel onNotify={notify} />}
+          {canDo('settings.manage') && (
+            <Suspense fallback={null}>
+              <SyncPanel notify={notify} />
+            </Suspense>
+          )}
           <CompaniesPanel notify={notify} />
         </>
       )}

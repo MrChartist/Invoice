@@ -22,6 +22,8 @@ import {
 import { requestPersistentStorage, type StorageStatus } from '../../lib/pwa';
 import { useT } from '../../i18n';
 import { syncT } from '../../i18n/areas/sync';
+import { vaultEnabled } from '../../lib/storage';
+import { VAULT_PLAIN_BACKUP_MESSAGE } from '../../lib/backup';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Pwa.module.css';
@@ -155,6 +157,12 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
         {error && (
           <p className={controls.error} role="alert">
             <AlertTriangle size={13} aria-hidden="true" /> {error}
+          </p>
+        )}
+
+        {encrypted === false && vaultEnabled() && (
+          <p className={controls.error} role="alert">
+            <AlertTriangle size={13} aria-hidden="true" /> {VAULT_PLAIN_BACKUP_MESSAGE} {syncT('noBackupUntil')}
           </p>
         )}
 

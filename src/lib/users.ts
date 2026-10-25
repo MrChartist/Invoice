@@ -9,7 +9,7 @@
 
 import { requireAccess, type Role } from './access';
 import { audit } from './audit';
-import { OWNER_ID, clearGuard, getCurrentUser, isValidPinFormat, listUsers, nameKey, readUsers, writeUsers, type StoredUser, type UserSummary } from './auth';
+import { OWNER_ID, announceUserChange, clearGuard, getCurrentUser, isValidPinFormat, listUsers, nameKey, readUsers, writeUsers, type StoredUser, type UserSummary } from './auth';
 import { hashPin } from './crypto';
 import { generateId } from './storage';
 
@@ -37,6 +37,8 @@ const summary = (u: StoredUser): UserSummary => ({ id: u.id, name: u.name, role:
 
 function log(action: 'create' | 'update' | 'delete', text: string): void {
   audit.record({ entity: 'settings', entity_id: 'users', action, summary: text });
+  // Every open tab re-checks who is signed in: a removed user's tab locks, a new role applies at once.
+  announceUserChange();
 }
 
 /** Add a clerk or viewer. Owner only (throws AccessDeniedError otherwise). */
@@ -88,7 +90,7 @@ export async function resetUserPin(id: string, pin: string): Promise<UserResult>
   return { ok: true, user: summary(next) };
 }
 
-/** Remove a user. Their open session ends the next time the app checks it. Owner only. */
+/** Remove a user. Their open tabs lock at once (user-change broadcast / storage event). Owner only. */
 export function removeUser(id: string): UserResult {
   requireAccess('security.manage');
   if (id === OWNER_ID || getCurrentUser()?.id === id) return { ok: false, reason: 'owner' };
