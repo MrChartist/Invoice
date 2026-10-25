@@ -70,6 +70,16 @@ export function Expenses() {
   const [filter, setFilter] = useState<PurchaseFilter>({ kind: 'ALL', status: 'ALL', category: 'ALL' });
   // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
   const [billOpen, setBillOpen] = useState(() => params.get('new') === 'bill');
+  // A Tally key / Gateway link while this page is already open (F9, Ctrl+F9 → ?tab=returns&new=dn)
+  // changes only the query: follow it (adjust-state-on-change, no effect).
+  const query = params.toString();
+  const [seenQuery, setSeenQuery] = useState(query);
+  if (seenQuery !== query) {
+    setSeenQuery(query);
+    const wanted = TAB_PARAMS.find((x) => x === params.get('tab'));
+    if (wanted) setTab(wanted);
+    if (params.get('new') === 'bill') setBillOpen(true);
+  }
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseRecord | null>(null);
   const [payFor, setPayFor] = useState<string | null>(null);
@@ -217,6 +227,7 @@ export function Expenses() {
       ) : tab === 'returns' ? (
         <Suspense fallback={null}>
           <ReturnsTab
+            key={params.get('new') ?? ''}
             purchases={purchases}
             vendors={vendors}
             orders={orders}

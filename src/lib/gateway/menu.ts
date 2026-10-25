@@ -7,6 +7,7 @@
  */
 import type { AccessAction } from '../access';
 import type { GwKey } from '../../i18n/areas/gateway';
+import { mastersHref } from '../../components/masters/screens';
 
 export type ScreenId =
   | 'root'
@@ -283,6 +284,26 @@ export const GATEWAY_EXTENSIONS: Array<{ screen: ScreenId; section: number; entr
   { screen: 'alter', section: 0, entry: { id: 'employee', label: 'employee', accel: 'm', target: go('/payroll?tab=employees'), need: 'payroll.view', keywords: 'employee staff payroll salary' } },
   { screen: 'vouchers', section: 0, entry: { id: 'v-payroll', label: 'payrollVoucher', accel: 'l', target: go('/payroll?tab=run'), need: 'payroll.view', keywords: 'payroll salary attendance' } },
   { screen: 'statutory', section: 0, entry: { id: 'sr-payroll', label: 'payrollReports', accel: 'p', target: go('/payroll?tab=reports'), need: 'payroll.view', keywords: 'pf esi ecr pt 24q form 16 payroll' } },
+
+  /* ── Phase 7 integration pass: every Tally-parity package reachable from the Gateway ── */
+  // WP-1 masters ("Accounts Info": groups, ledgers, opening trial balance, bill-wise openings).
+  { screen: 'root', section: 0, entry: { id: 'accinfo', label: 'accountsInfo', accel: 'o', target: go(mastersHref('menu')), keywords: 'accounts info masters group ledger opening balance trial balance billwise' } },
+  // WP-7 year-end wizard and Tally import (also Books header, Settings → Data).
+  { screen: 'root', section: 2, entry: { id: 'yearend', label: 'yearEnd', accel: 'y', target: go('/books?open=yearend'), need: 'books.edit', keywords: 'year end closing split company new year carry forward' } },
+  { screen: 'impexp', section: 0, entry: { id: 'ie-tally', label: 'tallyImport', accel: 't', target: go('/books?open=tally'), need: 'data.restore', keywords: 'tally xml import masters vouchers migration' } },
+  // WP-5 banking documents.
+  { screen: 'banking', section: 0, entry: { id: 'b-deposit', label: 'depositSlip', accel: 'd', target: go('/reconcile?tab=documents&doc=deposit'), need: 'books.edit', keywords: 'deposit slip pay in cheque cash' } },
+  { screen: 'banking', section: 0, entry: { id: 'b-advice', label: 'paymentAdvice', accel: 'a', target: go('/reconcile?tab=documents&doc=advice'), need: 'books.edit', keywords: 'payment advice remittance supplier' } },
+  { screen: 'banking', section: 0, entry: { id: 'b-epay', label: 'ePayments', accel: 'e', target: go('/reconcile?tab=documents&doc=epay'), need: 'books.edit', keywords: 'e-payment neft rtgs bulk upload bank file' } },
+  { screen: 'banking', section: 0, entry: { id: 'b-cash', label: 'cashTally', accel: 't', target: go('/reconcile?tab=documents&doc=cash'), need: 'books.edit', keywords: 'cash tally denomination day end' } },
+  // WP-3 purchase side and manufacturing vouchers.
+  { screen: 'vouchers', section: 0, entry: { id: 'v-pdn', label: 'purchaseReturn', accel: 'e', target: go('/expenses?tab=returns&new=dn'), need: 'books.edit', keywords: 'debit note purchase return supplier rejection' } },
+  { screen: 'vouchers', section: 0, entry: { id: 'v-grn', label: 'receiptNote', accel: 'g', target: go('/expenses?tab=returns&new=grn'), need: 'books.edit', keywords: 'grn receipt note goods received inward' } },
+  { screen: 'vouchers', section: 0, entry: { id: 'v-mfg', label: 'mfgJournal', accel: 'm', target: go('/manufacturing?tab=mfg'), need: 'books.edit', keywords: 'manufacturing journal production bom assemble' } },
+  // TDS payables (deducted by us), GST set-off (WP-6), ratio analysis (WP-2).
+  { screen: 'statutory', section: 0, entry: { id: 'sr-tdsp', label: 'tdsPayables', accel: 'd', target: go('/tds'), keywords: 'tds tcs payable 26q 27eq challan 16a deducted' } },
+  { screen: 'statutory', section: 0, entry: { id: 'sr-setoff', label: 'gstSetoff', accel: 'o', target: go('/gst-reports?tab=setoff'), keywords: 'gst set off pmt-06 challan cash ledger credit ledger utilisation' } },
+  { screen: 'more', section: 0, entry: { id: 'm-ratio', label: 'ratioAnalysis', accel: 'o', target: go('/books?tab=ratio'), keywords: 'ratio analysis current ratio quick ratio working capital' } },
 ];
 
 export type Can = (action: AccessAction) => boolean;

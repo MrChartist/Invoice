@@ -6,6 +6,7 @@ import { pick } from '../store/pick';
 import { useShallow } from 'zustand/react/shallow';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
+import { useHsnDefaultRate } from '../hooks/useHsnDefaultRate';
 import { ItemsTable } from '../components/creator/ItemsTable';
 import { ScanBar } from '../components/creator/ScanBar';
 import { SummaryPanel } from '../components/creator/SummaryPanel';
@@ -68,6 +69,7 @@ export function InvoiceCreator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { notify, toastNode } = useToast();
+  useHsnDefaultRate(); // WP-6: HSN master rate on lines whose HSN is typed
   const { t, lang } = useT();
   const s = useInvoiceStore(
     useShallow((st) => pick(st, ['approval', 'attachments', 'currency', 'dirty', 'doc_type', 'id', 'invoice_number', 'issue_date', 'items', 'notes', 'patch', 'setNotes', 'setTerms', 'status', 'terms', 'total'])),

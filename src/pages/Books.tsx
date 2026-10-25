@@ -20,6 +20,9 @@ import surface from '../styles/surface.module.css';
 import styles from './Books.module.css';
 import { useT } from '../i18n';
 import { booksT } from '../i18n/areas/books';
+import { wireT } from '../i18n/areas/wiring';
+import { useCan } from '../hooks/useCan';
+import controls from '../styles/controls.module.css';
 
 // The double-entry tabs (6.1–6.4) live in their own lazy chunk with the ledger engine.
 const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'));
@@ -28,6 +31,9 @@ const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'
 const FxTab = lazy(() => import('../components/books/planning/FxTab'));
 // Tally parity: bill-wise payables, voucher registers, ratio analysis (their own lazy chunk).
 const TallyPanel = lazy(() => import('../components/books/tally/TallyPanel'));
+// WP-7 entry points (also in Settings → Data and the Gateway): `?open=yearend` / `?open=tally`.
+const TallyImport = lazy(() => import('../components/import/TallyImport').then((m) => ({ default: m.TallyImport })));
+const YearEndWizard = lazy(() => import('../components/year-end/YearEndWizard').then((m) => ({ default: m.YearEndWizard })));
 
 const TABS = [
   { id: 'day', label: 'tabDay' },
@@ -64,6 +70,16 @@ export function Books() {
   const [openingOpen, setOpeningOpen] = useState(false);
   const { notify, toastNode } = useToast();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const { can } = useCan();
+  const openParam = params.get('open');
+  const wizard = openParam === 'yearend' && can('books.edit') ? 'yearend' : openParam === 'tally' && can('data.restore') ? 'tally' : null;
+  const setWizard = (w: 'yearend' | 'tally' | null) => {
+    const next = new URLSearchParams(params);
+    if (w) next.set('open', w);
+    else next.delete('open');
+    setParams(next, { replace: true });
+    if (!w) setData(loadBooksData());
+  };
 
   // Re-read on mount/focus so edits made on other pages show up.
   useEffect(() => {
@@ -130,7 +146,26 @@ export function Books() {
       <PageHeader
         title={booksT('title')}
         subtitle={booksT('subtitle')}
+        actions={
+          <>
+            {can('books.edit') && (
+              <button type="button" className={controls.btnOutline} onClick={() => setWizard('yearend')}>{wireT('startNewYear')}</button>
+            )}
+            {can('data.restore') && (
+              <button type="button" className={controls.btnGhost} onClick={() => setWizard('tally')}>{wireT('importTally')}</button>
+            )}
+          </>
+        }
       />
+      {wizard && (
+        <Suspense fallback={null}>
+          {wizard === 'tally' ? (
+            <TallyImport open onClose={() => setWizard(null)} notify={notify} />
+          ) : (
+            <YearEndWizard open onClose={() => setWizard(null)} notify={notify} />
+          )}
+        </Suspense>
+      )}
 
       <div className="no-print">
       <PeriodBar
