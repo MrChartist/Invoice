@@ -13,9 +13,9 @@ import { GST_HEADS, GST_HEAD_LABELS, MINOR_HEADS, MINOR_HEAD_LABELS, creditLedge
 import {
   CASH_REFUND_DISCLAIMER,
   REFUND_CATEGORIES,
-  REFUND_STATUSES,
   REFUND_STATUS_FORM,
   advanceRefund,
+  nextRefundStatuses,
   cashLedgerDetail,
   deletePmt09,
   deleteRefund,
@@ -276,7 +276,7 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
                   <td>{delay.daysLate > 0 && r.status !== 'REJECTED' && r.status !== 'WITHDRAWN' ? r7T('rfDelay', { days: delay.daysLate, amount: formatMoney(delay.interest) }) : '—'}</td>
                   <td>
                     <span className={styles.actions}>
-                      <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setStep({ id: r.id, status: r.status === 'DRAFT' ? 'FILED' : 'SANCTIONED', date: today, sanctioned: { igst: String(r.claimed.igst || ''), cgst: String(r.claimed.cgst || ''), sgst: String(r.claimed.sgst || ''), cess: String(r.claimed.cess || '') }, bank: r.bank_ledger_id ?? A.bank })}>{r7T('rfStep')}</button>
+                      {nextRefundStatuses(r.status).length > 0 && <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setStep({ id: r.id, status: nextRefundStatuses(r.status).find((x) => x === 'SANCTIONED' || x === 'PAID') ?? nextRefundStatuses(r.status)[0], date: today, sanctioned: { igst: String(r.claimed.igst || ''), cgst: String(r.claimed.cgst || ''), sgst: String(r.claimed.sgst || ''), cess: String(r.claimed.cess || '') }, bank: r.bank_ledger_id ?? A.bank })}>{r7T('rfStep')}</button>}
                       <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} aria-label={r7T('delete')} onClick={() => run(() => deleteRefund(r.id), r7T('deleted'))}><Trash2 size={14} aria-hidden /></button>
                     </span>
                   </td>
@@ -290,7 +290,7 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
         <div className={styles.bar} data-refund-step>
           <label>{r7T('rfNewStatus')}
             <select className={controls.select} value={step.status} onChange={(e) => setStep({ ...step, status: e.target.value as RefundStatus })}>
-              {REFUND_STATUSES.filter((x) => x !== 'DRAFT').map((x) => <option key={x} value={x}>{r7T(STATUS_KEY[x])} ({REFUND_STATUS_FORM[x]})</option>)}
+              {nextRefundStatuses(refunds.find((x) => x.id === step.id)?.status ?? 'FILED').map((x) => <option key={x} value={x}>{r7T(STATUS_KEY[x])} ({REFUND_STATUS_FORM[x]})</option>)}
             </select>
           </label>
           <label>{r7T('date')}<input type="date" className={controls.input} value={step.date} onChange={(e) => setStep({ ...step, date: e.target.value })} /></label>

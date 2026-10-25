@@ -218,7 +218,10 @@ export function requireAccess(action: AccessAction): void {
  * compliance marks, reminder log) and the ones whose APIs already guard each operation with finer
  * rules (invoices, payments) are deliberately not listed.
  */
-const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
+/** Payroll tables (review L1): a write is a books change AND needs payroll access, like the payroll APIs. */
+const PAYROLL_WRITE: readonly AccessAction[] = ['books.edit', 'payroll.view'];
+
+const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessAction[]>> = {
   // masters
   items_catalog: 'master.edit',
   clients: 'master.edit',
@@ -302,25 +305,25 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // request lives on the document itself, so a clerk can never forge a decision row (review L5)
   approvals: 'doc.approve',
   // payroll (Phase 7): owner-only, salaries are confidential
-  employees: 'payroll.view',
-  employee_groups: 'payroll.view',
-  pay_heads: 'payroll.view',
-  salary_structures: 'payroll.view',
-  attendance_types: 'payroll.view',
-  attendance: 'payroll.view',
-  payroll_runs: 'payroll.view',
-  payroll_payments: 'payroll.view',
+  employees: PAYROLL_WRITE,
+  employee_groups: PAYROLL_WRITE,
+  pay_heads: PAYROLL_WRITE,
+  salary_structures: PAYROLL_WRITE,
+  attendance_types: PAYROLL_WRITE,
+  attendance: PAYROLL_WRITE,
+  payroll_runs: PAYROLL_WRITE,
+  payroll_payments: PAYROLL_WRITE,
   // payroll depth (7P)
-  payroll_arrears: 'payroll.view',
-  employee_loans: 'payroll.view',
-  leave_types: 'payroll.view',
-  leave_entries: 'payroll.view',
-  payroll_adjustments: 'payroll.view',
-  perquisites: 'payroll.view',
-  fnf_settlements: 'payroll.view',
+  payroll_arrears: PAYROLL_WRITE,
+  employee_loans: PAYROLL_WRITE,
+  leave_types: PAYROLL_WRITE,
+  leave_entries: PAYROLL_WRITE,
+  payroll_adjustments: PAYROLL_WRITE,
+  perquisites: PAYROLL_WRITE,
+  fnf_settlements: PAYROLL_WRITE,
   // payroll follow-ups (7T): Form 10E workings, actuarial valuations
-  payroll_relief89: 'payroll.view',
-  actuarial_valuations: 'payroll.view',
+  payroll_relief89: PAYROLL_WRITE,
+  actuarial_valuations: PAYROLL_WRITE,
   // Phase 7 (Tally parity): manufacturing and stock vouchers
   manufacturing_vouchers: 'books.edit',
   stock_journals: 'books.edit',
@@ -357,5 +360,6 @@ export function asSystem<T>(fn: () => T): T {
 export function requireTableWrite(name: string): void {
   if (systemDepth > 0) return;
   const action = TABLE_ACTIONS[name];
-  if (action) requireAccess(action);
+  if (typeof action === 'string') requireAccess(action);
+  else if (action) for (const a of action) requireAccess(a);
 }

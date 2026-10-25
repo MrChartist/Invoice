@@ -381,6 +381,10 @@ test('integrity review: removal checks, godown and cost-centre usage read bills 
   const sale = { id: 's', invoice_number: 'INV/1', doc_type: 'INVOICE' as const, status: 'Sent' as const, issue_date: '2099-01-01', items: [{ id: 'x', name: 'Widget', hsn: '8471', type: 'Goods', quantity: 1, rate: 1, amount: 1, serials: ['S1'] }] };
   assert.equal(removalIssues({ items: [item], moves: [], invoices: [sale], purchases: [tracked] }, { refType: 'purchase', refId: 'pb' }, false).errors.length, 1);
   assert.deepEqual(godownReferences('g2', { purchases: [tracked] }), ['purchase bills']);
+  // Review M2: the Sec 25(4) pair guard reads `branch_transfer_id` and treats a void bill as gone.
+  const { transferPairOf } = await import('../src/lib/godowns.ts');
+  assert.deepEqual(transferPairOf('str9', { invoices: [], purchases: [{ ...bill, branch_transfer_id: 'str9' }] }), { bill: bill.bill_number });
+  assert.equal(transferPairOf('str9', { invoices: [], purchases: [{ ...bill, branch_transfer_id: 'str9', status: 'void' }] }), null);
   assert.equal(costCentreUsage('cc', { purchases: [tracked as never] }).purchases, 1);
 });
 

@@ -226,31 +226,37 @@ export interface StockJournalPosting {
   date: string;
   /** Debit-positive paise on Stock-in-hand from this entry. */
   delta: number;
+  /** Branch the journal is tagged to (WP-9), when it is: netted off that branch's own valuation. */
+  branch_id?: string;
 }
 
+const ONLY_STOCK: ReadonlySet<string> = new Set([STOCK_ACCOUNT]);
+
 /**
- * A manual journal that books closing stock into Stock-in-hand: the year-end wizard's class, or any
- * journal whose narration says "closing stock" and that touches Stock-in-hand.
+ * A manual journal that books closing stock into an Inventories ledger: only the year-end wizard's
+ * class (review L5 — a narration that merely mentions "closing stock" is an ordinary journal).
+ * `stockIds` are the Inventories ledgers (Stock-in-hand and the user's own stock ledgers), the same
+ * set `stockLedgerOpening` reads.
  */
-export function isClosingStockJournal(v: Pick<ManualVoucher, 'type' | 'voucher_class' | 'narration' | 'lines'>): boolean {
-  if (v.type !== 'JOURNAL') return false;
-  if (!v.lines.some((l) => l.account_id === STOCK_ACCOUNT)) return false;
-  return v.voucher_class === CLOSING_STOCK_CLASS || /closing\s*stock/i.test(v.narration ?? '');
+export function isClosingStockJournal(v: Pick<ManualVoucher, 'type' | 'voucher_class' | 'lines'>, stockIds: ReadonlySet<string> = ONLY_STOCK): boolean {
+  if (v.type !== 'JOURNAL' || v.voucher_class !== CLOSING_STOCK_CLASS) return false;
+  return v.lines.some((l) => stockIds.has(l.account_id));
 }
 
 /**
  * Stock-in-hand movements of the closing-stock journals that are in the books on `today` (optional /
  * memo / future post-dated vouchers are not), plus their automatic reversals (`reverse_on`).
  */
-export function stockJournalPostings(manual: readonly ManualVoucher[], today: string): StockJournalPosting[] {
+export function stockJournalPostings(manual: readonly ManualVoucher[], today: string, stockIds: ReadonlySet<string> = ONLY_STOCK): StockJournalPosting[] {
   const out: StockJournalPosting[] = [];
   for (const v of manual) {
-    if (!isClosingStockJournal(v)) continue;
+    if (!isClosingStockJournal(v, stockIds)) continue;
     if (v.variant === 'MEMO' || v.variant === 'OPTIONAL' || (v.post_dated && v.date > today)) continue;
-    const delta = v.lines.reduce((s, l) => s + (l.account_id === STOCK_ACCOUNT ? l.dr - l.cr : 0), 0);
+    const delta = v.lines.reduce((s, l) => s + (stockIds.has(l.account_id) ? l.dr - l.cr : 0), 0);
     if (!delta) continue;
-    out.push({ id: v.id, number: v.number, date: v.date, delta });
-    if (v.reverse_on && v.reverse_on > v.date) out.push({ id: v.id, number: `${v.number}-R`, date: v.reverse_on, delta: -delta });
+    const branch = v.branch_id ? { branch_id: v.branch_id } : {};
+    out.push({ id: v.id, number: v.number, date: v.date, delta, ...branch });
+    if (v.reverse_on && v.reverse_on > v.date) out.push({ id: v.id, number: `${v.number}-R`, date: v.reverse_on, delta: -delta, ...branch });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }

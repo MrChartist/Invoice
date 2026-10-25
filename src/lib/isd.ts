@@ -27,7 +27,7 @@ import { gstr6DueDate } from './gst-penalties';
 import { checkGstin } from './gstin';
 import { num, round2 } from './invoice-calc';
 import { assertUnlocked } from './period-lock';
-import { nextSeriesNumberFor, recordSeries } from './series-counters';
+import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 import { generateId, getTable, setTable } from './storage';
 import { toCsv } from './csv';
 
@@ -308,7 +308,9 @@ export function saveIsdDoc(input: IsdInput): IsdDoc {
   const all = loadIsdDocs();
   const prev = input.id ? all.find((d) => d.id === input.id) : undefined;
   const id = prev?.id ?? generateId();
-  const number = input.kind === 'DISTRIBUTION' ? prev?.number || nextIsdNumber(input.date, all) : s(input.number).slice(0, 30);
+  // Review L4: an edit that moves a distribution into another FY takes that FY's next number (as job work / MRP).
+  const kept = prev?.kind === 'DISTRIBUTION' ? prev.number : '';
+  const number = input.kind === 'DISTRIBUTION' ? (kept && numberFitsFy(kept, isoDay(input.date)) ? kept : nextIsdNumber(input.date, all)) : s(input.number).slice(0, 30);
   if (input.kind === 'INWARD' && all.some((d) => d.id !== id && d.kind === 'INWARD' && d.number.toUpperCase() === number.toUpperCase() && d.party_gstin === s(input.party_gstin).toUpperCase())) {
     throw new IsdError(`Invoice ${number} of this supplier is already recorded.`);
   }

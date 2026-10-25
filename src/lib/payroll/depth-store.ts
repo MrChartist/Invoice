@@ -14,7 +14,7 @@ import { num, round2 } from '../invoice-calc';
 import { assertUnlocked } from '../period-lock';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { generateId, setTable } from '../storage';
-import { formatMoney } from '../utils';
+import { withTablesRollback } from '../table-txn';
 import { A } from '../ledger/accounts';
 import { saveVoucher } from '../ledger/vouchers';
 import type {
@@ -50,8 +50,9 @@ import { lastDayOfMonth } from './statutory';
 export * from './depth-records';
 
 const now = () => new Date().toISOString();
-const money = (n: number) => `₹${formatMoney(n)}`;
 
+// Review H1: audit summaries name the record but never carry an employee's amounts; those stay in
+// the payroll records themselves (owner / payroll.view only).
 function guard(): void {
   requireAccess('books.edit');
   requireAccess('payroll.view');
@@ -98,7 +99,7 @@ export function saveArrears(input: ArrearsInput): ArrearsRecord {
   const gross = round2(months.reduce((s, m) => s + m.gross, 0));
   const [row] = normalizeArrears([{ id: prev?.id ?? generateId(), employee_id: input.employee_id, from_month: input.from_month, pay_month: input.pay_month, months, gross, note: str(input.note), created_at: prev?.created_at ?? now() }]);
   setTable(PAYROLL_TABLES.arrears, prev ? all.map((r) => (r.id === row.id ? row : r)) : [...all, row]);
-  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Arrears for ${employeeName(row.employee_id)}: ${months.length} month${months.length === 1 ? '' : 's'} from ${row.from_month}, ${money(gross)}, paid with ${row.pay_month}${arrearsEarlierFy(row) ? ' (earlier FY — relief u/s 89)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Arrears for ${employeeName(row.employee_id)}: ${months.length} month${months.length === 1 ? '' : 's'} from ${row.from_month}, paid with ${row.pay_month}${arrearsEarlierFy(row) ? ' (earlier FY — relief u/s 89)' : ''}` });
   return row;
 }
 
@@ -138,6 +139,12 @@ export function saveLoan(input: LoanInput): EmployeeLoan {
   guard();
   const errors = validateLoan(input);
   if (errors.length) throw new PayrollError(errors[0]);
+  // Review M1: the disbursement is re-booked in steps (delete the old payment, record the new one,
+  // repoint the loan); a refusal on the way (period lock on either date) puts all three tables back.
+  return withTablesRollback([PAYROLL_TABLES.loans, PAYROLL_TABLES.payments, 'series_counters'], () => saveLoanSteps(input));
+}
+
+function saveLoanSteps(input: LoanInput): EmployeeLoan {
   const all = loadLoans();
   const prev = input.id ? all.find((l) => l.id === input.id) : undefined;
   if (prev) {
@@ -158,7 +165,7 @@ export function saveLoan(input: LoanInput): EmployeeLoan {
     const payment = moneyChanged ? recordPayrollPayment({ kind: 'loan', loan_id: prev.id, date: input.date, amount: round2(num(input.amount)), paid_from: input.paid_from || 'bank', reference: prev.number }) : null;
     const [row] = normalizeLoans([{ ...prev, ...input, id: prev.id, number: prev.number, payment_id: payment?.id ?? prev.payment_id, created_at: prev.created_at }]);
     setTable(PAYROLL_TABLES.loans, loadLoans().map((l) => (l.id === row.id ? row : l)));
-    audit.record({ entity: 'payroll', entity_id: row.id, action: 'update', doc_number: row.number, summary: `Loan ${row.number} to ${employeeName(row.employee_id)} edited: ${money(row.amount)}, EMI ${money(row.emi)}, ${row.interest_rate}% p.a.` });
+    audit.record({ entity: 'payroll', entity_id: row.id, action: 'update', doc_number: row.number, summary: `Loan ${row.number} to ${employeeName(row.employee_id)} edited` });
     return row;
   }
   const id = generateId();
@@ -168,7 +175,7 @@ export function saveLoan(input: LoanInput): EmployeeLoan {
   const [row] = normalizeLoans([{ ...input, id, number, payment_id: payment.id, created_at: now() }]);
   setTable(PAYROLL_TABLES.loans, [...all, row]);
   recordSeries(number);
-  audit.record({ entity: 'payroll', entity_id: id, action: 'create', doc_number: number, summary: `${row.kind === 'advance' ? 'Salary advance' : 'Loan'} ${number} of ${money(row.amount)} to ${employeeName(row.employee_id)} on ${row.date}: EMI ${money(row.emi)} from ${row.start_month}, ${row.interest_rate ? `${row.interest_rate}% p.a.` : 'interest-free'}` });
+  audit.record({ entity: 'payroll', entity_id: id, action: 'create', doc_number: number, summary: `${row.kind === 'advance' ? 'Salary advance' : 'Loan'} ${number} to ${employeeName(row.employee_id)} on ${row.date}, recovered from ${row.start_month}` });
   return row;
 }
 
@@ -187,7 +194,7 @@ export function deleteLoan(id: string): void {
     setTable(PAYROLL_TABLES.loans, all);
     throw err;
   }
-  audit.record({ entity: 'payroll', entity_id: id, action: 'delete', doc_number: row.number, summary: `Loan ${row.number} (${money(row.amount)}) to ${employeeName(row.employee_id)} deleted` });
+  audit.record({ entity: 'payroll', entity_id: id, action: 'delete', doc_number: row.number, summary: `Loan ${row.number} to ${employeeName(row.employee_id)} deleted` });
 }
 
 /* ── Leave ────────────────────────────────────────────────────── */
@@ -266,7 +273,7 @@ export function addAdjustment(input: AdjustmentInput): PayrollAdjustment {
   assertMonthOpen(input.month, 'its items');
   const [row] = normalizeAdjustments([{ ...input, id: generateId(), created_at: now() }]);
   setTable(PAYROLL_TABLES.adjustments, [...loadAdjustments(), row]);
-  audit.record({ entity: 'payroll', entity_id: row.id, action: 'create', summary: `${row.tag === 'reimb' ? 'Reimbursement' : row.tag === 'bonus' ? 'Bonus' : 'Payroll item'} “${row.name}” ${money(row.amount)} for ${employeeName(row.employee_id)} in ${row.month}` });
+  audit.record({ entity: 'payroll', entity_id: row.id, action: 'create', summary: `${row.tag === 'reimb' ? 'Reimbursement' : row.tag === 'bonus' ? 'Bonus' : 'Payroll item'} “${row.name}” for ${employeeName(row.employee_id)} in ${row.month}` });
   return row;
 }
 
@@ -277,7 +284,7 @@ export function deleteAdjustment(id: string): void {
   if (!row) return;
   assertMonthOpen(row.month, 'its items');
   setTable(PAYROLL_TABLES.adjustments, all.filter((x) => x.id !== id));
-  audit.record({ entity: 'payroll', entity_id: id, action: 'delete', summary: `Payroll item “${row.name}” (${money(row.amount)}, ${row.month}) deleted` });
+  audit.record({ entity: 'payroll', entity_id: id, action: 'delete', summary: `Payroll item “${row.name}” (${row.month}) deleted` });
 }
 
 /* ── Perquisites ──────────────────────────────────────────────── */
@@ -294,7 +301,7 @@ export function savePerquisite(input: PerquisiteInput): Perquisite {
   const prev = input.id ? all.find((p) => p.id === input.id) : undefined;
   const [row] = normalizePerquisites([{ ...input, id: prev?.id ?? generateId(), created_at: prev?.created_at ?? now() }]);
   setTable(PAYROLL_TABLES.perquisites, prev ? all.map((p) => (p.id === row.id ? row : p)) : [...all, row]);
-  audit.record({ entity: 'employee', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Perquisite (${row.kind}) for ${employeeName(row.employee_id)}: ${money(row.monthly_value)} a month from ${row.from_month}${row.to_month ? ` to ${row.to_month}` : ''}` });
+  audit.record({ entity: 'employee', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Perquisite (${row.kind}) for ${employeeName(row.employee_id)} from ${row.from_month}${row.to_month ? ` to ${row.to_month}` : ''}` });
   return row;
 }
 

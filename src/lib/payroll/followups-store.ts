@@ -62,7 +62,7 @@ export function saveRelief89(input: Relief89Input): Relief89Record {
   const prev = input.id ? all.find((r) => r.id === input.id) : all.find((r) => r.employee_id === e.id && r.fy === fy);
   const [row] = normalizeRelief89([{ ...input, fy, years, income_with: incomeWith, relief: result.relief, id: prev?.id ?? generateId(), created_at: prev?.created_at ?? now(), ...(prev ? { updated_at: now() } : {}) }]);
   setTable(PAYROLL_TABLES.relief89, prev ? all.map((r) => (r.id === row.id ? row : r)) : [...all, row]);
-  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Relief u/s 89 (Form 10E) for ${employeeName(e.id)}, FY ${fy}-${String((fy + 1) % 100).padStart(2, '0')}: arrears ${money(arrears)} over ${years.length} year${years.length === 1 ? '' : 's'}, relief ${money(result.relief)}${row.apply_tds ? ' — allowed in TDS' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Relief u/s 89 (Form 10E) for ${employeeName(e.id)}, FY ${fy}-${String((fy + 1) % 100).padStart(2, '0')}: arrears over ${years.length} year${years.length === 1 ? '' : 's'}${row.apply_tds ? ' — allowed in TDS' : ''}` });
   return row;
 }
 
