@@ -12,7 +12,7 @@ extended here, not duplicated).
 | UI | Inventory page (`/inventory`): header bar buttons **Groups & categories** and **Units** (lazy modals), summary filters by group / category, compound reading under the quantity ("2 BOX 3 NOS"), tabs **Stock query** and **Order outstanding** (lazy, `?tab=query&item=<id>`, `?tab=orders`). Item form: group, category, alternate units, price lists. Godowns modal: "Inside godown". Manufacturing → Stock reports: **Group summary**, ageing slabs. Invoice editor unit column, bill / PO / GRN line editor (item picker + unit), bill form **Landed cost** |
 | Lib | `src/lib/units.ts` (units master, alternate units, conversion — pure + `unitsDb`), `units-live.ts` (editor context), `stock-groups.ts` (trees + `stockGroupsDb` / `stockCategoriesDb`), `stock-query.ts` (price lists + Stock Query), `landed-cost.ts`, `item-references.ts`; additions to `stock-reports.ts` (`groupWiseSummary`, `parseAgeSlabs`, `ageBucketBounds`), `sales-orders.ts` (`salesOrderOutstanding`, `groupOutstanding`), `godowns.ts` (`godownTree`, `godownParentIssue`, `rollUpGodowns`), `reorder.ts` (`pendingPoQty(…, receiptNotes)`) |
 | Strings | `src/i18n/areas/inventory-masters.ts` (`imT`, screens), `src/i18n/areas/units.ts` (`unitT`, the few line-editor / landed-cost strings, so the editor chunk stays small); ageing / group-summary labels in `src/i18n/areas/manufacturing.ts` |
-| Tests | `tests/inventory-masters.test.ts` (pure), `tests/integration/inventory-masters.test.ts` (storage, roles, audit, backup, delete guard, live Stock Query), WP-8 rows in `tests/purchase-contract.test.ts` |
+| Tests | `tests/inventory-masters.test.ts` (pure), `tests/alt-unit-reports.test.ts` (alternate units in reports, UQC in GST papers), `tests/integration/inventory-masters.test.ts` (storage, roles, audit, backup, delete guard, live Stock Query), WP-8 rows in `tests/purchase-contract.test.ts` |
 
 ## Data (all additive)
 
@@ -76,6 +76,28 @@ lines use the same rule (`returnStockEvents` got an optional id resolver). Invoi
   per godown and batch, last 5 purchases (cost per base unit, vendor) and sales (net rate per base unit, party), and the
   open SO lines. Rates are per the item's main unit.
 
+## Alternate units in reports and GST papers (WP-8 follow-up)
+
+- `CalcLine.unit_factor` (set by `calculateInvoice` only when ≠ 1) and `SalesLine.unitFactor` carry the snapshot to
+  readers; money and GST stay as typed.
+- **Item / party profit** (`profitability.ts`): both cost sources are per base unit, so a line costs
+  base cost × quantity × factor (2 BOX of 12 at ₹50 / NOS = ₹1,200, not ₹100). Purchase lots are converted the same
+  way (quantity × factor, rate ÷ factor). The item row's quantity is in the item's base unit when the line names a
+  stock item; otherwise as typed.
+- **Sales by item / HSN** (`salesByItem(…, index)`, Reports passes `buildItemIndex` of the stock items),
+  `profitByItem` and the dashboard best sellers count base units.
+- **UQC**: `portalUqc` (e-Invoice `Unit`, e-Way `qtyUnit`) and `hsnLineQty` (GSTR-1 HSN summary, hence GSTR-9
+  Table 17) use the units master's UQC (`uqcFor`) when the unit has a row with a UQC, else the built-in mapping
+  (unchanged). A master code that is not a portal UQC is ignored for the JSON; a unit with a master UQC no longer
+  raises "unit guessed". SAC lines stay NA. Options: `units` on `BuildOptions`, `Gstr9Options`, `EInvoiceOptions`,
+  `EwayOptions`, `BulkContext`.
+- **HSN summary quantity**: with `items` (stock items index) an alternate-unit line is summarised in the item's base
+  unit and its UQC (2 BOX of 12 → 24 at the UQC of NOS), so one HSN row per item matches the stock records; without
+  a resolvable item it reports as typed (2 at the UQC of BOX). e-Invoice / e-Way lines stay as typed (they mirror the
+  printed invoice). Working paper — verify with your CA: Table 12 accepts any valid UQC and several UQC rows per HSN,
+  so both readings are lawful; the base-unit choice means the HSN summary's UQC can differ from the e-Invoice line
+  for the same supply.
+
 ## Godown hierarchy
 
 `Godown.parent_id`; the Godowns modal shows the tree and an "Inside godown" picker (no cycles; a godown with
@@ -116,10 +138,9 @@ per row. `tests/perf.test.ts` paths unchanged.
 
 ## Open items
 
-- The units master's UQC is not yet used by the GSTR-1 HSN summary / e-Invoice / e-Way mappers (`uqcFor` is ready;
-  those files belong to WP-6 / einvoice). Decimal places are used for display helpers only (no input rounding).
-- Item-wise profitability (Reports → Item profit) costs tracked items per base unit but multiplies by the line
-  quantity, so lines in an alternate unit are under-costed there: `SalesLine` / `CalcLine` would need the factor.
+- Decimal places are used for display helpers only (no input rounding).
+- Sales-order fulfilment, Tally XML inventory lines and the GSTR-9 / purchase HSN registers (inward side) still read
+  line quantities as typed; the SO index is consistent while the invoice keeps the order line's unit.
 - Alternate units on POS lines, stock journals / manufacturing lines, transfers and adjustments (base unit only).
 - Price lists are not yet applied automatically to the editor's rate (pricing.ts / price levels own that); standard
   cost is not used for valuation (FIFO / weighted average stay the methods).

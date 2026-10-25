@@ -39,7 +39,7 @@ import {
   purchaseItc,
   type Period,
 } from './books';
-import type { StockPosition } from './inventory';
+import type { ItemIndex, StockPosition } from './inventory';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 
 /* ════════════════════════════════════════════════════════════════
@@ -50,8 +50,10 @@ export interface SalesLine {
   name: string;
   hsn: string;
   unit: string;
-  /** Signed: negative on a credit note. */
+  /** Signed: negative on a credit note. As typed, in `unit`. */
   quantity: number;
+  /** Base units per one `unit` (WP-8 alternate unit: 2 BOX of 12 → 12). Absent = 1. */
+  unitFactor?: number;
   taxable: number;
   cgst: number;
   sgst: number;
@@ -126,6 +128,7 @@ function toSalesLine(l: CalcLine, sign: number): SalesLine {
     hsn: String(l.hsn ?? '').trim(),
     unit: String(l.unit ?? '').trim(),
     quantity: sign * num(l.quantity),
+    ...(num(l.unit_factor) > 0 && num(l.unit_factor) !== 1 ? { unitFactor: num(l.unit_factor) } : {}),
     taxable: sign * l.taxable,
     cgst: sign * l.cgst,
     sgst: sign * l.sgst,
@@ -397,10 +400,31 @@ export interface ItemRow {
   share: number;
 }
 
-export function salesByItem(docs: readonly SalesDoc[], period: Period, by: ItemGrouping = 'item'): { rows: ItemRow[]; totals: { quantity: number; taxable: number; tax: number } } {
+/** Base units per one unit of a sales line (1 when absent). */
+export const salesLineFactor = (l: Pick<SalesLine, 'unitFactor'>): number => (num(l.unitFactor) > 0 ? num(l.unitFactor) : 1);
+
+/**
+ * A sales line's quantity and unit for a per-item quantity report: a line typed in an alternate unit
+ * (2 BOX of 12 NOS) reads as 24 NOS when the item's base unit is known from the stock items (`index`);
+ * otherwise, and for every base-unit line, as typed.
+ */
+export function salesLineBaseQty(l: Pick<SalesLine, 'name' | 'hsn' | 'unit' | 'quantity' | 'unitFactor'>, index?: ItemIndex): { quantity: number; unit: string } {
+  const f = salesLineFactor(l);
+  if (f === 1) return { quantity: l.quantity, unit: l.unit };
+  const base = index?.find(l.name, l.hsn)?.unit?.trim();
+  return base ? { quantity: l.quantity * f, unit: base } : { quantity: l.quantity, unit: l.unit };
+}
+
+/**
+ * `index` (optional, stock items): converts alternate-unit lines to the item's base unit so 2 BOX and
+ * 5 NOS of the same item add up to 29 NOS instead of 7.
+ */
+export function salesByItem(docs: readonly SalesDoc[], period: Period, by: ItemGrouping = 'item', index?: ItemIndex): { rows: ItemRow[]; totals: { quantity: number; taxable: number; tax: number } } {
   const map = new Map<string, ItemRow & { _docs: Set<string> }>();
   for (const d of docsInPeriod(docs, period)) {
-    for (const l of d.lines) {
+    for (const raw of d.lines) {
+      const bq = salesLineBaseQty(raw, index);
+      const l = { ...raw, quantity: bq.quantity, unit: bq.unit };
       const hsn = l.hsn || '';
       const key = by === 'hsn' ? `h:${hsn || '-'}` : `n:${norm(l.name)}|${hsn}`;
       const r =
@@ -727,7 +751,8 @@ export function profitByItem(docs: readonly SalesDoc[], positions: readonly Stoc
       const k = norm(l.name);
       const s = sold.get(k) ?? { revenue: 0, quantity: 0 };
       s.revenue = round2(s.revenue + l.taxable);
-      s.quantity = round2(s.quantity + l.quantity);
+      // Positions are counted in the item's base unit: an alternate-unit line (2 BOX of 12) adds 24.
+      s.quantity = round2(s.quantity + l.quantity * salesLineFactor(l));
       sold.set(k, s);
     }
   }

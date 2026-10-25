@@ -49,6 +49,7 @@ import {
   normalizePurchase,
   periodLabel,
   toUqc,
+  type BuildOptions,
   type Gstr1Report,
   type Gstr3bReport,
   type HsnRow,
@@ -162,6 +163,9 @@ export interface Gstr9Options {
   itc2b?: Partial<Pick<ItcHeads, 'igst' | 'cgst' | 'sgst' | 'cess'>> | null;
   /** Advance movements (`advanceTaxEvents`, 5.3): Table 11 in each month and 4F for the year. */
   advances?: readonly AdvanceMovement[];
+  /** Additive (WP-8): units master + stock items, passed to each monthly build so Table 17 matches GSTR-1's HSN summary. */
+  units?: BuildOptions['units'];
+  items?: BuildOptions['items'];
 }
 
 export interface Gstr9Report {
@@ -284,6 +288,8 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       links: opts.links,
       turnover: opts.lastFyTurnover,
       advances: opts.advances,
+      units: opts.units,
+      items: opts.items,
     });
     return { period, label: periodLabel(period), gstr1: rep.gstr1, gstr3b: rep.gstr3b };
   });

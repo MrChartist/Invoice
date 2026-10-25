@@ -17,6 +17,7 @@ import {
   type SalesDoc,
 } from '../../lib/sales-reports';
 import type { Period } from '../../lib/books';
+import type { ItemIndex } from '../../lib/inventory';
 import { formatDate, formatQuantity } from '../../lib/utils';
 import { EmptyState } from '../ui/EmptyState';
 import { Delta, ExportButton, InvoiceLink, Share } from './bits';
@@ -96,10 +97,10 @@ export function CustomersTab({ report, period }: { report: CustomerReport; perio
 
 /* ── Sales by item / HSN ───────────────────────────────────── */
 
-export function ItemsTab({ docs, period }: { docs: readonly SalesDoc[]; period: Period }) {
+export function ItemsTab({ docs, period, index }: { docs: readonly SalesDoc[]; period: Period; index?: ItemIndex }) {
   useT();
   const [by, setBy] = useState<ItemGrouping>('item');
-  const rep = useMemo(() => salesByItem(docs, period, by), [docs, period, by]);
+  const rep = useMemo(() => salesByItem(docs, period, by, index), [docs, period, by, index]);
   const cols: Column<ItemRow>[] = [
     { id: 'name', label: by === 'hsn' ? repT('colHsn') : repT('colItem'), sort: (r) => r.name, cell: (r) => r.name, total: repT('total') },
     ...(by === 'item' ? [{ id: 'hsn', label: repT('colHsn'), sort: (r: ItemRow) => r.hsn, cell: (r: ItemRow) => r.hsn || '—' } as Column<ItemRow>] : []),

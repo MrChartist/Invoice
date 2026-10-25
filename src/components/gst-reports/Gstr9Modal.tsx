@@ -6,6 +6,8 @@ import { getTable } from '../../lib/storage';
 import { readLinks } from '../../lib/documents';
 import { fyPeriod, gstSummary, loadBooksData } from '../../lib/books';
 import { advanceTaxEvents } from '../../lib/advance-tax';
+import { buildItemIndex, stockDb } from '../../lib/inventory';
+import { unitsDb } from '../../lib/units';
 import { periodForDate } from '../../lib/gst-reports';
 import { formatMoney } from '../../lib/utils';
 import {
@@ -134,6 +136,8 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
       links: readLinks(),
       books,
       advances: advanceTaxEvents(books.advances ?? [], books.transactions, books.invoices),
+      units: unitsDb.stored(),
+      items: buildItemIndex(stockDb.items()),
     };
   }, []);
   const report = useMemo(
@@ -144,6 +148,8 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
         filerStateCode,
         links: data.links,
         advances: data.advances,
+        units: data.units,
+        items: data.items,
         turnover: Number(turnover) || 0,
         books: gstSummary(data.books, fyPeriod(fy)),
         itc2b: { igst: Number(itc2b.igst) || 0, cgst: Number(itc2b.cgst) || 0, sgst: Number(itc2b.sgst) || 0, cess: Number(itc2b.cess) || 0 },

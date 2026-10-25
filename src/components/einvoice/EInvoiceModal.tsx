@@ -18,6 +18,7 @@ import {
 import { stringifyEway, type EwayTransMode } from '../../lib/eway';
 import { preflightEInvoice, preflightEway } from '../../lib/einvoice-validate';
 import { localDb } from '../../lib/localDb';
+import { unitsDb } from '../../lib/units';
 import { readLinks } from '../../lib/documents';
 import { useT } from '../../i18n';
 import { einvT } from '../../i18n/areas/einvoice';
@@ -103,6 +104,8 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
   const [dirty, setDirty] = useState(false);
 
   const fallbackSender = useMemo(() => (invoice.sender ? null : localDb.settings.activeProfile()), [invoice.sender]);
+  // WP-8: user-defined units carry their own UQC (units master).
+  const units = useMemo(() => unitsDb.stored(), []);
   const isExport = (invoice.place_of_supply ?? '') === '99';
   const isNote = invoice.doc_type === 'CREDIT_NOTE' || invoice.doc_type === 'DEBIT_NOTE';
 
@@ -116,11 +119,12 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
       preflightEInvoice(invoice, {
         now,
         fallbackSender,
+        units,
         supplyType: supplyType || undefined,
         preceding: isNote && precNo && precDate ? [{ no: precNo, date: precDate }] : undefined,
         export: isExport ? { countryCode, portCode } : undefined,
       }),
-    [invoice, now, fallbackSender, supplyType, isNote, precNo, precDate, isExport, countryCode, portCode],
+    [invoice, now, fallbackSender, units, supplyType, isNote, precNo, precDate, isExport, countryCode, portCode],
   );
 
   const eway = useMemo(
@@ -128,6 +132,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
       preflightEway(invoice, {
         now,
         fallbackSender,
+        units,
         transport: {
           mode: (meta.transport ?? 'ROAD') as EwayTransMode,
           vehicle: meta.vehicle,
@@ -139,7 +144,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
           docDate: meta.transport_doc_date,
         },
       }),
-    [invoice, now, fallbackSender, meta],
+    [invoice, now, fallbackSender, units, meta],
   );
 
   const metaIssues = useMemo(() => validateMeta(meta), [meta]);

@@ -14,6 +14,7 @@ import { calcInputFromRecord, calculateInvoice, round2, type CalcLine } from './
 import { docCurrency, inrTotals, missingFxRate } from './fx';
 import { stateByCode, stateByName } from './india-states';
 import { getTable, setTable } from './storage';
+import { uqcFor, type UnitMaster } from './units';
 
 /* ── Shared issue type (used by both validators) ───────────────── */
 
@@ -190,6 +191,8 @@ export interface EInvoiceOptions {
   withPayment?: boolean;
   /** Additive (WP-6): leave out EwbDtls (default: included when `invoice.transport` names a vehicle, transporter or LR). */
   withEwb?: boolean;
+  /** Additive (WP-8): the units master (`unitsDb.stored()`): a unit with its own UQC is sent as that UQC. */
+  units?: readonly UnitMaster[];
 }
 
 export interface EInvoiceBuild {
@@ -219,6 +222,15 @@ const UNIT_MAP: Record<string, string> = {
   HRS: 'OTH', HR: 'OTH', DAY: 'OTH', DAYS: 'OTH', MONTH: 'OTH', LOT: 'OTH',
 };
 
+/**
+ * Portal UQC of a line unit (WP-8): the units master's UQC when the unit has one (and it is a portal
+ * code), else the built-in mapping (`mapUnitToUqc`).
+ */
+export function portalUqc(unit: string | undefined, units: readonly UnitMaster[] = []): string {
+  const u = uqcFor(unit, units, mapUnitToUqc);
+  return (UQC_CODES as readonly string[]).includes(u) ? u : mapUnitToUqc(unit);
+}
+
 /** Map the app's free unit text to a portal UQC (falls back to OTH). */
 export function mapUnitToUqc(unit?: string): string {
   const key = (unit ?? '').trim().toUpperCase();
@@ -227,8 +239,9 @@ export function mapUnitToUqc(unit?: string): string {
   return (UQC_CODES as readonly string[]).includes(key) ? key : 'OTH';
 }
 
-/** True when the unit text was not recognised and fell back to OTH by guesswork. */
-export function isUnitGuessed(unit?: string): boolean {
+/** True when the unit text was not recognised and fell back to OTH by guesswork (a units-master UQC is not a guess). */
+export function isUnitGuessed(unit?: string, units: readonly UnitMaster[] = []): boolean {
+  if (units.length && (UQC_CODES as readonly string[]).includes(uqcFor(unit, units, () => ''))) return false;
   const key = (unit ?? '').trim().toUpperCase();
   return !!key && !(key in UNIT_MAP) && !(UQC_CODES as readonly string[]).includes(key);
 }
@@ -496,7 +509,7 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
       IsServc: isServiceHsn(l.hsn) ? 'Y' : 'N',
       HsnCd: l.hsn,
       Qty: Math.round(l.quantity * 1000) / 1000,
-      Unit: mapUnitToUqc(l.unit),
+      Unit: portalUqc(l.unit, options.units),
       UnitPrice: Math.round(unitPrice * 1000) / 1000,
       TotAmt: totAmt,
       Discount: discount,
