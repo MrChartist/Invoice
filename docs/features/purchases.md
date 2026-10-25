@@ -96,9 +96,9 @@ Vendors carry optional `msme_udyam` (`UDYAM-XX-00-0000000`, validated by `valida
   `amount_paid` not backed by payment rows (legacy / imported) is treated as paid on the bill date.
 
 Statutory values (`MSME_PAYMENT_DAYS`, `MSME_43BH_FROM`, `RBI_BANK_RATE_RULES`) live in `src/lib/tax-rules.ts`.
-**TODO (owner / CA):** `RBI_BANK_RATE_RULES` ends with the June 2025 entry (5.75%). Any later RBI policy change has not
-been added because it could not be verified offline — confirm the current Bank Rate and append a dated entry (never edit
-an old one).
+**TODO (owner / CA):** `RBI_BANK_RATE_RULES` ends with the 5 Dec 2025 entry (5.50%). Any later RBI policy change has
+not been added because it could not be verified offline — confirm the current Bank Rate from the RBI notification and
+append a dated entry (never edit an old one).
 `MsmeCard` shows open MSE bills and the 43B(h) totals for the current and previous FY on the Expenses
 page; it renders nothing until a vendor is marked micro or small. Estimates — verify with your CA.
 
