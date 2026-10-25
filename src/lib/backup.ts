@@ -328,6 +328,8 @@ const RECORD_TABLES = [
   'deposit_slips', 'cash_tally',
   // Business extras (WP-9): POS returns, approvals, branches, loyalty, AMC contracts
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
+  // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
+  'gst_setoffs', 'gst_challans', 'hsn_master',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -342,6 +344,7 @@ const ID_TABLES = new Set([
   'groups', 'ledger_openings', 'books_begin', 'opening_bills',
   'deposit_slips', 'cash_tally',
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
+  'gst_setoffs', 'gst_challans', 'hsn_master',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

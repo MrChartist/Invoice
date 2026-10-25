@@ -1,0 +1,116 @@
+/* GST set-off & payment, HSN master, monthly reconciliation, GSTR-9C (WP-6). Tokens only. */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+}
+
+.bar > label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.checks {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.warn {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+}
+
+.info {
+  composes: warn;
+  border-color: var(--border);
+  background: var(--muted);
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.grid th,
+.grid td {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.grid th:first-child,
+.grid td:first-child {
+  text-align: left;
+}
+
+.grid thead th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.grid tfoot td {
+  font-weight: 600;
+}
+
+.scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.cellInput {
+  width: 7rem;
+  text-align: right;
+}
+
+.ok {
+  color: var(--profit);
+}
+
+.bad {
+  color: var(--loss);
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.history {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .cellInput {
+    width: 5.5rem;
+  }
+}

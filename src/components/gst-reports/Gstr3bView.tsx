@@ -4,6 +4,9 @@ import styles from './gst-reports.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { plural } from '../../i18n/areas/plural';
+import { gstT } from '../../i18n/areas/gst';
+import { formatMoney } from '../../lib/utils';
+import surface from '../../styles/surface.module.css';
 
 interface Row {
   table: string;
@@ -31,7 +34,7 @@ const cols = (): Column<Row>[] => [
   opt('sgst'),
 ];
 
-export function Gstr3bView({ report: b }: { report: Gstr3bReport }) {
+export function Gstr3bView({ report: b, onOpenSetOff }: { report: Gstr3bReport; onOpenSetOff?: () => void }) {
   useT();
   const COLS = cols();
   const o = b.outward;
@@ -91,6 +94,17 @@ export function Gstr3bView({ report: b }: { report: Gstr3bReport }) {
       {block(gvT('b4'), t4, '')}
       {block(gvT('b5'), t5, '')}
       {block(gvT('b61'), t61, '')}
+      {onOpenSetOff && (
+        <div className={surface.statGrid} data-3b-liability-card>
+          <div className={surface.stat}>
+            <div className={surface.statTop}><span className={surface.statLabel}>{gvT('liabCashLabel')}</span></div>
+            <div className={surface.statValue}>{formatMoney(p.cash.igst + p.cash.cgst + p.cash.sgst + (p.cess ?? 0))}</div>
+            <div className={surface.statHint}>
+              <button type="button" className={styles.issueLink} style={{ background: 'none', border: 0, cursor: 'pointer', padding: 0 }} onClick={onOpenSetOff}>{gstT('openSetoff')}</button>
+            </div>
+          </div>
+        </div>
+      )}
       <ul className={styles.notes}>
         <li>{gvT('n3bSetoff')}</li>
         <li>{plural(gvT, 'n3bItcOne', 'n3bItcMany', b.purchasesConsidered)}</li>

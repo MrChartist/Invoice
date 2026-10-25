@@ -250,6 +250,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // Banking (WP-5)
   deposit_slips: 'books.edit',
   cash_tally: 'books.edit',
+  // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master
+  gst_setoffs: 'books.edit',
+  gst_challans: 'books.edit',
+  hsn_master: 'master.edit',
   // business extras (WP-9)
   pos_returns: 'doc.create',
   branches: 'master.edit',

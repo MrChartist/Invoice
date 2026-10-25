@@ -62,8 +62,14 @@ const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 // Annual GSTR-9 working paper (5.2) and bulk e-Invoice / e-Way + IRP response import (6.24): loaded on open.
 const Gstr9Modal = lazy(() => import('../components/gst-reports/Gstr9Modal'));
 const BulkEInvoiceModal = lazy(() => import('../components/einvoice/BulkEInvoiceModal'));
+// WP-6 GST depth: set-off & PMT-06 challans, purchase HSN register, monthly 1-vs-3B-vs-books, HSN master, GSTR-9C.
+const SetOffPanel = lazy(() => import('../components/gst-reports/SetOffPanel'));
+const PurchaseHsnView = lazy(() => import('../components/gst-reports/PurchaseHsnView'));
+const ReconMonthly = lazy(() => import('../components/gst-reports/ReconMonthly'));
+const HsnMasterPanel = lazy(() => import('../components/gst-reports/HsnMasterPanel'));
+const Gstr9cView = lazy(() => import('../components/gst-reports/Gstr9cView'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c';
 
 /** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
 const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
@@ -82,9 +88,14 @@ const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
   { id: 'amend', label: 'Amendments', key: 'tabAmend' },
   { id: 'eco', label: 'E-commerce 14', key: 'tabEco' },
   { id: 'gstr3b', label: 'GSTR-3B' },
+  { id: 'setoff', label: 'Set-off & payment', key: 'tabSetoff' },
   { id: 'gstr2b', label: '2B match', key: 'tab2b' },
+  { id: 'purhsn', label: 'Purchase HSN', key: 'tabPurHsn' },
+  { id: 'recon', label: '1 vs 3B vs Books', key: 'tabRecon' },
   { id: 'compliance', label: 'Compliance', key: 'tabCompliance' },
   { id: 'composition', label: 'Composition (CMP-08 / GSTR-4)', key: 'tabComposition' },
+  { id: 'hsnmaster', label: 'HSN master', key: 'tabHsnMaster' },
+  { id: 'gstr9c', label: 'GSTR-9C', key: 'tab9c' },
 ];
 const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0] } | undefined) => (x?.key ? gstT(x.key) : x?.label);
 
@@ -442,7 +453,21 @@ export function GstReports() {
           </Suspense>
         );
       case 'gstr3b':
-        return <Gstr3bView report={g3} />;
+        return <Gstr3bView report={g3} onOpenSetOff={() => setTab('setoff')} />;
+      case 'setoff':
+      case 'purhsn':
+      case 'recon':
+      case 'hsnmaster':
+      case 'gstr9c':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            {tab === 'setoff' && <SetOffPanel report={g3} period={period} gstin={gstin} stateCode={filerStateCode} turnover={lastFyTurnover} notify={notify} />}
+            {tab === 'purhsn' && <PurchaseHsnView period={period} filerStateCode={filerStateCode} />}
+            {tab === 'recon' && <ReconMonthly period={period} gstin={gstin} filerStateCode={filerStateCode} />}
+            {tab === 'hsnmaster' && <HsnMasterPanel notify={notify} />}
+            {tab === 'gstr9c' && <Gstr9cView fyStart={period.fyStart} gstin={gstin} filerStateCode={filerStateCode} turnover={Number(turnover.curGt) || 0} />}
+          </Suspense>
+        );
       case 'gstr2b':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
@@ -599,7 +624,7 @@ export function GstReports() {
         </div>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>
           <div className={local.toolbar}>
-            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' ? '' : ` · ${label}`}</h2>
+            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>

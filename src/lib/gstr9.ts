@@ -443,8 +443,8 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     if (!p || !inFy(p.date, fyStart)) continue;
     const core = readPurchase(raw);
     bills++;
-    const heads: Gstr9Heads = { taxable: 0, igst: p.igst, cgst: p.cgst, sgst: p.sgst, cess: 0 };
-    const tax = round2(p.igst + p.cgst + p.sgst);
+    const heads: Gstr9Heads = { taxable: 0, igst: p.igst, cgst: p.cgst, sgst: p.sgst, cess: p.cess ?? 0 };
+    const tax = round2(p.igst + p.cgst + p.sgst + (p.cess ?? 0));
     const blocked = !p.itcEligible && p.itcReversalReason === 'SEC_17_5';
     const claimed = p.itcEligible || blocked;
 
@@ -593,6 +593,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     sgst: { igst: 0, cgst: 0, sgst: 0 },
   };
   let carry = { igst: 0, cgst: 0, sgst: 0 };
+  let cessItc = 0;
   for (const m of months) {
     const p = m.gstr3b.payment;
     const net = m.gstr3b.itc.net;
@@ -606,8 +607,11 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       pay[k] = round2(pay[k] + p.liability[k] + p.rcLiability[k]);
       cash[k] = round2(cash[k] + so.cash[k]);
     }
-    pay.cess = round2(pay.cess + num(p.cess));
+    // WP-6: cess credit (cess on purchase bills) pays cess only; `cess` is the cash part, `cessLiability` the whole.
+    const cessUsed = num(p.cessItcUsed);
+    pay.cess = round2(pay.cess + num(p.cess) + cessUsed);
     cash.cess = round2(cash.cess + num(p.cess));
+    cessItc = round2(cessItc + cessUsed);
     used.igst.igst = round2(used.igst.igst + so.itcUsed.igst.igst);
     used.igst.cgst = round2(used.igst.cgst + so.itcUsed.igst.cgst);
     used.igst.sgst = round2(used.igst.sgst + so.itcUsed.igst.sgst);
@@ -622,7 +626,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     { id: '9-IGST', label: 'Integrated Tax', payable: pay.igst, cash: cash.igst, itc: { igst: used.igst.igst, cgst: used.cgst.igst, sgst: used.sgst.igst, cess: 0 } },
     { id: '9-CGST', label: 'Central Tax', payable: pay.cgst, cash: cash.cgst, itc: { igst: used.igst.cgst, cgst: used.cgst.cgst, sgst: 0, cess: 0 } },
     { id: '9-SGST', label: 'State / UT Tax', payable: pay.sgst, cash: cash.sgst, itc: { igst: used.igst.sgst, cgst: 0, sgst: used.sgst.sgst, cess: 0 } },
-    { id: '9-CESS', label: 'Cess', payable: pay.cess, cash: cash.cess, itc: { ...noItc }, note: 'Cess is paid in cash (no cess ITC is modelled).' },
+    { id: '9-CESS', label: 'Cess', payable: pay.cess, cash: cash.cess, itc: { ...noItc, cess: cessItc }, note: 'Cess credit (cess on purchase bills) pays cess only, month by month; not carried forward across months here.' },
     { id: '9-INT', label: 'Interest', payable: 0, cash: 0, itc: { ...noItc }, note: 'Not tracked; see the Compliance tab estimates.' },
     { id: '9-LATE', label: 'Late fee', payable: 0, cash: 0, itc: { ...noItc }, note: 'Not tracked; see the Compliance tab estimates.' },
     { id: '9-PEN', label: 'Penalty', payable: 0, cash: 0, itc: { ...noItc } },

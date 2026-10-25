@@ -85,6 +85,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const wasBlocked = purchase?.itc_eligible === false && purchase.itc_reversal_reason === 'SEC_17_5';
   const [blocked, setBlocked] = useState(wasBlocked);
   const [reversed, setReversed] = useState(wasBlocked ? 0 : purchase?.itc_reversed ?? 0);
+  // WP-6: compensation cess on the bill (lump amount, inside the total, claimed as cess credit with the GST).
+  const [cess, setCess] = useState(purchase?.cess_amount ?? 0);
   const [reason, setReason] = useState<ItcReversalReason>(wasBlocked ? 'RULE_42' : purchase?.itc_reversal_reason ?? 'RULE_42');
   const [billable, setBillable] = useState<BillableValue>({
     billable_to_client_id: purchase?.billable_to_client_id,
@@ -124,12 +126,13 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const vendor = vendors.find((v) => v.id === vendorId);
   // Imports always carry IGST (customs IGST for goods, reverse-charge IGST for services); '96' = other country.
   const taxPos = importType ? '96' : pos;
-  const totals = useMemo(
-    () => computePurchaseTotals(lines, { placeOfSupply: taxPos, businessState }),
-    [lines, taxPos, businessState],
-  );
+  const totals = useMemo(() => {
+    const t = computePurchaseTotals(lines, { placeOfSupply: taxPos, businessState });
+    const c = Math.round(Math.max(cess, 0) * 100) / 100;
+    return { ...t, cess: c, total: Math.round((t.total + c) * 100) / 100 };
+  }, [lines, taxPos, businessState, cess]);
   const interState = !!importType || (!!pos && !!businessState && pos !== businessState);
-  const advancedSet = rcm || !!importType || blocked || reversed > 0;
+  const advancedSet = rcm || !!importType || blocked || reversed > 0 || cess > 0;
 
   // Reverse charge / imports: the GST is paid by us to the government, so the supplier is owed only the taxable value.
   const selfTax = rcm || !!importType;
@@ -182,7 +185,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         cgst: totals.cgst,
         sgst: totals.sgst,
         igst: totals.igst,
-        itc_eligible: itc && !blocked && totals.tax > 0,
+        itc_eligible: itc && !blocked && totals.tax + totals.cess > 0,
+        cess_amount: totals.cess > 0 ? totals.cess : undefined,
         reverse_charge: rcm && !importType ? true : undefined,
         import_type: importType || undefined,
         boe_number: importType === 'GOODS' ? boeNumber.trim() || undefined : undefined,
@@ -281,6 +285,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
             <div className={styles.totalRow}><span>SGST</span><span>{formatCurrency(totals.sgst)}</span></div>
           </>
         )}
+        {totals.cess > 0 && <div className={styles.totalRow}><span>{purT('cessRow')}</span><span>{formatCurrency(totals.cess)}</span></div>}
         <div className={styles.totalGrand}><span>{purT('billTotal')}</span><span>{formatCurrency(totals.total)}</span></div>
         {selfTax && totals.tax > 0 && (
           <div className={styles.totalRow}>
@@ -337,6 +342,10 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
               </div>
             </div>
           )}
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor="bill-cess">{purT('cessAmount')}</label>
+            <input id="bill-cess" type="number" min={0} step="0.01" className={controls.input} value={cess || ''} onChange={(e) => setCess(Math.max(Number(e.target.value) || 0, 0))} />
+          </div>
           <label className={controls.check}>
             <input type="checkbox" checked={blocked} onChange={(e) => setBlocked(e.target.checked)} />
             {purT('blockedCheck')}

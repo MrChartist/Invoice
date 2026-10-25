@@ -263,6 +263,18 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.9e | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
 | 7.9f | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
 
+### GST depth & statutory postings (WP-6, `docs/features/gst-setoff.md`)
+
+| # | Item | Tally equivalent | Status |
+|---|------|------------------|--------|
+| 7.30 | ✅ **GST set-off journal** from a GSTR-3B period (P0-6): liability vs ITC vs cash by head, date-keyed utilisation order (Rule 88A / Sec 49A / original Sec 49(5), `GST_SETOFF_RULES`), Sec 50 interest + Sec 47 late fee estimates, Rule 86B warning; posted through `saveVoucher` (Dr Output / RCM payable / interest / late fee, Cr Input, Cr GST electronic cash ledger 2360); one journal per period × GSTIN (`src/lib/gst-setoff.ts`, "Set-off & payment" tab) | GST adjustment / Set Off of GST | done |
+| 7.31 | ✅ **PMT-06 challans** (`gst_challans`): CPIN, CIN / BRN, mode, bank ledger, major × minor head grid; deposit posts Dr electronic cash ledger / Cr bank; cash ledger balance by head, shortfall and "challan for the shortfall"; "Liability to be paid" card on the GSTR-3B tab | Stat Payment | done |
+| 7.32 | ✅ **Cess on purchase bills** (`cess_amount`): GSTR-3B 4A / 4C / 3.1(d) cess, cess credit against output cess only, GSTR-9 Tables 6 / 9, Input cess ledger posting | GST cess on purchases | done |
+| 7.33 | ✅ **e-Invoice ShipDtls / DispDtls / PayDtls / EwbDtls** from `invoice.ship_to`, a dispatch option, the sender's bank details and `invoice.transport` | e-Invoice with dispatch / ship-to / e-Way | done |
+| 7.34 | ✅ **HSN master** with dated rate history and default-rate inheritance (item → HSN → group → company), seeded from existing documents; **purchase HSN / rate register** (`hsn-master.ts`, `hsn-purchase-register.ts`) | GST Rate Setup, HSN-wise purchase summary | done |
+| 7.35 | ✅ **Month-wise GSTR-1 vs GSTR-3B vs Books** reconciliation and a **GSTR-9C working paper** (Tables 5 / 7 / 9 / 12 with adjustments) (`gst-recon-monthly.ts`, `gstr9c.ts`) | Reconciliation of Returns | done |
+| 7.36 | ⏳ WP-6 follow-ups: HSN-master defaults in the line editors, cess in Books `gstSummary` / accounting + Tally exports, ITC carry-forward into the next month's plan, PMT-09 / refunds, RCM self-invoice + Rule 52 voucher series, IFF JSON, EXPA, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

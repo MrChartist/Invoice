@@ -59,7 +59,8 @@ export const gvT = defineArea(
     n3bAdvances: '3.1(a) includes advances (GSTR-1 Table 11): tax on advances received {recTax} on {recTaxable}, less advances adjusted or refunded {adjTax} on {adjTaxable}. 3.2 is not adjusted for advances.',
     n3bOutwardRcm: 'Outward supplies of {amount} where the recipient pays tax under reverse charge are in GSTR-1 (B2B, RC = Y) but excluded from 3.1.',
     n3bExcessCredit: 'Credit notes exceed sales on some heads (IGST {igst}, CGST {cgst}, SGST {sgst}); the excess cannot be set off this month.',
-    n3bNoInterest: 'Interest and late fee are not computed.',
+    n3bNoInterest: 'Interest and late fee are not part of this table; the Set-off & payment tab estimates them.',
+    liabCashLabel: 'Liability to be paid in cash (tax + cess)',
 
     stOverdue: 'Overdue',
     stDueSoon: 'Due soon',
@@ -256,7 +257,8 @@ export const gvT = defineArea(
     n3bAdvances: '3.1(a) में अग्रिम शामिल हैं (GSTR-1 Table 11): प्राप्त अग्रिम {recTaxable} पर टैक्स {recTax}, घटाएँ समायोजित या वापस किए गए अग्रिम {adjTaxable} पर टैक्स {adjTax}। 3.2 में अग्रिमों का समायोजन नहीं होता।',
     n3bOutwardRcm: '{amount} की वे बाहरी आपूर्तियाँ, जिन पर प्राप्तकर्ता रिवर्स चार्ज में टैक्स देता है, GSTR-1 (B2B, RC = Y) में हैं पर 3.1 में शामिल नहीं।',
     n3bExcessCredit: 'कुछ हेड पर क्रेडिट नोट बिक्री से ज़्यादा हैं (IGST {igst}, CGST {cgst}, SGST {sgst}); अतिरिक्त राशि इस महीने सेट-ऑफ़ नहीं हो सकती।',
-    n3bNoInterest: 'ब्याज और लेट फ़ीस की गणना नहीं होती।',
+    n3bNoInterest: 'ब्याज और लेट फ़ीस इस तालिका में नहीं हैं; सेट-ऑफ़ और भुगतान टैब इनका अनुमान लगाता है।',
+    liabCashLabel: 'नकद में देय देयता (कर + सेस)',
 
     stOverdue: 'समय सीमा पार',
     stDueSoon: 'जल्द देय',

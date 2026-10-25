@@ -424,3 +424,30 @@ test('branches (WP-9) read the real purchase shape: branch_id, then place of sup
   assert.equal(branchOfPurchase({ ...bill, branch_id: 'x' }, branches), 'x');
   assert.equal(branchSummary(branches, [], [bill])[0].purchases, 1000);
 });
+
+test('WP-6 readers: cess on bills, purchase HSN register and the monthly 1-vs-3B-vs-books reconciliation', async () => {
+  const { purchaseHsnRegister } = await import('../src/lib/hsn-purchase-register.ts');
+  const { reconMonthly } = await import('../src/lib/gst-recon-monthly.ts');
+  const { buildLedger, A, trialBalance } = await import('../src/lib/ledger/index.ts');
+  const { EMPTY_BOOKS } = await import('../src/lib/books.ts');
+  // Additive cess_amount: read once, outside the GST total; readers that ignore cess still see the same bill.
+  const cessBill: PurchaseRecord = { ...bill, id: 'pc', cess_amount: 50, total: 1230 };
+  assert.equal(readPurchase(cessBill)!.cess, 50);
+  assert.equal(readPurchase(bill)!.cess, 0);
+  assert.equal(gstNormalize(cessBill, '27')!.cess, 50);
+  assert.equal(gstNormalize(bill, '27')!.cess, undefined);
+  assert.equal(booksNormalize(cessBill as never, [])!.total, 1230);
+  // The ledger debits Input cess (2353) for an ITC bill, so nothing lands in round-off.
+  const ledger = buildLedger({ ...EMPTY_BOOKS, purchases: [cessBill] as never, vendors: [], userAccounts: [], manual: [], assets: [], today: '2026-04-30' });
+  const tb = trialBalance(ledger, { start: '2026-04-01', end: '2026-04-30' });
+  assert.equal(tb.rows.find((r) => r.account.id === A.inCess)!.debit, 5000);
+  assert.equal(tb.rows.find((r) => r.account.id === A.roundOff), undefined);
+  // HSN register: lines → HSN × rate, bill heads spread over lines.
+  const reg = purchaseHsnRegister([cessBill, { ...bill, id: 'd', status: 'Draft' } as never], { from: '2026-04-01', to: '2026-04-30', filerStateCode: '27' });
+  assert.equal(reg.billsConsidered, 1);
+  assert.deepEqual(reg.rows.map((r) => [r.hsn, r.rate, r.uqc, r.qty, r.taxable, r.cgst, r.sgst, r.cess]), [['4802', 18, 'NOS', 10, 1000, 90, 90, 50]]);
+  // Monthly reconciliation reads purchases through buildGstReport: April ITC = 90 + 90 + 50.
+  const rows = reconMonthly([], [cessBill], { fyStart: 2026, upTo: '2026-04-30' });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].itc3b, 230);
+});

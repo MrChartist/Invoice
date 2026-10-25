@@ -33,7 +33,9 @@ export type AuditEntity =
   | 'godown'
   | 'purchase_order'
   | 'stock_adjustment'
-  | 'pos_day_close';
+  | 'pos_day_close'
+  /** GST set-off journals, PMT-06 challans and the HSN master (WP-6). */
+  | 'gst';
 
 export type AuditAction =
   | 'create'
@@ -178,4 +180,5 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   purchase_order: 'Purchase orders',
   stock_adjustment: 'Stock adjustments',
   pos_day_close: 'POS day close',
+  gst: 'GST set-off / challan',
 };

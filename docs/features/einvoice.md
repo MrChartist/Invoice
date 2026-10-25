@@ -103,4 +103,5 @@ Exported symbols: `bulkCandidates`, `buildBulkEInvoice`, `buildBulkEway`, `parse
 
 - GSTIN checks are structure + checksum; registration status is not verified (offline).
 - NIC may change schema details; version strings are in `EInvoicePayload.Version` and `EWAY_VERSION`.
-- Not generated: payment details (`PayDtls`), ship-to (`ShipDtls`), dispatch-from (`DispDtls`) on the e-Invoice, cess, advance/ref docs other than preceding invoice.
+- WP-6 (`gst-setoff.md`): `ShipDtls` from `invoice.ship_to`, `DispDtls` from the `dispatch` option, `PayDtls` from the sender's bank details / terms / due date (opt out: `withPayment: false`) and `EwbDtls` from `invoice.transport` (opt out: `withEwb: false`) are now generated. Field names / limits per NIC schema v1.1 as best known — verify. The e-Invoice modal has no dispatch-from form yet (option only).
+- Not generated: advance/ref docs other than preceding invoice.
