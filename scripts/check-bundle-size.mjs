@@ -25,7 +25,10 @@ const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // cost centres, composition, companies, vault…): every feature is a lazy page/tab chunk, and the
 // shell was trimmed at the same time (backup actions, Forgot-PIN erase loaded on demand), so first
 // paint stays under the unchanged 185 kB initial budget.
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 900);
+// Raised to 1150 for 5.4 round 2 (Hindi strings live beside English in each lazy area chunk) and the
+// Phase 7 Tally-parity modules (payroll, manufacturing, TDS, gateway, reports engine): all lazy, first
+// paint unchanged; this is the one-time offline precache (~1 MB gz for the whole app).
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 1150);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 // De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.
