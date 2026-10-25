@@ -30,15 +30,18 @@ export interface NotificationBellProps {
 }
 
 /**
- * Batch expiry alerts (6.6) need the stock engine: load that provider lazily, and only once some
- * stock item tracks batches, so simple users never download it.
+ * Batch expiry (6.6) and reorder (Phase 7) alerts need the stock engine: load that provider lazily,
+ * and only once some stock item tracks batches or has a reorder level, so simple users never download it.
  */
 let expiryAlerts: 'off' | 'loading' | 'on' = 'off';
 function ensureExpiryAlerts(onReady: () => void): void {
   if (expiryAlerts !== 'off') return;
   try {
-    const items = getTable<{ track_stock?: boolean; track_batches?: boolean }>('stock_items');
-    if (!items.some((i) => i.track_stock && i.track_batches)) return;
+    const items = getTable<{ track_stock?: boolean; track_batches?: boolean; reorder_level?: number; reorder_by_godown?: Record<string, number> }>('stock_items');
+    // Batch expiry (6.6) and reorder-level (Phase 7) alerts share one lazily loaded provider.
+    const wants = (i: (typeof items)[number]) =>
+      i.track_batches || Number(i.reorder_level) > 0 || Object.values(i.reorder_by_godown ?? {}).some((v) => Number(v) > 0);
+    if (!items.some((i) => i.track_stock && wants(i))) return;
   } catch {
     return;
   }

@@ -198,6 +198,14 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   Maharashtra February rule) and TDS u/s 192 projections (both regimes) from date-keyed rules; finalizing posts a
   Payroll voucher (`PRL/FY/…`) to the ledger, salary / statutory payments clear the payables; payslips, pay sheet,
   attendance register, PF ECR, ESI, PT, Form 24Q and Form 16 Part B working papers (`docs/features/payroll.md`).
+- **Manufacturing & stock vouchers** (`/manufacturing`, Tally parity): Bills of Materials (components per unit,
+  scrap %, by-products / co-products / scrap, several per item with a default), Manufacturing Journal
+  `MFG/FY26-27/0001` (components from the BOM, FEFO batch split, labour / power / overhead as ₹ or %, finished goods
+  valued at component cost + additional − by-product / scrap value), Stock Journal `SJ/…` for conversions and
+  repacking (godown-only moves stay STR transfers), Physical Stock `PHY/…` (counted vs book, shortage / excess posted
+  on the date), reorder levels + minimum order qty (per godown optional) with a Reorder Status that raises a purchase
+  order and a bell alert, and Stock Summary drill-down, Movement Analysis, Stock Ageing and Negative-stock reports.
+  Stock only: nothing posts to Books or the ledger (`docs/features/manufacturing.md`).
 - **Controls**: audit trail of every change with a tamper-evident hash chain and exportable head hash; "lock books up
   to" period lock enforced in the data layer with PIN-guarded, audited overrides.
 
@@ -269,6 +277,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - No direct portal / IRP / bank / payment-gateway connection (by design: no server).
 - Several bank accounts reconcile separately (BRS, statements, receipts and supplier payments name their account), but
   the Books bank book and the ledger keep one Bank total; cheques clear into the main account.
+- Manufacturing / stock journals move stock value only; additional costs are expensed when paid, and nothing
+  is posted to the ledger (no WIP or stock-in-hand voucher; closing stock is valued at report time). Serial-tracked items cannot be manufactured yet; job work
+  (Tally job work in / out, ITC-04) is not built.
 - Closing stock is now valued at report time (inventory FIFO / weighted average, or a typed figure) in the Trading
   account, P&L and balance sheet; it is not posted as a voucher. Fixed-asset disposals are not handled automatically —
   post them with a journal voucher. Realised exchange differences are posted automatically when a receipt carries its realised rate;
@@ -277,7 +288,7 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   and Tally; the self-assessed tax sits on "GST payable — reverse charge" / "IGST payable on imports" until cleared.
 - Exchange gain/loss is computed only for receipts where the realised rate is entered (no automatic FX rates — no
   server). GST always uses the invoice-date rate; exchange differences never change GST figures.
-- Cheques link to a single invoice / bill; clearing does not auto-record against foreign-currency invoices. The
+- A cheque can be allocated across several invoices / bills (WP-5); clearing does not auto-record against foreign-currency invoices. The
   cash-flow forecast is an estimate from due dates, payment history, bills, cheques and schedules (taxes, loans and
   salaries only when entered as bills).
 - Local user roles are convenience access control on one browser, not security; a viewer's secondary controls on

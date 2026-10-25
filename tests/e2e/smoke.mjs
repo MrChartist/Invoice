@@ -730,6 +730,52 @@ try {
     await writeJson(page, 'purchases', prevPurchases);
   });
 
+  await step('manufacturing: BOM, then manufacture 2 units; finished stock +2, components reduced', async () => {
+    const prevStock = await readJson(page, 'stock_items', null);
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [
+      item('e2e-leg', 'E2E Leg', { opening_qty: 20, opening_rate: 30 }),
+      item('e2e-top', 'E2E Top', { opening_qty: 5, opening_rate: 200 }),
+      item('e2e-table', 'E2E Table'),
+    ]);
+    await page.goto(srv.origin + '/manufacturing?tab=boms');
+    await page.getByRole('button', { name: 'New BOM' }).click();
+    await page.getByLabel('Finished item').selectOption({ label: 'E2E Table' });
+    await page.getByLabel('Component Line 1 item').selectOption({ label: 'E2E Leg (NOS)' });
+    await page.getByLabel('Component Line 1 quantity').fill('4');
+    await page.getByLabel('Component Line 1 quantity').press('Enter');
+    await page.getByLabel('Component Line 2 item').selectOption({ label: 'E2E Top (NOS)' });
+    await page.getByLabel('Component Line 2 quantity').fill('1');
+    await page.keyboard.press('Control+Enter');
+    await page.getByText('BOM "Standard" saved').waitFor();
+    // The app commits to IndexedDB a moment later: wait for it before reloading the page.
+    await readJson(page, 'boms', [], (v) => v.length === 1);
+
+    await page.goto(srv.origin + '/manufacturing?tab=mfg');
+    await page.getByRole('button', { name: 'New manufacturing journal' }).click();
+    await page.getByLabel('Finished item').selectOption({ label: 'E2E Table' });
+    const qty = page.getByLabel(/Quantity to manufacture/);
+    await qty.fill('2');
+    await qty.blur();
+    check((await page.getByLabel('Component Line 1 quantity').inputValue()) === '8', 'components are filled from the default BOM for 2 units');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByText(/MFG\/FY\d\d-\d\d\/0001 saved/).waitFor();
+    const vouchers = await readJson(page, 'manufacturing_vouchers', [], (v) => v.length > 0);
+    // 8 legs × ₹30 + 2 tops × ₹200 = ₹640.
+    check(vouchers.length === 1 && vouchers[0].qty === 2 && vouchers[0].cost_snapshot?.finished === 640,
+      `the manufacturing journal is saved with its cost (${vouchers[0]?.cost_snapshot?.finished})`);
+
+    await page.goto(srv.origin + '/manufacturing?tab=reports');
+    const row = (name) => page.getByRole('row').filter({ has: page.getByRole('button', { name, exact: true }) });
+    await row('E2E Table').waitFor();
+    check(/\b2 NOS\b/.test(await row('E2E Table').innerText()), 'stock summary: finished goods +2');
+    check(/\b12 NOS\b/.test(await row('E2E Leg').innerText()) && /\b3 NOS\b/.test(await row('E2E Top').innerText()), 'stock summary: components reduced (legs 20 → 12, tops 5 → 3)');
+
+    await writeJson(page, 'manufacturing_vouchers', null);
+    await writeJson(page, 'boms', null);
+    await writeJson(page, 'stock_items', prevStock);
+  });
+
   await step('POS: typed barcode, split cash + UPI, bill saved Paid, Z report shows the totals', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));

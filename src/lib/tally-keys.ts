@@ -7,8 +7,7 @@
  *    Ctrl/Alt combos (forms such as the voucher screen handle their own keys and preventDefault);
  *  - never fires on /pos (POS owns F2–F10) or while a modal dialog is open;
  *  - entries the signed-in role cannot use are skipped;
- *  - an entry without a route (Stock journal, Physical stock) is a ready hook that does nothing until
- *    its screen exists.
+ *  - an entry without a route is a ready hook that does nothing until its screen exists.
  */
 import type { AccessAction } from './access';
 import { matchesEvent, parseCombo } from '../hooks/useHotkeys';
@@ -53,8 +52,9 @@ export const TALLY_KEYS: readonly TallyKey[] = [
   { id: 'purchase', combo: 'f9', to: '/expenses?new=bill', need: 'books.edit' },
   { id: 'creditNote', combo: 'mod+f8', to: '/invoice?type=CREDIT_NOTE', need: 'doc.create' },
   { id: 'debitNote', combo: 'mod+f9', to: '/invoice?type=DEBIT_NOTE', need: 'doc.create' },
-  { id: 'stockJournal', combo: 'alt+f7', to: null, need: 'books.edit' },
-  { id: 'physicalStock', combo: 'mod+f7', to: null, need: 'books.edit' },
+  // Alt+F7 opens the stock vouchers (Stock / Manufacturing Journal), Ctrl+F7 Physical Stock (Phase 7, /manufacturing).
+  { id: 'stockJournal', combo: 'alt+f7', to: '/manufacturing?tab=journal', need: 'books.edit' },
+  { id: 'physicalStock', combo: 'mod+f7', to: '/manufacturing?tab=physical', need: 'books.edit' },
   { id: 'features', combo: 'f11', to: '/settings?tab=defaults' },
   { id: 'configure', combo: 'f12', to: '/settings' },
   { id: 'goto', combo: 'alt+g', to: '/gateway', state: { tally: 'goto' } },

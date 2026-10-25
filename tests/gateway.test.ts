@@ -140,8 +140,8 @@ test('Tally keys route F-keys outside fields, never inside inputs, on /pos or un
   assert.equal(resolveTallyKey(key('/', { ctrlKey: true }), ctx)?.id, 'help');
   assert.equal(resolveTallyKey(key('F12'), ctx)?.to, '/settings');
   assert.equal(resolveTallyKey(key('F5', { shiftKey: true }), ctx), null);
-  assert.equal(resolveTallyKey(key('F7', { altKey: true }), ctx), null, 'Stock journal hook waits for its screen');
-  assert.equal(resolveTallyKey(key('F7', { ctrlKey: true }), ctx), null, 'Physical stock hook waits for its screen');
+  assert.equal(resolveTallyKey(key('F7', { altKey: true }), ctx)?.to, '/manufacturing?tab=journal', 'Alt+F7 opens the stock journal (Phase 7)');
+  assert.equal(resolveTallyKey(key('F7', { ctrlKey: true }), ctx)?.to, '/manufacturing?tab=physical', 'Ctrl+F7 opens physical stock (Phase 7)');
   assert.equal(resolveTallyKey(key('a'), ctx), null);
 
   assert.equal(resolveTallyKey(key('F5'), { pathname: '/', typing: true }), null, 'not while typing');

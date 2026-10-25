@@ -23,11 +23,16 @@ import { requireAccess } from './access';
 import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { grnCoverage, loadReturnStockDocs, returnStockEvents, type ReturnStockDocs } from './events-returns';
+import type {
+  ManufacturingVoucher, PhysicalStockVoucher, StockJournal, VoucherOutputLine, VoucherStockLine,
+} from '../types/manufacturing';
 
 /* ── Types ───────────────────────────────────────────────────── */
 
 export type CostingMethod = 'WEIGHTED_AVG' | 'FIFO';
-export type MoveKind = 'opening' | 'sale' | 'purchase' | 'adjustment' | 'return' | 'transfer';
+export type MoveKind = 'opening' | 'sale' | 'purchase' | 'adjustment' | 'return' | 'transfer'
+  /** Phase 7: components issued / goods produced by a Manufacturing Journal or Stock Journal. */
+  | 'consumption' | 'production';
 export type StockStatus = 'untracked' | 'negative' | 'out' | 'low' | 'ok';
 
 export interface StockItem {
@@ -61,6 +66,11 @@ export interface StockItem {
    * under an old name still match it (`buildItemIndex`). A current name always wins over an alias.
    */
   aliases?: string[];
+  /* ── Reorder (Phase 7); absent = none ── */
+  /** Minimum order quantity: a suggested order is never smaller than this. */
+  min_order_qty?: number;
+  /** Optional reorder level per godown id (multi-godown businesses). */
+  reorder_by_godown?: Record<string, number>;
 }
 
 export interface StockMove {
@@ -142,6 +152,9 @@ export interface LedgerRow {
   balance: number;
   /** Running stock value after this row. */
   value: number;
+  /** Additive (Phase 7): party of the source document, and its number. */
+  party?: string;
+  refNumber?: string;
 }
 
 export interface StockPosition {
@@ -160,6 +173,9 @@ export interface StockPosition {
   returnedQty: number;
   adjustedInQty: number;
   adjustedOutQty: number;
+  /** Phase 7: units issued to / received from manufacturing and stock journals. */
+  consumedQty: number;
+  producedQty: number;
   status: StockStatus;
   isLow: boolean;
   isNegative: boolean;
@@ -194,6 +210,27 @@ export interface StockInputs {
   links?: { from_id: string; to_id: string; relation: string; reason?: string }[];
   /** WP-3 event source (events-returns.ts): receipt notes, rejections out, purchase returns. */
   returnDocs?: ReturnStockDocs;
+  /** Manufacturing / stock journal / physical stock vouchers (Phase 7), see `stockVoucherInputs`. */
+  vouchers?: StockVoucherInput[];
+}
+
+/**
+ * Engine view of a stock voucher. Consumption lines are issued at cost (FIFO / weighted average);
+ * production lines are received at the pooled cost:
+ *   pool = consumed cost + extraAmount + extraPct % of consumed cost − Σ fixed-rate lines (by-product, scrap)
+ * Lines with `cost_pct` take that share of the pool; the remaining share goes to lines with neither a
+ * rate nor a share, split by quantity. `adjust` lines (physical stock) are signed adjustments.
+ */
+export interface StockVoucherInput {
+  id: string;
+  number: string;
+  date: string;
+  type: 'manufacturing' | 'stock_journal' | 'physical';
+  consume: VoucherStockLine[];
+  produce: VoucherOutputLine[];
+  adjust?: { item_id: string; qty: number; godown_id?: string; batch_no?: string; rate?: number }[];
+  extraAmount?: number;
+  extraPct?: number;
 }
 
 const EPS = 1e-9;
@@ -301,6 +338,13 @@ export interface StockEvent {
   party?: string;
   /** Warranty months given on a sale line. */
   warrantyMonths?: number;
+  /* Stock vouchers (Phase 7). */
+  /** Voucher id for consumption / production events. */
+  voucher?: string;
+  /** Production: share of the voucher's pooled cost (undefined = fixed `rate`). */
+  share?: number;
+  /** Production: the voucher's extra cost and fixed-value deductions. */
+  pool?: { amount: number; pct: number; fixed: number };
 }
 
 function dayOf(d: unknown): string {
@@ -309,6 +353,8 @@ function dayOf(d: unknown): string {
 
 function rankFor(kind: MoveKind, qty: number): number {
   if (kind === 'opening') return 0;
+  // Vouchers run after the day's receipts and before its issues; their own order comes from `seq`.
+  if (kind === 'consumption' || kind === 'production') return 1.5;
   // A sales return follows the sale it reverses, even on the same day (serials come back in stock).
   if (kind === 'return') return 3;
   return qty >= 0 ? 1 : 2;
@@ -349,10 +395,10 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
   const out = new Map<string, StockEvent[]>();
   const index = buildItemIndex(items.filter((i) => i.track_stock));
   let seq = 0;
-  const push = (itemId: string, ev: Omit<StockEvent, 'seq' | 'rank' | 'godown'> & { godown?: string }) => {
+  const push = (itemId: string, ev: Omit<StockEvent, 'seq' | 'rank' | 'godown'> & { godown?: string; rank?: number }) => {
     if (asOf && ev.date > asOf) return;
     const list = out.get(itemId) ?? [];
-    list.push({ ...ev, godown: ev.godown || MAIN_GODOWN_ID, rank: rankFor(ev.kind, ev.qty), seq: seq++ });
+    list.push({ ...ev, godown: ev.godown || MAIN_GODOWN_ID, rank: ev.rank ?? rankFor(ev.kind, ev.qty), seq: seq++ });
     out.set(itemId, list);
   };
 
@@ -480,6 +526,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
   }
 
   returnStockEvents(input.returnDocs, purchases, index, push); // WP-3 event source
+  pushVoucherEvents(input.vouchers ?? [], byId, push);
 
   if (input.includeTransfers) {
     for (const t of input.transfers ?? []) {
@@ -502,6 +549,68 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     list.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.rank - b.rank || a.seq - b.seq));
   }
   return out;
+}
+
+const VOUCHER_LABEL: Record<StockVoucherInput['type'], string> = {
+  manufacturing: 'Manufacturing', stock_journal: 'Stock journal', physical: 'Physical stock',
+};
+
+/** Shares of the pooled cost per production line (index-aligned; undefined = fixed rate). */
+export function productionShares(lines: readonly Pick<VoucherOutputLine, 'qty' | 'rate' | 'cost_pct'>[]): (number | undefined)[] {
+  const isFixed = (l: Pick<VoucherOutputLine, 'rate' | 'cost_pct'>) => num(l.rate) > 0 && !(num(l.cost_pct) > 0);
+  const pctTotal = lines.reduce((s, l) => s + (isFixed(l) ? 0 : Math.max(num(l.cost_pct), 0)), 0);
+  const rest = Math.max(0, 1 - pctTotal / 100);
+  const restQty = lines.reduce((s, l) => s + (!isFixed(l) && !(num(l.cost_pct) > 0) ? Math.max(num(l.qty), 0) : 0), 0);
+  return lines.map((l) => {
+    if (isFixed(l)) return undefined;
+    if (num(l.cost_pct) > 0) return Math.max(num(l.cost_pct), 0) / 100;
+    return restQty > EPS ? (rest * Math.max(num(l.qty), 0)) / restQty : 0;
+  });
+}
+
+type PushFn = (itemId: string, ev: Omit<StockEvent, 'seq' | 'rank' | 'godown'> & { godown?: string; rank?: number }) => void;
+
+function pushVoucherEvents(vouchers: readonly StockVoucherInput[], byId: Map<string, StockItem>, push: PushFn): void {
+  const sorted = [...vouchers].sort((a, b) => dayOf(a.date).localeCompare(dayOf(b.date)) || a.number.localeCompare(b.number, undefined, { numeric: true }));
+  for (const v of sorted) {
+    const date = dayOf(v.date);
+    if (!date) continue;
+    const label = `${VOUCHER_LABEL[v.type]} — ${v.number}`;
+    const refType = v.type === 'manufacturing' ? 'manufacturing' : v.type === 'stock_journal' ? 'stock_journal' : 'physical_stock';
+    const base = { date, refType, refId: v.id, refNumber: v.number, party: VOUCHER_LABEL[v.type] };
+    const tracked = (id: string) => {
+      const it = byId.get(id);
+      return it && it.track_stock ? it : undefined;
+    };
+    for (const l of v.consume) {
+      const q = num(l.qty);
+      if (!tracked(l.item_id) || q <= 0) continue;
+      push(l.item_id, {
+        ...base, kind: 'consumption', qty: -q, particulars: `${label} (consumed)`, voucher: v.id,
+        godown: l.godown_id, batch: l.batch_no || undefined,
+      });
+    }
+    const produce = v.produce.filter((l) => tracked(l.item_id) && num(l.qty) > 0);
+    const shares = productionShares(produce);
+    const fixed = produce.reduce((s, l, i) => s + (shares[i] === undefined ? num(l.qty) * num(l.rate) : 0), 0);
+    const pool = { amount: Math.max(num(v.extraAmount), 0), pct: Math.max(num(v.extraPct), 0), fixed };
+    produce.forEach((l, i) => {
+      push(l.item_id, {
+        ...base, kind: 'production', qty: num(l.qty), particulars: `${label} (produced)`, voucher: v.id,
+        rate: shares[i] === undefined ? num(l.rate) : undefined, share: shares[i], pool,
+        godown: l.godown_id, batch: l.batch_no || undefined, mfg: l.mfg_date || undefined, expiry: l.expiry_date || undefined,
+      });
+    });
+    for (const a of v.adjust ?? []) {
+      const q = num(a.qty);
+      if (!tracked(a.item_id) || Math.abs(q) < EPS) continue;
+      // Physical stock is the closing count of its day: after every other movement that day.
+      push(a.item_id, {
+        ...base, kind: 'adjustment', qty: q, rank: 4, particulars: `${label} (${q > 0 ? 'excess' : 'shortage'})`,
+        rate: q > 0 && num(a.rate) > 0 ? num(a.rate) : undefined, godown: a.godown_id, batch: a.batch_no || undefined,
+      });
+    }
+  }
 }
 
 /** Trimmed, non-empty serials, or undefined when there are none. */
@@ -610,87 +719,190 @@ function roundQty(n: number): number {
 function emptyPosition(item: StockItem): StockPosition {
   return {
     item, qty: 0, value: 0, avgCost: 0, purchasedQty: 0, purchasedValue: 0, soldQty: 0, revenue: 0,
-    cogs: 0, returnedQty: 0, adjustedInQty: 0, adjustedOutQty: 0,
+    cogs: 0, returnedQty: 0, adjustedInQty: 0, adjustedOutQty: 0, consumedQty: 0, producedQty: 0,
     status: item.track_stock ? 'out' : 'untracked', isLow: false, isNegative: false,
     lastMovement: '', ledger: [],
   };
 }
 
-function runItem(item: StockItem, events: StockEvent[], method: CostingMethod): StockPosition {
+interface ItemRunner {
+  /** Process one event; returns the cost of goods issued (0 for receipts). */
+  step(ev: StockEvent): number;
+  finish(): StockPosition;
+}
+
+function itemRunner(item: StockItem, method: CostingMethod): ItemRunner {
   const c = method === 'FIFO' ? fifo() : weightedAverage();
   const pos = emptyPosition(item);
   let lastIssueUnit: number | undefined;
+  let i = 0;
 
-  events.forEach((ev, i) => {
-    // Transfers move stock between godowns: company-wide quantity and value are unchanged.
-    if (ev.kind === 'transfer') return;
-    const q = Math.abs(ev.qty);
-    let rate: number;
-    let amount: number;
-    if (ev.qty > 0) {
-      if (ev.kind === 'return') rate = ev.rate ?? lastIssueUnit ?? c.unit();
-      else if (ev.kind === 'opening') rate = ev.rate ?? 0;
-      else rate = ev.rate ?? c.unit();
-      c.receive(q, rate);
-      amount = q * rate;
-      if (ev.kind === 'purchase') {
-        pos.purchasedQty += q;
-        pos.purchasedValue += amount;
-      } else if (ev.kind === 'return') {
-        pos.returnedQty += q;
-        // A return reverses the sale: net units, revenue and COGS shrink.
-        pos.soldQty -= q;
-        pos.revenue -= q * (ev.saleRate ?? 0);
-        pos.cogs -= amount;
-      } else if (ev.kind === 'adjustment') pos.adjustedInQty += q;
-    } else {
-      const cost = c.issue(q);
-      amount = cost;
-      rate = q > 0 ? cost / q : 0;
-      lastIssueUnit = rate;
-      if (ev.kind === 'adjustment') pos.adjustedOutQty += q;
-      else {
-        pos.soldQty += q;
-        pos.revenue += q * (ev.saleRate ?? 0);
-        pos.cogs += cost;
+  return {
+    step(ev) {
+      const n = i++;
+      // Transfers move stock between godowns: company-wide quantity and value are unchanged.
+      if (ev.kind === 'transfer') return 0;
+      const q = Math.abs(ev.qty);
+      let rate: number;
+      let amount: number;
+      let issued = 0;
+      if (ev.qty > 0) {
+        if (ev.kind === 'return') rate = ev.rate ?? lastIssueUnit ?? c.unit();
+        else if (ev.kind === 'opening') rate = ev.rate ?? 0;
+        else rate = ev.rate ?? c.unit();
+        c.receive(q, rate);
+        amount = q * rate;
+        if (ev.kind === 'purchase') {
+          pos.purchasedQty += q;
+          pos.purchasedValue += amount;
+        } else if (ev.kind === 'return') {
+          pos.returnedQty += q;
+          // A return reverses the sale: net units, revenue and COGS shrink.
+          pos.soldQty -= q;
+          pos.revenue -= q * (ev.saleRate ?? 0);
+          pos.cogs -= amount;
+        } else if (ev.kind === 'adjustment') pos.adjustedInQty += q;
+        else if (ev.kind === 'production') pos.producedQty += q;
+      } else {
+        const cost = c.issue(q);
+        issued = cost;
+        amount = cost;
+        rate = q > 0 ? cost / q : 0;
+        lastIssueUnit = rate;
+        if (ev.kind === 'adjustment') pos.adjustedOutQty += q;
+        // Components consumed by a voucher are not sales: their cost moves into the produced goods.
+        else if (ev.kind === 'consumption') pos.consumedQty += q;
+        else {
+          pos.soldQty += q;
+          pos.revenue += q * (ev.saleRate ?? 0);
+          pos.cogs += cost;
+        }
       }
-    }
-    if (ev.kind !== 'opening' && ev.date > pos.lastMovement) pos.lastMovement = ev.date;
-    pos.ledger.push({
-      key: `${i}-${ev.refId ?? ev.kind}`,
-      date: ev.date === OPENING_DATE ? '' : ev.date,
-      kind: ev.kind,
-      particulars: ev.particulars,
-      refType: ev.refType,
-      refId: ev.refId,
-      qtyIn: ev.qty > 0 ? q : 0,
-      qtyOut: ev.qty < 0 ? q : 0,
-      rate: round2(rate),
-      amount: round2(amount),
-      balance: roundQty(c.qty()),
-      value: round2(c.value()),
-    });
-  });
+      if (ev.kind !== 'opening' && ev.date > pos.lastMovement) pos.lastMovement = ev.date;
+      pos.ledger.push({
+        key: `${n}-${ev.refId ?? ev.kind}`,
+        date: ev.date === OPENING_DATE ? '' : ev.date,
+        kind: ev.kind,
+        particulars: ev.particulars,
+        refType: ev.refType,
+        refId: ev.refId,
+        qtyIn: ev.qty > 0 ? q : 0,
+        qtyOut: ev.qty < 0 ? q : 0,
+        rate: round2(rate),
+        amount: round2(amount),
+        balance: roundQty(c.qty()),
+        value: round2(c.value()),
+        ...(ev.party ? { party: ev.party } : {}),
+        ...(ev.refNumber ? { refNumber: ev.refNumber } : {}),
+      });
+      return issued;
+    },
+    finish() {
+      pos.qty = roundQty(c.qty());
+      pos.value = round2(c.value());
+      pos.avgCost = pos.qty > 0 ? round2(pos.value / pos.qty) : round2(c.unit());
+      pos.purchasedValue = round2(pos.purchasedValue);
+      pos.revenue = round2(pos.revenue);
+      pos.cogs = round2(pos.cogs);
+      pos.consumedQty = roundQty(pos.consumedQty);
+      pos.producedQty = roundQty(pos.producedQty);
+      pos.status = statusOf(item, pos.qty);
+      pos.isNegative = pos.status === 'negative';
+      pos.isLow = item.track_stock && num(item.reorder_level) > 0 && pos.qty <= num(item.reorder_level) + EPS;
+      return pos;
+    },
+  };
+}
 
-  pos.qty = roundQty(c.qty());
-  pos.value = round2(c.value());
-  pos.avgCost = pos.qty > 0 ? round2(pos.value / pos.qty) : round2(c.unit());
-  pos.purchasedValue = round2(pos.purchasedValue);
-  pos.revenue = round2(pos.revenue);
-  pos.cogs = round2(pos.cogs);
-  pos.status = statusOf(item, pos.qty);
-  pos.isNegative = pos.status === 'negative';
-  pos.isLow = item.track_stock && num(item.reorder_level) > 0 && pos.qty <= num(item.reorder_level) + EPS;
-  return pos;
+function runItem(item: StockItem, events: StockEvent[], method: CostingMethod): StockPosition {
+  const r = itemRunner(item, method);
+  for (const ev of events) r.step(ev);
+  return r.finish();
+}
+
+/** Cost roll-up of one voucher as the engine computed it. */
+export interface VoucherCosting {
+  /** Cost of the components issued. */
+  consumed: number;
+  /** Extra cost added (₹ amounts + % of consumed). */
+  extra: number;
+  /** Fixed-value production (by-products, scrap) deducted. */
+  fixed: number;
+  /** consumed + extra − fixed (never below 0): what the shared production lines carry. */
+  pool: number;
+  /** Value received per item id. */
+  produced: Record<string, number>;
+}
+
+export interface StockComputation {
+  positions: StockPosition[];
+  vouchers: Map<string, VoucherCosting>;
+}
+
+const byOrder = (a: StockEvent, b: StockEvent) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.rank - b.rank || a.seq - b.seq);
+
+/**
+ * Positions plus the cost roll-up of every stock voucher. Without vouchers each item is costed on its
+ * own; with them every event runs in one global order so components are issued (FIFO / weighted
+ * average) before the goods they become are received at that cost — multi-level BOMs included.
+ */
+export function computeStockDetailed(input: StockInputs): StockComputation {
+  const method = input.method ?? 'WEIGHTED_AVG';
+  const events = collectEvents(input);
+  const vouchers = new Map<string, VoucherCosting>();
+  if (!input.vouchers?.length) {
+    const positions = input.items.map((item) =>
+      item.track_stock ? runItem(item, events.get(item.id) ?? [], method) : emptyPosition(item),
+    );
+    return { positions, vouchers };
+  }
+  const runners = new Map<string, ItemRunner>();
+  const all: { itemId: string; ev: StockEvent }[] = [];
+  for (const item of input.items) {
+    if (!item.track_stock) continue;
+    runners.set(item.id, itemRunner(item, method));
+    for (const ev of events.get(item.id) ?? []) all.push({ itemId: item.id, ev });
+  }
+  all.sort((a, b) => byOrder(a.ev, b.ev));
+  const costing = (id: string) => {
+    let v = vouchers.get(id);
+    if (!v) vouchers.set(id, (v = { consumed: 0, extra: 0, fixed: 0, pool: 0, produced: {} }));
+    return v;
+  };
+  for (const { itemId, ev } of all) {
+    const r = runners.get(itemId) as ItemRunner;
+    if (ev.voucher && ev.kind === 'consumption') {
+      costing(ev.voucher).consumed += r.step(ev);
+      continue;
+    }
+    if (ev.voucher && ev.kind === 'production') {
+      const v = costing(ev.voucher);
+      const p = ev.pool ?? { amount: 0, pct: 0, fixed: 0 };
+      v.extra = p.amount + (v.consumed * p.pct) / 100;
+      v.fixed = p.fixed;
+      v.pool = Math.max(0, v.consumed + v.extra - v.fixed);
+      const q = Math.abs(ev.qty);
+      const rate = ev.share === undefined ? num(ev.rate) : q > EPS ? (v.pool * ev.share) / q : 0;
+      v.produced[itemId] = (v.produced[itemId] ?? 0) + q * rate;
+      r.step({ ...ev, rate });
+      continue;
+    }
+    r.step(ev);
+  }
+  for (const v of vouchers.values()) {
+    v.consumed = round2(v.consumed);
+    v.extra = round2(v.extra);
+    v.fixed = round2(v.fixed);
+    v.pool = round2(v.pool);
+    for (const k of Object.keys(v.produced)) v.produced[k] = round2(v.produced[k]);
+  }
+  const positions = input.items.map((item) => runners.get(item.id)?.finish() ?? emptyPosition(item));
+  return { positions, vouchers };
 }
 
 /** Full stock position for every item (tracked and untracked). */
 export function computeStock(input: StockInputs): StockPosition[] {
-  const method = input.method ?? 'WEIGHTED_AVG';
-  const events = collectEvents(input);
-  return input.items.map((item) =>
-    item.track_stock ? runItem(item, events.get(item.id) ?? [], method) : emptyPosition(item),
-  );
+  return computeStockDetailed(input).positions;
 }
 
 /* ── Reports ─────────────────────────────────────────────────── */
@@ -922,6 +1134,46 @@ export function ledgerCsv(p: StockPosition): string {
    ================================================================ */
 
 export const TABLES = { items: 'stock_items', moves: 'stock_moves' } as const;
+/** Phase 7 voucher tables (owned by src/lib/manufacturing.ts; read here so every stock reader sees them). */
+export const VOUCHER_TABLES = {
+  boms: 'boms', manufacturing: 'manufacturing_vouchers', stockJournals: 'stock_journals', physical: 'physical_stock',
+} as const;
+
+const extraOf = (costs: readonly { mode: string; value: number }[] | undefined) => ({
+  extraAmount: (costs ?? []).reduce((s, c) => s + (c.mode === 'amount' ? Math.max(num(c.value), 0) : 0), 0),
+  extraPct: (costs ?? []).reduce((s, c) => s + (c.mode === 'pct' ? Math.max(num(c.value), 0) : 0), 0),
+});
+
+/** Engine inputs for the stored vouchers (pure). The main finished line of a Manufacturing Journal comes first. */
+export function stockVoucherInputs(
+  mfg: readonly ManufacturingVoucher[], journals: readonly StockJournal[] = [], physical: readonly PhysicalStockVoucher[] = [],
+): StockVoucherInput[] {
+  const out: StockVoucherInput[] = [];
+  for (const m of mfg) {
+    if (!m?.id || !m.item_id) continue;
+    out.push({
+      id: m.id, number: m.number ?? '', date: m.date, type: 'manufacturing',
+      consume: m.components ?? [],
+      produce: [
+        { id: `${m.id}:main`, item_id: m.item_id, qty: num(m.qty), godown_id: m.godown_id, batch_no: m.batch_no, mfg_date: m.mfg_date, expiry_date: m.expiry_date },
+        ...(m.outputs ?? []),
+      ],
+      ...extraOf(m.costs),
+    });
+  }
+  for (const j of journals) {
+    if (!j?.id) continue;
+    out.push({ id: j.id, number: j.number ?? '', date: j.date, type: 'stock_journal', consume: j.consume ?? [], produce: j.produce ?? [], ...extraOf(j.costs) });
+  }
+  for (const p of physical) {
+    if (!p?.id) continue;
+    out.push({
+      id: p.id, number: p.number ?? '', date: p.date, type: 'physical', consume: [], produce: [],
+      adjust: (p.lines ?? []).map((l) => ({ item_id: l.item_id, qty: num(l.diff), godown_id: l.godown_id, batch_no: l.batch_no, rate: l.rate })),
+    });
+  }
+  return out;
+}
 const SETTINGS_KEY = `${DB_PREFIX}inventory_settings`;
 
 export function loadSettings(): InventorySettings {
@@ -1026,6 +1278,11 @@ export function liveInputs(): StockInputs {
     includeChallans: settings.includeChallans,
     links: getTable<{ from_id: string; to_id: string; relation: string; reason?: string }>('doc_links'),
     returnDocs: loadReturnStockDocs(),
+    vouchers: stockVoucherInputs(
+      getTable<ManufacturingVoucher>(VOUCHER_TABLES.manufacturing),
+      getTable<StockJournal>(VOUCHER_TABLES.stockJournals),
+      getTable<PhysicalStockVoucher>(VOUCHER_TABLES.physical),
+    ),
   };
 }
 

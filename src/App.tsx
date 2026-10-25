@@ -24,6 +24,7 @@ const Books = lazy(() => import('./pages/Books').then((m) => ({ default: m.Books
 const GstReports = lazy(() => import('./pages/GstReports').then((m) => ({ default: m.GstReports })));
 const Exports = lazy(() => import('./pages/Exports').then((m) => ({ default: m.Exports })));
 const Inventory = lazy(() => import('./pages/Inventory').then((m) => ({ default: m.Inventory })));
+const Manufacturing = lazy(() => import('./pages/Manufacturing').then((m) => ({ default: m.Manufacturing })));
 const Recurring = lazy(() => import('./pages/Recurring').then((m) => ({ default: m.Recurring })));
 const Time = lazy(() => import('./pages/Time').then((m) => ({ default: m.Time })));
 const Payroll = lazy(() => import('./pages/Payroll').then((m) => ({ default: m.Payroll })));
@@ -100,6 +101,7 @@ function App() {
                 <Route path="/receivables" element={<Receivables />} />
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/inventory" element={<Inventory />} />
+                <Route path="/manufacturing" element={<Manufacturing />} />
                 <Route path="/books" element={<Books />} />
                 <Route path="/reconcile" element={<RequireAccess action="books.edit"><Reconcile /></RequireAccess>} />
                 <Route path="/cheques" element={<RequireAccess action="books.edit"><Cheques /></RequireAccess>} />

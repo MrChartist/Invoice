@@ -85,10 +85,14 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `recurring` | recurring | defined by that module |
 | `reminders` | reminders-share | defined by that module |
 | `doc_links` | documents | defined by that module |
-| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7); additive `aliases` (earlier names, recorded on rename) |
+| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7); additive `aliases` (earlier names, recorded on rename); `min_order_qty` / `reorder_by_godown` (Phase 7) |
 | `stock_moves` | inventory | `StockMove` (manual adjustments), additive `godown_id` / `batch_no` / `mfg_date` / `expiry_date` / `serials` |
 | `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed) |
 | `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger |
+| `boms` | manufacturing (Phase 7, `src/lib/manufacturing.ts`) | `Bom` (`src/types/manufacturing.ts`): components per `batch_qty` finished units (scrap %, godown), by-/co-products / scrap, `is_default` per item |
+| `manufacturing_vouchers` | manufacturing (Phase 7) | `ManufacturingVoucher` `MFG/FY<yy-yy>/<seq>`: finished item + qty, consumed lines (batch / godown), outputs, additional costs, display-only `cost_snapshot`; read by the stock engine, never by Books / ledger |
+| `stock_journals` | manufacturing (Phase 7) | `StockJournal` `SJ/FY<yy-yy>/<seq>`: source → destination lines (conversion / repacking). Godown-only moves are refused here and saved as `stock_transfers` |
+| `physical_stock` | manufacturing (Phase 7) | `PhysicalStockVoucher` `PHY/FY<yy-yy>/<seq>`: counted lines with `book_qty` and `diff` fixed at save; the diff is posted as an adjustment at the end of that day |
 | `einvoice_meta` | einvoice | defined by that module |
 | `design_prefs` | templates-studio | defined by that module |
 | `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}`; additive `tds_amount` (TDS deducted on the payment) and `group_id` (multi-bill payment) (Phase 7) |

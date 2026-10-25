@@ -203,3 +203,13 @@ Stock items carry an optional `barcode` next to `sku` (item form). A scan in the
 catalogue's own barcode / SKU) and adds the item; label sheets include stock items with a code that are not in the
 catalogue. POS bills move stock like any invoice (FEFO batch auto-pick and serial checks as in the editor). See
 `docs/features/pos-barcode-pricing.md`.
+
+## Manufacturing & stock vouchers (Phase 7)
+
+BOMs, Manufacturing Journal (`MFG/…`), Stock Journal (`SJ/…`), Physical Stock (`PHY/…`), reorder levels / Reorder
+Status and the Tally-style stock reports live on `/manufacturing` — see `docs/features/manufacturing.md`.
+Engine changes here: `StockInputs.vouchers` (read by `liveInputs()`), new move kinds `consumption` / `production`
+(not sales: `consumedQty` / `producedQty` on the position, no COGS), `computeStockDetailed` (global costing order when
+vouchers exist, plus each voucher's cost roll-up), `LedgerRow.party` / `refNumber`, and the additive stock-item fields
+`min_order_qty` and `reorder_by_godown`. Godown transfers remain STR records; the Stock Journal's transfer mode writes
+them too.

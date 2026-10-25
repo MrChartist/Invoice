@@ -424,3 +424,11 @@ test('branches (WP-9) read the real purchase shape: branch_id, then place of sup
   assert.equal(branchOfPurchase({ ...bill, branch_id: 'x' }, branches), 'x');
   assert.equal(branchSummary(branches, [], [bill])[0].purchases, 1000);
 });
+
+test('reorder status (Phase 7) reads received PO quantity from the real purchase shape', async () => {
+  const { pendingPoQty } = await import('../src/lib/reorder.ts');
+  const items = [{ id: 's', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 5 }];
+  const po = { id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-01', vendor_name: 'Acme Supplies', lines: [{ id: 'pl', name: 'Paper ream', hsn: '4802', quantity: 25, rate: 100, tax_rate: 18 }], taxable: 2500, cgst: 0, sgst: 0, igst: 0, total: 2500 };
+  const received: PurchaseRecord = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], po_line_id: 'pl' }] };
+  assert.equal(pendingPoQty([po], [received], items).get('s'), 15);
+});

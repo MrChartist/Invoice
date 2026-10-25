@@ -37,7 +37,12 @@ export type AuditEntity =
   /** Payroll masters: employees, groups, pay heads, salary structures, production types (Phase 7). */
   | 'employee'
   /** Payroll runs, attendance, salary / statutory payments (Phase 7). */
-  | 'payroll';
+  | 'payroll'
+  /** Phase 7 (Tally parity): Bill of Materials, Manufacturing Journal, Stock Journal, Physical Stock. */
+  | 'bom'
+  | 'manufacturing'
+  | 'stock_journal'
+  | 'physical_stock';
 
 export type AuditAction =
   | 'create'
@@ -186,4 +191,8 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   pos_day_close: 'POS day close',
   employee: 'Payroll masters',
   payroll: 'Payroll',
+  bom: 'Bills of materials',
+  manufacturing: 'Manufacturing journals',
+  stock_journal: 'Stock journals',
+  physical_stock: 'Physical stock',
 };
