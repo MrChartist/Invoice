@@ -10,8 +10,8 @@
 import { requireAccess } from '../access';
 import { audit } from '../audit';
 import { num, round2 } from '../invoice-calc';
-import { buildInvoiceNumber, getIndianFY, highestSequence } from '../invoice-number';
 import { assertUnlocked } from '../period-lock';
+import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { formatMoney } from '../utils';
@@ -583,11 +583,11 @@ export function finalizeRun(runId: string): PayrollRun {
   if (!run) throw new PayrollError('That payroll run no longer exists.');
   if (run.status === 'final') return run;
   if (!run.lines.length) throw new PayrollError('The run has no employees.');
-  const fy = getIndianFY(run.date).label;
-  const number = run.number || buildInvoiceNumber('PRL', fy, highestSequence(runs.map((r) => r.number), 'PRL', fy) + 1);
+  const number = run.number || nextSeriesNumberFor('PRL', run.date, runs.map((r) => r.number));
   const lock = assertUnlocked({ id: run.id, issue_date: run.date, invoice_number: number }, 'create');
   const next: PayrollRun = { ...run, number, status: 'final', finalized_at: now(), updated_at: now() };
   writeRuns(runs.map((r) => (r.id === runId ? next : r)));
+  recordSeries(number);
   const t = runTotals(next);
   audit.record({ entity: 'payroll', entity_id: run.id, action: 'create', doc_number: number, summary: `Payroll ${run.month} finalized as ${number} dated ${run.date}: gross ₹${formatMoney(t.gross)}, net ₹${formatMoney(t.net)}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
   return next;
@@ -668,13 +668,13 @@ export function recordPayrollPayment(input: PaymentInput): PayrollPayment {
     const run = loadRuns().find((r) => r.id === input.run_id);
     if (!run || run.status !== 'final') throw new PayrollError('Pay salary against a finalized payroll.');
   }
-  const fy = getIndianFY(input.date).label;
-  const number = str(input.number) || buildInvoiceNumber('PYP', fy, highestSequence(all.map((p) => p.number), 'PYP', fy) + 1);
+  const number = str(input.number) || nextSeriesNumberFor('PYP', input.date, all.map((p) => p.number));
   if (all.some((p) => p.number.toLowerCase() === number.toLowerCase())) throw new PayrollError(`Payment number ${number} is already used.`);
   const id = generateId();
   const lock = assertUnlocked({ id, issue_date: input.date, invoice_number: number }, 'create');
   const [row] = normalizePayments([{ ...input, amount, id, number, paid_from: str(input.paid_from) || 'bank', created_at: now() }]);
   setTable(PAYROLL_TABLES.payments, [...all, row]);
+  recordSeries(number);
   audit.record({ entity: 'payroll', entity_id: id, action: 'payment_add', doc_number: number, summary: `${PAYMENT_LABELS[row.kind]} paid ₹${formatMoney(amount)} on ${row.date} (${number})${row.period ? ` for ${row.period}` : ''}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
   return row;
 }

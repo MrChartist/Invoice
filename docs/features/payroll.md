@@ -61,7 +61,7 @@ cell returns to the computed value. Auto fill again keeps the overrides.
 | Payroll (final run, dated the voucher date) | each earning's account — 6000 Salaries & wages, 6010 Allowances & overtime, 6020 Bonus (per employee cost centre); 6030 Employer's contribution to PF, 6040 … to ESI, 6050 PF admin & EDLI charges | 2420 Salary payable (net), 2340 PF payable (employee + employer + EDLI / admin), 2341 ESI payable, 2342 Professional tax payable, 2337 TDS payable — salaries (192), other deductions to their own account (loan recovery → 3610 Loans & advances to employees, other → 2400) |
 | Payroll payment | the payable (salary / PF / ESI / PT / TDS) | the chosen cash / bank account |
 
-Reopening a final run removes its voucher until it is finalized again; it is refused while a salary payment points at
+Numbers `PRL` / `PYP` use the shared series high-water mark (`series-counters.ts`), so a deleted latest number is never reused. Reopening a final run removes its voucher until it is finalized again; it is refused while a salary payment points at
 the run. Payroll is not part of the Books cash book / `books.profitAndLoss` (like manual vouchers, it exists only in the
 ledger statements: trial balance, P&L, balance sheet, cash flow).
 
