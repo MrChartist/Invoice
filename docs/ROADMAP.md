@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.8, 5.9 ✅; 5.3–5.7 in progress) · Phase 6 (most ✅; 6.7–6.9, 6.21 in progress) · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.8, 5.9 ✅; 5.4–5.7 in progress) · Phase 6 (most ✅; 6.7–6.9, 6.21 in progress) · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -137,7 +137,7 @@ Larger features, each of which can ship on its own once Phases 1–4 are done.
 |---|------|--------|-------|
 | 5.1 | ✅ **GSTR-2B import & matcher**: user loads the portal JSON/Excel locally; match on GSTIN + bill no. + value; IMS Accept/Reject/Pending worksheet; 4A(5) books-vs-2B comparison (`docs/features/gstr2b.md`) | L | Needs 3.2 |
 | 5.2 | ✅ **GSTR-9 annual working paper** from 12 months of GSTR-1/3B + HSN, compared against books (`docs/features/gstr9.md`; 8A typed in from GSTR-2B, since the 5.1 matcher does not keep the 2B file) | M | Needs 3.1, 3.2 |
-| 5.3 | **Advances / receipt vouchers / Table 11** (tax on service advances, adjusted against the later invoice) | L | Needs 3.1 |
+| 5.3 | ✅ **Advances / receipt vouchers / Table 11**: ADV/FY receipt vouchers (Rule 50) and RFV refunds (Rule 51), date-keyed GST on service advances (none on goods since Notification 66/2017-CT), apply to invoices through the payments API, GSTR-1 11A/11B + JSON `at`/`txpd`, 3B 3.1(a), GSTR-9 4F, ledger, receivables, Tally (`docs/features/advances.md`) | L | Needs 3.1 |
 | 5.4 | **Hindi-first i18n**: string extraction, amount in words in Hindi, self-hosted Noto Sans Devanagari subset in the precache (fixes PDFs that vary by device today); then Marathi/Tamil/Gujarati | L | |
 | 5.5 | **POS / thermal quick-bill mode**: one-screen counter billing, walk-in customer, 80 mm auto-print, change calculator | M | Reuses `thermal80` / ReceiptBody |
 | 5.6 | **Barcode/SKU**: `BarcodeDetector` camera scan with typed fallback, Code128 labels | M | Pairs with 5.5 |

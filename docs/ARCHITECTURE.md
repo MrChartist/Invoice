@@ -73,7 +73,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `invoices` | core | `InvoiceRecord` (`src/types/invoice.ts`) |
 | `clients` | core | `Client` |
 | `items_catalog` | core | `InvoiceItem` |
-| `transactions` | core | `Payment` (payments received) |
+| `transactions` | core | `Payment` (payments received; `advance_id` marks an advance adjusted against the invoice, not new money) |
 | `vendors` | purchases | `Vendor` (`src/types/purchases.ts`) |
 | `purchases` | purchases | `PurchaseRecord` |
 | `recurring` | recurring | defined by that module |
@@ -100,6 +100,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `accounts` | ledger | user-added `Account` rows (`src/lib/ledger/accounts.ts`); default accounts are constants, never stored |
 | `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`) |
 | `cheques` | cheques (6.26) | `Cheque` (`src/types/cheques.ts`) — received / issued cheques, lifecycle, linked payment ids (`docs/features/cash-planning.md`) |
+| `advances` | advances (5.3) | `AdvanceRecord` (`src/types/advances.ts`) — advance receipt vouchers `ADV/FY…`, GST snapshot, refunds `RFV/FY…`; adjustments are `transactions` rows with `advance_id` (`docs/features/advances.md`) |
 | `cheque_print` | cheques (6.26) | cheque print layout + mm offsets (object, `src/lib/cheque-print.ts`) |
 | `fixed_assets` | ledger | `FixedAsset` register rows (`src/lib/ledger/assets.ts`) |
 | `cost_centres` | cost centres (6.16) | `CostCentre` master (`src/lib/cost-centres.ts`); documents point at it via optional `cost_centre_id` (`docs/features/cost-centres-budgets.md`) |

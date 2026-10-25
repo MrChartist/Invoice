@@ -43,6 +43,9 @@ const DocumentActions = lazy(() =>
   import('../components/creator/DocumentActions').then((m) => ({ default: m.DocumentActions })),
 );
 
+// Unadjusted advances of the client (5.3): the advances maths stays out of the editor chunk.
+const AdvanceNotice = lazy(() => import('../components/creator/AdvanceNotice').then((m) => ({ default: m.AdvanceNotice })));
+
 // The pickers start closed: they load right after the editor renders, off the first-paint path.
 const ClientSearchModal = lazy(() => import('../components/modals/ClientSearchModal').then((m) => ({ default: m.ClientSearchModal })));
 const ItemSearchModal = lazy(() => import('../components/modals/ItemSearchModal').then((m) => ({ default: m.ItemSearchModal })));
@@ -273,6 +276,9 @@ export function InvoiceCreator() {
               <PartiesSection profiles={profiles} onSearchClients={() => setClientsOpen(true)} />
             </div>
             <CreditWarning />
+            <Suspense fallback={null}>
+              <AdvanceNotice onApplied={(m) => notify(m)} />
+            </Suspense>
           </section>
 
           <section className={surface.card}>

@@ -122,7 +122,8 @@ export function collectionLags(invoices: readonly InvoiceRecord[], payments: rea
     const inv = byId.get(p.invoice_id);
     const due = isoDay(inv?.due_date);
     const paid = isoDay(p.date);
-    if (!inv || !due || !paid) continue;
+    // An advance adjustment (5.3) is not a collection: it says nothing about how late the client pays.
+    if (!inv || !due || !paid || p.advance_id) continue;
     const amt = Math.abs(num(p.amount)) * (fxRate(inv) ?? 1);
     if (!(amt > 0)) continue;
     const k = clientKey(inv.client);

@@ -11,7 +11,7 @@
  * Mapping (statutory form GSTR-9, Notification 39/2018-CT as amended):
  *  - Pt II Table 4 (tax payable): 4A B2C = B2CL + B2CS + B2CL credit/debit notes (net, as
  *    the form asks); 4B B2B regular (not reverse charge); 4C exports with payment; 4D SEZ
- *    with payment; 4E deemed exports; 4F advances (not modelled, 0); 4G inward reverse
+ *    with payment; 4E deemed exports; 4F advances = GSTR-1 Table 11A − 11B for the year; 4G inward reverse
  *    charge = 3B 3.1(d); 4I/4J credit/debit notes on 4B-4E; 4K/4L amendments (0).
  *  - Table 5 (no tax payable): 5A exports without payment; 5B SEZ without payment; 5C
  *    outward supplies where the recipient pays (reverse charge); 5D exempt (the app has no
@@ -42,6 +42,7 @@
  */
 
 import type { InvoiceRecord } from '../types/invoice';
+import type { AdvanceMovement } from './advance-tax';
 import {
   buildGstReport,
   computeSetOff,
@@ -158,6 +159,8 @@ export interface Gstr9Options {
   books?: Gstr9BooksSummary | null;
   /** Table 8A — ITC as per GSTR-2B, entered by hand. */
   itc2b?: Partial<Pick<ItcHeads, 'igst' | 'cgst' | 'sgst' | 'cess'>> | null;
+  /** Advance movements (`advanceTaxEvents`, 5.3): Table 11 in each month and 4F for the year. */
+  advances?: readonly AdvanceMovement[];
 }
 
 export interface Gstr9Report {
@@ -279,6 +282,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       filerStateCode: opts.filerStateCode,
       links: opts.links,
       turnover: opts.lastFyTurnover,
+      advances: opts.advances,
     });
     return { period, label: periodLabel(period), gstr1: rep.gstr1, gstr3b: rep.gstr3b };
   });
@@ -325,6 +329,9 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       addTo(t5.F, { taxable: n.nonGst });
     }
     addTo(t4.G, docHeads(m.gstr3b.outward.inwardRcm));
+    // 4F: advances taxed in the year less those adjusted / refunded (GSTR-1 Table 11A − 11B).
+    for (const r of g.at ?? []) addTo(t4.F, { taxable: r.taxable, igst: r.igst, cgst: r.cgst, sgst: r.sgst, cess: r.cess });
+    for (const r of g.txpd ?? []) addTo(t4.F, { taxable: r.taxable, igst: r.igst, cgst: r.cgst, sgst: r.sgst, cess: r.cess }, -1);
   }
 
   const t4H = sumHeads(t4.A, t4.B, t4.C, t4.D, t4.E, t4.F, t4.G);
@@ -341,7 +348,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     row('4C', 'Zero rated supply (export) on payment of tax (except supplies to SEZs)', t4.C),
     row('4D', 'Supply to SEZs on payment of tax', t4.D),
     row('4E', 'Deemed exports', t4.E),
-    row('4F', 'Advances on which tax has been paid but invoice has not been issued', t4.F, { note: 'Advances are not modelled in the app.' }),
+    row('4F', 'Advances on which tax has been paid but invoice has not been issued', t4.F, { note: 'GSTR-1 Table 11A − 11B over the year (advances received less adjusted / refunded).' }),
     row('4G', 'Inward supplies on which tax is to be paid on reverse charge basis', t4.G, { note: 'GSTR-3B 3.1(d), from purchase bills.' }),
     row('4H', 'Sub-total (A to G above)', t4H, { total: true }),
     row('4I', 'Credit notes issued in respect of transactions specified in (B) to (E) above (-)', t4.I),
@@ -668,7 +675,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       ? `Aggregate turnover ${entered > 0 ? 'entered' : 'worked out'} (₹${usedTurnover.toFixed(2)}) is up to ₹2 crore: filing GSTR-9 is optional for this FY (check the FY's notification).`
       : `Aggregate turnover ${entered > 0 ? 'entered' : 'worked out'} (₹${usedTurnover.toFixed(2)}) is above ₹2 crore: GSTR-9 is mandatory (and GSTR-9C above ₹5 crore).`,
     'Built from the 12 monthly GSTR-1 / GSTR-3B working papers of this app, not from what was actually filed on the portal; amend for any differences in the filed returns.',
-    'Advances (4F, Table 11 of GSTR-1), amendments (4K/4L, 5J/5K, Pt V), ISD, TRAN credit and 8C/8E are not modelled and shown as 0.',
+    'Advances (4F) are the net of GSTR-1 Table 11A and 11B for the year. Amendments (4K/4L, 5J/5K, Pt V), ISD, TRAN credit and 8C/8E are not modelled and shown as 0.',
     'Table 9 re-runs the monthly set-off carrying unused ITC into the next month; a month whose credit notes exceed its sales is not carried back.',
     'Books compare tax heads only and do not filter by GSTIN.',
   ];

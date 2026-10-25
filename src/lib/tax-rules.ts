@@ -106,6 +106,29 @@ export function tcsPresets(date?: string): TcsPreset[] {
 /** 0 doubles as exempt/nil-rated. 40% is the GST 2.0 demerit slab (from 22 Sep 2025). */
 export const GST_SLABS = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28, 40] as const;
 
+// ── GST on advances received (time of supply, CGST Act Sec 12 / 13) ───────────
+
+/**
+ * Is GST payable when an advance is received for GOODS? Services always pay tax on the advance
+ * (Sec 13(2): time of supply is the earlier of invoice and receipt). For goods, Notification
+ * 66/2017-CT (15 Nov 2017) moved the time of supply to the invoice for everyone except composition
+ * dealers, so no GST is due on a goods advance from that day (Notification 40/2017-CT had done it
+ * for turnover up to ₹1.5 crore from 13 Oct 2017; not modelled). Verify with your CA.
+ */
+export const ADVANCE_GST_ON_GOODS_RULES: readonly Versioned<boolean>[] = [
+  { from: '2017-07-01', value: true, source: 'CGST Act Sec 12(2) as enacted' },
+  { from: '2017-11-15', value: false, source: 'Notification 66/2017-CT (no GST on advances for goods)' },
+];
+
+export const ADVANCE_GST_ON_SERVICES_RULES: readonly Versioned<boolean>[] = [
+  { from: '2017-07-01', value: true, source: 'CGST Act Sec 13(2): earlier of invoice and receipt of payment' },
+];
+
+/** True when GST is payable on an advance for `supply` received on `date`. */
+export function advanceTaxable(supply: 'goods' | 'services', date?: string): boolean {
+  return ruleAt(supply === 'goods' ? ADVANCE_GST_ON_GOODS_RULES : ADVANCE_GST_ON_SERVICES_RULES, date);
+}
+
 // ── MSME: MSMED Act Sec 15/16 and Income-tax Sec 43B(h) ──────────────────────
 
 /** Payment limits under MSMED Act Sec 15, in days from acceptance (the bill date is used). */

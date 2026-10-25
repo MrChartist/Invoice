@@ -11,6 +11,9 @@ import { ClientFormModal } from '../components/modals/ClientFormModal';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
 import { isRevenueDoc } from '../lib/stats';
+import { ADVANCES_TABLE, advanceBalance } from '../lib/advance-tax';
+import { getTable } from '../lib/storage';
+import type { AdvanceRecord } from '../types/advances';
 import { formatCurrency } from '../lib/utils';
 import type { Client } from '../types/invoice';
 import controls from '../styles/controls.module.css';
@@ -59,6 +62,23 @@ export function Clients() {
       row.total += inv.total ?? 0;
       row.count += 1;
       map.set(key, row);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
+
+  // Unadjusted advances (5.3) per client id and lower-cased name.
+  const advanceOpen = useMemo(() => {
+    const map = new Map<string, number>();
+    const advances = getTable<AdvanceRecord>(ADVANCES_TABLE);
+    if (!advances.length) return map;
+    const payments = localDb.payments.getAll();
+    const invoices = localDb.invoices.getAll();
+    for (const a of advances) {
+      const open = advanceBalance(a, payments, invoices).open;
+      if (open <= 0.004) continue;
+      const key = a.client?.id || `name:${(a.client?.name ?? '').trim().toLowerCase()}`;
+      map.set(key, (map.get(key) ?? 0) + open);
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,6 +219,14 @@ export function Clients() {
                         ) : (
                           <span className={styles.sub}>—</span>
                         )}
+                        {(() => {
+                          const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
+                          return adv > 0 ? (
+                            <div className={styles.sub}>
+                              <Link to={`/receivables?tab=advances&party=${encodeURIComponent(c.id ?? `name:${c.name.trim().toLowerCase()}`)}`}>Advance {formatCurrency(adv)} unadjusted</Link>
+                            </div>
+                          ) : null;
+                        })()}
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>

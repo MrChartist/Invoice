@@ -92,7 +92,7 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   saved IRN / Ack / QR. (The app does not call the IRP.)
 - **GST reports**: GSTR-1 (B2B, B2CL by date-keyed threshold, B2CS, CDNR/CDNUR with C/D notes classified by the
   original invoice, EXP with shipping-bill fields, nil, HSN summary split B2B/B2C with the 4/6-digit rule, documents
-  issued) as offline-tool JSON and section CSVs; GSTR-3B (3.1, 3.2, 4 incl. imports, RCM and 4B(1)/4B(2) reversals, 5)
+  issued, advances received / adjusted in Table 11A / 11B as `at` / `txpd`) as offline-tool JSON and section CSVs; GSTR-3B (3.1 incl. tax on advances, 3.2, 4 incl. imports, RCM and 4B(1)/4B(2) reversals, 5)
   as JSON, CSV and a printable summary; aggregate-turnover support. Section CSVs are also offered as .xlsx.
   Bills of Supply go to Table 8 / 3B 3.1(c)-(e) and Table 13.
 - **Amendments**: "Amend (reported in a filed return)" freezes the document as filed; its own period's GSTR-1 never
@@ -110,7 +110,7 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **GSTR-9 working paper**: annual Tables 4-9, 17 and 18 from the 12 monthly GSTR-1 / 3B papers and purchase bills
   (6B inputs / services split, 6C/6D RCM, imports, Table 7 reversals by rule, Table 9 set-off with credit carried
   forward), differences GSTR-1 vs 3B vs books, the ₹2 crore optional-filing note; JSON working paper, CSV and print.
-  Advances, amendments (Pt V) and 8A (GSTR-2B) are not computed.
+  4F advances come from GSTR-1 Table 11A − 11B; amendments (Pt V) and 8A (GSTR-2B) are not computed.
 - **Compliance calendar**: GSTR-1 / IFF / GSTR-3B / GSTR-9 due dates for monthly or QRMP filers (CMP-08 / GSTR-4
   for composition dealers), filed tracking,
   Sec 50 interest and late-fee estimates, reminders in the notification bell.
@@ -118,6 +118,11 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 ### 3.3 Accounts, Books & Banking
 - **Late fee per client** (optional): % p.a. or flat ₹ with grace days on the client; "Add late fee" on an overdue
   bill creates a new draft invoice with one line (interest engine maths, period lock respected, original untouched).
+- **Advances**: money received before the invoice gets a receipt voucher (`ADV/FY/…`, Rule 50) with GST worked out
+  where due (services on receipt; goods not since Notification 66/2017-CT, date-keyed), is applied to one or more
+  invoices of the client through the payments API (period lock, audit) or refunded with a refund voucher
+  (`RFV/FY/…`, Rule 51); posts to "Advances from customers" / "GST paid on advances" in the ledger
+  (`docs/features/advances.md`).
 - **Receivables**: party ledgers, aging by days overdue (Not due, 1–30, 31–60, 61–90, 90+), DSO, printable statements,
   payment receipts (`RCPT/FY/…`) with amount in words, bulk mark-paid, TDS receivable register with 26AS/AIS CSV
   matching and Form 16A tracking.
@@ -217,6 +222,8 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   without IndexedDB (localStorage fallback) only a handful fit. Duplicated / converted documents do not copy them.
 - Custom fields are not available on purchase bills / expenses or recurring templates and are not part of the GSTR,
   e-Invoice or Tally outputs.
+- Advances: INR only; GST on advances is not in the Tally XML (post it with Tally's advance-receipt feature); refunds are
+  reported in GSTR-1 Table 11B and GSTR-3B 3.2 is not adjusted for advances — confirm both with your CA.
 - Data lives in one browser; use backups (or the encrypted folder backup) to move between devices.
 - Composition / amendments (5.9): e-commerce Sec 52 / 9(5), export amendments (EXPA), GSTR-9 Part V, CMP-08 / GSTR-4
   interest and late fees and composition eligibility checks are not built; re-amending keeps only the first original.

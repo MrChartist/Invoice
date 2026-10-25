@@ -770,6 +770,65 @@ try {
     check(await page.getByRole('link', { name: 'New invoice' }).count() > 0, 'owner signed back in with full access');
   });
 
+  await step('advances: record a service advance, raise an invoice, apply it, see Table 11', async () => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const now = new Date();
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    // Received last month (the GST page opens on the previous month), invoiced today.
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const advDay = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}-01`;
+
+    await page.goto(srv.origin + '/receivables?tab=advances');
+    await page.getByRole('button', { name: 'Record advance' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Record an advance' });
+    await dlg.getByLabel('Received from *').fill('Advance Client');
+    await dlg.getByLabel('Amount received (₹) *').fill('11800');
+    await dlg.getByLabel('Date received *').fill(advDay);
+    await dlg.getByLabel('GST rate of the supply').selectOption('18');
+    await dlg.getByLabel('Place of supply *').selectOption('27');
+    await dlg.getByText(/GST due on this advance: ₹1,800\.00/).waitFor();
+    await dlg.getByRole('button', { name: 'Save advance' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const adv = (await readJson(page, 'advances', [], (v) => v.length === 1))[0];
+    check(/^ADV\/FY\d\d-\d\d\/0001$/.test(adv?.number ?? '') && adv.tax?.cgst === 900 && adv.tax?.sgst === 900 && adv.tax?.taxable === 10000,
+      `advance stored with its receipt voucher number and GST (${adv?.number}, CGST ${adv?.tax?.cgst})`);
+
+    const invoices = await readJson(page, 'invoices', []);
+    invoices.push({
+      id: 'adv-inv', invoice_number: 'INV/ADV/0001', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, currency: 'INR',
+      template_id: 'classic_orange', client: { name: 'Advance Client', email: '', address: '', city: '', zip: '' },
+      sender: { companyName: 'E2E Trader', companyGstin: '27AAPFU0939F1ZV', stateCode: '27' },
+      items: [{ id: 'l1', name: 'Retainer', type: 'Service', hsn: '998311', quantity: 1, rate: 20000, tax_rate: 18, amount: 20000 }], gst_mode: 'CGST_SGST',
+      place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 18, shipping: 0, other_charges: 0,
+      round_off_enabled: false, amount_paid: 0, notes: '', terms: '', subtotal: 20000, discount_amount: 0, taxable_value: 20000, cgst_amount: 1800,
+      sgst_amount: 1800, igst_amount: 0, tax_amount: 3600, round_off: 0, total: 23600, balance_due: 23600,
+    });
+    await writeJson(page, 'invoices', invoices);
+
+    await page.goto(srv.origin + '/receivables?tab=advances');
+    await page.getByRole('button', { name: `Apply advance ${adv.number}` }).click();
+    const apply = page.getByRole('dialog', { name: `Apply ${adv.number}` });
+    const sel = apply.getByLabel('Invoice');
+    await sel.selectOption(await sel.locator('option', { hasText: 'INV/ADV/0001' }).getAttribute('value'));
+    await apply.getByLabel('Amount to apply (₹)').fill('11800');
+    await apply.getByRole('button', { name: 'Apply advance', exact: true }).click();
+    await apply.waitFor({ state: 'detached' });
+    const tx = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.advance_id === adv.id))).find((t) => t.advance_id === adv.id);
+    const inv = (await readJson(page, 'invoices', [], (v) => v.find((i) => i.id === 'adv-inv')?.status === 'Partially Paid')).find((i) => i.id === 'adv-inv');
+    check(tx?.amount === 11800 && tx.invoice_id === 'adv-inv' && tx.date === today, `the adjustment is a payment on the invoice (${tx?.amount}, ${tx?.date})`);
+    check(inv?.status === 'Partially Paid' && inv.balance_due === 11800, `the invoice is partly paid (${inv?.status}, balance ${inv?.balance_due})`);
+
+    await page.goto(srv.origin + '/gst-reports?tab=at');
+    const t11a = page.getByRole('table', { name: 'Advances received, Table 11A' });
+    await t11a.getByText('10,000.00').first().waitFor();
+    await t11a.getByText('900.00').first().waitFor();
+    check(true, 'GSTR-1 Table 11A shows the advance in the month received (taxable 10,000, CGST 900)');
+    await page.getByRole('tab', { name: /Adjusted 11B/ }).click();
+    // The adjustment is in the current month: 11B is empty in the previous month's view.
+    await page.getByText('No advances adjusted or refunded in this period.').waitFor();
+    check(true, 'Table 11B is reported in the month of adjustment, not the month received');
+  });
+
   await step('an existing localStorage user moves to IndexedDB on first load', async () => {
     // A device last used by a pre-4.x build: data in localStorage, schema v1, logo inline in the snapshot.
     const logo = `data:image/png;base64,${LOGO_PNG}`;

@@ -22,7 +22,9 @@ export type AuditEntity =
   /** Cheque register (6.26). */
   | 'cheque'
   /** Stock transfer voucher between godowns (6.10). */
-  | 'stock_transfer';
+  | 'stock_transfer'
+  /** Advance receipts, refunds and adjustments (5.3). */
+  | 'advance';
 
 export type AuditAction =
   | 'create'
@@ -107,6 +109,7 @@ export const AUDIT_ENTITIES: AuditEntity[] = [
   'cost_centre',
   'budget',
   'cheque',
+  'advance',
 ];
 
 export const AUDIT_ACTIONS: AuditAction[] = [
@@ -159,4 +162,5 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   budget: 'Budgets',
   cheque: 'Cheques',
   stock_transfer: 'Stock transfers',
+  advance: 'Advances',
 };

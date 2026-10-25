@@ -19,6 +19,10 @@
  *   Credit Note  Cr Party | Dr Sales, Dr Output taxes, ... (mirror of Sales)
  *   Receipt      Dr Bank/Cash [+ Dr TDS Receivable on the settling receipt] | Cr Party (bill allocation "Agst Ref" the invoice)
  *   Purchase     Cr Party | Dr Purchases, Dr Input CGST/SGST/IGST, ± Round Off
+ *   Advance      Receipt: Dr Bank/Cash | Cr Party (bill allocation "Advance", the ADV/… number);
+ *                refund: Payment: Dr Party ("Agst Ref" the ADV number) | Cr Bank/Cash. Applying an
+ *                advance to an invoice is bill-wise matching inside Tally, so no voucher is sent for
+ *                it; GST on advances (Tally's advance receipt / stat adjustment) is not exported (5.3).
  *
  * Any difference between the invoice's stored total and the sum of its
  * component amounts (rounding, legacy rows) is posted to the Round Off ledger,
@@ -34,6 +38,7 @@
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { fxNarration, inrTotals, inrValue } from './fx';
+import { advanceMovements } from './advance-tax';
 import {
   clean,
   emptySource,
@@ -196,7 +201,7 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
 
 /* ── Voucher model (pure data — what the tests assert on) ─────── */
 
-export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase';
+export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase' | 'Payment';
 export type Side = 'Dr' | 'Cr';
 
 export interface TallyEntry {
@@ -205,7 +210,7 @@ export interface TallyEntry {
   /** Always positive, integer paise. */
   paise: number;
   /** Bill allocation (party ledgers only). */
-  bill?: { name: string; type: 'New Ref' | 'Agst Ref' };
+  bill?: { name: string; type: 'New Ref' | 'Agst Ref' | 'Advance' };
 }
 
 export interface TallyInventoryLine {
@@ -445,7 +450,15 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       if (tds > 0 && before < cashDue && after >= cashDue) tdsOn.set(p, toPaise(inrValue(tds / 100, inv)));
     }
 
+    for (const p of allSorted) {
+      if (p.advance_id && tdsOn.has(p)) {
+        const inv = byId.get(p.invoice_id)!;
+        warnings.push(`${clean(inv.invoice_number) || inv.id}: the customer's TDS is settled by an advance adjustment, which has no voucher here — post the TDS journal in Tally.`);
+      }
+    }
     for (const p of filterPayments(source.payments, sales, o.range)) {
+      // Applying an advance (5.3) is bill-wise matching in Tally: the money came in on the advance.
+      if (p.advance_id) continue;
       const inv = byId.get(p.invoice_id)!;
       const party = partyNameOf(inv.client);
       registerParty(inv, party);
@@ -479,6 +492,52 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
           .filter(Boolean)
           .join(' | '),
         reference: clean(p.reference),
+        entries,
+        inventory: [],
+        inventoryLedger: '',
+      });
+    }
+    // Advance receipts and refunds (5.3), dated in range.
+    for (const m of advanceMovements(source.advances ?? [], source.payments, source.invoices)) {
+      if (m.kind === 'adjusted') continue;
+      if ((o.range.from && m.date < o.range.from) || (o.range.to && m.date > o.range.to)) continue;
+      const adv = (source.advances ?? []).find((a) => a.id === m.advanceId);
+      const party = partyNameOf(adv?.client);
+      addLedger({
+        name: party,
+        parent: 'Sundry Debtors',
+        billwise: true,
+        gstin: clean(adv?.client?.gstin).toUpperCase(),
+        stateName: stateNameOf(adv?.client?.state_code || adv?.place_of_supply || ''),
+        address: [clean(adv?.client?.address)].filter(Boolean),
+        email: clean(adv?.client?.email),
+      });
+      const isCash = /^\s*cash\s*$/i.test(String(m.method ?? ''));
+      const bank = isCash ? o.cashLedger : o.bankLedger;
+      std(bank, isCash ? 'Cash-in-Hand' : 'Bank Accounts');
+      const paise = toPaise(m.gross);
+      const entries: TallyEntry[] = [];
+      const received = m.kind === 'received';
+      if (received) {
+        push(entries, bank, 'Dr', paise);
+        push(entries, party, 'Cr', paise, { name: m.number, type: 'Advance' });
+      } else {
+        push(entries, party, 'Dr', paise, { name: m.number, type: 'Agst Ref' });
+        push(entries, bank, 'Cr', paise);
+      }
+      vouchers.push({
+        type: received ? 'Receipt' : 'Payment',
+        date: m.date,
+        number: received ? m.number : m.ref || m.number,
+        party,
+        partyGstin: '',
+        stateName: '',
+        narration: [
+          received ? 'Advance received' : `Refund of advance ${m.number}`,
+          clean(m.method),
+          m.taxed && `GST on advance ${fixed2(round2(m.igst + m.cgst + m.sgst))} (not posted: record it in Tally)`,
+        ].filter(Boolean).join(' | '),
+        reference: received ? clean(adv?.reference) : '',
         entries,
         inventory: [],
         inventoryLedger: '',
@@ -545,7 +604,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     .sort((a, b) => a.parent.localeCompare(b.parent) || a.name.localeCompare(b.name));
   const stockItems = [...stockMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 
-  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, Receipt: 3 };
+  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, Receipt: 3, Payment: 4 };
   vouchers.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
@@ -706,7 +765,7 @@ function qtyText(n: number): string {
 function voucherXml(v: TallyVoucher): Lines {
   const isInv = v.inventory.length > 0;
   const credit = v.type === 'Credit Note';
-  const isParty = v.type !== 'Receipt';
+  const isParty = v.type !== 'Receipt' && v.type !== 'Payment';
   const header: Lines = [
     ...el('DATE', tallyDate(v.date)),
     ...el('EFFECTIVEDATE', tallyDate(v.date)),

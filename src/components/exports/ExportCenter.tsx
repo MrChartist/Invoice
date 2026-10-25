@@ -7,6 +7,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './ExportCenter.module.css';
 import { getTable, setTable, KEYS } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
+import type { AdvanceRecord } from '../../types/advances';
 import type { Client, InvoiceRecord, Payment } from '../../types/invoice';
 import {
   DATASETS,
@@ -78,6 +79,7 @@ function loadSource(): ExportSource {
     items: getTable<Record<string, unknown>>(KEYS.items),
     purchases: getTable<unknown>('purchases'),
     vendors: getTable<unknown>('vendors'),
+    advances: getTable<AdvanceRecord>('advances'),
   };
 }
 

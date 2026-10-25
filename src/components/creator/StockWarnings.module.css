@@ -19,3 +19,15 @@
   color: var(--warning);
   flex-shrink: 0;
 }
+
+/* Text-like action inside a notice line (advance apply, 5.3). */
+.inlineBtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
