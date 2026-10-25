@@ -21,6 +21,7 @@ import surface from '../styles/surface.module.css';
 import styles from './Books.module.css';
 import { useT } from '../i18n';
 import { booksT } from '../i18n/areas/books';
+import { br2T } from '../i18n/areas/books-r2';
 import { wireT } from '../i18n/areas/wiring';
 import { useCan } from '../hooks/useCan';
 import controls from '../styles/controls.module.css';
@@ -30,6 +31,8 @@ const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'))
 // Cash-flow forecast (6.18) and exchange gain/loss (6.19): their own small lazy chunks.
 const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'));
 const FxTab = lazy(() => import('../components/books/planning/FxTab'));
+// R2-C2: deferred revenue / prepaid expense schedules (own lazy chunk).
+const DeferralsTab = lazy(() => import('../components/books/planning/DeferralsTab'));
 // Tally parity: bill-wise payables, voucher registers, ratio analysis (their own lazy chunk).
 // 8.109: saved views (period + tab + every report's F12 options) and month-end packs.
 const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
@@ -56,6 +59,7 @@ const TABS = [
   { id: 'billwise', label: 'tabBillwise' },
   { id: 'vreg', label: 'tabVreg' },
   { id: 'ratio', label: 'tabRatio' },
+  { id: 'defer', label: 'tabDefer' }, // R2-C2 (label from the books-r2 area)
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 // Day book and P&L read the ledger too (WP-2: one accounting truth); `rpt` = group summary, ratios, registers …
@@ -210,7 +214,7 @@ export function Books() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {booksT(t.label)}
+            {t.id === 'defer' ? br2T('tabDefer') : booksT(t.label as Parameters<typeof booksT>[0])}
           </button>
         ))}
       </div>
@@ -230,6 +234,11 @@ export function Books() {
             period={period}
             onEditOpening={() => setOpeningOpen(true)}
           />
+        )}
+        {tab === 'defer' && (
+          <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>
+            <DeferralsTab period={period} notify={notify} />
+          </Suspense>
         )}
         {(tab === 'fcst' || tab === 'fx') && (
           <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>

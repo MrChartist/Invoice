@@ -30,10 +30,10 @@ function Row({ label, value, strong, tone }: { label: string; value: string; str
  * forced for every template when the paper is the 80 mm thermal roll.
  */
 export function ReceiptBody({ invoice, sender, totals }: Props) {
-  const { money, currency, date, col, show, footerText, headerNote } = usePaper();
+  const { money, currency, date, col, show, footerText, headerNote, title: titled } = usePaper();
   const cur = invoice.currency;
   const c = invoice.client;
-  const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
+  const title = titled(DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice', invoice.doc_type); // R2-C5 suffix
   // Reverse charge: the tax is printed in the recipient-pays note, never added up here.
   const rcm = isRcmTotals(totals);
   const cgstSgst = isTaxed(invoice, totals) && !rcm;

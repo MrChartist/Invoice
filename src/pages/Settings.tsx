@@ -36,6 +36,7 @@ const SyncPanel = lazy(() => import('../components/sync/SyncPanel').then((m) => 
 const ShopModePanel = lazy(() => import('../components/settings/ShopModePanel').then((m) => ({ default: m.ShopModePanel })));
 const CurrencyRatesPanel = lazy(() => import('../components/settings/CurrencyRatesPanel').then((m) => ({ default: m.CurrencyRatesPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
+const DisplayPanel = lazy(() => import('../components/settings/DisplayPanel')); // R2-C6 (Security & device tab)
 
 type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
@@ -299,6 +300,7 @@ export function Settings() {
         </Suspense>
       )}
       {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
+      {tab === 'security' && <Suspense fallback={null}><DisplayPanel /></Suspense>}
 
       </div>
 

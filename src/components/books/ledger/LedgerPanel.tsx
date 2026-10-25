@@ -89,7 +89,7 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
       )}
       {tab === 'day' && <DayBookTab ledger={ledger} period={period} />}
       {tab === 'pnl' && <PnlTab ledger={ledger} data={data} period={period} stock={stock} onStockChanged={changed} notify={notify} />}
-      {tab === 'rpt' && <ReportsHub period={period} data={data} today={today} positions={getPositions} />}
+      {tab === 'rpt' && <ReportsHub period={period} data={data} today={today} positions={getPositions} notify={notify} />}
       {tab === 'coa' && <ChartTab ledger={ledger} asOf={asOf} onChanged={changed} onOpenAccount={(id) => onOpenAccount(id)} notify={notify} />}
       {tab === 'vch' && <VouchersTab ledger={ledger} period={period} onChanged={changed} onOpenAccount={onOpenAccount} notify={notify} />}
       {tab === 'tb' && <TrialBalanceTab ledger={ledger} period={period} stock={stock} />}
