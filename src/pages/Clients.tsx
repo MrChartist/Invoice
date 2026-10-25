@@ -21,6 +21,7 @@ import type { AdvanceRecord } from '../types/advances';
 import { formatCurrency } from '../lib/utils';
 import type { Client } from '../types/invoice';
 import { loadKhataReport } from '../lib/khata-actions';
+import { messageLangOf } from '../lib/message-langs';
 import { buildWhatsAppStatement, khataRows, khataTotals, sortKhataRows, type KhataRow, type KhataSort } from '../lib/khata';
 import { whatsappLink } from '../lib/share';
 import controls from '../styles/controls.module.css';
@@ -247,7 +248,7 @@ export function Clients() {
                   const c = row.client!;
                   const b = billed.get(c.name?.trim().toLowerCase() ?? '');
                   const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
-                  const waHref = row.party ? whatsappLink(c.phone, buildWhatsAppStatement({ sender, party: row.party })) : null;
+                  const waHref = row.party ? whatsappLink(c.phone, buildWhatsAppStatement({ sender, party: row.party, lang: messageLangOf(c) })) : null;
                   return (
                     <tr key={c.id ?? c.name} data-client-row={c.name}>
                       <td className={styles.cWho}>

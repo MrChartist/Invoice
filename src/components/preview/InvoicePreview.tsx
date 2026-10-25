@@ -7,7 +7,7 @@ import { localDb, blankProfile } from '../../lib/localDb';
 import { TEMPLATES, templateById } from '../templates/registry';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { ShareMenu } from '../share';
-import { paperSize, resolve as resolveDesign, saveDesign, loadDesign, sanitizePreprinted, type PreprintedPrefs } from '../../lib/design-prefs';
+import { designForDoc, paperSize, resolve as resolveDesign, saveDesign, loadDesign, sanitizePreprinted, type PreprintedPrefs } from '../../lib/design-prefs';
 import { printCopies, sanitizeCopies, supplyNature, type CopySetting } from '../../lib/print-copies';
 import { invoicePdfName, PdfBuilder } from '../../lib/pdf-batch';
 import { PrintOptions } from './PrintOptions';
@@ -21,6 +21,7 @@ import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
 import { receivableBalance } from '../../lib/rcm';
+import { canDocRight } from '../../lib/user-rights';
 
 
 interface InvoicePreviewModalProps {
@@ -66,7 +67,7 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
   // Print-job options (P0-9 copies, P2 pre-printed): start from the profile's default, change per job.
   const [copySetting, setCopySetting] = useState<CopySetting>(() => sanitizeCopies(design.copies));
   const [preprinted, setPreprinted] = useState<PreprintedPrefs>(() => design.preprinted ?? { on: false, top_mm: 40, left_mm: 0 });
-  const jobDesign = useMemo(() => ({ ...design, preprinted }), [design, preprinted]);
+  const jobDesign = useMemo(() => designForDoc({ ...design, preprinted }, invoice.doc_type), [design, preprinted, invoice.doc_type]); // R2-C5 per-type labels
   const nature = supplyNature(invoice);
   const copies = printCopies(invoice, copySetting);
 
@@ -321,10 +322,10 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
             onPreprinted={setPreprinted}
             onSaveDefault={saveJobDefaults}
           />
-          <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
+          <button type="button" className={controls.btnOutline} onClick={() => window.print()} disabled={!canDocRight(invoice.doc_type ?? '', 'print')}>
             <Printer size={16} /> <span className={styles.hideSm}>Print</span>
           </button>
-          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy}>
+          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy || !canDocRight(invoice.doc_type ?? '', 'print')}>
             {busy ? <Loader2 size={16} className={styles.spin} /> : <Download size={16} />} PDF
           </button>
           <button type="button" className={controls.btnIcon} onClick={onClose} aria-label="Close preview">

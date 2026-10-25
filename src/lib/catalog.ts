@@ -35,6 +35,10 @@ export interface CatalogDraft {
   sold_by_weight?: boolean;
   plu?: string;
   mrp_less_percent?: number;
+  /** Additive (8H catalogue v2): photo as an `asset:<id>` reference (`item-images.ts`); '' clears it. */
+  image?: string;
+  /** Additive (8H): `stock_groups` row used as the catalogue category; '' clears it. */
+  group_id?: string;
 }
 
 export type CatalogError = { field: 'name' | 'rate' | 'hsn' | 'tax_rate' | 'barcode' | 'sku' | 'short_code' | 'plu' | 'mrp_less_percent'; message: string };
@@ -137,6 +141,12 @@ export function applyCatalogDraft(
   if ('mrp' in draft) {
     if (Number(draft.mrp) > 0) extras.mrp = round2(Number(draft.mrp));
     else drop.push('mrp');
+  }
+  for (const k of ['image', 'group_id'] as const) {
+    if (!(k in draft)) continue;
+    const v = draft[k]?.trim();
+    if (v) extras[k] = v;
+    else drop.push(k);
   }
   if ('qty_slabs' in draft) {
     const slabs = cleanSlabs(draft.qty_slabs);

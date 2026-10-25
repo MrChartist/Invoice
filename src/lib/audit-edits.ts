@@ -57,6 +57,8 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   fx_bank_moves: { entity: 'voucher', label: 'Forex bank entry' },
   epay_batches: { entity: 'vendor_payment', label: 'e-Payment batch' },
   commission_postings: { entity: 'voucher', label: 'Commission posting' },
+  business_loans: { entity: 'voucher', label: 'Business loan' },
+  currency_rates: { entity: 'settings', label: 'Currency reference rate' },
   advances: { entity: 'advance', label: 'Advance' },
   recurring: { entity: 'recurring', label: 'Recurring schedule' },
   bank_statements: { entity: 'bank_statement', label: 'Bank statement line' },
@@ -78,6 +80,11 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   pos_returns: { entity: 'invoice', label: 'POS return' },
   doc_links: { entity: 'invoice', label: 'Document link' },
   year_end: { entity: 'settings', label: 'Year-end checklist' },
+  // R2-C: notes to accounts, deferral schedules, packing lists, package types
+  notes_to_accounts: { entity: 'settings', label: 'Notes to accounts' },
+  deferrals: { entity: 'voucher', label: 'Deferral schedule' },
+  packing_lists: { entity: 'invoice', label: 'Packing list' },
+  package_types: { entity: 'item', label: 'Package type' },
   // R2-B: batch invoice runs, proposal section snippets
   batch_runs: { entity: 'invoice', label: 'Batch invoice run' },
   proposal_snippets: { entity: 'settings', label: 'Proposal snippet' },

@@ -13,6 +13,8 @@ import { priceLevelsDb } from '../../lib/pricing';
 import type { Client } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
+import { reachT } from '../../i18n/areas/reach';
+import { MESSAGE_LANGS, isMessageLang } from '../../lib/message-langs';
 import controls from '../../styles/controls.module.css';
 import { ContactsEditor } from '../clients/ContactsEditor';
 import { AddressBookEditor } from '../clients/AddressBookEditor';
@@ -286,6 +288,14 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         )}
         <ContactsEditor value={form.contacts ?? []} onChange={(v) => set('contacts', v)} />
         <AddressBookEditor value={form.addresses ?? []} onChange={(v) => set('addresses', v)} />
+        <label className={controls.field}>
+          <span className={controls.label}>{reachT('msgLang')}</span>
+          <select className={controls.select} value={form.message_lang ?? ''} onChange={(e) => set('message_lang', isMessageLang(e.target.value) ? e.target.value : undefined)}>
+            <option value="">{reachT('msgLangDefault')}</option>
+            {MESSAGE_LANGS.map((l) => <option key={l.code} value={l.code} lang={l.code === 'hinglish' ? 'en' : l.code}>{l.label}</option>)}
+          </select>
+          <span className={controls.hint}>{reachT('msgLangHint')}</span>
+        </label>
         <label className={controls.field}>
           <span className={controls.label}>{salesT('cf.notes')}</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder={salesT('cf.notesPh')} />

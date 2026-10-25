@@ -553,3 +553,11 @@ export const TDS_EXTRA_SECTION_RULES: readonly { section: string; versions: read
     ],
   },
 ];
+
+// ── IMS remarks (R2-C3) — which IMS decisions on credit notes need a remark, by return period ─────────
+// As understood from GSTN IMS advisories (remarks for credit notes kept Pending / Rejected from the
+// Oct 2025 tax period). Verify with your CA; the 2B view lets the user switch the check off.
+export const IMS_REMARK_RULES: readonly Versioned<{ pending: boolean; reject: boolean }>[] = [
+  { from: '2017-07-01', value: { pending: false, reject: false } },
+  { from: '2025-10-01', value: { pending: true, reject: true }, source: 'GSTN IMS advisory (Oct 2025) as understood — verify' },
+];

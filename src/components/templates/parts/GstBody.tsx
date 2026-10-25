@@ -37,12 +37,12 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
  * tax summary, then bank/declaration and the signatory box.
  */
 export function GstBody({ invoice, sender, totals, skipEway }: Props) {
-  const { money, currency, date, col, show, footerText, headerNote } = usePaper();
+  const { money, currency, date, col, show, footerText, headerNote, title: titled } = usePaper();
   const c = invoice.client;
   const ship = invoice.ship_to && (invoice.ship_to.address || invoice.ship_to.name) ? invoice.ship_to : null;
   const cur = invoice.currency;
   const symbol = currencySymbol(cur);
-  const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
+  const title = titled(DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice', invoice.doc_type); // R2-C5 suffix
   const isQuote = invoice.doc_type === 'QUOTATION';
   const cgstSgst = isTaxed(invoice, totals);
   const igst = !cgstSgst && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;

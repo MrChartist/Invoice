@@ -121,8 +121,8 @@ test('proposal sections: cleaned, placed, reordered; only quotations print them;
 test('template wiring: cover before the header, sections and optional items around the items (accent only)', () => {
   const src = readFileSync(new URL('../src/components/templates/TemplateEngine.tsx', import.meta.url), 'utf8');
   assert.match(src, /<ProposalSections invoice=\{invoice\} place="cover" \/>\s*\{layoutBody\}/);
-  assert.match(src, /<ProposalSections invoice=\{invoice\} place="before" \/>\s*<PaperItemsTable/);
-  assert.match(src, /<TaxSummary invoice=\{invoice\} totals=\{totals\} \/>\s*<OptionalItemsBlock invoice=\{invoice\} \/>\s*<ProposalSections invoice=\{invoice\} place="after" \/>/);
+  assert.match(src, /<ProposalSections invoice=\{invoice\} place="before" \/>\s*\{hideAmounts \? <ChallanQtyTable invoice=\{invoice\} \/> : <PaperItemsTable/);
+  assert.match(src, /<TaxSummary invoice=\{invoice\} totals=\{totals\} \/>\}\s*<OptionalItemsBlock invoice=\{invoice\} \/>\s*<ProposalSections invoice=\{invoice\} place="after" \/>/);
   const css = readFileSync(new URL('../src/components/templates/parts/sales-r2-paper.module.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /#[0-9a-f]{3,6}\b/i, 'no raw hex in paper parts');
 });

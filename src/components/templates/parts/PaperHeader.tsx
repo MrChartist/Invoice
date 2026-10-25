@@ -96,8 +96,9 @@ export function SenderIdentity({
 }
 
 function DocTitle({ invoice, style }: { invoice: InvoiceRecord; style?: CSSProperties }) {
-  const { bilingual } = usePaper();
-  const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
+  const { bilingual, title: titled } = usePaper();
+  // R2-C5: the statutory title always prints; a Design Studio suffix is appended.
+  const title = titled(DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice', invoice.doc_type);
   return (
     <>
       <div className={styles.docTitle} style={style}>
@@ -132,9 +133,9 @@ export function StatementStrip({ invoice, due }: { invoice: InvoiceRecord; due: 
 
 /** The header treatments the templates are built from. */
 export function PaperHeader({ invoice, sender, meta }: HeaderProps) {
-  const { logoPosition, bilingual } = usePaper();
+  const { logoPosition, bilingual, title: titled } = usePaper();
   const layout = meta.layout;
-  const title = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
+  const title = titled(DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice', invoice.doc_type); // R2-C5 suffix
   // The Ink skin sets its own serif title face in CSS; don't override it inline.
   const titleStyle = layout === 'ink' ? undefined : { fontFamily: meta.fontFamily };
   const number = invoice.invoice_number || 'DRAFT';

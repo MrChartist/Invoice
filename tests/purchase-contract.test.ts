@@ -686,6 +686,19 @@ test('8G readers (margin chip, insights, Today card, SmartFind) read the real pu
   assert.ok(idx[0]?.ids.includes('27AAPFU0939F1ZV') && idx[0]?.subtitle.includes('Acme Supplies'));
 });
 
+test('R2-C2 deferrals read the real purchase shape (prepaid expense source lines, expense account)', async () => {
+  const { purchaseSourceLines, expenseAccountOf } = await import('../src/lib/deferrals.ts');
+  const lines = purchaseSourceLines(bill);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].amount, 1000, '10 × ₹100 before tax');
+  assert.equal(lines[0].date, '2026-04-12');
+  assert.equal(lines[0].number, 'AS/22');
+  assert.equal(lines[0].party, 'Acme Supplies');
+  assert.equal(purchaseSourceLines({ ...bill, status: 'cancelled' })[0].cancelled, true);
+  const lump = purchaseSourceLines({ ...bill, kind: 'EXPENSE', category: 'Rent', lines: [] });
+  assert.equal(lump[0].amount, 1000, 'a bill without lines defers its taxable value');
+  assert.equal(expenseAccountOf({ ...bill, kind: 'EXPENSE', category: 'Rent' }, []), 'rent');
+  assert.equal(expenseAccountOf(bill, []), 'purchases');
 test('R2-B5 back-to-back reader (backorders, cancel warning) reads bills against PO lines', async () => {
   const { backorderRows, openLinkedPos } = await import('../src/lib/back-to-back.ts');
   const po = {

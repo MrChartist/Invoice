@@ -69,6 +69,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (weighing-scale profile) and `mrchartist_pos_keys` (function-key overrides, 8E).
   `mrchartist_report_views` / `mrchartist_report_pack` (8G saved
   views and month-end pack schedule). `mrchartist_inv_save_choice` (editor split-Save choice) is in `DEVICE_LOCAL_KEYS`.
+  `mrchartist_plus_one_tap` (phone "+" opens a new invoice
+  directly, 8H) and `mrchartist_demo_pending` (wizard "explore with sample data" across the Demo-company reload, 8H).
+- 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
+  and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express

@@ -260,7 +260,7 @@ input, textarea, select { font: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  html:not(.a11y-motion-full) *, html:not(.a11y-motion-full) *::before, html:not(.a11y-motion-full) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -268,8 +268,63 @@ input, textarea, select { font: inherit; }
   }
 }
 
+/* ── Display preferences (R2-C6) ─────────────────────────────────
+   Classes on <html> set by public/theme-init.js before first paint and by src/lib/display-prefs.ts.
+   The type scale is in rem, so the root size scales the interface; printed documents are reset below. */
+html.a11y-text-90 { font-size: 14.4px; }
+html.a11y-text-110 { font-size: 17.6px; }
+html.a11y-text-120 { font-size: 19.2px; }
+html.a11y-text-130 { font-size: 20.8px; }
+
+html.a11y-motion-reduce, html.a11y-motion-reduce body { scroll-behavior: auto; }
+html.a11y-motion-reduce *, html.a11y-motion-reduce *::before, html.a11y-motion-reduce *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast: stronger text, borders and focus ring in both themes. */
+html.a11y-contrast {
+  --muted-foreground: #27272a;
+  --border: #71717a;
+  --input-border: #52525b;
+  --ring: #072b6b;
+  --primary: #072b6b;
+  --primary-hover: #071742;
+}
+html.dark.a11y-contrast {
+  --foreground: #ffffff;
+  --card-foreground: #ffffff;
+  --muted-foreground: #e4e4e7;
+  --border: #a1a1aa;
+  --input-border: #d4d4d8;
+  --ring: #e3b97e;
+  --primary: #e3b97e;
+  --primary-hover: #f0d2a6;
+}
+
+html.a11y-underline a,
+html.a11y-underline [role='link'] { text-decoration: underline; text-underline-offset: 2px; }
+
+html.a11y-targets button,
+html.a11y-targets [role='button'],
+html.a11y-targets [role='tab'],
+html.a11y-targets select,
+html.a11y-targets input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']) {
+  min-height: 2.75rem;
+}
+html.a11y-targets input[type='checkbox'],
+html.a11y-targets input[type='radio'] { min-width: 1.25rem; min-height: 1.25rem; }
+
+html.a11y-focus :focus {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
 /* ── Print ───────────────────────────────────────────────────── */
 @media print {
+  html { font-size: 16px !important; } /* display prefs (R2-C6) never reach paper */
   body { background: white !important; color: black !important; overflow: visible !important; height: auto !important; }
   #root { overflow: visible !important; height: auto !important; }
   .no-print { display: none !important; }

@@ -1,0 +1,41 @@
+/** Settings → Security & device → Display (R2-C6). */
+import { defineArea } from '../area';
+
+export const dispT = defineArea(
+  {
+    title: 'Display & accessibility',
+    note: 'These settings apply on this device only. They are never backed up or synced, and printed documents and PDFs look the same whatever you pick.',
+    textSize: 'Text size',
+    textSizeAria: 'Text size {pct}%',
+    contrast: 'High contrast',
+    contrastHint: 'Darker text and stronger borders.',
+    motion: 'Motion',
+    motionSystem: 'Follow device',
+    motionReduce: 'Reduce',
+    motionFull: 'Full',
+    underline: 'Underline links',
+    targets: 'Larger tap targets',
+    targetsHint: 'Buttons and fields at least 44 px tall.',
+    focus: 'Always show the focus ring',
+    reset: 'Reset display settings',
+    saved: 'Display settings saved on this device',
+  } as const,
+  {
+    title: 'डिस्प्ले और सुगम्यता',
+    note: 'ये सेटिंग केवल इसी डिवाइस पर लागू होती हैं। इनका बैकअप या सिंक नहीं होता, और छपे दस्तावेज़ व PDF हर चुनाव में एक जैसे दिखते हैं।',
+    textSize: 'अक्षर का आकार',
+    textSizeAria: 'अक्षर का आकार {pct}%',
+    contrast: 'उच्च कंट्रास्ट',
+    contrastHint: 'गहरा टेक्स्ट और मज़बूत किनारे।',
+    motion: 'एनिमेशन',
+    motionSystem: 'डिवाइस के अनुसार',
+    motionReduce: 'कम करें',
+    motionFull: 'पूरा',
+    underline: 'लिंक को रेखांकित करें',
+    targets: 'बड़े टैप लक्ष्य',
+    targetsHint: 'बटन और फ़ील्ड कम से कम 44 px ऊँचे।',
+    focus: 'फ़ोकस रिंग हमेशा दिखाएँ',
+    reset: 'डिस्प्ले सेटिंग रीसेट करें',
+    saved: 'डिस्प्ले सेटिंग इस डिवाइस पर सहेजी गईं',
+  },
+);

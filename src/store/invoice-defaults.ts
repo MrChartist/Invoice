@@ -361,6 +361,10 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.pos === true ? { pos: true } : {}),
     ...ecoFields(r.eco_gstin, r.eco_section),
     ...(CHALLAN_PURPOSES.has(String(r.challan_purpose)) ? { challan_purpose: r.challan_purpose as ChallanPurpose } : {}),
+    // 8H delivery challan toggles (additive).
+    ...(r.challan_hide_amounts === true ? { challan_hide_amounts: true } : {}),
+    ...(r.challan_returnable === true ? { challan_returnable: true } : {}),
+    ...(typeof r.challan_return_by === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.challan_return_by) ? { challan_return_by: r.challan_return_by } : {}),
     ...(() => {
       const transport = normalizeTransport(r.transport);
       return transport ? { transport } : {};

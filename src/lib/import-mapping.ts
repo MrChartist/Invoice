@@ -399,6 +399,100 @@ export const IMPORT_PRESETS: ImportPreset[] = [
         client_gstin: ['GSTIN'], taxable_value: ['Net Amount', 'Taxable Amount'], total: ['Bill Amount', 'Net Total'],
       },
     },
+  },  // 8H import presets (roadmap 8.126): header spellings of the tools' standard list exports. Best effort —
+  // columns the preset does not know are still matched by name, and the mapping step shows every guess.
+  {
+    id: 'quickbooks',
+    label: 'QuickBooks Online',
+    description: 'Customer, Product/Service and Invoice list exports from QuickBooks Online (India).',
+    headers: {
+      clients: {
+        name: ['Customer', 'Customer full name', 'Display Name'], company: ['Company', 'Company name'], email: ['Email'],
+        phone: ['Phone', 'Mobile'], address: ['Billing Address', 'Billing street'], city: ['Billing city'], state: ['Billing state'],
+        zip: ['Billing ZIP', 'Billing postcode'], gstin: ['GSTIN'],
+      },
+      items: {
+        name: ['Product/Service Name', 'Product/Service', 'Name'], description: ['Sales Description', 'Description'],
+        rate: ['Sales Price / Rate', 'Sales price/rate', 'Price'], hsn: ['HSN/SAC', 'SAC/HSN'], type: ['Type'], tax_rate: ['Sales tax', 'Tax'],
+      },
+      invoices: {
+        invoice_number: ['Num', 'No.', 'Invoice no'], issue_date: ['Date', 'Invoice date'], due_date: ['Due Date', 'Due date'],
+        client_name: ['Customer', 'Name'], total: ['Amount', 'Total'], balance_due: ['Open Balance', 'Balance'], po_number: ['P.O. Number'],
+      },
+    },
+  },
+  {
+    id: 'xero',
+    label: 'Xero',
+    description: 'Contacts, Inventory items and Sales invoice CSV exports from Xero (one row per invoice line).',
+    headers: {
+      clients: {
+        name: ['ContactName', '*ContactName'], email: ['EmailAddress'], phone: ['PhoneNumber', 'MobileNumber'],
+        address: ['POAddressLine1', 'SAAddressLine1'], address2: ['POAddressLine2'], city: ['POCity'], state: ['PORegion'],
+        zip: ['POPostalCode'], gstin: ['TaxNumber'],
+      },
+      items: {
+        name: ['ItemName', '*ItemCode', 'ItemCode'], description: ['SalesDescription'], rate: ['SalesUnitPrice'], tax_rate: ['SalesTaxRate'],
+      },
+      invoices: {
+        invoice_number: ['InvoiceNumber', '*InvoiceNumber'], issue_date: ['InvoiceDate', '*InvoiceDate'], due_date: ['DueDate', '*DueDate'],
+        client_name: ['ContactName', '*ContactName'], total: ['Total'], po_number: ['Reference'], item_name: ['Description', '*Description'],
+        item_qty: ['Quantity', '*Quantity'], item_rate: ['UnitAmount', '*UnitAmount'], status: ['Status'],
+      },
+    },
+  },
+  {
+    id: 'refrens',
+    label: 'Refrens',
+    description: 'Clients and Invoices exports from Refrens.',
+    headers: {
+      clients: {
+        name: ['Business Name', 'Client Name'], email: ['Email'], phone: ['Phone', 'Phone Number'], gstin: ['GSTIN', 'GST Number'],
+        address: ['Address', 'Street'], city: ['City'], state: ['State'], zip: ['Pincode', 'Postal Code'],
+      },
+      invoices: {
+        invoice_number: ['Invoice No.', 'Invoice Number'], issue_date: ['Invoice Date'], due_date: ['Due Date'], client_name: ['Client Name', 'Billed To'],
+        client_gstin: ['Client GSTIN'], taxable_value: ['Amount', 'Sub Total'], tax_amount: ['Tax', 'Total Tax'], total: ['Total', 'Total Amount'],
+        amount_paid: ['Amount Received', 'Paid Amount'], balance_due: ['Amount Due', 'Balance Due'], status: ['Status'],
+      },
+    },
+  },
+  {
+    id: 'clearone',
+    label: 'ClearOne (ClearTax)',
+    description: 'Customer, Item and Sales invoice exports from ClearOne / ClearTax billing.',
+    headers: {
+      clients: {
+        name: ['Customer Name', 'Name'], gstin: ['GSTIN', 'Customer GSTIN'], email: ['Email', 'Email ID'], phone: ['Mobile Number', 'Phone'],
+        address: ['Billing Address'], city: ['City'], state: ['State', 'Billing State'], zip: ['Pincode'],
+      },
+      items: {
+        name: ['Item Name'], hsn: ['HSN/SAC Code', 'HSN/SAC'], rate: ['Selling Price', 'Rate'], tax_rate: ['GST Rate', 'Tax Rate'], unit: ['Unit', 'UQC'],
+      },
+      invoices: {
+        invoice_number: ['Invoice Number', 'Document Number'], issue_date: ['Invoice Date', 'Document Date'], due_date: ['Due Date'],
+        client_name: ['Customer Name'], client_gstin: ['Customer GSTIN'], place_of_supply: ['Place of Supply'], taxable_value: ['Taxable Value'],
+        cgst: ['CGST Amount'], sgst: ['SGST Amount'], igst: ['IGST Amount'], total: ['Invoice Total', 'Invoice Value'],
+      },
+    },
+  },
+  {
+    id: 'marg',
+    label: 'Marg ERP',
+    description: 'Party master, Item master and Sale register exports from Marg ERP 9+.',
+    headers: {
+      clients: {
+        name: ['Party Name', 'Ledger'], address: ['Address', 'Address 1'], city: ['Station', 'City'], gstin: ['GST No.', 'GSTIN'],
+        phone: ['Mobile', 'Phone'], state: ['State'], email: ['Email'],
+      },
+      items: {
+        name: ['Product Name', 'Item Name'], hsn: ['HSN', 'HSN Code'], rate: ['Rate', 'Sale Rate'], tax_rate: ['GST %', 'GST'], unit: ['Unit', 'Pack'],
+      },
+      invoices: {
+        invoice_number: ['Bill No', 'Bill No.'], issue_date: ['Bill Date', 'Date'], client_name: ['Party Name'], client_gstin: ['GSTIN', 'GST No.'],
+        taxable_value: ['Taxable', 'Taxable Amt'], cgst: ['CGST'], sgst: ['SGST'], igst: ['IGST'], total: ['Net Amount', 'Bill Amount'],
+      },
+    },
   },
 ];
 

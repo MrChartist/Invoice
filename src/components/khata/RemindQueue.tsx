@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BellOff, Copy, MessageCircle, SkipForward, X } from 'lucide-react';
+import { MESSAGE_LANGS, messageLangOf } from '../../lib/message-langs';
 import { localDb } from '../../lib/localDb';
 import {
   buildPartyReminder, makePartyLogEntry, makePartySnooze, partyReminderQueue, partyStage,
@@ -37,7 +38,10 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
     return partyReminderQueue(report, input.clients ?? [], loadReminderLog(), { kind });
   }, [kind]);
   const [index, setIndex] = useState(0);
-  const [lang, setLang] = useState<PartyReminderLang>(() => (getLanguage() === 'hi' ? 'hi' : 'en'));
+  const [lang, setLang] = useState<PartyReminderLang>(() => {
+    const ui = getLanguage();
+    return ui === 'hi' || ui === 'mr' || ui === 'gu' || ui === 'ta' ? ui : 'en';
+  });
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [tally, setTally] = useState({ sent: 0, skipped: 0, snoozed: 0 });
   const [copied, setCopied] = useState(false);
@@ -54,8 +58,16 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
   }, [onClose]);
 
   const item = queue.items[index];
-  const generated = item ? buildPartyReminder({ party: item.party, sender, kind, lang }) : null;
-  const editKey = item ? `${item.party.key}|${lang}` : '';
+  // 8H: a party with its own message language gets it unless the user picks another for this party.
+  const [picked, setPicked] = useState<Record<string, PartyReminderLang>>({});
+  const own = item ? messageLangOf(item.client) : undefined;
+  const effLang: PartyReminderLang = item ? picked[item.party.key] ?? (own && own !== 'en' ? own : lang) : lang;
+  const pick = (l: PartyReminderLang) => {
+    setLang(l);
+    if (item) setPicked((p) => ({ ...p, [item.party.key]: l }));
+  };
+  const generated = item ? buildPartyReminder({ party: item.party, sender, kind, lang: effLang }) : null;
+  const editKey = item ? `${item.party.key}|${effLang}` : '';
   const body = item ? edits[editKey] ?? generated!.body : '';
   const total = queue.items.length;
 
@@ -116,9 +128,16 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
                 <span className={controls.label}>{khataT('language')}</span>
                 <div className={controls.segment} role="radiogroup" aria-label={khataT('language')}>
                   {(['en', 'hinglish', 'hi'] as const).map((l) => (
-                    <button key={l} type="button" role="radio" aria-checked={lang === l}
-                      className={lang === l ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setLang(l)}>
+                    <button key={l} type="button" role="radio" aria-checked={effLang === l}
+                      className={effLang === l ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => pick(l)}>
                       {l === 'en' ? khataT('langEn') : l === 'hinglish' ? khataT('langHinglish') : khataT('langHi')}
+                    </button>
+                  ))}
+                  {/* 8H: Marathi, Gujarati, Tamil (and each party's own message language by default). */}
+                  {(['mr', 'gu', 'ta'] as const).map((l) => (
+                    <button key={l} type="button" role="radio" aria-checked={effLang === l} lang={l}
+                      className={effLang === l ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => pick(l)}>
+                      {MESSAGE_LANGS.find((m) => m.code === l)?.label}
                     </button>
                   ))}
                 </div>

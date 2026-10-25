@@ -20,6 +20,7 @@ import { CompaniesPanel } from '../components/companies/CompaniesPanel';
 import { AutoBackupPanel } from '../components/pwa/AutoBackupPanel';
 import { can as canDo, type AccessAction } from '../lib/access';
 import { blankProfile, localDb, type AppSettings } from '../lib/localDb';
+import { SHOP_MODE_EVENT } from '../lib/shop-mode';
 import { checkGstin } from '../lib/gstin';
 import { isValidIfsc, isValidPan, isValidUpi } from '../lib/validators';
 import type { SenderProfile } from '../types/invoice';
@@ -31,7 +32,11 @@ import styles from '../components/settings/Settings.module.css';
 const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomFieldsPanel').then((m) => ({ default: m.CustomFieldsPanel })));
 // Folder sync (5.7): the panel brings the whole sync engine, so it loads only on the Data tab.
 const SyncPanel = lazy(() => import('../components/sync/SyncPanel').then((m) => ({ default: m.SyncPanel })));
+// Shop mode (8H) and the 8H masters (currency rates) load with the Defaults tab only.
+const ShopModePanel = lazy(() => import('../components/settings/ShopModePanel').then((m) => ({ default: m.ShopModePanel })));
+const CurrencyRatesPanel = lazy(() => import('../components/settings/CurrencyRatesPanel').then((m) => ({ default: m.CurrencyRatesPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
+const DisplayPanel = lazy(() => import('../components/settings/DisplayPanel')); // R2-C6 (Security & device tab)
 
 type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
@@ -146,6 +151,7 @@ export function Settings() {
       localDb.settings.save({ ...settings, onboarded: true });
       setSettings((s) => ({ ...s, onboarded: true }));
       setDirty(false);
+      window.dispatchEvent(new Event(SHOP_MODE_EVENT)); // 8H: the sidebar re-reads the shop mode
       notify(t('settings.saved'));
     } catch (err) {
       notify((err as Error).message, 'error');
@@ -262,7 +268,13 @@ export function Settings() {
       )}
       {tab === 'defaults' && (
         <>
+          <Suspense fallback={null}>
+            <ShopModePanel settings={settings} onChange={patchSettings} />
+          </Suspense>
           <DefaultsPanel settings={settings} onChange={patchSettings} />
+          <Suspense fallback={null}>
+            <CurrencyRatesPanel notify={notify} />
+          </Suspense>
           <LateFeeSettings
             profileId={settings.activeProfileId}
             profileName={settings.profiles.find((p) => p.id === settings.activeProfileId)?.companyName}
@@ -288,6 +300,7 @@ export function Settings() {
         </Suspense>
       )}
       {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
+      {tab === 'security' && <Suspense fallback={null}><DisplayPanel /></Suspense>}
 
       </div>
 
