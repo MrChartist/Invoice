@@ -16,6 +16,12 @@ import { saveOpeningBillsFor } from '../src/lib/opening-bills.ts';
 import { audit } from '../src/lib/audit.ts';
 import { loadCheques, saveCheque, transitionCheque } from '../src/lib/cheques.ts';
 import { touchesLock } from '../src/lib/sync-engine.ts';
+import { recordSeries } from '../src/lib/series-counters.ts';
+import { nextNoteNumber } from '../src/lib/purchase-returns.ts';
+import { nextReceiptNumber as nextGrnNumber, receiptNotesDb } from '../src/lib/receipt-notes.ts';
+import { nextSlipNumber } from '../src/lib/deposit-slip.ts';
+import { buildPosRecord, savePosBill } from '../src/lib/pos.ts';
+import { EXCHANGE_NOTE, applyExchange, openExchange, posReturnsDb, savePosReturn } from '../src/lib/pos-returns.ts';
 import * as BA from '../src/lib/bill-allocation.ts';
 import { approveDocument, saveApprovalPolicy } from '../src/lib/approvals.ts';
 
@@ -244,4 +250,62 @@ test('M5: a synced change inside the locked period is caught for the newer ledge
   assert.equal(touchesLock(lock, `${P}ledger_openings`, undefined, { id: 'o', ledger_id: 'bank', dr: 1, cr: 0 }), true, 'openings post on 31 Mar');
   assert.equal(touchesLock(lock, `${P}opening_bills`, undefined, { id: 'b', date: '2025-01-01' }), true);
   assert.equal(touchesLock('2026-03-30', `${P}ledger_openings`, undefined, { id: 'o', ledger_id: 'bank', dr: 1, cr: 0 }), false);
+});
+
+/* ── L1. Debit notes, GRNs and pay-in slips never hand a deleted number out again ── */
+
+test('L1: deleting the latest DN / GRN / RJO / PIS does not free its number', () => {
+  recordSeries('DN/FY26-27/0005');
+  recordSeries('GRN/FY26-27/0003');
+  recordSeries('RJO/FY26-27/0002');
+  recordSeries('PIS/FY26-27/0009');
+  assert.equal(nextNoteNumber([], '2026-06-01'), 'DN/FY26-27/0006', 'a deleted DN/0005 is not reused');
+  assert.equal(nextNoteNumber(['DN/FY26-27/0007'], '2026-06-01'), 'DN/FY26-27/0008');
+  assert.equal(nextGrnNumber([], 'GRN', '2026-06-01'), 'GRN/FY26-27/0004');
+  assert.equal(nextGrnNumber([], 'REJECTION_OUT', '2026-06-01'), 'RJO/FY26-27/0003');
+  assert.equal(nextSlipNumber([], '2026-06-01'), 'PIS/FY26-27/0010');
+  assert.equal(nextNoteNumber([], '2027-04-01'), 'DN/FY27-28/0001', 'each FY starts again');
+});
+
+test('L1: saving a GRN records its number as issued', () => {
+  const note = receiptNotesDb.save({ kind: 'GRN', date: '2026-06-01', vendor_name: 'V', lines: [{ id: 'l1', name: 'Bolt', quantity: 5, rate: 1 }] } as never, []);
+  assert.equal(note.number, 'GRN/FY26-27/0001');
+  receiptNotesDb.remove(note.id, []);
+  assert.equal(receiptNotesDb.nextNumber('GRN', '2026-06-02'), 'GRN/FY26-27/0002');
+});
+
+/* ── L4. Using an exchange credit is all-or-nothing; the voucher names the returning customer ── */
+
+test('L4: a failed exchange voucher leaves no exchange payment behind; the voucher debits the returned bill’s party', () => {
+  const DAY = '2026-05-10';
+  const posLine = (id: string, name: string, rate: number) => ({ id, name, type: 'Product' as const, hsn: '3401', unit: 'PCS', quantity: 1, rate, tax_rate: 18, discount_percent: 0, amount: rate });
+  const bill = (party: { name?: string }, items: ReturnType<typeof posLine>[], tenders: { method: 'Cash'; amount: number }[], exchangeReturnId?: string) => {
+    const record = buildPosRecord({ items, party, settings: localDb.settings.get(), sender: localDb.settings.activeProfile(), templateId: 'classic_orange', day: DAY });
+    return savePosBill({ record, tenders, ...(exchangeReturnId ? { exchangeReturnId } : {}) });
+  };
+  const first = bill({ name: 'Asha' }, [posLine('a', 'Shirt', 500)], [{ method: 'Cash', amount: 590 }]);
+  assert.ok(first.ok, first.errors.join('; '));
+  const ret = savePosReturn({ bill: first.record!, lines: [{ itemId: 'a', quantity: 1 }], settlement: 'exchange' });
+  assert.ok(ret.ok, ret.errors.join('; '));
+
+  const ls = globalThis.localStorage;
+  const realSet = ls.setItem.bind(ls);
+  ls.setItem = (k: string, v: string) => {
+    if (k.endsWith('_vouchers')) throw new DOMException('full', 'QuotaExceededError');
+    realSet(k, v);
+  };
+  let second;
+  try {
+    second = bill({}, [posLine('b', 'Shirt XL', 600)], [{ method: 'Cash', amount: 118 }], ret.row!.id);
+  } finally {
+    ls.setItem = realSet;
+  }
+  assert.equal(second.ok, false);
+  assert.equal(localDb.payments.getAll().filter((p) => (p.note ?? '').startsWith(EXCHANGE_NOTE)).length, 0, 'no exchange payment without its voucher');
+  assert.ok(openExchange(ret.row!.id), 'the credit is still open for a retry');
+
+  const x = applyExchange(ret.row!.id, localDb.invoices.getById(second.record!.id)!);
+  assert.equal(x.used, 590);
+  const v = loadVouchers().find((o) => o.id === posReturnsDb.all()[0].voucher_id)!;
+  assert.equal(v.lines.find((l) => l.account_id === 'debtors')?.party, 'Asha', 'the customer who returned the goods');
 });

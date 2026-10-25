@@ -26,7 +26,7 @@ import { GST_NOTE_REASONS } from '../types/purchases';
 import { requireAccess } from './access';
 import { audit } from './audit';
 import { isoDay } from './dates';
-import { buildInvoiceNumber, getIndianFY, highestSequence } from './invoice-number';
+import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { calculateInvoice, num, round2 } from './invoice-calc';
 import { assertUnlocked } from './period-lock';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
@@ -41,10 +41,12 @@ const EPS = 1e-6;
 
 /* ── Pure ─────────────────────────────────────────────────────── */
 
-/** Next `DN/FY<yy-yy>/<seq>` for a note dated `date` (highest issued + 1, so deletes never reuse a number). */
+/**
+ * Next `DN/FY<yy-yy>/<seq>` for a note dated `date`: above every existing number AND the series
+ * high-water mark (`series_counters`), so deleting the latest note never frees its number.
+ */
 export function nextNoteNumber(existing: readonly string[], date?: string): string {
-  const fy = getIndianFY(date).label;
-  return buildInvoiceNumber(DN_PREFIX, fy, highestSequence([...existing], DN_PREFIX, fy) + 1);
+  return nextSeriesNumberFor(DN_PREFIX, date, existing);
 }
 
 /** Does this reason normally send goods back? (Purchase return yes; discount / correction no.) */
@@ -292,6 +294,7 @@ export const purchaseReturnsDb = {
     const adjusted = bill ? round2(Math.min(noteSupplierAmount(draftRecord), balanceOf(bill))) : 0;
     const record: PurchaseReturn = { ...draftRecord, adjusted_amount: Math.max(adjusted, 0) };
     setTable(PURCHASE_RETURNS_TABLE, [...all, record]);
+    recordSeries(record.note_number);
     if (bill && record.adjusted_amount > 0) {
       // Agst Ref: roll into the bill like a payment (only `amount_paid` changes; allowed in a locked bill period).
       setTable('purchases', purchasesDb.all().map((p) => (p.id === bill.id ? { ...p, amount_paid: round2(num(p.amount_paid) + record.adjusted_amount), updated_at: now() } : p)));

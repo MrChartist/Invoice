@@ -393,7 +393,11 @@ export const TALLY_RESERVED_GROUPS: Readonly<Record<string, PrimaryGroupId>> = {
   'suspense a/c': 'OTHER_CL',
 };
 
-const reservedOf = (name: string): PrimaryGroupId | undefined => TALLY_RESERVED_GROUPS[name.trim().toLowerCase()];
+/** Own keys only: a Tally name such as "constructor" or "__proto__" is untrusted text, never an inherited key (L2). */
+const reservedOf = (name: string): PrimaryGroupId | undefined => {
+  const key = name.trim().toLowerCase();
+  return Object.hasOwn(TALLY_RESERVED_GROUPS, key) ? TALLY_RESERVED_GROUPS[key] : undefined;
+};
 
 /* ── Plan ─────────────────────────────────────────────────────── */
 
@@ -634,7 +638,7 @@ export function planTallyImport(parsed: TallyParsed, existing: ExistingBooks, op
       issues.push(`Group “${rec.parent || '(none)'}” not found; placed under Other current assets — check it.`);
       primary = 'OTHER_CA';
     }
-    const override = opts.mapTo?.[lower(rec.name)];
+    const override = opts.mapTo && Object.hasOwn(opts.mapTo, lower(rec.name)) ? opts.mapTo[lower(rec.name)] : undefined;
     let target: PlannedTarget;
     if (override && existing.chart.some((a) => a.id === override)) {
       target = { kind: 'account', accountId: override, existing: true };

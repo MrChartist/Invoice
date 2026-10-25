@@ -24,7 +24,8 @@ import { localDb } from './localDb';
 import { generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
 import { buildCreditNote, createCreditNote, creditableLines, isInvoiceType, readLinks, type CreditLineStatus, type DocLink } from './documents';
-import { saveVoucher, rupeesToPaise, type ManualVoucherLine } from './ledger/vouchers';
+import { VOUCHERS_TABLE, saveVoucher, rupeesToPaise, type ManualVoucherLine } from './ledger/vouchers';
+import { withTablesRollback } from './table-txn';
 import { A } from './ledger/accounts';
 import { receivableTotal } from './rcm';
 import { localDayOf } from './dates';
@@ -313,30 +314,36 @@ export function applyExchange(returnId: string, newBill: InvoiceRecord): { used:
   const due = round2(Math.max(num(newBill.balance_due), 0));
   const used = round2(Math.min(r.amount, due));
   const refunded = round2(r.amount - used);
-  let payment: Payment | undefined;
-  if (used > 0) {
-    payment = localDb.payments.record({
-      invoiceId: newBill.id,
-      amount: used,
-      method: 'Cash',
-      note: `${EXCHANGE_NOTE} ${r.credit_note_number}`,
+  // The credit note credited the customer who RETURNED the goods; the voucher clears that party.
+  const returnedBill = localDb.invoices.getById(r.bill_id);
+  // Payment, voucher and the used mark together or not at all (L4): a payment left without its
+  // voucher would show cash that never came in, and a retry would record it again.
+  return withTablesRollback(['transactions', 'invoices', VOUCHERS_TABLE, POS_RETURNS_TABLE], () => {
+    let payment: Payment | undefined;
+    if (used > 0) {
+      payment = localDb.payments.record({
+        invoiceId: newBill.id,
+        amount: used,
+        method: 'Cash',
+        note: `${EXCHANGE_NOTE} ${r.credit_note_number}`,
+        date: newBill.issue_date,
+      });
+    }
+    const v = saveVoucher({
+      type: 'PAYMENT',
       date: newBill.issue_date,
+      narration: `Exchange: ${r.credit_note_number} (return of ${r.bill_number}) used on ${newBill.invoice_number}${refunded > 0 ? ` · Cash ${refunded.toFixed(2)} refunded` : ''}`,
+      lines: refundVoucherLines(partyOf(returnedBill ?? newBill), [{ method: 'Cash', amount: r.amount }]),
     });
-  }
-  const v = saveVoucher({
-    type: 'PAYMENT',
-    date: newBill.issue_date,
-    narration: `Exchange: ${r.credit_note_number} (return of ${r.bill_number}) used on ${newBill.invoice_number}${refunded > 0 ? ` · Cash ${refunded.toFixed(2)} refunded` : ''}`,
-    lines: refundVoucherLines(partyOf(newBill), [{ method: 'Cash', amount: r.amount }]),
+    writeReturn({
+      ...r,
+      voucher_id: v.id,
+      exchange_bill_id: newBill.id,
+      exchange_used: used,
+      refunds: refunded > 0 ? [{ method: 'Cash', amount: refunded }] : [],
+    });
+    return { used, refunded, payment };
   });
-  writeReturn({
-    ...r,
-    voucher_id: v.id,
-    exchange_bill_id: newBill.id,
-    exchange_used: used,
-    refunds: refunded > 0 ? [{ method: 'Cash', amount: refunded }] : [],
-  });
-  return { used, refunded, payment };
 }
 
 /* ── Z report ─────────────────────────────────────────────────── */

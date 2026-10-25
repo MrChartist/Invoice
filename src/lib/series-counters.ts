@@ -1,7 +1,8 @@
 /**
  * Per-series high-water marks (data-integrity review, 2026-10).
  *
- * Voucher series that are numbered "highest existing + 1" (STR stock transfers, PO purchase orders,
+ * Voucher series that are numbered "highest existing + 1" (STR stock transfers, PO purchase orders, DN debit
+ * notes, GRN / RJO receipt notes, PIS pay-in slips,
  * ADV advance receipts, RFV advance refunds, RCPT payment receipts) would hand a deleted LATEST
  * number out again. Each save records the sequence it used here, and the next number is
  * `max(highest existing, high-water mark) + 1`, so a number is never issued twice.

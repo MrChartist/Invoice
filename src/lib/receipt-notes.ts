@@ -21,7 +21,7 @@ import { requireAccess } from './access';
 import { audit } from './audit';
 import { daysBetween } from './compliance';
 import { isoDay } from './dates';
-import { buildInvoiceNumber, getIndianFY, highestSequence } from './invoice-number';
+import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { num, round2 } from './invoice-calc';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import type { BillSeed } from './purchase-orders';
@@ -35,10 +35,9 @@ const EPS = 1e-6;
 
 /* ── Pure ─────────────────────────────────────────────────────── */
 
+/** Next GRN / RJO number: above every existing number and the series high-water mark (never reused). */
 export function nextReceiptNumber(existing: readonly string[], kind: ReceiptNote['kind'], date?: string): string {
-  const prefix = kind === 'GRN' ? GRN_PREFIX : REJECTION_PREFIX;
-  const fy = getIndianFY(date).label;
-  return buildInvoiceNumber(prefix, fy, highestSequence([...existing], prefix, fy) + 1);
+  return nextSeriesNumberFor(kind === 'GRN' ? GRN_PREFIX : REJECTION_PREFIX, date, existing);
 }
 
 /** Bills that count: saved, not void / draft, not a direct expense. */
@@ -313,6 +312,7 @@ export const receiptNotesDb = {
     if (all.some((n) => n.id !== existing?.id && n.number.toUpperCase() === number.toUpperCase())) throw new ReceiptNoteError(`Number ${number} is already used.`);
     const record: ReceiptNote = { ...existing, ...draft, id: existing?.id ?? generateId(), number, date: isoDay(input.date), created_at: existing?.created_at ?? now(), updated_at: now() };
     setTable(RECEIPT_NOTES_TABLE, existing ? all.map((n) => (n.id === record.id ? record : n)) : [...all, record]);
+    recordSeries(record.number);
     audit.record({ entity: 'purchase', entity_id: record.id, action: existing ? 'update' : 'create', doc_number: record.number, summary: `${record.kind === 'GRN' ? 'Receipt note' : 'Rejection out'} ${record.number} — ${record.vendor_name}, ${record.lines.length} line(s), ${record.date}` });
     return record;
   },
