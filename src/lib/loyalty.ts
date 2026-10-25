@@ -16,7 +16,7 @@
  */
 import type { InvoiceRecord } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
-import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from './storage';
+import { DB_PREFIX, generateId, getJson, getTable, peekTable, setJson, setTable } from './storage';
 import { requireAccess } from './access';
 import { localDayOf } from './dates';
 
@@ -229,7 +229,8 @@ export function loyaltyInfo(name: string): { enabled: boolean; balance: number; 
   const program = readProgram();
   return {
     enabled: program.enabled && eligibleParty(name),
-    balance: program.enabled ? pointsBalance(name, getTable<InvoiceRecord>('invoices'), adjustmentsDb.all(), program) : 0,
+    // Read-only view: shown as the customer name is typed, so no re-parse of the invoice table per keystroke.
+    balance: program.enabled ? pointsBalance(name, peekTable<InvoiceRecord>('invoices'), adjustmentsDb.all(), program) : 0,
     pointValue: ruleOn(program, localDayOf(new Date())).point_value,
     minRedeem: program.min_redeem,
   };

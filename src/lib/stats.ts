@@ -144,10 +144,13 @@ export function monthlyBilled(all: InvoiceRecord[], months = 6, now: Date = new 
 
 /** Unpaid documents, most overdue first — the "needs attention" list. */
 export function attentionList(invoices: InvoiceRecord[], limit = 5, now: Date = new Date()): InvoiceRecord[] {
+  // Overdue days computed once per row, not once per comparison (perf: the sort is n log n).
   return invoices
     .filter((inv) => isRevenueDoc(inv) && outstandingOf(inv) > 0)
-    .sort((a, b) => daysOverdue(b.due_date, now) - daysOverdue(a.due_date, now) || (a.due_date || '').localeCompare(b.due_date || ''))
-    .slice(0, limit);
+    .map((inv) => ({ inv, late: daysOverdue(inv.due_date, now), due: inv.due_date || '' }))
+    .sort((a, b) => b.late - a.late || a.due.localeCompare(b.due))
+    .slice(0, limit)
+    .map((r) => r.inv);
 }
 
 /** Compact INR for chart labels: 1.2L, 3.4Cr, 12k. */
