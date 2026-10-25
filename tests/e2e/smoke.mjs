@@ -115,7 +115,8 @@ const context = await browser.newContext({ serviceWorkers: 'block', acceptDownlo
 const page = await context.newPage();
 const errors = [];
 watch(page, errors);
-page.setDefaultTimeout(10000);
+// E2E_TIMEOUT (ms) helps on a loaded machine; 10 s otherwise.
+page.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
 
 try {
   await step('first-run account', async () => {
@@ -280,6 +281,41 @@ try {
     await block.waitFor();
     const text = await block.innerText();
     check(text.includes('Vehicle no.') && text.includes('MH12AB1234'), `the preview prints the custom field (${text.replace(/\s+/g, ' ').trim()})`);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+  });
+
+  await step('transport details print; preview with 3 copies downloads a PDF with 3x the pages', async () => {
+    const id = (await readJson(page, 'invoices', []))[0].id;
+    await page.goto(srv.origin + '/invoice/' + id);
+    await page.getByText('Transport / dispatch details').click();
+    await page.getByLabel('Vehicle number').fill('ka01ab0001');
+    await page.getByLabel('Transporter name').fill('Speedy Roadways');
+    await page.keyboard.press('Control+s');
+    const inv = (await readJson(page, 'invoices', [], (v) => v[0]?.transport?.vehicle_no))[0];
+    check(/^KA01AB0001$/i.test(inv.transport?.vehicle_no ?? ''), `transport details are saved on the invoice (${inv.transport?.vehicle_no})`);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.waitFor();
+    const vehicle = await dialog.locator('[data-transport-row="vehicle"]').first().innerText();
+    check(/KA01AB0001/i.test(vehicle), `the transport block prints the vehicle no. (${vehicle.replace(/\s+/g, ' ').trim()})`);
+
+    const pdfPages = async () => {
+      await dialog.getByRole('button', { name: /^Share/ }).click();
+      const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+      const body = readFileSync(await dl.path()).toString('latin1');
+      return (body.match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
+    };
+    const single = await pdfPages();
+    await dialog.getByRole('button', { name: /^1 copy$/ }).click();
+    const opts = page.getByRole('dialog', { name: 'Print options' });
+    for (const name of ['Original', 'Duplicate', 'Triplicate']) await opts.getByLabel(name, { exact: true }).check();
+    await dialog.locator('[data-print-copy="triplicate"]').waitFor();
+    const banners = await dialog.locator('[data-copy-banner]').allInnerTexts();
+    check(banners.length === 3 && /ORIGINAL FOR RECIPIENT/i.test(banners[0]) && /TRIPLICATE/i.test(banners[2]), `three copy banners (${banners.join(' / ')})`);
+    await page.keyboard.press('Escape'); // closes the options panel, not the preview
+    const triple = await pdfPages();
+    check(single >= 1 && triple === single * 3, `3 copies give 3x the PDF pages (${single} -> ${triple})`);
     await page.keyboard.press('Escape');
     await dialog.waitFor({ state: 'detached' });
   });

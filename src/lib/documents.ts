@@ -513,6 +513,7 @@ export function buildCreditNote(
     updated_at: undefined,
     amends: undefined,
     pos: undefined,
+    transport: undefined, // the original's dispatch details (P1-24)
     goods_returned: goodsReturned,
   };
   const rec = recompute(base);
@@ -616,6 +617,7 @@ export function buildDebitNote(
     updated_at: undefined,
     amends: undefined,
     pos: undefined,
+    transport: undefined,
   });
 }
 

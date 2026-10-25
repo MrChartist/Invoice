@@ -1174,3 +1174,44 @@
   letter-spacing: 0.01em;
   break-inside: avoid;
 }
+
+/* ── Copy banner (P0-9: Original / Duplicate / Triplicate) ─────── */
+.copyBanner {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: calc(var(--tpl-gap) * -0.5);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.copyBanner span {
+  border: 1px solid var(--tpl-accent);
+  border-radius: 3px;
+  padding: 2px 8px;
+}
+
+.paper[data-paper='thermal80'] .copyBanner { justify-content: center; margin-bottom: 0; }
+
+/* ── Pre-printed stationery (P2): no letterhead, no backgrounds ── */
+.preHead {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 1px solid var(--tpl-line);
+  padding-bottom: 6px;
+}
+
+.preHead strong { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tpl-ink); }
+.preHead span { font-family: var(--font-mono); font-size: 11px; color: var(--tpl-body); }
+
+.paper[data-preprinted] { background: transparent !important; box-shadow: none; }
+.paper[data-preprinted]::before,
+.paper[data-preprinted]::after { display: none !important; }
+.paper[data-preprinted] .watermark,
+.paper[data-preprinted] .letterFoot { display: none; }
+.paper[data-preprinted] .gSeller { visibility: hidden; }
+.paper[data-preprinted] .gTitle { background: transparent; color: var(--tpl-ink); }

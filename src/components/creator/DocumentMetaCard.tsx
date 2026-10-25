@@ -4,6 +4,7 @@ import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { ForexFields } from './ForexFields';
+import { TransportFields } from './TransportFields';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { localDb } from '../../lib/localDb';
@@ -155,6 +156,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
           hint={t('meta.costCentreHint')}
         />
         <ForexFields />
+        <TransportFields />
       </div>
     </section>
   );

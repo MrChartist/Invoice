@@ -55,6 +55,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     rcm_tax_excluded: true,
     goods_returned: false,
     eco_gstin: '07AAACZ1234A1C5', eco_section: 'PAY_9_5', challan_purpose: 'JOB_WORK',
+    transport: { mode: 'ROAD', vehicle_no: 'MH12AB1234', transporter_name: 'Speedy', transporter_id: '27AAACS1234A1Z5', lr_no: 'LR1', lr_date: '2026-04-11', eway_bill_no: '321000123456', distance_km: 40 },
     amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };

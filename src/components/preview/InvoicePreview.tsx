@@ -7,11 +7,13 @@ import { localDb, blankProfile } from '../../lib/localDb';
 import { TEMPLATES, templateById } from '../templates/registry';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { ShareMenu } from '../share';
-import { pageSlices, paperSize, resolve as resolveDesign } from '../../lib/design-prefs';
+import { paperSize, resolve as resolveDesign, saveDesign, loadDesign, sanitizePreprinted, type PreprintedPrefs } from '../../lib/design-prefs';
+import { printCopies, sanitizeCopies, supplyNature, type CopySetting } from '../../lib/print-copies';
+import { invoicePdfName, PdfBuilder } from '../../lib/pdf-batch';
+import { PrintOptions } from './PrintOptions';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../types/invoice';
 import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { downloadBlob } from '../../lib/download';
-import { ensureDevanagariFont } from '../../lib/fonts-ready';
 import { canShareFiles, invoiceSummaryText, invoiceUpiLink, shareFile } from '../../lib/share';
 import { buildClientCopyHtml } from '../../lib/client-copy';
 import { FOCUSABLE } from '../ui/Modal';
@@ -58,6 +60,24 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sender.id, isOpen],
   );
+  // Print-job options (P0-9 copies, P2 pre-printed): start from the profile's default, change per job.
+  const [copySetting, setCopySetting] = useState<CopySetting>(() => sanitizeCopies(design.copies));
+  const [preprinted, setPreprinted] = useState<PreprintedPrefs>(() => design.preprinted ?? { on: false, top_mm: 40, left_mm: 0 });
+  const jobDesign = useMemo(() => ({ ...design, preprinted }), [design, preprinted]);
+  const nature = supplyNature(invoice);
+  const copies = printCopies(invoice, copySetting);
+
+  const saveJobDefaults = () => {
+    try {
+      const profileId = sender.id || design.profile_id;
+      const own = loadDesign(profileId) ?? { ...design, profile_id: profileId };
+      saveDesign({ ...own, copies: copySetting, preprinted: sanitizePreprinted(preprinted) });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const size = paperSize(design);
   const PAPER_W = size.width;
   const PAPER_H = size.height;
@@ -118,40 +138,17 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   const meta = templateById(invoice.template_id);
   const step = (dir: -1 | 1) => invoice.setTemplate(TEMPLATES[(idx + dir + TEMPLATES.length) % TEMPLATES.length].id);
 
-  const pdfFilename = () => {
-    const safe = (invoice.invoice_number || 'draft').replace(/[\\/:*?"<>|]+/g, '-');
-    return `${DOCUMENT_LABELS[invoice.doc_type].replace(/\s+/g, '_')}_${safe}.pdf`;
-  };
+  const pdfFilename = () => invoicePdfName(invoice);
 
-  /** Render the paper to a PDF Blob (null if the preview is not mounted). Throws on failure. */
+  /** Render every copy to one PDF Blob (null if the preview is not mounted). Throws on failure. */
   const buildPdf = async (): Promise<Blob | null> => {
-    if (!paperRef.current) return null;
+    const host = paperRef.current;
+    if (!host) return null;
     // Loaded on demand — the PDF stack is ~200 KB gzipped and most sessions never export.
-    const [{ toJpeg }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
-    const node = paperRef.current;
-    await ensureDevanagariFont(node.textContent);
-    const height = Math.max(node.offsetHeight, PAPER_H);
-    const dataUrl = await toJpeg(node, {
-      quality: 0.92,
-      pixelRatio: 2.5,
-      cacheBust: true,
-      width: PAPER_W,
-      height,
-      backgroundColor: '#ffffff',
-      style: { transform: 'none', transformOrigin: 'top left' },
-    });
-
-    // Thermal rolls are one tall page; sheet formats are sliced page by page.
-    const slices = pageSlices(height, design);
-    const pageWmm = size.mm.width;
-    const imgHmm = (height / PAPER_W) * pageWmm;
-    const pageHmm = size.autoHeight ? imgHmm : size.mm.height;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageWmm, pageHmm] });
-    slices.forEach((_, page) => {
-      if (page > 0) pdf.addPage([pageWmm, pageHmm], 'portrait');
-      pdf.addImage(dataUrl, 'JPEG', 0, -page * pageHmm, pageWmm, imgHmm, undefined, 'FAST');
-    });
-    return pdf.output('blob');
+    const pdf = await PdfBuilder.create();
+    const papers = Array.from(host.querySelectorAll<HTMLElement>('[data-print-copy]'));
+    for (const node of papers.length ? papers : [host]) await pdf.addPaper(node, design);
+    return pdf.blob();
   };
 
   const handleExportPDF = async () => {
@@ -174,7 +171,8 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
    * frozen into images and the app's stylesheet rules are inlined so it opens anywhere offline.
    */
   const handleClientCopy = async () => {
-    const node = paperRef.current;
+    // The client copy is one paper: the first copy (with its "Original for Recipient" banner when copies are on).
+    const node = paperRef.current?.querySelector<HTMLElement>('[data-print-copy]') ?? paperRef.current;
     if (!node) return;
     const clone = node.cloneNode(true) as HTMLElement;
     const live = Array.from(node.querySelectorAll('canvas'));
@@ -297,6 +295,14 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
               <Share2 size={16} /> Share PDF now
             </button>
           )}
+          <PrintOptions
+            setting={copySetting}
+            nature={nature}
+            onChange={setCopySetting}
+            preprinted={preprinted}
+            onPreprinted={setPreprinted}
+            onSaveDefault={saveJobDefaults}
+          />
           <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
             <Printer size={16} /> <span className={styles.hideSm}>Print</span>
           </button>
@@ -314,8 +320,12 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
       <div className={styles.stage} ref={stageRef}>
         <div className={styles.paperFrame} style={{ width: PAPER_W * scale, height: paperHeight * scale }}>
           <div className={cn(styles.paperScale, 'paper-scale')} style={{ transform: `scale(${scale})`, width: PAPER_W }}>
-            <div ref={paperRef}>
-              <TemplateEngine invoice={invoice} sender={sender} totals={invoice.totals} templateId={invoice.template_id} design={design} pageRule />
+            <div ref={paperRef} data-copies={copies.length}>
+              {copies.map((c, i) => (
+                <div key={c.key} className={styles.copy} data-print-copy={c.key}>
+                  <TemplateEngine invoice={invoice} sender={sender} totals={invoice.totals} templateId={invoice.template_id} design={jobDesign} pageRule={i === 0} copyLabel={c.label} />
+                </div>
+              ))}
             </div>
           </div>
         </div>

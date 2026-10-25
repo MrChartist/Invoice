@@ -8,6 +8,7 @@ import { AddressLines, Logo } from './PaperHeader';
 import { buildUpiUrl, isRcmTotals, isTaxed } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
+import { TransportBlock } from './TransportBlock';
 
 interface Props {
   invoice: InvoiceRecord;
@@ -66,6 +67,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
         </div>
       )}
       <CustomFieldsBlock invoice={invoice} compact />
+      <TransportBlock invoice={invoice} compact />
       <hr className={styles.rcRule} />
 
       <div className={styles.rcItems}>

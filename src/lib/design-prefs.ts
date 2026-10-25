@@ -13,6 +13,7 @@
 
 import { getTable, setTable } from './storage';
 import { formatMoney } from './utils';
+import { sanitizeCopies, type CopySetting } from './print-copies';
 
 export const DESIGN_TABLE = 'design_prefs';
 /** `profile_id` of the row that applies to every profile without its own row. */
@@ -64,7 +65,33 @@ export interface DesignPrefs {
   header_note: string;
   number_format: NumberFormat;
   date_format: DateFormat;
+  /**
+   * Additive (P0-9): copies per print job / PDF — 'single' (default, one paper, no banner), 'auto'
+   * (Rule 48: goods 3, services 2) or an explicit list. Absent = 'single'. See `print-copies.ts`.
+   */
+  copies?: CopySetting;
+  /** Additive (P2): print on pre-printed stationery — no letterhead / backgrounds, content offset. */
+  preprinted?: PreprintedPrefs;
   updated_at?: string;
+}
+
+export interface PreprintedPrefs {
+  on: boolean;
+  /** Blank space left at the top for the printed letterhead, mm (0–120). */
+  top_mm: number;
+  /** Extra left margin, mm (-20–40). */
+  left_mm: number;
+}
+
+/** Clamp a stored pre-printed setting; undefined when absent or malformed. */
+export function sanitizePreprinted(value: unknown): PreprintedPrefs | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const v = value as Record<string, unknown>;
+  const clamp = (n: unknown, lo: number, hi: number, d: number) => {
+    const x = typeof n === 'number' && Number.isFinite(n) ? n : d;
+    return Math.min(hi, Math.max(lo, Math.round(x * 10) / 10));
+  };
+  return { on: v.on === true, top_mm: clamp(v.top_mm, 0, 120, 40), left_mm: clamp(v.left_mm, -20, 40, 0) };
 }
 
 export const LOGO_POSITIONS: LogoPosition[] = ['auto', 'left', 'right', 'center'];
@@ -203,6 +230,15 @@ export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIG
     header_note: 'header_note' in src ? text(src.header_note, 160) : base.header_note,
     number_format: pick(src.number_format, NUMBER_FORMATS, base.number_format),
     date_format: pick(src.date_format, DATE_FORMATS, base.date_format),
+    // Additive keys stay absent unless set, so a legacy design object round-trips unchanged.
+    ...(() => {
+      const copies = 'copies' in src ? sanitizeCopies(src.copies) : base.copies;
+      return copies !== undefined ? { copies } : {};
+    })(),
+    ...(() => {
+      const pp = 'preprinted' in src ? sanitizePreprinted(src.preprinted) : base.preprinted;
+      return pp ? { preprinted: pp } : {};
+    })(),
     updated_at: typeof src.updated_at === 'string' ? src.updated_at : base.updated_at,
   };
 }
@@ -314,6 +350,9 @@ export function applyPreset(current: DesignPrefs, presetId: string): DesignPrefs
     font: current.font,
     footer_text: current.footer_text,
     header_note: current.header_note,
+    // Print-job settings are not part of the look: a preset keeps them.
+    ...(current.copies !== undefined ? { copies: current.copies } : {}),
+    ...(current.preprinted ? { preprinted: current.preprinted } : {}),
     updated_at: current.updated_at,
   };
   return sanitizeDesign(preset.patch, base);

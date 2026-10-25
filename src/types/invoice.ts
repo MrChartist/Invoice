@@ -367,6 +367,26 @@ export interface ShipTo {
   gstin?: string;
 }
 
+export type TransportMode = 'ROAD' | 'RAIL' | 'AIR' | 'SHIP';
+
+/**
+ * Dispatch / transport details printed on the document (P1-24) and offered to the e-Way bill.
+ * Every field is optional; dates are local days (YYYY-MM-DD). See `src/lib/transport.ts`.
+ */
+export interface TransportDetails {
+  mode?: TransportMode;
+  vehicle_no?: string;
+  transporter_name?: string;
+  /** Transporter GSTIN or the 15-character TRANSIN. */
+  transporter_id?: string;
+  /** Lorry receipt / railway receipt / airway bill / bill of lading number. */
+  lr_no?: string;
+  lr_date?: string;
+  eway_bill_no?: string;
+  /** Approximate distance, km. */
+  distance_km?: number;
+}
+
 /** Everything that makes up one document. Also the persisted localStorage row. */
 export interface InvoiceRecord {
   id: string;
@@ -511,4 +531,6 @@ export interface InvoiceRecord {
   eco_section?: EcoSection;
   /** Additive, delivery challans only: Rule 55 purpose — decides the GSTR-1 Table 13 row (absent = not listed). */
   challan_purpose?: ChallanPurpose;
+  /** Additive (P1-24): transport / dispatch details, printed in the transport block. Absent = none. */
+  transport?: TransportDetails;
 }

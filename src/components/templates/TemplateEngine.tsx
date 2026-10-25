@@ -12,10 +12,13 @@ import { ReceiptBody } from './parts/ReceiptBody';
 import { StatusStamp } from './parts/StatusStamp';
 import { IrnBlock } from './parts/IrnBlock';
 import { SupplyDeclaration } from './parts/SupplyDeclaration';
+import { CopyBanner } from './parts/CopyBanner';
+import { TransportBlock } from './parts/TransportBlock';
 import { rcmTaxNote } from './paper-helpers';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
 import type { EInvoiceMeta } from '../../lib/einvoice';
+import { DOCUMENT_LABELS } from '../../types/invoice';
 import { cn } from '../../lib/utils';
 import { contrastText, paperSize, printPageCss } from '../../lib/design-prefs';
 import styles from './invoice-paper.module.css';
@@ -32,6 +35,11 @@ export interface TemplateEngineProps extends TemplateProps {
    * `invoice.id` in `einvoice_meta`; pass `null` to print none (e.g. a draft preview).
    */
   einvoiceMeta?: EInvoiceMeta | null;
+  /**
+   * Copy banner text ("Original for Recipient" …, see `src/lib/print-copies.ts`). Omit or '' for
+   * the legacy single paper with no banner.
+   */
+  copyLabel?: string;
 }
 
 const SKIN: Partial<Record<TemplateLayout, string | undefined>> = {
@@ -50,7 +58,7 @@ const SKIN: Partial<Record<TemplateLayout, string | undefined>> = {
  * Without `design` the output is the template's native A4 look; with it, the
  * user's preferences (accent, font, columns, paper, density, …) are applied.
  */
-export function TemplateEngine({ invoice, sender, totals, templateId, design, pageRule, einvoiceMeta }: TemplateEngineProps) {
+export function TemplateEngine({ invoice, sender, totals, templateId, design, pageRule, einvoiceMeta, copyLabel }: TemplateEngineProps) {
   const meta = templateById(templateId);
   const layout: TemplateLayout = design?.paper === 'thermal80' ? 'receipt' : meta.layout;
   const cfg = useMemo(() => buildPaperConfig(design, layout, layout === 'bilingual'), [design, layout]);
@@ -71,8 +79,17 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   }
 
   const outerClass = cn(styles.paper, SKIN[layout]);
+  // Pre-printed stationery (P2): the letterhead is already on the sheet; leave room for it.
+  const preprinted = design?.preprinted?.on ? design.preprinted : null;
   const dataAttrs = design
-    ? { 'data-paper': design.paper.toLowerCase(), 'data-density': design.density }
+    ? {
+        'data-paper': design.paper.toLowerCase(),
+        'data-density': design.density,
+        ...(preprinted ? { 'data-preprinted': '' } : {}),
+      }
+    : undefined;
+  const innerStyle: CSSProperties | undefined = preprinted
+    ? { paddingTop: `calc(var(--tpl-pt) + ${preprinted.top_mm}mm)`, paddingLeft: `calc(var(--tpl-px) + ${preprinted.left_mm}mm)` }
     : undefined;
 
   // Read from the document's own sender snapshot first (Critical Rule 3), like the rest of the paper.
@@ -83,20 +100,28 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
 
   const irn = buildIrnPrint(einvoiceMeta === undefined ? resolveEInvoiceMeta(invoice.id) : einvoiceMeta);
 
-  const showInitials = (layout === 'corporate' || layout === 'centered') && sender.companyName;
+  const showInitials = !preprinted && (layout === 'corporate' || layout === 'centered') && sender.companyName;
 
   const body = (() => {
-    if (layout === 'gst') return <GstBody invoice={invoice} sender={sender} totals={totals} />;
+    if (layout === 'gst') return <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} />;
     if (layout === 'receipt') return <ReceiptBody invoice={invoice} sender={sender} totals={totals} />;
     return (
       <>
-        <PaperHeader invoice={invoice} sender={sender} meta={effMeta} />
+        {preprinted ? (
+          <div className={styles.preHead}>
+            <strong>{DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'}</strong>
+            <span>{invoice.invoice_number || 'DRAFT'}</span>
+          </div>
+        ) : (
+          <PaperHeader invoice={invoice} sender={sender} meta={effMeta} />
+        )}
         {cfg.headerNote && <div className={styles.headerNote}>{cfg.headerNote}</div>}
         {layout === 'letterhead' && (
           <StatementStrip invoice={invoice} due={cfg.currency(totals.balance_due, invoice.currency)} />
         )}
         <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
         <CustomFieldsBlock invoice={invoice} />
+        <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
         <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />
         <TaxSummary invoice={invoice} totals={totals} />
 
@@ -130,7 +155,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
       <div className={outerClass} style={outerStyle} {...dataAttrs}>
         {showInitials && <div className={styles.watermark}>{sender.companyName.substring(0, 2).toUpperCase()}</div>}
         <StatusStamp invoice={invoice} />
-        <div className={styles.inner}>
+        <div className={styles.inner} style={innerStyle}>
+          <CopyBanner label={copyLabel} />
           {body}
           {irn && <IrnBlock model={irn} />}
           {declaration && <SupplyDeclaration text={declaration} />}
