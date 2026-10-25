@@ -13,6 +13,7 @@ import {
   deleteManualDeduction,
   dueCalendar,
   interestFor,
+  isPayrollChallan,
   quarterSummaries,
   saveChallan,
   saveManualDeduction,
@@ -346,14 +347,14 @@ export function ChallansTab({ data, canEdit, onChanged, notify }: { data: TdsDat
                 {list.map((c) => (
                   <tr key={c.id}>
                     <td>{formatDate(c.date)}</td>
-                    <td>{c.kind}</td>
+                    <td>{isPayrollChallan(c) ? tdsT('payroll192') : c.kind}</td>
                     <td className={surface.mono}>{c.bsr_code}</td>
                     <td className={surface.mono}>{c.challan_no}</td>
                     <td className={surface.numeric}>{formatMoney(c.amount)}</td>
                     <td className={surface.numeric}>{formatMoney(challanTotal(c))}</td>
                     <td>{c.deduction_keys.length}</td>
                     <td>
-                      {canEdit && (
+                      {canEdit && !isPayrollChallan(c) && (
                         <span className={books.toolbarGroup}>
                           <button type="button" className={controls.btnIcon} aria-label={tdsT('edit')} onClick={() => setEditing(c)}><Pencil size={15} /></button>
                           <button

@@ -360,6 +360,21 @@ Details: `docs/features/manufacturing.md`.
 | 7.98 | ✅ **IFF JSON** (QRMP months 1–2): B2B / CDNR (+ amendments) from the month's GSTR-1 build with the ₹50 lakh check (`src/lib/iff.ts`, date-keyed limit) — layout unverified | — | done |
 | 7.99 | ⏳ 7O follow-ups: Form 27Q return working paper / DTAA rates, TRACES justification import, 194-O ₹5 lakh individual exemption and 5% no-PAN rate, TDS on payment-mode bills reduced by later returns, PMT-09 / refunds, GSTR-9C Table 12 split of supplier notes, cess on supplier notes, accounting `gst_summary` export cess, TCS (27EQ) items in the bell | — | open |
 
+### 7P · Payroll depth (`docs/features/payroll.md`)
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 7.100 | ✅ **Arrears of back-dated revisions**: each finalized month recomputed with the revised structure, difference per pay head with PF (month's ceiling / EPS) and ESI (if covered then), paid in a chosen month, own table on the payslip, taxed in the year paid, relief u/s 89 noted | `payroll/depth.ts`, `ArrearsTab.tsx`, table `payroll_arrears` | done |
+| 7.101 | ✅ **Loans & advances** (`LOAN/FY…`): disbursement via payroll payment (Dr 3615), EMI recovered in runs (interest → 4920), reducing-balance schedule from actual recoveries, interest-free / concessional loan perquisite (Rule 3(7)(i), SBI rate per loan) in TDS | `depth.ts`, `LoansTab.tsx`, `employee_loans` | done |
+| 7.102 | ✅ **Leave**: types with accrual, openings, carry-forward cap, taken (unpaid → LOP), encashment paid in a run; balances report | `LeaveTab.tsx`, `leave_types`, `leave_entries` | done |
+| 7.103 | ✅ **Gratuity** (15/26 × last drawn × years, 5-year rule, ceiling by date) with provision working + journal; **Bonus Act** working (₹21,000 / ₹7,000, 8.33–20%) → payroll / provision | `depth.ts`, `FnfTab.tsx`, `ExtrasTab.tsx`, `payroll-rules.ts` | done |
+| 7.104 | ✅ **Full & final settlement** (`FNF/FY…`): notice pay recover / pay, leave encashment (10(10AA)), gratuity (10(10)), recovery of loans, final TDS, paid and posted with the run of its month; printable F&F statement | `depth.ts`, `depth-reports.ts`, `fnf_settlements` | done |
+| 7.105 | ✅ **Reimbursements** (exempt by head and regime) and one-off items, **perquisites** (typed value / month), old-regime **senior / super-senior slabs**, **80CCD(2)** employer NPS, **206AA** 20% without PAN | `compute.ts`, `ExtrasTab.tsx`, `payroll_adjustments`, `perquisites` | done |
+| 7.106 | ✅ **Integration**: payroll payments in the Books cash / bank book and Day Book, salary cost in `books.profitAndLoss`; payroll Journals / Payments + employee ledgers in the Tally XML; TDS 192 payments in the /tds challan list (read-only, section 192); PF 7Q / 14B estimate | `books-link.ts`, `tally-payroll.ts`, `tds-link.ts`, `depth-reports.ts` | done |
+| 7.107 | ✅ **ESI coverage per contribution period** (decided in its first month / month of joining) and **EPS stop at 58** from the date of birth | `compute.ts`, `store.ts` | done |
+| 7.108 | ⏳ Payroll follow-ups: EPFO arrear ECR, relief u/s 89 (Form 10E) working, actuarial gratuity / leave provisions, Rule 3 perquisite valuation tables, s. 17(2)(vii) ₹7.5 lakh, ESI low-wage exemption, TDS 201(1A) on salary, PT on arrears, per-user payroll grant for a trusted clerk | — | open |
+
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

@@ -9,7 +9,7 @@
 
 import { amountInWords } from '../amount-in-words';
 import { round2 } from '../invoice-calc';
-import { tdsSalaryRule, PT_STATES } from '../payroll-rules';
+import { PT_STATES, ccd2Pct, tdsSalaryRuleFor } from '../payroll-rules';
 import { formatCurrency, formatDate } from '../utils';
 import type { AttendanceRow, AttendanceType, Employee, PayrollRun, PayslipLine } from '../../types/payroll';
 import { OT_HOURS_TYPE } from '../../types/payroll';
@@ -52,6 +52,7 @@ const PAYSLIP_STYLE = `
   .words { font-size: 13px; color: #333; }
   .sign { margin-top: 36px; display: flex; justify-content: space-between; font-size: 12px; }
   .note { margin-top: 18px; font-size: 11px; color: #777; }
+  h2.sec { font-size: 14px; margin: 16px 0 6px; }
   @media print { body { padding: 0; } .sheet { border: 0; } }`;
 
 /** Printable payslip for one employee of a run. Every value is HTML-escaped. */
@@ -59,16 +60,35 @@ export function payslipHtml(run: Pick<PayrollRun, 'month' | 'number' | 'date' | 
   const c = run.company;
   const m = (n: number) => escapeHtml(formatCurrency(n, 'INR'));
   const info = (k: string, v: unknown) => (v === undefined || v === null || v === '' ? '' : `<div><span>${escapeHtml(k)}</span>${escapeHtml(v)}</div>`);
-  const rows = Math.max(l.earnings.length, l.deductions.length);
-  const body: string[] = [];
-  for (let i = 0; i < rows; i++) {
-    const e = l.earnings[i];
-    const d = l.deductions[i];
-    body.push(`<tr><td>${e ? escapeHtml(e.name) : ''}</td><td class="n">${e ? m(e.amount) : ''}</td><td>${d ? escapeHtml(d.name) : ''}</td><td class="n">${d ? m(d.amount) : ''}</td></tr>`);
-  }
+  // 7P: arrears get their own table; other one-off items stay in the main one.
+  const pairRows = (earn: PayslipLine['earnings'], ded: PayslipLine['deductions']) => {
+    const out: string[] = [];
+    for (let i = 0; i < Math.max(earn.length, ded.length); i++) {
+      const e = earn[i];
+      const d = ded[i];
+      const taxNote = e && e.taxable !== undefined && Math.abs(e.taxable - e.amount) > 0.004 ? ` <span class="muted">(taxable ${m(e.taxable)})</span>` : '';
+      out.push(`<tr><td>${e ? escapeHtml(e.name) + taxNote : ''}</td><td class="n">${e ? m(e.amount) : ''}</td><td>${d ? escapeHtml(d.name) : ''}</td><td class="n">${d ? m(d.amount) : ''}</td></tr>`);
+    }
+    return out;
+  };
+  const isArr = (x: { tag?: string }) => x.tag === 'arrear';
+  const body = pairRows(l.earnings.filter((x) => !isArr(x)), l.deductions.filter((x) => !isArr(x)));
+  const arrEarn = l.earnings.filter(isArr);
+  const arrDed = l.deductions.filter(isArr);
+  const sum = (xs: { amount: number }[]) => round2(xs.reduce((t, x) => t + x.amount, 0));
+  const arrears = l.arrears && (arrEarn.length || arrDed.length)
+    ? `<h2 class="sec">Arrears — revision from ${escapeHtml(monthLabel(l.arrears.from))}${l.arrears.to !== l.arrears.from ? ` to ${escapeHtml(monthLabel(l.arrears.to))}` : ''} (${l.arrears.months} month${l.arrears.months === 1 ? '' : 's'})</h2>
+  <table>
+    <thead><tr><th>Arrear earnings</th><th class="n">Amount</th><th>Deductions on arrears</th><th class="n">Amount</th></tr></thead>
+    <tbody>${pairRows(arrEarn, arrDed).join('')}</tbody>
+    <tfoot><tr><td>Arrears</td><td class="n">${m(sum(arrEarn))}</td><td>Deductions</td><td class="n">${m(sum(arrDed))}</td></tr></tfoot>
+  </table>`
+    : '';
   const employer = l.employer.length
     ? `<p class="muted">Employer contributions (not part of take-home pay): ${l.employer.map((x) => `${escapeHtml(x.name)} ${m(x.amount)}`).join(' · ')}</p>`
     : '';
+  const perq = l.perquisites ? `<p class="muted">Perquisites u/s 17(2) — taxable value, not paid in cash: ${m(l.perquisites)}</p>` : '';
+  const notes = (l.notes ?? []).map((n) => `<p class="muted">${escapeHtml(n)}</p>`).join('');
   const units = Object.entries(l.units ?? {}).filter(([, v]) => v);
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -100,11 +120,14 @@ export function payslipHtml(run: Pick<PayrollRun, 'month' | 'number' | 'date' | 
   <table>
     <thead><tr><th>Earnings</th><th class="n">Amount</th><th>Deductions</th><th class="n">Amount</th></tr></thead>
     <tbody>${body.join('')}</tbody>
-    <tfoot><tr><td>Gross earnings</td><td class="n">${m(l.gross)}</td><td>Total deductions</td><td class="n">${m(l.total_deductions)}</td></tr></tfoot>
+    <tfoot><tr><td>Gross earnings${l.arrears ? ' (incl. arrears)' : ''}</td><td class="n">${m(l.gross)}</td><td>Total deductions</td><td class="n">${m(l.total_deductions)}</td></tr></tfoot>
   </table>
+  ${arrears}
   <div class="net">Net pay: ${m(l.net)}</div>
   <div class="words">${escapeHtml(amountInWords(Math.max(0, l.net), 'INR'))}</div>
   ${employer}
+  ${perq}
+  ${notes}
   <div class="sign"><span>Employee signature</span><span>For ${escapeHtml(c?.companyName ?? '')} — authorised signatory</span></div>
   <div class="note">${escapeHtml(WORKING_PAPER)} TDS is a monthly projection under section 192; PF, ESI and Professional Tax use the rates in force for the month.</div>
 </div></body></html>`;
@@ -287,10 +310,13 @@ export function annualSalary(runs: readonly PayrollRun[], employee: Employee, fy
     .flatMap((r) => r.lines.filter((l) => l.employee_id === employee.id).map((l) => ({ month: r.month, l })));
   if (!lines.length) return null;
   const sum = (k: 'taxable_gross' | 'pt' | 'pf_ee' | 'tds') => round2(lines.reduce((s, x) => s + x.l[k], 0));
-  const rule = tdsSalaryRule(employee.tax_regime === 'old' ? 'old' : 'new', `${fyStartYear}-04-01`);
+  const regime = employee.tax_regime === 'old' ? 'old' : 'new';
+  const rule = tdsSalaryRuleFor(regime, `${fyStartYear}-04-01`, employee.dob);
   const prev_salary = employee.prev_salary ?? 0;
   const gross = sum('taxable_gross');
-  const income = salaryIncome({ gross: gross + prev_salary, pt: sum('pt'), hra_exemption: employee.hra_exemption, deductions: employee.tax_deductions, other_income: employee.other_income }, rule);
+  const nps = round2(lines.reduce((s, x) => s + (x.l.nps_er ?? 0), 0));
+  const npsCap = round2((lines.reduce((s, x) => s + x.l.pf_wages, 0) * ccd2Pct(regime, `${fyStartYear}-04-01`)) / 100);
+  const income = salaryIncome({ gross: gross + prev_salary, pt: sum('pt'), hra_exemption: employee.hra_exemption, deductions: employee.tax_deductions, other_income: employee.other_income, nps_er: nps, nps_cap: npsCap }, rule);
   const fyFrom = `${fyStartYear}-04-01`;
   const fyTo = `${fyStartYear + 1}-03-31`;
   return {
@@ -354,13 +380,14 @@ export function form16PartBRows(runs: readonly PayrollRun[], employee: Employee,
     ['7 Other income reported by the employee', i.other_income],
     ['9 Gross total income', i.gross_total_income],
     ['10 Deductions under Chapter VI-A (declared)', i.deductions],
+    ['10 Deduction u/s 80CCD(2) — employer NPS', i.ccd2],
     ['12 Total taxable income', i.total_income],
     ['13 Tax on total income', a.tax.tax_on_income],
     ['14 Rebate u/s 87A', a.tax.rebate],
     ['15 Surcharge', a.tax.surcharge],
     ['16 Health and education cess', a.tax.cess],
     ['17 Tax payable', a.tax.total],
-    ['18 Less: relief u/s 89', 0],
+    ['18 Less: relief u/s 89 (claimed by the employee in Form 10E — not computed)', 0],
     ['19 Net tax payable', a.tax.total],
     ['Tax deducted by this employer (s. 192)', a.tds],
     ['Tax deducted by previous employer(s)', a.prev_tds],

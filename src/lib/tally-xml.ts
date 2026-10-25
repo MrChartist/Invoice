@@ -48,6 +48,7 @@ import { advanceMovements } from './advance-tax';
 import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
 import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
+import { payrollTallyVouchers } from './tally-payroll';
 import {
   clean,
   emptySource,
@@ -679,6 +680,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
   if (source.books) {
     vouchers.push(...booksVouchers(source.books, { purchases: o.includePurchases ? source.purchases : [], vendors: source.vendors }, o, addLedger, bankOf, warnings));
     openingLedgers(source.books, source.clients, source.vendors, o, addLedger);
+    vouchers.push(...payrollTallyVouchers(source.books, o, addLedger)); // 7P: payroll journals + payments (tally-payroll.ts)
   }
   for (const name of ccLedgers) addLedger({ name, parent: '', costCentres: true });
 

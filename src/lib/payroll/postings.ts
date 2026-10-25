@@ -10,6 +10,8 @@
  *        & advances to employees)
  *     Dr Employer's contribution to PF / ESI, PF admin & EDLI charges | Cr PF payable / ESI payable
  *   Payroll payment   Dr Salary payable / PF / ESI / PT / TDS payable | Cr the cash / bank account
+ *   Loan / advance    Dr Loans & advances to employees (3615) | Cr the cash / bank account (7P); EMIs
+ *                     come back through the Payroll voucher (Cr 3615 principal, Cr Interest received)
  *
  * Pure (no storage). Working papers — verify with your CA.
  */
@@ -57,7 +59,12 @@ export function payrollVoucher(run: PayrollRun): LedgerVoucher | null {
   for (const l of run.lines) {
     const cc = l.cost_centre_id || undefined;
     for (const e of l.earnings) g.add(e.account_id, toPaise(e.amount), true, cc);
-    for (const d of l.deductions) g.add(d.statutory ? STATUTORY_PAYABLE[d.statutory] : d.account_id, toPaise(d.amount), false);
+    for (const d of l.deductions) {
+      // 7P: a loan EMI credits its interest part to Interest received, the principal to the loan account.
+      const interest = d.tag === 'loan' && d.interest ? Math.min(toPaise(d.interest), toPaise(d.amount)) : 0;
+      if (interest > 0) g.add(A.interestIncome, interest, false);
+      g.add(d.statutory ? STATUTORY_PAYABLE[d.statutory] : d.account_id, toPaise(d.amount) - interest, false);
+    }
     g.add(A.salaryPayable, toPaise(l.net), false);
     for (const x of l.employer) {
       g.add(x.account_id, toPaise(x.amount), true, cc);
@@ -90,6 +97,7 @@ const PAYMENT_ACCOUNT: Record<PayrollPayment['kind'], string> = {
   esi: A.esiPayable,
   pt: A.ptPayable,
   tds: A.tdsSalaryPayable,
+  loan: A.staffAdvances,
 };
 
 const PAYMENT_WORD: Record<PayrollPayment['kind'], string> = {
@@ -98,6 +106,7 @@ const PAYMENT_WORD: Record<PayrollPayment['kind'], string> = {
   esi: 'ESI paid (ESIC)',
   pt: 'Professional tax paid',
   tds: 'TDS on salary paid (192)',
+  loan: 'Loan / advance to employee',
 };
 
 export function payrollPaymentVoucher(p: PayrollPayment): LedgerVoucher | null {

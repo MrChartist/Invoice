@@ -279,6 +279,15 @@ function EmployeeModal({
           <input className={controls.input} type="date" value={f.dol ?? ''} onChange={(e) => set('dol', e.target.value || undefined)} />
         </label>
         <label className={controls.field}>
+          <span className={controls.label}>{pT('f.dob')}</span>
+          <input className={controls.input} type="date" value={f.dob ?? ''} onChange={(e) => set('dob', e.target.value || undefined)} />
+          <span className={controls.hint}>{pT('f.dobHint')}</span>
+        </label>
+        <label className={controls.field}>
+          <span className={controls.label}>{pT('f.noticeDays')}</span>
+          <input className={controls.inputNumeric} type="number" min="0" step="1" value={f.notice_days ?? ''} onChange={(e) => set('notice_days', e.target.value ? Number(e.target.value) : undefined)} />
+        </label>
+        <label className={controls.field}>
           <span className={controls.label}>{pT('f.state')}</span>
           <select className={controls.select} value={f.state ?? ''} onChange={(e) => set('state', e.target.value || undefined)}>
             <option value="">—</option>

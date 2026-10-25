@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import {
-  PAYMENT_LABELS,
   deletePayrollPayment,
   loadPayrollPayments,
   loadRuns,
@@ -24,7 +23,9 @@ interface Props {
   notify: (msg: string, tone?: 'success' | 'error') => void;
 }
 
-const KIND_KEY = { salary: 'ppay.salary', pf: 'ppay.pf', esi: 'ppay.esi', pt: 'ppay.pt', tds: 'ppay.tds' } as const;
+const KIND_KEY = { salary: 'ppay.salary', pf: 'ppay.pf', esi: 'ppay.esi', pt: 'ppay.pt', tds: 'ppay.tds', loan: 'ppay.loan' } as const;
+/** Kinds recorded here (a loan is paid out from the Loans tab). */
+const PAY_HERE: PayrollPaymentKind[] = ['salary', 'pf', 'esi', 'pt', 'tds'];
 
 export function PaymentsTab({ month, version, refresh, notify }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -41,6 +42,8 @@ export function PaymentsTab({ month, version, refresh, notify }: Props) {
   const [runId, setRunId] = useState('');
   const [period, setPeriod] = useState(month);
   const [reference, setReference] = useState('');
+  const [bsr, setBsr] = useState('');
+  const [challanNo, setChallanNo] = useState('');
 
   const submit = () => {
     try {
@@ -53,9 +56,12 @@ export function PaymentsTab({ month, version, refresh, notify }: Props) {
         ...(kind === 'salary' && run ? { run_id: run } : {}),
         ...(kind !== 'salary' && period ? { period } : {}),
         ...(reference.trim() ? { reference: reference.trim() } : {}),
+        ...(kind === 'tds' && bsr.trim() ? { bsr_code: bsr.trim(), challan_no: challanNo.trim() } : {}),
       });
       setAmount('');
       setReference('');
+      setBsr('');
+      setChallanNo('');
       refresh();
       notify(pT('ppay.saved', { number: p.number }));
     } catch (err) {
@@ -101,7 +107,7 @@ export function PaymentsTab({ month, version, refresh, notify }: Props) {
             <label className={controls.field}>
               <span className={controls.label}>{pT('ppay.kind')}</span>
               <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as PayrollPaymentKind)}>
-                {(Object.keys(KIND_KEY) as PayrollPaymentKind[]).map((k) => <option key={k} value={k}>{pT(KIND_KEY[k])}</option>)}
+                {PAY_HERE.map((k) => <option key={k} value={k}>{pT(KIND_KEY[k])}</option>)}
               </select>
             </label>
             <label className={controls.field}>
@@ -135,7 +141,20 @@ export function PaymentsTab({ month, version, refresh, notify }: Props) {
               <span className={controls.label}>{pT('ppay.reference')}</span>
               <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value)} />
             </label>
+            {kind === 'tds' && (
+              <>
+                <label className={controls.field}>
+                  <span className={controls.label}>{pT('ppay.bsr')}</span>
+                  <input className={controls.input} inputMode="numeric" maxLength={7} value={bsr} onChange={(e) => setBsr(e.target.value)} />
+                </label>
+                <label className={controls.field}>
+                  <span className={controls.label}>{pT('ppay.challanNo')}</span>
+                  <input className={controls.input} inputMode="numeric" maxLength={5} value={challanNo} onChange={(e) => setChallanNo(e.target.value)} />
+                </label>
+              </>
+            )}
           </div>
+          {kind === 'tds' && <p className={styles.note}>{pT('ppay.tdsLink')}</p>}
           <button type="button" className={controls.btnPrimary} onClick={submit}>
             <Plus size={15} /> {pT('ppay.recordBtn')}
           </button>
@@ -154,7 +173,7 @@ export function PaymentsTab({ month, version, refresh, notify }: Props) {
                   <tr key={p.id}>
                     <td>{formatDate(p.date)}</td>
                     <td className={surface.mono}>{p.number}</td>
-                    <td>{PAYMENT_LABELS[p.kind]}{p.period ? ` · ${p.period}` : ''}</td>
+                    <td>{pT(KIND_KEY[p.kind])}{p.period ? ` · ${p.period}` : ''}{p.bsr_code ? ` · BSR ${p.bsr_code}/${p.challan_no ?? ''}` : ''}</td>
                     <td>{p.reference ?? ''}</td>
                     <td className={styles.num}>{inr(p.amount)}</td>
                     <td className={styles.num}>

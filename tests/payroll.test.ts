@@ -106,7 +106,7 @@ test('income tax: FY 2025-26 new regime with 87A up to ₹12 lakh and marginal r
 });
 
 const emp = (over: Partial<Employee> = {}): Employee => ({
-  id: 'e1', code: 'E001', name: 'Asha', tax_regime: 'new', pf: false, esi: false, pt: false, active: true, created_at: '', ...over,
+  id: 'e1', code: 'E001', name: 'Asha', tax_regime: 'new', pf: false, esi: false, pt: false, active: true, created_at: '', pan: 'ABCDE1234F', ...over,
 });
 const struct = (amounts: Record<string, number>, over: Partial<SalaryStructure> = {}): SalaryStructure => ({
   id: 's1', employee_id: 'e1', effective_from: '2025-04-01', created_at: '', lines: Object.entries(amounts).map(([pay_head_id, amount]) => ({ pay_head_id, amount })), ...over,

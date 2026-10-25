@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fyQuarterOf, loadChallans, loadManualDeductions, loadReturnMarks, tdsDeductions, type TdsQuarter } from '../lib/tds-payables';
+import { fyQuarterOf, loadChallans, loadManualDeductions, loadPayrollTdsChallans, loadReturnMarks, tdsDeductions, type TdsQuarter } from '../lib/tds-payables';
 import { tcsCollections } from '../lib/tds-returns';
 import { purchasesDb, paymentsDb } from '../lib/purchases';
 import { vendorsDb } from '../lib/vendors';
@@ -29,7 +29,7 @@ function loadData(): TdsData {
   return {
     rows: tdsDeductions({ purchases: purchasesDb.all(), payments: paymentsDb.all(), manual: loadManualDeductions(), vendors: vendorsDb.all(), returns: getTable('purchase_returns') }),
     tcs: tcsCollections(getTable<InvoiceRecord>('invoices')),
-    challans: loadChallans(),
+    challans: [...loadChallans(), ...loadPayrollTdsChallans()], // 7P: + payroll TDS (192), read-only
     marks: loadReturnMarks(),
     manual: loadManualDeductions(),
   };

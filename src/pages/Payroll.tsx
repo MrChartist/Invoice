@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
@@ -10,13 +10,20 @@ import { RunTab } from '../components/payroll/RunTab';
 import { PaymentsTab } from '../components/payroll/PaymentsTab';
 import { ReportsTab } from '../components/payroll/ReportsTab';
 import { thisMonth } from '../components/payroll/shared';
+
+// 7P tabs load on first use (arrears, loans, leave, reimbursements / perquisites / bonus, F&F + gratuity).
+const ArrearsTab = lazy(() => import('../components/payroll/ArrearsTab').then((m) => ({ default: m.ArrearsTab })));
+const LoansTab = lazy(() => import('../components/payroll/LoansTab').then((m) => ({ default: m.LoansTab })));
+const LeaveTab = lazy(() => import('../components/payroll/LeaveTab').then((m) => ({ default: m.LeaveTab })));
+const ExtrasTab = lazy(() => import('../components/payroll/ExtrasTab').then((m) => ({ default: m.ExtrasTab })));
+const FnfTab = lazy(() => import('../components/payroll/FnfTab').then((m) => ({ default: m.FnfTab })));
 import { useT } from '../i18n';
 import { payrollT as pT } from '../i18n/areas/payroll';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/payroll/Payroll.module.css';
 
-const TABS = ['employees', 'heads', 'structures', 'attendance', 'run', 'payments', 'reports'] as const;
+const TABS = ['employees', 'heads', 'structures', 'attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_KEY = {
   employees: 'tabs.employees',
@@ -26,8 +33,13 @@ const TAB_KEY = {
   run: 'tabs.run',
   payments: 'tabs.payments',
   reports: 'tabs.reports',
+  leave: 'tabs.leave',
+  arrears: 'tabs.arrears',
+  extras: 'tabs.extras',
+  loans: 'tabs.loans',
+  fnf: 'tabs.fnf',
 } as const;
-const MONTH_TABS: readonly Tab[] = ['attendance', 'run', 'payments', 'reports'];
+const MONTH_TABS: readonly Tab[] = ['attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports'];
 
 /** Payroll (Phase 7, Tally parity): masters, attendance, monthly run, payments and statutory working papers. */
 export function Payroll() {
@@ -75,6 +87,13 @@ export function Payroll() {
         {tab === 'run' && <RunTab month={month} {...common} />}
         {tab === 'payments' && <PaymentsTab month={month} {...common} />}
         {tab === 'reports' && <ReportsTab month={month} {...common} />}
+        <Suspense fallback={<p className={styles.note}>{pT('loading')}</p>}>
+          {tab === 'leave' && <LeaveTab month={month} {...common} />}
+          {tab === 'arrears' && <ArrearsTab month={month} {...common} />}
+          {tab === 'extras' && <ExtrasTab month={month} {...common} />}
+          {tab === 'loans' && <LoansTab month={month} {...common} />}
+          {tab === 'fnf' && <FnfTab month={month} {...common} />}
+        </Suspense>
       </div>
       <p className={styles.note}>{pT('footer')}</p>
       {toastNode}

@@ -46,6 +46,10 @@ export interface Employee {
   /** Salary and TDS from an earlier employer this FY (Form 12B). */
   prev_salary?: number;
   prev_tds?: number;
+  /** Additive (7P): date of birth — EPS stops after the month of the 58th birthday; old-regime senior slabs. */
+  dob?: string;
+  /** Additive (7P): notice period in days (full & final settlement). */
+  notice_days?: number;
   active: boolean;
   created_at: string;
   updated_at?: string;
@@ -97,6 +101,8 @@ export interface PayHead {
   account_id?: string;
   /** Sort order on the payslip. */
   order?: number;
+  /** Additive (7P), employer heads: employer's NPS contribution — taxable salary, deductible u/s 80CCD(2). */
+  nps?: boolean;
   active: boolean;
   created_at: string;
 }
@@ -148,7 +154,18 @@ export interface PayslipAmount {
   amount: number;
   account_id: string;
   statutory?: StatutoryKind;
+  /** Additive (7P): one-off items shown in their own payslip section (arrears, loan EMI, leave encashment, F&F …). */
+  tag?: PayslipTag;
+  /** Additive (7P): the record behind a tagged item (loan / arrears / adjustment / settlement id). */
+  ref_id?: string;
+  /** Additive (7P), earnings: part taxable u/s 17 when it differs from `amount` (exempt gratuity, reimbursements …). */
+  taxable?: number;
+  /** Additive (7P), loan EMI: interest part of the amount (the rest is principal). */
+  interest?: number;
 }
+
+/** Additive (7P): kinds of one-off payslip items. */
+export type PayslipTag = 'arrear' | 'loan' | 'leave' | 'gratuity' | 'notice' | 'reimb' | 'bonus' | 'adjust';
 
 /** One employee's computed salary for a month — a snapshot stored on the run. */
 export interface PayslipLine {
@@ -199,6 +216,38 @@ export interface PayslipLine {
   /** Manual amounts typed in the review grid, by pay head id (they win over the computed value). */
   overrides?: Record<string, number>;
   warnings?: string[];
+  /* ── Additive (7P) ── */
+  /** Arrears of a back-dated revision paid with this month (also in earnings / deductions with tag `arrear`). */
+  arrears?: ArrearsSummary;
+  /** Taxable value of perquisites for the month (s. 17(2)) — in `taxable_gross`, never paid. */
+  perquisites?: number;
+  /** Employer NPS contribution of the month (in `taxable_gross`; deductible u/s 80CCD(2)). */
+  nps_er?: number;
+  /** Full & final settlement included in this payslip. */
+  fnf_id?: string;
+  /** Old-regime age band used for the TDS slabs. */
+  age_band?: 'senior' | 'super_senior';
+  /** Informational notes printed on the payslip (relief u/s 89, EPS stopped at 58, 206AA …). */
+  notes?: string[];
+}
+
+/** Additive (7P): arrears totals carried on a payslip. */
+export interface ArrearsSummary {
+  ids: string[];
+  from: string;
+  to: string;
+  months: number;
+  gross: number;
+  taxable: number;
+  pf_ee: number;
+  eps: number;
+  epf_er: number;
+  edli: number;
+  pf_admin: number;
+  esi_ee: number;
+  esi_er: number;
+  /** Some arrears relate to an earlier FY — relief u/s 89 (Form 10E) may be available. */
+  earlier_fy: boolean;
 }
 
 export interface PayrollCompany {
@@ -229,7 +278,8 @@ export interface PayrollRun {
   finalized_at?: string;
 }
 
-export type PayrollPaymentKind = 'salary' | 'pf' | 'esi' | 'pt' | 'tds';
+/** `loan` (7P) = a loan / advance paid to an employee (Dr Loans & advances to employees). */
+export type PayrollPaymentKind = 'salary' | 'pf' | 'esi' | 'pt' | 'tds' | 'loan';
 
 export interface PayrollPayment {
   id: string;
@@ -245,5 +295,173 @@ export interface PayrollPayment {
   reference?: string;
   /** Challan period, `YYYY-MM` (statutory payments). */
   period?: string;
+  /** Additive (7P), TDS payments: ITNS 281 challan details — shown in the /tds challan list as section 192. */
+  bsr_code?: string;
+  challan_no?: string;
+  /** Additive (7P), kind `loan`: the loan disbursed. */
+  loan_id?: string;
   created_at: string;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   7P — arrears, loans, leave, adjustments, perquisites, full & final
+   Tables: payroll_arrears, employee_loans, leave_types, leave_entries,
+   payroll_adjustments, perquisites, fnf_settlements.
+   ════════════════════════════════════════════════════════════════ */
+
+/** Arrears for one past month: recomputed − paid, per pay head and statutory figure. */
+export interface ArrearsMonth {
+  month: string;
+  earnings: { pay_head_id: string; name: string; amount: number; account_id: string; taxable: boolean }[];
+  gross: number;
+  taxable: number;
+  pf_wages: number;
+  pf_ee: number;
+  eps: number;
+  epf_er: number;
+  edli: number;
+  pf_admin: number;
+  esi_wages: number;
+  esi_ee: number;
+  esi_er: number;
+}
+
+/** A back-dated revision's arrears, paid with the run of `pay_month`. */
+export interface ArrearsRecord {
+  id: string;
+  employee_id: string;
+  /** First month of the revision (`YYYY-MM`). */
+  from_month: string;
+  /** Month the arrears are paid in. */
+  pay_month: string;
+  months: ArrearsMonth[];
+  gross: number;
+  note?: string;
+  created_at: string;
+}
+
+export type LoanKind = 'loan' | 'advance';
+
+export interface EmployeeLoan {
+  id: string;
+  /** `LOAN/FY25-26/0001`. */
+  number: string;
+  employee_id: string;
+  kind: LoanKind;
+  /** Day paid out (local `YYYY-MM-DD`). */
+  date: string;
+  amount: number;
+  /** Interest charged, % p.a. on the reducing balance (0 = interest-free). */
+  interest_rate: number;
+  /** Monthly instalment (interest first, then principal). */
+  emi: number;
+  /** First month an instalment is recovered. */
+  start_month: string;
+  /** Cash / bank ledger it was paid from. */
+  paid_from: string;
+  /** Medical-treatment loans (Rule 3(7)(i)) are not a perquisite. */
+  purpose?: 'general' | 'medical';
+  /** SBI rate for the perquisite (% p.a.) — overrides the placeholder in payroll-rules.ts. */
+  sbi_rate?: number;
+  /** The `payroll_payments` row (kind `loan`) that books the disbursement. */
+  payment_id?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface LeaveType {
+  id: string;
+  /** Short code shown in grids (CL, SL, EL). */
+  code: string;
+  name: string;
+  /** Paid leave; unpaid days taken count as loss of pay. */
+  paid: boolean;
+  /** Days credited for every month on the rolls (0 = no accrual). */
+  accrual: number;
+  /** Can be encashed (during service and on leaving). */
+  encashable: boolean;
+  /** Balance carried into a new FY is capped here (0 / absent = no cap). */
+  carry_cap?: number;
+  created_at: string;
+}
+
+export type LeaveEntryKind = 'opening' | 'taken' | 'encash' | 'adjust';
+
+export interface LeaveEntry {
+  id: string;
+  employee_id: string;
+  type_id: string;
+  kind: LeaveEntryKind;
+  /** Local `YYYY-MM-DD` (opening: the as-of day). */
+  date: string;
+  /** Days (adjust may be negative). */
+  days: number;
+  /** encash: pay month (`YYYY-MM`) the encashment is paid in. */
+  month?: string;
+  /** encash: amount typed instead of days × daily rate. */
+  amount?: number;
+  notes?: string;
+  created_at: string;
+}
+
+export type AdjustmentTag = 'reimb' | 'bonus' | 'adjust';
+
+/** A one-off earning / deduction for one employee's payslip of `month` (reimbursement, bonus, other). */
+export interface PayrollAdjustment {
+  id: string;
+  employee_id: string;
+  month: string;
+  kind: 'earning' | 'deduction';
+  tag: AdjustmentTag;
+  name: string;
+  amount: number;
+  /** Reimbursement head key (REIMBURSEMENT_HEADS) — decides the exempt part. */
+  head?: string;
+  /** Earnings: taxable part; absent = by head / fully taxable. */
+  taxable_amount?: number;
+  account_id?: string;
+  /** Bill / voucher reference. */
+  reference?: string;
+  created_at: string;
+}
+
+export type PerquisiteKind = 'accommodation' | 'car' | 'other';
+
+/** A perquisite's taxable value per month (s. 17(2)), from `from_month` to `to_month` (open-ended if absent). */
+export interface Perquisite {
+  id: string;
+  employee_id: string;
+  kind: PerquisiteKind;
+  description: string;
+  from_month: string;
+  to_month?: string;
+  monthly_value: number;
+  created_at: string;
+}
+
+export type FnfReason = 'resignation' | 'retirement' | 'termination' | 'death';
+
+export interface FnfSettlement {
+  id: string;
+  /** `FNF/FY25-26/0001`, given when saved. */
+  number: string;
+  employee_id: string;
+  reason: FnfReason;
+  /** Month the settlement is paid in (its payroll run carries the items). */
+  pay_month: string;
+  /** Notice: days short (recover) or days paid in lieu (pay). */
+  notice_mode: 'none' | 'recover' | 'pay';
+  notice_days: number;
+  /** Amount typed instead of days × monthly gross ÷ 30. */
+  notice_amount?: number;
+  leave_days: number;
+  leave_amount?: number;
+  /** Gratuity: computed unless typed. */
+  gratuity_amount?: number;
+  /** Recover every outstanding loan / advance from the settlement. */
+  recover_loans: boolean;
+  other: { name: string; kind: 'earning' | 'deduction'; amount: number; taxable?: boolean }[];
+  note?: string;
+  created_at: string;
+  updated_at?: string;
 }

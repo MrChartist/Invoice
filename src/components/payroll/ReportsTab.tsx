@@ -15,6 +15,10 @@ import {
   ptRegisterRows,
 } from '../../lib/payroll/reports';
 import { daysInMonth, fyStartOfMonth } from '../../lib/payroll/statutory';
+import { arrearsRegisterRows, pfLateRows } from '../../lib/payroll/depth-reports';
+import { loadArrears } from '../../lib/payroll/depth-records';
+import { loadPayrollPayments } from '../../lib/payroll/records';
+import { todayInput } from '../../lib/utils';
 import { downloadText } from '../../lib/download';
 import { payrollT as pT } from '../../i18n/areas/payroll';
 import controls from '../../styles/controls.module.css';
@@ -103,6 +107,8 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
             )}
             {item(pT('rep.ann2'), pT('rep.ann2Hint'), out(`form24Q-annexure2-FY${fyLabel}`, form24QAnnexure2Rows(fyRuns, employees, fyStart), '24Q Annexure II'))}
             {item(pT('rep.ptYear'), pT('rep.ptHint'), out(`pt-register-FY${fyLabel}`, ptRegisterRows(fyRuns), 'PT'))}
+            {item(pT('rep.pfLate'), pT('rep.pfLateHint'), out(`pf-late-estimate-FY${fyLabel}`, pfLateRows(fyRuns, loadPayrollPayments(), fyStart, todayInput()), 'PF late'))}
+            {item(pT('rep.arrears'), pT('rep.arrearsHint'), out(`arrears-FY${fyLabel}`, arrearsRegisterRows(loadArrears().filter((r) => fyStartOfMonth(r.pay_month) === `${fyStart}-04-01`), employees), 'Arrears'))}
             {item(
               pT('rep.f16'),
               pT('rep.f16Hint'),

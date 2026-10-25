@@ -375,6 +375,8 @@ export const A = {
   pfEmployer: 'pf_employer',
   esiEmployer: 'esi_employer',
   pfAdmin: 'pf_admin',
+  gratuity: 'gratuity', // 7P payroll: gratuity paid / provided
+  leaveEncashment: 'leave_encashment', // 7P payroll: leave encashment
   interestExp: 'interest_exp',
   bankCharges: 'bank_charges',
   depreciation: 'depreciation',
@@ -469,6 +471,8 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   def(A.pfEmployer, '6003', "Employer's contribution to PF", 'EMPLOYEE'),
   def(A.esiEmployer, '6004', "Employer's contribution to ESI", 'EMPLOYEE'),
   def(A.pfAdmin, '6005', 'PF admin & EDLI charges', 'EMPLOYEE'),
+  def(A.gratuity, '6006', 'Gratuity', 'EMPLOYEE'), // 7P payroll
+  def(A.leaveEncashment, '6007', 'Leave encashment', 'EMPLOYEE'), // 7P payroll
   def(A.interestExp, '6100', 'Interest on loans', 'FINANCE'),
   def(A.bankCharges, '6110', 'Bank charges', 'FINANCE'),
   def(A.depreciation, '6200', 'Depreciation', 'DEPRECIATION'),

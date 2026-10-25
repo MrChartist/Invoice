@@ -4,6 +4,9 @@
  */
 
 export * from './compute';
+export * from './depth';
+export * from './depth-store';
+export * from './depth-reports';
 export * from './postings';
 export * from './reports';
 export * from './statutory';

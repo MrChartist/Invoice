@@ -285,6 +285,14 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   attendance: 'payroll.view',
   payroll_runs: 'payroll.view',
   payroll_payments: 'payroll.view',
+  // payroll depth (7P)
+  payroll_arrears: 'payroll.view',
+  employee_loans: 'payroll.view',
+  leave_types: 'payroll.view',
+  leave_entries: 'payroll.view',
+  payroll_adjustments: 'payroll.view',
+  perquisites: 'payroll.view',
+  fnf_settlements: 'payroll.view',
   // Phase 7 (Tally parity): manufacturing and stock vouchers
   manufacturing_vouchers: 'books.edit',
   stock_journals: 'books.edit',

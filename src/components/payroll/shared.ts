@@ -42,6 +42,27 @@ export function thisMonth(now = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Props every payroll tab receives (month-scoped tabs use `month`). */
+export interface TabProps {
+  month: string;
+  version: number;
+  refresh: () => void;
+  notify: (msg: string, tone?: 'success' | 'error') => void;
+}
+
+/** Run an action, refresh the screen and toast its message (or the error). */
+export function runAction(fn: () => void, refresh: () => void, notify: TabProps['notify'], ok?: string): boolean {
+  try {
+    fn();
+    refresh();
+    if (ok) notify(ok);
+    return true;
+  } catch (err) {
+    notify((err as Error).message, 'error');
+    return false;
+  }
+}
+
 /** `<input type=number>` text → number, '' → null. */
 export function parseAmount(v: string): number | null {
   const t = v.replace(/,/g, '').trim();
