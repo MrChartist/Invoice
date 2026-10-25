@@ -55,6 +55,8 @@
 .agingTable { min-width: 860px; }
 .agingTable th[scope='row'], .agingTable tfoot th { text-align: left; text-transform: none; letter-spacing: 0; font-size: var(--text-md); color: var(--foreground); font-weight: 600; }
 .partyCell { padding: 0 !important; }
+.partyLine { display: flex; align-items: center; padding-right: 0.5rem; }
+.partyLine > :first-child { flex: 1; min-width: 0; }
 .expand {
   display: flex; align-items: center; gap: 0.375rem; width: 100%;
   background: none; border: none; cursor: pointer; font: inherit; font-weight: 600;

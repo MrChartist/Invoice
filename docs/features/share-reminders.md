@@ -86,3 +86,27 @@ rules are inlined, and an on-screen pay panel adds the amount due, a tappable **
 the UPI ID and QR. It carries its own `default-src 'none'` CSP, no scripts (`sanitizePaper` strips any), and opens
 offline in any browser; printing hides the pay panel. Shared as a file where supported, otherwise downloaded.
 Fonts fall back to the system font outside the app.
+
+## Party-level reminders (8.4, `docs/features/khata.md`)
+
+`src/lib/khata.ts` adds reminders per **party** rather than per invoice: `buildPartyReminder({party, sender, kind, lang})`
+(`kind` `overdue` = total overdue + oldest bill + UPI link for the overdue amount; `balance` = the monthly "your balance
+is ₹X"), in `en`, `hinglish` or `hi` (Devanagari). `partyReminderQueue(report, clients, log, {kind, today, cooldownDays})`
+lists who to message (overdue: oldest first; balance: biggest first), leaving out snoozed parties and those reminded
+inside the cool-down (3 days; 20 for the monthly balance).
+
+The stepper (`src/components/khata/RemindQueue.tsx`, lazy) opens WhatsApp for one party per tap and advances; Skip,
+Snooze 3 days and Copy too. **One tap per party** is a browser rule (a new window needs a user gesture) — the app never
+sends anything itself.
+
+Log rows use the existing `reminders` table with an additive `party_key` and an empty `invoice_id`
+(`makePartyLogEntry`, `makePartySnooze`, `partyReminderRows`, `lastPartyReminder`, `partySnoozedUntil`), so the
+per-invoice helpers above (`remindersFor`, `pendingReminders` …) never count them.
+
+## WhatsApp statement and statement web page (8.3)
+
+`buildWhatsAppStatement({sender, party})` — open bills, credits / advances, net due and a `upi://pay` link for the net
+— goes into `whatsappLink(phone, text)` from Clients rows, Receivables aging rows, the Statements tab and the statement
+viewer. The viewer's **Share PDF** uses `shareFile` (blocked → "Share PDF now", unsupported → download) and **Web page**
+uses the generalised `buildClientCopyHtml` (`pay.label`, `pay.ariaLabel`, `note`) with `freezePaper` / `documentCss`
+from `src/lib/client-copy-dom.ts`.

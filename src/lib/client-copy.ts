@@ -7,6 +7,10 @@
 
 export interface ClientCopyPay {
   amountText: string;
+  /** Label above the amount (default "Amount due"); a statement says "Balance due". */
+  label?: string;
+  /** Accessible name of the pay panel (default "Pay this invoice"). */
+  ariaLabel?: string;
   upiLink: string | null;
   upiId?: string;
   /** PNG data URL of the payment QR, if one was rendered. */
@@ -22,6 +26,8 @@ export interface ClientCopyInput {
   business: string;
   pay?: ClientCopyPay | null;
   generatedOn: string;
+  /** Optional line under the paper (e.g. "Statement as of 25 Oct 2026"). */
+  note?: string;
 }
 
 const esc = (s: string) =>
@@ -43,8 +49,8 @@ export function buildClientCopyHtml(input: ClientCopyInput): string {
   const upi = safeUpi(input.pay?.upiLink);
   const qr = safeImg(input.pay?.qrDataUrl);
   const payPanel = input.pay
-    ? `<section class="cc-pay" aria-label="Pay this invoice">
-  <div><div class="cc-label">Amount due</div><div class="cc-amount">${esc(input.pay.amountText)}</div>
+    ? `<section class="cc-pay" aria-label="${esc(input.pay.ariaLabel || 'Pay this invoice')}">
+  <div><div class="cc-label">${esc(input.pay.label || 'Amount due')}</div><div class="cc-amount">${esc(input.pay.amountText)}</div>
   ${input.pay.upiId ? `<div class="cc-label">UPI ID: <strong>${esc(input.pay.upiId)}</strong></div>` : ''}</div>
   ${upi ? `<a class="cc-btn" href="${esc(upi)}">Pay with UPI</a>` : ''}
   ${qr ? `<img class="cc-qr" src="${qr}" alt="UPI payment QR code" width="132" height="132">` : ''}
@@ -73,6 +79,7 @@ export function buildClientCopyHtml(input: ClientCopyInput): string {
 <body><main class="cc-wrap">
 ${payPanel}
 <div class="cc-page">${sanitizePaper(input.paperHtml)}</div>
+${input.note ? `<p class="cc-foot">${esc(input.note)}</p>` : ''}
 <p class="cc-foot">Sent by ${esc(input.business)} · generated ${esc(input.generatedOn)} · print this page for a paper copy</p>
 </main></body></html>`;
 }

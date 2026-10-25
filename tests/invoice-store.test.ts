@@ -63,6 +63,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     agent_id: 'ag1',
     offer: { scheme_id: 'sc1', label: 'Bill offer: 5% off on ₹1000+', value: 50 },
     rx: { patient: 'P', prescriber: 'Dr. Q' },
+    party_balance_snapshot: { previous: 1250.5, bill: 999, paid: 100, as_of: '2026-04-10' },
     amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };

@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, FileSpreadsheet, Loader2, Printer, X } from 'lucide-react';
+import { Download, FileSpreadsheet, Globe, Loader2, MessageCircle, Printer, Share2, X } from 'lucide-react';
 import { StatementDocument, type StatementDocumentProps } from './StatementDocument';
-import { downloadTextFile, exportNodeToPdf, safeFilename } from './exportUtils';
+import { downloadTextFile, exportNodeToPdf, nodeToPdfBlob, safeFilename } from './exportUtils';
 import { statementCsv } from '../../lib/receivables';
+import { buildWhatsAppStatement, partyUpiLink } from '../../lib/khata';
+import { canShareFiles, shareFile, whatsappLink } from '../../lib/share';
+import { buildClientCopyHtml } from '../../lib/client-copy';
+import { documentCss, freezePaper } from '../../lib/client-copy-dom';
+import { downloadBlob } from '../../lib/download';
+import { formatCurrency, formatDate } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { rcvT } from '../../i18n/areas/receivables';
+import { khataT } from '../../i18n/areas/khata';
 import styles from './StatementViewer.module.css';
 
 export interface StatementViewerProps extends StatementDocumentProps {
@@ -15,11 +22,16 @@ export interface StatementViewerProps extends StatementDocumentProps {
   onError?: (message: string) => void;
 }
 
-/** Full-screen A4 preview of a client statement with Print / PDF / CSV. */
+/**
+ * Full-screen A4 preview of a client statement with Print / PDF / CSV, plus (8.3) one-tap WhatsApp
+ * statement text, Share PDF through the OS share sheet (download where files cannot be shared) and a
+ * static statement web page with a Pay-with-UPI panel and QR.
+ */
 export function StatementViewer({ open, onClose, onError, ...doc }: StatementViewerProps) {
   useT(); // re-render on a language switch (5.4)
   const paperRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState<File | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -38,6 +50,8 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
   if (!open) return null;
 
   const base = `Statement_${safeFilename(doc.party.name)}_${doc.ledger.to || 'all'}`;
+  const inr = (doc.currency ?? 'INR').toUpperCase() === 'INR';
+  const waText = inr ? buildWhatsAppStatement({ sender: doc.sender, party: doc.party }) : '';
 
   const handlePdf = async () => {
     if (!paperRef.current) return;
@@ -51,15 +65,75 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
     }
   };
 
+  const shareReady = async (file: File) => {
+    const result = await shareFile(file, { title: file.name, text: waText || undefined });
+    if (result === 'blocked') return setReady(file);
+    setReady(null);
+    if (result === 'unsupported' || result === 'failed') downloadBlob(file.name, file);
+  };
+
+  const handleSharePdf = async () => {
+    if (!paperRef.current) return;
+    setBusy(true);
+    try {
+      const blob = await nodeToPdfBlob(paperRef.current);
+      await shareReady(new File([blob], `${base}.pdf`, { type: 'application/pdf' }));
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : rcvT('pdfFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleWebPage = async () => {
+    if (!paperRef.current) return;
+    const frozen = freezePaper(paperRef.current);
+    const net = doc.party.net;
+    const html = buildClientCopyHtml({
+      title: `Statement of account – ${doc.party.name}`,
+      paperHtml: frozen.html,
+      css: documentCss(),
+      business: doc.sender?.companyName ?? '',
+      pay: inr && net > 0.004
+        ? {
+            amountText: formatCurrency(net, 'INR'),
+            label: 'Balance due',
+            ariaLabel: 'Pay this balance',
+            upiLink: partyUpiLink(doc.sender, net, doc.party.name),
+            upiId: doc.sender?.upiId,
+            qrDataUrl: frozen.qrDataUrl,
+          }
+        : null,
+      generatedOn: formatDate(new Date()),
+      note: doc.ledger.to ? `Statement up to ${formatDate(doc.ledger.to)}` : undefined,
+    });
+    const name = `${base}.html`;
+    const file = new File([html], name, { type: 'text/html' });
+    const result = canShareFiles(file) ? await shareFile(file, { title: name }) : 'unsupported';
+    if (result === 'unsupported' || result === 'failed' || result === 'blocked') downloadBlob(name, file);
+  };
+
+  const btn = `${controls.btn} ${controls.btnOutline} ${controls.btnSm}`;
   return createPortal(
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={rcvT('svAria', { name: doc.party.name })}>
       <div className={`${styles.toolbar} no-print`}>
         <span className={styles.title}>{rcvT('svTitle')}</span>
         <div className={styles.actions}>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => window.print()}>
+          {inr && (
+            <a className={btn} href={whatsappLink(doc.client?.phone, waText)} target="_blank" rel="noopener noreferrer" data-wa-statement>
+              <MessageCircle size={14} /> {khataT('whatsapp')}
+            </a>
+          )}
+          <button type="button" className={btn} onClick={() => (ready ? void shareReady(ready) : void handleSharePdf())} disabled={busy}>
+            <Share2 size={14} /> {ready ? khataT('shareNow') : khataT('sharePdf')}
+          </button>
+          <button type="button" className={btn} onClick={() => void handleWebPage()}>
+            <Globe size={14} /> {khataT('webPage')}
+          </button>
+          <button type="button" className={btn} onClick={() => window.print()}>
             <Printer size={14} /> {rcvT('print')}
           </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
+          <button type="button" className={btn}
             onClick={() => downloadTextFile(`${base}.csv`, statementCsv(doc.ledger))}>
             <FileSpreadsheet size={14} /> CSV
           </button>

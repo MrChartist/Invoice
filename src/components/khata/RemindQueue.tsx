@@ -1,0 +1,165 @@
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { BellOff, Copy, MessageCircle, SkipForward, X } from 'lucide-react';
+import { localDb } from '../../lib/localDb';
+import {
+  buildPartyReminder, makePartyLogEntry, makePartySnooze, partyReminderQueue, partyStage,
+  type PartyReminderKind, type PartyReminderLang,
+} from '../../lib/khata';
+import { appendReminders, loadKhataReport, loadReminderLog, newId } from '../../lib/khata-actions';
+import { whatsappLink } from '../../lib/share';
+import { copyText } from '../share/clipboard';
+import { formatCurrency, formatDate } from '../../lib/utils';
+import { getLanguage, useT } from '../../i18n';
+import { khataT } from '../../i18n/areas/khata';
+import controls from '../../styles/controls.module.css';
+import styles from './khata.module.css';
+
+export interface RemindQueueProps {
+  /** `overdue`: "Remind all overdue". `balance`: the monthly "send everyone their balance". */
+  kind: PartyReminderKind;
+  onClose: () => void;
+  /** After at least one row was logged (so lists can refresh their "last reminded"). */
+  onChanged?: () => void;
+}
+
+/**
+ * Full-screen stepper (8.4): one party per screen, one tap opens its WhatsApp chat with the message
+ * and moves on. Skip / snooze 3 days / copy; every open, copy and snooze is logged in the existing
+ * `reminders` table with the party key. Browsers only open a new window from a user gesture, so it
+ * is honestly one tap per party — nothing is sent automatically.
+ */
+export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
+  useT();
+  const sender = useMemo(() => localDb.settings.activeProfile(), []);
+  const queue = useMemo(() => {
+    const { input, report } = loadKhataReport();
+    return partyReminderQueue(report, input.clients ?? [], loadReminderLog(), { kind });
+  }, [kind]);
+  const [index, setIndex] = useState(0);
+  const [lang, setLang] = useState<PartyReminderLang>(() => (getLanguage() === 'hi' ? 'hi' : 'en'));
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [tally, setTally] = useState({ sent: 0, skipped: 0, snoozed: 0 });
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const item = queue.items[index];
+  const generated = item ? buildPartyReminder({ party: item.party, sender, kind, lang }) : null;
+  const editKey = item ? `${item.party.key}|${lang}` : '';
+  const body = item ? edits[editKey] ?? generated!.body : '';
+  const total = queue.items.length;
+
+  const log = (channel: 'whatsapp' | 'copy') => {
+    if (!item) return;
+    try {
+      appendReminders([makePartyLogEntry(newId(), item.party.key, channel, partyStage(item.party), new Date(), kind)]);
+      onChanged?.();
+    } catch {
+      /* the log is a convenience; never block the reminder itself */
+    }
+  };
+  const next = (field: 'sent' | 'skipped' | 'snoozed') => {
+    setTally((t) => ({ ...t, [field]: t[field] + 1 }));
+    setCopied(false);
+    setIndex((i) => i + 1);
+  };
+
+  const title = kind === 'overdue' ? khataT('queueOverdue') : khataT('queueBalance');
+  return createPortal(
+    <div className={styles.queue} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={styles.queueBar}>
+        <span className={styles.queueTitle}>{title}</span>
+        <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={onClose} aria-label={khataT('close')}>
+          <X size={16} />
+        </button>
+      </div>
+      <div className={styles.queueBody}>
+        <div className={styles.queueCard}>
+          {total > 0 && (
+            <div className={styles.progress} role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={Math.min(index, total)}>
+              <div className={styles.progressFill} style={{ width: `${(Math.min(index, total) / total) * 100}%` }} />
+            </div>
+          )}
+          {(queue.snoozed > 0 || queue.recent > 0) && <p className={styles.meta}>{khataT('hidden', { snoozed: queue.snoozed, recent: queue.recent })}</p>}
+          {!item ? (
+            <>
+              <p className={styles.notice} role="status">
+                {total === 0 ? khataT('empty') : khataT('done', tally)}
+              </p>
+              <div className={styles.queueActions}>
+                <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} onClick={onClose}>{khataT('close')}</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className={styles.meta}>{khataT('step', { i: index + 1, n: total })}</span>
+              <div>
+                <div className={styles.partyName}>{item.party.name}</div>
+                <div className={styles.partyAmount}>{formatCurrency(item.amount, 'INR')}</div>
+                <div className={styles.meta}>
+                  {item.oldestDays > 0 && khataT('overdueLine', { amount: formatCurrency(item.overdue, 'INR'), n: item.oldestDays })}
+                  {item.lastSentAt && <> · {khataT('lastSent', { date: formatDate(item.lastSentAt) })}</>}
+                </div>
+              </div>
+              {!item.phone && <p className={controls.hint}>{khataT('noPhone')}</p>}
+              <div className={controls.field}>
+                <span className={controls.label}>{khataT('language')}</span>
+                <div className={controls.segment} role="radiogroup" aria-label={khataT('language')}>
+                  {(['en', 'hinglish', 'hi'] as const).map((l) => (
+                    <button key={l} type="button" role="radio" aria-checked={lang === l}
+                      className={lang === l ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setLang(l)}>
+                      {l === 'en' ? khataT('langEn') : l === 'hinglish' ? khataT('langHinglish') : khataT('langHi')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className={controls.field}>
+                <span className={controls.label}>{khataT('message')}</span>
+                <textarea className={`${controls.textarea} ${styles.message}`} value={body}
+                  onChange={(e) => setEdits((m) => ({ ...m, [editKey]: e.target.value }))} />
+              </label>
+              <div className={styles.queueActions}>
+                <a className={`${controls.btn} ${controls.btnPrimary} ${controls.btnLg}`} href={whatsappLink(item.phone, body)}
+                  target="_blank" rel="noopener noreferrer" data-queue-open
+                  onClick={() => { log('whatsapp'); next('sent'); }}>
+                  <MessageCircle size={18} /> {khataT('openWa')}
+                </a>
+                <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => next('skipped')}>
+                  <SkipForward size={16} /> {khataT('skip')}
+                </button>
+                <button type="button" className={`${controls.btn} ${controls.btnOutline}`}
+                  onClick={() => {
+                    try {
+                      appendReminders([makePartySnooze(newId(), item.party.key, 3)]);
+                      onChanged?.();
+                    } catch { /* see log() */ }
+                    next('snoozed');
+                  }}>
+                  <BellOff size={16} /> {khataT('snooze')}
+                </button>
+                <button type="button" className={`${controls.btn} ${controls.btnGhost}`}
+                  onClick={async () => { if (await copyText(body)) { setCopied(true); log('copy'); } }}>
+                  <Copy size={16} /> {copied ? khataT('copied') : khataT('copy')}
+                </button>
+              </div>
+              <p className={styles.meta}>{khataT('limit')}</p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+export default RemindQueue;

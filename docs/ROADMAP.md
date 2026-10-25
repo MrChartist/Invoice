@@ -445,6 +445,20 @@ Details: `docs/features/manufacturing.md`.
 | 7.166 | ✅ **Branch stock**: per-godown closing-stock valuation for branch statements in Books and Gateway (branch godowns × company-wide unit cost; "No branch" takes the rest so branches add up — `ledger/branch-stock.ts`); Alt+C on manufacturing / stock-journal line grids (items, godowns) and the bill godown select; the Sec 25(4) tax invoice + bill dialog opens automatically when a transfer between two GSTINs is saved | 7.84, P1-19 | done |
 | 7.167 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), price lists on POS, ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
 
+### 8A · Daily khata loop (`docs/features/khata.md`)
+
+What Khatabook / OkCredit / Vyapar / myBillBook users do every day, offline: `wa.me` / `upi://` / Web Share / files only.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.1 | ✅ **Balance-first Clients list**: *To collect / Advance / Settled* from `buildReceivables` (opening bills, credit notes, advances), overdue line, sort by balance / most overdue / name, **Overdue only** chip, header totals *You'll get / You'll give*, phone card layout | `khata.ts`, `Clients.tsx` | done |
+| 8.2 | ✅ **₹ Received / ₹ Given** per party (Clients rows, Statements tab): amount-first sheet, Cash / UPI / Bank + UTR, date, note; FIFO allocation (editable), rest on account, saved all or nothing with roles, period lock and audit (`savePartyReceipt`); ₹ Given = one-line Bill of Supply (composition) / non-GST bill (no GSTIN), or the editor prefilled with the party for a GST registrant (no invented non-GST document) | `bill-allocation.ts`, `khata-actions.ts`, `QuickEntrySheet.tsx` | done |
+| 8.3 | ✅ **One-tap WhatsApp statement** (open bills + net due + `upi://` link) on Clients / Receivables rows and the statement viewer; **Share PDF** through the share sheet (download fallback); static **statement web page** with Pay-with-UPI panel + QR (`client-copy.ts` generalised) | `StatementViewer.tsx`, `client-copy-dom.ts` | done |
+| 8.4 | ✅ **Party reminders + "Remind all overdue"**: `buildPartyReminder` (total overdue, oldest bill, UPI link; English / Hinglish / Hindi), full-screen stepper one tap per party with skip / snooze / copy, logged in `reminders` with additive `party_key`; **Send everyone their balance** monthly preset | `khata.ts`, `RemindQueue.tsx` | done |
+| 8.5 | ✅ **Party balance on the bill**: Design Studio toggle (`show_party_balance`, per profile) prints *Previous balance + This bill = Total due* on every template and the thermal / POS receipt from `party_balance_snapshot` frozen at first issue (reprints never change; legacy prints nothing); accent variable only | `party-balance.ts`, `PartyBalanceBlock.tsx`, store / POS save | done |
+| 8.6 | ✅ **Due dates in shop use**: the party's credit days set the due date of a new document; the editor nudges for a due date on an unpaid bill | `useInvoiceStore.ts`, `DocumentMetaCard.tsx` | done |
+| 8.7 | ⏳ 8A follow-ups: balance snapshot on recurring / converted / late-fee documents issued outside the editor, per-party reminder language, statement web page from list rows, non-INR khata | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

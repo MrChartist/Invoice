@@ -18,6 +18,8 @@ import {
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
 import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoice-defaults';
+import { nextPartyBalanceSnapshot } from '../lib/party-balance';
+import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import type {
   Client,
@@ -128,6 +130,7 @@ export const RECORD_KEYS = [
   'transport',
   'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
   'agent_id', 'offer', 'rx',
+  'party_balance_snapshot',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -247,6 +250,14 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         const own = readValues(get().custom_values).filter((v) => v.scope !== 'party');
         const merged = mergePartyValues(own, partyMap, customFieldsDb.all());
         partyPatch.custom_values = merged.length ? merged : undefined;
+      }
+      // A client picked from the master (it brings its party map) on a new document: its default
+      // credit period (6.25 `credit_days`) sets the due date (8.6). Typing a name never does.
+      if (partyMap !== undefined && !get().id && client.name?.trim()) {
+        const key = client.name.trim().toLowerCase();
+        const master = localDb.clients.getAll().find((c) => (c.name ?? '').trim().toLowerCase() === key);
+        const days = Math.round(Number(master?.credit_days) || 0);
+        if (days > 0) partyPatch.due_date = addDaysInput(days, get().issue_date);
       }
       // A client's GSTIN/state decides the place of supply, which decides the split.
       const place_of_supply =
@@ -581,6 +592,11 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         );
       }
       if (record.status === 'Draft' && !opts?.asDraft) record.status = 'Sent';
+      // Party balance on the bill (8.5): frozen at first issue, kept on later saves; legacy stays without.
+      const storedCopy = state.id ? localDb.invoices.getById(state.id) : undefined;
+      const snapshot = nextPartyBalanceSnapshot(record, storedCopy, () => partyBalanceSnapshotFor(record));
+      if (snapshot) record.party_balance_snapshot = snapshot;
+      else delete record.party_balance_snapshot;
 
       try {
         const saved = localDb.invoices.save(record);

@@ -189,3 +189,17 @@ Maths (`src/lib/late-fee.ts`, reusing `computeInterest` from `src/lib/interest.t
 
 Tests: `tests/late-fee.test.ts`. The older Settings-level interest estimate (`late-fee-irn-demo.md` §2) is unchanged and
 separate: it informs reminders; this rule creates the invoice line.
+
+## Daily khata loop (8A, `docs/features/khata.md`)
+
+- **Clients** leads with the party balance from `buildReceivables` (incl. opening bills and advances): *To collect* /
+  *Advance* / *Settled*, overdue line, sort by balance, **Overdue only** chip, header totals *You'll get / You'll give*.
+- **₹ Received** (Clients row, Statements tab): one receipt split over the open bills oldest first (editable), the rest
+  on account, saved all or nothing by `savePartyReceipt` (`bill-allocation.ts`) — `localDb.payments.record` rows tagged
+  `client_id` / `client_name` plus one invoice-less on-account row with its own `RCPT/FY…` number. Books now names the
+  party on such on-account rows (it used to say "Unknown customer").
+- **₹ Given**: one-line Bill of Supply (composition) / non-GST bill (no GSTIN), or the invoice editor prefilled with
+  the party (`/invoice?party=<client id>`) for a GST registrant.
+- **WhatsApp statement** on the aging rows, the Statements tab and the statement viewer; the viewer also has **Share
+  PDF** (Web Share Level 2, download fallback) and **Web page** (static statement page with a Pay-with-UPI panel + QR).
+- **Remind all overdue** / **Send everyone their balance** in the page header open the party reminder stepper.

@@ -402,6 +402,31 @@ try {
     await page.keyboard.press('Escape');
   });
 
+  await step('khata (8A): Clients shows the balance, ₹ Received drops it, the WhatsApp statement carries a upi:// link', async () => {
+    await page.goto(srv.origin + '/clients');
+    const row = page.locator('tr[data-client-row="Acme Buyers"]');
+    await row.getByText('To collect ₹2,540.00').waitFor();
+    check(true, 'balance-first Clients list: Acme Buyers shows "To collect ₹2,540.00"');
+    const wa = (await row.locator('a[data-wa-statement]').getAttribute('href')) ?? '';
+    const text = decodeURIComponent(wa.split('?text=')[1] ?? '');
+    check(wa.startsWith('https://wa.me/') && /upi:\/\/pay\?pa=e2e@okhdfcbank/.test(text) && /am=2540\.00/.test(text),
+      `WhatsApp statement link carries a upi:// link for the net due (${text.replace(/\s+/g, ' ').slice(0, 90)}…)`);
+    await row.getByRole('button', { name: 'Record money received from Acme Buyers' }).click();
+    const dlg = page.getByRole('dialog', { name: /Received from Acme Buyers/ });
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Amount (₹)', null, { timeout: 5000 });
+    check(true, 'the amount field is focused when the sheet opens');
+    await dlg.getByLabel('Amount (₹)', { exact: true }).fill('500');
+    await dlg.getByRole('radio', { name: 'UPI' }).click();
+    await dlg.getByLabel(/UTR/).fill('UPI-E2E-1');
+    const firstBill = await dlg.getByLabel(/^Amount for INV/).first().inputValue();
+    check(firstBill === '500', `the ₹500 is allocated to the oldest open bill first (${firstBill})`);
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await row.getByText('To collect ₹2,040.00').waitFor();
+    const tx = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.reference === 'UPI-E2E-1'))).filter((t) => t.reference === 'UPI-E2E-1');
+    check(tx.length === 1 && tx[0].amount === 500 && tx[0].method === 'UPI' && tx[0].client_name === 'Acme Buyers' && !!tx[0].invoice_id,
+      `₹ Received saved one UPI receipt against the bill, tagged with the party (${tx.length} row, ₹${tx[0]?.amount})`);
+  });
+
   await step('bulk mark paid, then delete with undo', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByLabel('Select INV/FY', { exact: false }).first().check();
