@@ -55,7 +55,12 @@ export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose
   const business = localDb.settings.activeProfile()?.companyName;
 
   const save = () => {
-    dayCloseDb.close(z, float, counted, note);
+    try {
+      dayCloseDb.close(z, float, counted, note);
+    } catch (err) {
+      notify((err as Error).message, 'error'); // R3-A: open restaurant orders block the day close
+      return;
+    }
     setTick((t) => t + 1);
     notify(posT('zClosed', { date: formatDate(day) }) + (drawer.difference ? posT(drawer.difference < 0 ? 'zShort' : 'zOver', { amount: formatCurrency(Math.abs(drawer.difference)) }) : ''));
   };

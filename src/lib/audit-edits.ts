@@ -85,6 +85,11 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   deferrals: { entity: 'voucher', label: 'Deferral schedule' },
   packing_lists: { entity: 'invoice', label: 'Packing list' },
   package_types: { entity: 'item', label: 'Package type' },
+  // R3-A: restaurant dining areas / tables, running orders (KOTs, cancellations), modifier groups
+  dining_areas: { entity: 'settings', label: 'Dining area' },
+  dining_tables: { entity: 'settings', label: 'Dining table' },
+  table_orders: { entity: 'invoice', label: 'Table order' },
+  modifier_groups: { entity: 'item', label: 'Modifier group' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

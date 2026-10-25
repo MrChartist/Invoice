@@ -376,6 +376,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   deferrals: 'books.edit',
   packing_lists: 'doc.create',
   package_types: 'master.edit',
+  // R3-A: restaurant masters (areas, tables, modifier groups) are masters; running table orders are documents
+  dining_areas: 'master.edit',
+  dining_tables: 'master.edit',
+  modifier_groups: 'master.edit',
+  table_orders: 'doc.create',
 };
 
 let systemDepth = 0;
