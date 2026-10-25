@@ -46,7 +46,8 @@ verification; add new versions, never edit old ones.
   (Sales voucher without tax ledgers), accounting CSV ("Bill of Supply").
 - e-Invoice: never (`eInvoiceDocType` returns null even with an override; bulk e-Invoice already excludes it). The
   e-Invoice / e-Way modal opens on the e-Way tab for a Bill of Supply; the e-Way JSON uses NIC document type `BIL`.
-  Bulk e-Way does not pick Bills of Supply up yet.
+  Bulk e-Way: tick "Include Bills of Supply" in the bulk modal (`bulkCandidates(…, { billsOfSupply: true })`); they are
+  never preselected, go into the e-Way file only and are listed as blocked for the e-Invoice file.
 
 ## GST reports
 - **Regular taxpayer's Bill of Supply** → GSTR-1 Table 8 in the `exempt_kind` column (nil / exempt / non-GST), GSTR-3B
@@ -68,9 +69,20 @@ verification; add new versions, never edit old ones.
   raises `TAX_COLLECTED`. Interest / late fee not computed.
 - **GSTR-4** (`buildGstr4`): Table 4A registered forward charge, 4B registered reverse charge, 4C unregistered,
   4D import of services; Table 5 the four CMP-08s; Table 6 outward by rate; totals. Goods imports are noted, not
-  tabled. TDS/TCS credit (Table 7+) not computed. CSV download for both.
+  tabled. CSV download for both.
+- **GSTR-4 Tables 7-9** (`src/lib/gstr4-annual.ts`, `Gstr4AnnualView` lazy under the GSTR-4 view): Table 7 TDS/TCS
+  credit — a TCS estimate from documents marked "operator collects TCS" (net value × `ecoTcsRate`: 1% from 1 Oct 2018,
+  0.5% from 10 Jul 2024; half CGST / half SGST) plus rows typed in from the portal (GSTR-7 / GSTR-8); Table 8 tax payable
+  (the four CMP-08s), interest payable (Sec 50, 18% p.a., on each CMP-08 paid after its due date — the date from the
+  Compliance tab's filed mark, else the as-of day once overdue) and late fee payable (GSTR-4 late fee for the filing date
+  entered, split CGST / SGST); "paid" columns and Table 9 (refund from the cash ledger, debit entry nos.) are typed in.
+  Typed-in values are stored in the new `gstr4_manual` table (one row per FY × GSTIN, backed up, `books.edit`).
+- **Interest / late fee** (`gst-penalties.ts`, date-keyed): CMP-08 has no late fee, only Sec 50 interest;
+  `GSTR4_LATE_FEE_RULES` — FY 2019-20 on ₹50/day (nil ₹20) up to ₹10,000; FY 2021-22 on capped at ₹2,000 (nil ₹500),
+  Notification 21/2021-CT. The waivers for FY 2019-20 / 2020-21 are not modelled. The Compliance tab now shows these
+  estimates for CMP-08 / GSTR-4 rows. Verify with your CA.
 - **Compliance calendar**: frequency "Composition" → CMP-08 per quarter, GSTR-4 per FY (defaults to it when the active
-  profile is composition). Late-fee / interest estimates are not modelled for these forms.
+  profile is composition), with CMP-08 interest and GSTR-4 late-fee estimates (above).
 - **Purchases**: data model untouched. With a composition active profile the Expenses stat card reads
   "GST on bills (no ITC)" and the bill form explains that ITC is not available.
 
@@ -85,8 +97,10 @@ Model — **an amendment is an edit of the same record, marked as such**:
 3. In the period containing `amended_on`, the edited record is reported in the amendment tables with the original
    number / date (`gstr1.amendments`): registered → B2BA (invoice) / CDNRA (note); unregistered inter-state above the
    B2CL threshold → B2CLA / CDNURA; other B2C → **B2CSA** rows = the original month's B2CS rows recomputed with every
-   amendment made up to the end of this period (a supply that left B2CS revises its old row down to zero). Exports are
-   flagged (`AMEND_EXPORT`), not generated. A draft / cancelled revision is not reported (`AMEND_NOT_LIVE`); a section
+   amendment made up to the end of this period (a supply that left B2CS revises its old row down to zero). Exports →
+   **EXPA** (invoice, with `exp_typ` WPAY / WOPAY and the shipping-bill fields) / CDNURA with `typ` EXPWP / EXPWOP (note);
+   SEZ supplies stay in B2BA / CDNRA with `inv_typ` SEWP / SEWOP. GSTR-9 takes export amendments through the same
+   effects (4K / 4L with payment, 5J / 5K without). A draft / cancelled revision is not reported (`AMEND_NOT_LIVE`); a section
    change is flagged (`AMEND_SECTION_CHANGED`).
 4. GSTR-3B of the amendment period takes the difference (revised version + original with the sign flipped).
 5. Payments, credit-note links, receivables, books and the ledger keep pointing at the one record, so nothing is
@@ -98,26 +112,28 @@ locked document must be unlocked with the PIN first (every change is in the audi
 amendment is needed.
 
 JSON keys (`AMEND_JSON_LAYOUT` in `gstr-json.ts`, **not verified against the current offline tool**): `b2ba` (`ctin`,
-`inv[]` with `oinum`, `oidt`, `inum`, `idt`, `val`, `pos`, `rchrg`, `inv_typ`, `itms`), `b2cla` (`pos`, `inv[]` with
+`inv[]` with `oinum`, `oidt`, `inum`, `idt`, `val`, `pos`, `rchrg`, `inv_typ`, `itms`), `expa` (`exp_typ`, `inv[]`
+with `oinum`, `oidt`, `inum`, `idt`, `val`, `sbpcode`, `sbnum`, `sbdt`, `itms[]` of `txval` / `rt` / `iamt` / `csamt`), `b2cla` (`pos`, `inv[]` with
 `oinum`/`oidt`), `cdnra` (`ctin`, `nt[]` with `ont_num`, `ont_dt`, `ntty`, `nt_num`, `nt_dt`, …), `cdnura`
 (`ont_num`/`ont_dt`, `typ`), `b2csa` (`omon`, `sply_ty`, `pos`, `typ`, `itms[]`). The revised `idt` is the document
 date (amending the number/date itself is possible by editing them). CSV: GST page → Amendments tab.
 
 ## Not covered (gaps)
-- **E-commerce Sec 52 (TCS by operators) / Sec 9(5) (operator pays tax)** — not built; GSTR-1 Table 14/15 and the
-  composition bar on supplies through an e-commerce operator (Sec 10(2)(d)) are not modelled.
-- Export amendments (EXPA), amendments of Table 8 / HSN / documents issued, GSTR-9 Part V (amendments) and GSTR-4
-  Tables 7+ are not generated.
+- E-commerce is in `gst-reports.md` (Table 14 / 3.1.1); Table 14A (amendments of Table 14) and Table 15 (operator's
+  own return) are not generated; an amended 9(5) supply is flagged `AMEND_ECO_95`. The composition bar on supplies
+  through a TCS operator (Sec 10(2)(d), goods allowed from 1 Oct 2023) is a warning in the editor only.
+- Amendments of Table 8 / HSN / documents issued and GSTR-9 Part V (amendments) are not generated.
 - Re-amending keeps the very first original and moves `amended_on`; the earlier amendment period then shows the
   latest revision (one level of history). There is no "undo amendment" button (edit the values back).
 - Composition eligibility (turnover limits, notified goods, inter-state bar) is warned about, not enforced; mixed
-  supplies of a composition dealer, CMP-02/03/04 transitions, interest and late fees on CMP-08 / GSTR-4 are not computed.
+  supplies of a composition dealer and CMP-02/03/04 transitions are not computed. A composition restaurant's supplies
+  through an operator paying tax u/s 9(5) still count in its CMP-08 turnover (CA question).
 - A trader's exempt goods (and a service provider's exempt services) are recognised only by a 0% catalogue rate on the line.
 
 ## Files
-`src/lib/bill-of-supply.ts`, `src/lib/composition-returns.ts`, `src/lib/amendments.ts`, `src/lib/tax-rules.ts`,
+`src/lib/bill-of-supply.ts`, `src/lib/composition-returns.ts`, `src/lib/gstr4-annual.ts`, `src/lib/amendments.ts`, `src/lib/tax-rules.ts`,
 `src/lib/gst-reports.ts` (`asFiled`, `isCompositionDoc`, amendments), `src/lib/gstr-json.ts`, `src/lib/compliance.ts`,
 `src/components/templates/parts/SupplyDeclaration.tsx`, `src/components/creator/SupplyNotice.tsx`,
 `src/components/documents/AmendDialog.tsx`, `src/components/gst-reports/CompositionView.tsx`.
-Tests: `tests/composition-amendments.test.ts`, `tests/purchase-contract.test.ts`; e2e step "composition profile issues
+Tests: `tests/composition-amendments.test.ts`, `tests/gst-gaps.test.ts`, `tests/purchase-contract.test.ts`; e2e step "composition profile issues
 a Bill of Supply with the Rule 49 declaration".

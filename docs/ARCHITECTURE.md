@@ -102,6 +102,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `gstr2b_actions` | GST reports (2B match) | `Gstr2bAction` IMS decision per return period + section + supplier GSTIN + normalised document no. (`src/lib/gstr2b.ts`) |
 | `time_entries` | time (6.13) | `TimeEntry` (`src/types/time.ts`); billed state derived from `invoiced_in` (`docs/features/time-expenses.md`) |
 | `mileage` | time (6.14) | `MileageEntry` (`src/types/time.ts`), same derived billing |
+| `gstr4_manual` | GST reports (composition, 5.9) | `Gstr4Manual` typed-in GSTR-4 Tables 7-9 (TDS/TCS credit rows, tax / interest / late fee paid, refund claimed, GSTR-4 filing date), one row per FY × GSTIN, `id` = `${fyStart}|${GSTIN}` (`src/lib/gstr4-annual.ts`) |
 | `compliance` | compliance (GST) | `FiledReturn` marks: GST return filed per form / period / GSTIN (`docs/features/compliance.md`) |
 | `accounts` | ledger | user-added `Account` rows (`src/lib/ledger/accounts.ts`); default accounts are constants, never stored |
 | `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`); additive variant fields `variant` (OPTIONAL / MEMO), `post_dated`, `reverse_on`, `voucher_class`, `regularised_at` (Phase 7) |

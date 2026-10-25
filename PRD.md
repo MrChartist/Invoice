@@ -106,19 +106,25 @@ server, no account, and no subscription. It runs entirely in the browser and wor
   linked invoice, export details) and e-Way Bill JSON generators, with pre-flight validation. The IRN, Ack No and signed
   QR returned by the IRP are entered back and printed on every template. Bulk: one IRP / e-Way JSON for many invoices
   (each preflighted, blocked ones listed with reasons) and bulk import of the IRP response file (JSON or CSV) into the
-  saved IRN / Ack / QR. (The app does not call the IRP.)
+  saved IRN / Ack / QR; Bills of Supply can be added to the bulk e-Way file (document type BIL). (The app does not
+  call the IRP.)
 - **GST reports**: GSTR-1 (B2B, B2CL by date-keyed threshold, B2CS, CDNR/CDNUR with C/D notes classified by the
   original invoice, EXP with shipping-bill fields, nil, HSN summary split B2B/B2C with the 4/6-digit rule, documents
   issued, advances received / adjusted in Table 11A / 11B as `at` / `txpd`) as offline-tool JSON and section CSVs; GSTR-3B (3.1 incl. tax on advances, 3.2, 4 incl. imports, RCM and 4B(1)/4B(2) reversals, 5)
   as JSON, CSV and a printable summary; aggregate-turnover support. Section CSVs are also offered as .xlsx.
-  Bills of Supply go to Table 8 / 3B 3.1(c)-(e) and Table 13.
+  Bills of Supply go to Table 8 / 3B 3.1(c)-(e) and Table 13. Supplies through an e-commerce operator (optional
+  operator GSTIN on the document): Sec 52 (TCS) keep their section with `etin` and are totalled in Table 14(a); Sec 9(5)
+  (the operator pays the tax) are value-only in Table 14(b) and 3B 3.1.1(ii). Delivery challans with a Rule 55 purpose
+  (job work / approval / liquid gas / other than supply) are listed in Table 13 (doc 9-12).
 - **Amendments**: "Amend (reported in a filed return)" freezes the document as filed; its own period's GSTR-1 never
-  changes and the edit is reported in the month it is made in (B2BA / B2CLA / CDNRA / CDNURA / revised B2CSA, JSON +
-  CSV) with 3B taking the difference. Whether an edit needs to be an amendment comes from the filed marks and the
+  changes and the edit is reported in the month it is made in (B2BA / B2CLA / CDNRA / CDNURA / revised B2CSA / EXPA,
+  JSON + CSV) with 3B taking the difference. Whether an edit needs to be an amendment comes from the filed marks and the
   period lock.
 - **Composition returns**: quarterly CMP-08 (turnover × date-keyed composition rate, CGST/SGST split, reverse-charge
   purchases and imports of services) and annual GSTR-4 (inward 4A-4D, CMP-08 summary, outward by rate) working
-  papers; GSTR-1 / 3B screens explain they do not apply; ITC is shown as not claimable.
+  papers, plus GSTR-4 Tables 7-9 (TCS credit estimated from operator sales, typed-in TDS/TCS rows, tax / interest /
+  late fee payable and paid, refund claimed — stored per FY) and CMP-08 interest / GSTR-4 late-fee estimates; GSTR-1 /
+  3B screens explain they do not apply; ITC is shown as not claimable.
 - **GSTR-2B / IMS matcher**: load the portal's GSTR-2B (JSON or Excel) locally; documents are matched to purchase
   bills on supplier GSTIN + normalised bill number with value / tax / date tolerances and classified as matched,
   value mismatch, in 2B only, in books only (ITC at risk, Sec 16(2)(aa)) or ITC not available. An IMS worksheet
@@ -268,8 +274,9 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - Hindi interface (5.4) is partial: the shell, login, Dashboard, the editor's main surface, the payment dialog and list
   empty states are translated; other screens, validation messages and printed receipts / statements are still in
   English, and GST working papers keep their English statutory wording ("verify with your CA").
-- Composition / amendments (5.9): e-commerce Sec 52 / 9(5), export amendments (EXPA), GSTR-9 Part V, CMP-08 / GSTR-4
-  interest and late fees and composition eligibility checks are not built; re-amending keeps only the first original.
+- Composition / amendments (5.9): GSTR-9 Part V, Table 14A / 15 (operator-side) amendments and composition eligibility
+  checks are not built; re-amending keeps only the first original. E-commerce Table 14 / 3.1.1 JSON keys are not
+  verified against the offline tool.
 
 ---
 

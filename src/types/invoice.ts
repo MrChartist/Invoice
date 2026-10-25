@@ -279,6 +279,20 @@ export type CompositionCategory = 'manufacturer' | 'trader' | 'restaurant' | 'se
 export type ExemptKind = 'NIL' | 'EXEMPT' | 'NON_GST';
 
 /**
+ * Supply made through an e-commerce operator (ECO): `TCS_52` = the operator collects TCS under Sec 52 (the
+ * supplier pays the tax and reports the supply with the operator's GSTIN, GSTR-1 Table 14(a)); `PAY_9_5` = the
+ * operator itself pays the tax under Sec 9(5) (restaurant / passenger transport / accommodation …; the supplier
+ * reports the value only, GSTR-1 Table 14(b) and GSTR-3B 3.1.1(ii)). See `src/lib/eco.ts`.
+ */
+export type EcoSection = 'TCS_52' | 'PAY_9_5';
+
+/**
+ * Why a delivery challan was issued (Rule 55). Only the first four are listed in GSTR-1 Table 13 (doc 9-12);
+ * `ANTICIPATION` (goods sent ahead of the tax invoice of the same supply) is not, and absent = not listed.
+ */
+export type ChallanPurpose = 'JOB_WORK' | 'APPROVAL' | 'LIQUID_GAS' | 'OTHER_THAN_SUPPLY' | 'ANTICIPATION';
+
+/**
  * Additive (roadmap 5.9): a document already reported in a filed GSTR-1 that was edited afterwards.
  * `original` is the document exactly as it was when the amendment started (it stays in the GSTR-1 of
  * its own period); the edited record is reported in the period of `amended_on` (B2BA / B2CLA / B2CSA /
@@ -473,4 +487,10 @@ export interface InvoiceRecord {
   amends?: AmendmentInfo;
   /** Additive (6.8): billed at the POS counter (counted in that day's Z report). Never copied. */
   pos?: boolean;
+  /** Additive (5.9 e-commerce): GSTIN of the e-commerce operator the supply was made through (absent = direct sale). */
+  eco_gstin?: string;
+  /** Additive: how that operator is involved (absent with `eco_gstin` = `TCS_52`). Only stored with `eco_gstin`. */
+  eco_section?: EcoSection;
+  /** Additive, delivery challans only: Rule 55 purpose — decides the GSTR-1 Table 13 row (absent = not listed). */
+  challan_purpose?: ChallanPurpose;
 }

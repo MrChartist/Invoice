@@ -337,6 +337,54 @@ export function compositionDueDays(periodStart?: string) {
   return ruleAt(COMPOSITION_DUE_RULES, periodStart);
 }
 
+// ── E-commerce operators (Sec 52 TCS / Sec 9(5)) ─────────────────────────────
+
+/**
+ * TCS an e-commerce operator collects under Sec 52 on the net value of taxable supplies made through it, % in
+ * total (IGST, or half CGST + half SGST). 1% from 1 Oct 2018 (Notification 52/2018-CT; Notifications 1/2018-IT and
+ * 2/2018-CT(R)); 0.5% from 10 Jul 2024 (Finance Act 2024 / Notification 15/2024-CT — verify the citation with your CA).
+ * Used only to ESTIMATE the TCS credit a supplier should see from GSTR-8 (GSTR-4 Table 7, the e-commerce tab).
+ */
+export const ECO_TCS_RATE_RULES: readonly Versioned<number>[] = [
+  { from: '2017-07-01', value: 0, source: 'Sec 52 not in force yet' },
+  { from: '2018-10-01', value: 1, source: 'Sec 52; Notification 52/2018-CT' },
+  { from: '2024-07-10', value: 0.5, source: 'Notification 15/2024-CT (0.25% + 0.25% / 0.5% IGST) — verify' },
+];
+
+export function ecoTcsRate(date?: string): number {
+  return ruleAt(ECO_TCS_RATE_RULES, date);
+}
+
+/**
+ * Where supplies made through an e-commerce operator are reported, by the first day of the return period /
+ * FY. Working-paper dates, VERIFY WITH YOUR CA (portal availability lagged the notifications):
+ *  - `gstr3b311`: GSTR-3B Table 3.1.1 (supplies notified u/s 9(5)) — Notification 14/2022-CT (5 Jul 2022).
+ *  - `gstr1Table14`: GSTR-1 Table 14 (supplies through ECOs: (a) TCS u/s 52, (b) tax paid by the ECO u/s 9(5))
+ *    and Table 15 — Notification 26/2022-CT (26 Dec 2022). Before that the ECO GSTIN was only a column of
+ *    B2B / B2CL / B2CS (B2CS type "E").
+ *  - `gstr9Row5C1`: GSTR-9 row 5C1 (supplies on which the ECO pays tax u/s 9(5)) — FY 2024-25 onwards
+ *    (Notification 12/2024-CT).
+ * The app reports Table 14 / 3.1.1 / 5C1 whenever there is data and raises an info note for earlier periods.
+ */
+export const ECO_REPORTING_RULES: readonly Versioned<{ gstr3b311: boolean; gstr1Table14: boolean; gstr9Row5C1: boolean }>[] = [
+  { from: '2017-07-01', value: { gstr3b311: false, gstr1Table14: false, gstr9Row5C1: false } },
+  { from: '2022-07-05', value: { gstr3b311: true, gstr1Table14: false, gstr9Row5C1: false }, source: 'Notification 14/2022-CT (GSTR-3B 3.1.1)' },
+  { from: '2022-12-26', value: { gstr3b311: true, gstr1Table14: true, gstr9Row5C1: false }, source: 'Notification 26/2022-CT (GSTR-1 Tables 14 / 15)' },
+  { from: '2024-04-01', value: { gstr3b311: true, gstr1Table14: true, gstr9Row5C1: true }, source: 'Notification 12/2024-CT (GSTR-9 5C1, FY 2024-25 on)' },
+];
+
+export function ecoReporting(periodStart?: string) {
+  return ruleAt(ECO_REPORTING_RULES, periodStart);
+}
+
+/**
+ * A composition dealer could not supply GOODS through an ECO that collects TCS (Sec 10(2)(d)) until the
+ * Finance Act 2023 amendment, in force from 1 Oct 2023 (Notification 28/2023-CT; intra-state only, Notification
+ * 36/2023-CT). SERVICES through such an ECO stay barred (Sec 10(2)(d) / 10(2A)(c) as amended). Warning only — verify
+ * with your CA.
+ */
+export const COMPOSITION_ECO_GOODS_FROM = '2023-10-01';
+
 // Interest / late-fee rates and caps are date-keyed in `gst-penalties.ts` (loaded only by the GST page).
 
 // ── Income-tax Act depreciation (Sec 32, Rule 5 / New Appendix I): WDV block rates ──

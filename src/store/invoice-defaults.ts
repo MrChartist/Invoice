@@ -15,6 +15,8 @@ import { readRefs } from '../lib/attachments';
 import type { AppSettings } from '../lib/localDb';
 import type {
   AmendmentInfo,
+  ChallanPurpose,
+  EcoSection,
   Client,
   DocumentType,
   InvoiceItem,
@@ -202,6 +204,15 @@ function normalizeAmends(raw: unknown): AmendmentInfo | undefined {
   };
 }
 
+const CHALLAN_PURPOSES = new Set(['JOB_WORK', 'APPROVAL', 'LIQUID_GAS', 'OTHER_THAN_SUPPLY', 'ANTICIPATION']);
+
+/** E-commerce operator fields: kept only with a GSTIN; the section only when it is a known one. */
+function ecoFields(gstin: unknown, section: unknown): { eco_gstin?: string; eco_section?: EcoSection } {
+  const g = typeof gstin === 'string' ? gstin.trim().toUpperCase() : '';
+  if (!g) return {};
+  return { eco_gstin: g, ...(section === 'TCS_52' || section === 'PAY_9_5' ? { eco_section: section } : {}) };
+}
+
 /** Upgrade any stored record (old or new) to the current `InvoiceRecord` shape. */
 export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_orange'): InvoiceRecord {
   const r = (raw ?? {}) as Partial<InvoiceRecord> & Record<string, unknown>;
@@ -303,6 +314,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.exempt_kind === 'NIL' || r.exempt_kind === 'EXEMPT' || r.exempt_kind === 'NON_GST' ? { exempt_kind: r.exempt_kind } : {}),
     ...(normalizeAmends(r.amends) ? { amends: normalizeAmends(r.amends) } : {}),
     ...(r.pos === true ? { pos: true } : {}),
+    ...ecoFields(r.eco_gstin, r.eco_section),
+    ...(CHALLAN_PURPOSES.has(String(r.challan_purpose)) ? { challan_purpose: r.challan_purpose as ChallanPurpose } : {}),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

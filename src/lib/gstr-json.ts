@@ -3,7 +3,7 @@
  * per-section CSV and a printable summary document. All pure (no DOM access).
  *
  * The JSON follows the structure of the GST offline utility (b2b / b2cl /
- * b2cs / cdnr / cdnur / exp / nil / at / txpd / hsn / doc_issue). It has NOT been validated
+ * b2cs / cdnr / cdnur / exp / nil / at / txpd / hsn / doc_issue / supeco and the amendment sections). It has NOT been validated
  * against the live portal schema — import it into the offline tool, let it
  * validate, and verify with your CA before filing.
  */
@@ -11,9 +11,12 @@
 import { round2 } from './invoice-calc';
 import { toGstnDate } from './gst-reports';
 import { csvCell, toCsv as sharedToCsv } from './csv';
+import { CHALLAN_DOC_TYPES } from './gst-reports';
 import type {
   AdvanceTableRow,
   AmendCdnRow,
+  AmendExpRow,
+  EcoRow,
   AmendDocRow,
   B2csaRow,
   CdnRow,
@@ -84,9 +87,21 @@ const hsnRows = (rows: HsnRow[]) =>
  * with your CA before filing.
  */
 export const AMEND_JSON_LAYOUT = {
-  b2ba: 'b2ba', b2cla: 'b2cla', cdnra: 'cdnra', cdnura: 'cdnura', b2csa: 'b2csa',
+  b2ba: 'b2ba', b2cla: 'b2cla', cdnra: 'cdnra', cdnura: 'cdnura', b2csa: 'b2csa', expa: 'expa',
   origInvNum: 'oinum', origInvDate: 'oidt', origNoteNum: 'ont_num', origNoteDate: 'ont_dt', origMonth: 'omon',
 } as const;
+
+/**
+ * E-commerce layout — ASSUMPTION, change here only; NOT verified against the current offline tool:
+ *  - `etin` (operator GSTIN) on B2B / B2CL invoices and B2CS rows, B2CS `typ` "E" with an operator, "OE" without;
+ *  - Table 14 under `supeco`: `clttx` = 14(a) TCS u/s 52, `paytx` = 14(b) tax paid by the operator u/s 9(5),
+ *    each `[{ etin, suppval, igst, cgst, sgst, cess }]` (14(b) tax columns 0 — the supplier pays none).
+ * Import into the offline tool, let it validate, and verify with your CA before filing.
+ */
+export const ECO_JSON_LAYOUT = { etin: 'etin', section: 'supeco', tcs: 'clttx', pay95: 'paytx', verified: false } as const;
+
+const ecoJson = (rows: EcoRow[]) =>
+  rows.map((r) => ({ etin: r.etin, suppval: round2(r.value), igst: round2(r.igst), cgst: round2(r.cgst), sgst: round2(r.sgst), cess: round2(r.cess) }));
 
 /**
  * Table 11 (advances) JSON layout: `at` (11A, advances received) and `txpd` (11B, advances
@@ -141,6 +156,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
         val: round2(i.value),
         pos: i.pos,
         rchrg: i.rchrg,
+        ...(i.etin ? { [ECO_JSON_LAYOUT.etin]: i.etin } : {}),
         inv_typ: i.invTyp ?? 'R',
         itms: itms(i.items),
       })),
@@ -154,6 +170,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
         inum: i.number,
         idt: toGstnDate(i.date),
         val: round2(i.value),
+        ...(i.etin ? { [ECO_JSON_LAYOUT.etin]: i.etin } : {}),
         itms: itms(i.items),
       })),
     }));
@@ -164,7 +181,8 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
       const row: Record<string, unknown> = {
         sply_ty: x.supply,
         rt: x.rate,
-        typ: 'OE',
+        typ: x.etin ? 'E' : 'OE',
+        ...(x.etin ? { [ECO_JSON_LAYOUT.etin]: x.etin } : {}),
         pos: x.pos,
         txval: round2(x.txval),
       };
@@ -237,6 +255,13 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
     };
   }
 
+  if (r.eco && (r.eco.tcs.length || r.eco.pay95.length)) {
+    out[ECO_JSON_LAYOUT.section] = {
+      ...(r.eco.tcs.length ? { [ECO_JSON_LAYOUT.tcs]: ecoJson(r.eco.tcs) } : {}),
+      ...(r.eco.pay95.length ? { [ECO_JSON_LAYOUT.pay95]: ecoJson(r.eco.pay95) } : {}),
+    };
+  }
+
   if (r.at?.length) out[ADVANCE_JSON_LAYOUT.receivedKey] = advanceJson(r.at);
   if (r.txpd?.length) out[ADVANCE_JSON_LAYOUT.adjustedKey] = advanceJson(r.txpd);
 
@@ -255,6 +280,26 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
     const L = AMEND_JSON_LAYOUT;
     const orig = (x: AmendDocRow) => ({ [L.origInvNum]: x.origNumber, [L.origInvDate]: toGstnDate(x.origDate) });
     const origNote = (x: AmendDocRow) => ({ [L.origNoteNum]: x.origNumber, [L.origNoteDate]: toGstnDate(x.origDate) });
+    if (am.expa?.length) {
+      out[L.expa] = [...groupBy(am.expa, (x: AmendExpRow) => x.expType)].map(([expType, invs]) => ({
+        exp_typ: expType,
+        inv: invs.map((i) => ({
+          ...orig(i),
+          inum: i.number,
+          idt: toGstnDate(i.date),
+          val: round2(i.value),
+          ...(i.sbpcode ? { sbpcode: i.sbpcode } : {}),
+          ...(i.sbnum ? { sbnum: i.sbnum } : {}),
+          ...(i.sbdt ? { sbdt: toGstnDate(i.sbdt) } : {}),
+          itms: i.items.map((it) => {
+            const row: Record<string, number> = { txval: round2(it.txval), rt: it.rate };
+            if (it.igst) row.iamt = round2(it.igst);
+            row.csamt = round2(it.cess ?? 0);
+            return row;
+          }),
+        })),
+      }));
+    }
     if (am.b2ba.length) {
       out[L.b2ba] = [...groupBy(am.b2ba, (x) => x.ctin)].map(([ctin, invs]) => ({
         ctin,
@@ -265,6 +310,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
           val: round2(i.value),
           pos: i.pos,
           rchrg: i.rchrg,
+          ...(i.etin ? { [ECO_JSON_LAYOUT.etin]: i.etin } : {}),
           inv_typ: i.invTyp ?? 'R',
           itms: itms(i.items),
         })),
@@ -305,11 +351,12 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
       }));
     }
     if (am.b2csa.length) {
-      out[L.b2csa] = [...groupBy(am.b2csa, (x: B2csaRow) => `${x.omon}|${x.pos}|${x.supply}`)].map(([, rows]) => ({
+      out[L.b2csa] = [...groupBy(am.b2csa, (x: B2csaRow) => `${x.omon}|${x.pos}|${x.supply}|${x.etin ?? ''}`)].map(([, rows]) => ({
         [L.origMonth]: rows[0].omon,
         sply_ty: rows[0].supply,
         pos: rows[0].pos,
-        typ: 'OE',
+        typ: rows[0].etin ? 'E' : 'OE',
+        ...(rows[0].etin ? { [ECO_JSON_LAYOUT.etin]: rows[0].etin } : {}),
         itms: rows.map((x) => {
           const it: Record<string, number> = { rt: x.rate, txval: round2(x.txval) };
           if (x.igst) it.iamt = round2(x.igst);
@@ -324,6 +371,7 @@ export function buildGstr1Json(r: Gstr1Report, opts: Gstr1JsonOptions = {}): Rec
 
   if (r.docIssue.length) {
     const codes: Record<string, number> = { 'Invoices for outward supply': 1, 'Debit Note': 4, 'Credit Note': 5, 'Receipt Voucher': 6, 'Refund Voucher': 8 };
+    for (const c of Object.values(CHALLAN_DOC_TYPES)) codes[c.name] = c.num;
     const byType = groupBy(r.docIssue, (x) => x.docType);
     out.doc_issue = {
       doc_det: [...byType].sort((a, b) => (codes[a[0]] ?? 1) - (codes[b[0]] ?? 1)).map(([docType, rows]) => ({
@@ -355,7 +403,7 @@ export function toCsv(rows: CsvCell[][]): string {
   return sharedToCsv(rows) + '\r\n';
 }
 
-export type SectionId = 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend';
+export type SectionId = 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco';
 
 export const SECTION_LABELS: Record<SectionId, string> = {
   b2b: 'B2B',
@@ -370,6 +418,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   hsn: 'HSN summary',
   docs: 'Documents issued',
   amend: 'Amendments',
+  eco: 'E-commerce (Table 14)',
 };
 
 const docRows = (rows: DocRow[], head: CsvCell[], extra: (r: DocRow) => CsvCell[] = () => []): CsvCell[][] => {
@@ -389,9 +438,15 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
   const tail = ['Rate %', 'Taxable value', 'IGST', 'CGST', 'SGST', 'Cess'];
   switch (id) {
     case 'b2b':
-      return toCsv(docRows(r.b2b, ['GSTIN/UIN', 'Receiver', 'Invoice no', 'Invoice date', 'Invoice value', 'Place of supply', 'Reverse charge', ...tail]));
+      return toCsv(withEtin(docRows(r.b2b, ['GSTIN/UIN', 'Receiver', 'Invoice no', 'Invoice date', 'Invoice value', 'Place of supply', 'Reverse charge', ...tail]), r.b2b));
     case 'b2cl':
-      return toCsv(docRows(r.b2cl, ['GSTIN/UIN', 'Receiver', 'Invoice no', 'Invoice date', 'Invoice value', 'Place of supply', 'Reverse charge', ...tail]));
+      return toCsv(withEtin(docRows(r.b2cl, ['GSTIN/UIN', 'Receiver', 'Invoice no', 'Invoice date', 'Invoice value', 'Place of supply', 'Reverse charge', ...tail]), r.b2cl));
+    case 'eco': {
+      const out: CsvCell[][] = [['Table', 'Nature of supply', 'E-commerce operator GSTIN', 'Documents', 'Net value of supplies', 'IGST', 'CGST', 'SGST', 'Cess']];
+      for (const x of r.eco?.tcs ?? []) out.push(['14(a)', 'Operator collects TCS u/s 52', x.etin, x.count, x.value, x.igst, x.cgst, x.sgst, x.cess]);
+      for (const x of r.eco?.pay95 ?? []) out.push(['14(b)', 'Operator pays tax u/s 9(5)', x.etin, x.count, x.value, x.igst, x.cgst, x.sgst, x.cess]);
+      return toCsv(out);
+    }
     case 'cdnr':
       return toCsv(docRows(r.cdnr, ['GSTIN/UIN', 'Receiver', 'Note no', 'Note date', 'Note value', 'Place of supply', 'Reverse charge', ...tail]));
     case 'cdnur':
@@ -409,8 +464,8 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
       );
     case 'b2cs':
       return toCsv([
-        ['Supply type', 'Place of supply', 'Rate %', 'Taxable value', 'IGST', 'CGST', 'SGST', 'Cess'],
-        ...r.b2cs.map((x) => [x.supply, x.pos, x.rate, x.txval, x.igst, x.cgst, x.sgst, x.cess]),
+        ['Supply type', 'Place of supply', 'Rate %', 'Taxable value', 'IGST', 'CGST', 'SGST', 'Cess', 'E-commerce GSTIN'],
+        ...r.b2cs.map((x) => [x.supply, x.pos, x.rate, x.txval, x.igst, x.cgst, x.sgst, x.cess, x.etin ?? '']),
       ]);
     case 'nil':
       return toCsv([
@@ -445,6 +500,7 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
         }
       };
       if (am) {
+        push('EXPA', am.expa ?? []);
         push('B2BA', am.b2ba);
         push('B2CLA', am.b2cla);
         push('CDNRA', am.cdnra);
@@ -459,6 +515,12 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
         ...r.docIssue.map((d) => [d.docType, d.series, d.from, d.to, d.total, d.cancelled, d.netIssued]),
       ]);
   }
+}
+
+/** Appends the e-commerce operator GSTIN column (one row per rate row of each document). */
+function withEtin(rows: CsvCell[][], docs: DocRow[]): CsvCell[][] {
+  const etins = docs.flatMap((d) => d.items.map(() => d.etin ?? ''));
+  return rows.map((row, i) => [...row, i === 0 ? 'E-commerce GSTIN' : etins[i - 1] ?? '']);
 }
 
 export function nilLabel(t: string): string {
@@ -489,6 +551,9 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
     ['3.1(c)', 'Other outward supplies (nil rated, exempted) - intra-state', b.outward.nilExempt.intra, '', '', ''],
     rowT('3.1(d)', 'Inward supplies (liable to reverse charge)', b.outward.inwardRcm),
     ['3.1(e)', 'Non-GST outward supplies', b.outward.nonGst, '', '', ''],
+    ...(b.ecoSupplies95 !== undefined
+      ? [['3.1.1(ii)', 'Taxable supplies made through an e-commerce operator that pays tax u/s 9(5) (value only)', b.ecoSupplies95, '', '', ''] as CsvCell[]]
+      : []),
     ...b.interStateUnreg.map((u): CsvCell[] => ['3.2', `Inter-state supplies to unregistered persons, POS ${u.pos}`, u.taxable, u.igst, '', '']),
     itc('4A(1)', 'ITC available: import of goods', b.itc.importGoods),
     itc('4A(2)', 'ITC available: import of services', b.itc.importServices),
@@ -562,6 +627,11 @@ export function buildGstr3bJson(b: Gstr3bReport, gstin: string, retPeriod: strin
         { ty: 'NONGST', inter: 0, intra: 0 },
       ],
     },
+    // Table 3.1.1 — key names (`eco_dtls`, `eco_sup` = (i) the operator's own, `eco_reg_sup` = (ii) the supplier's)
+    // believed to match the GSTN JSON, NOT verified. Only written when the period has such supplies.
+    ...(b.ecoSupplies95 !== undefined
+      ? { eco_dtls: { eco_sup: { txval: 0, iamt: 0, camt: 0, samt: 0, csamt: 0 }, eco_reg_sup: { txval: r(b.ecoSupplies95) } } }
+      : {}),
   };
 }
 
@@ -597,6 +667,10 @@ export function buildSummaryHtml(rep: GstReport, periodTitle: string, filerName 
   const txpd = g1.txpd ?? [];
   if (at.length) sections.push(['Advances received (11A)', at.length, sum(at, 'taxable'), sum(at, 'igst'), sum(at, 'cgst'), sum(at, 'sgst')]);
   if (txpd.length) sections.push(['Advances adjusted (11B, deducted)', txpd.length, sum(txpd, 'taxable'), sum(txpd, 'igst'), sum(txpd, 'cgst'), sum(txpd, 'sgst')]);
+  const ecoT = g1.eco?.tcs ?? [];
+  const eco95 = g1.eco?.pay95 ?? [];
+  if (ecoT.length) sections.push(['Table 14(a) through e-commerce (TCS u/s 52, included above)', ecoT.length, sum(ecoT, 'value'), sum(ecoT, 'igst'), sum(ecoT, 'cgst'), sum(ecoT, 'sgst')]);
+  if (eco95.length) sections.push(['Table 14(b) e-commerce operator pays tax u/s 9(5) (value only)', eco95.length, sum(eco95, 'value'), 0, 0, 0]);
   const p = b.payment;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>GST summary - ${esc(periodTitle)}</title>
 <style>
@@ -626,7 +700,7 @@ ${tr(['6.1 Tax payable before ITC', '', p.liability.igst, p.liability.cgst, p.li
 ${tr(['6.1 Payable in cash', '', p.cash.igst, p.cash.cgst, p.cash.sgst], true)}
 ${tr(['ITC carried forward', '', p.itcCarry.igst, p.itcCarry.cgst, p.itcCarry.sgst])}
 </tbody></table>
-<div class="w"><strong>Verify with your CA before filing.</strong> This is a working paper generated offline from your invoices; it is not a filed return, does not compute interest or late fee, and does not cover composition returns (see CMP-08 / GSTR-4), ISD, imports or export amendments. Amendment tables (B2BA, B2CLA, CDNRA, CDNURA, B2CSA) follow the offline-tool layout as best known.</div>
+<div class="w"><strong>Verify with your CA before filing.</strong> This is a working paper generated offline from your invoices; it is not a filed return, does not compute interest or late fee, and does not cover composition returns (see CMP-08 / GSTR-4), ISD or imports. Amendment tables (B2BA, B2CLA, CDNRA, CDNURA, B2CSA, EXPA) and e-commerce Table 14 follow the offline-tool layout as best known.</div>
 </body></html>`;
 }
 

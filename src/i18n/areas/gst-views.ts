@@ -93,7 +93,7 @@ export const gvT = defineArea(
 
     compReturn: 'Composition return',
     downloadCsv: 'Download CSV',
-    compHint: 'Category: {category} — {rate}% of turnover today (rates by document date, from tax-rules). Turnover is every live Bill of Supply / invoice / debit note less credit notes issued under a composition profile. Reverse-charge purchases and imports of services are taxed at the normal rate. A composition dealer cannot claim input tax credit. Interest, late fee and TDS/TCS credit are not computed. Working paper — verify with your CA.',
+    compHint: 'Category: {category} — {rate}% of turnover today (rates by document date, from tax-rules). Turnover is every live Bill of Supply / invoice / debit note less credit notes issued under a composition profile. Reverse-charge purchases and imports of services are taxed at the normal rate. A composition dealer cannot claim input tax credit. GSTR-4 Tables 7–9 and interest / late-fee estimates are under the GSTR-4 view. Working paper — verify with your CA.',
     capCmp08: 'CMP-08 statement',
     cmpCounts: '{docs} document(s) included; {drafts} draft and {cancelled} cancelled left out. Total payable in cash: {amount}.',
     cmpItc: 'GST of {amount} on purchase bills is not claimable (cost, not credit).',
@@ -290,7 +290,7 @@ export const gvT = defineArea(
 
     compReturn: 'कंपोज़िशन रिटर्न',
     downloadCsv: 'CSV डाउनलोड करें',
-    compHint: 'श्रेणी: {category} — आज टर्नओवर का {rate}% (दरें दस्तावेज़ की तारीख के अनुसार, tax-rules से)। टर्नओवर = कंपोज़िशन प्रोफ़ाइल से जारी हर चालू बिल ऑफ़ सप्लाई / इनवॉइस / डेबिट नोट, घटाएँ क्रेडिट नोट। रिवर्स चार्ज वाली खरीद और सेवाओं के आयात पर सामान्य दर से टैक्स लगता है। कंपोज़िशन डीलर इनपुट टैक्स क्रेडिट नहीं ले सकता। ब्याज, लेट फ़ीस और TDS/TCS क्रेडिट की गणना नहीं होती। यह कार्य-पत्र है — अपने CA से जाँच करवाएँ।',
+    compHint: 'श्रेणी: {category} — आज टर्नओवर का {rate}% (दरें दस्तावेज़ की तारीख के अनुसार, tax-rules से)। टर्नओवर = कंपोज़िशन प्रोफ़ाइल से जारी हर चालू बिल ऑफ़ सप्लाई / इनवॉइस / डेबिट नोट, घटाएँ क्रेडिट नोट। रिवर्स चार्ज वाली खरीद और सेवाओं के आयात पर सामान्य दर से टैक्स लगता है। कंपोज़िशन डीलर इनपुट टैक्स क्रेडिट नहीं ले सकता। GSTR-4 तालिका 7–9 और ब्याज / लेट फ़ीस के अनुमान GSTR-4 दृश्य में हैं। यह कार्य-पत्र है — अपने CA से जाँच करवाएँ।',
     capCmp08: 'CMP-08 विवरण',
     cmpCounts: '{docs} दस्तावेज़ शामिल; {drafts} ड्राफ़्ट और {cancelled} रद्द छोड़े गए। नकद में कुल देय: {amount}।',
     cmpItc: 'खरीद बिलों पर {amount} का GST क्लेम नहीं हो सकता (यह लागत है, क्रेडिट नहीं)।',

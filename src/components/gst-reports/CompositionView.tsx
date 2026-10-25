@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { buildCmp08, buildGstr4, cmp08Rows, gstr4Rows, type TaxHeads } from '../../lib/composition-returns';
 import { periodForDate, periodRange, type ReportPeriod } from '../../lib/gst-reports';
@@ -14,6 +14,9 @@ import local from './gst-reports.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { nodes } from '../../i18n/areas/nodes';
+
+// GSTR-4 Tables 7-9 + interest / late fee estimates: loaded when the GSTR-4 view is opened.
+const Gstr4AnnualView = lazy(() => import('./Gstr4AnnualView'));
 
 export interface CompositionViewProps {
   invoices: InvoiceRecord[];
@@ -132,6 +135,9 @@ export default function CompositionView({ invoices, purchases, period, gstin, fi
               total: <strong><Money value={g4.totals.payable} /></strong>,
             })}
           </p>
+          <Suspense fallback={null}>
+            <Gstr4AnnualView invoices={invoices} purchases={purchases} fyStart={period.fyStart} gstin={gstin} filerStateCode={filerStateCode} category={category} />
+          </Suspense>
         </>
       )}
     </div>

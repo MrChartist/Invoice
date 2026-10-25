@@ -200,6 +200,7 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   book_opening: 'books.edit',
   tds_certificates: 'books.edit',
   gstr2b_actions: 'books.edit',
+  gstr4_manual: 'books.edit',
   einvoice_meta: 'books.edit',
   pos_day_close: 'books.edit',
   // Tally parity: TDS on payables, bill-wise supplier advances
