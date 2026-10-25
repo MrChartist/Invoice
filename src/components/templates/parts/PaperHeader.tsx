@@ -83,6 +83,12 @@ export function SenderIdentity({
             <br />
           </>
         )}
+        {sender.drug_licence && (
+          <>
+            <span className={styles.metaLabel}>DL No.:</span> {sender.drug_licence}
+            <br />
+          </>
+        )}
         {sender.regLine && <>{sender.regLine}</>}
       </div>
     </div>

@@ -154,9 +154,61 @@ and `amcReminders` (`src/lib/business-alerts.ts`, loaded lazily); palette destin
 vouchers, branch-wise books and the Sec 25(4) transfer pair (above). The bell's GST set-off reminder now reaches every
 regular (non-composition) GSTIN filer, even before the set-off screen was first used.
 
+## 7U: sales commission, offers, ESC/POS, pharma pack (roadmap 7.43, 7.154–7.157)
+
+All opt-in; strings in `src/i18n/areas/extras-7u.ts` (`x7T`, English + Hindi). New Dashboard tiles (not on by
+default, *Customise tiles*): **Sales agents & commission**, **Offers & schemes**, **Pharma pack** (each its own lazy
+chunk under `src/components/extras7u/`). The invoice editor's summary panel mounts the lazy `EditorExtras` only once
+an agent, a bill-value offer or the pharma pack exists.
+
+| Piece | Pure logic | Data (additive) | Tests |
+|---|---|---|---|
+| Sales commission | `src/lib/sales-commission.ts` | table `sales_agents` (`master.edit`), table `commission_postings` (`books.edit`, DATED), `InvoiceRecord.agent_id` | `tests/extras-7u.test.ts` |
+| Offers | `src/lib/offers.ts`, `pricing.ts` (`Scheme.kind`, `free_item_*`, `slabs`, `label`) | `schemes` rows, `InvoiceRecord.offer {scheme_id, label, value}` | same |
+| ESC/POS / raw receipt | `src/lib/escpos.ts`, `components/extras7u/{PosPrinter.tsx,pos-raw-print.ts}` | device-local `mrchartist_pos_printer` (localStorage, never backed up) | same |
+| Pharma pack | `src/lib/pharma.ts`, `src/lib/pharma-gate.ts` | key `pharma_settings`, `stock_items.drug_schedule`, `SenderProfile.drug_licence`, `InvoiceRecord.rx` | same |
+
+**Sales commission.** Agent master: name, phone, PAN, flat % of taxable value, % per stock group (covers
+sub-groups, nearest group wins), basis **on invoice** (bill date; credit notes naming the agent take it back) or **on
+receipt** (pro rata to money received in the period, capped at the bill). Base = line taxable value in rupees
+(foreign documents at the invoice rate), so GST / cess / TCS / freight earn nothing. Statement + CSV per agent and
+period; **Post payable journal**: Dr "Sales commission" (a user ledger created on first use under Indirect expenses,
+code 6195+) | Cr Sundry creditors with the agent as party, via `saveVoucher` (period lock, audit, roles); periods of
+one agent cannot overlap; *Undo* deletes the journal. TDS u/s 194H is not computed — verify with your CA.
+
+**Offers.** Schemes gain `kind`: absent / `same` (unchanged buy X get Y of the same item), `buy_get` (buy A get B:
+the ₹0 free line is item B with B's HSN / unit / GST rate from the catalogue — `syncSchemeLines` takes the catalogue as
+an optional fifth argument, passed by the editor and the POS) and `bill_value` (slabs `{min_value, percent | amount}`,
+best slab reached wins). The bill value is the items after line discounts, before the invoice discount, **after the
+price level / slab / price list rate was chosen** (schemes run on the priced lines). The offer joins the invoice's
+AMOUNT discount (like loyalty) and is stored as `offer`; the editor applies it automatically with a clear line and a
+*Not on this bill* switch; the POS applies it after the loyalty redemption and shows its own totals line; the raw
+receipt prints it. A % invoice discount blocks the offer. GST is on the value after the discount (Sec 15(3)(a)); free
+goods follow Circular 92/11/2019-GST — **verify the treatment with your CA** (especially buy A get B where B has a
+higher GST rate than A).
+
+**ESC/POS.** POS header → *Printer* (per device, default **browser** print unchanged): *raw text receipt* (32 columns
+for 58 mm, 48 for 80 mm, monospaced, script-free print window) or *ESC/POS over Web Serial* (feature-detected; the
+user picks the port in the browser's chooser; `ESC @`, text, feed, partial cut; with "open the cash drawer" a cash bill
+adds `ESC p 0 25 250`). No network. In browser mode a drawer opens only through the printer driver's "open drawer on
+print" setting. A failed raw / serial print falls back to the browser print.
+
+**Pharma pack.** Pharma tile → switch on. Drug licence number(s) on the business profile (Settings), printed under the
+GSTIN (standard / GST / receipt layouts and the raw receipt). Schedule **H / H1 / X** per stock item (tile list).
+Editor: patient, address, prescriber, registration no. (`rx`), with a warning when H1 / X items lack them. **Schedule
+H1 register** (H1, optionally X) per period: date, bill no., patient, prescriber, drug, batch, quantity, rows without
+prescription flagged; CSV. Near-expiry / expired batches in stock. Sale gate (`pharmaGate`, one call in
+`liveDocTrackingIssues`, so editor, POS and recurring runs): *block expired batches* (no "Sell anyway"), near-expiry
+warning within N days (default 90), optionally blocking. Verify the register format with the drug inspector / your CA.
+
 ## Not built / gaps
 
-- Sales commission per agent, bill-value and "buy A get B" offers, ESC/POS cash drawer (Web Serial), pharma pack.
+- Commission: TDS 194H deduction, agent ledger with its own balance screen, commission on credit notes in receipt
+  basis, agent on POS bills (set it in the editor).
+- Offers: per-customer / per-category offers, combo prices, offers in recurring runs, conversions and importers.
+- ESC/POS: no QR / logo raster, no character code pages beyond ASCII (₹ prints as "Rs."), no network printers.
+- Pharma: Schedule X separate register book format, narcotics (NDPS) records, batch-wise MRP checks, prescription
+  scan attachment link.
 - Receivables statements read invoices / payments only, so a refund voucher does not appear there: a refunded walk-in
   return shows as a credit on the Walk-in customer statement (the ledger / TB / Books are right).
 - The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).

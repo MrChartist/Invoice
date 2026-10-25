@@ -262,6 +262,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // Banking (WP-5)
   deposit_slips: 'books.edit',
   cash_tally: 'books.edit',
+  // 7U banking: forex bank moves (revaluation / conversion journals), e-payment batches
+  fx_bank_moves: 'books.edit',
+  epay_batches: 'books.edit',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master
   gst_setoffs: 'books.edit',
   gst_challans: 'books.edit',
@@ -273,6 +276,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   branches: 'master.edit',
   amc_contracts: 'master.edit',
   loyalty_adjustments: 'master.edit',
+  // 7U: sales agents (master) and the commission payable journals posted for them
+  sales_agents: 'master.edit',
+  commission_postings: 'books.edit',
   // approvals decision log: only the owner's decision writes it (approvals.ts `decide`); a clerk's
   // request lives on the document itself, so a clerk can never forge a decision row (review L5)
   approvals: 'doc.approve',

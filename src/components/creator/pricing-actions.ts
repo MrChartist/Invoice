@@ -53,7 +53,7 @@ function reprice(lineId: string, ctx: EditorPricing, force = false): void {
 function syncSchemes(ctx: EditorPricing | null): void {
   const st = useInvoiceStore.getState();
   if (!ctx && !st.items.some((i) => i.free_of)) return;
-  const next = syncSchemeLines(st.items, ctx?.data.schemes ?? [], st.issue_date, generateId);
+  const next = syncSchemeLines(st.items, ctx?.data.schemes ?? [], st.issue_date, generateId, ctx?.data.catalog ?? []);
   if (next !== st.items) st.patch({ items: next });
 }
 

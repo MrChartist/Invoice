@@ -25,6 +25,7 @@ import {
   type PosAction, type Tender, type TenderMethod,
 } from '../lib/pos';
 import { redeemOnBill } from '../lib/loyalty';
+import { applyBillOffer } from '../lib/offers';
 import { DOCUMENT_LABELS, type Client, type InvoiceItem, type InvoiceRecord } from '../types/invoice';
 import { cn, formatCurrency, todayInput } from '../lib/utils';
 import controls from '../styles/controls.module.css';
@@ -43,6 +44,7 @@ const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m
 const PosReturnModal = lazy(() => import('../components/pos-returns/PosReturnModal').then((m) => ({ default: m.PosReturnModal })));
 const ExchangeCredit = lazy(() => import('../components/pos-returns/ExchangeCredit').then((m) => ({ default: m.ExchangeCredit })));
 const LoyaltyRedeem = lazy(() => import('../components/loyalty/LoyaltyRedeem').then((m) => ({ default: m.LoyaltyRedeem })));
+const PosPrinterButton = lazy(() => import('../components/extras7u/PosPrinter').then((m) => ({ default: m.PosPrinterButton }))); // 7U ESC/POS
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 
 interface Party {
@@ -123,7 +125,8 @@ export function Pos() {
   );
   // Loyalty points redeemed as an amount discount (WP-9); a refused redemption leaves the bill as built.
   const redeemed = useMemo(() => (redeemPts > 0 && party.client ? redeemOnBill(built, redeemPts) : null), [built, redeemPts, party.client]);
-  const record = redeemed?.record ?? built;
+  // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
+  const record = useMemo(() => applyBillOffer(redeemed?.record ?? built, data.pricing?.schemes ?? [], { retotalRecord: true }), [redeemed, built, data.pricing]);
   const tenders: Tender[] = useMemo(
     () => (Object.keys(tender) as TenderMethod[]).map((m) => ({
       method: m, amount: tender[m],
@@ -155,7 +158,7 @@ export function Pos() {
         else delete out.price_basis;
         return out;
       });
-      return syncSchemeLines(priced, p.schemes, day, generateId);
+      return syncSchemeLines(priced, p.schemes, day, generateId, p.catalog);
     },
     [data.pricing, party.client, day],
   );
@@ -348,6 +351,7 @@ export function Pos() {
             <button type="button" className={controls.btnOutline} onClick={() => setRetOpen(true)}>
               <RotateCcw size={16} /> {returnsT('title')}
             </button>
+            <Suspense fallback={null}><PosPrinterButton /></Suspense>
             <button type="button" className={controls.btnOutline} onClick={() => setZOpen(true)}>
               <ReceiptText size={16} /> {posT('zReport')}
             </button>
@@ -514,6 +518,7 @@ export function Pos() {
             <div className={cn(surface.cardBody, styles.totals)}>
               <div><span>{posT('items')}</span><span>{formatCurrency(record.subtotal)}</span></div>
               {record.discount_amount > 0 && <div><span>{posT('discount')}</span><span>−{formatCurrency(record.discount_amount)}</span></div>}
+              {record.offer && <div data-pos-offer><span>{record.offer.label}</span><span>−{formatCurrency(record.offer.value)}</span></div>}
               {record.cgst_amount > 0 && <div><span>CGST</span><span>{formatCurrency(record.cgst_amount)}</span></div>}
               {record.sgst_amount > 0 && <div><span>SGST</span><span>{formatCurrency(record.sgst_amount)}</span></div>}
               {record.igst_amount > 0 && <div><span>IGST</span><span>{formatCurrency(record.igst_amount)}</span></div>}

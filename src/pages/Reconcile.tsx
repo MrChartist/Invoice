@@ -52,7 +52,7 @@ import type { BankDoc } from '../components/bank/docs/BankingDocs';
 
 // WP-5: deposit slip, payment advice, e-payments, cash tally — loaded only when the tab opens.
 const BankingDocs = lazy(() => import('../components/bank/docs/BankingDocs'));
-const BANK_DOCS: readonly BankDoc[] = ['deposit', 'advice', 'epay', 'cash'];
+const BANK_DOCS: readonly BankDoc[] = ['deposit', 'advice', 'epay', 'cash', 'forex'];
 
 const TABS = [
   { id: 'reconcile', label: 'tabReconcile' },

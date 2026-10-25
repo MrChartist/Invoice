@@ -263,6 +263,10 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.loyalty_redeem && typeof r.loyalty_redeem === 'object' && Number((r.loyalty_redeem as { points?: unknown }).points) > 0
       ? { loyalty_redeem: { points: Number((r.loyalty_redeem as { points: number }).points), value: Number((r.loyalty_redeem as { value?: number }).value) || 0 } }
       : {}),
+    // 7U (additive): sales agent, bill-value offer, prescription (pharma pack).
+    ...(typeof r.agent_id === 'string' && r.agent_id ? { agent_id: r.agent_id } : {}),
+    ...(r.offer && typeof r.offer === 'object' && Number((r.offer as { value?: unknown }).value) > 0 ? { offer: r.offer as InvoiceRecord['offer'] } : {}),
+    ...(r.rx && typeof r.rx === 'object' ? { rx: r.rx as InvoiceRecord['rx'] } : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

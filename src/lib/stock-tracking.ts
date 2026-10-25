@@ -14,6 +14,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
+import { pharmaGate } from './pharma-gate';
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine } from '../types/stock';
 import type { AppNotification } from './notifications';
 import { num, round2 } from './invoice-calc';
@@ -727,7 +728,7 @@ export function editorStockContext(doc: { id?: string; doc_type: string; issue_d
 export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
   try {
     const multi = godownList(getTable<Godown>(GODOWNS_TABLE)).length > 1;
-    return docTrackingIssues(doc, liveTrackingInputs(), multi);
+    return pharmaGate(docTrackingIssues(doc, liveTrackingInputs(), multi), doc); // 7U pharma pack (off by default)
   } catch {
     return { errors: [], expired: [], warnings: [] };
   }

@@ -555,3 +555,13 @@ test('branch-wise books and Sec 25(4) transfer bills (WP-9) read the real purcha
   const l = buildLedger({ invoices: [], transactions: [], purchases: [{ ...bill, branch_transfer_id: 'str1' }], vendors: [], purchasePayments: [], openings: [], userAccounts: [], manual: [], assets: [], today: '2026-05-01' } as never);
   assert.ok(l.vouchers[0].lines.some((x) => x.account === 'branch_transfer_in' && x.dr === 100000));
 });
+
+test('7U reader (e-payment confirmation: open bills of a supplier) reads the real bill shape', async () => {
+  const { openBillsOf } = await import('../src/lib/epay-confirm.ts');
+  const withVendor = { ...bill, vendor_id: 'v1', due_date: '2026-05-12' };
+  assert.deepEqual(openBillsOf([withVendor], { id: 'v1', name: 'Acme Supplies' }), [{ purchaseId: 'p1', balance: 1180, due: '2026-05-12' }]);
+  // Legacy rows without vendor_id match by name; paid / void bills drop out.
+  assert.equal(openBillsOf([bill], { id: 'v1', name: 'acme supplies' }).length, 1);
+  assert.equal(openBillsOf([{ ...bill, amount_paid: 1180 }], { name: 'Acme Supplies' }).length, 0);
+  assert.equal(openBillsOf([{ ...bill, status: 'Cancelled' } as never], { name: 'Acme Supplies' }).length, 0);
+});

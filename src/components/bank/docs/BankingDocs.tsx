@@ -3,7 +3,7 @@
  * Lazy-loaded from the Reconcile page (`/reconcile?tab=documents&doc=deposit|advice|epay|cash`).
  * Printed documents stay in English (bank forms); screen labels go through `bnkT`.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, Printer, Save } from 'lucide-react';
 import { bankAccountsDb, DEFAULT_BANK_ID, maskAccountNo, type BankAccount } from '../../../lib/bank-accounts';
@@ -21,13 +21,19 @@ import { formatDate, formatMoney, todayInput } from '../../../lib/utils';
 import type { Vendor } from '../../../types/purchases';
 import { useT } from '../../../i18n';
 import { bnkT } from '../../../i18n/areas/banking';
+import { fxbT } from '../../../i18n/areas/extras-7u';
+import { saveEpayBatch } from '../../../lib/epay-confirm';
 import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import styles from './bankdocs.module.css';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
-export type BankDoc = 'deposit' | 'advice' | 'epay' | 'cash';
-const DOCS: { id: BankDoc; label: 'docDeposit' | 'docAdvice' | 'docEpay' | 'docCash' }[] = [
+// 7U: forex bank ledgers and e-payment confirmation, loaded only when opened.
+const ForexBankPanel = lazy(() => import('./ForexBankPanel'));
+const EpayConfirmPanel = lazy(() => import('./EpayConfirmPanel'));
+
+export type BankDoc = 'deposit' | 'advice' | 'epay' | 'cash' | 'forex';
+const DOCS: { id: Exclude<BankDoc, 'forex'>; label: 'docDeposit' | 'docAdvice' | 'docEpay' | 'docCash' }[] = [
   { id: 'deposit', label: 'docDeposit' },
   { id: 'advice', label: 'docAdvice' },
   { id: 'epay', label: 'docEpay' },
@@ -138,6 +144,7 @@ function DepositSlipPanel({ notify }: { notify: Notify }) {
   const [cash, setCash] = useState<DenominationCounts>({});
   const [slips, setSlips] = useState(() => loadDepositSlips());
   const [view, setView] = useState<DepositSlipView | null>(null);
+  const [contra, setContra] = useState(true);
   const [printing, print] = usePrint();
   const today = todayInput();
   const inHand = useMemo(() => depositableCheques(cheques, date > today ? today : date), [cheques, date, today]);
@@ -147,14 +154,14 @@ function DepositSlipPanel({ notify }: { notify: Notify }) {
 
   const save = () => {
     try {
-      const slip = saveDepositSlip({ date, bank_account_id: accountId, cheque_ids: chosen.map((c) => c.id), cash, depositor }, today);
+      const slip = saveDepositSlip({ date, bank_account_id: accountId, cheque_ids: chosen.map((c) => c.id), cash, depositor, post_cash_contra: contra }, today);
       const all = loadCheques();
       setCheques(all);
       setSlips(loadDepositSlips());
       setPicked({});
       setCash({});
       setView(depositSlipView(slip, slip.cheque_ids.map((id) => all.find((c) => c.id === id)!).filter(Boolean), account));
-      notify(bnkT('slipSaved', { number: slip.number }), 'success');
+      notify(bnkT('slipSaved', { number: slip.number }) + (slip.cash_voucher_number ? ` ${fxbT('contraPosted', { number: slip.cash_voucher_number })}` : ''), 'success');
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -196,7 +203,10 @@ function DepositSlipPanel({ notify }: { notify: Notify }) {
         <div className={surface.cardHead}>{bnkT('cash')}</div>
         <div className={surface.cardBody}>
           <DenominationGrid counts={cash} onChange={setCash} />
-          <p className={styles.muted}>{bnkT('slipCashNote')}</p>
+          <label className={controls.check}>
+            <input type="checkbox" checked={contra} onChange={(e) => setContra(e.target.checked)} /> {fxbT('postContra')}
+          </label>
+          <p className={styles.muted}>{contra ? fxbT('contraNote') : bnkT('slipCashNote')}</p>
         </div>
       </section>
       <div className={styles.totals}>
@@ -336,6 +346,7 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
   const [accountId, setAccountId] = useState(DEFAULT_BANK_ID);
   const [rows, setRows] = useState<EpayRow[]>([]);
   const [editing, setEditing] = useState('');
+  const [batches, setBatches] = useState(0);
   const byId = useMemo(() => new Map(vendors.map((v) => [v.id, v])), [vendors]);
   const debit = accounts.find((a) => a.id === accountId)?.account_no ?? '';
   const uploadRows: UploadRow[] = rows.map((r) => {
@@ -354,8 +365,11 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
   const download = () => {
     try {
       const f = buildUploadFile({ preset, date, debitAccountNo: debit, rows: uploadRows });
+      // 7U: keep the batch so the payments can be recorded once the bank confirms.
+      const batch = saveEpayBatch({ date, bank_account_id: accountId, preset, rows: uploadRows.map((r) => ({ vendorId: r.vendorId, vendorName: byId.get(r.vendorId ?? '')?.name ?? r.beneficiary, amount: r.amount, mode: r.mode, reference: r.reference, accountNo: r.accountNo })) });
       saveFile(f.filename, f.text);
-      notify(bnkT('downloaded', { n: f.count, amount: rupees(f.total) }), 'success');
+      setBatches((n) => n + 1);
+      notify(`${bnkT('downloaded', { n: f.count, amount: rupees(f.total) })} ${fxbT('batchKept', { number: batch.number })}`, 'success');
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -411,6 +425,7 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
       {problems.length > 0 && (
         <ul className={styles.list}>{problems.slice(0, 12).map((p) => <li key={p} className={styles.warn}>{p}</li>)}</ul>
       )}
+      <Suspense fallback={null}><EpayConfirmPanel notify={notify} version={batches} /></Suspense>
     </div>
   );
 }
@@ -485,11 +500,15 @@ export function BankingDocs({ doc, onDoc, notify }: { doc: BankDoc; onDoc: (d: B
             {bnkT(d.label)}
           </button>
         ))}
+        <button type="button" className={doc === 'forex' ? controls.segmentBtnActive : controls.segmentBtn} aria-pressed={doc === 'forex'} onClick={() => onDoc('forex')}>
+          {fxbT('docForex')}
+        </button>
       </div>
       {doc === 'deposit' && <DepositSlipPanel notify={notify} />}
       {doc === 'advice' && <PaymentAdvicePanel />}
       {doc === 'epay' && <EPaymentsPanel notify={notify} />}
       {doc === 'cash' && <CashTallyPanel notify={notify} />}
+      {doc === 'forex' && <Suspense fallback={null}><ForexBankPanel notify={notify} /></Suspense>}
     </div>
   );
 }

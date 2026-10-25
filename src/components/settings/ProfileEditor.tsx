@@ -10,6 +10,7 @@ import { compositionRate, todayIso } from '../../lib/tax-rules';
 import type { CompositionCategory, GstScheme, SenderProfile } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
+import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import styles from './Settings.module.css';
 
@@ -102,6 +103,11 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
           <span className={controls.label}>{setT('regLine')}</span>
           <input className={controls.input} value={profile.regLine ?? ''} onChange={(e) => onChange({ regLine: e.target.value })} placeholder="SEBI Reg. No. INH000015297" />
           <span className={controls.hint}>{setT('regLineHint')}</span>
+        </label>
+        <label className={controls.field}>
+          <span className={controls.label}>{x7T('drugLicence')}</span>
+          <input className={controls.input} value={profile.drug_licence ?? ''} onChange={(e) => onChange({ drug_licence: e.target.value || undefined })} placeholder="20B: KA-B12-123456, 21B: KA-B12-123457" />
+          <span className={controls.hint}>{x7T('drugLicenceHint')}</span>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{setT('address')}</span>
