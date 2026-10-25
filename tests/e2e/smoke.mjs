@@ -768,6 +768,8 @@ try {
     await page.locator('#login-pin').fill('482916');
     await page.getByText('Stored on this device').waitFor({ timeout: 15000 });
     check(await page.getByRole('link', { name: 'New invoice' }).count() > 0, 'owner signed back in with full access');
+  });
+
   await step('advances: record a service advance, raise an invoice, apply it, see Table 11', async () => {
     const pad = (n) => String(n).padStart(2, '0');
     const now = new Date();
