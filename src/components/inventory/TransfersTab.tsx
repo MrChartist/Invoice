@@ -16,6 +16,8 @@ import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine
 import { SerialPicker } from './SerialPicker';
 import { useT } from '../../i18n';
 import { invT } from '../../i18n/areas/inventory';
+import { unitT } from '../../i18n/areas/units';
+import { cleanAltUnits, factorFor, roundTypedQty, unitChoices, unitsDb } from '../../lib/units';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
@@ -55,7 +57,7 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
               <td>{formatDate(t.date)}</td>
               <td>{godownName(godowns, t.from_godown)} → {godownName(godowns, t.to_godown)}</td>
               <td>
-                {t.lines.map((l) => `${byId.get(l.item_id)?.name ?? invT('deletedItem')} × ${l.qty}${l.batch_no ? ` (${l.batch_no})` : ''}`).join(', ')}
+                {t.lines.map((l) => `${byId.get(l.item_id)?.name ?? invT('deletedItem')} × ${l.qty}${l.unit ? ` ${l.unit}` : ''}${l.batch_no ? ` (${l.batch_no})` : ''}`).join(', ')}
               </td>
               <td>
                 <button type="button" className={controls.btnDanger} aria-label={invT('deleteNamed', { name: t.transfer_number })} onClick={() => setDeleting(t)}>
@@ -120,6 +122,7 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
   const [error, setError] = useState('');
   const tracking: TrackingMap = useMemo(() => computeTracking({ ...inputs, asOf: date || undefined }), [inputs, date]);
   const sortedItems = useMemo(() => [...items].sort((a, b) => a.name.localeCompare(b.name)), [items]);
+  const units = useMemo(() => unitsDb.stored(), []);
 
   const patch = (id: string, change: Partial<StockTransferLine>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...change } : l)));
@@ -178,14 +181,14 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
           const available = t ? (t.byGodown[from] ?? 0) : 0;
           return (
             <div key={l.id} className={styles.serialBox}>
-              <div className={styles.lineRow}>
+              <div className={`${styles.lineRow} ${item && !item.track_serials && cleanAltUnits(item.alt_units, item.unit || 'NOS') ? styles.lineRowUnit : ''}`}>
                 <div className={controls.field}>
                   <label className={controls.label} htmlFor={`tr-item-${l.id}`}>{invT('itemN', { n: i + 1 })}</label>
                   <select
                     id={`tr-item-${l.id}`}
                     className={controls.select}
                     value={l.item_id}
-                    onChange={(e) => patch(l.id, { item_id: e.target.value, batch_no: undefined, serials: undefined })}
+                    onChange={(e) => patch(l.id, { item_id: e.target.value, batch_no: undefined, serials: undefined, unit: undefined, unit_factor: undefined })}
                   >
                     <option value="">{invT('chooseItem')}</option>
                     {sortedItems.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -201,8 +204,21 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
                     value={item?.track_serials ? String((l.serials ?? []).length) : String(l.qty || '')}
                     readOnly={!!item?.track_serials}
                     onChange={(e) => patch(l.id, { qty: num(e.target.value) })}
+                    onBlur={() => !item?.track_serials && patch(l.id, { qty: roundTypedQty(l.qty, l.unit || item?.unit, units) })}
                   />
                 </div>
+                {item && !item.track_serials && cleanAltUnits(item.alt_units, item.unit || 'NOS') && (
+                  <div className={controls.field}>
+                    <label className={controls.label} htmlFor={`tr-unit-${l.id}`}>{unitT('lineUnit', { n: i + 1 })}</label>
+                    <select id={`tr-unit-${l.id}`} className={controls.select} value={l.unit || item.unit}
+                      onChange={(e) => {
+                        const f = factorFor(item, e.target.value) ?? 1;
+                        patch(l.id, { unit: f === 1 ? undefined : e.target.value, unit_factor: f === 1 ? undefined : f, qty: roundTypedQty(l.qty, e.target.value, units) });
+                      }}>
+                      {unitChoices(item).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
+                    </select>
+                  </div>
+                )}
                 {item?.track_batches ? (
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor={`tr-batch-${l.id}`}>{invT('batch')}</label>

@@ -332,6 +332,8 @@ const RECORD_TABLES = [
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   // Manufacturing & stock vouchers (Phase 7): BOMs, Manufacturing / Stock Journals, Physical Stock
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
+  // Job work and Rejections In (Phase 7M)
+  'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
   'gst_setoffs', 'gst_challans', 'hsn_master',
   // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
@@ -354,6 +356,7 @@ const ID_TABLES = new Set([
   'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
+  'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
   'gst_setoffs', 'gst_challans', 'hsn_master',
   'year_end',
   'stock_groups', 'stock_categories', 'units',

@@ -30,7 +30,7 @@ journal only when valuation is off, and the Gateway Display BS / P&L use the sam
 | | Delivered | Partial | Open |
 |---|---|---|---|
 | P0 | P0-1 … P0-12 (all) | — | — |
-| P1 | P1-1, 2, 3, 4, 5, 11, 14, 15, 17, 18, 20, 22, 24, 25, 26 | P1-6, 7, 8, 12, 16, 19, 23 | P1-9 job work / ITC-04, P1-10 inventory masters (WP-8 in progress), P1-13 voucher types, P1-21 Excel import kinds |
+| P1 | P1-1, 2, 3, 4, 5, 8, 9, 11, 14, 15, 17, 18, 20, 22, 24, 25, 26 | P1-6, 7, 10, 12, 16, 19, 23 | P1-13 voucher types, P1-21 Excel import kinds |
 
 Status column / headings below are updated; the body text is the original analysis (it describes the gap, not
 today's app). Remaining follow-ups: `docs/ROADMAP.md` 7.7, 7.8, 7.19, 7.23, 7.28, 7.37, 7.43, 7.49, 7.59, 7.61.
@@ -170,8 +170,8 @@ work packages** (section 8).
 | Stock journal, physical stock, manufacturing journal | 🚧 | WIP-B | — |
 | Delivery Note (outward, before invoice) | ✅ | Delivery Challan with the "challans reduce stock" toggle | — |
 | **Receipt Note / GRN** (inward, before the supplier bill) | ❌ | PO → Bill directly; no goods-received document, so stock arrives only with the bill | P1 |
-| Rejection Out (return to supplier before billing) / Rejection In (customer rejects a delivery) | ❌ | — | P1 |
-| Material Out / Material In (job work) | ❌ | — | P1 |
+| Rejection Out (return to supplier before billing) / Rejection In (customer rejects a delivery) | ✅ | Rejections Out (WP-3); Rejections In (7.72, `src/lib/rejections-in.ts`) | P1 |
+| Material Out / Material In (job work) | ✅ | 7.70 (`src/lib/job-work.ts`, `docs/features/job-work.md`) | P1 |
 | Attendance / payroll vouchers | ✅ | WIP-A (`/payroll`) | — |
 | Voucher duplication, insert voucher (Ctrl+I), add voucher (Ctrl+A in Day Book), delete with numbering re-sequence choice | 🟡 | Duplicate exists for sales documents. Manual vouchers have no duplicate. Numbering never re-sequences (correct for GST) | P2 |
 | Voucher-level cost-centre allocation | ✅ | Per line (`ManualVoucherLine.cost_centre_id`) | — |
@@ -194,7 +194,7 @@ work packages** (section 8).
 | Feature | Status | Evidence / what is missing | Pri |
 |---|---|---|---|
 | BOM, manufacturing journal, by-products / scrap, additional cost | 🚧 | WIP-B | — |
-| Job work in / out orders, material in / out, job work reports, ITC-04 | ❌ | Not in WIP-B's stated scope. ITC-04 (goods sent to job workers) is a statutory return for manufacturers who send goods out for job work | P1 |
+| Job work in / out orders, material in / out, job work reports, ITC-04 | ✅ | Phase 7M (7.70–7.71): orders, Material Out / In, job-worker godowns, Sec 143 clocks, principal's register, ITC-04 working paper (`docs/features/job-work.md`) | P1 |
 | Production plan / material requirement (shortfall vs BOM) | ❌ | Depends on WIP-B | P2 |
 
 ### 3.F Inventory reports
@@ -274,7 +274,7 @@ work packages** (section 8).
 | GST liability / ITC set-off **posting** (Tally "Stat Payment" / GST adjustment journals: Dr Output, Cr Input; Dr Output, Cr Electronic cash ledger; interest / late fee ledgers) | ❌ | 3B computes set-off, but nothing posts it to the ledger, so Duties & Taxes balances keep growing. Account 2360 (electronic cash ledger) exists but is unused by any flow | **P0** |
 | GST challan (PMT-06) record with CIN / BRN and allocation per head (tax / interest / penalty / fee / others) | ❌ | — | P0 (with set-off) |
 | RCM: self-invoice (Rule 46(f)) for unregistered purchases, payment voucher (Rule 52) | 🟡 | RCM tax computed and posted to 2310; no self-invoice document or series | P1 |
-| ITC-04 (job work) | ❌ | — | P1 (with job work) |
+| ITC-04 (job work) | 🟡 | Working paper + CSV (Table 4, 5A / 5B / 5C; frequency by turnover), no portal JSON — 7.71 | P1 (with job work) |
 | ISD (GSTR-6), TDS / TCS under GST (GSTR-7 / 8) | ❌ | Niche for SMEs | P2 |
 | E-commerce operator Sec 52 / 9(5), GSTR-1 Table 14 / 15 | 🚧 | Worktree `src/lib/eco.ts` | — |
 | Export amendments (EXPA), HSN / doc amendments | ❌ | `composition-amendments.md`, "Not covered" | P2 |
@@ -463,7 +463,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** report titles in Tally words ("Group Summary", "Ledger Vouchers", "Day Book"), a period strip at top-right, Alt+F1
   "Detailed / Condensed" button label, Esc back.
 
-### P0-5 Purchase returns, supplier debit / credit notes — WP-3, size M — ✅ done (`docs/features/purchase-returns.md`; P1-8 GRN / Rejections Out and P1-12 purchase side done too, P1-9 open)
+### P0-5 Purchase returns, supplier debit / credit notes — WP-3, size M — ✅ done (`docs/features/purchase-returns.md`; P1-8 GRN / Rejections Out and P1-12 purchase side done too; P1-9 job work and Rejections In done in 7M, `docs/features/job-work.md`)
 - **Build:** a `PURCHASE_RETURN` / supplier debit note document (`DN/FY…` our series) against a bill: lines limited to
   the billed quantities, goods leave stock, ITC reversed. Also a "supplier credit note received" entry (the supplier's
   number / date, value-only or with goods). GSTR-2B CDNR lines match these. 3B nets ITC in 4A(5) (supplier notes reduce ITC; verify with your CA).
@@ -559,9 +559,9 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 | P1-5 | Exception reports | Negative ledgers, negative stock days, cash-in-hand negative on any date, debtors in credit / creditors in debit, vouchers with warnings, GST "uncertain transactions" with a resolve link | new `src/lib/ledger/exceptions.ts`, `ExceptionsTab.tsx`; reads `inventory`, `gst-reports` reconciliation | M | P0-3 | "Exception Reports" menu | ✅ `exceptions.ts` (WP-2) |
 | P1-6 | Receivables polish | Ageing by **due date or bill date**, user ageing slabs, interest column (party interest parameters), group-wise outstanding, bulk statements / reminder letters, "Confirmation of Accounts" letter for a date | `src/lib/receivables.ts`, `src/pages/Receivables.tsx`, `components/receivables/*` | M | P0-1 (groups) | "Bills Receivable", "Ledger Outstandings", "Confirmation of Accounts" | 🟡 bulk statements + confirmation letters (WP-4); ageing slabs / interest column open |
 | P1-7 | Interest Calculation reports | Party / ledger / bill-wise interest using the ledger interest parameters (both sides, incl. loans), with "book interest" → a journal or a debit-note draft | `src/lib/interest.ts` (extend), new `InterestTab.tsx` | M | P0-1 | Tally "Interest Calculations" (Alt+I in a ledger) | 🟡 lib `ledger-interest.ts` (WP-1); no report screen |
-| P1-8 | GRN / Receipt Note, Rejection In / Out, pending-bill reports | `RECEIPT_NOTE` doc (stock in before the bill; PO → GRN → Bill tracking), `REJECTION_OUT` (return before billing), `REJECTION_IN` (customer rejects a challan); "Goods received not billed", "Delivered not invoiced" | `src/types/purchases.ts`, new `src/lib/receipt-notes.ts`, `src/lib/inventory.ts` events (coordinate with WIP-B), `components/purchases/GrnTab.tsx` | M–L | WP-3 base | "Receipt Note" (Alt+F9), "Rejections In / Out" | 🟡 GRN + Rejections Out (WP-3); Rejections In open |
-| P1-9 | Job work in / out + ITC-04 | Material Out (to job worker, challan under Rule 55, 1-year / 3-year return clocks), Material In, job-worker godowns ("our stock with third party"), ITC-04 working paper (half-yearly / annual by turnover) | new `src/lib/job-work.ts`, `src/lib/itc04.ts`, godown flag, `components/inventory/JobWorkTab.tsx` | L | WIP-B (BOM / stock journal) | "Job Work Out Order", "Material Out" | ❌ open |
-| P1-10 | Inventory masters depth | Stock groups (tree) + categories, units master with UQC + decimals, **alternate / compound units** with conversion on lines (qty in Box → stock in Nos), group-wise stock summary, `PurchaseLine.item_id` | new `src/lib/stock-groups.ts`, `src/lib/units.ts`, additive `StockItem` fields, `components/inventory/{StockGroupsModal,UnitsModal}.tsx`, line editors | L | coordinate `inventory.ts` with WIP-B | "Stock Group", "Unit of Measure" (Simple / Compound), "Alternate Units: 1 Box = 12 Nos" | 🚧 WP-8 in progress |
+| P1-8 | GRN / Receipt Note, Rejection In / Out, pending-bill reports | `RECEIPT_NOTE` doc (stock in before the bill; PO → GRN → Bill tracking), `REJECTION_OUT` (return before billing), `REJECTION_IN` (customer rejects a challan); "Goods received not billed", "Delivered not invoiced" | `src/types/purchases.ts`, new `src/lib/receipt-notes.ts`, `src/lib/inventory.ts` events (coordinate with WIP-B), `components/purchases/GrnTab.tsx` | M–L | WP-3 base | "Receipt Note" (Alt+F9), "Rejections In / Out" | ✅ GRN + Rejections Out (WP-3); Rejections In (7M, 7.72) |
+| P1-9 | Job work in / out + ITC-04 | Material Out (to job worker, challan under Rule 55, 1-year / 3-year return clocks), Material In, job-worker godowns ("our stock with third party"), ITC-04 working paper (half-yearly / annual by turnover) | new `src/lib/job-work.ts`, `src/lib/itc04.ts`, godown flag, `components/inventory/JobWorkTab.tsx` | L | WIP-B (BOM / stock journal) | "Job Work Out Order", "Material Out" | ✅ done (7M: `src/lib/job-work.ts`, `events-job-work.ts`, `itc04.ts`, `components/job-work/*`; ITC-04 JSON open) |
+| P1-10 | Inventory masters depth | Stock groups (tree) + categories, units master with UQC + decimals, **alternate / compound units** with conversion on lines (qty in Box → stock in Nos), group-wise stock summary, `PurchaseLine.item_id` | new `src/lib/stock-groups.ts`, `src/lib/units.ts`, additive `StockItem` fields, `components/inventory/{StockGroupsModal,UnitsModal}.tsx`, line editors | L | coordinate `inventory.ts` with WIP-B | "Stock Group", "Unit of Measure" (Simple / Compound), "Alternate Units: 1 Box = 12 Nos" | 🟡 WP-8 done; alternate units on POS / stock journals / transfers / adjustments + decimal rounding in 7M (7.72); price lists into the editor and group filters open (7.66) |
 | P1-11 | Stock ageing + party-wise movement | Ageing by FIFO inward layers (slabs configurable), party-wise movement (who supplied / bought what) | new `src/lib/stock-ageing.ts`, Inventory tabs | M | — | "Ageing Analysis", "Movement Analysis → Party-wise" | ✅ stock ageing + party movement (WIP-B) |
 | P1-12 | Order outstanding reports | Sales / purchase orders pending by party / item / due date, overdue orders | `src/lib/sales-orders.ts` / `purchase-orders.ts` (pure additions), a new Reports tab | S–M | — | "Sales Order Outstandings" | 🟡 purchase orders (WP-3); sales orders with WP-8 |
 | P1-13 | Voucher Types master | User voucher types under a base type (Sales – Retail, Sales – Export), own prefix / suffix / starting number / restart (yearly, monthly), default print title / template, default bank, "use for POS" | new `src/lib/voucher-types.ts`; integrates with `invoice-number.ts` (numbering contract **must keep the Indian-FY default**) | M–L | coordinate with WIP-D | "Voucher Type Creation" | ❌ open |

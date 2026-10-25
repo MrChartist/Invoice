@@ -456,7 +456,7 @@ export function transferIssues(
   const seen = new Set<string>();
   for (const l of tr.lines ?? []) {
     const t = tracking.get(l.item_id);
-    const q = num(l.qty);
+    const q = num(l.qty) * lineFactor(l); // 7M: alternate unit
     if (!t || q <= 0) continue;
     const label = t.item.name;
     const key = `${l.item_id}|${t.item.track_batches ? (l.batch_no ?? '').toUpperCase() : ''}`;

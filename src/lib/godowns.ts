@@ -143,6 +143,13 @@ export function godownReferences(
   return out;
 }
 
+/** 7M: a Material Out / In names this godown (as the job worker's premises or on a line). */
+function jobWorkGodownInUse(id: string): boolean {
+  const named = (rows: readonly { job_worker_godown?: string; lines?: readonly { godown_id?: string }[]; received?: readonly { godown_id?: string }[] }[]) =>
+    rows.some((r) => r?.job_worker_godown === id || (r?.lines ?? []).some((l) => l?.godown_id === id) || (r?.received ?? []).some((l) => l?.godown_id === id));
+  return named(getTable('job_work_out')) || named(getTable('job_work_in'));
+}
+
 /** `godownReferences` over the stored data. */
 export function liveGodownReferences(id: string): string[] {
   let defaultGodown: string | undefined;
@@ -169,7 +176,7 @@ export const godownsDb = {
   isMulti: (): boolean => isMultiGodown(godownsDb.stored()),
 
   /** Add or rename a godown. Names are unique (case-insensitive). */
-  save(input: { id?: string; name: string; address?: string; parent_id?: string }): Godown {
+  save(input: { id?: string; name: string; address?: string; parent_id?: string; job_worker?: boolean; vendor_id?: string }): Godown {
     const name = input.name.trim();
     if (!name) throw new Error('Enter a godown name.');
     const rows = godownsDb.stored();
@@ -180,14 +187,19 @@ export const godownsDb = {
     const existing = input.id ? rows.find((g) => g.id === input.id) : undefined;
     const parentIssue = godownParentIssue(input.id, input.parent_id, list);
     if (parentIssue) throw new Error(parentIssue);
-    const { parent_id: _oldParent, ...base } = existing ?? ({} as Partial<Godown>);
+    const { parent_id: _oldParent, job_worker: oldJw, vendor_id: oldVendor, ...base } = existing ?? ({} as Partial<Godown>);
     void _oldParent;
+    // 7M: a job worker's premises (absent in the input = unchanged on an edit).
+    const jw = input.job_worker ?? oldJw;
+    const vendor = jw ? (input.vendor_id ?? oldVendor) : undefined;
     const row: Godown = {
       ...base,
       id: input.id || generateId(),
       name,
       ...(input.address?.trim() ? { address: input.address.trim() } : {}),
       ...(input.parent_id ? { parent_id: input.parent_id } : {}),
+      ...(jw ? { job_worker: true } : {}),
+      ...(vendor ? { vendor_id: vendor } : {}),
       created_at: existing?.created_at ?? now(),
       updated_at: now(),
     };
@@ -199,6 +211,7 @@ export const godownsDb = {
   /** Delete a godown. Refused for Main and while any record still points at it (`inUse`). */
   remove(id: string, inUse: boolean): void {
     if (id === MAIN_GODOWN_ID) throw new Error('The main godown cannot be deleted.');
+    if (jobWorkGodownInUse(id)) throw new Error('Job work challans (Material Out / In) use this godown, so it cannot be deleted.');
     if (inUse) throw new Error('Stock, bills, invoices or transfers still use this godown, so it cannot be deleted.');
     if (godownsDb.list().some((g) => g.parent_id === id)) throw new Error('Move or delete the godowns inside it first.');
     const row = godownsDb.stored().find((g) => g.id === id);

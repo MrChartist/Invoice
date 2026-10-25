@@ -270,6 +270,11 @@ const DATED: Record<string, string> = {
   [`${DB_PREFIX}manufacturing_vouchers`]: 'date',
   [`${DB_PREFIX}stock_journals`]: 'date',
   [`${DB_PREFIX}physical_stock`]: 'date',
+  [`${DB_PREFIX}job_work_orders`]: 'date',
+  [`${DB_PREFIX}job_work_out`]: 'date',
+  [`${DB_PREFIX}job_work_in`]: 'date',
+  [`${DB_PREFIX}job_work_principal`]: 'date',
+  [`${DB_PREFIX}rejections_in`]: 'date',
   [`${DB_PREFIX}advances`]: 'date',
   [`${DB_PREFIX}fixed_assets`]: 'acquired_on',
 };
@@ -810,6 +815,11 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}manufacturing_vouchers`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}stock_journals`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}physical_stock`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}job_work_orders`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}job_work_out`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}job_work_in`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}job_work_principal`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}rejections_in`]: { num: 'number', date: 'date' },
 };
 
 /** Duplicate document numbers (two devices issuing the same serial): listed, never renumbered. */

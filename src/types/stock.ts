@@ -15,6 +15,13 @@ export interface Godown {
   address?: string;
   /** Additive (WP-8): parent godown (a store room inside a warehouse); absent = top level. */
   parent_id?: string;
+  /**
+   * Additive (7M, job work): the premises of a job worker. Stock here is still ours ("our stock with third
+   * party") and counts in the stock summary; Material Out / In move goods to and from it.
+   */
+  job_worker?: boolean;
+  /** The job worker (`vendors` row) whose premises this is. */
+  vendor_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -28,6 +35,9 @@ export interface StockTransferLine {
   batch_no?: string;
   /** Serials moved (serial-tracked items); count equals `qty`. */
   serials?: string[];
+  /** Additive (7M): unit `qty` was typed in and its factor snapshot; readers convert with `lineFactor`. */
+  unit?: string;
+  unit_factor?: number;
 }
 
 /**

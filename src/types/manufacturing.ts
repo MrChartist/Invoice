@@ -75,6 +75,12 @@ export interface VoucherStockLine {
   /** Production lines of batch-tracked items. */
   mfg_date?: string;
   expiry_date?: string;
+  /**
+   * Additive (7M): unit the quantity was typed in and its factor snapshot (`qty` and a fixed `rate` are per that
+   * unit; `stockVoucherInputs` converts to base units). Absent = the item's base unit.
+   */
+  unit?: string;
+  unit_factor?: number;
 }
 
 /** Production line of a voucher: the cost split rules mirror `BomOutput`. */

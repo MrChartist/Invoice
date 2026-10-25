@@ -180,6 +180,9 @@
   gap: 0.5rem;
   align-items: end;
 }
+.lineRowUnit {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) auto;
+}
 @media (max-width: 640px) {
   .lineRow { grid-template-columns: 1fr 1fr; }
 }

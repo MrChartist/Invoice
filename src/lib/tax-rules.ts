@@ -502,3 +502,12 @@ export const RULE_86B_RULES: readonly Versioned<{ monthlyTaxable: number; cashPc
 export function rule86b(periodStart?: string): { monthlyTaxable: number; cashPct: number } | null {
   return ruleAt(RULE_86B_RULES, periodStart);
 }
+
+/**
+ * ITC-04 (job work, Rule 45(3)) frequency, keyed by the first day of the return period. `limit` = aggregate
+ * turnover (₹) above which `above` applies; due on `dueDay` of the month after the period. Append-only. Verify.
+ */
+export const ITC04_RULES: readonly Versioned<{ limit: number; above: 'Q' | 'H'; upTo: 'Q' | 'A'; dueDay: number }>[] = [
+  { from: '2017-07-01', value: { limit: 0, above: 'Q', upTo: 'Q', dueDay: 25 }, source: 'Rule 45(3): quarterly' },
+  { from: '2021-04-01', value: { limit: 5e7, above: 'H', upTo: 'A', dueDay: 25 }, source: 'Rule 45(3) amended by Notification 35/2021-CT (FY 2021-22 on) — verify' },
+];

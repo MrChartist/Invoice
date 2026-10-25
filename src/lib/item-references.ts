@@ -12,6 +12,8 @@ export interface ItemReferenceTables {
   manufacturing?: readonly { item_id?: string; components?: Lines; outputs?: Lines }[];
   stockJournals?: readonly { consume?: Lines; produce?: Lines }[];
   physical?: readonly { lines?: Lines }[];
+  /** 7M: job work orders, Material Out (`lines`) and Material In (`consumed` / `received` / `losses` / `supplied`). */
+  jobWork?: readonly { finished_item_id?: string; lines?: Lines; consumed?: Lines; received?: Lines; losses?: Lines; supplied?: Lines }[];
 }
 
 /** Readable names of the record kinds that name `itemId` ([] = free to delete). */
@@ -26,5 +28,7 @@ export function itemVoucherReferences(itemId: string, t: ItemReferenceTables): s
   if (sj) out.push(`${sj} stock journal${sj === 1 ? '' : 's'}`);
   const phy = (t.physical ?? []).filter((v) => has(v?.lines)).length;
   if (phy) out.push(`${phy} physical stock count${phy === 1 ? '' : 's'}`);
+  const jw = (t.jobWork ?? []).filter((v) => v?.finished_item_id === itemId || has(v?.lines) || has(v?.consumed) || has(v?.received) || has(v?.losses) || has(v?.supplied)).length;
+  if (jw) out.push(`${jw} job work order${jw === 1 ? '' : 's'} / challan${jw === 1 ? '' : 's'}`);
   return out;
 }
