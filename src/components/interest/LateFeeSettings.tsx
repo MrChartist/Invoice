@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Percent } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import {
-  INTEREST_DISCLAIMER,
   clearProfileLateFee,
   computeInterest,
   describeBasis,
@@ -16,6 +15,9 @@ import { formatCurrency } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './interest.module.css';
+import { useT } from '../../i18n';
+import { intT } from '../../i18n/areas/interest';
+import { nodes } from '../../i18n/areas/nodes';
 
 export interface LateFeeSettingsProps {
   /**
@@ -28,13 +30,14 @@ export interface LateFeeSettingsProps {
   onSaved?: (config: LateFeeConfig) => void;
 }
 
-const MODES: { id: LateFeeMode; label: string }[] = [
-  { id: 'annual', label: 'Per year' },
-  { id: 'monthly_flat', label: 'Per month' },
-];
+const MODES = [
+  { id: 'annual', label: 'perYear' },
+  { id: 'monthly_flat', label: 'perMonth' },
+] as const satisfies ReadonlyArray<{ id: LateFeeMode; label: string }>;
 
 /** Settings card for late-payment interest. Saves on every change to `mrchartist_inv_late_fee`. */
 export function LateFeeSettings({ profileId, profileName, onSaved }: LateFeeSettingsProps) {
+  useT();
   const [override, setOverride] = useState(() => (profileId ? hasProfileLateFee(profileId) : false));
   const [cfg, setCfg] = useState<LateFeeConfig>(() => getLateFeeConfig(profileId));
 
@@ -71,31 +74,30 @@ export function LateFeeSettings({ profileId, profileName, onSaved }: LateFeeSett
     <section className={surface.card}>
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon}>
-          <Percent size={16} /> Late-payment interest
+          <Percent size={16} /> {intT('title')}
         </span>
       </div>
       <div className={surface.cardBody}>
         <p className={surface.sectionNote}>
-          Shows how much interest an overdue invoice has built up, using the rate <strong>you</strong> enter here, which
-          should match the terms you agreed with your customer. Nothing is added to an invoice unless you click to add it.
+          {nodes(intT('intro'), { you: <strong>{intT('you')}</strong> })}
         </p>
 
         {profileId && (
           <label className={controls.check}>
             <input type="checkbox" checked={override} onChange={(e) => toggleOverride(e.target.checked)} />
-            <span>Use a different rule for {profileName || 'this profile'}</span>
+            <span>{intT('differentRule', { name: profileName || intT('thisProfile') })}</span>
           </label>
         )}
 
         <label className={controls.check}>
           <input type="checkbox" checked={cfg.enabled} onChange={(e) => update({ enabled: e.target.checked })} />
-          <span>Show accrued interest on overdue invoices</span>
+          <span>{intT('showAccrued')}</span>
         </label>
 
         <div className={locked ? styles.dim : undefined} aria-disabled={locked}>
           <div className={controls.field}>
-            <span className={controls.label}>Rate is charged</span>
-            <div className={controls.segment} role="radiogroup" aria-label="Interest basis" style={{ alignSelf: 'flex-start' }}>
+            <span className={controls.label}>{intT('rateCharged')}</span>
+            <div className={controls.segment} role="radiogroup" aria-label={intT('basisAria')} style={{ alignSelf: 'flex-start' }}>
               {MODES.map((m) => (
                 <button
                   key={m.id}
@@ -106,7 +108,7 @@ export function LateFeeSettings({ profileId, profileName, onSaved }: LateFeeSett
                   className={cfg.mode === m.id ? controls.segmentBtnActive : controls.segmentBtn}
                   onClick={() => update({ mode: m.id })}
                 >
-                  {m.label}
+                  {intT(m.label)}
                 </button>
               ))}
             </div>
@@ -114,44 +116,44 @@ export function LateFeeSettings({ profileId, profileName, onSaved }: LateFeeSett
 
           <div className={styles.settingsGrid} style={{ marginTop: '0.75rem' }}>
             <label className={controls.field}>
-              <span className={controls.label}>Rate from your terms</span>
+              <span className={controls.label}>{intT('rateFromTerms')}</span>
               <span className={styles.suffix}>
                 <NumberInput
                   className={`${controls.input} ${controls.inputNumeric}`}
                   value={cfg.rate}
                   disabled={locked}
-                  placeholder="e.g. as agreed"
-                  aria-label="Interest rate in percent"
+                  placeholder={intT('ratePh')}
+                  aria-label={intT('rateAria')}
                   onChange={(rate) => update({ rate })}
                 />
-                <span>{cfg.mode === 'annual' ? '% a year' : '% a month'}</span>
+                <span>{cfg.mode === 'annual' ? intT('pctYear') : intT('pctMonth')}</span>
               </span>
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>Grace period</span>
+              <span className={controls.label}>{intT('grace')}</span>
               <span className={styles.suffix}>
                 <NumberInput
                   className={`${controls.input} ${controls.inputNumeric}`}
                   value={cfg.grace_days}
                   disabled={locked}
-                  aria-label="Grace days"
+                  aria-label={intT('graceAria')}
                   onChange={(grace_days) => update({ grace_days })}
                 />
-                <span>days free</span>
+                <span>{intT('daysFree')}</span>
               </span>
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>Stop at (optional)</span>
+              <span className={controls.label}>{intT('stopAt')}</span>
               <span className={styles.suffix}>
                 <NumberInput
                   className={`${controls.input} ${controls.inputNumeric}`}
                   value={cfg.cap_percent ?? 0}
                   disabled={locked}
-                  placeholder="no cap"
-                  aria-label="Cap as percent of invoice"
+                  placeholder={intT('noCap')}
+                  aria-label={intT('capAria')}
                   onChange={(cap_percent) => update({ cap_percent: cap_percent > 0 ? cap_percent : undefined })}
                 />
-                <span>% of invoice</span>
+                <span>{intT('pctInvoice')}</span>
               </span>
             </label>
           </div>
@@ -163,20 +165,20 @@ export function LateFeeSettings({ profileId, profileName, onSaved }: LateFeeSett
               disabled={locked}
               onChange={(e) => update({ compounding: e.target.checked })}
             />
-            <span>Interest on interest (only if your terms say so)</span>
+            <span>{intT('compounding')}</span>
           </label>
         </div>
 
         {cfg.enabled && cfg.rate > 0 ? (
           <div className={styles.example} data-testid="late-fee-example">
-            <strong>Example:</strong> a {formatCurrency(10000)} invoice paid 30 days late works out to{' '}
-            <strong>{formatCurrency(sample.amount)}</strong> ({describeBasis(cfg)}).
+            <strong>{intT('exampleLabel')}</strong>{' '}
+            {nodes(intT('example'), { invoice: formatCurrency(10000), amount: <strong>{formatCurrency(sample.amount)}</strong>, basis: describeBasis(cfg) })}
           </div>
         ) : cfg.enabled ? (
-          <p className={styles.warn}>Enter the rate from your own terms. No rate is assumed, so nothing is shown until you do.</p>
+          <p className={styles.warn}>{intT('enterRate')}</p>
         ) : null}
 
-        <p className={surface.sectionNote}>{INTEREST_DISCLAIMER}</p>
+        <p className={surface.sectionNote}>{intT('disclaimer')}</p>
       </div>
     </section>
   );

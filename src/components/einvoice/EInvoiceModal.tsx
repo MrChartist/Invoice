@@ -19,6 +19,8 @@ import { stringifyEway, type EwayTransMode } from '../../lib/eway';
 import { preflightEInvoice, preflightEway } from '../../lib/einvoice-validate';
 import { localDb } from '../../lib/localDb';
 import { readLinks } from '../../lib/documents';
+import { useT } from '../../i18n';
+import { einvT } from '../../i18n/areas/einvoice';
 
 export interface EInvoiceModalProps {
   invoice: InvoiceRecord;
@@ -28,20 +30,21 @@ export interface EInvoiceModalProps {
 
 type Tab = 'einvoice' | 'eway' | 'portal';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'einvoice', label: 'e-Invoice' },
-  { id: 'eway', label: 'e-Way Bill' },
-  { id: 'portal', label: 'Portal details' },
+/** Tab / supply-type names: portal terms stay Latin, the rest go through the area translator. */
+const TABS: { id: Tab; label: () => string }[] = [
+  { id: 'einvoice', label: () => 'e-Invoice' },
+  { id: 'eway', label: () => 'e-Way Bill' },
+  { id: 'portal', label: () => einvT('tabPortal') },
 ];
 
-const SUPPLY_TYPES: { value: '' | EInvoiceSupplyType; label: string }[] = [
-  { value: '', label: 'Automatic (B2B / Export)' },
-  { value: 'B2B', label: 'B2B' },
-  { value: 'SEZWP', label: 'SEZ with payment' },
-  { value: 'SEZWOP', label: 'SEZ without payment' },
-  { value: 'EXPWP', label: 'Export with payment' },
-  { value: 'EXPWOP', label: 'Export without payment' },
-  { value: 'DEXP', label: 'Deemed export' },
+const SUPPLY_TYPES: { value: '' | EInvoiceSupplyType; label: () => string }[] = [
+  { value: '', label: () => einvT('stAuto') },
+  { value: 'B2B', label: () => 'B2B' },
+  { value: 'SEZWP', label: () => einvT('stSezwp') },
+  { value: 'SEZWOP', label: () => einvT('stSezwop') },
+  { value: 'EXPWP', label: () => einvT('stExpwp') },
+  { value: 'EXPWOP', label: () => einvT('stExpwop') },
+  { value: 'DEXP', label: () => einvT('stDexp') },
 ];
 
 function download(filename: string, text: string) {
@@ -76,6 +79,7 @@ export function EInvoiceModal({ invoice, open, onClose }: EInvoiceModalProps) {
 }
 
 function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClose: () => void }) {
+  useT();
   const { notify, toastNode } = useToast();
   const tabsId = useId();
   // A Bill of Supply is outside e-invoicing: only the e-Way Bill and portal tabs apply.
@@ -147,9 +151,9 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
   const copy = async (text: string, what: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      notify(`${what} copied to clipboard`);
+      notify(einvT('copied', { what }));
     } catch {
-      notify('Could not access the clipboard — use Download instead', 'error');
+      notify(einvT('clipboardFailed'), 'error');
     }
   };
 
@@ -163,9 +167,9 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
       const trimmed: EInvoiceMeta = { ...meta, irn: meta.irn?.trim().toLowerCase(), signed_qr: meta.signed_qr?.trim() };
       setMeta(saveEInvoiceMeta(trimmed));
       setDirty(false);
-      notify('Portal details saved');
+      notify(einvT('detailsSaved'));
     } catch (err) {
-      notify((err as Error).message || 'Could not save', 'error');
+      notify((err as Error).message || einvT('saveFailed'), 'error');
     }
   };
 
@@ -185,23 +189,23 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
           <FileJson size={18} aria-hidden="true" /> e-Invoice / e-Way
         </>
       }
-      subtitle={`${invoice.invoice_number || 'Unnumbered'} · generated offline — nothing is sent to any portal`}
+      subtitle={einvT('offlineSubtitle', { doc: invoice.invoice_number || einvT('unnumbered') })}
       footer={
         <div className={styles.footerRow}>
-          <span className={styles.note}>{dirty ? 'You have unsaved portal details.' : 'Saved on this device only.'}</span>
+          <span className={styles.note}>{dirty ? einvT('unsaved') : einvT('savedLocal')}</span>
           <div className={styles.actions}>
             <button type="button" className={controls.btnPrimary} onClick={save} disabled={!dirty}>
-              <Save size={16} aria-hidden="true" /> Save details
+              <Save size={16} aria-hidden="true" /> {einvT('saveDetails')}
             </button>
             <button type="button" className={controls.btnOutline} onClick={onClose}>
-              Close
+              {einvT('close')}
             </button>
           </div>
         </div>
       }
     >
       <div className={styles.stack}>
-        <div className={styles.tabs} role="tablist" aria-label="e-Invoice sections">
+        <div className={styles.tabs} role="tablist" aria-label={einvT('sections')}>
           <div className={controls.segment}>
             {tabs.map((t) => (
               <button
@@ -214,21 +218,21 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                 className={tab === t.id ? `${controls.segmentBtn} ${controls.segmentBtnActive}` : controls.segmentBtn}
                 onClick={() => setTab(t.id)}
               >
-                {t.label}
+                {t.label()}
               </button>
             ))}
           </div>
-          {meta.irn && <span className={styles.pillOk}>IRN recorded</span>}
+          {meta.irn && <span className={styles.pillOk}>{einvT('irnRecorded')}</span>}
         </div>
 
         <div role="tabpanel" id={`${tabsId}-panel`} aria-labelledby={`${tabsId}-${tab}`} className={styles.stack}>
           {tab === 'einvoice' && (
             <>
-              <ReadinessList result={einv} okText="Ready — this invoice passes every offline IRP check." />
+              <ReadinessList result={einv} okText={einvT('einvReady')} />
               <div className={styles.section}>
-                <h3 className={styles.sectionTitle}>Options</h3>
+                <h3 className={styles.sectionTitle}>{einvT('options')}</h3>
                 <div className={styles.grid2}>
-                  <Field label="Supply type">
+                  <Field label={einvT('supplyType')}>
                     <select
                       className={controls.select}
                       value={supplyType}
@@ -236,28 +240,28 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                     >
                       {SUPPLY_TYPES.map((s) => (
                         <option key={s.value} value={s.value}>
-                          {s.label}
+                          {s.label()}
                         </option>
                       ))}
                     </select>
                   </Field>
                   {isExport && (
-                    <Field label="Country code" hint="Two-letter, e.g. US">
+                    <Field label={einvT('countryCode')} hint={einvT('countryHint')}>
                       <input className={controls.input} maxLength={2} value={countryCode} onChange={(e) => setCountryCode(e.target.value.toUpperCase())} />
                     </Field>
                   )}
                 </div>
                 {isExport && (
-                  <Field label="Port code" hint="Optional, e.g. INBOM4">
+                  <Field label={einvT('portCode')} hint={einvT('portHint')}>
                     <input className={controls.input} maxLength={6} value={portCode} onChange={(e) => setPortCode(e.target.value.toUpperCase())} />
                   </Field>
                 )}
                 {isNote && (
                   <div className={styles.grid2}>
-                    <Field label="Original invoice no.">
+                    <Field label={einvT('origNo')}>
                       <input className={controls.input} value={precNo} onChange={(e) => setPrecNo(e.target.value)} placeholder="INV/FY25-26/0001" />
                     </Field>
-                    <Field label="Original invoice date">
+                    <Field label={einvT('origDate')}>
                       <input className={controls.input} type="date" value={precDate} onChange={(e) => setPrecDate(e.target.value)} />
                     </Field>
                   </div>
@@ -270,59 +274,58 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                   disabled={!einv.ready}
                   onClick={() => download(`einvoice_${stem}.json`, einvText)}
                 >
-                  <Download size={16} aria-hidden="true" /> Download e-Invoice JSON
+                  <Download size={16} aria-hidden="true" /> {einvT('downloadEinv')}
                 </button>
                 <button type="button" className={controls.btnOutline} onClick={() => copy(einvText, 'e-Invoice JSON')}>
-                  <ClipboardCopy size={16} aria-hidden="true" /> Copy JSON
+                  <ClipboardCopy size={16} aria-hidden="true" /> {einvT('copyJson')}
                 </button>
               </div>
               {!einv.ready && (
-                <p className={styles.note}>Download is enabled once blocking issues are fixed. You can still copy the draft JSON to inspect it.</p>
+                <p className={styles.note}>{einvT('downloadDisabled')}</p>
               )}
-              <pre className={styles.preview} tabIndex={0} aria-label="e-Invoice JSON preview">{einvText}</pre>
+              <pre className={styles.preview} tabIndex={0} aria-label={einvT('einvPreview')}>{einvText}</pre>
               <p className={styles.note}>
-                Upload on the IRP portal under e-Invoice → Generate → Bulk Generation. Only taxpayers over the
-                notified turnover limit need e-Invoicing, and only for B2B, SEZ and export supplies.
+                {einvT('einvUploadNote')}
               </p>
             </>
           )}
 
           {tab === 'eway' && (
             <>
-              <ReadinessList result={eway} okText="Ready — this e-Way Bill file passes every offline check." />
+              <ReadinessList result={eway} okText={einvT('ewayReady')} />
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>
-                  <Truck size={14} aria-hidden="true" /> Transport (Part B)
+                  <Truck size={14} aria-hidden="true" /> {einvT('transportPartB')}
                 </h3>
                 <div className={styles.grid3}>
-                  <Field label="Mode">
+                  <Field label={einvT('mode')}>
                     <select
                       className={controls.select}
                       value={meta.transport ?? 'ROAD'}
                       onChange={(e) => patch({ transport: e.target.value as EInvoiceMeta['transport'] })}
                     >
-                      <option value="ROAD">Road</option>
-                      <option value="RAIL">Rail</option>
-                      <option value="AIR">Air</option>
-                      <option value="SHIP">Ship</option>
+                      <option value="ROAD">{einvT('road')}</option>
+                      <option value="RAIL">{einvT('rail')}</option>
+                      <option value="AIR">{einvT('air')}</option>
+                      <option value="SHIP">{einvT('ship')}</option>
                     </select>
                   </Field>
-                  <Field label="Vehicle no.">
+                  <Field label={einvT('vehicleNo')}>
                     <input {...inputProps('vehicle')} className={`${controls.input} ${controls.inputMono}`} placeholder="MH12AB1234" />
                   </Field>
-                  <Field label="Vehicle type">
+                  <Field label={einvT('vehicleType')}>
                     <select
                       className={controls.select}
                       value={meta.vehicle_type ?? 'R'}
                       onChange={(e) => patch({ vehicle_type: e.target.value as 'R' | 'O' })}
                     >
-                      <option value="R">Regular</option>
-                      <option value="O">Over-dimensional cargo</option>
+                      <option value="R">{einvT('regular')}</option>
+                      <option value="O">{einvT('odc')}</option>
                     </select>
                   </Field>
                 </div>
                 <div className={styles.grid3}>
-                  <Field label="Distance (km)" hint="0 = portal calculates it">
+                  <Field label={einvT('distance')} hint={einvT('distanceHint')}>
                     <input
                       className={`${controls.input} ${controls.inputNumeric}`}
                       type="number"
@@ -333,18 +336,18 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                       onChange={(e) => patch({ distance: e.target.value === '' ? undefined : Number(e.target.value) })}
                     />
                   </Field>
-                  <Field label="Transporter GSTIN">
+                  <Field label={einvT('transporterGstin')}>
                     <input {...inputProps('transporter_id')} className={`${controls.input} ${controls.inputMono}`} maxLength={15} />
                   </Field>
-                  <Field label="Transporter name">
+                  <Field label={einvT('transporterName')}>
                     <input {...inputProps('transporter_name')} />
                   </Field>
                 </div>
                 <div className={styles.grid2}>
-                  <Field label="Transport doc no." hint="LR / RR / airway bill no.">
+                  <Field label={einvT('transportDocNo')} hint={einvT('transportDocHint')}>
                     <input {...inputProps('transport_doc_no')} />
                   </Field>
-                  <Field label="Transport doc date">
+                  <Field label={einvT('transportDocDate')}>
                     <input className={controls.input} type="date" value={meta.transport_doc_date ?? ''} onChange={(e) => patch({ transport_doc_date: e.target.value })} />
                   </Field>
                 </div>
@@ -356,16 +359,15 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                   disabled={!eway.ready}
                   onClick={() => download(`ewaybill_${stem}.json`, ewayText)}
                 >
-                  <Download size={16} aria-hidden="true" /> Download e-Way JSON
+                  <Download size={16} aria-hidden="true" /> {einvT('downloadEway')}
                 </button>
                 <button type="button" className={controls.btnOutline} onClick={() => copy(ewayText, 'e-Way Bill JSON')}>
-                  <ClipboardCopy size={16} aria-hidden="true" /> Copy JSON
+                  <ClipboardCopy size={16} aria-hidden="true" /> {einvT('copyJson')}
                 </button>
               </div>
-              <pre className={styles.preview} tabIndex={0} aria-label="e-Way Bill JSON preview">{ewayText}</pre>
+              <pre className={styles.preview} tabIndex={0} aria-label={einvT('ewayPreview')}>{ewayText}</pre>
               <p className={styles.note}>
-                Upload on the e-Way Bill portal under e-Waybill → Generate (Bulk). Transport details are kept with
-                this invoice when you press Save details.
+                {einvT('ewayUploadNote')}
               </p>
             </>
           )}
@@ -374,16 +376,16 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
             <>
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>
-                  <QrCode size={14} aria-hidden="true" /> Returned by the IRP
+                  <QrCode size={14} aria-hidden="true" /> {einvT('returnedIrp')}
                 </h3>
-                <Field label="IRN" hint="64-character hash">
+                <Field label="IRN" hint={einvT('irnHint')}>
                   <input {...inputProps('irn')} className={`${controls.input} ${controls.inputMono}`} spellCheck={false} />
                 </Field>
                 <div className={styles.grid2}>
                   <Field label="Ack No.">
                     <input {...inputProps('ack_no')} inputMode="numeric" />
                   </Field>
-                  <Field label="Ack date">
+                  <Field label={einvT('ackDate')}>
                     <input
                       className={controls.input}
                       type="datetime-local"
@@ -392,7 +394,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                     />
                   </Field>
                 </div>
-                <Field label="Signed QR code" hint="Paste the long signed token; templates can render it as a QR.">
+                <Field label={einvT('signedQr')} hint={einvT('signedQrHint')}>
                   <textarea
                     className={controls.textarea}
                     rows={3}
@@ -404,16 +406,16 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
               </div>
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>
-                  <Truck size={14} aria-hidden="true" /> Returned by the e-Way portal
+                  <Truck size={14} aria-hidden="true" /> {einvT('returnedEway')}
                 </h3>
                 <div className={styles.grid3}>
-                  <Field label="e-Way Bill no." hint="12 digits">
+                  <Field label={einvT('ewayNo')} hint={einvT('ewayNoHint')}>
                     <input {...inputProps('eway_no')} inputMode="numeric" maxLength={12} />
                   </Field>
-                  <Field label="Generated on">
+                  <Field label={einvT('generatedOn')}>
                     <input className={controls.input} type="date" value={meta.eway_date ?? ''} onChange={(e) => patch({ eway_date: e.target.value })} />
                   </Field>
-                  <Field label="Valid until">
+                  <Field label={einvT('validUntil')}>
                     <input className={controls.input} type="date" value={meta.eway_valid_upto ?? ''} onChange={(e) => patch({ eway_valid_upto: e.target.value })} />
                   </Field>
                 </div>

@@ -2,6 +2,9 @@ import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import type { PreflightIssue } from '../../lib/einvoice';
 import type { PreflightResult } from '../../lib/einvoice-validate';
 import styles from './einvoice.module.css';
+import { useT } from '../../i18n';
+import { einvT } from '../../i18n/areas/einvoice';
+import { plural } from '../../i18n/areas/plural';
 
 export interface ReadinessListProps {
   result: PreflightResult;
@@ -10,6 +13,7 @@ export interface ReadinessListProps {
 }
 
 function Row({ item }: { item: PreflightIssue }) {
+  useT();
   const isError = item.severity === 'error';
   const Icon = isError ? XCircle : AlertTriangle;
   return (
@@ -20,7 +24,7 @@ function Row({ item }: { item: PreflightIssue }) {
         aria-hidden="true"
       />
       <span>
-        <span className={styles.srOnly}>{isError ? 'Blocking error: ' : 'Warning: '}</span>
+        <span className={styles.srOnly}>{isError ? einvT('blockingError') : einvT('warningPrefix')}</span>
         <span className={styles.checkField}>{item.field}</span> — {item.message}
       </span>
     </li>
@@ -29,16 +33,17 @@ function Row({ item }: { item: PreflightIssue }) {
 
 /** Errors first, then warnings; a green line when everything passes. */
 export function ReadinessList({ result, okText }: ReadinessListProps) {
+  useT();
   const { errors, warnings } = result;
   return (
     <div className={styles.section} aria-live="polite">
-      <h3 className={styles.sectionTitle}>Readiness checklist</h3>
+      <h3 className={styles.sectionTitle}>{einvT('readiness')}</h3>
       <div className={styles.summary}>
         <span className={errors.length ? styles.pillBad : styles.pillOk}>
-          {errors.length ? `${errors.length} blocking` : 'No blocking issues'}
+          {errors.length ? einvT('blocking', { n: errors.length }) : einvT('noBlocking')}
         </span>
         <span className={warnings.length ? styles.pillWarn : styles.pill}>
-          {warnings.length} {warnings.length === 1 ? 'warning' : 'warnings'}
+          {plural(einvT, 'warningsOne', 'warningsMany', warnings.length)}
         </span>
       </div>
       {errors.length + warnings.length === 0 ? (
