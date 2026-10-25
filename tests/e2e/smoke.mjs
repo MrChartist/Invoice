@@ -617,7 +617,7 @@ try {
     };
     await gateway();
     await page.keyboard.press('o');
-    await page.getByRole('heading', { name: 'Accounts Info' }).first().waitFor();
+    await page.getByText('Groups, ledgers and opening balances', { exact: false }).first().waitFor();
     check(/\/books\?tab=coa&m=menu/.test(page.url()), 'O opens Accounts Info (WP-1 masters menu)');
     await gateway();
     await page.keyboard.press('n');
@@ -640,6 +640,19 @@ try {
     check(true, 'Y opens the year-end wizard (WP-7) from the Gateway');
     await page.keyboard.press('Escape');
     await wizard.waitFor({ state: 'hidden' });
+    // Phone width: the Tally-parity screens must not scroll the page sideways (tables scroll inside their wrapper).
+    await page.setViewportSize({ width: 360, height: 780 });
+    try {
+      for (const path of ['/gateway', '/books?tab=coa&m=menu', '/reconcile?tab=documents&doc=deposit', '/books?tab=ratio', '/expenses?tab=returns', '/tds', '/gst-reports?tab=setoff', '/manufacturing']) {
+        await page.goto(srv.origin + path);
+        await page.locator('h1').first().waitFor();
+        await page.waitForTimeout(300);
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        check(over <= 1, `${path}: no horizontal page scroll at 360 px (${over} px over)`);
+      }
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
   });
 
   await step('masters: sub-group under Sundry Debtors, party with a ₹10,000 Dr opening bill, seen in ageing and the trial balance', async () => {
