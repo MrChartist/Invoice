@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BellOff, Copy, Mail, MessageCircle, MessageSquare } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
@@ -32,7 +32,7 @@ import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
 import { remindT } from '../../i18n/areas/reminders';
 import { areaNodes } from '../../i18n/areas/nodes';
-import { loadReminderSchedule } from '../../lib/reminder-settings';
+import type { ReminderSchedule } from '../../lib/reminders';
 
 export interface ReminderModalProps {
   invoice: InvoiceRecord;
@@ -74,13 +74,31 @@ function ReminderModalBody({
     linkedCredits(getTable<CreditLinkRow>('doc_links').filter((l) => l.from_id === invoice.id), localDb.invoices.getAll()).get(invoice.id) ?? 0,
   );
   // R2-A5: the company schedule decides the suggested stage; edited templates replace the built-in wording.
-  const [schedule] = useState(loadReminderSchedule);
-  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited, schedule));
+  // Loaded after the dialog opens (dynamic import) so the payment / dashboard bundles stay small.
+  const [schedule, setSchedule] = useState<ReminderSchedule | null>(null);
+  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited));
   // 8H: the party's own message language when it has one (Client form), else English.
   const [lang, setLang] = useState<MessageLang>(() => partyLang(invoice));
   const [message, setMessage] = useState(() =>
-    buildReminderIn(invoice, suggestStage(invoice, new Date(), credited, schedule), partyLang(invoice), new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
+    buildReminderIn(invoice, suggestStage(invoice, new Date(), credited), partyLang(invoice), new Date(), { interestAccrued: interestForReminder(invoice), credited }),
   );
+  const edited = useRef(false);
+  useEffect(() => {
+    let live = true;
+    void import('../../lib/reminder-settings').then((m) => {
+      if (!live) return;
+      const s = m.loadReminderSchedule();
+      setSchedule(s);
+      if (edited.current) return;
+      const st = suggestStage(invoice, new Date(), credited, s);
+      setStage(st);
+      setMessage(buildReminderIn(invoice, st, partyLang(invoice), new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: s.templates }));
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [phone, setPhone] = useState(invoice.client?.phone ?? '');
   const [email, setEmail] = useState(invoice.client?.email ?? '');
 
@@ -91,10 +109,11 @@ function ReminderModalBody({
   const last = lastReminder(log, invoice.id);
 
   const regenerate = (nextStage: ReminderStage, nextLang: MessageLang) => {
+    edited.current = true;
     setStage(nextStage);
     setLang(nextLang);
     setMessage(
-      buildReminderIn(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
+      buildReminderIn(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule?.templates }),
     );
   };
 
@@ -267,7 +286,7 @@ function ReminderModalBody({
                 id="rm-subject"
                 className={controls.input}
                 value={message.subject}
-                onChange={(e) => setMessage((m) => ({ ...m, subject: e.target.value }))}
+                onChange={(e) => { edited.current = true; setMessage((m) => ({ ...m, subject: e.target.value })); }}
               />
             </div>
           )}
@@ -278,7 +297,7 @@ function ReminderModalBody({
               id="rm-body"
               className={cn(controls.textarea, styles.messageArea)}
               value={message.body}
-              onChange={(e) => setMessage((m) => ({ ...m, body: e.target.value }))}
+              onChange={(e) => { edited.current = true; setMessage((m) => ({ ...m, body: e.target.value })); }}
             />
             <div className={cn(styles.counter, smsLong && styles.counterWarn)}>
               {shareT('rmChars', { n: message.body.length })}{smsLong ? shareT('rmLong') : ''}

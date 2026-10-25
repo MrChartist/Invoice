@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {
   stageForDays, daysUntil, buildReminder, pendingReminders, lastReminder, reminderCount,
   makeLogEntry, makeSnooze, reminderPriority, isSnoozed, termsMentionInterest, fillTemplate, suggestStage,
-  DEFAULT_REMINDER_SCHEDULE, normalizeSchedule, scheduleIssues, templateFor, unknownPlaceholders, type ReminderSchedule,
+  DEFAULT_REMINDER_SCHEDULE, templateFor, unknownPlaceholders, type ReminderSchedule,
 } from '../src/lib/reminders.ts';
+import { normalizeSchedule, scheduleIssues } from '../src/lib/reminder-schedule.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
 const TODAY = new Date(2026, 9, 7, 15, 30); // 7 Oct 2026, afternoon

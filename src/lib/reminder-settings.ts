@@ -1,13 +1,14 @@
 /**
  * R2-A5: the company reminder schedule and edited templates, stored under the object key
  * `mrchartist_inv_reminder_settings` (backed up and synced like every company key). The pure maths lives in
- * `reminders.ts` (`ReminderSchedule`, `normalizeSchedule`, `stageForDays`); this file only reads and writes it.
+ * `reminders.ts` (`ReminderSchedule`, `stageForDays`) and `reminder-schedule.ts` (`normalizeSchedule`); this file only reads and writes it.
  * No module-level storage reads (safe to import from early chunks).
  */
 import { DB_PREFIX, getJson, setJson } from './storage';
 import { requireAccess } from './access';
 import { audit } from './audit';
-import { DEFAULT_REMINDER_SCHEDULE, normalizeSchedule, scheduleIssues, type ReminderSchedule } from './reminders';
+import { DEFAULT_REMINDER_SCHEDULE, type ReminderSchedule } from './reminders';
+import { normalizeSchedule, scheduleIssues } from './reminder-schedule';
 
 export const REMINDER_SETTINGS_KEY = `${DB_PREFIX}reminder_settings`;
 
