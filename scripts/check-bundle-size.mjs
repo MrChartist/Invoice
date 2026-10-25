@@ -28,7 +28,9 @@ const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // Raised to 1150 for 5.4 round 2 (Hindi strings live beside English in each lazy area chunk) and the
 // Phase 7 Tally-parity modules (payroll, manufacturing, TDS, gateway, reports engine): all lazy, first
 // paint unchanged; this is the one-time offline precache (~1 MB gz for the whole app).
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 1150);
+// Raised to 1400 for the Tally-parity work packages WP-1…WP-9 (masters, returns, printing, banking, business
+// extras, GST depth, migration / audit): every new screen is lazy, so first paint is unchanged.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 1400);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 // De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.
