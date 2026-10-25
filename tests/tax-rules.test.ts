@@ -34,3 +34,9 @@ test('206C(1H) TCS presets are withdrawn from 1 Apr 2025', () => {
 test('GST slabs include the 40% slab', () => {
   assert.ok((GST_SLABS as readonly number[]).includes(40));
 });
+
+test('RBI Bank Rate (MSMED interest): 5.50% from 5 Dec 2025, earlier dates unchanged', async () => {
+  const { rbiBankRate } = await import('../src/lib/tax-rules.ts');
+  assert.equal(rbiBankRate('2025-12-04'), 5.75);
+  assert.equal(rbiBankRate('2025-12-05'), 5.5);
+});

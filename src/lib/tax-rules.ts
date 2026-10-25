@@ -147,6 +147,8 @@ export const RBI_BANK_RATE_RULES: readonly Versioned<number>[] = [
   { from: '2025-02-07', value: 6.5, source: 'RBI policy, Feb 2025' },
   { from: '2025-04-09', value: 6.25, source: 'RBI policy, Apr 2025' },
   { from: '2025-06-06', value: 5.75, source: 'RBI policy, Jun 2025' },
+  { from: '2025-12-05', value: 5.5, source: 'RBI notification 5 Dec 2025 (repo 5.25%, MSF/Bank Rate 5.50%)' },
+  // Later changes: add from the RBI notification itself (a reported Oct 2026 hike is not yet verified here).
 ];
 
 export function rbiBankRate(date?: string): number {
