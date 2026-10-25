@@ -71,6 +71,12 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     payment_terms: { id: 'pt_net30', name: 'Net 30', early_discount: { percent: 2, until: '2026-04-17', amount: 20 } },
     amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
+    // R2-B
+    milestones: [{ id: 'm1', name: 'Plinth', percent: 30, expected_date: '2026-05-01' }],
+    progress_of: { source_id: 'q0', basis: 'percent', value: 30, stage: 1 },
+    revision_of: 'q0', revision_no: 2,
+    proposal_sections: [{ id: 's1', place: 'cover', title: 'Scope', body: 'Two floors' }],
+    attention: { name: 'R. Iyer', role: 'Accounts' },
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

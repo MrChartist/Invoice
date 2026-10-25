@@ -1951,6 +1951,37 @@ try {
     check(/verify with your CA/.test((await page.locator('[data-annual-preview]').textContent()) ?? ''), 'annual pack carries the "verify with your CA" draft line');
   });
 
+  await step('R2-B batch invoices: one saved invoice billed to two parties as drafts, numbered in order; undo deletes them', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevClients = await readJson(page, 'clients', []);
+    const src = prevInvoices.find((i) => (i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE') && i.status !== 'Cancelled');
+    check(!!src, 'a saved invoice to use as the source');
+    if (!src) return;
+    await writeJson(page, 'clients', [...prevClients,
+      { id: 'e2e-b1', name: 'E2E Member One', email: '', address: '', city: 'Pune', zip: '', state_code: '27' },
+      { id: 'e2e-b2', name: 'E2E Member Two', email: '', address: '', city: 'Bengaluru', zip: '', state_code: '29' }]);
+    await page.goto(srv.origin + '/recurring?tab=batch');
+    await page.locator('[data-batch-tab]').waitFor({ timeout: 15000 });
+    await page.locator('[data-batch-source]').selectOption(src.id);
+    await page.locator('[data-batch-search]').fill('E2E Member');
+    await page.locator('[data-batch-select-all]').click();
+    await page.locator('[data-batch-preview]').waitFor();
+    check((await page.locator('[data-batch-preview]').textContent())?.includes('IGST') === true, 'the Karnataka party is billed IGST in the preview');
+    await page.locator('[data-batch-issue]').click();
+    await page.locator('[data-batch-result]').waitFor();
+    const after = await readJson(page, 'invoices', [], (v) => v.length === prevInvoices.length + 2);
+    const made = after.filter((i) => !prevInvoices.some((p) => p.id === i.id));
+    check(made.length === 2 && made.every((i) => i.status === 'Draft'), 'two draft invoices saved');
+    const runs = await readJson(page, 'batch_runs', [], (v) => v.length > 0);
+    check(runs[0]?.invoice_ids?.length === 2, 'the run is recorded');
+    await page.locator('[data-batch-runs] button').first().click();
+    await page.locator('[data-batch-undo]').click();
+    await readJson(page, 'invoices', [], (v) => v.length === prevInvoices.length);
+    check(true, 'undo removed the run\'s drafts');
+    await writeJson(page, 'clients', prevClients);
+    await writeJson(page, 'batch_runs', null);
+  });
+
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
     // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
     await page.goto(srv.origin + '/settings?tab=data');

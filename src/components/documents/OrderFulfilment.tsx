@@ -11,6 +11,10 @@ import { useT } from '../../i18n';
 import { salesT, stateLabel } from '../../i18n/areas/sales';
 import { docLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
+import { posForSalesOrder } from '../../lib/purchase-orders';
+import { getTable } from '../../lib/storage';
+import type { PurchaseOrder } from '../../types/purchases';
+import { s2T } from '../../i18n/areas/sales-r2';
 import styles from './documents.module.css';
 
 const qty = (n: number) => (Math.round(n * 100) / 100).toLocaleString('en-IN');
@@ -34,6 +38,8 @@ export function OrderFulfilment({
     const ids = new Set(fulfil.documentIds);
     return { f: fulfil, docs: all.filter((d) => ids.has(d.id)).sort((a, b) => a.issue_date.localeCompare(b.issue_date)) };
   }, [order, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // R2-B5: back-to-back purchase orders raised from this order.
+  const pos = useMemo(() => posForSalesOrder(order.id, getTable<PurchaseOrder>('purchase_orders')), [order, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setClosed = (closed: boolean) => {
     try {
@@ -98,6 +104,17 @@ export function OrderFulfilment({
               {i > 0 && ', '}
               <Link to={`/invoice/${d.id}`}>{d.doc_type in DOCUMENT_LABELS ? docLabel(d.doc_type) : d.doc_type} {d.invoice_number}</Link>
               {d.status === 'Draft' ? salesT('of.draft') : ''}
+            </span>
+          ))}
+        </p>
+      )}
+      {pos.length > 0 && (
+        <p className={styles.itemMeta} data-linked-pos>
+          {s2T('po.linked')}{' '}
+          {pos.map((p, i) => (
+            <span key={p.id}>
+              {i > 0 && ', '}
+              <Link to="/expenses?tab=orders">{p.po_number}</Link> ({p.vendor_name}{p.drop_ship ? ', drop-ship' : ''})
             </span>
           ))}
         </p>

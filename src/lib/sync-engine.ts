@@ -331,6 +331,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   // R2-A: collection follow-ups (the day logged) and bad-debt recoveries (the day the money came in)
   [`${DB_PREFIX}collection_notes`]: 'date',
   [`${DB_PREFIX}write_off_recoveries`]: 'date',
+  // R2-B: batch invoice runs (issue date of the run's invoices)
+  [`${DB_PREFIX}batch_runs`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

@@ -13,6 +13,9 @@ import { areaNodes } from '../../i18n/areas/nodes';
 import controls from '../../styles/controls.module.css';
 import styles from './documents.module.css';
 import { getTable } from '../../lib/storage';
+import { poFulfilment, posForSalesOrder } from '../../lib/purchase-orders';
+import type { PurchaseOrder, PurchaseRecord } from '../../types/purchases';
+import { s2T } from '../../i18n/areas/sales-r2';
 
 // 8D (8.64): IRN / e-Way Bill cancel requests and the 24-hour deadline — loaded only for documents that have them.
 const EinvCancelPanel = lazy(() => import('../einvoice/EinvCancelPanel'));
@@ -44,6 +47,15 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
     () => getTable<{ invoice_id?: string; irn?: string; eway_no?: string }>('einvoice_meta').some((m) => m?.invoice_id === invoice.id && (m.irn || m.eway_no)),
     [invoice.id],
   );
+  // R2-B5: cancelling a sales order warns about its open back-to-back purchase orders.
+  const openPos = useMemo(() => {
+    if (invoice.doc_type !== 'SALES_ORDER' || isCancelled) return [];
+    const purchases = getTable<PurchaseRecord>('purchases');
+    return posForSalesOrder(invoice.id, getTable<PurchaseOrder>('purchase_orders')).filter((po) => {
+      const st = poFulfilment(po, purchases).state;
+      return st === 'Open' || st === 'Partly received';
+    });
+  }, [invoice.id, invoice.doc_type, isCancelled]);
 
   const submit = (acknowledgeStock = false): void => {
     try {
@@ -98,6 +110,11 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
             <p className={controls.hint}>
               {salesT('cn.cancelHint')}
             </p>
+            {openPos.length > 0 && (
+              <p className={styles.warn} role="alert" data-so-po-warning>
+                <AlertTriangle size={14} aria-hidden="true" /> {s2T('po.cancelWarn', { numbers: openPos.map((p) => p.po_number).join(', ') })}
+              </p>
+            )}
             <div className={controls.field}>
               <label className={controls.label} htmlFor="cancel-reason">
                 {salesT('reason')}

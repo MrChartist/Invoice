@@ -12,6 +12,7 @@ import {
   Eye,
   FilePlus2,
   FileText,
+  Layers,
   Lock,
   Pencil,
   Search,
@@ -43,6 +44,9 @@ import { useCan } from '../hooks/useCan';
 import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { quoteState, quoteTone } from '../lib/quote-status';
+import { supersededIds } from '../lib/quote-revisions';
+import { s2T } from '../i18n/areas/sales-r2';
+import type {} from '../types/sales-r2';
 import { buildOrderIndex, fulfilmentFromIndex, ORDER_STATES, orderTone, type OrderState } from '../lib/sales-orders';
 import { amountDue, linkedCredits } from '../lib/amount-due';
 import { bulkMarkPaid, bulkPaidTotal, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
@@ -66,6 +70,8 @@ const InvoicePreviewModal = lazy(() =>
 // Batch PDF / ZIP (WP-4): the PDF stack and template engine load only when used.
 const BulkCollectDialog = lazy(() => import('../components/invoicing-ux/BulkCollectDialog'));
 const BatchPdfModal = lazy(() => import('../components/preview/BatchPdfModal').then((m) => ({ default: m.BatchPdfModal })));
+// R2-B2: progress billing summary (by party / quotation), loaded on demand.
+const ProgressReportModal = lazy(() => import('../components/documents/ProgressReportModal').then((m) => ({ default: m.ProgressReportModal })));
 
 type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft' | 'approval';
 
@@ -174,6 +180,10 @@ export function Transactions() {
     return out;
   }, [invoices, links]);
 
+  const superseded = useMemo(() => supersededIds(links), [links]);
+  const hasStages = useMemo(() => invoices.some((i) => i.progress_of?.source_id), [invoices]);
+  const [showSuperseded, setShowSuperseded] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const inBranch = branchPredicates(branch).invoice;
@@ -183,6 +193,8 @@ export function Transactions() {
       .filter((inv) => matchesListFilter(inv, { docType, from, to }))
       .filter((inv) => !branch || inBranch(inv))
       .filter((inv) => docType !== 'SALES_ORDER' || !orderState || orderStates.get(inv.id) === orderState)
+      // R2-B3: quotations replaced by a later revision are hidden unless asked for.
+      .filter((inv) => showSuperseded || !superseded.has(inv.id))
       .filter(
         (inv) =>
           !q ||
@@ -191,7 +203,7 @@ export function Transactions() {
           ),
       );
     return sortInvoices(list, sort.key, sort.dir);
-  }, [invoices, query, filter, docType, orderState, orderStates, from, to, branch, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [invoices, query, filter, docType, orderState, orderStates, from, to, branch, sort, pendingDelete, superseded, showSuperseded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Long lists mount only the rows in view (see useVirtualRows); 100 rows or fewer render as before.
   const rowKeys = useMemo(() => rows.map((r) => r.id), [rows]);
@@ -263,7 +275,12 @@ export function Transactions() {
         // A copy is a fresh document: it fulfils no sales order and is not closed.
         sales_order_id: undefined,
         order_closed_on: undefined,
-        items: (inv.items ?? []).map(({ order_line_id: _drop, ...item }) => item),
+        // R2-B: a copy is not a revision, a stage invoice or a milestone tick of another document.
+        revision_of: undefined,
+        revision_no: undefined,
+        progress_of: undefined,
+        milestones: inv.milestones?.map((m) => ({ id: m.id, name: m.name, percent: m.percent, ...(m.expected_date ? { expected_date: m.expected_date } : {}) })),
+        items: (inv.items ?? []).map(({ order_line_id: _drop, progress_line_of: _p, ...item }) => (void _p, item)),
       };
       const saved = localDb.invoices.save(clone);
       reload();
@@ -383,6 +400,11 @@ export function Transactions() {
             <button type="button" className={controls.btnOutline} onClick={() => void exportXlsx()} disabled={rows.length === 0}>
               <Download size={16} /> {salesT('exportXlsx')}
             </button>
+            {hasStages && (
+              <button type="button" className={controls.btnOutline} onClick={() => setProgressOpen(true)} data-progress-report-open>
+                <Layers size={16} /> {s2T('p.report')}
+              </button>
+            )}
             {can('doc.create') && (
               <Link to="/invoice" className={controls.btnPrimary}>
                 <FilePlus2 size={16} /> {salesT('tx.newInvoice')}
@@ -449,6 +471,11 @@ export function Transactions() {
             <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label={salesT('tx.toDate')} />
           </label>
           <BranchFilter value={branch} onChange={setBranch} testId="tx-branch" />
+          {superseded.size > 0 && (
+            <label className={styles.range}>
+              <input type="checkbox" checked={showSuperseded} onChange={(e) => setShowSuperseded(e.target.checked)} data-show-superseded /> <span>{s2T('q.showSuperseded')}</span>
+            </label>
+          )}
           {(docType || from || to || branch) && (
             <button type="button" className={controls.btnGhost} onClick={() => { setDocType(''); setFrom(''); setTo(''); setBranch(''); }}>
               {salesT('tx.clearFilters')}
@@ -664,6 +691,11 @@ export function Transactions() {
       {batchPdf && (
         <Suspense fallback={null}>
           <BatchPdfModal invoices={batchPdf} onClose={() => setBatchPdf(null)} />
+        </Suspense>
+      )}
+      {progressOpen && (
+        <Suspense fallback={null}>
+          <ProgressReportModal onClose={() => setProgressOpen(false)} />
         </Suspense>
       )}
       {bulkCollect && (

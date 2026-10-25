@@ -1,5 +1,6 @@
-import { Fragment, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Fragment, lazy, Suspense, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { s2T } from '../../i18n/areas/sales-r2';
 import { groupOutstanding, salesOrderOutstanding, type OutstandingGroupBy } from '../../lib/sales-orders';
 import type { InvoiceRecord } from '../../types/invoice';
 import { getTable } from '../../lib/storage';
@@ -14,9 +15,36 @@ const BUCKET: Record<string, () => string> = {
   overdue: () => imT('bucketOverdue'), week: () => imT('bucketWeek'), later: () => imT('bucketLater'), none: () => imT('bucketNone'),
 };
 
-/** Sales Order Outstanding (WP-8, P1-12 sales side): pending by party / item / due date, overdue flagged. */
+/**
+ * Order outstanding tab: the Sales Order Outstanding report, or (R2-B5) the Backorders view — order lines
+ * waiting on goods with their back-to-back purchase orders. `?view=backorders` opens the latter.
+ */
 export function OrdersOutstandingTab({ version, today }: { version: number; today: string }) {
   useT(); // re-render on a language switch (5.4)
+  const [params] = useSearchParams();
+  const [view, setView] = useState<'outstanding' | 'backorders'>(params.get('view') === 'backorders' ? 'backorders' : 'outstanding');
+  return (
+    <div>
+      <div className={controls.segment} role="tablist" aria-label={s2T('bo.view')}>
+        {([['outstanding', s2T('bo.outstanding')], ['backorders', s2T('bo.backorders')]] as const).map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={view === k} className={view === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setView(k)}>{label}</button>
+        ))}
+      </div>
+      {view === 'backorders' ? (
+        <Suspense fallback={null}>
+          <BackordersView version={version} />
+        </Suspense>
+      ) : (
+        <Outstanding version={version} today={today} />
+      )}
+    </div>
+  );
+}
+
+const BackordersView = lazy(() => import('../documents/BackordersView').then((m) => ({ default: m.BackordersView })));
+
+/** Sales Order Outstanding (WP-8, P1-12 sales side): pending by party / item / due date, overdue flagged. */
+function Outstanding({ version, today }: { version: number; today: string }) {
   const [asOf, setAsOf] = useState(today);
   const [by, setBy] = useState<OutstandingGroupBy>('party');
   /* eslint-disable react-hooks/exhaustive-deps */
