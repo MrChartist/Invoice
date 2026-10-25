@@ -259,6 +259,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     // WP-9 (additive): approval state, branch, loyalty redemption.
     ...(r.approval && typeof r.approval === 'object' ? { approval: r.approval as InvoiceRecord['approval'] } : {}),
     ...(typeof r.branch_id === 'string' && r.branch_id ? { branch_id: r.branch_id } : {}),
+    ...(typeof r.branch_transfer_id === 'string' && r.branch_transfer_id ? { branch_transfer_id: r.branch_transfer_id } : {}),
     ...(r.loyalty_redeem && typeof r.loyalty_redeem === 'object' && Number((r.loyalty_redeem as { points?: unknown }).points) > 0
       ? { loyalty_redeem: { points: Number((r.loyalty_redeem as { points: number }).points), value: Number((r.loyalty_redeem as { value?: number }).value) || 0 } }
       : {}),

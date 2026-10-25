@@ -16,6 +16,7 @@ import { A, groupOf, type Account, type GroupId } from './accounts';
 import type { Ledger, LedgerVoucher } from './postings';
 import { stockChange, type StockValuer } from './closing-stock';
 import { isDirectGroup } from './report-groups';
+import { scopeLedger, type ReportScope } from './branch-books';
 
 const isPnl = (a: Account) => {
   const n = groupOf(a.group).nature;
@@ -115,7 +116,8 @@ export interface TrialBalance {
  * Opening at the period start, movements inside it, closing = opening + debit − credit.
  * A period that crosses 1 April keeps accumulating income/expense (it is one reporting window).
  */
-export function trialBalance(ledger: Ledger, period: Period): TrialBalance {
+export function trialBalance(ledger: Ledger, period: Period, scope?: ReportScope): TrialBalance {
+  ledger = scopeLedger(ledger, scope);
   const open = openingBalances(ledger, period.start);
   const mv = sums(ledger, (v) => v.date >= period.start && v.date <= period.end);
   const rows: TrialBalanceRow[] = [];
@@ -158,7 +160,8 @@ export interface AccountStatement {
   closing: number;
 }
 
-export function accountStatement(ledger: Ledger, accountId: string, period: Period, party?: string): AccountStatement | null {
+export function accountStatement(ledger: Ledger, accountId: string, period: Period, party?: string, scope?: ReportScope): AccountStatement | null {
+  ledger = scopeLedger(ledger, scope);
   const account = ledger.byId.get(accountId);
   if (!account) return null;
   const opening = openingBalances(ledger, period.start, party).get(accountId) ?? 0;
@@ -248,7 +251,8 @@ export interface LedgerProfitLoss {
   stockLabel: string;
 }
 
-export function ledgerProfitAndLoss(ledger: Ledger, period: Period, stock?: StockValuer): LedgerProfitLoss {
+export function ledgerProfitAndLoss(ledger: Ledger, period: Period, stock?: StockValuer, scope?: ReportScope): LedgerProfitLoss {
+  ledger = scopeLedger(ledger, scope);
   const mv = sums(ledger, (v) => v.date >= period.start && v.date <= period.end);
   const sections = new Map<GroupId, PnlSection>();
   for (const a of ledger.accounts) {
@@ -413,7 +417,8 @@ const ITEM_GROUP: Record<ItemKey, GroupId> = {
 
 const LIAB_KEYS = new Set<ItemKey>(['capital', 'reserves', 'ltBorrowings', 'stBorrowings', 'tradePayables', 'otherCl', 'provisions']);
 
-export function ledgerBalanceSheet(ledger: Ledger, asOf: string, stock?: StockValuer): LedgerBalanceSheet {
+export function ledgerBalanceSheet(ledger: Ledger, asOf: string, stock?: StockValuer, scope?: ReportScope): LedgerBalanceSheet {
+  ledger = scopeLedger(ledger, scope);
   const bal = closingBalances(ledger, asOf);
   const items = new Map<ItemKey, BsItem>();
   const add = (key: ItemKey, label: string, debitBalance: number, accountId?: string, party?: string) => {
@@ -545,7 +550,8 @@ const FINANCING_LABELS: Partial<Record<GroupId, string>> = {
   LOANS_ST: 'Short-term borrowings raised / (repaid)',
 };
 
-export function cashFlowStatement(ledger: Ledger, period: Period, stock?: StockValuer): CashFlowStatement {
+export function cashFlowStatement(ledger: Ledger, period: Period, stock?: StockValuer, scope?: ReportScope): CashFlowStatement {
+  ledger = scopeLedger(ledger, scope);
   const mv = sums(ledger, (v) => v.date >= period.start && v.date <= period.end);
   // −movement of an account = the cash it released (a debit to a non-cash account used cash).
   const released = (a: Account) => -net(mv.get(a.id));
@@ -666,3 +672,4 @@ export * from './registers';
 export * from './exceptions';
 export * from './funds-flow';
 export * from './drill';
+export * from './branch-books';

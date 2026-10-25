@@ -144,8 +144,13 @@ test('Gateway Display balance sheet / P&L equal the Books statements with stock 
   assert.equal(cell('t-assets'), books.totalAssets);
   assert.equal(cell('t-liab'), cell('t-assets'), 'the Gateway sheet ties');
   assert.equal(cell('pl'), books.profitForYear);
-  assert.equal(cell('stock-close'), 1000000);
   assert.equal(cell('stock-open'), 200000);
+  // The valued stock sits inside the Inventories head; drilling the head shows the stock line (as Books).
+  assert.equal(cell('g-INVENTORIES'), books.closingStock);
+  const head = buildFrame(ledger, 'bs', [{ t: 'g', v: 'INVENTORIES' }], PERIOD, '2026-10-01', { stock })!;
+  const stockRow = head.rows.find((r) => r.open === '/inventory')!;
+  assert.equal(stockRow.cells[0], 1000000);
+  assert.equal(head.total![0], books.closingStock);
   const iTotal = gw.rows.findIndex((r) => r.id === 't-liab');
   const sum = (rows: typeof gw.rows) => rows.filter((r) => !r.heading).reduce((s, r) => s + Number(r.cells[0] ?? 0), 0);
   assert.equal(sum(gw.rows.slice(0, iTotal)), books.totalEquityAndLiabilities, 'liability rows add up');

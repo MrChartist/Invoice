@@ -59,6 +59,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     approval: { state: 'pending', doc_id: 'full', requested_status: 'Sent', requested_by: 'Asha', requested_at: '2026-01-01T00:00:00.000Z' },
     branch_id: 'br1',
     loyalty_redeem: { points: 10, value: 5 },
+    branch_transfer_id: 'str1',
     amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };

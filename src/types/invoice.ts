@@ -546,6 +546,8 @@ export interface InvoiceRecord {
   approval?: ApprovalInfo;
   /** Additive (WP-9): `branches` row id — the branch / location the document belongs to. */
   branch_id?: string;
+  /** Additive (WP-9): `stock_transfers` id this Sec 25(4) inter-branch tax invoice was raised for (posts to "Branch transfer"). */
+  branch_transfer_id?: string;
   /** Additive (WP-9): loyalty points redeemed on this bill; `value` (₹) is part of its invoice discount. */
   loyalty_redeem?: { points: number; value: number };
 }

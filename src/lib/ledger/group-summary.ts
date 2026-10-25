@@ -13,6 +13,7 @@ import { monthLabel, monthsIn, type Period } from '../books';
 import type { Account } from './accounts';
 import type { Ledger, LedgerVoucher, LedgerVoucherKind } from './postings';
 import { openingBalances, trialBalance } from './reports';
+import { scopeLedger, type ReportScope } from './branch-books';
 import { accountGroupId, childGroups, isWithin, ledgersDirectlyIn, reportGroup, reportLedgersInGroup, syncReportGroups, type ReportGroupNode } from './report-groups';
 
 export interface Figures {
@@ -46,6 +47,8 @@ export interface GroupSummaryOptions {
   showZero?: boolean;
   /** Split control accounts (debtors / creditors) into party sub-ledgers. Default true. */
   parties?: boolean;
+  /** WP-9: narrow to one branch (`branch-books.ts` `ReportScope`). */
+  branchId?: string;
 }
 
 const ZERO: Figures = { opening: 0, debit: 0, credit: 0, closing: 0 };
@@ -131,6 +134,7 @@ function rowsUnder(ledger: Ledger, groupId: string | null, figs: Map<string, Fig
  * detailed (Alt+F1) view.
  */
 export function groupSummary(ledger: Ledger, period: Period, groupId: string | null, opts: GroupSummaryOptions = {}): GroupSummary {
+  ledger = scopeLedger(ledger, opts);
   syncReportGroups();
   const figs = accountFigures(ledger, period);
   const rows = rowsUnder(ledger, groupId, figs, period, opts);
@@ -275,7 +279,8 @@ export interface LedgerDayBook {
  * fixed assets, depreciation, openings, and whatever later postings add — optionally filtered by
  * voucher type. Totals equal the trial balance's debit / credit movement for the same period.
  */
-export function ledgerDayBook(ledger: Ledger, period: Period, kinds?: readonly LedgerVoucherKind[]): LedgerDayBook {
+export function ledgerDayBook(ledger: Ledger, period: Period, kinds?: readonly LedgerVoucherKind[], scope?: ReportScope): LedgerDayBook {
+  ledger = scopeLedger(ledger, scope);
   const keep = kinds?.length ? new Set(kinds) : null;
   const present = new Set<LedgerVoucherKind>();
   const entries: DayBookEntry[] = [];

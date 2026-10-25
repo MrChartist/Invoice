@@ -20,6 +20,8 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { wireT } from '../i18n/areas/wiring';
+import { BranchFilter } from '../components/branches/BranchFilter';
+import { branchPredicates } from '../lib/branch';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -127,6 +129,8 @@ export function Transactions() {
   const [orderState, setOrderState] = useState<OrderState | ''>('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  // WP-9: branch filter (own tag, else the branch inferred from the sender profile / GSTIN).
+  const [branch, setBranch] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkPay, setBulkPay] = useState<{ method: string; date: string } | null>(null);
@@ -163,10 +167,12 @@ export function Transactions() {
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const inBranch = branchPredicates(branch).invoice;
     const list = invoices
       .filter((inv) => !pendingDelete.has(inv.id))
       .filter((inv) => matchesFilter(inv, filter, now))
       .filter((inv) => matchesListFilter(inv, { docType, from, to }))
+      .filter((inv) => !branch || inBranch(inv))
       .filter((inv) => docType !== 'SALES_ORDER' || !orderState || orderStates.get(inv.id) === orderState)
       .filter(
         (inv) =>
@@ -176,7 +182,7 @@ export function Transactions() {
           ),
       );
     return sortInvoices(list, sort.key, sort.dir);
-  }, [invoices, query, filter, docType, orderState, orderStates, from, to, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [invoices, query, filter, docType, orderState, orderStates, from, to, branch, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Long lists mount only the rows in view (see useVirtualRows); 100 rows or fewer render as before.
   const rowKeys = useMemo(() => rows.map((r) => r.id), [rows]);
@@ -229,6 +235,7 @@ export function Transactions() {
         issue_date: issue,
         due_date: addDaysInput(localDb.settings.get().defaultDueDays, issue),
         amount_paid: 0,
+        branch_transfer_id: undefined, // a copy is an ordinary sale, never a Sec 25(4) transfer invoice
         // A duplicate is a new document: on reverse charge its tax stays out of the total (src/lib/rcm.ts).
         ...(inv.reverse_charge ? { rcm_tax_excluded: true, total: receivableTotal(inv) } : {}),
         balance_due: receivableTotal(inv),
@@ -430,8 +437,9 @@ export function Transactions() {
             <span>{salesT('tx.to')}</span>
             <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label={salesT('tx.toDate')} />
           </label>
-          {(docType || from || to) && (
-            <button type="button" className={controls.btnGhost} onClick={() => { setDocType(''); setFrom(''); setTo(''); }}>
+          <BranchFilter value={branch} onChange={setBranch} testId="tx-branch" />
+          {(docType || from || to || branch) && (
+            <button type="button" className={controls.btnGhost} onClick={() => { setDocType(''); setFrom(''); setTo(''); setBranch(''); }}>
               {salesT('tx.clearFilters')}
             </button>
           )}

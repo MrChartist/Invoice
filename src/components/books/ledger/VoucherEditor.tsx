@@ -29,6 +29,7 @@ import { useCreateOnTheFly } from '../../masters/useCreateOnTheFly';
 import { isAltC } from '../../masters/useMasterKeys';
 import { EditLogButton } from '../../audit/EditLogButton';
 import { wireT } from '../../../i18n/areas/wiring';
+import { BranchSelect } from '../../branches/BranchSelect';
 import { allocationsOf, openRefsFor, syncVoucherReceipts, validateAllocations, voucherReceipts, type ReceiptAllocation } from '../../../lib/bill-allocation';
 
 // P0-11 (WP-1): bill-wise details on a receipt against a Sundry Debtor, loaded when needed.
@@ -69,6 +70,8 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
   const [date, setDate] = useState(voucher?.date ?? defaultDate);
   const [number, setNumber] = useState(voucher?.number ?? '');
   const [narration, setNarration] = useState(voucher?.narration ?? '');
+  // WP-9: branch / location of the voucher (shown once a branch exists; drives branch-wise books).
+  const [branchId, setBranchId] = useState<string | undefined>(voucher?.branch_id);
   const [rows, setRows] = useState<Row[]>(() =>
     voucher
       ? voucher.lines.map((l) => ({ key: ++seq, account_id: l.account_id, party: l.party ?? '', cc: l.cost_centre_id, dr: toText(l.dr), cr: toText(l.cr) }))
@@ -117,7 +120,7 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
   const inBooksNow = !variant.variant && !variant.post_dated;
 
   const save = () => {
-    const input = { id: voucher?.id, type, date, number: number.trim() || undefined, narration, lines, ...variant, reverse_on: type === 'JOURNAL' ? variant.reverse_on : undefined };
+    const input = { id: voucher?.id, type, date, number: number.trim() || undefined, narration, lines, ...variant, reverse_on: type === 'JOURNAL' ? variant.reverse_on : undefined, ...(branchId ? { branch_id: branchId } : {}) };
     const errors = validateVoucher(input, accounts);
     if (errors.length) return setError(errors[0]);
     const useAlloc = debtorLine && inBooksNow ? alloc.filter((a) => a.amount > 0) : [];
@@ -184,6 +187,7 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
             <label className={controls.label} htmlFor={`${uid}-no`}>{ledgerT('number')}</label>
             <input id={`${uid}-no`} className={`${controls.input} ${controls.inputMono}`} value={number} placeholder={preview} onChange={(e) => setNumber(e.target.value)} />
           </div>
+          <BranchSelect id={`${uid}-branch`} value={branchId} onChange={setBranchId} />
         </div>
         <p className={controls.hint}>
           {type === 'JOURNAL' && ledgerT('hintJournal')}

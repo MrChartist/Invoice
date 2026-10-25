@@ -522,3 +522,17 @@ test('WP-8 readers (item_id / unit_factor on bill lines, stock query, reorder wi
   assert.deepEqual(gstNormalize(landed, '27'), gstNormalize(bill, '27'));
   assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [landed] }).get('s')?.[0]?.rate, 110);
 });
+
+test('branch-wise books and Sec 25(4) transfer bills (WP-9) read the real purchase shape', async () => {
+  const { voucherBranches } = await import('../src/lib/ledger/branch-books.ts');
+  const branches = [{ id: 'mh', name: 'Mumbai', state_code: '27' }, { id: 'ka', name: 'Bengaluru', state_code: '29' }];
+  const src = { invoices: [], transactions: [], manual: [], purchases: [bill, { ...bill, id: 'p2', branch_id: 'ka' }], purchasePayments: [{ id: 'pp', purchase_id: 'p2', amount: 10, date: '2026-04-20' }], purchaseReturns: [] };
+  const map = voucherBranches(src as never, [{ id: 'pur:p1' }, { id: 'pur:p2' }, { id: 'pay:pp' }] as never, branches);
+  assert.equal(map.get('pur:p1'), 'mh', 'place of supply');
+  assert.equal(map.get('pur:p2'), 'ka', 'branch_id');
+  assert.equal(map.get('pay:pp'), 'ka', 'payment follows its bill');
+  // A transfer bill posts to "Branch transfer (inward)" instead of Purchases.
+  const { buildLedger } = await import('../src/lib/ledger/postings.ts');
+  const l = buildLedger({ invoices: [], transactions: [], purchases: [{ ...bill, branch_transfer_id: 'str1' }], vendors: [], purchasePayments: [], openings: [], userAccounts: [], manual: [], assets: [], today: '2026-05-01' } as never);
+  assert.ok(l.vouchers[0].lines.some((x) => x.account === 'branch_transfer_in' && x.dr === 100000));
+});

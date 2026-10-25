@@ -1,5 +1,5 @@
 import { isStockDependencyError } from '../../lib/stock-timeline';
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -19,6 +19,13 @@ import { invT } from '../../i18n/areas/inventory';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
+import { loadBranches } from '../../lib/branch';
+import { transferInvoiceOf, transferTaxPair } from '../../lib/branch-transfer';
+import { localDb } from '../../lib/localDb';
+import { branchT } from '../../i18n/areas/branch-books';
+
+// WP-9: Sec 25(4) tax invoice + bill for a transfer between two GSTINs (lazy dialog).
+const BranchTransferDialog = lazy(() => import('../branches/BranchTransferDialog'));
 
 /** Stock transfer vouchers between godowns (6.10): list, create, delete. */
 export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onError }: {
@@ -35,6 +42,21 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
   const [deleting, setDeleting] = useState<StockTransfer | null>(null);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const sorted = useMemo(() => [...transfers].sort((a, b) => b.date.localeCompare(a.date) || b.transfer_number.localeCompare(a.transfer_number)), [transfers]);
+  // Transfers between branches with different GSTINs, and the invoice already raised for each.
+  const [taxFor, setTaxFor] = useState<StockTransfer | null>(null);
+  const branches = useMemo(() => {
+    try {
+      return loadBranches();
+    } catch {
+      return [];
+    }
+  }, []);
+  const raised = useMemo(() => {
+    void transfers;
+    if (!branches.some((b) => b.godown_id && b.gstin)) return null;
+    return localDb.invoices.getAll();
+  }, [branches, transfers]);
+  const pairOf = (t: StockTransfer) => (raised ? transferTaxPair(t, branches, godowns) : null);
 
   return (
     <>
@@ -58,6 +80,16 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
                 {t.lines.map((l) => `${byId.get(l.item_id)?.name ?? invT('deletedItem')} × ${l.qty}${l.batch_no ? ` (${l.batch_no})` : ''}`).join(', ')}
               </td>
               <td>
+                {pairOf(t) && (() => {
+                  const inv = transferInvoiceOf(t.id, raised ?? []);
+                  return inv ? (
+                    <span className={styles.muted}>{branchT('taxPairRaised', { number: inv.invoice_number })} </span>
+                  ) : (
+                    <button type="button" className={cn(controls.btnOutline, controls.btnSm)} title={branchT('taxPairNeeded')} onClick={() => setTaxFor(t)} data-testid={`bt-open-${t.id}`}>
+                      {branchT('taxPair')}
+                    </button>
+                  );
+                })()}
                 <button type="button" className={controls.btnDanger} aria-label={invT('deleteNamed', { name: t.transfer_number })} onClick={() => setDeleting(t)}>
                   <Trash2 size={16} />
                 </button>
@@ -80,6 +112,24 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
           }}
         />
       )}
+      {taxFor && (() => {
+        const pair = pairOf(taxFor);
+        return pair ? (
+          <Suspense fallback={null}>
+            <BranchTransferDialog
+              transfer={taxFor}
+              from={pair.from}
+              to={pair.to}
+              items={items}
+              onClose={() => setTaxFor(null)}
+              onSaved={(msg) => {
+                setTaxFor(null);
+                onChanged(msg);
+              }}
+            />
+          </Suspense>
+        ) : null;
+      })()}
       <ConfirmDialog
         open={!!deleting}
         destructive

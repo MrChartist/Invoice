@@ -8,6 +8,7 @@
 import type { Period } from '../books';
 import type { Ledger, LedgerVoucher, LedgerVoucherKind } from './postings';
 import { monthPeriods } from './group-summary';
+import { scopeLedger, type ReportScope } from './branch-books';
 
 export type RegisterId = 'sales' | 'purchase' | 'journal' | 'payment' | 'receipt' | 'contra' | 'debit_note' | 'credit_note';
 
@@ -54,7 +55,8 @@ export interface VoucherRegister {
 }
 
 /** Month-wise register for one voucher class. Every month of the period is listed (Tally style). */
-export function voucherRegister(ledger: Ledger, id: RegisterId, period: Period): VoucherRegister {
+export function voucherRegister(ledger: Ledger, id: RegisterId, period: Period, scope?: ReportScope): VoucherRegister {
+  ledger = scopeLedger(ledger, scope);
   const kinds = new Set(REGISTER_KINDS[id]);
   const months: RegisterMonth[] = monthPeriods(period).map((m) => ({ ...m, count: 0, amount: 0, vouchers: [] }));
   const idx = new Map(months.map((m, i) => [m.key, i]));
@@ -104,7 +106,8 @@ export interface VoucherStatistics {
 }
 
 /** Tally "Statistics": voucher counts by type (automatic vs manual) and ledgers in use. */
-export function voucherStatistics(ledger: Ledger, period: Period): VoucherStatistics {
+export function voucherStatistics(ledger: Ledger, period: Period, scope?: ReportScope): VoucherStatistics {
+  ledger = scopeLedger(ledger, scope);
   const m = new Map<LedgerVoucherKind, { auto: number; manual: number }>();
   const used = new Set<string>();
   for (const v of ledger.vouchers) {

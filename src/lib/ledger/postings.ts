@@ -60,6 +60,8 @@ import { openingVouchers } from './postings-openings';
 import { applyBankLedgers } from './postings-bank';
 import { payrollVouchers } from '../payroll/postings';
 import type { PayrollPayment, PayrollRun } from '../../types/payroll';
+import type { Branch } from '../branch';
+import { voucherBranches } from './branch-books';
 
 export interface PostingLine {
   account: string;
@@ -119,6 +121,8 @@ export interface LedgerInput extends BooksData {
   /** Payroll (Phase 7): finalized runs post a Payroll voucher; payments clear the payables. */
   payrollRuns?: PayrollRun[];
   payrollPayments?: PayrollPayment[];
+  /** Branch master (WP-9): when given, the ledger records each voucher's branch (`branch-books.ts`). */
+  branches?: Branch[];
 }
 
 export interface Ledger {
@@ -126,6 +130,10 @@ export interface Ledger {
   byId: Map<string, Account>;
   vouchers: LedgerVoucher[];
   warnings: string[];
+  /** Voucher id → branch id (only vouchers that belong to a branch); set when built with `branches`. */
+  voucherBranch?: ReadonlyMap<string, string>;
+  /** Set on a ledger narrowed by `scopeLedger` (the branch filter it shows). */
+  branchId?: string;
 }
 
 /* ── Voucher builder ───────────────────────────────────────────── */
@@ -226,7 +234,9 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
   const side = sale ? 1 : -1;
   l.dr(A.debtors, side * total, party);
   const items = Math.abs(toPaise(a.chargesTaxed ? a.taxable - a.charges : a.taxable));
-  for (const [cc, p] of itemsByCostCentre(inv, items)) l.cr(sale ? A.sales : A.salesReturns, side * p, undefined, cc);
+  // Sec 25(4) branch transfer (WP-9): its own account, so it nets against the receiving branch's bill.
+  const salesAcc = !sale ? A.salesReturns : str(inv.branch_transfer_id) ? A.branchTransferOut : A.sales;
+  for (const [cc, p] of itemsByCostCentre(inv, items)) l.cr(salesAcc, side * p, undefined, cc);
   l.cr(A.freightOut, side * Math.abs(toPaise(a.charges)));
   l.cr(A.outCgst, side * Math.abs(toPaise(a.cgst)));
   l.cr(A.outSgst, side * Math.abs(toPaise(a.sgst)));
@@ -396,7 +406,7 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
   const sgst = toPaise(n.sgst);
   const igst = gst - cgst - sgst;
   const party = n.party;
-  const expAcc = expenseAccountFor(n.isExpense, n.category, chart);
+  const expAcc = str((raw as { branch_transfer_id?: unknown }).branch_transfer_id) && !n.isExpense ? A.branchTransferIn : expenseAccountFor(n.isExpense, n.category, chart);
   const l = new Lines(str(raw.cost_centre_id) || undefined);
   l.dr(expAcc, n.itcEligible ? taxable : taxable + gst);
   if (n.itcEligible) {
@@ -690,5 +700,6 @@ export function buildLedger(input: LedgerInput): Ledger {
   }
 
   for (const v of applyBankLedgers(out, input, byId)) push(v); // WP-5: one ledger per bank account (postings-bank.ts)
-  return { accounts, byId, vouchers: sortVouchers(out), warnings };
+  const vouchers = sortVouchers(out);
+  return { accounts, byId, vouchers, warnings, ...(input.branches?.length ? { voucherBranch: voucherBranches(input, vouchers, input.branches) } : {}) };
 }

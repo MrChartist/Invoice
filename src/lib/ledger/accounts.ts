@@ -359,6 +359,9 @@ export const A = {
   staffAdvances: 'staff_advances',
   otherCa: 'other_ca',
   sales: 'sales',
+  /** Sec 25(4) inter-branch supplies (WP-9): kept apart from Sales so they net out on consolidation. */
+  branchTransferOut: 'branch_transfer_out',
+  branchTransferIn: 'branch_transfer_in',
   salesReturns: 'sales_returns',
   freightOut: 'freight_out',
   roundOff: 'round_off',
@@ -454,6 +457,7 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   def(A.sales, '4000', 'Sales', 'SALES'),
   def(A.salesReturns, '4010', 'Sales returns (credit notes)', 'SALES'),
   def(A.freightOut, '4020', 'Freight & other charges recovered', 'SALES'),
+  def(A.branchTransferOut, '4030', 'Branch transfer (outward, distinct GSTIN)', 'SALES'),
   def(A.roundOff, '4900', 'Round off', 'OTHER_INCOME'),
   def(A.otherIncome, '4910', 'Other income', 'OTHER_INCOME'),
   def(A.interestIncome, '4920', 'Interest received', 'OTHER_INCOME'),
@@ -461,6 +465,7 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   def(A.fxGain, '4930', 'Foreign exchange gain / loss', 'OTHER_INCOME'),
   def(A.purchases, '5000', 'Purchases', 'PURCHASES'),
   def(A.purchaseReturns, '5010', 'Purchase returns (debit notes)', 'PURCHASES'), // WP-3 (P0-5)
+  def(A.branchTransferIn, '5020', 'Branch transfer (inward, distinct GSTIN)', 'PURCHASES'),
   def(A.directExp, '5100', 'Direct expenses', 'DIRECT_EXPENSES'),
   def(A.freightIn, '5110', 'Freight inward', 'DIRECT_EXPENSES'),
   def(A.salaries, '6000', 'Salaries & wages', 'EMPLOYEE'),

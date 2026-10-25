@@ -126,7 +126,7 @@ export const RECORD_KEYS = [
   'goods_returned',
   'eco_gstin', 'eco_section', 'challan_purpose',
   'transport',
-  'approval', 'branch_id', 'loyalty_redeem',
+  'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
