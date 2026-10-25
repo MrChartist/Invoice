@@ -31,6 +31,13 @@ export interface PurchasePayment {
   created_at?: string;
   /** Additive (multi-account BRS): the bank account it was paid from; missing = the main account. */
   bank_account_id?: string;
+  /**
+   * Additive (Tally parity): TDS deducted on this payment (bills with `tds_on: 'PAYMENT'`). `amount`
+   * stays the cash paid; the bill's `amount_paid` rises by `amount + tds_amount`.
+   */
+  tds_amount?: number;
+  /** Additive: rows of one multi-bill payment share this id (`vendor_payments.group_id` for any remainder). */
+  group_id?: string;
 }
 
 export type PurchaseStatus = 'Unpaid' | 'Partially paid' | 'Paid' | 'Overdue';
@@ -282,11 +289,12 @@ export function purchasesToCsvRows(rows: PurchaseRecord[], today: string): (stri
   ];
 }
 
-/** Validate a payment against a bill; returns an error message or ''. */
-export function validatePayment(purchase: PurchaseRecord, amount: number, date: string): string {
+/** Validate a payment (plus any TDS deducted on it) against a bill; returns an error message or ''. */
+export function validatePayment(purchase: PurchaseRecord, amount: number, date: string, tds = 0): string {
   if (!(amount > 0)) return 'Enter an amount greater than zero.';
   if (!date) return 'Choose the payment date.';
-  if (round2(amount) > balanceOf(purchase) + 0.004) {
+  if (!(tds >= 0)) return 'TDS cannot be negative.';
+  if (round2(amount + tds) > balanceOf(purchase) + 0.004) {
     return `Amount exceeds the balance of ${balanceOf(purchase).toFixed(2)}.`;
   }
   return '';
@@ -371,21 +379,27 @@ export const paymentsDb = {
     paymentsDb.all().filter((p) => p.purchase_id === id).sort((a, b) => a.date.localeCompare(b.date)),
 
   /** Append a payment and roll it into the bill's `amount_paid`. Throws on invalid input. */
-  record(purchaseId: string, p: { amount: number; date: string; method: string; reference?: string; bankAccountId?: string }): PurchasePayment {
+  record(
+    purchaseId: string,
+    p: { amount: number; date: string; method: string; reference?: string; bankAccountId?: string; tdsAmount?: number; groupId?: string },
+  ): PurchasePayment {
     requireAccess('books.edit');
     const bill = purchasesDb.get(purchaseId);
     if (!bill) throw new Error('Bill not found.');
     const amount = round2(num(p.amount));
-    const problem = validatePayment(bill, amount, p.date);
+    const tds = round2(Math.max(num(p.tdsAmount), 0));
+    const problem = validatePayment(bill, amount, p.date, tds);
     if (problem) throw new Error(problem);
     assertPaymentUnlocked(p.date, 'pay');
     const payment: PurchasePayment = {
       id: generateId(), purchase_id: purchaseId, amount, date: p.date,
       method: p.method, reference: p.reference?.trim() || undefined, created_at: now(),
       bank_account_id: p.bankAccountId && p.method.toLowerCase() !== 'cash' ? p.bankAccountId : undefined,
+      ...(tds > 0 ? { tds_amount: tds } : {}),
+      ...(p.groupId ? { group_id: p.groupId } : {}),
     };
     setTable(PAYMENTS_TABLE, [...paymentsDb.all(), payment]);
-    writeBill({ ...bill, amount_paid: round2(num(bill.amount_paid) + amount) });
+    writeBill({ ...bill, amount_paid: round2(num(bill.amount_paid) + amount + tds) });
     return payment;
   },
 
@@ -397,6 +411,6 @@ export const paymentsDb = {
     assertPaymentUnlocked(target.date, 'unpay');
     setTable(PAYMENTS_TABLE, all.filter((p) => p.id !== paymentId));
     const bill = purchasesDb.get(target.purchase_id);
-    if (bill) writeBill({ ...bill, amount_paid: Math.max(round2(num(bill.amount_paid) - target.amount), 0) });
+    if (bill) writeBill({ ...bill, amount_paid: Math.max(round2(num(bill.amount_paid) - target.amount - Math.max(num(target.tds_amount), 0)), 0) });
   },
 };

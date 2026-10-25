@@ -128,3 +128,19 @@ only when the supplier's bill is saved.
 - No network, no new dependencies; CSV export reuses `src/lib/download.ts`.
 - Tests: `tests/purchases.test.ts` (shims `localStorage`), `tests/msme.test.ts`, GSTR-3B cases in
   `tests/gst-reports.test.ts`, field contract in `tests/purchase-contract.test.ts`.
+
+## TDS deducted on bills and payments (Tally parity, Phase 7)
+
+Bill and expense forms have a **TDS deducted by you** block (`TdsBillPanel`): section, deduct on booking / on payment,
+PAN, Sec 197 certificate, non-filer flag; rate, base and amount are suggested (`resolveBillTds` → `suggestTds`: Act rate,
+206AA / 206AB / 197, single and FY-aggregate thresholds with catch-up, 194Q excess) and can be overridden. Saved as the
+additive `tds_*` fields on `PurchaseRecord`. With "on booking", `supplierPayable` drops by the TDS (so `balanceOf`,
+status, payments and every payables reader follow); with "on payment" the payment dialog asks for the TDS deducted now and
+`purchase_payments.tds_amount` settles the bill with the cash. `readPurchase` exposes `tdsSection`, `tdsAmount`,
+`tdsOnBill`; Books `NormPurchase.tds` and export `tds` / `tdsSection` carry it; Tally credits `TDS Payable <section>`.
+Contract: `tests/purchase-contract.test.ts` (TDS row). New readers of `purchases`: `src/lib/tds-payables.ts`,
+`src/lib/billwise.ts`. Details: `docs/features/tds-payables.md`.
+
+Bill-wise supplier payments (Agst Ref over several bills, Advance / On Account / New Ref in `vendor_payments`, later
+adjustment) live on Books → Bill-wise payables (`docs/features/ledger.md`). `adjustAgainstBill` raises the bill's
+`amount_paid` without a payment row; `msme.ts` treats that part as paid on the bill date (estimate).

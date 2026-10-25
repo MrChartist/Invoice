@@ -21,6 +21,7 @@ import { useCostCentres } from '../../cost-centres/useCostCentres';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { VoucherVariantFields, type VariantValue } from '../tally/VoucherVariantFields';
 
 interface Row {
   key: number;
@@ -59,6 +60,8 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
       : [blank(), blank()],
   );
   const [error, setError] = useState('');
+  // Voucher variants (Tally parity): optional / memorandum, post-dated, reversing, class.
+  const [variant, setVariant] = useState<VariantValue>({ variant: voucher?.variant, post_dated: voucher?.post_dated, reverse_on: voucher?.reverse_on, voucher_class: voucher?.voucher_class });
   const byId = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const centres = useCostCentres();
   const isPnl = (id: string) => {
@@ -83,7 +86,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
   const patch = (key: number, p: Partial<Row>) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...p } : r)));
 
   const save = () => {
-    const input = { id: voucher?.id, type, date, number: number.trim() || undefined, narration, lines };
+    const input = { id: voucher?.id, type, date, number: number.trim() || undefined, narration, lines, ...variant, reverse_on: type === 'JOURNAL' ? variant.reverse_on : undefined };
     const errors = validateVoucher(input, accounts);
     if (errors.length) return setError(errors[0]);
     try {
@@ -206,6 +209,7 @@ export function VoucherEditor({ accounts, voucher, defaultDate, onClose, onSaved
           <label className={controls.label} htmlFor={`${uid}-narr`}>Narration</label>
           <textarea id={`${uid}-narr`} className={controls.textarea} rows={2} value={narration} onChange={(e) => setNarration(e.target.value)} />
         </div>
+        <VoucherVariantFields type={type} value={variant} onChange={setVariant} />
         {error && <div className={controls.error} role="alert">{error}</div>}
       </div>
     </Modal>

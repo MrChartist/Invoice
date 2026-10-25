@@ -91,7 +91,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger |
 | `einvoice_meta` | einvoice | defined by that module |
 | `design_prefs` | templates-studio | defined by that module |
-| `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}` |
+| `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}`; additive `tds_amount` (TDS deducted on the payment) and `group_id` (multi-bill payment) (Phase 7) |
 | `purchase_orders` | purchases (POs) | `PurchaseOrder` (`src/types/purchases.ts`); received qty derived from bills with `po_id` (`src/lib/purchase-orders.ts`) |
 | `audit_log` | audit | `AuditEntry` (`src/types/audit.ts`) — written by `localDb` mutations, capped at 5,000 rows |
 | `bank_statements` | reconcile | imported statement lines + match state (`docs/features/reconcile-reports.md`) |
@@ -104,7 +104,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `mileage` | time (6.14) | `MileageEntry` (`src/types/time.ts`), same derived billing |
 | `compliance` | compliance (GST) | `FiledReturn` marks: GST return filed per form / period / GSTIN (`docs/features/compliance.md`) |
 | `accounts` | ledger | user-added `Account` rows (`src/lib/ledger/accounts.ts`); default accounts are constants, never stored |
-| `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`) |
+| `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`); additive variant fields `variant` (OPTIONAL / MEMO), `post_dated`, `reverse_on`, `voucher_class`, `regularised_at` (Phase 7) |
 | `cheques` | cheques (6.26) | `Cheque` (`src/types/cheques.ts`) — received / issued cheques, lifecycle, linked payment ids (`docs/features/cash-planning.md`) |
 | `advances` | advances (5.3) | `AdvanceRecord` (`src/types/advances.ts`) — advance receipt vouchers `ADV/FY…`, GST snapshot, refunds `RFV/FY…`; adjustments are `transactions` rows with `advance_id` (`docs/features/advances.md`) |
 | `cheque_print` | cheques (6.26) | cheque print layout + mm offsets (object, `src/lib/cheque-print.ts`) |
@@ -120,6 +120,10 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `price_levels` | pricing (6.9, `src/lib/pricing.ts`) | `PriceLevel {id, name, percent_off?, rates?}` (rates keyed by catalogue item id); clients point at one via optional `price_level` |
 | `schemes` | pricing (6.9) | `Scheme` buy-X-get-Y rows (item, buy / free qty, optional date window, `active`); free goods are ₹0 invoice lines (`scheme_id`, `free_of`) |
 | `pos_day_close` | POS (6.8, `src/lib/pos.ts`) | `PosDayClose` cash-drawer count per day (opening float, expected / counted cash, difference, tender totals); POS bills themselves are normal `invoices` with `pos: true` (`docs/features/pos-barcode-pricing.md`) |
+| `tds_challans` | TDS on payables (Phase 7, `src/lib/tds-payables.ts`) | `TdsChallan` ITNS 281 challan (TDS / TCS, BSR code, serial, date, tax / interest / fee / others, `deduction_keys` it deposits); posted to the ledger as a payment (`docs/features/tds-payables.md`) |
+| `tds_deductions` | TDS on payables (Phase 7) | `ManualTdsDeduction` register-only deductions booked outside bills (not posted to the ledger) |
+| `tds_returns` | TDS on payables (Phase 7) | `TdsReturnMark` filed marks `26Q:<fy>-Q<n>` / `27EQ:…` with filing date and token |
+| `vendor_payments` | bill-wise payables (Phase 7, `src/lib/billwise.ts`) | `VendorPayment` (`src/types/purchases.ts`): supplier Advance / On Account / New Ref money not yet against a bill, with `allocations` adjusting it against bills later |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the

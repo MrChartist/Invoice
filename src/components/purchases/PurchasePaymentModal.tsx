@@ -6,6 +6,9 @@ import { PAYMENT_METHODS, balanceOf, paymentsDb, purchasesDb, validatePayment } 
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
+import { num, round2 } from '../../lib/invoice-calc';
+import { useT } from '../../i18n';
+import { tdsT } from '../../i18n/areas/tds';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -30,8 +33,12 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   const bill: PurchaseRecord | undefined = purchasesDb.get(purchaseId);
   const history = paymentsDb.forPurchase(purchaseId);
   const balance = bill ? balanceOf(bill) : 0;
+  useT();
+  // TDS deducted on payment (bills with tds_on 'PAYMENT'): what is still to deduct on this bill.
+  const tdsLeft = bill && bill.tds_on === 'PAYMENT' ? Math.max(round2(num(bill.tds_amount) - history.reduce((s, p) => s + num(p.tds_amount), 0)), 0) : 0;
+  const [tds, setTds] = useState(Math.min(tdsLeft, balance));
 
-  const [amount, setAmount] = useState(balance);
+  const [amount, setAmount] = useState(round2(balance - Math.min(tdsLeft, balance)));
   const [date, setDate] = useState(todayInput());
   const [method, setMethod] = useState('UPI');
   const [bankAccountId, setBankAccountId] = useState('');
@@ -42,10 +49,11 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   void version;
 
   const submit = () => {
-    const problem = validatePayment(bill, amount, date);
+    const problem = validatePayment(bill, amount, date, tds);
     if (problem) return setError(problem);
     try {
-      paymentsDb.record(purchaseId, { amount, date, method, reference, bankAccountId: bankAccountId || undefined });
+      paymentsDb.record(purchaseId, { amount, date, method, reference, bankAccountId: bankAccountId || undefined, tdsAmount: tds });
+      setTds(0);
       setError('');
       setVersion((v) => v + 1);
       const left = balanceOf(purchasesDb.get(purchaseId)!);
@@ -117,6 +125,13 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
               <input id="pp-ref" className={controls.input} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR / cheque no." />
             </div>
           </div>
+ {tdsLeft > 0 && (
+            <div className={controls.field}>
+              <label className={controls.label} htmlFor="pp-tds">{tdsT('tdsNow')}</label>
+              <NumberInput id="pp-tds" className={controls.inputNumeric} value={tds} onChange={setTds} />
+              <span className={controls.hint}>{tdsT('tdsNowHint', { left: tdsLeft.toFixed(2) })}</span>
+            </div>
+          )}
           <BankAccountSelect id="pp-bank-account" label="Paid from" method={method} value={bankAccountId} onChange={setBankAccountId} />
           {error && <p className={styles.formError} role="alert">{error}</p>}
           <div className={styles.inlineActions}>

@@ -247,8 +247,11 @@ export interface NormalPurchase {
    */
   selfTax: number;
   selfTaxKind: '' | 'RCM' | 'CUSTOMS';
-  /** Additive: what the supplier is owed — total − selfTax (`supplierPayable`). */
+  /** Additive: what the supplier is owed — total − selfTax − TDS deducted on booking (`supplierPayable`). */
   payable: number;
+  /** Additive (Tally parity): TDS deducted on booking the bill, and its section code ('' = none). */
+  tds: number;
+  tdsSection: string;
 }
 
 type Rec = Record<string, unknown>;
@@ -288,6 +291,8 @@ export function normalizePurchase(raw: unknown, vendors: unknown[] = []): Normal
     selfTax: selfAssessedTaxOf(c),
     selfTaxKind: selfAssessedTaxOf(c) > 0 ? (c.importType === 'GOODS' ? 'CUSTOMS' : 'RCM') : '',
     payable: supplierPayableOf(c),
+    tds: c.tdsOnBill,
+    tdsSection: c.tdsSection,
   };
 }
 

@@ -27,6 +27,7 @@ const Inventory = lazy(() => import('./pages/Inventory').then((m) => ({ default:
 const Recurring = lazy(() => import('./pages/Recurring').then((m) => ({ default: m.Recurring })));
 const Time = lazy(() => import('./pages/Time').then((m) => ({ default: m.Time })));
 const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.Cheques })));
+const Tds = lazy(() => import('./pages/Tds').then((m) => ({ default: m.Tds })));
 const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
@@ -74,6 +75,7 @@ function App() {
                 <Route path="/books" element={<Books />} />
                 <Route path="/reconcile" element={<RequireAccess action="books.edit"><Reconcile /></RequireAccess>} />
                 <Route path="/cheques" element={<RequireAccess action="books.edit"><Cheques /></RequireAccess>} />
+                <Route path="/tds" element={<Tds />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/gst-reports" element={<GstReports />} />
                 <Route path="/exports" element={<Exports />} />

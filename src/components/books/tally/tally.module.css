@@ -1,0 +1,69 @@
+.grid {
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.subTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+
+.buckets {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+}
+
+.bucket {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  background: var(--card);
+}
+
+.bucketLabel {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted-foreground);
+}
+
+.bucketValue {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.partyHead td {
+  font-weight: 600;
+  background: var(--muted);
+}
+
+.alloc {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted-foreground);
+}
+
+.allocList {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.allocRow {
+  display: grid;
+  grid-template-columns: 1fr 9rem;
+  gap: var(--space-2, 0.5rem);
+  align-items: center;
+}
+
+.formula {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .allocRow {
+    grid-template-columns: 1fr;
+  }
+}

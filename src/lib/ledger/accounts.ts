@@ -119,6 +119,13 @@ export const A = {
   importIgst: 'import_igst',
   tcsPayable: 'tcs_payable',
   tdsPayable: 'tds_payable',
+  tds194c: 'tds_194c',
+  tds194j: 'tds_194j',
+  tds194i: 'tds_194i',
+  tds194h: 'tds_194h',
+  tds194q: 'tds_194q',
+  tds194a: 'tds_194a',
+  tdsInterest: 'tds_interest',
   inCgst: 'in_cgst',
   inSgst: 'in_sgst',
   inIgst: 'in_igst',
@@ -191,6 +198,13 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   def(A.importIgst, '2311', 'IGST payable on imports (customs)', 'DUTIES_TAXES'),
   def(A.tcsPayable, '2320', 'TCS payable', 'DUTIES_TAXES'),
   def(A.tdsPayable, '2330', 'TDS payable', 'DUTIES_TAXES'),
+  // TDS deducted from suppliers, one ledger per section (Tally parity); 2330 takes anything else.
+  def(A.tds194c, '2331', 'TDS payable — 194C contractors', 'DUTIES_TAXES'),
+  def(A.tds194j, '2332', 'TDS payable — 194J professional / technical', 'DUTIES_TAXES'),
+  def(A.tds194i, '2333', 'TDS payable — 194I rent', 'DUTIES_TAXES'),
+  def(A.tds194h, '2334', 'TDS payable — 194H commission', 'DUTIES_TAXES'),
+  def(A.tds194q, '2335', 'TDS payable — 194Q purchase of goods', 'DUTIES_TAXES'),
+  def(A.tds194a, '2336', 'TDS payable — 194A interest', 'DUTIES_TAXES'),
   def(A.inCgst, '2350', 'Input CGST (credit ledger)', 'DUTIES_TAXES'),
   def(A.inSgst, '2351', 'Input SGST / UTGST (credit ledger)', 'DUTIES_TAXES'),
   def(A.inIgst, '2352', 'Input IGST (credit ledger)', 'DUTIES_TAXES'),
@@ -241,6 +255,7 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   def(A.marketing, '6350', 'Marketing & advertising', 'INDIRECT_EXPENSES'),
   def(A.office, '6360', 'Office supplies', 'INDIRECT_EXPENSES'),
   def(A.itcReversed, '6370', 'GST input credit reversed', 'INDIRECT_EXPENSES'),
+  def(A.tdsInterest, '6380', 'Interest & fees on TDS / TCS (not deductible)', 'INDIRECT_EXPENSES'),
   def(A.otherExp, '6390', 'Other expenses', 'INDIRECT_EXPENSES'),
 ];
 
@@ -256,6 +271,18 @@ export const EXPENSE_CATEGORY_ACCOUNTS: Readonly<Record<string, string>> = {
   'office supplies': A.office,
   'bank charges': A.bankCharges,
 };
+
+/** TDS payable ledger for a section code (`194J-T` → 194J …); unknown / custom codes go to 2330. */
+export function tdsAccountFor(sectionCode: string | undefined): string {
+  const s = (sectionCode ?? '').toUpperCase();
+  if (s.startsWith('194C')) return A.tds194c;
+  if (s.startsWith('194J')) return A.tds194j;
+  if (s.startsWith('194I')) return A.tds194i;
+  if (s.startsWith('194H')) return A.tds194h;
+  if (s.startsWith('194Q')) return A.tds194q;
+  if (s.startsWith('194A')) return A.tds194a;
+  return A.tdsPayable;
+}
 
 /* ── User accounts (table `accounts`) ───────────────────────────── */
 

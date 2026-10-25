@@ -583,6 +583,13 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         push(entries, selfLedger, 'Cr', selfTax);
         std(selfLedger, 'Duties & Taxes');
       }
+      // TDS deducted on booking the bill: owed to the government, one Duties & Taxes ledger per section.
+      const tds = Math.abs(toPaise(p.tds));
+      if (tds > 0) {
+        const tdsLedger = `TDS Payable ${(p.tdsSection || '').replace(/-.*/, '')}`.trim();
+        push(entries, tdsLedger, 'Cr', tds);
+        std(tdsLedger, 'Duties & Taxes');
+      }
       // GST on a bill whose ITC is blocked is part of the cost, never an "Input" credit.
       push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.itcEligible ? p.taxable : round2(p.taxable + p.tax))));
       if (p.itcEligible) {

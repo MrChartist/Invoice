@@ -199,6 +199,19 @@ Share, static catalogue HTML.
 **Recommended order:** 6.1–6.4 (unlock 6.16, 6.17, 6.19) → 5.1 + 6.22 → 6.5 → 6.12 → 6.6–6.9 (retail) → 6.13–6.15
 (freelancers); 6.20/6.21/5.4 in parallel.
 
+## Phase 7: Tally parity — accounting depth (v5.x)
+
+| # | Item | Tally feature | Status |
+|---|------|---------------|--------|
+| 7.1 | ✅ **TDS on payables**: deduct on bill or on payment, sections 194C / 194J (prof / tech) / 194I (a / b) / 194H / 194Q / 194A, single + FY-aggregate thresholds, 206AA / 206AB / Sec 197, TDS payable ledgers per section (`src/lib/tds-payables.ts`, `tds-rules.ts`, `docs/features/tds-payables.md`) | TDS deduction on purchase / payment | done |
+| 7.2 | ✅ **TDS / TCS challans** (ITNS 281: BSR, serial, date) linked to deductions; Sec 201(1A) / 206C(7) interest estimate; deposit / return due dates on `/tds` | Stat payment, TDS challan reconciliation | done |
+| 7.3 | ✅ **Return working papers**: Form 26Q and 27EQ in RPU column order (CSV / XLSX / text, unverified), Form 16A data, filed marks; 27Q flagged only | Form 26Q / 27EQ e-return | done |
+| 7.4 | ✅ **Voucher variants**: optional (make regular), memorandum, post-dated (with PDC summary), reversing journals, voucher classes (`src/lib/ledger/voucher-variants.ts`) | Optional / Memo / Post-dated / Reversing journal | done |
+| 7.5 | ✅ **Bill-wise payables**: Agst Ref over several bills, Advance / On Account / New Ref, later adjustment, ageing, party bill-wise view, MSMED interest (`src/lib/billwise.ts`) | Bill-wise details, outstanding ageing | done |
+| 7.6 | ✅ **Ratio analysis** from the ledger with drill-down (`src/lib/ledger/ratios.ts`) | Ratio Analysis | done |
+| 7.7 | Form 27Q (non-residents), Sec 194-O/194R/194S, lower-deduction certificate limits, TRACES justification import | — | open |
+| 7.8 | Vendor-form fields for PAN / deductee type / 206AB / Sec 197 (stored, not yet editable on the vendor form), TDS dates in the compliance calendar / notification bell | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

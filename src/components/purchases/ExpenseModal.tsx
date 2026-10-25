@@ -13,6 +13,8 @@ import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { NumberInput } from '../ui/NumberInput';
 import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
 import type { AttachmentRef } from '../../types/attachments';
+import { TdsBillPanel } from './TdsBillPanel';
+import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -64,12 +66,24 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? []);
   const [error, setError] = useState('');
+  const [tds, setTds] = useState<BillTdsInput>(() => ({
+    section: expense?.tds_section ?? '',
+    on: expense?.tds_on ?? 'BILL',
+    pan: expense?.tds_pan ?? '',
+    lowerCert: expense?.tds_cert_no,
+    ...(expense?.tds_section ? { rate: expense.tds_rate, base: expense.tds_base, amount: expense.tds_amount } : {}),
+  }));
 
   const vendor = vendors.find((v) => v.id === vendorId);
   const line = useMemo(() => expenseLine(category, amount, taxRate, inclusive), [category, amount, taxRate, inclusive]);
   const totals = useMemo(
     () => computePurchaseTotals([line], { placeOfSupply: businessState, businessState, gstApplies: taxRate > 0 }),
     [line, businessState, taxRate],
+  );
+
+  const tdsResolved = useMemo(
+    () => resolveBillTds(tds, { date, taxable: totals.taxable, prior: priorCreditsFor(purchasesDb.all(), { id: vendor?.id, name: vendor?.name ?? vendorName, pan: tds.pan }), excludeId: expense?.id }),
+    [tds, date, totals.taxable, vendor?.id, vendor?.name, vendorName, expense?.id],
   );
 
   const submit = () => {
@@ -102,8 +116,13 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         ...billablePatch(billable),
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
+        ...tdsResolved.fields,
       });
-      if (!expense && paidNow) paymentsDb.record(saved.id, { amount: supplierPayable(saved), date, method });
+      if (!expense && paidNow) {
+        // TDS deducted when paying: the payment is the net amount, the TDS settles the rest.
+        const tdsNow = saved.tds_on === 'PAYMENT' ? saved.tds_amount ?? 0 : 0;
+        paymentsDb.record(saved.id, { amount: supplierPayable(saved) - tdsNow, date, method, tdsAmount: tdsNow });
+      }
       onSaved(expense ? 'Expense updated' : `Expense of ${formatCurrency(saved.total)} added`);
       onClose();
     } catch (err) {
@@ -209,6 +228,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         <label className={controls.label} htmlFor="exp-notes">Notes</label>
         <textarea id="exp-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+
+      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={totals.total - (tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0)} nonResident={vendor?.non_resident} />
 
       <BillableFields idPrefix="exp" value={billable} onChange={setBillable} rebilledIn={expense?.rebilled_in} />
 
