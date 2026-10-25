@@ -100,8 +100,10 @@ Registered in `backup.ts` (`RECORD_TABLES` / `ID_TABLES`), `access.ts` (`TABLE_A
   regional languages keep their own wording (templates apply to English / Hinglish).
 - `reminder_mode`: `auto` (default), `manual` (only on demand — not in the queues), `never` (badge in Receivables).
   No per-party language field (8H owns that).
-- The Dashboard reminders panel loads the schedule / modes / promises / grades after first paint (dynamic import), so
-  the shell bundle does not grow.
+- The Dashboard reminders card (`share/RemindersPanel.tsx`) is now a lazy chunk of its own: it applies the schedule,
+  modes, promises and grades (`reminder-context.ts` `panelOptions`) and loads right after first paint. The schedule
+  checks and template validation live in `reminder-schedule.ts`; `reminders.ts` only takes an already-checked
+  `extras.template`. Net effect on first paint: −1.4 kB gz against the lead branch (180.4 → 179.0 kB).
 
 ### A6 Statement styles
 - Balance forward (the original paper), Open items (original, credited, received, open, days overdue; unallocated
@@ -130,6 +132,11 @@ Registered in `backup.ts` (`RECORD_TABLES` / `ID_TABLES`), `access.ts` (`TABLE_A
    `gst-reports.test.ts` / `einvoice.test.ts`.
 6. **MSME note** needs a seller Udyam number, so `SenderProfile.msme_udyam` was added (edited in the Payment terms panel).
 7. A6's "configured slabs" are not read: the strip uses the fixed receivables buckets.
+8. Bundle: the Dashboard reminders card became lazy (Dashboard.tsx, one `lazy()` line); payment scores on Receivables
+   load after the screen (`collections/aging-extras.ts`), the editor's grade line is `collections/CreditScoreLine.tsx`
+   (lazy), and the client-form fields are lazy in `ClientFormModal`. The few Receivables strings live in
+   `i18n/areas/collections-rcv.ts` so the route chunk shares no chunk with the lazy collections dialogs.
+9. R2-B's `partyRecipients` (contact persons) is not used by the reminder templates yet.
 
 ## Verify with your CA
 - **Settlement discount and GST** — default financial note carries no GST (Circular 92/11/2019-GST as understood);

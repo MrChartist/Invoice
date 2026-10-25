@@ -123,9 +123,9 @@ export function Receivables() {
   const fmt = (n: number) => formatCurrency(n, currency);
   // R2-A7: how each party usually pays (settled bills of the last 12 months, promises kept / broken) — loaded
   // after the screen renders so the route chunk stays small.
-  const [extras, setExtras] = useState<typeof import('../components/collections/AgingExtras') | null>(null);
+  const [extras, setExtras] = useState<typeof import('../components/collections/aging-extras') | null>(null);
   useEffect(() => {
-    import('../components/collections/AgingExtras').then((m) => setExtras(m)).catch(() => undefined);
+    import('../components/collections/aging-extras').then((m) => setExtras(m)).catch(() => undefined);
   }, []);
   const scores = useMemo(
     () => (extras ? extras.computeScores({ invoices: data.invoices, payments: data.payments as Payment[], links: data.links, clients: data.clients }, toDateInput(now)) : null),
