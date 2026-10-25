@@ -12,7 +12,7 @@ offline alternative is named) · 🚧 **in progress** (another agent is building
 · **P2** = nice to have. **Size:** S ≤ 2 days · M ≈ 1 week · L = 2–4 weeks.
 
 **In progress elsewhere (not repeated in the work packages):**
-- 🚧 **WIP-A Payroll**: employees, pay heads, attendance, salary structures, PF / ESI / PT / TDS on salary, payslips, statutory payroll reports.
+- ✅ **WIP-A Payroll** (`docs/features/payroll.md`): employees, pay heads, attendance, salary structures, PF / ESI / PT / TDS on salary, payslips, statutory payroll reports.
 - 🚧 **WIP-B Manufacturing & stock vouchers**: BOM, manufacturing journal, stock journal, physical stock, reorder.
 - 🚧 **WIP-C TDS & voucher classes**: TDS deducted on payments, 26Q / 27EQ, optional / memo / post-dated / reversing vouchers, bill-wise payables.
 - 🚧 **WIP-D Gateway**: Tally-style Gateway of Tally and F-key voucher entry.
@@ -155,7 +155,7 @@ work packages** (section 8).
 | **Receipt Note / GRN** (inward, before the supplier bill) | ❌ | PO → Bill directly; no goods-received document, so stock arrives only with the bill | P1 |
 | Rejection Out (return to supplier before billing) / Rejection In (customer rejects a delivery) | ❌ | — | P1 |
 | Material Out / Material In (job work) | ❌ | — | P1 |
-| Attendance / payroll vouchers | 🚧 | WIP-A | — |
+| Attendance / payroll vouchers | ✅ | WIP-A (`/payroll`) | — |
 | Voucher duplication, insert voucher (Ctrl+I), add voucher (Ctrl+A in Day Book), delete with numbering re-sequence choice | 🟡 | Duplicate exists for sales documents. Manual vouchers have no duplicate. Numbering never re-sequences (correct for GST) | P2 |
 | Voucher-level cost-centre allocation | ✅ | Per line (`ManualVoucherLine.cost_centre_id`) | — |
 | Excise / VAT legacy | n/a | Not relevant post-GST | — |
@@ -273,14 +273,14 @@ work packages** (section 8).
 | TDS receivable (customers deduct) + 26AS / AIS matching + Form 16A tracker | ✅ | `tds-register.ts` | — |
 | TDS deduction on payments / bills (194C / J / H / I / Q …), threshold tracking, 206AB higher rate, lower-deduction certificates | 🚧 | WIP-C | — |
 | 26Q / 27EQ returns | 🚧 | WIP-C | — |
-| 24Q (salary) | 🚧 | WIP-A (payroll) | — |
+| 24Q (salary) | ✅ | WIP-A (payroll, Annexure I / II working) | — |
 | 27Q (non-resident payments, DTAA rates) | ❌ | Not in WIP-C's stated scope | P2 |
 | TDS challan (ITNS 281) record with BSR / CIN and challan reconciliation (CSI file match) | ❌ / 🚧 | Ask WIP-C; if not covered → WP-6 | P1 |
 | Form 16A / 27D generation (issuing certificates to deductees) | ❌ / 🚧 | TRACES issues the official one (⛔); offline: a summary "TDS certificate working" PDF | P2 |
 | TCS on sale of goods (206C(1H)) | ✅ | Withdrawn from Apr 2025; dated presets in `tax-rules.ts` | — |
 | Interest on late TDS deduction / payment (Sec 201(1A)), late fee 234E | ❌ | — | P2 |
 
-### 3.K Payroll — 🚧 WIP-A in full
+### 3.K Payroll — ✅ WIP-A done (`docs/features/payroll.md`)
 
 Employees, employee groups, pay heads (earnings / deductions / employer contributions), attendance / production types,
 salary structures, payroll vouchers, PF (ECR text), ESI, PT (state slabs), TDS on salary (24Q, Form 16), payslips,
