@@ -318,6 +318,8 @@ const RECORD_TABLES = [
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   // Series high-water marks: STR / PO / ADV / RFV / RCPT numbers are never reused (integrity review)
   'series_counters',
+  // GSTR-4 typed-in Tables 7-9 per FY × GSTIN (5.9)
+  'gstr4_manual',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -326,7 +328,8 @@ const ID_TABLES = new Set([
   'stock_items', 'godowns', 'stock_transfers', 'advances',
   'price_levels', 'schemes', 'pos_day_close',
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
-  'price_levels', 'schemes', 'pos_day_close', 'series_counters',
+  'series_counters',
+  'gstr4_manual',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

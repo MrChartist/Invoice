@@ -28,6 +28,12 @@
  *  - Amendments (5.9): a document with `amends.original` is reported AS FILED in its own period (the
  *    original never changes) and, in the period of `amends.amended_on`, in B2BA / B2CLA / CDNRA / CDNURA
  *    (or as revised B2CSA rows); GSTR-3B of that period takes the difference (revised − original).
+ *    Export amendments go to EXPA (invoices) / CDNURA with EXPWP / EXPWOP (notes).
+ *  - E-commerce (src/lib/eco.ts): a document with `eco_gstin` is a supply made through an e-commerce operator.
+ *    Sec 52 (TCS): reported as usual with the operator GSTIN (`etin`; B2CS rows split by it) and per operator in
+ *    Table 14(a). Sec 9(5) (the operator pays the tax): value only, in Table 14(b) and GSTR-3B 3.1.1(ii) — not in
+ *    B2B / B2CL / B2CS / Table 8 / HSN / 3.1 (a CA-judgment item, see gst-reports.md).
+ *  - Table 13: delivery challans are listed only when their Rule 55 purpose qualifies (`challan_purpose`).
  */
 
 import type { InvoiceRecord, GstMode } from '../types/invoice';
@@ -36,7 +42,9 @@ import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
 import { isNonSupplyCategory, isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
-import { b2clThreshold, b2clThresholdLabel, hsnMinDigits, hsnTableSplit } from './tax-rules';
+import { b2clThreshold, b2clThresholdLabel, ecoReporting, hsnMinDigits, hsnTableSplit } from './tax-rules';
+import { checkEcoGstin, ecoOf } from './eco';
+import type { EcoSection } from '../types/invoice';
 import type { AdvanceMovement } from './advance-tax';
 
 /* ───────────────────────── Period ───────────────────────── */
@@ -179,6 +187,8 @@ export interface DocRow {
   cess?: number;
   /** Additive: GSTN invoice type (R regular, SEWP/SEWOP SEZ, DE deemed export). */
   invTyp?: 'R' | 'SEWP' | 'SEWOP' | 'DE';
+  /** Additive: GSTIN of the e-commerce operator (Sec 52) the supply was made through. */
+  etin?: string;
 }
 
 export interface B2csRow {
@@ -190,6 +200,28 @@ export interface B2csRow {
   cgst: number;
   sgst: number;
   cess: number;
+  /** Additive: e-commerce operator GSTIN (B2CS type "E"); absent = type "OE". */
+  etin?: string;
+}
+
+/** GSTR-1 Table 14: supplies made through one e-commerce operator (net of credit / debit notes). */
+export interface EcoRow {
+  etin: string;
+  /** Net taxable value of supplies. */
+  value: number;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  cess: number;
+  /** Documents behind the row. */
+  count: number;
+}
+
+export interface EcoTables {
+  /** 14(a): operator collects TCS u/s 52 (supplier pays the tax shown). */
+  tcs: EcoRow[];
+  /** 14(b): operator pays the tax u/s 9(5) — value only (tax columns zero). */
+  pay95: EcoRow[];
 }
 
 export interface ExportRow extends DocRow {
@@ -285,6 +317,8 @@ export interface Gstr1Report {
   at?: AdvanceTableRow[];
   /** Table 11B(1)/(2): advances adjusted (and refunded) in the period. Absent when none. */
   txpd?: AdvanceTableRow[];
+  /** Additive: Table 14 — supplies made through e-commerce operators. Absent when none. */
+  eco?: EcoTables;
   /** Totals across every outward document table (net of credit notes; advances not included). */
   totals: { taxable: number; igst: number; cgst: number; sgst: number; value: number; cess?: number };
   counts: { included: number; drafts: number; cancelled: number; notTaxDocs: number; composition?: number };
@@ -310,7 +344,17 @@ export interface B2csaRow extends B2csRow {
   omon: string;
 }
 
+/** Amended export invoice (EXPA). */
+export interface AmendExpRow extends AmendDocRow {
+  expType: 'WPAY' | 'WOPAY';
+  sbpcode?: string;
+  sbnum?: string;
+  sbdt?: string;
+}
+
 export interface Gstr1Amendments {
+  /** Additive: amended export invoices (Table 9A, EXPA). Absent when none. */
+  expa?: AmendExpRow[];
   b2ba: AmendDocRow[];
   b2cla: AmendDocRow[];
   cdnra: AmendCdnRow[];
@@ -396,6 +440,11 @@ export interface Gstr3bReport {
   outwardRcmTaxable: number;
   /** Advances (5.3): tax on advances received (+) and adjusted / refunded (−), already inside 3.1(a). Absent when none. */
   advances?: { received: Gstr3bTaxRow; adjusted: Gstr3bTaxRow };
+  /**
+   * Additive: Table 3.1.1 (ii) — taxable value of supplies made through an e-commerce operator that pays the tax
+   * u/s 9(5) (net of notes). Not in any 3.1 row. Absent when none. 3.1.1 (i) is the operator's own row (always 0 here).
+   */
+  ecoSupplies95?: number;
 }
 
 export interface GstReport {
@@ -482,7 +531,13 @@ export interface PDoc {
   lines: PLine[];
   /** Additive: Table 8 column for an untaxed Bill of Supply (absent for other documents: nil-rated). */
   exemptKind?: 'NIL' | 'EXEMPT' | 'NON_GST';
+  /** Additive: e-commerce operator GSTIN and section (src/lib/eco.ts). */
+  etin?: string;
+  ecoSection?: EcoSection;
 }
+
+/** Supply through an e-commerce operator that pays the tax u/s 9(5): value only (Table 14(b), 3B 3.1.1(ii)). */
+export const isEco95 = (d: Pick<PDoc, 'ecoSection' | 'isExport'>) => d.ecoSection === 'PAY_9_5' && !d.isExport;
 
 /** Documents GSTR-1 reports. A Bill of Supply (5.9) is a tax document with no tax: Table 8 + Table 13. */
 const TAX_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
@@ -648,6 +703,20 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     push('warning', 'NO_FILER_GSTIN', 'tax is charged but the sender profile has no GSTIN.', '/settings', 'Open settings');
   }
   if (!rec.invoice_number) push('warning', 'NO_NUMBER', 'document has no number.');
+  const eco = ecoOf(rec);
+  if (eco) {
+    const chk = checkEcoGstin(eco.gstin);
+    if (!chk.valid) push('error', 'ECO_GSTIN_INVALID', `${chk.message}; Table 14 and the e-commerce GSTIN column will be rejected.`);
+    else if (eco.section === 'TCS_52' && !chk.tcsRegistration) push('info', 'ECO_NOT_TCS', `e-commerce operator GSTIN ${eco.gstin} is not a TCS registration ("C" in place 14). Check it against the operator's GSTR-8 / statement.`);
+    if (eco.section === 'PAY_9_5') {
+      if (isExport) push('warning', 'ECO_95_EXPORT', 'marked "operator pays tax u/s 9(5)" but it is an export; reported as an export (Sec 9(5) covers notified domestic services).');
+      else if (calc.lines.some((l) => l.igst + l.cgst + l.sgst + l.cess > 0)) {
+        push('warning', 'ECO_95_TAXED', 'the e-commerce operator pays the tax u/s 9(5), but tax was charged on this document. Only the value is reported (Table 14(b), 3B 3.1.1(ii)); tax you collected must still be deposited — check with your CA.');
+      }
+    }
+    const rules = ecoReporting(String(rec.issue_date).slice(0, 10));
+    if (!rules.gstr1Table14) push('info', 'ECO_BEFORE_TABLE14', 'supplies through e-commerce operators were reported only with the ECO GSTIN column (B2B / B2CL / B2CS) before GSTR-1 Table 14 — Table 14 here is for reference.');
+  }
   const bos = rec.doc_type === 'BILL_OF_SUPPLY';
   if (bos && calc.lines.some((l) => l.nominal_rate > 0 && l.taxable !== 0)) {
     push('warning', 'BOS_TAXED_LINES', 'Bill of Supply has lines with a GST rate; no tax was charged, so they are reported as exempt in Table 8. Use a tax invoice for taxable supplies (Rule 46).');
@@ -673,6 +742,7 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     value,
     lines,
     ...(bos ? { exemptKind: rec.exempt_kind ?? 'EXEMPT' } : {}),
+    ...(eco ? { etin: eco.gstin, ecoSection: eco.section } : {}),
   };
 }
 
@@ -730,6 +800,7 @@ function docRow(d: PDoc, items: RateRow[]): DocRow {
     sgst: sum('sgst'),
     cess: sum('cess'),
     invTyp: d.invTyp,
+    ...(d.etin && d.ecoSection === 'TCS_52' ? { etin: d.etin } : {}),
   };
 }
 
@@ -746,15 +817,45 @@ export const RECEIPT_VOUCHER_DOC = 'Receipt Voucher';
 export const REFUND_VOUCHER_DOC = 'Refund Voucher';
 
 /**
+ * Table 13 rows for delivery challans by Rule 55 purpose (`challan_purpose`): doc 9 job work, 10 supply on
+ * approval, 11 liquid gas, 12 other than by way of supply. A challan sent ahead of the invoice of the same supply
+ * (`ANTICIPATION`) or with no purpose is NOT listed (the invoice is what is reported). Names follow the offline
+ * tool's document types as best known — verify with your CA.
+ */
+export const CHALLAN_DOC_TYPES: Readonly<Record<'JOB_WORK' | 'APPROVAL' | 'LIQUID_GAS' | 'OTHER_THAN_SUPPLY', { num: number; name: string }>> = {
+  JOB_WORK: { num: 9, name: 'Delivery Challan for job work' },
+  APPROVAL: { num: 10, name: 'Delivery Challan for supply on approval' },
+  LIQUID_GAS: { num: 11, name: 'Delivery Challan in case of liquid gas' },
+  OTHER_THAN_SUPPLY: { num: 12, name: 'Delivery Challan in cases other than by way of supply (excluding at S no. 9 to 11)' },
+};
+
+/** Table 13 document type of a challan, or null when it is not listed. */
+export function challanDocType(rec: Pick<InvoiceRecord, 'doc_type' | 'challan_purpose'>): string | null {
+  if (rec.doc_type !== 'DELIVERY_CHALLAN' || !rec.challan_purpose || rec.challan_purpose === 'ANTICIPATION') return null;
+  return CHALLAN_DOC_TYPES[rec.challan_purpose]?.name ?? null;
+}
+
+/**
  * GSTR-1 Table 13. Invoices / Bills of Supply, debit notes and credit notes come from the documents;
  * receipt vouchers (advances, ADV/…) and refund vouchers (RFV/…) from the period's advance movements
- * — every voucher issued counts, taxed or not. Delivery challans (doc 9–12) are NOT listed: the app
- * cannot tell a challan for job work / approval / "other than supply" from one sent ahead of an
- * invoice, so add those series on the portal (verify with your CA).
+ * — every voucher issued counts, taxed or not. Delivery challans (doc 9–12) are listed only when the
+ * challan carries a qualifying Rule 55 purpose (`challanDocType`). One DCH series shared by several
+ * purposes is split by purpose: a number used by a challan of another purpose (or one not listed) is not
+ * a gap. Verify with your CA.
  */
 function buildDocIssue(all: InvoiceRecord[], vouchers: readonly AdvanceMovement[] = []): DocIssueRow[] {
-  interface Bucket { docType: string; prefix: string; width: number; nums: Set<number>; cancelled: Set<number> }
+  interface Bucket { docType: string; prefix: string; width: number; nums: Set<number>; cancelled: Set<number>; challan?: boolean }
   const buckets = new Map<string, Bucket>();
+  // Every non-draft challan number by series prefix: shared-series numbers of other purposes are not gaps.
+  const challanNums = new Map<string, Set<number>>();
+  for (const rec of all) {
+    if (rec.doc_type !== 'DELIVERY_CHALLAN' || rec.status === 'Draft') continue;
+    const s = parseSeries(rec.invoice_number);
+    if (!s) continue;
+    const set = challanNums.get(s.prefix) ?? new Set<number>();
+    set.add(s.n);
+    challanNums.set(s.prefix, set);
+  }
   const addNumber = (docType: string, number: string, cancelled = false) => {
     const s = parseSeries(number);
     if (!s) return;
@@ -770,6 +871,19 @@ function buildDocIssue(all: InvoiceRecord[], vouchers: readonly AdvanceMovement[
     else if (m.kind === 'refunded' && m.ref) addNumber(REFUND_VOUCHER_DOC, m.ref);
   }
   for (const rec of all) {
+    const challanType = challanDocType(rec);
+    if (challanType) {
+      if (rec.status === 'Draft') continue;
+      const s = parseSeries(rec.invoice_number);
+      if (!s) continue;
+      const key = `${challanType}|${s.prefix}`;
+      const b = buckets.get(key) ?? { docType: challanType, prefix: s.prefix, width: s.width, nums: new Set<number>(), cancelled: new Set<number>(), challan: true };
+      b.nums.add(s.n);
+      b.width = Math.max(b.width, s.width);
+      if (rec.status === 'Cancelled') b.cancelled.add(s.n);
+      buckets.set(key, b);
+      continue;
+    }
     if (!TAX_DOC_TYPES.has(rec.doc_type)) continue;
     // A draft was never issued. Left out of the range, it is counted as a gap (cancelled) when it sits
     // between issued numbers, and does not stretch the "to" number when it is the latest one.
@@ -791,8 +905,16 @@ function buildDocIssue(all: InvoiceRecord[], vouchers: readonly AdvanceMovement[
     const sorted = [...b.nums].sort((x, y) => x - y);
     const lo = sorted[0];
     const hi = sorted[sorted.length - 1];
-    const total = hi - lo + 1;
-    const gaps = total - sorted.length;
+    let total = hi - lo + 1;
+    let gaps = total - sorted.length;
+    if (b.challan) {
+      // Shared challan series: numbers of other purposes are neither issued in this row nor cancelled.
+      const used = challanNums.get(b.prefix) ?? new Set<number>();
+      let others = 0;
+      for (let n = lo; n <= hi; n++) if (!b.nums.has(n) && used.has(n)) others++;
+      total -= others;
+      gaps -= others;
+    }
     const cancelled = b.cancelled.size + gaps;
     const fmt = (n: number) => `${b.prefix}${String(n).padStart(b.width, '0')}`;
     rows.push({
@@ -906,7 +1028,29 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     return d.value > b2clThreshold(d.date);
   };
 
+  const ecoTcs = new Map<string, EcoRow>();
+  const eco95 = new Map<string, EcoRow>();
+  const addEco = (map: Map<string, EcoRow>, d: PDoc, withTax: boolean) => {
+    const r = map.get(d.etin!) ?? { etin: d.etin!, value: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, count: 0 };
+    for (const l of d.lines) {
+      r.value = round2(r.value + d.sign * l.taxable);
+      if (!withTax) continue;
+      r.igst = round2(r.igst + d.sign * l.igst);
+      r.cgst = round2(r.cgst + d.sign * l.cgst);
+      r.sgst = round2(r.sgst + d.sign * l.sgst);
+      r.cess = round2(r.cess + d.sign * l.cess);
+    }
+    r.count++;
+    map.set(d.etin!, r);
+  };
+
   for (const d of docs) {
+    // Sec 9(5): the operator is liable — the supplier reports the value in Table 14(b) only.
+    if (isEco95(d) && d.etin) {
+      addEco(eco95, d, false);
+      continue;
+    }
+    if (d.etin && !d.isExport) addEco(ecoTcs, d, true);
     const items = rateRows(d.lines, d.zeroRated);
     const row = docRow(d, items);
     const label = d.number || d.rec.id;
@@ -940,8 +1084,8 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     } else {
       for (const l of d.lines) {
         if (isNilLine(l)) continue;
-        const key = `${d.supply}|${d.pos}|${l.rate}`;
-        const r = b2csMap.get(key) ?? { supply: d.supply, pos: d.pos, rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+        const key = `${d.supply}|${d.pos}|${l.rate}|${row.etin ?? ''}`;
+        const r = b2csMap.get(key) ?? { supply: d.supply, pos: d.pos, rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, ...(row.etin ? { etin: row.etin } : {}) };
         addLine(r, l, d.sign);
         b2csMap.set(key, r);
       }
@@ -989,7 +1133,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     fp: periodFp(opts.period),
     b2b,
     b2cl,
-    b2cs: [...b2csMap.values()].sort((a, b) => a.pos.localeCompare(b.pos) || a.rate - b.rate),
+    b2cs: [...b2csMap.values()].sort((a, b) => a.pos.localeCompare(b.pos) || a.rate - b.rate || (a.etin ?? '').localeCompare(b.etin ?? '')),
     cdnr,
     cdnur,
     exp,
@@ -1007,6 +1151,9 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
     ),
     ...(adv.at.length ? { at: adv.at } : {}),
     ...(adv.txpd.length ? { txpd: adv.txpd } : {}),
+    ...(ecoTcs.size || eco95.size
+      ? { eco: { tcs: [...ecoTcs.values()].sort((a, b) => a.etin.localeCompare(b.etin)), pay95: [...eco95.values()].sort((a, b) => a.etin.localeCompare(b.etin)) } }
+      : {}),
     // `cess` only appears when there is some, so reports without cess keep their exact shape.
     totals: totals.cess === 0 ? { taxable: totals.taxable, igst: totals.igst, cgst: totals.cgst, sgst: totals.sgst, value: totals.value } : totals,
     // `composition` only appears when some were left out, so existing report shapes stay exact.
@@ -1020,6 +1167,9 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
 
 /* ───────────────────────── Amendments (5.9) ───────────────────────── */
 
+/** Operator GSTIN a B2CS / B2CSA row is split by (Sec 52 only), else ''. */
+const tcsEtin = (d: PDoc) => (d.etin && d.ecoSection === 'TCS_52' ? d.etin : '');
+
 /** Revised − original of one amendment, split into tax-payable supplies and supplies without tax. */
 function amendEffect(number: string, cur: PDoc, orig: PDoc): AmendEffect {
   const taxPayable: Gstr3bTaxRow = { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
@@ -1027,7 +1177,7 @@ function amendEffect(number: string, cur: PDoc, orig: PDoc): AmendEffect {
   const take = (d: PDoc, f: number) => {
     for (const l of d.lines) {
       const s = f * d.sign;
-      if (d.rcm || isNilLine(l) || (d.zeroRated && taxOf(l) === 0)) {
+      if (d.rcm || isEco95(d) || isNilLine(l) || (d.zeroRated && taxOf(l) === 0)) {
         noTax.taxable = round2(noTax.taxable + s * l.taxable);
         continue;
       }
@@ -1067,8 +1217,8 @@ function buildAmendments(
   const amended = invoices.filter(
     (r) => r?.amends && inPeriod(r.amends.amended_on, opts.period) && TAX_DOC_TYPES.has(r.doc_type) && !isCompositionDoc(r) && sameFiler(r),
   );
-  const isB2cs = (d: PDoc) => !d.isExport && !d.registered && !(d.supply === 'INTER' && largeB2c(d));
-  const section = (d: PDoc) => (d.isExport ? 'EXP' : d.registered ? 'B2B' : isB2cs(d) ? 'B2CS' : 'B2CL');
+  const isB2cs = (d: PDoc) => !d.isExport && !isEco95(d) && !d.registered && !(d.supply === 'INTER' && largeB2c(d));
+  const section = (d: PDoc) => (isEco95(d) ? 'ECO 9(5)' : d.isExport ? 'EXP' : d.registered ? 'B2B' : isB2cs(d) ? 'B2CS' : 'B2CL');
   const omons = new Set<string>();
   let count = 0;
 
@@ -1099,8 +1249,12 @@ function buildAmendments(
     if (orig && section(orig) !== section(cur)) {
       flag('info', 'AMEND_SECTION_CHANGED', `originally reported in ${section(orig)}, now ${section(cur)}. Check with your CA how the portal expects this move to be reported.`);
     }
-    if (cur.isExport) {
-      flag('warning', 'AMEND_EXPORT', 'export amendments (EXPA / CDNURA for exports) are not generated — amend this one on the portal.');
+    if (isEco95(cur)) {
+      flag('warning', 'AMEND_ECO_95', 'supplies on which the e-commerce operator pays tax u/s 9(5) are amended in GSTR-1 Table 14A(b), which is not generated — amend it on the portal. GSTR-3B 3.1.1(ii) of this period takes the difference.');
+    } else if (cur.isExport) {
+      // Table 9A: EXPA for an export invoice, CDNURA (EXPWP / EXPWOP) for a note on one.
+      if (cur.isNote) tables.cdnura.push({ ...row, noteType: cur.noteType, unregType: row.igst > 0 ? 'EXPWP' : 'EXPWOP' });
+      else (tables.expa ??= []).push({ ...row, expType: row.igst > 0 ? 'WPAY' : 'WOPAY', ...shippingBillOf(rec) });
     } else if (cur.registered) {
       if (cur.isNote) tables.cdnra.push({ ...row, noteType: cur.noteType });
       else tables.b2ba.push(row);
@@ -1132,7 +1286,7 @@ function buildAmendments(
       const thisPeriod = !!r.amends && inPeriod(r.amends.amended_on, opts.period);
       if (thisPeriod) {
         // Keys of both versions are revised (a supply that left B2CS revises its old row down to zero).
-        const keyOf = (pd: PDoc, l: PLine) => `${pd.supply}|${pd.pos}|${l.rate}`;
+        const keyOf = (pd: PDoc, l: PLine) => `${pd.supply}|${pd.pos}|${l.rate}|${tcsEtin(pd)}`;
         const o = prepare(asFiledRec, opts, []);
         if (isB2cs(o)) for (const l of o.lines) if (!isNilLine(l)) touched.add(keyOf(o, l));
         if (isB2cs(d)) for (const l of d.lines) if (!isNilLine(l)) touched.add(keyOf(d, l));
@@ -1140,18 +1294,19 @@ function buildAmendments(
       if (!isB2cs(d)) continue;
       for (const l of d.lines) {
         if (isNilLine(l)) continue;
-        const key = `${d.supply}|${d.pos}|${l.rate}`;
-        const row = revised.get(key) ?? { omon, supply: d.supply, pos: d.pos, rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+        const key = `${d.supply}|${d.pos}|${l.rate}|${tcsEtin(d)}`;
+        const row = revised.get(key) ?? { omon, supply: d.supply, pos: d.pos, rate: l.rate, txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, ...(tcsEtin(d) ? { etin: tcsEtin(d) } : {}) };
         addLine(row, l, d.sign);
         revised.set(key, row);
       }
     }
     for (const key of touched) {
-      const [supply, pos, rate] = key.split('|');
-      tables.b2csa.push(revised.get(key) ?? { omon, supply: supply as 'INTRA' | 'INTER', pos, rate: Number(rate), txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+      const [supply, pos, rate, etin] = key.split('|');
+      tables.b2csa.push(revised.get(key) ?? { omon, supply: supply as 'INTRA' | 'INTER', pos, rate: Number(rate), txval: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, ...(etin ? { etin } : {}) });
     }
   }
   const byDate = <T extends { date: string; number: string }>(x: T, y: T) => x.date.localeCompare(y.date) || x.number.localeCompare(y.number);
+  tables.expa?.sort(byDate);
   tables.b2ba.sort(byDate);
   tables.b2cla.sort(byDate);
   tables.cdnra.sort(byDate);
@@ -1303,9 +1458,17 @@ export function buildGstr3b(
   const nil = { inter: 0, intra: 0 };
   let nonGst = 0;
   let outwardRcmTaxable = 0;
+  let eco95 = 0;
+  let hasEco95 = false;
   const unregInter = new Map<string, { pos: string; taxable: number; igst: number }>();
 
   for (const d of docs) {
+    if (isEco95(d)) {
+      // 3.1.1(ii): the operator pays the tax u/s 9(5); the supplier reports the value only, outside 3.1.
+      hasEco95 = true;
+      for (const l of d.lines) eco95 = round2(eco95 + d.sign * l.taxable);
+      continue;
+    }
     for (const l of d.lines) {
       const s = d.sign;
       if (d.rcm && !d.zeroRated) {
@@ -1443,6 +1606,7 @@ export function buildGstr3b(
     purchasesConsidered: purchases.length,
     outwardRcmTaxable,
     ...(advances ? { advances } : {}),
+    ...(hasEco95 ? { ecoSupplies95: eco95 } : {}),
   };
 }
 

@@ -17,6 +17,7 @@ import { TemplatePicker } from '../components/creator/TemplatePicker';
 import { CreatorHeader } from '../components/creator/CreatorHeader';
 import { DocumentMetaCard } from '../components/creator/DocumentMetaCard';
 import { SupplyNotice } from '../components/creator/SupplyNotice';
+import { GstExtrasFields } from '../components/creator/GstExtrasFields';
 import { MobileSaveBar } from '../components/creator/MobileSaveBar';
 import { CustomFieldsCard } from '../components/creator/CustomFieldsCard';
 import { AttachmentsPanel } from '../components/attachments/AttachmentsPanel';
@@ -276,6 +277,7 @@ export function InvoiceCreator() {
           <legend className={surface.srOnly}>{readOnly ? t('editor.docLegendLocked') : t('editor.docLegend')}</legend>
           <DocumentMetaCard editing={editing} saveTick={saveTick} />
           <SupplyNotice />
+          <GstExtrasFields />
 
           <section className={surface.card}>
             <div className={surface.cardHead}>{t('editor.parties')}</div>

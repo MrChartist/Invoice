@@ -16,6 +16,7 @@ import {
 } from '../../lib/compliance';
 import { estimateFor } from '../../lib/gst-penalties';
 import { buildGstReport, periodForDate } from '../../lib/gst-reports';
+import { compositionLateInputs } from '../../lib/gstr4-annual';
 import { localDb } from '../../lib/localDb';
 import { QRMP_TURNOVER_LIMIT, todayIso } from '../../lib/tax-rules';
 import { readLinks } from '../../lib/documents';
@@ -92,6 +93,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
           cashTax = p.cash.igst + p.cash.cgst + p.cash.sgst + (p.cess ?? 0);
           nil = rep.gstr1.counts.included === 0 && (r.form === 'GSTR1' || rep.gstr3b.purchasesConsidered === 0);
         }
+        if (!r.optional && filedOn > r.due && (r.form === 'CMP08' || r.form === 'GSTR4')) ({ cashTax, nil } = compositionLateInputs(r, invoices, purchases, { gstin, filerStateCode: stateCode }));
         return { r, status, filed, ...estimateFor(r, { filedOn, turnover, cashTax, nil }) };
       })
       .sort((a, b) => STATUS[a.status].rank - STATUS[b.status].rank || a.r.due.localeCompare(b.r.due));

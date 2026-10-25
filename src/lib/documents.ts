@@ -276,6 +276,8 @@ export function buildConvertedDraft(
     // An amendment marker belongs to the one document that was amended — never to a copy.
     amends: undefined,
     pos: undefined,
+    // A challan's Rule 55 purpose (GSTR-1 Table 13) means nothing on the invoice it becomes.
+    challan_purpose: target === 'DELIVERY_CHALLAN' ? source.challan_purpose : undefined,
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
   };

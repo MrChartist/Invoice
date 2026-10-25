@@ -58,6 +58,7 @@ import {
 import { checkGstin } from './gstin';
 import { stateByCode } from './india-states';
 import { num, round2 } from './invoice-calc';
+import { ecoReporting } from './tax-rules';
 import { readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv, type CsvCell } from './gstr-json';
 
@@ -292,6 +293,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     A: zero(), B: zero(), C: zero(), D: zero(), E: zero(), F: zero(), G: zero(), I: zero(), J: zero(), K: zero(), L: zero(),
   };
   const t5 = { A: zero(), B: zero(), C: zero(), D: zero(), E: zero(), F: zero(), H: zero(), I: zero(), J: zero(), K: zero() };
+  const t5C1 = zero();
   let documents = 0;
 
   for (const m of months) {
@@ -323,6 +325,8 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       else if (n.unregType === 'EXPWOP') addTo(n.noteType === 'C' ? t5.H : t5.I, h);
       else addTo(n.noteType === 'C' ? t4.I : t4.J, h);
     }
+    // 5C1: supplies through an e-commerce operator that pays the tax u/s 9(5) (GSTR-1 Table 14(b), value only).
+    for (const e of g.eco?.pay95 ?? []) addTo(t5C1, { taxable: e.value });
     for (const n of g.nil) {
       addTo(t5.D, { taxable: n.exempt });
       addTo(t5.E, { taxable: n.nil });
@@ -370,7 +374,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     row('4N', 'Supplies and advances on which tax is to be paid (H + M above)', t4N, { total: true }),
   ];
 
-  const t5G = sumHeads(t5.A, t5.B, t5.C, t5.D, t5.E, t5.F);
+  const t5G = sumHeads(t5.A, t5.B, t5.C, t5C1, t5.D, t5.E, t5.F);
   const t5L = zero();
   addTo(t5L, t5.H, -1);
   addTo(t5L, t5.I);
@@ -385,6 +389,14 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     row('5A', 'Zero rated supply (export) without payment of tax', t5.A),
     row('5B', 'Supply to SEZs without payment of tax', t5.B),
     row('5C', 'Supplies on which tax is to be paid by the recipient on reverse charge basis', t5.C),
+    // Only shown when there are such supplies, so papers without e-commerce keep their shape.
+    ...(t5C1.taxable !== 0
+      ? [row('5C1', 'Supplies on which tax is to be paid by e-commerce operators as per section 9(5)', t5C1, {
+          note: ecoReporting(`${fyStart}-04-01`).gstr9Row5C1
+            ? 'GSTR-1 Table 14(b) over the year (value only; the operator pays the tax).'
+            : 'GSTR-1 Table 14(b) over the year. Row 5C1 is on the form from FY 2024-25; for this year ask your CA where to report it.',
+        })]
+      : []),
     row('5D', 'Exempted', t5.D, { note: 'The app does not separate exempt from nil-rated lines; both are in 5E.' }),
     row('5E', 'Nil rated', t5.E),
     row('5F', 'Non-GST supply', t5.F),
@@ -650,7 +662,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
     addTo(g3Out, o.taxable);
     addTo(g3Out, o.zeroRated);
     g3Turnover = round2(
-      g3Turnover + o.taxable.taxable + o.zeroRated.taxable + o.nilExempt.inter + o.nilExempt.intra + o.nonGst + m.gstr3b.outwardRcmTaxable,
+      g3Turnover + o.taxable.taxable + o.zeroRated.taxable + o.nilExempt.inter + o.nilExempt.intra + o.nonGst + m.gstr3b.outwardRcmTaxable + (m.gstr3b.ecoSupplies95 ?? 0),
     );
   }
   const g1Out = sumHeads(t4N);

@@ -43,6 +43,8 @@ import { ComplianceView } from '../components/gst-reports/ComplianceView';
 const Gstr2bView = lazy(() => import('../components/gst-reports/Gstr2bView'));
 // Composition returns (CMP-08 / GSTR-4, roadmap 5.9): loaded when the tab is opened.
 const CompositionView = lazy(() => import('../components/gst-reports/CompositionView'));
+// E-commerce operators (GSTR-1 Table 14, 3B 3.1.1): loaded when the tab is opened.
+const EcoView = lazy(() => import('../components/gst-reports/EcoView'));
 import { checkGstin } from '../lib/gstin';
 import { parseCsv } from '../lib/csv';
 import type { HsnRow } from '../lib/gst-reports';
@@ -60,7 +62,7 @@ const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 const Gstr9Modal = lazy(() => import('../components/gst-reports/Gstr9Modal'));
 const BulkEInvoiceModal = lazy(() => import('../components/einvoice/BulkEInvoiceModal'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'gstr3b' | 'gstr2b' | 'composition';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition';
 
 /** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
 const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
@@ -77,6 +79,7 @@ const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
   { id: 'hsn', label: 'HSN' },
   { id: 'docs', label: 'Documents', key: 'tabDocs' },
   { id: 'amend', label: 'Amendments', key: 'tabAmend' },
+  { id: 'eco', label: 'E-commerce 14', key: 'tabEco' },
   { id: 'gstr3b', label: 'GSTR-3B' },
   { id: 'gstr2b', label: '2B match', key: 'tab2b' },
   { id: 'compliance', label: 'Compliance', key: 'tabCompliance' },
@@ -192,13 +195,14 @@ export function GstReports() {
   const label = periodLabel(period);
   const fileBase = `GSTR1_${gstin || 'all'}_${g1.fp}`;
   const am = g1.amendments;
-  const amendCount = am ? am.b2ba.length + am.b2cla.length + am.cdnra.length + am.cdnura.length + am.b2csa.length : 0;
+  const amendCount = am ? (am.expa?.length ?? 0) + am.b2ba.length + am.b2cla.length + am.cdnra.length + am.cdnura.length + am.b2csa.length : 0;
   const hasData = g1.counts.included > 0 || amendCount > 0 || !!g1.at?.length || !!g1.txpd?.length;
 
   const counts: Partial<Record<TabId, number>> = {
     b2b: g1.b2b.length, b2cl: g1.b2cl.length, b2cs: g1.b2cs.length, cdnr: g1.cdnr.length,
     cdnur: g1.cdnur.length, exp: g1.exp.length, nil: g1.nil.length, at: g1.at?.length ?? 0, txpd: g1.txpd?.length ?? 0, hsn: g1.hsn.length, docs: g1.docIssue.length,
     amend: amendCount,
+    eco: (g1.eco?.tcs.length ?? 0) + (g1.eco?.pay95.length ?? 0),
   };
 
   const printSummary = () => {
@@ -395,6 +399,7 @@ export function GstReports() {
             <p className={controls.hint} style={{ margin: 0 }}>
               {gstT('amendHint', { period: label })}
             </p>
+            {!!am?.expa?.length && <DataTable columns={amendCols()} rows={am.expa} rowKey={(r) => r.invoiceId} caption="EXPA" emptyText={empty} />}
             <h3 className={local.tbHeading}>{gstT('b2baHead')}</h3>
             <DataTable columns={amendCols()} rows={am?.b2ba ?? []} rowKey={(r) => r.invoiceId} caption="B2BA" emptyText={empty} />
             <h3 className={local.tbHeading}>{gstT('b2claHead')}</h3>
@@ -423,6 +428,12 @@ export function GstReports() {
           </>
         );
       }
+      case 'eco':
+        return (
+          <Suspense fallback={<p className={controls.hint}>Loading…</p>}>
+            <EcoView g1={g1} g3={g3} />
+          </Suspense>
+        );
       case 'composition':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
@@ -455,7 +466,7 @@ export function GstReports() {
     }
   };
 
-  const csvTabs: SectionId[] = ['b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'at', 'txpd', 'hsn', 'docs', 'amend'];
+  const csvTabs: SectionId[] = ['b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'at', 'txpd', 'hsn', 'docs', 'amend', 'eco'];
   const isCsvTab = (csvTabs as string[]).includes(tab);
 
   const t = g1.totals;

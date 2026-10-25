@@ -307,6 +307,10 @@ test('composition returns (CMP-08 / GSTR-4) read the real purchase shape: RCM ta
   assert.equal(rcm.itcNotClaimable, 0);
   const g4 = buildGstr4([], [bill, { ...bill, id: 'd', status: 'Draft' }], 2026, { filerStateCode: '27' });
   assert.equal(g4.inward.registered.value, 1000);
+  // GSTR-4 Tables 7-9 (gstr4-annual) read purchases through buildGstr4: reverse charge is tax payable in Table 8.
+  const { buildGstr4Annual } = await import('../src/lib/gstr4-annual.ts');
+  const annual = buildGstr4Annual([], [{ ...bill, reverse_charge: true }], 2026, null, { filerStateCode: '27' });
+  assert.equal(annual.table8.find((r) => r.head === 'cgst')!.taxPayable, 90);
 });
 
 test('supplierPayable: every "what we owe the vendor" reader leaves self-assessed GST out (RCM, imports)', async () => {

@@ -7,7 +7,9 @@
  *  - `buildBulkEInvoice` runs the existing single-invoice preflight on every selected
  *    invoice; the ones that pass go into ONE IRP bulk JSON (an array of v1.1 payloads,
  *    `buildEInvoiceBulk`); the rest are listed with their blocking reasons.
- *  - `buildBulkEway` does the same for e-Way Bills (`buildEwayBulk`, `billLists`).
+ *  - `buildBulkEway` does the same for e-Way Bills (`buildEwayBulk`, `billLists`). Bills of Supply (NIC
+ *    document type `BIL`) are e-Way only: `bulkCandidates(…, { billsOfSupply: true })` offers them and
+ *    `buildBulkEInvoice` lists them as blocked (no e-Invoice for a Bill of Supply).
  *  - `parseIrpResponse` + `applyIrpResponse` read the IRP bulk response and write IRN /
  *    Ack No / Ack date / signed QR (and e-Way Bill no. when the IRP generated one) into the
  *    existing `einvoice_meta` table, matched on the document number.
@@ -78,6 +80,11 @@ export interface BulkContext {
 }
 
 const E_INVOICE_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE']);
+/** Documents that move goods on an e-Way Bill but never go to the IRP (NIC document type `BIL`). */
+const EWAY_ONLY_DOC_TYPES = new Set(['BILL_OF_SUPPLY']);
+
+/** True for a document that goes into the e-Way file only (a Bill of Supply). */
+export const isEwayOnly = (inv: Pick<InvoiceRecord, 'doc_type'>) => EWAY_ONLY_DOC_TYPES.has(inv.doc_type);
 
 const label = (inv: InvoiceRecord) => inv.invoice_number || inv.id;
 
@@ -94,16 +101,18 @@ const fmtIssue = (i: { field: string; message: string }) => `${i.field}: ${i.mes
  * Invoices worth offering for a bulk file: tax documents in [from, to] (issue date, local
  * YYYY-MM-DD) that are not drafts or cancelled. B2C invoices are kept (preflight will say
  * why they are blocked); `preselect` marks the B2B / SEZ / export ones without an IRN yet.
+ * With `billsOfSupply`, Bills of Supply are offered too (`ewayOnly`, never preselected).
  */
 export function bulkCandidates(
   invoices: readonly InvoiceRecord[],
   range: { from: string; to: string },
   meta: readonly EInvoiceMeta[] = [],
-): { invoice: InvoiceRecord; preselect: boolean; hasIrn: boolean; hasEwb: boolean }[] {
+  opts: { billsOfSupply?: boolean } = {},
+): { invoice: InvoiceRecord; preselect: boolean; hasIrn: boolean; hasEwb: boolean; ewayOnly?: boolean }[] {
   const byId = new Map(meta.map((m) => [m.invoice_id, m]));
   return invoices
     .filter((i) => {
-      if (!i || !E_INVOICE_DOC_TYPES.has(i.doc_type)) return false;
+      if (!i || !(E_INVOICE_DOC_TYPES.has(i.doc_type) || (opts.billsOfSupply && EWAY_ONLY_DOC_TYPES.has(i.doc_type)))) return false;
       if (i.status === 'Draft' || i.status === 'Cancelled') return false;
       const d = String(i.issue_date ?? '').slice(0, 10);
       return d >= range.from && d <= range.to;
@@ -115,6 +124,7 @@ export function bulkCandidates(
       const hasEwb = !!m?.eway_no;
       const gstin = (invoice.client?.gstin ?? '').trim();
       const exportPos = ['96', '99'].includes((invoice.place_of_supply ?? '').trim());
+      if (EWAY_ONLY_DOC_TYPES.has(invoice.doc_type)) return { invoice, preselect: false, hasIrn, hasEwb, ewayOnly: true };
       return { invoice, preselect: !hasIrn && (/^[0-9]{2}[A-Z0-9]{13}$/i.test(gstin) || exportPos), hasIrn, hasEwb };
     });
 }
@@ -140,7 +150,8 @@ export function buildBulkEInvoice(invoices: readonly InvoiceRecord[], ctx: BulkC
   for (const inv of invoices) {
     const number = label(inv);
     const reasons = statusReasons(inv);
-    if (!E_INVOICE_DOC_TYPES.has(inv.doc_type)) reasons.push('Only tax invoices, credit notes and debit notes go to the IRP.');
+    if (EWAY_ONLY_DOC_TYPES.has(inv.doc_type)) reasons.push('Bill of Supply: no e-Invoice (it goes into the e-Way file only, document type BIL).');
+    else if (!E_INVOICE_DOC_TYPES.has(inv.doc_type)) reasons.push('Only tax invoices, credit notes and debit notes go to the IRP.');
     const m = meta.get(inv.id);
     if (m?.irn && !ctx.includeDone) reasons.push(`IRN already recorded (${m.irn.slice(0, 12)}…); generating it again would be rejected as a duplicate.`);
     const key = `${(inv.sender?.companyGstin ?? '').toUpperCase()}|${number.toUpperCase()}`;

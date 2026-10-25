@@ -31,6 +31,7 @@ An offline working paper for the GSTR-9 annual return, built from the app's own 
 | 4K / 4L, 5J / 5K | In-year amendments (`gstr1.amendments.effects`): revised − original of each amendment made in the FY, the same deltas GSTR-3B takes — an increase goes to 4K / 5J, a decrease to 4L / 5K (5J / 5K: zero-rated-without-payment, reverse-charge and nil lines). 4M = −I + J + K − L and 5L = −H + I + J − K, so 4N agrees with Table 9 |
 | Pt V (10-14) | Amendments of this FY's supplies made in the next FY: not modelled, 0 with a note |
 | 5C | Outward invoices flagged reverse charge (value only) |
+| 5C1 | Supplies through an e-commerce operator that pays tax u/s 9(5) (GSTR-1 Table 14(b), value only); row shown only when non-zero; on the form from FY 2024-25 (note for earlier years) |
 | 5D / 5E / 5F | GSTR-1 Table 8: exempt (always 0, the app has no exempt flag) / nil / non-GST |
 | 5H / 5I | Notes on SEWOP / EXPWOP / reverse-charge supplies |
 | 5N | 4N + 5M − 4G (total turnover) |
@@ -53,7 +54,7 @@ An offline working paper for the GSTR-9 annual return, built from the app's own 
 
 `comparison` rows, each with GSTR-1, GSTR-3B, books and the two differences:
 
-- **Total turnover**: 5N vs 3B 3.1(a)+(b)+(c)+(e) + outward reverse-charge value.
+- **Total turnover**: 5N vs 3B 3.1(a)+(b)+(c)+(e) + 3.1.1(ii) + outward reverse-charge value.
 - **Outward tax** per head (IGST, CGST, SGST, cess): Table 4N − 4G vs 3B 3.1(a)+(b) vs `books.gstSummary` output tax. The books column is not filtered by GSTIN and treats legacy single-rate tax as IGST.
 - **ITC availed**: bills (6I) vs 3B (6A) vs books ITC (total only).
 

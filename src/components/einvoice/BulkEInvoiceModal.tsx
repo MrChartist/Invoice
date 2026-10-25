@@ -16,6 +16,7 @@ import {
   buildBulkEInvoice,
   buildBulkEway,
   bulkCandidates,
+  isEwayOnly,
   importIrpResponse,
   type BulkBlocked,
   type IrpImportResult,
@@ -97,7 +98,9 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
     void version;
     return { invoices: getTable<InvoiceRecord>('invoices'), meta: getAllEInvoiceMeta(), links: readLinks() };
   }, [version]);
-  const candidates = useMemo(() => bulkCandidates(data.invoices, { from, to }, data.meta), [data, from, to]);
+  // Bills of Supply move goods on an e-Way Bill (NIC type BIL) but have no e-Invoice: offered on request.
+  const [withBos, setWithBos] = useState(false);
+  const candidates = useMemo(() => bulkCandidates(data.invoices, { from, to }, data.meta, { billsOfSupply: withBos }), [data, from, to, withBos]);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(candidates.filter((c) => c.preselect).map((c) => c.invoice.id)));
   const [includeDone, setIncludeDone] = useState(false);
   const [transport, setTransport] = useState<{ mode: EwayTransMode; vehicle: string; distance: string; transporterId: string }>({ mode: 'ROAD', vehicle: '', distance: '', transporterId: '' });
@@ -108,7 +111,7 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
     () => ({ now, fallbackSender, meta: data.meta, links: data.links, allInvoices: data.invoices, includeDone }),
     [now, fallbackSender, data, includeDone],
   );
-  const einv = useMemo(() => buildBulkEInvoice(selected, ctx), [selected, ctx]);
+  const einv = useMemo(() => buildBulkEInvoice(selected.filter((i) => !isEwayOnly(i)), ctx), [selected, ctx]);
   const eway = useMemo(
     () =>
       buildBulkEway(selected, {
@@ -225,6 +228,10 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
               <label className={styles.statusLine}>
                 <input type="checkbox" checked={includeDone} onChange={(e) => setIncludeDone(e.target.checked)} />
                 {einvT('includeDone')}
+              </label>
+              <label className={styles.statusLine}>
+                <input type="checkbox" checked={withBos} onChange={(e) => setWithBos(e.target.checked)} />
+                Include Bills of Supply (e-Way Bill only, document type BIL)
               </label>
 
               <div className={styles.section}>

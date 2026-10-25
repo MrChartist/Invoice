@@ -61,6 +61,35 @@ export const GSTR9_LATE_FEE_RULES: readonly Versioned<AnnualLateFeeTier[]>[] = [
   },
 ];
 
+/**
+ * GSTR-4 (composition annual return, FY 2019-20 on) late fee, CGST + SGST together, ₹; keyed by FY start.
+ * CMP-08 itself carries no late fee (it is a statement-cum-challan): only Sec 50 interest on tax paid late.
+ * Working-paper values — the FY 2019-20 / 2020-21 waivers (Notifications 67/2020 and 19/2021-CT …) are not
+ * modelled. Verify with your CA.
+ */
+export interface CompositionLateFee { perDay: number; perDayNil: number; cap: number; capNil: number }
+
+export const GSTR4_LATE_FEE_RULES: readonly Versioned<CompositionLateFee>[] = [
+  {
+    from: '2019-04-01',
+    value: { perDay: 50, perDayNil: 20, cap: 10000, capNil: 10000 },
+    source: 'Sec 47(1) (max ₹5,000 per Act); Notification 73/2017-CT (₹25 / ₹10 per Act per day) — verify',
+  },
+  {
+    from: '2021-04-01',
+    value: { perDay: 50, perDayNil: 20, cap: 2000, capNil: 500 },
+    source: 'Notification 21/2021-CT (FY 2021-22 on: max ₹1,000 + ₹1,000, nil ₹250 + ₹250) — verify',
+  },
+];
+
+/** GSTR-4 late fee (CGST + SGST) for the FY starting `fyStart`, filed on `filedOn` against `due`. */
+export function gstr4LateFee(due: string, filedOn: string, fyStart: number, nil = false): number {
+  const days = lateDays(due, filedOn);
+  if (!days) return 0;
+  const rule = ruleAt(GSTR4_LATE_FEE_RULES, `${fyStart}-04-01`);
+  return nil ? Math.min(days * rule.perDayNil, rule.capNil) : Math.min(days * rule.perDay, rule.cap);
+}
+
 /** Days late: after the due date up to and including the filing / payment day (0 if on time). */
 export function lateDays(due: string, filedOn: string): number {
   return Math.max(0, daysBetween(due, filedOn));
@@ -125,8 +154,10 @@ export function estimateFor(
 ): ReturnEstimate {
   const days = lateDays(r.due, o.filedOn);
   if (!days || r.optional) return { days: r.optional ? 0 : days, lateFee: 0, interest: 0 };
-  // Composition returns: their late-fee / interest tables are not modelled (shown as days late only).
-  if (r.form === 'CMP08' || r.form === 'GSTR4') return { days, lateFee: 0, interest: 0 };
+  // CMP-08: no late fee; Sec 50 interest on the tax paid late (cashTax = the quarter's payable).
+  if (r.form === 'CMP08') return { days, lateFee: 0, interest: gstInterest(o.cashTax ?? 0, r.due, o.filedOn, r.from) };
+  // GSTR-4: late fee only (the tax was paid through the CMP-08s).
+  if (r.form === 'GSTR4') return { days, lateFee: gstr4LateFee(r.due, o.filedOn, +r.from.slice(0, 4), o.nil), interest: 0 };
   if (r.form === 'GSTR9') {
     return { days, lateFee: gstr9LateFee(r.due, o.filedOn, +r.from.slice(0, 4), o.turnover), interest: 0 };
   }
