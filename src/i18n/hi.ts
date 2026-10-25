@@ -71,6 +71,7 @@ export const hi: Messages = {
   'nav.reconcile': 'बैंक मिलान',
   'nav.cheques': 'चेक',
   'nav.tds': 'TDS और TCS',
+  'nav.loans': 'लोन और EMI',
   'nav.payroll': 'पेरोल',
   'nav.reports': 'रिपोर्ट',
   'nav.gstReports': 'GST रिपोर्ट',

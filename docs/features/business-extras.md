@@ -143,6 +143,25 @@ unit, SKU, price incl. GST (or + GST), MRP strike-through, stock status for trac
 (`wa.me/<phone>?text=Order: …` from the profile phone, else `mailto:`). The app makes no network call; the file is
 downloaded for sharing / hosting.
 
+**Catalogue v2 (8H, roadmap 8.122)** — `buildCatalogue` / `catalogue-export.ts`:
+
+- **Photos**: catalogue items (and stock items) carry an additive `image: 'asset:<id>'`; the picture is stored once in
+  the existing `assets` table (content-hash interning, backed up / synced) and inlined as a data URI in the export.
+  Only raster data URIs (PNG / JPEG / WebP / GIF) are accepted — never SVG. Set in Settings → Items (Photo).
+- **Categories**: the catalogue item's `group_id`, else its stock item's stock group; one section per category with a
+  category bar.
+- **Badges**: "N% off MRP" when the MRP is above the price; an optional offer text badge.
+- **Cart**: the buyer adds items and quantities and sends **one** WhatsApp (or e-mail) order message with every line,
+  the total and their name (`cartMessage`, unit-tested; the inline script builds the same text). The file carries one
+  small inline script under a **hash-pinned CSP in a `<meta>` tag**: `default-src 'none'; img-src data:;
+  style-src 'sha256-…'; script-src 'sha256-…'; form-action 'none'; base-uri 'none'`. Why that is safe: no
+  `unsafe-inline`, no network, and the only script allowed is the exact constant whose hash is computed at export
+  (`cataloguePolicy`, tested against node's SHA-256); item data travels in a non-executed JSON block with `<`, `>`, `&`
+  escaped, and the script writes only `textContent` / `href`. Every value in the HTML is escaped.
+- **Script-free fallback**: "Catalogue without cart" exports under `script-src 'none'`; either file keeps an Order link
+  per item and an "Order from this category" link (the category's items listed for the buyer to fill in quantities), so
+  it works with JavaScript off.
+
 ## Wiring
 
 Done in the integration pass: `ApprovalBanner` in the invoice editor (lazy, only for pending / rejected documents);

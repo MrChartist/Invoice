@@ -57,6 +57,8 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   fx_bank_moves: { entity: 'voucher', label: 'Forex bank entry' },
   epay_batches: { entity: 'vendor_payment', label: 'e-Payment batch' },
   commission_postings: { entity: 'voucher', label: 'Commission posting' },
+  business_loans: { entity: 'voucher', label: 'Business loan' },
+  currency_rates: { entity: 'settings', label: 'Currency reference rate' },
   advances: { entity: 'advance', label: 'Advance' },
   recurring: { entity: 'recurring', label: 'Recurring schedule' },
   bank_statements: { entity: 'bank_statement', label: 'Bank statement line' },

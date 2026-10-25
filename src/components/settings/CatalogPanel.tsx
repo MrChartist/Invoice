@@ -39,6 +39,11 @@ type WeightDraft = { net: number; gross: number; unit: WeightUnit };
 const weightsOf = (i?: InvoiceItem): WeightDraft => ({ net: i?.net_weight ?? 0, gross: i?.gross_weight ?? 0, unit: i?.weight_unit === 'g' ? 'g' : 'kg' });
 
 // The label sheet (encoders + print HTML) loads only when opened.
+import { ImageSlot } from './ProfileEditor';
+import { reachT } from '../../i18n/areas/reach';
+import { itemImageData, storeItemImage } from '../../lib/item-images';
+import { stockGroupsDb } from '../../lib/stock-groups';
+
 const LabelSheetModal = lazy(() => import('./LabelSheetModal').then((m) => ({ default: m.LabelSheetModal })));
 
 const BLANK: CatalogDraft = { name: '', type: 'Service', hsn: '', unit: 'NOS', rate: 0, tax_rate: 18, barcode: '', sku: '', mrp: 0, qty_slabs: [] };
@@ -60,6 +65,8 @@ const toDraft = (i: InvoiceItem): CatalogDraft => ({
   sold_by_weight: !!i.sold_by_weight,
   plu: i.plu ?? '',
   mrp_less_percent: i.mrp_less_percent ?? 0,
+  image: i.image ?? '',
+  group_id: i.group_id ?? '',
 });
 
 const ROUNDS: RoundTo[] = ['paise', 'rupee', 'five', 'ten'];
@@ -428,6 +435,32 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                   <span className={controls.hint}>{retailT('mrpLessRate', { rate: formatCurrency(mrpLessRate({ rate: draft.rate, mrp: draft.mrp, mrp_less_percent: draft.mrp_less_percent })) })}</span>
                 )}
                 {fieldError('mrp_less_percent') && <span className={controls.error}>{fieldError('mrp_less_percent')}</span>}
+              </label>
+            </div>
+
+            {/* Catalogue v2 (8H): photo and category for the shared catalogue. */}
+            <div className={controls.row}>
+              <ImageSlot
+                label={reachT('photo')}
+                hint={reachT('photoHint')}
+                value={itemImageData(draft.image)}
+                maxDimension={480}
+                onPick={(data) => {
+                  try {
+                    setDraft({ ...draft, image: storeItemImage(data) });
+                  } catch (err) {
+                    notify((err as Error).message, 'error');
+                  }
+                }}
+                onClear={() => setDraft({ ...draft, image: '' })}
+                onError={(m) => notify(m, 'error')}
+              />
+              <label className={controls.field}>
+                <span className={controls.label}>{reachT('category')}</span>
+                <select className={controls.select} value={draft.group_id ?? ''} onChange={(e) => setDraft({ ...draft, group_id: e.target.value })}>
+                  <option value="">{reachT('noCategory')}</option>
+                  {stockGroupsDb.all().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
               </label>
             </div>
 

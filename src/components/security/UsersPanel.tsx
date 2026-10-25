@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Info, KeyRound, Trash2, UserPlus, Users } from 'lucide-react';
+import { lazy, Suspense, useState } from 'react';
+import { Info, KeyRound, SlidersHorizontal, Trash2, UserPlus, Users } from 'lucide-react';
+import { rightsT } from '../../i18n/areas/rights';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { OWNER_ID, isValidPinFormat, listUsers, type UserSummary } from '../../lib/auth';
 import { ASSIGNABLE_ROLES, MAX_NAME, MAX_USERS, addUser, removeUser, resetUserPin, setUserRole, type AssignableRole, type UserResult } from '../../lib/users';
@@ -13,6 +14,8 @@ import styles from './Security.module.css';
 interface Props {
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
 }
+
+const RightsEditor = lazy(() => import('./RightsEditor').then((m) => ({ default: m.RightsEditor })));
 
 const digits = (v: string) => v.replace(/\D/g, '').slice(0, 6);
 const problem = (r: UserResult) => (r.ok ? '' : secT(`ue.${r.reason}`, { n: r.reason === 'too-many' ? MAX_USERS : MAX_NAME }));
@@ -35,6 +38,8 @@ export function UsersPanel({ notify }: Props) {
   const [resetFor, setResetFor] = useState<UserSummary | null>(null);
   const [resetPin, setResetPin] = useState('');
   const [removing, setRemoving] = useState<UserSummary | null>(null);
+  // Finer rights (8H): the editor loads only when opened.
+  const [rightsFor, setRightsFor] = useState<UserSummary | null>(null);
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +121,9 @@ export function UsersPanel({ notify }: Props) {
                       <option key={r} value={r}>{roleLabel(r)}</option>
                     ))}
                   </select>
+                  <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setRightsFor(u)}>
+                    <SlidersHorizontal size={14} /> {rightsT('button')}
+                  </button>
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => { setResetFor(u); setResetPin(''); }}>
                     <KeyRound size={14} /> {secT('resetPin')}
                   </button>
@@ -192,6 +200,11 @@ export function UsersPanel({ notify }: Props) {
         </form>
       </div>
 
+      {rightsFor && (
+        <Suspense fallback={null}>
+          <RightsEditor user={rightsFor} notify={notify} onClose={() => { setRightsFor(null); refresh(); }} />
+        </Suspense>
+      )}
       <ConfirmDialog
         open={!!removing}
         destructive

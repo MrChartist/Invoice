@@ -80,6 +80,8 @@ export interface StockItem {
   /** `stock_groups` row (absent = Primary) and `stock_categories` row (absent = not categorised). */
   group_id?: string;
   category_id?: string;
+  /** Additive (8H catalogue v2): photo as an `asset:<id>` reference (`item-images.ts`). */
+  image?: string;
   /** Alternate units: 1 `unit` = `factor` base units (`src/lib/units.ts`). Lines snapshot `unit_factor`. */
   alt_units?: { unit: string; factor: number }[];
   /** Standard cost and selling price lists, each rate effective from `from` (yyyy-mm-dd) until the next entry. */

@@ -69,3 +69,12 @@ Working papers — verify with your CA before filing or importing.
 - Sales reports (`src/lib/sales-reports.ts`) and the TDS register stay INR-only, as before. Foreign documents are counted as excluded.
 - There is no per-date rate table, so the rate is typed per invoice. The country code for `ExpDtls.CntCode` is still entered in the e-Invoice modal.
 - Charges cannot be marked tax-inclusive. A credit note still never credits charges (see `docs/qa/logic.md`).
+
+## Currency master — dated reference rates (8H, roadmap 8.125)
+
+Settings → Defaults → **Currency reference rates** (`src/lib/currency-rates.ts`, table `currency_rates`, `master.edit`):
+₹ per unit by date, typed by hand or imported from a CSV of RBI / FBIL reference rates the user downloaded (wide
+`Date, USD, GBP, EUR, 100 JPY …` or long `Date, Currency, Rate`; dd-mm-yyyy / dd-Mon-yyyy / ISO dates; "100 JPY" columns
+are divided by 100). One rate per currency and day. A foreign-currency document with no exchange rate yet picks the
+latest rate dated on or before its own date (`rateOn`) and says which one it used; the user can type another. The rate
+for GST valuation / customs is the one notified for that purpose — verify with your CA.
