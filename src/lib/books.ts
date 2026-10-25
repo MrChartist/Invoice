@@ -29,7 +29,8 @@ import { toCsv } from './csv';
 import { isVoidStatus, readPurchase, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
-import type { VendorPayment } from '../types/purchases';
+import type { PurchaseReturn, VendorPayment } from '../types/purchases';
+import { booksReturnEffects } from './purchase-returns-gst';
 import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment } from './advance-tax';
 
 /* ════════════════════════════════════════════════════════════════
@@ -114,6 +115,8 @@ export interface BooksData {
   vendorPayments?: VendorPayment[];
   /** Advance receipts (5.3, `advances` table). Optional so older callers / fixtures stay valid. */
   advances?: AdvanceRecord[];
+  /** Additive (WP-3): purchase returns / supplier credit notes (`purchase_returns`). Optional. */
+  purchaseReturns?: PurchaseReturn[];
 }
 
 export const EMPTY_BOOKS: BooksData = {
@@ -808,6 +811,10 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
         ref: p.id,
       });
     }
+    // WP-3: purchase returns / supplier credit notes take the cost back on the note date.
+    for (const r of booksReturnEffects(data.purchaseReturns)) {
+      events.push({ date: r.date, kind: 'expense', amount: -r.cost, category: r.category, direct: !r.isExpense, ref: r.ref });
+    }
   } else {
     const byId = new Map(purchases.map((p) => [p.id, p]));
     const paidRows = new Map<string, number>();
@@ -1088,6 +1095,13 @@ export function balanceSheet(data: BooksData, asOf: string): BalanceSheet {
     selfTax += p.selfTax;
     itc += purchaseItc(p);
   }
+  // WP-3: purchase returns / supplier notes reduce what we owe, the ITC and any self-assessed GST.
+  for (const r of booksReturnEffects(data.purchaseReturns)) {
+    if (!upTo(r.date)) continue;
+    purchTotal -= r.payable;
+    selfTax -= r.selfTax;
+    itc -= r.itc;
+  }
   // Same rule on the payables side: cash that left the bank always reduces payables.
   let paid = 0;
   // TDS we deducted (on bills and on payments) is owed to the government, not the supplier.
@@ -1174,6 +1188,7 @@ export function loadBooksData(): BooksData {
     openings: loadOpenings(),
     advances: getTable<AdvanceRecord>(ADVANCES_TABLE),
     vendorPayments: getTable<VendorPayment>('vendor_payments'),
+    purchaseReturns: getTable<PurchaseReturn>('purchase_returns'),
   };
 }
 

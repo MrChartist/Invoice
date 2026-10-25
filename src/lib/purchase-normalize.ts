@@ -305,6 +305,8 @@ export interface PurchaseLineCore {
   mrp: number;
   serials: string[];
   godownId: string;
+  /** Additive (WP-3): the receipt-note (GRN) line this bill line bills, or ''. */
+  grnLineId: string;
 }
 
 /** The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. */
@@ -329,6 +331,7 @@ export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
       mrp: Math.max(num(line.mrp), 0),
       serials: Array.isArray(line.serials) ? line.serials.map((x) => str(x)).filter(Boolean) : [],
       godownId: pickStr(line, ['godown_id']),
+      grnLineId: pickStr(line, ['grn_line_id']),
     });
   }
   return out;

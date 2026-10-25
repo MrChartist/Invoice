@@ -1,0 +1,66 @@
+/* Purchase returns, receipt notes and pending reports (WP-3). Tokens only — no raw colours. */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.barGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.name {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.sub {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.foot {
+  margin: 0;
+  padding: 0.75rem 1.25rem 1rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.sectionHead {
+  margin: 0;
+  padding: 1rem 1.25rem 0.5rem;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.qty {
+  width: 6.5rem;
+}
+
+.rate {
+  width: 8rem;
+}
+
+.inlineEdit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.inlineEdit > * {
+  flex: 1 1 160px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}

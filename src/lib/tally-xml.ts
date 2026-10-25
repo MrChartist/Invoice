@@ -40,6 +40,7 @@ import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-ca
 import { fxNarration, inrTotals, inrValue } from './fx';
 import { receivableTotal } from './rcm';
 import { advanceMovements } from './advance-tax';
+import { debitNoteVouchers } from './tally-debit-notes';
 import {
   clean,
   emptySource,
@@ -210,7 +211,7 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
 
 /* ── Voucher model (pure data — what the tests assert on) ─────── */
 
-export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase' | 'Payment';
+export type TallyVoucherType = 'Sales' | 'Credit Note' | 'Receipt' | 'Purchase' | 'Payment' | 'Debit Note';
 export type Side = 'Dr' | 'Cr';
 
 export interface TallyEntry {
@@ -624,6 +625,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         inventoryLedger: '',
       });
     }
+    vouchers.push(...debitNoteVouchers(source.purchaseReturns, o, addLedger)); // WP-3: purchase returns (tally-debit-notes.ts)
   }
 
   // Only keep tax/std ledgers that vouchers actually use.
@@ -633,7 +635,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     .sort((a, b) => a.parent.localeCompare(b.parent) || a.name.localeCompare(b.name));
   const stockItems = [...stockMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 
-  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, Receipt: 3, Payment: 4 };
+  const typeOrder: Record<TallyVoucherType, number> = { Sales: 0, 'Credit Note': 1, Purchase: 2, 'Debit Note': 2.5, Receipt: 3, Payment: 4 };
   vouchers.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||

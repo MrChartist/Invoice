@@ -235,6 +235,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   vendor_payments: 'books.edit',
   // Number high-water marks: written alongside a payment / transfer / PO / advance save (integrity review).
   series_counters: 'books.edit',
+  // WP-3: purchase returns / supplier notes, receipt notes (GRN) and rejections out
+  purchase_returns: 'books.edit',
+  receipt_notes: 'books.edit',
 };
 
 let systemDepth = 0;

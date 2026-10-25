@@ -320,6 +320,8 @@ const RECORD_TABLES = [
   'series_counters',
   // GSTR-4 typed-in Tables 7-9 per FY × GSTIN (5.9)
   'gstr4_manual',
+  // WP-3: purchase returns / supplier notes, receipt notes (GRN) and rejections out
+  'purchase_returns', 'receipt_notes',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -330,6 +332,7 @@ const ID_TABLES = new Set([
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   'series_counters',
   'gstr4_manual',
+  'purchase_returns', 'receipt_notes',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

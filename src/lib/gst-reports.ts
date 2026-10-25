@@ -46,6 +46,8 @@ import { b2clThreshold, b2clThresholdLabel, ecoReporting, hsnMinDigits, hsnTable
 import { checkEcoGstin, ecoOf } from './eco';
 import type { EcoSection } from '../types/invoice';
 import type { AdvanceMovement } from './advance-tax';
+import type { PurchaseReturn } from '../types/purchases';
+import { itcAdjustmentsFromNotes } from './purchase-returns-gst';
 
 /* ───────────────────────── Period ───────────────────────── */
 
@@ -465,6 +467,8 @@ export interface BuildOptions {
   turnover?: number;
   /** Advance movements (`advanceTaxEvents` in advance-tax.ts) for GSTR-1 Table 11 and 3B 3.1(a). */
   advances?: readonly AdvanceMovement[];
+  /** Additive (WP-3): `purchase_returns` rows — supplier notes dated in the period reduce ITC (`itcAdjustmentsFromNotes`). */
+  purchaseNotes?: readonly PurchaseReturn[];
 }
 
 /**
@@ -1647,6 +1651,8 @@ export function buildGstReport(
       });
     }
   }
+  // WP-3: purchase returns / supplier credit notes in the period reduce ITC (negative rows, same tables as their bills).
+  purchases.push(...itcAdjustmentsFromNotes(opts.purchaseNotes ?? [], (d) => inPeriod(d, opts.period)));
   if (purchases.length === 0) {
     issues.push({
       id: 'NO_PURCHASES',

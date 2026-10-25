@@ -39,11 +39,12 @@
  * Pure apart from the `gstr2bActionsDb` storage helpers at the bottom.
  */
 
-import type { PurchaseRecord } from '../types/purchases';
+import type { PurchaseRecord, PurchaseReturn } from '../types/purchases';
 import { round2 } from './invoice-calc';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { normalizePurchase } from './gst-reports';
 import { checkGstin } from './gstin';
+import { notesAsBookBills } from './purchase-returns-gst';
 import { generateId, getTable, setTable } from './storage';
 import type { XlsxWorkbook } from './xlsx';
 
@@ -494,10 +495,15 @@ export interface BookBill {
   boeNumber: string;
   /** Counted in GSTR-3B Table 4A(5) by the books-based report (same rule as buildGstr3b). */
   in4a5: boolean;
+  /** Additive (WP-3): -1 for a purchase return / supplier credit note (matches 2B CDNR credit notes). */
+  sign?: 1 | -1;
 }
 
-/** Bills from the `purchases` table, read exactly as the GST report reads them (void / draft excluded). */
-export function bookBills(rawPurchases: readonly unknown[], filerStateCode: string): BookBill[] {
+/**
+ * Bills from the `purchases` table, read exactly as the GST report reads them (void / draft excluded),
+ * plus (WP-3) the purchase returns / supplier credit notes from `purchase_returns` as credit-note rows.
+ */
+export function bookBills(rawPurchases: readonly unknown[], filerStateCode: string, notes: readonly PurchaseReturn[] = []): BookBill[] {
   const out: BookBill[] = [];
   for (const raw of rawPurchases ?? []) {
     const p = normalizePurchase(raw, filerStateCode);
@@ -523,6 +529,7 @@ export function bookBills(rawPurchases: readonly unknown[], filerStateCode: stri
       in4a5: !p.importType && !p.reverseCharge && tax > 0 && (p.itcEligible || blocked),
     });
   }
+  out.push(...notesAsBookBills(notes));
   return out;
 }
 
@@ -577,6 +584,8 @@ function compare(line: Gstr2bLine, bill: BookBill, tol: number, dateTol: number)
 
 /** Bills a 2B section can be matched to. */
 function sectionAccepts(line: Gstr2bLine, b: BookBill): boolean {
+  // A 2B credit note matches only a books credit note (WP-3), and an invoice / debit note only a bill.
+  if ((line.sign < 0) !== ((b.sign ?? 1) < 0)) return false;
   if (line.section === 'IMPG') return b.importType === 'GOODS';
   if (line.section === 'IMPGSEZ') return b.importType === 'GOODS' || b.gstin === line.ctin;
   return b.importType !== 'GOODS';
@@ -613,7 +622,7 @@ export function matchGstr2b(data: Pick<Gstr2bData, 'lines'>, bills: readonly Boo
   // Fallback: same GSTIN, same tax within tolerance, date within tolerance, exactly one candidate.
   const fuzzy = new Map<string, BookBill>();
   for (const line of pending) {
-    if (!line.ctin || line.sign < 0) continue;
+    if (!line.ctin) continue;
     const cands = (byGstin.get(line.ctin) ?? []).filter(
       (b) =>
         !used.has(b.id) &&
@@ -635,7 +644,7 @@ export function matchGstr2b(data: Pick<Gstr2bData, 'lines'>, bills: readonly Boo
     if (!line.itcAvailable) cls = 'itc_unavailable';
     else if (!bill) cls = 'missing_in_books';
     else cls = diffs.length ? 'mismatch' : 'matched';
-    rows.push({ key: line.key, cls, line, bill, diffs, taxDiff: bill ? round2(line.sign * taxOf(line) - bill.tax) : 0 });
+    rows.push({ key: line.key, cls, line, bill, diffs, taxDiff: bill ? round2(line.sign * taxOf(line) - (bill.sign ?? 1) * bill.tax) : 0 });
   }
 
   for (const b of bills) {
@@ -740,7 +749,7 @@ export function itcEffect(
   range: { from: string; to: string },
 ): ItcEffect {
   const books = zero3();
-  for (const b of bills) if (b.in4a5 && b.date >= range.from && b.date <= range.to) add3(books, b);
+  for (const b of bills) if (b.in4a5 && b.date >= range.from && b.date <= range.to) add3(books, b, b.sign ?? 1);
 
   const restricted = zero3();
   const per2b = zero3();

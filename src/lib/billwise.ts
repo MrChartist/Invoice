@@ -10,7 +10,8 @@
  * Pure above the "Storage" divider. Working papers — verify with your CA.
  */
 
-import type { PurchaseRecord, Vendor, VendorPayment } from '../types/purchases';
+import type { PurchaseRecord, PurchaseReturn, Vendor, VendorPayment } from '../types/purchases';
+import { isLiveNote, noteSupplierAmount } from './purchase-returns-gst';
 import { requireAccess } from './access';
 import { audit } from './audit';
 import { daysBetween } from './compliance';
@@ -68,6 +69,8 @@ export interface OpenAdvance {
   ref: string;
   amount: number;
   unallocated: number;
+  /** WP-3: set when this open item is the on-account part of a purchase return / supplier note (not adjustable here). */
+  noteId?: string;
 }
 
 export interface PartyPayables {
@@ -92,6 +95,8 @@ export interface PayablesInput {
   ageBy?: 'due' | 'bill';
   /** Include fully settled bills (party ledger view). */
   includeSettled?: boolean;
+  /** WP-3: purchase returns / supplier notes — an Agst Ref adjustment on their bill, any excess on account. */
+  returns?: readonly PurchaseReturn[];
 }
 
 const emptyBuckets = (): Record<AgeBucket, number> => ({ notDue: 0, d0_30: 0, d31_60: 0, d61_90: 0, d90plus: 0 });
@@ -108,6 +113,10 @@ export function billwisePayables(input: PayablesInput): PartyPayables[] {
     for (const a of vp.allocations ?? []) {
       adjByBill.set(a.purchase_id, [...(adjByBill.get(a.purchase_id) ?? []), { date: a.date, amount: num(a.amount), ref: vp.kind === 'NEW_REF' ? vp.ref_name || 'New ref' : vp.kind === 'ADVANCE' ? 'Advance' : 'On account' }]);
     }
+  }
+  for (const n of input.returns ?? []) {
+    if (!isLiveNote(n) || !n.purchase_id || !(num(n.adjusted_amount) > 0)) continue;
+    adjByBill.set(n.purchase_id, [...(adjByBill.get(n.purchase_id) ?? []), { date: n.date, amount: num(n.adjusted_amount), ref: n.note_number }]);
   }
   const msme = new Map<string, number>();
   try {
@@ -164,6 +173,15 @@ export function billwisePayables(input: PayablesInput): PartyPayables[] {
     const p = party(vp.vendor_id, vp.vendor_name);
     p.advances.push({ id: vp.id, kind: vp.kind, date: vp.date, ref: vp.ref_name || vp.reference || '', amount: round2(num(vp.amount)), unallocated });
     p.advancesTotal = round2(p.advancesTotal + unallocated);
+  }
+  // WP-3: the part of a note not adjusted against a bill is a debit on the supplier's account.
+  for (const n of input.returns ?? []) {
+    if (!isLiveNote(n) || n.date > asOf) continue;
+    const open = round2(noteSupplierAmount(n) - (n.purchase_id && billIds.has(n.purchase_id) ? num(n.adjusted_amount) : 0));
+    if (open <= 0.004 && !input.includeSettled) continue;
+    const p = party(n.vendor_id, n.vendor_name);
+    p.advances.push({ id: n.id, kind: 'ON_ACCOUNT', date: n.date, ref: n.note_number, amount: round2(noteSupplierAmount(n)), unallocated: Math.max(open, 0), noteId: n.id });
+    p.advancesTotal = round2(p.advancesTotal + Math.max(open, 0));
   }
   for (const p of parties.values()) {
     p.bills.sort((a, b) => a.due.localeCompare(b.due) || a.date.localeCompare(b.date));

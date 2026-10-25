@@ -231,6 +231,16 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.18 | ⏳ **Employee master / payroll vouchers** in Create, **TDS** statutory rows (7.1–7.3), **Ratio analysis** report (7.6) | add through `GATEWAY_EXTENSIONS` when those modules exist | S |
 | 7.19 | ⏳ Bill-wise references (7.5) and voucher classes (7.4) on Gateway voucher entry, single-entry mode | needs a voucher schema addition | M |
 
+### Purchase returns, receipt notes, order outstanding (WP-3)
+
+| # | Item | Tally equivalent | Status |
+|---|---|---|---|
+| 7.20 | ✅ **Purchase return / supplier debit note** against a bill (`DN/FY<yy-yy>/<seq>`): quantity limited to billed less earlier returns, goods leave stock, ITC reversed, GST "reason for note", Agst Ref on the bill (bill-wise / payables), excess on account; Dr Creditors / Cr Purchase returns (5010) + input heads (`src/lib/purchase-returns.ts`, `ledger/postings-returns.ts`, `docs/features/purchase-returns.md`) | Debit Note (Ctrl+F9) | done |
+| 7.21 | ✅ **Supplier credit note received** (supplier's number / date, value only or with goods, with or without a bill); GSTR-3B ITC net of notes (`itcAdjustmentsFromNotes`), GSTR-2B CDNR matching (`bookBills` notes), Tally Debit Note voucher (`tally-debit-notes.ts`) | Debit Note with supplier ref | done |
+| 7.22 | ✅ **Receipt note (GRN)** → bill (PO → GRN → bill), **Rejections Out**, "Goods received not billed" (`src/lib/receipt-notes.ts`, stock source `events-returns.ts`) | Receipt Note (Alt+F9), Rejections Out | done |
+| 7.23 | ✅ **Purchase order outstanding** report (GRN-accepted + directly billed vs ordered, overdue days) | Purchase Order Outstandings | done |
+| 7.24 | Job work in / out (Rule 55 challans, 1 / 3-year return clocks, job-worker godowns) + **ITC-04** working paper; Rejections In (customer rejects a challan); sales-order outstanding (WP-8); GSTR-9 Table 6 / 9C use of supplier notes; TDS adjustment on a return of a TDS bill | Job Work Out / In Orders, Material Out / In, ITC-04 | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

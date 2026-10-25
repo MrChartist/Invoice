@@ -8,6 +8,7 @@
 
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
+import type { PurchaseReturn } from '../types/purchases';
 import { chargesAreTaxed, num, round2 } from './invoice-calc';
 import { inrRecord } from './fx';
 import { rcmTaxOf, supplierView } from './rcm';
@@ -99,6 +100,8 @@ export interface ExportSource {
   vendors: unknown[];
   /** Advance receipts (5.3). Optional: absent = none. */
   advances?: AdvanceRecord[];
+  /** Additive (WP-3): purchase returns / supplier credit notes (`purchase_returns`). Optional. */
+  purchaseReturns?: PurchaseReturn[];
 }
 
 export function emptySource(): ExportSource {

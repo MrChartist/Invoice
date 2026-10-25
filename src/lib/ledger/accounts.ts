@@ -160,6 +160,7 @@ export const A = {
   interestIncome: 'interest_income',
   fxGain: 'fx_gain',
   purchases: 'purchases',
+  purchaseReturns: 'purchase_returns', // WP-3 (P0-5): debit notes / supplier credit notes
   directExp: 'direct_exp',
   freightIn: 'freight_in',
   salaries: 'salaries',
@@ -241,6 +242,7 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   // Realised exchange differences (6.19): credit = gain, debit = loss (net shown under other income).
   def(A.fxGain, '4930', 'Foreign exchange gain / loss', 'OTHER_INCOME'),
   def(A.purchases, '5000', 'Purchases', 'PURCHASES'),
+  def(A.purchaseReturns, '5010', 'Purchase returns (debit notes)', 'PURCHASES'), // WP-3 (P0-5)
   def(A.directExp, '5100', 'Direct expenses', 'DIRECT_EXPENSES'),
   def(A.freightIn, '5110', 'Freight inward', 'DIRECT_EXPENSES'),
   def(A.salaries, '6000', 'Salaries & wages', 'EMPLOYEE'),
