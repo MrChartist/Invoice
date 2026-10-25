@@ -128,7 +128,9 @@ from the same or a third device), the listing's "current" side is updated to it 
 version supersedes both sides). A resolution first re-scans local data: if the current version is no longer the one
 that was listed (e.g. you edited the record after it was listed), nothing is written, the listing is refreshed and you
 are asked to choose again. So neither choice can bring back an older copy over a newer edit. Resolving needs the
-`doc.edit` permission (rows, duplicates) or `settings.manage` (singletons) of the local roles (6.21).
+`doc.edit` permission plus the table's own right (masters / books, `requireTableWrite`) for rows, or `settings.manage`
+for singletons, under the local roles (6.21): a viewer can never resolve. Merging another device's changes is not a user
+edit, so the merge-apply writes run as the app (`asSystem`) and a clerk / viewer session still receives them.
 
 ## Numbering safety
 Two devices can issue the same `INV/FY26-27/0007`. After every merge the engine groups documents by the canonical

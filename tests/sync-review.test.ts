@@ -11,6 +11,7 @@ import { DB_PREFIX, SINGLETON_KEYS, getTable, readRaw, removeRaw, setJson, setTa
 import { buildBackup, restoreBackup } from '../src/lib/backup.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { AUDIT_TABLE, audit } from '../src/lib/audit.ts';
+import { setActorProvider } from '../src/lib/access.ts';
 import * as R from '../src/lib/recurring.ts';
 import { makeDraft } from '../src/store/invoice-defaults.ts';
 import {
@@ -464,4 +465,40 @@ test('13: an amount_paid-only change to a bill in the locked period syncs (the p
   await sync(A);
   await on(A, () => assert.equal((loadConflicts()[0] as RowConflict)?.reason, 'locked'));
   assert.ok(hashStr('x'));
+});
+
+/* ── Roles (6.21) ───────────────────────────────────────────────── */
+
+test('roles: a viewer-session device still receives remote changes, but cannot resolve a conflict', async () => {
+  await on(A, () => {
+    setTable('clients', [client('c1', 'Acme')]);
+    setTable('vendors', [{ id: 'v1', name: 'Vendor' }]);
+  });
+  await sync(A);
+  await sync(B);
+  await on(A, () => setTable('clients', [client('c1', 'Acme', { city: 'A-city' })]));
+  await on(B, () => {
+    setTable('clients', [client('c1', 'Acme', { city: 'B-city' })]);
+    setTable('vendors', [{ id: 'v1', name: 'Vendor renamed' }]);
+  });
+  await sync(B);
+  setActorProvider(() => ({ id: 'u2', name: 'Viewer', role: 'viewer' }));
+  try {
+    const r = await sync(A);
+    assert.ok(r.ok, r.message);
+    await on(A, async () => {
+      assert.equal(getTable<{ name: string }>('vendors')[0].name, 'Vendor renamed', 'merge applied (system write)');
+      const c = loadConflicts().find((x) => x.kind === 'row')!;
+      const res = await resolveConflict(c.id, 'theirs', me(A));
+      assert.equal(res.ok, false, 'viewer cannot resolve');
+      assert.equal(byId('c1')?.city, 'A-city');
+    });
+  } finally {
+    setActorProvider(null);
+  }
+  await on(A, async () => {
+    const c = loadConflicts().find((x) => x.kind === 'row')!;
+    assert.equal((await resolveConflict(c.id, 'theirs', me(A))).ok, true, 'owner can');
+    assert.equal(byId('c1')?.city, 'B-city');
+  });
 });

@@ -22,7 +22,7 @@ import { numberKey, parseDocNumber } from './invoice-number';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { isDateLocked, normalizeLockDate } from './period-lock';
 import { activeCompanyId } from './company-registry';
-import { requireAccess, type AccessAction } from './access';
+import { asSystem, requireAccess, requireTableWrite, type AccessAction } from './access';
 import { SNAPSHOT_TABLES, ASSET_TABLE, parseAssets, referencedAssets } from './assets';
 import { companySyncPrefs, setCompanySyncPrefs, type SyncRunSummary } from './sync-device';
 import {
@@ -1138,7 +1138,8 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
   const state = ctx.state;
   let committed: { changed: string[]; texts: Record<string, string | null> };
   try {
-    committed = commit(ctx.work, proj);
+    // Another device's changes are not a user edit: the table-level role guard does not apply (6.21).
+    committed = asSystem(() => commit(ctx.work, proj));
   } catch (err) {
     return { ...report, ok: false, reason: 'error', message: `Sync could not apply the changes, so nothing was changed: ${(err as Error)?.message ?? err}` };
   }
@@ -1165,11 +1166,11 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
   Object.assign(report, ctx.stats, { peers: reads.length, conflicts: ctx.conflicts.length });
   if (ctx.stats.added + ctx.stats.updated + ctx.stats.deleted + ctx.stats.newConflicts > 0) {
     const parts = [`${ctx.stats.added} added`, `${ctx.stats.updated} changed`, `${ctx.stats.deleted} deleted`];
-    audit.record({
+    asSystem(() => audit.record({
       entity: 'system', entity_id: 'sync', action: 'import',
       summary: `Folder sync from ${names.join(', ') || 'other devices'}: ${parts.join(', ')}` +
         (ctx.stats.newConflicts ? `; ${ctx.stats.newConflicts} conflict${ctx.stats.newConflicts === 1 ? '' : 's'} to review` : ''),
-    });
+    }));
   }
   // Payload is taken now, from the exact state that was just committed.
   const payload = buildPayload(state, ctx.work, o.device, o.prefix);
@@ -1182,7 +1183,7 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
   state.key_h = keyH;
   state.last_sync = at;
   noteHighWater(state.clock);
-  saveMeta(state, ctx.conflicts, logs);
+  asSystem(() => saveMeta(state, ctx.conflicts, logs));
   for (const k of committed.changed) noteExternalChange(k);
 
   // 4. Attachment files: fetch the ones records now point at, upload this device's new ones.
@@ -1198,7 +1199,7 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
         const dir = await dirs.blobs.getDirectoryHandle(blobDirName(dev));
         const raw = await withRetry(() => readSealed(dir, `${id}${BLOB_EXT}`, o.key, 'blob', dev, [o.group, 'blob', dev, id]), attempts, delay);
         if (parseStoredAttachment(raw)?.id !== id) continue;
-        writeRaw(attachmentKey(id), raw);
+        asSystem(() => writeRaw(attachmentKey(id), raw));
         have.add(id);
         report.blobsIn++;
         got = true;
@@ -1247,7 +1248,7 @@ async function runSyncInner(o: SyncRunOptions): Promise<SyncReport> {
     }
   }
   if (report.ok && report.unreadable.length) report.message = `${report.unreadable.length} device file${report.unreadable.length === 1 ? '' : 's'} could not be used this time.`;
-  saveMeta(state);
+  asSystem(() => saveMeta(state));
   return report;
 }
 
@@ -1304,7 +1305,16 @@ export function resolveConflict(id: string, choice: Resolution, device: { id: st
       saveMeta(state, rest);
       return { ok: true };
     }
-    const denied = need(c.kind === 'single' ? 'settings.manage' : 'doc.edit');
+    // A person chooses here, so their role applies (a viewer can never resolve): the general edit right,
+    // plus the table's own right (masters / books) or settings for singletons.
+    let denied = need(c.kind === 'single' ? 'settings.manage' : 'doc.edit');
+    if (!denied && c.kind === 'row') {
+      try {
+        requireTableWrite(c.key.slice(DB_PREFIX.length));
+      } catch (err) {
+        denied = (err as Error)?.message || 'You do not have permission to change that.';
+      }
+    }
     if (denied) return { ok: false, message: denied };
     const self = device.id;
     const work = loadWork();
