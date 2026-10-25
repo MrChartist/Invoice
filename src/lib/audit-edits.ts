@@ -69,6 +69,10 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   gst_refunds: { entity: 'gst', label: 'GST refund claim' },
   isd_documents: { entity: 'gst', label: 'ISD document' },
   tds_justifications: { entity: 'tds', label: 'TRACES justification import' },
+  // 8D
+  gst_followups: { entity: 'gst', label: 'Supplier follow-up (2B)' },
+  gstr2b_itc: { entity: 'gst', label: '2B ITC pushed to 3B' },
+  gstr1_snapshots: { entity: 'gst', label: 'GSTR-1 as filed' },
   pos_day_close: { entity: 'pos_day_close', label: 'POS day close' },
   pos_returns: { entity: 'invoice', label: 'POS return' },
   doc_links: { entity: 'invoice', label: 'Document link' },

@@ -284,6 +284,11 @@ export interface SenderProfile {
   gst_scheme?: GstScheme;
   /** Additive: what kind of composition taxpayer — decides the rate (`compositionRate` in tax-rules). */
   composition_category?: CompositionCategory;
+  /**
+   * Additive (8D, 8.60): aggregate annual turnover (AATO, ₹) for e-invoicing — drives the e-invoice mandate check and
+   * the 30-day IRP reporting window (AATO ≥ ₹10 crore from 1 Apr 2025). Absent = unknown (no window shown).
+   */
+  einvoice_aato?: number;
 }
 
 /** GST registration type of a sender profile. */

@@ -459,6 +459,20 @@ What Khatabook / OkCredit / Vyapar / myBillBook users do every day, offline: `wa
 | 8.6 | ✅ **Due dates in shop use**: the party's credit days set the due date of a new document; the editor nudges for a due date on an unpaid bill | `useInvoiceStore.ts`, `DocumentMetaCard.tsx` | done |
 | 8.7 | ⏳ 8A follow-ups: balance snapshot on recurring / converted / late-fee documents issued outside the editor, per-party reminder language, statement web page from list rows, non-INR khata | — | open |
 
+### 8D · GST guards 2025–26 (`docs/features/einvoice.md`, `docs/features/gst-reports.md`, `docs/features/gstr2b.md`, `docs/features/compliance.md`)
+
+Statutory values date-keyed and append-only in the lazy `src/lib/gst-guards.ts` (not in the first-paint `tax-rules.ts`). Working papers — verify with your CA.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.60 | ✅ **IRP 30-day reporting window** (AATO ≥ ₹10 crore from 1 Apr 2025, invoices + credit / debit notes; ≥ ₹100 crore invoices from 1 Nov 2023): profile `einvoice_aato`, countdown in the e-Invoice dialog and the bulk list, GST guards list, bell at day 20 / day 27 (and once closed) for documents still without an IRN | `gst-guards.ts`, `IrpWindowNote.tsx`, `gst-guard-alerts.ts` | done |
+| 8.61 | ✅ **GSTR-1A working paper**: freeze the GSTR-1 as filed (`gstr1_snapshots`), later same-period additions / changes / removals listed (B2B / B2CL / CDNR / CDNUR / EXP + B2CS), closed once the period's 3B is marked filed; **GSTR-3B Table 3.2** as per GSTR-1 vs books per POS with the date-keyed lock (non-editable from the Apr 2025 period per advisory 11 Apr 2025, editable again per advisory 16 May 2025) | `gst-guards.ts`, `Gst8dPanel.tsx` (GST guards tab, under GSTR-3B) | done |
+| 8.62 | ✅ **Three-year time bar** (Sec 37(5) / 39(11) / 44(2) / 52(13), portal from 1 Aug 2025): "becomes barred on …" list on the Compliance tab (with "mark filed") and a bell notice 90 days ahead | `timeBarFor` / `timeBarList`, `Gst8dPanel.tsx` | done |
+| 8.63 | ✅ **Vendor follow-up from the 2B match** (Clear pattern): per-supplier note (not in 2B, value / tax / head / date / number differences, not in books) by WhatsApp / e-mail / PDF, "followed up on" marks (`gst_followups`); **matched ITC pushed** to a Table 4 panel under GSTR-3B (`gstr2b_itc`) | `gst-followup.ts`, `VendorFollowUp.tsx` | done |
+| 8.64 | ✅ **One cancel flow** (TallyPrime 7.0 pattern): cancelling a document with an IRN / EWB prepares the EWB + IRN cancel JSON together, shows the 24-hour deadlines (EWB first; after 24 h → credit note / recipient rejection) and tracks `einvoice_meta.irn_cancel` / `ewb_cancel` | `einvoice-cancel.ts`, `EinvCancelPanel.tsx` (in the cancel dialog) | done |
+| 8.65 | ✅ **GST exceptions** ("uncertain transactions"): missing HSN on B2B lines, POS vs GSTIN state, rate outside the date-keyed slab table (GST 2.0 from 22 Sep 2025), B2CL threshold edge (±5%), missing IRN where e-invoicing is mandatory (date-keyed mandate thresholds) | `gstExceptions`, GST guards tab | done |
+| 8.66 | ⏳ 8D follow-ups: Table 3.2 split for composition dealers / UIN holders; GSTR-1A JSON; IRN cancel from the bulk tool's response; time bar for GSTR-6 / 7 / 8; one-off due-date extensions | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

@@ -22,6 +22,9 @@ import { unitsDb } from '../../lib/units';
 import { readLinks } from '../../lib/documents';
 import { useT } from '../../i18n';
 import { einvT } from '../../i18n/areas/einvoice';
+import { IrpWindowNote } from './IrpWindowNote';
+import { cancelState } from '../../lib/einvoice-cancel';
+import { ggT } from '../../i18n/areas/gst-guards';
 
 export interface EInvoiceModalProps {
   invoice: InvoiceRecord;
@@ -228,11 +231,13 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
             ))}
           </div>
           {meta.irn && <span className={styles.pillOk}>{einvT('irnRecorded')}</span>}
+          {cancelState(meta) !== 'none' && <span className={styles.pill}>{cancelState(meta) === 'done' ? ggT('cnlAllDone') : ggT('cnlPending')}</span>}
         </div>
 
         <div role="tabpanel" id={`${tabsId}-panel`} aria-labelledby={`${tabsId}-${tab}`} className={styles.stack}>
           {tab === 'einvoice' && (
             <>
+              <IrpWindowNote invoice={invoice} hasIrn={!!meta.irn} />
               <ReadinessList result={einv} okText={einvT('einvReady')} />
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>{einvT('options')}</h3>

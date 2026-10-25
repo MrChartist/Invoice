@@ -77,8 +77,10 @@ const Gstr9cView = lazy(() => import('../components/gst-reports/Gstr9cView'));
 const RcmDocsPanel = lazy(() => import('../components/gst-reports/RcmDocsPanel'));
 // 7R: cash ledger / PMT-09 / refunds, ISD + GSTR-6, consolidated e-Way Bill, GSTR-1 / 3B per GSTIN (one lazy chunk).
 const Gst7rPanel = lazy(() => import('../components/gst-reports/Gst7rPanel'));
+// 8D: GST guards 2025-26 (IRP window, exceptions, GSTR-1A, Table 3.2, pushed 2B ITC).
+const Gst8dPanel = lazy(() => import('../components/gst-reports/Gst8dPanel'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c' | 'rcmdocs' | 'cashref' | 'isd' | 'ewbcons' | 'bygstin';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c' | 'rcmdocs' | 'cashref' | 'isd' | 'ewbcons' | 'bygstin' | 'guards';
 
 /** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
 const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
@@ -110,6 +112,7 @@ const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
   { id: 'isd', label: 'ISD / GSTR-6', key: 'tabIsd' },
   { id: 'ewbcons', label: 'Consolidated e-Way', key: 'tabEwbCons' },
   { id: 'bygstin', label: 'By GSTIN', key: 'tabByGstin' },
+  { id: 'guards', label: 'GST guards', key: 'tabGuards' },
 ];
 const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0] } | undefined) => (x?.key ? gstT(x.key) : x?.label);
 
@@ -475,7 +478,18 @@ export function GstReports() {
           </Suspense>
         );
       case 'gstr3b':
-        return <Gstr3bView report={g3} onOpenSetOff={() => setTab('setoff')} />;
+        return (
+          <>
+            <Gstr3bView report={g3} onOpenSetOff={() => setTab('setoff')} />
+            <Suspense fallback={null}><Gst8dPanel view="3b" period={period} gstin={gstin} g1={g1} g3={g3} /></Suspense>
+          </>
+        );
+      case 'guards':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <Gst8dPanel view="guards" period={period} gstin={gstin} g1={g1} g3={g3} invoices={invoices} notify={notify} />
+          </Suspense>
+        );
       case 'setoff':
       case 'purhsn':
       case 'recon':
