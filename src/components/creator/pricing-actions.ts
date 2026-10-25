@@ -13,7 +13,8 @@ import {
   PRICE_LEVELS_TABLE, SCHEMES_TABLE, catalogItemFor, levelForClient, masterClient, pricingInUse, resolvePrice, syncSchemeLines,
   type PriceLevel, type PricingData, type Scheme,
 } from '../../lib/pricing';
-import type { Client, InvoiceItem } from '../../types/invoice';
+import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
+import { LAST_RATE_BASIS, lastRateFor, lastRateToApply } from '../../lib/last-rate';
 import { PRICE_LIST_BASIS, priceListRate } from '../../lib/price-list';
 
 /** Notes don't take part: a credit / debit note re-states an earlier price. */
@@ -64,6 +65,8 @@ function reprice(lineId: string, ctx: EditorPricing | null, force = false): void
   const st = useInvoiceStore.getState();
   const line = st.items.find((i) => i.id === lineId);
   if (!line || line.free_of) return;
+  // 8.104: a last-rate line keeps its rate when the quantity changes (re-pricing on demand still applies).
+  if (!force && line.price_basis === LAST_RATE_BASIS) return;
   const cat = ctx ? catalogItemFor(ctx.data.catalog, line.name) : undefined;
   const list = listRateFor(line);
   if (!cat && list === undefined) return;
@@ -90,7 +93,19 @@ export function pickCatalogItem(lineId: string, source: Partial<InvoiceItem>): v
   st.applyCatalogItem(lineId, source);
   const ctx = editorPricing();
   reprice(lineId, ctx, true); // 7S: also applies a selling price list without levels / slabs
+  applyLastRate(lineId);
   syncSchemes(ctx);
+}
+
+/** 8.104: below price levels / lists, the rate last billed to this party wins over the catalogue rate. */
+function applyLastRate(lineId: string): void {
+  if (!pricedDoc()) return;
+  const st = useInvoiceStore.getState();
+  const line = st.items.find((i) => i.id === lineId);
+  if (!line || line.free_of || !line.name?.trim()) return;
+  const last = lastRateFor(peekTable<InvoiceRecord>(KEYS.invoices), st.client, line.name, { excludeId: st.id, currency: st.currency });
+  const rate = lastRateToApply(line, last);
+  if (rate !== null) st.patchItem(lineId, { rate, price_basis: LAST_RATE_BASIS });
 }
 
 /** Quantity typed on a line: slabs may change the rate; schemes follow. */

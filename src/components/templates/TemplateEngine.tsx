@@ -15,6 +15,7 @@ import { SupplyDeclaration } from './parts/SupplyDeclaration';
 import { CopyBanner } from './parts/CopyBanner';
 import { TransportBlock } from './parts/TransportBlock';
 import { PartyBalanceBlock } from './parts/PartyBalanceBlock';
+import { AcceptanceBlock } from './parts/AcceptanceBlock';
 import { rcmTaxNote } from './paper-helpers';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
@@ -164,6 +165,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {rcmNote && <SupplyDeclaration text={rcmNote} />}
           {/* 8.5: "Previous balance + This bill = Total due" from the bill's own snapshot (off by default). */}
           <PartyBalanceBlock invoice={invoice} compact={layout === 'receipt'} />
+          {/* 8G: payment schedule + quote acceptance snapshot (from the document only). */}
+          <AcceptanceBlock invoice={invoice} compact={layout === 'receipt'} />
         </div>
       </div>
     </PaperContext.Provider>

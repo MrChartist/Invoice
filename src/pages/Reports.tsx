@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, IndianRupee, Percent, ReceiptText, Wallet } from 'lucide-react';
 import {
@@ -43,6 +43,9 @@ import styles from './Reports.module.css';
 import { useT } from '../i18n';
 import { repT } from '../i18n/areas/reports';
 import { plural } from '../i18n/areas/plural';
+
+// 8.109: saved views + month-end packs (own chunk).
+const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
 
 const TABS = [
   { id: 'customers', label: 'tabCustomers' },
@@ -153,6 +156,20 @@ export function Reports() {
         title={repT('title')}
         subtitle={repT('subtitle')}
       />
+
+      <Suspense fallback={null}>
+        <ReportViewsBar
+          current={{ route: '/reports', tab, preset, period }}
+          initialViewId={params.get('view')}
+          openPacks={params.get('packs') === '1'}
+          initialMonth={params.get('month')}
+          onApply={(v) => {
+            setPreset(v.preset);
+            setPeriod(v.preset === 'custom' && v.period ? v.period : periodForPreset(v.preset));
+            if (TABS.some((t) => t.id === v.tab)) selectTab(v.tab as TabId);
+          }}
+        />
+      </Suspense>
 
       <PeriodBar
         preset={preset}

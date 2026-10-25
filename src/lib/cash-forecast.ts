@@ -32,6 +32,20 @@ import { isMse, paymentLimit } from './msme';
 import { isVoidStatus, pickStr, readPurchase, supplierPayableOf } from './purchase-normalize';
 import { previewOccurrences, scheduleStatus, templateTotals, type RecurringSchedule } from './recurring';
 import { receivableBalance } from './rcm';
+import { openInstalments } from './payment-schedule';
+
+/** Open receivable `inr` split over a document's unpaid instalments (one part on `due_date` without a schedule). */
+function scheduledParts(inv: InvoiceRecord, inr: number): { due: string; label: string; amount: number }[] {
+  const open = openInstalments(inv);
+  const sum = open.reduce((s, o) => s + o.open, 0);
+  if (!open.length || sum <= 0) return [{ due: '', label: '', amount: inr }];
+  let left = inr;
+  return open.map((o, i) => {
+    const amount = i === open.length - 1 ? round2(left) : round2((inr * o.open) / sum);
+    left = round2(left - amount);
+    return { due: o.instalment.due_date, label: o.instalment.label ?? '', amount };
+  });
+}
 
 export const HORIZONS = [30, 90, 180] as const;
 export type Horizon = (typeof HORIZONS)[number];
@@ -203,21 +217,25 @@ export function buildForecast(input: ForecastInput): Forecast {
     let inr = rate === 1 ? balance : mulRound2(balance, rate);
     inr = round2(inr - (pendingIn.get(inv.id) ?? 0));
     if (inr <= 0.004) continue;
-    const due = isoDay(inv.due_date) || isoDay(inv.issue_date) || today;
-    if (input.skipOverdueAfter !== undefined && daysFrom(due, today) > input.skipOverdueAfter) continue;
-    const lag = lagFor(inv.client);
-    const expected = lag === undefined ? due : shiftDay(due, lag);
-    push({
-      date: clamp(expected),
-      kind: 'receivable',
-      direction: 'in',
-      party: partyName(inv.client),
-      ref: inv.invoice_number || 'Invoice',
-      amount: inr,
-      basis: lag === undefined ? `due ${fmtDay(due)} (no payment history)` : `due ${fmtDay(due)} ${lag >= 0 ? '+' : '−'} ${Math.abs(lag)} days usual ${lag >= 0 ? 'delay' : 'early payment'}`,
-      overdue: expected < today,
-      link: `/invoice/${inv.id}`,
-    });
+    // 8.100: a payment schedule expects each unpaid instalment on its own date (in rupees, pro rata).
+    const parts = scheduledParts(inv, inr);
+    for (const part of parts) {
+      const due = part.due || isoDay(inv.due_date) || isoDay(inv.issue_date) || today;
+      if (input.skipOverdueAfter !== undefined && daysFrom(due, today) > input.skipOverdueAfter) continue;
+      const lag = lagFor(inv.client);
+      const expected = lag === undefined ? due : shiftDay(due, lag);
+      push({
+        date: clamp(expected),
+        kind: 'receivable',
+        direction: 'in',
+        party: partyName(inv.client),
+        ref: `${inv.invoice_number || 'Invoice'}${part.label ? ` · ${part.label}` : ''}`,
+        amount: part.amount,
+        basis: lag === undefined ? `due ${fmtDay(due)} (no payment history)` : `due ${fmtDay(due)} ${lag >= 0 ? '+' : '−'} ${Math.abs(lag)} days usual ${lag >= 0 ? 'delay' : 'early payment'}`,
+        overdue: expected < today,
+        link: `/invoice/${inv.id}`,
+      });
+    }
   }
 
   // Recurring schedules.

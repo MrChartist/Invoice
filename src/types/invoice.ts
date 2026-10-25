@@ -365,6 +365,12 @@ export interface Payment {
    * the date-order number (`receipts.ts`). Absent on advance adjustments.
    */
   receipt_number?: string;
+  /**
+   * Additive (8G, 8.106): the balance was written off as a bad debt, not received. Settles the bill like
+   * a payment, but cash books, receipts numbering and bank matching skip it; the ledger debits
+   * "Other expenses" (bad debts) instead of cash / bank (`src/lib/write-off.ts`).
+   */
+  write_off?: boolean;
 }
 
 /** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */
@@ -570,6 +576,40 @@ export interface InvoiceRecord {
    * Absent on legacy documents (nothing is printed). See `src/lib/party-balance.ts`.
    */
   party_balance_snapshot?: PartyBalanceSnapshot;
+  /**
+   * Additive (8G, 8.100): deposit / milestone instalments (quote, proforma, sales order, invoice). Feeds
+   * reminders, ageing and the cash forecast through `src/lib/payment-schedule.ts`. Absent = one due date.
+   */
+  payment_schedule?: PaymentInstalment[];
+  /**
+   * Additive (8G, 8.101): the client's acceptance of a quotation, snapshotted once (signature, signer,
+   * timestamp) and printed on the quote. Never rewritten by later edits (`src/lib/quote-acceptance.ts`).
+   */
+  acceptance?: QuoteAcceptance;
+}
+
+/** 8.100: one instalment. Exactly one of `percent` (of the document total) or `amount` is used. */
+export interface PaymentInstalment {
+  id: string;
+  /** e.g. "Deposit", "On delivery". */
+  label?: string;
+  /** Local day (YYYY-MM-DD). */
+  due_date: string;
+  percent?: number;
+  amount?: number;
+}
+
+/** 8.101: acceptance snapshot. `signature` is a PNG data URL drawn on the counter (absent for a remote "Accept"). */
+export interface QuoteAcceptance {
+  signer: string;
+  /** ISO timestamp. */
+  signed_at: string;
+  signature?: string;
+  /** `counter` = signed on this device; `remote` = the client accepted by WhatsApp / e-mail. */
+  method: 'counter' | 'remote';
+  /** Total accepted (document currency), frozen with the signature. */
+  amount: number;
+  note?: string;
 }
 
 /** 8.5: rupee figures frozen on the bill at issue (INR only). Total due = previous + bill − paid. */

@@ -65,7 +65,8 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   any P&L / balance sheet so Books, the Gateway and ratios agree.
 - Device-local viewing preferences, outside the `mrchartist_inv_` prefix (never backed up or synced):
   `mrchartist_report_prefs` (F12 report options per report) and `mrchartist_report_period` (shared report period,
-  Alt+F2); `mrchartist_tally_terms` (Gateway "Tally terms").
+  Alt+F2); `mrchartist_tally_terms` (Gateway "Tally terms"); `mrchartist_report_views` / `mrchartist_report_pack` (8G saved
+  views and month-end pack schedule). `mrchartist_inv_save_choice` (editor split-Save choice) is in `DEVICE_LOCAL_KEYS`.
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express

@@ -26,6 +26,13 @@ import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKey
 import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
 import { localDb } from '../lib/localDb';
+import { MetaSummary } from '../components/invoicing-ux/MetaSummary';
+import { LastRateHints } from '../components/invoicing-ux/LastRateHints';
+import { duplicateInEditor } from '../components/invoicing-ux/editor-actions';
+import { getSaveChoice, setSaveChoice, type SaveChoice } from '../lib/save-choice';
+import { invoiceUpiLink, whatsappLink } from '../lib/share';
+import { receivableBalance } from '../lib/rcm';
+import { uxT } from '../i18n/areas/invoicing-ux';
 import { clientToParty } from '../store/invoice-defaults';
 import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
@@ -55,6 +62,10 @@ const DocumentActions = lazy(() =>
 // WP-9 maker-checker: banner for a document pending / rejected approval (chunk loads only then).
 const ApprovalBanner = lazy(() => import('../components/approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalBanner })));
 const AdvanceNotice = lazy(() => import('../components/creator/AdvanceNotice').then((m) => ({ default: m.AdvanceNotice })));
+// 8G invoicing UX: payment schedule, last-rate hints, post-save send sheet (each its own chunk).
+const PaymentScheduleCard = lazy(() => import('../components/invoicing-ux/PaymentScheduleCard'));
+const SendSheet = lazy(() => import('../components/invoicing-ux/SendSheet'));
+const PaymentModal = lazy(() => import('../components/modals/PaymentModal').then((m) => ({ default: m.PaymentModal })));
 
 // The pickers start closed: they load right after the editor renders, off the first-paint path.
 const ClientSearchModal = lazy(() => import('../components/modals/ClientSearchModal').then((m) => ({ default: m.ClientSearchModal })));
@@ -85,6 +96,11 @@ export function InvoiceCreator() {
   const [saveTick, setSaveTick] = useState(0);
   const [lockTick, setLockTick] = useState(0);
   const [savedToast, setSavedToast] = useState<{ message: string; gapHint: string } | null>(null);
+  const [sendId, setSendId] = useState<string | null>(null);
+  // A1 / A4: preview opened with an automatic Print / Share PDF; payment dialog from the sheet.
+  const [previewAction, setPreviewAction] = useState<'print' | 'share' | undefined>(undefined);
+  const [payId, setPayId] = useState<string | null>(null);
+  const [saveChoice, setSaveChoiceState] = useState<SaveChoice>(() => getSaveChoice());
   // Selling an expired batch is blocked until the user confirms it (6.6).
   const [expiredAsk, setExpiredAsk] = useState<{ andNew: boolean; lines: string[] } | null>(null);
 
@@ -139,7 +155,7 @@ export function InvoiceCreator() {
   }, [profiles, id]);
 
   const save = useCallback(
-    (asDraft = false, andNew = false, expiredOk = false) => {
+    (asDraft = false, andNew = false, expiredOk = false, then: SaveChoice | 'sheet' = 'sheet') => {
       // Batch / serial / godown checks (6.6 / 6.10 / 6.11) — only when issuing; drafts never move stock.
       if (!asDraft) {
         const st = useInvoiceStore.getState();
@@ -195,11 +211,67 @@ export function InvoiceCreator() {
       const gapHint = gap
         ? t('editor.seriesGap', { numbers: gap.missingCount > 3 ? t('editor.andMore', { list: gapList, n: gap.missingCount - 3 }) : gapList })
         : '';
-      setSavedToast({ message, gapHint });
+      if (result.warning) notify(result.warning, 'error');
+      if (asDraft) {
+        setSavedToast({ message, gapHint });
+      } else if (then === 'print') {
+        // A4 Save & print: straight to the print dialog.
+        if (gapHint) notify(gapHint, 'info');
+        setPreviewAction('print');
+        setPreviewOpen(true);
+      } else if (then === 'whatsapp' && rec.client?.phone) {
+        // A4 Save & WhatsApp: open the tab now (still inside the click), fill in the chat once the
+        // message module has loaded — the same text as the sheet (summary, balance, UPI link).
+        const tab = window.open('', '_blank');
+        const phone = rec.client.phone;
+        void import('../lib/send-summary').then(({ partyOutstanding, sendMessage, sheetMessage }) => {
+          const text = sheetMessage(sendMessage(rec, partyOutstanding(localDb.invoices.getAll(), rec.client)), receivableBalance(rec) > 0 ? invoiceUpiLink(rec) : null);
+          const url = whatsappLink(phone, text);
+          if (tab) {
+            tab.opener = null;
+            tab.location.href = url;
+          } else window.open(url, '_blank', 'noopener');
+        });
+        notify(message);
+      } else {
+        // A1: the post-save success sheet stays until dismissed.
+        if (gapHint) notify(gapHint, 'info');
+        setSendId(rec.id);
+      }
       if (!id) navigate(`/invoice/${rec.id}`, { replace: true });
     },
     [id, navigate, notify, lang],
   );
+
+  /** A4: Save / Save & print / Save & WhatsApp, the choice remembered on this device. */
+  const saveWith = useCallback(
+    (choice: SaveChoice) => {
+      setSaveChoiceState(setSaveChoice(choice));
+      save(false, false, false, choice);
+    },
+    [save],
+  );
+
+  // A4 Alt+P: print the current document; Alt+D: duplicate it into a new unsaved document.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const k = e.key.toLowerCase();
+      if (k === 'p') {
+        e.preventDefault();
+        setPreviewAction('print');
+        setPreviewOpen(true);
+      } else if (k === 'd') {
+        e.preventDefault();
+        if (duplicateInEditor()) {
+          if (id) navigate('/invoice');
+          notify(uxT('dupDone'), 'info');
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [id, navigate, notify]);
 
   // Warn before a refresh/tab close would drop edits to a saved document (new documents autosave as drafts).
   useUnsavedChangesWarning(Boolean(s.dirty && s.id));
@@ -295,7 +367,6 @@ export function InvoiceCreator() {
       <div className={styles.layout}>
         <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
           <legend className={surface.srOnly}>{readOnly ? t('editor.docLegendLocked') : t('editor.docLegend')}</legend>
-          <DocumentMetaCard editing={editing} saveTick={saveTick} />
           <SupplyNotice />
           <GstExtrasFields />
 
@@ -323,7 +394,17 @@ export function InvoiceCreator() {
             <ScanBar disabled={readOnly} />
             <ItemsTable onPickCatalog={setItemTarget} />
             <StockWarnings />
+            <LastRateHints />
           </section>
+
+          {/* A5: customer & items first — document details as a one-line summary below the items. */}
+          <MetaSummary forceOpen={errors.length > 0}>
+            <DocumentMetaCard editing={editing} saveTick={saveTick} />
+          </MetaSummary>
+
+          <Suspense fallback={null}>
+            <PaymentScheduleCard notify={notify} />
+          </Suspense>
 
           <section className={surface.card}>
             <div className={surface.cardHead}>{t('editor.notesTerms')}</div>
@@ -364,9 +445,16 @@ export function InvoiceCreator() {
                 <AdvancedTaxPanel />
               </fieldset>
               <div className={styles.sideActions}>
-                <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => save()} disabled={readOnly}>
-                  <Save size={18} /> {t('editor.saveDoc', { doc: lang === 'en' ? label.toLowerCase() : label })}
-                </button>
+                <div className={styles.splitSave} role="group" aria-label={uxT('saveGroup')}>
+                  <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => saveWith(saveChoice)} disabled={readOnly} data-save-main>
+                    <Save size={18} /> {saveChoice === 'print' ? uxT('savePrint') : saveChoice === 'whatsapp' ? uxT('saveWhatsapp') : t('editor.saveDoc', { doc: lang === 'en' ? label.toLowerCase() : label })}
+                  </button>
+                  <select className={cn(controls.select, styles.splitPick)} value={saveChoice} disabled={readOnly} aria-label={uxT('saveChoose')} onChange={(e) => setSaveChoiceState(setSaveChoice(e.target.value as SaveChoice))} data-save-choice>
+                    <option value="save">{uxT('saveOnly')}</option>
+                    <option value="print">{uxT('savePrint')}</option>
+                    <option value="whatsapp">{uxT('saveWhatsapp')}</option>
+                  </select>
+                </div>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => save(false, true)} disabled={readOnly}>
                   <FilePlus2 size={16} /> {t('editor.saveNew')}
                 </button>
@@ -408,7 +496,16 @@ export function InvoiceCreator() {
 
       {previewOpen && (
         <Suspense fallback={null}>
-          <InvoicePreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+          <InvoicePreviewModal isOpen={previewOpen} autoAction={previewAction} onClose={() => { setPreviewOpen(false); setPreviewAction(undefined); }} />
+        </Suspense>
+      )}
+      {payId && (
+        <Suspense fallback={null}>
+          <PaymentModal
+            invoice={localDb.invoices.getById(payId) ?? null}
+            onClose={() => { setPayId(null); useInvoiceStore.getState().loadInvoice(payId); setSaveTick((n) => n + 1); }}
+            onChanged={() => { useInvoiceStore.getState().loadInvoice(payId); setSaveTick((n) => n + 1); }}
+          />
         </Suspense>
       )}
       <Suspense fallback={null}>
@@ -430,6 +527,17 @@ export function InvoiceCreator() {
           if (ask) save(false, ask.andNew, true);
         }}
       />
+      {sendId && (
+        <Suspense fallback={null}>
+          <SendSheet
+            invoiceId={sendId}
+            onClose={() => setSendId(null)}
+            onPreview={(action) => { setPreviewAction(action); setPreviewOpen(true); }}
+            onRecordPayment={() => setPayId(sendId)}
+            onNew={() => startNew(s.doc_type)}
+          />
+        </Suspense>
+      )}
       {savedToast && (
         <Suspense fallback={null}>
         <SavedToast
@@ -438,9 +546,8 @@ export function InvoiceCreator() {
           onClose={() => setSavedToast(null)}
           onView={() => setPreviewOpen(true)}
           onShare={() => {
-            const anchor = document.querySelector<HTMLElement>('[data-share-anchor] button');
-            anchor?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-            anchor?.click();
+            // 8.105: the "Send to customer" sheet (balance + party outstanding, WhatsApp / e-mail / Share).
+            if (s.id) setSendId(s.id);
           }}
           onNew={() => startNew(s.doc_type)}
         />

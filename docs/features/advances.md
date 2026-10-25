@@ -140,3 +140,6 @@ post that TDS journal in Tally.
 
 
 - With several bank accounts (multi-account BRS) an advance and each refund carry `bank_account_id` ("Received into" / "Paid from" picker, never for cash), so per-account bank balances include them.
+
+## 8G additions
+- **Request deposit** from a schedule's first instalment records an advance here (`saveAdvance`); the editor banner can now apply **part** of the open advances. See `docs/features/invoicing-ux.md` § 8.100.

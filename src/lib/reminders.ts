@@ -9,6 +9,7 @@ import { DOCUMENT_LABELS } from '../types/invoice';
 import { formatCurrency, formatDate } from './utils';
 import { invoiceUpiLink } from './share';
 import { receivableBalance, receivableTotal } from './rcm';
+import { effectiveDueDate } from './payment-schedule';
 
 export const REMINDERS_TABLE = 'reminders';
 
@@ -91,7 +92,7 @@ export function stageForDays(daysToDue: number): ReminderStage | null {
 
 export function suggestStage(invoice: InvoiceRecord, today: Date = new Date()): ReminderStage {
   if (invoice.status === 'Paid' || receivableBalance(invoice) <= 0) return 'thank_you';
-  return stageForDays(daysUntil(invoice.due_date, today)) ?? 'upcoming';
+  return stageForDays(daysUntil(effectiveDueDate(invoice), today)) ?? 'upcoming';
 }
 
 /* ── Templates ────────────────────────────────────────────────── */
@@ -402,7 +403,8 @@ export function pendingReminders(
     if (!COLLECTIBLE.has(invoice.doc_type)) continue;
     if (invoice.status === 'Paid' || invoice.status === 'Cancelled' || invoice.status === 'Draft') continue;
     if (!(receivableBalance(invoice) > 0)) continue;
-    const daysToDue = daysUntil(invoice.due_date, today);
+    // 8.100: a payment schedule's earliest unpaid instalment is the date to chase.
+    const daysToDue = daysUntil(effectiveDueDate(invoice), today);
     if (daysToDue < 0) overdueByClient.set(clientKey(invoice), (overdueByClient.get(clientKey(invoice)) ?? 0) + 1);
     const stage = stageForDays(daysToDue);
     if (!stage) continue;

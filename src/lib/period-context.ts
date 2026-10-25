@@ -19,7 +19,7 @@ export interface PeriodContext {
   period: Period;
 }
 
-const PRESETS: readonly PeriodPreset[] = ['this_month', 'last_month', 'this_quarter', 'this_fy', 'last_fy', 'custom'];
+const PRESETS: readonly PeriodPreset[] = ['this_month', 'last_month', 'this_quarter', 'this_fy', 'last_fy', 'mtd', 'qtd', 'ytd', 'custom'];
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Validate a stored / typed value; anything odd falls back to This FY. */

@@ -41,6 +41,10 @@
   margin-top: 0.5rem;
 }
 
+/* 8G A4: Save + remembered "then" choice. */
+.splitSave { display: flex; gap: 0.375rem; align-items: stretch; }
+.splitPick { flex: 0 0 auto; width: auto; max-width: 9.5rem; }
+
 .muted {
   font-family: var(--font-body);
   font-size: var(--text-sm);

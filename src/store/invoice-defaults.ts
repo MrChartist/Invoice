@@ -14,6 +14,7 @@ import { readValues } from '../lib/custom-fields';
 import { readRefs } from '../lib/attachments';
 import { normalizeTransport } from '../lib/transport';
 import { sanitizePartyBalance } from '../lib/party-balance';
+import { normalizeSchedule, sanitizeAcceptance } from '../lib/doc-snapshots';
 import type { AppSettings } from '../lib/localDb';
 import type {
   AmendmentInfo,
@@ -272,6 +273,15 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(() => {
       const snap = sanitizePartyBalance(r.party_balance_snapshot);
       return snap ? { party_balance_snapshot: snap } : {};
+    })(),
+    // 8G (additive): instalments and the quote acceptance snapshot.
+    ...(() => {
+      const sched = normalizeSchedule(r.payment_schedule);
+      return sched.length ? { payment_schedule: sched } : {};
+    })(),
+    ...(() => {
+      const acc = sanitizeAcceptance(r.acceptance);
+      return acc ? { acceptance: acc } : {};
     })(),
 
     discount_type: r.discount_type ?? 'PERCENT',

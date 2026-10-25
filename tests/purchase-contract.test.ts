@@ -613,3 +613,18 @@ test('7U reader (e-payment confirmation: open bills of a supplier) reads the rea
   assert.equal(openBillsOf([{ ...bill, amount_paid: 1180 }], { name: 'Acme Supplies' }).length, 0);
   assert.equal(openBillsOf([{ ...bill, status: 'Cancelled' } as never], { name: 'Acme Supplies' }).length, 0);
 });
+
+test('8G readers (margin chip, insights, Today card, SmartFind) read the real purchase shape', async () => {
+  const { buildUnitCosts } = await import('../src/lib/margin.ts');
+  assert.equal(buildUnitCosts([bill, { ...bill, id: 'v', status: 'cancelled', lines: [{ ...bill.lines[0], rate: 999 }] }], []).get('paper ream')?.cost, 100);
+  const { buildInsights } = await import('../src/lib/insights.ts');
+  const gst = buildInsights({ invoices: [], payments: [], purchases: [bill] }, '2026-04-20').find((c) => c.id === 'gstTrend');
+  assert.equal(gst?.value, -180, 'input tax on the bill reduces the GST estimate');
+  const { todaySummary } = await import('../src/lib/today.ts');
+  const exp: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE' };
+  assert.equal(todaySummary({ invoices: [], payments: [], purchases: [bill, exp] }, '2026-04-12').expenses, 1180);
+  const { buildIndex } = await import('../src/lib/search.ts');
+  const idx = buildIndex({ invoices: [], clients: [], items: [], bills: [bill as never] });
+  assert.equal(idx[0]?.title, 'AS/22');
+  assert.ok(idx[0]?.ids.includes('27AAPFU0939F1ZV') && idx[0]?.subtitle.includes('Acme Supplies'));
+});
