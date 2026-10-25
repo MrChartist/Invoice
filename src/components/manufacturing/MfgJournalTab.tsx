@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Factory, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -9,6 +10,11 @@ import {
   previewVoucherCost, validateManufacturing,
 } from '../../lib/manufacturing';
 import { computeTracking } from '../../lib/stock-tracking';
+import { collectEvents } from '../../lib/inventory';
+import { serialsAvailable } from '../../lib/serial-vouchers';
+import { unitsDb } from '../../lib/units';
+import { SerialCell } from './SerialCell';
+import { s7T } from '../../i18n/areas/inventory-7s';
 import type { AdditionalCost, ManufacturingVoucher } from '../../types/manufacturing';
 import { mfgT } from '../../i18n/areas/manufacturing';
 import { LinesGrid } from './LinesGrid';
@@ -21,7 +27,11 @@ import styles from './manufacturing.module.css';
 
 /** Manufacturing Journal (Tally Alt+F7): finished item + BOM + quantity → components, costs, value. */
 export function MfgJournalTab({ ctx }: { ctx: MfgContext }) {
-  const [editing, setEditing] = useState<ManufacturingVoucher | 'new' | null>(null);
+  // 7S: "Manufacture" from the production plan opens a new journal for ?make=<item>&qty=<n>.
+  const [params, setParams] = useSearchParams();
+  const make = params.get('make');
+  const [prefill] = useState(() => (make ? { item: make, qty: params.get('qty') ?? '1' } : null));
+  const [editing, setEditing] = useState<ManufacturingVoucher | 'new' | null>(() => (make && ctx.canBooks ? 'new' : null));
   const [deleting, setDeleting] = useState<ManufacturingVoucher | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rows = useMemo(() => manufacturingDb.all(), [ctx.version]);
@@ -48,7 +58,13 @@ export function MfgJournalTab({ ctx }: { ctx: MfgContext }) {
           </>
         ) : undefined}
       />
-      {editing && <MfgModal ctx={ctx} voucher={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <MfgModal ctx={ctx} voucher={editing === 'new' ? null : editing} prefill={editing === 'new' ? prefill : null}
+          onClose={() => {
+            setEditing(null);
+            if (params.get('make')) setParams((p) => { p.delete('make'); p.delete('qty'); return p; }, { replace: true });
+          }} />
+      )}
       <ConfirmDialog
         open={!!deleting} destructive title={mfgT('delete')} message={mfgT('confirmDelete', { number: deleting?.number ?? '' })} confirmLabel={mfgT('delete')}
         onClose={() => setDeleting(null)}
@@ -66,18 +82,23 @@ export function MfgJournalTab({ ctx }: { ctx: MfgContext }) {
   );
 }
 
-function MfgModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: ManufacturingVoucher | null; onClose: () => void }) {
-  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock && !i.track_serials).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
+function MfgModal({ ctx, voucher, prefill, onClose }: { ctx: MfgContext; voucher: ManufacturingVoucher | null; prefill?: { item: string; qty: string } | null; onClose: () => void }) {
+  // 7S: serial-tracked items are consumed / produced by serial.
+  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
   const boms = useMemo(() => bomsDb.all(), []);
+  const units = useMemo(() => unitsDb.stored(), []);
   const [date, setDate] = useState(voucher?.date ?? todayInput());
-  const [itemId, setItemId] = useState(voucher?.item_id ?? '');
-  const [bomId, setBomId] = useState(voucher?.bom_id ?? '');
-  const [qty, setQty] = useState(String(voucher?.qty ?? 1));
+  const pre = !voucher && prefill && ctx.items.some((i) => i.id === prefill.item && i.track_stock) ? prefill : null;
+  const [itemId, setItemId] = useState(voucher?.item_id ?? pre?.item ?? '');
+  const [bomId, setBomId] = useState(voucher?.bom_id ?? (pre ? bomsForItem(boms, pre.item)[0]?.id ?? '' : ''));
+  const [qty, setQty] = useState(String(voucher?.qty ?? pre?.qty ?? 1));
+  const [serials, setSerials] = useState<string[] | undefined>(voucher?.serials);
   const [godown, setGodown] = useState(voucher?.godown_id ?? '');
   const [batch, setBatch] = useState(voucher?.batch_no ?? '');
   const [expiry, setExpiry] = useState(voucher?.expiry_date ?? '');
-  const [components, setComponents] = useState<GridLine[]>(() => voucher?.components.map((c) => ({ ...c })) ?? []);
-  const [outputs, setOutputs] = useState<GridLine[]>(() => (voucher?.outputs ?? []).map((o) => ({ ...o })));
+  const [components, setComponents] = useState<GridLine[]>(() => voucher?.components.map((c) => ({ ...c }))
+    ?? (pre ? allocateFefo(prefillExplosion(pre, boms, 'components'), ctx.items, computeTracking({ ...ctx.inputs, asOf: date }), date) : []));
+  const [outputs, setOutputs] = useState<GridLine[]>(() => (voucher?.outputs ?? []).map((o) => ({ ...o })).concat(voucher ? [] : prefillExplosion(pre, boms, 'outputs')));
   const [costs, setCosts] = useState<AdditionalCost[]>(() => voucher?.costs ?? []);
   const [narration, setNarration] = useState(voucher?.narration ?? '');
   const [error, setError] = useState('');
@@ -109,10 +130,22 @@ function MfgModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Manufac
     id: voucher?.id ?? '__draft__', number: voucher?.number ?? '', date, item_id: itemId, bom_id: bomId || undefined, qty: num(qty),
     godown_id: godown || undefined, batch_no: batch.trim() || undefined, expiry_date: expiry || undefined,
     mfg_date: batch.trim() ? date : undefined,
-    components: components.filter((c) => c.item_id).map((c) => ({ id: c.id, item_id: c.item_id, qty: num(c.qty), godown_id: c.godown_id, batch_no: c.batch_no })),
+    serials: item?.track_serials ? serials : undefined,
+    components: components.filter((c) => c.item_id).map((c) => ({
+      id: c.id, item_id: c.item_id, qty: num(c.qty), godown_id: c.godown_id, batch_no: c.batch_no,
+      ...(c.unit_factor ? { unit: c.unit, unit_factor: c.unit_factor } : {}), ...(c.serials?.length ? { serials: c.serials } : {}),
+    })),
     outputs: outputs.filter((o) => o.item_id).map((o) => ({ ...o, qty: num(o.qty), kind: o.kind ?? 'by_product' })),
     costs: costs.filter((c) => num(c.value) > 0), narration: narration.trim() || undefined,
-  }), [voucher, date, itemId, bomId, qty, godown, batch, expiry, components, outputs, costs, narration]);
+  }), [voucher, date, itemId, bomId, qty, godown, batch, expiry, components, outputs, costs, narration, serials, item]);
+  // Serials in stock on the date (this voucher's saved copy left out), for "Fill from stock".
+  const serialPool = useMemo(() => {
+    let events: ReturnType<typeof collectEvents> | null = null;
+    return (id: string, gd: string | undefined) => {
+      events ??= collectEvents({ ...ctx.inputs, includeTransfers: true, vouchers: (ctx.inputs.vouchers ?? []).filter((v) => v.id !== voucher?.id) });
+      return serialsAvailable(id, date, gd || 'main', events);
+    };
+  }, [ctx.inputs, voucher, date]);
 
   const preview = useMemo(() => {
     if (!itemId || !(draft.qty > 0) || draft.components.length === 0) return null;
@@ -192,13 +225,19 @@ function MfgModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Manufac
             </>
           )}
         </div>
+        {item?.track_serials && (
+          <div className={controls.field}>
+            <span className={controls.label}>{s7T('finishedSerials')}</span>
+            <SerialCell key={itemId} serials={serials} qty={num(qty)} label={s7T('finishedSerials')} onChange={setSerials} />
+          </div>
+        )}
         {bomId && (
           <div><button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => fill(itemId, bomId, qty)}>{mfgT('fillFromBom')}</button></div>
         )}
         <p className={styles.section}>{mfgT('components')}</p>
-        <LinesGrid lines={components} items={tracked.filter((i) => i.id !== itemId)} onChange={setComponents} opts={{ label: mfgT('component'), godowns: ctx.godowns, batch: anyBatch }} />
+        <LinesGrid lines={components} items={tracked.filter((i) => i.id !== itemId)} onChange={setComponents} opts={{ label: mfgT('component'), godowns: ctx.godowns, batch: anyBatch, units, serials: 'out', serialPool }} />
         <p className={styles.section}>{mfgT('outputs')}</p>
-        <LinesGrid lines={outputs} items={tracked.filter((i) => i.id !== itemId)} onChange={setOutputs} opts={{ label: mfgT('byProduct'), outputs: true, godowns: ctx.godowns, batch: anyBatch }} />
+        <LinesGrid lines={outputs} items={tracked.filter((i) => i.id !== itemId)} onChange={setOutputs} opts={{ label: mfgT('byProduct'), outputs: true, godowns: ctx.godowns, batch: anyBatch, serials: 'in' }} />
         <p className={styles.section}>{mfgT('additionalCosts')}</p>
         <CostsGrid costs={costs} onChange={setCosts} />
         {preview && <CostSummary s={preview} />}
@@ -215,3 +254,12 @@ function MfgModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Manufac
   );
 }
 
+
+/** Components / outputs of the default BOM for a prefilled journal (from the production plan). */
+function prefillExplosion(pre: { item: string; qty: string } | null, boms: ReturnType<typeof bomsDb.all>, part: 'components' | 'outputs'): GridLine[] {
+  if (!pre) return [];
+  const bom = bomsForItem(boms, pre.item)[0];
+  if (!bom || !(num(pre.qty) > 0)) return [];
+  const exp = explodeBom(bom, num(pre.qty));
+  return part === 'components' ? exp.components.map(({ base: _b, scrap: _s, ...l }) => { void _b; void _s; return l; }) : exp.outputs;
+}

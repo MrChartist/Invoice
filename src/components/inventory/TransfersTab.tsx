@@ -28,6 +28,7 @@ import { loadBranches } from '../../lib/branch';
 import { transferInvoiceOf, transferTaxPair } from '../../lib/branch-transfer';
 import { localDb } from '../../lib/localDb';
 import { branchT } from '../../i18n/areas/branch-books';
+import { s7mT } from '../../i18n/areas/inventory-7s-mini';
 
 // WP-9: Sec 25(4) tax invoice + bill for a transfer between two GSTINs (lazy dialog).
 const BranchTransferDialog = lazy(() => import('../branches/BranchTransferDialog'));
@@ -61,7 +62,7 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
     if (!branches.some((b) => b.godown_id && b.gstin)) return null;
     return localDb.invoices.getAll();
   }, [branches, transfers]);
-  const pairOf = (t: StockTransfer) => (raised ? transferTaxPair(t, branches, godowns) : null);
+  const pairOf = (t: StockTransfer) => (raised ? transferTaxPair(t, branches, godowns.some((g) => g.id === t.to_godown) ? godowns : godownsDb.list()) : null);
 
   return (
     <>
@@ -113,7 +114,10 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
           onClose={() => setCreating(false)}
           onSaved={(t) => {
             setCreating(false);
-            onChanged(invT('transferSaved', { number: t.transfer_number }));
+            // 7S (7.84): a transfer between two GSTINs opens the Sec 25(4) tax invoice + bill dialog straight away.
+            const needsTax = !!transferTaxPair(t, branches, godownsDb.list());
+            onChanged(needsTax ? s7mT('transferTaxPrompt') : invT('transferSaved', { number: t.transfer_number }));
+            if (needsTax) setTaxFor(t);
           }}
         />
       )}

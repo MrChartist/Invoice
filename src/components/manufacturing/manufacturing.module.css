@@ -125,3 +125,36 @@
   overflow-x: auto;
   max-width: 100%;
 }
+
+/* 7S: serial numbers on voucher lines, MRP and report filters */
+.serialCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 10rem;
+}
+.serialCell textarea {
+  width: 100%;
+  min-height: 2.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.warnText {
+  color: var(--warning);
+  font-size: var(--text-xs);
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0 0 0.75rem;
+}
+.filters select {
+  max-width: 14rem;
+}
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+}

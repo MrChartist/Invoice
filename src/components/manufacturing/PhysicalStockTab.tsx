@@ -5,6 +5,8 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { cn, todayInput } from '../../lib/utils';
 import { num } from '../../lib/invoice-calc';
 import { generateId } from '../../lib/storage';
+import { cleanAltUnits, factorFor, roundTypedQty, unitChoices, unitsDb } from '../../lib/units';
+import { s7T } from '../../i18n/areas/inventory-7s';
 import {
   physicalDrift, physicalLines, physicalStockDb, physicalSummary, validatePhysical, type PhysicalDraftLine,
 } from '../../lib/manufacturing';
@@ -78,7 +80,16 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
   const multi = ctx.godowns.length > 1;
   const anyBatch = tracked.some((i) => i.track_batches);
   const [date, setDate] = useState(voucher?.date ?? todayInput());
-  const [lines, setLines] = useState<PhysicalDraftLine[]>(() => voucher?.lines.map((l) => ({ id: l.id, item_id: l.item_id, godown_id: l.godown_id, batch_no: l.batch_no, counted: l.counted })) ?? []);
+  // 7S: a count may be typed in an alternate unit (stored in base units, typed figure kept).
+  const [lines, setLines] = useState<PhysicalDraftLine[]>(() => voucher?.lines.map((l) => ({
+    id: l.id, item_id: l.item_id, godown_id: l.godown_id, batch_no: l.batch_no, counted: l.counted_typed ?? l.counted,
+    ...(l.unit_factor && l.unit_factor !== 1 ? { unit: l.unit, unit_factor: l.unit_factor } : {}),
+  })) ?? []);
+  const units = useMemo(() => unitsDb.stored(), []);
+  const anyAlt = lines.some((l) => {
+    const it = tracked.find((x) => x.id === l.item_id);
+    return !!(it && cleanAltUnits(it.alt_units, it.unit || 'NOS'));
+  });
   const [narration, setNarration] = useState(voucher?.narration ?? '');
   const [error, setError] = useState('');
   const computed = useMemo(() => {
@@ -148,7 +159,7 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
             <thead>
               <tr>
                 <th>{mfgT('item')}</th>{multi && <th>{mfgT('godown')}</th>}{anyBatch && <th>{mfgT('batch')}</th>}
-                <th className={styles.num}>{mfgT('book')}</th><th className={styles.num}>{mfgT('counted')}</th>
+                <th className={styles.num}>{mfgT('book')}</th><th className={styles.num}>{mfgT('counted')}</th>{anyAlt && <th>{s7T('unit')}</th>}
                 <th className={styles.num}>{mfgT('difference')}</th><th className={styles.num}>{mfgT('value')}</th>
                 <th><span className={surface.srOnly}>{mfgT('actions')}</span></th>
               </tr>
@@ -161,7 +172,7 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                 return (
                   <tr key={l.id}>
                     <td>
-                      <select className={controls.select} aria-label={mfgT('lineItem', { n })} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value })}>
+                      <select className={controls.select} aria-label={mfgT('lineItem', { n })} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined })}>
                         <option value="">{mfgT('choose')}</option>
                         {tracked.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
                       </select>
@@ -180,8 +191,25 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                     <td className={styles.num}>{c ? qtyText(c.book_qty) : '—'}</td>
                     <td>
                       <input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={`${mfgT('counted')} ${n}${item ? ` ${item.name}${l.godown_id ? ` ${godownName(ctx.godowns, l.godown_id)}` : ''}` : ''}`}
-                        value={String(l.counted)} onChange={(e) => patch(l.id, { counted: num(e.target.value) })} />
+                        value={String(l.counted)} onChange={(e) => patch(l.id, { counted: num(e.target.value) })}
+                        onBlur={() => patch(l.id, { counted: roundTypedQty(l.counted, l.unit || item?.unit, units) })} />
                     </td>
+                    {anyAlt && (
+                      <td>
+                        {item && cleanAltUnits(item.alt_units, item.unit || 'NOS') ? (
+                          <>
+                            <select className={controls.select} aria-label={`${s7T('unit')} ${n}`} value={l.unit || item.unit}
+                              onChange={(e) => {
+                                const f = factorFor(item, e.target.value) ?? 1;
+                                patch(l.id, f === 1 ? { unit: undefined, unit_factor: undefined } : { unit: e.target.value, unit_factor: f });
+                              }}>
+                              {unitChoices(item).map((u) => <option key={u.unit} value={u.unit}>{u.unit}</option>)}
+                            </select>
+                            {c && l.unit_factor ? <span className={styles.muted}>{s7T('inBase', { qty: qtyText(c.counted), unit: item.unit })}</span> : null}
+                          </>
+                        ) : <span className={styles.muted}>{item?.unit ?? ''}</span>}
+                      </td>
+                    )}
                     <td className={cn(styles.num, c && c.diff < 0 ? styles.loss : c && c.diff > 0 ? styles.profit : undefined)}>{c ? qtyText(c.diff) : '—'}</td>
                     <td className={styles.num}>{c ? money(Math.abs(c.diff) * num(c.rate)) : '—'}</td>
                     <td><button type="button" className={controls.btnIcon} aria-label={mfgT('removeLine', { n })} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}><Trash2 size={15} /></button></td>

@@ -50,6 +50,12 @@ export interface JobWorkEventContext {
 
 const day = (d: unknown) => String(d ?? '').slice(0, 10);
 const MAIN = 'main';
+/** 7S: trimmed serials of a line (same rule as `cleanSerials` in inventory.ts; kept local to avoid an import cycle). */
+const cleanSerials = (list: unknown): string[] | undefined => {
+  if (!Array.isArray(list)) return undefined;
+  const out = list.map((x) => String(x ?? '').trim()).filter(Boolean);
+  return out.length ? out : undefined;
+};
 
 export function loadJobWorkStockDocs(): JobWorkStockDocs {
   return {
@@ -90,7 +96,7 @@ export function jobWorkStockEvents(docs: JobWorkStockDocs | undefined, ctx: JobW
       const q = num(l?.qty) * lineFactor(l);
       const from = l.godown_id || MAIN;
       if (!ctx.byId(l.item_id) || !(q > 0) || from === o.job_worker_godown) continue;
-      const base = { date, kind: 'transfer' as const, refType: 'job_work_out', refId: o.id, refNumber: o.number, party: o.party_name, batch: l.batch_no || undefined };
+      const base = { date, kind: 'transfer' as const, refType: 'job_work_out', refId: o.id, refNumber: o.number, party: o.party_name, batch: l.batch_no || undefined, serials: cleanSerials(l.serials) };
       push(l.item_id, { ...base, qty: -q, godown: from, particulars: `Material out — ${o.number} · ${o.party_name}` });
       push(l.item_id, { ...base, qty: q, godown: o.job_worker_godown, particulars: `Material out — ${o.number} · at ${o.party_name}` });
     }
@@ -104,7 +110,7 @@ export function jobWorkStockEvents(docs: JobWorkStockDocs | undefined, ctx: JobW
     for (const l of v.consumed ?? []) {
       const q = num(l?.qty) * lineFactor(l);
       if (!ctx.byId(l.item_id) || !(q > 0)) continue;
-      push(l.item_id, { ...base, kind: 'consumption', qty: -q, godown: jw, batch: l.batch_no || undefined, voucher: v.id, particulars: `${label} (consumed at ${v.party_name})` });
+      push(l.item_id, { ...base, kind: 'consumption', qty: -q, godown: jw, batch: l.batch_no || undefined, serials: cleanSerials(l.serials), voucher: v.id, particulars: `${label} (consumed at ${v.party_name})` });
     }
     const made = (v.received ?? []).filter((l) => (l.kind === 'processed' || l.kind === 'scrap') && ctx.byId(l.item_id) && num(l.qty) * lineFactor(l) > 0);
     const processedQty = made.reduce((s, l) => s + (l.kind === 'processed' ? num(l.qty) * lineFactor(l) : 0), 0);
@@ -115,7 +121,7 @@ export function jobWorkStockEvents(docs: JobWorkStockDocs | undefined, ctx: JobW
       const q = num(l.qty) * f;
       const scrap = l.kind === 'scrap';
       push(l.item_id, {
-        ...base, kind: 'production', qty: q, godown: l.godown_id, batch: l.batch_no || undefined, voucher: v.id, pool,
+        ...base, kind: 'production', qty: q, godown: l.godown_id, batch: l.batch_no || undefined, serials: cleanSerials(l.serials), voucher: v.id, pool,
         rate: scrap ? Math.max(num(l.rate), 0) / f : undefined,
         share: scrap ? undefined : processedQty > 0 ? q / processedQty : 0,
         particulars: `${label} (${scrap ? 'scrap' : 'processed'} from ${v.party_name})`,
@@ -130,7 +136,7 @@ export function jobWorkStockEvents(docs: JobWorkStockDocs | undefined, ctx: JobW
         const q = num(l?.qty) * lineFactor(l);
         const to = l.godown_id || MAIN;
         if (!ctx.byId(l.item_id) || !(q > 0) || to === jw) continue;
-        const t = { ...base, kind: 'transfer' as const, batch: l.batch_no || undefined, particulars: `${label} (${what})` };
+        const t = { ...base, kind: 'transfer' as const, batch: l.batch_no || undefined, serials: cleanSerials(l.serials), particulars: `${label} (${what})` };
         push(l.item_id, { ...t, qty: -q, godown: jw });
         push(l.item_id, { ...t, qty: q, godown: to });
       }
@@ -138,7 +144,7 @@ export function jobWorkStockEvents(docs: JobWorkStockDocs | undefined, ctx: JobW
     for (const l of v.losses ?? []) {
       const q = num(l?.qty) * lineFactor(l);
       if (!ctx.byId(l.item_id) || !(q > 0)) continue;
-      push(l.item_id, { ...base, kind: 'adjustment', qty: -q, godown: jw, batch: l.batch_no || undefined, particulars: `${label} (loss at ${v.party_name})` });
+      push(l.item_id, { ...base, kind: 'adjustment', qty: -q, godown: jw, batch: l.batch_no || undefined, serials: cleanSerials(l.serials), particulars: `${label} (loss at ${v.party_name})` });
     }
   }
   if (!docs.rejections.length) return;

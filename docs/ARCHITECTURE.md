@@ -101,6 +101,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `job_work_principal` | job work (7M) | `PrincipalMovement` `JWP/FY…`: principal's goods received / returned (Job Work In; never our stock) |
 | `rejections_in` | sales (7M, `src/lib/rejections-in.ts`) | `RejectionIn` `RJI/FY…`: goods a customer rejected from a delivery challan before invoicing; stock back, challan balance reduced |
 | `physical_stock` | manufacturing (Phase 7) | `PhysicalStockVoucher` `PHY/FY<yy-yy>/<seq>`: counted lines with `book_qty` and `diff` fixed at save; the diff is posted as an adjustment at the end of that day |
+| `production_plans` | manufacturing (7S, `src/lib/mrp.ts`) | `ProductionPlan` `PP/FY<yy-yy>/<seq>`: planned finished items; the material requirement (MRP) is recomputed live from default BOMs, stock and open POs / GRNs — moves no stock, posts nothing |
 | `einvoice_meta` | einvoice | defined by that module |
 | `design_prefs` | templates-studio | defined by that module |
 | `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}`; additive `tds_amount` (TDS deducted on the payment) and `group_id` (multi-bill payment) (Phase 7) |
