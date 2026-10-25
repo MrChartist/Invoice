@@ -222,7 +222,7 @@
 .item:focus-visible,
 .itemActive {
   background: var(--pal-gold);
-  color: var(--ink);
+  color: var(--pal-on-gold);
   outline: none;
 }
 
@@ -239,7 +239,7 @@
 
 .item:focus-visible .accel,
 .itemActive .accel {
-  color: var(--ink);
+  color: var(--pal-on-gold);
 }
 
 .accelBadge {
@@ -354,7 +354,7 @@
 .row:focus,
 .rowActive {
   background: var(--pal-gold);
-  color: var(--ink);
+  color: var(--pal-on-gold);
   outline: none;
 }
 
@@ -466,7 +466,7 @@
 
 .option[aria-selected='true'] {
   background: var(--pal-gold);
-  color: var(--ink);
+  color: var(--pal-on-gold);
 }
 
 .optionSub {

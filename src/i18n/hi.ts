@@ -244,6 +244,12 @@ export const hi: Messages = {
   'dash.profilesBackup': 'प्रोफ़ाइल और बैकअप',
   'dash.profilesBackupHint': 'व्यवसाय विवरण, बैंक, UPI',
 
+  // ── Missing page (404 inside the shell) ──
+  'notFound.docTitle': 'पेज नहीं मिला — Mr. Chartist Invoice',
+  'notFound.title': 'यह पेज नहीं मिला',
+  'notFound.text': '{path} पर कुछ नहीं है। हो सकता है यह हट गया हो या लिंक ग़लत लिखा हो।',
+  'notFound.back': 'डैशबोर्ड पर वापस',
+
   // ── Invoice editor ────────────────────────────────────────────────
   'editor.newDoc': 'नया दस्तावेज़: {doc}',
   'editor.editDoc': '{doc} संपादित करें',

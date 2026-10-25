@@ -36,6 +36,8 @@
   --pal-macaw: #357cb6;
   --pal-gold: #d5a25e;
   --pal-clay: #ab6d48;
+  /* Text on a --pal-gold fill (selection bars): dark in both themes. */
+  --pal-on-gold: #0a0a0b;
 
   /* Brand */
   --brand: #1a4d94;

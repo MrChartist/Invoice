@@ -51,3 +51,22 @@ export function shiftDay(day: string, days: number): string {
   const t = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + days));
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
+
+/** Whole calendar days from `a` to `b` (both `YYYY-MM-DD`); NaN when either is not a full date. */
+function dayNumber(day: string): number {
+  const m = DAY_RE.exec(day);
+  if (!m || +m[1] < 1900) return NaN;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86_400_000;
+}
+
+/**
+ * The due date after the issue date moves from `prevIssue` to `nextIssue`: the credit period (due − issue) is
+ * kept, so back-dating an invoice does not leave it due months later, and moving it forward never leaves the
+ * due date before the issue date. Anything unparseable (or a due date already before the issue date) keeps
+ * `prevDue` as it was.
+ */
+export function dueAfterIssueChange(prevIssue: string, prevDue: string, nextIssue: string): string {
+  const terms = dayNumber(prevDue) - dayNumber(prevIssue);
+  if (!Number.isFinite(terms) || terms < 0 || !Number.isFinite(dayNumber(nextIssue))) return prevDue;
+  return shiftDay(nextIssue, terms);
+}

@@ -248,6 +248,12 @@ export const en = {
   'dash.manageDirectory': 'Manage your directory',
   'dash.profilesBackup': 'Profiles & backup',
   'dash.profilesBackupHint': 'Business details, bank, UPI',
+
+  // ── Missing page (404 inside the shell) ──
+  'notFound.docTitle': 'Page not found — Mr. Chartist Invoice',
+  'notFound.title': 'We can’t find that page',
+  'notFound.text': 'Nothing lives at {path}. It may have moved, or the link is mistyped.',
+  'notFound.back': 'Back to dashboard',
 } as const;
 
 /** Every key: the shell catalogue above plus the page catalogue (en-pages.ts, loaded with the pages). */

@@ -134,7 +134,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             </select>
           </div>
           <div className={controls.field}>
-            <GstinInput value={client.gstin ?? ''} onChange={(v) => setClient({ gstin: v })} placeholder={t('parties.clientGstinPh')} />
+            <GstinInput value={client.gstin ?? ''} onChange={(v) => setClient({ gstin: v })} placeholder={t('parties.clientGstinPh')} ariaLabel={t('parties.clientGstinPh')} />
           </div>
           <div className={controls.row}>
             <input className={controls.input} type="email" value={client.email} onChange={(e) => setClient({ email: e.target.value })} placeholder={t('parties.email')} aria-label={t('parties.clientEmail')} />
