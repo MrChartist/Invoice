@@ -271,8 +271,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   branches: 'master.edit',
   amc_contracts: 'master.edit',
   loyalty_adjustments: 'master.edit',
-  // approvals: a clerk's save files a request (doc.create); deciding needs doc.approve (approvals.ts)
-  approvals: 'doc.create',
+  // approvals decision log: only the owner's decision writes it (approvals.ts `decide`); a clerk's
+  // request lives on the document itself, so a clerk can never forge a decision row (review L5)
+  approvals: 'doc.approve',
   // payroll (Phase 7): owner-only, salaries are confidential
   employees: 'payroll.view',
   employee_groups: 'payroll.view',

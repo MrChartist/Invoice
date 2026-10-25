@@ -10,7 +10,6 @@ import {
   loadVouchers,
   nextVoucherNumber,
   rupeesToPaise,
-  saveVoucher,
   validateVoucher,
   type Account,
   type ManualVoucher,
@@ -29,7 +28,7 @@ import { useCreateOnTheFly } from '../../masters/useCreateOnTheFly';
 import { isAltC } from '../../masters/useMasterKeys';
 import { EditLogButton } from '../../audit/EditLogButton';
 import { wireT } from '../../../i18n/areas/wiring';
-import { allocationsOf, openRefsFor, syncVoucherReceipts, validateAllocations, voucherReceipts, type ReceiptAllocation } from '../../../lib/bill-allocation';
+import { allocationsOf, openRefsFor, saveReceiptVoucher, validateAllocations, type ReceiptAllocation } from '../../../lib/bill-allocation';
 
 // P0-11 (WP-1): bill-wise details on a receipt against a Sundry Debtor, loaded when needed.
 const BillAllocation = lazy(() => import('../../masters/BillAllocation'));
@@ -126,11 +125,9 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
       if (problems.length) return setError(problems[0]);
     }
     try {
-      const saved = saveVoucher(input, accounts);
-      if (useAlloc.length || (voucher && voucherReceipts(voucher.id).length)) {
-        const method = lines.some((l) => l.dr > 0 && l.account_id === 'cash') ? 'Cash' : 'Bank Transfer';
-        syncVoucherReceipts(saved, debtorLine?.party ?? '', (debtorLine?.cr ?? 0) / 100, useAlloc, method);
-      }
+      // Voucher + bill-wise receipt rows in one step: a refused bill keeps neither (H2).
+      const method = lines.some((l) => l.dr > 0 && l.account_id === 'cash') ? 'Cash' : 'Bank Transfer';
+      const saved = saveReceiptVoucher(input, accounts, { party: debtorLine?.party ?? '', total: (debtorLine?.cr ?? 0) / 100, allocations: useAlloc, method });
       onSaved(saved);
     } catch (err) {
       setError((err as Error).message || ledgerT('saveFailed'));

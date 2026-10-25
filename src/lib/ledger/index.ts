@@ -8,14 +8,14 @@ import { loadBooksData, toIsoDate, type BooksData } from '../books';
 import { loadChallans } from '../tds-payables';
 import { loadOpeningBills } from '../opening-bills';
 import { getTable } from '../storage';
-import { loadUserAccounts } from './accounts';
+import { chartOf, loadUserAccounts } from './accounts';
 import { loadAssets } from './assets';
 import { loadBooksBegin, loadOpenings } from './openings';
 import { buildLedger, type Ledger, type LedgerInput } from './postings';
-import type { OpeningsInput } from './postings-openings';
+import { dayBefore, type OpeningsInput } from './postings-openings';
 import { loadVouchers, type ManualVoucher } from './vouchers';
 import { loadSettings, loadPositions, type StockPosition } from '../inventory';
-import { effectiveMode, loadClosingStockConfig, netOfStockJournals, stockJournalPostings, stockValuerFor, type StockJournalPosting, type StockValuer } from './closing-stock';
+import { effectiveMode, loadClosingStockConfig, netOfStockJournals, netOfStockOpening, stockJournalPostings, stockValuerFor, type StockJournalPosting, type StockValuer } from './closing-stock';
 import { loadPayrollPayments, loadRuns } from '../payroll/records';
 
 export * from './accounts';
@@ -64,14 +64,22 @@ export function loadStockPositions(): StockPosition[] {
  * Closing-stock valuer per the company setting (inventory FIFO / weighted average, typed figures, or
  * none). Positions are only computed in inventory mode. Closing-stock journals already posted to
  * Stock-in-hand (year-end wizard, or a typed "closing stock" journal) are netted off, so a statement
- * never counts the stock twice (`netOfStockJournals`). Every statement screen (Books, Gateway Display,
+ * never counts the stock twice (`netOfStockJournals`); so is an opening balance typed on an Inventories ledger
+ * (`netOfStockOpening` — item openings are already in the valuation). Every statement screen (Books, Gateway Display,
  * ratios) must use this one function so they agree.
  */
 export function loadStockValuer(positions?: StockPosition[], lazy?: () => StockPosition[], manual: readonly ManualVoucher[] = loadVouchers()): StockValuer | undefined {
   let cached = positions;
   const get = () => (cached ??= lazy ? lazy() : loadPositions());
+  const today = toIsoDate(new Date());
   const raw = stockValuerFor(loadClosingStockConfig(), get, loadSettings().method);
-  return netOfStockJournals(raw, stockJournalPostings(manual, toIsoDate(new Date())));
+  return netOfStockOpening(netOfStockJournals(raw, stockJournalPostings(manual, today)), stockLedgerOpening(), dayBefore(loadBooksBegin(today)));
+}
+
+/** Σ opening balances (debit-positive paise) of the Inventories ledgers (Stock-in-hand and user stock ledgers). */
+function stockLedgerOpening(): number {
+  const inventories = new Set(chartOf(loadUserAccounts()).filter((a) => a.group === 'INVENTORIES').map((a) => a.id));
+  return loadOpenings().reduce((s, o) => s + (inventories.has(o.ledger_id) ? o.dr - o.cr : 0), 0);
 }
 
 /**

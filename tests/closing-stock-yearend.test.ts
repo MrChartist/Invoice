@@ -22,6 +22,7 @@ import {
   CLOSING_STOCK_CLASS,
   manualValuer,
   netOfStockJournals,
+  netOfStockOpening,
   saveClosingStockConfig,
   stockJournalPostings,
 } from '../src/lib/ledger/closing-stock.ts';
@@ -157,4 +158,17 @@ test('Gateway Display balance sheet / P&L equal the Books statements with stock 
   assert.equal(gpl.rows.find((r) => r.id === 'stock-close')!.cells[0], pl.trading.closingStock);
   // Without the valuer the Gateway would disagree: proves the stock really flows through.
   assert.notEqual(buildFrame(ledger, 'pl', [], PERIOD, '2026-10-01')!.rows.find((r) => r.id === 'net')!.cells[0], Math.abs(pl.netProfit));
+});
+
+test('H1: a Stock-in-hand ledger opening is netted only up to the opening stock the valuation carries', () => {
+  const v = manualValuer({ opening: 50_000_00, entries: [{ date: '2026-03-31', value: 70_000_00 }] });
+  const n = netOfStockOpening(v, 30_000_00, '2025-03-31')!;
+  assert.equal(n.value('2025-03-30'), 50_000_00, 'before the opening voucher nothing is netted');
+  assert.equal(n.value('2025-04-30'), 20_000_00, '50,000 valued − 30,000 already in the ledger');
+  assert.equal(n.openingIn('2025-04-30'), 20_000_00);
+  assert.equal(n.value('2026-03-31') - n.openingIn('2026-03-31'), v.value('2026-03-31') - v.openingIn('2026-03-31'), 'profit unchanged');
+  const capped = netOfStockOpening(manualValuer({ opening: 10_000_00 }), 30_000_00, '2025-03-31')!;
+  assert.equal(capped.value('2025-04-30'), 0, 'only the overlap is netted; the rest of the ledger opening stands');
+  assert.equal(netOfStockOpening(manualValuer({}), 30_000_00, '2025-03-31')!.value('2025-04-30'), 0);
+  assert.equal(netOfStockOpening(undefined, 30_000_00, '2025-03-31'), undefined);
 });

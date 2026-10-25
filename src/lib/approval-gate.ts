@@ -43,27 +43,61 @@ export function rupeeValue(doc: Pick<InvoiceRecord, 'total' | 'currency' | 'exch
   return (doc.currency || 'INR').toUpperCase() !== 'INR' && fx > 0 ? total * fx : total;
 }
 
+type GateDoc = Pick<InvoiceRecord, 'id' | 'status' | 'total' | 'currency' | 'exchange_rate' | 'pos' | 'approval'>;
+type GateStored = Pick<InvoiceRecord, 'status'> & Partial<Pick<InvoiceRecord, 'total' | 'currency' | 'exchange_rate'>>;
+
+const sameValue = (a: number, b: number) => Math.abs(a - b) <= 0.004;
+/** Would a document of this value need approval under the policy (ignoring who saves it)? */
+const valueNeedsApproval = (doc: GateDoc, policy: ApprovalPolicy) => policy.mode === 'all' || rupeeValue(doc) > policy.threshold + 0.004;
+
 /**
  * Pure: does saving `doc` (over `stored`) need the owner's approval? Only when it is being issued
  * now (new, or leaving Draft), the saver cannot approve, it is not a POS counter bill (paid on the
- * spot — the counter is exempt), and this very document was not approved already.
+ * spot — the counter is exempt), and this very document was not approved already AT THIS VALUE
+ * (H3: an approved document whose value was changed since must be approved again; approvals made
+ * before `approved_value` existed still count as they did).
  */
-export function approvalRequired(
-  doc: Pick<InvoiceRecord, 'id' | 'status' | 'total' | 'currency' | 'exchange_rate' | 'pos' | 'approval'>,
-  stored: Pick<InvoiceRecord, 'status'> | undefined,
-  policy: ApprovalPolicy,
-  saverCanApprove: boolean,
-): boolean {
+export function approvalRequired(doc: GateDoc, stored: GateStored | undefined, policy: ApprovalPolicy, saverCanApprove: boolean): boolean {
   if (!policy.enabled || saverCanApprove || doc.pos) return false;
   if (doc.status === 'Draft') return false;
   if (stored && stored.status !== 'Draft') return false;
-  if (doc.approval?.state === 'approved' && doc.approval.doc_id === doc.id) return false;
-  return policy.mode === 'all' || rupeeValue(doc) > policy.threshold + 0.004;
+  if (doc.approval?.state === 'approved' && doc.approval.doc_id === doc.id) {
+    const approved = doc.approval.approved_value;
+    if (approved === undefined || sameValue(rupeeValue(doc), approved)) return false;
+  }
+  return valueNeedsApproval(doc, policy);
+}
+
+/**
+ * Pure (H3): is this an edit of an ISSUED document by someone who may not approve, changing its
+ * value so that it would need approval? Such an edit is refused, not held: turning an issued
+ * document back into a draft would pull it out of revenue, GST papers and the books behind the
+ * owner's back. The baseline is the value the owner approved, else the stored value.
+ */
+export function issuedValueChangeBlocked(doc: GateDoc, stored: GateStored | undefined, policy: ApprovalPolicy, saverCanApprove: boolean): boolean {
+  if (!policy.enabled || saverCanApprove || doc.pos || !stored || stored.status === 'Draft' || doc.status === 'Draft') return false;
+  if (stored.total === undefined) return false;
+  const approved = doc.approval?.state === 'approved' && doc.approval.doc_id === doc.id ? doc.approval.approved_value : undefined;
+  const baseline = approved ?? rupeeValue({ total: stored.total, currency: stored.currency ?? 'INR', exchange_rate: stored.exchange_rate });
+  if (sameValue(rupeeValue(doc), baseline)) return false;
+  return valueNeedsApproval(doc, policy);
+}
+
+export class ApprovalRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ApprovalRequiredError';
+  }
 }
 
 /** The data layer's single branch: hold `doc` as a pending draft when approval is required. */
 export function holdIfApprovalNeeded(doc: InvoiceRecord, stored: InvoiceRecord | undefined): void {
-  if (!approvalRequired(doc, stored, readApprovalPolicy(), can('doc.approve'))) return;
+  const policy = readApprovalPolicy();
+  const canApprove = can('doc.approve');
+  if (issuedValueChangeBlocked(doc, stored, policy, canApprove)) {
+    throw new ApprovalRequiredError(`Changing the amount of ${doc.invoice_number || 'this issued document'} needs the owner's approval: ask the owner to make the change, or issue a credit / debit note.`);
+  }
+  if (!approvalRequired(doc, stored, policy, canApprove)) return;
   const actor = currentActor();
   const info: ApprovalInfo = {
     state: 'pending',
@@ -74,4 +108,11 @@ export function holdIfApprovalNeeded(doc: InvoiceRecord, stored: InvoiceRecord |
   };
   doc.status = 'Draft';
   doc.approval = info;
+}
+
+/** Refuse money / status moves on a document still waiting for the owner (H3). */
+export function assertNotPendingApproval(doc: Pick<InvoiceRecord, 'invoice_number' | 'approval'> | undefined, what: string): void {
+  if (doc?.approval?.state === 'pending') {
+    throw new ApprovalRequiredError(`${doc.invoice_number || 'This document'} is waiting for the owner's approval; ${what} after it is approved.`);
+  }
 }

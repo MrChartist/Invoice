@@ -562,4 +562,9 @@ export interface ApprovalInfo {
   decided_by?: string;
   decided_at?: string;
   note?: string;
+  /**
+   * Additive (security review H3): rupee value (`rupeeValue`) the owner approved. A clerk who later
+   * changes the value has to ask again; absent on approvals made before this field existed.
+   */
+  approved_value?: number;
 }

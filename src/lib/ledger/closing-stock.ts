@@ -237,3 +237,24 @@ export function netOfStockJournals(stock: StockValuer | undefined, postings: rea
     netted: sorted.filter((p) => p.delta > 0),
   };
 }
+
+/**
+ * Report-time valuation NET of the Stock-in-hand OPENING balance typed in the ledger (or brought in
+ * by a Tally import). Item-master openings already sit in the valuation, so a Stock-in-hand ledger
+ * opening on top would put the opening stock on the balance sheet twice. From `openingDate` (the
+ * opening voucher's day, the day before the books begin) both the value and the opening part are
+ * reduced by the overlap — the ledger opening, capped at the opening stock the valuation itself
+ * carries — so Inventories = ledger opening + (value − overlap) holds the opening stock once, and the
+ * "difference in opening balances" credit shrinks by what the ledger opening already balanced.
+ * Profit (closing − opening) is unchanged. A ledger opening with no item / typed opening behind it
+ * still stands on its own. With no such opening the valuer is returned unchanged.
+ */
+export function netOfStockOpening(stock: StockValuer | undefined, ledgerOpening: number, openingDate: string): StockValuer | undefined {
+  if (!stock || !(ledgerOpening > 0)) return stock;
+  const carried = (date: string) => (date >= openingDate ? Math.min(ledgerOpening, Math.max(stock.openingIn(date), 0)) : 0);
+  return {
+    ...stock,
+    value: (date) => stock.value(date) - carried(date),
+    openingIn: (date) => stock.openingIn(date) - carried(date),
+  };
+}

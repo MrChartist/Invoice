@@ -7,7 +7,6 @@ import { localDb } from '../../../lib/localDb';
 import { printT } from '../../../i18n/areas/printing';
 import { deleteVoucher, loadVouchers, type Ledger, type LedgerVoucher, type ManualVoucher } from '../../../lib/ledger';
 import type { Period } from '../../../lib/books';
-import { removeVoucherReceipts } from '../../../lib/bill-allocation';
 import { toCsv } from '../../../lib/csv';
 import { formatDate } from '../../../lib/utils';
 import { todayIso } from '../../../lib/tax-rules';
@@ -74,8 +73,7 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
   const confirmDelete = () => {
     if (!deleting) return;
     try {
-      deleteVoucher(deleting.id);
-      removeVoucherReceipts(deleting.id); // P0-11: its bill-wise receipt rows go with it
+      deleteVoucher(deleting.id); // P0-11: its bill-wise receipt rows go with it (data layer)
       notify(ledgerT('voucherDeleted', { number: deleting.number }));
       onChanged();
     } catch (err) {

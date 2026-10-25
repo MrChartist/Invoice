@@ -10,7 +10,7 @@ import { TALLY_FIXTURE } from './tally-fixture.ts';
 import { setActorProvider } from '../src/lib/access.ts';
 import { audit } from '../src/lib/audit.ts';
 import { getTable } from '../src/lib/storage.ts';
-import { A, loadOpenings, loadUserAccounts, loadUserGroups, loadVouchers, openingDifference, partyLedgerId } from '../src/lib/ledger/index.ts';
+import { A, ledgerBalanceSheet, loadLedger, loadStockValuer, loadOpenings, loadUserAccounts, loadUserGroups, loadVouchers, openingDifference, partyLedgerId } from '../src/lib/ledger/index.ts';
 import { loadOpeningBills } from '../src/lib/opening-bills.ts';
 import { decodeTallyBytes, parseXmlLite, sanitizeTallyXml, TallyXmlError, xmlNodeFromDom } from '../src/lib/tally-xml-read.ts';
 import { parseTallyXml, planTallyImport, suggestBooksBegin, tallyDay, tallyPaise, voucherTag } from '../src/lib/tally-import.ts';
@@ -172,6 +172,22 @@ test('apply: masters via WP-1 APIs, openings match Tally to the paisa, vouchers 
   const rows = audit.all();
   assert.ok(rows.some((r) => r.action === 'import' && /finished/.test(r.summary)));
   assert.ok(rows.some((r) => r.entity === 'voucher' && r.action === 'create'));
+});
+
+test('H1: imported opening stock is counted once on the balance sheet (stock items + Stock-in-hand opening)', () => {
+  applyTallyImport(plan());
+  const bs = ledgerBalanceSheet(loadLedger(), '2025-04-30', loadStockValuer());
+  const inv = bs.assets.flatMap((s) => s.items).find((i) => i.label === 'Inventories');
+  assert.equal(inv?.amount, 2000000, JSON.stringify(inv));
+  assert.equal(bs.difference, 0);
+});
+
+test('H1: at the year end the imported opening stock is still counted once', () => {
+  applyTallyImport(plan());
+  const bs = ledgerBalanceSheet(loadLedger(), '2026-03-31', loadStockValuer());
+  const inv = bs.assets.flatMap((s) => s.items).find((i) => i.label === 'Inventories');
+  assert.equal(inv?.amount, 2000000);
+  assert.equal(bs.difference, 0);
 });
 
 test('re-import: everything is recognised, nothing is added twice', async () => {

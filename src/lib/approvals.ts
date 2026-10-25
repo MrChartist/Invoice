@@ -14,7 +14,7 @@ import { currentActor, requireAccess } from './access';
 import { audit } from './audit';
 import { localDb } from './localDb';
 import { generateId, getTable, setJson, setTable } from './storage';
-import { APPROVAL_POLICY_KEY, readApprovalPolicy, type ApprovalPolicy } from './approval-gate';
+import { APPROVAL_POLICY_KEY, readApprovalPolicy, rupeeValue, type ApprovalPolicy } from './approval-gate';
 import { formatCurrency } from './utils';
 
 export { readApprovalPolicy, approvalRequired, rupeeValue, type ApprovalPolicy } from './approval-gate';
@@ -83,7 +83,15 @@ function decide(id: string, decision: 'approved' | 'rejected', note?: string): I
   if (decision === 'rejected' && !note?.trim()) throw new ApprovalError('Add a note so the clerk knows what to change.');
   const by = currentActor()?.name ?? 'Owner';
   const at = new Date().toISOString();
-  const approval = { ...doc.approval, state: decision, decided_by: by, decided_at: at, ...(note?.trim() ? { note: note.trim() } : {}) };
+  const approval = {
+    ...doc.approval,
+    state: decision,
+    decided_by: by,
+    decided_at: at,
+    ...(note?.trim() ? { note: note.trim() } : {}),
+    // H3: the value approved; a later change of value by a clerk needs approval again.
+    ...(decision === 'approved' ? { approved_value: rupeeValue(doc) } : {}),
+  };
   const next: InvoiceRecord = {
     ...doc,
     approval,
