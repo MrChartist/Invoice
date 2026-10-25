@@ -8,6 +8,7 @@ import styles from './ExportCenter.module.css';
 import { getTable, setTable, KEYS } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
 import type { AdvanceRecord } from '../../types/advances';
+import type { PurchaseReturn } from '../../types/purchases';
 import type { Client, InvoiceRecord, Payment } from '../../types/invoice';
 import {
   DATASETS,
@@ -98,6 +99,7 @@ function loadSource(): ExportSource {
     purchases: getTable<unknown>('purchases'),
     vendors: getTable<unknown>('vendors'),
     advances: getTable<AdvanceRecord>('advances'),
+    purchaseReturns: getTable<PurchaseReturn>('purchase_returns'),
   };
 }
 

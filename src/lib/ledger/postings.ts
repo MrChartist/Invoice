@@ -53,6 +53,7 @@ import type { TdsChallan } from '../tds-payables';
 import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
 import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
+import { purchaseReturnPostings } from './postings-returns';
 
 export interface PostingLine {
   account: string;
@@ -633,6 +634,7 @@ export function buildLedger(input: LedgerInput): Ledger {
     push(supplierPaymentVoucher(pp, bill));
   }
   for (const vp of input.vendorPayments ?? []) push(vendorPaymentVoucher(vp));
+  for (const v of purchaseReturnPostings(input.purchaseReturns, accounts)) push(v); // WP-3: debit notes (postings-returns.ts)
   for (const inv of input.invoices) if (num(inv.tcs_amount) > 0) tdsKeys.set(`tcs:${inv.id}`, { account: A.tcsPayable, amount: inrValue(num(inv.tcs_amount), inv) });
   // Manual register deductions (`man:` keys) are not in this map: their share goes to 2330 TDS payable.
   for (const ch of input.challans ?? []) push(challanVoucher(ch, tdsKeys));

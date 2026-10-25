@@ -19,6 +19,8 @@ import {
 } from '../../lib/gstr2b';
 import { periodFp, periodLabel, periodRange, type ReportPeriod } from '../../lib/gst-reports';
 import { purchasesDb } from '../../lib/purchases';
+import { getTable } from '../../lib/storage';
+import type { PurchaseReturn } from '../../types/purchases';
 import { vendorsDb } from '../../lib/vendors';
 import { MAX_IMPORT_BYTES, toCsv } from '../../lib/csv';
 import { downloadText } from '../../lib/download';
@@ -72,7 +74,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
   const range = useMemo(() => periodRange(period), [period]);
   const actionPeriod = data?.period || periodFp(period);
   // `rev` is read so the memo re-reads storage after a bill is created / an action is saved.
-  const bills = useMemo(() => (rev >= 0 ? bookBills(purchasesDb.all(), filerStateCode) : []), [filerStateCode, rev]);
+  const bills = useMemo(() => (rev >= 0 ? bookBills(purchasesDb.all(), filerStateCode, getTable<PurchaseReturn>('purchase_returns')) : []), [filerStateCode, rev]);
   const match = useMemo(() => (data ? matchGstr2b(data, bills, { period: range }) : null), [data, bills, range]);
   const actions = useMemo(() => (rev >= 0 ? gstr2bActionsDb.forPeriod(actionPeriod) : new Map()), [actionPeriod, rev]);
   const effect = useMemo(() => (match ? itcEffect(match, bills, actions, actionPeriod, range) : null), [match, bills, actions, actionPeriod, range]);

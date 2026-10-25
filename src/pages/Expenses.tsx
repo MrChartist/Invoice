@@ -41,12 +41,16 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 
-type Tab = 'bills' | 'orders' | 'vendors';
+type Tab = 'bills' | 'orders' | 'vendors' | 'returns';
 
 // Purchase orders are a separate, rarely-opened tab: load it on demand.
 const PurchaseOrdersTab = lazy(() =>
   import('../components/purchases/PurchaseOrdersTab').then((m) => ({ default: m.PurchaseOrdersTab })),
 );
+
+// WP-3: purchase returns / supplier notes, receipt notes (GRN) and pending reports — also on demand.
+const ReturnsTab = lazy(() => import('../components/purchases/ReturnsTab').then((m) => ({ default: m.ReturnsTab })));
+const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns'];
 
 const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: 'kindAll' | 'kindBills' | 'kindExpenses' }[] = [
   { id: 'ALL', label: 'kindAll' },
@@ -60,7 +64,7 @@ export function Expenses() {
   const { t } = useT();
   const [version, setVersion] = useState(0);
   const [params] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => (params.get('tab') === 'orders' ? 'orders' : params.get('tab') === 'vendors' ? 'vendors' : 'bills'));
+  const [tab, setTab] = useState<Tab>(() => TAB_PARAMS.find((x) => x === params.get('tab')) ?? 'bills');
   const [seed, setSeed] = useState<BillSeed | null>(null);
   const [filter, setFilter] = useState<PurchaseFilter>({ kind: 'ALL', status: 'ALL', category: 'ALL' });
   // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
@@ -182,6 +186,9 @@ export function Expenses() {
           <button type="button" role="tab" aria-selected={tab === 'vendors'} className={tab === 'vendors' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('vendors')}>
             {purT('tabVendors')} <span className={styles.count}>{vendors.length}</span>
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'returns'} className={tab === 'returns' ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab('returns')}>
+            {purT('tabReturns')}
+          </button>
         </div>
       </div>
 
@@ -192,6 +199,24 @@ export function Expenses() {
             vendors={vendors}
             purchases={purchases}
             businessState={business.stateCode}
+            onVendorCreated={reload}
+            onConvert={(s) => {
+              setEditing(null);
+              setSeed(s);
+              setBillOpen(true);
+            }}
+            onChanged={(message, tone) => {
+              reload();
+              if (message) notify(message, tone);
+            }}
+          />
+        </Suspense>
+      ) : tab === 'returns' ? (
+        <Suspense fallback={null}>
+          <ReturnsTab
+            purchases={purchases}
+            vendors={vendors}
+            orders={orders}
             onVendorCreated={reload}
             onConvert={(s) => {
               setEditing(null);

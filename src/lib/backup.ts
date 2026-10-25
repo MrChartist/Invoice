@@ -276,6 +276,8 @@ const RECORD_TABLES = [
   'price_levels', 'schemes', 'pos_day_close',
   // Tally parity: TDS challans / manual deductions / return marks, supplier advances (bill-wise)
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
+  // WP-3: purchase returns / supplier notes, receipt notes (GRN) and rejections out
+  'purchase_returns', 'receipt_notes',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -284,6 +286,7 @@ const ID_TABLES = new Set([
   'stock_items', 'godowns', 'stock_transfers', 'advances',
   'price_levels', 'schemes', 'pos_day_close',
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
+  'purchase_returns', 'receipt_notes',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

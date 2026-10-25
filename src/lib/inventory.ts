@@ -19,6 +19,7 @@ import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normal
 import { toCsv } from './csv';
 import { creditNoteReturnsGoods } from './credit-restock';
 import { MAIN_GODOWN_ID, type StockTransfer } from '../types/stock';
+import { grnCoverage, loadReturnStockDocs, returnStockEvents, type ReturnStockDocs } from './events-returns';
 
 /* ── Types ───────────────────────────────────────────────────── */
 
@@ -183,6 +184,8 @@ export interface StockInputs {
    * credit note that returns goods moves stock (`creditNoteReturnsGoods`).
    */
   links?: { from_id: string; to_id: string; relation: string; reason?: string }[];
+  /** WP-3 event source (events-returns.ts): receipt notes, rejections out, purchase returns. */
+  returnDocs?: ReturnStockDocs;
 }
 
 const EPS = 1e-9;
@@ -395,6 +398,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     }
   }
 
+  const grnCovered = grnCoverage(input.returnDocs); // WP-3: goods a receipt note already brought in
   for (const p of purchases) {
     // Same reader as Books / GST / exports: drafts, cancelled bills and direct
     // expenses (rent, fees ...) never move stock.
@@ -402,7 +406,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     if (!bill || isVoidStatus(bill.status) || bill.isExpense) continue;
     for (const line of readPurchaseLines(p)) {
       const it = index.find(line.name, line.hsn);
-      const q = line.quantity;
+      const q = line.quantity - grnCovered.take(line.grnLineId, line.quantity);
       if (!it || q <= 0) continue;
       push(it.id, {
         date: bill.date,
@@ -423,6 +427,8 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
       });
     }
   }
+
+  returnStockEvents(input.returnDocs, purchases, index, push); // WP-3 event source
 
   if (input.includeTransfers) {
     for (const t of input.transfers ?? []) {
@@ -918,6 +924,7 @@ export function liveInputs(): StockInputs {
     method: settings.method,
     includeChallans: settings.includeChallans,
     links: getTable<{ from_id: string; to_id: string; relation: string; reason?: string }>('doc_links'),
+    returnDocs: loadReturnStockDocs(),
   };
 }
 

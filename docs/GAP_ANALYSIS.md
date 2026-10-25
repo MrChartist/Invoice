@@ -446,7 +446,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 - **Tally feel:** report titles in Tally words ("Group Summary", "Ledger Vouchers", "Day Book"), a period strip at top-right, Alt+F1
   "Detailed / Condensed" button label, Esc back.
 
-### P0-5 Purchase returns, supplier debit / credit notes — WP-3, size M
+### P0-5 Purchase returns, supplier debit / credit notes — WP-3, size M — ✅ done (`docs/features/purchase-returns.md`; P1-8 GRN / Rejections Out and P1-12 purchase side done too, P1-9 open)
 - **Build:** a `PURCHASE_RETURN` / supplier debit note document (`DN/FY…` our series) against a bill: lines limited to
   the billed quantities, goods leave stock, ITC reversed. Also a "supplier credit note received" entry (the supplier's
   number / date, value-only or with goods). GSTR-2B CDNR lines match these. 3B nets ITC in 4A(5) (supplier notes reduce ITC; verify with your CA).

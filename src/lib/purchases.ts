@@ -367,6 +367,8 @@ export const purchasesDb = {
     requireAccess('books.edit');
     const bill = purchasesDb.get(id);
     if (bill) assertBillUnlocked(bill, 'delete');
+    // WP-3: a debit note / supplier credit note is adjusted against this bill — delete the note first.
+    if (getTable<{ purchase_id?: string }>('purchase_returns').some((n) => n?.purchase_id === id)) throw new Error('A debit note or supplier credit note is recorded against this bill. Delete the note first.');
     setTable(PURCHASES_TABLE, purchasesDb.all().filter((p) => p.id !== id));
     setTable(PAYMENTS_TABLE, paymentsDb.all().filter((p) => p.purchase_id !== id));
     if (bill?.attachments?.length) releaseAttachments(bill.attachments.map((a) => a.id));

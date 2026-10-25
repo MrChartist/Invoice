@@ -33,6 +33,7 @@ import {
 } from '../lib/gstr-json';
 import type { InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
+import type { PurchaseReturn } from '../types/purchases';
 import { advanceTaxEvents } from '../lib/advance-tax';
 import { DataTable, Money, type Column } from '../components/gst-reports/DataTable';
 import { Gstr3bView } from '../components/gst-reports/Gstr3bView';
@@ -185,7 +186,7 @@ export function GstReports() {
 
   const report = useMemo(() => {
     const prof = profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin);
-    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover, advances });
+    return buildGstReport(invoices, purchases, { period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover, advances, purchaseNotes: getTable<PurchaseReturn>('purchase_returns') });
   }, [invoices, purchases, profiles, period, gstin, lastFyTurnover, advances]);
 
   const { gstr1: g1, gstr3b: g3, issues } = report;

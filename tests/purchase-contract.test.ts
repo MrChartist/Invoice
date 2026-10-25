@@ -357,3 +357,22 @@ test('TDS-on-payables fields (Tally parity): every reader agrees on what the sup
   // Legacy rows read as no TDS.
   assert.deepEqual([readPurchase(bill)!.tdsAmount, readPurchase(bill)!.tdsOnBill, supplierPayable(bill)], [0, 0, 1180]);
 });
+
+test('WP-3 readers (purchase returns, receipt notes, GRN stock source) understand the real bill shape', async () => {
+  const { returnableLines, validateNote, noteGstMode } = await import('../src/lib/purchase-returns.ts');
+  const { billedByGrnLine, purchaseOrderOutstanding } = await import('../src/lib/receipt-notes.ts');
+  const { grnCoverage } = await import('../src/lib/events-returns.ts');
+  // Returnable lines come from the bill's own `lines`; the GST mode from its split.
+  const r = returnableLines(bill, []);
+  assert.deepEqual([r[0].line.id, r[0].billed, r[0].available, r[0].unitCost], ['l1', 10, 10, 100]);
+  assert.equal(noteGstMode(bill), 'CGST_SGST');
+  assert.equal(noteGstMode({ ...bill, cgst: 0, sgst: 0, igst: 180 }), 'IGST');
+  assert.match(validateNote({ kind: 'DEBIT_NOTE', date: '2026-05-01', purchaseId: 'p1', reason: '01', goodsReturned: true, lines: [{ id: 'x', bill_line_id: 'l1', name: 'Paper ream', quantity: 1, rate: 100, tax_rate: 18 }] }, { ...bill, status: 'Draft' } as never, []), /draft or cancelled/);
+  // Bill lines billing a GRN are found through `grn_line_id`; void bills and expenses are ignored.
+  const g = { ...bill, lines: [{ ...bill.lines[0], grn_line_id: 'gl1' }] };
+  assert.equal(billedByGrnLine([g, { ...g, id: 'v', status: 'cancelled' } as never, { ...g, id: 'e', kind: 'EXPENSE' }]).get('gl1'), 10);
+  assert.equal(readPurchaseLines(g)[0].grnLineId, 'gl1');
+  assert.equal(readPurchaseLines(bill)[0].grnLineId, '');
+  assert.equal(grnCoverage({ notes: [], receipts: [{ id: 'g', kind: 'GRN', number: 'G', date: '2026-04-01', vendor_name: 'A', lines: [{ id: 'gl1', name: 'Paper ream', quantity: 4, rate: 1, tax_rate: 0 }] }] }).take('gl1', 10), 4);
+  assert.equal(purchaseOrderOutstanding([], [bill], [], '2026-12-31').length, 0);
+});

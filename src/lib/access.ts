@@ -207,6 +207,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   tds_deductions: 'books.edit',
   tds_returns: 'books.edit',
   vendor_payments: 'books.edit',
+  // WP-3: purchase returns / supplier notes, receipt notes (GRN) and rejections out
+  purchase_returns: 'books.edit',
+  receipt_notes: 'books.edit',
 };
 
 let systemDepth = 0;

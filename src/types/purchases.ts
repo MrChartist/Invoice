@@ -67,6 +67,8 @@ export interface PurchaseLine {
   serials?: string[];
   /** Godown the goods are received into (absent = the default godown). */
   godown_id?: string;
+  /** Additive (WP-3): the receipt-note (GRN) line this bill line bills. Goods came in on the GRN. */
+  grn_line_id?: string;
 }
 
 /** A supplier bill or a direct expense. Persisted in table `purchases`. */
@@ -212,6 +214,139 @@ export interface PurchaseOrder {
   total: number;
   notes?: string;
   /** yyyy-mm-dd the user closed a partly received order. */
+  closed_on?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/* ── Purchase returns / supplier notes (WP-3, P0-5) — table `purchase_returns` ── */
+
+/**
+ * `DEBIT_NOTE`  — our debit note to the supplier (purchase return / rate difference we claim), `DN/FY…`.
+ * `SUPPLIER_CN` — the supplier's credit note received (their number / date), entered against our books.
+ * Both are a Tally "Debit Note" voucher on our side: Dr supplier, Cr Purchase returns + input tax.
+ */
+export type PurchaseNoteKind = 'DEBIT_NOTE' | 'SUPPLIER_CN';
+
+/** GST "reason for issuing note" (the list GSTR-1 / Tally use); stored as the code. */
+export type NoteReasonCode = '01' | '02' | '03' | '04' | '05' | '06' | '07';
+
+export const GST_NOTE_REASONS: { value: NoteReasonCode; label: string; goods: boolean }[] = [
+  { value: '01', label: 'Sales return / purchase return', goods: true },
+  { value: '02', label: 'Post-sale discount', goods: false },
+  { value: '03', label: 'Deficiency in services', goods: false },
+  { value: '04', label: 'Correction in invoice', goods: false },
+  { value: '05', label: 'Change in place of supply', goods: false },
+  { value: '06', label: 'Finalisation of provisional assessment', goods: false },
+  { value: '07', label: 'Others', goods: false },
+];
+
+export interface PurchaseReturnLine {
+  id: string;
+  /** The bill line returned / re-valued (`PurchaseLine.id`). */
+  bill_line_id?: string;
+  name: string;
+  hsn?: string;
+  unit?: string;
+  /** Quantity returned (goods). A value-only line carries 1 with `rate` = the value. */
+  quantity: number;
+  /** Taxable value per unit. */
+  rate: number;
+  tax_rate: number;
+  /** Stock dimensions copied from the bill line (6.6 / 6.10 / 6.11). */
+  godown_id?: string;
+  batch_no?: string;
+  serials?: string[];
+}
+
+/** A purchase return / supplier debit note, or a supplier's credit note received. */
+export interface PurchaseReturn {
+  id: string;
+  kind: PurchaseNoteKind;
+  /** Our voucher number `DN/FY<yy-yy>/<seq>` (Indian FY of `date`), for both kinds. */
+  note_number: string;
+  /** yyyy-mm-dd */
+  date: string;
+  /** The bill (Agst Ref). Absent = on account (supplier owes us until adjusted). */
+  purchase_id?: string;
+  /** "Original Invoice No. / Date" snapshot. */
+  bill_number?: string;
+  bill_date?: string;
+  vendor_id?: string;
+  vendor_name: string;
+  vendor_gstin?: string;
+  place_of_supply?: string;
+  /** The supplier's credit note number / date (required for SUPPLIER_CN; set later on a DN once received). */
+  supplier_note_number?: string;
+  supplier_note_date?: string;
+  reason: NoteReasonCode;
+  /** Goods physically go back to the supplier (stock out). False = value only (discount, rate difference). */
+  goods_returned: boolean;
+  lines: PurchaseReturnLine[];
+  taxable: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total: number;
+  /** Snapshot of the bill: ITC claimed on it (only then is ITC reversed by the note). */
+  itc_eligible: boolean;
+  reverse_charge?: boolean;
+  import_type?: ImportType;
+  /** Snapshot of the bill's kind and category (the account the cost was booked to). */
+  bill_kind?: PurchaseKind;
+  category?: string;
+  /** Part of the note applied to the bill's balance (raises the bill's `amount_paid`); the rest is on account. */
+  adjusted_amount: number;
+  cost_centre_id?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/* ── Receipt notes (GRN) and Rejection Out (WP-3, P1-8) — table `receipt_notes` ── */
+
+export interface ReceiptNoteLine {
+  id: string;
+  name: string;
+  hsn?: string;
+  unit?: string;
+  quantity: number;
+  /** Expected cost per unit (PO rate); stock is valued at it until billed. */
+  rate: number;
+  tax_rate: number;
+  /** The PO line received (GRN), or the GRN line rejected (Rejection Out). */
+  po_line_id?: string;
+  grn_line_id?: string;
+  godown_id?: string;
+  batch_no?: string;
+  mfg_date?: string;
+  expiry_date?: string;
+}
+
+/**
+ * `GRN` — goods received before the supplier's bill (Tally "Receipt Note"): stock in, no books / GST.
+ * `REJECTION_OUT` — goods received on a GRN sent back before billing (Tally "Rejections Out"): stock out.
+ */
+export interface ReceiptNote {
+  id: string;
+  kind: 'GRN' | 'REJECTION_OUT';
+  /** `GRN/FY<yy-yy>/<seq>` or `RJO/FY<yy-yy>/<seq>`. */
+  number: string;
+  /** yyyy-mm-dd */
+  date: string;
+  vendor_id?: string;
+  vendor_name: string;
+  vendor_gstin?: string;
+  place_of_supply?: string;
+  /** GRN: the purchase order received against. */
+  po_id?: string;
+  /** REJECTION_OUT: the GRN the goods came in on. */
+  grn_id?: string;
+  /** Supplier's delivery challan / LR number. */
+  challan_no?: string;
+  lines: ReceiptNoteLine[];
+  notes?: string;
+  /** yyyy-mm-dd the user closed a GRN with quantities that will never be billed. */
   closed_on?: string;
   created_at?: string;
   updated_at?: string;
