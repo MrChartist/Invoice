@@ -16,7 +16,7 @@ import { rcvT } from '../../i18n/areas/receivables';
 import { khataT } from '../../i18n/areas/khata';
 import styles from './StatementViewer.module.css';
 import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type StatementStyle } from '../../lib/statement-styles';
-import { colT } from '../../i18n/areas/collections';
+import { rcv2T as colT } from '../../i18n/areas/collections-rcv';
 import { localDayOf } from '../../lib/dates';
 
 export interface StatementViewerProps extends StatementDocumentProps {

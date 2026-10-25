@@ -10,6 +10,7 @@ import { loadReminderSchedule } from './reminder-settings';
 import type { PendingOptions } from './reminders';
 import { brokenPromiseParties, idByNameOf, isHeldByPromise, loadCollectionNotes, openPromises, partyKeyFor, receiptsByParty } from './collections';
 import { localDayOf } from './dates';
+import { gradeLookup } from './payment-score';
 
 export function reminderOptions(invoices: readonly InvoiceRecord[], today: Date = new Date()): Pick<PendingOptions, 'schedule' | 'modeOf' | 'isHeld' | 'isFirm'> {
   const clients = getTable<Client>(KEYS.clients);
@@ -30,4 +31,13 @@ export function reminderOptions(invoices: readonly InvoiceRecord[], today: Date 
     out.isFirm = (inv) => firm.has(keyOf(inv));
   }
   return out;
+}
+
+/** Dashboard reminders panel (loaded after first paint): the options above plus payment grades (R2-A7). Never throws. */
+export function panelOptions(invoices: readonly InvoiceRecord[], today: Date = new Date()): Partial<PendingOptions> {
+  try {
+    return { ...reminderOptions(invoices, today), gradeOf: gradeLookup(invoices, today) };
+  } catch {
+    return {};
+  }
 }

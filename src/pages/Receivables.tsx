@@ -11,12 +11,8 @@ import {
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
 import { uxT } from '../i18n/areas/invoicing-ux';
-import { colT } from '../i18n/areas/collections';
-import { paymentScores, type PaymentScore } from '../lib/payment-score';
-import { loadCollectionNotes, receiptsByParty } from '../lib/collections';
+import { rcv2T as colT } from '../i18n/areas/collections-rcv';
 import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type StatementStyle } from '../lib/statement-styles';
-import { PaymentScoreBadge } from '../components/collections/PaymentScoreBadge';
-import colStyles from '../components/collections/collections.module.css';
 import type { Payment } from '../types/invoice';
 import { getTable } from '../lib/storage';
 import type { CreditLinkRow } from '../lib/amount-due';
@@ -125,12 +121,17 @@ export function Receivables() {
   const dso = useMemo(() => computeDso(report, 90, now), [report, now]);
   const efficiency = overallEfficiency(months);
   const fmt = (n: number) => formatCurrency(n, currency);
-  // R2-A7: how each party usually pays (settled bills of the last 12 months, promises kept / broken).
-  const scores = useMemo(() => {
-    const notes = loadCollectionNotes();
-    const payments = data.payments as Payment[];
-    return paymentScores({ invoices: data.invoices, payments, links: data.links, clients: data.clients, notes, receipts: notes.length ? receiptsByParty(data.invoices, payments, data.clients) : [] }, toDateInput(now));
-  }, [data, now]);
+  // R2-A7: how each party usually pays (settled bills of the last 12 months, promises kept / broken) — loaded
+  // after the screen renders so the route chunk stays small.
+  const [extras, setExtras] = useState<typeof import('../components/collections/AgingExtras') | null>(null);
+  useEffect(() => {
+    import('../components/collections/AgingExtras').then((m) => setExtras(m)).catch(() => undefined);
+  }, []);
+  const scores = useMemo(
+    () => (extras ? extras.computeScores({ invoices: data.invoices, payments: data.payments as Payment[], links: data.links, clients: data.clients }, toDateInput(now)) : null),
+    [extras, data, now],
+  );
+  const badge = (key: string): ReactNode => (extras && scores ? <extras.PaymentScoreBadge score={scores.get(key)} /> : null);
 
   // Per-client late-fee terms (roadmap 6.15): overdue bills of such clients get "Add late fee",
   // which creates a NEW draft invoice; the overdue one is never edited.
@@ -260,11 +261,11 @@ export function Receivables() {
 
       <div role="tabpanel" id={`rcv-panel-${tab}`} aria-labelledby={`rcv-tab-${tab}`}>
         {tab === 'aging' && <AgingTab report={report} currency={currency} fmt={fmt} lateFeeRules={lateFeeRules} onLateFee={addLateFee} clients={data.clients}
-          scores={scores} notify={notify} onChanged={() => setData(loadData())}
+          badge={badge} notify={notify} onChanged={() => setData(loadData())}
           onStatement={(p) => { const n = new URLSearchParams(params); n.set('tab', 'statements'); n.set('party', p.key); setParams(n, { replace: true }); }} />}
         {tab === 'statements' && <StatementsTab report={report} data={data} currency={currency} now={now}
           partyKey={params.get('party') ?? ''} onPick={(k) => { const n = new URLSearchParams(params); n.set('party', k); setParams(n, { replace: true }); }}
-          notify={notify} onChanged={() => setData(loadData())} scores={scores} />}
+          notify={notify} onChanged={() => setData(loadData())} badge={badge} />}
         {tab === 'followups' && (
           <Suspense fallback={null}>
             <FollowUpsTab report={report} invoices={data.invoices} payments={data.payments as Payment[]} clients={data.clients} notify={notify} />
@@ -341,10 +342,10 @@ function Stat({ label, value, hint, icon, tone }: {
 
 /* ── Aging ────────────────────────────────────────────────────── */
 
-function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee, clients, scores, notify, onChanged }: {
+function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee, clients, badge, notify, onChanged }: {
   report: ReturnType<typeof buildReceivables>;
   clients: ReturnType<typeof loadData>['clients'];
-  scores: Map<string, PaymentScore>;
+  badge: (partyKey: string) => ReactNode;
   notify: (m: string, tone?: 'success' | 'error' | 'info') => void;
   onChanged: () => void;
   currency: string;
@@ -440,9 +441,9 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
                             {p.name}
                           </button>
                         ) : <span className={styles.noExpand}>{p.name}</span>}
-                        <PaymentScoreBadge score={scores.get(p.key)} />
-                        {modeOf(p) === 'never' && <span className={colStyles.modeBadge}>{colT('rmNeverBadge')}</span>}
-                        {modeOf(p) === 'manual' && <span className={colStyles.modeBadge}>{colT('rmManualBadge')}</span>}
+                        {badge(p.key)}
+                        {modeOf(p) === 'never' && <span className={`${surface.badge} ${surface.badgeDraft}`}>{colT('rmNeverBadge')}</span>}
+                        {modeOf(p) === 'manual' && <span className={`${surface.badge} ${surface.badgeDraft}`}>{colT('rmManualBadge')}</span>}
                         {currency === 'INR' && p.net > 0.004 && can('payment.record') && (
                           <button type="button" className={controls.btnIcon} aria-label={`${colT('fuLog')}: ${p.name}`} title={colT('fuLog')}
                             onClick={() => setFollowUp(p)} data-log-followup>
@@ -572,8 +573,8 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee, onWriteOff }:
 
 /* ── Statements ───────────────────────────────────────────────── */
 
-function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, onChanged, scores }: {
-  scores: Map<string, PaymentScore>;
+function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, onChanged, badge }: {
+  badge: (partyKey: string) => ReactNode;
   report: ReturnType<typeof buildReceivables>;
   data: ReturnType<typeof loadData>;
   currency: string;
@@ -667,7 +668,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
 
       <div className={surface.card}>
         <div className={surface.cardHead}>
-          <h2 className={styles.h2}>{party.name} <PaymentScoreBadge score={scores.get(party.key)} /></h2>
+          <h2 className={styles.h2}>{party.name} {badge(party.key)}</h2>
           <div className={surface.pageActions}>
             {currency === 'INR' && can('payment.record') && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setFollowUp(true)} data-log-followup>

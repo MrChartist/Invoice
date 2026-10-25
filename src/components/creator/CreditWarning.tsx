@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,15 +9,14 @@ import { canOverrideCredit, creditStatus, readCreditPolicy } from '../../lib/cre
 import { localDb } from '../../lib/localDb';
 import { getTable, peekTable } from '../../lib/storage';
 import { todayInput } from '../../lib/utils';
-import type { InvoiceRecord, Payment } from '../../types/invoice';
-import { paymentScore } from '../../lib/payment-score';
-import { loadCollectionNotes } from '../../lib/collections';
-import { PaymentScoreBadge } from '../collections/PaymentScoreBadge';
-import { colT } from '../../i18n/areas/collections';
+import type { InvoiceRecord } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
 import { crT } from '../../i18n/areas/credit';
 import styles from './StockWarnings.module.css';
+
+// R2-A7: the customer's payment grade, loaded on demand with the scoring code.
+const CreditScoreLine = lazy(() => import('../collections/CreditScoreLine'));
 
 /**
  * Credit-limit notice (6.25 / 8.80): the client master's limit / credit days vs what they owe plus this
@@ -39,14 +38,15 @@ export function CreditWarning() {
     // the draft total walks a handful of rows, not the whole table; read-only, so no re-parse either.
     const invoices = peekTable<InvoiceRecord>('invoices').filter((inv) => belongsTo(inv, master));
     const links = getTable<{ from_id: string; to_id: string; relation: string }>('doc_links');
-    // R2-A7: how this customer usually pays (their settled bills of the last 12 months).
-    const mine = new Set(invoices.map((i) => i.id));
-    const score = master.id ? paymentScore(master.id, { invoices, payments: peekTable<Payment>('transactions').filter((p) => mine.has(p.invoice_id)), links, clients: [master], notes: loadCollectionNotes().filter((n) => n.party_key === master.id), receipts: [] }, todayInput()) : null;
-    return { master, invoices, links, cheques: getTable<BounceLike>('cheques'), policy: readCreditPolicy(), score };
+    return { master, invoices, links, cheques: getTable<BounceLike>('cheques'), policy: readCreditPolicy() };
   }, [clientId, clientName]);
   if (!context) return null;
-  const score = context.score;
-  const slow = score?.grade === 'C' || score?.grade === 'D';
+  const scoreLine = (slowOnly: boolean) => (
+    <Suspense fallback={null}>
+      <CreditScoreLine master={context.master} invoices={context.invoices} links={context.links} slowOnly={slowOnly}
+        wrapClass={styles.wrap} lineClass={styles.line} ariaLabel={edT('cwAria')} />
+    </Suspense>
+  );
   const status = creditStatus(
     {
       id: s.id, client: s.client, doc_type: s.doc_type, status: s.status, total: s.totals.total, tds_amount: s.totals.tds_amount,
@@ -54,19 +54,11 @@ export function CreditWarning() {
     },
     { master: context.master, policy: context.policy, invoices: context.invoices, links: context.links, cheques: context.cheques, day: todayInput() },
   );
-  if ((!status || !status.check.warnings.length) && !slow) return null;
-  if (!status || !status.check.warnings.length) {
-    return (
-      <div className={styles.wrap} role="status" aria-label={edT('cwAria')} data-payment-score-note>
-        <p className={styles.line}><PaymentScoreBadge score={score} /> {colT('scTitle', { name: context.master.name })}: {score?.reasons.join(' · ')}</p>
-      </div>
-    );
-  }
+  // Without credit warnings only a slow payer (grade C / D) gets a notice.
+  if (!status || !status.check.warnings.length) return context.master.id ? scoreLine(true) : null;
   return (
     <div className={styles.wrap} role="status" aria-label={edT('cwAria')} data-credit-mode={status.mode}>
-      {score && (
-        <p className={styles.line}><PaymentScoreBadge score={score} /> {colT('scTitle', { name: context.master.name })}: {score.reasons.join(' · ')}</p>
-      )}
+      {scoreLine(false)}
       {status.check.warnings.map((w) => (
         <p key={w} className={styles.line}>
           <ShieldAlert size={14} aria-hidden="true" /> {w}

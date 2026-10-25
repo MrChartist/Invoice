@@ -14,7 +14,7 @@ import { printT } from '../../i18n/areas/printing';
 import controls from '../../styles/controls.module.css';
 import styles from './StatementViewer.module.css';
 import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, skipInBulk, type StatementStyle } from '../../lib/statement-styles';
-import { colT } from '../../i18n/areas/collections';
+import { rcv2T as colT } from '../../i18n/areas/collections-rcv';
 
 interface Props {
   parties: PartyReceivable[];
