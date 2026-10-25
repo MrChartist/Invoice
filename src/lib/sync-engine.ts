@@ -318,12 +318,16 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}van_settlements`]: 'date',
   [`${DB_PREFIX}expiry_claims`]: 'date',
   [`${DB_PREFIX}expiry_receipts`]: 'date',
+  [`${DB_PREFIX}business_loans`]: 'date',
   [`${DB_PREFIX}pos_returns`]: 'day',
   [`${DB_PREFIX}pos_shifts`]: 'day', // 8E cashier shifts
   [`${DB_PREFIX}cheques`]: chequeDay,
   [`${DB_PREFIX}ledger_openings`]: openingDay,
   [`${DB_PREFIX}opening_bills`]: openingDay,
   [`${DB_PREFIX}books_begin`]: (r) => (str(r.date) ? openingDayFor(str(r.date)) : undefined),
+  // R2-C: deferral schedules (their journals are `vouchers` rows, locked on their own dates) and packing lists
+  [`${DB_PREFIX}deferrals`]: (r) => str((r.source as Record<string, unknown> | undefined)?.date) || str(r.start) || undefined,
+  [`${DB_PREFIX}packing_lists`]: 'date',
   // R2-A: collection follow-ups (the day logged) and bad-debt recoveries (the day the money came in)
   [`${DB_PREFIX}collection_notes`]: 'date',
   [`${DB_PREFIX}write_off_recoveries`]: 'date',
@@ -885,10 +889,13 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}payroll_payments`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}actuarial_valuations`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}employee_loans`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}business_loans`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}fnf_settlements`]: { num: 'number', date: 'pay_month' },
   [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
   // Review L2: RCM self-invoices (RCM/…) and payment vouchers (RPV/…) are two series in one table.
   [`${DB_PREFIX}rcm_documents`]: { num: 'number', date: 'date', scope: 'kind' },
+  // R2-C: packing lists (PKL/FY…)
+  [`${DB_PREFIX}packing_lists`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

@@ -6,6 +6,7 @@ import { PaperHeader, StatementStrip } from './parts/PaperHeader';
 import { PartyPanel } from './parts/PartyPanel';
 import { CustomFieldsBlock } from './parts/CustomFieldsBlock';
 import { PaperItemsTable } from './parts/PaperItemsTable';
+import { ChallanQtyTable } from './parts/ChallanQtyTable';
 import { NotesBlock, PaymentBlock, TaxSummary, TotalsBlock } from './parts/FooterBlocks';
 import { GstBody } from './parts/GstBody';
 import { ReceiptBody } from './parts/ReceiptBody';
@@ -22,7 +23,7 @@ import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
 import type { EInvoiceMeta } from '../../lib/einvoice';
 import { DOCUMENT_LABELS } from '../../types/invoice';
-import { cn } from '../../lib/utils';
+import { cn, formatDate } from '../../lib/utils';
 import { contrastText, paperSize, printPageCss } from '../../lib/design-prefs';
 import styles from './invoice-paper.module.css';
 
@@ -105,9 +106,16 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
 
   const showInitials = !preprinted && (layout === 'corporate' || layout === 'centered') && sender.companyName;
 
+  // 8H delivery challan toggles: print without amounts; mark a returnable challan.
+  const challan = invoice.doc_type === 'DELIVERY_CHALLAN';
+  const hideAmounts = challan && !!invoice.challan_hide_amounts;
+  const returnNote = challan && invoice.challan_returnable
+    ? `Returnable delivery challan — not a sale. Goods to be returned${invoice.challan_return_by ? ` by ${formatDate(invoice.challan_return_by)}` : ''}.`
+    : '';
+
   const body = (() => {
-    if (layout === 'gst') return <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} />;
-    if (layout === 'receipt') return <ReceiptBody invoice={invoice} sender={sender} totals={totals} />;
+    if (layout === 'gst' && !hideAmounts) return <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} />;
+    if (layout === 'receipt' && !hideAmounts) return <ReceiptBody invoice={invoice} sender={sender} totals={totals} />;
     return (
       <>
         {preprinted ? (
@@ -119,21 +127,21 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <PaperHeader invoice={invoice} sender={sender} meta={effMeta} />
         )}
         {cfg.headerNote && <div className={styles.headerNote}>{cfg.headerNote}</div>}
-        {layout === 'letterhead' && (
+        {layout === 'letterhead' && !hideAmounts && (
           <StatementStrip invoice={invoice} due={cfg.currency(totals.balance_due, invoice.currency)} />
         )}
         <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
-        <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />
-        <TaxSummary invoice={invoice} totals={totals} />
+        {hideAmounts ? <ChallanQtyTable invoice={invoice} /> : <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />}
+        {!hideAmounts && <TaxSummary invoice={invoice} totals={totals} />}
 
         <div className={cn(styles.footer, styles.keepTogether)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <PaymentBlock sender={sender} />
+            {!hideAmounts && <PaymentBlock sender={sender} />}
             <NotesBlock invoice={invoice} />
           </div>
-          <TotalsBlock invoice={invoice} sender={sender} totals={totals} />
+          {!hideAmounts && <TotalsBlock invoice={invoice} sender={sender} totals={totals} />}
         </div>
 
         {layout === 'letterhead' && (
@@ -164,6 +172,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {irn && <IrnBlock model={irn} />}
           {declaration && <SupplyDeclaration text={declaration} />}
           {rcmNote && <SupplyDeclaration text={rcmNote} />}
+          {returnNote && <SupplyDeclaration text={returnNote} />}
           {/* 8.5: "Previous balance + This bill = Total due" from the bill's own snapshot (off by default). */}
           <PartyBalanceBlock invoice={invoice} compact={layout === 'receipt'} />
           <PaymentScheduleBlock invoice={invoice} compact={layout === 'receipt'} />

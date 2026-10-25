@@ -5,16 +5,20 @@ import { useToast } from '../ui/useToast';
 import type { InvoiceRecord } from '../../types/invoice';
 import {
   STAGE_ORDER,
-  buildReminder,
   lastReminder,
   remindersFor,
   suggestStage,
   type ReminderChannel,
-  type ReminderLanguage,
   type ReminderRecord,
   type ReminderStage,
 } from '../../lib/reminders';
 import { interestForReminder } from '../../lib/interest';
+import { MESSAGE_LANGS, buildReminderIn, isMessageLang, messageLangOf, type MessageLang } from '../../lib/message-langs';
+import { localDb } from '../../lib/localDb';
+
+/** The party's message language: from the document's client snapshot, else the client record. */
+const partyLang = (invoice: InvoiceRecord): MessageLang =>
+  messageLangOf(invoice.client) ?? messageLangOf(invoice.client?.id ? localDb.clients.getById(invoice.client.id) : undefined) ?? 'en';
 import { isValidEmail, mailtoLink, normalizePhone, smsLink, whatsappLink } from '../../lib/share';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { cn } from '../../lib/utils';
@@ -23,7 +27,6 @@ import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
 import { useReminderLog } from './useReminderLog';
 import { amountDue, linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
-import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
@@ -73,9 +76,10 @@ function ReminderModalBody({
   // R2-A5: the company schedule decides the suggested stage; edited templates replace the built-in wording.
   const [schedule] = useState(loadReminderSchedule);
   const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited, schedule));
-  const [lang, setLang] = useState<ReminderLanguage>('en');
+  // 8H: the party's own message language when it has one (Client form), else English.
+  const [lang, setLang] = useState<MessageLang>(() => partyLang(invoice));
   const [message, setMessage] = useState(() =>
-    buildReminder(invoice, suggestStage(invoice, new Date(), credited, schedule), 'en', new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
+    buildReminderIn(invoice, suggestStage(invoice, new Date(), credited, schedule), partyLang(invoice), new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
   );
   const [phone, setPhone] = useState(invoice.client?.phone ?? '');
   const [email, setEmail] = useState(invoice.client?.email ?? '');
@@ -86,11 +90,11 @@ function ReminderModalBody({
   );
   const last = lastReminder(log, invoice.id);
 
-  const regenerate = (nextStage: ReminderStage, nextLang: ReminderLanguage) => {
+  const regenerate = (nextStage: ReminderStage, nextLang: MessageLang) => {
     setStage(nextStage);
     setLang(nextLang);
     setMessage(
-      buildReminder(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
+      buildReminderIn(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, templates: schedule.templates }),
     );
   };
 
@@ -216,24 +220,9 @@ function ReminderModalBody({
             </div>
             <div className={controls.field}>
               <span className={controls.label}>{shareT('rmLanguage')}</span>
-              <div className={controls.segment} role="group" aria-label={shareT('rmLanguage')}>
-                <button
-                  type="button"
-                  className={lang === 'en' ? controls.segmentBtnActive : controls.segmentBtn}
-                  aria-pressed={lang === 'en'}
-                  onClick={() => regenerate(stage, 'en')}
-                >
-                  English
-                </button>
-                <button
-                  type="button"
-                  className={lang === 'hinglish' ? controls.segmentBtnActive : controls.segmentBtn}
-                  aria-pressed={lang === 'hinglish'}
-                  onClick={() => regenerate(stage, 'hinglish')}
-                >
-                  Hinglish
-                </button>
-              </div>
+              <select className={controls.select} aria-label={shareT('rmLanguage')} value={lang} onChange={(e) => isMessageLang(e.target.value) && regenerate(stage, e.target.value)}>
+                {MESSAGE_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+              </select>
             </div>
           </div>
 

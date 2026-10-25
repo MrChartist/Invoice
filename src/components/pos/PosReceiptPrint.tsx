@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TemplateEngine } from '../templates/TemplateEngine';
-import { resolve as resolveDesign } from '../../lib/design-prefs';
+import { designForDoc, resolve as resolveDesign } from '../../lib/design-prefs';
 import { calcInputFromRecord, calculateInvoice } from '../../lib/invoice-calc';
 import { blankProfile, localDb } from '../../lib/localDb';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -25,7 +25,7 @@ export function PosReceiptPrint({ invoice, onDone }: { invoice: InvoiceRecord; o
 function BrowserReceiptPrint({ invoice, onDone }: { invoice: InvoiceRecord; onDone: () => void }) {
   // The bill's own sender snapshot first (Critical Rule 3).
   const sender = invoice.sender ?? localDb.settings.activeProfile() ?? blankProfile();
-  const design = useMemo(() => ({ ...resolveDesign(sender.id), paper: 'thermal80' as const }), [sender.id]);
+  const design = useMemo(() => designForDoc({ ...resolveDesign(sender.id), paper: 'thermal80' as const }, invoice.doc_type), [sender.id, invoice.doc_type]);
   const totals = useMemo(() => calculateInvoice(calcInputFromRecord(invoice)), [invoice]);
 
   useEffect(() => {

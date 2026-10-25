@@ -3,6 +3,7 @@ import { currencySymbol, formatCurrency, formatDate, formatMoney } from '../../l
 import {
   fontCss,
   formatDatePref,
+  docTitleText,
   formatNumberPref,
   paperSize,
   type DesignPrefs,
@@ -11,6 +12,7 @@ import {
 } from '../../lib/design-prefs';
 import { makeLabels, type Labeller } from './labels';
 import type { TemplateLayout } from './registry';
+import type { DocumentType } from '../../types/invoice';
 
 /**
  * Everything a part needs to know about the active design, resolved once by
@@ -36,6 +38,8 @@ export interface PaperConfig {
   headerNote: string;
   footerText: string;
   fontOverride?: string;
+  /** R2-C5: printed title for a document type — the statutory title plus the design's suffix, if any. */
+  title: (baseTitle: string, docType?: DocumentType) => string;
 }
 
 export function buildPaperConfig(
@@ -50,7 +54,7 @@ export function buildPaperConfig(
     layout,
     paper: d?.paper ?? 'A4',
     size: paperSize(d),
-    t: makeLabels(bilingual),
+    t: makeLabels(bilingual, d?.labels),
     bilingual,
     money: international
       ? (n, cur = 'INR') => formatNumberPref(n, cur, 'international')
@@ -86,6 +90,7 @@ export function buildPaperConfig(
     headerNote: d?.header_note?.trim() ?? '',
     footerText: d?.footer_text?.trim() ?? '',
     fontOverride: fontCss(d?.font),
+    title: (baseTitle, docType) => docTitleText(baseTitle, d, docType),
   };
 }
 

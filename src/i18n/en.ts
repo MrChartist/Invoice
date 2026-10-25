@@ -77,6 +77,7 @@ export const en = {
   'nav.cheques': 'Cheques',
   'nav.tds': 'TDS & TCS',
   'nav.payroll': 'Payroll',
+  'nav.loans': 'Loans & EMIs',
   'nav.reports': 'Reports',
   'nav.gstReports': 'GST reports',
   'nav.exports': 'Exports',

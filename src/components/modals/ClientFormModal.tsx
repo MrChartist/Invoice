@@ -14,6 +14,8 @@ import type { Client } from '../../types/invoice';
 import { ReminderModeField } from '../collections/ReminderModeField'; // R2-A
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
+import { reachT } from '../../i18n/areas/reach';
+import { MESSAGE_LANGS, isMessageLang } from '../../lib/message-langs';
 import controls from '../../styles/controls.module.css';
 
 const BLANK: Client = {
@@ -273,6 +275,14 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
             <span className={controls.hint}>{salesT('cf.priceHint')}</span>
           </label>
         )}
+        <label className={controls.field}>
+          <span className={controls.label}>{reachT('msgLang')}</span>
+          <select className={controls.select} value={form.message_lang ?? ''} onChange={(e) => set('message_lang', isMessageLang(e.target.value) ? e.target.value : undefined)}>
+            <option value="">{reachT('msgLangDefault')}</option>
+            {MESSAGE_LANGS.map((l) => <option key={l.code} value={l.code} lang={l.code === 'hinglish' ? 'en' : l.code}>{l.label}</option>)}
+          </select>
+          <span className={controls.hint}>{reachT('msgLangHint')}</span>
+        </label>
         <label className={controls.field}>
           <span className={controls.label}>{salesT('cf.notes')}</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder={salesT('cf.notesPh')} />

@@ -4,7 +4,7 @@ import { Download, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { blankProfile, localDb } from '../../lib/localDb';
-import { resolve as resolveDesign, type DesignPrefs } from '../../lib/design-prefs';
+import { designForDoc, resolve as resolveDesign, type DesignPrefs } from '../../lib/design-prefs';
 import { calcInputFromRecord, calculateInvoice, type CalcTotals } from '../../lib/invoice-calc';
 import { normalizeRecord } from '../../store/invoice-defaults';
 import { printCopies, type PrintCopy } from '../../lib/print-copies';
@@ -29,7 +29,7 @@ function prepare(raw: InvoiceRecord, useCopies: boolean): Job {
   const invoice = normalizeRecord(raw, raw.template_id);
   // The document's own sender snapshot first (Critical Rule 3).
   const sender = invoice.sender ?? localDb.settings.activeProfile() ?? blankProfile();
-  const design = resolveDesign(sender.id);
+  const design = designForDoc(resolveDesign(sender.id), invoice.doc_type); // R2-C5 per-type labels
   const totals = calculateInvoice(calcInputFromRecord(invoice));
   return { invoice, sender, totals, design, copies: printCopies(invoice, useCopies ? design.copies : 'single') };
 }

@@ -113,3 +113,10 @@ from `src/lib/client-copy-dom.ts`.
 
 ## 8G additions
 - Reminders chase the earliest unpaid instalment of a payment schedule. The post-save success sheet (WhatsApp with UPI link and party outstanding) and quotation Accept / Request changes links in the client copy are described in `docs/features/invoicing-ux.md` § 8.101 / 8.105.
+
+## Message language (8H)
+
+Reminders can also be written in Hindi (Devanagari), Marathi, Gujarati and Tamil (`buildReminderIn`,
+`src/lib/message-langs.ts`), next to English and Hinglish. The reminder dialog has a language picker that defaults to the
+party's **message language** (additive `Client.message_lang`, set in the client form); khata party reminders and the
+WhatsApp statement follow it too. Amounts, dates and the UPI pay link are the same facts as in English.

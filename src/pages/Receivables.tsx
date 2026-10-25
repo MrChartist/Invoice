@@ -1,5 +1,6 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { mailtoLink, whatsappLink } from '../lib/share';
+import { messageLangOf } from '../lib/message-langs';
 import { buildWhatsAppStatement } from '../lib/khata';
 import { khataT } from '../i18n/areas/khata';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -360,7 +361,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
   // WhatsApp statement per party row (8.3): wa.me with open bills, net due and a upi:// link.
   const waHref = (p: PartyReceivable) => {
     const c = clients.find((x) => (p.clientId && x.id === p.clientId) || x.name?.trim().toLowerCase() === p.name.trim().toLowerCase());
-    return whatsappLink(c?.phone, buildWhatsAppStatement({ sender, party: p }));
+    return whatsappLink(c?.phone, buildWhatsAppStatement({ sender, party: p, lang: messageLangOf(c) }));
   };
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const top = topDebtors(report, 5);
@@ -687,7 +688,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
             )}
             {currency === 'INR' && (
               <a className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} target="_blank" rel="noopener noreferrer" data-wa-statement
-                href={whatsappLink(client?.phone, buildWhatsAppStatement({ sender, party }))}>
+                href={whatsappLink(client?.phone, buildWhatsAppStatement({ sender, party, lang: messageLangOf(client) }))}>
                 <MessageCircle size={14} /> {khataT('waStatement')}
               </a>
             )}

@@ -26,6 +26,7 @@ import { edT } from '../../i18n/areas/editor';
 import { uxT } from '../../i18n/areas/invoicing-ux';
 import { stateLabel } from '../../i18n/areas/sales';
 import styles from './DocumentActions.module.css';
+import { PackingListButton } from '../dispatch/PackingListButton'; // R2-C4
 
 const OrderFulfilment = lazy(() => import('../documents/OrderFulfilment').then((m) => ({ default: m.OrderFulfilment })));
 const AmendDialog = lazy(() => import('../documents/AmendDialog').then((m) => ({ default: m.AmendDialog })));
@@ -121,6 +122,7 @@ export function DocumentActions({
             <FileClock size={16} /> {edT('daAmend')}
           </button>
         )}
+        <PackingListButton invoice={saved} />
       </div>
 
       {saved.doc_type === 'QUOTATION' && (() => {

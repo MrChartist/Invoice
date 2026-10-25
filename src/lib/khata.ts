@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from './utils';
 import { isoDay, localDayOf } from './dates';
 import { billAmount, canCarryPartyBalance } from './party-balance';
 import { fillTemplate, stageForDays, type ReminderChannel, type ReminderRecord, type ReminderSchedule, type ReminderStage } from './reminders';
+import { PARTY_TEMPLATES, statementLabels, type MessageLang } from './message-langs';
 
 const EPS = 0.005;
 const inr = (n: number) => formatCurrency(Math.abs(n), 'INR');
@@ -190,6 +191,8 @@ export interface WhatsAppStatementInput {
   today?: Date;
   /** Bills listed (oldest first); the rest are summed in one line. */
   maxBills?: number;
+  /** Additive (8H): the party's message language (`message-langs.ts`). Default English. */
+  lang?: MessageLang;
 }
 
 /**
@@ -200,35 +203,40 @@ export function buildWhatsAppStatement(input: WhatsAppStatementInput): string {
   const { sender, party } = input;
   const today = input.today ?? new Date();
   const max = input.maxBills ?? 8;
+  // 8H: the party's message language (labels only; amounts and dates stay as in English).
+  const L = statementLabels(input.lang);
+  const en = L === statementLabels('en');
+  const f = (text: string, vars: Record<string, string>) => fillTemplate(text, vars);
   const lines: string[] = [];
-  lines.push(`*Statement – ${sender?.companyName?.trim() || 'Account statement'}*`);
-  lines.push(`${party.name} · as of ${formatDate(localDayOf(today))}`);
+  lines.push(`*${L.statement} – ${sender?.companyName?.trim() || L.accountStatement}*`);
+  lines.push(`${party.name} · ${f(L.asOf, { date: formatDate(localDayOf(today)) })}`);
   lines.push('');
   if (party.bills.length) {
-    lines.push('Open bills:');
+    lines.push(L.openBills);
     for (const b of party.bills.slice(0, max)) {
-      const tail = b.daysOverdue > 0 ? `${b.daysOverdue} days overdue` : `due ${formatDate(b.dueDate)}`;
+      const tail = b.daysOverdue > 0 ? f(L.daysOverdue, { n: String(b.daysOverdue) }) : f(L.due, { date: formatDate(b.dueDate) });
       lines.push(`• ${b.number} (${formatDate(b.issueDate)}): ${inr(b.outstanding)} – ${tail}`);
     }
     const rest = party.bills.slice(max);
-    if (rest.length) lines.push(`• ${rest.length} more bill${rest.length === 1 ? '' : 's'}: ${inr(rest.reduce((s, b) => s + b.outstanding, 0))}`);
+    const more = en ? `${rest.length} more bill${rest.length === 1 ? '' : 's'}` : f(L.moreBills, { n: String(rest.length) });
+    if (rest.length) lines.push(`• ${more}: ${inr(rest.reduce((s, b) => s + b.outstanding, 0))}`);
   }
   const credits = round2(party.creditNotes + party.advances);
-  if (credits > EPS && party.bills.length) lines.push(`Less credits / advances: ${inr(credits)}`);
+  if (credits > EPS && party.bills.length) lines.push(`${L.lessCredits}: ${inr(credits)}`);
   lines.push('');
   if (party.net > EPS) {
     const overdue = overdueOf(party);
-    lines.push(`*Net due: ${inr(party.net)}*${overdue > EPS ? ` (overdue ${inr(overdue)})` : ''}`);
+    lines.push(`*${L.netDue}: ${inr(party.net)}*${overdue > EPS ? ` (${L.overdue} ${inr(overdue)})` : ''}`);
     const link = partyUpiLink(sender, party.net, party.name);
     if (link) {
-      lines.push(`Pay by UPI: ${link}`);
+      lines.push(`${L.payByUpi}: ${link}`);
       lines.push(`UPI ID: ${sender!.upiId}`);
     }
-    lines.push('Kindly arrange the payment. Thank you!');
+    lines.push(L.kindly);
   } else if (party.net < -EPS) {
-    lines.push(`*Advance with us: ${inr(party.net)}* – nothing to pay. Thank you!`);
+    lines.push(`*${f(L.advance, { amount: inr(party.net) })}`);
   } else {
-    lines.push('*No balance due.* Thank you!');
+    lines.push(`*${L.noBalance}`);
   }
   if (sender?.companyPhone?.trim()) lines.push(`Ph: ${sender.companyPhone.trim()}`);
   return lines.join('\n');
@@ -236,11 +244,13 @@ export function buildWhatsAppStatement(input: WhatsAppStatementInput): string {
 
 /* ── Party-level reminders ────────────────────────────────────── */
 
-export type PartyReminderLang = 'en' | 'hinglish' | 'hi';
+export type PartyReminderLang = 'en' | 'hinglish' | 'hi' | 'mr' | 'gu' | 'ta';
 /** `overdue`: chase what is past due. `balance`: the monthly "here is your balance" message. */
 export type PartyReminderKind = 'overdue' | 'balance';
 
 const PARTY_T: Record<PartyReminderLang, Record<PartyReminderKind, string> & { upi: string; upiId: string; there: string }> = {
+  // Marathi, Gujarati, Tamil (8H) live with the other regional message texts.
+  ...PARTY_TEMPLATES,
   en: {
     overdue:
       'Hi {client},\n\nA friendly reminder from {business}: {amount} is overdue on your account (oldest bill {oldest_ref} of {oldest_date}, {days} days overdue).\nTotal balance: {net}\n{upi_line}\nIf you have already paid, please share the reference. Thank you!\n{phone}',
@@ -297,7 +307,7 @@ function tidy(s: string): string {
 
 /**
  * One WhatsApp message per party: total overdue + oldest bill + a UPI link for the amount asked
- * (`overdue`), or the plain balance (`balance`). English, Hinglish or Hindi.
+ * (`overdue`), or the plain balance (`balance`). English, Hinglish, Hindi, Marathi, Gujarati or Tamil.
  */
 export function buildPartyReminder(input: PartyReminderInput): PartyReminder {
   const { party, sender } = input;

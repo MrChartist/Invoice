@@ -25,6 +25,10 @@ import {
   type ShowColumns,
 } from '../../lib/design-prefs';
 import { calculateInvoice } from '../../lib/invoice-calc';
+import { designForDoc, GLOBAL_PROFILE_ID } from '../../lib/design-prefs';
+import { localDb } from '../../lib/localDb';
+import { DesignLabels, LogoAccentSuggest } from './DesignLabels';
+import { dlT } from '../../i18n/areas/design-r2';
 import { cn } from '../../lib/utils';
 import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
 import { SAMPLE_SENDER, buildSampleInvoice } from './sample';
@@ -158,7 +162,7 @@ function LivePreview({
   return (
     <div ref={stageRef} className={styles.stage} style={{ height: height || undefined }} data-testid="design-preview">
       <div ref={paperRef} className={styles.scaler} style={{ transform: `scale(${scale})`, width: size.width }}>
-        <TemplateEngine invoice={invoice} sender={sender} totals={totals} templateId={templateId} design={design} />
+        <TemplateEngine invoice={invoice} sender={sender} totals={totals} templateId={templateId} design={designForDoc(design, invoice.doc_type)} />
       </div>
     </div>
   );
@@ -194,6 +198,17 @@ export function DesignPanel({
 
   const sample = useMemo(() => previewInvoice ?? buildSampleInvoice(), [previewInvoice]);
   const sender = previewSender ?? SAMPLE_SENDER;
+  // R2-C5: the logo the accent is suggested from — the preview's sender, else this profile's own logo.
+  const logo = useMemo(() => {
+    if (previewSender?.logo) return previewSender.logo;
+    try {
+      const s = localDb.settings.get();
+      const p = profileId === GLOBAL_PROFILE_ID ? localDb.settings.activeProfile() : s.profiles.find((x) => x.id === profileId);
+      return p?.logo || undefined;
+    } catch {
+      return undefined;
+    }
+  }, [previewSender, profileId]);
   const watermarkMode =
     design.watermark === WATERMARK_NONE ? 'none' : design.watermark === WATERMARK_AUTO ? 'auto' : 'custom';
 
@@ -266,6 +281,7 @@ export function DesignPanel({
                 spellCheck={false}
               />
             </div>
+            <LogoAccentSuggest logo={logo} active={design.accent} onPick={(hex) => set({ accent: hex })} />
           </div>
 
           <div className={controls.field}>
@@ -358,6 +374,10 @@ export function DesignPanel({
             ))}
           </div>
           <p className={controls.hint}>{desT('columnsHint')}</p>
+        </Section>
+
+        <Section title={dlT('labels')}>
+          <DesignLabels design={design} onChange={set} />
         </Section>
 
         <Section title={desT('sections')}>

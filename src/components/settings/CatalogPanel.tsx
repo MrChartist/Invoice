@@ -27,10 +27,23 @@ import { setT } from '../../i18n/areas/settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
+import { setCatalogWeights } from '../../lib/packing';
+import type { WeightUnit } from '../../types/books-r2';
+import { pkT } from '../../i18n/areas/dispatch-r2';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
+// R2-C4: package types for packing lists (own lazy chunk) and per-unit weights on catalogue rows.
+const PackageTypesPanel = lazy(() => import('../dispatch/PackageTypesPanel'));
+type WeightDraft = { net: number; gross: number; unit: WeightUnit };
+const weightsOf = (i?: InvoiceItem): WeightDraft => ({ net: i?.net_weight ?? 0, gross: i?.gross_weight ?? 0, unit: i?.weight_unit === 'g' ? 'g' : 'kg' });
+
 // The label sheet (encoders + print HTML) loads only when opened.
+import { ImageSlot } from './ProfileEditor';
+import { reachT } from '../../i18n/areas/reach';
+import { itemImageData, storeItemImage } from '../../lib/item-images';
+import { stockGroupsDb } from '../../lib/stock-groups';
+
 const LabelSheetModal = lazy(() => import('./LabelSheetModal').then((m) => ({ default: m.LabelSheetModal })));
 
 const BLANK: CatalogDraft = { name: '', type: 'Service', hsn: '', unit: 'NOS', rate: 0, tax_rate: 18, barcode: '', sku: '', mrp: 0, qty_slabs: [] };
@@ -52,6 +65,8 @@ const toDraft = (i: InvoiceItem): CatalogDraft => ({
   sold_by_weight: !!i.sold_by_weight,
   plu: i.plu ?? '',
   mrp_less_percent: i.mrp_less_percent ?? 0,
+  image: i.image ?? '',
+  group_id: i.group_id ?? '',
 });
 
 const ROUNDS: RoundTo[] = ['paise', 'rupee', 'five', 'ten'];
@@ -72,6 +87,8 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
   // Per-level own rates being edited for the open item (level id → text; blank = use the level's % off).
   const [levelRates, setLevelRates] = useState<Record<string, string>>({});
   const [levels, setLevels] = useState(() => priceLevelsDb.all());
+  const [weights, setWeights] = useState<WeightDraft>(() => weightsOf());
+  const [pkgTypes, setPkgTypes] = useState(false);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const items = useMemo(() => listCatalog(), [version]);
@@ -86,6 +103,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
 
   const openDraft = (d: CatalogDraft) => {
     setDraft(d);
+    setWeights(weightsOf(d.id ? items.find((i) => i.id === d.id) : undefined));
     setError(null);
     const all = priceLevelsDb.all();
     setLevels(all);
@@ -110,6 +128,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
     if (!draft) return;
     const result = saveCatalogItem({ ...draft, custom_fields: cleanValueMap(draft.custom_fields, customFieldsDb.all()) });
     if (!result.ok) return setError(result.error);
+    setCatalogWeights(result.item.id, { net_weight: weights.net, gross_weight: weights.gross, weight_unit: weights.unit }); // R2-C4
     for (const l of levels) {
       const text = (levelRates[l.id] ?? '').trim();
       const n = text === '' ? undefined : Number(text);
@@ -140,6 +159,9 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
         <div className={surface.pageActions}>
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setLabels(true)} disabled={items.length === 0}>
             <Barcode size={14} /> {setT('printLabels')}
+          </button>
+          <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setPkgTypes(true)}>
+            <Package size={14} /> {pkT('typesTitle')}
           </button>
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setRevise(true)} disabled={items.length === 0}>
             <Percent size={14} /> {setT('reviseRates')}
@@ -416,6 +438,53 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
               </label>
             </div>
 
+            {/* Catalogue v2 (8H): photo and category for the shared catalogue. */}
+            <div className={controls.row}>
+              <ImageSlot
+                label={reachT('photo')}
+                hint={reachT('photoHint')}
+                value={itemImageData(draft.image)}
+                maxDimension={480}
+                onPick={(data) => {
+                  try {
+                    setDraft({ ...draft, image: storeItemImage(data) });
+                  } catch (err) {
+                    notify((err as Error).message, 'error');
+                  }
+                }}
+                onClear={() => setDraft({ ...draft, image: '' })}
+                onError={(m) => notify(m, 'error')}
+              />
+              <label className={controls.field}>
+                <span className={controls.label}>{reachT('category')}</span>
+                <select className={controls.select} value={draft.group_id ?? ''} onChange={(e) => setDraft({ ...draft, group_id: e.target.value })}>
+                  <option value="">{reachT('noCategory')}</option>
+                  {stockGroupsDb.all().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <fieldset className={styles.group}>
+              <legend className={controls.label}>{pkT('weights')}</legend>
+              <div className={styles.inline}>
+                <label className={controls.field}>
+                  <span className={controls.label}>{pkT('netWeight')}</span>
+                  <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={weights.net} onChange={(n) => setWeights({ ...weights, net: n })} />
+                </label>
+                <label className={controls.field}>
+                  <span className={controls.label}>{pkT('grossWeight')}</span>
+                  <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={weights.gross} onChange={(n) => setWeights({ ...weights, gross: n })} />
+                </label>
+                <label className={controls.field}>
+                  <span className={controls.label}>{pkT('weightUnit')}</span>
+                  <select className={controls.select} value={weights.unit} onChange={(e) => setWeights({ ...weights, unit: e.target.value === 'g' ? 'g' : 'kg' })}>
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+
             <fieldset className={styles.group}>
               <legend className={controls.label}>{setT('qtySlabs')}</legend>
               {(draft.qty_slabs ?? []).map((slab, n) => (
@@ -518,6 +587,13 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
         </p>
       </Modal>
 
+      {pkgTypes && (
+        <Modal open onClose={() => setPkgTypes(false)} title={pkT('typesTitle')} size="lg">
+          <Suspense fallback={null}>
+            <PackageTypesPanel notify={notify} />
+          </Suspense>
+        </Modal>
+      )}
       {labels && (
         <Suspense fallback={null}>
           <LabelSheetModal open={labels} onClose={() => setLabels(false)} onChanged={reload} preselected={selected} />
