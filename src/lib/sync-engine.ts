@@ -31,6 +31,7 @@ import {
   DEVICE_LOCAL_KEYS,
   SINGLETON_KEYS,
   SYNC_META_KEYS,
+  DEVICE_DRAFT_KEYS,
   isLocalOnlyKey,
   listKeys,
   readRaw,
@@ -251,6 +252,7 @@ const sameVersion = (a: RowMeta | null | undefined, b: RowMeta | null | undefine
 const EXCLUDED = new Set<string>([
   ...['draft', 'schema_version', 'audit_log', 'timer', 'backup_snooze', 'auto_backup', 'install_dismissed', 'notif_state', 'export_prefs', '__probe'].map((k) => DB_PREFIX + k),
   ...SYNC_META_KEYS,
+  ...DEVICE_DRAFT_KEYS, // POS bills on hold (8.21) belong to this counter
   ...DEVICE_LOCAL_KEYS,
 ]);
 

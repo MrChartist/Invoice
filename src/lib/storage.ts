@@ -82,6 +82,11 @@ export const DEVICE_LOCAL_KEYS: readonly string[] = [
  * erase removes it, so the next sync compares from scratch and surfaces differences as conflicts.
  */
 export const SYNC_META_KEYS: readonly string[] = [`${DB_PREFIX}sync_state`, `${DB_PREFIX}sync_conflicts`, `${DB_PREFIX}sync_audit`];
+/**
+ * Working drafts of THIS device (8.21: POS bills on hold): per company in the data store, so sealed in
+ * vault mode, but never in a backup, never synced, not announced to other tabs; restore / erase remove them.
+ */
+export const DEVICE_DRAFT_KEYS: readonly string[] = [`${DB_PREFIX}pos_held`];
 const DEVICE_LOCAL = new Set(DEVICE_LOCAL_KEYS);
 
 /** True for keys that always live in localStorage, whatever the backend. */

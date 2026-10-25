@@ -1,5 +1,5 @@
 import { reloadAfterFlush } from '../../lib/storage';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, FileLock2, Info, Upload } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import {
@@ -16,6 +16,7 @@ import {
   type BackupSummary,
 } from '../../lib/backup';
 import { downloadText } from '../../lib/download';
+import { takeShared } from '../../lib/share-inbox';
 import { useT } from '../../i18n';
 import { secT } from '../../i18n/areas/security';
 import controls from '../../styles/controls.module.css';
@@ -91,6 +92,13 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
     }
   };
 
+  // 8.20: a backup shared into the app (share target) opens here: same validation, passphrase and undo copy.
+  useEffect(() => {
+    const shared = takeShared('backup')?.[0];
+    if (shared) void onFile(shared);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const decrypt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pending) return;
@@ -149,7 +157,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
             <Upload size={16} /> {secT('restoreEnc')}
           </button>
         </div>
-        <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+        <input ref={fileInput} type="file" accept="application/json,.json,text/plain,.txt" hidden onChange={(e) => onFile(e.target.files?.[0])} />
       </form>
 
       <Modal

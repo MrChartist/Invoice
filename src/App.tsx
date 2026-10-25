@@ -32,6 +32,8 @@ const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.C
 const Tds = lazy(() => import('./pages/Tds').then((m) => ({ default: m.Tds })));
 const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
 const Gateway = lazy(() => import('./pages/Gateway').then((m) => ({ default: m.Gateway })));
+// 8.20 / 8.23: files shared into the installed app (Web Share Target, POSTed to the service worker).
+const ShareTarget = lazy(() => import('./pages/ShareTarget').then((m) => ({ default: m.ShareTarget })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -114,6 +116,7 @@ function App() {
                 <Route path="/design" element={<RequireAccess action="settings.manage"><DesignStudio /></RequireAccess>} />
                 {/* Settings opens for every role and shows each role only the tabs it may use (6.21). */}
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/share-target" element={<ShareTarget />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

@@ -1,5 +1,5 @@
 import { isStockDependencyError } from '../lib/stock-timeline';
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, FilePlus2, Landmark, PiggyBank, Receipt, Search, Tags, Wallet, Zap } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -22,6 +22,9 @@ import type { BillSeed } from '../lib/purchase-orders';
 import { getTable } from '../lib/storage';
 import { can } from '../lib/access';
 import type { PurchaseOrder } from '../types/purchases';
+import type { AttachmentRef } from '../types/attachments';
+import { takeShared } from '../lib/share-inbox';
+import { releaseAttachments } from '../lib/attachments';
 import {
   PURCHASE_STATUSES,
   categorySummary,
@@ -74,6 +77,9 @@ export function Expenses() {
   const [branch, setBranch] = useState('');
   // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
   const [billOpen, setBillOpen] = useState(() => params.get('new') === 'bill');
+  // 8.23: manifest shortcut "New expense" (?new=expense); a photo / PDF shared into the app adds `shared=1`.
+  const [expenseOpen, setExpenseOpen] = useState(() => params.get('new') === 'expense' && params.get('shared') !== '1' && can('books.edit'));
+  const [sharedFiles, setSharedFiles] = useState<AttachmentRef[] | null>(null);
   // A Tally key / Gateway link while this page is already open (F9, Ctrl+F9 → ?tab=returns&new=dn)
   // changes only the query: follow it (adjust-state-on-change, no effect).
   const query = params.toString();
@@ -83,8 +89,25 @@ export function Expenses() {
     const wanted = TAB_PARAMS.find((x) => x === params.get('tab'));
     if (wanted) setTab(wanted);
     if (params.get('new') === 'bill') setBillOpen(true);
+    if (params.get('new') === 'expense' && params.get('shared') !== '1' && can('books.edit')) setExpenseOpen(true);
   }
-  const [expenseOpen, setExpenseOpen] = useState(false);
+  useEffect(() => {
+    const files = params.get('shared') === '1' && can('books.edit') ? takeShared('receipt') : null;
+    if (!files) return;
+    void import('../lib/attachment-upload').then(async ({ attachFile }) => {
+      const refs: AttachmentRef[] = [];
+      for (const f of files.slice(0, 10)) {
+        try {
+          refs.push(await attachFile(f));
+        } catch (err) {
+          notify(`${f.name}: ${(err as Error).message}`, 'error');
+        }
+      }
+      setSharedFiles(refs);
+      setExpenseOpen(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [editing, setEditing] = useState<PurchaseRecord | null>(null);
   const [payFor, setPayFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<PurchaseRecord | null>(null);
@@ -118,6 +141,12 @@ export function Expenses() {
     else setBillOpen(true);
   };
   const closeForms = () => {
+    if (sharedFiles?.length) {
+      // Shared files the expense did not keep (form cancelled) are removed; ones a saved record uses stay.
+      const ids = sharedFiles.map((r) => r.id);
+      setTimeout(() => releaseAttachments(ids), 2000);
+    }
+    setSharedFiles(null);
     setBillOpen(false);
     setExpenseOpen(false);
     setEditing(null);
@@ -349,6 +378,7 @@ export function Expenses() {
         open={expenseOpen}
         onClose={closeForms}
         expense={editing?.kind === 'EXPENSE' ? editing : null}
+        attachments={sharedFiles ?? undefined}
         vendors={vendors}
         businessState={business.stateCode}
         onSaved={saved}

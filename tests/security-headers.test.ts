@@ -22,5 +22,7 @@ test('CSP stays strict and the meta copy drops only frame-ancestors', () => {
 test('Permissions-Policy: the camera is allowed for this origin only (barcode scan, 6.7); everything else stays off', () => {
   const policy = (HEADER_RULES[0][1] as Record<string, string>)['Permissions-Policy'];
   assert.match(policy, /(^|, )camera=\(self\)(,|$)/);
+  // 8.26: Web Bluetooth receipt printers, this origin only (still needs the user to pick the printer).
+  assert.match(policy, /(^|, )bluetooth=\(self\)(,|$)/);
   for (const off of ['microphone', 'geolocation', 'payment', 'usb']) assert.match(policy, new RegExp(`${off}=\\(\\)`));
 });

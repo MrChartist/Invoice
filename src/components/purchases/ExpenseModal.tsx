@@ -28,6 +28,8 @@ export interface ExpenseModalProps {
   vendors: Vendor[];
   businessState: string;
   onSaved: (message: string) => void;
+  /** 8.23: files to start a NEW expense with (a receipt shared into the app). */
+  attachments?: AttachmentRef[];
 }
 
 /** Quick-add for day-to-day spends: amount + category + optional GST, no line items. */
@@ -41,14 +43,14 @@ export function ExpenseModal({ open, onClose, expense, ...rest }: ExpenseModalPr
       title={expense ? purT('expEditTitle') : purT('expAddTitle')}
       subtitle={purT('expSub')}
     >
-      <ExpenseForm key={expense?.id ?? 'new'} expense={expense ?? undefined} onClose={onClose} {...rest} />
+      <ExpenseForm key={expense?.id ?? (rest.attachments?.length ? 'shared' : 'new')} expense={expense ?? undefined} onClose={onClose} {...rest} />
     </Modal>
   );
 }
 
 type FormProps = Omit<ExpenseModalProps, 'open' | 'expense'> & { expense?: PurchaseRecord };
 
-function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: FormProps) {
+function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attachments: seeded }: FormProps) {
   const first = expense?.lines?.[0];
   const [category, setCategory] = useState(expense?.category ?? 'Rent');
   const [amount, setAmount] = useState(first ? first.rate : 0);
@@ -68,7 +70,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
     markup_percent: expense?.markup_percent,
     pure_agent: expense?.pure_agent,
   });
-  const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? []);
+  const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? seeded ?? []);
   const [error, setError] = useState('');
   const [tds, setTds] = useState<BillTdsInput>(() => ({
     section: expense?.tds_section ?? '',

@@ -121,3 +121,37 @@ because receipts travel inside the file.
 `queryPermission` / `requestPermission` only on a click, unattended runs report `permission`) and a stored
 non-extractable key derived from a separate sync passphrase; see `docs/features/sync.md`. Sync bookkeeping is never in
 a backup, and a restore removes it so the next sync compares from scratch.
+
+## Phones: share backup, share target, shortcuts (8B · roadmap 8.20, 8.23, 8.24)
+
+Phones (no `showDirectoryPicker`: Android Chrome, iOS Safari; also desktop Safari / Firefox) cannot run folder
+backups, so the backup has to leave through the OS share sheet.
+
+- **Share backup** (`src/lib/backup-share.ts`, `ShareBackupDialog.tsx`): owner only (`data.backup`). The file is
+  encrypted with the stored backup key (Automatic backups → passphrase) or with a passphrase set in the dialog
+  (default: remembered as the same encrypt-only key; untick to use it once). Two taps by design: the slow key
+  derivation runs on "Set passphrase", then "Share backup" opens the sheet with a fresh user gesture. A readable file
+  needs "Share without encryption" + a warning, and is **refused in vault mode** (`shareBackupGate`, reason `vault`).
+  Android Chrome refuses `.json` in the share sheet, so `….encrypted.json` is tried, then `….encrypted.txt`
+  (text/plain); the restore pickers accept `.txt` (content is validated, not the extension). Only a completed share
+  counts as a backup (`recordBackup`); cancel does not. Without Web Share the dialog offers the download.
+- **Nudges** (`src/lib/phone-backup.ts`, `PhoneBackupNudge.tsx`, lazy): on phones the banner appears after
+  **10 new documents** (invoices + purchases created since the last backup) **or 3 days**, snooze as before; its
+  button is Share backup. Folder-capable browsers keep the 7-day `BackupNudge`.
+- **Status line** (`BackupStatusLine.tsx`, lazy): "Backed up 2 h ago ✓" / "Not backed up — tap to save" /
+  "N new documents since the last backup" on the Dashboard (phones) and at the top of the bell panel (every device),
+  owner only; tapping opens Share backup.
+- **Share target** (`public/manifest.json` `share_target`, `public/sw.js`, `src/lib/share-inbox.ts`,
+  `src/pages/ShareTarget.tsx`): the installed app appears in the phone's share sheet. Android POSTs the file to
+  `/share-target`; the service worker stores up to 10 files (≤ 200 MB each) in the `mci-share` cache (kept across
+  versions in `KEEP`) and redirects to `/share-target` (behind the PIN / vault screens), which reads and empties the
+  cache and routes by name / type: **backup** (`.json` / `.txt`) → Settings → Security → restore (owner only;
+  `EncryptedBackup` runs its usual validation, passphrase and restore undo copy); **image / PDF** → Expenses → new
+  expense with the files attached (`attachFile`; unused ones released on cancel); **CSV / XLSX** → Reconcile → bank
+  statement import (`ImportPanel`). Nothing is uploaded anywhere.
+- **Manifest shortcuts** added: POS (`/pos`), Payment in (`/clients?pay=1` — the quick-pay screen belongs to the
+  receivables / khata work), New expense (`/expenses?new=expense`).
+- **Contacts** (8.24): `ContactPickButton` in the add-client form uses the Contact Picker API (Android Chrome,
+  feature-detected, hidden elsewhere) and fills blank name / phone / e-mail / address / city / PIN fields only.
+- Tests: `tests/phone-backup-share.test.ts` (owner gate, encryption, `.txt` fallback, cancel, vault), share routing
+  and nudge rules in `tests/phone-counter.test.ts`; `npm run verify:offline` passes with the new SW branch.

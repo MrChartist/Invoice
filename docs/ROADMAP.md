@@ -445,6 +445,21 @@ Details: `docs/features/manufacturing.md`.
 | 7.166 | ✅ **Branch stock**: per-godown closing-stock valuation for branch statements in Books and Gateway (branch godowns × company-wide unit cost; "No branch" takes the rest so branches add up — `ledger/branch-stock.ts`); Alt+C on manufacturing / stock-journal line grids (items, godowns) and the bill godown select; the Sec 25(4) tax invoice + bill dialog opens automatically when a transfer between two GSTINs is saved | 7.84, P1-19 | done |
 | 7.167 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), price lists on POS, ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
 
+### 8B · Phone & counter (`docs/features/pwa-backup.md`, `docs/features/pos-barcode-pricing.md`)
+
+From the Vyapar / myBillBook / OkCredit comparison: the phone and the shop counter.
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 8.20 | ✅ **Phone backup that happens**: encrypted "Share backup" through Web Share L2 (Drive / WhatsApp / Files; `.txt` fallback for Android Chrome; owner only; never readable in vault mode); nudges after 10 new documents or 3 days; "Backed up 2 h ago ✓ / Not backed up — tap to save" on the phone Dashboard and in the bell; a backup shared into the app opens the restore flow (owner, validation, undo copy) | `backup-share.ts`, `phone-backup.ts`, `ShareBackupDialog.tsx`, `BackupStatusLine.tsx` | done |
+| 8.21 | ✅ **Hold & new bill**: up to 9 parked carts (Shift+F8), recall list (F1, keys 1–9), kept per company on the device (`DEVICE_DRAFT_KEYS`: sealed, not backed up / synced) | `pos-hold.ts`, `HeldBills.tsx` | done |
+| 8.22 | ✅ **UPI QR at the counter** for the exact UPI amount (`am`, `tr` = bill number), full-screen customer view, "Paid? enter UTR"; **quick-item tiles** (favourites + stock groups); zero / negative stock in red | `PosUpiQr.tsx`, `pos-tiles.ts`, `PosTiles.tsx` | done |
+| 8.23 | ✅ **PWA entry points**: shortcuts (POS, Payment in → `/clients?pay=1`, New expense); `share_target` for backups, receipt images / PDFs (→ new expense with attachment) and CSV / XLSX (→ bank-statement import) | `manifest.json`, `sw.js`, `share-inbox.ts`, `ShareTarget.tsx` | done |
+| 8.24 | ✅ **Add party from contacts** (Contact Picker API, Android Chrome, feature-detected) | `contact-pick.ts`, `ContactPickButton.tsx` | done |
+| 8.25 | ✅ **Calculator in number fields** ("120*3+40", "1000+18%"), tiny parser, no eval | `calc-expr.ts`, `NumberInput.tsx` | done |
+| 8.26 | ✅ **Web Bluetooth thermal printing** (BLE 58 / 80 mm ESC/POS, off by default, `bluetooth=(self)`), browser-print fallback | `escpos.ts`, `PosPrinter.tsx` | done |
+| 8.27 | ⏳ 8B follow-ups: share-target on iOS (no Web Share Target there), remembered BLE printer across reloads (`getDevices` still behind a flag), Payment-in quick-pay screen (khata work), tiles for price-list items, held carts across devices (deliberately not synced) | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

@@ -999,6 +999,59 @@ try {
     await writeJson(page, 'pos_day_close', null);
   });
 
+  await step('8B: POS calculator qty, hold & recall across a reload, UPI QR for the exact amount with the bill number', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-hold', name: 'E2E Hold Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865305',
+    }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8901030865305');
+    await scan.press('Enter');
+    const qty = page.getByLabel('Quantity of E2E Hold Soap (line 1)');
+    await qty.waitFor();
+    // 8.25: a sum typed into a number field is worked out (no eval).
+    await qty.fill('2*3');
+    await qty.press('Tab');
+    check((await qty.inputValue()) === '6', `calculator: "2*3" → ${await qty.inputValue()}`);
+
+    // 8.21: Shift+F8 parks the bill; it survives a reload (company store) and F1 → 1 recalls it.
+    await page.keyboard.press('Shift+F8');
+    await page.getByText(/Bill parked \(1 on hold\)/).first().waitFor();
+    check((await page.getByText('Scan an item or search by name to start the bill.').count()) === 1, 'hold starts a new bill');
+    const held = await readJson(page, 'pos_held', [], (v) => v.length === 1);
+    check(held.length === 1 && held[0].items?.[0]?.name === 'E2E Hold Soap' && held[0].items[0].quantity === 6, `held cart stored (${held.length})`);
+    await page.reload();
+    await scan.waitFor();
+    check(/1/.test(await page.locator('[data-pos-held]').innerText()), 'held count shown after a reload');
+    await page.keyboard.press('F1');
+    const dlg = page.getByRole('dialog', { name: 'Bills on hold' });
+    await dlg.waitFor();
+    await page.keyboard.press('1');
+    await qty.waitFor();
+    check((await qty.inputValue()) === '6', 'recalled bill keeps its lines');
+    const after = await readJson(page, 'pos_held', [], (v) => v.length === 0);
+    check(after.length === 0, 'recalled bill leaves the hold list');
+
+    // 8.22: UPI tender → customer-facing QR for the exact amount, bill number as the reference.
+    await page.keyboard.press('F6');
+    const qr = page.locator('[data-pos-upi-qr]');
+    await qr.waitFor();
+    check((await qr.getAttribute('data-pos-upi-qr')) === '708.00', `UPI QR amount (${await qr.getAttribute('data-pos-upi-qr')})`);
+    check((await qr.locator('svg').count()) > 0 && /INV\/FY\d\d-\d\d\/\d{4}/.test(await qr.innerText()), 'QR drawn with the bill number');
+    await qr.getByRole('button', { name: 'Show to customer' }).click();
+    const full = page.getByRole('dialog', { name: 'Pay by UPI' });
+    await full.waitFor();
+    await full.locator('#pos-utr-full').fill('UTR123456');
+    await full.getByRole('button', { name: 'Done' }).click();
+    check((await page.locator('#pos-utr').inputValue()) === 'UTR123456', 'UTR typed on the customer screen is kept');
+
+    await page.keyboard.press('F8');
+    await writeJson(page, 'pos_held', null);
+    await writeJson(page, 'items_catalog', prevCatalog);
+  });
+
   await step('POS return: bill → return one item → refund cash; Z report shows the return (WP-9)', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const before = await readJson(page, 'invoices', []);

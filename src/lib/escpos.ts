@@ -12,6 +12,12 @@
  *    after the user picks the port in the browser's own chooser (`navigator.serial`, Chrome / Edge on
  *    desktop; feature-detected). With "kick the drawer" on, a cash bill sends `ESC p 0 25 250`.
  *    No network, no driver, nothing leaves the device.
+ *  - `bluetooth` (8.26) — the same ESC/POS bytes to a Bluetooth Low Energy 58 / 80 mm printer through
+ *    Web Bluetooth (`navigator.bluetooth`, Chrome on Android / desktop; feature-detected), only after the
+ *    user picks the printer in the browser's own chooser. The known printer services are tried in turn
+ *    and the first writable characteristic gets the bytes in {@link BLE_CHUNK}-byte writes. The chosen
+ *    printer is remembered for the tab; after a reload the browser asks once more. Classic (SPP-only)
+ *    Bluetooth printers are not reachable from a browser: pair them with the OS and use `browser`.
  *
  * Pure above "Device".
  */
@@ -19,13 +25,13 @@
 import type { SenderProfile, InvoiceRecord } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
 
-export type PrinterMode = 'browser' | 'raw' | 'serial';
+export type PrinterMode = 'browser' | 'raw' | 'serial' | 'bluetooth';
 export type ReceiptWidth = 58 | 80;
 
 export interface PrinterPrefs {
   mode: PrinterMode;
   width: ReceiptWidth;
-  /** Send the drawer kick on cash bills (serial mode only). */
+  /** Send the drawer kick on cash bills (serial / Bluetooth modes). */
   drawer: boolean;
   baud: number;
 }
@@ -156,7 +162,7 @@ export function loadPrinterPrefs(): PrinterPrefs {
     const raw = JSON.parse(localStorage.getItem(POS_PRINTER_KEY) ?? 'null') as Partial<PrinterPrefs> | null;
     if (!raw || typeof raw !== 'object') return { ...DEFAULT_PRINTER };
     return {
-      mode: raw.mode === 'raw' || raw.mode === 'serial' ? raw.mode : 'browser',
+      mode: raw.mode === 'raw' || raw.mode === 'serial' || raw.mode === 'bluetooth' ? raw.mode : 'browser',
       width: raw.width === 58 ? 58 : 80,
       drawer: raw.drawer === true,
       baud: [9600, 19200, 38400, 57600, 115200].includes(Number(raw.baud)) ? Number(raw.baud) : 9600,
@@ -216,6 +222,100 @@ export async function sendToSerial(bytes: Uint8Array, baud: number): Promise<voi
     }
   } finally {
     await port.close();
+  }
+}
+
+/* ── Web Bluetooth (8.26) ───────────────────────────────────────── */
+
+/**
+ * GATT services of common BLE receipt printers (and their usual write characteristic): the 0x18F0
+ * "printer" service (0x2AF1), ISSC transparent UART (49535343-…, 49535343-8841-…), 0xFF00 (0xFF02),
+ * 0xFFE0 (0xFFE1) and the e7810a71-… service used by many 58 mm units (bef8d6c9-…).
+ */
+export const BLE_PRINTER_SERVICES = [
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000ff00-0000-1000-8000-00805f9b34fb',
+  '0000ffe0-0000-1000-8000-00805f9b34fb',
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+] as const;
+
+/** Bytes per GATT write: under the 185-byte MTU most printers negotiate, and far under Chrome's 512 cap. */
+export const BLE_CHUNK = 180;
+
+/** Split bytes into writes of at most `size`. */
+export function chunkBytes(bytes: Uint8Array, size = BLE_CHUNK): Uint8Array[] {
+  const step = Math.max(1, Math.floor(size));
+  const out: Uint8Array[] = [];
+  for (let i = 0; i < bytes.length; i += step) out.push(bytes.subarray(i, i + step));
+  return out;
+}
+
+interface BleCharacteristic {
+  properties: { write?: boolean; writeWithoutResponse?: boolean };
+  writeValueWithResponse?(v: BufferSource): Promise<void>;
+  writeValueWithoutResponse?(v: BufferSource): Promise<void>;
+  writeValue?(v: BufferSource): Promise<void>;
+}
+interface BleService { getCharacteristics(): Promise<BleCharacteristic[]> }
+interface BleServer { connected: boolean; getPrimaryService(uuid: string): Promise<BleService>; disconnect(): void }
+interface BleDevice { name?: string; gatt?: { connected: boolean; connect(): Promise<BleServer>; disconnect(): void } }
+interface BluetoothLike {
+  requestDevice(o: { acceptAllDevices: true; optionalServices: string[] }): Promise<BleDevice>;
+  getAvailability?(): Promise<boolean>;
+}
+
+const bluetoothApi = (): BluetoothLike | null => {
+  const nav = (typeof navigator !== 'undefined' ? navigator : undefined) as (Navigator & { bluetooth?: BluetoothLike }) | undefined;
+  return nav?.bluetooth && typeof nav.bluetooth.requestDevice === 'function' ? nav.bluetooth : null;
+};
+
+/** True when the browser offers Web Bluetooth (Chrome / Edge on Android, ChromeOS, desktop; secure page). */
+export const bluetoothSupported = (): boolean => !!bluetoothApi();
+
+let blePrinter: BleDevice | null = null;
+
+/** Ask the user to pick the BLE printer (must run from a click). Returns its name, or null. */
+export async function chooseBluetoothPrinter(): Promise<string | null> {
+  const api = bluetoothApi();
+  if (!api) return null;
+  blePrinter = await api.requestDevice({ acceptAllDevices: true, optionalServices: [...BLE_PRINTER_SERVICES] });
+  return blePrinter.name || 'Bluetooth printer';
+}
+
+/** First writable characteristic among the known printer services. */
+async function writableCharacteristic(server: BleServer): Promise<BleCharacteristic> {
+  for (const uuid of BLE_PRINTER_SERVICES) {
+    try {
+      const service = await server.getPrimaryService(uuid);
+      const ch = (await service.getCharacteristics()).find((c) => c.properties.write || c.properties.writeWithoutResponse);
+      if (ch) return ch;
+    } catch {
+      /* this printer does not offer that service */
+    }
+  }
+  throw new Error('This Bluetooth device is not a supported receipt printer.');
+}
+
+/** Send bytes to the chosen BLE printer (asks for one when none was chosen in this tab). */
+export async function sendToBluetooth(bytes: Uint8Array): Promise<void> {
+  const api = bluetoothApi();
+  if (!api) throw new Error('This browser has no Web Bluetooth: use the browser print mode.');
+  if (!blePrinter?.gatt) blePrinter = await api.requestDevice({ acceptAllDevices: true, optionalServices: [...BLE_PRINTER_SERVICES] });
+  const gatt = blePrinter.gatt;
+  if (!gatt) throw new Error('This Bluetooth device cannot be connected.');
+  const server = await gatt.connect();
+  try {
+    const ch = await writableCharacteristic(server);
+    for (const part of chunkBytes(bytes)) {
+      const copy = part.slice(); // a fresh ArrayBuffer per write
+      if (ch.properties.write && ch.writeValueWithResponse) await ch.writeValueWithResponse(copy);
+      else if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(copy);
+      else if (ch.writeValue) await ch.writeValue(copy);
+      else throw new Error('The printer refused the data.');
+    }
+  } finally {
+    gatt.disconnect();
   }
 }
 
