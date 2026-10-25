@@ -15,6 +15,7 @@ import type { CreditLink } from '../../lib/stats';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { tilesT } from '../../i18n/areas/extras';
+import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './tiles.module.css';
@@ -26,9 +27,12 @@ const LoyaltyPanel = lazy(() => import('../loyalty/LoyaltyPanel').then((m) => ({
 // 7U business extras (each its own chunk, only when the tile is on).
 const AgentsPanel = lazy(() => import('../extras7u/AgentsPanel').then((m) => ({ default: m.AgentsPanel })));
 const OffersPanel = lazy(() => import('../extras7u/OffersPanel').then((m) => ({ default: m.OffersPanel })));
+// 8G: Today card + offline insights (own chunks).
+const TodayPanel = lazy(() => import('../invoicing-ux/TodayPanel'));
+const InsightsPanel = lazy(() => import('../invoicing-ux/InsightsPanel'));
 const PharmaPanel = lazy(() => import('../extras7u/PharmaPanel').then((m) => ({ default: m.PharmaPanel })));
 
-const TILE_LABEL: Record<TileId, Parameters<typeof tilesT>[0]> = {
+const TILE_LABEL: Record<Exclude<TileId, 'today' | 'insights'>, Parameters<typeof tilesT>[0]> = {
   receivables: 'receivables',
   payables: 'payables',
   cashBank: 'cashBank',
@@ -43,6 +47,7 @@ const TILE_LABEL: Record<TileId, Parameters<typeof tilesT>[0]> = {
   offers: 'offers',
   pharma: 'pharma',
 };
+const tileLabel = (t: TileId) => (t === 'today' ? uxT('tdTitle') : t === 'insights' ? uxT('inTitle') : tilesT(TILE_LABEL[t]));
 
 /**
  * Configurable dashboard tiles (WP-9, P1-17). Mounted lazily below the dashboard's own content,
@@ -59,10 +64,10 @@ export function DashboardTiles() {
   const branches = useMemo(() => branchesDb.all(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const data = useMemo(() => {
     const showStock = tiles.includes('lowStock');
-    let stock: { name: string; qty: number; unit: string; reorder: number; isLow: boolean }[] = [];
-    if (showStock) {
+    let stock: { name: string; qty: number; unit: string; reorder: number; isLow: boolean; tracked?: boolean }[] = [];
+    if (showStock || tiles.includes('insights')) {
       try {
-        stock = loadPositions().map((p) => ({ name: p.item.name, qty: p.qty, unit: p.item.unit || '', reorder: Number(p.item.reorder_level) || 0, isLow: p.isLow }));
+        stock = loadPositions().map((p) => ({ name: p.item.name, qty: p.qty, unit: p.item.unit || '', reorder: Number(p.item.reorder_level) || 0, isLow: p.isLow, tracked: !!p.item.track_stock }));
       } catch {
         stock = [];
       }
@@ -99,7 +104,7 @@ export function DashboardTiles() {
   const stat = (id: TileId, icon: ReactNode, value: string, hint: string, to?: string) => (
     <div className={surface.stat} data-tile={id} key={id}>
       <div className={surface.statTop}>
-        <span className={surface.statLabel}>{tilesT(TILE_LABEL[id])}</span>
+        <span className={surface.statLabel}>{tileLabel(id)}</span>
         <span className={surface.statIcon}>{icon}</span>
       </div>
       <div className={surface.statValue}>{to ? <Link to={to}>{value}</Link> : value}</div>
@@ -124,7 +129,7 @@ export function DashboardTiles() {
             <div className={own.pickerBody}>
               {ALL_TILES.map((t) => (
                 <label key={t} className={controls.check}>
-                  <input type="checkbox" checked={on(t)} onChange={() => toggle(t)} /> {tilesT(TILE_LABEL[t])}
+                  <input type="checkbox" checked={on(t)} onChange={() => toggle(t)} /> {tileLabel(t)}
                 </label>
               ))}
               {can('view') && (
@@ -170,6 +175,8 @@ export function DashboardTiles() {
           </div>
         )}
         <Suspense fallback={null}>
+          {on('today') && <TodayPanel books={data.books} />}
+          {on('insights') && <InsightsPanel books={data.books} stock={data.stock.filter((x) => x.tracked)} />}
           {on('branches') && (
             <div data-tile="branches">
               <BranchesPanel rows={v.branches} canEdit={can('master.edit')} onChanged={() => setTick((t) => t + 1)} notify={notify} icon={<Store size={16} />} />

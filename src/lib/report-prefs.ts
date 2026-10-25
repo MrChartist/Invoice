@@ -69,3 +69,18 @@ export function setReportPrefs(reportId: string, prefs: ReportPrefs): ReportPref
   }
   return clean;
 }
+
+/** 8.109 saved views: every report's options at once (snapshot / restore). */
+export function getAllReportPrefs(): Record<string, ReportPrefs> {
+  const all = readAll();
+  return Object.fromEntries(Object.keys(all).map((k) => [k, normalizeReportPrefs(all[k])]));
+}
+
+export function setAllReportPrefs(map: Record<string, unknown>): void {
+  const clean = Object.fromEntries(Object.entries(map ?? {}).slice(0, 60).map(([k, v]) => [k.slice(0, 40), normalizeReportPrefs(v)]));
+  try {
+    globalThis.localStorage?.setItem(REPORT_PREFS_KEY, JSON.stringify({ ...readAll(), ...clean }));
+  } catch {
+    /* remembered for this render only */
+  }
+}

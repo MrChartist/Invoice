@@ -543,6 +543,24 @@ From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Vali
 | 8.149 | ✅ **Create item from an unknown code** (POS + editor scan bar) | `QuickItemSheet.tsx`, `catalog.ts` | done |
 | 8.150 | ✅ Wiring: PWA "Payment in" (`/clients?pay=1`) → party picker → ₹ Received sheet; shared image / PDF → "Capture as supplier bill (read e-invoice QR)" or "New expense" | `PartyPicker.tsx`, `Clients.tsx`, `ShareTarget.tsx` | done |
 | 8.151 | ⏳ 8E follow-ups: scale labels with an embedded price check digit, USB-HID / Bluetooth scales, pole displays over serial (VFD), drawer hand-over between shifts, short codes on stock-only items, Option+P on macOS for the global key | — | open |
+### 8G · Invoicing UX & insights (`docs/features/invoicing-ux.md`)
+
+Zoho Books / FreshBooks / Xero / TallyPrime 7 habits, offline: deposits and acceptance without a portal, SmartFind, insights computed on the device.
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| 8.100 | ✅ **Deposits & payment schedules**: additive `payment_schedule` (% or ₹ instalments with due dates) on quotes / proformas / orders / invoices, printed; reminders, ageing and the cash forecast follow the earliest unpaid instalment; "Request deposit" records an advance receipt voucher (Rule 50) or raises a proforma; the advances banner applies part of an advance | `payment-schedule.ts`, `schedule-tools.ts`, `doc-snapshots.ts`, `PaymentScheduleCard.tsx`, `AdvanceNotice.tsx` | done |
+| 8.101 | ✅ **Quote acceptance offline**: client copy "Accept" / "Request changes" (pre-filled wa.me / mailto, no script); counter acceptance with an on-canvas signature + name + timestamp snapshotted once on the quote (`acceptance`), printed, Accepted, audited | `quote-acceptance.ts`, `AcceptQuoteDialog.tsx`, `AcceptanceBlock.tsx`, `client-copy.ts` | done |
+| 8.102 | ✅ **Live margin chip** in the summary (latest purchase rate → standard cost → opening rate), deferred, hidden from viewers, never printed | `margin.ts`, `MarginChip.tsx` | done |
+| 8.103 | ✅ **SmartFind**: bills, suppliers, payments / advances, vouchers, cheques, GSTIN / PAN / IRN / UTR, amounts (`12.5k`, `₹12,500`, `>50k`, `10k-20k`), typo tolerance, optional all-companies read-only peek; index cached per storage version | `smart-find.ts`, `search.ts`, `company-peek.ts`, `CommandPalette.tsx` | done |
+| 8.104 | ✅ **Last rate to this party** applied below price levels / lists (basis "Last rate"), with a chip to use it or go back to the catalogue rate | `last-rate.ts`, `pricing-actions.ts`, `LastRateHints.tsx` | done |
+| 8.105 | ✅ **Today card** (sales, cash / UPI / bank, udhaar, expenses, cash in hand, "Share to my WhatsApp") and the **post-save success sheet** (WhatsApp with UPI link + party outstanding, Share PDF, Print, Record payment, New; stays until dismissed; bottom sheet on phones) | `today.ts`, `TodayPanel.tsx`, `send-summary.ts`, `SendSheet.tsx` | done |
+| 8.106 | ✅ **Bulk actions** on filtered Transactions / Receivables: bulk remind (logged) and bulk bad-debt write-off (confirmed, audited; ledger Dr Other expenses / Cr debtors, never cash) | `write-off.ts`, `BulkCollectDialog.tsx`, `ReceivablesBulk.tsx` | done |
+| 8.107 | ✅ **MTD / QTD / YTD** presets on the report period bar | `books.ts` `periodForPreset`, `PeriodBar.tsx` | done |
+| 8.108 | ✅ **Offline insights** (deterministic): revenue vs 3-month average, top customers, expense heads spiking, DSO change, customers paying slower, margin erosion, stock at risk, GST payable trend; each card drills into its report | `insights.ts`, `InsightsPanel.tsx` (dashboard tile) | done |
+| 8.109 | ✅ **Saved report views** (device-local: name + tab + period + every report's F12 options) and **month-end packs** (P&L, BS, ageing, GSTR-1 / 3B papers in one ZIP; monthly schedule offered by the bell, auto-written to a connected backup folder) | `report-views.ts`, `report-pack.ts`, `report-pack-alerts.ts`, `ReportViewsBar.tsx` | done |
+| 8.110 | ✅ **Editor flow** (competitor tutorials): Record payment in Document actions; payment mode chips + UTR and "Fully paid" on Amount received (the receipt is recorded with that mode); split Save (Save / Save & print / Save & WhatsApp, remembered per device); Alt+P print, Alt+D duplicate; customer & items first (document details as one line, party extras behind "More details"); "Cash sale (walk-in)" chip | `counter-receipt.ts`, `PayModeChips.tsx`, `save-choice.ts`, `MetaSummary.tsx`, `editor-actions.ts`, `PartiesSection.tsx` | done |
+| 8.111 | ⏳ 8G follow-ups: PDF (not just ZIP) month-end pack; GST relief on bad debts (none in GST — documented only); schedule instalments on recurring templates; insights per branch; signature pad in the POS | — | open |
 
 ## Summary timeline
 

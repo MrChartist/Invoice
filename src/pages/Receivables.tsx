@@ -4,11 +4,12 @@ import { buildWhatsAppStatement } from '../lib/khata';
 import { khataT } from '../i18n/areas/khata';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, BellRing, ChevronRight, Clock, Copy, Download, FileStack, FileText, Mail, MessageCircle, Percent, Printer, Scale, Send, Wallet,
+  AlertTriangle, BellRing, ChevronRight, Clock, Copy, Download, FileStack, FileText, ListChecks, Mail, MessageCircle, Percent, Printer, Scale, Send, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
+import { uxT } from '../i18n/areas/invoicing-ux';
 import { getTable } from '../lib/storage';
 import type { CreditLinkRow } from '../lib/amount-due';
 import type { AdvanceRecord } from '../types/advances';
@@ -46,6 +47,8 @@ const AdvancesTab = lazy(() => import('../components/advances/AdvancesTab'));
 // Daily khata loop (8A): quick ₹ Received / ₹ Given and the party reminder queue, loaded on first use.
 const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
 const RemindQueue = lazy(() => import('../components/khata/RemindQueue'));
+// 8.106: bulk remind / write-off on the filtered ageing list.
+const ReceivablesBulk = lazy(() => import('../components/invoicing-ux/ReceivablesBulk'));
 
 type Tab = 'aging' | 'statements' | 'collections' | 'advances' | 'tds';
 const TABS: { id: Tab; label: () => string }[] = [
@@ -97,6 +100,7 @@ export function Receivables() {
   const currencies = useMemo(() => currenciesIn(data.invoices), [data.invoices]);
   const [currencyPick, setCurrencyPick] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkAct, setBulkAct] = useState(false);
   const [queue, setQueue] = useState<'overdue' | 'balance' | null>(null);
   const currency = currencyPick || currencies[0] || 'INR';
 
@@ -179,9 +183,19 @@ export function Receivables() {
             <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setQueue('balance')} disabled={report.totals.net <= 0}>
               <Send size={16} /> {khataT('sendBalances')}
             </button>
+            {can('payment.record') && (
+              <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setBulkAct(true)} disabled={report.totals.billCount === 0} data-receivables-bulk-open>
+                <ListChecks size={16} /> {uxT('bkOpenBtn')}
+              </button>
+            )}
           </>
         )}
       </Header>
+      {bulkAct && (
+        <Suspense fallback={null}>
+          <ReceivablesBulk report={report} invoices={data.invoices} onClose={() => setBulkAct(false)} onDone={(m) => { notify(m, 'success'); setData(loadData()); }} />
+        </Suspense>
+      )}
       {queue && (
         <Suspense fallback={null}>
           <RemindQueue kind={queue} onClose={() => setQueue(null)} />

@@ -64,6 +64,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     offer: { scheme_id: 'sc1', label: 'Bill offer: 5% off on ₹1000+', value: 50 },
     rx: { patient: 'P', prescriber: 'Dr. Q' },
     party_balance_snapshot: { previous: 1250.5, bill: 999, paid: 100, as_of: '2026-04-10' },
+    payment_schedule: [{ id: 'i1', label: 'Deposit', due_date: '2026-04-10', percent: 30 }, { id: 'i2', due_date: '2026-05-10', percent: 70 }],
+    acceptance: { signer: 'Ravi', signed_at: '2026-04-11T05:30:00.000Z', method: 'counter', amount: 1, signature: 'data:image/png;base64,iVBORw0KGgo=' },
     amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
   };

@@ -110,3 +110,6 @@ per-invoice helpers above (`remindersFor`, `pendingReminders` …) never count t
 viewer. The viewer's **Share PDF** uses `shareFile` (blocked → "Share PDF now", unsupported → download) and **Web page**
 uses the generalised `buildClientCopyHtml` (`pay.label`, `pay.ariaLabel`, `note`) with `freezePaper` / `documentCss`
 from `src/lib/client-copy-dom.ts`.
+
+## 8G additions
+- Reminders chase the earliest unpaid instalment of a payment schedule. The post-save success sheet (WhatsApp with UPI link and party outstanding) and quotation Accept / Request changes links in the client copy are described in `docs/features/invoicing-ux.md` § 8.101 / 8.105.
