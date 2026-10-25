@@ -117,7 +117,7 @@ close needs `payment.record` (`dayCloseDb.close`). A viewer sees neither the POS
 
 ## Limitations / not built
 
-- POS returns: raise a credit note from the invoice as usual (the POS has no return screen). POS bills appear in the
+- POS returns / exchange now have their own screen (WP-9, `docs/features/business-extras.md`). POS bills appear in the
   normal invoice list and can be edited there like any invoice.
 - A walk-in bill upserts one "Walk-in customer" client row (and a client per typed walk-in name), the same as any
   invoice saved by the editor.

@@ -231,6 +231,17 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.18 | ⏳ **Employee master / payroll vouchers** in Create, **TDS** statutory rows (7.1–7.3), **Ratio analysis** report (7.6) | add through `GATEWAY_EXTENSIONS` when those modules exist | S |
 | 7.19 | ⏳ Bill-wise references (7.5) and voucher classes (7.4) on Gateway voucher entry, single-entry mode | needs a voucher schema addition | M |
 
+### Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
+
+| # | Item | Competitors | Effort |
+|---|------|-------------|--------|
+| 7.9a | ✅ **POS returns / exchange** (WP-9, P1-25): scan / pick the bill → lines & qty → credit note with goods back to stock → refund by cash / UPI / card (payment voucher) or exchange against the next bill; Z report shows returns, refunds and net (`src/lib/pos-returns.ts`, `docs/features/business-extras.md`) | Vyapar, Marg, Busy | M |
+| 7.9b | ✅ **Approvals (maker-checker)** (WP-9, P1-18): `doc.approve` (owner), "invoices above ₹X / all documents by clerks" policy, pending-approval drafts, owner queue, audit + `approvals` log (`src/lib/approval-gate.ts`, `approvals.ts`) | Zoho | M |
+| 7.9c | ✅ **Branches / locations** (WP-9, P1-19): branch master, additive `branch_id` on documents / purchases / vouchers (inferred from profile / GSTIN), branch filter + branch-wise summary; reports-engine option documented for WP-2 (`src/lib/branch.ts`) | Tally, Busy | M |
+| 7.9d | ✅ **Dashboard tiles** (WP-9, P1-17): receivables, payables, cash / bank, GST due, top items, low stock, branches, approvals, AMC, loyalty — per user, lazily loaded (`src/lib/dashboard-tiles.ts`) | TallyPrime 4 | S–M |
+| 7.9e | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
+| 7.9f | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

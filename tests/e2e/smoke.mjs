@@ -655,6 +655,57 @@ try {
     await writeJson(page, 'pos_day_close', null);
   });
 
+  await step('POS return: bill → return one item → refund cash; Z report shows the return (WP-9)', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const before = await readJson(page, 'invoices', []);
+    const beforeIds = new Set(before.map((i) => i.id));
+    const prevVouchers = await readJson(page, 'vouchers', []);
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-ret', name: 'E2E Return Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865282',
+    }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8901030865282');
+    await scan.press('Enter');
+    await page.getByLabel('Quantity of E2E Return Soap (line 1)').fill('2');
+    await page.keyboard.press('F4'); // cash takes the rest
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    check(bill?.total === 236 && bill.status === 'Paid', `bill for the return (${bill?.total}, ${bill?.status})`);
+
+    await page.getByRole('button', { name: 'Return / exchange' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Return / exchange' });
+    await dlg.waitFor();
+    await dlg.locator('#ret-bill').fill(bill?.invoice_number ?? '');
+    await dlg.getByRole('button', { name: 'Find' }).click();
+    await dlg.getByLabel('Return quantity of E2E Return Soap (line 1)').fill('1');
+    await page.waitForFunction(() => /118\.00/.test(document.querySelector('[data-ret-total]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    check((await dlg.locator('#ret-Cash').inputValue()) === '118', `refund defaults to cash 118 (${await dlg.locator('#ret-Cash').inputValue()})`);
+    await dlg.getByRole('button', { name: 'Save return' }).click();
+    await page.getByText(/CRN\/FY\d\d-\d\d\/\d{4} saved — refund/).first().waitFor();
+    const cn = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id)))).find((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id));
+    check(cn?.goods_returned === true && cn.total === 118, `credit note with goods returned (${cn?.invoice_number}, ${cn?.total})`);
+    const rets = await readJson(page, 'pos_returns', [], (v) => v.length > 0);
+    check(rets.length === 1 && rets[0].refunds?.[0]?.method === 'Cash' && rets[0].refunds[0].amount === 118 && !!rets[0].voucher_id, 'return row with a cash refund and its voucher');
+
+    await page.getByRole('button', { name: 'Z report' }).click();
+    const z = page.getByRole('dialog', { name: 'Day-end Z report' });
+    await z.waitFor();
+    const returns = await z.locator('[data-z="returns"]').innerText();
+    const refund = await z.locator('[data-z="refund-cash"]').innerText();
+    check(/^1\b/.test(returns.trim()) && /118\.00/.test(refund), `Z report shows the return (${returns}, refund ${refund})`);
+    await page.keyboard.press('Escape');
+
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => t.invoice_id !== bill?.id));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id && i.id !== cn?.id));
+    await writeJson(page, 'doc_links', (await readJson(page, 'doc_links', [])).filter((l) => l.to_id !== cn?.id));
+    await writeJson(page, 'vouchers', prevVouchers.length ? prevVouchers : null);
+    await writeJson(page, 'pos_returns', null);
+    await writeJson(page, 'items_catalog', prevCatalog);
+  });
+
   let backupPath = '';
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');

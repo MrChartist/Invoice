@@ -18,6 +18,7 @@ import type { InvoiceRecord } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from './storage';
 import { requireAccess } from './access';
+import { localDayOf } from './dates';
 
 export const LOYALTY_PROGRAM_KEY = `${DB_PREFIX}loyalty_program`;
 export const LOYALTY_ADJUSTMENTS_TABLE = 'loyalty_adjustments';
@@ -214,4 +215,22 @@ export function applyRedemption(rec: InvoiceRecord, points: number, balance: num
     loyalty_redeem: { points: pts, value },
   };
   return { record: retotal(next), errors: [] };
+}
+
+/** `applyRedemption` with the stored programme and the customer's live balance (POS / editor). */
+export function redeemOnBill(rec: InvoiceRecord, points: number, invoices: readonly InvoiceRecord[] = getTable<InvoiceRecord>('invoices')): RedeemResult & { balance: number } {
+  const program = readProgram();
+  const balance = pointsBalance(rec.client?.name ?? '', invoices, adjustmentsDb.all(), program, rec.id || undefined);
+  return { ...applyRedemption(rec, points, balance, program), balance };
+}
+
+/** Balance and programme state for a customer (what the redeem box shows). */
+export function loyaltyInfo(name: string): { enabled: boolean; balance: number; pointValue: number; minRedeem: number } {
+  const program = readProgram();
+  return {
+    enabled: program.enabled && eligibleParty(name),
+    balance: program.enabled ? pointsBalance(name, getTable<InvoiceRecord>('invoices'), adjustmentsDb.all(), program) : 0,
+    pointValue: ruleOn(program, localDayOf(new Date())).point_value,
+    minRedeem: program.min_redeem,
+  };
 }

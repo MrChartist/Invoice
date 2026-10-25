@@ -24,6 +24,7 @@ import {
   POS_SHORTCUTS, buildPosRecord, fillRest, posShortcut, savePosBill, tenderSummary,
   type PosAction, type Tender, type TenderMethod,
 } from '../lib/pos';
+import { redeemOnBill } from '../lib/loyalty';
 import { DOCUMENT_LABELS, type Client, type InvoiceItem, type InvoiceRecord } from '../types/invoice';
 import { cn, formatCurrency, todayInput } from '../lib/utils';
 import controls from '../styles/controls.module.css';
@@ -39,6 +40,7 @@ const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m
 // WP-9: return / exchange screen and the exchange-credit banner (own files, loaded on demand).
 const PosReturnModal = lazy(() => import('../components/pos-returns/PosReturnModal').then((m) => ({ default: m.PosReturnModal })));
 const ExchangeCredit = lazy(() => import('../components/pos-returns/ExchangeCredit').then((m) => ({ default: m.ExchangeCredit })));
+const LoyaltyRedeem = lazy(() => import('../components/loyalty/LoyaltyRedeem').then((m) => ({ default: m.LoyaltyRedeem })));
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 
 interface Party {
@@ -96,6 +98,7 @@ export function Pos() {
   const [lastBill, setLastBill] = useState<InvoiceRecord | null>(null);
   const [retOpen, setRetOpen] = useState(false);
   const [exchange, setExchange] = useState<{ id: string; amount: number; number: string } | null>(null);
+  const [redeemPts, setRedeemPts] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const settings = useMemo(() => localDb.settings.get(), []);
@@ -103,10 +106,13 @@ export function Pos() {
   const day = todayInput();
   const level = data.pricing && party.client ? levelForClient(party.client, data.pricing.levels) : null;
 
-  const record = useMemo(
+  const built = useMemo(
     () => buildPosRecord({ items, party: { client: party.client, name: party.name, phone: party.phone }, settings, sender, templateId: localDb.template.get(), day, deliverToClientState: dispatch }),
     [items, party, settings, sender, day, dispatch],
   );
+  // Loyalty points redeemed as an amount discount (WP-9); a refused redemption leaves the bill as built.
+  const redeemed = useMemo(() => (redeemPts > 0 && party.client ? redeemOnBill(built, redeemPts) : null), [built, redeemPts, party.client]);
+  const record = redeemed?.record ?? built;
   const tenders: Tender[] = useMemo(
     () => (Object.keys(tender) as TenderMethod[]).map((m) => ({
       method: m, amount: tender[m],
@@ -183,6 +189,7 @@ export function Pos() {
   /** Pick (or clear) the saved customer; a new customer may buy at another level, so automatic lines are re-priced. */
   const chooseClient = (client: Client | null) => {
     setParty(client ? { client, name: '', phone: '' } : WALK_IN);
+    setRedeemPts(0);
     setDispatch(false);
     setCustomerText('');
     setItems((cur) => (cur.length ? finish(cur, undefined, false, client) : cur));
@@ -228,6 +235,7 @@ export function Pos() {
 
   const reset = () => {
     setItems([]);
+    setRedeemPts(0);
     setParty(WALK_IN);
     setDispatch(false);
     setCustomerText('');
@@ -442,6 +450,11 @@ export function Pos() {
                   <input type="checkbox" checked={dispatch} onChange={(e) => setDispatch(e.target.checked)} />
                   {posT('dispatch')}
                 </label>
+              )}
+              {party.client && (
+                <Suspense fallback={null}>
+                  <LoyaltyRedeem key={party.client.id || party.client.name} customer={party.client.name} points={redeemPts} errors={redeemed?.errors ?? []} onApply={setRedeemPts} />
+                </Suspense>
               )}
               {party.client ? null : (
                 <>

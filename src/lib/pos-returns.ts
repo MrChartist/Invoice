@@ -77,7 +77,9 @@ function writeReturn(row: PosReturn): void {
 
 /* ── Finding the bill ─────────────────────────────────────────── */
 
-const norm = (s: string) => (s || '').replace(/[\s\u0000-\u001f]/g, '').toUpperCase();
+/** Case-, space- and scanner-control-character-insensitive form of a bill number. */
+const norm = (s: string) =>
+  [...(s || '')].filter((c) => c.charCodeAt(0) > 32).join('').toUpperCase();
 
 /**
  * The sales bill for a scanned / typed bill number: an exact match (ignoring case and spaces)
