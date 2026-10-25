@@ -1559,6 +1559,27 @@ try {
     check(true, 'an unused account can be deleted; the picker goes away with one account');
   });
 
+  await step('8F distribution: add an area and a beat, beat plan and reports render, stock analysis tab loads', async () => {
+    await page.goto(srv.origin + '/distribution?tab=masters');
+    await page.locator('[data-area-name]').fill('E2E North');
+    await page.locator('[data-area-name]').press('Enter');
+    await readJson(page, 'dist_areas', [], (v) => v.some((a) => a.name === 'E2E North'));
+    await page.locator('[data-beat-name]').fill('E2E Market Rd');
+    await page.getByRole('checkbox', { name: 'Mon' }).check();
+    await page.getByRole('button', { name: 'Add beat' }).click();
+    const beats = await readJson(page, 'dist_beats', [], (v) => v.some((b) => b.name === 'E2E Market Rd'));
+    check(beats.find((b) => b.name === 'E2E Market Rd')?.days?.includes(1), 'beat saved with its visiting weekday');
+    await page.getByRole('tab', { name: 'Reports' }).click();
+    await page.locator('[data-dist-reports]').waitFor({ timeout: 15000 });
+    await page.getByRole('tab', { name: 'Beat plan' }).click();
+    await page.locator('[data-beat-plan]').waitFor({ timeout: 15000 });
+    await page.goto(srv.origin + '/inventory?tab=analysis');
+    await page.locator('[data-stock-analysis]').waitFor({ timeout: 15000 });
+    check(true, 'stock analysis tab renders');
+    await writeJson(page, 'dist_beats', null);
+    await writeJson(page, 'dist_areas', null);
+  });
+
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
     // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
     await page.goto(srv.origin + '/settings?tab=data');

@@ -351,7 +351,8 @@ const RECORD_TABLES = [
   // Inventory masters (WP-8): stock groups, stock categories, units of measure
   'stock_groups', 'stock_categories', 'units',
   // 7U: forex bank moves, e-payment batches, sales agents, commission postings
-  'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
+  'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',  // 8F: distribution masters, van settlements, order pad, breakage / expiry claims and receipts
+  'dist_areas', 'dist_routes', 'dist_beats', 'van_settlements', 'order_pad_outbox', 'order_pad_imports', 'expiry_claims', 'expiry_receipts',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -380,6 +381,7 @@ const ID_TABLES = new Set([
   'year_end',
   'stock_groups', 'stock_categories', 'units',
   'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
+  'dist_areas', 'dist_routes', 'dist_beats', 'van_settlements', 'order_pad_outbox', 'order_pad_imports', 'expiry_claims', 'expiry_receipts',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

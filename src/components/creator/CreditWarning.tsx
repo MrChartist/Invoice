@@ -4,17 +4,20 @@ import { ShieldAlert } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
-import { creditCheck, masterFor, type BounceLike } from '../../lib/credit-limit';
+import { masterFor, type BounceLike } from '../../lib/credit-limit';
+import { canOverrideCredit, creditStatus, readCreditPolicy } from '../../lib/credit-policy';
 import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { todayInput } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
+import { crT } from '../../i18n/areas/credit';
 import styles from './StockWarnings.module.css';
 
 /**
- * Credit-limit notice (6.25): the client master's limit / credit days vs what they owe plus this
- * document. Advisory only — saving is never blocked.
+ * Credit-limit notice (6.25 / 8.80): the client master's limit / credit days vs what they owe plus this
+ * document (and open sales orders, when the policy counts them). Warn: advisory. Block: a clerk's save
+ * is held for the owner's approval; the owner's save is an audited override (`approval-gate.ts`).
  */
 export function CreditWarning() {
   useT(); // re-render on a language switch (5.4)
@@ -27,36 +30,27 @@ export function CreditWarning() {
   const context = useMemo(() => {
     const master = masterFor({ id: clientId, name: clientName ?? '' }, localDb.clients.getAll());
     if (!master) return null;
-    return { master, invoices: localDb.invoices.getAll(), cheques: getTable<BounceLike>('cheques') };
+    return { master, invoices: localDb.invoices.getAll(), links: getTable<{ from_id: string; to_id: string; relation: string }>('doc_links'), cheques: getTable<BounceLike>('cheques'), policy: readCreditPolicy() };
   }, [clientId, clientName]);
   if (!context) return null;
-  const check = creditCheck({
-    client: context.master,
-    draft: {
-      id: s.id,
-      doc_type: s.doc_type,
-      status: s.status,
-      total: s.totals.total,
-      tds_amount: s.totals.tds_amount,
-      amount_paid: s.amount_paid,
-      currency: s.currency,
-      exchange_rate: s.exchange_rate,
+  const status = creditStatus(
+    {
+      id: s.id, client: s.client, doc_type: s.doc_type, status: s.status, total: s.totals.total, tds_amount: s.totals.tds_amount,
+      amount_paid: s.amount_paid, currency: s.currency, exchange_rate: s.exchange_rate,
     },
-    invoices: context.invoices,
-    today: todayInput(),
-    cheques: context.cheques,
-  });
-  if (!check.warnings.length) return null;
+    { master: context.master, policy: context.policy, invoices: context.invoices, links: context.links, cheques: context.cheques, day: todayInput() },
+  );
+  if (!status || !status.check.warnings.length) return null;
   return (
-    <div className={styles.wrap} role="status" aria-label={edT('cwAria')}>
-      {check.warnings.map((w) => (
+    <div className={styles.wrap} role="status" aria-label={edT('cwAria')} data-credit-mode={status.mode}>
+      {status.check.warnings.map((w) => (
         <p key={w} className={styles.line}>
           <ShieldAlert size={14} aria-hidden="true" /> {w}
         </p>
       ))}
       <p className={styles.line}>
         <span>
-          {edT('cwSave')}{' '}
+          {status.blocked ? (canOverrideCredit() ? crT('blockedOwner') : crT('blockedClerk')) : edT('cwSave')}{' '}
           <Link to={`/receivables?tab=statements&party=${encodeURIComponent(context.master.id ?? '')}`}>{edT('cwStatement')}</Link>
         </span>
       </p>

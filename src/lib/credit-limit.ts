@@ -57,6 +57,8 @@ export interface CreditCheck {
   creditDays?: number;
   /** Rupees owed on other open documents. */
   outstanding: number;
+  /** 8.80: open sales orders still to bill (0 unless asked for). */
+  openOrders?: number;
   /** Rupees this draft adds (0 for documents that are not invoices / debit notes). */
   thisInvoice: number;
   projected: number;
@@ -121,6 +123,8 @@ export function creditCheck(input: {
   invoices: readonly InvoiceRecord[];
   today: string;
   cheques?: readonly BounceLike[];
+  /** 8.80: rupee value of the party's open sales orders still to bill (counted in the exposure when given). */
+  openOrders?: number;
 }): CreditCheck {
   const { client, draft, invoices, today } = input;
   const empty: CreditCheck = { outstanding: 0, thisInvoice: 0, projected: 0, overBy: 0, overdue: { count: 0, amount: 0, oldestDays: 0 }, bounced: 0, warnings: [] };
@@ -153,14 +157,15 @@ export function creditCheck(input: {
   overdue.amount = round2(overdue.amount);
   const counts = CREDIT_DOCS.has(draft.doc_type ?? 'INVOICE') && draft.status !== 'Cancelled';
   const thisInvoice = counts ? openInr(draft, false) ?? 0 : 0;
-  const projected = round2(outstanding + thisInvoice);
+  const orders = Math.max(round2(num(input.openOrders)), 0);
+  const projected = round2(outstanding + orders + thisInvoice);
   const overBy = limit !== undefined && projected > limit + 0.004 ? round2(projected - limit) : 0;
 
   const inr = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const warnings: string[] = [];
   if (overBy > 0) {
     warnings.push(
-      `Over the credit limit by ${inr(overBy)}: ${inr(outstanding)} outstanding${thisInvoice ? ` + ${inr(thisInvoice)} on this document` : ''} against a limit of ${inr(limit!)}.`,
+      `Over the credit limit by ${inr(overBy)}: ${inr(outstanding)} outstanding${orders ? ` + ${inr(orders)} on open sales orders` : ''}${thisInvoice ? ` + ${inr(thisInvoice)} on this document` : ''} against a limit of ${inr(limit!)}.`,
     );
   }
   if (overdue.count > 0) {
@@ -169,5 +174,5 @@ export function creditCheck(input: {
     );
   }
   if (bounced > 0) warnings.push(`${bounced} cheque${bounced === 1 ? '' : 's'} from this client bounced — consider advance payment.`);
-  return { limit, creditDays, outstanding, thisInvoice, projected, overBy, overdue, bounced, warnings };
+  return { limit, creditDays, outstanding, openOrders: orders, thisInvoice, projected, overBy, overdue, bounced, warnings };
 }

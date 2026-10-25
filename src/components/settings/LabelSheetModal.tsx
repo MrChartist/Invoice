@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Printer, Wand2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+
+const RawLabelButtons = lazy(() => import('../distribution/RawLabelButtons')); // 8.87 thermal rolls
 import { NumberInput } from '../ui/NumberInput';
 import { barRuns, encodeBarcode, nextInStoreEan, pickSymbology } from '../../lib/barcode';
 import { LABEL_LAYOUTS, expandLabels, labelSheetHtml, layoutById, sheetCount, type LabelItem, type PriceShown } from '../../lib/label-sheet';
@@ -130,6 +132,7 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
       footer={
         <>
           <button type="button" className={controls.btnOutline} onClick={onClose}>{setT('close')}</button>
+          <Suspense fallback={null}><RawLabelButtons items={chosen} layout={layout} onMessage={setMessage} /></Suspense>
           <button type="button" className={controls.btnPrimary} onClick={print} disabled={labels.length === 0}>
             <Printer size={16} /> {setT('printLabels')}
           </button>

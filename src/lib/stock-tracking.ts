@@ -14,7 +14,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
-import { pharmaGate } from './pharma-gate';
+import { pharmaGate, readPharmaSettings, saleLimitGate } from './pharma-gate';
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine } from '../types/stock';
 import type { AppNotification } from './notifications';
 import { num, round2 } from './invoice-calc';
@@ -26,7 +26,7 @@ import {
 import { getTable } from './storage';
 import { lineFactor } from './units';
 import { creditNoteReturnsGoods } from './credit-restock';
-import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList } from './godowns';
+import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList, godownName, nonSaleableGodowns } from './godowns';
 import { batchDelta, dayWindow, eventLabel, firstShortAfter, godownDelta, serialDelta } from './stock-timeline';
 
 const EPS = 1e-9;
@@ -727,8 +727,23 @@ export function editorStockContext(doc: { id?: string; doc_type: string; issue_d
 /** Issue checks for the document open in the editor, from live data. */
 export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
   try {
-    const multi = godownList(getTable<Godown>(GODOWNS_TABLE)).length > 1;
-    return pharmaGate(docTrackingIssues(doc, liveTrackingInputs(), multi), doc); // 7U pharma pack (off by default)
+    const godowns = godownList(getTable<Godown>(GODOWNS_TABLE));
+    const multi = godowns.length > 1;
+    const issues = pharmaGate(docTrackingIssues(doc, liveTrackingInputs(), multi), doc); // 7U pharma pack (off by default)
+    if (doc.status === 'Draft' || doc.status === 'Cancelled') return issues;
+    // 8F: no sale from an expiry godown; optional batch-MRP ceiling (tracking computed only when that is on).
+    const pharma = readPharmaSettings();
+    let tracking: TrackingMap | null = null;
+    const mrpOf = pharma.enabled && pharma.block_above_mrp
+      ? (l: { name: string; batch_no?: string }) => {
+          tracking ??= computeTracking(liveTrackingInputs());
+          const it = buildItemIndex(liveTrackingInputs().items.filter((i) => i.track_stock)).find(l.name);
+          const batches = (it && tracking.get(it.id)?.batches) || [];
+          const b = l.batch_no ? batches.find((x) => x.batch.toUpperCase() === l.batch_no!.toUpperCase()) : batches.length === 1 ? batches[0] : undefined;
+          return b?.mrp;
+        }
+      : undefined;
+    return saleLimitGate(issues, doc, { nonSaleable: nonSaleableGodowns(godowns), godownName: (id) => godownName(godowns, id), mrpOf, settings: pharma });
   } catch {
     return { errors: [], expired: [], warnings: [] };
   }

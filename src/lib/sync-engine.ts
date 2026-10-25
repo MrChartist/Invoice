@@ -310,6 +310,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}fx_bank_moves`]: 'date',
   [`${DB_PREFIX}epay_batches`]: 'date',
   [`${DB_PREFIX}commission_postings`]: 'date',
+  // 8F: van settlements, breakage / expiry claims and receipts
+  [`${DB_PREFIX}van_settlements`]: 'date',
+  [`${DB_PREFIX}expiry_claims`]: 'date',
+  [`${DB_PREFIX}expiry_receipts`]: 'date',
   [`${DB_PREFIX}pos_returns`]: 'day',
   [`${DB_PREFIX}cheques`]: chequeDay,
   [`${DB_PREFIX}ledger_openings`]: openingDay,
@@ -861,6 +865,9 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}job_work_principal`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}rejections_in`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}production_plans`]: { num: 'number', date: 'date' },
+  // 8F: van settlements (VST) and breakage / expiry receipts (BER)
+  [`${DB_PREFIX}van_settlements`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}expiry_receipts`]: { num: 'number', date: 'date' },
   // M5: every other numbered series (DN / GRN / RJO / PIS / PRL / PYP / PO).
   [`${DB_PREFIX}purchase_returns`]: { num: 'note_number', date: 'date' },
   [`${DB_PREFIX}receipt_notes`]: { num: 'number', date: 'date' },

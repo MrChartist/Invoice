@@ -32,6 +32,9 @@ const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.C
 const Tds = lazy(() => import('./pages/Tds').then((m) => ({ default: m.Tds })));
 const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
 const Gateway = lazy(() => import('./pages/Gateway').then((m) => ({ default: m.Gateway })));
+// 8F distribution: masters / reports / van / order-pad import, and the salesman order pad.
+const Distribution = lazy(() => import('./pages/Distribution').then((m) => ({ default: m.Distribution })));
+const OrderPad = lazy(() => import('./pages/OrderPad').then((m) => ({ default: m.OrderPad })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -99,6 +102,8 @@ function App() {
                 <Route path="/recurring" element={<RequireAccess action="books.edit"><Recurring /></RequireAccess>} />
                 <Route path="/time" element={<RequireAccess action="books.edit"><Time /></RequireAccess>} />
                 <Route path="/receivables" element={<Receivables />} />
+                <Route path="/distribution" element={<Distribution />} />
+                <Route path="/order-pad" element={<RequireAccess action="doc.create" fallback="/transactions"><OrderPad /></RequireAccess>} />
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/manufacturing" element={<Manufacturing />} />

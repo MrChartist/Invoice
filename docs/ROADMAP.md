@@ -445,6 +445,20 @@ Details: `docs/features/manufacturing.md`.
 | 7.166 | ✅ **Branch stock**: per-godown closing-stock valuation for branch statements in Books and Gateway (branch godowns × company-wide unit cost; "No branch" takes the rest so branches add up — `ledger/branch-stock.ts`); Alt+C on manufacturing / stock-journal line grids (items, godowns) and the bill godown select; the Sec 25(4) tax invoice + bill dialog opens automatically when a transfer between two GSTINs is saved | 7.84, P1-19 | done |
 | 7.167 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), price lists on POS, ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
 
+### 8F · Distribution, pharma, stock depth (`docs/features/distribution.md`)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 8.80 | ✅ **Credit-limit enforcement** (BUSY / Marg / Zoho): policy Off / Warn / Block per company + per party, open sales orders and overdue-beyond-credit-days options; editor and POS (saved customers, unpaid part); Block holds a clerk's document in the approval queue (`reason: 'credit'`), owner override audited (`credit-policy.ts`, `holdIfCreditBlocked` in `approval-gate.ts`) | — | done |
+| 8.81 | ✅ **Distribution masters & reports**: areas / beats / routes, party area / beat / default salesman, sales / outstanding / collections by salesman / beat / area, returns by beat, day-wise beat plan, agent on POS bills; **offline order pad** with HMAC-signed order files (share / file / QR) imported as sales orders with dedupe (`distribution.ts`, `order-pad.ts`) | — | done |
+| 8.82 | ✅ **Van sales**: van godown kind, van load (transfer), van settlement (returns + cash vs bills, `VST/FY…`), pick lists by bin (`van.ts`, `pick-list.ts`) | — | done |
+| 8.83 | ✅ **Fast / slow / non-moving and ABC analysis** (`stock-analysis.ts`) | — | done |
+| 8.84 | ✅ **Pharma operations** (Marg): Breakage / Expiry Issue grouped by supplier with debit notes + claims, claim tracking, Breakage / Expiry Receive into a non-saleable Expiry godown, destruction with an ITC-reversal reminder (verify with your CA), salt / substitute search, block sale above batch MRP (`expiry-ops.ts`, `salt-search.ts`, `saleLimitGate`) | — | done |
+| 8.85 | ✅ **Item variants** (attribute grid → child items with SKUs / barcodes) and **kits** consuming BOM components on sale (`variants.ts`, `events-kits.ts`) | — | done |
+| 8.86 | ✅ **Bin / rack** on items and batches, snapshotted on delivery challan lines and printed on pick lists (`bins.ts`) | — | done |
+| 8.87 | ✅ **Thermal roll labels**: 50×25, 38×25 2-up, 100×50 presets; raw TSPL / EPL / ZPL over Web Serial or file; weighed-goods EAN-13 with embedded price (`label-sheet.ts`, `label-raw.ts`) | — | done |
+| 8.88 | ⏳ 8F follow-ups: one debit note spanning several bills of a supplier, POS decoding of weighed-goods codes, kit shortfall warnings, order-pad partial import / camera QR scan | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |
