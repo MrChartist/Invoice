@@ -23,6 +23,7 @@ import { DEPRECIATION_BLOCK_LABELS } from '../../../lib/tax-rules';
 import { formatDate } from '../../../lib/utils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { AssetModal } from './AssetModal';
+import { StockJournalNotice } from './StockJournalNotice';
 import { money } from './format';
 import { PrintTitle, StatementToolbar } from './shared';
 import surface from '../../../styles/surface.module.css';
@@ -155,6 +156,8 @@ function BalanceSheetRoot({ ledger, asOf, period, stock, assets, today, onChange
           {stock ? reportsT('bsStockNote', { method: stock.label }) : reportsT('bsNoStockNote')}
         </span>
       </div>
+
+      <StockJournalNotice stock={stock} onChanged={onChanged} notify={notify} />
 
       <div className={`${books.twoCol} ${styles.drillTable}`} tabIndex={0} onKeyDown={nav.table.onKeyDown} id={nav.bodyId}>
         <Side title={ledgerT('bsEquity')} sections={bs.equityAndLiabilities} total={bs.totalEquityAndLiabilities} index={0} row={rowProps} onItem={onItem} onAccount={onAccount} />

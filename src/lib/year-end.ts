@@ -3,9 +3,11 @@
  * year are closed, the Tally "Split Company Data" moment presented as one screen.
  *
  *   1. integrity     — the books integrity check (TB balances, orphaned links, negative cash days);
- *   2. closing_stock — stock value on 31 March (inventory valuation); optionally posted as a journal
- *                      (Dr Stock-in-hand | Cr Purchases, reversed on 1 April) when the P&L does not
- *                      already carry closing stock;
+ *   2. closing_stock — stock value on 31 March. When report-time valuation (WP-2,
+ *                      `mrchartist_inv_closing_stock`) is on, the step only shows the valued figure and
+ *                      is satisfied; a journal (Dr Stock-in-hand | Cr Purchases, reversed on 1 April) is
+ *                      offered only when valuation is off. Reports net any such journal off the valuation
+ *                      (`netOfStockJournals`), so the stock is never counted twice;
  *   3. depreciation  — the fixed-asset register's depreciation for the year (posted automatically on
  *                      31 March); warns when fixed-asset ledgers hold amounts the register does not know;
  *   4. provisions    — year-end provisions journal (Dr expense | Cr Provisions), reversed on 1 April;
@@ -29,7 +31,8 @@ import type { IntegrityReport } from './books-integrity';
 import { toCsv } from './csv';
 
 export const YEAR_END_TABLE = 'year_end';
-export const CLOSING_STOCK_CLASS = 'Year-end closing stock';
+export { CLOSING_STOCK_CLASS } from './ledger/closing-stock';
+import { CLOSING_STOCK_CLASS, type ClosingStockMode } from './ledger/closing-stock';
 export const PROVISION_CLASS = 'Year-end provision';
 
 export type YearEndStepId = 'integrity' | 'closing_stock' | 'depreciation' | 'provisions' | 'opening_bills' | 'lock' | 'carry_forward';
@@ -65,6 +68,11 @@ export interface YearEndInput {
   integrity: IntegrityReport;
   /** Inventory valuation at 31 March (paise) and the number of stock items valued. */
   closingStock: { value: number; items: number };
+  /**
+   * Report-time closing-stock valuation (WP-2, `mrchartist_inv_closing_stock`) in effect for this
+   * company: when it is on, statements already carry the stock and the step posts nothing.
+   */
+  valuation?: { mode: ClosingStockMode; label: string; value: number };
   assets: readonly FixedAsset[];
   manual: readonly ManualVoucher[];
   lockUntil: string;
@@ -112,15 +120,31 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
   /* 2. Closing stock */
   const autoStock = input.ledger.vouchers.some((v) => /closing\s*stock/i.test(v.kind) || v.id.startsWith('cls:'));
   const stockJv = input.manual.find((v) => v.voucher_class === CLOSING_STOCK_CLASS && v.date === end);
-  steps.push({
-    id: 'closing_stock',
-    status: autoStock || stockJv || marks.closing_stock ? 'done' : input.closingStock.items ? 'todo' : 'done',
-    amount: input.closingStock.value,
-    facts: [
-      input.closingStock.items ? `Stock on ${end}: ${rs(input.closingStock.value)} (${input.closingStock.items} item${input.closingStock.items === 1 ? '' : 's'}, inventory valuation).` : 'No stock items are tracked.',
-      autoStock ? 'The P&L already carries closing stock.' : stockJv ? `Posted as ${stockJv.number}.` : 'Not posted to the books yet.',
-    ],
-  });
+  const valued = input.valuation && input.valuation.mode !== 'none' ? input.valuation : undefined;
+  if (valued) {
+    // Report-time valuation (WP-2) already carries closing stock in every statement: nothing to post.
+    steps.push({
+      id: 'closing_stock',
+      status: 'done',
+      amount: valued.value,
+      facts: [
+        `Stock on ${end}: ${rs(valued.value)} (${valued.label}), valued at report time in the P&L and balance sheet.`,
+        stockJv
+          ? `Journal ${stockJv.number} also books closing stock; reports show the valuation net of it, so nothing is counted twice. Delete the journal (or stop valuing stock) to keep one method.`
+          : 'Nothing to post: a closing-stock journal would count the stock twice.',
+      ],
+    });
+  } else {
+    steps.push({
+      id: 'closing_stock',
+      status: autoStock || stockJv || marks.closing_stock ? 'done' : input.closingStock.items ? 'todo' : 'done',
+      amount: input.closingStock.value,
+      facts: [
+        input.closingStock.items ? `Stock on ${end}: ${rs(input.closingStock.value)} (${input.closingStock.items} item${input.closingStock.items === 1 ? '' : 's'}, inventory valuation).` : 'No stock items are tracked.',
+        autoStock ? 'The P&L already carries closing stock.' : stockJv ? `Posted as ${stockJv.number}.` : 'Stock is not valued at report time and not posted to the books yet.',
+      ],
+    });
+  }
 
   /* 3. Depreciation */
   let dep = 0;

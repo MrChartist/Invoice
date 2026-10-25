@@ -15,7 +15,7 @@ import { fyStartYearOf } from '../../lib/books';
 import { groupOf } from '../../lib/ledger/accounts';
 import { rupeesToPaise } from '../../lib/ledger/vouchers';
 import { carryForward, carryForwardCsv, fyEndOf, fyId, type YearEndStepId } from '../../lib/year-end';
-import { loadYearEnd, lockYear, postClosingStock, postProvisions, saveYearEndMark } from '../../lib/year-end-store';
+import { loadYearEnd, lockYear, postClosingStock, postProvisions, saveYearEndMark, stopValuingStock } from '../../lib/year-end-store';
 import controls from '../../styles/controls.module.css';
 import styles from '../import/TallyImport.module.css';
 
@@ -77,6 +77,16 @@ export function YearEndWizard({ open, onClose, notify }: YearEndWizardProps) {
           </>
         ) : null;
       case 'closing_stock':
+        if (state?.valuation && state.valuation.mode !== 'none') {
+          return (
+            <div className={styles.inline}>
+              <span className={styles.muted}>{migT('stockValued', { label: state.valuation.label })}</span>
+              <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => act(() => { stopValuingStock(); return migT('stockSwitched'); })}>
+                {migT('stockUseJournal')}
+              </button>
+            </div>
+          );
+        }
         return (
           <div className={styles.inline}>
             <label className={controls.field}>

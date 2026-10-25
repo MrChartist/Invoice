@@ -5,7 +5,8 @@
 
 import { requireAccess } from './access';
 import { checkBooksIntegrity, type IntegrityReport } from './books-integrity';
-import { loadPositions } from './inventory';
+import { loadPositions, loadSettings as loadInventorySettings, type StockPosition } from './inventory';
+import { loadClosingStockConfig, saveClosingStockConfig, stockValuerFor } from './ledger/closing-stock';
 import { loadAssets } from './ledger/assets';
 import { A } from './ledger/accounts';
 import { loadLedgerInput, buildLedger, loadVouchers, saveVoucher, loadOpenings, type ManualVoucher, type Ledger } from './ledger/index';
@@ -23,6 +24,7 @@ import {
   partyBalancesAt,
   yearEndChecklist,
   yearEndJournal,
+  type YearEndInput,
   type YearEndRecord,
   type YearEndStep,
   type YearEndStepId,
@@ -63,6 +65,8 @@ export interface YearEndState {
   ledger: Ledger;
   integrity: IntegrityReport;
   manual: ManualVoucher[];
+  /** Report-time closing-stock valuation in effect (absent when the inventory could not be read). */
+  valuation?: YearEndInput['valuation'];
 }
 
 export function loadYearEnd(fyStart: number): YearEndState {
@@ -77,6 +81,14 @@ export function loadYearEnd(fyStart: number): YearEndState {
   } catch {
     /* no inventory */
   }
+  let valuation: YearEndInput['valuation'];
+  try {
+    let all: StockPosition[] | undefined;
+    const raw = stockValuerFor(loadClosingStockConfig(), () => (all ??= loadPositions()), loadInventorySettings().method);
+    valuation = raw ? { mode: raw.mode, label: raw.label, value: raw.value(end) } : { mode: 'none', label: '', value: 0 };
+  } catch {
+    /* no inventory */
+  }
   const fyBegin = `${fyStart}-04-01`;
   // An opening bill from before this year counts as still open while its party carries a balance at year end.
   const debt = partyBalancesAt(ledger, A.debtors, end);
@@ -88,6 +100,7 @@ export function loadYearEnd(fyStart: number): YearEndState {
     ledger,
     integrity,
     closingStock: stock,
+    ...(valuation ? { valuation } : {}),
     assets: loadAssets(),
     manual,
     lockUntil: getLockUntil(),
@@ -95,11 +108,27 @@ export function loadYearEnd(fyStart: number): YearEndState {
     record: loadYearEndRecord(fyStart),
     today,
   });
-  return { steps, ledger, integrity, manual };
+  return { steps, ledger, integrity, manual, ...(valuation ? { valuation } : {}) };
 }
 
-/** Post (or replace) the closing-stock journal on 31 March. */
+/**
+ * Turn report-time stock valuation off (`mode: 'none'`) so a posted closing-stock journal is the only
+ * source of closing stock. Keeps any typed figures for later.
+ */
+export function stopValuingStock(): void {
+  requireAccess('books.edit');
+  saveClosingStockConfig({ ...loadClosingStockConfig(), mode: 'none' });
+}
+
+/**
+ * Post (or replace) the closing-stock journal on 31 March. Refused while report-time valuation is on
+ * (the statements already carry the stock; a journal would only be netted off).
+ */
 export function postClosingStock(fyStart: number, valuePaise: number, reverse = true): ManualVoucher {
+  const cfg = loadClosingStockConfig();
+  if (stockValuerFor(cfg, () => loadPositions(), loadInventorySettings().method)) {
+    throw new Error('Closing stock is valued at report time, so a journal is not needed. Choose "Do not value stock" first to post it as a journal.');
+  }
   const existing = loadVouchers().find((v) => v.voucher_class === CLOSING_STOCK_CLASS && v.date === fyEndOf(fyStart));
   const j = yearEndJournal('closing_stock', fyStart, [{ account_id: A.stock, amount: valuePaise }], reverse);
   return saveVoucher({ ...j, ...(existing ? { id: existing.id } : {}) });
