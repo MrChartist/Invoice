@@ -121,6 +121,8 @@ export interface AdvanceMovement {
   /** Refunded: the refund voucher number; adjusted / received: the payment method. */
   ref?: string;
   method?: string;
+  /** Received / refunded: the bank account (multi-account BRS); missing = the main account. */
+  bank_account_id?: string;
 }
 
 /**
@@ -156,15 +158,16 @@ export function advanceMovements(
     out.push({
       ...base, kind: 'received', sourceId: adv.id, date, gross: amount,
       taxable: round2(amount - heads.igst - heads.cgst - heads.sgst), ...heads, method: adv.method, ref: adv.reference,
+      bank_account_id: adv.bank_account_id,
     });
 
-    const consumed: { kind: 'adjusted' | 'refunded'; id: string; date: string; amount: number; inv?: InvoiceRecord; ref?: string; method?: string }[] = [];
+    const consumed: { kind: 'adjusted' | 'refunded'; id: string; date: string; amount: number; inv?: InvoiceRecord; ref?: string; method?: string; bank_account_id?: string }[] = [];
     for (const p of liveAdjustments(adv.id, payments, invById)) {
       const inv = invById.get(p.invoice_id);
       consumed.push({ kind: 'adjusted', id: String(p.id), date: isoDay(p.date) || date, amount: round2(num(p.amount)), inv, ref: p.reference, method: p.method });
     }
     for (const r of adv.refunds ?? []) {
-      if (num(r.amount) > 0) consumed.push({ kind: 'refunded', id: r.id, date: isoDay(r.date) || date, amount: round2(num(r.amount)), ref: r.number, method: r.method });
+      if (num(r.amount) > 0) consumed.push({ kind: 'refunded', id: r.id, date: isoDay(r.date) || date, amount: round2(num(r.amount)), ref: r.number, method: r.method, bank_account_id: r.bank_account_id });
     }
     consumed.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
     // Tax share of the first `c` rupees consumed; the whole advance carries exactly its own tax.
@@ -185,6 +188,7 @@ export function advanceMovements(
         ...base, kind: m.kind, sourceId: m.id, date: m.date, gross: m.amount,
         taxable: round2(m.amount - igst - cgst - sgst), igst, cgst, sgst,
         invoiceId: m.inv?.id, invoiceNumber: m.inv?.invoice_number, ref: m.ref, method: m.method,
+        bank_account_id: m.bank_account_id,
       });
     }
   }

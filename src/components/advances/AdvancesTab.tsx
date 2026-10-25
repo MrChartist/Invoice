@@ -27,6 +27,7 @@ import { AdvanceFormModal } from './AdvanceFormModal';
 import { ApplyAdvancePanel } from './ApplyAdvancePanel';
 import { openPrintable } from './print';
 import surface from '../../styles/surface.module.css';
+import { BankAccountSelect } from '../bank/BankAccountSelect';
 import controls from '../../styles/controls.module.css';
 import styles from './advances.module.css';
 
@@ -240,12 +241,13 @@ function RefundModal({ row, onClose, onDone }: { row: AdvanceRow; onClose: () =>
   const [amount, setAmount] = useState(String(row.balance.open));
   const [date, setDate] = useState(todayInput());
   const [method, setMethod] = useState(METHODS[0]);
+  const [bankAccountId, setBankAccountId] = useState('');
   const [reference, setReference] = useState('');
   const [error, setError] = useState('');
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const r = refundAdvance(a.id, { amount: Number(amount), date, method, reference });
+      const r = refundAdvance(a.id, { amount: Number(amount), date, method, reference, bankAccountId: bankAccountId || undefined });
       onDone(`${money(r.amount)} refunded (${r.number})`);
     } catch (err) {
       setError(err instanceof AdvanceError ? err.message : (err as Error).message);
@@ -283,6 +285,7 @@ function RefundModal({ row, onClose, onDone }: { row: AdvanceRow; onClose: () =>
             <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value)} />
           </label>
         </div>
+        <BankAccountSelect id="advrf-bank-account" label="Paid from" method={method} value={bankAccountId} onChange={setBankAccountId} />
         <span className={controls.hint}>Unadjusted {money(row.balance.open)}. GST paid on the refunded part comes off in GSTR-1 Table 11B of the refund month (verify with your CA).</span>
       </form>
     </Modal>

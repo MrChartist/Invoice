@@ -8,6 +8,7 @@ import { GST_SLABS } from '../../lib/tax-rules';
 import { referenceLabel } from '../../lib/receipts';
 import { formatMoney, todayInput } from '../../lib/utils';
 import type { AdvanceRecord, AdvanceSupply } from '../../types/advances';
+import { BankAccountSelect } from '../bank/BankAccountSelect';
 import controls from '../../styles/controls.module.css';
 import styles from './advances.module.css';
 
@@ -21,6 +22,7 @@ interface Form {
   rate: string;
   pos: string;
   method: string;
+  bankAccountId: string;
   reference: string;
   description: string;
   note: string;
@@ -47,7 +49,7 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
   const [error, setError] = useState('');
 
   function blank(party: string): Form {
-    return { party, date: todayInput(), amount: '', supply: 'services', rate: String(defaultRate ?? 18), pos: senderState, method: METHODS[0], reference: '', description: '', note: '' };
+    return { party, date: todayInput(), amount: '', supply: 'services', rate: String(defaultRate ?? 18), pos: senderState, method: METHODS[0], bankAccountId: '', reference: '', description: '', note: '' };
   }
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
             rate: String(advance.tax_rate),
             pos: advance.place_of_supply,
             method: advance.method,
+            bankAccountId: advance.bank_account_id ?? '',
             reference: advance.reference ?? '',
             description: advance.description ?? '',
             note: advance.note ?? '',
@@ -95,6 +98,7 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
       tax_rate: Number(form.rate),
       amount: Number(form.amount),
       method: form.method,
+      bankAccountId: form.bankAccountId || undefined,
       reference: form.reference,
       description: form.description,
       note: form.note,
@@ -197,6 +201,7 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
             <input className={controls.input} value={form.reference} onChange={(e) => set('reference', e.target.value.trimStart())} />
           </label>
         </div>
+        <BankAccountSelect id="adv-bank-account" label="Received into" method={form.method} value={form.bankAccountId} onChange={(v) => set('bankAccountId', v)} />
         <label className={controls.field}>
           <span className={controls.label}>Description of supply (printed)</span>
           <input className={controls.input} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder={form.supply === 'goods' ? 'e.g. Advance for 200 units of item X' : 'e.g. Retainer for statutory audit FY 25-26'} />

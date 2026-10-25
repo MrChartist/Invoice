@@ -105,6 +105,8 @@ export interface AdvanceInput {
   reference?: string;
   description?: string;
   note?: string;
+  /** Multi-account BRS: the bank account it went into (ignored for cash). */
+  bankAccountId?: string;
 }
 
 export function validateAdvance(input: AdvanceInput, today: string = todayIso()): string[] {
@@ -199,6 +201,7 @@ export function saveAdvance(input: AdvanceInput, ctx: Ctx = {}): AdvanceRecord {
     tax_rate,
     amount,
     method: String(input.method || 'Bank transfer'),
+    ...(input.bankAccountId && !/^cash$/i.test(String(input.method)) ? { bank_account_id: input.bankAccountId } : {}),
     ...(input.reference?.trim() ? { reference: input.reference.trim() } : {}),
     ...(input.description?.trim() ? { description: input.description.trim() } : {}),
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
@@ -331,6 +334,8 @@ export interface RefundInput {
   method: string;
   reference?: string;
   note?: string;
+  /** Multi-account BRS: the bank account it was paid from (ignored for cash). */
+  bankAccountId?: string;
 }
 
 export function refundAdvance(advanceId: string, input: RefundInput, ctx: Ctx = {}): AdvanceRefund {
@@ -354,6 +359,7 @@ export function refundAdvance(advanceId: string, input: RefundInput, ctx: Ctx = 
     date,
     amount,
     method: String(input.method || 'Bank transfer'),
+    ...(input.bankAccountId && !/^cash$/i.test(String(input.method)) ? { bank_account_id: input.bankAccountId } : {}),
     ...(input.reference?.trim() ? { reference: input.reference.trim() } : {}),
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
     created_at: (ctx.now ?? new Date()).toISOString(),

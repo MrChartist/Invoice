@@ -89,3 +89,22 @@ test('statements keep their account; a receipt made from a statement line goes i
   const pay = recordReceiptFromLine(st.lines[0], inv.id);
   assert.equal(pay.bank_account_id, 'icici');
 });
+
+test('advance receipts and refunds land in the account they name', async () => {
+  const { saveAdvance, refundAdvance } = await import('../src/lib/advances.ts');
+  const a = saveAdvance({
+    date: '2026-05-10', client: { name: 'Acme Buyers' }, place_of_supply: '27', supply: 'services', tax_rate: 18, amount: 11800,
+    method: 'Bank transfer', bankAccountId: 'icici',
+  }, { today: '2026-06-30' });
+  assert.equal(a.bank_account_id, 'icici');
+  refundAdvance(a.id, { amount: 1180, date: '2026-05-20', method: 'NEFT', bankAccountId: 'icici' }, { today: '2026-06-30' });
+  const cash = saveAdvance({
+    date: '2026-05-11', client: { name: 'Walk-in' }, place_of_supply: '27', supply: 'services', tax_rate: 18, amount: 500,
+    method: 'Cash', bankAccountId: 'icici',
+  }, { today: '2026-06-30' });
+  assert.equal(cash.bank_account_id, undefined, 'never for cash');
+  const data = loadBooksData();
+  const v = buildVouchers(data);
+  const icici = bankAccountsDb.save({ id: 'icici', name: 'ICICI', opening: 0, opening_as_of: '2026-04-01' });
+  assert.equal(bankAccountBalanceAt(v, data.openings, icici, '2026-05-31').balance, 10620, 'received 11,800 − refunded 1,180');
+});

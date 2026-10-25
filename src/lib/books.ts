@@ -502,6 +502,7 @@ export function buildVouchers(data: BooksData): Voucher[] {
       credit: received ? m.gross : 0,
       method: str(m.method) || 'Bank transfer',
       account: accountForMethod(m.method),
+      bank_account_id: accountForMethod(m.method) === 'bank' && m.bank_account_id ? m.bank_account_id : undefined,
       link: '/receivables?tab=advances',
     });
   }

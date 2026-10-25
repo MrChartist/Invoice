@@ -33,6 +33,8 @@ export interface AdvanceRefund {
   reference?: string;
   note?: string;
   created_at: string;
+  /** Additive (multi-account BRS): bank account it was paid from; missing = the main account. */
+  bank_account_id?: string;
 }
 
 /** Issuer details printed on the voucher, frozen when it is saved (Critical Rule 3). */
@@ -61,6 +63,8 @@ export interface AdvanceRecord {
   amount: number;
   method: string;
   reference?: string;
+  /** Additive (multi-account BRS): bank account it was received into; missing = the main account. */
+  bank_account_id?: string;
   /** What the advance is for (printed as the description of supply). */
   description?: string;
   note?: string;

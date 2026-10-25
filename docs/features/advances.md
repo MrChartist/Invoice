@@ -133,3 +133,6 @@ post that TDS journal in Tally.
   party. Advances are not matched to bank-statement lines yet.
 - Cess, composition dealers, Notification 40/2017-CT, Rule 50's default-rate provisos and 3.2 are not modelled.
 - Advance tax is shown per voucher; there is no separate "GST on advance" payment voucher — the 3B liability includes it.
+
+
+- With several bank accounts (multi-account BRS) an advance and each refund carry `bank_account_id` ("Received into" / "Paid from" picker, never for cash), so per-account bank balances include them.
