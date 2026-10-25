@@ -75,8 +75,8 @@ reports. Everything GST-related is a **working paper — verify with your CA**.
   `src/lib/backup.ts`, `src/pages/Expenses.tsx` (lazy tab + GRN → bill seed), `src/i18n/areas/purchases.ts` (`tabReturns`).
 
 ## Open
-- Job work in / out + ITC-04 (P1-9), Rejections In (customer side). Sales-order outstanding is done (WP-8,
-  Inventory → Order outstanding).
+- ~~Job work in / out + ITC-04 (P1-9), Rejections In (customer side)~~ — done in Phase 7M (`docs/features/job-work.md`).
+  Sales-order outstanding is done (WP-8, Inventory → Order outstanding).
 - Editing a note (delete and record again); serial selection on returns of serial-tracked lines (lib supports `serials`, UI does not).
 - TDS on a bill with TDS deducted at booking is not adjusted by a return; GSTR-9 / 9C and the compliance late-fee
   estimate do not read notes yet; cash-basis Books P&L ignores notes.

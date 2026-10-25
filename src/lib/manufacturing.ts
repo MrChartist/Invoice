@@ -32,6 +32,7 @@ import { requireAccess } from './access';
 import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
+import { lineFactor } from './units';
 
 export const BOMS_TABLE = VOUCHER_TABLES.boms;
 export const MFG_TABLE = VOUCHER_TABLES.manufacturing;
@@ -256,7 +257,7 @@ export function consumptionShortfalls(
     const batch = t.item.track_batches ? (l.batch_no ?? '').trim().toUpperCase() : '';
     const k = `${l.item_id}|${godown}|${batch}`;
     const w = want.get(k) ?? { item: t.item, godown, batch, qty: 0 };
-    w.qty += num(l.qty);
+    w.qty += num(l.qty) * lineFactor(l); // 7M: alternate unit
     want.set(k, w);
   }
   const out: string[] = [];
@@ -506,7 +507,7 @@ export const stockJournalsDb = {
     };
     if (inputs) {
       const vc = previewVoucherCost(inputs, sjInput({ ...draft, id: input.id ?? '__draft__', number: input.number ?? '' } as StockJournal));
-      draft.cost_snapshot = costSnapshot(vc, undefined, draft.produce.reduce((s, l) => s + num(l.qty), 0));
+      draft.cost_snapshot = costSnapshot(vc, undefined, draft.produce.reduce((s, l) => s + num(l.qty) * lineFactor(l), 0));
     }
     return saveVoucher<StockJournal>(SJ_TABLE, SJ_PREFIX, 'stock_journal', 'Stock journal', draft,
       (r) => `${plural(r.consume.length, 'source line')} → ${plural(r.produce.length, 'destination line')}`);

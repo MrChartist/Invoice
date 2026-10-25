@@ -27,6 +27,8 @@ import { liveRemovalIssues, assertRemovable } from './stock-timeline';
 import { ADVANCES_TABLE, advanceBalance } from './advance-tax';
 import { doubleBilledRows, liveInvoiceIds, mileageDb, timeDb } from './timesheets';
 import { purchasesDb } from './purchases';
+import { REJECTIONS_IN_TABLE, rejectedByLine } from './rejections-in';
+import type { RejectionIn } from '../types/job-work';
 import type { AdvanceRecord } from '../types/advances';
 import {
   DOCUMENT_LABELS,
@@ -196,6 +198,31 @@ export interface ConvertContext {
   pending?: Record<string, number>;
   /** Sales order source only: carry shipping / other charges (false once an earlier document of this kind took them). */
   carryCharges?: boolean;
+  /** Delivery challan source only (7M): quantity rejected per challan line id (Rejections In); billed is the balance. */
+  rejected?: Record<string, number>;
+}
+
+/** A challan's lines less what the customer rejected (Rejections In); fully rejected lines are left off. */
+function challanPart(source: InvoiceRecord, rejected: Record<string, number>): Partial<InvoiceRecord> {
+  const items: InvoiceItem[] = [];
+  let partial = false;
+  for (const line of source.items ?? []) {
+    const rej = num(rejected[line.id]);
+    if (!(rej > 0)) {
+      items.push({ ...line, id: generateId() });
+      continue;
+    }
+    partial = true;
+    const q = round2(num(line.quantity) - rej);
+    if (q > 0) items.push({ ...line, id: generateId(), quantity: q, amount: round2(q * num(line.rate)) });
+  }
+  if (items.length === 0) throw new DocumentError('Everything on this challan was rejected: there is nothing to invoice.');
+  return {
+    items,
+    ...(partial && source.discount_type === 'AMOUNT' && num(source.discount_rate) > 0
+      ? { discount_type: 'PERCENT' as const, discount_rate: equivalentDiscountPct(source) }
+      : {}),
+  };
 }
 
 /** The invoice-level discount re-expressed as a percent of the net line value, so a part-document gets its share. */
@@ -282,6 +309,7 @@ export function buildConvertedDraft(
     loyalty_redeem: undefined,
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
+    ...(source.doc_type === 'DELIVERY_CHALLAN' && ctx.rejected && target !== 'DELIVERY_CHALLAN' ? challanPart(source, ctx.rejected) : {}),
   };
   return recompute(draft);
 }
@@ -315,7 +343,9 @@ export function convertDocument(source: InvoiceRecord, target: DocumentType): In
       carryCharges: !all.some((d) => f.documentIds.includes(d.id) && sameKind(d.doc_type)),
     };
   }
+  const rejected = source.doc_type === 'DELIVERY_CHALLAN' ? rejectedByLine(getTable<RejectionIn>(REJECTIONS_IN_TABLE), source.id) : {};
   const draft = buildConvertedDraft(source, target, {
+    ...(Object.keys(rejected).length ? { rejected } : {}),
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, target, source.sender?.invoicePrefix || undefined),
     today,

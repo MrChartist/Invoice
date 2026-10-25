@@ -103,7 +103,8 @@ A WIP / stock-in-hand posting arrives with the closing-stock work in `docs/GAP_A
 
 ## Gaps / next steps
 
-- Job work out / in (Tally job work vouchers, material sent / received, ITC-04) — not built.
+- ~~Job work out / in (Tally job work vouchers, material sent / received, ITC-04)~~ — Phase 7M, `docs/features/job-work.md`
+  (tabs "Job work" and "Rejections in" on this page). Stock journal lines take alternate units (7M).
 - Serial-tracked items cannot be consumed or produced by vouchers (use stock adjustments).
 - ~~Ageing bucket labels come from the lib in English~~ — WP-8: labels are translated on screen and the slabs are
   configurable (`parseAgeSlabs`, `ageBucketBounds`).

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
@@ -8,6 +8,8 @@ import { MAIN_GODOWN_ID, type Godown } from '../../types/stock';
 import { SerialPicker } from './SerialPicker';
 import { useT } from '../../i18n';
 import { invT } from '../../i18n/areas/inventory';
+import { unitT } from '../../i18n/areas/units';
+import { cleanAltUnits, factorFor, roundTypedQty, unitChoices, unitsDb } from '../../lib/units';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
@@ -46,6 +48,8 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
   const [expiry, setExpiry] = useState('');
   const [serialText, setSerialText] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
+  const [unit, setUnit] = useState(position.item.unit);
+  const units = useMemo(() => unitsDb.stored(), []);
   const uid = useId();
 
   const { item } = position;
@@ -55,7 +59,10 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
   const addSerials = bySerial && direction === 'add' ? parseSerials(serialText) : [];
   // Removing serial-tracked stock: the quantity is the serials ticked.
   const q = bySerial && direction === 'remove' ? picked.length : num(qty);
-  const after = position.qty + (direction === 'add' ? q : -q);
+  // 7M: an item with alternate units may be adjusted in one (2 BOX = 24 NOS); serials always count base units.
+  const alt = !bySerial && !!cleanAltUnits(item.alt_units, item.unit || 'NOS');
+  const factor = alt ? factorFor(item, unit) ?? 1 : 1;
+  const after = position.qty + (direction === 'add' ? q : -q) * factor;
   const qtyError = q <= 0 ? (bySerial && direction === 'remove' ? invT('errTickSerials') : invT('errQty')) : '';
   const dateError = !date ? invT('errDate') : '';
   const where = multi ? godown : undefined;
@@ -75,6 +82,7 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
     const move = makeAdjustment({
       item_id: item.id, date, direction, qty: q, rate: direction === 'add' ? num(rate) : 0,
       reason: note.trim() ? `${reason}: ${note.trim()}` : reason,
+      ...(factor !== 1 ? { unit, unit_factor: factor } : {}),
     });
     onSave({
       ...move,
@@ -108,10 +116,11 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
 
         <div className={controls.row}>
           <div className={controls.field}>
-            <label className={controls.label} htmlFor={`${uid}-q`}>{invT('qtyUnit', { unit: item.unit })}</label>
+            <label className={controls.label} htmlFor={`${uid}-q`}>{invT('qtyUnit', { unit: alt ? unit : item.unit })}</label>
             <input
               id={`${uid}-q`} className={`${controls.input} ${controls.inputNumeric} ${touched && qtyError ? controls.inputInvalid : ''}`}
               inputMode="decimal" value={bySerial && direction === 'remove' ? String(q) : qty} onChange={(e) => setQty(e.target.value)} autoFocus
+              onBlur={() => qty && !bySerial && setQty(String(roundTypedQty(qty, unit, units)))}
               aria-invalid={touched && !!qtyError} readOnly={bySerial && direction === 'remove'}
             />
             {touched && qtyError && <span className={controls.error} role="alert">{qtyError}</span>}
@@ -121,6 +130,15 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
             <input id={`${uid}-d`} type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
+
+        {alt && (
+          <div className={controls.field}>
+            <label className={controls.label} htmlFor={`${uid}-u`}>{unitT('lineUnit', { n: 1 })}</label>
+            <select id={`${uid}-u`} className={controls.select} value={unit} onChange={(e) => { setUnit(e.target.value); if (qty) setQty(String(roundTypedQty(qty, e.target.value, units))); }}>
+              {unitChoices(item).map((c) => <option key={c.unit} value={c.unit}>{c.unit}{c.factor !== 1 ? ` (${unitT('equals', { qty: c.factor, unit: item.unit })})` : ''}</option>)}
+            </select>
+          </div>
+        )}
 
         {multi && (
           <div className={controls.field}>

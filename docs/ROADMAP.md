@@ -201,7 +201,7 @@ Share, static catalogue HTML.
 
 ## Phase 7: Tally parity (v5.x)
 
-Numbering: one sequence 7.1–7.61 in the sub-sections below (renumbered after the WP merge; the work-package
+Numbering: one sequence 7.1–7.61 in the sub-sections below (7L continues at 7.62, 7M at 7.70) (renumbered after the WP merge; the work-package
 documents in `docs/features/` keep their own WP ids). Gap ids refer to `docs/GAP_ANALYSIS.md`.
 
 ### 7A · Accounting depth (TDS, voucher variants, bill-wise, masters, payroll)
@@ -253,7 +253,7 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.25 | ✅ **Supplier credit note received** (supplier's number / date, value only or with goods, with or without a bill); GSTR-3B ITC net of notes (`itcAdjustmentsFromNotes`), GSTR-2B CDNR matching (`bookBills` notes), Tally Debit Note voucher (`tally-debit-notes.ts`) | Debit Note with supplier ref | done |
 | 7.26 | ✅ **Receipt note (GRN)** → bill (PO → GRN → bill), **Rejections Out**, "Goods received not billed" (`src/lib/receipt-notes.ts`, stock source `events-returns.ts`) | Receipt Note (Alt+F9), Rejections Out | done |
 | 7.27 | ✅ **Purchase order outstanding** report (GRN-accepted + directly billed vs ordered, overdue days) | Purchase Order Outstandings | done |
-| 7.28 | Job work in / out (Rule 55 challans, 1 / 3-year return clocks, job-worker godowns) + **ITC-04** working paper; Rejections In (customer rejects a challan); sales-order outstanding (WP-8); GSTR-9 Table 6 / 9C use of supplier notes; TDS adjustment on a return of a TDS bill | Job Work Out / In Orders, Material Out / In, ITC-04 | open |
+| 7.28 | ✅ Job work in / out + **ITC-04** and Rejections In: see 7M (7.70–7.73); sales-order outstanding (WP-8, 7.63). Still open: GSTR-9 Table 6 / 9C use of supplier notes; TDS adjustment on a return of a TDS bill | Job Work Out / In Orders, Material Out / In, ITC-04 | partly open |
 
 ### 7E · Printing & documents output (WP-4)
 
@@ -273,7 +273,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.33 | **Physical Stock** `PHY/FY…`: counted vs book, shortage / excess with value, positions after the date follow the count, drift warning | Ctrl+F7 Physical Stock | ✅ |
 | 7.34 | **Reorder levels + MOQ** (per godown optional), Reorder Status with pending POs and "Create purchase order", bell alert | Reorder Status | ✅ |
 | 7.35 | **Inventory reports**: Stock Summary drill-down (item → month → vouchers), Movement Analysis by party, Stock Ageing (FIFO layers, by batch), Negative stock exceptions (`src/lib/stock-reports.ts`) | Stock Summary, Movement Analysis, Ageing | ✅ |
-| 7.36 | Job work out / in orders, material sent / received, ITC-04 | Job Work vouchers | see 7.28 |
+| 7.36 | Job work out / in orders, material sent / received, ITC-04 | Job Work vouchers | ✅ see 7M |
 | 7.37 | Serial-tracked items in manufacturing; production plan / material requirement vs BOM | — | Next step |
 
 ### 7G · Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
@@ -333,7 +333,16 @@ Details: `docs/features/manufacturing.md`.
 | 7.63 | ✅ **Sales Order Outstanding** (pending delivery / invoice by party · item · due date, overdue days) on Inventory → Order outstanding; reorder "pending PO" counts goods received on GRNs before the bill | P1-12 | done |
 | 7.64 | ✅ Configurable **ageing slabs** with Hindi bucket labels (Stock reports → Ageing) | P1-11 | done |
 | 7.65 | ✅ **Godown hierarchy** (godown inside a godown, stock rolled up), **standard cost / selling price lists** with effective dates, **Stock Query** (stock by godown / batch, last purchase / sale rates, pending orders, prices), **landed cost** on a bill (freight etc. spread to the goods' stock cost, memo only); stock-item delete blocked while BOMs / stock vouchers use it | P2 | done |
-| 7.66 | ⏳ (UQC mapping into GSTR-1 HSN / e-Invoice / e-Way and alternate-unit item profit: done after the merge) alternate units on POS lines and stock journals; price lists feeding the editor's rate; group-wise reorder / ageing filters | P1-10, P2 | open |
+| 7.66 | ⏳ (UQC mapping into GSTR-1 HSN / e-Invoice / e-Way and alternate-unit item profit: done after the merge; alternate units on POS lines and stock journals: done in 7.72) price lists feeding the editor's rate; group-wise reorder / ageing filters | P1-10, P2 | open |
+
+### 7M · Job work, ITC-04, Rejections In, alternate units on stock vouchers (`docs/features/job-work.md`)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.70 | ✅ **Job work out**: Job Work Out order (`JWO/FY…`), **Material Out** delivery challan under Rule 55 / Sec 143 (`JWC/FY…`, printable in triplicate), **job-worker godowns** (created on first challan, `job_worker` flag — still our stock in the summary), **Material In** (`JWR/FY…`: processed goods at inputs + job charges − scrap, scrap, returned inputs, losses, 5C supplies; consumption typed or exploded from the BOM), **Sec 143 return clocks** (inputs 1 year, capital goods 3 years, tools none, extension) with due-soon / **deemed supply** alerts; stock event source `events-job-work.ts` (one registration line in `collectEvents`) | P1-9 | done |
+| 7.71 | ✅ **Job work in** (we are the job worker): principal's material received / sent back register (`JWP/FY…`, not our stock), job charges invoice (SAC 9988 service line opened in the editor); **ITC-04 working paper** (Table 4, 5A / 5B / 5C; half-yearly above ₹5 crore / annual from FY 2021-22, quarterly before — `ITC04_RULES` date-keyed in `tax-rules.ts`; CSV; verify with your CA) | P1-9 | done |
+| 7.72 | ✅ **Rejections In** (`RJI/FY…`): customer rejects goods on a delivery challan before invoicing — stock back while challans move stock, challan balance reduced and billed balance on conversion; **alternate units** (`unit_factor`) on POS lines, stock journals, stock transfers and manual adjustments; typed quantities rounded to the units master's decimal places | P1-8, P1-10 | done |
+| 7.73 | ⏳ Job work follow-ups: serial-tracked items to job workers, e-Way bill JSON for job-work challans, clock alerts in the bell, principal's goods by godown / batch, GSTR-1 / ITC-04 JSON | P1-9 | open |
 
 
 ## Summary timeline

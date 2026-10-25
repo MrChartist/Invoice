@@ -35,6 +35,8 @@ import { docLabel as docName } from '../i18n/labels';
 import { posT } from '../i18n/areas/pos';
 import { returnsT } from '../i18n/areas/extras';
 import { areaNodes } from '../i18n/areas/nodes';
+import { unitT } from '../i18n/areas/units';
+import { cleanAltUnits, lineUnitPatch, roundTypedQty, unitChoices, unitsDb } from '../lib/units';
 
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
 // WP-9: return / exchange screen and the exchange-credit banner (own files, loaded on demand).
@@ -71,6 +73,7 @@ function loadCounter() {
     clients: localDb.clients.getAll(),
     pricing: pricingInUse(pricing) ? pricing : null,
     positions: stock.some((s) => s.track_stock) ? loadPositions() : [],
+    units: unitsDb.stored(),
     ctx: editorStockContext({ doc_type: 'INVOICE', issue_date: todayInput() }),
   };
 }
@@ -166,8 +169,25 @@ export function Pos() {
     [finish, settings.defaultTaxRate],
   );
 
+  // 7M: a typed quantity rounds to its unit's decimal places (units master: 2.5 NOS → 3, 1.2345 KG → 1.235).
   const setQty = (id: string, qty: number) =>
-    setItems((cur) => finish(cur.map((l) => (l.id === id ? { ...l, quantity: Math.max(round2(qty), 0), amount: round2(Math.max(qty, 0) * num(l.rate)) } : l)), id));
+    setItems((cur) => finish(cur.map((l) => {
+      if (l.id !== id) return l;
+      const q = Math.max(roundTypedQty(qty, l.unit, data.units), 0);
+      return { ...l, quantity: q, amount: round2(q * num(l.rate)) };
+    }), id));
+  /** 7M: sell a line in an alternate unit (1 BOX = 12 NOS): unit + factor snapshot, rate rescaled; a typed price. */
+  const setUnit = (id: string, item: StockItem, unit: string) =>
+    setItems((cur) => cur.map((l) => {
+      if (l.id !== id) return l;
+      const p = lineUnitPatch(item, l, unit);
+      const q = roundTypedQty(l.quantity, p.unit, data.units);
+      const out: InvoiceItem = { ...l, unit: p.unit, rate: p.rate, quantity: q, amount: round2(q * p.rate) };
+      if (p.unit_factor) out.unit_factor = p.unit_factor;
+      else delete out.unit_factor;
+      delete out.price_basis;
+      return out;
+    }));
   const setRate = (id: string, rate: number) =>
     setItems((cur) => cur.map((l) => {
       if (l.id !== id) return l;
@@ -389,6 +409,11 @@ export function Pos() {
                         <span className={styles.muted}>
                           {[l.hsn && `HSN ${l.hsn}`, typeof l.tax_rate === 'number' && record.gst_mode !== 'NONE' && `GST ${l.tax_rate}%`, lvl && posT('lineStock', { n: lvl.qty, unit: lvl.unit })].filter(Boolean).join(' · ')}
                         </span>
+                        {stockItem && !stockItem.track_serials && !free && cleanAltUnits(stockItem.alt_units, stockItem.unit || 'NOS') && (
+                          <select className={cn(controls.select, styles.unitSel)} value={l.unit || stockItem.unit} onChange={(e) => setUnit(l.id, stockItem, e.target.value)} aria-label={unitT('lineUnit', { n: n + 1 })}>
+                            {unitChoices(stockItem).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
+                          </select>
+                        )}
                         {(l.price_basis || free) && <span className={styles.chip}><Tags size={12} aria-hidden="true" /> {free ? posT('free') : posT('basisPrice', { basis: l.price_basis ?? '' })}</span>}
                       </div>
                       <div role="cell" className={styles.qty}>

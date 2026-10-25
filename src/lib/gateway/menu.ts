@@ -300,6 +300,13 @@ export const GATEWAY_EXTENSIONS: Array<{ screen: ScreenId; section: number; entr
   { screen: 'vouchers', section: 0, entry: { id: 'v-pdn', label: 'purchaseReturn', accel: 'e', target: go('/expenses?tab=returns&new=dn'), need: 'books.edit', keywords: 'debit note purchase return supplier rejection' } },
   { screen: 'vouchers', section: 0, entry: { id: 'v-grn', label: 'receiptNote', accel: 'g', target: go('/expenses?tab=returns&new=grn'), need: 'books.edit', keywords: 'grn receipt note goods received inward' } },
   { screen: 'vouchers', section: 0, entry: { id: 'v-mfg', label: 'mfgJournal', accel: 'm', target: go('/manufacturing?tab=mfg'), need: 'books.edit', keywords: 'manufacturing journal production bom assemble' } },
+  // Phase 7M: job work (P1-9) and Rejections In (P1-8).
+  { screen: 'vouchers', section: 0, entry: { id: 'v-jwo', label: 'jobWorkOrder', accel: 'w', target: go('/manufacturing?tab=jobwork&jw=orders'), need: 'books.edit', keywords: 'job work order job worker processing' } },
+  { screen: 'vouchers', section: 0, entry: { id: 'v-mout', label: 'materialOut', accel: 'o', target: go('/manufacturing?tab=jobwork&jw=out'), need: 'books.edit', keywords: 'material out job work challan rule 55 send job worker' } },
+  { screen: 'vouchers', section: 0, entry: { id: 'v-min', label: 'materialIn', accel: 'i', target: go('/manufacturing?tab=jobwork&jw=in'), need: 'books.edit', keywords: 'material in job work received processed scrap' } },
+  { screen: 'vouchers', section: 0, entry: { id: 'v-rji', label: 'rejectionsIn', accel: 'x', target: go('/manufacturing?tab=rejections'), need: 'books.edit', keywords: 'rejection in customer rejected delivery challan return' } },
+  { screen: 'invbooks', section: 0, entry: { id: 'ib-jobwork', label: 'jobWorkRegister', accel: 'j', target: go('/manufacturing?tab=jobwork&jw=clocks'), keywords: 'job work register stock with job worker return clock 143' } },
+  { screen: 'statutory', section: 0, entry: { id: 'sr-itc04', label: 'itc04', accel: '4', target: go('/manufacturing?tab=jobwork&jw=itc04'), keywords: 'itc-04 itc04 job work return' } },
   // TDS payables (deducted by us), GST set-off (WP-6), ratio analysis (WP-2).
   { screen: 'statutory', section: 0, entry: { id: 'sr-tdsp', label: 'tdsPayables', accel: 'd', target: go('/tds'), keywords: 'tds tcs payable 26q 27eq challan 16a deducted' } },
   { screen: 'statutory', section: 0, entry: { id: 'sr-setoff', label: 'gstSetoff', accel: 'o', target: go('/gst-reports?tab=setoff'), keywords: 'gst set off pmt-06 challan cash ledger credit ledger utilisation' } },

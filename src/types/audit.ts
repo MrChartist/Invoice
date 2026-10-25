@@ -43,6 +43,9 @@ export type AuditEntity =
   | 'manufacturing'
   | 'stock_journal'
   | 'physical_stock'
+  /** Phase 7M: job work orders, Material Out / In, principal's material; Rejections In (sales side). */
+  | 'job_work'
+  | 'rejection_in'
   /** GST set-off journals, PMT-06 challans and the HSN master (WP-6). */
   | 'gst'
   /** WP-7 (P0-10): rows the table-write edit log records for tables without a module-level entity. */
@@ -227,6 +230,8 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   manufacturing: 'Manufacturing journals',
   stock_journal: 'Stock journals',
   physical_stock: 'Physical stock',
+  job_work: 'Job work',
+  rejection_in: 'Rejections in',
   gst: 'GST set-off / challan',
   vendor: 'Suppliers',
   purchase_payment: 'Supplier payments',

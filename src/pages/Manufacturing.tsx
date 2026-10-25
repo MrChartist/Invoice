@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Boxes } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -21,9 +21,13 @@ import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from '../components/manufacturing/manufacturing.module.css';
 
-type Tab = 'boms' | 'mfg' | 'journal' | 'physical' | 'reorder' | 'reports';
-const TABS: Tab[] = ['boms', 'mfg', 'journal', 'physical', 'reorder', 'reports'];
-const LABEL = { boms: 'tabBoms', mfg: 'tabMfg', journal: 'tabSj', physical: 'tabPhysical', reorder: 'tabReorder', reports: 'tabReports' } as const;
+// Phase 7M: job work / ITC-04 and Rejections In load on demand (own chunk).
+const JobWorkTab = lazy(() => import('../components/job-work/JobWorkTab').then((m) => ({ default: m.JobWorkTab })));
+const RejectionsInTab = lazy(() => import('../components/job-work/RejectionsInTab').then((m) => ({ default: m.RejectionsInTab })));
+
+type Tab = 'boms' | 'mfg' | 'journal' | 'physical' | 'jobwork' | 'rejections' | 'reorder' | 'reports';
+const TABS: Tab[] = ['boms', 'mfg', 'journal', 'physical', 'jobwork', 'rejections', 'reorder', 'reports'];
+const LABEL = { boms: 'tabBoms', mfg: 'tabMfg', journal: 'tabSj', physical: 'tabPhysical', jobwork: 'tabJobWork', rejections: 'tabRejections', reorder: 'tabReorder', reports: 'tabReports' } as const;
 
 /** /manufacturing — Tally-style manufacturing and stock vouchers (Phase 7). */
 export function Manufacturing() {
@@ -50,7 +54,7 @@ export function Manufacturing() {
       canMasters: can('master.edit'),
     };
   }, [version, notify]);
-  const setTab = useCallback((t: Tab) => setParams((p) => { p.set('tab', t); return p; }, { replace: true }), [setParams]);
+  const setTab = useCallback((t: Tab) => setParams((p) => { p.set('tab', t); p.delete('jw'); return p; }, { replace: true }), [setParams]);
   const tracked = ctx.items.filter((i) => i.track_stock);
 
   return (
@@ -79,6 +83,11 @@ export function Manufacturing() {
               {tab === 'physical' && <PhysicalStockTab ctx={ctx} />}
               {tab === 'reorder' && <ReorderTab ctx={ctx} />}
               {tab === 'reports' && <StockReportsTab ctx={ctx} />}
+              {(tab === 'jobwork' || tab === 'rejections') && (
+                <Suspense fallback={<p className={styles.muted}>{mfgT('loading')}</p>}>
+                  {tab === 'jobwork' ? <JobWorkTab ctx={ctx} /> : <RejectionsInTab ctx={ctx} />}
+                </Suspense>
+              )}
             </>
           )}
         </div>

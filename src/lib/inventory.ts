@@ -23,6 +23,7 @@ import { requireAccess } from './access';
 import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { grnCoverage, loadReturnStockDocs, returnStockEvents, type ReturnStockDocs } from './events-returns';
+import { jobWorkStockEvents, loadJobWorkStockDocs, type JobWorkStockDocs } from './events-job-work';
 import { lineFactor } from './units';
 import { itemVoucherReferences } from './item-references';
 import type {
@@ -105,6 +106,12 @@ export interface StockMove {
   expiry_date?: string;
   /** Additive (6.11): serials added / removed; count equals |qty|. */
   serials?: string[];
+  /**
+   * Additive (7M): unit the quantity was typed in and its factor snapshot (`qty` and `rate` are per that unit;
+   * the engine converts with `lineFactor`). Absent = the item's base unit.
+   */
+  unit?: string;
+  unit_factor?: number;
 }
 
 /** Minimal, defensive view of a purchase bill (the purchases module owns the real type). */
@@ -223,6 +230,8 @@ export interface StockInputs {
   returnDocs?: ReturnStockDocs;
   /** Manufacturing / stock journal / physical stock vouchers (Phase 7), see `stockVoucherInputs`. */
   vouchers?: StockVoucherInput[];
+  /** 7M event source (events-job-work.ts): Material Out / In with job workers, Rejections In. */
+  jobWorkDocs?: JobWorkStockDocs;
 }
 
 /**
@@ -432,7 +441,8 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
   for (const m of moves) {
     const it = byId.get(m.item_id);
     if (!it || !it.track_stock || !num(m.qty)) continue;
-    const q = num(m.qty);
+    const mf = lineFactor(m); // 7M: an adjustment typed in an alternate unit
+    const q = num(m.qty) * mf;
     const note = m.note ? ` — ${m.note}` : '';
     const label =
       m.kind === 'opening' ? 'Opening balance'
@@ -444,8 +454,8 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
       date: m.kind === 'opening' ? dayOf(m.date) || OPENING_DATE : dayOf(m.date),
       kind: m.kind,
       qty: q,
-      rate: num(m.rate) > 0 ? num(m.rate) : undefined,
-      saleRate: q < 0 ? num(m.rate) : undefined,
+      rate: num(m.rate) > 0 ? num(m.rate) / mf : undefined,
+      saleRate: q < 0 ? num(m.rate) / mf : undefined,
       particulars: label,
       refType: m.ref_type ?? 'move',
       refId: m.ref_id ?? m.id,
@@ -545,13 +555,14 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     return it?.track_stock ? it : undefined;
   });
   pushVoucherEvents(input.vouchers ?? [], byId, push);
+  jobWorkStockEvents(input.jobWorkDocs, { byId: (id) => (byId.get(id)?.track_stock ? byId.get(id) : undefined), index, invoices, links: input.links, includeChallans, includeTransfers: !!input.includeTransfers }, push); // 7M event source
 
   if (input.includeTransfers) {
     for (const t of input.transfers ?? []) {
       const date = dayOf(t.date);
       for (const l of t.lines ?? []) {
         const it = byId.get(l.item_id);
-        const q = num(l.qty);
+        const q = num(l.qty) * lineFactor(l); // 7M: a transfer line typed in an alternate unit
         if (!it || !it.track_stock || q <= 0 || !t.from_godown || !t.to_godown || t.from_godown === t.to_godown) continue;
         const base = {
           date, kind: 'transfer' as const, refType: 'transfer', refId: t.id, refNumber: t.transfer_number,
@@ -868,7 +879,8 @@ export function computeStockDetailed(input: StockInputs): StockComputation {
   const method = input.method ?? 'WEIGHTED_AVG';
   const events = collectEvents(input);
   const vouchers = new Map<string, VoucherCosting>();
-  if (!input.vouchers?.length) {
+  // Vouchers (manufacturing, stock journal, job work Material In) need one global order for their pooled cost.
+  if (!input.vouchers?.length && ![...events.values()].some((list) => list.some((e) => e.voucher))) {
     const positions = input.items.map((item) =>
       item.track_stock ? runItem(item, events.get(item.id) ?? [], method) : emptyPosition(item),
     );
@@ -1061,9 +1073,14 @@ export function makeAdjustment(opts: {
   rate?: number;
   reason: string;
   id?: string;
+  /** 7M: the unit `qty` / `rate` were typed in and its factor (absent or 1 = the item's base unit). */
+  unit?: string;
+  unit_factor?: number;
 }): StockMove {
   const q = Math.abs(num(opts.qty));
+  const f = num(opts.unit_factor);
   return {
+    ...(opts.unit && f > 0 && f !== 1 ? { unit: opts.unit, unit_factor: f } : {}),
     id: opts.id ?? generateId(),
     item_id: opts.item_id,
     date: opts.date,
@@ -1162,6 +1179,13 @@ const extraOf = (costs: readonly { mode: string; value: number }[] | undefined) 
   extraPct: (costs ?? []).reduce((s, c) => s + (c.mode === 'pct' ? Math.max(num(c.value), 0) : 0), 0),
 });
 
+/** A voucher line in base units: `qty` × `unit_factor`, a fixed `rate` per base unit (7M alternate units). */
+function baseLine<T extends { qty: number; rate?: number; unit_factor?: number }>(l: T): T {
+  const f = lineFactor(l);
+  if (f === 1) return l;
+  return { ...l, qty: num(l.qty) * f, ...(l.rate !== undefined ? { rate: num(l.rate) / f } : {}) };
+}
+
 /** Engine inputs for the stored vouchers (pure). The main finished line of a Manufacturing Journal comes first. */
 export function stockVoucherInputs(
   mfg: readonly ManufacturingVoucher[], journals: readonly StockJournal[] = [], physical: readonly PhysicalStockVoucher[] = [],
@@ -1171,17 +1195,17 @@ export function stockVoucherInputs(
     if (!m?.id || !m.item_id) continue;
     out.push({
       id: m.id, number: m.number ?? '', date: m.date, type: 'manufacturing',
-      consume: m.components ?? [],
+      consume: (m.components ?? []).map(baseLine),
       produce: [
         { id: `${m.id}:main`, item_id: m.item_id, qty: num(m.qty), godown_id: m.godown_id, batch_no: m.batch_no, mfg_date: m.mfg_date, expiry_date: m.expiry_date },
-        ...(m.outputs ?? []),
+        ...(m.outputs ?? []).map(baseLine),
       ],
       ...extraOf(m.costs),
     });
   }
   for (const j of journals) {
     if (!j?.id) continue;
-    out.push({ id: j.id, number: j.number ?? '', date: j.date, type: 'stock_journal', consume: j.consume ?? [], produce: j.produce ?? [], ...extraOf(j.costs) });
+    out.push({ id: j.id, number: j.number ?? '', date: j.date, type: 'stock_journal', consume: (j.consume ?? []).map(baseLine), produce: (j.produce ?? []).map(baseLine), ...extraOf(j.costs) });
   }
   for (const p of physical) {
     if (!p?.id) continue;
@@ -1234,7 +1258,7 @@ function logMove(m: StockMove, action: 'create' | 'delete', item?: StockItem, ov
     const dir = m.qty >= 0 ? 'added' : 'removed';
     audit.record({
       entity: 'stock_adjustment', entity_id: m.id, action,
-      summary: `${action === 'create' ? 'Stock adjustment' : 'Deleted stock adjustment'}: ${Math.abs(m.qty)} ${item?.unit ?? ''} of ${item?.name ?? 'an item'} ${dir} on ${m.date}${m.note ? ` (${m.note})` : ''}${overridden ? ' (period lock overridden)' : ''}`,
+      summary: `${action === 'create' ? 'Stock adjustment' : 'Deleted stock adjustment'}: ${Math.abs(m.qty)} ${m.unit ?? item?.unit ?? ''} of ${item?.name ?? 'an item'} ${dir} on ${m.date}${m.note ? ` (${m.note})` : ''}${overridden ? ' (period lock overridden)' : ''}`,
     });
   } catch {
     /* logging never breaks a save */
@@ -1261,6 +1285,7 @@ export const stockDb = {
     const refs = itemVoucherReferences(id, {
       boms: getTable(VOUCHER_TABLES.boms), manufacturing: getTable(VOUCHER_TABLES.manufacturing),
       stockJournals: getTable(VOUCHER_TABLES.stockJournals), physical: getTable(VOUCHER_TABLES.physical),
+      jobWork: [...getTable<{ finished_item_id?: string }>('job_work_orders'), ...getTable<{ lines?: { item_id?: string }[] }>('job_work_out'), ...getTable<{ consumed?: { item_id?: string }[] }>('job_work_in')],
     });
     if (refs.length) throw new Error(`This item is used by ${refs.join(', ')}, so it cannot be deleted. Remove it from them first.`);
     setTable(TABLES.items, getTable<StockItem>(TABLES.items).filter((x) => x.id !== id));
@@ -1301,6 +1326,7 @@ export function liveInputs(): StockInputs {
     includeChallans: settings.includeChallans,
     links: getTable<{ from_id: string; to_id: string; relation: string; reason?: string }>('doc_links'),
     returnDocs: loadReturnStockDocs(),
+    jobWorkDocs: loadJobWorkStockDocs(),
     vouchers: stockVoucherInputs(
       getTable<ManufacturingVoucher>(VOUCHER_TABLES.manufacturing),
       getTable<StockJournal>(VOUCHER_TABLES.stockJournals),
@@ -1359,7 +1385,7 @@ let positionsCache: { key: (string | null)[]; positions: StockPosition[] } | nul
 function cachedPositionsWithout(docId: string | undefined): StockPosition[] {
   const key = [
     docId ?? '',
-    ...['invoices', 'purchases', TABLES.items, TABLES.moves, 'doc_links'].map((t) => readRaw(DB_PREFIX + t)),
+    ...['invoices', 'purchases', TABLES.items, TABLES.moves, 'doc_links', 'job_work_in', 'rejections_in'].map((t) => readRaw(DB_PREFIX + t)),
     readRaw(SETTINGS_KEY),
   ];
   if (positionsCache && positionsCache.key.length === key.length && positionsCache.key.every((k, i) => k === key[i])) {

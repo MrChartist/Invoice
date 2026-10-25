@@ -187,6 +187,14 @@ export function roundToUnit(qty: number, decimals: number): number {
   return Math.round((num(qty) + Number.EPSILON) * p) / p || 0;
 }
 
+/**
+ * A typed quantity rounded to the decimal places of the unit it was typed in (7M): 2.5 NOS → 3, 1.23456 KG →
+ * 1.235. Units the master does not know keep three places. Non-numbers read as 0.
+ */
+export function roundTypedQty(qty: unknown, unit: string | undefined, stored: readonly UnitMaster[]): number {
+  return roundToUnit(num(qty), decimalsFor(unit, stored));
+}
+
 /** UQC of a unit: the master's explicit code, else `fallback(symbol)` (the e-Invoice / GSTR mapping). */
 export function uqcFor(unit: string | undefined, stored: readonly UnitMaster[], fallback: (u?: string) => string): string {
   const u = stored.find((x) => !isCompound(x) && key(x.symbol) === key(unit));

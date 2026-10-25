@@ -821,6 +821,50 @@ try {
     await writeJson(page, 'stock_items', prevStock);
   });
 
+  await step('job work: Material Out to a job worker (still our stock), Material In processed; ITC-04 lists the challan', async () => {
+    const prevStock = await readJson(page, 'stock_items', null);
+    const prevGodowns = await readJson(page, 'godowns', null);
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [item('e2e-rod', 'E2E Rod', { unit: 'KG', opening_qty: 100, opening_rate: 50 }), item('e2e-shaft', 'E2E Shaft')]);
+    await page.goto(srv.origin + '/manufacturing?tab=jobwork&jw=out');
+    await page.getByRole('button', { name: 'New Material Out (challan)' }).click();
+    await page.getByLabel('Job worker', { exact: true }).fill('E2E Acme');
+    await page.getByLabel('Send line 1 item').selectOption({ label: 'E2E Rod (KG)' });
+    await page.getByLabel('Send line 1 quantity').fill('40');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByText(/Saved JWC\/FY\d\d-\d\d\/0001/).waitFor();
+    const outs = await readJson(page, 'job_work_out', [], (v) => v.length === 1);
+    const godowns = await readJson(page, 'godowns', [], (v) => v.some((g) => g.job_worker));
+    check(outs[0]?.job_worker_godown === godowns.find((g) => g.job_worker)?.id, "the challan sends the goods to the job worker's own godown");
+
+    await page.getByRole('tab', { name: 'Material in' }).click();
+    await page.getByRole('button', { name: 'New Material In' }).click();
+    await page.getByLabel('Goods received back line 1 item').selectOption({ label: 'E2E Shaft (NOS)' });
+    await page.getByLabel('Goods received back line 1 quantity').fill('10');
+    await page.getByLabel('Inputs consumed at the job worker line 1 item').selectOption({ label: 'E2E Rod (KG)' });
+    await page.getByLabel('Inputs consumed at the job worker line 1 quantity').fill('30');
+    await page.getByLabel('Job work charges (₹, ex-GST)').fill('500');
+    await page.getByText(/Processed goods cost/).waitFor();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByText(/Saved JWR\/FY\d\d-\d\d\/0001/).waitFor();
+    await readJson(page, 'job_work_in', [], (v) => v.length === 1);
+
+    await page.goto(srv.origin + '/manufacturing?tab=reports');
+    const row = (name) => page.getByRole('row').filter({ has: page.getByRole('button', { name, exact: true }) });
+    await row('E2E Rod').waitFor();
+    check(/\b70 KG\b/.test(await row('E2E Rod').innerText()), 'stock summary: rod 100 → 70 KG (10 KG still with the job worker counts as ours)');
+    check(/\b10 NOS\b/.test(await row('E2E Shaft').innerText()), 'stock summary: 10 processed shafts received');
+
+    await page.goto(srv.origin + '/manufacturing?tab=jobwork&jw=itc04');
+    await page.getByText('Table 4 — goods sent to job workers').waitFor();
+    check((await page.getByRole('row').filter({ hasText: /JWC\/FY\d\d-\d\d\/0001/ }).count()) >= 1, 'ITC-04 Table 4 lists the challan');
+    check(await page.getByText(/verify with your CA/i).first().isVisible(), 'ITC-04 carries the verify-with-your-CA wording');
+
+    for (const t of ['job_work_out', 'job_work_in']) await writeJson(page, t, null);
+    await writeJson(page, 'godowns', prevGodowns);
+    await writeJson(page, 'stock_items', prevStock);
+  });
+
   await step('POS: typed barcode, split cash + UPI, bill saved Paid, Z report shows the totals', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));

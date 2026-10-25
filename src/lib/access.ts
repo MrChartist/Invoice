@@ -286,6 +286,12 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   manufacturing_vouchers: 'books.edit',
   stock_journals: 'books.edit',
   physical_stock: 'books.edit',
+  // Phase 7M: job work (orders, Material Out / In, principal's material) and Rejections In
+  job_work_orders: 'books.edit',
+  job_work_out: 'books.edit',
+  job_work_in: 'books.edit',
+  job_work_principal: 'books.edit',
+  rejections_in: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
 };

@@ -89,12 +89,17 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `reminders` | reminders-share | defined by that module |
 | `doc_links` | documents | defined by that module |
 | `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7); additive `aliases` (earlier names, recorded on rename); `min_order_qty` / `reorder_by_godown` (Phase 7); `group_id` / `category_id` / `alt_units` / `standard_costs` / `selling_prices` (WP-8) |
-| `stock_moves` | inventory | `StockMove` (manual adjustments), additive `godown_id` / `batch_no` / `mfg_date` / `expiry_date` / `serials` |
-| `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed); additive `parent_id` (WP-8 hierarchy) |
-| `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger |
+| `stock_moves` | inventory | `StockMove` (manual adjustments), additive `godown_id` / `batch_no` / `mfg_date` / `expiry_date` / `serials`; `unit` / `unit_factor` (7M alternate units) |
+| `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed); additive `parent_id` (WP-8 hierarchy); `job_worker` / `vendor_id` (7M: a job worker's premises — still our stock) |
+| `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger; lines take `unit` / `unit_factor` (7M) |
 | `boms` | manufacturing (Phase 7, `src/lib/manufacturing.ts`) | `Bom` (`src/types/manufacturing.ts`): components per `batch_qty` finished units (scrap %, godown), by-/co-products / scrap, `is_default` per item |
 | `manufacturing_vouchers` | manufacturing (Phase 7) | `ManufacturingVoucher` `MFG/FY<yy-yy>/<seq>`: finished item + qty, consumed lines (batch / godown), outputs, additional costs, display-only `cost_snapshot`; read by the stock engine, never by Books / ledger |
 | `stock_journals` | manufacturing (Phase 7) | `StockJournal` `SJ/FY<yy-yy>/<seq>`: source → destination lines (conversion / repacking). Godown-only moves are refused here and saved as `stock_transfers` |
+| `job_work_orders` | job work (7M, `src/lib/job-work.ts`) | `JobWorkOrder` `JWO/FY<yy-yy>/<seq>` (`src/types/job-work.ts`): direction out / in, party, process, goods expected back, BOM (`docs/features/job-work.md`) |
+| `job_work_out` | job work (7M) | `MaterialOut` `JWC/FY…`: Rule 55 challan to a job worker; goods move to the job worker's godown (read by the stock engine through `events-job-work.ts`) |
+| `job_work_in` | job work (7M) | `MaterialIn` `JWR/FY…`: consumed / processed / scrap / returned / lost / 5C-supplied lines, job charges (stock cost only) |
+| `job_work_principal` | job work (7M) | `PrincipalMovement` `JWP/FY…`: principal's goods received / returned (Job Work In; never our stock) |
+| `rejections_in` | sales (7M, `src/lib/rejections-in.ts`) | `RejectionIn` `RJI/FY…`: goods a customer rejected from a delivery challan before invoicing; stock back, challan balance reduced |
 | `physical_stock` | manufacturing (Phase 7) | `PhysicalStockVoucher` `PHY/FY<yy-yy>/<seq>`: counted lines with `book_qty` and `diff` fixed at save; the diff is posted as an adjustment at the end of that day |
 | `einvoice_meta` | einvoice | defined by that module |
 | `design_prefs` | templates-studio | defined by that module |

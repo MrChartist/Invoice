@@ -9,6 +9,7 @@ import {
 } from '../../lib/manufacturing';
 import { godownName, transfersDb, validateTransferShape } from '../../lib/godowns';
 import { transferIssues } from '../../lib/stock-tracking';
+import { lineFactor, unitsDb } from '../../lib/units';
 import { MAIN_GODOWN_ID } from '../../types/stock';
 import type { AdditionalCost, StockJournal } from '../../types/manufacturing';
 import { mfgT } from '../../i18n/areas/manufacturing';
@@ -94,6 +95,7 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
   const [to, setTo] = useState(ctx.godowns.find((g) => g.id !== MAIN_GODOWN_ID)?.id ?? '');
   const [error, setError] = useState('');
   const anyBatch = tracked.some((i) => i.track_batches);
+  const units = useMemo(() => unitsDb.stored(), []);
 
   const draft = useMemo((): StockJournal => ({
     id: journal?.id ?? '__draft__', number: journal?.number ?? '', date, consume: clean(consume), produce: clean(produce),
@@ -102,7 +104,7 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
   const preview = useMemo(() => {
     if (mode !== 'conversion' || !draft.consume.length || !draft.produce.length) return null;
     try {
-      return costSnapshot(previewVoucherCost(ctx.inputs, sjInput(draft)), undefined, draft.produce.reduce((s, l) => s + l.qty, 0));
+      return costSnapshot(previewVoucherCost(ctx.inputs, sjInput(draft)), undefined, draft.produce.reduce((s, l) => s + l.qty * lineFactor(l), 0));
     } catch {
       return null;
     }
@@ -112,7 +114,7 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
   const submit = () => {
     try {
       if (mode === 'transfer') {
-        const lines = clean(consume).map((l) => ({ id: l.id, item_id: l.item_id, qty: l.qty, ...(l.batch_no ? { batch_no: l.batch_no } : {}) }));
+        const lines = clean(consume).map((l) => ({ id: l.id, item_id: l.item_id, qty: l.qty, ...(l.batch_no ? { batch_no: l.batch_no } : {}), ...(l.unit_factor ? { unit: l.unit, unit_factor: l.unit_factor } : {}) }));
         const tr = { id: '', date, from_godown: from, to_godown: to, lines };
         const err = validateTransferShape(tr) || transferIssues(tr, ctx.inputs)[0] || '';
         if (err) return setError(err);
@@ -175,15 +177,15 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
           multi ? (
             <>
               <p className={styles.muted}>{mfgT('transferHint')}</p>
-              <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('transfer'), batch: anyBatch }} />
+              <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('transfer'), batch: anyBatch, units }} />
             </>
           ) : <p className={styles.notice}>{mfgT('needGodowns')}</p>
         ) : (
           <>
             <p className={styles.section}>{mfgT('source')}</p>
-            <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('source'), godowns: ctx.godowns, batch: anyBatch }} />
+            <LinesGrid lines={consume} items={tracked} onChange={setConsume} opts={{ label: mfgT('source'), godowns: ctx.godowns, batch: anyBatch, units }} />
             <p className={styles.section}>{mfgT('destination')}</p>
-            <LinesGrid lines={produce} items={tracked} onChange={setProduce} opts={{ label: mfgT('destination'), godowns: ctx.godowns, batch: anyBatch, valuation: true }} />
+            <LinesGrid lines={produce} items={tracked} onChange={setProduce} opts={{ label: mfgT('destination'), godowns: ctx.godowns, batch: anyBatch, valuation: true, units }} />
             <p className={styles.section}>{mfgT('additionalCosts')}</p>
             <CostsGrid costs={costs} onChange={setCosts} />
             {preview && <CostSummary s={preview} />}

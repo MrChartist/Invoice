@@ -2,6 +2,7 @@ import type { KeyboardEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { StockItem } from '../../lib/inventory';
+import { cleanAltUnits, lineUnitPatch, roundTypedQty, unitChoices, type UnitMaster } from '../../lib/units';
 import type { BomOutputKind } from '../../types/manufacturing';
 import { blankLine, type GridLine } from './context';
 import type { Godown } from '../../types/stock';
@@ -24,6 +25,11 @@ export interface GridOptions {
   valuation?: boolean;
   /** Prefix for accessible labels (e.g. "Component"). */
   label: string;
+  /**
+   * 7M: units master. When given, a line of an item with alternate units can be typed in one (unit + unit_factor
+   * snapshot) and typed quantities round to the unit's decimal places.
+   */
+  units?: readonly UnitMaster[];
 }
 
 
@@ -52,6 +58,10 @@ export function LinesGrid({ lines, items, onChange, opts }: {
   };
   const byId = new Map(items.map((i) => [i.id, i]));
   const kinds: [BomOutputKind, string][] = [['by_product', mfgT('byProduct')], ['co_product', mfgT('coProduct')], ['scrap', mfgT('scrap')]];
+  const anyAlt = !!opts.units && lines.some((l) => {
+    const it = byId.get(l.item_id);
+    return !!(it && cleanAltUnits(it.alt_units, it.unit || 'NOS'));
+  });
 
   return (
     <div className={styles.wrap}>
@@ -60,6 +70,7 @@ export function LinesGrid({ lines, items, onChange, opts }: {
           <tr>
             <th>{opts.label}</th>
             <th className={styles.num}>{mfgT('qty')}</th>
+            {anyAlt && <th>{mfgT('unit')}</th>}
             {opts.scrapPct && <th className={styles.num}>{mfgT('scrapPct')}</th>}
             {opts.outputs && <th>{mfgT('kind')}</th>}
             {(opts.outputs || opts.valuation) && <th className={styles.num}>{mfgT('ratePerUnit')}</th>}
@@ -77,7 +88,7 @@ export function LinesGrid({ lines, items, onChange, opts }: {
             return (
               <tr key={l.id}>
                 <td>
-                  <select id={`ln-${l.id}`} className={controls.select} aria-label={`${opts.label} ${mfgT('lineItem', { n })}`} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value })}>
+                  <select id={`ln-${l.id}`} className={controls.select} aria-label={`${opts.label} ${mfgT('lineItem', { n })}`} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined })}>
                     <option value="">{mfgT('choose')}</option>
                     {items.map((it) => <option key={it.id} value={it.id}>{it.name}{it.unit ? ` (${it.unit})` : ''}</option>)}
                   </select>
@@ -87,8 +98,22 @@ export function LinesGrid({ lines, items, onChange, opts }: {
                     className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={`${opts.label} ${mfgT('lineQty', { n })}`}
                     value={String(l.qty ?? '')} onKeyDown={onQtyKey}
                     onChange={(e) => patch(l.id, { qty: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    onBlur={opts.units ? () => patch(l.id, { qty: roundTypedQty(l.qty, l.unit || item?.unit, opts.units ?? []) }) : undefined}
                   />
                 </td>
+                {anyAlt && (
+                  <td>
+                    {item && cleanAltUnits(item.alt_units, item.unit || 'NOS') ? (
+                      <select className={controls.select} aria-label={`${opts.label} ${mfgT('lineUnit', { n })}`} value={l.unit || item.unit}
+                        onChange={(e) => {
+                          const p = lineUnitPatch(item, l, e.target.value);
+                          patch(l.id, { unit: p.unit_factor ? p.unit : undefined, unit_factor: p.unit_factor, ...(l.rate ? { rate: p.rate || undefined } : {}), qty: roundTypedQty(l.qty, p.unit, opts.units ?? []) });
+                        }}>
+                        {unitChoices(item).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
+                      </select>
+                    ) : <span className={styles.muted}>{item?.unit ?? ''}</span>}
+                  </td>
+                )}
                 {opts.scrapPct && (
                   <td>
                     <input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={`${opts.label} ${n} ${mfgT('scrapPct')}`}

@@ -138,10 +138,14 @@ per row. `tests/perf.test.ts` paths unchanged.
 
 ## Open items
 
-- Decimal places are used for display helpers only (no input rounding).
+- ~~Decimal places are used for display helpers only (no input rounding)~~ — 7M: typed quantities round to the unit's
+  decimal places (`roundTypedQty`) on POS lines, stock journals, transfers, adjustments and job-work lines; the invoice /
+  bill editors still keep what is typed.
 - Sales-order fulfilment, Tally XML inventory lines and the GSTR-9 / purchase HSN registers (inward side) still read
   line quantities as typed; the SO index is consistent while the invoice keeps the order line's unit.
-- Alternate units on POS lines, stock journals / manufacturing lines, transfers and adjustments (base unit only).
+- ~~Alternate units on POS lines, stock journals, transfers and adjustments~~ — 7M (`docs/features/job-work.md`): `unit` +
+  `unit_factor` on those lines too, converted by every stock reader. Manufacturing Journal component lines and
+  physical stock counts are still base unit only.
 - Price lists are not yet applied automatically to the editor's rate (pricing.ts / price levels own that); standard
   cost is not used for valuation (FIFO / weighted average stay the methods).
 - Group / category filters on Reorder, Ageing and Movement reports; categories have no summary report yet.

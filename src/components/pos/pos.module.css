@@ -371,3 +371,11 @@
     left: auto;
   }
 }
+
+/* 7M: alternate-unit picker under a line's name. */
+.unitSel {
+  max-width: 7.5rem;
+  margin-top: 0.25rem;
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
