@@ -257,6 +257,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   loyalty_adjustments: 'master.edit',
   // approvals: a clerk's save files a request (doc.create); deciding needs doc.approve (approvals.ts)
   approvals: 'doc.create',
+  // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
+  year_end: 'books.edit',
 };
 
 let systemDepth = 0;

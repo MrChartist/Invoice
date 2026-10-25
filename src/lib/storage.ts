@@ -831,10 +831,38 @@ export function getTable<T>(name: string): T[] {
   return SNAPSHOT_TABLES.has(name) ? decodeRows(rows, assetIndex()) : rows;
 }
 
+/**
+ * WP-7 (P0-10, MCA edit log): ONE observer of `setTable` writes. Called after a write succeeded with
+ * the table name, the table's raw JSON before the write (null when it had none) and the rows written
+ * (asset-encoded rows for snapshot tables). Only `setTable` reports: `writeRaw` (restore, sync merges,
+ * migrations) does not. The observer must be cheap and must not write the table it is told about;
+ * anything it throws is swallowed, so it can never break a save. `audit-edits.ts` is the only user.
+ */
+export type TableWriteHook = (name: string, prevRaw: string | null, rows: readonly unknown[]) => void;
+let tableWriteHook: TableWriteHook | null = null;
+
+/** Install (or with `null` remove) the single table-write observer. Returns the previous one. */
+export function onTableWrite(hook: TableWriteHook | null): TableWriteHook | null {
+  const prev = tableWriteHook;
+  tableWriteHook = hook;
+  return prev;
+}
+
+function notifyTableWrite(name: string, prevRaw: string | null, rows: readonly unknown[]): void {
+  if (!tableWriteHook) return;
+  try {
+    tableWriteHook(name, prevRaw, rows);
+  } catch {
+    /* the observer never breaks a save */
+  }
+}
+
 export function setTable<T>(name: string, rows: T[]): void {
   requireTableWrite(name); // roles (6.21): clerk / viewer limits, defence in depth
+  const prevRaw = tableWriteHook ? readRaw(DB_PREFIX + name) : null;
   if (!SNAPSHOT_TABLES.has(name)) {
     writeRaw(DB_PREFIX + name, JSON.stringify(rows));
+    notifyTableWrite(name, prevRaw, rows);
     return;
   }
   const idx = assetIndex();
@@ -851,6 +879,7 @@ export function setTable<T>(name: string, rows: T[]): void {
     }
   }
   writeRaw(DB_PREFIX + name, JSON.stringify(encoded.rows));
+  notifyTableWrite(name, prevRaw, encoded.rows);
 }
 
 export function getJson<T>(fullKey: string, fallback: T): T {

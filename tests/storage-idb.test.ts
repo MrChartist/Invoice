@@ -192,25 +192,26 @@ test('localStorage cleared on its own: IndexedDB data is kept', async () => {
 
 test('a background write refused for lack of space is reported, blocks growth, and clears once a write succeeds', async () => {
   await initStorage();
-  setTable('clients', [{ id: 'a' }, { id: 'b' }]);
+  // A table outside the audit edit log (WP-7), so no audit write joins the flushes being tested.
+  setTable('export_prefs', [{ id: 'a' }, { id: 'b' }]);
   await flushStorage();
   let calls = 0;
   const off = subscribeStorageFailure(() => calls++);
   fakeIdb.failNextWrite('QuotaExceededError');
-  setTable('clients', [{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+  setTable('export_prefs', [{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
   await flushStorage();
   const failure = storageFailure();
   assert.ok(failure instanceof StorageWriteError && failure.quotaExceeded);
   assert.equal(calls, 1);
   assert.match(failure.message, /storage is full/i);
   // Growing writes now fail synchronously, like localStorage did.
-  assert.throws(() => setTable('clients', [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]), StorageWriteError);
+  assert.throws(() => setTable('export_prefs', [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]), StorageWriteError);
   // Shrinking writes go through, and retry the pending ones.
-  setTable('clients', [{ id: 'a' }]);
+  setTable('export_prefs', [{ id: 'a' }]);
   await flushStorage();
   assert.equal(storageFailure(), null);
   assert.equal(calls, 2);
-  assert.equal(idbData().get(K('clients')), '[{"id":"a"}]');
+  assert.equal(idbData().get(K('export_prefs')), '[{"id":"a"}]');
   off();
 });
 

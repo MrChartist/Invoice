@@ -13,6 +13,9 @@
  *     anchor's seal. Otherwise the rows were edited, added or had their seal stripped.
  *  5. Optionally, a head hash noted earlier must still be in the log ("truncated" if newer rows were cut
  *     off), unless a `restore` marker records that a backup replaced the log it belonged to.
+ *  6. (WP-7) An `archive` anchor works like `truncate` for rule 3, but the rows it names were MOVED to an
+ *     archive segment, not removed. Verifying `audit.fullRows()` (segments + live log, concatenated)
+ *     checks the one unbroken chain across every segment; the live log alone still verifies on its own.
  */
 
 import type { AuditEntry } from '../types/audit';
@@ -41,6 +44,8 @@ export interface ChainReport {
   head: string | null;
   /** Older rows removed by the app itself, from the newest `truncate` anchor. Not tampering. */
   trimmed?: { dropped: number; reason: 'storage' | 'cap'; at: string };
+  /** WP-7: rows moved to archive segments, per the `archive` anchors in these rows. */
+  archived?: { rows: number; segments: number };
   restores: number;
   noted?: NotedHeadResult;
   broken?: ChainBreak;
@@ -52,7 +57,11 @@ export function verifyAuditChain(rows: AuditEntry[], opts: { notedHead?: string 
   const where = new Map<string, number>();
   rows.forEach((r, i) => r.hash && where.set(r.hash, i));
   let lastTrunc: AuditEntry | undefined;
-  for (let i = rows.length - 1; i >= 0 && !lastTrunc; i--) if (rows[i].action === 'truncate' && rows[i].hash) lastTrunc = rows[i];
+  // The newest anchor that cut older rows off this log: removed (`truncate`) or moved to a segment (`archive`).
+  for (let i = rows.length - 1; i >= 0 && !lastTrunc; i--) if ((rows[i].action === 'truncate' || rows[i].action === 'archive') && rows[i].hash) lastTrunc = rows[i];
+  let lastDrop: AuditEntry | undefined;
+  for (let i = rows.length - 1; i >= 0 && !lastDrop; i--) if (rows[i].action === 'truncate' && rows[i].hash) lastDrop = rows[i];
+  const archives = rows.filter((r) => r.action === 'archive' && r.hash);
 
   const report: ChainReport = {
     ok: true,
@@ -61,7 +70,8 @@ export function verifyAuditChain(rows: AuditEntry[], opts: { notedHead?: string 
     legacy: 0,
     head: rows.length ? (rows[rows.length - 1].hash ?? null) : null,
     restores: rows.filter((r) => r.action === 'restore' && r.hash).length,
-    ...(lastTrunc ? { trimmed: { dropped: lastTrunc.seal?.dropped ?? 0, reason: lastTrunc.seal?.reason ?? 'cap', at: lastTrunc.at } } : {}),
+    ...(lastDrop ? { trimmed: { dropped: lastDrop.seal?.dropped ?? 0, reason: lastDrop.seal?.reason === 'storage' ? 'storage' : 'cap', at: lastDrop.at } } : {}),
+    ...(archives.length ? { archived: { rows: archives.reduce((s, r) => s + (r.seal?.dropped ?? 0), 0), segments: new Set(archives.map((r) => r.seal?.segment)).size } } : {}),
   };
   const fail = (index: number, reason: ChainBreakReason, message: string): ChainReport => ({ ...report, ok: false, broken: { index, reason, message } });
   const sealMatches = (s: { count: number; digest: string } | undefined, run: AuditEntry[]) =>
@@ -137,5 +147,6 @@ export function describeChain(r: ChainReport): string {
   const parts = [r.chained === 1 ? 'The 1 sealed entry checks out' : `All ${r.chained} sealed entries check out`];
   if (r.legacy) parts.push(`${r.legacy} earlier ${r.legacy === 1 ? 'entry is' : 'entries are'} sealed as a block`);
   if (r.trimmed) parts.push(`older entries were removed (${r.trimmed.reason === 'storage' ? 'storage full' : 'size limit'})`);
+  if (r.archived) parts.push(`${r.archived.rows} older ${r.archived.rows === 1 ? 'entry was' : 'entries were'} moved to ${plural(r.archived.segments, 'archive segment')} (kept)`);
   return `${parts.join('; ')}.`;
 }
