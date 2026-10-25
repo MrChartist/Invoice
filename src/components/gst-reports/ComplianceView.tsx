@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 import {
   FORM_LABELS,
@@ -22,6 +22,8 @@ import { QRMP_TURNOVER_LIMIT, todayIso } from '../../lib/tax-rules';
 import { readLinks } from '../../lib/documents';
 import { formatDate } from '../../lib/utils';
 import type { InvoiceRecord } from '../../types/invoice';
+import type { PurchaseReturn } from '../../types/purchases';
+import { getTable } from '../../lib/storage';
 import { DataTable, Money } from './DataTable';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
@@ -29,6 +31,9 @@ import local from './gst-reports.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { nodes } from '../../i18n/areas/nodes';
+
+// 7O (7.96): TDS deposit / 26Q due dates — loads the TDS engine only when this tab is open.
+const TdsDueCalendar = lazy(() => import('../tds/TdsDueCalendar'));
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -79,6 +84,8 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
   const rows = useMemo<Row[]>(() => {
     if (!since) return [];
     const links = readLinks();
+    // 7O (7.93): supplier notes reduce the month's ITC, so the late-fee / interest base follows the 3B.
+    const purchaseNotes = getTable<PurchaseReturn>('purchase_returns');
     return complianceCalendar({ frequency, stateCode, today, since })
       .map((r) => {
         const filed = filedFor(filedRows, r, gstin);
@@ -88,7 +95,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
         let nil = false;
         if (!r.optional && filedOn > r.due && (r.form === 'GSTR1' || r.form === 'GSTR3B')) {
           const period = periodForDate(r.periodKey.includes('-Q') ? 'quarter' : 'month', r.from);
-          const rep = buildGstReport(invoices, purchases, { period, gstin, filerStateCode: stateCode, links });
+          const rep = buildGstReport(invoices, purchases, { period, gstin, filerStateCode: stateCode, links, purchaseNotes });
           const p = rep.gstr3b.payment;
           cashTax = p.cash.igst + p.cash.cgst + p.cash.sgst + (p.cess ?? 0);
           nil = rep.gstr1.counts.included === 0 && (r.form === 'GSTR1' || rep.gstr3b.purchasesConsidered === 0);
@@ -174,6 +181,9 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
           ]}
         />
       )}
+      <Suspense fallback={null}>
+        <TdsDueCalendar today={today} />
+      </Suspense>
       <ul className={local.notes}>
         <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
         <li>{gvT('ncLateFee')}</li>

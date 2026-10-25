@@ -31,6 +31,8 @@ import {
   sectionCsv,
   type SectionId,
 } from '../lib/gstr-json';
+import { buildIffJson, iffCheck, isIffMonth } from '../lib/iff';
+import { o7T } from '../i18n/areas/gst-tds-7o';
 import type { InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
 import type { PurchaseReturn } from '../types/purchases';
@@ -70,8 +72,10 @@ const PurchaseHsnView = lazy(() => import('../components/gst-reports/PurchaseHsn
 const ReconMonthly = lazy(() => import('../components/gst-reports/ReconMonthly'));
 const HsnMasterPanel = lazy(() => import('../components/gst-reports/HsnMasterPanel'));
 const Gstr9cView = lazy(() => import('../components/gst-reports/Gstr9cView'));
+// 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52); IFF B2B working paper.
+const RcmDocsPanel = lazy(() => import('../components/gst-reports/RcmDocsPanel'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c';
+type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c' | 'rcmdocs';
 
 /** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
 const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
@@ -98,6 +102,7 @@ const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
   { id: 'composition', label: 'Composition (CMP-08 / GSTR-4)', key: 'tabComposition' },
   { id: 'hsnmaster', label: 'HSN master', key: 'tabHsnMaster' },
   { id: 'gstr9c', label: 'GSTR-9C', key: 'tab9c' },
+  { id: 'rcmdocs', label: 'RCM self-invoice', key: 'tabRcm' },
 ];
 const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0] } | undefined) => (x?.key ? gstT(x.key) : x?.label);
 
@@ -467,12 +472,14 @@ export function GstReports() {
       case 'recon':
       case 'hsnmaster':
       case 'gstr9c':
+      case 'rcmdocs':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
             {tab === 'setoff' && <SetOffPanel report={g3} period={period} gstin={gstin} stateCode={filerStateCode} turnover={lastFyTurnover} notify={notify} />}
             {tab === 'purhsn' && <PurchaseHsnView period={period} filerStateCode={filerStateCode} />}
             {tab === 'recon' && <ReconMonthly period={period} gstin={gstin} filerStateCode={filerStateCode} />}
             {tab === 'hsnmaster' && <HsnMasterPanel notify={notify} />}
+            {tab === 'rcmdocs' && <RcmDocsPanel notify={notify} />}
             {tab === 'gstr9c' && <Gstr9cView fyStart={period.fyStart} gstin={gstin} filerStateCode={filerStateCode} turnover={Number(turnover.curGt) || 0} />}
           </Suspense>
         );
@@ -522,6 +529,18 @@ export function GstReports() {
             onClick={() => download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1, { gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }), null, 2))}>
             <FileJson size={16} aria-hidden /> GSTR-1 JSON
           </button>
+          {period.kind === 'month' && isIffMonth(period) && (
+            <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={o7T('iffTitle')} data-iff-json
+              onClick={() => {
+                // 7O (7.98): IFF for QRMP months 1–2 — B2B / CDNR only, ₹50 lakh a month (working paper).
+                const chk = iffCheck(g1, period, periodRange(period).from);
+                if (chk.warnings.includes('OVER_LIMIT')) notify(o7T('iffOver', { value: formatMoney(chk.value) }), 'error');
+                else if (chk.warnings.includes('EMPTY')) return notify(o7T('iffEmpty'), 'info');
+                download(`IFF_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildIffJson(g1), null, 2));
+              }}>
+              <FileJson size={16} aria-hidden /> IFF JSON
+            </button>
+          )}
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData}
             onClick={() => download(`GSTR3B_${gstin || 'all'}_${g1.fp}.csv`, 'text/csv', gstr3bCsv(g3))}>
             <FileSpreadsheet size={16} aria-hidden /> GSTR-3B CSV
@@ -632,7 +651,7 @@ export function GstReports() {
         </div>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>
           <div className={local.toolbar}>
-            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
+            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' || tab === 'rcmdocs' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>

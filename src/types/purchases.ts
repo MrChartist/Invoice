@@ -35,6 +35,13 @@ export interface Vendor {
   /** Sec 197 lower / nil deduction certificate: number and rate (%). */
   tds_lower_cert?: string;
   tds_lower_rate?: number;
+  /**
+   * Additive (7O, 7.95): Sec 197 certificate amount limit (₹ of credits it covers in the FY) and validity
+   * (bare `YYYY-MM-DD`, inclusive). Outside the validity the normal rate applies; above the limit too.
+   */
+  tds_lower_limit?: number;
+  tds_lower_from?: string;
+  tds_lower_to?: string;
   /** Non-resident payee: TDS goes in Form 27Q (flagged only — not computed by this app). */
   non_resident?: boolean;
   /**
@@ -328,6 +335,13 @@ export interface PurchaseReturn {
   category?: string;
   /** Part of the note applied to the bill's balance (raises the bill's `amount_paid`); the rest is on account. */
   adjusted_amount: number;
+  /**
+   * Additive (7O, 7.94): TDS taken back because the bill had TDS deducted at booking (`tdsReversalForReturn`):
+   * the supplier's account falls by the note less this, the section's TDS payable by this. Absent = none.
+   */
+  tds_reversed?: number;
+  /** Section code of that TDS (snapshot of the bill's `tds_section`). */
+  tds_section?: string;
   cost_centre_id?: string;
   notes?: string;
   created_at?: string;

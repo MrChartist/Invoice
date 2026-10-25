@@ -18,6 +18,11 @@ import { localDb } from './localDb';
 import { registerNotificationProvider, type AppNotification } from './notifications';
 import { getTable, KEYS } from './storage';
 import { wireT } from '../i18n/areas/wiring';
+import { o7T } from '../i18n/areas/gst-tds-7o';
+import { loadTdsDue, usesTds, type DueItem } from './tds-payables';
+
+/** 7O (7.96): remind this many days before a TDS deposit / 26Q due date (and keep reminding while overdue). */
+export const TDS_LEAD_DAYS = 5;
 
 export const SETOFF_TABLE = 'gst_setoffs';
 export const GST_CHALLAN_TABLE = 'gst_challans';
@@ -34,6 +39,14 @@ export interface BusinessAlertInput {
   amc: readonly AmcContract[];
   /** Set-off reminders: only for a GST-registered filer who has used the set-off screen. */
   setoff?: { gstin: string; frequency: FilerFrequency; stateCode?: string; postedKeys: ReadonlySet<string> };
+  /** 7O (7.96): TDS deposit / return due items (`dueCalendar`) of the current and previous FY. */
+  tdsDue?: readonly DueItem[];
+}
+
+/** TDS due items worth a bell notice: deposits / returns overdue, or due within `TDS_LEAD_DAYS` (certificates skipped). */
+export function tdsDueReminders(items: readonly DueItem[], today: string): DueItem[] {
+  const soon = addDays(today, TDS_LEAD_DAYS);
+  return items.filter((d) => d.what !== 'certificate' && (d.status === 'overdue' || (d.status === 'upcoming' && d.due <= soon)));
 }
 
 const addDays = (day: string, n: number) => {
@@ -103,6 +116,18 @@ export function businessNotices(input: BusinessAlertInput): AppNotification[] {
       });
     }
   }
+  for (const d of tdsDueReminders(input.tdsDue ?? [], input.today)) {
+    const what = d.what === 'deposit' ? o7T('nTdsDeposit', { kind: d.kind, period: d.period }) : o7T('nTdsReturn', { form: d.kind === 'TDS' ? '26Q' : '27EQ', period: d.period });
+    out.push({
+      id: `tdsdue:${d.id}:${d.status}`,
+      severity: d.status === 'overdue' ? 'critical' : 'warning',
+      title: d.status === 'overdue' ? o7T('nTdsOverdue', { what }) : o7T('nTdsSoon', { what }),
+      detail: o7T('nTdsDetail', { date: d.due, amount: d.amount.toFixed(2) }),
+      href: '/tds?tab=overview',
+      cta: o7T('nTdsCta'),
+      at: input.at,
+    });
+  }
   return out;
 }
 
@@ -125,6 +150,7 @@ export function registerBusinessAlerts(): void {
       approver: readApprovalPolicy().enabled && can('doc.approve'),
       invoices: ctx.invoices ?? getTable<InvoiceRecord>(KEYS.invoices),
       amc: getTable<AmcContract>(AMC_TABLE),
+      ...(usesTds() ? { tdsDue: loadTdsDue(today) } : {}),
       ...(usesSetoff && gstin
         ? {
             setoff: {

@@ -4,7 +4,7 @@ import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
 import { getTable } from '../../lib/storage';
 import { readLinks } from '../../lib/documents';
-import { fyPeriod, gstSummary, loadBooksData } from '../../lib/books';
+import { fyPeriod, gstSummary, itcWithCess, loadBooksData } from '../../lib/books';
 import { advanceTaxEvents } from '../../lib/advance-tax';
 import { buildItemIndex, stockDb } from '../../lib/inventory';
 import { unitsDb } from '../../lib/units';
@@ -150,8 +150,9 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
         advances: data.advances,
         units: data.units,
         items: data.items,
+        purchaseNotes: data.books.purchaseReturns ?? [],
         turnover: Number(turnover) || 0,
-        books: gstSummary(data.books, fyPeriod(fy)),
+        books: ((g) => ({ ...g, itc: itcWithCess(g) }))(gstSummary(data.books, fyPeriod(fy))),
         itc2b: { igst: Number(itc2b.igst) || 0, cgst: Number(itc2b.cgst) || 0, sgst: Number(itc2b.sgst) || 0, cess: Number(itc2b.cess) || 0 },
       }),
     [data, fy, gstin, filerStateCode, turnover, itc2b],

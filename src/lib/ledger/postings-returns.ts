@@ -3,7 +3,8 @@
  * `buildLedger` (postings.ts); the vouchers it returns go through the same balance / account checks.
  *
  *   Debit note / supplier credit note (Tally "Debit Note"):
- *     Dr Sundry creditors (party)  — the note total less self-assessed GST
+ *     Dr Sundry creditors (party)  — the note total less self-assessed GST (less TDS reversed, 7O)
+ *     Dr TDS payable (section)     — TDS reversed when the bill had TDS deducted at booking (7O)
  *     Cr Purchase returns (5010)   — taxable value (+ GST when the bill's ITC was not claimed);
  *                                    a note on an expense bill credits that expense account instead
  *     Cr Input CGST / SGST / IGST  — the ITC given back (only when the bill claimed ITC)
@@ -16,8 +17,8 @@
 import type { PurchaseReturn } from '../../types/purchases';
 import { toPaise } from '../export-shared';
 import { num } from '../invoice-calc';
-import { isLiveNote, noteSelfTax } from '../purchase-returns-gst';
-import { A, EXPENSE_CATEGORY_ACCOUNTS, groupOf, type Account } from './accounts';
+import { isLiveNote, noteSelfTax, noteTdsReversed } from '../purchase-returns-gst';
+import { A, EXPENSE_CATEGORY_ACCOUNTS, groupOf, tdsAccountFor, type Account } from './accounts';
 import type { LedgerVoucher, PostingLine } from './postings';
 
 /** The account the bill's cost went to: same rule as `expenseAccountFor` in postings.ts; goods → Purchase returns. */
@@ -54,8 +55,11 @@ export function purchaseReturnPostings(notes: readonly PurchaseReturn[] | undefi
     const party = String(n.vendor_name ?? '').trim() || 'Unknown vendor';
     const cc = n.cost_centre_id || undefined;
     const self = noteSelfTax(n) > 0 ? gst : 0;
+    // 7O (7.94): TDS deducted at booking on the bill comes back off the TDS payable, not the supplier.
+    const tds = Math.min(toPaise(noteTdsReversed(n)), Math.max(total - self, 0));
     const lines: (PostingLine | null)[] = [
-      line(A.creditors, total - self, true, party, cc),
+      line(A.creditors, total - self - tds, true, party, cc),
+      line(tdsAccountFor(n.tds_section), tds, true, undefined, cc),
       line(costAccountFor(n, chart), n.itc_eligible ? taxable : taxable + gst, false, undefined, cc),
     ];
     if (n.itc_eligible) lines.push(line(A.inCgst, cgst, false, undefined, cc), line(A.inSgst, sgst, false, undefined, cc), line(A.inIgst, igst, false, undefined, cc));

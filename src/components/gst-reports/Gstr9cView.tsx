@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { buildGstr9 } from '../../lib/gstr9';
 import { buildGstr9c, type Gstr9cAdjustments, type Gstr9cLine } from '../../lib/gstr9c';
-import { fyPeriod, gstSummary, loadBooksData, profitAndLoss } from '../../lib/books';
+import { fyPeriod, gstSummary, itcWithCess, loadBooksData, profitAndLoss } from '../../lib/books';
 import { advanceTaxEvents } from '../../lib/advance-tax';
 import { readLinks } from '../../lib/documents';
 import { getTable } from '../../lib/storage';
@@ -49,6 +49,7 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
       filerStateCode,
       links: readLinks(),
       advances: advanceTaxEvents(books.advances ?? [], books.transactions, books.invoices),
+      purchaseNotes: books.purchaseReturns ?? [],
       turnover: turnover || 0,
     });
     const g = gstSummary(books, period);
@@ -57,7 +58,7 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
       books: {
         turnover: profitAndLoss(books, period).income,
         tax: { igst: g.outputIgst, cgst: g.outputCgst, sgst: g.outputSgst, cess: g.outputCess ?? 0 },
-        itc: g.itc,
+        itc: itcWithCess(g),
       },
     };
   }, [fyStart, gstin, filerStateCode, turnover]);

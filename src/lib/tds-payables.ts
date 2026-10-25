@@ -116,6 +116,33 @@ export interface Payee {
   nonFiler?: boolean;
   lowerRate?: number;
   lowerCert?: string;
+  /**
+   * Additive (7O, 7.95): Sec 197 certificate validity (bare days, inclusive) and amount limit (₹ of payments /
+   * credits it covers). Outside the validity the certificate is ignored; above the limit the normal rate
+   * applies to the excess (`suggestTds` splits the base).
+   */
+  lowerFrom?: string;
+  lowerTo?: string;
+  lowerLimit?: number;
+  /** Credits already covered by this certificate (₹, same FY) — from `certificateUsed`. */
+  lowerUsed?: number;
+}
+
+/** Is the Sec 197 certificate in force on `date` (number present, inside its validity)? */
+export function certificateInForce(payee: Pick<Payee, 'lowerCert' | 'lowerRate' | 'lowerFrom' | 'lowerTo'>, date: string): boolean {
+  if (!payee.lowerCert?.trim() || typeof payee.lowerRate !== 'number' || !(payee.lowerRate >= 0)) return false;
+  const from = isoDay(payee.lowerFrom);
+  const to = isoDay(payee.lowerTo);
+  if (from && date < from) return false;
+  if (to && date > to) return false;
+  return true;
+}
+
+/** Room left under the certificate's limit (₹); Infinity when it has no limit. */
+export function certificateRoom(payee: Pick<Payee, 'lowerLimit' | 'lowerUsed'>): number {
+  const limit = num(payee.lowerLimit);
+  if (!(limit > 0)) return Infinity;
+  return Math.max(round2(limit - Math.max(num(payee.lowerUsed), 0)), 0);
 }
 
 /* ── Rate ─────────────────────────────────────────────────────── */
@@ -150,10 +177,14 @@ export function tdsRateFor(code: string, date: string, payee: Payee = {}): TdsRa
       reason = 'C';
     }
     notes.push(`No valid PAN: Sec 206AA rate ${rate}%.`);
-  } else if (payee.lowerCert && typeof payee.lowerRate === 'number' && payee.lowerRate >= 0) {
-    rate = payee.lowerRate;
+  } else if (certificateInForce(payee, date) && certificateRoom(payee) > 0) {
+    rate = payee.lowerRate as number;
     reason = 'A';
     notes.push(`Sec 197 certificate ${payee.lowerCert}: ${rate}%.`);
+  } else if (payee.lowerCert?.trim() && typeof payee.lowerRate === 'number') {
+    notes.push(certificateInForce(payee, date)
+      ? `Sec 197 certificate ${payee.lowerCert}: its limit is used up — normal rate.`
+      : `Sec 197 certificate ${payee.lowerCert} is not valid on this date — normal rate.`);
   }
   const ab = ruleAt(TDS_206AB_RULES, date);
   if (payee.nonFiler && reason !== 'A') {
@@ -182,6 +213,18 @@ export interface PriorCredit {
   tds: number;
   /** Section code, '' when the bill carried none (assumed the same nature for the same payee). */
   code: string;
+  /** Additive (7O): Sec 197 certificate number the credit was deducted under ('' / absent = none). */
+  cert?: string;
+}
+
+/** Credits of the same Indian FY already deducted under certificate `cert` before `date` (₹ of base). */
+export function certificateUsed(prior: readonly PriorCredit[], cert: string, date: string, excludeId?: string): number {
+  const c = cert.trim().toUpperCase();
+  const fq = fyQuarterOf(date);
+  if (!c || !fq) return 0;
+  return round2(prior
+    .filter((p) => (!excludeId || p.id !== excludeId) && String(p.cert ?? '').trim().toUpperCase() === c && p.date <= date && fyQuarterOf(p.date)?.fy === fq.fy)
+    .reduce((t, p) => t + Math.max(num(p.base), 0), 0));
 }
 
 export interface ThresholdResult {
@@ -263,11 +306,22 @@ export function suggestTds(code: string, date: string, base: number, payee: Paye
   const r = tdsRateFor(code, date, payee);
   if (!r) return null;
   const t = thresholdCheck(code, date, base, prior, excludeId);
-  const amount = t.applies ? roundTds((t.taxableBase * r.rate) / 100) : 0;
+  let amount = t.applies ? roundTds((t.taxableBase * r.rate) / 100) : 0;
+  let rate = r.rate;
+  // 7O (7.95): a Sec 197 certificate covers credits only up to its limit; the excess is taxed at the normal
+  // (Act / 206AA / 206AB) rate. The effective rate is shown; the 26Q reason stays 'A'.
+  const room = r.reason === 'A' ? certificateRoom(payee) : Infinity;
+  if (t.applies && room < t.taxableBase) {
+    const normal = tdsRateFor(code, date, { ...payee, lowerCert: undefined, lowerRate: undefined });
+    const normalRate = normal?.rate ?? r.actRate;
+    amount = roundTds((room * r.rate) / 100 + ((t.taxableBase - room) * normalRate) / 100);
+    rate = t.taxableBase > 0 ? round2((amount * 100) / t.taxableBase) : r.rate;
+    r.notes.push(`Certificate limit: ₹${room.toFixed(2)} at ${r.rate}%, ₹${round2(t.taxableBase - room).toFixed(2)} at ${normalRate}%.`);
+  }
   return {
     applies: t.applies,
     code,
-    rate: r.rate,
+    rate,
     base: t.applies ? t.taxableBase : round2(Math.max(num(base), 0)),
     amount,
     reason: t.applies ? r.reason : 'Y',
@@ -285,6 +339,10 @@ export interface BillTdsInput {
   nonFiler?: boolean;
   lowerCert?: string;
   lowerRate?: number;
+  /** Additive (7O): certificate validity / limit from the vendor master. */
+  lowerFrom?: string;
+  lowerTo?: string;
+  lowerLimit?: number;
   rate?: number;
   base?: number;
   amount?: number;
@@ -313,7 +371,8 @@ const NO_TDS: BillTdsFields = { tds_section: undefined, tds_rate: undefined, tds
 export function resolveBillTds(v: BillTdsInput, ctx: { date: string; taxable: number; prior: readonly PriorCredit[]; excludeId?: string }): { suggestion: TdsSuggestion | null; fields: BillTdsFields } {
   if (!v.section) return { suggestion: null, fields: NO_TDS };
   const pan = v.pan.trim().toUpperCase();
-  const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate }, ctx.prior, ctx.excludeId);
+  const lowerUsed = v.lowerCert?.trim() ? certificateUsed(ctx.prior, v.lowerCert, ctx.date, ctx.excludeId) : 0;
+  const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate, lowerFrom: v.lowerFrom, lowerTo: v.lowerTo, lowerLimit: v.lowerLimit, lowerUsed }, ctx.prior, ctx.excludeId);
   if (!suggestion) return { suggestion: null, fields: NO_TDS };
   const rate = v.rate ?? suggestion.rate;
   const base = v.base ?? suggestion.base;
@@ -356,9 +415,92 @@ export function priorCreditsFor(purchases: readonly unknown[], vendor: { id?: st
     const samePan = isValidPan(vendor.pan) && String(r.tds_pan ?? '').toUpperCase() === String(vendor.pan).toUpperCase();
     const sameName = !vendor.id && !!name && c.partyName.toLowerCase() === name;
     if (!sameId && !samePan && !sameName) continue;
-    out.push({ id: c.id, date: c.date, base: num(r.tds_base, c.taxable), tds: c.tdsAmount, code: c.tdsSection });
+    out.push({ id: c.id, date: c.date, base: num(r.tds_base, c.taxable), tds: c.tdsAmount, code: c.tdsSection, ...(s(r.tds_cert_no) ? { cert: s(r.tds_cert_no) } : {}) });
   }
   return out;
+}
+
+/* ── Vendor master TDS fields (7O, 7.95) ───────────────────────── */
+
+export interface VendorTdsFields {
+  pan?: string;
+  deductee_type?: DeducteeType;
+  tds_section?: string;
+  tds_non_filer?: boolean;
+  tds_lower_cert?: string;
+  tds_lower_rate?: number;
+  tds_lower_limit?: number;
+  tds_lower_from?: string;
+  tds_lower_to?: string;
+  non_resident?: boolean;
+}
+
+/** Problems with the vendor form's TDS block: '' when fine. Messages are English (the form shows them as is). */
+export function vendorTdsProblem(v: VendorTdsFields): string {
+  const pan = String(v.pan ?? '').trim().toUpperCase();
+  if (pan && !isValidPan(pan)) return 'PAN must be 10 characters: 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F).';
+  if (v.tds_section && !payableSection(v.tds_section)) return 'Choose a TDS section from the list.';
+  const anyCert = [v.tds_lower_rate, v.tds_lower_limit, v.tds_lower_from, v.tds_lower_to].some((x) => x !== undefined && x !== '' && x !== null);
+  if (anyCert && !String(v.tds_lower_cert ?? '').trim()) return 'Enter the Sec 197 certificate number for the rate / limit / validity.';
+  if (String(v.tds_lower_cert ?? '').trim()) {
+    const rate = Number(v.tds_lower_rate);
+    if (v.tds_lower_rate === undefined || !Number.isFinite(rate) || rate < 0 || rate > 100) return 'Enter the certificate rate (0–100%).';
+    if (v.tds_lower_limit !== undefined && !(Number(v.tds_lower_limit) >= 0)) return 'The certificate limit cannot be negative.';
+    const from = isoDay(v.tds_lower_from);
+    const to = isoDay(v.tds_lower_to);
+    if ((v.tds_lower_from && !from) || (v.tds_lower_to && !to)) return 'Enter valid certificate dates.';
+    if (from && to && to < from) return 'The certificate ends before it starts.';
+  }
+  return '';
+}
+
+/** The TDS fields to store on a vendor (trimmed; empty → undefined so an edit can clear them). */
+export function cleanVendorTds(v: VendorTdsFields): VendorTdsFields {
+  const pan = String(v.pan ?? '').trim().toUpperCase();
+  const cert = String(v.tds_lower_cert ?? '').trim();
+  const n = (x: unknown) => (x === undefined || x === null || x === '' || !Number.isFinite(Number(x)) ? undefined : round2(Number(x)));
+  return {
+    pan: pan || undefined,
+    deductee_type: v.deductee_type || undefined,
+    tds_section: v.tds_section || undefined,
+    tds_non_filer: v.tds_non_filer ? true : undefined,
+    tds_lower_cert: cert || undefined,
+    tds_lower_rate: cert ? n(v.tds_lower_rate) : undefined,
+    tds_lower_limit: cert ? n(v.tds_lower_limit) : undefined,
+    tds_lower_from: cert ? isoDay(v.tds_lower_from) || undefined : undefined,
+    tds_lower_to: cert ? isoDay(v.tds_lower_to) || undefined : undefined,
+    non_resident: v.non_resident ? true : undefined,
+  };
+}
+
+/* ── Purchase returns on a TDS bill (7O, 7.94) ─────────────────── */
+
+export interface ReturnTdsInput {
+  tds_amount?: unknown;
+  tds_base?: unknown;
+  tds_on?: unknown;
+  tds_section?: unknown;
+  taxable?: unknown;
+}
+
+/**
+ * TDS to reverse when a purchase return / supplier credit note of `noteTaxable` (GST excluded) is recorded
+ * against a bill that had TDS deducted at booking (`tds_on` BILL / unset): the bill's TDS × note value ÷
+ * TDS base, rounded to the rupee (Sec 288B), never more than what is left after earlier notes
+ * (`earlierReversed`). 0 for TDS on payment (later payments simply carry less TDS) and for bills without TDS.
+ * The supplier's account is then reduced by the note less this TDS, and the TDS payable by this TDS.
+ * Working paper — the treatment of TDS already deposited (adjust against later deductions / refund through
+ * TRACES) is for your CA.
+ */
+export function tdsReversalForReturn(bill: ReturnTdsInput | undefined | null, noteTaxable: number, earlierReversed = 0): number {
+  if (!bill) return 0;
+  const tds = round2(Math.max(num(bill.tds_amount), 0));
+  if (!(tds > 0) || s(bill.tds_on).toUpperCase() === 'PAYMENT') return 0;
+  const base = Math.max(num(bill.tds_base, num(bill.taxable)), 0);
+  const value = Math.max(num(noteTaxable), 0);
+  if (!(base > 0) || !(value > 0)) return 0;
+  const left = Math.max(round2(tds - Math.max(num(earlierReversed), 0)), 0);
+  return Math.min(roundTds((tds * Math.min(value / base, 1))), left);
 }
 
 /* ── Register ─────────────────────────────────────────────────── */
@@ -405,6 +547,13 @@ export interface TdsDeductionRow {
   /** Tax became deductible (credit or payment, whichever first). */
   creditedOn: string;
   deductedOn: string;
+  /**
+   * Additive (7O, 7.94): TDS taken back by purchase returns / supplier notes on the bill (already netted from
+   * `amount` and, pro rata, `base`), and the latest such note's date. A note dated after the deduction was
+   * deposited leaves excess TDS with the government (`returnAfterDeposit` on the register screen).
+   */
+  returnReversed?: number;
+  returnDate?: string;
   reason: string;
   certNo: string;
   nonResident: boolean;
@@ -417,6 +566,8 @@ export interface RegisterInput {
   payments: readonly unknown[];
   manual?: readonly ManualTdsDeduction[];
   vendors?: readonly unknown[];
+  /** Additive (7O, 7.94): `purchase_returns` rows — their `tds_reversed` reduces the bill's deduction. */
+  returns?: readonly unknown[];
 }
 
 const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
@@ -427,6 +578,17 @@ export function tdsDeductions(input: RegisterInput): TdsDeductionRow[] {
   const vendors = new Map<string, Record<string, unknown>>();
   for (const v of input.vendors ?? []) if (v && typeof v === 'object') vendors.set(s((v as Record<string, unknown>).id), v as Record<string, unknown>);
   const bills = new Map<string, Record<string, unknown>>();
+  // 7O: TDS reversed by purchase returns, per bill.
+  const reversed = new Map<string, { amount: number; date: string }>();
+  for (const raw of input.returns ?? []) {
+    const n = (raw ?? {}) as Record<string, unknown>;
+    const amt = round2(Math.max(num(n.tds_reversed), 0));
+    const bill = s(n.purchase_id);
+    const date = isoDay(n.date);
+    if (!(amt > 0) || !bill || !date) continue;
+    const prev = reversed.get(bill);
+    reversed.set(bill, { amount: round2((prev?.amount ?? 0) + amt), date: prev && prev.date > date ? prev.date : date });
+  }
   const push = (row: Omit<TdsDeductionRow, 'fy' | 'quarter' | 'section' | 'rpu' | 'payeeKey'>) => {
     const fq = fyQuarterOf(row.deductedOn);
     if (!fq || !(row.amount > 0)) return;
@@ -441,7 +603,11 @@ export function tdsDeductions(input: RegisterInput): TdsDeductionRow[] {
     if (!(c.tdsAmount > 0) || s(r.tds_on).toUpperCase() === 'PAYMENT') continue;
     const vendor = vendors.get(s(r.vendor_id));
     const pan = (s(r.tds_pan) || s(vendor?.pan)).toUpperCase();
+    const rev = reversed.get(c.id);
+    const fullBase = round2(num(r.tds_base, c.taxable));
+    const revAmount = rev ? Math.min(rev.amount, c.tdsAmount) : 0;
     push({
+      ...(rev ? { returnReversed: revAmount, returnDate: rev.date } : {}),
       key: `bill:${c.id}`,
       source: 'bill',
       purchaseId: c.id,
@@ -451,9 +617,9 @@ export function tdsDeductions(input: RegisterInput): TdsDeductionRow[] {
       deducteeType: (s(r.tds_deductee_type) as DeducteeType) || deducteeTypeFromPan(pan) || 'OTHER',
       code: c.tdsSection,
       billNumber: c.number,
-      base: round2(num(r.tds_base, c.taxable)),
+      base: revAmount > 0 && c.tdsAmount > 0 ? round2((fullBase * (c.tdsAmount - revAmount)) / c.tdsAmount) : fullBase,
       rate: num(r.tds_rate),
-      amount: c.tdsAmount,
+      amount: round2(c.tdsAmount - revAmount),
       creditedOn: c.date,
       deductedOn: c.date,
       reason: s(r.tds_reason),
@@ -897,4 +1063,29 @@ export function setReturnFiled(form: TdsForm, fy: number, quarter: TdsQuarter, f
   setTable(TDS_RETURNS_TABLE, rows);
   audit.record({ entity: 'tds', entity_id: id, action: 'update', doc_number: id, summary: day ? `Form ${form} for Q${quarter} FY${fy}-${String(fy + 1).slice(2)} marked filed on ${day}` : `Form ${form} for Q${quarter} FY${fy}-${String(fy + 1).slice(2)} filed mark cleared` });
   return rows;
+}
+
+/* ── Due items for the bell and the GST compliance calendar (7O, 7.96) ── */
+
+/** TDS (26Q side) deposit / return / certificate due items of the current and previous Indian FY. */
+export function loadTdsDue(today: string): DueItem[] {
+  const fq = fyQuarterOf(today);
+  if (!fq) return [];
+  const rows = tdsDeductions({
+    purchases: getTable('purchases'),
+    payments: getTable('purchase_payments'),
+    manual: loadManualDeductions(),
+    vendors: getTable('vendors'),
+    returns: getTable('purchase_returns'),
+  });
+  if (!rows.length) return [];
+  const challans = loadChallans();
+  const marks = loadReturnMarks();
+  return [fq.fy - 1, fq.fy].flatMap((fy) => dueCalendar(rows, challans, marks, fy, today, 'TDS')).sort((a, b) => a.due.localeCompare(b.due));
+}
+
+/** Cheap check: does this company deduct TDS at all (a bill / payment with TDS, a manual deduction, a challan)? */
+export function usesTds(): boolean {
+  const has = (rows: readonly unknown[]) => rows.some((r) => !!r && typeof r === 'object' && Number((r as { tds_amount?: unknown }).tds_amount) > 0);
+  return getTable(TDS_CHALLANS_TABLE).length > 0 || getTable(TDS_DEDUCTIONS_TABLE).length > 0 || has(getTable('purchases')) || has(getTable('purchase_payments'));
 }

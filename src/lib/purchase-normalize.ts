@@ -240,11 +240,25 @@ export function selfAssessedTaxOf(c: Pick<PurchaseCore, 'reverseCharge' | 'impor
 }
 
 /**
- * What the supplier is owed on a bill: its total less any self-assessed GST inside it, less TDS we
- * deducted when booking the bill (that part is owed to the government — TDS payable).
+ * Compensation cess on a reverse-charge / import bill that WE pay to the government (7O, 7.90): the
+ * cess is self-assessed exactly like the GST (RCM cess in GSTR-3B 3.1(d); customs cess with the Bill
+ * of Entry), so it is never owed to the supplier — when the stored total actually includes it.
  */
-export function supplierPayableOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'> & Partial<Pick<PurchaseCore, 'tdsOnBill'>>): number {
-  return round2(c.total - selfAssessedTaxOf(c) - Math.max(c.tdsOnBill ?? 0, 0));
+export function selfAssessedCessOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'> & Partial<Pick<PurchaseCore, 'cess'>>): number {
+  const cess = Math.max(c.cess ?? 0, 0);
+  if (!(c.reverseCharge || c.importType !== '') || !(cess > 0)) return 0;
+  const withoutCess = c.taxable + selfAssessedTaxOf(c);
+  const totalIncludesCess = Math.abs(c.total - (withoutCess + cess)) <= Math.abs(c.total - withoutCess);
+  return totalIncludesCess ? round2(cess) : 0;
+}
+
+/**
+ * What the supplier is owed on a bill: its total less any self-assessed GST (and, 7O, self-assessed
+ * cess) inside it, less TDS we deducted when booking the bill (that part is owed to the government —
+ * TDS payable).
+ */
+export function supplierPayableOf(c: Pick<PurchaseCore, 'reverseCharge' | 'importType' | 'tax' | 'taxable' | 'total'> & Partial<Pick<PurchaseCore, 'tdsOnBill' | 'cess'>>): number {
+  return round2(c.total - selfAssessedTaxOf(c) - selfAssessedCessOf(c) - Math.max(c.tdsOnBill ?? 0, 0));
 }
 
 /**

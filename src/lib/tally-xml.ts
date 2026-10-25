@@ -155,6 +155,8 @@ export interface TallyOptions {
   inputCgst?: string;
   inputSgst?: string;
   inputIgst?: string;
+  /** Additive (7O, 7.90): compensation cess credit on purchase bills (Duties & Taxes). */
+  inputCess?: string;
   /** GST we owe under reverse charge on purchases / imports of services (Duties & Taxes). */
   rcmPayableLedger?: string;
   /** IGST on imported goods, paid at customs with the Bill of Entry (Duties & Taxes). */
@@ -178,6 +180,7 @@ export const DEFAULT_LEDGER_NAMES = {
   inputCgst: 'Input CGST',
   inputSgst: 'Input SGST',
   inputIgst: 'Input IGST',
+  inputCess: 'Input Cess',
   rcmPayableLedger: 'GST Payable on Reverse Charge',
   customsIgstLedger: 'IGST Payable on Imports',
 } as const;
@@ -211,6 +214,7 @@ function resolveOptions(o: TallyOptions): ResolvedOptions {
     inputCgst: n(o.inputCgst, DEFAULT_LEDGER_NAMES.inputCgst),
     inputSgst: n(o.inputSgst, DEFAULT_LEDGER_NAMES.inputSgst),
     inputIgst: n(o.inputIgst, DEFAULT_LEDGER_NAMES.inputIgst),
+    inputCess: n(o.inputCess, DEFAULT_LEDGER_NAMES.inputCess),
     rcmPayableLedger: n(o.rcmPayableLedger, DEFAULT_LEDGER_NAMES.rcmPayableLedger),
     customsIgstLedger: n(o.customsIgstLedger, DEFAULT_LEDGER_NAMES.customsIgstLedger),
   };
@@ -613,7 +617,8 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const entries: TallyEntry[] = [];
       // Reverse charge / imports: the supplier is owed only what it billed; the GST we pay ourselves
       // goes to its own Duties & Taxes ledger (as the in-app ledger does: 2310 / 2311).
-      const selfTax = Math.abs(toPaise(p.selfTax));
+      // 7O: self-assessed cess (reverse charge / customs) goes to the same Duties & Taxes ledger as the GST.
+      const selfTax = Math.abs(toPaise(p.selfTax)) + Math.abs(toPaise(p.selfCess ?? 0));
       const selfLedger = p.selfTaxKind === 'CUSTOMS' ? o.customsIgstLedger : o.rcmPayableLedger;
       push(entries, p.partyName, 'Cr', Math.abs(toPaise(p.payable)), { name: p.number || p.id || p.partyName, type: 'New Ref' });
       if (selfTax > 0) {
@@ -628,11 +633,17 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         std(tdsLedger, 'Duties & Taxes');
       }
       // GST on a bill whose ITC is blocked is part of the cost, never an "Input" credit.
-      push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.itcEligible ? p.taxable : round2(p.taxable + p.tax))));
+      // 7O: cess too — input cess credit when ITC is claimed, else part of the cost (never round-off).
+      const cess = Math.abs(toPaise(p.cess ?? 0));
+      push(entries, o.purchaseLedger, 'Dr', Math.abs(toPaise(p.itcEligible ? p.taxable : round2(p.taxable + p.tax))) + (p.itcEligible ? 0 : cess));
       if (p.itcEligible) {
         push(entries, o.inputCgst, 'Dr', Math.abs(toPaise(p.cgst)));
         push(entries, o.inputSgst, 'Dr', Math.abs(toPaise(p.sgst)));
         push(entries, o.inputIgst, 'Dr', Math.abs(toPaise(round2(p.tax - p.cgst - p.sgst))));
+        if (cess > 0) {
+          push(entries, o.inputCess, 'Dr', cess);
+          std(o.inputCess, 'Duties & Taxes', 'Cess');
+        }
       }
       balanceWithRoundOff(entries, o.roundOffLedger);
       addLedger({

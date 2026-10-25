@@ -34,6 +34,10 @@ export const TDS_PAYABLE_SECTIONS: readonly TdsPayableSection[] = [
   { code: '194H', family: '194H', section: '194H', label: '194H Commission / brokerage', rpu: '94H' },
   { code: '194Q', family: '194Q', section: '194Q', label: '194Q Purchase of goods', rpu: '94Q' },
   { code: '194A', family: '194A', section: '194A', label: '194A Interest (other than on securities)', rpu: '94A' },
+  // 7O (7.97): rates date-keyed in tax-rules.ts (`TDS_EXTRA_SECTION_RULES`); RPU codes UNVERIFIED.
+  { code: '194O', family: '194O', section: '194-O', label: '194-O E-commerce operator (participant’s sales)', rpu: '94O' },
+  { code: '194R', family: '194R', section: '194R', label: '194R Business perquisite / benefit', rpu: '94R' },
+  { code: '194S', family: '194S', section: '194S', label: '194S Virtual digital asset', rpu: '94S' },
 ];
 
 export function payableSection(code: string | undefined): TdsPayableSection | undefined {
@@ -105,8 +109,19 @@ export const TDS_THRESHOLD_RULES: readonly Versioned<Record<string, TdsThreshold
 ];
 
 export function tdsThreshold(family: string, date?: string): TdsThreshold | undefined {
-  return ruleAt(TDS_THRESHOLD_RULES, date)[family];
+  return ruleAt(TDS_THRESHOLD_RULES, date)[family] ?? (TDS_EXTRA_THRESHOLD_RULES[family] ? ruleAt(TDS_EXTRA_THRESHOLD_RULES[family], date) ?? undefined : undefined);
 }
+
+/**
+ * 7O (7.97): thresholds of the later sections, one dated history per family (null = none). UNVERIFIED:
+ * 194R ₹20,000 per FY per recipient; 194S ₹10,000 per FY (₹50,000 for a "specified person" buyer — not
+ * modelled, the lower figure is used). 194-O has none here: its ₹5 lakh exemption is for individual / HUF
+ * participants only and is left to the CA. Append new versions; never edit an old one.
+ */
+export const TDS_EXTRA_THRESHOLD_RULES: Readonly<Record<string, readonly Versioned<TdsThreshold | null>[]>> = {
+  '194R': [{ from: '2022-07-01', value: { aggregate: 20000 }, source: 'Sec 194R — verify' }],
+  '194S': [{ from: '2022-07-01', value: { aggregate: 10000 }, source: 'Sec 194S (other than a specified person) — verify' }],
+};
 
 /** Sec 206AA: payee without a valid PAN — at least 20% (5% for 194Q from 1 Jul 2021). */
 export const TDS_NO_PAN_RULES: readonly Versioned<{ rate: number; overrides: Record<string, number> }>[] = [

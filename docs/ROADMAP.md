@@ -214,8 +214,8 @@ documents in `docs/features/` keep their own WP ids). Gap ids refer to `docs/GAP
 | 7.4 | ✅ **Voucher variants**: optional (make regular), memorandum, post-dated (with PDC summary), reversing journals, voucher classes (`src/lib/ledger/voucher-variants.ts`) | Optional / Memo / Post-dated / Reversing journal | done |
 | 7.5 | ✅ **Bill-wise payables**: Agst Ref over several bills, Advance / On Account / New Ref, later adjustment, ageing, party bill-wise view, MSMED interest (`src/lib/billwise.ts`) | Bill-wise details, outstanding ageing | done |
 | 7.6 | ✅ **Ratio analysis** from the ledger with drill-down (`src/lib/ledger/ratios.ts`) | Ratio Analysis | done |
-| 7.7 | Form 27Q (non-residents), Sec 194-O/194R/194S, lower-deduction certificate limits, TRACES justification import | — | open |
-| 7.8 | Vendor-form fields for PAN / deductee type / 206AB / Sec 197 (stored, not yet editable on the vendor form), TDS dates in the compliance calendar / notification bell | — | open |
+| 7.7 | ⏳ (Sec 194-O / 194R / 194S presets, certificate limits / validity: done in 7O — 7.95, 7.97) Form 27Q (non-residents; flag kept), TRACES justification import | — | open |
+| 7.8 | ✅ Vendor-form fields for PAN / deductee type / 206AB / Sec 197, TDS dates in the compliance calendar / notification bell — done in 7O (7.95, 7.96) | — | done |
 | 7.9 | ✅ **Masters & openings ("Accounts Info")**: user groups / sub-groups under the Schedule III primaries (nature and gross-profit effect inherited), Group / Ledger Create · Alter · Display with Tally keys (Enter / Ctrl+A / Esc, Alt+C hook), ledger and party opening balances on a books-beginning date posted as an Opening voucher with the difference in opening balances reported, bill-wise opening outstandings in receivables ageing and statements, opening trial balance screen, ledger interest parameters (lib), bill allocation on manual receipts — `docs/features/masters.md` | Groups, Ledgers, Opening balances, Bill-wise details (WP-1: P0-1, P0-2, P0-11, P1-7 lib) | done (P1-21 import kinds, P2 cost categories: open) |
 | 7.10 | ✅ **Payroll** (WIP-A): employees, pay heads (Tally calculation types), salary structures, attendance / production, Auto fill payroll run → Payroll voucher in the ledger, salary / PF / ESI / PT / TDS (192) payments, payslips, PF ECR, ESI, PT, Form 24Q / Form 16 Part B working papers (`/payroll`, `src/lib/payroll/`, `docs/features/payroll.md`) | Payroll | done |
 
@@ -253,7 +253,7 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.25 | ✅ **Supplier credit note received** (supplier's number / date, value only or with goods, with or without a bill); GSTR-3B ITC net of notes (`itcAdjustmentsFromNotes`), GSTR-2B CDNR matching (`bookBills` notes), Tally Debit Note voucher (`tally-debit-notes.ts`) | Debit Note with supplier ref | done |
 | 7.26 | ✅ **Receipt note (GRN)** → bill (PO → GRN → bill), **Rejections Out**, "Goods received not billed" (`src/lib/receipt-notes.ts`, stock source `events-returns.ts`) | Receipt Note (Alt+F9), Rejections Out | done |
 | 7.27 | ✅ **Purchase order outstanding** report (GRN-accepted + directly billed vs ordered, overdue days) | Purchase Order Outstandings | done |
-| 7.28 | Job work in / out (Rule 55 challans, 1 / 3-year return clocks, job-worker godowns) + **ITC-04** working paper; Rejections In (customer rejects a challan); sales-order outstanding (WP-8); GSTR-9 Table 6 / 9C use of supplier notes; TDS adjustment on a return of a TDS bill | Job Work Out / In Orders, Material Out / In, ITC-04 | open |
+| 7.28 | Job work in / out (Rule 55 challans, 1 / 3-year return clocks, job-worker godowns) + **ITC-04** working paper; Rejections In (customer rejects a challan); sales-order outstanding (WP-8); (GSTR-9 Table 6 / 9 use of supplier notes and TDS adjustment on a return of a TDS bill: done in 7O — 7.93, 7.94; 9C Table 12 split still open) | Job Work Out / In Orders, Material Out / In, ITC-04 | open |
 
 ### 7E · Printing & documents output (WP-4)
 
@@ -316,14 +316,14 @@ Details: `docs/features/manufacturing.md`.
 | 7.56 | ✅ **e-Invoice ShipDtls / DispDtls / PayDtls / EwbDtls** from `invoice.ship_to`, a dispatch option, the sender's bank details and `invoice.transport` | e-Invoice with dispatch / ship-to / e-Way | done |
 | 7.57 | ✅ **HSN master** with dated rate history and default-rate inheritance (item → HSN → group → company), seeded from existing documents; **purchase HSN / rate register** (`hsn-master.ts`, `hsn-purchase-register.ts`) | GST Rate Setup, HSN-wise purchase summary | done |
 | 7.58 | ✅ **Month-wise GSTR-1 vs GSTR-3B vs Books** reconciliation and a **GSTR-9C working paper** (Tables 5 / 7 / 9 / 12 with adjustments) (`gst-recon-monthly.ts`, `gstr9c.ts`) | Reconciliation of Returns | done |
-| 7.59 | ⏳ WP-6 follow-ups: cess in Books `gstSummary` / accounting + Tally exports, ITC carry-forward into the next month's plan, PMT-09 / refunds, RCM self-invoice + Rule 52 voucher series, IFF JSON, EXPA, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 | — | open |
+| 7.59 | ⏳ WP-6 follow-ups (cess in Books / exports / Tally, ITC carry-forward, RCM self-invoice + Rule 52 series, IFF JSON: done in 7O — 7.90–7.98): PMT-09 / refunds, EXPA, ISD, consolidated e-Way, rate-wise 9C Table 9 / Table 14 | — | open |
 
 ### 7K · Integration pass (after the WP merge)
 
 | # | Item | Status |
 |---|------|--------|
 | 7.60 | ✅ **Everything reachable and consistent**: closing stock never double counted (report-time valuation nets any closing-stock journal; year-end wizard posts a journal only when valuation is off, one-click switch either way); Gateway BS / P&L = Books statements with stock; Gateway rows, sidebar "Accounts Info", palette destinations, Books header entries for the year-end wizard / Tally import; Alt+C ledgers in the Books voucher editor; Edit log on vouchers and bills; approval banner, "Pending approval" filter, branch selects; bell notices for approvals / AMC / GST set-off due; vendor bank details; HSN-master default rate on invoice / bill lines; Ctrl+F9 on the purchase side = purchase debit note (`tests/closing-stock-yearend.test.ts`, `tests/wiring.test.ts`) | done |
-| 7.61 | ⏳ Integration follow-ups: branch filter on the Transactions / purchase lists and branch-wise TB / P&L (`branchPredicates` option in the reports engine), loyalty redemption in the invoice editor, POS "Return / exchange" deep link, branch select on manual vouchers, DrillStack for the Gateway Display viewer, PAN / TDS fields on the vendor form | open |
+| 7.61 | ⏳ Integration follow-ups: branch filter on the Transactions / purchase lists and branch-wise TB / P&L (`branchPredicates` option in the reports engine), loyalty redemption in the invoice editor, POS "Return / exchange" deep link, branch select on manual vouchers, DrillStack for the Gateway Display viewer, PAN / TDS fields on the vendor form (done in 7O, 7.95) | open |
 
 ### 7L · Inventory masters & analysis (WP-8, `docs/features/inventory-masters.md`)
 
@@ -335,6 +335,21 @@ Details: `docs/features/manufacturing.md`.
 | 7.65 | ✅ **Godown hierarchy** (godown inside a godown, stock rolled up), **standard cost / selling price lists** with effective dates, **Stock Query** (stock by godown / batch, last purchase / sale rates, pending orders, prices), **landed cost** on a bill (freight etc. spread to the goods' stock cost, memo only); stock-item delete blocked while BOMs / stock vouchers use it | P2 | done |
 | 7.66 | ⏳ (UQC mapping into GSTR-1 HSN / e-Invoice / e-Way and alternate-unit item profit: done after the merge) alternate units on POS lines and stock journals; price lists feeding the editor's rate; group-wise reorder / ageing filters | P1-10, P2 | open |
 
+
+### 7O · GST & TDS follow-ups (`docs/features/gst-setoff.md`, `docs/features/tds-payables.md`)
+
+| # | Item | Tally equivalent | Status |
+|---|------|------------------|--------|
+| 7.90 | ✅ **Purchase cess everywhere**: Books `gstSummary` (`itcCess`, `rcmCess`, `netCessPayable`; `itcWithCess` for 3B / 9 / 9C comparisons), cost when not claimed, balance sheet; `purchases.ts` `itcTotals.cess`; accounting purchase register "Cess" column; Tally "Input Cess" ledger — nothing lands in round-off any more; **reverse-charge / import cess** out of the supplier payable (`selfAssessedCessOf`) and onto GST payable — reverse charge (2310) / customs (2311) in the ledger and Tally | GST cess on purchases | done |
+| 7.91 | ✅ **ITC carry-forward**: a posted set-off stores the unutilised ITC by head (`itc_carry`); the next period's plan starts from it (`carryForwardFor`, gap / pre-7O notes), "Credit ledger (carried)" view (`creditLedgerBalance`); **negative net ITC** (4B(2) / supplier notes above the period's credit) shown signed in the 3B view (`itc.netSigned`), absorbed by carried credit first, else paid in cash with the input ledger restored — flagged for the CA | Electronic credit ledger | done |
+| 7.92 | ✅ **RCM self-invoice** (Sec 31(3)(f) / Rule 46, `RCM/FY…`) per bill or **consolidated for a month**, and **Rule 52 payment voucher** (`RPV/FY…`) for reverse-charge purchases from unregistered suppliers; Indian-FY series via `series-counters.ts` (never re-issued), 16-character limit, Rule 47A 30-day due date (date-keyed in `gst-penalties.ts`), printable; GST reports tab "RCM self-invoice" (`src/lib/rcm-self-invoice.ts`, table `rcm_documents`) | Self-invoice / payment voucher under RCM | done |
+| 7.93 | ✅ **Supplier notes in GSTR-9 and the compliance estimates**: monthly 3B builds behind GSTR-9 / 9C read `purchase_returns` (Table 6A, Table 9), Table 6B–6F / 8 reduced in the bill's bucket; the Compliance tab's late-fee / interest base nets supplier notes | — | done |
+| 7.94 | ✅ **TDS on a purchase return**: a note against a bill with TDS at booking carries `tds_reversed` (`tdsReversalForReturn`, pro rata, rupee-rounded): Dr TDS payable instead of the supplier (ledger, Tally debit note), Books TDS payable, the TDS register nets the bill's deduction and warns when the return comes after the deposit | — | done |
+| 7.95 | ✅ **Vendor form TDS block**: PAN, deductee type, default section, 206AB, non-resident (27Q flag), Sec 197 certificate number / rate / **limit** / **validity** — the bill form applies the certificate only inside its validity and up to its limit (excess at the normal rate) | Party TDS details | done |
+| 7.96 | ✅ **TDS dates in the GST compliance calendar** (lazy `TdsDueCalendar`) and the **notification bell** (deposit / 26Q overdue or due within 5 days) | Statutory reminders | done |
+| 7.97 | ✅ **Sec 194-O / 194R / 194S** presets, date-keyed append-only (`TDS_EXTRA_SECTION_RULES` in `tax-rules.ts`, thresholds `TDS_EXTRA_THRESHOLD_RULES`), on both the receivables and payables side — unverified, see CA list | TDS nature of payment | done |
+| 7.98 | ✅ **IFF JSON** (QRMP months 1–2): B2B / CDNR (+ amendments) from the month's GSTR-1 build with the ₹50 lakh check (`src/lib/iff.ts`, date-keyed limit) — layout unverified | — | done |
+| 7.99 | ⏳ 7O follow-ups: Form 27Q return working paper / DTAA rates, TRACES justification import, 194-O ₹5 lakh individual exemption and 5% no-PAN rate, TDS on payment-mode bills reduced by later returns, PMT-09 / refunds, GSTR-9C Table 12 split of supplier notes, cess on supplier notes, accounting `gst_summary` export cess, TCS (27EQ) items in the bell | — | open |
 
 ## Summary timeline
 

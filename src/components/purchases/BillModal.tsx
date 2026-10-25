@@ -136,6 +136,9 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       pan: purchase?.tds_pan ?? v?.pan ?? '',
       lowerCert: purchase?.tds_cert_no ?? v?.tds_lower_cert,
       lowerRate: v?.tds_lower_rate,
+      lowerFrom: v?.tds_lower_from,
+      lowerTo: v?.tds_lower_to,
+      lowerLimit: v?.tds_lower_limit,
       nonFiler: v?.tds_non_filer,
       ...(purchase?.tds_section ? { rate: purchase.tds_rate, base: purchase.tds_base, amount: purchase.tds_amount } : {}),
     };
@@ -173,7 +176,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     [tds, date, totals.taxable, vendor?.id, vendor?.name, init?.vendor_name, purchase?.id],
   );
   const tdsOnBill = tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0;
-  const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total, tdsOnBill });
+  const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total, cess: totals.cess, tdsOnBill });
 
   const submit = () => {
     if (!vendor && !init?.vendor_name) return setError(purT('errVendor'));
@@ -263,7 +266,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           const vendorState = v ? resolveStateCode({ code: v.state_code, gstin: v.gstin }) : '';
           if (vendorState) setPos(vendorState);
           if (v) setItc(!!v.gstin);
-          if (v) setTds((t) => ({ ...t, pan: t.pan || v.pan || '', section: t.section || v.tds_section || '', nonFiler: v.tds_non_filer, lowerCert: v.tds_lower_cert, lowerRate: v.tds_lower_rate }));
+          if (v) setTds((t) => ({ ...t, pan: t.pan || v.pan || '', section: t.section || v.tds_section || '', nonFiler: v.tds_non_filer, lowerCert: v.tds_lower_cert, lowerRate: v.tds_lower_rate, lowerFrom: v.tds_lower_from, lowerTo: v.tds_lower_to, lowerLimit: v.tds_lower_limit }));
         }}
       />
 

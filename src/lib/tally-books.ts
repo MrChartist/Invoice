@@ -81,6 +81,8 @@ export interface BooksLedgerNames {
   inputCgst: string;
   inputSgst: string;
   inputIgst: string;
+  /** Additive (7O): input cess ledger name (default "Input Cess"). */
+  inputCess?: string;
   rcmPayableLedger: string;
   customsIgstLedger: string;
 }
@@ -156,6 +158,7 @@ export function ledgerResolver(src: TallyBooksSource, o: BooksLedgerNames, addLe
     [A.inCgst]: { name: o.inputCgst, parent: 'Duties & Taxes', duty: 'Central Tax' },
     [A.inSgst]: { name: o.inputSgst, parent: 'Duties & Taxes', duty: 'State Tax' },
     [A.inIgst]: { name: o.inputIgst, parent: 'Duties & Taxes', duty: 'Integrated Tax' },
+    [A.inCess]: { name: o.inputCess || 'Input Cess', parent: 'Duties & Taxes', duty: 'Cess' },
     [A.tcsPayable]: { name: o.tcsLedger, parent: 'Duties & Taxes' },
     [A.tdsReceivable]: { name: o.tdsLedger, parent: 'Current Assets' },
     [A.rcmPayable]: { name: o.rcmPayableLedger, parent: 'Duties & Taxes' },

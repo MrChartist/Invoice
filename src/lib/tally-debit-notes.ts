@@ -16,7 +16,7 @@ import type { PurchaseReturn } from '../types/purchases';
 import { checkGstin } from './gstin';
 import { num } from './invoice-calc';
 import { inRange, stateNameOf, toPaise, type DateRange } from './export-shared';
-import { isLiveNote, noteSelfTax } from './purchase-returns-gst';
+import { isLiveNote, noteSelfTax, noteTdsReversed } from './purchase-returns-gst';
 import type { TallyEntry, TallyVoucher } from './tally-xml';
 
 export const PURCHASE_RETURNS_LEDGER = 'Purchase Returns';
@@ -55,7 +55,14 @@ export function debitNoteVouchers(notes: readonly PurchaseReturn[] | undefined, 
     const gstin = String(n.vendor_gstin ?? '').trim().toUpperCase();
     const stateName = stateNameOf(checkGstin(gstin).stateCode ?? n.place_of_supply ?? '');
     const entries: TallyEntry[] = [];
-    push(entries, party, 'Dr', total - self, n.purchase_id && n.bill_number ? { name: n.bill_number, type: 'Agst Ref' } : { name: n.note_number, type: 'New Ref' });
+    // 7O (7.94): TDS reversed with the note goes back to the section's TDS payable, not the supplier.
+    const tds = Math.min(toPaise(noteTdsReversed(n)), Math.max(total - self, 0));
+    const tdsLedger = `TDS Payable ${String(n.tds_section ?? '').replace(/-.*/, '')}`.trim();
+    if (tds > 0) {
+      push(entries, tdsLedger, 'Dr', tds);
+      addLedger({ name: tdsLedger, parent: 'Duties & Taxes' });
+    }
+    push(entries, party, 'Dr', total - self - tds, n.purchase_id && n.bill_number ? { name: n.bill_number, type: 'Agst Ref' } : { name: n.note_number, type: 'New Ref' });
     push(entries, PURCHASE_RETURNS_LEDGER, 'Cr', n.itc_eligible ? taxable : taxable + gst);
     if (n.itc_eligible) {
       push(entries, o.inputCgst, 'Cr', cgst);

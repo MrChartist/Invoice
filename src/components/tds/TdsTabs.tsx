@@ -34,6 +34,7 @@ import { StatCard } from '../ui/StatCard';
 import { EmptyState } from '../ui/EmptyState';
 import { useT } from '../../i18n';
 import { tdsT } from '../../i18n/areas/tds';
+import { o7T } from '../../i18n/areas/gst-tds-7o';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import books from '../books/books.module.css';
@@ -194,7 +195,15 @@ export function DeductionsTab({ data, fy, today, canEdit, onChanged, notify }: {
                       <td>{formatDate(r.deductedOn)}</td>
                       <td className={surface.numeric}>{formatMoney(r.base)}</td>
                       <td className={surface.numeric}>{r.rate}%</td>
-                      <td className={surface.numeric}>{formatMoney(r.amount)}</td>
+                      <td className={surface.numeric}>
+                        {formatMoney(r.amount)}
+                        {r.returnReversed ? (
+                          <div className={styles.alloc} data-tds-return>
+                            {o7T('retReversed', { amount: formatMoney(r.returnReversed), date: formatDate(r.returnDate ?? '') })}
+                            {ch && r.returnDate && ch.date < r.returnDate ? ` ${o7T('retAfterDeposit')}` : ''}
+                          </div>
+                        ) : null}
+                      </td>
                       <td>{ch ? `${ch.bsr_code}/${ch.challan_no} · ${formatDate(ch.date)}` : tdsT('notLinked')}</td>
                       <td className={surface.numeric}>
                         {est.total ? formatMoney(est.total) : ''}

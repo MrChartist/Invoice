@@ -46,7 +46,7 @@ import { allocateProportionally, calcInputFromRecord, calculateInvoice, num } fr
 import { invoiceAmounts, toPaise } from '../export-shared';
 import { fxNarration, inrValue } from '../fx';
 import { receivableTotal } from '../rcm';
-import { readPurchase } from '../purchase-normalize';
+import { readPurchase, selfAssessedCessOf } from '../purchase-normalize';
 import { realisedFx } from '../fx-gain';
 import { A, EXPENSE_CATEGORY_ACCOUNTS, chartOf, groupOf, tdsAccountFor, type Account } from './accounts';
 import { VOUCHER_TYPE_LABELS, type ManualVoucher } from './vouchers';
@@ -410,12 +410,15 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
   // as long as the bill total actually includes it (an imported row may carry only the taxable value).
   const selfTax = (c.reverseCharge || c.importType !== '') && gst > 0 ? gst : 0;
   const totalIncludesTax = Math.abs(total - (taxable + gst)) <= Math.abs(total - taxable);
-  const supplier = selfTax && totalIncludesTax ? total - selfTax : total;
+  // 7O (7.90): self-assessed cess on a reverse-charge / import bill goes with the GST, never to the supplier.
+  const selfCess = toPaise(selfAssessedCessOf(c));
+  const supplier = (selfTax && totalIncludesTax ? total - selfTax : total) - selfCess;
   // TDS deducted on booking the bill (Tally parity): owed to the government, not the supplier.
   const tds = Math.min(Math.max(toPaise(c.tdsOnBill), 0), supplier);
   l.cr(A.creditors, supplier - tds, party);
   l.cr(tdsAccountFor(c.tdsSection), tds);
   if (selfTax) l.cr(c.importType === 'GOODS' ? A.importIgst : A.rcmPayable, selfTax);
+  if (selfCess) l.cr(c.importType === 'GOODS' ? A.importIgst : A.rcmPayable, selfCess);
   // ITC reversed against the bill (Rules 42/43/37 …): spread over the heads, charged to P&L.
   if (n.itcEligible && c.itcReversed > 0 && gst > 0) {
     const rev = Math.min(toPaise(c.itcReversed), gst);

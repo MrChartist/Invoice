@@ -60,6 +60,7 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   tds_challans: { entity: 'tds', label: 'TDS challan' },
   tds_deductions: { entity: 'tds', label: 'TDS deduction' },
   tds_returns: { entity: 'tds', label: 'TDS return mark' },
+  rcm_documents: { entity: 'gst', label: 'RCM self-invoice / payment voucher' },
   pos_day_close: { entity: 'pos_day_close', label: 'POS day close' },
   pos_returns: { entity: 'invoice', label: 'POS return' },
   doc_links: { entity: 'invoice', label: 'Document link' },
