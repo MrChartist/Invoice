@@ -32,7 +32,7 @@ export interface BusinessAlertInput {
   approver: boolean;
   invoices: readonly Pick<InvoiceRecord, 'id' | 'invoice_number' | 'approval' | 'total'>[];
   amc: readonly AmcContract[];
-  /** Set-off reminders: only for a GST-registered filer who has used the set-off screen. */
+  /** Set-off reminders: for a regular GST-registered filer (or one who has used the set-off screen). */
   setoff?: { gstin: string; frequency: FilerFrequency; stateCode?: string; postedKeys: ReadonlySet<string> };
 }
 
@@ -112,8 +112,11 @@ export function registerBusinessAlerts(): void {
   if (unregister) return;
   unregister = registerNotificationProvider((ctx) => {
     const today = localDayOf(ctx.now);
-    const usesSetoff = getTable(SETOFF_TABLE).length > 0 || getTable(GST_CHALLAN_TABLE).length > 0;
     const gstin = ctx.profile?.companyGstin?.trim().toUpperCase() ?? '';
+    // Every regular (non-composition) GST filer gets the reminder, even before the set-off screen was
+    // first used; a composition dealer only once it has set-off / challan records (cheap checks first).
+    const regular = !!gstin && ctx.profile?.gst_scheme !== 'composition' && ctx.gstFrequency !== 'composition';
+    const usesSetoff = regular || getTable(SETOFF_TABLE).length > 0 || getTable(GST_CHALLAN_TABLE).length > 0;
     const postedKeys = new Set(
       getTable<{ period_key?: string; gstin?: string }>(SETOFF_TABLE)
         .filter((r) => !r.gstin || r.gstin === gstin)

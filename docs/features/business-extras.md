@@ -78,16 +78,35 @@ tenders; the drawer's expected cash subtracts cash refunds. CSV and the 80 mm pr
   returns / purchases per branch, "No branch" row), `branchPredicates(branchId)` (one predicate per table).
 - The Dashboard tiles have a branch filter (receivables, payables, cash / bank, GST, top items all narrow to the branch).
 
-**Integration point for WP-2 (reports engine, `src/lib/ledger/reports.ts` — not edited here):** add an option
-`{ branchId?: string }` to the report builders and filter source rows before postings:
+**Branch-wise books (7N, `src/lib/ledger/branch-books.ts`).** The ledger built by `loadLedgerInput()` carries the
+branch master, so `buildLedger` records each voucher's branch (`Ledger.voucherBranch`). Every report builder takes the
+option `{ branchId }` (`ReportScope`): `trialBalance`, `ledgerProfitAndLoss`, `ledgerBalanceSheet`, `cashFlowStatement`,
+`accountStatement`, `groupSummary` (in its options), `ledgerDayBook`, `voucherRegister`, `voucherStatistics`, and the
+Gateway `buildFrame` (`FrameOptions.branchId`). `scopeLedger(ledger, { branchId })` narrows once (cached per ledger).
 
-```ts
-import { branchPredicates } from '../branch';
-const p = branchPredicates(opts.branchId);
-const data = { ...src, invoices: src.invoices.filter(p.invoice), purchases: src.purchases.filter(p.purchase), vouchers: src.vouchers.filter(p.voucher) };
-```
+- Sales / credit notes: `branchOfInvoice`; receipts and advance adjustments follow their invoice; bills / expenses:
+  `branchOfPurchase`; supplier payments and debit notes follow their bill; manual vouchers: `branch_id`. Openings,
+  depreciation, payroll, challans, advances received and on-account supplier payments are company level ("No branch"),
+  as is a row tagged with a deleted branch — so the branches plus "No branch" always add up to the company books, and each
+  branch trial balance balances on its own (`tests/branch-books.test.ts`).
+- Report-time closing stock is company-wide and is left out of a branch view (the screens say so).
+- UI: branch filter (`BranchFilter`, shown once a branch exists) in the Books statements toolbar (Day book, P&L, Reports,
+  TB, Ledger, BS, Cash flow), on Gateway Display (kept in the URL as `b=`), Transactions and the purchase list; branch
+  select on manual vouchers (Books voucher editor, Gateway voucher entry).
 
-Receipts / payments follow their document. Inter-branch stock transfer as a tax invoice (Sec 25(4)) is **not** built.
+**Inter-branch transfer between distinct GSTINs (Sec 25(4), `src/lib/branch-transfer.ts`).** A branch can name its
+godown (`Branch.godown_id`; sub-godowns belong to their parent's branch). A stock transfer whose godowns belong to two
+branches with different GSTINs shows **Tax invoice + bill** in the transfer list: the dialog takes a value per unit
+(default: average cost, else the opening / sale rate — Rule 28, verify with your CA) and saves
+
+- a TAX_INVOICE from the sending branch (its GSTIN on the sender snapshot, the receiving branch as client, place of
+  supply = receiving state, IGST across states), and
+- the matching purchase bill at the receiving branch (ITC eligible, bill number = invoice number).
+
+Both carry `branch_transfer_id` and post to the default ledgers **4030 Branch transfer (outward)** / **5020 Branch
+transfer (inward)** instead of Sales / Purchases, so the pair nets to nil on consolidation and only the GST remains. Lines
+keep their HSN but carry the transfer number in the name, so the stock engine does not move the goods again (the transfer
+voucher already did). One pair per transfer (a cancelled invoice frees it). Working paper — verify with your CA.
 
 ## Dashboard tiles (P1-17)
 
@@ -103,7 +122,8 @@ Books / Receivables screens (`summarize`, `buildVouchers` + `accountBalanceAt`, 
   rate is appended from today (old bills keep the rate of their date).
 - Accrual is derived: live sales bills of a saved customer earn; credit notes take back; cancelled bills earn nothing and
   return their redeemed points; the walk-in row never earns. Manual corrections in `loyalty_adjustments`.
-- Redemption (POS customer card; `LoyaltyRedeem` can be mounted in the editor the same way): `applyRedemption` adds the
+- Redemption (POS customer card, and the invoice editor's summary panel through the lazy `EditorLoyalty`, mounted only
+  while the programme is on, for sales bills with a customer): `applyRedemption` adds the
   value to the bill's invoice-level **amount discount** and stores `loyalty_redeem`. GST is on the reduced value (discount
   at the time of supply, Sec 15(3)(a)) — verify with your CA. A % invoice discount must be removed first.
 
@@ -127,10 +147,12 @@ downloaded for sharing / hosting.
 Done in the integration pass: `ApprovalBanner` in the invoice editor (lazy, only for pending / rejected documents);
 Transactions "Pending approval" filter (shown while any is pending) and badge; branch select (`BranchSelect`, shown once
 a branch exists) on the invoice editor and the purchase bill form; bell notices for pending approvals (approver only)
-and `amcReminders` (`src/lib/business-alerts.ts`, loaded lazily); palette destination "POS return / exchange" → `/pos`.
+and `amcReminders` (`src/lib/business-alerts.ts`, loaded lazily); palette destination "POS return / exchange" →
+`/pos?return=1`, which opens the return dialog straight away (also when already on the POS).
 
-Still open: `LoyaltyRedeem` in the editor, branch filter on the Transactions / purchase lists, branch select on manual
-vouchers, opening the POS return dialog straight from the palette.
+7N: loyalty redemption in the editor, branch filter on the Transactions / purchase lists, branch select on manual
+vouchers, branch-wise books and the Sec 25(4) transfer pair (above). The bell's GST set-off reminder now reaches every
+regular (non-composition) GSTIN filer, even before the set-off screen was first used.
 
 ## Not built / gaps
 
@@ -138,4 +160,5 @@ vouchers, opening the POS return dialog straight from the palette.
 - Receivables statements read invoices / payments only, so a refund voucher does not appear there: a refunded walk-in
   return shows as a credit on the Walk-in customer statement (the ledger / TB / Books are right).
 - The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).
-- Inter-branch transfers as tax invoices and branch-wise TB / P&L (needs the WP-2 option above).
+- Branch-wise closing stock (per-godown valuation) is not apportioned; a branch view shows no report-time stock.
+- The Sec 25(4) pair is raised by hand from the transfer list; the e-invoice / e-way JSON for it is the normal one.

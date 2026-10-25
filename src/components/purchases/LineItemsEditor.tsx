@@ -15,6 +15,8 @@ import type { StockItem } from '../../lib/inventory';
 import { unitT } from '../../i18n/areas/units';
 import { useT } from '../../i18n';
 import { purT } from '../../i18n/areas/purchases';
+import { useCreateOnTheFly } from '../masters/useCreateOnTheFly';
+import { isAltC } from '../masters/useMasterKeys';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -57,6 +59,16 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
       ...(it.hsn ? { hsn: it.hsn } : {}),
       ...(typeof it.tax_rate === 'number' ? { tax_rate: it.tax_rate } : {}),
     });
+  // Alt+C on the item name creates a stock item with the typed name and picks it (Tally parity).
+  const fly = useCreateOnTheFly();
+  const createItem = (line: PurchaseLine) => {
+    void fly.open({ kind: 'stockItem', name: line.name }).then((saved) => {
+      if (!saved) return;
+      const fresh = liveUnits().items.find((x) => x.id === saved.id);
+      setTick((t) => t + 1);
+      if (fresh) pickItem(line, fresh);
+    });
+  };
   /** The line's stock item when it has alternate units (picked id first, else name + HSN). */
   const altItem = (l: PurchaseLine): StockItem | undefined => {
     const byId = l.item_id ? units.items.find((i) => i.id === l.item_id) : undefined;
@@ -92,6 +104,12 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
                     onFocus={() => setTick((t) => t + 1)}
                     getSuggestions={itemSuggestions}
                     onPick={(it) => pickItem(l, it)}
+                    aria-keyshortcuts="Alt+C"
+                    onKeyDown={(e) => {
+                      if (!isAltC(e.nativeEvent)) return;
+                      e.preventDefault();
+                      createItem(l);
+                    }}
                     // Typing a different name detaches the picked stock item (older lines match by name + HSN).
                     onChange={(name) => patch(l.id, { name, ...(l.item_id && units.items.find((x) => x.id === l.item_id)?.name.trim().toLowerCase() !== name.trim().toLowerCase() ? { item_id: undefined, unit_factor: undefined } : {}) })}
                   />
@@ -182,6 +200,7 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
       >
         <Plus size={15} /> {purT('addLine')}
       </button>
+      {fly.node}
     </div>
   );
 }

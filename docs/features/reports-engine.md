@@ -129,6 +129,25 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
   non-current movements (capital, reserves, loans, fixed assets, investments, long-term advances) = change in working
   capital (stock included); `difference` is 0 for consistent books (tested).
 
+## Branch scope (7N, P1-19)
+- Every builder takes an optional `{ branchId }` (`ReportScope`, `src/lib/ledger/branch-books.ts`): `trialBalance(ledger,
+  period, scope?)`, `ledgerProfitAndLoss(ledger, period, stock?, scope?)`, `ledgerBalanceSheet(ledger, asOf, stock?,
+  scope?)`, `cashFlowStatement(…, stock?, scope?)`, `accountStatement(…, party?, scope?)`, `groupSummary(…, { branchId })`,
+  `ledgerDayBook(…, kinds?, scope?)`, `voucherRegister(…, scope?)`, `voucherStatistics(…, scope?)`; the Gateway's
+  `buildFrame(…, { branchId })`. `''` = company, a branch id, or `UNASSIGNED` ("No branch").
+- Whole vouchers are kept or dropped (`scopeLedger`, cached per ledger), using the branch `buildLedger` recorded for each
+  voucher from its source row (`Ledger.voucherBranch`, set when `LedgerInput.branches` is given — `loadLedgerInput` does).
+  Branch TBs balance and add up to the company TB (tested). A branch view passes no stock valuer (stock is company-wide).
+- UI: `LedgerPanel` keeps the full ledger for the chart / vouchers / planning tabs and gives the statements the scoped one
+  (branch filter above the report, with a note); Gateway Display keeps the branch in the URL (`b=`).
+
+## Gateway Display drill (7N)
+- Balance sheet head → its Schedule III break-up, exactly Books' `BsItem.detail`: own ledgers plus party balances that
+  moved sides (advances to suppliers / from customers under the advances / other-liabilities heads) and the valued
+  closing-stock line under Inventories (which now carries the stock inside the head instead of a separate root row).
+  Party lines drill straight into that party's monthly summary (`DisplayRow.drillTo`: account, then party). A head that
+  holds only its own group's ledgers keeps the Tally group screen (opening / Dr / Cr / closing).
+
 ## Data
 - New company key `mrchartist_inv_closing_stock` (JSON object; in backups automatically; not a record table).
 - Device-local, never backed up: `mrchartist_report_prefs`, `mrchartist_report_period`.
@@ -142,6 +161,7 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
 - Comparative columns: Group Summary and P&L only; TB / BS read one period.
 - Keys: Alt+F2 (period), Alt+F1 and F12 are handled in the capture phase on Books report screens, so they win over the
   global Tally keys (`src/lib/tally-keys.ts`: Alt+F2 → Gateway period, F12 → Settings) there; elsewhere the global keys apply.
-- The Gateway Display viewer now builds its BS / P&L from `ledgerBalanceSheet` / `ledgerProfitAndLoss` with
-  `loadStockValuer()` (same figures as Books, tested); it still uses its own frame model rather than `DrillStack`.
+- The Gateway Display viewer builds its BS / P&L from `ledgerBalanceSheet` / `ledgerProfitAndLoss` with
+  `loadStockValuer()` (same figures as Books, tested) and its heads drill into the same Schedule III detail as Books; it
+  keeps its own URL-based frame model (Back / Esc walk the path) rather than mounting `DrillStack`.
 - Closing stock per godown / cost centre and "lower of cost or NRV" are not modelled.

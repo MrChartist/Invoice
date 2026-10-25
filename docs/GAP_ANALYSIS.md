@@ -30,10 +30,14 @@ journal only when valuation is off, and the Gateway Display BS / P&L use the sam
 | | Delivered | Partial | Open |
 |---|---|---|---|
 | P0 | P0-1 … P0-12 (all) | — | — |
-| P1 | P1-1, 2, 3, 4, 5, 11, 14, 15, 17, 18, 20, 22, 24, 25, 26 | P1-6, 7, 8, 12, 16, 19, 23 | P1-9 job work / ITC-04, P1-10 inventory masters (WP-8 in progress), P1-13 voucher types, P1-21 Excel import kinds |
+| P1 | P1-1, 2, 3, 4, 5, 11, 14, 15, 17, 18, 19, 20, 22, 24, 25, 26 | P1-6, 7, 8, 12, 16, 23 | P1-9 job work / ITC-04, P1-10 inventory masters (WP-8 in progress), P1-13 voucher types, P1-21 Excel import kinds |
 
 Status column / headings below are updated; the body text is the original analysis (it describes the gap, not
-today's app). Remaining follow-ups: `docs/ROADMAP.md` 7.7, 7.8, 7.19, 7.23, 7.28, 7.37, 7.43, 7.49, 7.59, 7.61.
+today's app). Remaining follow-ups: `docs/ROADMAP.md` 7.7, 7.8, 7.19, 7.23, 7.28, 7.37, 7.43, 7.49, 7.59, 7.61, 7.84.
+
+7N (branch accounting): P1-19 is delivered — branch-wise books through a `{ branchId }` option on every report (branch
+TBs add up to the company TB), branch filters on Books / Gateway Display / Transactions / purchases, branch select on
+manual vouchers, and the Sec 25(4) inter-branch tax invoice + bill (ROADMAP 7.80–7.83).
 
 ---
 
@@ -570,7 +574,7 @@ Each item lists what to build, the files it touches, size, dependencies, and the
 | P1-16 | GST depth | e-Invoice ShipDtls / DispDtls / PayDtls; cess on purchase bills; RCM self-invoice + Rule 52 payment voucher series; HSN master with rate history and default rate inheritance (company → group → item); purchase-side HSN / rate register; month-wise "GSTR-1 vs 3B vs Books" reconciliation; GSTR-9C working paper | `src/lib/einvoice.ts`, `purchases.ts`, new `src/lib/hsn-master.ts`, `src/lib/gstr9c.ts`, `components/gst-reports/*` | L | WP-3 (supplier notes for 9C ITC) | TallyPrime "GST Rate Setup", "Reconciliation of Returns" | 🟡 WP-6 (HSN defaults wired on lines); RCM self-invoice open |
 | P1-17 | Dashboard tiles | Tile picker: cash, each bank, receivables, payables, GST payable (from P0-6), stock value, top items / parties, overdue POs | `src/pages/Dashboard.tsx`, `src/lib/stats.ts` | S–M | P0-6, P0-8 | TallyPrime 4 Dashboard "Add Tile" | ✅ WP-9 |
 | P1-18 | Approvals (maker-checker) | Optional: a clerk's invoices / bills / payments save as "Pending approval" (not issued, no number consumed until approved, or a provisional number); the owner approves or rejects with a note; bell notice | `src/lib/access.ts` (new action), `localDb.invoices.save` path, a new `approvals` table | M | — | Zoho-style; Tally users know it as "Approval Workflow" from Tally ERP add-ons | ✅ WP-9; banner, list filter, bell notice |
-| P1-19 | Branch accounting | Branch = a profile GSTIN; branch-wise TB / P&L filter (from the document's sender GSTIN / cost centre), inter-branch stock transfer as a tax invoice between distinct persons (Sec 25(4)) with "Branch Transfer" accounts | `src/lib/ledger/reports.ts` (filter), `godowns.ts` (godown → branch) | M–L | P0-3 | Tally multi-GSTIN "Registration" selector in reports | 🟡 branch master + tags + selects (WP-9); branch-wise TB / P&L, inter-branch invoice open |
+| P1-19 | Branch accounting | Branch = a profile GSTIN; branch-wise TB / P&L filter (from the document's sender GSTIN / cost centre), inter-branch stock transfer as a tax invoice between distinct persons (Sec 25(4)) with "Branch Transfer" accounts | `src/lib/ledger/reports.ts` (filter), `godowns.ts` (godown → branch) | M–L | P0-3 | Tally multi-GSTIN "Registration" selector in reports | ✅ branch master + tags + selects (WP-9); branch-wise books via `{ branchId }` on every report, branch filters on Books / Gateway / Transactions / purchases, Sec 25(4) transfer invoice + bill with "Branch transfer" ledgers (7N, ROADMAP 7.80–7.81); per-godown branch stock valuation open (7.84) |
 | P1-20 | Year-end wizard | Checklist: closing stock, depreciation run, provisions journal, lock FY, opening bills check, carry-forward report, optional archive of old FYs to a separate "history" company | new `src/lib/year-end.ts`, `components/year-end/*` | M | P0-3, P0-10 | Tally "Split Company Data" (presented as "Start new year") | ✅ WP-7; consistent with report-time closing stock |
 | P1-21 | Excel import of ledgers, vendors, stock items, vouchers | New import kinds in the wizard, mapped like clients / items | `src/lib/import-mapping.ts`, `importers.ts` (new kinds), wizard steps | M | P0-1 | TallyPrime 4 "Import → Excel" templates | ❌ open |
 | P1-22 | Tally XML export completeness (beyond P0-12) | Cost-centre allocations, godown / batch allocations (with masters), stock transfers as Stock Journal, per-bank ledgers, receipts at the realised FX rate, opening balances in masters | `src/lib/tally-xml.ts` | M | P0-1, P0-8 | — | ✅ WP-7 |
