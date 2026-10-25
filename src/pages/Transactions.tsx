@@ -56,6 +56,9 @@ const InvoicePreviewModal = lazy(() =>
   import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
 );
 
+// Batch PDF / ZIP (WP-4): the PDF stack and template engine load only when used.
+const BatchPdfModal = lazy(() => import('../components/preview/BatchPdfModal').then((m) => ({ default: m.BatchPdfModal })));
+
 type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft';
 
 const FILTERS: { id: Filter; label: () => string }[] = [
@@ -120,6 +123,7 @@ export function Transactions() {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkPay, setBulkPay] = useState<{ method: string; date: string } | null>(null);
+  const [batchPdf, setBatchPdf] = useState<InvoiceRecord[] | null>(null);
   // Deletes wait a few seconds behind an Undo toast before they touch storage.
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(() => new Set());
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -227,6 +231,8 @@ export function Transactions() {
         // An amendment marker belongs to the amended document only (5.9).
         amends: undefined,
         pos: undefined,
+        // A new shipment: vehicle / LR / e-Way numbers belong to the original (P1-24).
+        transport: undefined,
         created_at: undefined,
         updated_at: undefined,
         // A copy is a fresh document: it fulfils no sales order and is not closed.
@@ -429,6 +435,9 @@ export function Transactions() {
             <button type="button" className={controls.btnOutline} onClick={() => exportCsv(visibleSelected)}>
               <Download size={16} /> {salesT('exportCsv')}
             </button>
+            <button type="button" className={controls.btnOutline} onClick={() => setBatchPdf(visibleSelected)}>
+              <FileText size={16} /> PDF / ZIP
+            </button>
             {visibleSelected.some(mayDelete) && (
               <button
                 type="button"
@@ -599,6 +608,11 @@ export function Transactions() {
         onConfirm={() => deleting && handleDelete(deleting)}
         onClose={() => setDeleting(null)}
       />
+      {batchPdf && (
+        <Suspense fallback={null}>
+          <BatchPdfModal invoices={batchPdf} onClose={() => setBatchPdf(null)} />
+        </Suspense>
+      )}
       <Modal
         open={!!bulkPay}
         onClose={() => setBulkPay(null)}

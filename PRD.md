@@ -89,6 +89,11 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 - **Custom fields**: user-defined text / number / date fields on documents, items and clients / vendors, optionally
   printed in a "Details" box (and under item lines). Saved invoices keep the labels they were saved with; the sales
   register CSV gains a column per field used.
+- **Printing & documents output** (`docs/features/printing.md`): Original / Duplicate / Triplicate copies in one
+  print job or PDF with Rule 48 banners (goods 3, services 2; challans per Rule 55) and a per-profile default;
+  transport details (mode, vehicle, transporter, LR / RR, e-Way bill no.) on the document; Tally-style voucher
+  printing; batch PDF or ZIP of PDFs from the documents list; bulk statements and confirmation-of-accounts letters;
+  pre-printed stationery mode.
 - **Sharing**: the PDF itself through the OS share sheet (WhatsApp, mail), a self-contained "client copy" web page with
   a Pay-with-UPI button, WhatsApp / e-mail / SMS text with UPI links.
 - **Reminders**: stage-based templates (upcoming, due today, polite / firm / final overdue, thank-you) in English and

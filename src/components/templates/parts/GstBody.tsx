@@ -11,11 +11,14 @@ import { buildUpiUrl, isRcmTotals, isTaxed, trackingText } from '../paper-helper
 import styles from '../invoice-paper.module.css';
 import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
 import { ItemCustomLine } from './CustomFieldsBlock';
+import { transportRows } from '../../../lib/transport';
 
 interface Props {
   invoice: InvoiceRecord;
   sender: SenderProfile;
   totals: CalcTotals;
+  /** e-Way number the IRN block already prints (not repeated in the dispatch cells). */
+  skipEway?: string;
 }
 
 function Cell({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -32,7 +35,7 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
  * document facts on top, the item grid with tax ledgers as rows, an HSN/SAC
  * tax summary, then bank/declaration and the signatory box.
  */
-export function GstBody({ invoice, sender, totals }: Props) {
+export function GstBody({ invoice, sender, totals, skipEway }: Props) {
   const { money, currency, date, col, show, footerText, headerNote } = usePaper();
   const c = invoice.client;
   const ship = invoice.ship_to && (invoice.ship_to.address || invoice.ship_to.name) ? invoice.ship_to : null;
@@ -99,6 +102,12 @@ export function GstBody({ invoice, sender, totals }: Props) {
           <Cell label="Buyer's Ref / PO">{invoice.po_number || '—'}</Cell>
           {show.place && <Cell label="Place of supply">{place || '—'}</Cell>}
           <Cell label="Reverse charge">{invoice.reverse_charge ? 'Yes' : 'No'}</Cell>
+          {/* Tally's "Dispatch details" (P1-24): only when the document carries transport details. */}
+          {transportRows(invoice.transport, (d) => date(d), { skipEway }).map((r) => (
+            <Cell key={`tr-${r.key}`} label={r.label}>
+              <span data-transport-row={r.key}>{r.value}</span>
+            </Cell>
+          ))}
           {printableValues(invoice.custom_values).map((v) => (
             <Cell key={v.id} label={v.label}>{formatCustomValue(v, (d) => date(d))}</Cell>
           ))}

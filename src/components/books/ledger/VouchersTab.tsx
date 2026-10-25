@@ -1,6 +1,10 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronRight, FilePlus2, NotebookPen, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus2, NotebookPen, Pencil, Printer, Trash2 } from 'lucide-react';
+import { buildVoucherPrint, printHtmlDocument, voucherHtml } from '../../../lib/voucher-print';
+import { downloadText } from '../../../lib/download';
+import { localDb } from '../../../lib/localDb';
+import { printT } from '../../../i18n/areas/printing';
 import { deleteVoucher, loadVouchers, type Ledger, type LedgerVoucher, type ManualVoucher } from '../../../lib/ledger';
 import type { Period } from '../../../lib/books';
 import { toCsv } from '../../../lib/csv';
@@ -44,6 +48,17 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
   );
 
   const today = todayIso();
+
+  // Tally-style voucher print (P1-15): company header, Dr / Cr particulars, narration, words, signatures.
+  const printVoucher = (v: LedgerVoucher) => {
+    const p = localDb.settings.activeProfile();
+    const model = buildVoucherPrint(v, (id) => ledger.byId.get(id)?.name ?? id, { name: p?.companyName ?? '', address: p?.companyAddress, gstin: p?.companyGstin });
+    const html = voucherHtml([model], `${v.kind} ${v.number}`);
+    printHtmlDocument(html, (h) => {
+      downloadText(`voucher-${(v.number || v.kind).replace(/[^\w-]+/g, '-')}.html`, h, 'text/html');
+      notify(printT('popupBlocked'));
+    });
+  };
   const manualById = (id?: string) => (id ? loadVouchers().find((v) => v.id === id) ?? null : null);
 
   const csv = () =>
@@ -129,6 +144,10 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
                         </td>
                         <td className={surface.numeric}>{money(total(v))}</td>
                         <td className="no-print">
+                          <div className={books.toolbarGroup}>
+                            <button type="button" className={controls.btnIcon} aria-label={printT('printVoucher', { number: v.number || v.kind })} onClick={() => printVoucher(v)}>
+                              <Printer size={16} />
+                            </button>
                           {v.source === 'manual' && (
                             <div className={books.toolbarGroup}>
                               <button type="button" className={controls.btnIcon} aria-label={ledgerT('editName', { name: v.number })} onClick={() => setEditing(manualById(v.manualId))}>
@@ -139,6 +158,7 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
                               </button>
                             </div>
                           )}
+                          </div>
                         </td>
                       </tr>
                       {isOpen && (

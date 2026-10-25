@@ -180,7 +180,7 @@ backups already match or beat the Indian SME tools; the gaps below all work **wi
 | 6.19 | ✅ **Exchange gain/loss** (realised on receipts, posted to ledger 4930; period-end revaluation report; `src/lib/fx-gain.ts`) | Zoho, Tally, Xero | S–M |
 | 6.20 | ✅ **Separate companies** on one device (isolated data sets + switcher) (`src/lib/companies.ts`: one IndexedDB database per company) | Tally, Busy, Vyapar | M |
 | 6.21 | ✅ **Local user roles** on a shared device (owner / clerk / viewer PINs; access control, not security) — `src/lib/access.ts`, `src/lib/users.ts`, `docs/features/security.md` § Local user roles | Vyapar, myBillBook, Zoho | M |
-| 6.22 | ✅ **.xlsx import/export without a dependency** (native `DecompressionStream` + a hand-written XML tokenizer, `src/lib/xlsx.ts`); ZIP writer `src/lib/zip.ts` ready for a ZIP of PDFs (not wired yet) | most | M |
+| 6.22 | ✅ **.xlsx import/export without a dependency** (native `DecompressionStream` + a hand-written XML tokenizer, `src/lib/xlsx.ts`); ZIP writer `src/lib/zip.ts` (used for the ZIP of PDFs, 7.4) | most | M |
 | 6.23 | ✅ **Custom fields** on documents, items, parties, printable (Settings → Custom fields; invoices snapshot label + value; `src/lib/custom-fields.ts`) | Tally (UDF), Zoho, Vyapar | S–M |
 | 6.24 | ✅ **Bulk e-Invoice / e-Way JSON** and bulk IRN response import (`einvoice.md`) | Zoho, Tally | S |
 | 6.25 | ✅ **Party/item profitability, credit limits at billing** (Reports → Item / Party profit; editor warning; `profitability.ts`, `credit-limit.ts`) | Vyapar, Zoho | S–M |
@@ -230,6 +230,12 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.17 | ⏳ **Stock journal (Alt+F7) / Physical stock (Ctrl+F7)**: key hooks and menu rows ready (shown "not available"); wire them when the manufacturing / stock-count screens land (`GATEWAY_EXTENSIONS`, `TALLY_KEYS`) | — | S |
 | 7.18 | ⏳ **Employee master / payroll vouchers** in Create, **TDS** statutory rows (7.1–7.3), **Ratio analysis** report (7.6) | add through `GATEWAY_EXTENSIONS` when those modules exist | S |
 | 7.19 | ⏳ Bill-wise references (7.5) and voucher classes (7.4) on Gateway voucher entry, single-entry mode | needs a voucher schema addition | M |
+
+### Printing & documents output (WP-4)
+
+| # | Item | Gap ids | Effort |
+|---|------|---------|--------|
+| 7.21 | ✅ **Printing & documents output**: Rule 48 copies in one print job / PDF with a per-profile default, transport details printed (GST dispatch cells + block), voucher printing, batch PDF / ZIP, bulk statements + confirmation-of-accounts letters, pre-printed stationery mode — `docs/features/printing.md` | P0-9, P1-15, P1-24, P1-6 (print), P2 | M |
 
 ## Summary timeline
 

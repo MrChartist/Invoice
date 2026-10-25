@@ -12,6 +12,7 @@ import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput, todayInput } from '../lib/utils';
 import { readValues } from '../lib/custom-fields';
 import { readRefs } from '../lib/attachments';
+import { normalizeTransport } from '../lib/transport';
 import type { AppSettings } from '../lib/localDb';
 import type {
   AmendmentInfo,
@@ -303,6 +304,10 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.exempt_kind === 'NIL' || r.exempt_kind === 'EXEMPT' || r.exempt_kind === 'NON_GST' ? { exempt_kind: r.exempt_kind } : {}),
     ...(normalizeAmends(r.amends) ? { amends: normalizeAmends(r.amends) } : {}),
     ...(r.pos === true ? { pos: true } : {}),
+    ...(() => {
+      const transport = normalizeTransport(r.transport);
+      return transport ? { transport } : {};
+    })(),
 
     created_at: r.created_at,
     updated_at: r.updated_at,

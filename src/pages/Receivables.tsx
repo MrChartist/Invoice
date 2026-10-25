@@ -2,7 +2,7 @@ import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, ty
 import { mailtoLink } from '../lib/share';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ChevronRight, Clock, Copy, Download, FileText, Mail, Percent, Scale, Wallet,
+  AlertTriangle, ChevronRight, Clock, Copy, Download, FileStack, FileText, Mail, Percent, Printer, Scale, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
@@ -23,6 +23,7 @@ import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
 import { bucketLabel, rcvT } from '../i18n/areas/receivables';
+import { printT } from '../i18n/areas/printing';
 import { AgingStack, CollectionsChart, ShareBar, AgeChip } from '../components/receivables/Charts';
 import { StatementViewer } from '../components/receivables/StatementViewer';
 import { downloadTextFile } from '../components/receivables/exportUtils';
@@ -33,6 +34,8 @@ import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
 
 // The TDS register, its 26AS parser and Form 16A tracking load only when opened.
+// Bulk statements / confirmation letters (WP-4): loaded with the PDF stack only when opened.
+const BulkStatements = lazy(() => import('../components/receivables/BulkStatements').then((m) => ({ default: m.BulkStatements })));
 const TdsTab = lazy(() => import('../components/receivables/TdsTab'));
 // Advance receipts (5.3): register, vouchers, apply / refund — loaded when opened.
 const AdvancesTab = lazy(() => import('../components/advances/AdvancesTab'));
@@ -81,6 +84,7 @@ export function Receivables() {
 
   const currencies = useMemo(() => currenciesIn(data.invoices), [data.invoices]);
   const [currencyPick, setCurrencyPick] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const currency = currencyPick || currencies[0] || 'INR';
 
   const now = useMemo(() => new Date(), []);
@@ -151,7 +155,16 @@ export function Receivables() {
           onClick={() => downloadTextFile(`Receivables_aging_${todayInput()}.csv`, agingCsv(report))}>
           <Download size={16} /> {rcvT('exportCsv')}
         </button>
+        <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setBulkOpen(true)} disabled={report.parties.length === 0}>
+          <FileStack size={16} /> {printT('bulkStatements')}
+        </button>
       </Header>
+      {bulkOpen && (
+        <Suspense fallback={null}>
+          <BulkStatements parties={report.parties} clients={data.clients} sender={localDb.settings.activeProfile()} currency={currency}
+            defaultFrom={toDateInput(fyStart(now))} defaultTo={toDateInput(now)} onClose={() => setBulkOpen(false)} />
+        </Suspense>
+      )}
 
       <div className={surface.statGrid}>
         <Stat label={rcvT('netOutstanding')} value={fmt(report.totals.net)} icon={Wallet}
@@ -531,6 +544,10 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
                 <Mail size={14} /> {rcvT('email')}
               </a>
             )}
+            <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} disabled={invalidRange}
+              onClick={() => void import('../components/receivables/letters').then((m) => m.printConfirmationLetters([party], data.clients, sender, from, to, currency))}>
+              <Printer size={14} /> {printT('letterOne')}
+            </button>
             <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={() => setViewer(true)} disabled={invalidRange}>
               <FileText size={14} /> {rcvT('printPdf')}
             </button>
