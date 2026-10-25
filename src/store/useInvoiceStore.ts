@@ -22,6 +22,7 @@ import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoic
 import { nextPartyBalanceSnapshot } from '../lib/party-balance';
 import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
+import '../types/sales-r2'; // R2-B: declaration-merged record fields (RECORD_KEYS below)
 import type {
   Client,
   DiscountType,
@@ -119,6 +120,8 @@ export interface InvoiceState extends InvoiceRecord {
  * added to the record type but not here — otherwise the editor would silently drop it on save.
  */
 export const RECORD_KEYS = [
+  // R2-B sales documents (declared in src/types/sales-r2.ts / contacts.ts)
+  'milestones', 'progress_of', 'revision_of', 'revision_no', 'proposal_sections', 'attention',
   'id', 'invoice_number', 'doc_type', 'issue_date', 'due_date', 'status', 'currency', 'template_id',
   'client', 'sender', 'items', 'gst_mode', 'place_of_supply', 'reverse_charge', 'discount_type',
   'discount_rate', 'tax_rate', 'shipping', 'other_charges', 'round_off_enabled', 'amount_paid', 'notes',

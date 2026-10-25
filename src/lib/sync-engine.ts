@@ -328,6 +328,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   // R2-C: deferral schedules (their journals are `vouchers` rows, locked on their own dates) and packing lists
   [`${DB_PREFIX}deferrals`]: (r) => str((r.source as Record<string, unknown> | undefined)?.date) || str(r.start) || undefined,
   [`${DB_PREFIX}packing_lists`]: 'date',
+  // R2-B: batch invoice runs (issue date of the run's invoices)
+  [`${DB_PREFIX}batch_runs`]: 'date',
   // R3-A: running table orders, dated by the local day they were opened (`day`, else the `opened_at` date)
   [`${DB_PREFIX}table_orders`]: (r) => str(r.day) || str(r.opened_at).slice(0, 10) || undefined,
 };

@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import { GstinInput } from '../ui/GstinInput';
 import { Typeahead } from '../ui/Typeahead';
 import { localDb } from '../../lib/localDb';
-import { suggest } from '../../lib/suggest';
+import { clientExtras, suggest } from '../../lib/suggest';
+import { PartyBookPickers } from '../clients/PartyBookPickers';
+import { applyPartyDefaults } from '../clients/party-defaults';
 import { clientToParty } from '../../store/invoice-defaults';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { WALK_IN_NAME } from '../../lib/counter-receipt';
@@ -37,7 +39,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
     (q: string) =>
       suggest(q, directory, {
         label: (c) => c.name,
-        extra: (c) => [c.company, c.gstin, c.city],
+        extra: clientExtras, // R2-B4: also contact persons' names / phones
         sub: (c) => [c.city, c.gstin].filter(Boolean).join(' · '),
       }),
     [directory],
@@ -121,7 +123,10 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             onChange={(name) => setClient({ name })}
             onFocus={() => setDirectory(localDb.clients.getAll())}
             getSuggestions={clientSuggestions}
-            onPick={(c) => setClient(clientToParty(c))}
+            onPick={(c) => {
+              setClient(clientToParty(c));
+              applyPartyDefaults(c); // R2-B4: default ship-to + primary contact on a new document
+            }}
             placeholder={t('parties.clientNamePh')}
             aria-label={t('parties.clientName')}
           />
@@ -135,6 +140,8 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             <GstinInput value={client.gstin ?? ''} onChange={(v) => setClient({ gstin: v })} placeholder={t('parties.clientGstinPh')} ariaLabel={t('parties.clientGstinPh')} />
           </div>
           <input className={controls.input} type="tel" value={client.phone ?? ''} onChange={(e) => setClient({ phone: e.target.value })} placeholder={t('parties.phone')} aria-label={t('parties.clientPhone')} />
+          {/* R2-B4: Kind attn. + ship-to from the party's address book */}
+          <PartyBookPickers />
           {/* A5: name, GSTIN and phone first; the rest behind "More details". */}
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-expanded={more} onClick={() => setMore((m) => !m)} data-party-more>
             {more ? uxT('lessDetails') : uxT('moreDetails')}

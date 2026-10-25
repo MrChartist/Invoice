@@ -15,6 +15,9 @@ import {
 } from '../../lib/purchase-orders';
 import { blankPurchaseLine } from '../../lib/purchases';
 import { localDb } from '../../lib/localDb';
+import { Link } from 'react-router-dom';
+import { getTable } from '../../lib/storage';
+import { s2T } from '../../i18n/areas/sales-r2';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { downloadText } from '../../lib/download';
 import { addDaysInput, formatCurrency, formatDate, todayInput } from '../../lib/utils';
@@ -78,6 +81,12 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
         .sort((a, b) => b.po.date.localeCompare(a.po.date) || b.po.po_number.localeCompare(a.po.po_number)),
     [orders, purchases, stateFilter],
   );
+
+  // R2-B5: back-to-back POs name the sales order they were raised for.
+  const soNumbers = useMemo(() => {
+    if (!orders.some((o) => o.so_id)) return new Map<string, string>();
+    return new Map(getTable<{ id: string; invoice_number: string }>('invoices').map((i) => [i.id, i.invoice_number]));
+  }, [orders]);
 
   const convert = (po: PurchaseOrder) => {
     try {
@@ -144,6 +153,12 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
                   <tr key={po.id}>
                     <td>
                       <div className={tabStyles.name}>{po.po_number}</div>
+                      {po.so_id && (
+                        <div className={tabStyles.sub} data-po-so>
+                          <Link to={`/invoice/${po.so_id}`}>{s2T('po.soRef', { number: soNumbers.get(po.so_id) ?? '—' })}</Link>
+                          {po.drop_ship ? ` · ${s2T('po.dropShipTag')}` : ''}
+                        </div>
+                      )}
                       {f.bills.length > 0 && <div className={tabStyles.sub}>{purT(f.bills.length === 1 ? 'poBillsOne' : 'poBillsMany', { n: f.bills.length, list: f.bills.map((b) => b.bill_number).join(', ') })}</div>}
                     </td>
                     <td>{po.vendor_name || '—'}</td>

@@ -376,6 +376,9 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   deferrals: 'books.edit',
   packing_lists: 'doc.create',
   package_types: 'master.edit',
+  // R2-B: batch invoice runs (written with the invoices they issue), proposal section snippets
+  batch_runs: 'doc.create',
+  proposal_snippets: 'doc.create',
   // R3-A: restaurant masters (areas, tables, modifier groups) are masters; running table orders are documents
   dining_areas: 'master.edit',
   dining_tables: 'master.edit',

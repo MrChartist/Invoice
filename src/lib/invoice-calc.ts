@@ -37,6 +37,7 @@ import type {
   SupplyType,
   TcsBase,
 } from '../types/invoice';
+import type {} from '../types/sales-r2'; // R2-B3 optional / alternative line fields
 
 /**
  * Round to paise, half AWAY from zero (so -2.345 and 2.345 round symmetrically,
@@ -408,8 +409,16 @@ function splitTax(tax: number, mode: GstMode): { cgst: number; sgst: number; igs
   return { cgst: 0, sgst: 0, igst: 0 };
 }
 
+/**
+ * R2-B3: an optional (or alternative) quotation line the client has not selected. It is printed in its
+ * own "Optional items" block and stays outside every total until selected.
+ */
+export function isExcludedLine(item: Pick<InvoiceItem, 'optional' | 'alt_group' | 'selected'> | null | undefined): boolean {
+  return !!item && (!!item.optional || !!(item.alt_group ?? '').trim()) && !item.selected;
+}
+
 export function calculateInvoice(input: CalcInput): CalcTotals {
-  const items = input.items ?? [];
+  const items = (input.items ?? []).filter((i) => !isExcludedLine(i));
   const fallbackRate = num(input.tax_rate);
   const baseMode: GstMode = input.gst_mode ?? 'NONE';
   const zeroRated = isZeroRated(input.supply_type);

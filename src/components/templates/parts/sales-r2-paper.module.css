@@ -1,0 +1,119 @@
+/* R2-B paper parts: Kind attn., optional items, proposal sections. Colours come from the template
+   variables (accent only, Critical Rule 5). */
+
+.attn {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--tpl-body);
+}
+
+.attnLabel {
+  font-weight: 700;
+  color: var(--tpl-accent);
+}
+
+.optional {
+  margin-top: 12px;
+  break-inside: avoid;
+}
+
+.optHead {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+  margin-bottom: 4px;
+}
+
+.optTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+  color: var(--tpl-body);
+}
+
+.optTable th,
+.optTable td {
+  padding: 4px 6px;
+  border-bottom: 1px dashed var(--tpl-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.optTable th {
+  color: var(--tpl-muted);
+  font-weight: 600;
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.optTag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--tpl-accent);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--tpl-accent);
+}
+
+.optFoot td {
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.optNote {
+  font-size: 9.5px;
+  color: var(--tpl-muted);
+  margin-top: 3px;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.section {
+  break-inside: avoid;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tpl-accent);
+  margin-bottom: 3px;
+}
+
+.sectionBody {
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--tpl-body);
+  white-space: pre-wrap;
+}
+
+.sectionImg {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  margin-top: 6px;
+  object-fit: contain;
+}
+
+.cover {
+  min-height: 240px;
+  padding: 18px 0;
+  border-bottom: 2px solid var(--tpl-accent);
+  margin-bottom: 16px;
+}
+
+.cover .sectionTitle {
+  font-size: 20px;
+}

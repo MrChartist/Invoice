@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarClock, Pause, Plus, Repeat, TrendingUp } from 'lucide-react';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -25,6 +25,10 @@ import controls from '../styles/controls.module.css';
 import styles from './Recurring.module.css';
 import { useT } from '../i18n';
 import { recT } from '../i18n/areas/recurring';
+import { s2T } from '../i18n/areas/sales-r2';
+
+// R2-B1: batch invoices (one template, many parties), loaded on demand.
+const BatchTab = lazy(() => import('../components/recurring/BatchTab').then((m) => ({ default: m.BatchTab })));
 
 export interface RecurringPageProps {
   /** Open the create modal prefilled from this saved invoice. */
@@ -42,6 +46,7 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
   const [params, setParams] = useSearchParams();
   const queryFrom = params.get('from') ?? undefined;
   const prefillId = fromInvoiceId ?? queryFrom;
+  const tab = params.get('tab') === 'batch' ? 'batch' : 'schedules';
 
   const [schedules, setSchedules] = useState<RecurringSchedule[]>(() => recurringDb.getAll());
   const [editorOpen, setEditorOpen] = useState(Boolean(prefillId));
@@ -154,6 +159,22 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
         }
       />
 
+      {/* R2-B1: Schedules | Batch invoices */}
+      <div className={controls.segment} role="tablist" aria-label={recT('title')}>
+        {([['schedules', s2T('rec.tabSchedules')], ['batch', s2T('rec.tabBatch')]] as const).map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn}
+            onClick={() => { const next = new URLSearchParams(params); if (k === 'batch') next.set('tab', 'batch'); else next.delete('tab'); setParams(next, { replace: true }); }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'batch' ? (
+        <Suspense fallback={null}>
+          <BatchTab />
+        </Suspense>
+      ) : (
+      <>
       <section className={surface.statGrid} aria-label={recT('summary')}>
         <StatCard label={recT('active')} value={stats.active} hint={recT('nPaused', { n: stats.paused })} icon={Repeat} tone="profit" />
         <StatCard label={recT('nextRun')} value={stats.next ? formatDate(stats.next) : '—'} hint={recT('nextRunHint')} icon={CalendarClock} />
@@ -190,6 +211,9 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
             />
           ))}
         </div>
+      )}
+
+      </>
       )}
 
       <RecurringEditor
