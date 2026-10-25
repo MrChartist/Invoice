@@ -11,6 +11,8 @@ import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
 import { purT, purCategory, purStatus } from '../i18n/areas/purchases';
 import { BillModal } from '../components/purchases/BillModal';
+import { BranchFilter } from '../components/branches/BranchFilter';
+import { branchPredicates } from '../lib/branch';
 import { ExpenseModal } from '../components/purchases/ExpenseModal';
 import { PurchasePaymentModal } from '../components/purchases/PurchasePaymentModal';
 import { PurchasesTable } from '../components/purchases/PurchasesTable';
@@ -68,6 +70,8 @@ export function Expenses() {
   const [tab, setTab] = useState<Tab>(() => TAB_PARAMS.find((x) => x === params.get('tab')) ?? 'bills');
   const [seed, setSeed] = useState<BillSeed | null>(null);
   const [filter, setFilter] = useState<PurchaseFilter>({ kind: 'ALL', status: 'ALL', category: 'ALL' });
+  // WP-9: branch filter (own tag, else the only branch in the bill's place-of-supply state).
+  const [branch, setBranch] = useState('');
   // F9 / Gateway → Purchase voucher opens the bill form straight away (?new=bill).
   const [billOpen, setBillOpen] = useState(() => params.get('new') === 'bill');
   // A Tally key / Gateway link while this page is already open (F9, Ctrl+F9 → ?tab=returns&new=dn)
@@ -99,7 +103,8 @@ export function Expenses() {
   const month = today.slice(0, 7);
   const patch = (p: Partial<PurchaseFilter>) => setFilter((f) => ({ ...f, ...p }));
 
-  const rows = filterPurchases(purchases, filter, today);
+  const inBranch = branchPredicates(branch).purchase;
+  const rows = filterPurchases(purchases, filter, today).filter((p) => !branch || inBranch(p));
   const payables = payablesOutstanding(purchases);
   const paidThisMonth = paidInMonth(payments, month);
   const itc = itcTotals(purchases, month);
@@ -294,6 +299,7 @@ export function Expenses() {
                   <option key={c} value={c}>{purCategory(c)}</option>
                 ))}
               </select>
+              <BranchFilter value={branch} onChange={setBranch} className={`${controls.select} ${styles.filterSelect}`} testId="pur-branch" />
               <label className={styles.dateField}>
                 {purT('from')}
                 <input type="date" className={controls.input} value={filter.from ?? ''} max={filter.to || undefined} onChange={(e) => patch({ from: e.target.value })} />

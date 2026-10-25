@@ -17,6 +17,7 @@ import {
   ledgerBalanceSheet,
   ledgerProfitAndLoss,
   partiesOf,
+  scopeLedger,
   trialBalance,
   type GroupId,
   type Ledger,
@@ -65,6 +66,8 @@ export interface DisplayRow {
   /** Heading / total rows are not focusable. */
   heading?: boolean;
   drill?: Seg;
+  /** Several segments pushed at once (a Schedule III head's party line: account, then party). */
+  drillTo?: Seg[];
   /** Voucher row: where Enter opens it (null = no page). */
   open?: string | null;
 }
@@ -158,23 +161,21 @@ const BAL_COLS: DisplayColumn[] = [
 function balanceSheetFrame(ledger: Ledger, period: Period, asOf: string, stock?: StockValuer): DisplayFrame {
   const bs = ledgerBalanceSheet(ledger, asOf, stock);
   const rows: DisplayRow[] = [];
-  const split = new Set<string>(['RESERVES', 'CAPITAL', 'INVENTORIES']);
+  // Reserves and capital lose the year's result / opening stock, which get their own rows (Tally style);
+  // Inventories keeps the valued stock line inside the head (drill shows it, as in Books).
+  const split = new Set<string>(['RESERVES', 'CAPITAL']);
   const side = (sections: typeof bs.assets, liabilities: boolean) => {
     for (const sec of sections) {
       for (const it of sec.items) {
         let amount = it.amount;
         if (liabilities && it.groupId === 'RESERVES') amount -= bs.profitForYear;
         if (liabilities && it.groupId === 'CAPITAL') amount -= bs.openingStock;
-        if (!liabilities && it.groupId === 'INVENTORIES') amount -= bs.closingStock;
         if (amount || !split.has(it.groupId ?? '')) {
           const drill: Seg | undefined = it.groupId && isGroupId(it.groupId) ? { t: 'g', v: it.groupId } : undefined;
           rows.push({ id: `g-${it.groupId ?? it.label}`, label: it.label, cells: [amount], level: 1, ...(drill ? { drill } : {}) });
         }
         if (liabilities && it.groupId === 'CAPITAL' && bs.openingStock) {
           rows.push({ id: 'stock-open', label: { key: 'openingStockRow' }, cells: [bs.openingStock], level: 1, open: '/inventory' });
-        }
-        if (!liabilities && it.groupId === 'INVENTORIES' && bs.closingStock) {
-          rows.push({ id: 'stock-close', label: { key: 'closingStockRow' }, cells: [bs.closingStock], level: 1, open: '/inventory' });
         }
       }
     }
@@ -187,6 +188,28 @@ function balanceSheetFrame(ledger: Ledger, period: Period, asOf: string, stock?:
   side(bs.assets, false);
   rows.push({ id: 't-assets', label: { key: 'total' }, cells: [bs.totalAssets], level: 0, heading: true });
   return { title: { report: 'bs' }, period, asOf, columns: [{ key: 'particulars', kind: 'text' }, { key: 'amount', kind: 'amount' }], rows };
+}
+
+/**
+ * One Schedule III head of the balance sheet, broken up exactly like Books (`BsItem.detail`): its
+ * ledgers, party balances that moved sides (advances to suppliers / from customers) and the valued
+ * closing-stock line. Ledger lines drill into the ledger (party lines into that party's account).
+ * Null when the head holds only its own group's ledgers (the group screen then shows them).
+ */
+function bsHeadFrame(ledger: Ledger, groupId: GroupId, period: Period, asOf: string, stock?: StockValuer): DisplayFrame | null {
+  const bs = ledgerBalanceSheet(ledger, asOf, stock);
+  const item = [...bs.equityAndLiabilities, ...bs.assets].flatMap((s) => s.items).find((i) => i.groupId === groupId);
+  if (!item) return null;
+  // A head that is just its group's own ledgers keeps the Tally group screen (opening / Dr / Cr / closing).
+  if (item.detail.every((d) => d.accountId && !d.party && ledger.byId.get(d.accountId)?.group === groupId)) return null;
+  const rows: DisplayRow[] = item.detail.map((d, n) => {
+    const base = { id: `d-${n}-${d.accountId ?? 'x'}-${d.party ?? ''}`, label: d.label, cells: [d.amount] as Cell[], level: 1 };
+    if (d.accountId && d.party) return { ...base, drill: { t: 'a', v: d.accountId }, drillTo: [{ t: 'a', v: d.accountId }, { t: 'p', v: d.party }] };
+    if (d.accountId) return { ...base, drill: { t: 'a', v: d.accountId } };
+    if (groupId === 'INVENTORIES' || groupId === 'CAPITAL') return { ...base, open: '/inventory' };
+    return base;
+  });
+  return { title: { text: item.label }, period, asOf, columns: [{ key: 'particulars', kind: 'text' }, { key: 'amount', kind: 'amount' }], rows, total: [item.amount] };
 }
 
 /** P&L: the same `ledgerProfitAndLoss` (with the stock valuer) as Books; stock lines open the stock summary. */
@@ -374,6 +397,8 @@ export interface FrameOptions {
    * shows exactly the Books statements (absent = stock not valued).
    */
   stock?: StockValuer;
+  /** WP-9: narrow every frame to one branch (`scopeLedger`; '' = whole company). */
+  branchId?: string;
 }
 
 /**
@@ -381,6 +406,7 @@ export interface FrameOptions {
  * the screen then falls back to the deepest valid frame.
  */
 export function buildFrame(ledger: Ledger, report: ReportId, path: readonly Seg[], period: Period, today: string, opts: FrameOptions = {}): DisplayFrame | null {
+  ledger = scopeLedger(ledger, opts);
   const eff = effectivePeriod(report, period, today);
   const p = eff.period;
   let account: string | undefined = report === 'acct' ? opts.account : undefined;
@@ -418,7 +444,8 @@ export function buildFrame(ledger: Ledger, report: ReportId, path: readonly Seg[
       continue;
     }
     if (s.t === 'g') {
-      if (lastStep) frame = ledgersFrame(ledger, p, { text: groupOf(s.v).label }, (_id, g) => g === s.v);
+      // A balance-sheet head drills into its Schedule III break-up (same lines as Books).
+      if (lastStep) frame = (report === 'bs' && i === 0 ? bsHeadFrame(ledger, s.v, p, eff.asOf ?? p.end, opts.stock) : null) ?? ledgersFrame(ledger, p, { text: groupOf(s.v).label }, (_id, g) => g === s.v);
       continue;
     }
     if (s.t === 'a') {

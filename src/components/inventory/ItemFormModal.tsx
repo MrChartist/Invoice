@@ -12,6 +12,7 @@ import { useT } from '../../i18n';
 import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
+import { EditLogButton } from '../audit/EditLogButton';
 
 export interface ItemFormModalProps {
   open: boolean;
@@ -124,6 +125,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       subtitle={invT('itemSub')}
       footer={
         <>
+          {!isNew && <EditLogButton recordId={item.id} name={item.name} />}
           <button type="button" className={controls.btnOutline} onClick={onClose}>{invT('cancel')}</button>
           <button type="button" className={controls.btnPrimary} onClick={submit}>
             {isNew ? invT('addItem') : invT('saveChanges')}

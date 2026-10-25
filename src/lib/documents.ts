@@ -307,6 +307,7 @@ export function buildConvertedDraft(
     challan_purpose: target === 'DELIVERY_CHALLAN' ? source.challan_purpose : undefined,
     approval: undefined, // WP-9: never copied
     loyalty_redeem: undefined,
+    branch_transfer_id: undefined,
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
     ...(source.doc_type === 'DELIVERY_CHALLAN' && ctx.rejected && target !== 'DELIVERY_CHALLAN' ? challanPart(source, ctx.rejected) : {}),
@@ -548,6 +549,7 @@ export function buildCreditNote(
     transport: undefined, // the original's dispatch details (P1-24)
     approval: undefined, // WP-9: never copied
     loyalty_redeem: undefined,
+    branch_transfer_id: undefined,
     goods_returned: goodsReturned,
   };
   const rec = recompute(base);
@@ -654,6 +656,7 @@ export function buildDebitNote(
     transport: undefined,
     approval: undefined, // WP-9: never copied
     loyalty_redeem: undefined,
+    branch_transfer_id: undefined,
   });
 }
 

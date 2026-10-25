@@ -201,7 +201,7 @@ Share, static catalogue HTML.
 
 ## Phase 7: Tally parity (v5.x)
 
-Numbering: one sequence 7.1–7.61 in the sub-sections below (7L continues at 7.62, 7M at 7.70) (renumbered after the WP merge; the work-package
+Numbering: one sequence 7.1–7.61 in the sub-sections below (7L continues at 7.62, 7M at 7.70, 7N at 7.80, 7O at 7.90, 7P at 7.100) (renumbered after the WP merge; the work-package
 documents in `docs/features/` keep their own WP ids). Gap ids refer to `docs/GAP_ANALYSIS.md`.
 
 ### 7A · Accounting depth (TDS, voucher variants, bill-wise, masters, payroll)
@@ -323,7 +323,7 @@ Details: `docs/features/manufacturing.md`.
 | # | Item | Status |
 |---|------|--------|
 | 7.60 | ✅ **Everything reachable and consistent**: closing stock never double counted (report-time valuation nets any closing-stock journal; year-end wizard posts a journal only when valuation is off, one-click switch either way); Gateway BS / P&L = Books statements with stock; Gateway rows, sidebar "Accounts Info", palette destinations, Books header entries for the year-end wizard / Tally import; Alt+C ledgers in the Books voucher editor; Edit log on vouchers and bills; approval banner, "Pending approval" filter, branch selects; bell notices for approvals / AMC / GST set-off due; vendor bank details; HSN-master default rate on invoice / bill lines; Ctrl+F9 on the purchase side = purchase debit note (`tests/closing-stock-yearend.test.ts`, `tests/wiring.test.ts`) | done |
-| 7.61 | ⏳ Integration follow-ups: branch filter on the Transactions / purchase lists and branch-wise TB / P&L (`branchPredicates` option in the reports engine), loyalty redemption in the invoice editor, POS "Return / exchange" deep link, branch select on manual vouchers, DrillStack for the Gateway Display viewer, PAN / TDS fields on the vendor form (done in 7O, 7.95) | open |
+| 7.61 | ✅ Integration follow-ups: branch filters, branch-wise books, loyalty in the editor, POS return deep link, voucher branch select, Gateway Display drill (7N, 7.80–7.83); PAN / TDS fields on the vendor form (7O, 7.95) | done |
 
 ### 7L · Inventory masters & analysis (WP-8, `docs/features/inventory-masters.md`)
 
@@ -374,6 +374,16 @@ Details: `docs/features/manufacturing.md`.
 | 7.107 | ✅ **ESI coverage per contribution period** (decided in its first month / month of joining) and **EPS stop at 58** from the date of birth | `compute.ts`, `store.ts` | done |
 | 7.108 | ⏳ Payroll follow-ups: EPFO arrear ECR, relief u/s 89 (Form 10E) working, actuarial gratuity / leave provisions, Rule 3 perquisite valuation tables, s. 17(2)(vii) ₹7.5 lakh, ESI low-wage exemption, TDS 201(1A) on salary, PT on arrears, per-user payroll grant for a trusted clerk | — | open |
 
+
+### 7N · Branch accounting & integration gaps (`docs/features/business-extras.md`, `docs/features/reports-engine.md`)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.80 | ✅ **Branch-wise books**: `{ branchId }` option on every report builder (TB, P&L, BS, cash flow, ledger, group summary, day book, registers, statistics, Gateway frames) via `scopeLedger` — whole vouchers by their source row's branch (documents, receipts follow invoices, bills, supplier payments / debit notes follow bills, tagged manual vouchers; company-level entries under "No branch"); branch TBs balance and add up to the company TB; branch filter in the Books statements toolbar and Gateway Display (`b=`); branch select on manual vouchers (Books editor, Gateway voucher entry); branch filter on Transactions and the purchase list (`src/lib/ledger/branch-books.ts`, `tests/branch-books.test.ts`, e2e step) | P1-19 | done |
+| 7.81 | ✅ **Inter-branch transfer between distinct GSTINs** (Sec 25(4)): a stock transfer between godowns of two branches with different GSTINs offers "Tax invoice + bill" — TAX_INVOICE from the sending registration + matching ITC bill at the receiving branch, posted to new default ledgers 4030 / 5020 "Branch transfer" so the pair nets out; value per Rule 28 flagged "verify with your CA" (`src/lib/branch-transfer.ts`, `components/branches/BranchTransferDialog.tsx`) | P1-19 | done |
+| 7.82 | ✅ **Gateway Display drill = Books**: a balance-sheet head drills into its Schedule III break-up (party advances that moved sides, the valued closing-stock line inside Inventories), party lines straight to the party's monthly summary (`src/lib/gateway/drill.ts`) | P0-4 | done |
+| 7.83 | ✅ Small gaps: loyalty redemption in the invoice editor (lazy, only while the programme is on); palette "POS return / exchange" opens the return dialog (`/pos?return=1`); bell GST set-off reminder for every regular filer even before the set-off screen is used (never for composition); Alt+C create-on-the-fly for stock items and godowns (stock-transfer pickers, bill / PO line item names); Edit log on the stock item form (`tests/wiring-7n.test.ts`) | — | done |
+| 7.84 | ⏳ Branch follow-ups: per-godown closing-stock valuation for branch statements, Alt+C in the manufacturing / stock-journal line grids and the bill godown select, automatic Sec 25(4) prompt when the transfer is saved, branch column on GSTR-1 / 3B papers per GSTIN | P1-19 | open |
 
 ## Summary timeline
 

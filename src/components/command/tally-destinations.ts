@@ -25,7 +25,7 @@ const ROWS: Array<{ key: Key; href: string; need?: AccessAction; keywords: strin
   { key: 'pPurchaseReturn', href: '/expenses?tab=returns&new=dn', need: 'books.edit', keywords: ['debit note', 'return', 'supplier'] },
   { key: 'pGrn', href: '/expenses?tab=returns&new=grn', need: 'books.edit', keywords: ['grn', 'goods received', 'inward'] },
   { key: 'pMfg', href: '/manufacturing?tab=mfg', need: 'books.edit', keywords: ['manufacturing', 'production', 'bom'] },
-  { key: 'pReturnExchange', href: '/pos', need: 'doc.create', keywords: ['return', 'exchange', 'pos', 'refund'] },
+  { key: 'pReturnExchange', href: '/pos?return=1', need: 'doc.create', keywords: ['return', 'exchange', 'pos', 'refund'] },
 ];
 
 export function tallyDestinations(): StaticEntry[] {

@@ -610,6 +610,47 @@ try {
     check(true, 'Esc returns to the Day Book');
   });
 
+  await step('branch-wise books: a voucher tagged to a branch; Books TB, Gateway TB and Transactions filter by branch (P1-19)', async () => {
+    // No state / GSTIN / profile: nothing is inferred to it, so only the tagged voucher belongs to the branch.
+    await writeJson(page, 'branches', [{ id: 'br-e2e', name: 'Pune branch', code: 'PUN' }]);
+    await page.goto(srv.origin + '/books?tab=vch');
+    await page.getByRole('button', { name: 'New voucher' }).click();
+    const dlg = page.getByRole('dialog', { name: 'New voucher' });
+    await dlg.getByLabel('Branch / location').selectOption('br-e2e');
+    await dlg.getByLabel('Line 1 account').selectOption('rent');
+    await dlg.getByLabel('Line 1 debit').fill('777');
+    await dlg.getByLabel('Line 2 account').selectOption('bank');
+    await dlg.getByLabel('Line 2 credit').fill('777');
+    await dlg.getByText('Balanced').waitFor();
+    await dlg.getByRole('button', { name: 'Save voucher' }).click();
+    await dlg.waitFor({ state: 'detached' });
+    const tagged = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.branch_id === 'br-e2e'));
+    check(tagged.some((x) => x.branch_id === 'br-e2e' && x.lines[0].dr === 77700), 'the voucher is saved with its branch');
+    await page.getByRole('tab', { name: 'Trial balance' }).click();
+    await page.getByText('Debits = credits').waitFor();
+    await page.getByTestId('books-branch').selectOption('br-e2e');
+    await page.getByText('Branch view:', { exact: false }).first().waitFor();
+    await page.getByText('Debits = credits').waitFor();
+    const rentRow = page.getByRole('row', { name: /Rent/ }).first();
+    const rentText = await rentRow.innerText();
+    check(/777\.00/.test(rentText) && !/1,234|2,734|1,500/.test(rentText), `Books trial balance for the branch shows only its ₹777 rent (${rentText.replace(/\s+/g, ' ')})`);
+    await page.goto(srv.origin + '/gateway/display?r=tb&b=br-e2e');
+    await page.getByRole('heading', { name: 'Trial balance' }).waitFor();
+    check((await page.getByTestId('gw-branch').inputValue()) === 'br-e2e', 'the Gateway trial balance keeps the branch from the URL');
+    await page.getByTestId('gw-row-g-INDIRECT_EXPENSES').waitFor();
+    const gwText = await page.getByTestId('gw-row-g-INDIRECT_EXPENSES').innerText();
+    check(/777\.00/.test(gwText), `Gateway branch TB: indirect expenses = the branch voucher (${gwText.replace(/\s+/g, ' ')})`);
+    await page.goto(srv.origin + '/transactions');
+    await page.getByTestId('tx-branch').waitFor();
+    await page.locator('tbody tr').first().waitFor();
+    const before = await page.locator('tbody tr').count();
+    await page.getByTestId('tx-branch').selectOption('br-e2e');
+    await page.waitForTimeout(300);
+    const after = await page.locator('tbody tr').count();
+    check(before > 0 && after < before, `Transactions filtered to a branch with no documents (${before} → ${after} rows)`);
+    await writeJson(page, 'branches', []);
+  });
+
   await step('integration: the Gateway reaches Accounts Info, banking documents, ratio analysis and the year-end wizard', async () => {
     const gateway = async () => {
       await page.goto(srv.origin + '/gateway');

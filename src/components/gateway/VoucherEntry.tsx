@@ -6,6 +6,8 @@ import { useT } from '../../i18n';
 import { useCan } from '../../hooks/useCan';
 import { localDb } from '../../lib/localDb';
 import { vendorsDb } from '../../lib/vendors';
+import { loadBranches } from '../../lib/branch';
+import { wireT } from '../../i18n/areas/wiring';
 import { chartOf, groupOf, loadUserAccounts, type Account } from '../../lib/ledger/accounts';
 import { deleteVoucher, loadVouchers, nextVoucherNumber, saveVoucher, validateVoucher, type ManualVoucherType } from '../../lib/ledger/vouchers';
 import { costCentreLabel, loadCostCentres, pickableCentres } from '../../lib/cost-centres';
@@ -71,6 +73,7 @@ export function VoucherEntry() {
   const [chart, setChart] = useState<Account[]>(() => chartOf(loadUserAccounts()));
   const [clients, setClients] = useState(() => localDb.clients.getAll());
   const [vendors, setVendors] = useState(() => vendorsDb.all());
+  const [branches] = useState(() => loadBranches());
   const centres = useMemo(() => loadCostCentres(), []);
   const byId = useMemo(() => new Map(chart.map((a) => [a.id, a])), [chart]);
   const options = useMemo(() => ledgerOptions(chart, clients, vendors, type), [chart, clients, vendors, type]);
@@ -79,6 +82,7 @@ export function VoucherEntry() {
   const [date, setDate] = useState(() => existing?.date ?? getVoucherDate());
   const [number, setNumber] = useState(existing?.number ?? '');
   const [narration, setNarration] = useState(existing?.narration ?? '');
+  const [branchId, setBranchId] = useState(existing?.branch_id ?? '');
   const [lines, setLines] = useState<EntryLine[]>(initialLines);
   const [queries, setQueries] = useState<Record<number, string>>({});
   const [suggest, setSuggest] = useState<{ key: number; index: number } | null>(null);
@@ -96,6 +100,7 @@ export function VoucherEntry() {
     setDate(existing?.date ?? getVoucherDate());
     setNumber(existing?.number ?? '');
     setNarration(existing?.narration ?? '');
+    setBranchId(existing?.branch_id ?? '');
     setLines(existing ? linesFromVoucher(existing, nextKey) : [blankLine(firstSide(type))]);
     setQueries({});
   }
@@ -129,7 +134,7 @@ export function VoucherEntry() {
     () => (existing && existing.type === type ? existing.number : nextVoucherNumber(loadVouchers(), type, isCalendarDay(date) ? date : getVoucherDate())),
     [existing, type, date, version], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const draftInput = () => toVoucherInput({ id: existing?.id, type, date, narration, number: number.trim() || undefined }, lines, chart);
+  const draftInput = () => ({ ...toVoucherInput({ id: existing?.id, type, date, narration, number: number.trim() || undefined }, lines, chart), ...(branchId ? { branch_id: branchId } : {}) });
   const dirty = existing
     ? JSON.stringify({ date, narration, lines: draftInput().lines }) !== baseline
     : filledLines(lines).length > 0 || narration.trim() !== '';
@@ -364,6 +369,17 @@ export function VoucherEntry() {
                 size={18}
               />
             </label>
+            {branches.length > 0 && (
+              <label className={styles.vField}>
+                {wireT('branch')}
+                <select data-field="branch" className={controls.select} value={branchId} onChange={(e) => setBranchId(e.target.value)} data-testid="gw-v-branch">
+                  <option value="">{wireT('branchAuto')}</option>
+                  {branches.filter((b) => !b.inactive || b.id === branchId).map((b) => (
+                    <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className={styles.vField}>
               {gwT('vDate')}
               <input data-field="date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} aria-keyshortcuts="F2" />

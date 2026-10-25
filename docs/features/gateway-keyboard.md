@@ -84,7 +84,7 @@ themselves; the button bar offers both.
 ## Display reports and drill-down
 | Report (`r=`) | Root frame |
 |---|---|
-| `bs` Balance sheet | the Books statement (`ledgerBalanceSheet` + `loadStockValuer()`): one row per head + Profit & loss A/c row + closing / opening stock rows (open the stock summary), FY-to-date as at the period end (capped at today); totals equal Books |
+| `bs` Balance sheet | the Books statement (`ledgerBalanceSheet` + `loadStockValuer()`): one row per head (Inventories includes the valued closing stock) + Profit & loss A/c row + opening stock row (opens the stock summary), FY-to-date as at the period end (capped at today); totals equal Books |
 | `pl` Profit & loss | income / expense groups, opening / closing stock, net profit (same as Books) |
 | `tb` Trial balance, `groups` Group summary | closing Dr / Cr per group |
 | `daybook` | every ledger voucher in the period (manual + automatic) |
@@ -96,6 +96,12 @@ Drill path (`d=`): group `g:` → ledger `a:` → party `p:` (control accounts) 
 on a voucher row it opens the Gateway voucher screen (manual vouchers) or the source document (invoice, bills page…).
 Esc goes one level up (browser Back works the same), restoring the selected line. Alt+F2 changes the period for all
 Display reports.
+
+Balance-sheet heads (7N) drill into the same Schedule III break-up as Books: own ledgers, party balances that moved sides
+(advance to a supplier, advance from a customer) and the valued closing-stock line; a party line pushes `a:` and `p:` at
+once (`DisplayRow.drillTo`). A head made only of its group's ledgers keeps the group screen. With branches, a branch filter
+sits in the report header and is kept in the URL (`b=<branch id>` or `__none__`); every frame is narrowed to that branch
+(`buildFrame(…, { branchId })`, no report-time stock in a branch view).
 
 ## Period store
 `src/lib/gateway/period.ts`: working period (default: this Indian FY) and voucher date, per tab in sessionStorage

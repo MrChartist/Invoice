@@ -99,6 +99,8 @@ export interface PurchaseRecord {
   kind: PurchaseKind;
   /** Additive (WP-9): `branches` row id of the branch / location that received the bill. */
   branch_id?: string;
+  /** Additive (WP-9): `stock_transfers` id of the Sec 25(4) inter-branch transfer this bill receives (posts to "Branch transfer"). */
+  branch_transfer_id?: string;
   vendor_id?: string;
   vendor_name: string;
   vendor_gstin?: string;

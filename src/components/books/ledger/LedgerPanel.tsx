@@ -2,8 +2,8 @@
  * Double-entry tabs of the Books page (Phase 6.1–6.4). Loaded lazily by Books.tsx, so the
  * ledger engine never reaches the app shell's bundle.
  */
-import { useCallback, useMemo, useState } from 'react';
-import { buildLedger, loadLedgerInput, loadStockPositions, loadStockValuer, loadVouchers, type LedgerVoucher, type ManualVoucher } from '../../../lib/ledger';
+import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { scopeLedger, buildLedger, loadLedgerInput, loadStockPositions, loadStockValuer, loadVouchers, type LedgerVoucher, type ManualVoucher } from '../../../lib/ledger';
 import type { StockPosition } from '../../../lib/inventory';
 import type { BooksData, Period } from '../../../lib/books';
 import { todayIso } from '../../../lib/tax-rules';
@@ -21,6 +21,12 @@ import { DayBookTab } from './DayBookTab';
 import { PnlTab } from './PnlTab';
 import { ReportsHub } from './ReportsHub';
 import { ReportEnvProvider } from './ReportViews';
+import { branchT } from '../../../i18n/areas/branch-books';
+import books from '../books.module.css';
+
+// WP-9: branch-wise books. The filter renders nothing until a branch exists.
+const BranchFilter = lazy(() => import('../../branches/BranchFilter').then((m) => ({ default: m.BranchFilter })));
+const BRANCH_TABS = new Set<LedgerTabId>(['day', 'pnl', 'rpt', 'tb', 'ledger', 'bs', 'cf']);
 
 export type LedgerTabId = 'day' | 'pnl' | 'rpt' | 'coa' | 'vch' | 'tb' | 'ledger' | 'bs' | 'cf' | 'proj' | 'budget';
 
@@ -44,7 +50,11 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
     void version;
     return loadLedgerInput(data, today);
   }, [data, today, version]);
-  const ledger = useMemo(() => buildLedger(input), [input]);
+  const fullLedger = useMemo(() => buildLedger(input), [input]);
+  // Branch filter for the statements (P1-19): whole vouchers of that branch only (`scopeLedger`).
+  const [branchId, setBranchId] = useState('');
+  const branchView = BRANCH_TABS.has(tab) && !!branchId;
+  const ledger = useMemo(() => (branchView ? scopeLedger(fullLedger, { branchId }) : fullLedger), [fullLedger, branchView, branchId]);
   const changed = () => setVersion((v) => v + 1);
   // Closing stock (report-time): the inventory engine runs once per data change, and only when a
   // statement asks for it.
@@ -54,7 +64,9 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
     let cache: StockPosition[] | undefined;
     return () => (cache ??= loadStockPositions());
   }, [data, version]);
-  const stock = useMemo(() => loadStockValuer(undefined, positions, input.manual), [positions, input.manual]);
+  const companyStock = useMemo(() => loadStockValuer(undefined, positions, input.manual), [positions, input.manual]);
+  // Report-time closing stock is company-wide: not apportioned to a branch.
+  const stock = branchView ? undefined : companyStock;
   const getPositions = useCallback(() => positions(), [positions]);
 
   const openVoucher = (v: LedgerVoucher) => {
@@ -64,6 +76,14 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
 
   return (
     <ReportEnvProvider value={{ ledger, stock, onOpenManual: openVoucher }}>
+      {BRANCH_TABS.has(tab) && (
+        <Suspense fallback={null}>
+          <div className={`${books.toolbar} no-print`}>
+            <BranchFilter value={branchId} onChange={setBranchId} testId="books-branch" />
+            {branchView && <span className={books.muted}>{branchT('scopeNote')}</span>}
+          </div>
+        </Suspense>
+      )}
       {tab === 'day' && <DayBookTab ledger={ledger} period={period} />}
       {tab === 'pnl' && <PnlTab ledger={ledger} data={data} period={period} stock={stock} onStockChanged={changed} notify={notify} />}
       {tab === 'rpt' && <ReportsHub period={period} data={data} today={today} positions={getPositions} />}
@@ -79,7 +99,7 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
       {tab === 'budget' && <BudgetsTab ledger={ledger} notify={notify} />}
       {editing && (
         <VoucherEditor
-          accounts={ledger.accounts}
+          accounts={fullLedger.accounts}
           voucher={editing}
           defaultDate={editing.date}
           onClose={() => setEditing(null)}

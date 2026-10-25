@@ -1,12 +1,15 @@
 import { isStockDependencyError } from '../../lib/stock-timeline';
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState, type KeyboardEvent } from 'react';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { cn, formatDate, todayInput } from '../../lib/utils';
 import { num } from '../../lib/invoice-calc';
 import { generateId } from '../../lib/storage';
-import { godownName, transfersDb, validateTransferShape } from '../../lib/godowns';
+import { godownName, godownsDb, transfersDb, validateTransferShape } from '../../lib/godowns';
+import { stockDb } from '../../lib/inventory';
+import { useCreateOnTheFly } from '../masters/useCreateOnTheFly';
+import { isAltC } from '../masters/useMasterKeys';
 import { isPeriodLockedError } from '../../lib/period-lock';
 import {
   batchOptions, blankTransferLine, computeTracking, serialsInStock, transferIssues, type TrackingMap,
@@ -21,6 +24,13 @@ import { cleanAltUnits, factorFor, roundTypedQty, unitChoices, unitsDb } from '.
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
+import { loadBranches } from '../../lib/branch';
+import { transferInvoiceOf, transferTaxPair } from '../../lib/branch-transfer';
+import { localDb } from '../../lib/localDb';
+import { branchT } from '../../i18n/areas/branch-books';
+
+// WP-9: Sec 25(4) tax invoice + bill for a transfer between two GSTINs (lazy dialog).
+const BranchTransferDialog = lazy(() => import('../branches/BranchTransferDialog'));
 
 /** Stock transfer vouchers between godowns (6.10): list, create, delete. */
 export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onError }: {
@@ -37,6 +47,21 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
   const [deleting, setDeleting] = useState<StockTransfer | null>(null);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const sorted = useMemo(() => [...transfers].sort((a, b) => b.date.localeCompare(a.date) || b.transfer_number.localeCompare(a.transfer_number)), [transfers]);
+  // Transfers between branches with different GSTINs, and the invoice already raised for each.
+  const [taxFor, setTaxFor] = useState<StockTransfer | null>(null);
+  const branches = useMemo(() => {
+    try {
+      return loadBranches();
+    } catch {
+      return [];
+    }
+  }, []);
+  const raised = useMemo(() => {
+    void transfers;
+    if (!branches.some((b) => b.godown_id && b.gstin)) return null;
+    return localDb.invoices.getAll();
+  }, [branches, transfers]);
+  const pairOf = (t: StockTransfer) => (raised ? transferTaxPair(t, branches, godowns) : null);
 
   return (
     <>
@@ -60,6 +85,16 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
                 {t.lines.map((l) => `${byId.get(l.item_id)?.name ?? invT('deletedItem')} × ${l.qty}${l.unit ? ` ${l.unit}` : ''}${l.batch_no ? ` (${l.batch_no})` : ''}`).join(', ')}
               </td>
               <td>
+                {pairOf(t) && (() => {
+                  const inv = transferInvoiceOf(t.id, raised ?? []);
+                  return inv ? (
+                    <span className={styles.muted}>{branchT('taxPairRaised', { number: inv.invoice_number })} </span>
+                  ) : (
+                    <button type="button" className={cn(controls.btnOutline, controls.btnSm)} title={branchT('taxPairNeeded')} onClick={() => setTaxFor(t)} data-testid={`bt-open-${t.id}`}>
+                      {branchT('taxPair')}
+                    </button>
+                  );
+                })()}
                 <button type="button" className={controls.btnDanger} aria-label={invT('deleteNamed', { name: t.transfer_number })} onClick={() => setDeleting(t)}>
                   <Trash2 size={16} />
                 </button>
@@ -82,6 +117,24 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
           }}
         />
       )}
+      {taxFor && (() => {
+        const pair = pairOf(taxFor);
+        return pair ? (
+          <Suspense fallback={null}>
+            <BranchTransferDialog
+              transfer={taxFor}
+              from={pair.from}
+              to={pair.to}
+              items={items}
+              onClose={() => setTaxFor(null)}
+              onSaved={(msg) => {
+                setTaxFor(null);
+                onChanged(msg);
+              }}
+            />
+          </Suspense>
+        ) : null;
+      })()}
       <ConfirmDialog
         open={!!deleting}
         destructive
@@ -107,16 +160,41 @@ export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onE
   );
 }
 
-function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
+function TransferModal({ godowns: baseGodowns, items: baseItems, inputs, onClose, onSaved }: {
   godowns: Godown[];
   items: StockItem[];
   inputs: StockInputs;
   onClose: () => void;
   onSaved: (t: StockTransfer) => void;
 }) {
+  // Alt+C on the godown / item pickers creates the master on the fly (Tally parity).
+  const fly = useCreateOnTheFly();
+  const [added, setAdded] = useState<{ godowns: Godown[]; items: StockItem[] }>({ godowns: [], items: [] });
+  const godowns = useMemo(() => [...baseGodowns, ...added.godowns], [baseGodowns, added.godowns]);
+  const items = useMemo(() => [...baseItems, ...added.items], [baseItems, added.items]);
+  const createGodown = (apply: (id: string) => void) => (e: KeyboardEvent<HTMLSelectElement>) => {
+    if (!isAltC(e.nativeEvent)) return;
+    e.preventDefault();
+    void fly.open({ kind: 'godown' }).then((g) => {
+      if (!g) return;
+      const row = godownsDb.list().find((x) => x.id === g.id);
+      if (row) setAdded((a) => ({ ...a, godowns: [...a.godowns, row] }));
+      apply(g.id);
+    });
+  };
+  const createItem = (lineId: string) => (e: KeyboardEvent<HTMLSelectElement>) => {
+    if (!isAltC(e.nativeEvent)) return;
+    e.preventDefault();
+    void fly.open({ kind: 'stockItem' }).then((it) => {
+      if (!it) return;
+      const row = stockDb.items().find((x) => x.id === it.id);
+      if (row?.track_stock) setAdded((a) => ({ ...a, items: [...a.items, row] }));
+      if (row?.track_stock) patch(lineId, { item_id: row.id, batch_no: undefined, serials: undefined });
+    });
+  };
   const [date, setDate] = useState(todayInput());
   const [from, setFrom] = useState(MAIN_GODOWN_ID);
-  const [to, setTo] = useState(godowns.find((g) => g.id !== MAIN_GODOWN_ID)?.id ?? '');
+  const [to, setTo] = useState(baseGodowns.find((g) => g.id !== MAIN_GODOWN_ID)?.id ?? '');
   const [lines, setLines] = useState<StockTransferLine[]>([blankTransferLine(generateId())]);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -162,13 +240,13 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="tr-from">{invT('fromGodown')}</label>
-            <select id="tr-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>
+            <select id="tr-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)} onKeyDown={createGodown(setFrom)} aria-keyshortcuts="Alt+C">
               {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="tr-to">{invT('toGodown')}</label>
-            <select id="tr-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)}>
+            <select id="tr-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={createGodown(setTo)} aria-keyshortcuts="Alt+C">
               <option value="">{invT('choose')}</option>
               {godowns.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
@@ -189,6 +267,8 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
                     className={controls.select}
                     value={l.item_id}
                     onChange={(e) => patch(l.id, { item_id: e.target.value, batch_no: undefined, serials: undefined, unit: undefined, unit_factor: undefined })}
+                    onKeyDown={createItem(l.id)}
+                    aria-keyshortcuts="Alt+C"
                   >
                     <option value="">{invT('chooseItem')}</option>
                     {sortedItems.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -256,6 +336,7 @@ function TransferModal({ godowns, items, inputs, onClose, onSaved }: {
         {error && <p className={controls.error} role="alert">{error}</p>}
         <button type="submit" hidden />
       </form>
+      {fly.node}
     </Modal>
   );
 }

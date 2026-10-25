@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { gwT, type GwKey } from '../../i18n/areas/gateway';
+import { branchT } from '../../i18n/areas/branch-books';
+import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { toIsoDate } from '../../lib/books';
 import { loadLedger, loadStockValuer } from '../../lib/ledger';
@@ -11,6 +13,9 @@ import { isTypingTarget } from '../../hooks/useHotkeys';
 import { useGateway, useGatewaySession, useScreenKeys } from './context';
 import { ButtonBar } from './ButtonBar';
 import styles from './Gateway.module.css';
+
+// WP-9: branch filter (renders nothing without branches); the branch is kept in the URL (`b=`).
+const BranchFilter = lazy(() => import('../branches/BranchFilter').then((m) => ({ default: m.BranchFilter })));
 
 const REPORT_TITLE: Record<ReportId, GwKey> = {
   bs: 'rBs',
@@ -70,20 +75,22 @@ export function DisplayReport() {
   const path = useMemo(() => decodePath(params.get('d')), [params]);
   const account = params.get('x') ?? undefined;
   const from = params.get('from');
+  const branchId = params.get('b') ?? '';
 
   const ledger = useMemo(() => loadLedger(), []);
   // Same closing-stock-aware statements as Books (only the BS / P&L frames need the valuer).
   const needsStock = report === 'bs' || report === 'pl';
-  const stock = useMemo(() => (needsStock ? loadStockValuer() : undefined), [needsStock]);
+  // Report-time stock is company-wide: a branch view leaves it out (branch-books.ts).
+  const stock = useMemo(() => (needsStock && !branchId ? loadStockValuer() : undefined), [needsStock, branchId]);
   const today = toIsoDate(new Date());
   // A path that no longer resolves (deleted account …) falls back to its deepest valid frame.
   const frame = useMemo(() => {
     for (let n = path.length; n >= 0; n--) {
-      const f = buildFrame(ledger, report, path.slice(0, n), period, today, { account, stock });
+      const f = buildFrame(ledger, report, path.slice(0, n), period, today, { account, stock, branchId });
       if (f) return f;
     }
     return null;
-  }, [ledger, report, path, period, today, account, stock]);
+  }, [ledger, report, path, period, today, account, stock, branchId]);
 
   const rows = frame?.rows ?? [];
   const focusable = rows.map((r, i) => (r.heading ? -1 : i)).filter((i) => i >= 0);
@@ -112,7 +119,8 @@ export function DisplayReport() {
     const r = rows[i];
     if (!r || r.heading) return;
     memory.set(key, i);
-    if (r.drill) navigate(withPath([...path, r.drill]), { state: { drill: true } });
+    if (r.drillTo?.length) navigate(withPath([...path, ...r.drillTo]), { state: { drill: true } });
+    else if (r.drill) navigate(withPath([...path, r.drill]), { state: { drill: true } });
     else if (r.open !== undefined) {
       if (r.open) navigate(r.open);
       else notify(gwT('noDocument'), 'info');
@@ -189,6 +197,19 @@ export function DisplayReport() {
             </div>
             <h1 className={styles.reportTitle} id="gw-report-title">{title}</h1>
           </div>
+          <Suspense fallback={null}>
+            <BranchFilter
+              className={controls.select}
+              testId="gw-branch"
+              value={branchId}
+              onChange={(v) => {
+                const next = new URLSearchParams(params);
+                if (v) next.set('b', v);
+                else next.delete('b');
+                navigate(`/gateway/display?${next.toString()}`, { replace: true });
+              }}
+            />
+          </Suspense>
           <div className={styles.status}>
             {frame?.asOf ? gwT('asAt', { date: formatDate(frame.asOf) }) : frame ? gwT('periodRange', { from: formatDate(frame.period.start), to: formatDate(frame.period.end) }) : null}
           </div>
@@ -253,6 +274,7 @@ export function DisplayReport() {
         )}
         <p className={styles.note}>
           {gwT('drillHint')} · {gwT('caNote')}
+          {branchId && <> · {branchT('scopeNote')}</>}
         </p>
       </section>
     </>

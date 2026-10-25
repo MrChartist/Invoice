@@ -17,6 +17,7 @@ import { loadVouchers, type ManualVoucher } from './vouchers';
 import { loadSettings, loadPositions, type StockPosition } from '../inventory';
 import { effectiveMode, loadClosingStockConfig, netOfStockJournals, netOfStockOpening, stockJournalPostings, stockValuerFor, type StockJournalPosting, type StockValuer } from './closing-stock';
 import { loadPayrollPayments, loadRuns } from '../payroll/records';
+import { loadBranches } from '../branch';
 
 export * from './accounts';
 export * from './assets';
@@ -48,6 +49,7 @@ export function loadLedgerInput(books: BooksData = loadBooksData(), today: strin
     clients: getTable<Client>('clients'),
     payrollRuns: loadRuns(),
     payrollPayments: loadPayrollPayments(),
+    branches: loadBranches(), // WP-9: lets the reports narrow to a branch (`branch-books.ts`)
   };
 }
 

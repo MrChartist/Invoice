@@ -1,4 +1,6 @@
+import { lazy, Suspense, useMemo } from 'react';
 import { NumberInput } from '../ui/NumberInput';
+import { DB_PREFIX, getJson } from '../../lib/storage';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
@@ -10,6 +12,10 @@ import { useT, type MessageKey } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
 import styles from './SummaryPanel.module.css';
+
+// WP-9: loyalty redemption, loaded only while the programme is switched on.
+const EditorLoyalty = lazy(() => import('../loyalty/EditorLoyalty'));
+const LOYALTY_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
 
 const GST_MODES: { id: GstMode; label: MessageKey }[] = [
   { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },
@@ -37,6 +43,8 @@ export function SummaryPanel() {
   const sym = currencySymbol(cur);
   const money = (n: number) => formatCurrency(n, cur);
   const challan = s.doc_type === 'DELIVERY_CHALLAN';
+  // Cheap check of the stored programme flag; the loyalty module itself loads only when it is on.
+  const loyaltyOn = useMemo(() => getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}loyalty_program`, null)?.enabled === true, []);
 
   return (
     <div className={styles.panel}>
@@ -61,6 +69,11 @@ export function SummaryPanel() {
           <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.discount_rate} onChange={(n) => s.setDiscount(s.discount_type, n)} placeholder="0" aria-label={tr('summary.extraDiscount')} />
         </div>
       </div>
+      {loyaltyOn && LOYALTY_DOCS.has(s.doc_type) && (
+        <Suspense fallback={null}>
+          <EditorLoyalty />
+        </Suspense>
+      )}
       {t.invoice_discount_amount > 0 && (
         <Row label={tr('summary.discountApplied')} tone="good">
           −{money(t.invoice_discount_amount)}

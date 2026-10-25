@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Keyboard, Minus, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
@@ -99,7 +99,15 @@ export function Pos() {
   const [autoPrint, setAutoPrint] = useState(true);
   const [zOpen, setZOpen] = useState(false);
   const [lastBill, setLastBill] = useState<InvoiceRecord | null>(null);
-  const [retOpen, setRetOpen] = useState(false);
+  // `/pos?return=1` (palette "POS return / exchange") opens the return dialog straight away.
+  const [params, setParams] = useSearchParams();
+  const [retOpen, setRetOpen] = useState(() => params.get('return') === '1');
+  const [seenReturn, setSeenReturn] = useState(params.get('return'));
+  if (params.get('return') !== seenReturn) {
+    // Already on /pos when the palette link is used: open on the URL change (state adjusted during render).
+    setSeenReturn(params.get('return'));
+    if (params.get('return') === '1') setRetOpen(true);
+  }
   const [exchange, setExchange] = useState<{ id: string; amount: number; number: string } | null>(null);
   const [redeemPts, setRedeemPts] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -594,7 +602,14 @@ export function Pos() {
         <Suspense fallback={null}>
           <PosReturnModal
             open={retOpen}
-            onClose={() => setRetOpen(false)}
+            onClose={() => {
+              setRetOpen(false);
+              if (params.has('return')) {
+                const next = new URLSearchParams(params);
+                next.delete('return');
+                setParams(next, { replace: true });
+              }
+            }}
             notify={notify}
             onExchange={(r) => setExchange({ id: r.id, amount: r.amount, number: r.credit_note_number })}
           />
