@@ -22,6 +22,7 @@ import { StatCard } from '../components/ui/StatCard';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
+import { bucketLabel, rcvT } from '../i18n/areas/receivables';
 import { AgingStack, CollectionsChart, ShareBar, AgeChip } from '../components/receivables/Charts';
 import { StatementViewer } from '../components/receivables/StatementViewer';
 import { downloadTextFile } from '../components/receivables/exportUtils';
@@ -37,12 +38,12 @@ const TdsTab = lazy(() => import('../components/receivables/TdsTab'));
 const AdvancesTab = lazy(() => import('../components/advances/AdvancesTab'));
 
 type Tab = 'aging' | 'statements' | 'collections' | 'advances' | 'tds';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'aging', label: 'Aging' },
-  { id: 'statements', label: 'Statements' },
-  { id: 'collections', label: 'Collections' },
-  { id: 'advances', label: 'Advances' },
-  { id: 'tds', label: 'TDS' },
+const TABS: { id: Tab; label: () => string }[] = [
+  { id: 'aging', label: () => rcvT('tabAging') },
+  { id: 'statements', label: () => rcvT('tabStatements') },
+  { id: 'collections', label: () => rcvT('tabCollections') },
+  { id: 'advances', label: () => rcvT('tabAdvances') },
+  { id: 'tds', label: () => rcvT('tabTds') },
 ];
 
 /** 1 April of the Indian financial year containing `d`. */
@@ -107,10 +108,10 @@ export function Receivables() {
     if (!inv) return;
     try {
       const saved = createLateFeeInvoice(inv);
-      notify(`Late-fee draft ${saved.invoice_number} created — review it before sending`);
+      notify(rcvT('lateFeeCreated', { number: saved.invoice_number }));
       navigate(`/invoice/${saved.id}`);
     } catch (err) {
-      notify((err as Error).message || 'Could not create the late-fee invoice', 'error');
+      notify((err as Error).message || rcvT('lateFeeFailed'), 'error');
     }
   };
 
@@ -140,7 +141,7 @@ export function Receivables() {
       <Header>
         {currencies.length > 1 && (
           <label className={styles.inline}>
-            <span className={controls.label}>Currency</span>
+            <span className={controls.label}>{rcvT('currency')}</span>
             <select className={controls.select} value={currency} onChange={(e) => setCurrencyPick(e.target.value)}>
               {currencies.map((c) => <option key={c}>{c}</option>)}
             </select>
@@ -148,22 +149,22 @@ export function Receivables() {
         )}
         <button type="button" className={`${controls.btn} ${controls.btnOutline}`}
           onClick={() => downloadTextFile(`Receivables_aging_${todayInput()}.csv`, agingCsv(report))}>
-          <Download size={16} /> Export CSV
+          <Download size={16} /> {rcvT('exportCsv')}
         </button>
       </Header>
 
       <div className={surface.statGrid}>
-        <Stat label="Net outstanding" value={fmt(report.totals.net)} icon={Wallet}
-          hint={`${report.totals.billCount} open bill${report.totals.billCount === 1 ? '' : 's'}`} />
-        <Stat label="Overdue" value={fmt(report.totals.overdue)} icon={AlertTriangle} tone="loss"
-          hint={report.totals.gross > 0 ? `${Math.round((report.totals.overdue / report.totals.gross) * 100)}% of open bills` : 'All clear'} />
-        <Stat label="DSO (90 days)" value={dso === null ? '—' : `${dso} days`} icon={Clock}
-          hint="Avg. days to collect" />
-        <Stat label="Collection efficiency" value={efficiency === null ? '—' : `${efficiency}%`} icon={Percent}
-          hint="Received ÷ billed, last 12 months" />
+        <Stat label={rcvT('netOutstanding')} value={fmt(report.totals.net)} icon={Wallet}
+          hint={report.totals.billCount === 1 ? rcvT('openBillsOne') : rcvT('openBillsMany', { n: report.totals.billCount })} />
+        <Stat label={rcvT('overdue')} value={fmt(report.totals.overdue)} icon={AlertTriangle} tone="loss"
+          hint={report.totals.gross > 0 ? rcvT('pctOfOpen', { pct: Math.round((report.totals.overdue / report.totals.gross) * 100) }) : rcvT('allClear')} />
+        <Stat label={rcvT('dso')} value={dso === null ? '—' : rcvT('days', { n: dso })} icon={Clock}
+          hint={rcvT('dsoHint')} />
+        <Stat label={rcvT('efficiency')} value={efficiency === null ? '—' : `${efficiency}%`} icon={Percent}
+          hint={rcvT('efficiencyHint')} />
       </div>
 
-      <div className={styles.tabs} role="tablist" aria-label="Receivables reports">
+      <div className={styles.tabs} role="tablist" aria-label={rcvT('tabsAria')}>
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" id={`rcv-tab-${t.id}`} aria-selected={tab === t.id}
             aria-controls={`rcv-panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
@@ -176,7 +177,7 @@ export function Receivables() {
               setTab(next.id);
               requestAnimationFrame(() => document.getElementById(`rcv-tab-${next.id}`)?.focus());
             }}>
-            {t.label}
+            {t.label()}
           </button>
         ))}
       </div>
@@ -189,19 +190,19 @@ export function Receivables() {
           notify={notify} />}
         {tab === 'collections' && (
           <div className={surface.card}>
-            <div className={surface.cardHead}><h2 className={styles.h2}>Billed vs received — last 12 months</h2></div>
+            <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('billedVsReceived')}</h2></div>
             <div className={surface.cardBody}>
               <CollectionsChart rows={months} currency={currency} />
             </div>
             <div className={surface.tableWrap}>
               <table className={surface.table}>
-                <caption className={surface.srOnly}>Monthly collections</caption>
+                <caption className={surface.srOnly}>{rcvT('monthlyCollections')}</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Month</th><th scope="col" className={surface.numeric}>Billed</th>
-                    <th scope="col" className={surface.numeric}>Credit notes</th>
-                    <th scope="col" className={surface.numeric}>Received</th>
-                    <th scope="col" className={surface.numeric}>Efficiency</th>
+                    <th scope="col">{rcvT('month')}</th><th scope="col" className={surface.numeric}>{rcvT('billed')}</th>
+                    <th scope="col" className={surface.numeric}>{rcvT('creditNotes')}</th>
+                    <th scope="col" className={surface.numeric}>{rcvT('received')}</th>
+                    <th scope="col" className={surface.numeric}>{rcvT('efficiencyCol')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -220,12 +221,12 @@ export function Receivables() {
           </div>
         )}
         {tab === 'advances' && (
-          <Suspense fallback={<div className={surface.card}><p className={styles.note}>Loading advances…</p></div>}>
+          <Suspense fallback={<div className={surface.card}><p className={styles.note}>{rcvT('loadingAdvances')}</p></div>}>
             <AdvancesTab partyKey={params.get('party') ?? ''} notify={notify} onChanged={() => setData(loadData())} />
           </Suspense>
         )}
         {tab === 'tds' && (
-          <Suspense fallback={<div className={surface.card}><p className={styles.note}>Loading TDS register…</p></div>}>
+          <Suspense fallback={<div className={surface.card}><p className={styles.note}>{rcvT('loadingTds')}</p></div>}>
             <TdsTab data={data} notify={notify} />
           </Suspense>
         )}
@@ -238,8 +239,8 @@ export function Receivables() {
 function Header({ children }: { children?: ReactNode }) {
   return (
     <PageHeader
-      title="Receivables"
-      subtitle="Who owes you what, how old it is, and a statement to send them."
+      title={rcvT('title')}
+      subtitle={rcvT('subtitle')}
       actions={children}
     />
   );
@@ -283,13 +284,13 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee 
   return (
     <div className={styles.stack}>
       <div className={surface.card}>
-        <div className={surface.cardHead}><h2 className={styles.h2}>Outstanding by age</h2></div>
+        <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('byAge')}</h2></div>
         <div className={surface.cardBody}><AgingStack buckets={report.totals.buckets} currency={currency} /></div>
       </div>
 
       {top.length > 0 && (
         <div className={surface.card}>
-          <div className={surface.cardHead}><h2 className={styles.h2}>Top debtors</h2></div>
+          <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('topDebtors')}</h2></div>
           <ol className={styles.debtors}>
             {top.map((p) => (
               <li key={p.key} className={styles.debtor}>
@@ -299,7 +300,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee 
                 </div>
                 <ShareBar percent={debtorShare(report, p)} />
                 <span className={surface.statHint}>
-                  {debtorShare(report, p)}% of receivables{p.oldestOverdueDays > 0 ? ` · oldest ${p.oldestOverdueDays} days overdue` : ''}
+                  {rcvT('shareOf', { pct: debtorShare(report, p) })}{p.oldestOverdueDays > 0 ? rcvT('oldest', { n: p.oldestOverdueDays }) : ''}
                 </span>
               </li>
             ))}
@@ -308,16 +309,16 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee 
       )}
 
       <div className={surface.card}>
-        <div className={surface.cardHead}><h2 className={styles.h2}>Party-wise outstanding</h2></div>
+        <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('partyWise')}</h2></div>
         <div className={surface.tableWrap}>
           <table className={`${surface.table} ${styles.agingTable}`} aria-rowcount={virtual.enabled ? ariaIndex.total : undefined}>
-            <caption className={surface.srOnly}>Outstanding by party and age. Expand a row to see its bills.</caption>
+            <caption className={surface.srOnly}>{rcvT('agingCaption')}</caption>
             <thead>
               <tr aria-rowindex={virtual.enabled ? 1 : undefined}>
-                <th scope="col">Party</th>
-                {AGING_BUCKETS.map((b) => <th key={b} scope="col" className={surface.numeric}>{b}</th>)}
-                <th scope="col" className={surface.numeric}>Credits</th>
-                <th scope="col" className={surface.numeric}>Net</th>
+                <th scope="col">{rcvT('party')}</th>
+                {AGING_BUCKETS.map((b) => <th key={b} scope="col" className={surface.numeric}>{bucketLabel(b)}</th>)}
+                <th scope="col" className={surface.numeric}>{rcvT('credits')}</th>
+                <th scope="col" className={surface.numeric}>{rcvT('net')}</th>
               </tr>
             </thead>
             <tbody {...virtual.bodyProps}>
@@ -356,7 +357,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee 
             </tbody>
             <tfoot>
               <tr className={styles.totalRow} aria-rowindex={virtual.enabled ? ariaIndex.total : undefined}>
-                <th scope="row">Total</th>
+                <th scope="row">{rcvT('total')}</th>
                 {AGING_BUCKETS.map((b) => <td key={b} className={surface.numeric}>{m(report.totals.buckets[b])}</td>)}
                 <td className={surface.numeric}>{m(report.totals.creditNotes + report.totals.advances)}</td>
                 <td className={surface.numeric}>{formatMoney(report.totals.net, currency)}</td>
@@ -383,11 +384,11 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
   return (
     <table className={styles.bills} aria-rowcount={virtual.ariaRowCount(hasCredits ? 2 : 1)}>
       <thead>
-        <tr aria-rowindex={virtual.enabled ? 1 : undefined}><th scope="col">Bill</th><th scope="col">Issued</th><th scope="col">Due</th>
-          <th scope="col" className={surface.numeric}>Total</th>
-          <th scope="col" className={surface.numeric}>Paid</th>
-          <th scope="col" className={surface.numeric}>Outstanding</th>
-          <th scope="col">Age</th></tr>
+        <tr aria-rowindex={virtual.enabled ? 1 : undefined}><th scope="col">{rcvT('bill')}</th><th scope="col">{rcvT('issued')}</th><th scope="col">{rcvT('due')}</th>
+          <th scope="col" className={surface.numeric}>{rcvT('total')}</th>
+          <th scope="col" className={surface.numeric}>{rcvT('paid')}</th>
+          <th scope="col" className={surface.numeric}>{rcvT('outstanding')}</th>
+          <th scope="col">{rcvT('age')}</th></tr>
       </thead>
       <tbody {...virtual.bodyProps}>
         {virtual.slots.map((slot) => {
@@ -403,13 +404,13 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
               <td className={surface.numeric}><strong>{formatMoney(b.outstanding, currency)}</strong></td>
               <td>
                 <AgeChip bucket={b.bucket}>
-                  {b.daysOverdue > 0 ? `${b.daysOverdue} days overdue` : 'Not due'}
+                  {b.daysOverdue > 0 ? rcvT('daysOverdue', { n: b.daysOverdue }) : rcvT('notDue')}
                 </AgeChip>
                 {b.daysOverdue > 0 && lateFeeRules.has(b.invoiceId) && (
                   <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`}
-                    title={`Creates a new draft invoice: ${describeClientLateFee(lateFeeRules.get(b.invoiceId)!)}`}
-                    aria-label={`Add late fee on ${b.number}`} onClick={() => onLateFee(b.invoiceId)}>
-                    <Percent size={14} aria-hidden="true" /> Add late fee
+                    title={rcvT('lateFeeTitle', { rule: describeClientLateFee(lateFeeRules.get(b.invoiceId)!) })}
+                    aria-label={rcvT('lateFeeOn', { number: b.number })} onClick={() => onLateFee(b.invoiceId)}>
+                    <Percent size={14} aria-hidden="true" /> {rcvT('addLateFee')}
                   </button>
                 )}
               </td>
@@ -419,9 +420,9 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
         {hasCredits && (
           <tr aria-rowindex={virtual.enabled ? p.bills.length + 2 : undefined}>
             <td colSpan={7} className={surface.statHint}>
-              Less unadjusted credits: {p.creditNotes > 0 && `credit notes ${formatMoney(p.creditNotes, currency)}`}
+              {rcvT('lessCredits')}{p.creditNotes > 0 && rcvT('lessCN', { amount: formatMoney(p.creditNotes, currency) })}
               {p.creditNotes > 0 && p.advances > 0 && ', '}
-              {p.advances > 0 && `advances ${formatMoney(p.advances, currency)}`}
+              {p.advances > 0 && rcvT('lessAdv', { amount: formatMoney(p.advances, currency) })}
             </td>
           </tr>
         )}
@@ -474,9 +475,9 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
-      notify('Statement text copied — paste it into WhatsApp or email');
+      notify(rcvT('copied'));
     } catch {
-      notify('Could not access the clipboard in this browser', 'error');
+      notify(rcvT('noClipboard'), 'error');
     }
   };
 
@@ -486,7 +487,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
     <div className={styles.stack}>
       <div className={`${surface.card} ${styles.filters}`}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="rcv-party">Party</label>
+          <label className={controls.label} htmlFor="rcv-party">{rcvT('party')}</label>
           <select id="rcv-party" className={controls.select} value={party.key} onChange={(e) => onPick(e.target.value)}>
             {[...report.parties].sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
               <option key={p.key} value={p.key}>{p.name}</option>
@@ -494,15 +495,15 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
           </select>
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="rcv-from">From</label>
+          <label className={controls.label} htmlFor="rcv-from">{rcvT('from')}</label>
           <input id="rcv-from" type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="rcv-to">To</label>
+          <label className={controls.label} htmlFor="rcv-to">{rcvT('to')}</label>
           <input id="rcv-to" type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
         </div>
-        <div className={styles.presets} role="group" aria-label="Date range presets">
-          {([['fy', 'This FY'], ['lastfy', 'Last FY'], ['q', 'Last 90 days'], ['all', 'All time']] as const).map(([k, l]) => (
+        <div className={styles.presets} role="group" aria-label={rcvT('presets')}>
+          {([['fy', rcvT('thisFy')], ['lastfy', rcvT('lastFy')], ['q', rcvT('last90')], ['all', rcvT('allTime')]] as const).map(([k, l]) => (
             <Fragment key={k}>{(() => {
               const [pf, pt] = presetRange(k);
               const on = pf === from && pt === to;
@@ -514,7 +515,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
             })()}</Fragment>
           ))}
         </div>
-        {invalidRange && <p className={controls.error} role="alert">The start date is after the end date.</p>}
+        {invalidRange && <p className={controls.error} role="alert">{rcvT('badRange')}</p>}
       </div>
 
       <div className={surface.card}>
@@ -522,41 +523,41 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
           <h2 className={styles.h2}>{party.name}</h2>
           <div className={surface.pageActions}>
             <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={copy}>
-              <Copy size={14} /> Copy text
+              <Copy size={14} /> {rcvT('copyText')}
             </button>
             {client?.email && (
               <a className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 href={mailtoLink({ to: client.email, subject: `Statement of account – ${sender?.companyName ?? ''}`, body: text })}>
-                <Mail size={14} /> Email
+                <Mail size={14} /> {rcvT('email')}
               </a>
             )}
             <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={() => setViewer(true)} disabled={invalidRange}>
-              <FileText size={14} /> Print / PDF
+              <FileText size={14} /> {rcvT('printPdf')}
             </button>
           </div>
         </div>
 
         <div className={styles.ledgerSummary}>
-          <Mini label="Opening" value={formatMoney(ledger.opening, currency)} dir={ledger.opening} />
-          <Mini label="Debit" value={formatMoney(ledger.totalDebit, currency)} />
-          <Mini label="Credit" value={formatMoney(ledger.totalCredit, currency)} />
-          <Mini label="Closing" value={formatMoney(ledger.closing, currency)} dir={ledger.closing} strong />
+          <Mini label={rcvT('opening')} value={formatMoney(ledger.opening, currency)} dir={ledger.opening} />
+          <Mini label={rcvT('debit')} value={formatMoney(ledger.totalDebit, currency)} />
+          <Mini label={rcvT('credit')} value={formatMoney(ledger.totalCredit, currency)} />
+          <Mini label={rcvT('closing')} value={formatMoney(ledger.closing, currency)} dir={ledger.closing} strong />
         </div>
 
         <div className={surface.tableWrap}>
           <table className={surface.table} aria-rowcount={virtual.ariaRowCount(3)}>
-            <caption className={surface.srOnly}>Ledger for {party.name}</caption>
+            <caption className={surface.srOnly}>{rcvT('ledgerFor', { name: party.name })}</caption>
             <thead>
               <tr aria-rowindex={virtual.enabled ? 1 : undefined}>
-                <th scope="col">Date</th><th scope="col">Voucher</th><th scope="col">Particulars</th>
-                <th scope="col" className={surface.numeric}>Debit</th>
-                <th scope="col" className={surface.numeric}>Credit</th>
-                <th scope="col" className={surface.numeric}>Balance</th>
+                <th scope="col">{rcvT('date')}</th><th scope="col">{rcvT('voucher')}</th><th scope="col">{rcvT('particulars')}</th>
+                <th scope="col" className={surface.numeric}>{rcvT('debit')}</th>
+                <th scope="col" className={surface.numeric}>{rcvT('credit')}</th>
+                <th scope="col" className={surface.numeric}>{rcvT('balance')}</th>
               </tr>
             </thead>
             <tbody {...virtual.bodyProps}>
               <tr className={styles.openingRow} aria-rowindex={virtual.enabled ? 2 : undefined}>
-                <td>{from ? formatDate(from) : '—'}</td><td /><td><em>Opening balance</em></td><td /><td />
+                <td>{from ? formatDate(from) : '—'}</td><td /><td><em>{rcvT('openingBalance')}</em></td><td /><td />
                 <td className={surface.numeric}>{drcr(ledger.opening, currency)}</td>
               </tr>
               {virtual.slots.map((slot) => {
@@ -574,12 +575,12 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
                 );
               })}
               {ledger.entries.length === 0 && (
-                <tr><td colSpan={6} className={surface.statHint}>No transactions in this period.</td></tr>
+                <tr><td colSpan={6} className={surface.statHint}>{rcvT('noTx')}</td></tr>
               )}
             </tbody>
             <tfoot>
               <tr className={styles.totalRow} aria-rowindex={virtual.enabled ? ledger.entries.length + 3 : undefined}>
-                <th scope="row" colSpan={3}>Closing balance</th>
+                <th scope="row" colSpan={3}>{rcvT('closingBalance')}</th>
                 <td className={surface.numeric}>{formatMoney(ledger.totalDebit, currency)}</td>
                 <td className={surface.numeric}>{formatMoney(ledger.totalCredit, currency)}</td>
                 <td className={surface.numeric}>{drcr(ledger.closing, currency)}</td>
@@ -588,7 +589,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify }
           </table>
         </div>
         <p className={`${surface.sectionNote} ${styles.note}`}>
-          Dr = the party owes you; Cr = you owe the party (advance or credit note exceeds bills).
+          {rcvT('drcrNote')}
         </p>
       </div>
 

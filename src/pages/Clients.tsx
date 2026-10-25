@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
+import { salesT } from '../i18n/areas/sales';
 import { ClientFormModal } from '../components/modals/ClientFormModal';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
@@ -108,16 +109,16 @@ export function Clients() {
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Clients"
-        subtitle={`${clients.length} saved · clients are also added automatically when you save an invoice`}
+        title={salesT('cl.title')}
+        subtitle={salesT('cl.subtitle', { n: clients.length })}
         actions={
           edit ? (
             <>
               <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
-                <FileUp size={16} /> Import
+                <FileUp size={16} /> {salesT('cl.import')}
               </button>
               <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-                <Plus size={16} /> Add client
+                <Plus size={16} /> {salesT('cl.add')}
               </button>
             </>
           ) : undefined
@@ -132,8 +133,8 @@ export function Clients() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, company, city, GSTIN or PAN"
-              aria-label="Search clients"
+              placeholder={salesT('cl.searchPh')}
+              aria-label={salesT('cl.searchAria')}
             />
           </label>
         </div>
@@ -158,12 +159,12 @@ export function Clients() {
             <table className={`${surface.table} ${styles.directory}`}>
               <thead>
                 <tr>
-                  <th>Client</th>
-                  <th>Contact</th>
-                  <th>Location</th>
-                  <th>GSTIN / PAN</th>
-                  <th className={surface.numeric}>Billed</th>
-                  <th aria-label="Actions" />
+                  <th>{salesT('cl.colClient')}</th>
+                  <th>{salesT('cl.colContact')}</th>
+                  <th>{salesT('cl.colLocation')}</th>
+                  <th>{salesT('cl.colGstin')}</th>
+                  <th className={surface.numeric}>{salesT('cl.colBilled')}</th>
+                  <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
               <tbody>
@@ -217,7 +218,7 @@ export function Clients() {
                           <>
                             {formatCurrency(b.total)}
                             <div className={styles.sub}>
-                              {b.count} invoice{b.count === 1 ? '' : 's'}
+                              {b.count === 1 ? salesT('cl.invoicesOne') : salesT('cl.invoicesMany', { n: b.count })}
                             </div>
                           </>
                         ) : (
@@ -227,22 +228,22 @@ export function Clients() {
                           const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
                           return adv > 0 ? (
                             <div className={styles.sub}>
-                              <Link to={`/receivables?tab=advances&party=${encodeURIComponent(c.id ?? `name:${c.name.trim().toLowerCase()}`)}`}>Advance {formatCurrency(adv)} unadjusted</Link>
+                              <Link to={`/receivables?tab=advances&party=${encodeURIComponent(c.id ?? `name:${c.name.trim().toLowerCase()}`)}`}>{salesT('cl.advance', { amount: formatCurrency(adv) })}</Link>
                             </div>
                           ) : null;
                         })()}
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
-                          <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={`Statement for ${c.name}`} title="Account statement">
+                          <Link to={`/receivables?tab=statements&party=${c.id}`} className={controls.btnIcon} aria-label={salesT('cl.statementFor', { name: c.name })} title={salesT('cl.statement')}>
                             <Scale size={16} />
                           </Link>
                           {edit && (
                             <>
-                              <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`} title="Edit">
+                              <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={salesT('cl.editOf', { name: c.name })} title={salesT('edit')}>
                                 <Pencil size={16} />
                               </button>
-                              <button type="button" className={controls.btnDanger} onClick={() => setDeleting(c)} aria-label={`Delete ${c.name}`} title="Delete">
+                              <button type="button" className={controls.btnDanger} onClick={() => setDeleting(c)} aria-label={salesT('cl.deleteOf', { name: c.name })} title={salesT('delete')}>
                                 <Trash2 size={16} />
                               </button>
                             </>
@@ -264,7 +265,7 @@ export function Clients() {
         onClose={() => setImportOpen(false)}
         onDone={() => {
           setVersion((v) => v + 1);
-          notify('Clients imported');
+          notify(salesT('cl.imported'));
         }}
       />
       <ClientFormModal
@@ -273,19 +274,19 @@ export function Clients() {
         onClose={() => setFormOpen(false)}
         onSaved={(c, isNew) => {
           setVersion((v) => v + 1);
-          notify(isNew ? `${c.name} added` : `${c.name} updated`);
+          notify(salesT(isNew ? 'cl.added' : 'cl.updated', { name: c.name }));
         }}
       />
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title="Delete this client?"
-        message={`${deleting?.name ?? ''} will be removed from your directory. Invoices already issued keep their own copy of the client details.`}
-        confirmLabel="Delete client"
+        title={salesT('cl.deleteTitle')}
+        message={salesT('cl.deleteMsg', { name: deleting?.name ?? '' })}
+        confirmLabel={salesT('cl.deleteConfirm')}
         onConfirm={() => {
           if (deleting?.id) localDb.clients.remove(deleting.id);
           setVersion((v) => v + 1);
-          notify('Client deleted');
+          notify(salesT('cl.deleted'));
         }}
         onClose={() => setDeleting(null)}
       />

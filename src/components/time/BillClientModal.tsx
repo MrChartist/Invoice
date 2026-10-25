@@ -7,6 +7,8 @@ import { Modal } from '../ui/Modal';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './time.module.css';
+import { useT } from '../../i18n';
+import { timeT } from '../../i18n/areas/time';
 
 /** Preview and create a new draft invoice from a client's unbilled time, costs and trips. */
 export function BillClientModal({ target, prefs, onClose, onCreated }: {
@@ -15,8 +17,9 @@ export function BillClientModal({ target, prefs, onClose, onCreated }: {
   onClose: () => void;
   onCreated: (invoiceId: string, invoiceNumber: string) => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   return (
-    <Modal open={!!target} onClose={onClose} size="lg" title={target ? `Bill ${target.name}` : 'Bill'} subtitle="Creates a new draft invoice you can review before sending.">
+    <Modal open={!!target} onClose={onClose} size="lg" title={target ? timeT('billTitle', { name: target.name }) : timeT('bill')} subtitle={timeT('billSub')}>
       {target && <BillForm key={target.key} clientKey={target.key} prefs={prefs} onClose={onClose} onCreated={onCreated} />}
     </Modal>
   );
@@ -57,15 +60,15 @@ function BillForm({ clientKey, prefs, onClose, onCreated }: {
       <div className={styles.includeRow}>
         <label className={controls.check}>
           <input type="checkbox" checked={include.time} disabled={!all.time.length} onChange={() => toggle('time')} />
-          Time ({all.time.length} {all.time.length === 1 ? 'entry' : 'entries'})
+          {all.time.length === 1 ? timeT('incTimeOne') : timeT('incTimeMany', { n: all.time.length })}
         </label>
         <label className={controls.check}>
           <input type="checkbox" checked={include.expenses} disabled={!all.expenses.length} onChange={() => toggle('expenses')} />
-          Expenses ({all.expenses.length})
+          {timeT('incExpenses', { n: all.expenses.length })}
         </label>
         <label className={controls.check}>
           <input type="checkbox" checked={include.mileage} disabled={!all.mileage.length} onChange={() => toggle('mileage')} />
-          Mileage ({all.mileage.length} {all.mileage.length === 1 ? 'trip' : 'trips'})
+          {all.mileage.length === 1 ? timeT('incMileageOne') : timeT('incMileageMany', { n: all.mileage.length })}
         </label>
       </div>
 
@@ -73,7 +76,7 @@ function BillForm({ clientKey, prefs, onClose, onCreated }: {
         <div className={surface.tableWrap}>
           <table className={surface.table}>
             <thead>
-              <tr><th>Line</th><th className={surface.numeric}>Qty</th><th className={surface.numeric}>Rate</th><th className={surface.numeric}>GST</th><th className={surface.numeric}>Amount</th></tr>
+              <tr><th>{timeT('line')}</th><th className={surface.numeric}>{timeT('qty')}</th><th className={surface.numeric}>{timeT('rate')}</th><th className={surface.numeric}>{timeT('gst')}</th><th className={surface.numeric}>{timeT('amount')}</th></tr>
             </thead>
             <tbody>
               {lines.map((l) => (
@@ -92,22 +95,25 @@ function BillForm({ clientKey, prefs, onClose, onCreated }: {
           </table>
         </div>
       ) : (
-        <p className={styles.muted}>Nothing selected to bill.</p>
+        <p className={styles.muted}>{timeT('nothingSelected')}</p>
       )}
 
       <div className={styles.billTotals}>
-        <span>Taxable {formatCurrency(taxable)}</span>
-        <span>GST about {formatCurrency(gst)}</span>
+        <span>{timeT('taxable', { amount: formatCurrency(taxable) })}</span>
+        <span>{timeT('gstAbout', { amount: formatCurrency(gst) })}</span>
       </div>
       <p className={styles.muted}>
-        Time is rounded per entry ({prefs.round_mode === 'none' || !prefs.round_increment ? 'exact minutes' : `${prefs.round_mode} ${prefs.round_increment} min`})
-        and billed in hours (SAC {prefs.sac}). Re-billed costs and mileage are part of the taxable supply; pure-agent
-        reimbursements are 0% lines. The invoice works out CGST/SGST or IGST from the client&apos;s state — verify with your CA.
+        {timeT('billNote', {
+          rule: prefs.round_mode === 'none' || !prefs.round_increment
+            ? timeT('roundExact')
+            : timeT('roundRule', { mode: prefs.round_mode === 'up' ? timeT('modeUp') : timeT('modeNearest'), n: prefs.round_increment }),
+          sac: prefs.sac,
+        })}
       </p>
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.actions}>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-        <button type="button" className={controls.btnPrimary} disabled={!lines.length} onClick={create}>Create draft invoice</button>
+        <button type="button" className={controls.btnOutline} onClick={onClose}>{timeT('cancel')}</button>
+        <button type="button" className={controls.btnPrimary} disabled={!lines.length} onClick={create}>{timeT('createDraft')}</button>
       </div>
     </div>
   );

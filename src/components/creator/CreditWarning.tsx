@@ -8,6 +8,8 @@ import { creditCheck, masterFor, type BounceLike } from '../../lib/credit-limit'
 import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { todayInput } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from './StockWarnings.module.css';
 
 /**
@@ -15,6 +17,7 @@ import styles from './StockWarnings.module.css';
  * document. Advisory only — saving is never blocked.
  */
 export function CreditWarning() {
+  useT(); // re-render on a language switch (5.4)
   const s = useInvoiceStore(
     useShallow((st) => pick(st, ['client', 'id', 'doc_type', 'status', 'currency', 'exchange_rate', 'amount_paid', 'totals'])),
   );
@@ -45,7 +48,7 @@ export function CreditWarning() {
   });
   if (!check.warnings.length) return null;
   return (
-    <div className={styles.wrap} role="status" aria-label="Credit check">
+    <div className={styles.wrap} role="status" aria-label={edT('cwAria')}>
       {check.warnings.map((w) => (
         <p key={w} className={styles.line}>
           <ShieldAlert size={14} aria-hidden="true" /> {w}
@@ -53,8 +56,8 @@ export function CreditWarning() {
       ))}
       <p className={styles.line}>
         <span>
-          You can still save.{' '}
-          <Link to={`/receivables?tab=statements&party=${encodeURIComponent(context.master.id ?? '')}`}>View statement</Link>
+          {edT('cwSave')}{' '}
+          <Link to={`/receivables?tab=statements&party=${encodeURIComponent(context.master.id ?? '')}`}>{edT('cwStatement')}</Link>
         </span>
       </p>
     </div>

@@ -9,6 +9,9 @@ import { cn, formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './pos.module.css';
+import { dateLocale, useT } from '../../i18n';
+import { posT } from '../../i18n/areas/pos';
+import { areaNodes } from '../../i18n/areas/nodes';
 
 function printHtml(html: string, name: string) {
   const w = window.open('', '_blank');
@@ -25,6 +28,7 @@ function printHtml(html: string, name: string) {
 
 /** Day-end Z report with the cash-drawer count (stored in `pos_day_close`). */
 export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose: () => void; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }) {
+  useT(); // re-render on a language switch (5.4)
   const [day, setDay] = useState(todayInput());
   const [tick, setTick] = useState(0);
   const z = useMemo(
@@ -51,7 +55,7 @@ export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose
   const save = () => {
     dayCloseDb.close(z, float, counted, note);
     setTick((t) => t + 1);
-    notify(`Day ${formatDate(day)} closed${drawer.difference ? ` — ${drawer.difference < 0 ? 'short' : 'over'} by ${formatCurrency(Math.abs(drawer.difference))}` : ''}`);
+    notify(posT('zClosed', { date: formatDate(day) }) + (drawer.difference ? posT(drawer.difference < 0 ? 'zShort' : 'zOver', { amount: formatCurrency(Math.abs(drawer.difference)) }) : ''));
   };
 
   return (
@@ -59,72 +63,72 @@ export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose
       open={open}
       onClose={onClose}
       size="lg"
-      title="Day-end Z report"
-      subtitle="POS bills of the day and the money taken for them"
+      title={posT('zTitle')}
+      subtitle={posT('zSub')}
       footer={
         <>
           <button type="button" className={controls.btnOutline} onClick={() => downloadText(`z-report-${day}.csv`, zReportCsv(z, closed), 'text/csv')}>
             <Download size={16} /> CSV
           </button>
           <button type="button" className={controls.btnOutline} onClick={() => printHtml(zReportHtml(z, { business, close: closed }), `z-report-${day}`)}>
-            <Printer size={16} /> Print 80 mm
+            <Printer size={16} /> {posT('zPrint')}
           </button>
           <button type="button" className={controls.btnPrimary} onClick={save}>
-            <Save size={16} /> {closed ? 'Update day close' : 'Close the day'}
+            <Save size={16} /> {closed ? posT('zUpdate') : posT('zClose')}
           </button>
         </>
       }
     >
       <div className={styles.zGrid}>
         <label className={controls.field}>
-          <span className={controls.label}>Day</span>
+          <span className={controls.label}>{posT('zDay')}</span>
           <input id="z-day" type="date" className={controls.input} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} />
         </label>
 
-        <table className={cn(surface.table, styles.zTable)} aria-label="Z report totals">
+        <table className={cn(surface.table, styles.zTable)} aria-label={posT('zTotals')}>
           <tbody>
-            <tr><th scope="row">Bills</th><td className={surface.numeric} data-z="bills">{z.bills}{z.cancelled ? ` (+${z.cancelled} cancelled)` : ''}</td></tr>
-            {z.firstNumber && <tr><th scope="row">Numbers</th><td className={surface.numeric}>{z.firstNumber} – {z.lastNumber}</td></tr>}
-            <tr><th scope="row">Gross sales</th><td className={surface.numeric}>{formatCurrency(z.gross)}</td></tr>
-            <tr><th scope="row">Discounts</th><td className={surface.numeric}>{formatCurrency(-z.discounts)}</td></tr>
-            <tr><th scope="row">Taxable value</th><td className={surface.numeric}>{formatCurrency(z.taxable)}</td></tr>
+            <tr><th scope="row">{posT('zBills')}</th><td className={surface.numeric} data-z="bills">{z.bills}{z.cancelled ? posT('zCancelled', { n: z.cancelled }) : ''}</td></tr>
+            {z.firstNumber && <tr><th scope="row">{posT('zNumbers')}</th><td className={surface.numeric}>{z.firstNumber} – {z.lastNumber}</td></tr>}
+            <tr><th scope="row">{posT('zGross')}</th><td className={surface.numeric}>{formatCurrency(z.gross)}</td></tr>
+            <tr><th scope="row">{posT('zDiscounts')}</th><td className={surface.numeric}>{formatCurrency(-z.discounts)}</td></tr>
+            <tr><th scope="row">{posT('zTaxable')}</th><td className={surface.numeric}>{formatCurrency(z.taxable)}</td></tr>
             {z.taxByRate.map((s) => (
-              <tr key={s.rate}><th scope="row">GST {s.rate}% on {formatCurrency(s.taxable)}</th><td className={surface.numeric}>{formatCurrency(s.tax)}</td></tr>
+              <tr key={s.rate}><th scope="row">{posT('zGstOn', { rate: s.rate, amount: formatCurrency(s.taxable) })}</th><td className={surface.numeric}>{formatCurrency(s.tax)}</td></tr>
             ))}
-            {z.cess ? <tr><th scope="row">Cess</th><td className={surface.numeric}>{formatCurrency(z.cess)}</td></tr> : null}
-            {z.roundOff ? <tr><th scope="row">Round-off</th><td className={surface.numeric}>{formatCurrency(z.roundOff)}</td></tr> : null}
-            <tr className={styles.strong}><th scope="row">Net sales</th><td className={surface.numeric} data-z="net">{formatCurrency(z.net)}</td></tr>
-            <tr><th scope="row">Cash</th><td className={surface.numeric} data-z="cash">{formatCurrency(z.tenders.cash)}</td></tr>
+            {z.cess ? <tr><th scope="row">{posT('cess')}</th><td className={surface.numeric}>{formatCurrency(z.cess)}</td></tr> : null}
+            {z.roundOff ? <tr><th scope="row">{posT('roundOff')}</th><td className={surface.numeric}>{formatCurrency(z.roundOff)}</td></tr> : null}
+            <tr className={styles.strong}><th scope="row">{posT('zNet')}</th><td className={surface.numeric} data-z="net">{formatCurrency(z.net)}</td></tr>
+            <tr><th scope="row">{posT('m.Cash')}</th><td className={surface.numeric} data-z="cash">{formatCurrency(z.tenders.cash)}</td></tr>
             <tr><th scope="row">UPI</th><td className={surface.numeric} data-z="upi">{formatCurrency(z.tenders.upi)}</td></tr>
-            <tr><th scope="row">Card</th><td className={surface.numeric} data-z="card">{formatCurrency(z.tenders.card)}</td></tr>
-            {z.tenders.other ? <tr><th scope="row">Other</th><td className={surface.numeric}>{formatCurrency(z.tenders.other)}</td></tr> : null}
-            {z.credit ? <tr><th scope="row">On account</th><td className={surface.numeric}>{formatCurrency(z.credit)}</td></tr> : null}
+            <tr><th scope="row">{posT('m.Card')}</th><td className={surface.numeric} data-z="card">{formatCurrency(z.tenders.card)}</td></tr>
+            {z.tenders.other ? <tr><th scope="row">{posT('zOther')}</th><td className={surface.numeric}>{formatCurrency(z.tenders.other)}</td></tr> : null}
+            {z.credit ? <tr><th scope="row">{posT('zOnAccount')}</th><td className={surface.numeric}>{formatCurrency(z.credit)}</td></tr> : null}
           </tbody>
         </table>
 
         <fieldset className={styles.drawer}>
-          <legend className={controls.label}>Cash drawer</legend>
+          <legend className={controls.label}>{posT('zDrawer')}</legend>
           <div className={controls.row}>
             <label className={controls.field}>
-              <span className={controls.label}>Opening float (₹)</span>
+              <span className={controls.label}>{posT('zFloat')}</span>
               <NumberInput id="z-float" className={cn(controls.input, controls.inputNumeric)} value={float} onChange={setFloat} placeholder="0" />
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>Counted cash (₹)</span>
+              <span className={controls.label}>{posT('zCounted')}</span>
               <NumberInput id="z-counted" className={cn(controls.input, controls.inputNumeric)} value={counted} onChange={setCounted} placeholder="0" />
             </label>
           </div>
           <p className={styles.drawerLine}>
-            Expected in drawer: <strong>{formatCurrency(drawer.expected)}</strong> ·{' '}
+            {areaNodes(posT('zExpected'), { amount: <strong>{formatCurrency(drawer.expected)}</strong> })} ·{' '}
             <span className={drawer.difference < 0 ? styles.short : drawer.difference > 0 ? styles.over : undefined} data-z="difference">
-              {drawer.difference < 0 ? 'Short' : drawer.difference > 0 ? 'Over' : 'Difference'} {formatCurrency(Math.abs(drawer.difference))}
+              {drawer.difference < 0 ? posT('zShortLbl') : drawer.difference > 0 ? posT('zOverLbl') : posT('zDiff')} {formatCurrency(Math.abs(drawer.difference))}
             </span>
           </p>
           <label className={controls.field}>
-            <span className={controls.label}>Note</span>
-            <input className={controls.input} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. ₹10 coin short" />
+            <span className={controls.label}>{posT('zNote')}</span>
+            <input className={controls.input} value={note} onChange={(e) => setNote(e.target.value)} placeholder={posT('zNotePh')} />
           </label>
-          {closed && <p className={controls.hint}>Closed {new Date(closed.closed_at).toLocaleString('en-IN')} — saving again updates the count.</p>}
+          {closed && <p className={controls.hint}>{posT('zClosedAt', { time: new Date(closed.closed_at).toLocaleString(dateLocale()) })}</p>}
         </fieldset>
       </div>
     </Modal>

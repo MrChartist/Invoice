@@ -9,6 +9,8 @@ import { localDb } from '../../lib/localDb';
 import { can } from '../../lib/access';
 import { round2 } from '../../lib/invoice-calc';
 import { formatCurrency } from '../../lib/utils';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
 import styles from './StockWarnings.module.css';
 
 /**
@@ -16,6 +18,7 @@ import styles from './StockWarnings.module.css';
  * first up to the balance (each through the payments API). Loaded lazily by the editor.
  */
 export function AdvanceNotice({ onApplied }: { onApplied?: (message: string) => void }) {
+  useT(); // re-render on a language switch (5.4)
   const s = useInvoiceStore(useShallow((st) => pick(st, ['client', 'id', 'dirty', 'doc_type', 'amount_paid'])));
   const [tick, setTick] = useState(0);
   const [error, setError] = useState('');
@@ -50,7 +53,7 @@ export function AdvanceNotice({ onApplied }: { onApplied?: (message: string) => 
       setError('');
       useInvoiceStore.getState().loadInvoice(stored.id);
       setTick((t) => t + 1);
-      onApplied?.(`Advance of ${formatCurrency(applicable, 'INR')} applied to ${stored.invoice_number}`);
+      onApplied?.(edT('anApplied', { amount: formatCurrency(applicable, 'INR'), number: stored.invoice_number }));
     } catch (err) {
       setError((err as Error).message);
       setTick((t) => t + 1);
@@ -58,17 +61,17 @@ export function AdvanceNotice({ onApplied }: { onApplied?: (message: string) => 
   };
 
   return (
-    <div className={styles.wrap} role="status" aria-label="Unadjusted advances">
+    <div className={styles.wrap} role="status" aria-label={edT('anAria')}>
       <p className={styles.line}>
         <HandCoins size={14} aria-hidden="true" />
         <span>
-          {clientName} has {formatCurrency(total, 'INR')} of advances not yet adjusted ({context.open.map((o) => o.advance.number).join(', ')}).{' '}
+          {edT('anText', { client: clientName ?? '', amount: formatCurrency(total, 'INR'), list: context.open.map((o) => o.advance.number).join(', ') })}{' '}
           {ready ? (
-            <button type="button" className={styles.inlineBtn} onClick={apply}>Apply {formatCurrency(applicable, 'INR')} to this invoice</button>
+            <button type="button" className={styles.inlineBtn} onClick={apply}>{edT('anApply', { amount: formatCurrency(applicable, 'INR') })}</button>
           ) : (
-            <>Save and issue the invoice, then apply it here or from Record payment.</>
+            <>{edT('anLater')}</>
           )}{' '}
-          <Link to={`/receivables?tab=advances${clientId ? `&party=${encodeURIComponent(clientId)}` : ''}`}>View advances</Link>
+          <Link to={`/receivables?tab=advances${clientId ? `&party=${encodeURIComponent(clientId)}` : ''}`}>{edT('anView')}</Link>
         </span>
       </p>
       {error && <p className={styles.line} role="alert">{error}</p>}

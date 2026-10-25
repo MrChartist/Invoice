@@ -19,6 +19,9 @@ import { isLocked } from '../../lib/period-lock';
 import { canAmend } from '../../lib/amendments';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { edT } from '../../i18n/areas/editor';
+import { stateLabel } from '../../i18n/areas/sales';
 import styles from './DocumentActions.module.css';
 
 const OrderFulfilment = lazy(() => import('../documents/OrderFulfilment').then((m) => ({ default: m.OrderFulfilment })));
@@ -36,6 +39,7 @@ export function DocumentActions({
   /** Called after an action changed the stored document (cancel / reinstate). */
   onChanged?: () => void;
 }) {
+  useT(); // re-render on a language switch (5.4)
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
   const [creditOpen, setCreditOpen] = useState(false);
@@ -81,24 +85,24 @@ export function DocumentActions({
         <ConvertMenu invoice={saved} onRequestCreditNote={canCredit ? () => setCreditOpen(true) : undefined} onRequestDebitNote={canCredit ? () => setDebitOpen(true) : undefined} />
         {!isOrder && <RecurringButton invoice={saved} onCreated={() => navigate('/recurring')} />}
         {/* A Bill of Supply is never e-invoiced; it can still need an e-Way Bill (document type BIL). */}
-        {!isOrder && <EInvoiceButton invoice={saved} label={saved.doc_type === 'BILL_OF_SUPPLY' ? 'e-Way Bill' : undefined} />}
+        {!isOrder && <EInvoiceButton invoice={saved} label={saved.doc_type === 'BILL_OF_SUPPLY' ? edT('daEway') : undefined} />}
         <button
           type="button"
           className={`${controls.btnOutline} ${controls.btnSm}`}
           onClick={() => setCancelOpen(true)}
           disabled={locked}
-          title={locked ? 'This document is in a locked period — unlock it with your PIN first' : undefined}
+          title={locked ? edT('daLockedTitle') : undefined}
         >
-          {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? 'Reinstate' : 'Cancel document'}
+          {locked ? <Lock size={16} /> : cancelled ? <RotateCcw size={16} /> : <Ban size={16} />} {cancelled ? edT('daReinstate') : edT('daCancel')}
         </button>
         {canAmend(saved) && (
           <button
             type="button"
             className={`${controls.btnOutline} ${controls.btnSm}`}
             onClick={() => setAmendOpen(true)}
-            title="Change a document already reported in a filed GSTR-1: reported as B2BA / CDNRA in this month's return"
+            title={edT('daAmendTitle')}
           >
-            <FileClock size={16} /> Amend (reported in a filed return)
+            <FileClock size={16} /> {edT('daAmend')}
           </button>
         )}
       </div>
@@ -114,17 +118,17 @@ export function DocumentActions({
           }
         };
         return (
-          <div className={styles.row} role="group" aria-label="Quotation outcome">
-            <span>Quotation:</span> <StatusBadge status={q} tone={quoteTone(q)} />
+          <div className={styles.row} role="group" aria-label={edT('daQuoteOutcome')}>
+            <span>{edT('daQuotation')}</span> <StatusBadge status={stateLabel(q)} tone={quoteTone(q)} />
             {q !== 'Converted' && (
               <>
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Accepted'}
                   onClick={() => setOutcome(saved.quote_status === 'Accepted' ? undefined : 'Accepted')}>
-                  <ThumbsUp size={15} /> Accepted
+                  <ThumbsUp size={15} /> {edT('daAccepted')}
                 </button>
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Declined'}
                   onClick={() => setOutcome(saved.quote_status === 'Declined' ? undefined : 'Declined')}>
-                  <ThumbsDown size={15} /> Declined
+                  <ThumbsDown size={15} /> {edT('daDeclined')}
                 </button>
               </>
             )}
@@ -142,8 +146,8 @@ export function DocumentActions({
 
       <DocumentTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
 
-      <section aria-label="Activity" className={styles.activity}>
-        <h3 className={styles.activityHead}>Activity</h3>
+      <section aria-label={edT('daActivity')} className={styles.activity}>
+        <h3 className={styles.activityHead}>{edT('daActivity')}</h3>
         <Suspense fallback={null}>
           <ActivityTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
         </Suspense>

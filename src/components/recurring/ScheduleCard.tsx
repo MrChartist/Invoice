@@ -1,7 +1,6 @@
 import { CalendarClock, Edit3, Pause, Play, SkipForward, Square, Trash2, Zap } from 'lucide-react';
 import {
   daysBetween,
-  describeFrequency,
   scheduleStatus,
   templateTotals,
   type RecurringSchedule,
@@ -10,6 +9,8 @@ import { cn, formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './recurring.module.css';
+import { useT } from '../../i18n';
+import { frequencyText, recT } from '../../i18n/areas/recurring';
 
 export interface ScheduleCardProps {
   schedule: RecurringSchedule;
@@ -24,10 +25,10 @@ export interface ScheduleCardProps {
 
 function relativeDay(target: string, today: string): { text: string; tone?: string } {
   const diff = daysBetween(today, target);
-  if (diff === 0) return { text: 'Today', tone: styles.dueSoon };
-  if (diff === 1) return { text: 'Tomorrow', tone: styles.dueSoon };
-  if (diff > 1) return { text: `In ${diff} days`, tone: diff <= 3 ? styles.dueSoon : undefined };
-  return { text: `${-diff} day${diff === -1 ? '' : 's'} overdue`, tone: styles.overdue };
+  if (diff === 0) return { text: recT('today'), tone: styles.dueSoon };
+  if (diff === 1) return { text: recT('tomorrow'), tone: styles.dueSoon };
+  if (diff > 1) return { text: recT('inDays', { n: diff }), tone: diff <= 3 ? styles.dueSoon : undefined };
+  return { text: diff === -1 ? recT('lateOne') : recT('lateMany', { n: -diff }), tone: styles.overdue };
 }
 
 export function ScheduleCard({
@@ -40,6 +41,7 @@ export function ScheduleCard({
   onStop,
   onDelete,
 }: ScheduleCardProps) {
+  useT(); // re-render on a language switch (5.4)
   const status = scheduleStatus(s);
   const today = todayInput();
   const total = templateTotals(s.template).total;
@@ -56,8 +58,8 @@ export function ScheduleCard({
         <div>
           <h3 className={styles.cardTitle}>{s.name}</h3>
           <p className={styles.cardSub}>
-            {s.template.client.name || 'No client'} · {describeFrequency(s)} ·{' '}
-            {s.mode === 'issue' ? 'Issued as Sent' : 'Created as Draft'}
+            {s.template.client.name || recT('noClient')} · {frequencyText(s)} ·{' '}
+            {s.mode === 'issue' ? recT('issuedSent') : recT('createdDraft')}
           </p>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -70,28 +72,28 @@ export function ScheduleCard({
               status === 'ended' && styles.badgeEnded,
             )}
           >
-            {status}
+            {recT(`status.${status}`)}
           </span>
         </div>
       </div>
 
       <div className={styles.facts}>
         <div>
-          <span className={styles.factLabel}>Next run</span>
+          <span className={styles.factLabel}>{recT('nextRun')}</span>
           <span className={cn(styles.factValue, rel?.tone)}>
             {status === 'ended' ? '—' : formatDate(s.next_run)}
             {rel && <span style={{ fontWeight: 500 }}> · {rel.text}</span>}
           </span>
         </div>
         <div>
-          <span className={styles.factLabel}>Last run</span>
-          <span className={styles.factValue}>{s.last_run ? formatDate(s.last_run) : 'Never'}</span>
+          <span className={styles.factLabel}>{recT('lastRun')}</span>
+          <span className={styles.factValue}>{s.last_run ? formatDate(s.last_run) : recT('never')}</span>
         </div>
         <div>
-          <span className={styles.factLabel}>Invoices</span>
+          <span className={styles.factLabel}>{recT('invoices')}</span>
           <span className={styles.factValue}>
             {s.run_count}
-            {remaining !== null ? ` · ${remaining} left` : ''}
+            {remaining !== null ? recT('left', { n: remaining }) : ''}
           </span>
         </div>
       </div>
@@ -99,38 +101,38 @@ export function ScheduleCard({
       <div className={styles.actions}>
         {status !== 'ended' && (
           <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} onClick={() => onRunNow(s)}>
-            <Zap size={14} /> Run now
+            <Zap size={14} /> {recT('runNow')}
           </button>
         )}
         {status === 'active' && (
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => onPause(s)}>
-            <Pause size={14} /> Pause
+            <Pause size={14} /> {recT('pause')}
           </button>
         )}
         {status === 'paused' && (
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => onResume(s)}>
-            <Play size={14} /> Resume
+            <Play size={14} /> {recT('resume')}
           </button>
         )}
         {status !== 'ended' && (
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => onSkip(s)}>
-            <SkipForward size={14} /> Skip next
+            <SkipForward size={14} /> {recT('skipNext')}
           </button>
         )}
         <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => onEdit(s)}>
-          <Edit3 size={14} /> Edit
+          <Edit3 size={14} /> {recT('edit')}
         </button>
         {status !== 'ended' && (
           <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => onStop(s)}>
-            <Square size={14} /> End
+            <Square size={14} /> {recT('end')}
           </button>
         )}
         <button
           type="button"
           className={controls.btnDanger}
           onClick={() => onDelete(s)}
-          aria-label={`Delete ${s.name}`}
-          title="Delete schedule"
+          aria-label={recT('deleteOf', { name: s.name })}
+          title={recT('deleteSchedule')}
         >
           <Trash2 size={16} />
         </button>
@@ -139,7 +141,7 @@ export function ScheduleCard({
       {recent.length > 0 && (
         <details className={styles.history}>
           <summary>
-            <CalendarClock size={13} style={{ verticalAlign: '-2px' }} /> Run history ({s.history.length})
+            <CalendarClock size={13} style={{ verticalAlign: '-2px' }} /> {recT('history', { n: s.history.length })}
           </summary>
           <ul className={styles.historyList}>
             {recent.map((h) => (

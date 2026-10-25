@@ -4,6 +4,9 @@ import { ArrowRightLeft, ChevronDown, FilePlus2, FileMinus2 } from 'lucide-react
 import { allowedConversions, canRaiseNote, convertDocument } from '../../lib/documents';
 import type { InvoiceRecord } from '../../types/invoice';
 import { useToast } from '../ui/useToast';
+import { useT } from '../../i18n';
+import { salesT } from '../../i18n/areas/sales';
+import { docLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './documents.module.css';
 
@@ -19,6 +22,7 @@ export interface ConvertMenuProps {
 
 /** Dropdown of valid document conversions for one document. */
 export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequestDebitNote }: ConvertMenuProps) {
+  useT(); // re-render on a language switch (5.4)
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -51,11 +55,11 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
     try {
       const rec = convertDocument(invoice, target);
       setOpen(false);
-      notify(`Created draft ${rec.invoice_number}`);
+      notify(salesT('cv.created', { number: rec.invoice_number }));
       if (onCreated) onCreated(rec);
       else navigate(`/invoice/${rec.id}`);
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Could not convert the document.', 'error');
+      notify(err instanceof Error ? err.message : salesT('cv.failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -72,12 +76,12 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
         disabled={busy}
       >
         <ArrowRightLeft size={16} aria-hidden="true" />
-        Convert
+        {salesT('cv.convert')}
         <ChevronDown size={14} aria-hidden="true" />
       </button>
 
       {open && (
-        <div className={styles.menu} role="menu" aria-label="Convert document">
+        <div className={styles.menu} role="menu" aria-label={salesT('cv.menu')}>
           {options.map((o) => (
             <button
               key={o.target}
@@ -88,7 +92,7 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
               disabled={busy}
             >
               <FilePlus2 size={16} aria-hidden="true" />
-              {o.label}
+              {salesT(invoice.doc_type === 'SALES_ORDER' ? 'cv.toPending' : 'cv.to', { doc: docLabel(o.target) })}
             </button>
           ))}
           {showCredit && (
@@ -104,7 +108,7 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
                 }}
               >
                 <FileMinus2 size={16} aria-hidden="true" />
-                Create credit note
+                {salesT('cv.creditNote')}
               </button>
               {onRequestDebitNote && (
                 <button
@@ -117,13 +121,13 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
                   }}
                 >
                   <FilePlus2 size={16} aria-hidden="true" />
-                  Create debit note
+                  {salesT('cv.debitNote')}
                 </button>
               )}
             </>
           )}
           {options.length > 0 && (
-            <p className={styles.menuNote}>Creates a new draft; the original is kept.</p>
+            <p className={styles.menuNote}>{salesT('cv.note')}</p>
           )}
         </div>
       )}

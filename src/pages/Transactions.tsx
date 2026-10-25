@@ -25,6 +25,8 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
+import { salesT, stateLabel } from '../i18n/areas/sales';
+import { docLabel, methodLabel } from '../i18n/labels';
 import { Modal } from '../components/ui/Modal';
 import { VirtualGap } from '../components/ui/VirtualGap';
 import { useVirtualRows } from '../hooks/useVirtualRows';
@@ -56,12 +58,12 @@ const InvoicePreviewModal = lazy(() =>
 
 type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft';
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'unpaid', label: 'Unpaid' },
-  { id: 'overdue', label: 'Overdue' },
-  { id: 'paid', label: 'Paid' },
-  { id: 'draft', label: 'Draft' },
+const FILTERS: { id: Filter; label: () => string }[] = [
+  { id: 'all', label: () => salesT('tx.fAll') },
+  { id: 'unpaid', label: () => salesT('tx.fUnpaid') },
+  { id: 'overdue', label: () => salesT('tx.fOverdue') },
+  { id: 'paid', label: () => salesT('tx.fPaid') },
+  { id: 'draft', label: () => salesT('tx.fDraft') },
 ];
 
 function matchesFilter(inv: InvoiceRecord, filter: Filter, now: Date): boolean {
@@ -86,7 +88,7 @@ export function Transactions() {
   const navigate = useNavigate();
   const loadInvoice = useInvoiceStore((s) => s.loadInvoice);
   const { notify, toastNode } = useToast();
-  const { t } = useT();
+  const { t, lang } = useT();
 
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
@@ -202,7 +204,7 @@ export function Transactions() {
 
   const handlePreview = (inv: InvoiceRecord) => {
     if (loadInvoice(inv.id)) setPreviewOpen(true);
-    else notify('Could not open this document.', 'error');
+    else notify(salesT('tx.openFailed'), 'error');
   };
 
   const handleDuplicate = (inv: InvoiceRecord) => {
@@ -234,7 +236,7 @@ export function Transactions() {
       };
       const saved = localDb.invoices.save(clone);
       reload();
-      notify(`Duplicated as ${saved.invoice_number}`);
+      notify(salesT('tx.duplicated', { number: saved.invoice_number }));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -267,11 +269,11 @@ export function Transactions() {
     setPendingDelete(ids);
     setSelected(new Set());
     deleteTimer.current = setTimeout(() => flushDeletes(ids), 6000);
-    const label = docs.length === 1 ? docs[0].invoice_number : `${docs.length} documents`;
-    notify(`${label} deleted`, 'success', {
+    const label = docs.length === 1 ? docs[0].invoice_number : salesT('tx.nDocuments', { n: docs.length });
+    notify(salesT('tx.deleted', { label }), 'success', {
       duration: 6000,
       action: {
-        label: 'Undo',
+        label: salesT('tx.undo'),
         onClick: () => {
           clearTimeout(deleteTimer.current);
           setPendingDelete(new Set());
@@ -286,8 +288,8 @@ export function Transactions() {
     setBulkPay(null);
     setSelected(new Set());
     reload();
-    const skipped = r.skipped.length ? ` · ${r.skipped.length} skipped (${r.skipped[0].number}: ${r.skipped[0].reason})` : '';
-    notify(`${r.paid.length} marked paid (${formatCurrency(r.total)})${skipped}`, r.paid.length ? 'success' : 'info');
+    const skipped = r.skipped.length ? salesT('tx.bulkSkipped', { n: r.skipped.length, number: r.skipped[0].number, reason: r.skipped[0].reason }) : '';
+    notify(salesT('tx.bulkPaid', { n: r.paid.length, amount: formatCurrency(r.total) }) + skipped, r.paid.length ? 'success' : 'info');
   };
 
   const ledgerRows = (list: InvoiceRecord[]) => {
@@ -313,35 +315,35 @@ export function Transactions() {
 
   const exportCsv = (list: InvoiceRecord[] = rows) => {
     downloadText(`invoice-ledger-${todayInput()}.csv`, toCsv(ledgerRows(list)), 'text/csv');
-    notify(`Exported ${list.length} row${list.length === 1 ? '' : 's'}`);
+    notify(list.length === 1 ? salesT('exportedOne') : salesT('exportedMany', { n: list.length }));
   };
 
   const exportXlsx = async (list: InvoiceRecord[] = rows) => {
     try {
       const { downloadXlsx } = await import('../lib/xlsx');
       await downloadXlsx(`invoice-ledger-${todayInput()}.xlsx`, [{ name: 'Invoices', rows: ledgerRows(list) }]);
-      notify(`Exported ${list.length} row${list.length === 1 ? '' : 's'}`);
+      notify(list.length === 1 ? salesT('exportedOne') : salesT('exportedMany', { n: list.length }));
     } catch {
-      notify('Could not build the Excel file', 'error');
+      notify(salesT('xlsxFailed'), 'error');
     }
   };
 
   return (
     <div className={surface.page}>
       <PageHeader
-        title="Invoices"
-        subtitle="Every document you have issued, with payment status."
+        title={salesT('tx.title')}
+        subtitle={salesT('tx.subtitle')}
         actions={
           <>
             <button type="button" className={controls.btnOutline} onClick={() => exportCsv()} disabled={rows.length === 0}>
-              <Download size={16} /> Export CSV
+              <Download size={16} /> {salesT('exportCsv')}
             </button>
             <button type="button" className={controls.btnOutline} onClick={() => void exportXlsx()} disabled={rows.length === 0}>
-              <Download size={16} /> Export .xlsx
+              <Download size={16} /> {salesT('exportXlsx')}
             </button>
             {can('doc.create') && (
               <Link to="/invoice" className={controls.btnPrimary}>
-                <FilePlus2 size={16} /> New invoice
+                <FilePlus2 size={16} /> {salesT('tx.newInvoice')}
               </Link>
             )}
           </>
@@ -349,9 +351,9 @@ export function Transactions() {
       />
 
       <div className={surface.statGrid}>
-        <StatCard label="Billed" value={formatCurrency(summary.billed)} icon={FileText} hint={`${summary.count} issued`} />
-        <StatCard label="Received" value={formatCurrency(summary.received)} icon={Banknote} tone="profit" />
-        <StatCard label="Outstanding" value={formatCurrency(summary.outstanding)} icon={FileText} tone="warning" />
+        <StatCard label={salesT('tx.billed')} value={formatCurrency(summary.billed)} icon={FileText} hint={salesT('tx.issued', { n: summary.count })} />
+        <StatCard label={salesT('tx.received')} value={formatCurrency(summary.received)} icon={Banknote} tone="profit" />
+        <StatCard label={salesT('tx.outstanding')} value={formatCurrency(summary.outstanding)} icon={FileText} tone="warning" />
       </div>
 
       <section className={surface.card}>
@@ -362,11 +364,11 @@ export function Transactions() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search number, client or GSTIN"
-              aria-label="Search invoices"
+              placeholder={salesT('tx.searchPh')}
+              aria-label={salesT('tx.searchAria')}
             />
           </label>
-          <div className={controls.segment} role="group" aria-label="Filter by status">
+          <div className={controls.segment} role="group" aria-label={salesT('tx.filterAria')}>
             {FILTERS.map((f) => (
               <button
                 key={f.id}
@@ -375,45 +377,45 @@ export function Transactions() {
                 className={filter === f.id ? controls.segmentBtnActive : controls.segmentBtn}
                 onClick={() => setFilter(f.id)}
               >
-                {f.label} <span className={styles.count}>{counts[f.id]}</span>
+                {f.label()} <span className={styles.count}>{counts[f.id]}</span>
               </button>
             ))}
           </div>
         </div>
 
         <div className={styles.filters}>
-          <select className={controls.select} aria-label="Document type" value={docType} onChange={(e) => setDocType(e.target.value as DocumentType | '')}>
-            <option value="">All types</option>
+          <select className={controls.select} aria-label={salesT('tx.docType')} value={docType} onChange={(e) => setDocType(e.target.value as DocumentType | '')}>
+            <option value="">{salesT('tx.allTypes')}</option>
             {docTypes.map((t) => (
-              <option key={t} value={t}>{DOCUMENT_LABELS[t] ?? t}</option>
+              <option key={t} value={t}>{t in DOCUMENT_LABELS ? docLabel(t) : t}</option>
             ))}
           </select>
           {docType === 'SALES_ORDER' && (
-            <select className={controls.select} aria-label="Order status" value={orderState} onChange={(e) => setOrderState(e.target.value as OrderState | '')}>
-              <option value="">All orders</option>
+            <select className={controls.select} aria-label={salesT('tx.orderStatus')} value={orderState} onChange={(e) => setOrderState(e.target.value as OrderState | '')}>
+              <option value="">{salesT('tx.allOrders')}</option>
               {ORDER_STATES.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>{stateLabel(s)}</option>
               ))}
             </select>
           )}
           <label className={styles.range}>
-            <span>From</span>
-            <input type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
+            <span>{salesT('tx.from')}</span>
+            <input type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label={salesT('tx.fromDate')} />
           </label>
           <label className={styles.range}>
-            <span>To</span>
-            <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
+            <span>{salesT('tx.to')}</span>
+            <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label={salesT('tx.toDate')} />
           </label>
           {(docType || from || to) && (
             <button type="button" className={controls.btnGhost} onClick={() => { setDocType(''); setFrom(''); setTo(''); }}>
-              Clear filters
+              {salesT('tx.clearFilters')}
             </button>
           )}
         </div>
 
         {visibleSelected.length > 0 && (
-          <div className={styles.bulkBar} role="region" aria-label="Bulk actions">
-            <strong>{visibleSelected.length} selected</strong>
+          <div className={styles.bulkBar} role="region" aria-label={salesT('tx.bulkActions')}>
+            <strong>{salesT('tx.selected', { n: visibleSelected.length })}</strong>
             {can('payment.record') && (
               <button
                 type="button"
@@ -421,11 +423,11 @@ export function Transactions() {
                 disabled={!visibleSelected.some(canMarkPaid)}
                 onClick={() => setBulkPay({ method: 'Bank Transfer', date: todayInput() })}
               >
-                <CheckCheck size={16} /> Mark paid
+                <CheckCheck size={16} /> {salesT('tx.markPaid')}
               </button>
             )}
             <button type="button" className={controls.btnOutline} onClick={() => exportCsv(visibleSelected)}>
-              <Download size={16} /> Export CSV
+              <Download size={16} /> {salesT('exportCsv')}
             </button>
             {visibleSelected.some(mayDelete) && (
               <button
@@ -434,17 +436,17 @@ export function Transactions() {
                 disabled={visibleSelected.some(isLocked) || !visibleSelected.every(mayDelete)}
                 title={
                   visibleSelected.some(isLocked)
-                    ? 'Some selected documents are in a locked period'
+                    ? salesT('tx.someLocked')
                     : !visibleSelected.every(mayDelete)
-                      ? 'Only the owner can delete issued documents'
+                      ? salesT('tx.ownerOnly')
                       : undefined
                 }
                 onClick={() => setDeleting(visibleSelected)}
               >
-                <Trash2 size={16} /> Delete
+                <Trash2 size={16} /> {salesT('delete')}
               </button>
             )}
-            <button type="button" className={controls.btnGhost} onClick={() => setSelected(new Set())} aria-label="Clear selection">
+            <button type="button" className={controls.btnGhost} onClick={() => setSelected(new Set())} aria-label={salesT('tx.clearSelection')}>
               <X size={16} />
             </button>
           </div>
@@ -473,18 +475,18 @@ export function Transactions() {
                   <th className={styles.cCheck}>
                     <input
                       type="checkbox"
-                      aria-label={allSelected ? 'Clear selection' : 'Select all shown'}
+                      aria-label={allSelected ? salesT('tx.clearSelection') : salesT('tx.selectAll')}
                       checked={allSelected}
                       onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))}
                     />
                   </th>
-                  {sortHead('number', 'Document')}
-                  {sortHead('client', 'Client')}
-                  {sortHead('date', 'Date')}
-                  <th>Status</th>
-                  {sortHead('total', 'Total', true)}
-                  {sortHead('balance', 'Balance', true)}
-                  <th aria-label="Actions" />
+                  {sortHead('number', salesT('tx.colDocument'))}
+                  {sortHead('client', salesT('tx.colClient'))}
+                  {sortHead('date', salesT('tx.colDate'))}
+                  <th>{salesT('tx.colStatus')}</th>
+                  {sortHead('total', salesT('tx.colTotal'), true)}
+                  {sortHead('balance', salesT('tx.colBalance'), true)}
+                  <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
               <tbody {...virtual.bodyProps}>
@@ -494,18 +496,19 @@ export function Transactions() {
                   const status = effectiveStatus(inv, now);
                   const canPay = isRevenueDoc(inv) && receivableBalance(inv) > 0;
                   const locked = isLocked(inv); // period lock: read-only, no edit / delete / payment
-                  const lockedTitle = 'Locked period — open the document to view or unlock it';
+                  const lockedTitle = salesT('tx.lockedTitle');
+                  const num = { number: inv.invoice_number };
                   return (
                     <tr key={inv.id} aria-selected={selected.has(inv.id)} {...virtual.rowProps(slot.index)}>
                       <td className={styles.cCheck}>
-                        <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={`Select ${inv.invoice_number}`} />
+                        <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={salesT('tx.select', num)} />
                       </td>
                       <td className={styles.cDoc}>
                         <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
                           {inv.invoice_number}
                         </Link>
-                        {locked && <Lock size={12} aria-label="Locked period" style={{ marginLeft: 6, verticalAlign: '-1px', color: 'var(--warning)' }} />}
-                        <div className={styles.docType}>{DOCUMENT_LABELS[inv.doc_type] ?? 'Invoice'}</div>
+                        {locked && <Lock size={12} aria-label={salesT('tx.lockedPeriod')} style={{ marginLeft: 6, verticalAlign: '-1px', color: 'var(--warning)' }} />}
+                        <div className={styles.docType}>{docLabel(inv.doc_type in DOCUMENT_LABELS ? inv.doc_type : 'INVOICE')}</div>
                       </td>
                       <td className={styles.cClient}>
                         <div className={styles.client}>
@@ -516,19 +519,19 @@ export function Transactions() {
                       <td className={cn(styles.nowrap, styles.cDate)}>
                         {formatDate(inv.issue_date)}
                         <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
-                          Due {formatDate(inv.due_date) || '—'}
+                          {salesT('tx.due', { date: formatDate(inv.due_date) || '—' })}
                         </div>
                       </td>
                       <td className={styles.cStatus}>
                         {inv.doc_type === 'QUOTATION' ? (
                           (() => {
                             const q = quoteState(inv, links, now);
-                            return <StatusBadge status={q} tone={quoteTone(q)} />;
+                            return <StatusBadge status={stateLabel(q)} tone={quoteTone(q)} />;
                           })()
                         ) : inv.doc_type === 'SALES_ORDER' ? (
                           (() => {
                             const o = orderStates.get(inv.id) ?? 'Open';
-                            return <StatusBadge status={o} tone={orderTone(o)} />;
+                            return <StatusBadge status={stateLabel(o)} tone={orderTone(o)} />;
                           })()
                         ) : (
                           <StatusBadge status={status} />
@@ -541,25 +544,25 @@ export function Transactions() {
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
                           {canPay && can('payment.record') && (
-                            <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} disabled={locked} title={locked ? lockedTitle : 'Record payment'} aria-label={`Record payment for ${inv.invoice_number}`}>
+                            <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} disabled={locked} title={locked ? lockedTitle : salesT('tx.recordPayment')} aria-label={salesT('tx.recordPaymentFor', num)}>
                               <Banknote size={16} />
                             </button>
                           )}
-                          <button type="button" className={controls.btnIcon} onClick={() => handlePreview(inv)} title="Preview / PDF" aria-label={`Preview ${inv.invoice_number}`}>
+                          <button type="button" className={controls.btnIcon} onClick={() => handlePreview(inv)} title={salesT('tx.previewPdf')} aria-label={salesT('tx.previewOf', num)}>
                             <Eye size={16} />
                           </button>
                           {can('doc.edit') && (
-                            <button type="button" className={controls.btnIcon} onClick={() => navigate(`/invoice/${inv.id}`)} disabled={locked} title={locked ? lockedTitle : 'Edit'} aria-label={`Edit ${inv.invoice_number}`}>
+                            <button type="button" className={controls.btnIcon} onClick={() => navigate(`/invoice/${inv.id}`)} disabled={locked} title={locked ? lockedTitle : salesT('edit')} aria-label={salesT('tx.editOf', num)}>
                               <Pencil size={16} />
                             </button>
                           )}
                           {can('doc.create') && (
-                            <button type="button" className={controls.btnIcon} onClick={() => handleDuplicate(inv)} title="Duplicate" aria-label={`Duplicate ${inv.invoice_number}`}>
+                            <button type="button" className={controls.btnIcon} onClick={() => handleDuplicate(inv)} title={salesT('tx.duplicate')} aria-label={salesT('tx.duplicateOf', num)}>
                               <Copy size={16} />
                             </button>
                           )}
                           {mayDelete(inv) && (
-                            <button type="button" className={controls.btnDanger} onClick={() => setDeleting([inv])} disabled={locked} title={locked ? lockedTitle : 'Delete'} aria-label={`Delete ${inv.invoice_number}`}>
+                            <button type="button" className={controls.btnDanger} onClick={() => setDeleting([inv])} disabled={locked} title={locked ? lockedTitle : salesT('delete')} aria-label={salesT('tx.deleteOf', num)}>
                               <Trash2 size={16} />
                             </button>
                           )}
@@ -590,9 +593,9 @@ export function Transactions() {
       <ConfirmDialog
         open={!!deleting}
         destructive
-        title={deleting && deleting.length > 1 ? `Delete ${deleting.length} documents?` : 'Delete this document?'}
-        message={`${deleting && deleting.length > 1 ? 'They' : deleting?.[0]?.invoice_number ?? ''} and their payment history will be removed from this device. You can undo for a few seconds.`}
-        confirmLabel="Delete"
+        title={deleting && deleting.length > 1 ? salesT('tx.deleteManyTitle', { n: deleting.length }) : salesT('tx.deleteOneTitle')}
+        message={deleting && deleting.length > 1 ? salesT('tx.deleteManyMsg') : salesT('tx.deleteOneMsg', { number: deleting?.[0]?.invoice_number ?? '' })}
+        confirmLabel={salesT('delete')}
         onConfirm={() => deleting && handleDelete(deleting)}
         onClose={() => setDeleting(null)}
       />
@@ -600,25 +603,25 @@ export function Transactions() {
         open={!!bulkPay}
         onClose={() => setBulkPay(null)}
         size="sm"
-        title={`Mark ${visibleSelected.filter(canMarkPaid).length} as paid`}
-        subtitle={`Records the full balance of each (${formatCurrency(visibleSelected.filter(canMarkPaid).reduce((s, i) => s + (Number(receivableBalance(i)) || 0), 0))}).`}
+        title={salesT('tx.bulkTitle', { n: visibleSelected.filter(canMarkPaid).length })}
+        subtitle={salesT('tx.bulkSub', { amount: formatCurrency(visibleSelected.filter(canMarkPaid).reduce((s, i) => s + (Number(receivableBalance(i)) || 0), 0)) })}
         footer={
           <>
-            <button type="button" className={controls.btnOutline} onClick={() => setBulkPay(null)}>Cancel</button>
-            <button type="button" className={controls.btnPrimary} onClick={runBulkPay}>Mark paid</button>
+            <button type="button" className={controls.btnOutline} onClick={() => setBulkPay(null)}>{salesT('cancel')}</button>
+            <button type="button" className={controls.btnPrimary} onClick={runBulkPay}>{salesT('tx.markPaid')}</button>
           </>
         }
       >
         {bulkPay && (
           <div className={controls.row}>
             <label className={controls.field}>
-              <span className={controls.label}>Received on</span>
+              <span className={controls.label}>{salesT('tx.receivedOn')}</span>
               <input type="date" className={controls.input} value={bulkPay.date} onChange={(e) => setBulkPay({ ...bulkPay, date: e.target.value })} />
             </label>
             <label className={controls.field}>
-              <span className={controls.label}>Method</span>
+              <span className={controls.label}>{salesT('tx.method')}</span>
               <select className={controls.select} value={bulkPay.method} onChange={(e) => setBulkPay({ ...bulkPay, method: e.target.value })}>
-                {['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Card'].map((m) => <option key={m}>{m}</option>)}
+                {['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Card'].map((m) => <option key={m} value={m}>{m === 'Bank Transfer' && lang === 'en' ? m : methodLabel(m === 'Bank Transfer' ? 'Bank transfer' : m)}</option>)}
               </select>
             </label>
           </div>

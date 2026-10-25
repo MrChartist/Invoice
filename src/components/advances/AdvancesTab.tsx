@@ -19,7 +19,6 @@ import {
 import { advanceMovements } from '../../lib/advance-tax';
 import { localDb } from '../../lib/localDb';
 import { can } from '../../lib/access';
-import { referenceLabel } from '../../lib/receipts';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import type { AdvanceRecord, AdvanceRefund } from '../../types/advances';
 import { downloadTextFile } from '../receivables/exportUtils';
@@ -29,6 +28,10 @@ import { openPrintable } from './print';
 import surface from '../../styles/surface.module.css';
 import { BankAccountSelect } from '../bank/BankAccountSelect';
 import controls from '../../styles/controls.module.css';
+import { useT } from '../../i18n';
+import { rcvT, refLabel } from '../../i18n/areas/receivables';
+import { methodLabel } from '../../i18n/labels';
+import { areaNodes } from '../../i18n/areas/nodes';
 import styles from './advances.module.css';
 
 export interface AdvancesTabProps {
@@ -44,6 +47,7 @@ const METHODS = ['Bank transfer', 'UPI', 'Cash', 'Cheque', 'Other'];
 
 /** Advance receipts register (5.3): record, print, apply to invoices, refund. */
 export default function AdvancesTab({ partyKey = '', notify, onChanged }: AdvancesTabProps) {
+  useT(); // re-render on a language switch (5.4)
   const [version, setVersion] = useState(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const data = useMemo(() => ({ advances: loadAdvances(), payments: localDb.payments.getAll(), invoices: localDb.invoices.getAll() }), [version]);
@@ -71,20 +75,20 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
   };
 
   const remove = (a: AdvanceRecord) => {
-    if (!window.confirm(`Delete advance ${a.number}? Its receipt voucher number will not be reused.`)) return;
+    if (!window.confirm(rcvT('confirmDelete', { number: a.number }))) return;
     try {
       deleteAdvance(a.id);
-      changed(`Advance ${a.number} deleted`);
+      changed(rcvT('deleted', { number: a.number }));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
   };
 
   const removeRefund = (a: AdvanceRecord, r: AdvanceRefund) => {
-    if (!window.confirm(`Remove refund ${r.number}?`)) return;
+    if (!window.confirm(rcvT('confirmRemoveRefund', { number: r.number }))) return;
     try {
       deleteRefund(a.id, r.id);
-      changed(`Refund ${r.number} removed`);
+      changed(rcvT('refundRemoved', { number: r.number }));
     } catch (err) {
       notify((err as Error).message, 'error');
     }
@@ -99,10 +103,10 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
     <div className={surface.card}>
       <div className={surface.cardHead}>
         <div className={styles.toolbar} style={{ width: '100%' }}>
-          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Advances received</h2>
+          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>{rcvT('advTitle')}</h2>
           <div className={styles.toolbarActions}>
             <label className={controls.check}>
-              <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show settled
+              <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> {rcvT('showSettled')}
             </label>
             <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} disabled={!rows.length}
               onClick={() => downloadTextFile(`Advances_${todayInput()}.csv`, advancesCsv(rows))}>
@@ -110,32 +114,31 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
             </button>
             {canEdit && (
               <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={() => { setEditing(null); setFormOpen(true); }}>
-                <Plus size={14} aria-hidden="true" /> Record advance
+                <Plus size={14} aria-hidden="true" /> {rcvT('recordAdvance')}
               </button>
             )}
           </div>
         </div>
       </div>
       <p className={styles.note}>
-        Money received before the invoice gets a receipt voucher (ADV series, Rule 50). GST on an advance for services is due in the month received
-        (GSTR-1 Table 11A) and comes off when you apply it to the invoice (Table 11B); none on goods. Unadjusted: <strong>{money(totals.open)}</strong>. Verify with your CA.
-        {' '}<Link to="/gst-reports?tab=at">Table 11 in GST reports</Link>
+        {areaNodes(rcvT('advNote'), { amount: <strong>{money(totals.open)}</strong> })}
+        {' '}<Link to="/gst-reports?tab=at">{rcvT('advTable11')}</Link>
       </p>
       {rows.length === 0 ? (
-        <EmptyState icon={HandCoins} title="No advances" text="Record money a client paid before you invoiced them. Apply it to the invoice later, or refund it." />
+        <EmptyState icon={HandCoins} title={rcvT('noAdvances')} text={rcvT('noAdvancesText')} />
       ) : (
         <div className={surface.tableWrap}>
           <table className={surface.table}>
-            <caption className={surface.srOnly}>Advance receipts</caption>
+            <caption className={surface.srOnly}>{rcvT('advCaption')}</caption>
             <thead>
               <tr>
-                <th scope="col">Voucher</th>
-                <th scope="col">Client</th>
-                <th scope="col" className={styles.numeric}>Received</th>
-                <th scope="col" className={styles.numeric}>GST</th>
-                <th scope="col" className={styles.numeric}>Adjusted / refunded</th>
-                <th scope="col" className={styles.numeric}>Unadjusted</th>
-                <th scope="col"><span className={surface.srOnly}>Actions</span></th>
+                <th scope="col">{rcvT('voucher')}</th>
+                <th scope="col">{rcvT('client')}</th>
+                <th scope="col" className={styles.numeric}>{rcvT('received')}</th>
+                <th scope="col" className={styles.numeric}>{rcvT('gst')}</th>
+                <th scope="col" className={styles.numeric}>{rcvT('adjRefunded')}</th>
+                <th scope="col" className={styles.numeric}>{rcvT('unadjusted')}</th>
+                <th scope="col"><span className={surface.srOnly}>{rcvT('actions')}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -150,11 +153,11 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
                     <tr>
                       <td>
                         <strong className={surface.mono}>{a.number}</strong>
-                        <span className={styles.sub}>{formatDate(a.date)} · {a.method}{a.reference ? ` · ${a.reference}` : ''}</span>
+                        <span className={styles.sub}>{formatDate(a.date)} · {methodLabel(a.method)}{a.reference ? ` · ${a.reference}` : ''}</span>
                       </td>
                       <td>
                         {a.client.company || a.client.name}
-                        <span className={styles.sub}>{a.supply === 'goods' ? 'Goods' : 'Services'} · {a.tax_rate}% · POS {a.place_of_supply}</span>
+                        <span className={styles.sub}>{a.supply === 'goods' ? rcvT('goods') : rcvT('services')} · {a.tax_rate}% · {rcvT('pos', { code: a.place_of_supply })}</span>
                       </td>
                       <td className={styles.numeric}>{money(a.amount)}</td>
                       <td className={styles.numeric}>{a.tax.applies ? money(tax) : '—'}</td>
@@ -162,26 +165,26 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
                       <td className={`${styles.numeric} ${b.open > 0.004 ? styles.open : ''}`}>{money(b.open)}</td>
                       <td>
                         <div className={styles.actions}>
-                          <button type="button" className={controls.btnIcon} title="Print receipt voucher" aria-label={`Print receipt voucher ${a.number}`} onClick={() => openPrintable(advanceVoucherHtml(a), a.number)}>
+                          <button type="button" className={controls.btnIcon} title={rcvT('printVoucher')} aria-label={rcvT('printVoucherOf', { number: a.number })} onClick={() => openPrintable(advanceVoucherHtml(a), a.number)}>
                             <Printer size={15} />
                           </button>
                           {movable && (
-                            <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} aria-label={`Apply advance ${a.number}`} onClick={() => setApplying(a)}>
-                              Apply
+                            <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} aria-label={rcvT('applyOf', { number: a.number })} onClick={() => setApplying(a)}>
+                              {rcvT('apply')}
                             </button>
                           )}
                           {movable && (
-                            <button type="button" className={controls.btnIcon} title="Refund" aria-label={`Refund advance ${a.number}`} onClick={() => setRefunding(r)}>
+                            <button type="button" className={controls.btnIcon} title={rcvT('refund')} aria-label={rcvT('refundOf', { number: a.number })} onClick={() => setRefunding(r)}>
                               <Undo2 size={15} />
                             </button>
                           )}
                           {!frozen && (
-                            <button type="button" className={controls.btnIcon} title="Edit" aria-label={`Edit advance ${a.number}`} onClick={() => { setEditing(a); setFormOpen(true); }}>
+                            <button type="button" className={controls.btnIcon} title={rcvT('edit')} aria-label={rcvT('editOf', { number: a.number })} onClick={() => { setEditing(a); setFormOpen(true); }}>
                               <Pencil size={15} />
                             </button>
                           )}
                           {!frozen && (
-                            <button type="button" className={controls.btnDanger} title="Delete" aria-label={`Delete advance ${a.number}`} onClick={() => remove(a)}>
+                            <button type="button" className={controls.btnDanger} title={rcvT('delete')} aria-label={rcvT('deleteOf', { number: a.number })} onClick={() => remove(a)}>
                               <Trash2 size={15} />
                             </button>
                           )}
@@ -193,15 +196,16 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
                         <td colSpan={7}>
                           {r.adjustments.map(({ payment, invoiceNumber }) => (
                             <span key={payment.id} className={styles.sub}>
-                              {formatDate(payment.date)} · {money(payment.amount)} adjusted against{' '}
-                              <Link to={`/invoice/${payment.invoice_id}`}>{invoiceNumber || 'invoice'}</Link> (remove it from that invoice&apos;s payments to undo)
+                              {areaNodes(rcvT('adjustedAgainst', { date: formatDate(payment.date), amount: money(payment.amount) }), {
+                                link: <Link to={`/invoice/${payment.invoice_id}`}>{invoiceNumber || rcvT('invoiceLower')}</Link>,
+                              })}
                             </span>
                           ))}
                           {(a.refunds ?? []).map((rf) => (
                             <span key={rf.id} className={styles.sub}>
-                              {formatDate(rf.date)} · {money(rf.amount)} refunded · {rf.number}{' '}
-                              <button type="button" className={controls.btnGhost} onClick={() => printRefund(a, rf)}>Print refund voucher</button>
-                              {canEdit && <button type="button" className={controls.btnGhost} onClick={() => removeRefund(a, rf)}>Remove</button>}
+                              {rcvT('refundedLine', { date: formatDate(rf.date), amount: money(rf.amount), number: rf.number })}{' '}
+                              <button type="button" className={controls.btnGhost} onClick={() => printRefund(a, rf)}>{rcvT('printRefund')}</button>
+                              {canEdit && <button type="button" className={controls.btnGhost} onClick={() => removeRefund(a, rf)}>{rcvT('remove')}</button>}
                             </span>
                           ))}
                         </td>
@@ -216,11 +220,11 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
       )}
 
       <AdvanceFormModal open={formOpen} advance={editing} onClose={() => setFormOpen(false)}
-        onSaved={(a, isNew) => changed(isNew ? `Advance ${a.number} recorded` : `Advance ${a.number} updated`)} />
+        onSaved={(a, isNew) => changed(rcvT(isNew ? 'recorded' : 'updated', { number: a.number }))} />
 
       {applying && (
-        <Modal open onClose={() => setApplying(null)} size="md" title={`Apply ${applying.number}`} subtitle={`${applying.client.company || applying.client.name} · against an invoice`}
-          footer={<button type="button" className={controls.btnOutline} onClick={() => setApplying(null)}>Close</button>}>
+        <Modal open onClose={() => setApplying(null)} size="md" title={rcvT('applyTitle', { number: applying.number })} subtitle={rcvT('applySub', { client: applying.client.company || applying.client.name })}
+          footer={<button type="button" className={controls.btnOutline} onClick={() => setApplying(null)}>{rcvT('close')}</button>}>
           <ApplyAdvancePanel advance={applying} version={version} bare onApplied={(msg) => { setApplying(null); changed(msg); }} />
         </Modal>
       )}
@@ -248,45 +252,45 @@ function RefundModal({ row, onClose, onDone }: { row: AdvanceRow; onClose: () =>
     e.preventDefault();
     try {
       const r = refundAdvance(a.id, { amount: Number(amount), date, method, reference, bankAccountId: bankAccountId || undefined });
-      onDone(`${money(r.amount)} refunded (${r.number})`);
+      onDone(rcvT('refunded', { amount: money(r.amount), number: r.number }));
     } catch (err) {
       setError(err instanceof AdvanceError ? err.message : (err as Error).message);
     }
   };
   return (
-    <Modal open onClose={onClose} size="sm" title={`Refund ${a.number}`} subtitle="Refund voucher (Rule 51) for an advance with no supply against it."
+    <Modal open onClose={onClose} size="sm" title={rcvT('refundTitle', { number: a.number })} subtitle={rcvT('refundSub')}
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={onClose}>Cancel</button>
-          <button type="submit" form="refund-form" className={controls.btnPrimary}>Record refund</button>
+          <button type="button" className={controls.btnOutline} onClick={onClose}>{rcvT('cancel')}</button>
+          <button type="submit" form="refund-form" className={controls.btnPrimary}>{rcvT('recordRefund')}</button>
         </>
       }>
       <form id="refund-form" onSubmit={submit} noValidate className={styles.form}>
         {error && <p className={controls.error} role="alert">{error}</p>}
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Amount (₹)</span>
+            <span className={controls.label}>{rcvT('amountRs')}</span>
             <input className={`${controls.input} ${controls.inputNumeric}`} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>Date</span>
+            <span className={controls.label}>{rcvT('date')}</span>
             <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
           </label>
         </div>
         <div className={controls.row}>
           <label className={controls.field}>
-            <span className={controls.label}>Method</span>
+            <span className={controls.label}>{rcvT('method')}</span>
             <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
-              {METHODS.map((m) => <option key={m}>{m}</option>)}
+              {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
             </select>
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>{referenceLabel(method)} (optional)</span>
+            <span className={controls.label}>{rcvT('optional', { label: refLabel(method) })}</span>
             <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value)} />
           </label>
         </div>
-        <BankAccountSelect id="advrf-bank-account" label="Paid from" method={method} value={bankAccountId} onChange={setBankAccountId} />
-        <span className={controls.hint}>Unadjusted {money(row.balance.open)}. GST paid on the refunded part comes off in GSTR-1 Table 11B of the refund month (verify with your CA).</span>
+        <BankAccountSelect id="advrf-bank-account" label={rcvT('paidFrom')} method={method} value={bankAccountId} onChange={setBankAccountId} />
+        <span className={controls.hint}>{rcvT('refundHint', { amount: money(row.balance.open) })}</span>
       </form>
     </Modal>
   );
