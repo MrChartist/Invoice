@@ -252,6 +252,17 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 |---|------|---------|--------|
 | 7.25 | ✅ **Printing & documents output**: Rule 48 copies in one print job / PDF with a per-profile default, transport details printed (GST dispatch cells + block), voucher printing, batch PDF / ZIP, bulk statements + confirmation-of-accounts letters, pre-printed stationery mode — `docs/features/printing.md` | P0-9, P1-15, P1-24, P1-6 (print), P2 | M |
 
+### Business extras (WP-9, `docs/GAP_ANALYSIS.md` § 8)
+
+| # | Item | Competitors | Effort |
+|---|------|-------------|--------|
+| 7.9a | ✅ **POS returns / exchange** (WP-9, P1-25): scan / pick the bill → lines & qty → credit note with goods back to stock → refund by cash / UPI / card (payment voucher) or exchange against the next bill; Z report shows returns, refunds and net (`src/lib/pos-returns.ts`, `docs/features/business-extras.md`) | Vyapar, Marg, Busy | M |
+| 7.9b | ✅ **Approvals (maker-checker)** (WP-9, P1-18): `doc.approve` (owner), "invoices above ₹X / all documents by clerks" policy, pending-approval drafts, owner queue, audit + `approvals` log (`src/lib/approval-gate.ts`, `approvals.ts`) | Zoho | M |
+| 7.9c | ✅ **Branches / locations** (WP-9, P1-19): branch master, additive `branch_id` on documents / purchases / vouchers (inferred from profile / GSTIN), branch filter + branch-wise summary; reports-engine option documented for WP-2 (`src/lib/branch.ts`) | Tally, Busy | M |
+| 7.9d | ✅ **Dashboard tiles** (WP-9, P1-17): receivables, payables, cash / bank, GST due, top items, low stock, branches, approvals, AMC, loyalty — per user, lazily loaded (`src/lib/dashboard-tiles.ts`) | TallyPrime 4 | S–M |
+| 7.9e | ✅ **Loyalty points**, **AMC / service contracts**, **static catalogue HTML** (WP-9, P2) (`src/lib/loyalty.ts`, `amc.ts`, `catalogue-html.ts`) | Vyapar, Marg, Busy | M |
+| 7.9f | ⏳ Sales commission per agent, bill-value / buy-A-get-B offers, ESC/POS cash drawer, pharma pack (WP-9, P2 — not built yet) | Marg, Busy | M |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

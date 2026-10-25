@@ -12,6 +12,8 @@ import styles from './pos.module.css';
 import { dateLocale, useT } from '../../i18n';
 import { posT } from '../../i18n/areas/pos';
 import { areaNodes } from '../../i18n/areas/nodes';
+import { posReturnsDb } from '../../lib/pos-returns';
+import { ZReturnsRows } from '../pos-returns/ZReturnsRows';
 
 function printHtml(html: string, name: string) {
   const w = window.open('', '_blank');
@@ -32,7 +34,7 @@ export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose
   const [day, setDay] = useState(todayInput());
   const [tick, setTick] = useState(0);
   const z = useMemo(
-    () => zReport(day, localDb.invoices.getAll(), localDb.payments.getAll()),
+    () => zReport(day, localDb.invoices.getAll(), localDb.payments.getAll(), posReturnsDb.all()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [day, open, tick],
   );
@@ -103,6 +105,7 @@ export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose
             <tr><th scope="row">{posT('m.Card')}</th><td className={surface.numeric} data-z="card">{formatCurrency(z.tenders.card)}</td></tr>
             {z.tenders.other ? <tr><th scope="row">{posT('zOther')}</th><td className={surface.numeric}>{formatCurrency(z.tenders.other)}</td></tr> : null}
             {z.credit ? <tr><th scope="row">{posT('zOnAccount')}</th><td className={surface.numeric}>{formatCurrency(z.credit)}</td></tr> : null}
+            <ZReturnsRows z={z} />
           </tbody>
         </table>
 

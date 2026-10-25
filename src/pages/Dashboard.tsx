@@ -43,6 +43,9 @@ function greeting(hour: number): MessageKey {
 
 // Pulls in the whole sample-data builder, so it loads after first paint.
 const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').then((m) => ({ default: m.SetupWizard })));
+// WP-9: configurable tiles (receivables, payables, cash / bank, GST, top items, stock, branches,
+// approvals, AMC, loyalty) — their own chunk, mounted after first paint.
+const DashboardTiles = lazy(() => import('../components/dashboard/DashboardTiles').then((m) => ({ default: m.DashboardTiles })));
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
 
 /** "2026-10" → "Oct" / "अक्टू॰" in the interface language (5.4). */
@@ -85,6 +88,11 @@ export function Dashboard() {
     return () => {
       alive = false;
     };
+  }, []);
+  const [tilesReady, setTilesReady] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setTilesReady(true), 0);
+    return () => clearTimeout(id);
   }, []);
   const lowStock = extras?.lowStock ?? 0;
   const profit = extras?.profit;
@@ -341,6 +349,11 @@ export function Dashboard() {
           <ArrowRight size={16} />
         </Link>
       </div>
+      {tilesReady && (
+        <Suspense fallback={null}>
+          <DashboardTiles />
+        </Suspense>
+      )}
     </div>
   );
 }

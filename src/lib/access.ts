@@ -61,7 +61,9 @@ export type AccessAction =
   /** View screens, print / download a document PDF. */
   | 'view'
   /** Export reports (CSV / Excel / GST papers). */
-  | 'report.export';
+  | 'report.export'
+  /** Approve / reject a document a clerk issued while approvals are on (WP-9 maker-checker). Owner only. */
+  | 'doc.approve';
 
 const CLERK: ReadonlySet<AccessAction> = new Set<AccessAction>([
   'doc.create',
@@ -157,6 +159,7 @@ const DENIED_TEXT: Partial<Record<AccessAction, string>> = {
   'data.restore': 'restore a backup',
   'data.erase': 'erase data',
   'period.override': 'override the period lock',
+  'doc.approve': 'approve or reject documents',
 };
 
 export function deniedMessage(action: AccessAction, role: Role = currentRole()): string {
@@ -247,6 +250,13 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // Banking (WP-5)
   deposit_slips: 'books.edit',
   cash_tally: 'books.edit',
+  // business extras (WP-9)
+  pos_returns: 'doc.create',
+  branches: 'master.edit',
+  amc_contracts: 'master.edit',
+  loyalty_adjustments: 'master.edit',
+  // approvals: a clerk's save files a request (doc.create); deciding needs doc.approve (approvals.ts)
+  approvals: 'doc.create',
 };
 
 let systemDepth = 0;

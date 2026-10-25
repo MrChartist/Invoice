@@ -189,6 +189,8 @@ export function buildLateFeeInvoice(
     amends: undefined,
     pos: undefined,
     transport: undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
     // A new document: on reverse charge (copied from the original) its tax stays out of the total.
     rcm_tax_excluded: original.reverse_charge && original.doc_type !== 'BILL_OF_SUPPLY' ? true : undefined,
   };

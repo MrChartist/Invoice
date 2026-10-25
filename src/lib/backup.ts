@@ -326,6 +326,8 @@ const RECORD_TABLES = [
   'groups', 'ledger_openings', 'books_begin', 'opening_bills',
   // Banking (WP-5): deposit slips, day-end cash tally
   'deposit_slips', 'cash_tally',
+  // Business extras (WP-9): POS returns, approvals, branches, loyalty, AMC contracts
+  'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -339,6 +341,7 @@ const ID_TABLES = new Set([
   'purchase_returns', 'receipt_notes',
   'groups', 'ledger_openings', 'books_begin', 'opening_bills',
   'deposit_slips', 'cash_tally',
+  'pos_returns', 'approvals', 'branches', 'loyalty_adjustments', 'amc_contracts',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

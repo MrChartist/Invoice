@@ -278,6 +278,8 @@ export function buildConvertedDraft(
     pos: undefined,
     // A challan's Rule 55 purpose (GSTR-1 Table 13) means nothing on the invoice it becomes.
     challan_purpose: target === 'DELIVERY_CHALLAN' ? source.challan_purpose : undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
   };
@@ -514,6 +516,8 @@ export function buildCreditNote(
     amends: undefined,
     pos: undefined,
     transport: undefined, // the original's dispatch details (P1-24)
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
     goods_returned: goodsReturned,
   };
   const rec = recompute(base);
@@ -618,6 +622,8 @@ export function buildDebitNote(
     amends: undefined,
     pos: undefined,
     transport: undefined,
+    approval: undefined, // WP-9: never copied
+    loyalty_redeem: undefined,
   });
 }
 

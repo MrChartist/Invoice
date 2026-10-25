@@ -416,3 +416,11 @@ test('payment advice (WP-5) reads the real purchase shape', async () => {
   assert.equal(adv!.vendorGstin, '27AAPFU0939F1ZV');
   assert.deepEqual(adv!.lines.map((l) => [l.billNo, l.billDate, l.billAmount, l.tdsOnBill, l.paid, l.balance]), [['AS/22', '2026-04-12', 1180, 100, 1080, 0]]);
 });
+
+test('branches (WP-9) read the real purchase shape: branch_id, then place of supply', async () => {
+  const { branchOfPurchase, branchSummary } = await import('../src/lib/branch.ts');
+  const branches = [{ id: 'mh', name: 'Mumbai', state_code: '27' }];
+  assert.equal(branchOfPurchase(bill, branches), 'mh');
+  assert.equal(branchOfPurchase({ ...bill, branch_id: 'x' }, branches), 'x');
+  assert.equal(branchSummary(branches, [], [bill])[0].purchases, 1000);
+});

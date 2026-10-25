@@ -227,6 +227,19 @@ server, no account, and no subscription. It runs entirely in the browser and wor
 
 ---
 
+### 3.5 Business extras (WP-9)
+- **POS returns / exchange**: from the counter, scan or pick the original bill, choose lines and quantities; a credit
+  note (goods back to stock) is raised and the customer is refunded by cash / UPI / card (booked as a payment voucher),
+  or the credit pays the next bill (exchange). The Z report lists returns, refunds by tender and net sales after returns.
+- **Approvals (maker-checker)**: optional; invoices above an amount (or every document) a clerk issues wait as drafts
+  until the owner approves or rejects them with a note. Audited.
+- **Branches / locations**: branch master, documents / purchases / vouchers tagged (or inferred from the profile /
+  GSTIN), branch filter and branch-wise sales / returns / purchases.
+- **Dashboard tiles**: receivables, payables, cash & bank, GST payable this month, top items, low stock, branches,
+  approvals, AMC and loyalty — chosen per user, loaded after first paint.
+- **Loyalty points** (date-keyed rate, redeemed as a pre-tax discount), **AMC / service contracts** (visit schedule,
+  renewal reminders) and a **static product catalogue HTML** export. Details: `docs/features/business-extras.md`.
+
 ## 4. Technical Architecture
 
 - **Frontend**: React 19 + TypeScript 6 (strict) + Vite 8 (Rolldown bundler); every page except Dashboard and Login is

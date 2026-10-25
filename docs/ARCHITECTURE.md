@@ -134,6 +134,11 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `receipt_notes` | receipt notes (WP-3, `src/lib/receipt-notes.ts`) | `ReceiptNote`: GRN `GRN/FY…` (stock in before the bill) and Rejections Out `RJO/FY…`; billed qty derived from bill lines' `grn_line_id` |
 | `deposit_slips` | banking (WP-5, `src/lib/deposit-slip.ts`) | `DepositSlip` pay-in slips `PIS/FY<yy-yy>/<seq>`: cheque ids, cash denomination counts, totals (`docs/features/banking.md`) |
 | `cash_tally` | banking (WP-5, `src/lib/cash-tally.ts`) | `CashTally` day-end cash count by denomination vs the Books cash balance, one row per day |
+| `pos_returns` | POS returns (WP-9, `src/lib/pos-returns.ts`) | `PosReturn` per return: bill, credit note, settlement (`refund` / `exchange` / `account`), refunds by tender, voucher id, exchange bill; read by the Z report (`docs/features/business-extras.md`) |
+| `approvals` | approvals (WP-9, `src/lib/approvals.ts`) | `ApprovalLogRow` decision log (approved / rejected, by whom, note); the live state is `approval` on the invoice. Policy object under the key `approval_policy` |
+| `branches` | branches (WP-9, `src/lib/branch.ts`) | `Branch {id, name, code?, gstin?, state_code?, profile_id?, godown_id?, address?, inactive?}`; additive `branch_id` on invoices / purchases / vouchers |
+| `loyalty_adjustments` | loyalty (WP-9, `src/lib/loyalty.ts`) | manual points corrections; accrual is derived from invoices, redemption is `loyalty_redeem` on the bill. Programme object under the key `loyalty_program` (date-keyed rules) |
+| `amc_contracts` | AMC (WP-9, `src/lib/amc.ts`) | `AmcContract` with `visits` log, `renewed_from` link |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the
