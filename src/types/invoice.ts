@@ -265,6 +265,9 @@ export interface Client {
   agent_id?: string;
   /** Per-party credit policy (8.80); absent = the company policy (`credit_policy`). */
   credit_policy?: 'off' | 'warn' | 'block';
+  /* ── Round 2 (R2-A, docs/features/collections-r2.md); additive, master only ── */
+  /** R2-A5: how reminders treat this party — `auto` (default, in the queues), `manual` (on demand only), `never`. */
+  reminder_mode?: ReminderMode;
   created_at?: string;
   updated_at?: string;
 }
@@ -593,7 +596,26 @@ export interface InvoiceRecord {
    * Absent on legacy documents (nothing is printed). See `src/lib/party-balance.ts`.
    */
   party_balance_snapshot?: PartyBalanceSnapshot;
+  /* ── Round 2 (R2-A, docs/features/collections-r2.md); additive, never copied to a new document ── */
+  /**
+   * R2-A2: a FINANCIAL credit note (settlement discount / short payment / bad debt) — it settles a bill
+   * without being a GST credit note (`src/lib/financial-note.ts`). Only on `CREDIT_NOTE` rows, series `FCN`.
+   */
+  note_kind?: 'financial';
+  /** R2-A2: why the financial note was raised (with `note_kind`). */
+  financial_reason?: FinancialReason;
+  /**
+   * R2-A2: ledger account the note is debited to (snapshot of the company setting at issue, so a later
+   * change of setting never re-posts an old note). Absent = the default for the reason.
+   */
+  financial_account?: string;
 }
+
+/** R2-A5: per-party reminder mode. */
+export type ReminderMode = 'auto' | 'manual' | 'never';
+
+/** R2-A2: reason of a financial credit note. */
+export type FinancialReason = 'settlement_discount' | 'short_payment' | 'bad_debt';
 
 /** 8.5: rupee figures frozen on the bill at issue (INR only). Total due = previous + bill − paid. */
 export interface PartyBalanceSnapshot {
