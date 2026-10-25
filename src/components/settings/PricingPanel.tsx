@@ -10,6 +10,7 @@ import type { Client } from '../../types/invoice';
 import { cn, formatDate } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
+import { retailT } from '../../i18n/areas/retail';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
@@ -97,7 +98,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
               {levels.map((l) => (
                 <tr key={l.id}>
                   <td className={styles.name}>{l.name}</td>
-                  <td className={surface.numeric}>{l.percent_off ? `${l.percent_off}%` : '—'}</td>
+                  <td className={surface.numeric}>{l.percent_off ? `${l.percent_off}%${l.basis === 'mrp' ? ` ${retailT('offMrp')}` : ''}` : '—'}</td>
                   <td className={surface.numeric}>{Object.keys(l.rates ?? {}).length}</td>
                   <td className={surface.numeric}>{usage.get(l.id) ?? 0}</td>
                   <td>
@@ -190,6 +191,14 @@ export function PricingPanel({ notify }: { notify: Notify }) {
               <span className={controls.label}>{setT('pctOffDefault')}</span>
               <NumberInput className={cn(controls.input, controls.inputNumeric)} value={level.percent_off ?? 0} onChange={(n) => setLevel({ ...level, percent_off: n })} placeholder="0" />
               <span className={controls.hint}>{setT('pctOffHint')}</span>
+            </label>
+            {/* 8E (8.145): "MRP less %" levels take the percent off the item's MRP. */}
+            <label className={controls.field}>
+              <span className={controls.label}>{retailT('levelBasis')}</span>
+              <select className={controls.select} value={level.basis ?? 'rate'} onChange={(e) => setLevel({ ...level, basis: e.target.value === 'mrp' ? 'mrp' : undefined })} data-level-basis>
+                <option value="rate">{retailT('basisRate')}</option>
+                <option value="mrp">{retailT('basisMrp')}</option>
+              </select>
             </label>
             {error && <p className={controls.error} role="alert">{error}</p>}
           </div>

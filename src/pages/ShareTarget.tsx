@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { retailT } from '../i18n/areas/retail';
 import { Link, useNavigate } from 'react-router-dom';
 import { FileUp } from 'lucide-react';
 import { can } from '../lib/access';
@@ -22,6 +23,27 @@ export function ShareTarget() {
   useT();
   const navigate = useNavigate();
   const [message, setMessage] = useState(phoneT('inboxReading'));
+  // 8E wiring: an image / PDF can be a supplier bill (e-invoice QR → draft bill) or an expense receipt.
+  const [choice, setChoice] = useState<File[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const asExpense = (files: File[]) => {
+    stashShared('receipt', files);
+    navigate('/expenses?new=expense&shared=1', { replace: true });
+  };
+  const asBill = async (files: File[]) => {
+    setBusy(true);
+    setMessage(retailT('shareReading'));
+    try {
+      const { openCaptureFromFile } = await import('../lib/capture-browser');
+      let route = '/expenses?tab=inbox';
+      for (const f of files) route = (await openCaptureFromFile(f, { source: 'share' })).route;
+      navigate(route, { replace: true });
+    } catch (err) {
+      setBusy(false);
+      setMessage((err as Error).message);
+    }
+  };
 
   useEffect(() => {
     let live = true;
@@ -40,8 +62,8 @@ export function ShareTarget() {
       }
       if (!can('books.edit')) return setMessage(phoneT('inboxDenied'));
       if (route.kind === 'receipt') {
-        stashShared('receipt', files.filter((f) => /^(image\/|application\/pdf)/.test(f.type) || /\.(pdf|jpe?g|png|webp|gif)$/i.test(f.name)));
-        navigate('/expenses?new=expense&shared=1', { replace: true });
+        setChoice(files.filter((f) => /^(image\/|application\/pdf)/.test(f.type) || /\.(pdf|jpe?g|png|webp|gif)$/i.test(f.name)));
+        setMessage(retailT('shareAsk'));
       } else {
         stashShared('statement', files.slice(0, 1));
         navigate('/reconcile?tab=import', { replace: true });
@@ -60,6 +82,12 @@ export function ShareTarget() {
         </div>
         <div className={`${surface.cardBody} ${styles.stack}`}>
           <p className={styles.note} data-share-inbox>{message}</p>
+          {choice && !busy && (
+            <>
+              <button type="button" className={controls.btnPrimary} onClick={() => void asBill(choice)} data-share-bill>{retailT('shareBill')}</button>
+              <button type="button" className={controls.btnOutline} onClick={() => asExpense(choice)} data-share-expense>{retailT('shareExpense')}</button>
+            </>
+          )}
           <Link to="/" className={controls.btnOutline}>{phoneT('inboxHome')}</Link>
         </div>
       </section>

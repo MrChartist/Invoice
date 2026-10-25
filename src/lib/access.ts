@@ -299,6 +299,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   tds_justifications: 'books.edit',
   // business extras (WP-9)
   pos_returns: 'doc.create',
+  // 8E: cashier shifts — a clerk opens / closes their own shift at the counter
+  pos_shifts: 'doc.create',
   branches: 'master.edit',
   amc_contracts: 'master.edit',
   loyalty_adjustments: 'master.edit',

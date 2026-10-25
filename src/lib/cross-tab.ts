@@ -66,6 +66,18 @@ export function initCrossTab(): void {
   });
 }
 
+/**
+ * A same-origin BroadcastChannel (8E customer display: the counter tab talks to the display window), or
+ * null where the browser has none. Messages stay inside this browser: nothing is stored or sent out.
+ */
+export function openBroadcast(name: string): BroadcastChannel | null {
+  try {
+    return typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(name);
+  } catch {
+    return null;
+  }
+}
+
 /** Test seam. */
 export function resetCrossTab(): void {
   version = 0;

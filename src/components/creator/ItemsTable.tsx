@@ -10,7 +10,7 @@ import { liveUnits } from '../../lib/units-live';
 import { lineFactor, lineUnitPatch } from '../../lib/units';
 import { unitT } from '../../i18n/areas/units';
 import { cn, formatCurrency } from '../../lib/utils';
-import { lineKeyAction } from './line-keys';
+import { lineKeyAction, shortCodeFirst } from './line-keys';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { LineTracking } from './LineTracking';
@@ -47,11 +47,11 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const [catalog, setCatalog] = useState<InvoiceItem[]>([]);
   const itemSuggestions = useCallback(
     (q: string) =>
-      suggest(q, catalog, {
+      shortCodeFirst(q, catalog, suggest(q, catalog, {
         label: (i) => i.name,
-        extra: (i) => [i.hsn],
+        extra: (i) => [i.hsn, i.short_code],
         sub: (i) => [i.hsn && `HSN ${i.hsn}`, formatCurrency(i.rate, currency)].filter(Boolean).join(' · '),
-      }),
+      })),
     [catalog, currency],
   );
   const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});

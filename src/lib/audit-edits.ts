@@ -74,6 +74,7 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   gstr2b_itc: { entity: 'gst', label: '2B ITC pushed to 3B' },
   gstr1_snapshots: { entity: 'gst', label: 'GSTR-1 as filed' },
   pos_day_close: { entity: 'pos_day_close', label: 'POS day close' },
+  pos_shifts: { entity: 'pos_day_close', label: 'POS cashier shift' },
   pos_returns: { entity: 'invoice', label: 'POS return' },
   doc_links: { entity: 'invoice', label: 'Document link' },
   year_end: { entity: 'settings', label: 'Year-end checklist' },

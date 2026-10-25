@@ -314,6 +314,8 @@ const RECORD_TABLES = [
   'advances',
   // Price levels & schemes (6.9), POS day-close records (6.8)
   'price_levels', 'schemes', 'pos_day_close',
+  // 8E retail speed: cashier shifts (X / Z per shift)
+  'pos_shifts',
   // Tally parity: TDS challans / manual deductions / return marks, supplier advances (bill-wise)
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   // Series high-water marks: STR / PO / ADV / RFV / RCPT numbers are never reused (integrity review)
@@ -362,7 +364,7 @@ const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
   'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', 'cheques', 'bank_accounts', ASSET_TABLE, CUSTOM_FIELDS_TABLE,
   'stock_items', 'godowns', 'stock_transfers', 'advances',
-  'price_levels', 'schemes', 'pos_day_close',
+  'price_levels', 'schemes', 'pos_day_close', 'pos_shifts',
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   'series_counters',
   'gstr4_manual',

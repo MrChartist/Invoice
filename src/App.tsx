@@ -34,6 +34,8 @@ const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
 const Gateway = lazy(() => import('./pages/Gateway').then((m) => ({ default: m.Gateway })));
 // 8.20 / 8.23: files shared into the installed app (Web Share Target, POSTed to the service worker).
 const ShareTarget = lazy(() => import('./pages/ShareTarget').then((m) => ({ default: m.ShareTarget })));
+// 8.143: customer-facing display window (no shell; shows only what the POS tab broadcasts).
+const CustomerDisplay = lazy(() => import('./components/pos-retail/CustomerDisplay').then((m) => ({ default: m.CustomerDisplay })));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -91,6 +93,7 @@ function App() {
           <IdleLock onLock={() => setAuthed(false)} />
           <Suspense fallback={<PageFallback />}>
             <Routes>
+              <Route path="/pos-display" element={<CustomerDisplay />} />
               <Route element={<DashboardLayout onLogout={() => setAuthed(false)} />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/invoice" element={<RequireAccess action="doc.create" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />

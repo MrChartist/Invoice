@@ -502,6 +502,23 @@ Competitor parity with Zoho Books / Xero / QuickBooks / Refrens / TallyPrime 7.0
 | 8.45 | ✅ **Bank rules + memory** (`bank_rules`): ALL / ANY of narration contains / starts with / safe regex, counterparty token, amount range, debit / credit, bank account → expense (head, supplier, GST + ITC, cost centre, branch, mode), voucher to a ledger, receipt against a customer's invoices, contra (twin reused), ignore; run after invoice matching; every suggestion labelled Rule / Match / Memory; memory learned from past expense categorisations; "Create rule for similar lines?" after a manual expense; all-or-nothing batches through the existing writers (roles, period lock, approval gate, audit) | `bank-rules.ts`, `bank-rules-apply.ts`, `BankRulesPanel.tsx`, `RuleSuggestions.tsx` | done |
 | 8.46 | ⏳ 8C follow-ups: PDF page rendering for QR reading, a multi-line GST split from the QR (needs the full e-invoice JSON), rule actions with GST on vouchers, memory for receipts / vouchers, payment approval inside the e-payment batch screen, total-JS budget headroom | — | open |
 
+### 8E · Retail speed (`docs/features/pos-barcode-pricing.md` § 8E)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| 8.140 | ✅ **Weighing-scale barcodes**: device-local profile (prefixes 20–29, PLU length, weight / price, decimals, check digit), item `sold_by_weight` + `plu`; weight × rate or exact embedded price; **live weight over Web Serial** (stable ASCII frame → focused quantity, Alt+W) | `scale-barcode.ts`, `scale-serial.ts`, `RetailSettings.tsx` | done |
+| 8.141 | ✅ **Keyboard speed pack**: `3*code` / `3 code` / `3*` quantity prefix, item `short_code` (POS + editor typeahead), `=500` gross → rate (and "=" in a rate field), Alt+Q last line's quantity, unknown code → search kept + create item, Ctrl+F5 day summary, Shift+F1 help, PgUp / PgDn bill browser, **custom function keys** (device-local keymap) | `pos-keys.ts`, `pos.ts` (`keyCombo`, `posShortcut(e, keymap)`), `PosHelp.tsx`, `DaySummary.tsx`, `BillBrowser.tsx` | done |
+| 8.142 | ✅ **Cashier shifts** (`pos_shifts`): open with float per user, X report, Z per shift with cash count, close blocked while bills are on hold; day close unchanged | `pos-shifts.ts`, `ShiftPanel.tsx` | done |
+| 8.143 | ✅ **Customer-facing display** (`/pos-display` pop-up, BroadcastChannel): lines, total, UPI QR, thank-you / change; nothing stored | `pos-display.ts`, `CustomerDisplay.tsx`, `cross-tab.ts` | done |
+| 8.144 | ✅ **More tenders**: Cheque, Wallet, On account (saved customers, credit-limit check) — each with "fill rest" | `pos.ts`, `Pos.tsx` | done |
+| 8.145 | ✅ **MRP less %** on items and price levels; **selling price lists on the POS** | `pricing.ts`, `catalog.ts`, `Pos.tsx` | done |
+| 8.146 | ✅ **Alt+P** opens the POS from anywhere | `DashboardLayout.tsx`, `useHotkeys.ts` | done |
+| 8.147 | ✅ **Change strip**: full-width "Give change ₹…" for 3 s after saving | `Pos.tsx` | done |
+| 8.148 | ✅ **WhatsApp this bill** (beside Reprint, save toast; prompt when no phone; UPI link for a balance) | `pos-share.ts` | done |
+| 8.149 | ✅ **Create item from an unknown code** (POS + editor scan bar) | `QuickItemSheet.tsx`, `catalog.ts` | done |
+| 8.150 | ✅ Wiring: PWA "Payment in" (`/clients?pay=1`) → party picker → ₹ Received sheet; shared image / PDF → "Capture as supplier bill (read e-invoice QR)" or "New expense" | `PartyPicker.tsx`, `Clients.tsx`, `ShareTarget.tsx` | done |
+| 8.151 | ⏳ 8E follow-ups: scale labels with an embedded price check digit, USB-HID / Bluetooth scales, pole displays over serial (VFD), drawer hand-over between shifts, short codes on stock-only items, Option+P on macOS for the global key | — | open |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

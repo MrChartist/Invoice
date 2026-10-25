@@ -39,6 +39,11 @@ export interface PriceLevel {
   percent_off?: number;
   /** Own rate per catalogue item id (wins over `percent_off`). */
   rates?: Record<string, number>;
+  /**
+   * Additive (8E, 8.145): what `percent_off` is taken from — 'mrp' = "MRP less %" (items without an MRP fall
+   * back to their rate). Absent = the item's rate.
+   */
+  basis?: 'rate' | 'mrp';
   created_at?: string;
 }
 
@@ -101,23 +106,38 @@ export function slabFor(slabs: readonly QtySlab[] | undefined, qty: number): Qty
   return best;
 }
 
-/** The level's rate for a catalogue item (own rate, else % off base), or undefined when it sets none. */
-export function levelRate(level: PriceLevel | null | undefined, item: Pick<InvoiceItem, 'id' | 'rate'>): number | undefined {
+/**
+ * 8E (8.145): "MRP less %" — the rate of an item priced as its MRP less `mrp_less_percent`; the item's own
+ * rate when it has no MRP or no such percent. The catalogue form stores the result as `rate` too, so
+ * importers and conversions see the same price.
+ */
+export function mrpLessRate(item: Pick<InvoiceItem, 'rate'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent'>>): number {
+  const mrp = num(item.mrp);
+  const pct = num(item.mrp_less_percent);
+  if (mrp > 0 && pct > 0 && pct < 100) return round2(mrp * (1 - pct / 100));
+  return round2(num(item.rate));
+}
+
+/** The level's rate for a catalogue item (own rate, else % off base — or off MRP for an MRP level), or undefined when it sets none. */
+export function levelRate(level: PriceLevel | null | undefined, item: Pick<InvoiceItem, 'id' | 'rate'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent'>>): number | undefined {
   if (!level) return undefined;
   const own = level.rates?.[item.id];
   if (typeof own === 'number' && Number.isFinite(own) && own >= 0) return round2(own);
   const pct = num(level.percent_off);
-  if (pct > 0 && pct <= 100) return round2(num(item.rate) * (1 - pct / 100));
+  if (pct > 0 && pct <= 100) {
+    const from = level.basis === 'mrp' && num(item.mrp) > 0 ? num(item.mrp) : mrpLessRate(item);
+    return round2(from * (1 - pct / 100));
+  }
   return undefined;
 }
 
 /** Price of `qty` units of a catalogue item for a party at `level` (see the module comment for the order). */
 export function resolvePrice(
-  item: Pick<InvoiceItem, 'id' | 'rate' | 'qty_slabs'>,
+  item: Pick<InvoiceItem, 'id' | 'rate' | 'qty_slabs'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent'>>,
   qty: number,
   level?: PriceLevel | null,
 ): PriceQuote {
-  const base = round2(num(item.rate));
+  const base = mrpLessRate(item);
   const lvl = levelRate(level, item);
   let quote: PriceQuote = lvl !== undefined ? { rate: lvl, basis: level!.name, source: 'level' } : { rate: base, source: 'base' };
   const slab = slabFor(item.qty_slabs, num(qty));
@@ -315,6 +335,7 @@ export const priceLevelsDb = {
       name: level.name.trim(),
       ...(num(level.percent_off) > 0 ? { percent_off: num(level.percent_off) } : {}),
       ...(level.rates && Object.keys(level.rates).length ? { rates: level.rates } : {}),
+      ...(level.basis === 'mrp' ? { basis: 'mrp' as const } : {}),
       created_at: level.created_at || new Date().toISOString(),
     };
     const idx = all.findIndex((l) => l.id === row.id);
