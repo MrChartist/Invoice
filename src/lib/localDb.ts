@@ -39,7 +39,7 @@ import { releaseAttachments, releaseDropped } from './attachments';
 import { nextReceiptNumber, recordSeries } from './series-counters';
 import { receivableTotal } from './rcm';
 import { linkedCredits, settledStatus, type CreditLinkRow } from './amount-due';
-import { assertNotPendingApproval, holdIfApprovalNeeded } from './approval-gate';
+import { assertNotPendingApproval, holdIfApprovalNeeded, holdIfCreditBlocked } from './approval-gate';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -395,6 +395,7 @@ export const localDb = {
 
       // WP-9 maker-checker: a clerk's document that needs the owner's approval is held as a pending draft.
       holdIfApprovalNeeded(toSave, stored);
+      holdIfCreditBlocked(toSave, stored); // 8.80 credit limit: Block -> owner approval (audited override)
 
       // GST Rule 46: one number, one document (a document may keep its own legacy number).
       if (toSave.invoice_number && !(stored && numberKey(stored.invoice_number) === numberKey(toSave.invoice_number))) {
@@ -425,7 +426,8 @@ export const localDb = {
       // Grow the local CRM / catalogue from real usage.
       if (toSave.client?.name?.trim()) {
         // Credit terms (6.25) live on the client master only: an old snapshot must never reset them.
-        const { credit_limit: _limit, credit_days: _days, ...snapshot } = toSave.client;
+        // 8F: so do the distribution fields (area / beat / default agent / credit policy).
+        const { credit_limit: _limit, credit_days: _days, area_id: _a, beat_id: _b, agent_id: _g, credit_policy: _p, ...snapshot } = toSave.client;
         localDb.clients.upsert(snapshot);
       }
       localDb.items.upsertMany(
@@ -470,6 +472,7 @@ export const localDb = {
       if (status !== 'Draft' && status !== 'Cancelled') assertNotPendingApproval(before, 'it can be issued or marked paid');
       const next: InvoiceRecord = { ...before, status, updated_at: new Date().toISOString() };
       holdIfApprovalNeeded(next, before);
+      holdIfCreditBlocked(next, before);
       invoices[idx] = next;
       setTable(KEYS.invoices, invoices);
       if (next.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(id);

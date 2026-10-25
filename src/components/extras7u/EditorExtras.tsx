@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { RECORD_KEYS, useInvoiceStore } from '../../store/useInvoiceStore';
 import { agentsDb } from '../../lib/sales-commission';
+import { localDb } from '../../lib/localDb';
 import { schemesDb } from '../../lib/pricing';
 import { applyBillOffer, removeBillOffer } from '../../lib/offers';
 import { liveScheduleIndex, readPharmaSettings, rxMissing } from '../../lib/pharma';
@@ -36,6 +37,13 @@ export default function EditorExtras() {
   const pharma = useMemo(() => readPharmaSettings(), []);
   const index = useMemo(() => (pharma.enabled ? liveScheduleIndex() : new Map()), [pharma.enabled]);
   const [skipOffer, setSkipOffer] = useState(false);
+  // 8F: a party's default salesman fills an empty agent when the party is picked.
+  const clientId = useInvoiceStore((st) => st.client?.id);
+  useEffect(() => {
+    if (!clientId || useInvoiceStore.getState().agent_id) return;
+    const agent = localDb.clients.getById(clientId)?.agent_id;
+    if (agent && agents.some((a) => a.id === agent)) s.patch({ agent_id: agent });
+  }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bill-value offer: re-applied whenever the bill changes (same record back = nothing to do).
   useEffect(() => {

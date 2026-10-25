@@ -202,14 +202,21 @@ prescription flagged; CSV. Near-expiry / expired batches in stock. Sale gate (`p
 `liveDocTrackingIssues`, so editor, POS and recurring runs): *block expired batches* (no "Sell anyway"), near-expiry
 warning within N days (default 90), optionally blocking. Verify the register format with the drug inspector / your CA.
 
+**Pharma operations (8F, `docs/features/distribution.md`).** Inventory → *Breakage / expiry*: Breakage / Expiry Issue
+(near-expiry / expired batches traced to the supplier who sold each batch, debit notes per supplier bill + one claim
+per supplier in one all-or-nothing pass), claim tracking (pending / credit received with the supplier's credit note /
+rejected), Breakage / Expiry Receive into a non-saleable *Expiry* godown with optional replacement, destruction with an
+ITC-reversal reminder (Sec 17(5)(h), verify with your CA). Salt / composition on stock items with substitute search in
+the editor item picker and the POS; optional *block sale above batch MRP* (`block_above_mrp`). Agent on POS bills (8F).
+
 ## Not built / gaps
 
 - Commission: TDS 194H deduction, agent ledger with its own balance screen, commission on credit notes in receipt
-  basis, agent on POS bills (set it in the editor).
+  basis (agent on POS bills: 8F).
 - Offers: per-customer / per-category offers, combo prices, offers in recurring runs, conversions and importers.
 - ESC/POS: no QR / logo raster, no character code pages beyond ASCII (₹ prints as "Rs."), no network printers.
-- Pharma: Schedule X separate register book format, narcotics (NDPS) records, batch-wise MRP checks, prescription
-  scan attachment link.
+- Pharma: Schedule X separate register book format, narcotics (NDPS) records, prescription scan attachment link
+  (batch-wise MRP check: 8F).
 - Receivables statements read invoices / payments only, so a refund voucher does not appear there: a refunded walk-in
   return shows as a credit on the Walk-in customer statement (the ledger / TB / Books are right).
 - The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).

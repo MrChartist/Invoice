@@ -147,6 +147,7 @@ export function savePharmaSettings(s: PharmaSettings): void {
     block_expired: !!s.block_expired,
     near_expiry_days: Math.min(Math.max(Math.round(num(s.near_expiry_days)), 0), 730),
     block_near_expiry: !!s.block_near_expiry,
+    block_above_mrp: !!s.block_above_mrp,
   });
 }
 

@@ -323,7 +323,8 @@ try {
 
     const pdfPages = async () => {
       await dialog.getByRole('button', { name: /^Share/ }).click();
-      const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+      // A 3-copy capture can take over 10 s on a loaded box (seen at load average 7 on 4 cores).
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
       const body = readFileSync(await dl.path()).toString('latin1');
       return (body.match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
     };
@@ -1690,6 +1691,30 @@ try {
     await page.getByRole('button', { name: 'Delete' }).click();
     await page.locator('#rec-account').waitFor({ state: 'detached' });
     check(true, 'an unused account can be deleted; the picker goes away with one account');
+  });
+
+  await step('8F distribution: add an area and a beat, beat plan and reports render, stock analysis tab loads', async () => {
+    await page.goto(srv.origin + '/distribution?tab=masters');
+    await page.locator('[data-area-name]').fill('E2E North');
+    await page.locator('[data-area-name]').press('Enter');
+    await readJson(page, 'dist_areas', [], (v) => v.some((a) => a.name === 'E2E North'));
+    await page.locator('[data-beat-name]').fill('E2E Market Rd');
+    await page.getByRole('checkbox', { name: 'Mon' }).check();
+    await page.getByRole('button', { name: 'Add beat' }).click();
+    const beats = await readJson(page, 'dist_beats', [], (v) => v.some((b) => b.name === 'E2E Market Rd'));
+    check(beats.find((b) => b.name === 'E2E Market Rd')?.days?.includes(1), 'beat saved with its visiting weekday');
+    await page.getByRole('tab', { name: 'Reports' }).click();
+    await page.locator('[data-dist-reports]').waitFor({ timeout: 15000 });
+    await page.getByRole('tab', { name: 'Beat plan' }).click();
+    await page.locator('[data-beat-plan]').waitFor({ timeout: 15000 });
+    const prevStock = await readJson(page, 'stock_items', []);
+    await writeJson(page, 'stock_items', [...prevStock, { id: 'e2e-8f', name: 'E2E Soap', unit: 'NOS', track_stock: true, opening_qty: 5, opening_rate: 10, reorder_level: 0 }]);
+    await page.goto(srv.origin + '/inventory?tab=analysis');
+    await page.locator('[data-stock-analysis]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-move-class="non"]').filter({ hasText: 'E2E Soap' }).count() === 1, 'stock analysis: an item with no outward is non-moving');
+    await writeJson(page, 'stock_items', prevStock.length ? prevStock : null);
+    await writeJson(page, 'dist_beats', null);
+    await writeJson(page, 'dist_areas', null);
   });
 
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {

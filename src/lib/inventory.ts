@@ -24,10 +24,11 @@ import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { grnCoverage, loadReturnStockDocs, returnStockEvents, type ReturnStockDocs } from './events-returns';
 import { jobWorkStockEvents, loadJobWorkStockDocs, type JobWorkStockDocs } from './events-job-work';
+import { kitStockEvents } from './events-kits';
 import { lineFactor } from './units';
 import { itemVoucherReferences } from './item-references';
 import type {
-  ManufacturingVoucher, PhysicalStockVoucher, StockJournal, VoucherOutputLine, VoucherStockLine,
+  Bom, ManufacturingVoucher, PhysicalStockVoucher, StockJournal, VoucherOutputLine, VoucherStockLine,
 } from '../types/manufacturing';
 
 /* ── Types ───────────────────────────────────────────────────── */
@@ -53,6 +54,7 @@ export interface StockItem {
   reorder_level: number;
   sale_rate?: number;
   tax_rate?: number;
+  /** Shelf / bin / rack location (8F: printed on pick lists and delivery challans). */
   location?: string;
   created_at?: string;
   /* ── Opt-in tracking (6.6 / 6.11); absent = off ── */
@@ -83,6 +85,18 @@ export interface StockItem {
   /** Standard cost and selling price lists, each rate effective from `from` (yyyy-mm-dd) until the next entry. */
   standard_costs?: { from: string; rate: number }[];
   selling_prices?: { from: string; rate: number }[];
+  /* ── 8F (docs/features/distribution.md, inventory.md); absent = none ── */
+  /** Salt / composition (pharma), e.g. "Paracetamol 500mg": the editor and POS find substitutes by it. */
+  salt?: string;
+  /** Variant child: the parent (template) item id; `variant_attrs` holds its values, e.g. {Size: 'L', Colour: 'Red'}. */
+  variant_of?: string;
+  variant_attrs?: Record<string, string>;
+  /** Variant parent: the attribute grid the children were generated from. */
+  variant_axes?: { name: string; values: string[] }[];
+  /** Kit: sold as one line; its default BOM's components leave stock on the sale (`events-kits.ts`). Not stocked itself. */
+  kit?: boolean;
+  /** Bin / rack per batch (key: batch number, upper case); the item's own bin is `location`. */
+  batch_bins?: Record<string, string>;
 }
 
 export interface StockMove {
@@ -232,6 +246,8 @@ export interface StockInputs {
   vouchers?: StockVoucherInput[];
   /** 7M event source (events-job-work.ts): Material Out / In with job workers, Rejections In. */
   jobWorkDocs?: JobWorkStockDocs;
+  /** 8.85: BOMs, read for kit items (`events-kits.ts`): a kit sale issues its components. */
+  kitBoms?: Bom[];
 }
 
 /**
@@ -555,6 +571,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     return it?.track_stock ? it : undefined;
   });
   pushVoucherEvents(input.vouchers ?? [], byId, push);
+  kitStockEvents(invoices, items, input.kitBoms, (d) => ((excludeInvoiceId && d.id === excludeInvoiceId) || (d.id && fromChallan.has(d.id)) ? null : ((e) => (e === 'in' && !creditNoteReturnsGoods(d, input.links) ? null : e))(invoiceEffect(d.doc_type, d.status, includeChallans))), push); // 8.85 kits
   jobWorkStockEvents(input.jobWorkDocs, { byId: (id) => (byId.get(id)?.track_stock ? byId.get(id) : undefined), index, invoices, links: input.links, includeChallans, includeTransfers: !!input.includeTransfers }, push); // 7M event source
 
   if (input.includeTransfers) {
@@ -1328,6 +1345,7 @@ export function liveInputs(): StockInputs {
     links: getTable<{ from_id: string; to_id: string; relation: string; reason?: string }>('doc_links'),
     returnDocs: loadReturnStockDocs(),
     jobWorkDocs: loadJobWorkStockDocs(),
+    kitBoms: getTable<Bom>(VOUCHER_TABLES.boms),
     vouchers: stockVoucherInputs(
       getTable<ManufacturingVoucher>(VOUCHER_TABLES.manufacturing),
       getTable<StockJournal>(VOUCHER_TABLES.stockJournals),
@@ -1386,7 +1404,7 @@ let positionsCache: { key: (string | null)[]; positions: StockPosition[] } | nul
 function cachedPositionsWithout(docId: string | undefined): StockPosition[] {
   const key = [
     docId ?? '',
-    ...['invoices', 'purchases', TABLES.items, TABLES.moves, 'doc_links', 'job_work_in', 'rejections_in'].map((t) => readRaw(DB_PREFIX + t)),
+    ...['invoices', 'purchases', TABLES.items, TABLES.moves, 'doc_links', 'job_work_in', 'rejections_in', VOUCHER_TABLES.boms].map((t) => readRaw(DB_PREFIX + t)),
     readRaw(SETTINGS_KEY),
   ];
   if (positionsCache && positionsCache.key.length === key.length && positionsCache.key.every((k, i) => k === key[i])) {

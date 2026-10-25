@@ -16,6 +16,8 @@ export interface PharmaSettings {
   block_expired: boolean;
   near_expiry_days: number;
   block_near_expiry: boolean;
+  /** Additive (8.84): refuse a sale priced above the batch MRP (incl. GST, per base unit). */
+  block_above_mrp?: boolean;
 }
 
 export const DEFAULT_PHARMA: PharmaSettings = { enabled: false, block_expired: false, near_expiry_days: 90, block_near_expiry: false };
@@ -30,6 +32,7 @@ export function readPharmaSettings(): PharmaSettings {
       block_expired: raw.block_expired === true,
       near_expiry_days: Number.isFinite(days) && days >= 0 && days <= 730 ? days : DEFAULT_PHARMA.near_expiry_days,
       block_near_expiry: raw.block_near_expiry === true,
+      block_above_mrp: raw.block_above_mrp === true,
     };
   } catch {
     return { ...DEFAULT_PHARMA };
@@ -73,4 +76,40 @@ export function pharmaGate<T extends Issues>(
     }
   }
   return out;
+}
+
+/* ── 8F sale limits: non-saleable godowns and the batch MRP ceiling ── */
+
+interface LimitLine { name: string; quantity?: number; rate?: number; discount_percent?: number; tax_rate?: number; unit_factor?: number; godown_id?: string; batch_no?: string }
+
+/** Tax-inclusive selling price per base unit of a line (rate after the line discount, GST added). */
+export function linePricePerBase(l: LimitLine): number {
+  const net = (Number(l.rate) || 0) * (1 - Math.min(Math.max(Number(l.discount_percent) || 0, 0), 100) / 100);
+  const f = Number(l.unit_factor) > 0 ? Number(l.unit_factor) : 1;
+  return (net * (1 + Math.max(Number(l.tax_rate) || 0, 0) / 100)) / f;
+}
+
+/**
+ * Errors for a sale (8.84 / 8.82): a line leaving a non-saleable godown (kind 'expiry'), and — with the
+ * pharma option "Block sale above MRP" — a line priced (incl. GST, per base unit) above its batch's MRP.
+ * `mrpOf` returns the MRP per base unit of a line's batch (undefined = unknown, not checked).
+ */
+export function saleLimitGate<T extends Issues>(
+  issues: T,
+  doc: { doc_type?: string; items: readonly LimitLine[] },
+  opts: { nonSaleable: ReadonlySet<string>; godownName: (id: string) => string; mrpOf?: (l: LimitLine) => number | undefined; settings?: PharmaSettings },
+): T {
+  if (!SALE_TYPES.has(doc.doc_type ?? '')) return issues;
+  const settings = opts.settings ?? readPharmaSettings();
+  const errors: string[] = [];
+  for (const l of doc.items) {
+    if (!l.name?.trim() || !((Number(l.quantity) || 0) > 0)) continue;
+    if (l.godown_id && opts.nonSaleable.has(l.godown_id)) errors.push(`${l.name}: ${opts.godownName(l.godown_id)} holds non-saleable (expired / breakage) stock — sell from another godown.`);
+    if (settings.enabled && settings.block_above_mrp && opts.mrpOf) {
+      const mrp = opts.mrpOf(l);
+      const price = linePricePerBase(l);
+      if (mrp && mrp > 0 && price > mrp + 0.005) errors.push(`${l.name}: price ₹${price.toFixed(2)} (incl. GST) is above the batch MRP ₹${mrp.toFixed(2)} (pharma setting).`);
+    }
+  }
+  return errors.length ? { ...issues, errors: [...issues.errors, ...errors] } : issues;
 }

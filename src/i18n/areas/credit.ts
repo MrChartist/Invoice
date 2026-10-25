@@ -1,0 +1,43 @@
+/** 8.80 credit-limit enforcement: editor / POS notices and the credit policy card. */
+import { defineArea } from '../area';
+
+export const crT = defineArea(
+  {
+    blockedClerk: 'Credit limit: Block. Saving will hold this document as a draft for the owner\'s approval.',
+    blockedOwner: 'Credit limit: Block. You may save as the owner; the override is recorded in the audit log.',
+    posBlocked: 'Over the credit limit: take payment for the unpaid part, or ask the owner to override.',
+    posOverride: 'Override the credit limit and save',
+    posOverrideAsk: 'This customer is over the credit limit. Save the bill anyway? The override is recorded in the audit log.',
+    policyTitle: 'Credit control',
+    policyIntro: 'What happens when a customer is over the credit limit or credit days in the client master. Block holds a clerk\'s document for the owner\'s approval (Approvals queue); the owner can still save, and every override is audited.',
+    mode: 'Policy',
+    off: 'Off',
+    warn: 'Warn',
+    block: 'Block',
+    companyDefault: 'Company policy',
+    includeOrders: 'Count open sales orders (still to bill) in the outstanding',
+    blockOverdue: 'Also block when bills are overdue beyond the credit days',
+    saved: 'Credit policy saved',
+    save: 'Save policy',
+    heldCredit: 'Held: over the credit limit',
+  } as const,
+  {
+    blockedClerk: 'क्रेडिट सीमा: रोक। सेव करने पर यह दस्तावेज़ मालिक की मंज़ूरी के लिए ड्राफ़्ट में रहेगा।',
+    blockedOwner: 'क्रेडिट सीमा: रोक। मालिक के रूप में आप सेव कर सकते हैं; यह ओवरराइड ऑडिट लॉग में दर्ज होगा।',
+    posBlocked: 'क्रेडिट सीमा पार: बकाया हिस्से का भुगतान लें, या मालिक से ओवरराइड कराएँ।',
+    posOverride: 'क्रेडिट सीमा ओवरराइड करके सेव करें',
+    posOverrideAsk: 'यह ग्राहक क्रेडिट सीमा से ऊपर है। फिर भी बिल सेव करें? ओवरराइड ऑडिट लॉग में दर्ज होगा।',
+    policyTitle: 'क्रेडिट नियंत्रण',
+    policyIntro: 'जब ग्राहक क्लाइंट मास्टर की क्रेडिट सीमा या क्रेडिट दिनों से ऊपर हो तब क्या हो। रोक में क्लर्क का दस्तावेज़ मालिक की मंज़ूरी (Approvals) तक रुका रहता है; मालिक फिर भी सेव कर सकता है, और हर ओवरराइड ऑडिट होता है।',
+    mode: 'नीति',
+    off: 'बंद',
+    warn: 'चेतावनी',
+    block: 'रोक',
+    companyDefault: 'कंपनी नीति',
+    includeOrders: 'खुले सेल्स ऑर्डर (बिल होना बाकी) को बकाया में गिनें',
+    blockOverdue: 'क्रेडिट दिनों से पुराने बकाया बिल होने पर भी रोकें',
+    saved: 'क्रेडिट नीति सेव हुई',
+    save: 'नीति सेव करें',
+    heldCredit: 'रुका: क्रेडिट सीमा पार',
+  },
+);

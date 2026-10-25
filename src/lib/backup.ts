@@ -356,6 +356,8 @@ const RECORD_TABLES = [
   'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
   // 8C: documents inbox, draft bills, recurring bills, bank rules, supplier payment requests
   'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
+  // 8F: distribution masters, van settlements, order pad, breakage / expiry claims and receipts
+  'dist_areas', 'dist_routes', 'dist_beats', 'van_settlements', 'order_pad_outbox', 'order_pad_imports', 'expiry_claims', 'expiry_receipts',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -386,6 +388,7 @@ const ID_TABLES = new Set([
   'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
   'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
   'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
+  'dist_areas', 'dist_routes', 'dist_beats', 'van_settlements', 'order_pad_outbox', 'order_pad_imports', 'expiry_claims', 'expiry_receipts',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

@@ -43,6 +43,9 @@ import { returnsT } from '../i18n/areas/extras';
 import { areaNodes } from '../i18n/areas/nodes';
 import { unitT } from '../i18n/areas/units';
 import { cleanAltUnits, lineUnitPatch, roundTypedQty, unitChoices, unitsDb } from '../lib/units';
+import { canOverrideCredit, creditStatus, recordCreditOverride } from '../lib/credit-policy'; // 8.80
+import { saltIndex, saltOf } from '../lib/salt-search'; // 8.84
+import { crT } from '../i18n/areas/credit';
 
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
 // WP-9: return / exchange screen and the exchange-credit banner (own files, loaded on demand).
@@ -52,6 +55,7 @@ const LoyaltyRedeem = lazy(() => import('../components/loyalty/LoyaltyRedeem').t
 const PosPrinterButton = lazy(() => import('../components/extras7u/PosPrinter').then((m) => ({ default: m.PosPrinterButton }))); // 7U ESC/POS
 // 8.22: customer-facing UPI QR (qrcode.react loads only once a UPI amount is typed).
 const PosUpiQr = lazy(() => import('../components/pos/PosUpiQr').then((m) => ({ default: m.PosUpiQr })));
+const PosDistExtras = lazy(() => import('../components/distribution/PosDistExtras')); // 8F agent + credit notice
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 
 interface Party {
@@ -83,6 +87,7 @@ function loadCounter() {
     pricing: pricingInUse(pricing) ? pricing : null,
     positions: stock.some((s) => s.track_stock) ? loadPositions() : [],
     units: unitsDb.stored(),
+    salts: saltIndex(stock), // 8.84 substitute search
     ctx: editorStockContext({ doc_type: 'INVOICE', issue_date: todayInput() }),
     // 8.22: quick-item tiles — stock groups and recent POS bills (most sold, when nothing is starred).
     groups: getTable<{ id: string; name: string; parent_id?: string }>('stock_groups'),
@@ -126,6 +131,9 @@ export function Pos() {
   const [held, setHeld] = useState<HeldCart[]>(loadHeld);
   const [heldOpen, setHeldOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [agentId, setAgentId] = useState(''); // 8F: sales agent on the bill
+  const [creditAsk, setCreditAsk] = useState(''); // 8.80: owner override prompt
+  const [creditOver, setCreditOver] = useState(false);
 
   const settings = useMemo(() => localDb.settings.get(), []);
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
@@ -139,7 +147,8 @@ export function Pos() {
   // Loyalty points redeemed as an amount discount (WP-9); a refused redemption leaves the bill as built.
   const redeemed = useMemo(() => (redeemPts > 0 && party.client ? redeemOnBill(built, redeemPts) : null), [built, redeemPts, party.client]);
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
-  const record = useMemo(() => applyBillOffer(redeemed?.record ?? built, data.pricing?.schemes ?? [], { retotalRecord: true }), [redeemed, built, data.pricing]);
+  const offered = useMemo(() => applyBillOffer(redeemed?.record ?? built, data.pricing?.schemes ?? [], { retotalRecord: true }), [redeemed, built, data.pricing]);
+  const record = useMemo(() => (agentId ? { ...offered, agent_id: agentId } : offered), [offered, agentId]);
   const tenders: Tender[] = useMemo(
     () => (Object.keys(tender) as TenderMethod[]).map((m) => ({
       method: m, amount: tender[m],
@@ -243,6 +252,8 @@ export function Pos() {
   /** Pick (or clear) the saved customer; a new customer may buy at another level, so automatic lines are re-priced. */
   const chooseClient = (client: Client | null) => {
     setParty(client ? { client, name: '', phone: '' } : WALK_IN);
+    setAgentId(client?.agent_id ?? '');
+    setCreditOver(false);
     setRedeemPts(0);
     setDispatch(false);
     setCustomerText('');
@@ -255,11 +266,11 @@ export function Pos() {
     () =>
       suggest(query, data.sources, {
         label: (i) => i.name,
-        extra: (i) => [i.hsn, i.sku, i.barcode],
-        sub: (i) => [formatCurrency(num(i.rate)), i.sku && `SKU ${i.sku}`].filter(Boolean).join(' · '),
+        extra: (i) => [i.hsn, i.sku, i.barcode, saltOf(data.salts, i.name)],
+        sub: (i) => [formatCurrency(num(i.rate)), i.sku && `SKU ${i.sku}`, saltOf(data.salts, i.name)].filter(Boolean).join(' · '),
         limit: 8,
       }),
-    [query, data.sources],
+    [query, data.sources, data.salts],
   );
 
   const onCode = (code: string) => {
@@ -291,6 +302,8 @@ export function Pos() {
     setItems([]);
     setRedeemPts(0);
     setParty(WALK_IN);
+    setAgentId('');
+    setCreditOver(false);
     setDispatch(false);
     setCustomerText('');
     setTender(NO_TENDER);
@@ -300,9 +313,16 @@ export function Pos() {
     setTimeout(() => searchRef.current?.focus(), 0);
   };
 
-  const save = (expiredOk = false) => {
+  const save = (expiredOk = false, creditOk = false) => {
     if (items.length === 0) {
       setErrors([posT('errEmpty')]);
+      return;
+    }
+    // 8.80: a saved customer over the credit limit (Block) — the unpaid part adds credit.
+    const blocked = party.client && !creditOk && !creditOver ? creditStatus(record, { unpaid: summary.due })?.blocked : '';
+    if (blocked) {
+      if (canOverrideCredit()) setCreditAsk(blocked);
+      else setErrors([crT('posBlocked'), blocked]);
       return;
     }
     const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client, exchangeReturnId: exchange?.id });
@@ -609,6 +629,9 @@ export function Pos() {
                   <LoyaltyRedeem key={party.client.id || party.client.name} customer={party.client.name} points={redeemPts} errors={redeemed?.errors ?? []} onApply={setRedeemPts} />
                 </Suspense>
               )}
+              <Suspense fallback={null}>
+                <PosDistExtras client={party.client} record={record} unpaid={summary.due} agentId={agentId} onAgent={setAgentId} />
+              </Suspense>
               {party.client ? null : (
                 <>
                   <Typeahead
@@ -719,6 +742,21 @@ export function Pos() {
         }}
       />
       <HeldBills open={heldOpen} list={held} onClose={() => setHeldOpen(false)} onRecall={recall} onDrop={drop} />
+      <ConfirmDialog
+        open={!!creditAsk}
+        destructive
+        title={crT('posOverride')}
+        message={`${crT('posOverrideAsk')} ${creditAsk}`}
+        confirmLabel={crT('posOverride')}
+        cancelLabel={posT('goBack')}
+        onClose={() => setCreditAsk('')}
+        onConfirm={() => {
+          recordCreditOverride(party.client?.name ?? '', creditAsk);
+          setCreditAsk('');
+          setCreditOver(true);
+          save(false, true);
+        }}
+      />
       {zOpen && (
         <Suspense fallback={null}>
           <ZReportModal open={zOpen} onClose={() => setZOpen(false)} notify={notify} />

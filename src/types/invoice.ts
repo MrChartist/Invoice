@@ -192,6 +192,11 @@ export interface InvoiceItem {
    * quantity × unit_factor; the rate stays per line unit (`src/lib/units.ts`).
    */
   unit_factor?: number;
+  /**
+   * Additive (8F, 8.86), invoice lines only: bin / rack the goods were picked from (snapshot of the stock
+   * item's or batch's bin when the line was picked), printed on delivery challans and pick lists.
+   */
+  bin?: string;
 }
 
 /** A quantity slab on a catalogue item (6.9). */
@@ -242,6 +247,15 @@ export interface Client {
    * The party's opening balance lives in `ledger_openings`, its bill-wise breakup in `opening_bills`.
    */
   group_id?: string;
+  /* ── Distribution (8F, docs/features/distribution.md); additive, master only (never on a snapshot decision) ── */
+  /** `dist_areas` row of this party. */
+  area_id?: string;
+  /** `dist_beats` row (the salesman's visiting round) of this party. */
+  beat_id?: string;
+  /** Default `sales_agents` row: new sales documents for this party name this agent. */
+  agent_id?: string;
+  /** Per-party credit policy (8.80); absent = the company policy (`credit_policy`). */
+  credit_policy?: 'off' | 'warn' | 'block';
   created_at?: string;
   updated_at?: string;
 }
@@ -601,4 +615,6 @@ export interface ApprovalInfo {
    * changes the value has to ask again; absent on approvals made before this field existed.
    */
   approved_value?: number;
+  /** Additive (8.80): why the document was held — absent = the approval policy; 'credit' = over the credit limit. */
+  reason?: 'credit';
 }
