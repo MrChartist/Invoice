@@ -85,9 +85,9 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `recurring` | recurring | defined by that module |
 | `reminders` | reminders-share | defined by that module |
 | `doc_links` | documents | defined by that module |
-| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7); additive `aliases` (earlier names, recorded on rename); `min_order_qty` / `reorder_by_godown` (Phase 7) |
+| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7); additive `aliases` (earlier names, recorded on rename); `min_order_qty` / `reorder_by_godown` (Phase 7); `group_id` / `category_id` / `alt_units` / `standard_costs` / `selling_prices` (WP-8) |
 | `stock_moves` | inventory | `StockMove` (manual adjustments), additive `godown_id` / `batch_no` / `mfg_date` / `expiry_date` / `serials` |
-| `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed) |
+| `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed); additive `parent_id` (WP-8 hierarchy) |
 | `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger |
 | `boms` | manufacturing (Phase 7, `src/lib/manufacturing.ts`) | `Bom` (`src/types/manufacturing.ts`): components per `batch_qty` finished units (scrap %, godown), by-/co-products / scrap, `is_default` per item |
 | `manufacturing_vouchers` | manufacturing (Phase 7) | `ManufacturingVoucher` `MFG/FY<yy-yy>/<seq>`: finished item + qty, consumed lines (batch / godown), outputs, additional costs, display-only `cost_snapshot`; read by the stock engine, never by Books / ledger |
@@ -151,6 +151,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `branches` | branches (WP-9, `src/lib/branch.ts`) | `Branch {id, name, code?, gstin?, state_code?, profile_id?, godown_id?, address?, inactive?}`; additive `branch_id` on invoices / purchases / vouchers |
 | `loyalty_adjustments` | loyalty (WP-9, `src/lib/loyalty.ts`) | manual points corrections; accrual is derived from invoices, redemption is `loyalty_redeem` on the bill. Programme object under the key `loyalty_program` (date-keyed rules) |
 | `amc_contracts` | AMC (WP-9, `src/lib/amc.ts`) | `AmcContract` with `visits` log, `renewed_from` link |
+| `stock_groups` / `stock_categories` | inventory masters (WP-8, `src/lib/stock-groups.ts`) | `StockTreeNode {id, name, parent_id?}` (nested); items point via `group_id` / `category_id`; `master.edit` (`docs/features/inventory-masters.md`) |
+| `units` | inventory masters (WP-8, `src/lib/units.ts`) | `UnitMaster`: simple unit (symbol, name, UQC, decimals; a built-in symbol is an override) or compound (`first` / `factor` / `second`); `master.edit` |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the

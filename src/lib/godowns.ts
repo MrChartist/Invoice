@@ -19,6 +19,7 @@ import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 import { assertRemovable, liveRemovalIssues } from './stock-timeline';
+import { descendantIds, treeRows, type TreeRow } from './stock-groups';
 
 export const GODOWNS_TABLE = 'godowns';
 export const TRANSFERS_TABLE = 'stock_transfers';
@@ -31,7 +32,33 @@ export { MAIN_GODOWN_ID };
 export function godownList(stored: readonly Godown[]): Godown[] {
   const main = stored.find((g) => g.id === MAIN_GODOWN_ID);
   const rest = stored.filter((g) => g.id !== MAIN_GODOWN_ID && g.name?.trim());
-  return [{ id: MAIN_GODOWN_ID, name: main?.name?.trim() || 'Main' }, ...rest];
+  return [{ id: MAIN_GODOWN_ID, name: main?.name?.trim() || 'Main', ...(main?.parent_id ? { parent_id: main.parent_id } : {}) }, ...rest];
+}
+
+/* ── Godown hierarchy (WP-8): a godown may sit inside another (parent_id); stock stays per godown ── */
+
+/** Godowns depth-first under their parents (Main and the other top-level godowns first, by name). */
+export function godownTree(list: readonly Godown[]): TreeRow[] {
+  return treeRows(list.map((g) => ({ id: g.id, name: g.name, ...(g.parent_id ? { parent_id: g.parent_id } : {}) })));
+}
+
+/** Why `parentId` cannot be the parent of godown `id`, or ''. */
+export function godownParentIssue(id: string | undefined, parentId: string | undefined, list: readonly Godown[]): string {
+  if (!parentId) return '';
+  if (!list.some((g) => g.id === parentId)) return 'The parent godown no longer exists.';
+  if (id && descendantIds(id, list).has(parentId)) return 'A godown cannot be placed inside itself or one of its sub-godowns.';
+  return '';
+}
+
+/** Quantity per godown including every sub-godown below it (a warehouse shows its store rooms' stock too). */
+export function rollUpGodowns(byGodown: Readonly<Record<string, number>>, list: readonly Godown[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const g of list) {
+    let sum = 0;
+    for (const id of descendantIds(g.id, list)) sum += num(byGodown[id]);
+    out[g.id] = Math.round((sum + Number.EPSILON) * 1000) / 1000 || 0;
+  }
+  return out;
 }
 
 /** Godown pickers and reports appear only once a second godown exists. */
@@ -142,7 +169,7 @@ export const godownsDb = {
   isMulti: (): boolean => isMultiGodown(godownsDb.stored()),
 
   /** Add or rename a godown. Names are unique (case-insensitive). */
-  save(input: { id?: string; name: string; address?: string }): Godown {
+  save(input: { id?: string; name: string; address?: string; parent_id?: string }): Godown {
     const name = input.name.trim();
     if (!name) throw new Error('Enter a godown name.');
     const rows = godownsDb.stored();
@@ -151,11 +178,16 @@ export const godownsDb = {
       throw new Error(`A godown named "${name}" already exists.`);
     }
     const existing = input.id ? rows.find((g) => g.id === input.id) : undefined;
+    const parentIssue = godownParentIssue(input.id, input.parent_id, list);
+    if (parentIssue) throw new Error(parentIssue);
+    const { parent_id: _oldParent, ...base } = existing ?? ({} as Partial<Godown>);
+    void _oldParent;
     const row: Godown = {
-      ...existing,
+      ...base,
       id: input.id || generateId(),
       name,
       ...(input.address?.trim() ? { address: input.address.trim() } : {}),
+      ...(input.parent_id ? { parent_id: input.parent_id } : {}),
       created_at: existing?.created_at ?? now(),
       updated_at: now(),
     };
@@ -168,6 +200,7 @@ export const godownsDb = {
   remove(id: string, inUse: boolean): void {
     if (id === MAIN_GODOWN_ID) throw new Error('The main godown cannot be deleted.');
     if (inUse) throw new Error('Stock, bills, invoices or transfers still use this godown, so it cannot be deleted.');
+    if (godownsDb.list().some((g) => g.parent_id === id)) throw new Error('Move or delete the godowns inside it first.');
     const row = godownsDb.stored().find((g) => g.id === id);
     setTable(GODOWNS_TABLE, godownsDb.stored().filter((g) => g.id !== id));
     logGodown(id, 'delete', `Godown "${row?.name ?? id}" deleted`);

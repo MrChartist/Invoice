@@ -5,7 +5,10 @@ import { Typeahead } from '../ui/Typeahead';
 import { localDb } from '../../lib/localDb';
 import { suggest } from '../../lib/suggest';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
-import { UNITS, GST_SLABS, type InvoiceItem } from '../../types/invoice';
+import { GST_SLABS, type InvoiceItem } from '../../types/invoice';
+import { liveUnits } from '../../lib/units-live';
+import { lineFactor, lineUnitPatch } from '../../lib/units';
+import { unitT } from '../../i18n/areas/units';
 import { cn, formatCurrency } from '../../lib/utils';
 import { lineKeyAction } from './line-keys';
 import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
@@ -36,7 +39,10 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [docId, docType, issueDate, docStatus, stockTick],
   );
-  const { addItem, updateItem, duplicateItem, moveItem, removeItem } = useInvoiceStore.getState();
+  // Units master + alternate units (WP-8), re-read with the stock context (on name focus), never per keystroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const units = useMemo(() => liveUnits(), [stockTick]);
+  const { addItem, updateItem, patchItem, duplicateItem, moveItem, removeItem } = useInvoiceStore.getState();
   // Catalogue snapshot, refreshed whenever an item name gains focus.
   const [catalog, setCatalog] = useState<InvoiceItem[]>([]);
   const itemSuggestions = useCallback(
@@ -190,11 +196,28 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
             </div>
 
             <div className={styles.cell} data-label={t('items.colUnit')}>
-              <select className={cn(controls.ghost, styles.unit)} data-field="unit" value={item.unit || 'NOS'} onChange={(e) => updateItem(item.id, 'unit', e.target.value)} aria-label={t('items.itemUnit', { n: index + 1 })}>
-                {UNITS.map((u) => (
-                  <option key={u}>{u}</option>
-                ))}
-              </select>
+              {(() => {
+                // An item with alternate units offers its own units; the factor is snapshotted on the line.
+                const alt = units.pick?.find(item.name, item.hsn);
+                const current = item.unit || 'NOS';
+                const options = alt ? alt.choices.map((c) => c.unit) : units.symbols;
+                const list = options.some((u) => u.toUpperCase() === current.toUpperCase()) ? options : [...options, current];
+                const f = lineFactor(item);
+                return (
+                  <>
+                    <select
+                      className={cn(controls.ghost, styles.unit)} data-field="unit" value={current}
+                      onChange={(e) => (alt ? patchItem(item.id, lineUnitPatch(alt.item, item, e.target.value)) : item.unit_factor ? patchItem(item.id, { unit: e.target.value, unit_factor: undefined }) : updateItem(item.id, 'unit', e.target.value))}
+                      aria-label={t('items.itemUnit', { n: index + 1 })}
+                    >
+                      {list.map((u) => (
+                        <option key={u}>{u}</option>
+                      ))}
+                    </select>
+                    {f !== 1 && alt && <span className={styles.unitHint}>{unitT('equals', { qty: Math.round(item.quantity * f * 1000) / 1000, unit: alt.item.unit })}</span>}
+                  </>
+                );
+              })()}
             </div>
 
             {priced && (

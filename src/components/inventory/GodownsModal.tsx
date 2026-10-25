@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Edit3, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
-import { godownsDb, liveGodownReferences } from '../../lib/godowns';
+import { godownTree, godownsDb, liveGodownReferences } from '../../lib/godowns';
+import { descendantIds } from '../../lib/stock-groups';
+import { imT } from '../../i18n/areas/inventory-masters';
+import { depthClass } from './tree-indent';
 import { godownInUse, type TrackingMap } from '../../lib/stock-tracking';
 import { MAIN_GODOWN_ID, type Godown } from '../../types/stock';
 import { useT } from '../../i18n';
@@ -24,13 +27,16 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   onChanged: (message: string) => void;
 }) {
   useT(); // re-render on a language switch (5.4)
-  const [editing, setEditing] = useState<{ id?: string; name: string; address: string } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string } | null>(null);
+  // WP-8: godowns may sit inside another godown (warehouse → store room); shown as a tree.
+  const tree = godownTree(godowns);
+  const blocked = editing?.id ? descendantIds(editing.id, godowns) : new Set<string>();
   const [error, setError] = useState('');
 
   const save = () => {
     if (!editing) return;
     try {
-      godownsDb.save({ id: editing.id, name: editing.name, address: editing.address });
+      godownsDb.save({ id: editing.id, name: editing.name, address: editing.address, parent_id: editing.parent_id || undefined });
       onChanged(editing.id ? invT('godownRenamed') : invT('godownAdded', { name: editing.name.trim() }));
       setEditing(null);
       setError('');
@@ -66,13 +72,13 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
         <table className={surface.table}>
           <thead><tr><th>{invT('thName')}</th><th>{invT('thAddress')}</th><th><span className={surface.srOnly}>{invT('thActions')}</span></th></tr></thead>
           <tbody>
-            {godowns.map((g) => (
+            {tree.map(({ node, depth }) => ({ g: godowns.find((x) => x.id === node.id) ?? { id: node.id, name: node.name }, depth })).map(({ g, depth }) => (
               <tr key={g.id}>
-                <td>{g.name}{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}</td>
+                <td><span className={depthClass(depth)}>{g.name}</span>{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}</td>
                 <td className={styles.muted}>{g.address || '—'}</td>
                 <td>
                   <span className={surface.rowActions}>
-                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '' })}>
+                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '' })}>
                       <Edit3 size={16} />
                     </button>
                     {g.id !== MAIN_GODOWN_ID && (
@@ -99,13 +105,20 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
                 <input id="gd-addr" className={controls.input} value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} />
               </div>
             </div>
+            <div className={controls.field}>
+              <label className={controls.label} htmlFor="gd-parent">{imT('godownParent')}</label>
+              <select id="gd-parent" className={controls.select} value={editing.parent_id} onChange={(e) => setEditing({ ...editing, parent_id: e.target.value })}>
+                <option value="">{imT('topLevel')}</option>
+                {tree.filter((r) => !blocked.has(r.node.id)).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
+              </select>
+            </div>
             <div className={surface.pageActions}>
               <button type="button" className={controls.btnOutline} onClick={() => { setEditing(null); setError(''); }}>{invT('cancel')}</button>
               <button type="submit" className={controls.btnPrimary}>{editing.id ? invT('save') : invT('addGodown')}</button>
             </div>
           </form>
         ) : (
-          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setEditing({ name: '', address: '' })}>
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setEditing({ name: '', address: '', parent_id: '' })}>
             <Plus size={14} aria-hidden="true" /> {invT('addGodown')}
           </button>
         )}

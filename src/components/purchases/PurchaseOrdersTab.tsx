@@ -270,7 +270,7 @@ function PoForm({
         vendor_gstin: vendor?.gstin ?? po?.vendor_gstin,
         place_of_supply: pos || undefined,
         // Drop the empty trailing row; strip any stock link a bill line type might carry.
-        lines: lines.filter((l) => l.name.trim() || l.rate > 0).map(({ id, name, hsn, unit, quantity, rate, tax_rate }) => ({ id, name, hsn, unit, quantity, rate, tax_rate })),
+        lines: lines.filter((l) => l.name.trim() || l.rate > 0).map(({ id, name, hsn, unit, quantity, rate, tax_rate, item_id, unit_factor }) => ({ id, name, hsn, unit, quantity, rate, tax_rate, ...(item_id ? { item_id } : {}), ...(unit_factor ? { unit_factor } : {}) })),
         taxable: totals.taxable,
         cgst: totals.cgst,
         sgst: totals.sgst,

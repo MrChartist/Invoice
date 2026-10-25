@@ -102,6 +102,8 @@ export function billSeedFromPo(po: PurchaseOrder, purchases: readonly PurchaseRe
       rate: num(l.line.rate),
       tax_rate: num(l.line.tax_rate),
       po_line_id: l.line.id,
+      ...(l.line.item_id ? { item_id: l.line.item_id } : {}),
+      ...(l.line.unit_factor ? { unit_factor: l.line.unit_factor } : {}),
     }));
   return {
     po_id: po.id,

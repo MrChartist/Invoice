@@ -103,7 +103,10 @@ build-time config must use Vite's `VITE_` prefix.
   Exception: GST interest / late-fee tables live in `src/lib/gst-penalties.ts` (same date-keyed shape) so they
   stay out of the early-loading notifications chunk, and payroll statutory values (EPF / ESI / PT / TDS u/s 192) live in
   `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle.
-- `PurchaseLine.item_id` is not set by the bill form yet, so inventory matches purchases by name + HSN.
+- The bill / PO / GRN line editor sets `PurchaseLine.item_id` when a stock item is picked (WP-8) and the stock engine
+  matches on it first; older lines (and typed names) still match by name + HSN, so keep that fallback.
+- Alternate units: a line typed in another unit keeps quantity / rate as typed and snapshots `unit_factor`; every
+  stock reader must convert with `lineFactor` / `PurchaseLineCore.unitFactor` (`src/lib/units.ts`).
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.
 - A 4-6 digit PIN is a lock screen, not encryption of the stored data; optional vault mode (`src/lib/vault.ts`) encrypts the IndexedDB store at rest. Never write the `__vault__` record or sealed (`mcv1:`) values outside `storage.ts`.

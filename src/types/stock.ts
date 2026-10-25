@@ -13,6 +13,8 @@ export interface Godown {
   id: string;
   name: string;
   address?: string;
+  /** Additive (WP-8): parent godown (a store room inside a warehouse); absent = top level. */
+  parent_id?: string;
   created_at?: string;
   updated_at?: string;
 }

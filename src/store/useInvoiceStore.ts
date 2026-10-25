@@ -402,6 +402,9 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         const values = snapshotFromMap(source.custom_fields, customFieldsDb.all(), 'item');
         if (values.length) next.custom_values = values;
         else delete next.custom_values;
+        // A picked item starts in its catalogue unit (WP-8): any alternate-unit factor of the old line goes.
+        if (num(source.unit_factor) > 0 && num(source.unit_factor) !== 1) next.unit_factor = num(source.unit_factor);
+        else delete next.unit_factor;
         next.amount = round2(num(next.quantity) * num(next.rate));
         return next;
       }),

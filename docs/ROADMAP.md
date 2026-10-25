@@ -287,6 +287,16 @@ Details: `docs/features/manufacturing.md`.
 | 7.26 | ✅ **Group Summary + drill-down everywhere** (BS / P&L / TB → group → ledger → months → vouchers → voucher; reusable DrillStack, Enter / Esc), Alt+F1, F12 options, Alt+F2 shared period context | P0-4, P1-3, P1-26 | done |
 | 7.27 | ✅ **Comparative columns** (previous period, month / quarter-wise), month-wise voucher registers with columnar view, exception reports, statistics, funds flow; closing stock in ratio analysis (7.6) | P1-1, P1-2, P1-4, P1-5, P2 | done |
 
+### Inventory masters & analysis (WP-8)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.28 | ✅ **Stock groups (nested) + stock categories**, **units master** (UQC, decimal places, compound units), **alternate units on lines** (2 BOX → 24 NOS in stock, `unit_factor` snapshot) on the invoice editor and bill / PO / GRN lines, **group-wise Stock Summary**, `PurchaseLine.item_id` set by the bill form's item picker — `docs/features/inventory-masters.md` | P1-10 | done |
+| 7.29 | ✅ **Sales Order Outstanding** (pending delivery / invoice by party · item · due date, overdue days) on Inventory → Order outstanding; reorder "pending PO" counts goods received on GRNs before the bill | P1-12 | done |
+| 7.30 | ✅ Configurable **ageing slabs** with Hindi bucket labels (Stock reports → Ageing) | P1-11 | done |
+| 7.31 | ✅ **Godown hierarchy** (godown inside a godown, stock rolled up), **standard cost / selling price lists** with effective dates, **Stock Query** (stock by godown / batch, last purchase / sale rates, pending orders, prices), **landed cost** on a bill (freight etc. spread to the goods' stock cost, memo only); stock-item delete blocked while BOMs / stock vouchers use it | P2 | done |
+| 7.32 | ⏳ Units master UQC wired into GSTR-1 HSN / e-Invoice / e-Way unit mapping; alternate units on POS lines and stock journals; price lists feeding the editor's rate; group-wise reorder / ageing filters | P1-10, P2 | open |
+
 
 ## Summary timeline
 

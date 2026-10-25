@@ -191,7 +191,8 @@ Every check runs on the dated event list, never on the end state:
   forms; importers and the API-less data layer do not re-validate serials or batches. Deleting a stock adjustment is not
   dependency-checked yet. Recurring templates drop serials and batches (each occurrence is a
   new sale), so auto-issued recurring invoices of batch items reduce the unbatched bucket.
-- Bill lines still match stock items by name + HSN (`PurchaseLine.item_id` is not set).
+- Bill lines picked from the stock list carry `item_id` and match on it first (WP-8); typed / older lines still match by
+  name + HSN. Invoice lines match by name + HSN only.
 - **Tally XML does not export batch or godown allocations** (`BATCHALLOCATIONS.LIST` / `GODOWNNAME` need godown and
   batch-enabled stock-item masters we do not export); Tally books everything to its main location. Stock transfers are
   not exported (they would be Stock Journal vouchers).
@@ -213,3 +214,10 @@ Engine changes here: `StockInputs.vouchers` (read by `liveInputs()`), new move k
 vouchers exist, plus each voucher's cost roll-up), `LedgerRow.party` / `refNumber`, and the additive stock-item fields
 `min_order_qty` and `reorder_by_godown`. Godown transfers remain STR records; the Stock Journal's transfer mode writes
 them too.
+
+## Inventory masters & analysis (WP-8)
+
+Stock groups / categories, units master and alternate units, group-wise summary, godown hierarchy, price lists,
+Stock Query, Sales Order Outstanding and landed cost: `docs/features/inventory-masters.md`. Engine changes here are
+one conversion per concern: `lineFactor` on invoice lines, `item_id` / `unitFactor` / `landedUnit` on bill lines
+(`readPurchaseLines`), and the same factor in `events-returns.ts` (GRN / rejection / purchase return lines).

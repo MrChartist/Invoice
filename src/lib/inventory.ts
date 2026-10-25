@@ -23,6 +23,8 @@ import { requireAccess } from './access';
 import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { grnCoverage, loadReturnStockDocs, returnStockEvents, type ReturnStockDocs } from './events-returns';
+import { lineFactor } from './units';
+import { itemVoucherReferences } from './item-references';
 import type {
   ManufacturingVoucher, PhysicalStockVoucher, StockJournal, VoucherOutputLine, VoucherStockLine,
 } from '../types/manufacturing';
@@ -71,6 +73,15 @@ export interface StockItem {
   min_order_qty?: number;
   /** Optional reorder level per godown id (multi-godown businesses). */
   reorder_by_godown?: Record<string, number>;
+  /* ── Masters (WP-8, docs/features/inventory-masters.md); absent = none ── */
+  /** `stock_groups` row (absent = Primary) and `stock_categories` row (absent = not categorised). */
+  group_id?: string;
+  category_id?: string;
+  /** Alternate units: 1 `unit` = `factor` base units (`src/lib/units.ts`). Lines snapshot `unit_factor`. */
+  alt_units?: { unit: string; factor: number }[];
+  /** Standard cost and selling price lists, each rate effective from `from` (yyyy-mm-dd) until the next entry. */
+  standard_costs?: { from: string; rate: number }[];
+  selling_prices?: { from: string; rate: number }[];
 }
 
 export interface StockMove {
@@ -457,7 +468,8 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     const clientName = inv.client?.name ? ` · ${inv.client.name}` : '';
     for (const line of inv.items ?? []) {
       const it = index.find(line.name, line.hsn);
-      const q = num(line.quantity);
+      const factor = lineFactor(line); // WP-8: a line typed in an alternate unit (2 BOX = 24 NOS)
+      const q = num(line.quantity) * factor;
       if (!it || q <= 0) continue;
       const dims = {
         godown: line.godown_id,
@@ -474,7 +486,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
           date,
           kind: 'sale',
           qty: -q,
-          saleRate: netRate(line),
+          saleRate: netRate(line) / factor,
           particulars: `${inv.doc_type === 'DELIVERY_CHALLAN' ? 'Challan' : 'Sale'} — ${inv.invoice_number ?? ''}${clientName}`,
           refType: 'invoice',
           refId: inv.id,
@@ -485,7 +497,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
           date,
           kind: 'return',
           qty: q,
-          saleRate: netRate(line),
+          saleRate: netRate(line) / factor,
           particulars: `Sales return — ${inv.invoice_number ?? ''}${clientName}`,
           refType: 'invoice',
           refId: inv.id,
@@ -502,14 +514,17 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     const bill = readPurchase(p);
     if (!bill || isVoidStatus(bill.status) || bill.isExpense) continue;
     for (const line of readPurchaseLines(p)) {
-      const it = index.find(line.name, line.hsn);
-      const q = line.quantity - grnCovered.take(line.grnLineId, line.quantity);
+      // WP-8: the picked stock item (`item_id`) first, name + HSN for older lines; quantity in base units.
+      const byItemId = line.itemId ? byId.get(line.itemId) : undefined;
+      const it = byItemId?.track_stock ? byItemId : index.find(line.name, line.hsn);
+      const lineBase = line.quantity * line.unitFactor;
+      const q = lineBase - grnCovered.take(line.grnLineId, lineBase);
       if (!it || q <= 0) continue;
       push(it.id, {
         date: bill.date,
         kind: 'purchase',
         qty: q,
-        rate: line.unitCost,
+        rate: (line.unitCost + line.landedUnit) / line.unitFactor, // WP-8: landed cost loads the stock cost
         particulars: `Purchase — ${bill.number}${bill.partyName ? ` · ${bill.partyName}` : ''}`,
         refType: 'purchase',
         refId: bill.id || undefined,
@@ -525,7 +540,10 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     }
   }
 
-  returnStockEvents(input.returnDocs, purchases, index, push); // WP-3 event source
+  returnStockEvents(input.returnDocs, purchases, index, push, (id) => { // WP-3 event source (+ WP-8 item_id)
+    const it = byId.get(id);
+    return it?.track_stock ? it : undefined;
+  });
   pushVoucherEvents(input.vouchers ?? [], byId, push);
 
   if (input.includeTransfers) {
@@ -1087,7 +1105,7 @@ export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, posit
   const wanted = new Map<string, number>();
   for (const line of doc.items ?? []) {
     const it = index.find(line.name, line.hsn);
-    const q = num(line.quantity);
+    const q = num(line.quantity) * lineFactor(line);
     if (it && q > 0) wanted.set(it.id, (wanted.get(it.id) ?? 0) + q);
   }
   const out: StockShortfall[] = [];
@@ -1238,8 +1256,13 @@ export const stockDb = {
     else all.push(row);
     setTable(TABLES.items, all);
   },
-  /** Deleting an item also removes its manual moves. */
+  /** Deleting an item also removes its manual moves. Refused while a BOM or stock voucher uses it (WP-8). */
   deleteItem(id: string): void {
+    const refs = itemVoucherReferences(id, {
+      boms: getTable(VOUCHER_TABLES.boms), manufacturing: getTable(VOUCHER_TABLES.manufacturing),
+      stockJournals: getTable(VOUCHER_TABLES.stockJournals), physical: getTable(VOUCHER_TABLES.physical),
+    });
+    if (refs.length) throw new Error(`This item is used by ${refs.join(', ')}, so it cannot be deleted. Remove it from them first.`);
     setTable(TABLES.items, getTable<StockItem>(TABLES.items).filter((x) => x.id !== id));
     setTable(TABLES.moves, getTable<StockMove>(TABLES.moves).filter((m) => m.item_id !== id));
   },

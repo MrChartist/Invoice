@@ -14,6 +14,8 @@ import { useCostCentres } from '../cost-centres/useCostCentres';
 import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
+import { LandedCostFields, type LandedValue } from './LandedCostFields';
+import { cleanLandedCosts } from '../../lib/landed-cost';
 import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
 import type { AttachmentRef } from '../../types/attachments';
 import type { BillStockContext } from './BillLineTracking';
@@ -72,6 +74,11 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [lines, setLines] = useState(init?.lines?.length ? init.lines : [blankPurchaseLine()]);
   const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
   const [notes, setNotes] = useState(init?.notes ?? '');
+  // WP-8: landed cost (freight, loading …) loads the goods' stock cost only.
+  const [landed, setLanded] = useState<LandedValue>(() => ({
+    costs: (purchase?.landed_costs ?? []).map((c) => ({ label: c.label, amount: String(c.amount) })),
+    basis: purchase?.landed_basis === 'qty' ? 'qty' : 'value',
+  }));
   const compositionProfile = useMemo(() => localDb.settings.activeProfile()?.gst_scheme === 'composition', []);
   const poId = purchase?.po_id ?? seed?.po_id;
   const [costCentre, setCostCentre] = useState<string | undefined>(purchase?.cost_centre_id);
@@ -193,6 +200,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         total: totals.total,
         amount_paid: purchase?.amount_paid ?? 0,
         notes: notes.trim() || undefined,
+        landed_costs: cleanLandedCosts(landed.costs.map((c) => ({ label: c.label, amount: Number(c.amount) }))),
+        landed_basis: landed.basis === 'qty' && landed.costs.length ? 'qty' : undefined,
         ...billablePatch(billable),
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
@@ -270,6 +279,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={setLines} stock={stock} />
+      <LandedCostFields value={landed} onChange={setLanded} />
 
       <div className={styles.totals} aria-live="polite">
         <div className={styles.totalRow}><span>{purT('taxable')}</span><span>{formatCurrency(totals.taxable)}</span></div>

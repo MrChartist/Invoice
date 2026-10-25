@@ -220,6 +220,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   groups: 'master.edit',
   accounts: 'master.edit',
   boms: 'master.edit',
+  // Inventory masters (WP-8)
+  stock_groups: 'master.edit',
+  stock_categories: 'master.edit',
+  units: 'master.edit',
   // books
   stock_moves: 'books.edit',
   stock_transfers: 'books.edit',

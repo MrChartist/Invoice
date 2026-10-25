@@ -1,0 +1,95 @@
+/* Inventory masters (WP-8): trees, alternate units, price lists, stock query. Tokens only. */
+
+.indent {
+  display: inline-block;
+}
+.depth1 { padding-left: 1.25rem; }
+.depth2 { padding-left: 2.5rem; }
+.depth3 { padding-left: 3.75rem; }
+.depth4 { padding-left: 5rem; }
+
+.groupRow td {
+  font-weight: 700;
+  background: var(--card-inner);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pairRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.card {
+  background: var(--card-inner);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.875rem;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+}
+
+.mini {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.mini th,
+.mini td {
+  text-align: left;
+  padding: 0.3rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.mini th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+.num {
+  text-align: right !important;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.overdue {
+  color: var(--loss);
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .pairRow {
+    grid-template-columns: 1fr;
+  }
+}

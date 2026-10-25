@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { BillLineTracking, type BillStockContext } from './BillLineTracking';
 import type { PurchaseLine } from '../../types/purchases';
@@ -7,6 +7,12 @@ import { blankPurchaseLine as blankLine } from '../../lib/purchases';
 import { round2 } from '../../lib/invoice-calc';
 import { formatCurrency } from '../../lib/utils';
 import { NumberInput } from '../ui/NumberInput';
+import { Typeahead } from '../ui/Typeahead';
+import { suggest } from '../../lib/suggest';
+import { liveUnits } from '../../lib/units-live';
+import { cleanAltUnits, lineFactor, lineUnitPatch, unitChoices } from '../../lib/units';
+import type { StockItem } from '../../lib/inventory';
+import { unitT } from '../../i18n/areas/units';
 import { useT } from '../../i18n';
 import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
@@ -31,7 +37,32 @@ function needsTracking(line: PurchaseLine, ctx: BillStockContext | undefined): b
 export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps) {
   useT(); // re-render on a language switch (5.4)
   const patch = (id: string, change: Partial<PurchaseLine>) =>
-    onChange(lines.map((l) => (l.id === id ? { ...l, ...change } : l)));
+    onChange(lines.map((l) => {
+      if (l.id !== id) return l;
+      const next = { ...l, ...change } as PurchaseLine & Record<string, unknown>;
+      for (const k of Object.keys(change)) if (next[k] === undefined) delete next[k];
+      return next;
+    }));
+  // WP-8: stock items for the name picker (sets `item_id`) and alternate units; re-read on name focus.
+  const [tick, setTick] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const units = useMemo(() => liveUnits(), [tick]);
+  const itemSuggestions = useCallback(
+    (q: string) => suggest(q, units.items, { label: (i) => i.name, extra: (i) => [i.hsn, i.sku], sub: (i) => [i.hsn && `HSN ${i.hsn}`, i.unit].filter(Boolean).join(' · ') }),
+    [units],
+  );
+  const pickItem = (line: PurchaseLine, it: StockItem) =>
+    patch(line.id, {
+      name: it.name, item_id: it.id, unit: it.unit, unit_factor: undefined,
+      ...(it.hsn ? { hsn: it.hsn } : {}),
+      ...(typeof it.tax_rate === 'number' ? { tax_rate: it.tax_rate } : {}),
+    });
+  /** The line's stock item when it has alternate units (picked id first, else name + HSN). */
+  const altItem = (l: PurchaseLine): StockItem | undefined => {
+    const byId = l.item_id ? units.items.find((i) => i.id === l.item_id) : undefined;
+    if (byId) return cleanAltUnits(byId.alt_units, byId.unit) ? byId : undefined;
+    return units.pick?.find(l.name, l.hsn)?.item;
+  };
 
   return (
     <div>
@@ -53,12 +84,16 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
               <Fragment key={l.id}>
               <tr>
                 <td data-label={purT('thItem')}>
-                  <input
+                  <Typeahead
                     className={controls.ghost}
                     value={l.name}
                     placeholder={purT('itemPh')}
                     aria-label={purT('lineItem', { n: i + 1 })}
-                    onChange={(e) => patch(l.id, { name: e.target.value })}
+                    onFocus={() => setTick((t) => t + 1)}
+                    getSuggestions={itemSuggestions}
+                    onPick={(it) => pickItem(l, it)}
+                    // Typing a different name detaches the picked stock item (older lines match by name + HSN).
+                    onChange={(name) => patch(l.id, { name, ...(l.item_id && units.items.find((x) => x.id === l.item_id)?.name.trim().toLowerCase() !== name.trim().toLowerCase() ? { item_id: undefined, unit_factor: undefined } : {}) })}
                   />
                 </td>
                 <td data-label={purT('thHsn')}>
@@ -79,6 +114,19 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
                     aria-label={purT('lineQty', { n: i + 1 })}
                     onChange={(quantity) => patch(l.id, { quantity })}
                   />
+                  {(() => {
+                    const it = altItem(l);
+                    if (!it) return null;
+                    const f = lineFactor(l);
+                    return (
+                      <>
+                        <select className={`${controls.ghost} ${styles.lineUnit}`} value={l.unit || it.unit} aria-label={unitT('lineUnit', { n: i + 1 })} onChange={(e) => patch(l.id, lineUnitPatch(it, l, e.target.value))}>
+                          {unitChoices(it).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
+                        </select>
+                        {f !== 1 && <span className={styles.lineUnitHint}>{unitT('equals', { qty: Math.round(l.quantity * f * 1000) / 1000, unit: it.unit })}</span>}
+                      </>
+                    );
+                  })()}
                 </td>
                 <td data-label={purT('thRate')}>
                   <NumberInput

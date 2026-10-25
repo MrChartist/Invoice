@@ -79,7 +79,7 @@ function GrnForm({ vendors, orders, purchases, notes, onVendorCreated, onClose, 
     const next = poFulfilment(po, purchases)
       .lines.map((l) => ({ l, left: Math.max(l.pending - (onGrn.get(l.line.id) ?? 0), 0) }))
       .filter((x) => x.left > 0)
-      .map(({ l, left }) => ({ id: generateId(), name: l.line.name, hsn: l.line.hsn, unit: l.line.unit, quantity: left, rate: num(l.line.rate), tax_rate: num(l.line.tax_rate), po_line_id: l.line.id }));
+      .map(({ l, left }) => ({ id: generateId(), name: l.line.name, hsn: l.line.hsn, unit: l.line.unit, quantity: left, rate: num(l.line.rate), tax_rate: num(l.line.tax_rate), po_line_id: l.line.id, ...(l.line.item_id ? { item_id: l.line.item_id } : {}), ...(l.line.unit_factor ? { unit_factor: l.line.unit_factor } : {}) }));
     if (next.length) setLines(next);
   };
 
@@ -98,7 +98,7 @@ function GrnForm({ vendors, orders, purchases, notes, onVendorCreated, onClose, 
           challan_no: challan.trim() || undefined,
           lines: lines
             .filter((l) => l.name.trim() || num(l.quantity) > 0)
-            .map((l): ReceiptNoteLine => ({ id: l.id, name: l.name, hsn: l.hsn, unit: l.unit, quantity: num(l.quantity), rate: num(l.rate), tax_rate: num(l.tax_rate), ...(l.po_line_id ? { po_line_id: l.po_line_id } : {}) })),
+            .map((l): ReceiptNoteLine => ({ id: l.id, name: l.name, hsn: l.hsn, unit: l.unit, quantity: num(l.quantity), rate: num(l.rate), tax_rate: num(l.tax_rate), ...(l.po_line_id ? { po_line_id: l.po_line_id } : {}), ...(l.item_id ? { item_id: l.item_id } : {}), ...(l.unit_factor ? { unit_factor: l.unit_factor } : {}) })),
           notes: remarks.trim() || undefined,
         },
         purchases,
