@@ -142,6 +142,27 @@ function ensureCaptureAlerts(onReady: () => void): void {
     });
 }
 
+/** 8.109: month-end pack schedule (device-local) — its provider loads only once a schedule is set. */
+let packAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensurePackAlerts(onReady: () => void): void {
+  if (packAlerts !== 'off') return;
+  try {
+    if (!(Number(JSON.parse(globalThis.localStorage?.getItem('mrchartist_report_pack') ?? '{}')?.day) > 0)) return;
+  } catch {
+    return;
+  }
+  packAlerts = 'loading';
+  import('../../lib/report-pack-alerts')
+    .then((m) => {
+      m.registerPackAlerts(onReady);
+      packAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      packAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -173,6 +194,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensureBusinessAlerts(reload);
     ensureGstGuardAlerts(reload);
     ensureCaptureAlerts(reload);
+    ensurePackAlerts(reload);
   }, []);
 
   useEffect(() => {

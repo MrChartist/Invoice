@@ -178,3 +178,6 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
   `loadStockValuer()` (same figures as Books, tested) and its heads drill into the same Schedule III detail as Books; it
   keeps its own URL-based frame model (Back / Esc walk the path) rather than mounting `DrillStack`.
 - ~~Closing stock per godown~~ — 7S (branch scope above); per cost centre and "lower of cost or NRV" are not modelled.
+
+## 8G additions
+- **MTD / QTD / YTD** period presets; **saved views** (device-local: tab + period + every report's F12 options) and **month-end packs** (ZIP of P&L, BS, ageing, GSTR-1 / 3B papers; bell-offered schedule). See `docs/features/invoicing-ux.md` § 8.107 / 8.109.

@@ -4,9 +4,11 @@ import {
   ArrowDown,
   ArrowUp,
   Banknote,
+  BellRing,
   CheckCheck,
   Copy,
   Download,
+  Ban,
   Eye,
   FilePlus2,
   FileText,
@@ -17,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
+import { uxT } from '../i18n/areas/invoicing-ux';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { wireT } from '../i18n/areas/wiring';
@@ -61,6 +64,7 @@ const InvoicePreviewModal = lazy(() =>
 );
 
 // Batch PDF / ZIP (WP-4): the PDF stack and template engine load only when used.
+const BulkCollectDialog = lazy(() => import('../components/invoicing-ux/BulkCollectDialog'));
 const BatchPdfModal = lazy(() => import('../components/preview/BatchPdfModal').then((m) => ({ default: m.BatchPdfModal })));
 
 type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft' | 'approval';
@@ -135,6 +139,8 @@ export function Transactions() {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkPay, setBulkPay] = useState<{ method: string; date: string } | null>(null);
+  // 8.106: bulk remind / bulk write-off on the selected (filtered) rows.
+  const [bulkCollect, setBulkCollect] = useState<'remind' | 'writeoff' | null>(null);
   const [batchPdf, setBatchPdf] = useState<InvoiceRecord[] | null>(null);
   // Deletes wait a few seconds behind an Undo toast before they touch storage.
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(() => new Set());
@@ -244,6 +250,7 @@ export function Transactions() {
         balance_due: receivableTotal(inv),
         late_fee_for: undefined,
         party_balance_snapshot: undefined, // 8.5: a copy takes its own balance when issued
+        acceptance: undefined, // 8.101: a signature belongs to the quote that was signed
         // Files stay with the original document (6.12); custom field values are copied like any other field.
         attachments: undefined,
         // An amendment marker belongs to the amended document only (5.9).
@@ -462,6 +469,16 @@ export function Transactions() {
                 <CheckCheck size={16} /> {salesT('tx.markPaid')}
               </button>
             )}
+            {can('payment.record') && (
+              <>
+                <button type="button" className={controls.btnOutline} onClick={() => setBulkCollect('remind')} data-bulk-remind-open>
+                  <BellRing size={16} /> {uxT('bkRemind')}
+                </button>
+                <button type="button" className={controls.btnOutline} onClick={() => setBulkCollect('writeoff')} data-bulk-writeoff-open>
+                  <Ban size={16} /> {uxT('bkWriteOff')}
+                </button>
+              </>
+            )}
             <button type="button" className={controls.btnOutline} onClick={() => exportCsv(visibleSelected)}>
               <Download size={16} /> {salesT('exportCsv')}
             </button>
@@ -647,6 +664,11 @@ export function Transactions() {
       {batchPdf && (
         <Suspense fallback={null}>
           <BatchPdfModal invoices={batchPdf} onClose={() => setBatchPdf(null)} />
+        </Suspense>
+      )}
+      {bulkCollect && (
+        <Suspense fallback={null}>
+          <BulkCollectDialog mode={bulkCollect} invoices={visibleSelected} onClose={() => setBulkCollect(null)} onDone={(m) => { notify(m, 'success'); setSelected(new Set()); reload(); }} />
         </Suspense>
       )}
       <Modal

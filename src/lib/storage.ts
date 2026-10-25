@@ -74,6 +74,7 @@ export const DEVICE_LOCAL_KEYS: readonly string[] = [
   COMPANY_REGISTRY_KEY,
   `${DB_PREFIX}sync_device`, // folder sync (5.7): this device's id / name / per-company switch
   LANG_KEY,
+  `${DB_PREFIX}save_choice`, // 8G A4: the editor's last Save / Save & print / Save & WhatsApp choice
 ];
 
 /**

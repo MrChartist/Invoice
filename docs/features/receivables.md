@@ -205,3 +205,7 @@ separate: it informs reminders; this rule creates the invoice line.
 - **WhatsApp statement** on the aging rows, the Statements tab and the statement viewer; the viewer also has **Share
   PDF** (Web Share Level 2, download fallback) and **Web page** (static statement page with a Pay-with-UPI panel + QR).
 - **Remind all overdue** / **Send everyone their balance** in the page header open the party reminder stepper.
+
+## 8G additions
+- Ageing uses `effectiveDueDate` (earliest unpaid instalment of a `payment_schedule`, else the due date).
+- **Bulk actions** (ageing bucket filter): bulk remind and bulk bad-debt write-off (`write-off.ts`). See `docs/features/invoicing-ux.md` § 8.100 / 8.106.

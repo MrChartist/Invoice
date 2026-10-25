@@ -101,3 +101,6 @@ outputs keep the "working paper — verify with your CA" wording.
 - Bank-specific leaf positions are not known exactly — the offsets exist for that.
 - Forecast ignores taxes payable (GST/TDS deposits), loans and salaries unless they are bills; credit notes not yet
   set off are not deducted from receivables.
+
+## 8G additions
+- A document with a `payment_schedule` is expected instalment by instalment (open balance spread pro rata over the unpaid instalments), each shifted by the client's usual lag. See `docs/features/invoicing-ux.md` § 8.100.

@@ -380,6 +380,9 @@ export const localDb = {
 
       if (stored) {
         toSave.created_at = stored.created_at ?? now;
+        // 8.101: a signed acceptance is a snapshot — an edit of the quote never rewrites or drops it.
+        if (stored.acceptance) toSave.acceptance = stored.acceptance;
+        else delete toSave.acceptance;
       } else {
         toSave.id = invoice.id || generateId();
         toSave.created_at = now;
@@ -521,7 +524,7 @@ export const localDb = {
       ),
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
-    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string; advanceId?: string }): Payment => {
+    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string; advanceId?: string; writeOff?: boolean }): Payment => {
       requireAccess('payment.record');
       const amount = round2(Number(input.amount) || 0);
       // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
@@ -541,6 +544,8 @@ export const localDb = {
       if (input.bankAccountId && (input.method || '').toLowerCase() !== 'cash') payment.bank_account_id = input.bankAccountId;
       // An advance adjusted against the invoice (5.3): settles the bill, but is not new money.
       if (input.advanceId) payment.advance_id = input.advanceId;
+      // 8.106: a bad-debt write-off settles the bill without money (no receipt number).
+      if (input.writeOff) payment.write_off = true;
       // Read-only lookup: the payment never changes this row (syncPaymentState writes a copy).
       const target = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
       // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
@@ -552,7 +557,7 @@ export const localDb = {
       assertNotPendingApproval(target, 'record payments');
       const before = getTable<Payment>(KEYS.transactions);
       // Receipt voucher number, fixed at record time (never reused after a delete / cheque bounce).
-      if (!payment.advance_id) payment.receipt_number = nextReceiptNumber(payment.date, before);
+      if (!payment.advance_id && !payment.write_off) payment.receipt_number = nextReceiptNumber(payment.date, before);
       setTable(KEYS.transactions, [...before, payment]);
       try {
         syncPaymentState(input.invoiceId, payment.amount);

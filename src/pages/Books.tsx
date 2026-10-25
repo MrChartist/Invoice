@@ -9,6 +9,7 @@ import {
   type CashAccount,
 } from '../lib/books';
 import { setPeriodContext, usePeriodContext } from '../lib/period-context';
+import { getAllReportPrefs, setAllReportPrefs } from '../lib/report-prefs';
 import { StorageWriteError } from '../lib/storage';
 import { useToast } from '../components/ui/useToast';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -30,6 +31,8 @@ const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'))
 const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'));
 const FxTab = lazy(() => import('../components/books/planning/FxTab'));
 // Tally parity: bill-wise payables, voucher registers, ratio analysis (their own lazy chunk).
+// 8.109: saved views (period + tab + every report's F12 options) and month-end packs.
+const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
 const TallyPanel = lazy(() => import('../components/books/tally/TallyPanel'));
 // WP-7 entry points (also in Settings → Data and the Gateway): `?open=yearend` / `?open=tally`.
 const TallyImport = lazy(() => import('../components/import/TallyImport').then((m) => ({ default: m.TallyImport })));
@@ -66,6 +69,8 @@ export function Books() {
 
   // Shared report period (Alt+F2), remembered on this device for every ledger report.
   const { preset, period } = usePeriodContext();
+  // 8.109: re-mount the report after a saved view restores its F12 options.
+  const [viewTick, setViewTick] = useState(0);
   const [data, setData] = useState<BooksData>(() => loadBooksData());
   const [openingOpen, setOpeningOpen] = useState(false);
   const { notify, toastNode } = useToast();
@@ -168,6 +173,19 @@ export function Books() {
       )}
 
       <div className="no-print">
+      <Suspense fallback={null}>
+        <ReportViewsBar
+          current={{ route: '/books', tab, preset, period, prefs: getAllReportPrefs() }}
+          initialViewId={params.get('view')}
+          onApply={(v) => {
+            if (v.prefs) setAllReportPrefs(v.prefs);
+            setPeriodContext(v.preset, v.preset === 'custom' ? v.period : undefined);
+            if (TABS.some((t) => t.id === v.tab)) selectTab(v.tab as TabId);
+            setViewTick((n) => n + 1);
+          }}
+        />
+      </Suspense>
+
       <PeriodBar
         preset={preset}
         period={period}
@@ -199,6 +217,7 @@ export function Books() {
 
       <div
         role="tabpanel"
+        key={viewTick}
         id={`books-panel-${tab}`}
         aria-labelledby={`books-tab-${tab}`}
         tabIndex={0}

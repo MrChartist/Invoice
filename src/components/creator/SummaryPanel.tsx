@@ -18,6 +18,10 @@ const EditorLoyalty = lazy(() => import('../loyalty/EditorLoyalty'));
 const LOYALTY_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
 // 7U: sales agent, bill-value offer, prescription — loaded only once one of them is in use.
 const EditorExtras = lazy(() => import('../extras7u/EditorExtras'));
+// 8.102: live gross margin (hidden from viewers, never printed) — its own chunk.
+const MarginChip = lazy(() => import('../invoicing-ux/MarginChip'));
+// A3: payment mode + "Fully paid" on Amount received.
+const PayModeChips = lazy(() => import('../invoicing-ux/PayModeChips'));
 
 const GST_MODES: { id: GstMode; label: MessageKey }[] = [
   { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },
@@ -154,6 +158,9 @@ export function SummaryPanel() {
             <span>{tr('editor.total')}</span>
             <span>{money(t.total)}</span>
           </div>
+          <Suspense fallback={null}>
+            <MarginChip />
+          </Suspense>
           <p className={styles.words}>{amountInWords(t.total, cur)}</p>
           {lang === 'hi' && <p className={styles.words} lang="hi">{amountInWordsHi(t.total, cur)}</p>}
 
@@ -161,6 +168,9 @@ export function SummaryPanel() {
             <span>{tr('summary.amountReceived')}</span>
             <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.amount_paid} onChange={s.setAmountPaid} placeholder="0.00" aria-label={tr('summary.amountReceived')} />
           </div>
+          <Suspense fallback={null}>
+            <PayModeChips />
+          </Suspense>
           {t.tds_amount > 0 && (
             <Row label={tr('summary.lessTds', { section: s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${s.tds_section})` : '' })} tone="good">
               −{money(t.tds_amount)}

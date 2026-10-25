@@ -291,7 +291,8 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
   const amount = Math.abs(toPaise(inrValue(num(t.amount), inv)));
   if (!date || amount === 0) return null;
   const party = inv ? partyOfInvoice(inv) : str((t as { client_name?: unknown }).client_name) || 'Unknown customer';
-  const cashAcc = accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
+  // 8.106: a bad-debt write-off debits Other expenses (bad debts), never cash / bank.
+  const cashAcc = t.write_off ? A.otherExp : accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
   // Realised exchange difference (6.19): the bank gets the realised rupees, the debtor is
   // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
   const fx = realisedFx(t, inv);
@@ -310,7 +311,7 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
     party,
     narration: [
       `Against ${invNo}`,
-      str(t.method),
+      t.write_off ? 'Bad debt written off' : str(t.method),
       tds > 0 && `TDS ${(tds / 100).toFixed(2)} withheld${str(inv?.tds_section) ? ` u/s ${str(inv?.tds_section)}` : ''}`,
       inv ? fxNarration(num(t.amount), inv) : '',
       fx && `realised @ ₹${fx.realisedRate} (exchange ${fx.gain >= 0 ? 'gain' : 'loss'} ${Math.abs(fx.gain).toFixed(2)})`,
