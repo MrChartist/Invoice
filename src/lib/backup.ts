@@ -393,6 +393,8 @@ const RECORD_TABLES = [
   'work_types', 'project_tasks', 'retainers',
   // Round 3 (R3-C): GSTR-1 portal file imports, DSC register, monthly client checklist
   'gst_portal_files', 'dsc_register', 'client_checklist',
+  // Round 4 (R4-A): production orders, QC decisions, recall notices, landed-cost vouchers
+  'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -437,6 +439,8 @@ const ID_TABLES = new Set([
   'work_types', 'project_tasks', 'retainers',
   // Round 3 (R3-C): GSTR-1 portal file imports, DSC register, monthly client checklist
   'gst_portal_files', 'dsc_register', 'client_checklist',
+  // Round 4 (R4-A)
+  'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

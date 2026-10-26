@@ -105,6 +105,11 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   gst_portal_files: { entity: 'gst', label: 'Portal file' },
   dsc_register: { entity: 'settings', label: 'DSC' },
   client_checklist: { entity: 'settings', label: 'Checklist' },
+  // R4-A: production orders, QC decisions, recall notices (stock side), landed-cost vouchers (purchase side)
+  production_orders: { entity: 'manufacturing', label: 'Production order' },
+  qc_results: { entity: 'manufacturing', label: 'QC decision' },
+  recall_notices: { entity: 'manufacturing', label: 'Recall notice' },
+  landed_cost_vouchers: { entity: 'purchase', label: 'Landed-cost voucher' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

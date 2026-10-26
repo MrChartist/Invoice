@@ -337,10 +337,22 @@ export interface PurchaseLineCore {
   unitFactor: number;
   /** Additive (WP-8): landed cost per line unit from the bill's `landed_costs` (stock cost only; 0 = none). */
   landedUnit: number;
+  /** Additive (R4-A5): the bill line's own `id`, or '' (older / imported lines). */
+  lineId: string;
 }
 
-/** The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. */
-export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
+/**
+ * Engine-only key (R4-A5): a COPY of a bill handed to the stock engine may carry `{ [lineId]: extra per line unit }`
+ * from landed-cost vouchers (`landed-voucher.ts` `applyLandedVouchers`). It is never written to storage.
+ */
+export const LANDED_EXTRA_KEY = '__landed_extra';
+
+/**
+ * The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. `extra` (R4-A5) is an optional
+ * per-line map (line id → landed cost per line unit) added on top of the bill's own `landed_costs`; absent, the map a
+ * landed-cost voucher left on an engine copy of the bill (`LANDED_EXTRA_KEY`) is used.
+ */
+export function readPurchaseLines(raw: unknown, extra?: Readonly<Record<string, number>>): PurchaseLineCore[] {
   const r = asRec(raw);
   const lines = Array.isArray(r.lines) ? r.lines : Array.isArray(r.items) ? r.items : [];
   const out: PurchaseLineCore[] = [];
@@ -367,12 +379,15 @@ export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
       itemId: pickStr(line, ['item_id']),
       unitFactor: num(line.unit_factor) > 0 ? num(line.unit_factor) : 1,
       landedUnit: 0,
+      lineId: pickStr(line, ['id']),
     });
   }
   if (Array.isArray(r.landed_costs) && r.landed_costs.length) {
-    const extra = allocateLandedCost(out, r.landed_costs, r.landed_basis === 'qty' ? 'qty' : 'value');
-    out.forEach((l, i) => { l.landedUnit = extra[i]; });
+    const own = allocateLandedCost(out, r.landed_costs, r.landed_basis === 'qty' ? 'qty' : 'value');
+    out.forEach((l, i) => { l.landedUnit = own[i]; });
   }
+  const more = extra ?? (asRec(r[LANDED_EXTRA_KEY]) as Record<string, number>);
+  if (more) for (const l of out) if (l.lineId && num(more[l.lineId]) > 0) l.landedUnit += num(more[l.lineId]);
   return out;
 }
 

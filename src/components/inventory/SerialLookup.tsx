@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { ListTree, Search } from 'lucide-react';
 import { cn, formatDate } from '../../lib/utils';
 import { godownName } from '../../lib/godowns';
 import { lookupSerial, type SerialRef, type TrackingMap } from '../../lib/stock-tracking';
 import type { Godown } from '../../types/stock';
 import { useT } from '../../i18n';
 import { invT } from '../../i18n/areas/inventory';
+import { pLinkT } from '../../i18n/areas/production-r4-links'; // R4-A3
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
@@ -60,6 +61,7 @@ export function SerialLookup({ tracking, today, godowns, initialQuery = '' }: {
             <span className={r.inStock ? styles.in : styles.muted}>
               {r.inStock ? (multi ? invT('inStockAt', { godown: godownName(godowns, r.godown) }) : invT('inStock')) : invT('sold')}
             </span>
+            <Link className={cn(controls.btnGhost, controls.btnSm)} to={`/manufacturing?tab=trace&dir=back&item=${encodeURIComponent(r.item.id)}&serial=${encodeURIComponent(r.serial)}`} aria-label={pLinkT('traceSerial', { serial: r.serial })}><ListTree size={14} aria-hidden="true" /> {pLinkT('trace')}</Link>
           </div>
           <div>
             <div className={styles.summaryLabel}>{invT('purchased')}</div>

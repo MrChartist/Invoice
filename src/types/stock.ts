@@ -25,8 +25,10 @@ export interface Godown {
   /**
    * Additive (8F): what the godown is for. 'van' = a delivery van (stock loaded by transfer, settled daily);
    * 'expiry' = non-saleable expired / breakage stock (sales from it are refused). Absent = an ordinary godown.
+   * Round 4 (set once by R4-A, B's value included): 'wip' = shop floor of production orders (R4-A1), 'qc' = goods
+   * held for a quality check (R4-A4), 'transit' = goods on the way between stores (R4-B4). All three are non-saleable.
    */
-  kind?: 'van' | 'expiry';
+  kind?: 'van' | 'expiry' | 'wip' | 'qc' | 'transit';
   created_at?: string;
   updated_at?: string;
 }

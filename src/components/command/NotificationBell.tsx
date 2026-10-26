@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { t } from '../../i18n';
-import { SINGLETON_KEYS, getJson, getTable, subscribeStorageChanges } from '../../lib/storage';
+import { SINGLETON_KEYS, getJson, getTable, peekTable, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
 import {
@@ -203,6 +203,14 @@ function ensureR3cAlerts(onReady: () => void): void {
   gate('dsc', () => getTable('dsc_register').length > 0, () => import('../../lib/dsc-alerts').then((m) => m.registerDscAlerts()));
 }
 
+// R4-A: production orders past due / completed-not-closed and stock aged in QC — lazy, once an order or a QC godown exists.
+let productionAlerts = 0;
+function ensureProductionAlerts(onReady: () => void): void {
+  if (productionAlerts || !(peekTable('production_orders').length || peekTable<{ kind?: string }>('godowns').some((g) => g?.kind === 'qc'))) return;
+  productionAlerts = 1;
+  import('../../lib/production/order-alerts').then((m) => { m.registerProductionAlerts(onReady); onReady(); }, () => { productionAlerts = 0; });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -237,6 +245,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensurePackAlerts(reload);
     ensureProjectAlerts(reload); // R3-B
     ensureR3cAlerts(reload); // R3-C
+    ensureProductionAlerts(reload); // R4-A
   }, []);
 
   useEffect(() => {

@@ -551,6 +551,25 @@ export const stockJournalsDb = {
   },
 };
 
+/**
+ * R4-A1: a consume-only Stock Journal (`SJ/FY…`) — shop-floor material written off as scrap when a production order is
+ * closed. The normal Stock Journal needs a destination line; this one has none (the engine issues the lines at cost and
+ * receives nothing). Same guards as every voucher: role, period lock, series counter, serial check, audit.
+ * `production_order_id` is kept on the record like every other additive field.
+ */
+export function saveConsumeOnlyJournal(
+  input: Omit<StockJournal, 'id' | 'number' | 'produce' | 'costs'> & { id?: string; number?: string }, items: readonly StockItem[], inputs?: StockInputs,
+): StockJournal {
+  if (!input.date) throw new Error('Choose the date.');
+  const consume = (input.consume ?? []).filter((l) => l.item_id && num(l.qty) > 0);
+  if (consume.length === 0) throw new Error('Nothing to write off.');
+  const err = lineShapeErrors(consume, new Map(items.map((i) => [i.id, i])), 'Write-off', true) || serialShapeError(consume, items);
+  if (err) throw new Error(err);
+  if (inputs) assertSerials(inputs, input.id, input.date, consume, []);
+  return saveVoucher<StockJournal>(SJ_TABLE, SJ_PREFIX, 'stock_journal', 'Stock journal', { ...input, consume, produce: [], costs: [] },
+    (r) => `${plural(r.consume.length, 'line')} written off (consume only)`);
+}
+
 export const physicalStockDb = {
   all: (): PhysicalStockVoucher[] => getTable<PhysicalStockVoucher>(PHYSICAL_TABLE),
   nextNumber: (date?: string) => nextSeriesNumberFor(PHYSICAL_PREFIX, date, physicalStockDb.all().map((v) => v.number)),
