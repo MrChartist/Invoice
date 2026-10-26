@@ -69,8 +69,10 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
         notes: stored,
         scopeLabel,
         generatedOn: today,
+        // QA-3 F18: a running year is drawn to the report period's end (never past today), labelled interim.
+        asAt: period.end,
       }),
-    [ledger, stock, fy, company, entity, stored, scopeLabel, today],
+    [ledger, stock, fy, company, entity, stored, scopeLabel, today, period.end],
   );
   const body = useMemo(() => annualPackBody(pack), [pack]);
 
@@ -120,7 +122,7 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
       const blob = await zipBlob([
         { name: `${stem}.html`, data: enc.encode(html()) },
         { name: `${stem}.xlsx`, data: await xlsxBytes() },
-        { name: `BalanceSheet_${pack.fy.end}.csv`, data: enc.encode(balanceSheetLedgerCsv(pack.bs)) },
+        { name: `BalanceSheet_${pack.asAt}.csv`, data: enc.encode(balanceSheetLedgerCsv(pack.bs)) },
         { name: `PnL_${pack.fy.id}.csv`, data: enc.encode(pnlCsv(pack.pl)) },
         { name: `CashFlow_${pack.fy.id}.csv`, data: enc.encode(cashFlowCsv(pack.cf)) },
         { name: `TrialBalance_${pack.fy.id}.csv`, data: enc.encode(trialBalanceCsv(pack.tb)) },

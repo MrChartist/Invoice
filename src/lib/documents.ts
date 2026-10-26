@@ -120,6 +120,29 @@ export function allowedConversions(
   }));
 }
 
+/**
+ * The conversions the Convert menu lists (QA-3 F22). The matrix allows both "Invoice" and "Tax Invoice" targets (old
+ * flows and imports may use either), but a menu offering both is confusing: a GST-registered sender gets "Tax
+ * Invoice", an unregistered one "Invoice". Bill of Supply stays for a registered sender (exempt supplies, composition).
+ */
+export function menuConversions(
+  source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on' | 'sender'>>,
+): ConversionOption[] {
+  const registered = !!String(source.sender?.companyGstin ?? '').trim();
+  const composition = registered && source.sender?.gst_scheme === 'composition';
+  return allowedConversions(source).filter((o) => {
+    if (o.target === 'INVOICE') return !registered;
+    if (o.target === 'TAX_INVOICE') return registered && !composition;
+    if (o.target === 'BILL_OF_SUPPLY') return registered;
+    return true;
+  });
+}
+
+/** Sales documents a recurring schedule may start from (QA-3 F22: never a credit / debit note, quote, order or challan). */
+export function isRecurringSource(t: DocumentType): boolean {
+  return isInvoiceType(t) || t === 'PROFORMA';
+}
+
 export function canConvert(
   source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on'>>,
   target: DocumentType,

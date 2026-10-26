@@ -171,6 +171,8 @@ export const setT = defineArea(
     cancel: 'Cancel',
     restore: 'Restore',
     restoreContains: '{file} contains {invoices} invoice(s) and {clients} client(s).',
+    restoreContainsNamed: 'The backup of {name} from {date} contains {invoices} invoice(s) and {clients} client(s).',
+    restoreContainsName: 'The backup of {name} contains {invoices} invoice(s) and {clients} client(s).',
     restoreWarn: 'Everything currently on this device will be replaced by this backup (your PIN is kept). Download a backup first if you are unsure.',
     eraseTitle: 'Erase all data?',
     eraseMsg:
@@ -486,6 +488,8 @@ export const setT = defineArea(
     cancel: 'रद्द करें',
     restore: 'रिस्टोर करें',
     restoreContains: '{file} में {invoices} इनवॉइस और {clients} ग्राहक हैं।',
+    restoreContainsNamed: '{name} के {date} के बैकअप में {invoices} इनवॉइस और {clients} ग्राहक हैं।',
+    restoreContainsName: '{name} के बैकअप में {invoices} इनवॉइस और {clients} ग्राहक हैं।',
     restoreWarn: 'इस डिवाइस पर अभी जो कुछ है, वह इस बैकअप से बदल जाएगा (आपका PIN बना रहेगा)। पक्का न हो तो पहले बैकअप डाउनलोड करें।',
     eraseTitle: 'सारा डेटा मिटाएँ?',
     eraseMsg:

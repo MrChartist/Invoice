@@ -79,6 +79,23 @@ export interface AnnualPackInput {
   /** Shown on the cover, e.g. a branch name. */
   scopeLabel?: string;
   generatedOn?: string;
+  /**
+   * As-at date the user picked for a year still running (QA-3 F18). Ignored once the FY has ended: a closed year is
+   * always drawn to 31 March. While it runs, the statements stop at this date (or `generatedOn`) and say "interim".
+   */
+  asAt?: string;
+}
+
+/** The date the pack's statements run to: the FY end once the FY has ended, else the picked as-at date (or today) inside the FY. */
+export function packAsAt(fy: { start: string; end: string }, today: string, asAt?: string): { asAt: string; interim: boolean } {
+  const t = today.slice(0, 10);
+  if (t > fy.end) return { asAt: fy.end, interim: false };
+  const picked = (asAt ?? '').slice(0, 10);
+  // A picked date outside this FY (the shared report period may be another year) falls back to today.
+  let d = picked && picked >= fy.start && picked <= fy.end ? picked : t;
+  if (d > t) d = t; // never a date in the future
+  if (d < fy.start) d = fy.start;
+  return { asAt: d, interim: d < fy.end };
 }
 
 export interface AnnualPack {
@@ -88,6 +105,10 @@ export interface AnnualPack {
   entity: EntityType;
   scopeLabel?: string;
   generatedOn: string;
+  /** Last day the statements cover (the FY end for a closed year). */
+  asAt: string;
+  /** True while the FY is still running: the pack is an interim draft to `asAt`. */
+  interim: boolean;
   bs: LedgerBalanceSheet;
   bsPrev: LedgerBalanceSheet;
   pl: LedgerProfitLoss;
@@ -105,15 +126,19 @@ export function buildAnnualPack(input: AnnualPackInput): AnnualPack {
   const fy = { ...fyP, label: fyText(input.fyStartYear), id: fyId(input.fyStartYear) };
   const prev = { ...prevP, label: fyText(input.fyStartYear - 1) };
   const entity = input.entity ?? input.notes?.entity_type ?? 'proprietorship';
-  const bs = ledgerBalanceSheet(input.ledger, fy.end, input.stock);
+  const generatedOn = input.generatedOn ?? new Date().toISOString().slice(0, 10);
+  // QA-3 F18: a year still running is drawn to the as-at date, not to a 31 March that has not come yet.
+  const { asAt, interim } = packAsAt(fyP, generatedOn, input.asAt);
+  const curP = { start: fyP.start, end: asAt };
+  const bs = ledgerBalanceSheet(input.ledger, asAt, input.stock);
   const bsPrev = ledgerBalanceSheet(input.ledger, prev.end, input.stock);
-  const pl = ledgerProfitAndLoss(input.ledger, fyP, input.stock);
+  const pl = ledgerProfitAndLoss(input.ledger, curP, input.stock);
   const plPrev = ledgerProfitAndLoss(input.ledger, prevP, input.stock);
-  const cf = cashFlowStatement(input.ledger, fyP, input.stock);
-  const tb = trialBalance(input.ledger, fyP);
-  const notes = buildNotes({ ledger: input.ledger, fy, prev, bs, bsPrev, pl, plPrev, stock: input.stock, assets: input.assets, vendors: input.vendors, invoices: input.invoices, entity, stored: input.notes ?? null });
+  const cf = cashFlowStatement(input.ledger, curP, input.stock);
+  const tb = trialBalance(input.ledger, curP);
+  const notes = buildNotes({ ledger: input.ledger, fy: { ...fy, end: asAt }, prev, bs, bsPrev, pl, plPrev, stock: input.stock, assets: input.assets, vendors: input.vendors, invoices: input.invoices, entity, stored: input.notes ?? null });
   return {
-    fy, prev, company: input.company, entity, scopeLabel: input.scopeLabel, generatedOn: input.generatedOn ?? new Date().toISOString().slice(0, 10),
+    fy, prev, company: input.company, entity, scopeLabel: input.scopeLabel, generatedOn, asAt, interim,
     bs, bsPrev, pl, plPrev, cf, tb, notes, difference: bs.difference,
   };
 }
@@ -276,12 +301,12 @@ export function annualPackBody(pack: AnnualPack): string {
   const c = pack.company;
   const sub = [c.address, c.gstin ? `GSTIN: ${c.gstin}` : '', c.pan ? `PAN: ${c.pan}` : ''].filter(Boolean).join('\n');
   const ent = { proprietorship: 'Proprietorship', partnership: 'Partnership firm', llp: 'Limited liability partnership', company: 'Company' }[pack.entity];
-  const asAt = `As at ${formatDate(pack.fy.end)}`;
-  const period = `For the year ended ${formatDate(pack.fy.end)}`;
+  const asAt = pack.interim ? `As at ${formatDate(pack.asAt)} (interim — the year ends ${formatDate(pack.fy.end)})` : `As at ${formatDate(pack.fy.end)}`;
+  const period = pack.interim ? `For the period ${formatDate(pack.fy.start)} to ${formatDate(pack.asAt)} (interim)` : `For the year ended ${formatDate(pack.fy.end)}`;
   const tie = pack.difference ? `<p class="warn">The balance sheet does not tie: difference ₹${esc(amt(pack.difference))}. Check the Vouchers warnings in Books before sharing.</p>` : '';
   const pages = [
     `<section class="ap-page"><div class="cover"><h2>${esc(ent)}</h2><h1>${esc(c.name || 'Your business')}</h1>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
-      <h2 style="margin-top:28px">Annual accounts · ${esc(pack.fy.label)}</h2><div class="sub">${esc(`${formatDate(pack.fy.start)} to ${formatDate(pack.fy.end)}`)}${pack.scopeLabel ? ` · ${esc(pack.scopeLabel)}` : ''}</div>
+      <h2 style="margin-top:28px">Annual accounts · ${esc(pack.fy.label)}</h2><div class="sub">${esc(`${formatDate(pack.fy.start)} to ${formatDate(pack.interim ? pack.asAt : pack.fy.end)}${pack.interim ? ' · Interim, figures to date' : ''}`)}${pack.scopeLabel ? ` · ${esc(pack.scopeLabel)}` : ''}</div>
       <div class="draft">${esc(DRAFT_LINE)}</div>
       <h3 style="margin-top:36px">Contents</h3><ol class="index">${SECTIONS.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
       <p class="foot">Prepared on ${esc(formatDate(pack.generatedOn))} from the books kept in Mr. Chartist Invoice. Figures are the same as Books → Balance sheet / P&amp;L. Not audited.</p></div></section>`,

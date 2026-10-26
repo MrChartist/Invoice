@@ -226,6 +226,47 @@ export function adjustCatalogRates(ids: ReadonlySet<string> | 'all', percent: nu
   return after.filter((item, n) => item.rate !== before[n].rate).length;
 }
 
+/* ── Short code from the stock item form (QA-3 F24) ─────────────── */
+
+/** The catalogue entry a stock item shares its name with (stock items and the catalogue are matched by name). */
+export function catalogueEntryFor(name: string, items: readonly InvoiceItem[] = listCatalog()): InvoiceItem | undefined {
+  const n = norm(name);
+  return n ? items.find((i) => norm(i.name) === n) : undefined;
+}
+
+/**
+ * Set (or clear with '') the short code of the catalogue entry named like a stock item, so it can be typed at the
+ * counter / in the editor without visiting Settings → Items. With no entry yet, one is created from the stock item.
+ * Returns an error message for a bad or duplicate code.
+ */
+export function setStockShortCode(
+  stock: { name: string; hsn?: string; unit?: string; sale_rate?: number; tax_rate?: number },
+  code: string,
+): { ok: true } | { ok: false; error: CatalogError } {
+  const items = listCatalog();
+  const entry = catalogueEntryFor(stock.name, items);
+  const short = code.trim();
+  if ((entry?.short_code ?? '') === short) return { ok: true };
+  requireAccess('master.edit');
+  if (!entry) {
+    if (!short) return { ok: true };
+    const hsn = (stock.hsn ?? '').replace(/\D/g, '');
+    return saveCatalogItem({ name: stock.name.trim(), type: hsn.startsWith('99') ? 'Service' : 'Product', hsn, unit: stock.unit || 'NOS', rate: Number(stock.sale_rate) || 0, tax_rate: Number(stock.tax_rate) || 0, short_code: short });
+  }
+  // Only the short code changes: the rest of the catalogue row is left exactly as it is.
+  if (short) {
+    if (!/^[A-Za-z0-9._-]{1,12}$/.test(short)) return { ok: false, error: { field: 'short_code', message: 'A short code is up to 12 letters / digits, no spaces.' } };
+    const twin = items.find((i) => i.id !== entry.id && codeKey(i.short_code) === codeKey(short));
+    if (twin) return { ok: false, error: { field: 'short_code', message: `“${twin.name}” already uses this short code.` } };
+  }
+  setTable(KEYS.items, items.map((i) => {
+    if (i.id !== entry.id) return i;
+    const { short_code: _old, ...rest } = i;
+    return short ? { ...rest, short_code: short } : rest;
+  }));
+  return { ok: true };
+}
+
 /* ── Create an item from an unknown code (8E, roadmap 8.149) ─────── */
 
 export interface QuickItemFields {

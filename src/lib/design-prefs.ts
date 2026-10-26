@@ -527,17 +527,18 @@ export const presets: DesignPreset[] = [
     patch: {
       density: 'compact',
       logo_size: 's',
-      show_columns: { hsn: true, unit: true, discount: false, tax_rate: true, taxable: true },
-      show_qr: false,
+      // QA-3 F17: the discount column prints only when a line has a discount, so it stays on (rows must add up), and
+      // the UPI QR stays — "compact" is about spacing, not about dropping how the customer pays.
+      show_columns: { hsn: true, unit: true, discount: true, tax_rate: true, taxable: true },
     },
   },
   {
     id: 'minimal',
     name: 'Minimal',
-    description: 'Only the essentials, generous whitespace',
+    description: 'Only the essentials (no HSN, unit or GST-rate columns), generous whitespace',
     patch: {
       density: 'spacious',
-      show_columns: { hsn: false, unit: false, discount: false, tax_rate: false, taxable: false },
+      show_columns: { hsn: false, unit: false, discount: true, tax_rate: false, taxable: false },
       show_qr: false,
       show_terms: false,
       show_place_of_supply: false,
@@ -552,7 +553,7 @@ export const presets: DesignPreset[] = [
       paper: 'thermal80',
       density: 'compact',
       logo_size: 's',
-      show_columns: { hsn: false, unit: true, discount: false, tax_rate: false, taxable: false },
+      show_columns: { hsn: false, unit: true, discount: true, tax_rate: false, taxable: false },
       show_signature: false,
       show_terms: false,
     },

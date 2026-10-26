@@ -4,7 +4,7 @@ import { AdvanceError, computeAdvanceTax, saveAdvance, senderSnapshot, validateA
 import { localDb } from '../../lib/localDb';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { checkGstin } from '../../lib/gstin';
-import { GST_SLABS } from '../../lib/tax-rules';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { formatMoney, todayInput } from '../../lib/utils';
 import type { AdvanceRecord, AdvanceSupply } from '../../types/advances';
 import { BankAccountSelect } from '../bank/BankAccountSelect';
@@ -174,7 +174,7 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('afRate')}</span>
             <select className={controls.select} value={form.rate} onChange={(e) => set('rate', e.target.value)}>
-              {GST_SLABS.map((r) => <option key={r} value={String(r)}>{r}%</option>)}
+              {gstRateOptions(form.date, Number(form.rate)).map((r) => <option key={r} value={String(r)}>{r}%</option>)}
             </select>
           </label>
         </div>

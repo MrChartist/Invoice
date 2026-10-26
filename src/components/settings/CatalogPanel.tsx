@@ -15,7 +15,8 @@ import {
   type CatalogError,
   type RoundTo,
 } from '../../lib/catalog';
-import { GST_SLABS, UNITS, type InvoiceItem } from '../../types/invoice';
+import { UNITS, type InvoiceItem } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { nextInStoreEan } from '../../lib/barcode';
 import { levelRate, mrpLessRate, priceLevelsDb } from '../../lib/pricing';
 import { retailT } from '../../i18n/areas/retail';
@@ -340,7 +341,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
               <label className={controls.field}>
                 <span className={controls.label}>{setT('gstRate')}</span>
                 <select className={controls.select} value={draft.tax_rate} onChange={(e) => setDraft({ ...draft, tax_rate: Number(e.target.value) })}>
-                  {GST_SLABS.map((r) => (
+                  {gstRateOptions(undefined, draft.tax_rate).map((r) => (
                     <option key={r} value={r}>
                       {r}%
                     </option>

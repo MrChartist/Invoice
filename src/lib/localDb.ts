@@ -126,6 +126,16 @@ export function blankProfile(): SenderProfile {
   };
 }
 
+/**
+ * Catalogue type of a line learnt from a saved invoice (QA-3 F24): a goods HSN (not chapter 99) is a Product, a SAC
+ * (99…) a Service; with no HSN the line's own type is kept.
+ */
+export function catalogueItemType(item: { hsn?: string; type?: string }): string | undefined {
+  const code = String(item.hsn ?? '').replace(/\s/g, '');
+  if (/^\d{2,8}$/.test(code)) return code.startsWith('99') ? 'Service' : 'Product';
+  return item.type || undefined;
+}
+
 /** Reads settings, upgrading the pre-2.1 flat shape to the profiles array. */
 function readSettings(): AppSettings {
   const raw = getJson<Record<string, unknown> | null>(SINGLETON_KEYS.settings, null);
@@ -311,6 +321,8 @@ export const localDb = {
           const next = opts.fillOnly
             ? { ...keepFilled(item), ...keepFilled(items[idx]) } as InvoiceItem
             : { ...items[idx], ...keepFilled(item) };
+          // QA-3 F24: an item learnt before as "Service" although its own HSN is goods is corrected when learnt again.
+          if (opts.fillOnly && item.type === 'Product' && next.type === 'Service' && catalogueItemType({ hsn: next.hsn }) === 'Product') next.type = 'Product';
           if (JSON.stringify(next) !== JSON.stringify(items[idx])) {
             items[idx] = next;
             changed = true;
@@ -452,7 +464,7 @@ export const localDb = {
       localDb.items.upsertMany(
         (toSave.items ?? [])
           .filter((item) => item.name?.trim())
-          .map((item) => ({ name: item.name, type: item.type, rate: item.rate, hsn: item.hsn, unit: item.unit, tax_rate: item.tax_rate })),
+          .map((item) => ({ name: item.name, type: catalogueItemType(item), rate: item.rate, hsn: item.hsn, unit: item.unit, tax_rate: item.tax_rate })),
         { fillOnly: true },
       );
       return toSave;
