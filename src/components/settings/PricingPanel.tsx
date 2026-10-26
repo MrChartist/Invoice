@@ -5,6 +5,9 @@ import { defineArea } from '../../i18n/area';
 // R4-B3: store price grid (own chunk).
 const StorePricesGrid = lazy(() => import('../retail/StorePricesGrid'));
 const storeBtnT = defineArea({ open: 'Store prices' } as const, { open: 'स्टोर मूल्य' });
+// R8-A (TR-A1): trade discounts, minimum margins, party-item special rates (own chunk, opened on demand).
+const PartyRatesEditor = lazy(() => import('../trade/PartyRatesEditor'));
+const tradeT = defineArea({ open: 'Trade terms & party rates' } as const, { open: 'ट्रेड शर्तें और पार्टी रेट' });
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -45,6 +48,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
   const catalog = useMemo(() => listCatalog().sort((a, b) => a.name.localeCompare(b.name)), []);
 
   const hasBranches = useMemo(() => getTable('branches').length > 0, []);
+  const [tradeOpen, setTradeOpen] = useState(false); // R8-A
   const [gridOpen, setGridOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('storeprices') === '1');
   const [level, setLevel] = useState<PriceLevel | null>(null);
   const [scheme, setScheme] = useState<Scheme | null>(null);
@@ -291,6 +295,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
         onClose={() => setRemoving(null)}
       />
       {gridOpen && <Suspense fallback={null}><StorePricesGrid onClose={() => setGridOpen(false)} notify={notify} /></Suspense>}
+      <details className={surface.cardBody} onToggle={(e) => setTradeOpen((e.target as HTMLDetailsElement).open)} data-trade-terms><summary>{tradeT('open')}</summary>{tradeOpen && <Suspense fallback={null}><PartyRatesEditor onDone={(m, e) => notify(m, e ? 'error' : 'success')} /></Suspense>}</details>
     </section>
   );
 }

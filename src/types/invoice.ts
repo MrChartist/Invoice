@@ -691,7 +691,7 @@ export interface PaymentTermsSnapshot {
 export type ReminderMode = 'auto' | 'manual' | 'never';
 
 /** R2-A2: reason of a financial credit note. */
-export type FinancialReason = 'settlement_discount' | 'short_payment' | 'bad_debt';
+export type FinancialReason = 'settlement_discount' | 'short_payment' | 'bad_debt' | 'price_drop'; // price_drop: TR-A3
 
 /** 8.5: rupee figures frozen on the bill at issue (INR only). Total due = previous + bill − paid. */
 export interface PartyBalanceSnapshot {
@@ -722,6 +722,6 @@ export interface ApprovalInfo {
    * changes the value has to ask again; absent on approvals made before this field existed.
    */
   approved_value?: number;
-  /** Additive (8.80): why the document was held — absent = the approval policy; 'credit' = over the credit limit. */
-  reason?: 'credit';
+  /** Additive (8.80): why the document was held — absent = the approval policy; 'credit' = over the credit limit; 'margin' = below the minimum margin (TR-A1). */
+  reason?: 'credit' | 'margin';
 }

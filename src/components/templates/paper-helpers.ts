@@ -1,6 +1,7 @@
 import type { CalcTotals } from '../../lib/invoice-calc';
 import type { InvoiceItem, InvoiceRecord, SenderProfile } from '../../types/invoice';
 import { upiLink } from '../../lib/share';
+import { shiftDay } from '../../lib/dates';
 
 /** `YYYY-MM-DD` → `MM/YYYY`, the way batch dates are printed on packs. */
 function monthYear(day: string): string {
@@ -13,9 +14,10 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months'> & { bin?: string }) | undefined): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit'>> & { bin?: string }) | undefined): string {
   if (!item) return '';
   const parts: string[] = [];
+  if (discountText(item)) parts.push(discountText(item)); // TR-A1
   if (item.bin) parts.push(`Bin ${item.bin}`); // 8.86: snapshot on delivery challan lines
   if (item.batch_no) parts.push(`Batch ${item.batch_no}`);
   if (item.batch_no && item.batch_mfg) parts.push(`Mfg ${monthYear(item.batch_mfg)}`);
@@ -63,4 +65,19 @@ export function rcmTaxNote(totals: CalcTotals, money: (amount: number) => string
 /** Legacy single "Tax" line. */
 export function isSingleTax(invoice: InvoiceRecord, totals: CalcTotals): boolean {
   return invoice.gst_mode === 'SINGLE' && totals.tax_amount > 0;
+}
+
+/** TR-A1: the trade-discount snapshot of a line, e.g. "Disc 18 + 4 % + ₹5/unit" ('' without one). */
+export function discountText(item: Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit'>>): string {
+  const chain = (item.disc_chain ?? []).filter((d) => d > 0);
+  const t = [chain.length ? `${chain.join(' + ')} %` : '', (item.disc_per_unit ?? 0) > 0 ? `₹${item.disc_per_unit}/unit` : ''].filter(Boolean).join(' + ');
+  return t ? `Disc ${t}` : '';
+}
+
+/** TR-A1: "2% cash discount if paid by 03-11-2026: ₹1,234.00" under the totals ('' without a term). */
+export function cashDiscountText(invoice: Pick<InvoiceRecord, 'cash_discount' | 'issue_date' | 'doc_type'>, total: number, money: (amount: number) => string): string {
+  const cd = invoice.cash_discount;
+  if (!cd || !(cd.percent > 0) || invoice.doc_type === 'CREDIT_NOTE' || !(total > 0)) return '';
+  const [y, m, d] = shiftDay(invoice.issue_date, cd.days).split('-');
+  return `${cd.percent}% cash discount if paid by ${d}-${m}-${y}: ${money(Math.round(total * cd.percent) / 100)}`;
 }

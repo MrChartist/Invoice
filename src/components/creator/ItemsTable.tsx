@@ -33,6 +33,8 @@ import { s2T } from '../../i18n/areas/sales-r2';
 const ProposalSectionsCard = lazy(() => import('./ProposalSectionsCard').then((m) => ({ default: m.ProposalSectionsCard })));
 // R8-C (TR-C1): agency lot picker on sales lines (agency pack only, lazy).
 const LotPicker = lazy(() => import('../trade/LotPicker'));
+// R8-A (TR-A1): compound / per-unit discount sub-row (Trade discounts setting or distributor / commodity pack, lazy).
+const LineDiscountCell = lazy(() => import('../trade/LineDiscountCell'));
 import { impliedPacks } from '../../lib/shop-mode';
 import styles from './ItemsTable.module.css';
 
@@ -47,6 +49,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const issueDate = useInvoiceStore((s) => s.issue_date);
   const docStatus = useInvoiceStore((s) => s.status);
   const agencyOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('agency'), []); // R8-C
+  const tradeOn = useMemo(() => ((s) => !!s.trade_discounts || impliedPacks(s).some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()), []); // R8-A
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
   // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
   const [stockTick, setStockTick] = useState(0);
@@ -187,6 +190,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 </div>
               ) : null}
               {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
+              {tradeOn && priced && <Suspense fallback={null}><LineDiscountCell item={item} index={index} /></Suspense>}
               {agencyOn && (docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'BILL_OF_SUPPLY') && <Suspense fallback={null}><LotPicker item={item} index={index} /></Suspense>}
               {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (

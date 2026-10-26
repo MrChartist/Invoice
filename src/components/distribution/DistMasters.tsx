@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Edit3, Trash2 } from 'lucide-react';
 import { areasDb, assignParties, beatsDb, routesDb, type Beat } from '../../lib/distribution';
 import { getTable } from '../../lib/storage';
@@ -8,6 +8,10 @@ import { distT } from '../../i18n/areas/distribution';
 import { crT } from '../../i18n/areas/credit';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
+// R8-A (TR-A1): party-item special rates and bulk paste (distributor / commodity pack, lazy).
+const PartyRatesEditor = lazy(() => import('../trade/PartyRatesEditor'));
+import { impliedPacks } from '../../lib/shop-mode';
+import { localDb } from '../../lib/localDb';
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
 interface Agent { id: string; name: string }
@@ -166,6 +170,7 @@ export default function DistMasters({ onDone }: { onDone: (msg: string, error?: 
           })}>{distT('assign', { n: pick.size })}</button>
         </div>
       )}
+      {impliedPacks(localDb.settings.get()).some((p) => p === 'distributor' || p === 'commodity') && <Suspense fallback={null}><PartyRatesEditor onDone={onDone} /></Suspense>}
     </div>
   );
 }

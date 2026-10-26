@@ -15,6 +15,143 @@ export interface CashDiscountTerm {
   days: number;
 }
 
+/** Party-item special rate (table `party_rates`, TR-A1): one client or vendor × one item, dated. */
+export interface PartyRate {
+  id: string;
+  side: 'sale' | 'purchase';
+  /** `clients` row (sale) or `vendors` row (purchase). */
+  party_id: string;
+  party_name: string;
+  /** Catalogue / stock item id when known; matched by name otherwise. */
+  item_id?: string;
+  item_name: string;
+  rate?: number;
+  disc_chain?: number[];
+  disc_per_unit?: number;
+  valid_from: string;
+  valid_to?: string;
+  updated_at?: string;
+}
+
+/** Scheme scope v2 (additive on `schemes` rows, TR-A2). Absent = the scheme's single item, as before. */
+export interface SchemeScope {
+  group_ids?: string[];
+  item_ids?: string[];
+  /** Matched against the stock item's category name, else a word of its name. */
+  brand?: string;
+  client_ids?: string[];
+  level_ids?: string[];
+}
+export type ClaimBasis = 'free_goods_at_cost' | 'free_goods_at_rate' | 'discount_given' | 'fixed_per_unit';
+
+/** One row of a claim statement (invoice line under a principal's scheme, or a price-drop unit). */
+export interface ClaimRow {
+  invoice_id?: string;
+  line_id?: string;
+  invoice_number: string;
+  date: string;
+  party: string;
+  item: string;
+  qty: number;
+  free_qty: number;
+  value: number;
+}
+export type ClaimStatus = 'draft' | 'sent' | 'settled' | 'short' | 'rejected';
+/** Claim to a principal (table `trade_claims`, numbered TCL/FY…). */
+export interface TradeClaim {
+  id: string;
+  number: string;
+  date: string;
+  kind: 'scheme' | 'price_drop';
+  principal_id: string;
+  principal_name: string;
+  from: string;
+  to: string;
+  rows: ClaimRow[];
+  amount: number;
+  status: ClaimStatus;
+  price_drop_id?: string;
+  settlement?: { mode: 'financial' | 'gst'; note_no: string; date: string; amount: number; voucher_id?: string; return_id?: string };
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Price-drop run (table `price_drops`, numbered PDR/FY…, TR-A3). */
+export interface PriceDropRun {
+  id: string;
+  number: string;
+  date: string;
+  /** The drop per unit by item (name, folded match). */
+  items: { name: string; drop: number }[];
+  from: string;
+  to: string;
+  client_ids?: string[];
+  mode: 'financial' | 'gst';
+  /** Agreed before supply (only then may GST notes be issued). */
+  agreed?: boolean;
+  rows: { client_id?: string; client_name: string; invoice_id: string; invoice_number: string; item: string; qty: number; value: number }[];
+  own_stock: { item: string; qty: number }[];
+  note_ids: string[];
+  total: number;
+  status: 'issued' | 'undone';
+  principal_id?: string;
+  claim_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Interest settings (object `interest_settings`, TR-A4). */
+export interface InterestSettings {
+  rate?: number;
+  grace_days?: number;
+  basis?: 'due' | 'bill';
+  min_amount?: number;
+}
+/** One interest run (table `interest_runs`, dated). */
+export interface InterestRun {
+  id: string;
+  date: string;
+  as_of: string;
+  /** Bills charged and the period each was charged for. */
+  bills: { id: string; party: string; from: string; to: string; amount: number }[];
+  invoice_ids: string[];
+  total: number;
+  created_at?: string;
+}
+
+/** Returnable packaging master (table `packaging_types`, TR-A5). */
+export interface PackagingType {
+  id: string;
+  name: string;
+  unit?: string;
+  deposit?: number;
+  charge_rate?: number;
+  hsn?: string;
+  tax_rate?: number;
+  returnable?: boolean;
+}
+/** Crates / bags given (out) or taken back (in) — table `packaging_moves`, dated. */
+export interface PackagingMove {
+  id: string;
+  date: string;
+  party_kind: 'client' | 'vendor';
+  party_id?: string;
+  party_name: string;
+  type_id: string;
+  out: number;
+  in: number;
+  doc_id?: string;
+  doc_no?: string;
+  /** Deposit received (+) or refunded (−) with this move, and its voucher. */
+  deposit?: number;
+  voucher_id?: string;
+  /** Closed by a charge for unreturned units (the draft invoice). */
+  charge_invoice_id?: string;
+  note?: string;
+  created_at?: string;
+}
+
 /* ── TR-B: weight and bag billing (shape owned by TR-B) ── */
 
 export type WeightUnit = 'KG' | 'QTL' | 'MT';
@@ -190,6 +327,28 @@ declare module './invoice' {
   interface Client {
     /** TR-A1: the party's default cash-discount term. */
     cash_discount?: CashDiscountTerm;
+  }
+}
+declare module '../lib/localDb' {
+  interface AppSettings {
+    /** TR-A1: company default minimum margin % (stock groups may set their own). */
+    trade_min_margin?: number;
+  }
+}
+declare module '../lib/stock-groups' {
+  interface StockTreeNode {
+    /** TR-A1: minimum margin % for items of this group (and its sub-groups). */
+    min_margin_percent?: number;
+  }
+}
+declare module '../lib/pricing' {
+  interface Scheme {
+    /** TR-A2: scope v2, free slabs, the principal who pays and how the claim is valued. */
+    scope?: SchemeScope;
+    free_slabs?: { min_qty: number; free_qty: number }[];
+    principal_vendor_id?: string;
+    claim_basis?: ClaimBasis;
+    claim_rate?: number;
   }
 }
 
