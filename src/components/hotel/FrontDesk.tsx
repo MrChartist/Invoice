@@ -36,18 +36,19 @@ import { B, csvDownload, errText, printHtml } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './hotel.module.css';
+import FolioView from './FolioView'; // R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
 
 /* ── Small kit ─────────────────────────────────────────────────── */
 
 type Rec = Record<string, unknown>;
 type Opt = readonly (string | readonly [string, string])[];
 /** [field, label (area key, else the field name), n(umber) | d(ate) | t(ime) | c(heckbox) | select options]. */
-type Spec = readonly [string, string, ('n' | 'd' | 't' | 'c' | Opt)?];
+export type Spec = readonly [string, string, ('n' | 'd' | 't' | 'c' | Opt)?];
 const lab = (l: string) => (Object.hasOwn(hT.en, l) ? hT(l as HKey) : l.replace(/_/g, ' '));
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const table = (head: string[], rows: unknown[][]) => `<table border="1" cellpadding="4"><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
 
-function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; spec: readonly Spec[]; off?: boolean }) {
+export function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; spec: readonly Spec[]; off?: boolean }) {
   return (
     <>
       {spec.map(([k, l, t]) => t === 'c' ? (
@@ -70,8 +71,8 @@ function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; spec: re
 }
 
 const Grid = ({ children }: { children: ReactNode }) => <div className={styles.grid}>{children}</div>;
-const Row = ({ children }: { children: ReactNode }) => <div className={styles.row}>{children}</div>;
-const Tbl = ({ head, rows }: { head: ReactNode[]; rows: ReactNode[][] }) => rows.length ? (
+export const Row = ({ children }: { children: ReactNode }) => <div className={styles.row}>{children}</div>;
+export const Tbl = ({ head, rows }: { head: ReactNode[]; rows: ReactNode[][] }) => rows.length ? (
   <div className={surface.tableWrap}><table className={surface.table}><thead><tr>{head.map((h, i) => <th key={i}>{h}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table></div>
 ) : <p className={styles.note}>{hT('empty')}</p>;
 
@@ -89,8 +90,12 @@ export interface Ctx {
   go: (view: string) => void;
   run: (fn: () => unknown, ok?: string) => void;
 }
-/** R7-B / R7-C plug their lazy views in here: `folios: lazy(() => import(...))`, `formc`, `reports`. */
-const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {};
+/** R7-B / R7-C plug their views in here (`folios` is static: see the import), `formc`, `reports`. */
+/** R7-B2: the Tables / POS "Room" button loads through this chunk, so the hotel libs stay in one chunk. */
+export { default as RoomPicker } from './RoomPicker';
+const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {
+  folios: FolioView, // R7-B
+};
 
 export default function FrontDesk() {
   useT();

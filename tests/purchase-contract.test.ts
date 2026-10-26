@@ -846,3 +846,22 @@ test('R8-C: the bank stock statement counts unpaid goods bills (kind PURCHASE) a
   assert.equal(creditorsForGoods('2026-04-30'), 1180);
   assert.equal(creditorsForGoods('2026-04-01'), 0, 'a bill dated after the statement date is not owed yet');
 });
+
+// R7-B: `agent-commission.ts` and `ota-payout.ts` WRITE commission bills (purchase drafts, posted later as bills); the
+// bill they draft reads back through readPurchase / books / GST / export like any bill.
+test('R7-B commission bills (agent-commission, ota-payout) read back through readPurchase / books / GST / export readers', async () => {
+  const { commissionBill } = await import('../src/lib/hotel/agent-commission.ts');
+  const { billOfDraft } = await import('../src/lib/purchase-drafts.ts');
+  const agentGstin = `29AAPFU0939F1Z${gstinChecksumChar('29AAPFU0939F1Z')}`;
+  const agent = { ...commissionBill({ vendor: { name: 'Travel Co', gstin: agentGstin }, amount: 1000, date: '2026-10-20', home: '27', ref: 'RES/FY26-27/0001', lowBand: false, tds194h: true }), id: 'c1' } as PurchaseRecord;
+  const ota = { ...commissionBill({ vendor: { name: 'Booking.com' }, amount: 500, gst: 90, date: '2026-10-20', home: '27', ref: 'OTA payout', lowBand: true, tds194h: false }), id: 'c2' } as PurchaseRecord;
+  assert.equal(readPurchase(agent)?.total, 1180);
+  assert.equal(booksNormalize(agent as never)!.taxable, 1000);
+  assert.equal(booksNormalize(agent as never)!.itcEligible, true);
+  assert.equal(gstNormalize(agent, '27')!.igst, 180, 'agent in another state → IGST');
+  assert.equal(exportNormalize(agent)!.total, 1180);
+  assert.equal(agent.tds_section, '194H');
+  assert.equal(booksNormalize(ota as never)!.itcEligible, false, 'fully low-band hotel: ITC flagged');
+  const draft = { ...ota, status: 'draft', draft: { source: 'manual', created_at: '' } } as never;
+  assert.equal(readPurchase({ ...billOfDraft(draft), id: 'c3' } as PurchaseRecord)?.total, 590);
+});

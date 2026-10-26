@@ -356,4 +356,42 @@ export interface HotelSettings {
 
 /* ── R7-B block (append below) ─────────────────────────────────── */
 
+declare module './restaurant' {
+  interface TableOrder {
+    /** R7-B2: settled by "charge to room" onto this folio (no POS bill; the check-out invoice charges it). */
+    folio_id?: string;
+  }
+}
+
+declare module './invoice' {
+  interface Client {
+    /** R7-B4: hotel billing defaults of a company / travel agent (master only). */
+    hotel?: ClientHotel;
+  }
+}
+
+/** R7-B4 (D11): TDS the company deducts (`none` default, chosen by the user — the app never guesses). */
+export interface ClientHotel {
+  tds_default?: 'none' | '194I-B' | '194C';
+  /** Travel agent's commission % on the room value (194H on payment). */
+  commission_pct?: number;
+  rate_plan_id?: string;
+}
+
+/** R7-B additive fields on folio lines (same-file interface merging). */
+export interface FolioLine {
+  /** GST % of a laundry / minibar / misc line (from its catalogue item or the default). */
+  tax_rate?: number;
+  /** B6 (D13): value of the unit-night a cancellation / no-show charge replaces — decides its band. */
+  band_value?: number;
+}
+
+/** R7-B additive fields on reservations. */
+export interface Reservation {
+  /** B4: who the bill goes to (company / agent need `bill_to`). Absent = guest, or company when `bill_to` is set. */
+  bill_kind?: 'guest' | 'company' | 'agent';
+  /** B4: the agent's commission bill draft (`purchase_drafts`). */
+  commission?: { draft_id: string; amount: number; date: string };
+}
+
 /* ── R7-C block (append below) ─────────────────────────────────── */
