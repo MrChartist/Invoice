@@ -82,12 +82,12 @@ No new numbered series. `sync-engine.ts` `DATED` / `NUMBERED`: none (as the PRD 
 ## Bundle
 
 Measured with the same gzip as `check-bundle-size.mjs` against a build of the merge base (`claude/elegant-cannon-cwapiv`
-@ ef7d135, with R2-A and QA-1) and of this branch:
+@ b27b7f9, with R2-A, QA-1 and R3-A) and of this branch:
 
 | | base | R3-C | delta |
 |---|---|---|---|
-| initial JS (gz) | 183,507 B (179.2 kB) | 183,849 B (179.5 kB) | **+342 B (+0.33 kB)** (budget +0.4 kB) |
-| total JS (gz) | 1,985.5 kB | ≈ 2,027 kB | ≈ +41 kB, all lazy (budget 2,400 kB) |
+| initial JS (gz) | 183,895 B (179.6 kB) | 184,180 B (179.9 kB) | **+285 B (+0.28 kB)** (budget +0.4 kB) |
+| total JS (gz) | 2,029.7 kB | 2,073.9 kB | +44.2 kB, all lazy (budget 2,400 kB) |
 
 First-paint additions: the `/practice` lazy route (+ its chunk names in Vite's preload map), the nav entry and
 `nav.practice` strings, three `WATCHED_TABLES` / `TABLE_ACTIONS` lines, two lines in `localDb.invoices.save` and one in
@@ -166,7 +166,7 @@ the data), desks and the practice page are all lazy.
 ## Verification
 
 `npx tsc -b` ✓ · `npm run lint` 0 errors (22 warnings, none new beyond the existing set-state-in-effect pattern) ·
-`npm test` 2046 / 2046 ✓ · `npm run build` ✓ · `npm run check:size` initial 179.5 / 185 kB, total 2030 / 2400 kB ✓ ·
+`npm test` 2075 / 2075 ✓ · `npm run build` ✓ · `npm run check:size` initial 179.9 / 185 kB, total 2073.9 / 2400 kB ✓ ·
 `npm run verify:offline` ✓ · `npm run test:e2e` (E2E_TIMEOUT=60000) all checks passed. New unit tests: `tests/editor-layout.test.ts`,
 `tests/doc-evidence.test.ts`, `tests/design-page.test.ts`, `tests/gst-portal-files.test.ts`,
 `tests/eway-validity.test.ts`, `tests/practice.test.ts` (+ a case in `tests/purchase-contract.test.ts`, the updated tab
