@@ -14,9 +14,9 @@ import { BankAccountSelect } from '../components/bank/BankAccountSelect';
 import { HeldBills } from '../components/pos/HeldBills';
 import { PosTiles } from '../components/pos/PosTiles';
 import { localDb } from '../lib/localDb';
-import { generateId, getTable } from '../lib/storage';
+import { KEYS, generateId, getTable, peekTable } from '../lib/storage';
 import { num, round2 } from '../lib/invoice-calc';
-import { suggest } from '../lib/suggest';
+import { makeSuggester } from '../lib/suggest';
 import { addScannedLine, findByCode, findByShortCode } from '../lib/scan';
 import { TABLES, findLevel, loadPositions, type StockItem } from '../lib/inventory';
 import { editorStockContext, serialKey, serialsInStock } from '../lib/stock-tracking';
@@ -120,7 +120,8 @@ function loadCounter() {
     ctx: editorStockContext({ doc_type: 'INVOICE', issue_date: todayInput() }),
     // 8.22: quick-item tiles — stock groups and recent POS bills (most sold, when nothing is starred).
     groups: getTable<{ id: string; name: string; parent_id?: string }>('stock_groups'),
-    posBills: localDb.invoices.getAll().filter((i) => i.pos),
+    // PERF-2: filtered from the shared parsed rows (read-only: the tiles and bill browser only read them).
+    posBills: peekTable<InvoiceRecord>(KEYS.invoices).filter((i) => i.pos),
     // 8E (8.145): selling price lists (stock items with dated prices) apply on the POS as in the editor.
     lists: stock.some((s) => s.selling_prices?.length),
     // R3-A4: modifier groups (Settings → Tables) and the stock group of each item (for group-linked modifiers).
@@ -377,16 +378,18 @@ export function Pos() {
 
   /* ── Scan / search ─────────────────────────────────────────── */
 
-  const hits = useMemo(
+  // PERF-2: the item list is folded once per counter load, not per keystroke.
+  const itemSuggester = useMemo(
     () =>
-      suggest(searchTermOf(query), data.sources, {
+      makeSuggester(data.sources, {
         label: (i) => i.name,
         extra: (i) => [i.hsn, i.sku, i.barcode, i.short_code, saltOf(data.salts, i.name)],
         sub: (i) => [formatCurrency(num(i.rate)), i.sku && `SKU ${i.sku}`, saltOf(data.salts, i.name)].filter(Boolean).join(' · '),
         limit: 8,
       }),
-    [query, data.sources, data.salts],
+    [data.sources, data.salts],
   );
+  const hits = useMemo(() => itemSuggester(searchTermOf(query)), [itemSuggester, query]);
 
   /** 8E: a code, a short code or a scale label → added (with `qty`); null when the term is none of them. */
   const resolveTerm = (term: string, qty?: number): { ok: boolean; message: string } | null => {
@@ -738,8 +741,8 @@ export function Pos() {
 
   /* ── Render ────────────────────────────────────────────────── */
 
-  const clientSuggestions = useCallback(
-    (q: string) => suggest(q, data.clients, { label: (c) => c.name, extra: (c) => [c.phone, c.company, c.gstin], sub: (c) => [c.phone, c.gstin].filter(Boolean).join(' · ') }),
+  const clientSuggestions = useMemo(
+    () => makeSuggester(data.clients, { label: (c) => c.name, extra: (c) => [c.phone, c.company, c.gstin], sub: (c) => [c.phone, c.gstin].filter(Boolean).join(' · ') }),
     [data.clients],
   );
   const stockOf = (l: InvoiceItem) => (data.positions.length ? findLevel(data.positions, l.name, l.hsn) : null);

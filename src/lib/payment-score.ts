@@ -19,7 +19,7 @@ import { num, round2 } from './invoice-calc';
 import { receivableTotal } from './rcm';
 import { isLiveCreditNote, type CreditLinkRow } from './amount-due';
 import { idByNameOf, loadCollectionNotes, partyKeyFor, promiseCounts, receiptsByParty, shiftDay, type CollectionNote, type PartyReceipt } from './collections';
-import { KEYS, getTable } from './storage';
+import { KEYS, peekTable } from './storage';
 import { isoDay, localDayOf } from './dates';
 
 export type PaymentGrade = 'A' | 'B' | 'C' | 'D';
@@ -153,12 +153,25 @@ export function paymentScores(input: ScoreInput, today: string): Map<string, Pay
   const from = shiftDay(today, -365);
   const prevFrom = shiftDay(today, -730);
   const parties = new Set<string>([...settled.map((s) => s.party), ...writtenOff.keys()]);
+  // PERF-2: group once (order kept) instead of filtering every bill / note per party.
+  const settledBy = new Map<string, Settled[]>();
+  for (const s of settled) {
+    const list = settledBy.get(s.party);
+    if (list) list.push(s);
+    else settledBy.set(s.party, [s]);
+  }
+  const notesBy = new Map<string, CollectionNote[]>();
+  for (const n of input.notes ?? []) {
+    const list = notesBy.get(n.party_key);
+    if (list) list.push(n);
+    else notesBy.set(n.party_key, [n]);
+  }
   const out = new Map<string, PaymentScore>();
   for (const party of parties) {
-    const mine = settled.filter((s) => s.party === party);
+    const mine = settledBy.get(party) ?? [];
     const cur = summarise(mine.filter((s) => s.day > from && s.day <= today));
     const prev = summarise(mine.filter((s) => s.day > prevFrom && s.day <= from));
-    const { kept, broken } = promiseCounts(party, input.notes ?? [], input.receipts ?? [], today, from);
+    const { kept, broken } = promiseCounts(party, notesBy.get(party) ?? [], input.receipts ?? [], today, from);
     const wo = writtenOff.get(party) ?? 0;
     const reasons: string[] = [];
     let grade: PaymentGrade | null = null;
@@ -204,11 +217,11 @@ export function scoreSummary(s: PaymentScore): string {
  * the call) and grades each invoice's party.
  */
 export function gradeLookup(invoices: readonly InvoiceRecord[], today: Date = new Date()): (inv: InvoiceRecord) => PaymentGrade | null {
-  const clients = getTable<Client>(KEYS.clients);
-  const payments = getTable<Payment>(KEYS.transactions);
+  const clients = peekTable<Client>(KEYS.clients);
+  const payments = peekTable<Payment>(KEYS.transactions);
   const notes = loadCollectionNotes();
   const scores = paymentScores(
-    { invoices, payments, links: getTable<CreditLinkRow>('doc_links'), clients, notes, receipts: notes.length ? receiptsByParty(invoices, payments, clients) : [] },
+    { invoices, payments, links: peekTable<CreditLinkRow>('doc_links'), clients, notes, receipts: notes.length ? receiptsByParty(invoices, payments, clients) : [] },
     localDayOf(today),
   );
   const idByName = idByNameOf(clients);

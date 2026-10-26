@@ -5,7 +5,7 @@
  * screens that already load `payment-score.ts`.
  */
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
-import { KEYS, getTable } from './storage';
+import { KEYS, peekTable } from './storage';
 import { loadReminderSchedule } from './reminder-settings';
 import type { PendingOptions } from './reminders';
 import { brokenPromiseParties, idByNameOf, isHeldByPromise, loadCollectionNotes, openPromises, partyKeyFor, receiptsByParty } from './collections';
@@ -13,7 +13,7 @@ import { localDayOf } from './dates';
 import { gradeLookup } from './payment-score';
 
 export function reminderOptions(invoices: readonly InvoiceRecord[], today: Date = new Date()): Pick<PendingOptions, 'schedule' | 'modeOf' | 'isHeld' | 'isFirm'> {
-  const clients = getTable<Client>(KEYS.clients);
+  const clients = peekTable<Client>(KEYS.clients); // PERF-2: read-only
   const idByName = idByNameOf(clients);
   const byId = new Map(clients.filter((c) => c.id).map((c) => [c.id as string, c]));
   const keyOf = (inv: InvoiceRecord) => partyKeyFor(inv.client, idByName);
@@ -24,7 +24,7 @@ export function reminderOptions(invoices: readonly InvoiceRecord[], today: Date 
   const notes = loadCollectionNotes();
   if (notes.some((n) => n.promise)) {
     const day = localDayOf(today);
-    const receipts = receiptsByParty(invoices, getTable<Payment>(KEYS.transactions), clients);
+    const receipts = receiptsByParty(invoices, peekTable<Payment>(KEYS.transactions), clients);
     const holds = openPromises(notes, receipts, day);
     const firm = brokenPromiseParties(notes, receipts, day);
     out.isHeld = (inv) => isHeldByPromise(holds, inv.id, keyOf(inv));

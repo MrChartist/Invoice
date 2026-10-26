@@ -1,10 +1,11 @@
-import { Suspense, lazy, useCallback, useState } from 'react';
+import { Suspense, lazy, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { GstinInput } from '../ui/GstinInput';
 import { Typeahead } from '../ui/Typeahead';
 import { localDb } from '../../lib/localDb';
-import { clientExtras, suggest } from '../../lib/suggest';
+import { DB_PREFIX, KEYS, readRaw } from '../../lib/storage';
+import { clientExtras, makeSuggester } from '../../lib/suggest';
 import { PartyBookPickers } from '../clients/PartyBookPickers';
 import { applyPartyDefaults } from '../clients/party-defaults';
 import { clientToParty } from '../../store/invoice-defaults';
@@ -39,9 +40,17 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
   // Directory snapshot, refreshed whenever the name field gains focus.
   const [directory, setDirectory] = useState<Client[]>([]);
   const [picked, setPicked] = useState<{ client: Client; seq: number } | null>(null); // R3-B
-  const clientSuggestions = useCallback(
-    (q: string) =>
-      suggest(q, directory, {
+  // PERF-2: the directory is folded once per snapshot, not per keystroke; an unchanged table keeps its snapshot.
+  const directoryRaw = useRef<string | null | undefined>(undefined);
+  const refreshDirectory = () => {
+    const raw = readRaw(DB_PREFIX + KEYS.clients);
+    if (raw === directoryRaw.current) return;
+    directoryRaw.current = raw;
+    setDirectory(localDb.clients.getAll());
+  };
+  const clientSuggestions = useMemo(
+    () =>
+      makeSuggester(directory, {
         label: (c) => c.name,
         extra: clientExtras, // R2-B4: also contact persons' names / phones
         sub: (c) => [c.city, c.gstin].filter(Boolean).join(' · '),
@@ -125,7 +134,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             className={controls.input}
             value={client.name}
             onChange={(name) => setClient({ name })}
-            onFocus={() => setDirectory(localDb.clients.getAll())}
+            onFocus={refreshDirectory}
             getSuggestions={clientSuggestions}
             onPick={(c) => {
               setClient(clientToParty(c));

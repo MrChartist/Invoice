@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -197,9 +198,11 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
-  const options = useMemo<Option[]>(() => {
+  // PERF-2: the input paints first; scoring 50k+ index rows follows in a deferred (interruptible) render.
+  const searchQuery = useDeferredValue(query);
+  const optionsFor = useCallback((text: string): Option[] => {
     if (!open) return [];
-    const q = query.trim();
+    const q = text.trim();
     if (!q) {
       const base: Option[] = recents.map((text) => ({ key: `recent:${text}`, kind: 'recent', text }));
       const staticRows: SearchResult[] = [
@@ -217,7 +220,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     return groupResults(found).flatMap((g) =>
       g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
     );
-  }, [open, query, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, actionEntries, allCompanies, peeked]);
+  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, actionEntries, allCompanies, peeked]);
+  const options = useMemo(() => optionsFor(searchQuery), [optionsFor, searchQuery]);
 
   // Reset on open; remember and restore focus.
   useEffect(() => {
@@ -296,7 +300,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
         break;
       case 'Enter':
         e.preventDefault();
-        choose(options[clampedActive]);
+        // Typed faster than the deferred results: pick the first hit for what is in the box now.
+        choose(searchQuery === query ? options[clampedActive] : optionsFor(query)[0]);
         break;
       case 'Escape':
         e.preventDefault();
@@ -381,7 +386,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
         <div ref={listRef} id={listId} className={styles.list} role="listbox" aria-label="Results">
           {options.length === 0 && (
             <div className={styles.empty} role="presentation">
-              <p className={styles.emptyTitle}>No matches for “{query.trim()}”</p>
+              <p className={styles.emptyTitle}>No matches for “{searchQuery.trim()}”</p>
               <p className={styles.emptyHint}>
                 Try an invoice number like <code>0007</code>, a party, a GSTIN / PAN / UTR, an amount like <code>12.5k</code> or <code>&gt;50k</code>.
               </p>
@@ -451,7 +456,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
           <span><kbd className={styles.kbd}>?</kbd> shortcuts</span>
         </div>
         <div className={styles.srOnly} role="status" aria-live="polite">
-          {query.trim() ? `${options.length} result${options.length === 1 ? '' : 's'}` : ''}
+          {searchQuery.trim() ? `${options.length} result${options.length === 1 ? '' : 's'}` : ''}
         </div>
       </div>
     </div>,

@@ -24,7 +24,7 @@ import type { Client, InvoiceItem, InvoiceRecord, Payment } from '../types/invoi
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { computeInterest, interestInputFor, type InterestInput, type InterestResult, type LateFeeConfig } from './interest';
 import { readLinks, type DocLink } from './documents';
-import { generateId } from './storage';
+import { KEYS, generateId, peekTable } from './storage';
 import { localDb } from './localDb';
 import { isoDay, shiftDay } from './dates';
 import { inrValue } from './fx';
@@ -217,12 +217,35 @@ export function buildLateFeeInvoice(
 /* ── Storage-backed helpers for the UI ─────────────────────────── */
 
 /** The client's rule: the client master (current terms) first, else the snapshot on the invoice. */
-export function lateFeeRuleFor(invoice: InvoiceRecord, clients: readonly Client[] = localDb.clients.getAll()): ClientLateFee | undefined {
+export function lateFeeRuleFor(invoice: InvoiceRecord, clients: readonly Client[] = peekTable<Client>(KEYS.clients)): ClientLateFee | undefined {
   const c = invoice.client;
-  const master =
-    (c?.id && clients.find((x) => x.id === c.id)) ||
-    clients.find((x) => x.name && c?.name && x.name.trim().toLowerCase() === c.name.trim().toLowerCase() && (x.gstin ?? '') === (c.gstin ?? ''));
+  const idx = clientIndex(clients);
+  const master = (c?.id && idx.byId.get(c.id)) || (c?.name ? idx.byNameGstin.get(nameGstinKey(c.name, c.gstin)) : undefined);
   return sanitizeClientLateFee(master ? master.late_fee : c?.late_fee);
+}
+
+const nameGstinKey = (name: string, gstin: string | undefined) => `${name.trim().toLowerCase()}\u0000${gstin ?? ''}`;
+
+/**
+ * PERF-2: id and name+GSTIN lookups of a client list, built once per list (the receivables screen asks for
+ * every overdue bill). The first matching client wins, exactly as the `find`s it replaces.
+ */
+const clientIndexes = new WeakMap<readonly Client[], { byId: Map<string, Client>; byNameGstin: Map<string, Client> }>();
+function clientIndex(clients: readonly Client[]) {
+  let idx = clientIndexes.get(clients);
+  if (!idx) {
+    idx = { byId: new Map(), byNameGstin: new Map() };
+    for (const x of clients) {
+      if (!x) continue;
+      if (x.id && !idx.byId.has(x.id)) idx.byId.set(x.id, x);
+      if (x.name) {
+        const k = nameGstinKey(x.name, x.gstin);
+        if (!idx.byNameGstin.has(k)) idx.byNameGstin.set(k, x);
+      }
+    }
+    clientIndexes.set(clients, idx);
+  }
+  return idx;
 }
 
 /** A late-fee invoice already raised for this original (not cancelled), if any. */

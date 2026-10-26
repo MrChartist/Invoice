@@ -7,7 +7,7 @@
 
 import type { Client, InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { effectiveStatus } from './invoice-status';
-import { DB_PREFIX, KEYS, getTable, readRaw, writeRaw } from './storage';
+import { DB_PREFIX, KEYS, peekTable, readRaw, writeRaw } from './storage';
 import { amountMatches, parseQuery, typoScore, type ParsedQuery } from './smart-find';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 
@@ -63,25 +63,34 @@ export interface StaticEntry {
   keywords?: string[];
 }
 
+/** Rows are only read (the index copies strings out), so peeked, shared tables can be passed in. */
 export interface SearchData {
-  invoices: InvoiceRecord[];
-  clients: Client[];
-  items: Partial<InvoiceItem>[];
+  invoices: readonly InvoiceRecord[];
+  clients: readonly Client[];
+  items: readonly Partial<InvoiceItem>[];
   pages: StaticEntry[];
   actions: StaticEntry[];
-  vendors?: AnyRow[];
-  bills?: AnyRow[];
-  payments?: Payment[];
-  vouchers?: AnyRow[];
-  cheques?: AnyRow[];
-  advances?: AnyRow[];
-  einvoice?: AnyRow[];
+  vendors?: readonly AnyRow[];
+  bills?: readonly AnyRow[];
+  payments?: readonly Payment[];
+  vouchers?: readonly AnyRow[];
+  cheques?: readonly AnyRow[];
+  advances?: readonly AnyRow[];
+  einvoice?: readonly AnyRow[];
 }
 
 /* ── Normalisation ──────────────────────────────────────────── */
 
+/** Plain ASCII folds to its lower case; only other text needs the per-character pass. */
+function isAscii(text: string): boolean {
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) > 127) return false;
+  return true;
+}
+
 /** Lower-cases and strips accents per character so indices map 1:1 to the original. */
 export function fold(text: string): string {
+  // PERF-2: identical result for ASCII (NFD is a no-op, no marks, one char each) without the per-char regex.
+  if (isAscii(text)) return text.toLowerCase();
   let out = '';
   for (const ch of text) {
     const f = ch.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
@@ -90,7 +99,13 @@ export function fold(text: string): string {
   return out;
 }
 
-const isAlnum = (c: string) => /[\p{L}\p{N}]/u.test(c);
+const ALNUM = /[\p{L}\p{N}]/u;
+/** `isAlnum(t[j])` with an ASCII fast path. */
+function alnumAt(t: string, j: number): boolean {
+  const c = t.charCodeAt(j);
+  if (c < 128) return (c >= 48 && c <= 57) || (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
+  return ALNUM.test(t[j]);
+}
 
 /* ── Fuzzy scorer ───────────────────────────────────────────── */
 
@@ -115,14 +130,21 @@ function toRanges(indices: number[]): Range[] {
  * subsequence. Returns null when the token is not a subsequence of the text.
  */
 export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
-  const q = fold(query).replace(/\s+/g, '');
+  return fuzzyFolded(fold(query).replace(/\s+/g, ''), fold(text));
+}
+
+/* DP scratch buffers, grown on demand and reused (PERF-2: no m×n arrays allocated per call). */
+let dpBuf = new Float64Array(256);
+let fromBuf = new Int32Array(256);
+
+/** `fuzzyMatch` on already-folded text (`q` folded with whitespace removed). Same scores and ranges. */
+export function fuzzyFolded(q: string, t: string, memo?: Map<string, FuzzyMatch | null>): FuzzyMatch | null {
   if (!q) return { score: 0, ranges: [] };
-  const t = fold(text);
   const n = t.length;
   const m = q.length;
   if (m > n) return null;
 
-  const boundary = (j: number) => j === 0 || !isAlnum(t[j - 1]);
+  const boundary = (j: number) => j === 0 || !alnumAt(t, j - 1);
 
   // Exact substring: prefer one that starts a word, then the earliest.
   let best: FuzzyMatch | null = null;
@@ -136,35 +158,65 @@ export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
   }
   if (best) return best;
 
-  // Subsequence DP: dp[i][j] = best score matching q[0..i] with q[i] at t[j].
+  // Cheap reject (PERF-2): the DP below finds a match iff `q` is a subsequence of `t`.
+  for (let i = 0, from = 0; i < m; i++) {
+    const at = t.indexOf(q[i], from);
+    if (at === -1) return null;
+    from = at + 1;
+  }
+  if (!memo) return subsequenceDp(q, t);
+  let hit = memo.get(t);
+  if (hit === undefined) {
+    hit = subsequenceDp(q, t);
+    memo.set(t, hit);
+  }
+  return hit;
+}
+
+function subsequenceDp(q: string, t: string): FuzzyMatch | null {
+  const n = t.length;
+  const m = q.length;
+  const boundary = (j: number) => j === 0 || !alnumAt(t, j - 1);
+  // Subsequence DP: dp[i][j] = best score matching q[0..i] with q[i] at t[j] (flat, row-major).
   const NEG = -Infinity;
-  const dp: number[][] = Array.from({ length: m }, () => new Array<number>(n).fill(NEG));
-  const from: number[][] = Array.from({ length: m }, () => new Array<number>(n).fill(-1));
+  const size = m * n;
+  if (dpBuf.length < size) {
+    dpBuf = new Float64Array(size);
+    fromBuf = new Int32Array(size);
+  }
+  const dp = dpBuf;
+  const from = fromBuf;
+  dp.fill(NEG, 0, size);
+  from.fill(-1, 0, size);
   for (let i = 0; i < m; i++) {
+    const qi = q.charCodeAt(i);
+    const row = i * n;
+    const prevRow = row - n;
     for (let j = i; j < n; j++) {
-      if (t[j] !== q[i]) continue;
+      if (t.charCodeAt(j) !== qi) continue;
       const base = 1 + (boundary(j) ? 12 : 0) + (j === 0 ? 6 : 0);
       if (i === 0) {
-        dp[i][j] = base - Math.min(j, 10) * 0.3;
+        dp[row + j] = base - Math.min(j, 10) * 0.3;
         continue;
       }
       for (let k = i - 1; k < j; k++) {
-        const prev = dp[i - 1][k];
+        const prev = dp[prevRow + k];
         if (prev === NEG) continue;
         const gap = j - k - 1;
-        const s = prev + base + (gap === 0 ? 8 : -Math.min(gap, 6));
-        if (s > dp[i][j]) {
-          dp[i][j] = s;
-          from[i][j] = k;
+        const sc = prev + base + (gap === 0 ? 8 : -Math.min(gap, 6));
+        if (sc > dp[row + j]) {
+          dp[row + j] = sc;
+          from[row + j] = k;
         }
       }
     }
   }
   let bj = -1;
   let bs = NEG;
+  const last = (m - 1) * n;
   for (let j = 0; j < n; j++) {
-    if (dp[m - 1][j] > bs) {
-      bs = dp[m - 1][j];
+    if (dp[last + j] > bs) {
+      bs = dp[last + j];
       bj = j;
     }
   }
@@ -172,7 +224,7 @@ export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
   const idx: number[] = [];
   for (let i = m - 1, j = bj; i >= 0; i--) {
     idx.unshift(j);
-    j = from[i][j];
+    j = from[i * n + j];
   }
   // Subsequence matches are capped below any substring match.
   return { score: Math.min(95, Math.max(1, bs)), ranges: toRanges(idx) };
@@ -208,6 +260,11 @@ export interface Field {
   /** Highlight ranges are only reported for the title field. */
   isTitle?: boolean;
   isNumber?: boolean;
+  /** `fold(text)`, filled on first use and kept with the cached index (PERF-2: never re-folded per key). */
+  folded?: string;
+  /** Which of a–z / 0–9 occur in `folded` (`charMask`), filled with it. */
+  maskLo?: number;
+  maskHi?: number;
 }
 
 export interface Scored {
@@ -215,20 +272,132 @@ export interface Scored {
   ranges: Range[];
 }
 
+/** One query token, folded once per search, with per-search memos of the costly passes (PERF-2). */
+export interface QueryToken {
+  raw: string;
+  /** Folded, whitespace removed (what `fuzzyMatch` compares). */
+  q: string;
+  /** Folded as typed (what `typoScore` compares). */
+  folded: string;
+  /** Subsequence-DP results by folded field text (the same name / status repeats across thousands of rows). */
+  dp: Map<string, FuzzyMatch | null>;
+  /** Typo scores by folded field text. */
+  typo: Map<string, number>;
+  /** Typo scores by single word (ASCII fast path of `typoScore`). */
+  words: Map<string, number>;
+  /** Digits only: the token can match a document number's sequence (`matchNumberToken`). */
+  digits: boolean;
+  /** `charMask` of `q`. */
+  maskLo: number;
+  maskHi: number;
+}
+
+/*
+ * Character masks (PERF-2 cheap reject): bit per a–z and 0–9 present in folded text. A token char with no
+ * bit (anything else) is never counted as missing, so the reject stays exact:
+ *  - fuzzy needs every token char in the field (subsequence), so any missing char rules it out;
+ *  - a typo match within `allowed` edits leaves at most `allowed` distinct token chars absent from the word.
+ */
+function bitOf(c: number): number {
+  if (c >= 97 && c <= 122) return c - 97;
+  if (c >= 48 && c <= 57) return c - 22; // 26..35
+  return -1;
+}
+
+function charMask(text: string, from = 0, to = text.length): [lo: number, hi: number] {
+  let lo = 0;
+  let hi = 0;
+  for (let i = from; i < to; i++) {
+    const b = bitOf(text.charCodeAt(i));
+    if (b < 0) continue;
+    if (b < 32) lo |= 1 << b;
+    else hi |= 1 << (b - 32);
+  }
+  return [lo, hi];
+}
+
+function popcount(x: number): number {
+  x -= (x >>> 1) & 0x55555555;
+  x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+  return (((x + (x >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+}
+
+/** Distinct token chars (with a bit) absent from a text with masks lo/hi. */
+const missingChars = (tok: QueryToken, lo: number, hi: number) => popcount(tok.maskLo & ~lo) + popcount(tok.maskHi & ~hi);
+
+/** Split a query into prepared tokens (whitespace-separated, AND-ed by `scoreTokens`). */
+export function prepareTokens(query: string): QueryToken[] {
+  return query.trim().split(/\s+/).filter(Boolean).map((raw) => {
+    const folded = fold(raw);
+    const q = folded.replace(/\s+/g, '');
+    const [maskLo, maskHi] = charMask(q);
+    return { raw, q, folded, digits: /^\d+$/.test(raw), dp: new Map(), typo: new Map(), words: new Map(), maskLo, maskHi };
+  });
+}
+
+function foldedOf(f: Field): string {
+  let v = f.folded;
+  if (v === undefined) {
+    v = fold(f.text);
+    f.folded = v;
+    [f.maskLo, f.maskHi] = charMask(v);
+  }
+  return v;
+}
+
+const isWordCode = (c: number) => (c >= 48 && c <= 57) || (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
+
+/**
+ * `typoScore(tok.folded, text)` with the same result: for ASCII text it walks the words in place, skips the
+ * ones whose length can never come within the allowed edits, and scores each distinct word once per search.
+ */
+function typoFast(tok: QueryToken, text: string): number {
+  const token = tok.folded;
+  if (!isAscii(text) || !isAscii(token)) return typoScore(token, text);
+  const allowed = token.length <= 6 ? 1 : 2;
+  // A word shorter than this is compared whole and differs in length by more than `allowed`.
+  const minLen = Math.max(3, token.length - allowed);
+  let best = 0;
+  const n = text.length;
+  for (let i = 0; i < n; ) {
+    while (i < n && !isWordCode(text.charCodeAt(i))) i++;
+    const start = i;
+    while (i < n && isWordCode(text.charCodeAt(i))) i++;
+    if (i - start < minLen) continue;
+    // The compared candidate is the word or its first `token.length` chars: too many absent token chars → no match.
+    const candEnd = i - start > token.length + allowed ? start + token.length : i;
+    const [lo, hi] = charMask(text, start, candEnd);
+    if (missingChars(tok, lo, hi) > allowed) continue;
+    const word = text.slice(start, i);
+    let sc = tok.words.get(word);
+    if (sc === undefined) {
+      sc = typoScore(token, word);
+      tok.words.set(word, sc);
+    }
+    if (sc > best) best = sc;
+  }
+  return best;
+}
+
 /** Every whitespace-separated token must match some field (AND). */
 export function scoreFields(query: string, fields: Field[]): Scored | null {
-  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  return scoreTokens(prepareTokens(query), fields);
+}
+
+/** `scoreFields` over prepared tokens: same scores and ranges, folding and DP work shared across entries. */
+export function scoreTokens(tokens: readonly QueryToken[], fields: readonly Field[]): Scored | null {
   if (!tokens.length) return { score: 0, ranges: [] };
   let total = 0;
   const ranges: Range[] = [];
-  for (const token of tokens) {
+  for (const tok of tokens) {
+    const token = tok.raw;
     let bestScore = 0;
     let bestRanges: Range[] = [];
     for (const f of fields) {
       if (!f.text) continue;
       let s = 0;
       let r: Range[] = [];
-      if (f.isNumber) {
+      if (f.isNumber && tok.digits) {
         const ns = matchNumberToken(token, f.text);
         if (ns) {
           s = ns * f.weight;
@@ -236,15 +405,24 @@ export function scoreFields(query: string, fields: Field[]): Scored | null {
           if (tail && f.isTitle) r = [[tail.index, tail.index + tail[1].length]];
         }
       }
-      if (!s) {
-        const fm = fuzzyMatch(token, f.text);
+      const ft = s ? '' : foldedOf(f);
+      const missing = s ? 0 : missingChars(tok, f.maskLo!, f.maskHi!);
+      if (!s && missing === 0) {
+        const fm = fuzzyFolded(tok.q, ft, tok.dp);
         if (fm) {
           s = fm.score * f.weight;
           if (f.isTitle) r = fm.ranges;
         }
       }
       // 8.103: spelling slips ("sharmaa", "kumr") still find the word, ranked below real matches.
-      if (!s) s = typoScore(fold(token), fold(f.text)) * f.weight;
+      if (!s && tok.folded.length >= 4 && missing <= (tok.folded.length <= 6 ? 1 : 2)) {
+        let ts = tok.typo.get(ft);
+        if (ts === undefined) {
+          ts = typoFast(tok, ft);
+          tok.typo.set(ft, ts);
+        }
+        s = ts * f.weight;
+      }
       if (s > bestScore) {
         bestScore = s;
         bestRanges = r;
@@ -311,6 +489,9 @@ export interface IndexEntry {
   amounts: number[];
   /** Upper-cased GSTIN / PAN / IRN / UTR / reference values. */
   ids: string[];
+  /** Union of the fields' char masks (PERF-2), filled on first search. */
+  maskLo?: number;
+  maskHi?: number;
 }
 
 /** Build the index over every searchable table (pure; cached per storage version by `searchIndex`). */
@@ -467,19 +648,19 @@ export function buildIndex(d: Omit<SearchData, 'pages' | 'actions'>, now: Date =
 const INDEX_TABLES = ['invoices', 'clients', 'items_catalog', 'vendors', 'purchases', 'transactions', 'vouchers', 'cheques', 'advances', 'einvoice_meta'] as const;
 let indexCache: { raws: (string | null)[]; day: string; index: IndexEntry[] } | null = null;
 
-/** Rows of every searchable table, read once per storage version. */
+/** Rows of every searchable table, read once per storage version (shared peeked rows: read-only). */
 export function loadSearchData(): Omit<SearchData, 'pages' | 'actions'> {
   return {
-    invoices: getTable<InvoiceRecord>(KEYS.invoices),
-    clients: getTable<Client>(KEYS.clients),
-    items: getTable<Partial<InvoiceItem>>(KEYS.items),
-    vendors: getTable<AnyRow>('vendors'),
-    bills: getTable<AnyRow>('purchases'),
-    payments: getTable<Payment>(KEYS.transactions),
-    vouchers: getTable<AnyRow>('vouchers'),
-    cheques: getTable<AnyRow>('cheques'),
-    advances: getTable<AnyRow>('advances'),
-    einvoice: getTable<AnyRow>('einvoice_meta'),
+    invoices: peekTable<InvoiceRecord>(KEYS.invoices),
+    clients: peekTable<Client>(KEYS.clients),
+    items: peekTable<Partial<InvoiceItem>>(KEYS.items),
+    vendors: peekTable<AnyRow>('vendors'),
+    bills: peekTable<AnyRow>('purchases'),
+    payments: peekTable<Payment>(KEYS.transactions),
+    vouchers: peekTable<AnyRow>('vouchers'),
+    cheques: peekTable<AnyRow>('cheques'),
+    advances: peekTable<AnyRow>('advances'),
+    einvoice: peekTable<AnyRow>('einvoice_meta'),
   };
 }
 
@@ -489,12 +670,40 @@ export function searchIndex(now: Date = new Date()): IndexEntry[] {
   const day = now.toDateString();
   if (indexCache && indexCache.day === day && indexCache.raws.every((r, i) => r === raws[i])) return indexCache.index;
   const index = buildIndex(loadSearchData(), now);
+  // Fold every field and fill the char masks now (palette open), so the first keystroke does not pay for it.
+  for (const e of index) entryCannotMatch(e, []);
   indexCache = { raws, day, index };
   return index;
 }
 
 /** Score one entry against a parsed query (null = no match). */
-function scoreEntry(e: Pick<IndexEntry, 'fields' | 'amounts' | 'ids'>, pq: ParsedQuery): Scored | null {
+/**
+ * Cheap whole-entry reject: a text token with more distinct chars absent from EVERY field than a typo could
+ * forgive cannot match any field. Digit tokens are skipped ("0007" equals sequence 7 without a 0 in the text).
+ */
+function entryCannotMatch(e: Pick<IndexEntry, 'fields' | 'maskLo' | 'maskHi'>, tokens: readonly QueryToken[]): boolean {
+  if (e.maskLo === undefined) {
+    let lo = 0;
+    let hi = 0;
+    for (const f of e.fields) {
+      if (!f.text) continue;
+      foldedOf(f);
+      lo |= f.maskLo!;
+      hi |= f.maskHi!;
+    }
+    e.maskLo = lo;
+    e.maskHi = hi;
+  }
+  for (const tok of tokens) {
+    if (tok.digits) continue;
+    const len = tok.folded.length;
+    const forgiven = len < 4 ? 0 : len <= 6 ? 1 : 2;
+    if (missingChars(tok, e.maskLo, e.maskHi!) > forgiven) return true;
+  }
+  return false;
+}
+
+function scoreEntry(e: Pick<IndexEntry, 'fields' | 'amounts' | 'ids' | 'maskLo' | 'maskHi'>, pq: ParsedQuery, tokens: readonly QueryToken[]): Scored | null {
   if (pq.amount && !amountMatches(pq.amount, e.amounts)) return null;
   let bonus = 0;
   for (const id of pq.ids) {
@@ -502,8 +711,26 @@ function scoreEntry(e: Pick<IndexEntry, 'fields' | 'amounts' | 'ids'>, pq: Parse
     bonus += 400;
   }
   if (!pq.text) return pq.amount || pq.ids.length ? { score: 120 + bonus, ranges: [] } : null;
-  const sc = scoreFields(pq.text, e.fields);
+  if (entryCannotMatch(e, tokens)) return null;
+  const sc = scoreTokens(tokens, e.fields);
   return sc ? { score: sc.score + bonus, ranges: sc.ranges } : null;
+}
+
+/** Same order as `String#localeCompare` with no arguments (both use the default locale's collator), built once. */
+let titleCollator: Intl.Collator | null = null;
+const byRank = (a: SearchResult, b: SearchResult) => b.score - a.score || (titleCollator ??= new Intl.Collator()).compare(a.title, b.title);
+
+/**
+ * The first `k` of `list` sorted by `byRank`, without sorting thousands of weak hits (PERF-2): only rows
+ * scoring at least the k-th best score can make the cut, and the stable sort keeps their order.
+ */
+export function topRanked(list: SearchResult[], k: number): SearchResult[] {
+  if (list.length > k * 4 && k > 0) {
+    const scores = Float64Array.from(list, (r) => r.score).sort();
+    const floor = scores[scores.length - k];
+    list = list.filter((r) => r.score >= floor);
+  }
+  return list.sort(byRank).slice(0, k);
 }
 
 export function searchAll(query: string, opts: SearchOptions = {}): SearchResult[] {
@@ -523,37 +750,36 @@ export function searchAll(query: string, opts: SearchOptions = {}): SearchResult
   const pages = d.pages ?? DEFAULT_PAGES;
   const actions = d.actions ?? [];
   const pq = parseQuery(q);
+  const tokens = prepareTokens(pq.text);
 
   const groups = Object.fromEntries(GROUP_ORDER.map((g) => [g, [] as SearchResult[]])) as Record<SearchGroup, SearchResult[]>;
   for (const e of index) {
-    const sc = scoreEntry(e, pq);
+    const sc = scoreEntry(e, pq, tokens);
     if (!sc) continue;
     groups[e.group].push({ id: e.id, group: e.group, title: e.title, subtitle: e.subtitle, icon: e.icon, href: e.href, score: sc.score, ranges: sc.ranges });
   }
 
   // Pages / actions match on the whole query text (amount / id tokens never name a command).
+  const whole = prepareTokens(q);
   for (const [group, list] of [['pages', pages], ['actions', actions]] as const) {
     for (const e of list) {
-      const sc = scoreFields(q, staticFields(e));
+      const sc = scoreTokens(whole, staticFields(e));
       if (!sc) continue;
       groups[group].push({ id: e.id, group, title: e.title, subtitle: e.subtitle, icon: e.icon, href: e.href, actionId: e.actionId, score: sc.score, ranges: sc.ranges });
     }
   }
 
   const result: SearchResult[] = [];
-  for (const g of GROUP_ORDER) {
-    groups[g].sort((a, b) => b.score - a.score || a.title.localeCompare(b.title));
-    result.push(...groups[g].slice(0, perGroup));
-  }
+  for (const g of GROUP_ORDER) result.push(...topRanked(groups[g], perGroup));
   return result;
 }
 
 /** Injected data (tests / callers): missing tables are simply empty, never read from storage mid-test. */
 function loadSearchDataFallback(d: Partial<SearchData>): Omit<SearchData, 'pages' | 'actions'> {
   return {
-    invoices: d.invoices ?? getTable<InvoiceRecord>(KEYS.invoices),
-    clients: d.clients ?? getTable<Client>(KEYS.clients),
-    items: d.items ?? getTable<Partial<InvoiceItem>>(KEYS.items),
+    invoices: d.invoices ?? peekTable<InvoiceRecord>(KEYS.invoices),
+    clients: d.clients ?? peekTable<Client>(KEYS.clients),
+    items: d.items ?? peekTable<Partial<InvoiceItem>>(KEYS.items),
     vendors: d.vendors ?? [],
     bills: d.bills ?? [],
     payments: d.payments ?? [],
@@ -570,9 +796,10 @@ function loadSearchDataFallback(d: Partial<SearchData>): Omit<SearchData, 'pages
 export function searchPeek(query: string, company: { id: string; name: string }, data: Omit<SearchData, 'pages' | 'actions'>, now: Date = new Date(), perCompany = 5): SearchResult[] {
   const pq = parseQuery(query.trim());
   if (!query.trim()) return [];
+  const tokens = prepareTokens(pq.text);
   const out: SearchResult[] = [];
   for (const e of buildIndex(data, now)) {
-    const sc = scoreEntry(e, pq);
+    const sc = scoreEntry(e, pq, tokens);
     if (!sc) continue;
     out.push({ id: `co:${company.id}:${e.id}`, group: 'companies', title: e.title, subtitle: `${company.name} · ${e.subtitle}`, icon: e.icon, score: sc.score, ranges: sc.ranges, company: company.id });
   }

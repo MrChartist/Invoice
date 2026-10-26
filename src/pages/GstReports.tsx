@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { CalendarRange, CheckCircle2, Download, FileJson, FileSpreadsheet, Files, Printer, ShieldAlert } from 'lucide-react';
-import { getTable, readRaw, writeRaw } from '../lib/storage';
+import { getTable, peekTable, readRaw, writeRaw } from '../lib/storage';
 import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
 import { stateByCode } from '../lib/india-states';
@@ -121,11 +121,12 @@ const pos = (code: string) => {
 export function GstReports() {
   useT();
   const { notify, toastNode } = useToast();
-  const invoices = useMemo(() => getTable<InvoiceRecord>('invoices'), []);
-  const purchases = useMemo(() => getTable<unknown>('purchases'), []);
+  // PERF-2: shared, parsed-once rows. The report builders and panels only read them (never mutate).
+  const invoices = useMemo(() => peekTable<InvoiceRecord>('invoices') as InvoiceRecord[], []);
+  const purchases = useMemo(() => peekTable<unknown>('purchases') as unknown[], []);
   // Advance receipts (5.3): GSTR-1 Table 11 and their effect on 3B 3.1(a).
   const advances = useMemo(
-    () => advanceTaxEvents(getTable<AdvanceRecord>('advances'), getTable<Payment>('transactions'), invoices),
+    () => advanceTaxEvents(getTable<AdvanceRecord>('advances'), peekTable<Payment>('transactions') as Payment[], invoices),
     [invoices],
   );
   const profiles = useMemo<SenderProfile[]>(() => localDb.settings.get().profiles, []);

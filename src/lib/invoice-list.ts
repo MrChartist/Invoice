@@ -32,6 +32,10 @@ export function matchesListFilter(inv: InvoiceRecord, f: ListFilter): boolean {
 
 const balanceOf = (i: InvoiceRecord) => (isRevenueDoc(i) ? Number(receivableBalance(i)) || 0 : 0);
 
+/* PERF-2: the collators `localeCompare` would build on every call, built once (same order). */
+let numericCollator: Intl.Collator | null = null;
+let defaultCollator: Intl.Collator | null = null;
+
 export function sortInvoices(rows: readonly InvoiceRecord[], key: SortKey, dir: SortDir): InvoiceRecord[] {
   const sign = dir === 'asc' ? 1 : -1;
   const val = (i: InvoiceRecord): string | number => {
@@ -44,13 +48,19 @@ export function sortInvoices(rows: readonly InvoiceRecord[], key: SortKey, dir: 
       case 'balance': return balanceOf(i);
     }
   };
-  return [...rows].sort((a, b) => {
-    const x = val(a);
-    const y = val(b);
-    const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'en', { numeric: true });
+  const numeric = (numericCollator ??= new Intl.Collator('en', { numeric: true })).compare;
+  const plain = (defaultCollator ??= new Intl.Collator()).compare;
+  // Sort keys computed once per row (not twice per comparison); the comparator is unchanged, and the
+  // sort is stable, so the order is exactly what it was.
+  const keyed = rows.map((row) => ({ row, k: val(row), created: String(row.created_at ?? '') }));
+  keyed.sort((a, b) => {
+    const x = a.k;
+    const y = b.k;
+    const c = typeof x === 'number' && typeof y === 'number' ? x - y : numeric(String(x), String(y));
     // Stable tie-break: newest first, so equal keys keep a predictable order.
-    return c * sign || String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''));
+    return c * sign || plain(b.created, a.created);
   });
+  return keyed.map((e) => e.row);
 }
 
 /** Live credit notes per invoice, read from `doc_links` (src/lib/amount-due.ts). */
