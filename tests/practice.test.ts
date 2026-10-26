@@ -2,7 +2,7 @@ import './helpers/shim.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
-import { boardTable, buildPracticeBoard, buildPracticeRow, type PeekedCompany } from '../src/lib/practice.ts';
+import { boardCsv, boardTable, buildPracticeBoard, buildPracticeRow, peekedCompany, type PeekedCompany } from '../src/lib/practice.ts';
 import { dscDb, dscStatus, nearestExpiry, sanitizeDsc, type DscRow } from '../src/lib/dsc-register.ts';
 import { dscNotices } from '../src/lib/dsc-alerts.ts';
 import { BUILTIN_TEMPLATE, checklistDb, cleanTemplate, monthChecklist, prevMonth, progress, toggleItem, type ChecklistMonth } from '../src/lib/client-checklist.ts';
@@ -116,4 +116,26 @@ test('checklist carry-over across months and the FY; template layering', () => {
   const m = checklistDb.toggle('2026-05', 'company-item', 'Asha', new Date('2026-05-02T00:00:00Z'));
   assert.equal(m.items[0].by, 'Asha');
   assert.equal(checklistDb.months().length, 1);
+});
+
+test('QA5-2 F8: the board CSV neutralises formula injection in a company name and a DSC holder', () => {
+  const evil = company({ name: '=HYPERLINK("http://x","Click")' });
+  const tables = { ...evil.tables, dsc_register: [{ id: 'd9', holder: '@cmd', role: 'director', valid_to: '2026-11-20' }] } as PeekedCompany['tables'];
+  const csv = boardCsv(buildPracticeBoard([{ ...evil, tables }], '2026-10-15'));
+  const cells = csv.split(/\r?\n/)[1];
+  assert.ok(cells.startsWith(`"'=HYPERLINK(`), cells);
+  assert.ok(cells.includes(",'@cmd,"), cells);
+});
+
+test('QA5-2 F19: a registry entry with no database is "no data on this device", not "Locked"', () => {
+  const ghost = peekedCompany({ id: 'g', name: 'Ghost Co' }, null);
+  assert.deepEqual([ghost.missing, !!ghost.locked], [true, false]);
+  const sealed = peekedCompany({ id: 's', name: 'Sealed' }, { locked: true, tables: {} });
+  assert.deepEqual([!!sealed.missing, sealed.locked], [false, true]);
+  const open = peekedCompany({ id: 'o', name: 'Open' }, { locked: false, tables: { invoices: [] } });
+  assert.deepEqual([!!open.missing, !!open.locked, !!open.tables], [false, false, true]);
+  const [row] = buildPracticeBoard([ghost], '2026-10-15');
+  assert.equal(row.missing, true);
+  assert.equal(row.locked, false);
+  assert.match(String(boardTable([row])[1].at(-1)), /No data on this device/);
 });

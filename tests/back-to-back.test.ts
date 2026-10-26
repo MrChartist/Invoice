@@ -2,7 +2,7 @@ import './helpers/shim.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
-import { backorderRows, buildBackToBackPos, createBackToBackPos, onOrderQty, openLinkedPos, soToPoRows, type FreeStockFn } from '../src/lib/back-to-back.ts';
+import { backorderRows, buildBackToBackPos, createBackToBackPos, onOrderQty, openLinkedPos, poLinesReceived, soToPoRows, type FreeStockFn } from '../src/lib/back-to-back.ts';
 import { orderFulfilment } from '../src/lib/sales-orders.ts';
 import { poHtml, posForSalesOrder, purchaseOrdersDb } from '../src/lib/purchase-orders.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
@@ -106,4 +106,31 @@ test('storage: POs saved in the PO series, queried by sales order', () => {
   assert.deepEqual(saved.map((p) => p.po_number), ['PO/FY26-27/0001', 'PO/FY26-27/0002']);
   assert.equal(posForSalesOrder('so1', purchaseOrdersDb.all()).length, 2);
   assert.throws(() => createBackToBackPos([]), /Nothing to order/);
+});
+
+test('QA5-2 F21: free stock is shared across order lines of one item; a short-closed PO counts only what it received', () => {
+  // Two order lines of the same bearing (5 BOX + 3 BOX); 12 NOS = 1.2 BOX free in all.
+  const two = so({ items: [
+    { id: 'L1', name: 'Bearing 6205', type: 'goods', hsn: '8482', unit: 'BOX', unit_factor: 10, quantity: 5, rate: 900, tax_rate: 18, amount: 4500 },
+    { id: 'L4', name: 'Bearing 6205', type: 'goods', hsn: '8482', unit: 'BOX', unit_factor: 10, quantity: 3, rate: 900, tax_rate: 18, amount: 2700 },
+  ] });
+  const f = orderFulfilment(two, [two], []);
+  const rows = soToPoRows(f, 'so1', [], { free, lastSupplier });
+  assert.deepEqual(rows.map((r) => [r.line.id, r.free, r.short]), [['L1', 1.2, 3.8], ['L4', 0, 3]], 'the 1.2 BOX free is used once');
+
+  // A PO for 3.8 BOX short-closed after 2 BOX arrived: only 2 count as on order, 1.8 is proposed again.
+  const po: PurchaseOrder = {
+    id: 'p1', po_number: 'PO/FY26-27/0001', date: '2026-06-02', vendor_name: 'SKF Dealer', so_id: 'so1', closed_on: '2026-06-15',
+    lines: [{ id: 'pl1', name: 'Bearing 6205', unit: 'BOX', quantity: 3.8, rate: 800, tax_rate: 18, so_line_id: 'L1' }],
+    taxable: 3040, cgst: 0, sgst: 0, igst: 547.2, total: 3587.2,
+  };
+  const grn = { id: 'g1', kind: 'GRN', number: 'GRN/1', date: '2026-06-05', vendor_name: 'SKF Dealer', lines: [{ id: 'gl1', name: 'Bearing 6205', quantity: 2, rate: 800, po_line_id: 'pl1' }] } as unknown as ReceiptNote;
+  const received = poLinesReceived([po], [], [grn]);
+  assert.equal(received.get('pl1'), 2);
+  assert.equal(onOrderQty('so1', [po], received).get('L1'), 2);
+  assert.equal(onOrderQty('so1', [po]).get('L1') ?? 0, 0, 'closed with nothing known received: nothing on order');
+  const one = orderFulfilment(so(), [so()], []);
+  assert.equal(soToPoRows(one, 'so1', [po], { free, lastSupplier, received }).find((r) => r.line.id === 'L1')!.short, 1.8);
+  // An open PO still counts its whole quantity.
+  assert.equal(onOrderQty('so1', [{ ...po, closed_on: undefined }], received).get('L1'), 3.8);
 });

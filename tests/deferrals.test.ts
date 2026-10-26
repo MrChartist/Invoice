@@ -3,7 +3,7 @@ import './helpers/shim.ts';
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freezeDate, resetStorage, thawDate } from './helpers/shim.ts';
-import { createViaStore, installSettings, reload } from './helpers/world.ts';
+import { clientUS, createViaStore, installSettings, reload } from './helpers/world.ts';
 import {
   ADVANCE_INCOME_NAME,
   PREPAID_NAME,
@@ -22,7 +22,7 @@ import {
 } from '../src/lib/deferrals.ts';
 import { A, buildLedger, chartOf, closingBalances, ledgerProfitAndLoss, loadLedgerInput, loadUserAccounts, loadVouchers, trialBalance } from '../src/lib/ledger/index.ts';
 import { localDb } from '../src/lib/localDb.ts';
-import { getTable, setTable } from '../src/lib/storage.ts';
+import { SINGLETON_KEYS, getJson, getTable, setJson, setTable } from '../src/lib/storage.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
 beforeEach(() => {
@@ -31,6 +31,8 @@ beforeEach(() => {
 });
 afterEach(() => thawDate());
 
+/** Remove the period lock directly (moving it earlier needs the owner's PIN in the app). */
+const unlockBooks = () => setJson(SINGLETON_KEYS.settings, { ...getJson<Record<string, unknown>>(SINGLETON_KEYS.settings, {}), lock_until: '' });
 const sum = (rows: { amount: number }[]) => rows.reduce((s, r) => s + r.amount, 0);
 
 test('schedule by months: equal shares on calendar month ends, rounding on the last', () => {
@@ -108,9 +110,60 @@ test('period lock: a locked release is skipped, then posted once unlocked', () =
   const s = localDb.settings.get();
   localDb.settings.save({ ...s, lock_until: '2025-04-30' });
   const r = postDue('2025-05-31');
-  assert.equal(r.locked, 2, 'init (1 Apr) and April are locked');
-  assert.equal(r.posted, 1, 'May posts');
-  assert.equal(loadVouchers().length, 1);
+  // QA5-2 F6: no release may post before the initial deferral exists (Sales would be overstated).
+  assert.equal(r.locked, 3, 'init (1 Apr) and April are locked; May is held until the initial deferral posts');
+  assert.equal(r.posted, 0);
+  assert.equal(loadVouchers().length, 0);
+  unlockBooks();
+  assert.equal(postDue('2025-05-31').posted, 3, 'init + April + May once unlocked');
+});
+
+test('QA5-2 F6: a schedule whose source date is locked is refused; releases never post without the initial deferral', () => {
+  const inv = annualAmc('2026-08-10');
+  localDb.settings.save({ ...localDb.settings.get(), lock_until: '2026-08-31' });
+  const [line] = invoiceSourceLines(inv);
+  assert.throws(() => createDeferral({ source: line, amount_paise: 1_200_000, start: '2026-08-01', months: 12, method: 'months' }), /locked/i);
+  assert.equal(loadDeferrals().length, 0);
+  // A schedule written before the lock moved (or imported) still never releases ahead of its initial entry.
+  unlockBooks();
+  createDeferral({ source: line, amount_paise: 1_200_000, start: '2026-08-01', months: 12, method: 'months' });
+  localDb.settings.save({ ...localDb.settings.get(), lock_until: '2026-08-31' });
+  const r = postDue('2026-10-31');
+  assert.equal(r.posted, 0, 'r2 / r3 are held');
+  assert.equal(loadVouchers().length, 0);
+  const pl = ledgerProfitAndLoss(buildLedger(loadLedgerInput()), { start: '2026-04-01', end: '2027-03-31' });
+  assert.equal(pl.income.flatMap((x) => x.lines).find((l) => l.account.id === A.sales)?.amount, 1_200_000, 'Sales is the invoice value, never more');
+});
+
+test('QA5-2 F5: the deferrable amount is the line taxable value in INR', () => {
+  const inc = createViaStore({ date: '2026-10-01', lines: [{ name: 'Annual AMC', qty: 1, rate: 11800, tax: 18 }], inclusive: true });
+  assert.equal(invoiceSourceLines(inc)[0].amount, 10000, 'tax backed out of an inclusive price');
+  const disc = createViaStore({ date: '2026-10-01', lines: [{ name: 'Annual AMC', qty: 1, rate: 10000, tax: 18, disc: 10 }, { name: 'Setup', qty: 1, rate: 1000, tax: 18 }], invoiceDiscount: { type: 'PERCENT', value: 20 } });
+  assert.deepEqual(invoiceSourceLines(disc).map((l) => l.amount), [7200, 800], 'line and invoice discounts, pro-rata like the invoice calc');
+  assert.equal(invoiceSourceLines(disc).reduce((s, l) => s + l.amount, 0), disc.taxable_value);
+  const usd = createViaStore({ client: clientUS, date: '2026-10-01', lines: [{ name: 'SaaS year', qty: 1, rate: 1200, tax: 0 }], currency: 'USD', supply: 'EXPORT_LUT' as never, patch: { exchange_rate: 84 } as never });
+  assert.equal(invoiceSourceLines(usd)[0].amount, 100800, 'converted at the document rate');
+  // An unselected optional line is not on the bill: it offers nothing and the other line keeps its own index.
+  const opt = { ...disc, items: [{ ...disc.items[0], optional: true, selected: false }, disc.items[1]] };
+  assert.deepEqual(invoiceSourceLines(opt).map((l) => [l.line_index, l.amount]), [[1, 800]]);
+  // A bill-level discount on a purchase is spread over its lines the same way.
+  setTable('purchases', [{ id: 'b9', kind: 'BILL', vendor_name: 'V', bill_number: 'B-9', date: '2026-10-01', taxable: 9000, total: 10620, lines: [{ name: 'Insurance', quantity: 1, rate: 6000 }, { name: 'AMC', quantity: 1, rate: 4000 }] }]);
+  assert.deepEqual(purchaseSourceLines(getTable('purchases')[0]).map((l) => l.amount), [5400, 3600]);
+});
+
+test('QA5-2 F22: deleting a schedule with a locked journal changes nothing', () => {
+  const inv = annualAmc('2026-04-01');
+  const [line] = invoiceSourceLines(inv);
+  const d = createDeferral({ source: line, amount_paise: 1_200_000, start: '2026-04-01', months: 12, method: 'months' });
+  postDue('2026-06-30');
+  assert.equal(loadVouchers().length, 4);
+  // Later journals first (a re-posted entry is appended), so the unlocked ones would go before the locked one.
+  setTable('deferrals', loadDeferrals().map((x) => ({ ...x, voucher_ids: [...x.voucher_ids].reverse() })));
+  localDb.settings.save({ ...localDb.settings.get(), lock_until: '2026-05-15' });
+  assert.throws(() => deleteDeferral(d.id), /locked/i);
+  assert.equal(loadVouchers().length, 4, 'no journal deleted');
+  assert.equal(loadDeferrals().length, 1);
+  assert.equal(postDue('2026-06-30').posted, 0, 'nothing posts twice');
 });
 
 test('stop / reversal on cancel: unreleased amount comes back, holding account clears', () => {

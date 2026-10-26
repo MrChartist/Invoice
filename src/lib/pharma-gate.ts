@@ -113,3 +113,50 @@ export function saleLimitGate<T extends Issues>(
   }
   return errors.length ? { ...issues, errors: [...issues.errors, ...errors] } : issues;
 }
+
+/* ── QA5-2 F9: a sale may not draw on stock held in a non-saleable godown ── */
+
+/**
+ * Errors for sale lines whose godown (absent = Main, where the stock engine books it) has less than the
+ * line needs while the item has quantity sitting in non-saleable godowns (QC hold, expiry, WIP, in transit):
+ * that sale would sell held goods and drive the saleable godown negative. Items with no held stock keep the
+ * usual behaviour (a shortfall is a warning). `byGodown` is the item's balance per godown WITHOUT this document.
+ */
+export function heldStockGate<T extends Issues>(
+  issues: T,
+  doc: { doc_type?: string; items: readonly (LimitLine & { hsn?: string; optional?: boolean; alt_group?: string; selected?: boolean })[] },
+  opts: {
+    nonSaleable: ReadonlySet<string>;
+    itemOf: (l: { name: string; hsn?: string }) => string | undefined;
+    byGodown: (itemId: string) => Readonly<Record<string, number>> | undefined;
+    godownName: (id: string) => string;
+    mainId: string;
+  },
+): T {
+  if (!opts.nonSaleable.size || !SALE_TYPES.has(doc.doc_type ?? '')) return issues;
+  const need = new Map<string, { item: string; godown: string; name: string; qty: number }>();
+  for (const l of doc.items) {
+    const q = (Number(l.quantity) || 0) * (Number(l.unit_factor) > 0 ? Number(l.unit_factor) : 1);
+    // Unselected optional / alternative lines are not sold.
+    if (!l.name?.trim() || !(q > 0) || ((l.optional || (l.alt_group ?? '').trim()) && !l.selected)) continue;
+    const godown = l.godown_id || opts.mainId;
+    const item = opts.nonSaleable.has(godown) ? undefined : opts.itemOf(l);
+    if (!item) continue;
+    const key = `${item}|${godown}`;
+    const row = need.get(key) ?? { item, godown, name: l.name.trim(), qty: 0 };
+    row.qty += q;
+    need.set(key, row);
+  }
+  const errors: string[] = [];
+  const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
+  for (const r of need.values()) {
+    const bal = opts.byGodown(r.item) ?? {};
+    const heldIn = [...opts.nonSaleable].filter((g) => (Number(bal[g]) || 0) > 1e-9);
+    if (!heldIn.length) continue;
+    const have = Math.max(Number(bal[r.godown]) || 0, 0);
+    if (r.qty <= have + 1e-9) continue;
+    const held = heldIn.reduce((s, g) => s + (Number(bal[g]) || 0), 0);
+    errors.push(`${r.name}: only ${fmt(have)} saleable in ${opts.godownName(r.godown)}; ${fmt(held)} is held in ${heldIn.map(opts.godownName).join(', ')} (not for sale) — release it first or sell from another godown.`);
+  }
+  return errors.length ? { ...issues, errors: [...issues.errors, ...errors] } : issues;
+}

@@ -20,9 +20,9 @@
  * judgement call: the date is the user's, the screen only reminds them — verify with your CA.
  */
 
-import type { DocumentType, InvoiceItem, InvoiceRecord } from '../types/invoice';
+import type { DocumentType, InvoiceItem, InvoiceRecord, RoundMode } from '../types/invoice';
 import type { Milestone, ProgressBasis, ProgressOf } from '../types/sales-r2';
-import { calcInputFromRecord, calculateInvoice, isExcludedLine, mulRound2, num, pctOf, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, isExcludedLine, mulRound2, num, pctOf, resolveRoundMode, round2 } from './invoice-calc';
 import { generateId, getTable, KEYS, setTable } from './storage';
 import { localDb } from './localDb';
 import { withTablesRollback } from './table-txn';
@@ -39,8 +39,11 @@ export interface LinkLike {
 }
 
 const EPS = 1e-6;
-/** Stage quantities keep 4 decimals. */
-export const roundQty = (n: number): number => Math.round((n + Math.sign(n) * Number.EPSILON) * 1e4) / 1e4 || 0;
+/**
+ * Stage quantities keep 6 decimals (QA5-2 F16: at 4, a 1-LOT line billed at 33.333% became 33.33% and left a
+ * "0.0001" balance stage).
+ */
+export const roundQty = (n: number): number => Math.round((n + Math.sign(n) * Number.EPSILON) * 1e6) / 1e6 || 0;
 const isBill = (t: DocumentType | undefined) => t === 'INVOICE' || t === 'TAX_INVOICE' || t === 'BILL_OF_SUPPLY';
 
 /** Line value before GST: quantity × rate less the line discount. */
@@ -208,7 +211,27 @@ function recompute(input: InvoiceRecord): InvoiceRecord {
   };
 }
 
-const fmtPct = (n: number) => `${Math.round(n * 100) / 100}%`;
+/** "33.33%", "33.333%", "100.0001%": up to 4 decimals, so a share just past 100% never reads as "100%". */
+const fmtPct = (n: number) => `${Math.round(n * 1e4) / 1e4}%`;
+
+/**
+ * QA5-2 F16: each stage rounds its own total, so with round-off on the stages can miss the quotation's total by
+ * a rupee. The balance stage takes the rounding direction (nearest / up / down) that brings the stages to the
+ * quotation total — a stored round mode, so every reader that recomputes the bill gets the same figure. Not
+ * done once credit notes changed the stages (the target is no longer the quotation total).
+ */
+function absorbRoundOff(draft: InvoiceRecord, summary: ProgressSummary): InvoiceRecord {
+  const mode = resolveRoundMode(draft.round_mode, !!draft.round_off_enabled);
+  if (mode === 'none' || summary.credits.length) return draft;
+  const target = round2(summary.quotedTotal - summary.stages.reduce((s, i) => s + num(i.total), 0));
+  let best = draft;
+  for (const m of ['nearest', 'up', 'down'] as RoundMode[]) {
+    if (m === mode) continue;
+    const alt = recompute({ ...draft, round_mode: m, round_off_enabled: true });
+    if (Math.abs(alt.total - target) < Math.abs(best.total - target) - 0.001) best = alt;
+  }
+  return best;
+}
 
 /** The shell of a stage invoice: the source's parties, tax setup and terms, nothing that belongs to the source alone. */
 function stageShell(source: InvoiceRecord, ctx: StageContext, items: InvoiceItem[], progress: ProgressOf, title: string, charges: { shipping: number; other: number }): InvoiceRecord {
@@ -335,10 +358,10 @@ export function buildBalanceInvoice(source: InvoiceRecord, ctx: StageContext): I
   if (!items.length) throw new ProgressError('Nothing is left to bill: every line is fully invoiced.');
   const billedCharges = summary.stages.reduce((s, i) => ({ shipping: s.shipping + num(i.shipping), other: s.other + num(i.other_charges) }), { shipping: 0, other: 0 });
   const progress: ProgressOf = { source_id: source.id, basis: 'percent', value: round2(Math.max(100 - summary.percent, 0)), stage, final: true };
-  return stageShell(source, ctx, items, progress, `Stage ${stage} — remaining balance of ${source.invoice_number}`, {
+  return absorbRoundOff(stageShell(source, ctx, items, progress, `Stage ${stage} — remaining balance of ${source.invoice_number}`, {
     shipping: Math.max(round2(num(source.shipping) - billedCharges.shipping), 0),
     other: round2(num(source.other_charges) - billedCharges.other),
-  });
+  }), summary);
 }
 
 /* ── Progress billing summary report ────────────────────────────── */

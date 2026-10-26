@@ -141,3 +141,27 @@ test('allocate: steps for all but the last share, remainder last; shareStep keep
   assert.equal((s * 28) % 200, 0);
   assert.equal((s * 12) % 100, 0);
 });
+
+test('QA5-2 F17: an add-on whose quantity differs from its parent splits as share lines, exact to the paisa', () => {
+  const order = { lines: [
+    { id: 'n', name: 'Butter naan', quantity: 3, rate: 60, tax_rate: 5, hsn: '996331', unit: 'NOS', type: 'Product', amount: 180 },
+    { id: 'm', name: '+ Extra butter', quantity: 1, rate: 30, tax_rate: 5, hsn: '996331', unit: 'NOS', type: 'Product', amount: 30, modifier_of: 'n' },
+  ] } as unknown as { lines: OrderLine[] };
+  const parts = partLines(order, [{ line_id: 'n', part: 1, qty: 1 }, { line_id: 'n', part: 2, qty: 1 }, { line_id: 'n', part: 3, qty: 1 }], 3);
+  const value = (l: InvoiceItem) => Math.round(l.quantity * l.rate * 100);
+  assert.equal(parts.flat().reduce((s, l) => s + value(l), 0), 21000, 'the parts add up to ₹210 exactly');
+  for (const p of parts) {
+    const naan = p.find((l) => l.name === 'Butter naan')!;
+    assert.equal(naan.quantity, 1, 'the parent splits by quantity');
+    const butter = p.find((l) => l.name === '+ Extra butter')!;
+    assert.equal(butter.quantity, 1, 'no 0.33 of a non-weight add-on');
+  }
+  // GST-exact steps (5%: ₹0.40), remainder on the last part.
+  assert.deepEqual(parts.map((p) => p.find((l) => l.name === '+ Extra butter')!.rate), [10, 10, 10]);
+  // A whole-number child (2 dips on 2 kebabs) still follows the parent by quantity.
+  const two = partLines({ lines: [
+    { id: 'k', name: 'Kebab', quantity: 2, rate: 200, tax_rate: 5, hsn: '996331', unit: 'NOS', type: 'Product', amount: 400 },
+    { id: 'd', name: '+ Dip', quantity: 2, rate: 15, tax_rate: 5, hsn: '996331', unit: 'NOS', type: 'Product', amount: 30, modifier_of: 'k' },
+  ] } as unknown as { lines: OrderLine[] }, [{ line_id: 'k', part: 1, qty: 1 }, { line_id: 'k', part: 2, qty: 1 }], 2);
+  assert.deepEqual(two.map((p) => p.map((l) => [l.name, l.quantity, l.rate])), [[['Kebab', 1, 200], ['+ Dip', 1, 15]], [['Kebab', 1, 200], ['+ Dip', 1, 15]]]);
+});

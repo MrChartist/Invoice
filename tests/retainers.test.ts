@@ -47,11 +47,32 @@ test('rollover cap and forfeiture', () => {
   assert.equal(nov.rolled_in, 120);
   assert.equal(nov.allowance, 720);
   const closed = rt.closePeriod(r, '2026-10-01', entries, billable, [], '2026-11-05', '2026-11-05T00:00:00Z');
-  assert.deepEqual(closed.row, { period: '2026-10-01', used: 360, rolled: 120, forfeited: 120, at: '2026-11-05T00:00:00Z' });
+  assert.deepEqual(closed.row, { period: '2026-10-01', used: 360, rolled: 120, forfeited: 120, at: '2026-11-05T00:00:00Z', covered: { a: 360 } });
   assert.deepEqual(closed.stamp, ['a']);
   assert.throws(() => rt.closePeriod(closed.retainer, '2026-10-01', entries, billable, [], '2026-11-05'), /already closed/);
   assert.throws(() => rt.closePeriod(r, '2026-11-01', entries, billable, [], '2026-12-05'), /Close Oct 2026 first/);
   assert.equal(rt.periodsToClose(rt.drawdown(r, entries, billable, [], '2026-11-05')).length, 1);
+});
+
+test('QA5-2 F4: closing a period keeps the overage of a partly covered entry billable', () => {
+  resetStorage();
+  installSettings();
+  localDb.clients.upsert(clientMH);
+  const r = rt.saveRetainer({ client_key: 'c-mh', client_name: 'Bharat Traders', hours_per_period: 1, period: 'month', fee: 2000, start: '2026-09-01', rollover_cap: 0 });
+  ts.timeDb.save(entry({ id: 'e1', date: '2026-09-05', minutes: 30, created_at: '2026-09-05T10:00:00Z' }));
+  ts.timeDb.save(entry({ id: 'e2', date: '2026-09-10', minutes: 60, created_at: '2026-09-10T10:00:00Z' }));
+  const open = ts.unbilledFor('c-mh').time.map((e) => [e.id, e.minutes]);
+  assert.deepEqual(open, [['e2', 30]], 'open period: 30 min of e2 is overage');
+  rt.commitClose(r.id, '2026-09-01', billable, [], '2026-10-26');
+  const [sep] = rt.drawdown(rt.loadRetainers()[0], ts.timeDb.all(), billable, [], '2026-10-26');
+  assert.equal(sep.used, 60, 'used never exceeds the allowance');
+  assert.equal(sep.overage_minutes, 30);
+  assert.deepEqual(ts.unbilledFor('c-mh').time.map((e) => [e.id, e.minutes]), [['e2', 30]], 'the 30 overage minutes stay unbilled after the close');
+  assert.deepEqual(rt.loadRetainers()[0].closes[0].covered, { e1: 30, e2: 30 });
+  // A close row written before the fix (no per-entry split) is capped by its recorded used minutes.
+  const legacy = { ...rt.loadRetainers()[0], closes: [{ period: '2026-09-01', used: 60, rolled: 0, forfeited: 0, at: 'x' }] };
+  const [old] = rt.drawdown(legacy, ts.timeDb.all(), billable, [], '2026-10-26');
+  assert.deepEqual([[...old.covered], [...old.overage]], [[['e1', 30], ['e2', 30]], [['e2', 30]]]);
 });
 
 test('overage only billed once; covered time never reaches the Unbilled flow', () => {

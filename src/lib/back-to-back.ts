@@ -3,8 +3,9 @@
  * purchase order", Xero backorders).
  *
  *  - "Create purchase order" on a sales order proposes, per order line, the quantity still to deliver
- *    less free stock (in the line's godown when it names one; "full quantity" ignores stock) less what
- *    earlier back-to-back POs of this order already asked for. Quantities are in the order line's
+ *    less free stock (in the line's godown when it names one, used once across lines of the same item;
+ *    "full quantity" ignores stock) less what earlier back-to-back POs of this order already asked for
+ *    (a short-closed PO counts only what it received). Quantities are in the order line's
  *    unit; stock is in base units and converted with `lineFactor` (alternate units).
  *  - The supplier per line is pre-filled with the item's last supplier; one PO is created per supplier.
  *    PO lines carry `so_line_id`, the PO `so_id` (and `drop_ship` + the customer's `ship_to`).
@@ -46,16 +47,30 @@ export type FreeStockFn = (line: Pick<InvoiceItem, 'name' | 'hsn' | 'godown_id'>
 /** Last supplier and rate of a stock item. */
 export type LastSupplierFn = (itemId: string) => { vendor_name?: string; vendor_id?: string; rate?: number } | undefined;
 
-/** Quantity per sales-order line id already asked for on this order's back-to-back POs (line units). */
-export function onOrderQty(soId: string, orders: readonly PurchaseOrder[]): Map<string, number> {
+/**
+ * Quantity per sales-order line id already asked for on this order's back-to-back POs (line units). A
+ * short-closed PO (`closed_on`) counts only what it received (`received`: PO line id → quantity, from
+ * `poLinesReceived`; absent = nothing known) — the rest will never come, so it is proposed again (QA5-2 F21).
+ */
+export function onOrderQty(soId: string, orders: readonly PurchaseOrder[], received?: ReadonlyMap<string, number>): Map<string, number> {
   const out = new Map<string, number>();
   for (const po of orders) {
     if (po?.so_id !== soId) continue;
     for (const l of po.lines ?? []) {
       if (!l.so_line_id) continue;
-      out.set(l.so_line_id, roundQty((out.get(l.so_line_id) ?? 0) + num(l.quantity)));
+      const q = po.closed_on ? Math.min(Math.max(num(received?.get(l.id)), 0), num(l.quantity)) : num(l.quantity);
+      out.set(l.so_line_id, roundQty((out.get(l.so_line_id) ?? 0) + q));
     }
   }
+  return out;
+}
+
+/** Received quantity per PO line, closed POs included (GRN accepted + bills not from a GRN, `purchaseOrderOutstanding`). */
+export function poLinesReceived(orders: readonly PurchaseOrder[], purchases: readonly PurchaseRecord[], notes: readonly ReceiptNote[]): Map<string, number> {
+  const asOpen = orders.filter(Boolean).map((po) => (po.closed_on ? { ...po, closed_on: undefined } : po));
+  const open = new Map(purchaseOrderOutstanding(asOpen, purchases, notes, '9999-12-31').map((r) => [r.lineId, r.received]));
+  const out = new Map<string, number>();
+  for (const po of asOpen) for (const l of po.lines ?? []) out.set(l.id, open.has(l.id) ? open.get(l.id)! : num(l.quantity));
   return out;
 }
 
@@ -77,15 +92,22 @@ export interface SoToPoRow {
  * Pure: the proposal for "Create purchase order". `fullQty` orders the whole pending quantity (still
  * less what earlier back-to-back POs asked for), ignoring stock.
  */
-export function soToPoRows(f: OrderFulfilment, soId: string, orders: readonly PurchaseOrder[], opts: { free?: FreeStockFn; lastSupplier?: LastSupplierFn; fullQty?: boolean } = {}): SoToPoRow[] {
-  const asked = onOrderQty(soId, orders);
+export function soToPoRows(f: OrderFulfilment, soId: string, orders: readonly PurchaseOrder[], opts: { free?: FreeStockFn; lastSupplier?: LastSupplierFn; fullQty?: boolean; received?: ReadonlyMap<string, number> } = {}): SoToPoRow[] {
+  const asked = onOrderQty(soId, orders, opts.received);
+  // QA5-2 F21: free stock (base units, per item and godown) is used once across the order's lines of one item.
+  const left = new Map<string, number>();
   return f.lines
     .filter((l) => l.pendingDelivery > EPS)
     .map((l) => {
       const factor = lineFactor(l.item);
       const stock = opts.free?.(l.item);
-      const free = stock ? Math.max(roundQty(stock.qty / factor), 0) : 0;
       const onOrder = asked.get(l.item.id) ?? 0;
+      const key = stock ? `${stock.itemId}|${l.item.godown_id ?? ''}` : '';
+      const avail = stock ? Math.max(left.get(key) ?? stock.qty, 0) : 0;
+      const need = Math.max(l.pendingDelivery - onOrder, 0) * factor;
+      const take = Math.min(avail, need);
+      if (stock) left.set(key, avail - take);
+      const free = stock ? Math.max(roundQty(take / factor), 0) : 0;
       const short = Math.max(roundQty(l.pendingDelivery - (opts.fullQty ? 0 : free) - onOrder), 0);
       const sup = stock ? opts.lastSupplier?.(stock.itemId) : undefined;
       return {

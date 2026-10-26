@@ -4,10 +4,10 @@ import { Building2, Download, Lock, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DscRegister } from '../components/practice/DscRegister';
 import { ChecklistPanel } from '../components/practice/ChecklistPanel';
-import { buildPracticeBoard, boardTable, type PeekedCompany, type PracticeRow, type PracticeTables } from '../lib/practice';
+import { buildPracticeBoard, boardCsv, boardTable, peekedCompany, type PeekedCompany, type PracticeRow, type PracticeTables } from '../lib/practice';
 import { checklistDb } from '../lib/client-checklist';
 import { companyDbName } from '../lib/company-registry';
-import { readRegistry, switchCompany } from '../lib/companies';
+import { deleteCompany, readRegistry, switchCompany } from '../lib/companies';
 import { SINGLETON_KEYS, getJson, getTable } from '../lib/storage';
 import { todayIso } from '../lib/tax-rules';
 import { downloadText } from '../lib/download';
@@ -43,16 +43,10 @@ async function loadBoard(): Promise<PeekedCompany[]> {
       out.push({ id: c.id, name: c.name, current: true, tables: currentTables() });
       continue;
     }
-    const peek = await peekCompliance(companyDbName(c.id));
-    out.push(peek && !peek.locked ? { id: c.id, name: c.name, tables: peek.tables as PracticeTables } : { id: c.id, name: c.name, locked: true });
+    out.push(peekedCompany(c, await peekCompliance(companyDbName(c.id))));
   }
   return out;
 }
-
-const csvCell = (v: string | number) => {
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
 
 /**
  * R3-C6 practice desk (`/practice`, owner only): a read-only board of every company on this device —
@@ -71,11 +65,16 @@ export function Practice() {
     refresh();
   }, [refresh]);
 
-  const exportCsv = () => rows && downloadText(`practice_board_${today}.csv`, boardTable(rows).map((r) => r.map(csvCell).join(',')).join('\n') + '\n', 'text/csv');
+  const exportCsv = () => rows && downloadText(`practice_board_${today}.csv`, boardCsv(rows), 'text/csv');
   const exportXlsx = async () => {
     if (!rows) return;
     const { downloadXlsx } = await import('../lib/xlsx');
     await downloadXlsx(`practice_board_${today}.xlsx`, [{ name: 'Practice board', rows: boardTable(rows) }]);
+  };
+  // A registry entry whose database is gone (removed elsewhere): drop it from the list (deleting a
+  // database that does not exist creates nothing).
+  const forget = (id: string) => {
+    void deleteCompany(id).then(refresh).catch(refresh);
   };
   const open = (id: string) => {
     window.history.replaceState(null, '', '/');
@@ -117,7 +116,9 @@ export function Practice() {
                 {rows.map((r) => (
                   <tr key={r.id} className={r.current ? styles.current : undefined} data-practice-row={r.id}>
                     <td><strong>{r.name}</strong>{r.current && <div className={styles.note}>{dkT('pr.open1')}</div>}</td>
-                    {r.locked ? (
+                    {r.missing ? (
+                      <td colSpan={9} className={styles.muted}>{dkT('pr.missing')}</td>
+                    ) : r.locked ? (
                       <td colSpan={9} className={styles.muted}><Lock size={13} aria-hidden /> {dkT('pr.locked')}</td>
                     ) : (
                       <>
@@ -135,7 +136,9 @@ export function Practice() {
                       </>
                     )}
                     <td>
-                      {r.current
+                      {r.missing
+                        ? <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => forget(r.id)}>{dkT('pr.forget')}</button>
+                        : r.current
                         ? <Link to="/gst-reports?tab=compliance" className={`${controls.btnGhost} ${controls.btnSm}`}>{dkT('pr.markFiled')}</Link>
                         : <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => open(r.id)}>{dkT('pr.open')}</button>}
                     </td>
