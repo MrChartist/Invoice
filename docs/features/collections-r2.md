@@ -65,9 +65,16 @@ Registered in `backup.ts` (`RECORD_TABLES` / `ID_TABLES`), `access.ts` (`TABLE_A
   Expenses), no GST ledgers, no stock lines. Books P&L (accrual): an indirect expense named by the reason; cash basis:
   nothing (the discounted part was never income).
 - Dashboard revenue (`stats.ts`): a financial note is an expense, not a reduction of billed revenue (documented
-  choice, PRD open question 10); it still settles the bill's outstanding.
+  choice, PRD open question 10); it still settles the bill's outstanding. Reports → Sales (by customer / item / month,
+  tax by rate) follow the same rule and leave financial notes out (QA5 F13), so sales there agree with the P&L. The
+  tax of the GST variant is in the GST reports only.
+- Composition returns (CMP-08, GSTR-4, the GSTR-4 e-commerce TCS estimate) leave out a no-GST financial note, like
+  GSTR-1: kasar never lowers composition turnover (QA5 F3).
 - Clerk cap: the lower of ₹100 and 2% of the bill (company setting). Above it the note is saved as a draft
-  with `approval.state = 'pending'` and waits in the existing approval queue; a pending note reduces nothing.
+  with `approval.state = 'pending'` and waits in the existing approval queue; a pending note reduces nothing, but it
+  reserves its amount: a further note may settle only the due less the pending notes (`settleableOn`). On approval the
+  bill must still owe the note (`assertNoteStillSettles`), else the owner is told to reject it (QA5 F1). The cap is in
+  rupees: a foreign-currency amount is converted at the bill's rate first (QA5 F18).
 - Removing a receipt never cancels its note; the payment dialog offers to cancel the bill's settlement notes.
 
 ### A3 Write-off (on the 8G `write_off` payment flag)
@@ -75,15 +82,20 @@ Registered in `backup.ts` (`RECORD_TABLES` / `ID_TABLES`), `access.ts` (`TABLE_A
   is set up. Bulk write-off stays in the 8G bulk dialog (bucket filter). Both now require `doc.deleteIssued` (owner).
 - Ledger: Dr "Bad debts written off" / Cr party (was "Other expenses" in 8G). GST untouched; the dialog says so.
 - Register (Receivables → Collections): party, bill, written off, date, reason, recovered, net; CSV and Excel.
+- Amount: the true amount due (`amountDue`, linked credit notes and FCNs applied), never total − paid (QA5 F2).
 - Recovery: same FY → the write-off row is reduced and the money is a normal receipt; earlier FY → a Receipt voucher
-  Dr Cash / Bank, Cr "Bad debts recovered". Both logged in `write_off_recoveries`. Undo (owner) removes the row.
+  Dr Cash / Bank, Cr "Bad debts recovered". Same FY with the bill or write-off inside the period lock → the same
+  voucher, dated the day the money came in (mode `locked_period`, QA5 F11). All logged in `write_off_recoveries`.
+  Undo (owner) removes the row; `payments.remove` itself requires `doc.deleteIssued` for a write-off row, and the
+  payment dialog offers no receipt print for it (QA5 F12).
 - Exclusions are automatic: a written-off bill is settled, so reminders, the khata queue, credit-limit exposure and the
   cash forecast skip it, and it is no longer in receivables (DSO numerator). Write-off rows are not "received" in the
   monthly collections table.
 
 ### A4 Follow-ups
 - A promise is KEPT when money received from the party between the day it was made and the promised date reaches the
-  amount; BROKEN when the date has passed without that (partly kept = broken with some money); OPEN otherwise.
+  amount (receipts are shared out over overlapping promises, earliest promised date first, each used once —
+  `promiseAllocation`, QA5 F20); BROKEN when the date has passed without that (partly kept = broken with some money); OPEN otherwise.
 - While a promise is open, `pendingReminders` (`isHeld`) and the khata queue (`heldParties`) skip the covered bills
   (all bills for "on account") until the promise date; after a broken promise (`isFirm`, last 90 days) the next
   reminder suggests at least the firm stage.
