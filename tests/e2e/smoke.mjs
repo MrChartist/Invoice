@@ -1588,7 +1588,7 @@ try {
     const centres = await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'Mobile app'));
     const proj = centres.find((c) => c.name === 'Mobile app');
     check(proj?.budget_minutes === 120 && proj?.kind === 'project', `project stored with a 2 h budget (${proj?.budget_minutes})`);
-    await page.locator('[data-project-select]').selectOption({ label: 'Mobile app' });
+    await page.locator('[data-project-select]').selectOption(proj.id);
     await page.locator('[data-add-task]').click();
     const tdlg = page.getByRole('dialog', { name: 'Add task' });
     await tdlg.locator('#tk-title').fill('Wireframes');
@@ -1609,7 +1609,7 @@ try {
     const te = logged.find((e) => e.description === 'Wireframes v1');
     check(!!te?.task_id && te?.cost_centre_id === proj?.id, `entry carries the task and its project (${te?.cost_centre_id === proj?.id})`);
     await page.reload();
-    await page.locator('[data-project-select]').selectOption({ label: 'Mobile app' });
+    await page.locator('[data-project-select]').selectOption(proj.id);
     const header = await page.locator('[data-project-header]').innerText();
     check(/1h 45m of 2h 00m/.test(header) && /87% of the hours budget/.test(header), `header: tracked vs budget and the 80% warning (${header.replace(/\s+/g, ' ').slice(0, 120)})`);
 
