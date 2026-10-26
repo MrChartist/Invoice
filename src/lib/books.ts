@@ -488,6 +488,8 @@ export function buildVouchers(data: BooksData): Voucher[] {
     if (isAdvanceAdjustment(t) || t.write_off) continue;
     // R4-B1: a gift-voucher redemption moved no money (the cash came in when the voucher was sold).
     if ((t as { gift_voucher_id?: string }).gift_voucher_id) continue;
+    // R5-C6: a receipt settled from a security deposit held moved no money either.
+    if (t.deposit_adjustment_id) continue;
     const date = toIsoDate(t.date);
     const inv = invById.get(t.invoice_id);
     // A receipt against a foreign-currency invoice is booked at the rupees actually realised

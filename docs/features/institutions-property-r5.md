@@ -46,6 +46,10 @@ FCRA portals and the law are the authority — verify with your CA.
   zero-rated, outward RCM and Sec 9(5) supplies are taxable). All per head (IGST / CGST / SGST / cess).
 - "Post" saves one journal (Dr 6370 GST input credit reversed | Cr input ledgers), class "ITC reversal — Rule 42 / 43",
   and a `common_credit_runs` row (every figure); once per month; "Undo" deletes it (period lock, recycle bin).
+- GSTR-3B: `gst-reports.ts` gains the additive option `itcReversals` (4B(1)) and `journalItcReversals(vouchers)`, which
+  reads the journals of that class (credits less debits on the input ledgers; a true-up reclaim is negative). The GST
+  page passes it, so a posted reversal shows in 4(B)(1) of its month — verify with your CA. Other `buildGstReport`
+  callers (GSTR-9, compliance, report pack) do not pass it yet.
 - Annual true-up on the FY's C2 and turnover vs the monthly D1 + D2 posted; + reverse more / − reclaim (journal flips);
   due with the September return (`COMMON_CREDIT_TRUE_UP_RULES`); CSV working paper with every figure.
 
@@ -108,7 +112,8 @@ FCRA portals and the law are the authority — verify with your CA.
 
 - `received` (liability "Security deposits received", other current liabilities, created by name) or `paid` (asset
   3200). Movements through `saveVoucher` (period lock, roles, audit): receive / pay; adjust against an existing invoice
-  (a journal Dr deposits received | Cr debtors whose bill-wise receipt row settles the invoice — no new document);
+  (a journal Dr deposits received | Cr debtors whose bill-wise receipt row — stamped `deposit_adjustment_id`, so no cash /
+  bank reader counts it — settles the invoice; no new document);
   damages / forfeit (a TAX invoice for the applied amount, tax inclusive, then settled the same way); refund (payment /
   receipt voucher + a refund receipt page). Balance per deposit; deposit held on the rent roll; party-wise schedule CSV.
 
@@ -135,9 +140,9 @@ in `src/lib/r5c-rules.ts` (date-keyed, every source "verify"): `COMMON_CREDIT_TR
 `DONATION_CASH_LIMIT_RULES`, `ANON_DONATION_RULES`, `FORM_10BD_DUE_RULES`, `FORM_10BD_COLUMNS`, `NPO_APPLICATION_RULES`,
 `FCRA_ADMIN_CAP_RULES`, `FC4_DUE_RULES`.
 
-Lead rows for ROADMAP / ARCHITECTURE / AGENTS: the nine tables and fields above; "a deposit adjustment row (method
-`Security deposit adjustment`, `voucher_id`) moved no money — cash / bank readers should skip it like `gift_voucher_id`
-rows"; "Rule 42 / 43 reversals are journals: GSTR-3B 4(B)(1) still reads reversals on bills only".
+Lead rows for ROADMAP / ARCHITECTURE / AGENTS: the nine tables and fields above; "a receipt row with
+`deposit_adjustment_id` (R5-C6) moved no money: every cash / bank reader skips it, like `gift_voucher_id`"; "Rule 42 / 43
+reversals are journals of class `ITC reversal — Rule 42 / 43`; `buildGstReport` takes them through `itcReversals`".
 
 ## Bundle (vite build, gzip -9; baseline = `claude/elegant-cannon-cwapiv` at 569d492)
 
@@ -164,9 +169,8 @@ getting under 28 kB means dropping a feature or the Hindi strings (~3.5 kB) — 
    appends to `tax-rules.ts` / `tds-rules.ts`: `tax-rules.ts` is in the first-paint bundle (the same exception AGENTS.md
    makes for `gst-penalties.ts` / `payroll-rules.ts`), and one file keeps the merge with R5-B's appends trivial.
 3. **GSTR-3B 4(B)(1).** The PRD assumed "the existing reversal reader" would pick up the journal; it reads reversals on
-   purchase bills only (and `vouchers` drop unknown fields). The reversal is posted as a journal (class "ITC reversal —
-   Rule 42 / 43") and stored with every figure; the screen says to enter the total in 4(B)(1). `gst-reports.ts` is not
-   edited (one additive `extraReversals` option would close it — lead).
+   purchase bills only (and `vouchers` drop unknown fields). Added instead: the additive `itcReversals` option in
+   `gst-reports.ts` fed by `journalItcReversals` (journals of class "ITC reversal — Rule 42 / 43"), passed by the GST page.
 4. **`admin_expense` flag** on accounts → the list of administrative ledgers is `settings.npo_admin_accounts` (no edit
    to `accounts.ts`, which drops unknown fields). Accumulated amounts (Form 10) → `settings.npo_accumulated`.
 5. **Files.** `fc4.ts`, `application.ts`, `RentRoll.tsx`, `FundStatement.tsx`, `Fc4Panel.tsx` exist as specified; the
@@ -204,7 +208,8 @@ getting under 28 kB means dropping a feature or the Hindi strings (~3.5 kB) — 
 
 ## Known limits
 
-- A deposit adjustment settles the invoice through a voucher-tagged receipt row (like a bill-wise receipt voucher):
-  the ledger is right, but the simple cash book (`books.ts` `buildVouchers`) lists the row as a receipt.
-- The GSTR-3B tab reads ITC reversals on bills only; post the Rule 42 / 43 total into 4(B)(1) by hand (shown on screen).
+- A deposit adjustment settles the invoice through a voucher-tagged receipt row stamped `deposit_adjustment_id`; the
+  cash book / cash tally / forecast (`books.ts` `buildVouchers`), BRS receipt candidates, the day summary (`today.ts`),
+  payment modes (`sales-reports.ts`) and export realisation skip it; the ledger posts the journal once.
+- GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does).
 - Gifts in kind create no voucher; FC-4 lists totals, not the portal's line items.

@@ -52,6 +52,7 @@ const CompositionView = lazy(() => import('../components/gst-reports/Composition
 // E-commerce operators (GSTR-1 Table 14, 3B 3.1.1): loaded when the tab is opened.
 const EcoView = lazy(() => import('../components/gst-reports/EcoView'));
 import { checkGstin } from '../lib/gstin';
+import { journalItcReversals } from '../lib/gst-reports'; // R5-C2
 import { GST_TABS, GST_TAB_GROUPS, PACK_GST_TABS, resolveGstTab, tabForKey, type GstTabGroupId, type GstTabId } from '../lib/gst-tabs';
 import { activePacks } from '../lib/industry-packs'; // R5-C
 import { defineArea } from '../i18n/area';
@@ -217,6 +218,8 @@ export function GstReports() {
       purchaseNotes: getTable<PurchaseReturn>('purchase_returns'),
       // 7R: ISD credit received by our unit(s) — 3B 4A(4).
       isdInward: loadIsdInward(),
+      // R5-C2: Rule 42 / 43 common-credit reversal journals → 4B(1).
+      itcReversals: journalItcReversals(getTable('vouchers')),
       // WP-8: user-defined UQCs, and alternate-unit lines summarised in the item's base unit.
       units: unitsDb.stored(),
       items: buildItemIndex(stockDb.items()),

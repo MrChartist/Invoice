@@ -27,7 +27,7 @@ export const iT = defineArea(
     ccNote: 'Tag each bill’s ITC use (untagged = common). Verify with your CA.', reverse: 'To reverse',
     'cc.T': 'Input tax of the month', 'cc.T1': 'Non-business', 'cc.T2': 'Exempt only', 'cc.T3': 'Blocked', 'cc.C1': 'T − (T1 + T2 + T3)', 'cc.T4': 'Taxable only', 'cc.C2': 'C1 − T4 (common)',
     'cc.D1': '(E ÷ F) × C2', 'cc.D2': '5% × C2', 'cc.C3': 'C2 − D1 − D2', 'cc.Tm': 'Σ Tc ÷ 60', 'cc.Te': 'Tm × E ÷ F', 'cc.reverse': 'T1 + T2 + D1 + D2 + Te',
-    cc3b: 'Enter the total in GSTR-3B 4(B)(1).', itcUse: 'ITC use',
+    cc3b: 'Once posted, the GSTR-3B tab shows it in 4(B)(1).', itcUse: 'ITC use',
     'use.common': 'Common', 'use.taxable_only': 'Taxable only', 'use.exempt_only': 'Exempt only', 'use.non_business': 'Non-business', 'use.common_capital': 'Common capital goods',
     trueUp: 'Annual true-up', trueUpLine: 'Year: {annual}; reversed monthly: {posted}; difference {diff} (+ reverse, − reclaim; interest u/s 50) — by {due}.',
     // C3
@@ -86,7 +86,7 @@ export const iT = defineArea(
     ccNote: 'हर बिल का ITC उपयोग टैग करें (बिना टैग = साझा)। Verify with your CA.', reverse: 'रिवर्स करना',
     'cc.T': 'महीने का इनपुट टैक्स', 'cc.T1': 'गैर-व्यावसायिक', 'cc.T2': 'केवल छूट', 'cc.T3': 'अवरुद्ध', 'cc.C1': 'T − (T1 + T2 + T3)', 'cc.T4': 'केवल कर-योग्य', 'cc.C2': 'C1 − T4 (साझा)',
     'cc.D1': '(E ÷ F) × C2', 'cc.D2': '5% × C2', 'cc.C3': 'C2 − D1 − D2', 'cc.Tm': 'Σ Tc ÷ 60', 'cc.Te': 'Tm × E ÷ F', 'cc.reverse': 'T1 + T2 + D1 + D2 + Te',
-    cc3b: 'कुल राशि GSTR-3B 4(B)(1) में भरें।', itcUse: 'ITC उपयोग',
+    cc3b: 'पोस्ट करने पर GSTR-3B टैब इसे 4(B)(1) में दिखाता है।', itcUse: 'ITC उपयोग',
     'use.common': 'साझा', 'use.taxable_only': 'केवल कर-योग्य', 'use.exempt_only': 'केवल छूट', 'use.non_business': 'गैर-व्यावसायिक', 'use.common_capital': 'साझा पूँजीगत माल',
     trueUp: 'वार्षिक मिलान', trueUpLine: 'वर्ष: {annual}; मासिक रिवर्स: {posted}; अंतर {diff} (+ रिवर्स, − वापसी; धारा 50 ब्याज) — {due} तक।',
     'don.receipts': 'रसीदें', 'don.form10bd': '10BD / 10BE', newDonation: 'नई रसीद', donor: 'दाता', newDonor: 'नया दाता…', idCode: 'ID प्रकार', idNo: 'ID नं.',

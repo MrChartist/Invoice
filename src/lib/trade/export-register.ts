@@ -92,7 +92,7 @@ export function buildRegister(input: RegisterInput): RealisationRow[] {
   const received = new Map<string, number>();
   for (const p of input.payments) {
     // A bad-debt write-off or a gift-voucher redemption (R4-B) brings no foreign exchange in.
-    if (!p?.invoice_id || p.write_off || (p as { gift_voucher_id?: string }).gift_voucher_id || (p.date && p.date > asAt)) continue;
+    if (!p?.invoice_id || p.write_off || (p as { gift_voucher_id?: string }).gift_voucher_id || p.deposit_adjustment_id || (p.date && p.date > asAt)) continue; // R5-C6: deposit adjustments too
     received.set(p.invoice_id, (received.get(p.invoice_id) ?? 0) + n(p.amount));
   }
   const irmBy = new Map<string, RealisationRow['irms']>();

@@ -24,6 +24,7 @@ import { generateId, getTable, peekTable, setTable } from '../storage';
 import { withTablesRollback } from '../table-txn';
 import { round2 } from '../invoice-calc';
 import { toCsv } from '../csv';
+import { ITC_REVERSAL_CLASS } from '../gst-reports';
 import { COMMON_CREDIT_TRUE_UP_RULES, ruleAt } from '../r5c-rules';
 import { COMMON_CREDIT_TABLE, R5cError, paise } from './r5c';
 
@@ -174,7 +175,7 @@ export function postReversal(input: { month: string; kind: 'monthly' | 'annual';
   const lines = reversalLines(input.heads);
   if (lines.length < 2) throw new R5cError('nothing');
   return withTablesRollback([COMMON_CREDIT_TABLE, 'vouchers'], () => {
-    const v = saveVoucher({ type: 'JOURNAL', date: input.date, narration: `ITC reversal ${input.kind === 'annual' ? 'annual true-up' : ''} ${input.month} — Rule 42 / 43 common credit (GSTR-3B 4(B)(1)); working paper, verify with your CA`.replace(/\s+/g, ' '), lines, voucher_class: 'ITC reversal — Rule 42 / 43' });
+    const v = saveVoucher({ type: 'JOURNAL', date: input.date, narration: `ITC reversal ${input.kind === 'annual' ? 'annual true-up' : ''} ${input.month} — Rule 42 / 43 common credit (GSTR-3B 4(B)(1)); working paper, verify with your CA`.replace(/\s+/g, ' '), lines, voucher_class: ITC_REVERSAL_CLASS });
     const row: CommonCreditRun = { id: generateId(), month: input.month, kind: input.kind, figures: input.figures, heads: { ...input.heads }, journal_id: v.id, date: input.date, created_at: new Date().toISOString() };
     setTable(COMMON_CREDIT_TABLE, [...getTable<CommonCreditRun>(COMMON_CREDIT_TABLE), row]);
     return row;

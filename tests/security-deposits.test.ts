@@ -41,6 +41,29 @@ test('adjust against an existing invoice: receipt only (no new document), the in
   assert.throws(() => adjustAgainstInvoice(r.id, rent.id, 1, '2026-05-21'), /balance/);
 });
 
+test('regression: an adjustment settles the invoice, moves no money (cash book, BRS skip it) and the trial balance is right', async () => {
+  const { loadBooksData, buildVouchers } = await import('../src/lib/books.ts');
+  const { receiptCandidates } = await import('../src/lib/bank-recon.ts');
+  const { trialBalance } = await import('../src/lib/ledger/reports.ts');
+  const r = received();
+  const rent = createViaStore({ client: localDb.clients.getById('ten')!, date: '2026-05-01', docType: 'TAX_INVOICE', lines: [{ name: 'Rent', qty: 1, rate: 20000, tax: 18 }], status: 'Sent' });
+  adjustAgainstInvoice(r.id, rent.id, 23600, '2026-05-20');
+  const rows = localDb.payments.getAll().filter((p) => p.invoice_id === rent.id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].deposit_adjustment_id, r.id, 'the receipt row carries the marker');
+  assert.equal(localDb.invoices.getById(rent.id)!.status, 'Paid');
+  const book = buildVouchers(loadBooksData());
+  assert.ok(!book.some((v) => v.type === 'Receipt' && v.invoice_id === rent.id), 'the cash book does not list it');
+  assert.equal(book.filter((v) => v.type === 'Receipt').reduce((s, v) => s + v.credit, 0), 0, 'no receipt at all in the cash book');
+  assert.ok(!receiptCandidates(localDb.invoices.getAll(), localDb.payments.getAll()).some((c) => c.docId === rent.id), 'nor among BRS candidates');
+  const tb = trialBalance(loadLedger(), { start: '2026-04-01', end: '2027-03-31' });
+  assert.equal(tb.totals.debit, tb.totals.credit);
+  const closing = (pred: (a: { id: string; name: string }) => boolean) => tb.rows.filter((x) => pred(x.account)).reduce((s, x) => s + x.closing, 0);
+  assert.equal(closing((a) => a.id === A.bank), 10000000, 'the bank holds only the deposit (₹1,00,000)');
+  assert.equal(closing((a) => a.name === 'Security deposits received'), -7640000, '₹76,400 still held');
+  assert.equal(closing((a) => a.id === A.debtors), 0, 'the rent invoice is settled in the books');
+});
+
 test('damages and forfeit raise a tax invoice for the applied amount (tax inclusive), settled from the deposit; refund closes it', () => {
   const r = received();
   const { invoice: dmg, deposit } = applyToCharge(r.id, 'adjust', 11800, '2026-06-01', 'Repainting', ctx());

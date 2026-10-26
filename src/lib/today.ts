@@ -43,7 +43,7 @@ export function todaySummary(input: { invoices: readonly InvoiceRecord[]; paymen
     out.udhaar = round2(out.udhaar + Math.max(receivableBalance(inv), 0));
   }
   for (const p of input.payments) {
-    if (!p || p.advance_id || p.write_off || isoDay(p.date) !== day || !inr(byId.get(p.invoice_id))) continue;
+    if (!p || p.advance_id || p.write_off || p.deposit_adjustment_id || isoDay(p.date) !== day || !inr(byId.get(p.invoice_id))) continue; // R5-C6: no money moved
     const k = modeOf(p.method);
     out[k] = round2(out[k] + num(p.amount));
   }

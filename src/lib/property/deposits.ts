@@ -10,7 +10,7 @@
  *  - refund: payment voucher (received) / receipt voucher (paid).
  * A refundable deposit is not income until applied. Working paper — verify with your CA (§7 Q12).
  */
-import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
+import type { InvoiceRecord, Payment, SenderProfile } from '../../types/invoice';
 import type { DepositMoveKind, DepositMovement, SecurityDeposit } from '../../types/institutions-r5';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
@@ -104,6 +104,8 @@ function settleFromDeposit(d: SecurityDeposit, inv: InvoiceRecord, amount: numbe
     undefined,
     { party, total: amount, allocations: [{ bill_id: inv.id, ref: inv.invoice_number, amount }], method: ADJUST_METHOD },
   );
+  // The receipt rows moved no money: mark them so cash / bank readers skip them (like gift-voucher rows).
+  setTable('transactions', getTable<Payment & { voucher_id?: string }>('transactions').map((r) => (r.voucher_id === v.id ? { ...r, deposit_adjustment_id: d.id } : r)));
   return write(d, { id: generateId(), kind, date, amount, doc_id: inv.id, voucher_id: v.id, note });
 }
 

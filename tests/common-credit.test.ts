@@ -71,6 +71,22 @@ test('posting: one balanced journal tagged "ITC reversal — Rule 42 / 43", once
   assert.equal(loadVouchers().length, 0);
 });
 
+test('GSTR-3B 4(B)(1): the posted reversal journal feeds the month through itcReversals (a reclaim reduces it)', async () => {
+  const { buildGstReport, journalItcReversals } = await import('../src/lib/gst-reports.ts');
+  const { getTable } = await import('../src/lib/storage.ts');
+  const r = rule42(inputsFor(FIXTURE, '2026-05-01', '2026-05-31'), 20000, 100000, '2026-05');
+  const g3 = (month: number) => buildGstReport([], [], { period: { kind: 'month', fyStart: 2026, month }, itcReversals: journalItcReversals(getTable('vouchers')) }).gstr3b.itc.reversedRules;
+  assert.deepEqual(g3(5), { igst: 0, cgst: 0, sgst: 0, cess: 0 }, 'nothing before posting');
+  const run = postReversal({ month: '2026-05', kind: 'monthly', heads: r.reverse, figures: figuresOf(r), date: '2026-05-31' });
+  assert.deepEqual(g3(5), { igst: 20, cgst: 187.5, sgst: 187.5, cess: 0 });
+  assert.deepEqual(g3(6), { igst: 0, cgst: 0, sgst: 0, cess: 0 }, 'only in its own month');
+  postReversal({ month: 'FY2026-27', kind: 'annual', heads: { igst: 0, cgst: -50, sgst: -50, cess: 0 }, figures: {}, date: '2026-05-31' });
+  assert.deepEqual(g3(5), { igst: 20, cgst: 137.5, sgst: 137.5, cess: 0 }, 'a true-up reclaim reduces 4B(1)');
+  unpostReversal(run.id);
+  assert.deepEqual(g3(5), { igst: 0, cgst: -50, sgst: -50, cess: 0 }, 'undoing the posting removes it');
+  assert.deepEqual(journalItcReversals([{ date: '2026-05-31', voucher_class: 'Other', lines: [{ account_id: A.inCgst, dr: 0, cr: 100 }] }]), [], 'other journals are ignored');
+});
+
 test('annual true-up both ways: reverse more, or reclaim (journal flips)', () => {
   const months = [{ C2: { igst: 0, cgst: 1000, sgst: 1000, cess: 0 }, nonBusiness: false }, { C2: { igst: 0, cgst: 1000, sgst: 1000, cess: 0 }, nonBusiness: false }];
   const posted = { igst: 0, cgst: 200, sgst: 200, cess: 0 };

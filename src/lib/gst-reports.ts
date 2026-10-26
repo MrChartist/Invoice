@@ -501,6 +501,35 @@ export interface BuildOptions {
    * (and of the filer GSTIN, when both are set) go to 4A(4) — ineligible ones to 4D(2) — and into 4C.
    */
   isdInward?: readonly { date: string; gstin?: string; igst: number; cgst: number; sgst: number; cess: number; eligible: boolean }[];
+  /**
+   * Additive (R5-C2): ITC reversed by journal — the Rule 42 / 43 common-credit reversals (`journalItcReversals`).
+   * Rows dated in the period go to 4B(1) (a negative row — an annual true-up reclaim — reduces it). Working paper:
+   * verify with your CA.
+   */
+  itcReversals?: readonly { date: string; igst: number; cgst: number; sgst: number; cess: number }[];
+}
+
+/** Voucher class of the Rule 42 / 43 reversal journals (R5-C2, `institutions/common-credit.ts`). */
+export const ITC_REVERSAL_CLASS = 'ITC reversal — Rule 42 / 43';
+const INPUT_HEADS: Readonly<Record<string, 'igst' | 'cgst' | 'sgst' | 'cess'>> = { in_igst: 'igst', in_cgst: 'cgst', in_sgst: 'sgst', in_cess: 'cess' };
+
+/**
+ * R5-C2: the 4B(1) rows of the Rule 42 / 43 reversal journals — per journal, credits less debits on the input-tax
+ * ledgers (rupees). Optional / memorandum vouchers are left out. Pure. Verify with your CA.
+ */
+export function journalItcReversals(vouchers: readonly unknown[]): { date: string; igst: number; cgst: number; sgst: number; cess: number }[] {
+  const out: { date: string; igst: number; cgst: number; sgst: number; cess: number }[] = [];
+  for (const raw of vouchers) {
+    const v = raw as { date?: string; voucher_class?: string; variant?: string; lines?: { account_id?: string; dr?: number; cr?: number }[] } | null;
+    if (!v || v.voucher_class !== ITC_REVERSAL_CLASS || v.variant || !v.date || !Array.isArray(v.lines)) continue;
+    const row = { date: v.date, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+    for (const l of v.lines) {
+      const h = INPUT_HEADS[l?.account_id ?? ''];
+      if (h) row[h] = round2(row[h] + (num(l.cr) - num(l.dr)) / 100);
+    }
+    out.push(row);
+  }
+  return out;
 }
 
 /**
@@ -1667,6 +1696,9 @@ export function buildGstr3b(
       add(RULE_REVERSALS.has(p.itcReversalReason) ? reversedRules : reversed, { igst: p.igst * ratio, cgst: p.cgst * ratio, sgst: p.sgst * ratio, cess: (p.cess ?? 0) * ratio });
     }
   }
+
+  // R5-C2: Rule 42 / 43 reversals posted by journal (common credit) — 4B(1). Verify with your CA.
+  for (const r of opts.itcReversals ?? []) if (inPeriod(r.date, opts.period)) add(reversedRules, r);
 
   // 7R (7.122): ISD credit received (4A(4)); ineligible ISD credit is shown in 4D(2).
   const isd = zeroHeads();

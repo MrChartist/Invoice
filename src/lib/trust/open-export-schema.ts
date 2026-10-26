@@ -181,6 +181,7 @@ export const COLUMN_MEANING: Readonly<Record<string, string>> = {
   id: 'Row id (unique in its table).',
   invoice_id: 'Sales document id (invoices.id).',
   gift_voucher_id: 'Gift voucher redeemed by this receipt (moves no cash).',
+  deposit_adjustment_id: 'Security deposit this receipt was settled from (moves no cash).',
   purchase_id: 'Supplier bill id (purchases.id).',
   voucher_id: 'Voucher id (vouchers.id).',
   vendor_id: 'Supplier id (vendors.id).',

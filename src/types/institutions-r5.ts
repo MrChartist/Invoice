@@ -278,6 +278,13 @@ declare module './invoice' {
     /** Additive (R5-C3): registrations of a non-profit. */
     npo?: NpoProfile;
   }
+  interface Payment {
+    /**
+     * Additive (R5-C6): the `security_deposits` row this receipt row was settled from. It moved NO money (the deposit
+     * held pays the invoice): every cash / bank reader skips it, like a `gift_voucher_id` row.
+     */
+    deposit_adjustment_id?: string;
+  }
 }
 
 declare module './purchases' {
