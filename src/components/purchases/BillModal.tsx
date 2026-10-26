@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getTable } from '../../lib/storage';
 import type { HsnMasterRow } from '../../lib/hsn-master';
 import type { ImportType, ItcReversalReason, PurchaseRecord, Vendor } from '../../types/purchases';
 import { ITC_REVERSAL_REASONS, PURCHASE_CATEGORIES } from '../../types/purchases';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
-import { blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
+import { billFormSnapshot, blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
 import { supplierPayableOf } from '../../lib/purchase-normalize';
 import type { BillSeed } from '../../lib/purchase-orders';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
@@ -53,23 +53,30 @@ export interface BillModalProps {
 /** Supplier bill with line items, GST split by place of supply, and ITC flag. */
 export function BillModal({ open, onClose, purchase, seed, ...rest }: BillModalProps) {
   useT(); // re-render on a language switch (5.4)
+  // QA-3 F12: Esc, the backdrop and × ask before throwing away typed lines (the form's Cancel button is explicit).
+  const dirty = useRef(false);
+  const guardedClose = useCallback(() => {
+    if (dirty.current && !window.confirm(purT('discardBill'))) return;
+    dirty.current = false;
+    onClose();
+  }, [onClose]);
   // Re-mount the form per bill so state initialises from props without effects.
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={guardedClose}
       size="xl"
       title={purchase ? purT('billEditTitle') : purT('billAddTitle')}
       subtitle={seed && !purchase ? purT('billSeedSub') : purT('billSub')}
     >
-      <BillForm key={purchase?.id ?? (seed ? `po-${seed.po_id}` : 'new')} purchase={purchase ?? undefined} seed={purchase ? undefined : seed ?? undefined} onClose={onClose} {...rest} />
+      <BillForm key={purchase?.id ?? (seed ? `po-${seed.po_id}` : 'new')} purchase={purchase ?? undefined} seed={purchase ? undefined : seed ?? undefined} onClose={onClose} dirtyRef={dirty} {...rest} />
     </Modal>
   );
 }
 
-type FormProps = Omit<BillModalProps, 'open' | 'purchase' | 'seed'> & { purchase?: PurchaseRecord; seed?: BillSeed };
+type FormProps = Omit<BillModalProps, 'open' | 'purchase' | 'seed'> & { purchase?: PurchaseRecord; seed?: BillSeed; dirtyRef?: RefObject<boolean> };
 
-function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onSaved, onClose }: FormProps) {
+function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onSaved, onClose, dirtyRef }: FormProps) {
   const init = purchase ?? seed;
   const [vendorId, setVendorId] = useState(init?.vendor_id ?? '');
   const [billNumber, setBillNumber] = useState(purchase?.bill_number ?? '');
@@ -100,6 +107,11 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   };
   const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
   const [notes, setNotes] = useState(init?.notes ?? '');
+  // What the dialog opened with, to tell whether closing would lose typed work (QA-3 F12).
+  const [openedWith] = useState(() => billFormSnapshot({ vendorId: init?.vendor_id ?? '', billNumber: purchase?.bill_number ?? '', lines: init?.lines?.length ? init.lines : [], notes: init?.notes ?? '' }));
+  useEffect(() => {
+    if (dirtyRef) dirtyRef.current = billFormSnapshot({ vendorId, billNumber, lines, notes }) !== openedWith;
+  });
   // WP-8: landed cost (freight, loading …) loads the goods' stock cost only.
   const [landed, setLanded] = useState<LandedValue>(() => ({
     costs: (purchase?.landed_costs ?? []).map((c) => ({ label: c.label, amount: String(c.amount) })),
@@ -320,7 +332,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       <BranchSelect id="bill-branch" value={branchId} onChange={setBranchId} />
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
-      <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} />
+      <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} />
       <LandedCostFields value={landed} onChange={setLanded} />
 
       <div className={styles.totals} aria-live="polite">

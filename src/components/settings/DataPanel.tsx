@@ -31,7 +31,7 @@ import { cleanupUnusedAttachments } from '../../lib/attachments';
 import { isIosSafari, isStandalone, requestPersistentStorage } from '../../lib/pwa';
 import { localDb } from '../../lib/localDb';
 import { downloadText } from '../../lib/download';
-import { formatCurrency } from '../../lib/utils';
+import { formatCurrency, formatDate } from '../../lib/utils';
 import type { InvoiceItem } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
@@ -52,6 +52,15 @@ interface PendingRestore {
   data: Record<string, string>;
   summary: BackupSummary;
   fileName: string;
+}
+
+/** QA-3 F14: name the backup by its business and date (the file name only when the backup carries neither). */
+function restoreSummaryText(p: PendingRestore | null): string {
+  if (!p) return '';
+  const counts = { invoices: p.summary.invoices, clients: p.summary.clients };
+  const date = p.summary.exportedAt ? formatDate(p.summary.exportedAt.slice(0, 10)) : '';
+  if (p.summary.business) return setT(date ? 'restoreContainsNamed' : 'restoreContainsName', { name: p.summary.business, date, ...counts });
+  return setT('restoreContains', { file: p.fileName, ...counts });
 }
 
 export function DataPanel({ notify }: Props) {
@@ -110,6 +119,7 @@ export function DataPanel({ notify }: Props) {
       return notify((err as Error).message, 'error');
     }
     markBackupDone();
+    setVersion((v) => v + 1); // QA-3 F13: the status line re-reads the last-backup time now, not after a reload
     notify(setT('backupDownloaded'));
   };
 
@@ -126,6 +136,7 @@ export function DataPanel({ notify }: Props) {
       await writable.write(new Blob([text], { type: 'application/json' }));
       await writable.close();
       markBackupDone();
+      setVersion((v) => v + 1);
       notify(setT('backupSaved'));
     } catch (err) {
       if ((err as Error).name !== 'AbortError') notify(setT('couldNotSave', { message: (err as Error).message }), 'error');
@@ -409,7 +420,7 @@ export function DataPanel({ notify }: Props) {
         }
       >
         <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
-          {setT('restoreContains', { file: pending?.fileName ?? '', invoices: pending?.summary.invoices ?? 0, clients: pending?.summary.clients ?? 0 })}
+          {restoreSummaryText(pending)}
           {' '}{attachmentRestoreNote(pending?.summary)}{' '}
           {setT('restoreWarn')}
         </p>

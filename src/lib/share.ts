@@ -189,23 +189,33 @@ export function invoiceUpiLink(invoice: InvoiceRecord, amount?: number): string 
 
 /* ── Plain-text summary ───────────────────────────────────────── */
 
+/** Documents a customer pays against. Quotations, proformas, orders and challans carry no balance (QA-3 F3). */
+const PAYABLE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
+export const isPayableDoc = (inv: Pick<InvoiceRecord, 'doc_type'>): boolean => PAYABLE_DOCS.has(inv.doc_type ?? 'INVOICE');
+
+/** WhatsApp marks bold as `*text*`; an e-mail shows the asterisks literally, so drop them (QA-3 F23). */
+export function emailText(text: string): string {
+  return text.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,:;!?]|$)/gm, '$1$2');
+}
+
 export function invoiceSummaryText(invoice: InvoiceRecord): string {
   const cur = invoice.currency || 'INR';
   const label = DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice';
   const items = invoice.items ?? [];
+  const payable = isPayableDoc(invoice);
   const lines: string[] = [];
   lines.push(`*${label} ${invoice.invoice_number}*`);
   if (invoice.sender?.companyName) lines.push(`From: ${invoice.sender.companyName}`);
   if (invoice.client?.name) lines.push(`To: ${invoice.client.name}`);
   lines.push(`Date: ${formatDate(invoice.issue_date)}`);
-  if (invoice.due_date) lines.push(`Due: ${formatDate(invoice.due_date)}`);
+  if (invoice.due_date) lines.push(`${invoice.doc_type === 'QUOTATION' ? 'Valid until' : 'Due'}: ${formatDate(invoice.due_date)}`);
   lines.push('');
   for (const item of items.slice(0, 8)) lines.push(`- ${item.name} x ${item.quantity}`);
   if (items.length > 8) lines.push(`- …and ${items.length - 8} more`);
   lines.push('');
   lines.push(`Total: ${formatCurrency(invoice.total, cur)}`);
-  if ((invoice.amount_paid ?? 0) > 0) lines.push(`Paid: ${formatCurrency(invoice.amount_paid, cur)}`);
-  const due = receivableBalance(invoice);
+  if (payable && (invoice.amount_paid ?? 0) > 0) lines.push(`Paid: ${formatCurrency(invoice.amount_paid, cur)}`);
+  const due = payable ? receivableBalance(invoice) : 0;
   if (due > 0) lines.push(`Balance due: ${formatCurrency(due, cur)}`);
   const s = invoice.sender;
   if (s?.upiId && due > 0) lines.push(`UPI: ${s.upiId}`);

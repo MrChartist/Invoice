@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { t } from '../../i18n';
 import { SINGLETON_KEYS, getJson, getTable, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
@@ -272,7 +273,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     }
   };
 
-  const label = unread ? `Notifications, ${unread} unread` : 'Notifications';
+  const label = unread ? t('shell.notificationsUnread', { n: unread }) : t('shell.notifications');
 
   return (
     <div ref={rootRef} className={cn(styles.root, className)}>

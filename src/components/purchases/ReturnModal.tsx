@@ -15,7 +15,7 @@ import { generateId } from '../../lib/storage';
 import { isVoidStatus, readPurchase } from '../../lib/purchase-normalize';
 import { num, round2 } from '../../lib/invoice-calc';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { useT } from '../../i18n';
@@ -280,7 +280,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved 
           <div className={controls.field}>
             <label className={controls.label} htmlFor="rn-rate">{prT('gstRate')}</label>
             <select id="rn-rate" className={controls.select} value={valueRate} onChange={(e) => setValueRate(Number(e.target.value))}>
-              {GST_SLABS.map((s) => (
+              {gstRateOptions(date, valueRate).map((s) => (
                 <option key={s} value={s}>{s}%</option>
               ))}
             </select>

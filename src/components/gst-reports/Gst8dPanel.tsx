@@ -50,6 +50,7 @@ const EX_KEY = {
   POS_STATE_MISMATCH: 'exPos',
   RATE_NOT_IN_SLABS: 'exRate',
   B2CL_EDGE: 'exB2cl',
+  OWN_GSTIN: 'exOwnGstin',
 } as const;
 
 /** Return-period key used by the compliance calendar for a report period. */

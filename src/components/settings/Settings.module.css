@@ -5,6 +5,12 @@
   align-items: start;
 }
 
+/* QA-3 F25: grid items may shrink below their content (large text on a phone); lists scroll inside. */
+.layout > * {
+  min-width: 0;
+}
+
+
 .profileList {
   display: flex;
   flex-direction: column;

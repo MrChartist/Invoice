@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRightLeft, ChevronDown, FilePlus2, FileMinus2, History, Layers, ShoppingCart } from 'lucide-react';
-import { allowedConversions, canRaiseNote, convertDocument, readLinks } from '../../lib/documents';
+import { menuConversions, canRaiseNote, convertDocument, readLinks } from '../../lib/documents';
 import { reviseBlocked, reviseQuotation } from '../../lib/quote-revisions';
 import { progressBlocked } from '../../lib/progress-billing';
 import { s2T } from '../../i18n/areas/sales-r2';
@@ -38,7 +38,7 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
   // R2-B: revisions, progress billing and back-to-back POs. A superseded quotation converts no further.
   const links = readLinks();
   const superseded = invoice.doc_type === 'QUOTATION' && links.some((l) => l.relation === 'revised' && l.from_id === invoice.id);
-  const options = superseded ? [] : allowedConversions(invoice);
+  const options = superseded ? [] : menuConversions(invoice);
   const canRevise = invoice.doc_type === 'QUOTATION' && !reviseBlocked(invoice, links);
   const canProgress = (invoice.doc_type === 'QUOTATION' || invoice.doc_type === 'SALES_ORDER') && !progressBlocked(invoice, links);
   const canPo = invoice.doc_type === 'SALES_ORDER' && invoice.status !== 'Draft' && invoice.status !== 'Cancelled' && !invoice.order_closed_on;

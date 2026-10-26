@@ -106,6 +106,23 @@ export function computePurchaseTotals(
 }
 
 /**
+ * What a bill form holds that the user typed (QA-3 F12): the vendor, bill no., notes and every line with a name or
+ * amount. Blank lines are ignored, so an untouched "add bill" form equals its starting snapshot.
+ */
+export function billFormSnapshot(f: { vendorId: string; billNumber: string; lines: readonly Pick<PurchaseLine, 'name' | 'quantity' | 'rate' | 'tax_rate' | 'hsn'>[]; notes: string }): string {
+  const lines = f.lines
+    .filter((l) => String(l.name ?? '').trim() || Number(l.rate) > 0)
+    .map((l) => [String(l.name ?? '').trim(), Number(l.quantity) || 0, Number(l.rate) || 0, Number(l.tax_rate) || 0, String(l.hsn ?? '').trim()]);
+  return JSON.stringify([f.vendorId || '', f.billNumber.trim(), f.notes.trim(), lines]);
+}
+
+/** Label key for the quick-expense amount (QA-3 F11): it says whether the typed amount includes GST. */
+export function expenseAmountLabel(taxRate: number, inclusive: boolean): 'amountRs' | 'amountInclGst' | 'amountExGst' {
+  if (!(taxRate > 0)) return 'amountRs';
+  return inclusive ? 'amountInclGst' : 'amountExGst';
+}
+
+/**
  * Quick expense: the user types what they paid. When `amountIncludesTax` the
  * amount is the gross figure and tax is backed out of it.
  */
