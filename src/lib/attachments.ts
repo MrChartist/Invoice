@@ -26,7 +26,7 @@
  */
 
 import type {} from '../types/docs-r3'; // R3-C2: AttachmentRef.print
-import { DB_PREFIX, SINGLETON_KEYS, listKeys, readRaw, removeRaw, writeRaw } from './storage';
+import { DB_PREFIX, SINGLETON_KEYS, listKeys, peekTable, readRaw, removeRaw, writeRaw } from './storage';
 import { hashContent } from './assets';
 import type { AttachmentMime, AttachmentRef } from '../types/attachments';
 
@@ -245,6 +245,10 @@ export function attachmentIdsIn(rows: unknown, into: Set<string> = new Set()): S
   return into;
 }
 
+/** Live store: tables through the shared parsed rows (`peekTable`, read-only), the small draft parsed as before. */
+const liveParsed = (fullKey: string): unknown =>
+  fullKey === SINGLETON_KEYS.draft ? parseJson(readRaw(fullKey)) : peekTable<unknown>(fullKey.slice(DB_PREFIX.length));
+
 const parseJson = (raw: string | null | undefined): unknown => {
   if (!raw) return null;
   try {
@@ -258,10 +262,16 @@ const parseJson = (raw: string | null | undefined): unknown => {
  * Every attachment id still in use: invoices, purchases and the editor's autosaved draft.
  * `read` defaults to live storage; backup validation passes the file's key/value map.
  */
-export function referencedAttachmentIds(read: (fullKey: string) => string | null | undefined = readRaw): Set<string> {
+export function referencedAttachmentIds(
+  read: (fullKey: string) => string | null | undefined = readRaw,
+  /** Already-parsed values by full key (backup validation parses each table once). */
+  parsed?: (fullKey: string) => unknown,
+): Set<string> {
   const ids = new Set<string>();
-  for (const t of ATTACHMENT_OWNER_TABLES) attachmentIdsIn(parseJson(read(DB_PREFIX + t)), ids);
-  const draft = parseJson(read(SINGLETON_KEYS.draft));
+  // PERF-1: the live store is read through the shared parsed tables (runs on every save that drops a file).
+  const get = parsed ?? (read === readRaw ? liveParsed : (k: string) => parseJson(read(k)));
+  for (const t of ATTACHMENT_OWNER_TABLES) attachmentIdsIn(get(DB_PREFIX + t), ids);
+  const draft = get(SINGLETON_KEYS.draft);
   if (draft && typeof draft === 'object') attachmentIdsIn([draft], ids);
   return ids;
 }
@@ -346,7 +356,7 @@ export interface BackupAttachmentCheck {
  * removed from `data`. Dangling references are counted, not refused: attachments are supporting
  * files, so a backup made without some of them still restores and the records show "file missing".
  */
-export function checkBackupAttachments(data: Record<string, string>): BackupAttachmentCheck {
+export function checkBackupAttachments(data: Record<string, string>, parsed?: (fullKey: string) => unknown): BackupAttachmentCheck {
   let files = 0;
   let dropped = 0;
   const present = new Set<string>();
@@ -362,7 +372,7 @@ export function checkBackupAttachments(data: Record<string, string>): BackupAtta
     files++;
     present.add(id);
   }
-  const refs = referencedAttachmentIds((k) => data[k]);
+  const refs = referencedAttachmentIds((k) => data[k], parsed);
   const missing = [...refs].filter((id) => !present.has(id)).length;
   return { files, dropped, missing };
 }

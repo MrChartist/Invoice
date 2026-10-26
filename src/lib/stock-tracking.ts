@@ -24,6 +24,7 @@ import {
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
 import { getTable } from './storage';
+import { memoOnReads } from './table-memo';
 import { lineFactor } from './units';
 import { creditNoteReturnsGoods } from './credit-restock';
 import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList, godownName, nonSaleableGodowns } from './godowns';
@@ -341,7 +342,13 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  * separately so the editor can ask for confirmation. Credit notes may only take back serials
  * that are currently sold. The document's own saved copy is left out of the balances.
  */
-export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown = false): TrackingIssues {
+export function docTrackingIssues(
+  doc: DocInput,
+  input: StockInputs,
+  multiGodown = false,
+  /** PERF-1: the balances without this document, when the caller has them memoised (read-only). */
+  pre?: () => { tracking: TrackingMap; events: Map<string, StockEvent[]> },
+): TrackingIssues {
   const issues: TrackingIssues = { errors: [], expired: [], warnings: [] };
   const docType = doc.doc_type;
   const outgoing = isOutgoingDoc(docType);
@@ -353,10 +360,11 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
   const tracked = input.items.filter((i) => i.track_stock && (i.track_batches || i.track_serials || multiGodown));
   if (tracked.length === 0) return issues;
   const index = buildItemIndex(input.items.filter((i) => i.track_stock));
-  const tracking = computeTracking({ ...input, excludeInvoiceId: doc.id });
+  const given = pre?.();
+  const tracking = given?.tracking ?? computeTracking({ ...input, excludeInvoiceId: doc.id });
   // Point-in-time checks run on the dated events (stock-timeline.ts): availability at the end of
   // the document's day AND no later document depending on the same units.
-  const events = collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id });
+  const events = given?.events ?? collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id });
   // Serials taken out by the challan this invoice was made from belong to this sale.
   const sourceRefs = new Set(
     doc.id ? (input.links ?? []).filter((l) => l.relation === 'converted' && l.to_id === doc.id).map((l) => l.from_id) : [],
@@ -672,7 +680,14 @@ export function liveTrackingInputs(): StockInputs {
   return { ...liveInputs(), transfers: getTable<StockTransfer>(TRANSFERS_TABLE), includeTransfers: true };
 }
 
+/** Live tracking. Without overrides it is memoised on every key it read (PERF-1) and SHARED: read-only. */
+/** PERF-1: `liveTrackingInputs()` memoised on every key it read — SHARED, read-only (internal readers only). */
+function sharedTrackingInputs(): StockInputs {
+  return memoOnReads('stock-tracking:inputs', liveTrackingInputs);
+}
+
 export function loadTracking(overrides: Partial<StockInputs> = {}): TrackingMap {
+  if (Object.keys(overrides).length === 0) return memoOnReads('stock-tracking:all', () => computeTracking(sharedTrackingInputs()));
   return computeTracking({ ...liveTrackingInputs(), ...overrides });
 }
 
@@ -697,12 +712,18 @@ export interface EditorStockContext {
  * document type never moves stock.
  */
 export function editorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string; goods_returned?: boolean }): EditorStockContext | null {
+  // PERF-1: re-read on every item-name focus; recomputed only when a key it read (or the document) changed. Shared, read-only.
+  const key = JSON.stringify([doc.id ?? '', doc.doc_type, doc.issue_date, doc.status ?? '', doc.goods_returned ?? null]);
+  return memoOnReads('stock-tracking:editor', () => buildEditorStockContext(doc), key);
+}
+
+function buildEditorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string; goods_returned?: boolean }): EditorStockContext | null {
   const outgoing = isOutgoingDoc(doc.doc_type);
   const incoming = doc.doc_type === 'CREDIT_NOTE' && doc.goods_returned !== false;
   if (!outgoing && !incoming) return null;
   try {
     const godowns = godownList(getTable<Godown>(GODOWNS_TABLE));
-    const input = liveTrackingInputs();
+    const input = sharedTrackingInputs();
     const items = input.items.filter((i) => i.track_stock);
     const multi = godowns.length > 1;
     if (!multi && !items.some((i) => i.track_batches || i.track_serials)) return null;
@@ -729,15 +750,23 @@ export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
   try {
     const godowns = godownList(getTable<Godown>(GODOWNS_TABLE));
     const multi = godowns.length > 1;
-    const issues = pharmaGate(docTrackingIssues(doc, liveTrackingInputs(), multi), doc); // 7U pharma pack (off by default)
+    // PERF-1: shared inputs, and the balances without this document memoised per document id.
+    const pre = () => memoOnReads('stock-tracking:withoutDoc', () => {
+      const input = sharedTrackingInputs();
+      return {
+        tracking: computeTracking({ ...input, excludeInvoiceId: doc.id }),
+        events: collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id }),
+      };
+    }, doc.id ?? '');
+    const issues = pharmaGate(docTrackingIssues(doc, sharedTrackingInputs(), multi, pre), doc); // 7U pharma pack (off by default)
     if (doc.status === 'Draft' || doc.status === 'Cancelled') return issues;
     // 8F: no sale from an expiry godown; optional batch-MRP ceiling (tracking computed only when that is on).
     const pharma = readPharmaSettings();
     let tracking: TrackingMap | null = null;
     const mrpOf = pharma.enabled && pharma.block_above_mrp
       ? (l: { name: string; batch_no?: string }) => {
-          tracking ??= computeTracking(liveTrackingInputs());
-          const it = buildItemIndex(liveTrackingInputs().items.filter((i) => i.track_stock)).find(l.name);
+          tracking ??= computeTracking(sharedTrackingInputs());
+          const it = buildItemIndex(sharedTrackingInputs().items.filter((i) => i.track_stock)).find(l.name);
           const batches = (it && tracking.get(it.id)?.batches) || [];
           const b = l.batch_no ? batches.find((x) => x.batch.toUpperCase() === l.batch_no!.toUpperCase()) : batches.length === 1 ? batches[0] : undefined;
           return b?.mrp;

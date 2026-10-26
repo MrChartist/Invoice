@@ -336,3 +336,18 @@ test('report prefs: device-local per report, tolerant read', () => {
   assert.equal(normalizeReportPrefs({ columns: 'weird', showZero: 'yes' }).columns, 'none');
   assert.equal(localStorage.getItem('mrchartist_inv_report_prefs'), null);
 });
+
+test('PERF-1: balances are computed once per ledger and day, and every caller gets a fresh Map', async () => {
+  const { closingBalances, openingBalances, ledgerBalanceSheet: bsOf } = await import('../src/lib/ledger/reports.ts');
+  const first = closingBalances(ledger, FY.end);
+  const expected = new Map(first);
+  first.set(A.bank, 123);
+  first.clear();
+  assert.deepEqual(closingBalances(ledger, FY.end), expected, 'a caller changing its Map does not reach the cache');
+  const fresh = buildLedger(input);
+  assert.deepEqual(closingBalances(ledger, FY.end), closingBalances(fresh, FY.end));
+  assert.deepEqual(openingBalances(ledger, FY2.start), openingBalances(fresh, FY2.start));
+  assert.deepEqual(closingBalances(ledger, FY.end, 'Acme'), closingBalances(fresh, FY.end, 'Acme'));
+  assert.deepEqual(bsOf(ledger, FY2.end), bsOf(fresh, FY2.end));
+  assert.deepEqual(bsOf(ledger, FY2.end), bsOf(ledger, FY2.end));
+});

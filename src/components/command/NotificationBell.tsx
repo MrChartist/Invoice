@@ -2,13 +2,13 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { t } from '../../i18n';
-import { SINGLETON_KEYS, getJson, getTable, peekTable, subscribeStorageChanges } from '../../lib/storage';
+import { SINGLETON_KEYS, getJson, peekTable, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
 import {
   dismiss,
   loadNotifState,
-  loadVisibleNotifications,
+  reusableVisibleNotifications,
   markAllRead,
   markRead,
   pruneState,
@@ -41,11 +41,11 @@ let expiryAlerts: 'off' | 'loading' | 'on' = 'off';
 function ensureExpiryAlerts(onReady: () => void): void {
   if (expiryAlerts !== 'off') return;
   try {
-    const items = getTable<{ track_stock?: boolean; track_batches?: boolean; reorder_level?: number; reorder_by_godown?: Record<string, number> }>('stock_items');
+    const items = peekTable<{ track_stock?: boolean; track_batches?: boolean; reorder_level?: number; reorder_by_godown?: Record<string, number> }>('stock_items');
     // Batch expiry (6.6) and reorder-level (Phase 7) alerts share one lazily loaded provider.
     const wants = (i: (typeof items)[number]) =>
       i.track_batches || Number(i.reorder_level) > 0 || Object.values(i.reorder_by_godown ?? {}).some((v) => Number(v) > 0);
-    if (!items.some((i) => i.track_stock && wants(i)) && !getTable('job_work_out').length) return; // 7S: job-work clocks
+    if (!items.some((i) => i.track_stock && wants(i)) && !peekTable('job_work_out').length) return; // 7S: job-work clocks
   } catch {
     return;
   }
@@ -71,10 +71,10 @@ function ensureBusinessAlerts(onReady: () => void): void {
   try {
     // 7O: TDS deposit / 26Q reminders once TDS is in use (a challan, or a bill / payment carrying TDS).
     const tds = (r: unknown) => Number((r as { tds_amount?: unknown } | null)?.tds_amount) > 0;
-    const used = getTable('amc_contracts').length > 0 || getTable('gst_setoffs').length > 0 || getTable('gst_challans').length > 0
-      || getTable('tds_challans').length > 0 || getTable('purchases').some(tds) || getTable('purchase_payments').some(tds)
+    const used = peekTable('amc_contracts').length > 0 || peekTable('gst_setoffs').length > 0 || peekTable('gst_challans').length > 0
+      || peekTable('tds_challans').length > 0 || peekTable('purchases').some(tds) || peekTable('purchase_payments').some(tds)
       // 7R: TCS (27EQ) reminders once an invoice carries TCS.
-      || getTable('invoices').some((r) => Number((r as { tcs_amount?: unknown } | null)?.tcs_amount) > 0);
+      || peekTable('invoices').some((r) => Number((r as { tcs_amount?: unknown } | null)?.tcs_amount) > 0);
     if (!used && !(readApprovalPolicy().enabled && can('doc.approve'))) return;
   } catch {
     return;
@@ -101,8 +101,8 @@ function ensureGstGuardAlerts(onReady: () => void): void {
   try {
     const old = `${new Date().getFullYear() - 2}-12-31`;
     const aato = (getJson<{ profiles?: { einvoice_aato?: number }[] } | null>(SINGLETON_KEYS.settings, null)?.profiles ?? []).some((p) => Number(p?.einvoice_aato) > 0);
-    if (!aato && !getTable('einvoice_meta').length
-      && !getTable<{ issue_date?: string; status?: string }>('invoices').some((i) => i?.status !== 'Draft' && String(i?.issue_date ?? '9') < old)) return;
+    if (!aato && !peekTable('einvoice_meta').length
+      && !peekTable<{ issue_date?: string; status?: string }>('invoices').some((i) => i?.status !== 'Draft' && String(i?.issue_date ?? '9') < old)) return;
   } catch {
     return;
   }
@@ -127,7 +127,7 @@ function ensureCaptureAlerts(onReady: () => void): void {
   if (captureAlerts !== 'off') return;
   try {
     const due = (r: unknown) => { const p = r as { due_date?: string; total?: number; amount_paid?: number } | null; return !!p?.due_date && Number(p.amount_paid) < Number(p.total); };
-    if (!['doc_inbox', 'purchase_drafts', 'recurring_bills', 'payment_requests'].some((t) => getTable(t).length) && !getTable('purchases').some(due)) return;
+    if (!['doc_inbox', 'purchase_drafts', 'recurring_bills', 'payment_requests'].some((t) => peekTable(t).length) && !peekTable('purchases').some(due)) return;
   } catch {
     return;
   }
@@ -169,7 +169,7 @@ let projectAlerts: 'off' | 'loading' | 'on' = 'off';
 function ensureProjectAlerts(onReady: () => void): void {
   if (projectAlerts !== 'off') return;
   try {
-    if (!getTable('project_tasks').length) return;
+    if (!peekTable('project_tasks').length) return;
   } catch {
     return;
   }
@@ -199,8 +199,51 @@ function ensureR3cAlerts(onReady: () => void): void {
     r3cAlerts[id] = 'loading';
     load().then(() => { r3cAlerts[id] = 'on'; onReady(); }, () => { r3cAlerts[id] = 'off'; });
   };
-  gate('eway', () => getTable<{ eway_no?: string }>('einvoice_meta').some((m) => !!m?.eway_no), () => import('../../lib/eway-alerts').then((m) => m.registerEwayAlerts()));
-  gate('dsc', () => getTable('dsc_register').length > 0, () => import('../../lib/dsc-alerts').then((m) => m.registerDscAlerts()));
+  gate('eway', () => peekTable<{ eway_no?: string }>('einvoice_meta').some((m) => !!m?.eway_no), () => import('../../lib/eway-alerts').then((m) => m.registerEwayAlerts()));
+  gate('dsc', () => peekTable('dsc_register').length > 0, () => import('../../lib/dsc-alerts').then((m) => m.registerDscAlerts()));
+}
+
+function runBell(force: boolean, setItems: (list: VisibleNotification[]) => void, reload: () => void): void {
+  try {
+    setItems(reusableVisibleNotifications(new Date(), force));
+  } catch {
+    setItems([]);
+  }
+  ensureExpiryAlerts(reload);
+  ensureBusinessAlerts(reload);
+  ensureGstGuardAlerts(reload);
+  ensureCaptureAlerts(reload);
+  ensurePackAlerts(reload);
+  ensureProjectAlerts(reload); // R3-B
+  ensureR3cAlerts(reload); // R3-C
+  ensureProductionAlerts(reload); // R4-A
+}
+
+/** Coalesces refresh requests into one run on the next task (a forced request wins). */
+function bellScheduler(setItems: (list: VisibleNotification[]) => void) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let force = false;
+  const s = {
+    schedule(f = false): void {
+      force ||= f;
+      if (timer !== null) return;
+      timer = setTimeout(() => {
+        const ff = force;
+        timer = null;
+        force = false;
+        s.run(ff);
+      }, 0);
+    },
+    run(f: boolean): void {
+      runBell(f, setItems, () => s.schedule(true));
+    },
+    cancel(): void {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      force = false;
+    },
+  };
+  return s;
 }
 
 // R4-A: production orders past due / completed-not-closed and stock aged in QC — lazy, once an order or a QC godown exists.
@@ -225,43 +268,35 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
 
-  const refresh = useCallback(() => {
-    try {
-      setItems(loadVisibleNotifications(new Date()));
-    } catch {
-      setItems([]);
-    }
-    const reload = () => {
-      try {
-        setItems(loadVisibleNotifications(new Date()));
-      } catch {
-        /* keep what is shown */
-      }
-    };
-    ensureExpiryAlerts(reload);
-    ensureBusinessAlerts(reload);
-    ensureGstGuardAlerts(reload);
-    ensureCaptureAlerts(reload);
-    ensurePackAlerts(reload);
-    ensureProjectAlerts(reload); // R3-B
-    ensureR3cAlerts(reload); // R3-C
-    ensureProductionAlerts(reload); // R4-A
-  }, []);
+  // PERF-1: every trigger (poll, focus, cross-tab change, a provider that finished loading) is coalesced
+  // into ONE run on the next task; unchanged data reuses the providers' last result (`reusableVisibleNotifications`).
+  const [bell] = useState(() => bellScheduler(setItems));
+  /** Immediate, fresh refresh (the bell is opened, a notice was acted on). */
+  const refresh = useCallback(() => bell.run(true), [bell]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-    const timer = setInterval(refresh, pollMs);
-    window.addEventListener('focus', refresh);
-    window.addEventListener('storage', refresh);
-    const unsubscribe = subscribeStorageChanges(refresh);
+    const schedule = (f = false) => bell.schedule(f);
+    // First run after first paint, in idle time (never in the boot critical path).
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const idle = w.requestIdleCallback ? w.requestIdleCallback(() => schedule(), { timeout: 2000 }) : null;
+    const boot = idle === null ? setTimeout(() => schedule(), 0) : null;
+    const tick = () => schedule();
+    // Another tab's localStorage write (device-local keys) is invisible to `storageVersion`: recompute.
+    const onStorage = () => schedule(true);
+    const timer = setInterval(tick, pollMs);
+    window.addEventListener('focus', tick);
+    window.addEventListener('storage', onStorage);
+    const unsubscribe = subscribeStorageChanges(tick);
     return () => {
       unsubscribe();
       clearInterval(timer);
-      window.removeEventListener('focus', refresh);
-      window.removeEventListener('storage', refresh);
+      if (idle !== null) w.cancelIdleCallback?.(idle);
+      if (boot !== null) clearTimeout(boot);
+      bell.cancel();
+      window.removeEventListener('focus', tick);
+      window.removeEventListener('storage', onStorage);
     };
-  }, [refresh, pollMs]);
+  }, [bell, pollMs]);
 
   // Close on outside click / Escape; return focus to the bell.
   useEffect(() => {

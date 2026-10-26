@@ -157,7 +157,7 @@ export function measureStorage(): Pick<
   let usedChars = 0;
   const tables: StorageInput['tables'] = [];
   // Attachment files are one key each: report them as a single "attachments" entry.
-  const used = referencedAttachmentIds((k) => data[k]);
+  const used = referencedAttachmentIds(); // live store = `data`; shared parsed tables (PERF-1)
   let attachmentCount = 0;
   let attachmentChars = 0;
   let unusedAttachments = 0;
