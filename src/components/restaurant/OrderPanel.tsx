@@ -22,6 +22,8 @@ import {
   printBill, reopenOrder, sendOrderKot, setServiceCharge, settleOrder, transferTo, voidOrder,
 } from '../../lib/restaurant/orders-store';
 import { cn, formatCurrency } from '../../lib/utils';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
 import { useT } from '../../i18n';
 import { rT } from '../../i18n/areas/restaurant';
 import controls from '../../styles/controls.module.css';
@@ -32,6 +34,7 @@ const SplitBillDialog = lazy(() => import('./SplitBillDialog').then((m) => ({ de
 const ModifierPicker = lazy(() => import('./ModifierPicker').then((m) => ({ default: m.ModifierPicker })));
 const PosReceiptPrint = lazy(() => import('../pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 const BillImageShare = lazy(() => import('./BillImageShare').then((m) => ({ default: m.BillImageShare })));
+const RoomPicker = lazy(() => import('../hotel/FrontDesk').then((m) => ({ default: m.RoomPicker }))); // R7-B2 "charge to room" (hotel pack only)
 
 const METHODS: MoneyTender[] = ['Cash', 'UPI', 'Card'];
 type Notify = (m: string, tone?: 'success' | 'error' | 'info', opts?: { action?: { label: string; onClick: () => void }; duration?: number }) => void;
@@ -451,6 +454,7 @@ export function OrderPanel(p: OrderPanelProps) {
           footer={
             <>
               <button type="button" className={controls.btnOutline} onClick={() => setSettleOpen(false)}>{rT('cancel')}</button>
+              {isPackOn(localDb.settings.get(), 'hotel') && <Suspense fallback={null}><RoomPicker order={order.id} notify={notify} onDone={() => { setSettleOpen(false); onChanged(); }} /></Suspense>}
               <button type="button" className={controls.btnPrimary} onClick={settle} data-settle-now>{rT('settleNow', { amount: formatCurrency(bill.total) })}</button>
             </>
           }

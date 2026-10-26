@@ -30,6 +30,7 @@ import {
 } from '../lib/pos';
 // R4-B1 / B3: promotional gift voucher discount; store price lists and the counter's branch.
 import { applyPromoDiscount, promoVoucherIssue } from '../lib/retail/gift-voucher-core';
+import { isPackOn } from '../lib/industry-packs';
 import { BRANCH_PRICES_TABLE, branchContext, posBranch, storePricingInUse, writePosBranch } from '../lib/retail/store-prices';
 import { loadBranches, type Branch } from '../lib/branch';
 import { defineArea } from '../i18n/area';
@@ -104,6 +105,7 @@ const NO_TENDER = { Cash: 0, UPI: 0, Card: 0, Cheque: 0, Wallet: 0 } as Record<M
 const TENDER_KEY: Record<MoneyTender, PosAction> = { Cash: 'cash', UPI: 'upi', Card: 'card', Cheque: 'cheque', Wallet: 'wallet' };
 // R4-B1: the gift-voucher tender panel loads only when the company has vouchers.
 const GiftVoucherTender = lazy(() => import('../components/retail/GiftVoucherTender'));
+const RoomPicker = lazy(() => import('../components/hotel/FrontDesk').then((m) => ({ default: m.RoomPicker }))); // R7-B2 "Room" tender (hotel pack only)
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
 
@@ -1120,6 +1122,7 @@ export function Pos() {
                   <GiftVoucherTender day={record.issue_date} due={summary.due} applied={gvApplied} onChange={setGvApplied} />
                 </Suspense>
               )}
+              {isPackOn(settings, 'hotel') && items.length > 0 && <Suspense fallback={null}><RoomPicker record={record} notify={notify} onDone={reset} /></Suspense>}
               {promo.error && <p className={controls.error} role="alert">{promo.error}</p>}
               {tender.Cheque > 0 && (
                 <input className={controls.input} value={chequeRef} onChange={(e) => setChequeRef(e.target.value)} placeholder={retailT('chequePh')} aria-label={retailT('chequePh')} id="pos-cheque-ref" />

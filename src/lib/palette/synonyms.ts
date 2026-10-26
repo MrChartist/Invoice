@@ -40,6 +40,7 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/gst-reports?tab=eway-desk': ['eway', 'e-way bill', 'ewb', 'vehicle update', 'validity'],
   '/gst-reports?tab=export-desk': ['export', 'lut', 'irm', 'ebrc', 'e-brc', 'realisation', 'boe'],
   '/gst-reports?tab=common-credit': ['rule 42', 'rule 43', 'itc reversal', 'common credit'],
+  '/gst-reports?tab=hotel-gst': ['specified premises', '7500', 'hotel gst', 'room tariff', '996311'],
   // TDS (Income-tax Act 2025 sections keep the 1961 names as words too)
   '/tds?tab=overview': ['tds', 'tcs', 'withholding'],
   '/tds?tab=deductions': ['194c', '194j', '194h', '194i', '194q', '393', 'deduction'],

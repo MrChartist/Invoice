@@ -36,18 +36,21 @@ import { B, csvDownload, errText, printHtml } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './hotel.module.css';
+import FormCView from './FormCView';
+import ReportsView from './ReportsView';
+import FolioView from './FolioView'; // R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
 
 /* ── Small kit ─────────────────────────────────────────────────── */
 
-type Rec = Record<string, unknown>;
+export type Rec = Record<string, unknown>;
 type Opt = readonly (string | readonly [string, string])[];
 /** [field, label (area key, else the field name), n(umber) | d(ate) | t(ime) | c(heckbox) | select options]. */
-type Spec = readonly [string, string, ('n' | 'd' | 't' | 'c' | Opt)?];
+export type Spec = readonly [string, string, ('n' | 'd' | 't' | 'c' | Opt)?];
 const lab = (l: string) => (Object.hasOwn(hT.en, l) ? hT(l as HKey) : l.replace(/_/g, ' '));
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const table = (head: string[], rows: unknown[][]) => `<table border="1" cellpadding="4"><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
 
-function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; spec: readonly Spec[]; off?: boolean }) {
+export function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; spec: readonly Spec[]; off?: boolean }) {
   return (
     <>
       {spec.map(([k, l, t]) => t === 'c' ? (
@@ -70,8 +73,8 @@ function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; spec: re
 }
 
 const Grid = ({ children }: { children: ReactNode }) => <div className={styles.grid}>{children}</div>;
-const Row = ({ children }: { children: ReactNode }) => <div className={styles.row}>{children}</div>;
-const Tbl = ({ head, rows }: { head: ReactNode[]; rows: ReactNode[][] }) => rows.length ? (
+export const Row = ({ children }: { children: ReactNode }) => <div className={styles.row}>{children}</div>;
+export const Tbl = ({ head, rows }: { head: ReactNode[]; rows: ReactNode[][] }) => rows.length ? (
   <div className={surface.tableWrap}><table className={surface.table}><thead><tr>{head.map((h, i) => <th key={i}>{h}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table></div>
 ) : <p className={styles.note}>{hT('empty')}</p>;
 
@@ -89,8 +92,14 @@ export interface Ctx {
   go: (view: string) => void;
   run: (fn: () => unknown, ok?: string) => void;
 }
-/** R7-B / R7-C plug their lazy views in here: `folios: lazy(() => import(...))`, `formc`, `reports`. */
-const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {};
+/** R7-B / R7-C views (all in this chunk: one chunk for the pack): `folios`, `formc`, `reports`. */
+/** R7-B2: the Tables / POS "Room" button loads through this chunk, so the hotel libs stay in one chunk. */
+export { default as RoomPicker } from './RoomPicker';
+const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {
+  folios: FolioView, // R7-B
+  formc: FormCView, // R7-C2
+  reports: ReportsView, // R7-C3
+};
 
 export default function FrontDesk() {
   useT();
@@ -182,6 +191,7 @@ function Board({ ctx, hk }: { ctx: Ctx; hk: boolean }) {
               <b>{room.number}</b>
               <span>{d.types.find((t) => t.id === room.room_type_id)?.code} · {hT(`hk.${st}`)}</span>
               {res && line && <span>{res.guest.name.split(' ').pop()} · {nightsBetween(day, lineDates(res, line).departure).length}</span>}
+              {line?.form_c && !line.form_c.filed_at && <span className={styles.warn} data-formc-chip>{hT('view.formc')} {Math.round((Date.parse(line.form_c.due_at) - Date.now()) / 3_600_000)}h</span>}
             </>;
             return hk ? (
               <div key={room.id} className={cn(styles.tile, styles[st], res && styles.occ)} data-hk-room={room.number}>
@@ -576,3 +586,11 @@ function Setup({ ctx }: { ctx: Ctx }) {
     </div>
   );
 }
+
+// R7-C: the GST → Hotel tab and the bell reach the pack's compliance code through this chunk (one chunk per pack, the
+// R5-C `r5c-screens` pattern) via `hotel-lazy.ts`: `hotelChunk().then((m) => m.HotelGstTab)`.
+export { default as HotelGstTab } from './HotelGstTab';
+// eslint-disable-next-line react-refresh/only-export-components
+export { registerHotelAlerts } from '../../lib/hotel/hotel-alerts';
+// eslint-disable-next-line react-refresh/only-export-components
+export { exemptLike } from '../../lib/hotel/band-report'; // R7-C1 (D12) → GST → Common credit

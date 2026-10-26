@@ -112,7 +112,7 @@ test('every topic has English and Hindi titles, what / when, ≤ 5 steps; statut
 });
 
 test('every caItems id exists in docs/CA_REVIEW.md', () => {
-  const ids = new Set([...src('docs/CA_REVIEW.md').matchAll(/^\| ((?:G|TR|T|P|AC|I|X)\d+)\b/gm)].map((m) => m[1])); // R8: TR ids
+  const ids = new Set([...src('docs/CA_REVIEW.md').matchAll(/^\| ((?:G|TR|T|P|AC|I|X|HT)\d+)\b/gm)].map((m) => m[1])); // R8: TR ids; R7: HT ids
   assert.ok(ids.size >= 150, `read ${ids.size} CA ids`);
   for (const x of ALL) for (const id of x.statutory?.caItems ?? []) assert.ok(ids.has(id), `${x.id}: CA item ${id} not in CA_REVIEW.md`);
 });

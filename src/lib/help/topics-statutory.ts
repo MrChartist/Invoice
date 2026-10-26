@@ -59,6 +59,10 @@ export const TOPICS: readonly HelpTopic[] = [
   t('gst-reports:guards', 'GST guards', 'GST जाँच', 'Checks before filing: rates outside the slab list, missing GSTINs, e-Invoice window, Table 3.2 and more.', 'Before every download.', { statutory: ca(['G2', 'G15', 'G45']) }),
   t('gst-reports:portal-files', 'Portal files', 'पोर्टल फ़ाइलें', 'GSTR-1 JSON files you uploaded and the error files the portal sent back.', 'After an upload, to fix portal errors.', { statutory: ca(['G27']) }),
   t('gst-reports:eway-desk', 'e-Way desk', 'ई-वे डेस्क', 'e-Way bills to make, extend or close, with validity as the app applies it.', 'Before goods move.', { statutory: ca(['G46'], 'e-Way bill') }),
+  t('gst-reports:hotel-gst', 'Hotel GST', 'होटल GST', 'Hotel pack: room-night bands, specified-premises status with its evidence, the declarations register, the band report for the common-credit working, and checks.', 'Monthly before GSTR-1 / 3B; 1 Jan – 31 Mar for declarations.', {
+    statutory: ca(['HT1', 'HT2', 'HT3', 'HT4', 'HT5', 'HT6', 'HT14', 'HT16'], 'Annexure VII / VIII / IX'),
+    related: rel(['Common credit', '/gst-reports?tab=common-credit'], ['Front desk', '/tables?tab=frontdesk']),
+  }),
   t('gst-reports:export-desk', 'Export desk', 'एक्सपोर्ट डेस्क', 'Export realisation, IRM / e-BRC, incentives and imports by bill of entry.', 'If you export or import.', { statutory: ca(['X1', 'X2', 'X3', 'X9']) }),
   t('tds', 'TDS & TCS', 'TDS और TCS', 'Tax you deduct from suppliers (TDS) and collect from customers (TCS): deductions, challans, quarterly return papers and certificates.', 'Monthly deposit and quarterly returns.', {
     steps: ['Mark TDS on supplier bills or payments.', 'Record the challan when you deposit.', 'Prepare the quarterly return paper and Form 16A.'],

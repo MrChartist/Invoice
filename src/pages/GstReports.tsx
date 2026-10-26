@@ -109,12 +109,13 @@ const PortalFilesView = lazy(() => import('../components/gst-reports/PortalFiles
 const EwayDesk = lazy(() => import('../components/gst-reports/EwayDesk'));
 const PreflightDialog = lazy(() => import('../components/gst-reports/PreflightDialog'));
 
-const tabLabel = (x: { id?: string; label: string; key?: Parameters<typeof gstT>[0]; desk?: 'tab.portal' | 'tab.eway' } | undefined) => (x?.desk ? dkT(x.desk) : x?.key ? gstT(x.key) : x?.id === 'common-credit' ? ccTabT('tab') : x?.label);
+const tabLabel = (x: { id?: string; label: string; key?: Parameters<typeof gstT>[0]; desk?: 'tab.portal' | 'tab.eway' } | undefined) => (x?.desk ? dkT(x.desk) : x?.key ? gstT(x.key) : x?.id === 'common-credit' || x?.id === 'hotel-gst' ? ccTabT(x.id === 'hotel-gst' ? 'hotel' : 'tab') : x?.label);
 // R4-C2: export desk tab (its own lazy chunk).
 const ExportDesk = lazy(() => import('../components/trade/ExportDesk'));
 // R5-C2: Rule 42 / 43 common-credit working (fees / non-profit / leases packs; its own lazy chunk).
 const CommonCreditView = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.CommonCreditView })));
-const ccTabT = defineArea({ tab: 'Common credit (Rule 42 / 43)' } as const, { tab: 'साझा क्रेडिट (Rule 42 / 43)' });
+const HotelGstTab = lazy(() => import('../components/hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => ({ default: m.HotelGstTab }))); // R7-C1 (the pack's chunk)
+const ccTabT = defineArea({ tab: 'Common credit (Rule 42 / 43)', hotel: 'Hotel GST' } as const, { tab: 'साझा क्रेडिट (Rule 42 / 43)', hotel: 'होटल GST' });
 // R6-A3 / A6: "About this tab" strip and the one-time tip (lazy); glossary terms on section headings.
 const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
@@ -631,6 +632,8 @@ export function GstReports() {
             <CommonCreditView notify={notify} />
           </Suspense>
         );
+      case 'hotel-gst':
+        return <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}><HotelGstTab notify={notify} /></Suspense>;
       case 'export-desk':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
