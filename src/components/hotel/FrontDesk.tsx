@@ -92,15 +92,13 @@ export interface Ctx {
   go: (view: string) => void;
   run: (fn: () => unknown, ok?: string) => void;
 }
-/** R7-B / R7-C plug their lazy views in here: `folios: lazy(() => import(...))`, `formc`, `reports`. */
-const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {
-  formc: FormCView, // R7-C2 (in this chunk: one chunk for the pack)
-  reports: ReportsView, // R7-C3
-/** R7-B / R7-C plug their views in here (`folios` is static: see the import), `formc`, `reports`. */
+/** R7-B / R7-C views (all in this chunk: one chunk for the pack): `folios`, `formc`, `reports`. */
 /** R7-B2: the Tables / POS "Room" button loads through this chunk, so the hotel libs stay in one chunk. */
 export { default as RoomPicker } from './RoomPicker';
 const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {
   folios: FolioView, // R7-B
+  formc: FormCView, // R7-C2
+  reports: ReportsView, // R7-C3
 };
 
 export default function FrontDesk() {
