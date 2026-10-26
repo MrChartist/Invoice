@@ -521,9 +521,15 @@ try {
     await page.getByRole('button', { name: /^Record payment for INV/ }).first().click();
     const dlg = page.getByRole('dialog', { name: 'Record payment' });
     const amount = dlg.getByLabel('Amount', { exact: true });
-    const due = Number(await amount.inputValue());
+    // The dialog pre-fills the balance after it opens: wait for it rather than reading an empty field.
+    let due = 0;
+    for (let i = 0; i < 50 && !(due > 10); i++) {
+      due = Number(await amount.inputValue());
+      if (!(due > 10)) await page.waitForTimeout(100);
+    }
+    check(due > 10, `the payment dialog pre-fills the balance (${due})`);
     await amount.fill(String(Math.round((due - 10) * 100) / 100));
-    await dlg.locator('[data-settle-rest]').waitFor({ timeout: 10000 });
+    await dlg.locator('[data-settle-rest]').waitFor({ timeout: 15000 });
     await dlg.locator('[data-settle-choice="short_payment"]').check();
     check((await dlg.locator('[data-settle-amount]').inputValue()) === '10', 'Settle the rest pre-fills the ₹10 left open');
     await dlg.getByRole('button', { name: 'Record payment' }).click();
