@@ -51,6 +51,7 @@ import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
 import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
 import { payrollTallyVouchers } from './tally-payroll';
+import { sectionText } from './ita2025';
 
 import {
   clean,
@@ -557,7 +558,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
           clean(p.method),
           clean(p.reference) && `Ref ${clean(p.reference)}`,
           `Against ${invNo}`,
-          tds > 0 && `TDS ${fixed2(tds / 100)} withheld${clean(inv.tds_section) ? ` u/s ${clean(inv.tds_section)}` : ''}`,
+          tds > 0 && `TDS ${fixed2(tds / 100)} withheld${clean(inv.tds_section) ? ` u/s ${clean(sectionText(inv.tds_section, inv.issue_date))}` : ''}`,
           fxNarration(num(p.amount), inv),
         ]
           .filter(Boolean)

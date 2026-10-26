@@ -27,6 +27,7 @@ import { challanByKey, challanTotal, deducteeCode, type TdsChallan, type TdsDedu
 import { rpuDate } from './tds-returns';
 import { nrActRate, nrNatureOf, payableSection, type NrNature } from './tds-rules';
 import { isValidPan } from './validators';
+import { actRef, formText, quarterStart, sectionText } from './ita2025';
 
 export const FORM27Q_NOTE = 'UNVERIFIED Form 27Q working paper (non-residents) in NSDL RPU column order as understood — import through the RPU, validate with the FVU and verify every rate, the DTAA claim and Form 15CA / 15CB with your CA.';
 
@@ -144,6 +145,8 @@ const NATURE_LABEL: Record<NrNature, string> = { ROYALTY: 'Royalty', FTS: 'Fees 
 
 export interface Form27QPaper {
   form: '27Q';
+  /** Name for the period: "Form 27Q", or "Form 144 [old 27Q]" from Apr 2026 (Income-tax Act 2025). */
+  formLabel: string;
   fy: number;
   quarter: TdsQuarter;
   challanRows: (string | number)[][];
@@ -194,17 +197,20 @@ export function form27Q(rows: readonly TdsDeductionRow[], vendors: readonly unkn
     ]);
   });
   const deducted = round2(list.reduce((t, x) => t + x.row.amount, 0));
-  return { form: '27Q', fy, quarter, challanRows, deducteeRows, totals: { deducted, deposited: round2(deposited), challans: used.length, shortBy: round2(shortBy) }, warnings: [...new Set(warnings)] };
+  // Income-tax Act 2025: Sec 195 → Sec 393(2) Table; the RPU section codes above stay the 1961 ones the app knows.
+  const ref = list.find((x) => actRef(x.row.code, x.row.creditedOn).act === 2025);
+  if (ref) warnings.push(`Income-tax Act 2025 period: ${sectionText(ref.row.code, ref.row.creditedOn)}. The section codes above are the 1961-Act RPU codes; map them to the current RPU's codes and verify with your CA.`);
+  return { form: '27Q', formLabel: formText('27Q', quarterStart(fy, quarter)), fy, quarter, challanRows, deducteeRows, totals: { deducted, deposited: round2(deposited), challans: used.length, shortBy: round2(shortBy) }, warnings: [...new Set(warnings)] };
 }
 
 export function form27QCsv(p: Form27QPaper): string {
-  return toCsv([[FORM27Q_NOTE], ['Form 27Q', `FY ${p.fy}-${String(p.fy + 1).slice(2)}`, `Q${p.quarter}`], [], ['Challan details'], ...p.challanRows, [], ['Deductee details (non-residents)'], ...p.deducteeRows, [], ['Warnings'], ...p.warnings.map((w) => [w])]);
+  return toCsv([[FORM27Q_NOTE], [p.formLabel, `FY ${p.fy}-${String(p.fy + 1).slice(2)}`, `Q${p.quarter}`], [], ['Challan details'], ...p.challanRows, [], ['Deductee details (non-residents)'], ...p.deducteeRows, [], ['Warnings'], ...p.warnings.map((w) => [w])]);
 }
 
 export function form27QSheets(p: Form27QPaper): { name: string; rows: (string | number)[][] }[] {
   return [
     { name: 'Challans', rows: p.challanRows },
     { name: 'Deductees', rows: p.deducteeRows },
-    { name: 'Notes', rows: [['Note'], [FORM27Q_NOTE], ...p.warnings.map((w) => [w])] },
+    { name: 'Notes', rows: [['Note'], [FORM27Q_NOTE], [p.formLabel], ...p.warnings.map((w) => [w])] },
   ];
 }

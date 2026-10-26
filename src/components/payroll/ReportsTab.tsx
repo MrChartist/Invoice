@@ -22,6 +22,8 @@ import { arrearEcrLines, arrearEcrRows, arrearEcrText, s17viiRows, tds201Rows } 
 import { todayInput } from '../../lib/utils';
 import { downloadText } from '../../lib/download';
 import { payrollT as pT } from '../../i18n/areas/payroll';
+import { ita25T, ita25Words } from '../../i18n/areas/ita2025';
+import { formText, fyStart as fyFirstDay, ITA2025_FROM } from '../../lib/ita2025';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
@@ -110,7 +112,7 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
           <h2 className={styles.h2}>{pT('rep.annual', { fy: fyLabel })}</h2>
           <ul className={styles.reports}>
             {item(
-              pT('rep.q24'),
+              fyFirstDay(fyStart) >= ITA2025_FROM ? ita25T('annex1', { form: formText('24Q', fyFirstDay(fyStart), ita25Words()) }) : pT('rep.q24'),
               pT('rep.q24Hint'),
               <span className={styles.inline}>
                 <select className={controls.select} aria-label={pT('rep.quarter')} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as 1 | 2 | 3 | 4)}>
@@ -119,14 +121,14 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
                 {out(`form24Q-annexure1-FY${fyLabel}-Q${quarter}`, form24QAnnexure1Rows(fyRuns, fyStart, quarter), '24Q Annexure I')}
               </span>,
             )}
-            {item(pT('rep.ann2'), pT('rep.ann2Hint'), out(`form24Q-annexure2-FY${fyLabel}`, form24QAnnexure2Rows(fyRuns, employees, fyStart), '24Q Annexure II'))}
+            {item(fyFirstDay(fyStart) >= ITA2025_FROM ? ita25T('annex2', { form: formText('24Q', fyFirstDay(fyStart), ita25Words()) }) : pT('rep.ann2'), pT('rep.ann2Hint'), out(`form24Q-annexure2-FY${fyLabel}`, form24QAnnexure2Rows(fyRuns, employees, fyStart), '24Q Annexure II'))}
             {item(pT('rep.ptYear'), pT('rep.ptHint'), out(`pt-register-FY${fyLabel}`, ptRegisterRows(fyRuns), 'PT'))}
             {item(pT('rep.pfLate'), pT('rep.pfLateHint'), out(`pf-late-estimate-FY${fyLabel}`, pfLateRows(fyRuns, loadPayrollPayments(), fyStart, todayInput()), 'PF late'))}
             {item(pT('rep.tds201'), pT('rep.tds201Hint'), out(`tds-201-1A-FY${fyLabel}`, tds201Rows(fyRuns, loadPayrollPayments(), fyStart, todayInput()), '201(1A)'))}
             {item(pT('rep.s17vii'), pT('rep.s17viiHint'), out(`s17-2-vii-FY${fyLabel}`, s17viiRows(fyRuns, employees, fyStart), '17(2)(vii)'))}
             {item(pT('rep.arrears'), pT('rep.arrearsHint'), out(`arrears-FY${fyLabel}`, arrearsRegisterRows(loadArrears().filter((r) => fyStartOfMonth(r.pay_month) === `${fyStart}-04-01`), employees), 'Arrears'))}
             {item(
-              pT('rep.f16'),
+              fyFirstDay(fyStart) >= ITA2025_FROM ? ita25T('partB', { form: formText('16', fyFirstDay(fyStart), ita25Words()) }) : pT('rep.f16'),
               pT('rep.f16Hint'),
               emp ? (
                 <span className={styles.inline}>

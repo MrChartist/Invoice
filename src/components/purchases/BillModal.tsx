@@ -460,7 +460,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         </div>
       </details>
 
-      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={supplierPayable} nonResident={vendor?.non_resident} />
+      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={supplierPayable} nonResident={vendor?.non_resident} date={date} />
 
       {itc && !rcm && !importType && totals.tax > 0 && vendor && !vendor.gstin && (
         <p className={styles.note}>{purT('noGstinNote')}</p>

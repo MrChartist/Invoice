@@ -28,6 +28,8 @@ import { formatDate, formatMoney, todayInput } from '../../lib/utils';
 import type { TdsData } from './TdsTabs';
 import { useT } from '../../i18n';
 import { tdsT } from '../../i18n/areas/tds';
+import { ita25Words } from '../../i18n/areas/ita2025';
+import { formText, quarterStart } from '../../lib/ita2025';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
@@ -81,7 +83,7 @@ export function Form27qTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
       </div>
       <p className={books.notice}>{FORM27Q_NOTE}</p>
       <p className={books.muted}>
-        FY {fy}-{String(fy + 1).slice(2)} · Q{quarter} · {tdsT('deducted')} {inr(paper.totals.deducted)} · {tdsT('deposited')} {inr(paper.totals.deposited)}
+        <strong>{formText('27Q', quarterStart(fy, quarter), ita25Words())}</strong> · FY {fy}-{String(fy + 1).slice(2)} · Q{quarter} · {tdsT('deducted')} {inr(paper.totals.deducted)} · {tdsT('deposited')} {inr(paper.totals.deposited)}
         {paper.totals.shortBy > 0 ? ` · ${r7T('q27Short', { amount: inr(paper.totals.shortBy) })}` : ''}
       </p>
       <div className={surface.card}>

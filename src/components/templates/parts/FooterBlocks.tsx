@@ -6,6 +6,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord, SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { buildUpiUrl, isRcmTotals, isSingleTax, isTaxed } from '../paper-helpers';
+import { ACT_WORDS_PRINT, sectionText } from '../../../lib/ita2025';
 import styles from '../invoice-paper.module.css';
 
 interface BlockProps {
@@ -248,7 +249,7 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
       )}
       {totals.tds_amount > 0 && (
         <div className={styles.totalRow}>
-          <span>Less: TDS{invoice.tds_section && invoice.tds_section !== 'CUSTOM' ? ` (${invoice.tds_section})` : ''}</span>
+          <span>Less: TDS{invoice.tds_section && invoice.tds_section !== 'CUSTOM' ? ` (${sectionText(invoice.tds_section, invoice.issue_date, ACT_WORDS_PRINT)})` : ''}</span>
           <span>-{money(totals.tds_amount, cur)}</span>
         </div>
       )}
