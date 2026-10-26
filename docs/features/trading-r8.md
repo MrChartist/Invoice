@@ -200,3 +200,75 @@ editor + engine 3.1 kB, discount sub-row 1.6 kB, schemes 1.1 kB; the rest is laz
 - TR4: scheme-claim settlement defaults to a financial journal; a GST supplier credit note is optional.
 - G6 / TR18: bulk interest drafts take each bill's principal GST rate (opening bills: the party's latest invoice rate).
 - TR8: crate deposits carry no GST (liability); unreturned crates are billed as a taxable sale.
+
+---
+
+# TR-B — commodity and mandi trade (weight / bag billing, bill charges, brokers)
+
+Commodity or agency pack only (`industry_packs` contains `commodity` / `agency`); everything ships in **one lazy chunk**
+through `src/components/trade/tr-b-hub.ts` (the editor line, editor summary and bill modal mount it with
+`lazy(() => import('../trade/tr-b-hub').then(…))`; `MandiTab.tsx` / `BrokersTab.tsx` are one-line facades to it, so the
+Distribution tabs share the chunk). Hosts gate inline on `impliedPacks(…)` and import no TR-B module themselves.
+Working papers — verify with your CA.
+
+**B1 Weight and bag billing** — `src/lib/trade/tr-weight.ts` (pure): net kg = gross (KG / QTL / MT) − packages × tare −
+dhalta (`per_package` kg, `per_qtl` kg per quintal of the weight after tare, or `percent` of it), each step rounded to
+the gram; quantity = net ÷ kg per billing unit (3 decimals). Stock item flag `sold_by_weight_bags` (Inventory → item →
+"Sold by weight / bags", shown with the pack on). `LineWeightRow` (editor) and `WeightFields` (bill / GRN lines via
+`BillTradePanel`) write the `wt` snapshot and the **net as the line quantity**; the line's `unit_factor` (alternate
+units, e.g. 1 QTL = 100 KG) is untouched, so invoice-calc, GST, the HSN summary and the stock engine (quantity ×
+`lineFactor`) read it unchanged. Typing a quantity drops `wt` (manual line); changing the billing unit converts the same
+weighing. Print: `paper-helpers.ts` `weightText` joins the tracking sub-line on the standard layouts ("120 BAG · gross
+6,072 kg − tare 72 kg − dhalta 60 kg = 5,940 kg"); "Weight slip" in the editor summary prints the weighed lines without
+prices. Deviation: the returnable-packaging movement for weighed bags (B1 criterion 6) is not posted — TR-A's packaging
+API is not on this branch; the bag count stays on the line snapshot.
+
+**B2 Bill charges and the market fee register** — `src/lib/trade/tr-charges.ts`: heads (`trade_charge_heads`, name / side
+/ basis % · per bag · per qtl · per unit · fixed / GST treatment / payable to mandi / auto / order; "Add the usual heads"
+adds market fee, aadat, hamali, tulai, palledari, bardana, dharmada with **blank rates**). `withCharges` makes the charge
+**document lines** (`charge_head_id`, unit OTH, qty 1) from the goods lines: `in_value` takes the HSN and rate of the
+highest-value goods line, `own_rate` its SAC / rate, `outside` 0% with the Rule 33 note; zero amounts are dropped,
+line ids kept. `useChargeLines` (editor summary `ChargesStrip`, bill modal `BillTradePanel`) recomputes them whenever the
+goods change; a new document starts with the "add automatically" heads, a saved one is never rewritten just by opening
+it. GSTR-1 HSN: `gst-reports.ts` gives charge lines quantity 0 and the goods row's UQC (value counted, quantity not).
+Distribution → **Mandi**: heads editor, register per head and side for a period, payable to mandi (heads marked
+payable), Market fee register CSV. Deviations: (1) `ledger/postings.ts` is **not** edited — charge lines post with the
+goods (Sales / Purchases); "payable to mandi" is a register figure, not a ledger balance (there was no per-line account
+hook, and adding one would have touched every sales posting). (2) On purchases the charge is a bill line (purchase
+value, ITC as the bill says), not a landed cost.
+
+**B3 Brokers** — a broker is a `sales_agents` row with `kind: 'broker'`, `brokerage_basis` (percent / per_package /
+per_qtl / per_unit), `brokerage_rate`, `paid_by` (`us` / `other_party` = memo), `vendor_id` (payee); `agentsDb.save` keeps
+them and the salesman picker (`EditorExtras`) hides brokers. `broker_id` on sales (editor summary picker) and goods bills
+(bill modal), defaulting from `Client.broker_id` / `Vendor.broker_id` ("Default for this party" tick sets it).
+`tr-brokers.ts` (pure): brokerage per document on the goods lines only (charge lines are not brokered), statement + CSV.
+`tr-brokers-post.ts` (loaded on click): journal Dr Brokerage (Indirect expenses, created on first use) | Cr Sundry
+creditors (broker) | Cr TDS payable — 194H, with `deduct194h` (sales-commission.ts) over the broker's earlier postings of
+the FY; table `brokerage_postings` (no overlapping periods); undo deletes the journal and the TDS-register row (recycle
+bin). Salesman commission: `postCommission(…, { tds194h: true })`, opt-in tick on the agents panel.
+
+**Sample data** — `tradingExtras` adds, for the commodity pack (Demo company only): a wheat item sold by weight (base KG,
+1 QTL = 100 KG), market fee 1% (in value, payable, auto) and hamali ₹4 a bag, a broker at ₹5 a quintal and one sale of
+120 bags weighed 6,072 kg → 59.400 QTL with its charge lines and broker. `DEMO_EXTRA_TABLES` gains
+`trade_charge_heads`, `sales_agents`.
+
+**Tests** — `tr-weight` (wheat example, per-bag / % / QTL-gross, gram rounding, typed quantity, stock = net × factor,
+editor keeps `wt`, host gating), `tr-charges` (each basis, in-value / own-rate / pure-agent, GST effect, recompute,
+register + payable + CSV, GSTR-1 HSN quantity unchanged, heads master + recycle bin, sample sale), `tr-brokers` (each
+basis, memo, 194H below / above ₹20,000 with catch-up, 5% → 2% on 1 Oct 2024, 206AA, posting journal + 26Q row,
+overlap refused, undo, salesman opt-in); purchase-contract (register and statement read the real bill shape);
+tr-registry (writers import `tr-registry`). E2E step "R8-B weight + charges".
+
+**Sizes** (gz, vs `bdf0ef4`, TR-A merged): initial JS 188,984 → 188,997 B (**+13 B**); total JS 2,698,318 → 2,712,194 B
+(**+13.6 kB**, over the 11 kB share by ≈2.6 kB). Of it: the TR-B chunk 9.5 kB (three features' screens, editor parts
+and engines with Hindi), the posting module 1.2 kB, `tr-weight` 0.8 kB (shared with the print templates), sample data
+0.7 kB, sales-commission broker fields / 194H 0.5 kB, preload lists and mounts in the host chunks ≈1.5 kB. Strings were
+trimmed and the screens consolidated into one chunk (from 18.1 kB at first build); the rest is the three items' code.
+
+**Round 8 changes that touch existing CA items (TR-B)**
+
+- T15 (TR-B3): brokers post brokerage with 194H by default (threshold, catch-up and the 1 Oct 2024 5% → 2% rate by
+  posting date, via `suggestTds('194H', …)`); salesman commission keeps no TDS unless "Deduct TDS u/s 194H" is ticked
+  on its posting (§8 Q18). Both write a 194H row in the TDS register (26Q) and undo removes it.
+- TR6 / TR7 (TR-B2): bill charges are part of the goods' value by default (`in_value`, Sec 15(2)); `own_rate` and the
+  pure-agent `outside` option (Rule 33, 0% with the note) are per head. No preset rates.

@@ -32,7 +32,7 @@ export default function EditorExtras() {
     doc_type: st.doc_type, agent_id: st.agent_id, offer: st.offer, rx: st.rx, items: st.items, issue_date: st.issue_date,
     discount_type: st.discount_type, discount_rate: st.discount_rate, patch: st.patch,
   })));
-  const agents = useMemo(() => agentsDb.all(), []);
+  const agents = useMemo(() => agentsDb.all().filter((a) => a.kind !== 'broker'), []); // R8-B: brokers have their own picker
   const offers = useMemo(() => schemesDb.all().filter((x) => x.kind === 'bill_value'), []);
   const pharma = useMemo(() => readPharmaSettings(), []);
   const index = useMemo(() => (pharma.enabled ? liveScheduleIndex() : new Map()), [pharma.enabled]);

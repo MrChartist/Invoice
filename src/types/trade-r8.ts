@@ -165,6 +165,44 @@ export interface LineWeight {
   gross_unit: WeightUnit;
 }
 
+/** TR-B2 bill-charge head (table `trade_charge_heads`). Rates are blank by default: State / mandi specific (TR6). */
+export interface ChargeHead {
+  id: string;
+  name: string;
+  side: 'sale' | 'purchase' | 'both';
+  basis: 'percent' | 'per_package' | 'per_qtl' | 'per_unit' | 'fixed';
+  rate: number;
+  /** `in_value` (default): part of the goods' value at their rate and HSN (Sec 15(2)); `own_rate`: own SAC / rate;
+   *  `outside`: pure-agent reimbursement (Rule 33), outside the value — TR7. */
+  gst: 'in_value' | 'own_rate' | 'outside';
+  sac?: string;
+  gst_rate?: number;
+  /** Collected for / owed to the mandi (counts in "payable to mandi"). */
+  payable?: boolean;
+  auto?: boolean;
+  order?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** TR-B3 brokerage payable posted for a broker and period (table `brokerage_postings`, dated `to`). */
+export interface BrokeragePosting {
+  id: string;
+  broker_id: string;
+  broker_name: string;
+  from: string;
+  to: string;
+  date: string;
+  amount: number;
+  tds: number;
+  tds_rate: number;
+  voucher_id: string;
+  voucher_number: string;
+  /** The 194H row in the TDS register (`tds_deductions`). */
+  tds_row_id?: string;
+  created_at: string;
+}
+
 /* ── TR-C: agents, statutory rules, bank statements, setup ── */
 
 /** Trade profile chosen under the `wholesale` business type (TR-C5). */
@@ -371,12 +409,21 @@ declare module './invoice' {
 declare module './purchases' {
   interface PurchaseLine {
     wt?: LineWeight;
+    /** TR-B2: the bill-charge head that made this line (market fee paid on a farmer's purchase …). */
+    charge_head_id?: string;
   }
   interface PurchaseRecord {
     broker_id?: string;
   }
   interface Vendor {
     broker_id?: string;
+  }
+}
+
+declare module '../lib/inventory' {
+  interface StockItem {
+    /** TR-B1: lines of this item show the bags / weight sub-row. */
+    sold_by_weight_bags?: boolean;
   }
 }
 

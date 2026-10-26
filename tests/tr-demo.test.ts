@@ -29,8 +29,9 @@ test('a wholesale company with trading packs gets the trading profile; the agent
   assert.deepEqual(Object.keys(dist.tables ?? {}).sort(), ['packaging_moves', 'packaging_types', 'party_rates', 'schemes'], 'R8-A distributor rows');
   assert.ok(Object.values(dist.tables!).every((rows) => rows!.every((r) => r.demo === true)));
   const ex = await demoExtras('trading', { today: TODAY, base, packs: ['agency', 'commodity'] });
-  assert.equal(ex.invoices?.length, 2);
-  assert.ok(ex.invoices!.every((i) => i.agency && i.items.every((l) => l.arrival_id === 'demo-arrival-1')));
+  const agency = ex.invoices!.filter((i) => i.agency); // R8-B adds the commodity sale (no agency lines)
+  assert.equal(agency.length, 2);
+  assert.ok(agency.every((i) => i.items.every((l) => l.arrival_id === 'demo-arrival-1')));
   assert.equal(ex.tables?.arrivals?.length, 1);
   assert.equal(ex.tables?.indents?.length, 2);
   assert.equal(ex.tables?.sale_pattis?.length, 1);

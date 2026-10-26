@@ -2922,7 +2922,6 @@ try {
     await page.keyboard.press('Escape');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
-
   await step('R8-A discounts + claims: a party rate prices the line, "18+4" → 21.28 % printed as "18 + 4 %", a price-drop run makes one financial note, Receivables → Interest lists the party', async () => {
     const keys = ['settings', 'clients', 'items_catalog', 'invoices', 'party_rates', 'price_drops', 'doc_links', 'series_counters', 'interest_settings'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
@@ -2966,6 +2965,45 @@ try {
     await page.locator('[data-interest-rate]').fill('18', { timeout: 15000 });
     await page.locator(`[data-interest-party="${buyer.name}"]`).waitFor({ timeout: 15000 });
     check(true, 'Receivables → Interest lists the party with the overdue bill');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R8-B weight + charges: a weighed line (120 bags / 6,072 kg / tare 0.6 / dhalta 1 kg a qtl → 59.400 QTL), the market fee line added by itself, the broker; Mandi register and Brokers statement', async () => {
+    const keys = ['settings', 'stock_items', 'trade_charge_heads', 'sales_agents', 'invoices', 'draft'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'wholesale', industry_packs: ['commodity'], trade_kind: 'commodity', modules: undefined, lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-wheat', name: 'E2E Wheat', hsn: '1001', unit: 'KG', track_stock: true, opening_qty: 10000, opening_rate: 20, reorder_level: 0, alt_units: [{ unit: 'QTL', factor: 100 }], sold_by_weight_bags: true }]);
+    await writeJson(page, 'trade_charge_heads', [{ id: 'e2e-mfee', name: 'Market fee', side: 'both', basis: 'percent', rate: 1, gst: 'in_value', payable: true, auto: true, order: 0 }]);
+    await writeJson(page, 'sales_agents', [...(prev.sales_agents ?? []), { id: 'e2e-broker', name: 'E2E Dalal', rate: 0, basis: 'invoice', kind: 'broker', brokerage_basis: 'per_qtl', brokerage_rate: 5 }]);
+    await writeJson(page, 'draft', null);
+    await page.goto(srv.origin + '/invoice');
+    const line = page.locator('[data-line]').first();
+    await line.locator('[data-field="name"]').fill('E2E Wheat', { timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await line.locator('[data-field="unit"]').selectOption('QTL'); // unit first: a later unit change rescales the rate
+    await line.locator('[data-field="rate"]').fill('2450');
+    await line.locator('[data-weigh]').click({ timeout: 15000 });
+    await line.locator('[data-wt="packages"]').fill('120');
+    await line.locator('[data-wt="gross"]').fill('6072');
+    await line.locator('[data-wt="tare"]').fill('0.6');
+    await line.locator('[data-wt="ded"]').fill('1');
+    await page.waitForFunction(() => document.querySelector('[data-line] [data-field="quantity"]')?.value === '59.4', null, { timeout: 15000 });
+    check(true, 'net 5,940 kg becomes the quantity 59.4 QTL');
+    await page.locator('[data-line] [data-field="name"]').nth(1).waitFor({ timeout: 15000 });
+    check((await page.locator('[data-line] [data-field="name"]').nth(1).inputValue()) === 'Market fee', 'the market-fee head adds its line by itself');
+    await page.locator('[data-broker]').selectOption('e2e-broker');
+    const draft = await readJson(page, 'draft', null, (v) => v?.broker_id === 'e2e-broker' && v?.items?.some((l) => l.charge_head_id), 10000);
+    const fee = draft?.items?.find((l) => l.charge_head_id === 'e2e-mfee');
+    check(draft?.items?.[0]?.wt?.packages === 120 && fee?.rate === 1455.3 && fee?.hsn === draft.items[0].hsn && fee?.tax_rate === draft.items[0].tax_rate, `the draft keeps the weighing and a ₹1,455.30 market-fee line at the goods' HSN / rate (${fee?.rate})`);
+    const day = draft?.issue_date;
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { ...draft, id: 'e2e-cm-sale', invoice_number: 'INV/E2E/CM1', status: 'Sent' }]);
+    await page.goto(srv.origin + `/distribution?tab=mandi`);
+    const reg = page.locator('[data-mandi-register]');
+    await reg.waitFor({ timeout: 15000 });
+    check(/Market fee[\s\S]*1,455\.30/.test(await reg.innerText()) && /1,455\.30/.test(await page.locator('[data-mandi-payable]').innerText()), `Mandi shows the register row and the payable (${day})`);
+    await page.goto(srv.origin + '/distribution?tab=brokers');
+    const st = page.locator('[data-brokerage]');
+    await st.waitFor({ timeout: 15000 });
+    check((await st.getAttribute('data-brokerage')) === '297', `Brokers lists the brokerage ₹297 (59.4 qtl × ₹5): ${await st.getAttribute('data-brokerage')}`);
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 } catch {

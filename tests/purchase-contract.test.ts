@@ -853,3 +853,16 @@ test('R8-A: the last purchase rate reads the real bill shape (lines, legacy item
   assert.deepEqual(lastPurchaseRate([bill, legacy], { name: 'Acme Supplies' }, 'paper ream'), { rate: 100, date: '2026-04-12', number: 'AS/22' });
   assert.equal(lastPurchaseRate([{ ...bill, kind: 'EXPENSE' }], { name: 'Acme Supplies' }, 'Paper ream'), null, 'expenses are not goods bought');
 });
+
+// R8-B: the market fee register (`tr-charges.ts`) and the brokerage statement (`tr-brokers.ts`) read goods bills through
+// `readPurchase` (date, number, party, status, kind) and keep the stored lines' `charge_head_id` / `wt`.
+test('R8-B readers (market fee register, brokerage statement) read the real purchase shape', async () => {
+  const { chargeRegister } = await import('../src/lib/trade/tr-charges.ts');
+  const { brokerageStatement } = await import('../src/lib/trade/tr-brokers.ts');
+  const withFee: PurchaseRecord = { ...bill, broker_id: 'b1', lines: [...bill.lines, { id: 'l2', name: 'Market fee', hsn: '4802', unit: 'OTH', quantity: 1, rate: 10, tax_rate: 18, charge_head_id: 'h1' }] };
+  const heads = [{ id: 'h1', name: 'Market fee', side: 'both' as const, basis: 'percent' as const, rate: 1, gst: 'in_value' as const }];
+  const period = { from: '2026-04-01', to: '2026-04-30' };
+  assert.deepEqual(chargeRegister(period, { invoices: [], purchases: [withFee, { ...withFee, id: 'e', kind: 'EXPENSE' }], heads }).map((r) => [r.side, r.number, r.party, r.base, r.amount]), [['purchase', 'AS/22', 'Acme Supplies', 1000, 10]]);
+  const st = brokerageStatement({ id: 'b1', name: 'B', rate: 0, basis: 'invoice', kind: 'broker', brokerage_basis: 'percent', brokerage_rate: 1 }, period, { invoices: [], purchases: [withFee] });
+  assert.deepEqual(st.lines.map((l) => [l.number, l.base, l.brokerage]), [['AS/22', 1000, 10]]);
+});
