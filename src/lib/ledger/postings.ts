@@ -64,6 +64,7 @@ import type { Branch } from '../branch';
 import { voucherBranches } from './branch-books';
 import { FINANCIAL_REASON_LABELS, financialAccountOf, isFinancialNote } from '../financial-note';
 import { gvLiabilityId } from '../retail/gift-voucher-core'; // R4-B1
+import { sectionText } from '../ita2025';
 
 export interface PostingLine {
   account: string;
@@ -318,7 +319,7 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number,
     narration: [
       `Against ${invNo}`,
       t.write_off ? 'Bad debt written off' : str(t.method),
-      tds > 0 && `TDS ${(tds / 100).toFixed(2)} withheld${str(inv?.tds_section) ? ` u/s ${str(inv?.tds_section)}` : ''}`,
+      tds > 0 && `TDS ${(tds / 100).toFixed(2)} withheld${str(inv?.tds_section) ? ` u/s ${sectionText(str(inv?.tds_section), str(inv?.issue_date))}` : ''}`,
       inv ? fxNarration(num(t.amount), inv) : '',
       fx && `realised @ ₹${fx.realisedRate} (exchange ${fx.gain >= 0 ? 'gain' : 'loss'} ${Math.abs(fx.gain).toFixed(2)})`,
     ]

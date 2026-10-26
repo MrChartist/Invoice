@@ -15,7 +15,10 @@
  * A path or tile this table does not know is always shown (new screens never vanish by accident).
  */
 
-export type BusinessType = 'kirana' | 'wholesale' | 'services' | 'manufacturer' | 'full' | 'restaurant';
+export type BusinessType =
+  | 'kirana' | 'wholesale' | 'services' | 'manufacturer' | 'full' | 'restaurant'
+  // R5-A1 industry packs (type only; presets in `shop-presets.ts`, packs in `industry-packs.ts`)
+  | 'ecommerce' | 'transport' | 'contractor' | 'institution' | 'nonprofit' | 'property';
 
 /** Optional modules (invoices, clients, receivables, dashboard and settings are always on). */
 export type ModuleId =

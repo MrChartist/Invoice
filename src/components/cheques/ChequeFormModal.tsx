@@ -208,7 +208,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
             {chqT('fValid', { date: formatDate(validUntil(form.cheque_date)) })}
           </span>
         )}
-        <BankAccountSelect id="cheque-bank-account" label={bnkT('intoAccount')} method="Cheque" value={form.bank_account_id} onChange={(id) => set('bank_account_id', id)} />
+        <BankAccountSelect purpose="cheque" id="cheque-bank-account" label={bnkT('intoAccount')} method="Cheque" value={form.bank_account_id} onChange={(id) => set('bank_account_id', id)} />
         <label className={controls.check}>
           <input type="checkbox" checked={form.multi} disabled={frozen} onChange={(e) => set('multi', e.target.checked)} /> {bnkT('severalDocs')}
         </label>

@@ -11,6 +11,8 @@ import { amountInWordsHi } from '../../lib/amount-in-words-hi';
 import { amountInWordsIn, isWordsLang } from '../../lib/amount-in-words-in';
 import { useT, type MessageKey } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
+import { ita25Words } from '../../i18n/areas/ita2025';
+import { sectionText } from '../../lib/ita2025';
 import controls from '../../styles/controls.module.css';
 import styles from './SummaryPanel.module.css';
 
@@ -43,7 +45,7 @@ function Row({ label, children, tone, strong }: { label: React.ReactNode; childr
 export function SummaryPanel() {
   const { t: tr, lang } = useT();
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['amount_paid', 'charges_taxable', 'patch', 'currency', 'discount_rate', 'discount_type', 'doc_type', 'gst_mode', 'other_charges', 'round_off_enabled', 'setAmountPaid', 'setDiscount', 'setGstMode', 'setOtherCharges', 'setRoundOff', 'setShipping', 'shipping', 'tcs_label', 'tds_section', 'totals'])),
+    useShallow((st) => pick(st, ['amount_paid', 'charges_taxable', 'patch', 'currency', 'discount_rate', 'discount_type', 'doc_type', 'gst_mode', 'issue_date', 'other_charges', 'round_off_enabled', 'setAmountPaid', 'setDiscount', 'setGstMode', 'setOtherCharges', 'setRoundOff', 'setShipping', 'shipping', 'tcs_label', 'tds_section', 'totals'])),
   );
   const t = s.totals;
   const cur = s.currency;
@@ -179,7 +181,7 @@ export function SummaryPanel() {
             <PayModeChips />
           </Suspense>
           {t.tds_amount > 0 && (
-            <Row label={tr('summary.lessTds', { section: s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${s.tds_section})` : '' })} tone="good">
+            <Row label={tr('summary.lessTds', { section: s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${sectionText(s.tds_section, s.issue_date, ita25Words())})` : '' })} tone="good">
               −{money(t.tds_amount)}
             </Row>
           )}

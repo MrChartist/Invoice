@@ -773,3 +773,24 @@ test('R4-C readers (import register by BOE, open-format export) read the real pu
   assert.deepEqual(lines.columns.slice(0, 3), ['purchase_id', 'line_no', 'id']);
   assert.deepEqual(lines.rows[0].slice(0, 3), ['p1', 1, 'l1']);
 });
+
+// R5-A: `settlement-post.ts` WRITES fee bills (marketplace fee tax invoice); every reader sees the real shape.
+test('R5-A fee bill written by settlement-post reads back through readPurchase / books / GST / export readers', async () => {
+  await import('./helpers/shim.ts');
+  const { fixture, importMtr, setupWorld } = await import('./helpers/marketplace.ts');
+  const { importSettlement, parseSettlement } = await import('../src/lib/marketplace/settlement-import.ts');
+  const { postSettlement, recordFeeInvoice } = await import('../src/lib/marketplace/settlement-post.ts');
+  const ch = setupWorld();
+  importMtr(ch);
+  const s = importSettlement(ch, parseSettlement([{ name: 'v2', table: fixture('amazon-settlement-v2.csv') }], 'amazon_v2'), 'v2.csv');
+  postSettlement(s.id);
+  const { bill: fee } = recordFeeInvoice(s.id, { bill_number: 'AMZ-FEE-10', date: '2026-10-31', hsn: '9985' });
+  assert.ok(readPurchase(fee));
+  const n = booksNormalize(fee as never);
+  assert.equal(n!.taxable, 220);
+  assert.equal(n!.isExpense, true);
+  assert.equal(n!.itcEligible, true);
+  const g = gstNormalize(fee, '27');
+  assert.equal(Math.round((g!.cgst + g!.sgst + g!.igst) * 100) / 100, 30.6);
+  assert.equal(exportNormalize(fee)!.total, 250.6);
+});

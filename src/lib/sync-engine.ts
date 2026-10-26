@@ -353,6 +353,11 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}export_irms`]: 'date',
   [`${DB_PREFIX}export_incentives`]: 'date',
   [`${DB_PREFIX}export_writeoffs`]: 'date',
+  // R5-A: marketplace imports (import day), settlements (deposit date), GST TCS / TDS credit rows (month), returns desk
+  [`${DB_PREFIX}marketplace_imports`]: (r) => str(r.imported_at).slice(0, 10) || undefined,
+  [`${DB_PREFIX}settlements`]: 'deposit_date',
+  [`${DB_PREFIX}eco_credits`]: (r) => (/^\d{4}-\d{2}$/.test(str(r.month)) ? `${str(r.month)}-01` : undefined),
+  [`${DB_PREFIX}marketplace_returns`]: (r) => str(r.expected_on) || str(r.created_at).slice(0, 10) || undefined,
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

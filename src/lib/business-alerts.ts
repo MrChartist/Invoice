@@ -19,6 +19,8 @@ import { registerNotificationProvider, type AppNotification } from './notificati
 import { getTable, KEYS } from './storage';
 import { wireT } from '../i18n/areas/wiring';
 import { o7T } from '../i18n/areas/gst-tds-7o';
+import { ita25Words } from '../i18n/areas/ita2025';
+import { formText, periodStart } from './ita2025';
 import { loadTcsDue, loadTdsDue, usesTcs, usesTds, type DueItem } from './tds-payables';
 
 /** 7O (7.96): remind this many days before a TDS deposit / 26Q due date (and keep reminding while overdue). */
@@ -119,7 +121,7 @@ export function businessNotices(input: BusinessAlertInput): AppNotification[] {
     }
   }
   for (const d of tdsDueReminders([...(input.tdsDue ?? []), ...(input.tcsDue ?? [])], input.today)) {
-    const what = d.what === 'deposit' ? o7T('nTdsDeposit', { kind: d.kind, period: d.period }) : o7T('nTdsReturn', { form: d.form ?? (d.kind === 'TDS' ? '26Q' : '27EQ'), period: d.period });
+    const what = d.what === 'deposit' ? o7T('nTdsDeposit', { kind: d.kind, period: d.period }) : o7T('nTdsReturn', { form: formText(d.form ?? (d.kind === 'TDS' ? '26Q' : '27EQ'), periodStart(d.period), { ...ita25Words(), form: '{n}' }), period: d.period });
     out.push({
       id: `tdsdue:${d.id}:${d.status}`,
       severity: d.status === 'overdue' ? 'critical' : 'warning',

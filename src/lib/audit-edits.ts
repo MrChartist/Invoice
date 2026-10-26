@@ -120,6 +120,13 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   export_irms: { entity: 'payment', label: 'IRM' },
   export_incentives: { entity: 'voucher', label: 'Export incentive' },
   export_writeoffs: { entity: 'payment', label: 'Export write-off' },
+  // R5-A: marketplace channels / SKU map (masters), imports, settlements, GST TCS / TDS credit rows, returns desk
+  sales_channels: { entity: 'client', label: 'Sales channel' },
+  channel_skus: { entity: 'item', label: 'Channel SKU' },
+  marketplace_imports: { entity: 'invoice', label: 'Marketplace import' },
+  settlements: { entity: 'payment', label: 'Marketplace settlement' },
+  eco_credits: { entity: 'gst', label: 'GST TCS / TDS credit' },
+  marketplace_returns: { entity: 'invoice', label: 'Marketplace return' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

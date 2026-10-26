@@ -77,6 +77,7 @@ function clean(rows: unknown[]): BankAccount[] {
       ...(typeof o.branch === 'string' && o.branch.trim() ? { branch: o.branch.trim() } : {}),
       ...(id !== DEFAULT_BANK_ID && typeof o.currency === 'string' && /^[A-Za-z]{3}$/.test(o.currency.trim()) && o.currency.trim().toUpperCase() !== 'INR' ? { currency: o.currency.trim().toUpperCase() } : {}),
       ...(Number.isFinite(Number(o.fcy_opening)) && o.fcy_opening !== undefined && o.fcy_opening !== '' ? { fcy_opening: round2(Number(o.fcy_opening)) } : {}),
+      ...(id !== DEFAULT_BANK_ID && o.clearing === true ? { clearing: true } : {}), // R5-A2: marketplace settlement clearing
     });
   }
   if (!seen.has(DEFAULT_BANK_ID)) out.unshift({ ...MAIN });
@@ -116,6 +117,15 @@ export function liveBankAccountUsage(id: string): string[] {
     cheques: getTable('cheques'),
     statements: getTable('bank_statements'),
   });
+}
+
+/**
+ * R5-A2: accounts a picker may offer. A marketplace settlement clearing account (`clearing`) is not a real bank: it
+ * never prints cheques, never pays suppliers by bulk e-payment and never receives a bank statement.
+ */
+export type BankPickPurpose = 'cheque' | 'epay' | 'brs' | 'any';
+export function pickableBankAccounts(purpose: BankPickPurpose, accounts: readonly BankAccount[] = bankAccountsDb.active()): BankAccount[] {
+  return purpose === 'any' ? [...accounts] : accounts.filter((a) => !(a as { clearing?: boolean }).clearing);
 }
 
 export const bankAccountsDb = {

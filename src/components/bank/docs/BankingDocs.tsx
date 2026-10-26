@@ -6,7 +6,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, Printer, Save } from 'lucide-react';
-import { bankAccountsDb, DEFAULT_BANK_ID, maskAccountNo, type BankAccount } from '../../../lib/bank-accounts';
+import { bankAccountsDb, DEFAULT_BANK_ID, maskAccountNo, pickableBankAccounts, type BankAccount } from '../../../lib/bank-accounts';
 import { loadCheques } from '../../../lib/cheques';
 import { DENOMINATIONS, cashTotal, type DenominationCounts } from '../../../lib/denominations';
 import { depositSlipView, depositableCheques, loadDepositSlips, saveDepositSlip, type DepositSlipView } from '../../../lib/deposit-slip';
@@ -135,7 +135,7 @@ function SlipDocument({ v }: { v: DepositSlipView }) {
 }
 
 function DepositSlipPanel({ notify }: { notify: Notify }) {
-  const [accounts] = useState(() => bankAccountsDb.active());
+  const [accounts] = useState(() => pickableBankAccounts('cheque')); // R5-A2: no clearing accounts
   const [date, setDate] = useState(todayInput());
   const [accountId, setAccountId] = useState(DEFAULT_BANK_ID);
   const [depositor, setDepositor] = useState('');
@@ -339,7 +339,7 @@ function VendorBankEditor({ vendor, onSaved, notify }: { vendor: Vendor; onSaved
 }
 
 function EPaymentsPanel({ notify }: { notify: Notify }) {
-  const [accounts] = useState(() => bankAccountsDb.active());
+  const [accounts] = useState(() => pickableBankAccounts('epay')); // R5-A2: no clearing accounts
   const [vendors, setVendors] = useState(() => vendorsDb.all());
   const [preset, setPreset] = useState<UploadPreset>('generic');
   const [date, setDate] = useState(todayInput());
