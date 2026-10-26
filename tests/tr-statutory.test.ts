@@ -91,7 +91,9 @@ test('RCM notified goods: HSN × supplier kind × date (raw cotton only from 15 
   assert.equal(rcmGoodsMatches([{ hsn: '52010012' }], farmer, '2017-11-15')[0].goods, 'Raw cotton');
   assert.equal(rcmGoodsMatches([{ hsn: '2401' }], farmer, '2026-01-01')[0].goods, 'Tobacco leaves');
   assert.equal(rcmGoodsMatches([{ hsn: '2401' }], registered, '2026-01-01').length, 0, 'tobacco from a registered trader: no prompt');
-  assert.equal(rcmGoodsMatches([{ hsn: '5004' }], registered, '2026-01-01').length, 1, 'silk yarn from its maker');
+  // QA8 T14: a registered trader is not a silk-yarn maker unless the vendor is flagged so.
+  assert.equal(rcmGoodsMatches([{ hsn: '5004' }], registered, '2026-01-01').length, 0, 'silk yarn from a registered trader');
+  assert.equal(rcmGoodsMatches([{ hsn: '5004' }], supplierKinds({ principal_kind: 'registered', gstin: '27AAACB2230M1Z5', rcm_maker: true }), '2026-01-01').length, 1, 'silk yarn from its maker');
   assert.equal(rcmGoodsMatches([{ hsn: '1404' }], farmer, '2026-01-01')[0].goods, 'Bidi wrapper leaves (tendu)');
   assert.equal(rcmGoodsMatches([{ hsn: '1001' }], farmer, '2026-01-01').length, 0);
 });

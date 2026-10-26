@@ -270,6 +270,7 @@ export const purT = defineArea(
     msmeCategory: 'MSME category',
     notMsme: 'Not MSME / unknown',
     msmeHint: 'Micro and small suppliers must be paid within 45 days (Sec 43B(h)).',
+    rcmMaker: 'Makes silk yarn (reverse charge on its silk yarn, N 4/2017-CT(R))',
     udyam: 'Udyam number',
     address: 'Address',
     // Purchase orders
@@ -566,6 +567,7 @@ export const purT = defineArea(
     msmeCategory: 'MSME श्रेणी',
     notMsme: 'MSME नहीं / पता नहीं',
     msmeHint: 'सूक्ष्म और लघु सप्लायरों को 45 दिन के भीतर भुगतान ज़रूरी है (धारा 43B(h))।',
+    rcmMaker: 'रेशम धागा बनाता है (इसके रेशम धागे पर रिवर्स चार्ज, N 4/2017-CT(R))',
     udyam: 'उद्यम नंबर',
     address: 'पता',
     'po.Open': 'खुला',

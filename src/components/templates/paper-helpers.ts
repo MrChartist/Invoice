@@ -2,7 +2,7 @@ import type { CalcTotals } from '../../lib/invoice-calc';
 import type { InvoiceItem, InvoiceRecord, SenderProfile } from '../../types/invoice';
 import { upiLink } from '../../lib/share';
 import { shiftDay } from '../../lib/dates';
-import { weightText } from '../../lib/trade/tr-weight';
+import { weightText, wtHolds } from '../../lib/trade/tr-weight';
 
 /** `YYYY-MM-DD` → `MM/YYYY`, the way batch dates are printed on packs. */
 function monthYear(day: string): string {
@@ -15,7 +15,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit'>> & { bin?: string }) | undefined): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit'>> & { bin?: string }) | undefined): string {
   if (!item) return '';
   const parts: string[] = [];
   if (discountText(item)) parts.push(discountText(item)); // TR-A1
@@ -25,7 +25,7 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   if (item.batch_no && item.batch_expiry) parts.push(`Exp ${monthYear(item.batch_expiry)}`);
   if (item.serials?.length) parts.push(`S/N: ${item.serials.join(', ')}`);
   if (item.serials?.length && item.warranty_months) parts.push(`Warranty ${item.warranty_months} month${item.warranty_months === 1 ? '' : 's'}`);
-  if (item.wt) parts.push(weightText(item.wt)); // R8-B (TR-B1): bags and weighing
+  if (item.wt && (item.quantity === undefined || wtHolds(item))) parts.push(weightText(item.wt)); // R8-B (TR-B1); QA8 T12 / T16: only while it still gives the quantity
   return parts.filter(Boolean).join(' · ');
 }
 

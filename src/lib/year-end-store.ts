@@ -15,6 +15,9 @@ import { loadOpeningBills } from './opening-bills';
 import { getLockUntil } from './period-lock';
 import { getTable, setTable } from './storage';
 import { isoDay } from './dates';
+import type { InvoiceRecord } from '../types/invoice';
+import { agencySales, loadArrivals } from './trade/tr-arrivals';
+import { loadPattis, unsettledLots } from './trade/tr-patti';
 import {
   CLOSING_STOCK_CLASS,
   YEAR_END_TABLE,
@@ -60,6 +63,14 @@ export function saveYearEndMark(fyStart: number, step: YearEndStepId): YearEndRe
   return next;
 }
 
+/** QA8 T10: unsettled agency lots at `end` (undefined when the company has no arrivals), whatever the pack. */
+export function loadAgencyLots(end: string): { number: string; lot_no: string; principal: string }[] | undefined {
+  const arrivals = loadArrivals().filter((a) => a.date <= end);
+  if (!arrivals.length) return undefined;
+  const sales = agencySales(getTable<InvoiceRecord>('invoices')).filter((x) => x.date <= end);
+  return unsettledLots(arrivals, sales, loadPattis().filter((p) => p.date <= end)).map((a) => ({ number: a.number, lot_no: a.lot_no, principal: a.principal_name }));
+}
+
 export interface YearEndState {
   steps: YearEndStep[];
   ledger: Ledger;
@@ -95,6 +106,7 @@ export function loadYearEnd(fyStart: number): YearEndState {
   const cred = partyBalancesAt(ledger, A.creditors, end);
   const old = loadOpeningBills().filter((b) => b.date < fyBegin && (b.side === 'payable' ? cred : debt).has(b.party_name));
   const manual = loadVouchers();
+  const agencyLots = loadAgencyLots(end);
   const steps = yearEndChecklist({
     fyStart,
     ledger,
@@ -107,6 +119,7 @@ export function loadYearEnd(fyStart: number): YearEndState {
     oldOpenBills: { count: old.length, amount: Math.round(old.reduce((s, b) => s + b.amount, 0) * 100) },
     record: loadYearEndRecord(fyStart),
     today,
+    ...(agencyLots ? { agencyLots } : {}),
   });
   return { steps, ledger, integrity, manual, ...(valuation ? { valuation } : {}) };
 }

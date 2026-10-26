@@ -114,9 +114,12 @@ export interface InterestRun {
   date: string;
   as_of: string;
   /** Bills charged and the period each was charged for. */
-  bills: { id: string; party: string; from: string; to: string; amount: number }[];
+  bills: { id: string; party: string; from: string; to: string; amount: number; /** The interest draft that charged it (QA8 T5). */ invoice_id?: string }[];
   invoice_ids: string[];
   total: number;
+  /** QA8 T5: undone (its drafts deleted) — its bills are free to be charged again. */
+  status?: 'undone';
+  undone_at?: string;
   created_at?: string;
 }
 
@@ -289,6 +292,8 @@ export interface SalePatti {
   total_deductions: number;
   /** Advances paid on the lots (recovered: they already sit on the principal's ledger). */
   advance: number;
+  /** The advance deducted per lot (QA8 T3: a lot's advance is recovered once across its pattis). */
+  advance_by_lot?: Record<string, number>;
   net_payable: number;
   /** Aadat exempt (agricultural produce) or taxable (a separate commission invoice to the principal). */
   commission_gst: 'exempt' | 'taxable';
@@ -448,6 +453,8 @@ declare module './purchases' {
   interface Vendor {
     /** TR-C1 / C2: farmer (agriculturist), registered or unregistered person. */
     principal_kind?: PrincipalKind;
+    /** QA8 T14: the supplier manufactures silk yarn (N 4/2017-CT(R) entry: RCM on silk yarn from such a person). */
+    rcm_maker?: boolean;
   }
 }
 declare module '../lib/localDb' {

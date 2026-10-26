@@ -174,7 +174,7 @@ function PriceDrop({ run, vendors }: { run: Run; vendors: Vendors }) {
     items: items.split(/\r?\n/).map((l) => l.split(/,|\t/)).filter((p) => p[0]?.trim() && Number(p[1]) > 0).map((p) => ({ name: p[0].trim(), drop: Number(p[1]) })),
     from: shiftDay(date, -days), to: shiftDay(date, -1),
   }), [items, date, days]);
-  const rows = useMemo(() => (spec.items.length ? dropRows(getTable<InvoiceRecord>('invoices'), getTable('doc_links'), spec, coveredPairs(loadPriceDrops())) : []), [spec]);
+  const rows = useMemo(() => (spec.items.length ? dropRows(getTable<InvoiceRecord>('invoices'), getTable('doc_links'), spec, coveredPairs(loadPriceDrops(), { invoices: getTable<InvoiceRecord>('invoices'), links: getTable('doc_links') })) : []), [spec]);
   const runs = loadPriceDrops();
   const issue = () => run(() => issuePriceDrop({ ...spec, date, mode, agreed, own_stock: liveStockBefore(spec.items.map((i) => i.name), date) }).number);
   return (

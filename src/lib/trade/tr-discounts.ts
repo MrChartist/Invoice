@@ -1,7 +1,8 @@
 /**
  * TR-A1 trade discounts: compound chains ("18+4"), ₹ per unit, and the minimum-margin hold.
  *
- * The line keeps ONE effective `discount_percent` (6 decimals) — `invoice-calc.ts` is untouched, so GST, HSN, Tally,
+ * The line keeps ONE effective `discount_percent` (10 decimals — QA8 T11: enough that the net of a ₹1,000-crore line
+ * still equals qty × (rate × chain − per unit) to the paisa) — `invoice-calc.ts` is untouched, so GST, HSN, Tally,
  * books and every reader see the same figure (§8 Q2). `disc_chain` / `disc_per_unit` are print snapshots:
  *   chain %     = 100 × (1 − Π(1 − dᵢ/100))
  *   effective % = chain % + disc_per_unit / rate × 100   (net unit price = rate × (1 − chain %) − per unit)
@@ -11,7 +12,7 @@
 import type { InvoiceItem } from '../../types/invoice';
 import { num } from '../invoice-calc';
 
-const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
+const r10 = (n: number) => Math.round(n * 1e10) / 1e10;
 
 /** "18+4" / "18 + 4 + 2" / "10" → steps; null when not a chain of ≤ 3 numbers in 0–100. */
 export function parseChain(text: string): number[] | null {
@@ -22,13 +23,13 @@ export function parseChain(text: string): number[] | null {
 }
 
 export const chainPercent = (chain: readonly number[] | undefined): number =>
-  r6(100 * (1 - (chain ?? []).reduce((p, d) => p * (1 - Math.min(Math.max(num(d), 0), 100) / 100), 1)));
+  r10(100 * (1 - (chain ?? []).reduce((p, d) => p * (1 - Math.min(Math.max(num(d), 0), 100) / 100), 1)));
 
 /** The effective line % for a chain and a ₹-per-unit discount on `rate` (capped at 100). */
 export function effectivePercent(chain: readonly number[] | undefined, perUnit: number | undefined, rate: number): number {
   const c = chainPercent(chain);
   const pu = num(perUnit) > 0 && num(rate) > 0 ? (num(perUnit) / num(rate)) * 100 : 0;
-  return r6(Math.min(c + pu, 100));
+  return r10(Math.min(c + pu, 100));
 }
 
 /** "18 + 4 %" · "18 + 4 % + ₹5/unit" · '' (print sub-line and editor label). */

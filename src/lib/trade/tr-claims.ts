@@ -102,11 +102,23 @@ function update(id: string, fn: (c: TradeClaim) => TradeClaim): TradeClaim {
   return next;
 }
 
+/** QA8 T7: a price-drop claim that is rejected or deleted frees its run (it can be claimed again). */
+function releaseRun(c: TradeClaim): void {
+  if (c.kind !== 'price_drop' || !c.price_drop_id) return;
+  const runs = getTable<{ id: string; claim_id?: string }>(TR_TABLES.priceDrops);
+  if (runs.some((r) => r.id === c.price_drop_id && r.claim_id === c.id)) setTable(TR_TABLES.priceDrops, runs.map((r) => (r.id === c.price_drop_id && r.claim_id === c.id ? { ...r, claim_id: undefined } : r)));
+}
+
 export function markClaim(id: string, to: 'sent' | 'rejected'): TradeClaim {
   requireAccess('books.edit');
-  return update(id, (c) => {
-    if (c.status === 'settled' || c.status === 'short') throw new ClaimError(`Claim ${c.number} is settled.`);
-    return { ...c, status: to };
+  return withTablesRollback([CLAIMS_TABLE, TR_TABLES.priceDrops], () => {
+    const next = update(id, (c) => {
+      if (c.status === 'settled' || c.status === 'short') throw new ClaimError(`Claim ${c.number} is settled.`);
+      if (to === 'sent' && c.status === 'rejected' && c.kind === 'price_drop') throw new ClaimError(`Claim ${c.number} was rejected: claim the price-drop run again instead.`);
+      return { ...c, status: to };
+    });
+    if (to === 'rejected') releaseRun(next);
+    return next;
   });
 }
 
@@ -126,6 +138,7 @@ export function settleClaim(id: string, s: Settlement): TradeClaim {
   const c = loadClaims().find((x) => x.id === id);
   if (!c) throw new ClaimError('Claim not found.');
   if (c.status === 'settled' || c.status === 'short' || c.status === 'rejected') throw new ClaimError(`Claim ${c.number} is ${c.status}.`);
+  if (c.kind === 'price_drop' && c.price_drop_id && !getTable<{ id: string; status?: string; claim_id?: string }>(TR_TABLES.priceDrops).some((r) => r.id === c.price_drop_id && r.status === 'issued' && r.claim_id === c.id)) throw new ClaimError(`Claim ${c.number}: its price-drop run was undone or claimed again.`);
   const amount = round2(num(s.amount));
   if (!(amount > 0) || !s.note_no.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(s.date)) throw new ClaimError("Enter the principal's credit note number, date and amount.");
   return withTablesRollback([CLAIMS_TABLE, 'vouchers', 'accounts', 'purchase_returns', 'purchases', 'series_counters'], () => {
@@ -176,5 +189,8 @@ export function deleteClaim(id: string): void {
   if (!c) return;
   if (c.status !== 'draft' && c.status !== 'rejected') throw new ClaimError(`Claim ${c.number} is ${c.status}: reject it first.`);
   assertUnlocked({ id, issue_date: c.date, invoice_number: c.number }, 'delete');
-  setTable(CLAIMS_TABLE, all.filter((x) => x.id !== id));
+  withTablesRollback([CLAIMS_TABLE, TR_TABLES.priceDrops], () => {
+    setTable(CLAIMS_TABLE, all.filter((x) => x.id !== id));
+    releaseRun(c);
+  });
 }
