@@ -149,6 +149,7 @@ export const RECORD_KEYS = [
   'note_kind', 'financial_reason', 'financial_account', 'payment_terms',
   // R3-A
   'table_order_id', 'split_of',
+  'annexure', // R3-B (src/types/service-r3.ts)
   'delivery_proof', // R3-C
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 

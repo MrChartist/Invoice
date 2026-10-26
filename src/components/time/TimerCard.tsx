@@ -11,6 +11,9 @@ import controls from '../../styles/controls.module.css';
 import styles from './time.module.css';
 import { useT } from '../../i18n';
 import { timeT } from '../../i18n/areas/time';
+import { RateSourceTag, TaskSelect, WorkTypeSelect } from './rate-ui'; // R3-B1 / B2
+import { rateFor, useRateMasters } from './rate-masters';
+import { svcT } from '../../i18n/areas/service-r3';
 
 /** Start / pause / resume / stop. Stopping turns the clock into a time entry. */
 export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; prefs: TimePrefs; onLogged: (message: string) => void }) {
@@ -20,6 +23,21 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
   const [project, setProject] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  // R3-B: task (sets project + rate), work type, and the rate the cards resolve (overwritable).
+  const masters = useRateMasters();
+  const [taskId, setTaskId] = useState('');
+  const [workTypeId, setWorkTypeId] = useState('');
+  const [typedRate, setTypedRate] = useState<number | null>(null);
+  const task = masters.tasks.find((t) => t.id === taskId);
+  const ccId = task?.cost_centre_id ?? '';
+  const resolved = rateFor({ client_id: clientId || undefined, task_id: taskId || undefined, cost_centre_id: ccId || undefined, work_type_id: workTypeId || undefined }, masters, clients, prefs);
+  const rate = typedRate ?? resolved.rate;
+  const pickTask = (id: string) => {
+    setTaskId(id);
+    const t = masters.tasks.find((x) => x.id === id);
+    const cc = t ? masters.centres.find((c) => c.id === t.cost_centre_id) : undefined;
+    if (cc) setProject(cc.name);
+  };
 
   const start = () => {
     const client = clients.find((c) => c.id === clientId);
@@ -30,8 +48,11 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
       client_name: client.name,
       project: project.trim() || undefined,
       description: description.trim(),
-      hourly_rate: prefs.default_rate,
+      hourly_rate: rate,
       billable: true,
+      ...(taskId ? { task_id: taskId } : {}),
+      ...(ccId ? { cost_centre_id: ccId } : {}),
+      ...(workTypeId ? { work_type_id: workTypeId } : {}),
     }, Date.now()));
   };
 
@@ -48,6 +69,9 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
         minutes,
         hourly_rate: timer.hourly_rate ?? prefs.default_rate,
         billable: timer.billable !== false,
+        ...(timer.task_id ? { task_id: timer.task_id } : {}),
+        ...(timer.cost_centre_id ? { cost_centre_id: timer.cost_centre_id } : {}),
+        ...(timer.work_type_id ? { work_type_id: timer.work_type_id } : {}),
       });
       onLogged(timeT('loggedFor', { time: formatMinutes(minutes), client: timer.client_name ?? '' }));
     } else {
@@ -56,6 +80,8 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
     writeTimer(null);
     setProject('');
     setDescription('');
+    setTaskId('');
+    setTypedRate(null);
   };
 
   if (timer) {
@@ -105,6 +131,12 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
         <div className={controls.field}>
           <label className={controls.label} htmlFor="tm-desc">{timeT('working')}</label>
           <input id="tm-desc" className={controls.input} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <TaskSelect id="tm-task" masters={masters} clientId={clientId} value={taskId} onChange={pickTask} />
+        <WorkTypeSelect id="tm-wt" workTypes={masters.workTypes} value={workTypeId} onChange={setWorkTypeId} />
+        <div className={controls.field}>
+          <label className={controls.label} htmlFor="tm-rate">{svcT('rate')} <RateSourceTag source={typedRate === null ? resolved.source : 'manual'} /></label>
+          <input id="tm-rate" type="number" min={0} step="0.01" className={controls.input} value={rate || ''} onChange={(e) => setTypedRate(e.target.value === '' ? null : Math.max(Number(e.target.value) || 0, 0))} />
         </div>
         <button type="submit" className={controls.btnPrimary}>
           <Play size={16} /> {timeT('start')}

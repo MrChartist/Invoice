@@ -251,3 +251,28 @@ export const STATEMENT_LABELS: Record<'en' | RegionalLang, StatementLabels> = {
 export function statementLabels(lang: MessageLang | undefined): StatementLabels {
   return lang && isRegional(lang) ? STATEMENT_LABELS[lang] : STATEMENT_LABELS.en;
 }
+
+/* ── R3-B7: "we miss you" re-order nudge to a customer gone quiet ───────────── */
+
+/** `{client}`, `{business}`, `{items}` (their usual items, comma-separated), `{phone}`. */
+export const NUDGE_TEMPLATES: Record<MessageLang, string> = {
+  en: 'Hello {client},\n\nIt has been a while since your last order with {business}. Shall we send your usual{items_line}? Just reply to this message and we will get it ready.\n\nThank you!\n{phone}',
+  hinglish: 'Namaste {client},\n\n{business} se aapka last order kaafi din pehle aaya tha. Kya aapka usual saamaan{items_line} bhej dein? Bas is message ka reply kar dijiye, hum tayyar kar denge.\n\nDhanyavaad!\n{phone}',
+  hi: 'नमस्ते {client},\n\n{business} से आपका पिछला ऑर्डर काफ़ी दिन पहले आया था। क्या आपका रोज़ का सामान{items_line} भेज दें? बस इस संदेश का जवाब दें, हम तैयार कर देंगे।\n\nधन्यवाद!\n{phone}',
+  mr: 'नमस्कार {client},\n\n{business} कडे आपली शेवटची ऑर्डर बऱ्याच दिवसांपूर्वी आली होती. आपले नेहमीचे सामान{items_line} पाठवू का? फक्त या संदेशाला उत्तर द्या, आम्ही तयार ठेवू.\n\nधन्यवाद!\n{phone}',
+  gu: 'નમસ્તે {client},\n\n{business} સાથે આપનો છેલ્લો ઓર્ડર ઘણા દિવસ પહેલાં આવ્યો હતો. આપનો રોજનો માલ{items_line} મોકલી આપીએ? બસ આ સંદેશનો જવાબ આપો, અમે તૈયાર રાખીશું.\n\nઆભાર!\n{phone}',
+  ta: 'வணக்கம் {client},\n\n{business} இல் உங்கள் கடைசி ஆர்டர் சில நாட்களுக்கு முன்பு வந்தது. உங்கள் வழக்கமான பொருட்களை{items_line} அனுப்பலாமா? இந்தச் செய்திக்குப் பதில் அனுப்புங்கள், தயார் செய்கிறோம்.\n\nநன்றி!\n{phone}',
+};
+
+/** The nudge text in the party's message language (English when unset). */
+export function buildNudge(lang: MessageLang | undefined, vars: { client: string; business: string; items: readonly string[]; phone?: string }): string {
+  const t = NUDGE_TEMPLATES[lang ?? 'en'];
+  const items = vars.items.filter(Boolean).slice(0, 5);
+  return t
+    .replace('{client}', vars.client || '')
+    .replace('{business}', vars.business || '')
+    .replace('{items_line}', items.length ? ` (${items.join(', ')})` : '')
+    .replace('{phone}', vars.phone?.trim() ? `Ph: ${vars.phone.trim()}` : '')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}

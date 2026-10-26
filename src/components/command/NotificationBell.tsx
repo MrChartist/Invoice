@@ -164,6 +164,27 @@ function ensurePackAlerts(onReady: () => void): void {
     });
 }
 
+// R3-B2: project budget warnings (80% / 100%) — the provider loads only once `project_tasks` has rows.
+let projectAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureProjectAlerts(onReady: () => void): void {
+  if (projectAlerts !== 'off') return;
+  try {
+    if (!getTable('project_tasks').length) return;
+  } catch {
+    return;
+  }
+  projectAlerts = 'loading';
+  import('../../lib/project-alerts')
+    .then((m) => {
+      m.registerProjectAlerts();
+      projectAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      projectAlerts = 'off';
+    });
+}
+
 // R3-C: e-Way Bill expiry (only once `einvoice_meta` holds an e-Way Bill number) and DSC expiry (only once
 // `dsc_register` has rows) — each provider loads lazily on its own.
 const r3cAlerts: Record<string, 'off' | 'loading' | 'on'> = {};
@@ -214,6 +235,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensureGstGuardAlerts(reload);
     ensureCaptureAlerts(reload);
     ensurePackAlerts(reload);
+    ensureProjectAlerts(reload); // R3-B
     ensureR3cAlerts(reload); // R3-C
   }, []);
 

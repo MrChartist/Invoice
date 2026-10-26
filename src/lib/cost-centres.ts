@@ -38,9 +38,23 @@ export interface CostCentre {
   /** Optional parent centre id — one level of grouping only (a parent cannot itself have a parent). */
   parent_id?: string;
   notes?: string;
+  /* ── R3-B project fields (additive, optional; only meaningful on kind 'project') ── */
+  /** Project hourly rate (rate cards, R3-B1): beats the client rate, loses to a task rate. */
+  hourly_rate?: number;
+  /** Hours budget in minutes (R3-B2). */
+  budget_minutes?: number;
+  /** Fee budget in rupees (R3-B2). */
+  fee_budget?: number;
+  /** Local days YYYY-MM-DD. */
+  start?: string;
+  due?: string;
+  status?: ProjectStatus;
   created_at: string;
   updated_at?: string;
 }
+
+export type ProjectStatus = 'active' | 'on_hold' | 'done';
+export const PROJECT_STATUSES: readonly ProjectStatus[] = ['active', 'on_hold', 'done'];
 
 export type CostCentreInput = Omit<CostCentre, 'id' | 'created_at' | 'updated_at'> & { id?: string };
 
@@ -52,6 +66,23 @@ export class CostCentreError extends Error {
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const posNum = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
+
+/** R3-B: the optional project fields of a raw row / input, cleaned (absent when empty). */
+function projectFields(o: Record<string, unknown>): Partial<CostCentre> {
+  const out: Partial<CostCentre> = {};
+  const rate = posNum(o.hourly_rate);
+  if (rate !== undefined) out.hourly_rate = Math.round(rate * 100) / 100;
+  const budget = posNum(o.budget_minutes);
+  if (budget !== undefined) out.budget_minutes = Math.round(budget);
+  const fee = posNum(o.fee_budget);
+  if (fee !== undefined) out.fee_budget = Math.round(fee * 100) / 100;
+  if (DAY.test(str(o.start))) out.start = str(o.start);
+  if (DAY.test(str(o.due))) out.due = str(o.due);
+  if (PROJECT_STATUSES.includes(o.status as ProjectStatus)) out.status = o.status as ProjectStatus;
+  return out;
+}
 
 /** Tolerant read of stored rows (malformed rows are skipped). */
 export function normalizeCostCentres(rows: unknown[]): CostCentre[] {
@@ -71,6 +102,7 @@ export function normalizeCostCentres(rows: unknown[]): CostCentre[] {
       active: o.active !== false,
       ...(str(o.parent_id) && str(o.parent_id) !== id ? { parent_id: str(o.parent_id) } : {}),
       ...(str(o.notes) ? { notes: str(o.notes) } : {}),
+      ...projectFields(o),
       created_at: str(o.created_at),
       ...(str(o.updated_at) ? { updated_at: str(o.updated_at) } : {}),
     });
@@ -144,6 +176,7 @@ export function validateCostCentre(input: CostCentreInput, all: readonly CostCen
   if (!COST_CENTRE_KINDS.includes(input.kind)) errors.push('Choose a kind.');
   const others = all.filter((c) => c.id !== input.id);
   if (name && others.some((c) => c.name.toLowerCase() === name.toLowerCase())) errors.push(`A cost centre named "${name}" already exists.`);
+  if (input.start && input.due && input.due < input.start) errors.push('The due date is before the start date.');
   if (input.parent_id) {
     const parent = others.find((c) => c.id === input.parent_id);
     if (!parent) errors.push('The parent cost centre does not exist.');
@@ -167,6 +200,8 @@ export function saveCostCentre(input: CostCentreInput): CostCentre {
     active: input.active !== false,
     ...(str(input.parent_id) ? { parent_id: str(input.parent_id) } : {}),
     ...(str(input.notes) ? { notes: str(input.notes) } : {}),
+    // Forms that do not know the project fields (Books → cost centres) keep them; an explicit undefined clears one.
+    ...projectFields({ ...prev, ...input } as unknown as Record<string, unknown>),
     created_at: prev?.created_at ?? now,
     ...(prev ? { updated_at: now } : {}),
   };
@@ -191,6 +226,8 @@ export interface CostCentreUsage {
   children: number;
   /** Recurring templates (document-level or line overrides) — they would issue documents pointing at it. */
   recurring: number;
+  /** R3-B2: project tasks of this project. */
+  tasks?: number;
 }
 
 type Row = Record<string, unknown>;
@@ -198,7 +235,7 @@ type Row = Record<string, unknown>;
 /** Pure usage count over raw table rows. */
 export function costCentreUsage(
   id: string,
-  t: { invoices?: Row[]; purchases?: Row[]; vouchers?: Row[]; time?: Row[]; mileage?: Row[]; budgets?: Row[]; centres?: readonly CostCentre[]; recurring?: Row[] },
+  t: { invoices?: Row[]; purchases?: Row[]; vouchers?: Row[]; time?: Row[]; mileage?: Row[]; budgets?: Row[]; centres?: readonly CostCentre[]; recurring?: Row[]; tasks?: Row[] },
 ): CostCentreUsage {
   const has = (r: Row) => r.cost_centre_id === id;
   const lines = (r: Row, key: string) => (Array.isArray(r[key]) ? (r[key] as Row[]) : []);
@@ -214,10 +251,11 @@ export function costCentreUsage(
       const tpl = (r.template && typeof r.template === 'object' ? r.template : {}) as Row;
       return has(r) || has(tpl) || lines(tpl, 'items').some(has);
     }).length,
+    tasks: (t.tasks ?? []).filter(has).length,
   };
 }
 
-export const usageTotal = (u: CostCentreUsage) => u.invoices + u.purchases + u.vouchers + u.time + u.mileage + u.budgets + u.children + (u.recurring ?? 0);
+export const usageTotal = (u: CostCentreUsage) => u.invoices + u.purchases + u.vouchers + u.time + u.mileage + u.budgets + u.children + (u.recurring ?? 0) + (u.tasks ?? 0);
 
 export function readCostCentreUsage(id: string): CostCentreUsage {
   return costCentreUsage(id, {
@@ -229,6 +267,7 @@ export function readCostCentreUsage(id: string): CostCentreUsage {
     budgets: getTable<Row>('budgets'),
     centres: loadCostCentres(),
     recurring: getTable<Row>('recurring'),
+    tasks: getTable<Row>('project_tasks'), // R3-B2
   });
 }
 
@@ -241,7 +280,7 @@ export function deleteCostCentre(id: string): void {
   const row = all.find((c) => c.id === id);
   if (!row) return;
   if (usageTotal(readCostCentreUsage(id)) > 0) {
-    throw new CostCentreError(`"${row.name}" is used by documents, recurring templates, budgets or other cost centres — mark it inactive instead.`);
+    throw new CostCentreError(`"${row.name}" is used by documents, recurring templates, budgets, project tasks or other cost centres — mark it inactive instead.`);
   }
   setTable(COST_CENTRES_TABLE, all.filter((c) => c.id !== id));
   audit.record({ entity: 'cost_centre', entity_id: id, action: 'delete', summary: `Deleted ${COST_CENTRE_KIND_LABELS[row.kind].toLowerCase()} "${row.name}"` });
