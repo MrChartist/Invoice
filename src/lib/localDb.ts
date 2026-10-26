@@ -659,6 +659,8 @@ export const localDb = {
       const row = rows.find((t) => t.id === paymentId);
       if (!row) return;
       requireAccess('payment.record');
+      // QA5 F12: removing a write-off row reverses an owner-only, PIN-confirmed write-off (`reverseWriteOff`).
+      if (row.write_off) requireAccess('doc.deleteIssued');
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
       const overridden = target ? assertUnlocked(target, 'unpay') === 'overridden' : false;
       setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));
