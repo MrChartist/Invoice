@@ -42,6 +42,9 @@ const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
 const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 // R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
 const BillRateHints = lazy(() => import('../trade/BillRateHints'));
+// R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
+const BillTradePanel = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.BillTradePanel })));
+import { impliedPacks } from '../../lib/shop-mode';
 
 export interface BillModalProps {
   open: boolean;
@@ -114,6 +117,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   };
   const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
   const [notes, setNotes] = useState(init?.notes ?? '');
+  const [brokerId, setBrokerId] = useState(purchase?.broker_id); // R8-B
+  const tradeOn = useMemo(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency'), []); // R8-B
   // What the dialog opened with, to tell whether closing would lose typed work (QA-3 F12).
   const [openedWith] = useState(() => billFormSnapshot({ vendorId: init?.vendor_id ?? '', billNumber: purchase?.bill_number ?? '', lines: init?.lines?.length ? init.lines : [], notes: init?.notes ?? '' }));
   useEffect(() => {
@@ -255,6 +260,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         cost_centre_id: costCentre,
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
+        broker_id: brokerId, // R8-B
         ...tdsResolved.fields,
       }, { confirmed: !!warning });
       if (res.kind === 'warn') {
@@ -335,6 +341,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} />
       {vendor && ((x) => !!x.trade_discounts || !!x.industry_packs?.some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()) && <Suspense fallback={null}><BillRateHints lines={lines} vendor={vendor} date={date} onRate={(id, rate) => changeLines(lines.map((l) => (l.id === id ? { ...l, rate } : l)))} /></Suspense>}
+      {tradeOn && <Suspense fallback={null}><BillTradePanel lines={lines} onLines={changeLines} vendor={vendor} broker={brokerId} onBroker={setBrokerId} isNew={!purchase} /></Suspense>}
       {!rcm && !importType && vendor && <Suspense fallback={null}><RcmGoodsNotice lines={lines} date={date} vendor={vendor} onApply={() => setRcm(true)} /></Suspense>}
       <LandedCostFields value={landed} onChange={setLanded} />
 

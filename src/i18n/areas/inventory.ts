@@ -169,6 +169,7 @@ export const invT = defineArea(
     trackingSection: 'Tracking (optional)',
     trackBatches: 'Track batches with MFG / expiry dates (medicines, food, cosmetics) — sales pick the batch that expires first',
     trackSerials: 'Track serial / IMEI numbers (one per unit) and warranty',
+    soldByWeight: 'Sold by weight / bags (bags, gross, tare and dhalta on bill lines)', // R8-B
     warranty: 'Warranty (months)',
     warrantyPh: '0 = none',
     openingSerials: 'Opening serials (one per line)',
@@ -434,6 +435,7 @@ export const invT = defineArea(
     trackingSection: 'ट्रैकिंग (वैकल्पिक)',
     trackBatches: 'निर्माण / एक्सपायरी तारीख के साथ बैच ट्रैक करें (दवाइयाँ, खाना, कॉस्मेटिक्स) — बिक्री में पहले एक्सपायर होने वाला बैच चुना जाता है',
     trackSerials: 'सीरियल / IMEI नंबर (हर इकाई का एक) और वारंटी ट्रैक करें',
+    soldByWeight: 'वज़न / बोरी से बिकता है (बिल लाइनों पर बोरी, कुल वज़न, बारदाना और धलता)',
     warranty: 'वारंटी (महीने)',
     warrantyPh: '0 = कोई नहीं',
     openingSerials: 'ओपनिंग सीरियल (हर लाइन में एक)',

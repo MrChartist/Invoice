@@ -8,8 +8,11 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Godown } from '../../types/stock';
-import type { Arrival, Indent, PackagingMove, PackagingType, PartyRate, SalePatti } from '../../types/trade-r8';
+import type { Arrival, ChargeHead, Indent, LineWeight, PackagingMove, PackagingType, PartyRate, SalePatti } from '../../types/trade-r8';
 import type { Scheme } from '../pricing';
+import type { InvoiceItem } from '../../types/invoice';
+import type { StockItem } from '../inventory';
+import type { SalesAgent } from '../sales-commission';
 import { applyTotals, type Demo, type DemoExtras } from '../demo-data';
 import { deriveGstMode } from '../invoice-calc';
 import { shiftDay } from '../dates';
@@ -115,9 +118,65 @@ function distributorExtras({ today, base }: ProfileContext): DemoExtras {
   return { tables: { party_rates: [rate], schemes: [scheme], packaging_types: [crate], packaging_moves: [move(1, 40, 0, 75), move(2, 0, 35, 70), move(3, 20, 0, 5)] } };
 }
 
+/**
+ * R8-B (TR-B1/B2/B3) commodity rows: a wheat item sold by weight (base KG, 1 QTL = 100 KG), two charge heads (market
+ * fee 1% in the goods' value, payable to the mandi; hamali ₹4 a bag), a broker at ₹5 a quintal and one sale of 120 bags
+ * weighed 6,072 kg gross (tare 0.6 kg a bag, dhalta 1 kg a quintal → 59.400 QTL) with its charge lines and broker.
+ */
+function commodityExtras({ today, base }: ProfileContext): DemoExtras {
+  const item: Demo<StockItem> = { id: 'demo-wheat-wt', demo: true, name: 'Wheat (sample, by weight)', hsn: '1001', unit: 'KG', track_stock: true, opening_qty: 20000, opening_rate: 23, reorder_level: 0, sale_rate: 2450, tax_rate: 0, alt_units: [{ unit: 'QTL', factor: 100 }], sold_by_weight_bags: true };
+  const heads: Demo<ChargeHead>[] = [
+    { id: 'demo-head-mfee', demo: true, name: 'Market fee', side: 'both', basis: 'percent', rate: 1, gst: 'in_value', payable: true, auto: true, order: 0 },
+    { id: 'demo-head-hamali', demo: true, name: 'Hamali', side: 'sale', basis: 'per_package', rate: 4, gst: 'in_value', auto: true, order: 1 },
+  ];
+  const broker: Demo<SalesAgent> = { id: 'demo-broker-1', demo: true, name: 'Sample Broker (demo)', rate: 0, basis: 'invoice', kind: 'broker', brokerage_basis: 'per_qtl', brokerage_rate: 5 };
+  const d = shiftDay(today, -3);
+  const client = base.clients[0];
+  const pos = client.gstin?.slice(0, 2) || base.profile.stateCode || '27';
+  const wt: LineWeight = { packages: 120, kind: 'BAG', gross: 6072, tare_per_package: 0.6, deduction: { basis: 'per_qtl', value: 1 }, gross_unit: 'KG' };
+  // Net 5,940 kg = 59.400 QTL; charge lines as `withCharges` makes them (market fee 1% of ₹1,45,530; hamali 120 × ₹4),
+  // in the goods' value at the wheat HSN and rate (pinned by tests/tr-charges.test.ts and tr-demo.test.ts).
+  const line = (id: string, p: Partial<InvoiceItem>): InvoiceItem => ({ id: `demo-cm-1-${id}`, name: '', type: 'Goods', hsn: '1001', unit: 'OTH', quantity: 1, rate: 0, tax_rate: 0, discount_percent: 0, amount: 0, ...p });
+  const items = [
+    line('l1', { name: item.name, unit: 'QTL', unit_factor: 100, quantity: 59.4, rate: 2450, wt }),
+    line('mfee', { name: 'Market fee', rate: 1455.3, charge_head_id: heads[0].id }),
+    line('hamali', { name: 'Hamali', rate: 480, charge_head_id: heads[1].id }),
+  ];
+  const sale = applyTotals({
+    ...base.invoices[0],
+    id: 'demo-commodity-1',
+    demo: true,
+    doc_type: 'INVOICE',
+    invoice_number: buildInvoiceNumber('DEMOCM', fyOf(d), 1),
+    issue_date: d,
+    due_date: shiftDay(d, 7),
+    status: 'Sent',
+    client: { ...client },
+    items: items.map((l) => ({ ...l, amount: Math.round(l.quantity * l.rate * 100) / 100 })),
+    place_of_supply: pos,
+    gst_mode: deriveGstMode({ senderStateCode: base.profile.stateCode, placeOfSupply: pos, senderHasGstin: true, taxEnabled: true }),
+    discount_rate: 0,
+    po_number: undefined,
+    amount_paid: 0,
+    broker_id: broker.id,
+    notes: 'Weighed sale with mandi charges and a broker — sample.',
+    created_at: `${d}T12:00:00.000Z`,
+  } as Demo<InvoiceRecord>);
+  return { invoices: [sale], tables: { stock_items: [item], trade_charge_heads: heads, sales_agents: [broker] } };
+}
+
+const mergeExtras = (a: DemoExtras, b: DemoExtras): DemoExtras => {
+  const tables: NonNullable<DemoExtras['tables']> = { ...a.tables };
+  for (const [k, rows] of Object.entries(b.tables ?? {}) as [keyof typeof tables, Demo<{ id: string }>[]][]) tables[k] = [...(tables[k] ?? []), ...rows];
+  return { invoices: [...(a.invoices ?? []), ...(b.invoices ?? [])], tables };
+};
+
 export function tradingExtras(ctx: ProfileContext): DemoExtras {
-  // R8-C: the agency rows; R8-A: the distributor rows; TR-B (commodity) appends theirs below.
-  const a = ctx.packs.includes('agency') ? agencyExtras(ctx) : {};
-  const d = ctx.packs.includes('distributor') ? distributorExtras(ctx) : {};
-  return a.tables && d.tables ? { ...a, tables: { ...a.tables, ...d.tables } } : a.tables ? a : d;
+  // R8-C: the agency rows; R8-A: the distributor rows; R8-B: the commodity rows.
+  const parts = [
+    ctx.packs.includes('agency') ? agencyExtras(ctx) : {},
+    ctx.packs.includes('distributor') ? distributorExtras(ctx) : {},
+    ctx.packs.includes('commodity') ? commodityExtras(ctx) : {},
+  ].filter((x) => x.tables || x.invoices);
+  return parts.length ? parts.reduce(mergeExtras) : {};
 }
