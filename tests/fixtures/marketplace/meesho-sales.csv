@@ -1,0 +1,2 @@
+identifier,sup_name,gstin,sub_order_num,order_date,hsn_code,quantity,gst_rate,total_taxable_sale_value,tax_amount,total_invoice_value,taxable_shipping,end_customer_state_new,sku
+tcs_sales,Seller,27AABCU9603R1ZX,M-901,2026-10-03,6912,1,18,200,36,236,0,Gujarat,MUG-RED

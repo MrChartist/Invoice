@@ -43,6 +43,7 @@ import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
 import { defineArea } from '../i18n/area';
+import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-A
 
 // The TDS register, its 26AS parser and Form 16A tracking load only when opened.
 // Bulk statements / confirmation letters (WP-4): loaded with the PDF stack only when opened.
@@ -66,8 +67,12 @@ const PartyTimeline = lazy(() => import('../components/collections/PartyTimeline
 const GiftVouchersPanel = lazy(() => import('../components/retail/GiftVouchersPanel'));
 const gvTabT = defineArea({ tab: 'Gift vouchers' } as const, { tab: 'गिफ़्ट वाउचर' });
 
-type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds' | 'giftvouchers';
-const TABS: { id: Tab; label: () => string }[] = [
+// R5-A: marketplace seller pack (channels, imports, settlements, TCS / TDS credit, returns) — listed only with the pack on.
+const MarketplaceTab = lazy(() => import('../components/marketplace/MarketplaceTab'));
+const mpTabT = defineArea({ tab: 'Marketplace' } as const, { tab: 'मार्केटप्लेस' });
+
+type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds' | 'giftvouchers' | 'marketplace';
+const TABS: { id: Tab; label: () => string; pack?: PackId }[] = [
   { id: 'aging', label: () => rcvT('tabAging') },
   { id: 'statements', label: () => rcvT('tabStatements') },
   { id: 'followups', label: () => colT('tabFollowups') }, // R2-A4
@@ -75,6 +80,7 @@ const TABS: { id: Tab; label: () => string }[] = [
   { id: 'advances', label: () => rcvT('tabAdvances') },
   { id: 'tds', label: () => rcvT('tabTds') },
   { id: 'giftvouchers', label: () => gvTabT('tab') }, // R4-B1
+  { id: 'marketplace', label: () => mpTabT('tab'), pack: 'marketplace' }, // R5-A
 ];
 
 /** 1 April of the Indian financial year containing `d`. */
@@ -124,6 +130,8 @@ export function Receivables() {
   }, []);
 
   const tab: Tab = (TABS.find((t) => t.id === params.get('tab'))?.id ?? 'aging');
+  // R5-A: pack tabs show only with their pack on (a pack tab opened by URL stays listed while it is shown).
+  const shownTabs = useMemo(() => visibleTabs(TABS, localDb.settings.get(), tab), [tab]);
   const setTab = (t: Tab) => {
     const next = new URLSearchParams(params);
     next.set('tab', t);
@@ -269,15 +277,15 @@ export function Receivables() {
       </div>
 
       <div className={styles.tabs} role="tablist" aria-label={rcvT('tabsAria')}>
-        {TABS.map((t) => (
+        {shownTabs.map((t) => (
           <button key={t.id} type="button" role="tab" id={`rcv-tab-${t.id}`} aria-selected={tab === t.id}
             aria-controls={`rcv-panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
             className={tab === t.id ? styles.tabActive : styles.tab} onClick={() => setTab(t.id)}
             onKeyDown={(e) => {
               if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
               e.preventDefault();
-              const i = TABS.findIndex((x) => x.id === t.id);
-              const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+              const i = shownTabs.findIndex((x) => x.id === t.id);
+              const next = shownTabs[(i + (e.key === 'ArrowRight' ? 1 : shownTabs.length - 1)) % shownTabs.length];
               setTab(next.id);
               requestAnimationFrame(() => document.getElementById(`rcv-tab-${next.id}`)?.focus());
             }}>
@@ -346,6 +354,7 @@ export function Receivables() {
           </Suspense>
         )}
         {tab === 'giftvouchers' && <Suspense fallback={null}><GiftVouchersPanel /></Suspense>}
+        {tab === 'marketplace' && <Suspense fallback={<div className={surface.card}><p className={styles.note}>…</p></div>}><MarketplaceTab notify={notify} /></Suspense>}
       </div>
       {toastNode}
     </div>

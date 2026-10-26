@@ -4,6 +4,7 @@ import { ALL_MODULES, type BusinessType, type ModuleId } from '../../lib/shop-mo
 import { BUSINESS_TYPES, applyBusinessType, isBusinessType } from '../../lib/shop-presets';
 import { useT } from '../../i18n';
 import { reachT } from '../../i18n/areas/reach';
+import { PACK_IDS, activePacks, type PackId } from '../../lib/industry-packs';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './ShopModePanel.module.css';
@@ -25,6 +26,9 @@ export function ShopModePanel({ settings, onChange }: Props) {
     const next = on.has(m) ? [...on].filter((x) => x !== m) : [...on, m];
     onChange({ modules: ALL_MODULES.filter((x) => next.includes(x)) });
   };
+  // R5-A1: industry packs — an explicit list once the user ticks a box (absent = follow the business type).
+  const packs = activePacks(settings);
+  const togglePack = (p: PackId) => onChange({ industry_packs: PACK_IDS.filter((x) => (x === p ? !packs.includes(p) : packs.includes(x))) });
   const pickType = (v: string) => {
     if (!v) return onChange({ business_type: undefined, modules: undefined });
     if (isBusinessType(v)) onChange(applyBusinessType(v as BusinessType));
@@ -67,6 +71,15 @@ export function ShopModePanel({ settings, onChange }: Props) {
           ))}
         </fieldset>
         <p className={controls.hint}>{all ? reachT('showingAll') : reachT('coreNote')}</p>
+        <fieldset className={styles.modules} data-industry-packs>
+          <legend className={controls.label}>{reachT('packsTitle')}{Array.isArray(settings.industry_packs) ? '' : ` — ${reachT('packsFromType')}`}</legend>
+          {PACK_IDS.map((p) => (
+            <label key={p} className={controls.check} title={reachT(`packDesc.${p}`)}>
+              <input type="checkbox" checked={packs.includes(p)} onChange={() => togglePack(p)} /> <span><strong>{reachT(`pack.${p}`)}</strong><br /><small>{reachT(`packDesc.${p}`)}</small></span>
+            </label>
+          ))}
+        </fieldset>
+        <p className={controls.hint}>{reachT('packsSub')}</p>
       </div>
     </section>
   );

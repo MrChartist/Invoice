@@ -455,6 +455,8 @@ const RECORD_TABLES = [
   'gift_vouchers', 'branch_prices', 'transfer_requests',
   // Round 4 (R4-C): LUT register, export IRMs / incentives / write-offs, recycle bin
   'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
+  // Round 5 (R5-A): sales channels, channel SKU map, marketplace imports, settlements, GST TCS / TDS credit rows, returns desk
+  'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -507,6 +509,8 @@ const ID_TABLES = new Set([
   'gift_vouchers', 'branch_prices', 'transfer_requests',
   // Round 4 (R4-C)
   'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
+  // Round 5 (R5-A)
+  'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

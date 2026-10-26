@@ -176,7 +176,15 @@ export interface TdsInput {
   payments?: Payment[];
   clients?: Client[];
   certificates?: TdsCertificate[];
+  /**
+   * Additive (R5-A5): expected TDS that is not on an invoice — e.g. 194-O deducted by an e-commerce operator, from
+   * imported settlements (`marketplace/tcs-credit.ts`). Register and 26AS reconciliation treat them like invoice lines.
+   */
+  extraExpected?: TdsExpectedLine[];
 }
+
+/** R5-A5: a non-invoice expected TDS line (`invoiceId` = the source record id, `number` = its reference). */
+export type TdsExpectedLine = TdsInvoiceLine;
 
 export function tdsInvoiceLines(input: TdsInput): TdsInvoiceLine[] {
   const clients = input.clients ?? [];
@@ -221,6 +229,7 @@ export function tdsInvoiceLines(input: TdsInput): TdsInvoiceLine[] {
       settled,
     });
   }
+  for (const l of input.extraExpected ?? []) if (l && l.tds > 0 && tdsPeriodOf(l.date)) out.push(l); // R5-A5
   return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.number.localeCompare(b.number)));
 }
 

@@ -149,6 +149,13 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   export_incentives: 'Export incentives: RoDTEP, duty drawback, IGST refund.',
   export_writeoffs: 'Export realisation write-offs.',
   recycle_bin: 'Recently deleted rows (only when chosen).',
+  // R5-A: marketplace seller pack
+  sales_channels: 'Marketplace sales channels: operator GSTINs / TAN, party, clearing account, import mappings.',
+  channel_skus: 'Channel SKU / listing id → catalogue item map (units per listing).',
+  marketplace_imports: 'Marketplace report imports (sales, settlement, returns) with the documents they created.',
+  settlements: 'Marketplace settlements: payout, lines per order and bucket, posting references.',
+  eco_credits: 'GST TCS / TDS credit rows from the portal, with the accept / reject decision.',
+  marketplace_returns: 'Marketplace returns / RTO / claims desk.',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',

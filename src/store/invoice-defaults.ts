@@ -317,6 +317,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.delivery_proof && typeof r.delivery_proof === 'object' && (r.delivery_proof as { receiver?: unknown }).receiver ? { delivery_proof: r.delivery_proof as InvoiceRecord['delivery_proof'] } : {}),
     // R4-C1 (additive): export document fields, absent on legacy rows.
     ...Object.fromEntries((['incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms'] as const).filter((k) => typeof r[k] === 'string' && r[k]).map((k) => [k, r[k]])),
+    // R5-A3 (additive): marketplace order link survives an edit (idempotent re-import).
+    ...(typeof r.channel_id === 'string' ? { channel_id: r.channel_id, channel_order_id: r.channel_order_id as string, channel_import_id: r.channel_import_id as string } : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

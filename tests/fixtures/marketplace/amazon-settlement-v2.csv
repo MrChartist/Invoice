@@ -1,0 +1,22 @@
+settlement-id,settlement-start-date,settlement-end-date,deposit-date,total-amount,currency,transaction-type,order-id,merchant-order-id,adjustment-id,shipment-id,marketplace-name,amount-type,amount-description,amount,fulfillment-id,posted-date,sku,quantity-purchased
+9001,2026-10-01,2026-10-14,2026-10-16,2016.57,INR,,,,,,,,,,,,,
+9001,,,,,,Order,402-111,,,S1,Amazon.in,ItemPrice,Principal,590,MFN,2026-10-06,MUG-RED,1
+9001,,,,,,Order,402-111,,,S1,Amazon.in,ItemFees,Commission,-50,MFN,2026-10-06,MUG-RED,1
+9001,,,,,,Order,402-111,,,S1,Amazon.in,ItemFees,Commission IGST,-9,MFN,2026-10-06,MUG-RED,1
+9001,,,,,,Order,402-111,,,S1,Amazon.in,ItemWithheldTax,TCS-IGST,-2.5,MFN,2026-10-06,MUG-RED,1
+9001,,,,,,Order,402-111,,,S1,Amazon.in,ItemWithheldTax,TDS (Section 194-O),-0.59,MFN,2026-10-06,MUG-RED,1
+9001,,,,,,Refund,402-111,,,S1,Amazon.in,ItemPrice,Principal,-590,MFN,2026-10-13,MUG-RED,1
+9001,,,,,,Order,402-222,,,S2,Amazon.in,ItemPrice,Principal,1062,MFN,2026-10-07,MUG-3PK,1
+9001,,,,,,Order,402-222,,,S2,Amazon.in,ItemFees,FixedClosingFee,-20,MFN,2026-10-07,MUG-3PK,1
+9001,,,,,,Order,402-222,,,S2,Amazon.in,ItemFees,FixedClosingFee CGST,-1.8,MFN,2026-10-07,MUG-3PK,1
+9001,,,,,,Order,402-222,,,S2,Amazon.in,ItemFees,FixedClosingFee SGST,-1.8,MFN,2026-10-07,MUG-3PK,1
+9001,,,,,,Order,402-222,,,S2,Amazon.in,ItemWithheldTax,TCS-CGST,-2.25,MFN,2026-10-07,MUG-3PK,1
+9001,,,,,,Order,402-222,,,S2,Amazon.in,ItemWithheldTax,TCS-SGST,-2.25,MFN,2026-10-07,MUG-3PK,1
+9001,,,,,,Order,402-222,,,S2,Amazon.in,ItemWithheldTax,TDS (Section 194-O),-1.06,MFN,2026-10-07,MUG-3PK,1
+9001,,,,,,Order,402-444,,,S4,Amazon.in,ItemPrice,Principal,1180,MFN,2026-10-08,MUG-RED,2
+9001,,,,,,Order,402-444,,,S4,Amazon.in,ItemFees,Commission,-100,MFN,2026-10-08,MUG-RED,2
+9001,,,,,,Order,402-444,,,S4,Amazon.in,ItemFees,Commission IGST,-18,MFN,2026-10-08,MUG-RED,2
+9001,,,,,,Order,402-444,,,S4,Amazon.in,ItemWithheldTax,TCS-IGST,-5,MFN,2026-10-08,MUG-RED,2
+9001,,,,,,Order,402-444,,,S4,Amazon.in,ItemWithheldTax,TDS (Section 194-O),-1.18,MFN,2026-10-08,MUG-RED,2
+9001,,,,,,other-transaction,,,,,Amazon.in,FBA Inventory Reimbursement,WAREHOUSE_DAMAGE,40,,2026-10-10,MUG-RED,
+9001,,,,,,other-transaction,,,,,Amazon.in,Cost of Advertising,Sponsored products,-50,,2026-10-10,,
