@@ -26,6 +26,8 @@ import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKey
 import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
 import { localDb } from '../lib/localDb';
+import { snapshotLineImages } from '../lib/line-images'; // R3-C2
+import { useLivePreviewPane } from '../components/creator/live-preview-gate'; // R3-C1
 import { MetaSummary } from '../components/invoicing-ux/MetaSummary';
 import { LastRateHints } from '../components/invoicing-ux/LastRateHints';
 import { duplicateInEditor } from '../components/invoicing-ux/editor-actions';
@@ -71,6 +73,9 @@ const PaymentModal = lazy(() => import('../components/modals/PaymentModal').then
 const ClientSearchModal = lazy(() => import('../components/modals/ClientSearchModal').then((m) => ({ default: m.ClientSearchModal })));
 const ItemSearchModal = lazy(() => import('../components/modals/ItemSearchModal').then((m) => ({ default: m.ItemSearchModal })));
 
+// R3-C1: live paper preview pane (≥ 1280 px, toggle remembered per device); never requested on phones.
+const LivePreviewPane = lazy(() => import('../components/creator/LivePreviewPane'));
+
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
   import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
@@ -105,6 +110,7 @@ export function InvoiceCreator() {
   const [expiredAsk, setExpiredAsk] = useState<{ andNew: boolean; lines: string[] } | null>(null);
 
   const profiles = useMemo(() => localDb.settings.get().profiles.filter((p) => p.companyName.trim()), []);
+  const pane = useLivePreviewPane(); // R3-C1
   const editing = Boolean(s.id);
   const openPreview = useCallback(() => setPreviewOpen(true), []);
 
@@ -185,6 +191,12 @@ export function InvoiceCreator() {
             return;
           }
         }
+      }
+      // R3-C2: each line snapshots its catalogue photo reference at save (later photo changes never reach it).
+      {
+        const st = useInvoiceStore.getState();
+        const items = snapshotLineImages(st.items, localDb.items.getAll());
+        if (items !== st.items) st.patch({ items });
       }
       const result = useInvoiceStore.getState().saveInvoice({ asDraft });
       if (!result.ok) {
@@ -364,13 +376,20 @@ export function InvoiceCreator() {
         </div>
       )}
 
-      <div className={styles.layout}>
+      {pane.wide && (
+        <div className={styles.paneBar}>
+          <button type="button" className={cn(controls.btnGhost, controls.btnSm)} aria-pressed={pane.on} onClick={pane.toggle} data-live-preview-toggle>
+            <Eye size={15} /> {pane.on ? pane.hideLabel : pane.showLabel}
+          </button>
+        </div>
+      )}
+      <div className={cn(styles.layout, pane.on && styles.layoutWithPane)}>
         <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
           <legend className={surface.srOnly}>{readOnly ? t('editor.docLegendLocked') : t('editor.docLegend')}</legend>
           <SupplyNotice />
           <GstExtrasFields />
 
-          <section className={surface.card}>
+          <section className={surface.card} data-r3c-section="party">
             <div className={surface.cardHead}>{t('editor.parties')}</div>
             <div className={surface.cardBody}>
               <PartiesSection profiles={profiles} onSearchClients={() => setClientsOpen(true)} />
@@ -381,7 +400,7 @@ export function InvoiceCreator() {
             </Suspense>
           </section>
 
-          <section className={surface.card}>
+          <section className={surface.card} data-r3c-section="items">
             <div className={surface.cardHead}>
               <span>{t('editor.items')}</span>
               <span className={styles.muted}>
@@ -406,7 +425,7 @@ export function InvoiceCreator() {
             <PaymentScheduleCard notify={notify} />
           </Suspense>
 
-          <section className={surface.card}>
+          <section className={surface.card} data-r3c-section="notes">
             <div className={surface.cardHead}>{t('editor.notesTerms')}</div>
             <div className={surface.cardBody}>
               <label className={controls.field}>
@@ -430,13 +449,14 @@ export function InvoiceCreator() {
                 onChange={(next) => s.patch({ attachments: next.length ? next : undefined })}
                 label={t('editor.attachmentsLabel')}
                 hint={t('editor.attachmentsHint')}
+                printable
               />
             </div>
           </section>
         </fieldset>
 
         <aside className={styles.side}>
-          <section className={surface.card}>
+          <section className={surface.card} data-r3c-section="totals">
             <div className={surface.cardHead}>{t('editor.summary')}</div>
             <div className={surface.cardBody}>
               <fieldset className={cn(styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
@@ -490,6 +510,11 @@ export function InvoiceCreator() {
             </div>
           </section>
         </aside>
+        {pane.on && (
+          <Suspense fallback={<div className={styles.paneSlot} aria-hidden="true" />}>
+            <LivePreviewPane />
+          </Suspense>
+        )}
       </div>
 
       <MobileSaveBar total={s.total} currency={s.currency} readOnly={readOnly} onPreview={openPreview} onSave={() => save()} />

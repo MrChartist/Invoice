@@ -1,0 +1,18 @@
+/* R3-C1 live tile: the draft at 0.18 scale (794 × 1123 px paper → ~143 × 202 px, clipped to the tile). */
+.live {
+  position: relative;
+  display: block;
+  height: 96px;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  pointer-events: none;
+}
+
+.sheet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}

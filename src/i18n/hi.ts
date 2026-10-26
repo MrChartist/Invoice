@@ -80,6 +80,7 @@ export const hi: Messages = {
   'nav.gateway': 'गेटवे',
   'nav.accountsInfo': 'खाता जानकारी',
   'nav.designStudio': 'डिज़ाइन स्टूडियो',
+  'nav.practice': 'प्रैक्टिस डेस्क',
   'nav.settings': 'सेटिंग्स',
   'nav.groupSales': 'बिक्री',
   'nav.groupPurchases': 'खरीद और स्टॉक',

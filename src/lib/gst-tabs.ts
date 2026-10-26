@@ -7,7 +7,9 @@ import type { gstT } from '../i18n/areas/gst';
 export type GstTabId =
   | 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs'
   | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c'
-  | 'rcmdocs' | 'cashref' | 'isd' | 'ewbcons' | 'bygstin' | 'guards';
+  | 'rcmdocs' | 'cashref' | 'isd' | 'ewbcons' | 'bygstin' | 'guards'
+  // R3-C4 / C5
+  | 'portal-files' | 'eway-desk';
 
 export type GstTabGroupId = 'gstr1' | 'gstr3b' | 'recon' | 'tools';
 
@@ -16,6 +18,8 @@ export interface GstTab {
   /** English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
   label: string;
   key?: Parameters<typeof gstT>[0];
+  /** R3-C: on-screen name from the desks area (`desks-r3.ts`) instead of the GST area. */
+  desk?: 'tab.portal' | 'tab.eway';
 }
 
 /** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
@@ -49,6 +53,9 @@ export const GST_TABS: readonly GstTab[] = [
   { id: 'ewbcons', label: 'Consolidated e-Way', key: 'tabEwbCons' },
   { id: 'bygstin', label: 'By GSTIN', key: 'tabByGstin' },
   { id: 'guards', label: 'GST guards', key: 'tabGuards' },
+  // R3-C4 / C5: GSTR-1 portal files, e-Way desk
+  { id: 'portal-files', label: 'Portal files', desk: 'tab.portal' },
+  { id: 'eway-desk', label: 'e-Way desk', desk: 'tab.eway' },
 ];
 
 /** Display order: GSTR-1 sections, GSTR-3B and payment, reconciliation, then the other tools. */
@@ -56,7 +63,7 @@ export const GST_TAB_GROUPS: readonly { id: GstTabGroupId; tabs: readonly GstTab
   { id: 'gstr1', tabs: ['overview', 'b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'at', 'txpd', 'hsn', 'docs', 'amend', 'eco'] },
   { id: 'gstr3b', tabs: ['gstr3b', 'setoff', 'cashref', 'rcmdocs'] },
   { id: 'recon', tabs: ['gstr2b', 'purhsn', 'recon', 'guards', 'bygstin'] },
-  { id: 'tools', tabs: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons'] },
+  { id: 'tools', tabs: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons', 'portal-files', 'eway-desk'] },
 ];
 
 /** Tab ids in on-screen order (arrow-key navigation walks this list). */

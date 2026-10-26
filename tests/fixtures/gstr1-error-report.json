@@ -1,0 +1,23 @@
+{
+  "gstin": "{{GSTIN}}",
+  "fp": "{{FP}}",
+  "b2b": [
+    {
+      "ctin": "{{CTIN}}",
+      "inv": [
+        {
+          "inum": "{{INUM}}",
+          "idt": "{{IDT}}",
+          "val": 1180,
+          "pos": "27",
+          "rchrg": "N",
+          "inv_typ": "R",
+          "error_cd": "RET191106",
+          "error_msg": "Invoice date is beyond the tax period",
+          "itms": [{ "num": 1801, "itm_det": { "rt": 18, "txval": 1000, "camt": 90, "samt": 90, "csamt": 0 } }]
+        }
+      ]
+    }
+  ],
+  "b2cs": [{ "sply_ty": "INTRA", "rt": 5, "pos": "27", "txval": 10, "error_cd": "RET191200", "error_msg": "Rate not allowed" }]
+}

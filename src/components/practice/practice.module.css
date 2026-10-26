@@ -1,0 +1,20 @@
+/* R3-C6 practice desk — tokens only. */
+.stack { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.section { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.875rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); min-width: 0; }
+.head { margin: 0; font-size: var(--text-md); font-weight: 700; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.note { margin: 0; font-size: var(--text-xs); color: var(--muted-foreground); }
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.table th, .table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.table th { font-size: var(--text-xs); color: var(--muted-foreground); font-weight: 600; white-space: nowrap; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bad { color: var(--destructive); font-weight: 600; }
+.warn { color: var(--warning); font-weight: 600; }
+.ok { color: var(--profit); }
+.muted { color: var(--muted-foreground); }
+.current { background: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.5rem; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+.item { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.flag { font-size: var(--text-2xs); font-weight: 700; color: var(--warning); text-transform: uppercase; letter-spacing: 0.04em; }

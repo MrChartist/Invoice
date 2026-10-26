@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, type CSSProperties } from 'react';
+import { lazy, Suspense, useMemo, type CSSProperties } from 'react';
 import type { TemplateLayout, TemplateProps } from './registry';
 import { templateById } from './registry';
 import { PaperContext, buildPaperConfig } from './paper-context';
@@ -26,11 +26,15 @@ import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
 import type { EInvoiceMeta } from '../../lib/einvoice';
 import { DOCUMENT_LABELS } from '../../types/invoice';
 import { cn, formatDate } from '../../lib/utils';
-import { contrastText, paperSize, printPageCss } from '../../lib/design-prefs';
+import { contrastText, marginVars, paperSize, printPageCss } from '../../lib/design-prefs';
+import { PageArt } from './parts/PageArt'; // R3-C3
 import styles from './invoice-paper.module.css';
 
 // R3-B4: timesheet annexure page — lazy, so the preview chunk does not grow; renders nothing without data.
 const LazyAnnexure = lazy(() => import('./parts/AnnexureBlock'));
+// R3-C2: photo pages and the receiver signature load only for documents that carry them.
+const LazyPhotoPages = lazy(() => import('./parts/PhotoPages'));
+const LazyDeliveryProof = lazy(() => import('./parts/DeliveryProofBlock'));
 
 export interface TemplateEngineProps extends TemplateProps {
   templateId: string;
@@ -82,6 +86,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
 
   const outerStyle = { '--tpl-accent': accent, fontFamily } as CSSProperties & Record<string, string | number>;
   if (design?.accent) outerStyle['--tpl-on-accent'] = contrastText(design.accent);
+  Object.assign(outerStyle, marginVars(design)); // R3-C3 page margins (nothing without them)
   if (design && design.paper !== 'A4') {
     outerStyle.width = size.width;
     outerStyle.minHeight = size.autoHeight ? 0 : size.height;
@@ -191,6 +196,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
       <div className={outerClass} style={outerStyle} {...dataAttrs}>
         {showInitials && <div className={styles.watermark}>{sender.companyName.substring(0, 2).toUpperCase()}</div>}
         <StatusStamp invoice={invoice} />
+        <PageArt />
         <div className={styles.inner} style={innerStyle}>
           <CopyBanner label={copyLabel} />
           {body}
@@ -203,8 +209,12 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <PaymentScheduleBlock invoice={invoice} compact={layout === 'receipt'} />
           {/* 8G: payment schedule + quote acceptance snapshot (from the document only). */}
           <AcceptanceBlock invoice={invoice} compact={layout === 'receipt'} />
+          {/* R3-C2: receiver signature ("Received by") right after the signature / acceptance block. */}
+          {invoice.delivery_proof && <Suspense fallback={null}><LazyDeliveryProof invoice={invoice} compact={layout === 'receipt'} /></Suspense>}
           {/* R3-B4: annexure as a following page (never on thermal / receipt paper). */}
           {invoice.annexure && layout !== 'receipt' && <Suspense fallback={null}><LazyAnnexure invoice={invoice} /></Suspense>}
+          {/* R3-C2: photo pages after the totals / annexure (2 × 2 per page). */}
+          {invoice.attachments?.some((a) => a.print) && <Suspense fallback={null}><LazyPhotoPages invoice={invoice} /></Suspense>}
         </div>
       </div>
     </PaperContext.Provider>

@@ -94,3 +94,58 @@ export async function peekOtherCompanies(
   }
   return out;
 }
+
+/* ── R3-C6 practice desk ─────────────────────────────────────── */
+
+/** Tables the practice board reads from another company (object keys and record tables alike). */
+const COMPLIANCE_KEYS = ['settings', 'compliance', 'tds_returns', 'dsc_register', 'client_checklist', 'checklist_template', 'invoices', 'vouchers', 'purchases'] as const;
+
+export type PeekedCompliance = { locked: boolean; tables: Partial<Record<(typeof COMPLIANCE_KEYS)[number], unknown>> };
+
+/**
+ * Read-only, version-less peek of one company's compliance tables (never creates or upgrades a
+ * database; nothing is written). A vault-sealed company (`__vault__` record or `mcv1:` values) or one
+ * that cannot be read comes back `locked`. Null when the database does not exist.
+ */
+export async function peekCompliance(dbName: string): Promise<PeekedCompliance | null> {
+  if (typeof indexedDB === 'undefined') return null;
+  const db = await openExisting(dbName);
+  if (!db) return null;
+  try {
+    if (!db.objectStoreNames.contains(DATA_STORE)) return { locked: true, tables: {} };
+    const keys = [...COMPLIANCE_KEYS.map((k) => PREFIX + k), '__vault__'];
+    const values = await new Promise<unknown[] | null>((resolve) => {
+      const out: unknown[] = new Array(keys.length).fill(undefined);
+      try {
+        const tx = db.transaction(DATA_STORE, 'readonly');
+        const store = tx.objectStore(DATA_STORE);
+        keys.forEach((k, i) => {
+          const r = store.get(k);
+          r.onsuccess = () => {
+            out[i] = r.result;
+          };
+        });
+        tx.oncomplete = () => resolve(out);
+        tx.onerror = () => resolve(null);
+        tx.onabort = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+    if (!values || values[values.length - 1] !== undefined) return { locked: true, tables: {} };
+    if (values.some((v) => typeof v === 'string' && v.startsWith('mcv1:'))) return { locked: true, tables: {} };
+    const tables: PeekedCompliance['tables'] = {};
+    COMPLIANCE_KEYS.forEach((k, i) => {
+      const v = values[i];
+      if (typeof v !== 'string') return;
+      try {
+        tables[k] = JSON.parse(v);
+      } catch {
+        /* unreadable value: left out */
+      }
+    });
+    return { locked: false, tables };
+  } finally {
+    db.close();
+  }
+}

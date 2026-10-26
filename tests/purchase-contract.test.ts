@@ -726,3 +726,9 @@ test('R3-B4 annexure reads the real purchase shape (re-billed cost through expen
   assert.deepEqual(a.expenses!.map((x) => [x.ref, x.amount, x.markup_pct, x.pure_agent]), [['p9', 1100, 10, false], ['p10', 1180, 0, true]]);
   assert.equal(a.expenses![0].amount, expenseLine(billable, DEFAULT_TIME_PREFS).amount, 'same amount as the invoice line');
 });
+
+test('R3-C6 practice board reads the real purchase shape (bill date counts as the last entry)', async () => {
+  const { buildPracticeRow } = await import('../src/lib/practice.ts');
+  const row = buildPracticeRow({ id: 'c', name: 'C', tables: { purchases: [bill, { ...bill, id: 'p2', date: undefined, bill_date: '2026-05-01' }] } }, '2026-06-01');
+  assert.equal(row.lastVoucher, '2026-05-01');
+});
