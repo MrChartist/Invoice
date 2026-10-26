@@ -139,8 +139,6 @@ the data), desks and the practice page are all lazy.
 - PRD lists `period_lock` for the peek: the lock date lives in `settings.lock_until`, which is what is read.
 - The GSTR-1A link points to GST → GST guards (where the 8.61 GSTR-1A paper lives).
 - `subsetChecks` is a focused preflight (GSTIN, period, number) rather than the full page preflight.
-- `tests/e2e/smoke.mjs`: the merged QA-3 F4 / F5 step's IndexedDB poll now tolerates the Demo-company reload
-  (`page.evaluate(...).catch(() => null)`); it failed intermittently with "Execution context was destroyed".
 - `/practice` is "owner only" via `settings.manage` (the owner-only action; clerks and viewers lack it).
 
 ## Verify with your CA (statutory points — every screen carries the wording)

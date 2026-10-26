@@ -77,6 +77,9 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     revision_of: 'q0', revision_no: 2,
     proposal_sections: [{ id: 's1', place: 'cover', title: 'Scope', body: 'Two floors' }],
     attention: { name: 'R. Iyer', role: 'Accounts' },
+    // R3-A
+    table_order_id: 'ord1',
+    split_of: { order_id: 'ord1', part: 2, parts: 3 },
     // R3-C
     delivery_proof: { receiver: 'Ravi', remark: 'Received in good condition', signed_at: '2026-04-12T05:30:00.000Z', signature: 'asset:abc' },
   };

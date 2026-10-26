@@ -65,6 +65,7 @@ export const en = {
   'nav.dashboard': 'Dashboard',
   'nav.newInvoice': 'New invoice',
   'nav.pos': 'POS',
+  'nav.tables': 'Tables',
   'nav.invoices': 'Invoices',
   'nav.clients': 'Clients',
   'nav.recurring': 'Recurring',

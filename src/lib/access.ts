@@ -383,6 +383,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   // R2-B: batch invoice runs (written with the invoices they issue), proposal section snippets
   batch_runs: 'doc.create',
   proposal_snippets: 'doc.create',
+  // R3-A: restaurant masters (areas, tables, modifier groups) are masters; running table orders are documents
+  dining_areas: 'master.edit',
+  dining_tables: 'master.edit',
+  modifier_groups: 'master.edit',
+  table_orders: 'doc.create',
   // R3-C: GSTR-1 portal file imports, DSC register, monthly client checklist
   gst_portal_files: 'books.edit',
   dsc_register: 'books.edit',
