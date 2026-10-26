@@ -144,6 +144,7 @@ export const RECORD_KEYS = [
   'agent_id', 'offer', 'rx',
   'party_balance_snapshot',
   'payment_schedule', 'acceptance',
+  'annexure', // R3-B (src/types/service-r3.ts)
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

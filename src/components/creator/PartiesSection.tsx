@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { Suspense, lazy, useCallback, useState } from 'react';
 import { AlertTriangle, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { GstinInput } from '../ui/GstinInput';
@@ -18,6 +18,9 @@ import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
 import styles from './PartiesSection.module.css';
 
+// R3-B5 / B6: party defaults (once, with Undo) + repeat last bill / usual items — lazy, loads on a party pick.
+const PartyHabitsStrip = lazy(() => import('./PartyHabitsStrip'));
+
 interface Props {
   profiles: SenderProfile[];
   onSearchClients: () => void;
@@ -35,6 +38,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
   const { setSender, setClient, setPlaceOfSupply } = useInvoiceStore.getState();
   // Directory snapshot, refreshed whenever the name field gains focus.
   const [directory, setDirectory] = useState<Client[]>([]);
+  const [picked, setPicked] = useState<{ client: Client; seq: number } | null>(null); // R3-B
   const clientSuggestions = useCallback(
     (q: string) =>
       suggest(q, directory, {
@@ -126,6 +130,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             onPick={(c) => {
               setClient(clientToParty(c));
               applyPartyDefaults(c); // R2-B4: default ship-to + primary contact on a new document
+              setPicked((p) => ({ client: c, seq: (p?.seq ?? 0) + 1 })); // R3-B5 / B6
             }}
             placeholder={t('parties.clientNamePh')}
             aria-label={t('parties.clientName')}
@@ -142,6 +147,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
           <input className={controls.input} type="tel" value={client.phone ?? ''} onChange={(e) => setClient({ phone: e.target.value })} placeholder={t('parties.phone')} aria-label={t('parties.clientPhone')} />
           {/* R2-B4: Kind attn. + ship-to from the party's address book */}
           <PartyBookPickers />
+          {picked && <Suspense fallback={null}><PartyHabitsStrip key={picked.seq} party={picked.client} /></Suspense>}
           {/* A5: name, GSTIN and phone first; the rest behind "More details". */}
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-expanded={more} onClick={() => setMore((m) => !m)} data-party-more>
             {more ? uxT('lessDetails') : uxT('moreDetails')}

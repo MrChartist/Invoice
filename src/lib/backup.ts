@@ -366,6 +366,8 @@ const RECORD_TABLES = [
   'notes_to_accounts', 'deferrals', 'packing_lists', 'package_types',
   // Round 2 (R2-B): batch invoice runs, proposal section snippets
   'batch_runs', 'proposal_snippets',
+  // Round 3 (R3-B): work types (rate cards), project tasks, retainers
+  'work_types', 'project_tasks', 'retainers',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -402,6 +404,8 @@ const ID_TABLES = new Set([
   'notes_to_accounts', 'deferrals', 'packing_lists', 'package_types',
   // Round 2 (R2-B): batch invoice runs, proposal section snippets
   'batch_runs', 'proposal_snippets',
+  // Round 3 (R3-B): work types (rate cards), project tasks, retainers
+  'work_types', 'project_tasks', 'retainers',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

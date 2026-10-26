@@ -18,7 +18,7 @@ import { isRevenueDoc } from '../lib/stats';
 import { ADVANCES_TABLE, advanceBalance } from '../lib/advance-tax';
 import { getTable } from '../lib/storage';
 import type { AdvanceRecord } from '../types/advances';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, todayInput } from '../lib/utils';
 import type { Client } from '../types/invoice';
 import { loadKhataReport } from '../lib/khata-actions';
 import { messageLangOf } from '../lib/message-langs';
@@ -31,12 +31,17 @@ import { receivableTotal } from '../lib/rcm';
 import { clientsCsv, contactSearchFields } from '../lib/contacts';
 import { downloadText } from '../lib/download';
 import { s2T } from '../i18n/areas/sales-r2';
+import { svcT } from '../i18n/areas/service-r3';
+import { loadQuietSettings, quietCustomers } from '../lib/quiet-customers';
+import { DOC_DEFAULT_COLUMNS, docDefaultsToCells } from '../lib/party-defaults'; // R3-B5 CSV columns
 
 // Daily khata loop (8A): the quick ₹ Received / ₹ Given sheet and the reminder queue load on first use.
 const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
 const RemindQueue = lazy(() => import('../components/khata/RemindQueue'));
 // PWA shortcut "Payment in" (`/clients?pay=1`, 8E wiring): pick the party, then the ₹ Received sheet.
 const PartyPicker = lazy(() => import('../components/khata/PartyPicker'));
+// R3-B7: customers gone quiet (chip + report).
+const QuietCustomers = lazy(() => import('../components/clients/QuietCustomers'));
 
 export function Clients() {
   const { notify, toastNode } = useToast();
@@ -57,6 +62,7 @@ export function Clients() {
   const [queue, setQueue] = useState<'overdue' | 'balance' | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [picking, setPicking] = useState(() => searchParams.get('pay') === '1' && canReceive);
+  const [quietOnly, setQuietOnly] = useState(() => searchParams.get('quiet') === '1'); // R3-B7
   useEffect(() => {
     if (searchParams.get('pay') !== '1') return;
     const next = new URLSearchParams(searchParams);
@@ -90,6 +96,8 @@ export function Clients() {
   const report = useMemo(() => loadKhataReport().report, [version]);
   const rows = useMemo(() => khataRows(clients, report), [clients, report]);
   const totals = useMemo(() => khataTotals(rows), [rows]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const quietCount = useMemo(() => quietCustomers(localDb.invoices.getAll(), clients, loadQuietSettings(), todayInput()).length, [clients, version, quietOnly]);
 
   // Billed per client, keyed by lower-cased name (invoices snapshot the client).
   const billed = useMemo(() => {
@@ -153,7 +161,7 @@ export function Clients() {
                 <FileUp size={16} /> {salesT('cl.import')}
               </button>
               {/* R2-B4: client list with the first contact / address columns (the import reads them back). */}
-              <button type="button" className={controls.btnOutline} disabled={!clients.length} onClick={() => downloadText('clients.csv', clientsCsv(clients), 'text/csv')} data-clients-csv>
+              <button type="button" className={controls.btnOutline} disabled={!clients.length} onClick={() => downloadText('clients.csv', clientsCsv(clients, { headers: DOC_DEFAULT_COLUMNS, cells: (c) => docDefaultsToCells(c.doc_defaults) }), 'text/csv')} data-clients-csv>
                 <Download size={16} /> {s2T('exportCsv')}
               </button>
               <button type="button" className={controls.btnPrimary} onClick={openAdd}>
@@ -188,6 +196,12 @@ export function Clients() {
         </section>
       )}
 
+      {quietOnly && (
+        <Suspense fallback={null}>
+          <QuietCustomers clients={clients} notify={notify} />
+        </Suspense>
+      )}
+
       <section className={surface.card}>
         <div className={styles.toolbar}>
           <label className={styles.search}>
@@ -203,6 +217,9 @@ export function Clients() {
           <div className={styles.filters}>
             <button type="button" className={overdueOnly ? styles.chipOn : styles.chip} aria-pressed={overdueOnly} onClick={() => setOverdueOnly((v) => !v)}>
               {khataT('overdueOnly')}{totals.overdueParties > 0 ? ` · ${totals.overdueParties}` : ''}
+            </button>
+            <button type="button" className={quietOnly ? styles.chipOn : styles.chip} aria-pressed={quietOnly} onClick={() => setQuietOnly((v) => !v)} data-quiet-chip>
+              {svcT('quiet')}{quietCount > 0 ? ` · ${quietCount}` : ''}
             </button>
             <label className={styles.sort}>
               <span className={surface.srOnly}>{khataT('sort')}</span>

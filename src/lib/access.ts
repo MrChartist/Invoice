@@ -379,6 +379,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   // R2-B: batch invoice runs (written with the invoices they issue), proposal section snippets
   batch_runs: 'doc.create',
   proposal_snippets: 'doc.create',
+  // R3-B: work types are a master; project tasks and retainers are time books (like time_entries)
+  work_types: 'master.edit',
+  project_tasks: 'books.edit',
+  retainers: 'books.edit',
 };
 
 let systemDepth = 0;

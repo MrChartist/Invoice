@@ -35,6 +35,7 @@ const AmendDialog = lazy(() => import('../documents/AmendDialog').then((m) => ({
 const PaymentModal = lazy(() => import('../modals/PaymentModal').then((m) => ({ default: m.PaymentModal })));
 const AcceptQuoteDialog = lazy(() => import('../invoicing-ux/AcceptQuoteDialog'));
 const ActivityTimeline = lazy(() => import('../audit/ActivityTimeline').then((m) => ({ default: m.ActivityTimeline })));
+const AnnexureActions = lazy(() => import('./AnnexureActions')); // R3-B4
 
 /** Everything you can do with an already-saved document, in one place. */
 export function DocumentActions({
@@ -123,6 +124,8 @@ export function DocumentActions({
           </button>
         )}
         <PackingListButton invoice={saved} />
+        {/* R3-B4: download / refresh the timesheet annexure (last action, §6). */}
+        {saved.annexure && <Suspense fallback={null}><AnnexureActions invoice={saved} onChanged={reloadEditor} /></Suspense>}
       </div>
 
       {saved.doc_type === 'QUOTATION' && (() => {

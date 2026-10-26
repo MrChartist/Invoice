@@ -163,6 +163,27 @@ function ensurePackAlerts(onReady: () => void): void {
     });
 }
 
+// R3-B2: project budget warnings (80% / 100%) — the provider loads only once `project_tasks` has rows.
+let projectAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureProjectAlerts(onReady: () => void): void {
+  if (projectAlerts !== 'off') return;
+  try {
+    if (!getTable('project_tasks').length) return;
+  } catch {
+    return;
+  }
+  projectAlerts = 'loading';
+  import('../../lib/project-alerts')
+    .then((m) => {
+      m.registerProjectAlerts();
+      projectAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      projectAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -195,6 +216,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensureGstGuardAlerts(reload);
     ensureCaptureAlerts(reload);
     ensurePackAlerts(reload);
+    ensureProjectAlerts(reload); // R3-B
   }, []);
 
   useEffect(() => {

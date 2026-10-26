@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
 import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
@@ -20,6 +20,8 @@ import { ContactsEditor } from '../clients/ContactsEditor';
 import { AddressBookEditor } from '../clients/AddressBookEditor';
 import { normalizeAddresses, normalizeContacts } from '../../lib/contacts';
 import { s2T } from '../../i18n/areas/sales-r2';
+
+const DocDefaultsFields = lazy(() => import('../clients/DocDefaultsFields')); // R3-B5
 
 const BLANK: Client = {
   name: '',
@@ -288,6 +290,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         )}
         <ContactsEditor value={form.contacts ?? []} onChange={(v) => set('contacts', v)} />
         <AddressBookEditor value={form.addresses ?? []} onChange={(v) => set('addresses', v)} />
+        <Suspense fallback={null}><DocDefaultsFields value={form.doc_defaults} onChange={(v) => set('doc_defaults', v)} /></Suspense>
         <label className={controls.field}>
           <span className={controls.label}>{reachT('msgLang')}</span>
           <select className={controls.select} value={form.message_lang ?? ''} onChange={(e) => set('message_lang', isMessageLang(e.target.value) ? e.target.value : undefined)}>

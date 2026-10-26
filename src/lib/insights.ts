@@ -12,8 +12,10 @@ import { isRevenueDoc } from './stats';
 import { receivableTotal } from './rcm';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { documentMargin, type UnitCost } from './margin';
+import type { Client } from '../types/invoice';
+import { quietCustomers, type QuietSettings } from './quiet-customers'; // R3-B7
 
-export type InsightId = 'revenue' | 'topCustomers' | 'expenseSpike' | 'dso' | 'slowPayers' | 'margin' | 'stockRisk' | 'gstTrend';
+export type InsightId = 'revenue' | 'topCustomers' | 'expenseSpike' | 'dso' | 'slowPayers' | 'margin' | 'stockRisk' | 'gstTrend' | 'quietCustomers';
 export type InsightTone = 'good' | 'warn' | 'info';
 
 export interface Insight {
@@ -44,6 +46,8 @@ export interface InsightInput {
   vendors?: readonly unknown[];
   costs?: ReadonlyMap<string, UnitCost>;
   stock?: readonly StockRow[];
+  /** R3-B7: clients and the quiet-customer settings (the card is left out without them). */
+  quiet?: { clients: readonly Client[]; settings: QuietSettings };
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -225,6 +229,12 @@ export function buildInsights(input: InsightInput, today: string): Insight[] {
   const gstNow = gstOf(w.current);
   const gstBase = round2(avg(w.previous.map(gstOf)));
   const gstChange = pctChange(gstNow, gstBase);
+  // 9. R3-B7 customers gone quiet: regulars past max(threshold, 1.5 × their usual gap).
+  if (input.quiet) {
+    const quiet = quietCustomers(input.invoices, input.quiet.clients, input.quiet.settings, today);
+    out.push({ id: 'quietCustomers', tone: quiet.length ? 'warn' : 'good', value: quiet.length, unit: 'count', rows: quiet.slice(0, 3).map((q) => ({ label: q.name, value: q.days_quiet, extra: q.median_gap })), href: '/clients?quiet=1' });
+  }
+
   out.push({ id: 'gstTrend', tone: gstChange !== null && gstChange >= 25 ? 'warn' : 'info', value: gstNow, unit: 'inr', baseline: gstBase, changePct: gstChange, rows: [], href: '/gst-reports' });
 
   return out;

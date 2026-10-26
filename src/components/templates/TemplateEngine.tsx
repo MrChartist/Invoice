@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { Suspense, lazy, useMemo, type CSSProperties } from 'react';
 import type { TemplateLayout, TemplateProps } from './registry';
 import { templateById } from './registry';
 import { PaperContext, buildPaperConfig } from './paper-context';
@@ -27,6 +27,9 @@ import { DOCUMENT_LABELS } from '../../types/invoice';
 import { cn, formatDate } from '../../lib/utils';
 import { contrastText, paperSize, printPageCss } from '../../lib/design-prefs';
 import styles from './invoice-paper.module.css';
+
+// R3-B4: timesheet annexure page — lazy, so the preview chunk does not grow; renders nothing without data.
+const LazyAnnexure = lazy(() => import('./parts/AnnexureBlock'));
 
 export interface TemplateEngineProps extends TemplateProps {
   templateId: string;
@@ -198,6 +201,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <PartyBalanceBlock invoice={invoice} compact={layout === 'receipt'} />
           {/* 8G: payment schedule + quote acceptance snapshot (from the document only). */}
           <AcceptanceBlock invoice={invoice} compact={layout === 'receipt'} />
+          {/* R3-B4: annexure as a following page (never on thermal / receipt paper). */}
+          {invoice.annexure && layout !== 'receipt' && <Suspense fallback={null}><LazyAnnexure invoice={invoice} /></Suspense>}
         </div>
       </div>
     </PaperContext.Provider>

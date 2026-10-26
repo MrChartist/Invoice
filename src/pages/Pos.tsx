@@ -71,6 +71,7 @@ const PosPrinterButton = lazy(() => import('../components/extras7u/PosPrinter').
 // 8.22: customer-facing UPI QR (qrcode.react loads only once a UPI amount is typed).
 const PosUpiQr = lazy(() => import('../components/pos/PosUpiQr').then((m) => ({ default: m.PosUpiQr })));
 const PosDistExtras = lazy(() => import('../components/distribution/PosDistExtras')); // 8F agent + credit notice
+const UsualTiles = lazy(() => import('../components/creator/UsualTiles')); // R3-B6 "Usual" tiles for a saved customer
 const PosReceiptPrint = lazy(() => import('../components/pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 // 8E: help, day summary, bill browser, counter settings, shifts, create-item sheet (each loads on first use).
 const PosHelp = lazy(() => import('../components/pos-retail/PosHelp').then((m) => ({ default: m.PosHelp })));
@@ -948,6 +949,7 @@ export function Pos() {
                   <LoyaltyRedeem key={party.client.id || party.client.name} customer={party.client.name} points={redeemPts} errors={redeemed?.errors ?? []} onApply={setRedeemPts} />
                 </Suspense>
               )}
+              {party.client && <Suspense fallback={null}><UsualTiles key={party.client.id || party.client.name} client={party.client} onPick={addSource} /></Suspense>}
               <Suspense fallback={null}>
                 <PosDistExtras client={party.client} record={record} unpaid={summary.due} agentId={agentId} onAgent={setAgentId} />
               </Suspense>
