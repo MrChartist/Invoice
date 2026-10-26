@@ -80,7 +80,7 @@ export function pharmaGate<T extends Issues>(
 
 /* ── 8F sale limits: non-saleable godowns and the batch MRP ceiling ── */
 
-interface LimitLine { name: string; quantity?: number; rate?: number; discount_percent?: number; tax_rate?: number; unit_factor?: number; godown_id?: string; batch_no?: string }
+interface LimitLine { name: string; quantity?: number; rate?: number; discount_percent?: number; tax_rate?: number; unit_factor?: number; godown_id?: string; batch_no?: string; arrival_id?: string }
 
 /** Tax-inclusive selling price per base unit of a line (rate after the line discount, GST added). */
 export function linePricePerBase(l: LimitLine): number {
@@ -97,14 +97,15 @@ export function linePricePerBase(l: LimitLine): number {
 export function saleLimitGate<T extends Issues>(
   issues: T,
   doc: { doc_type?: string; items: readonly LimitLine[] },
-  opts: { nonSaleable: ReadonlySet<string>; godownName: (id: string) => string; mrpOf?: (l: LimitLine) => number | undefined; settings?: PharmaSettings },
+  opts: { nonSaleable: ReadonlySet<string>; godownName: (id: string) => string; mrpOf?: (l: LimitLine) => number | undefined; settings?: PharmaSettings; agencyOk?: ReadonlySet<string> },
 ): T {
   if (!SALE_TYPES.has(doc.doc_type ?? '')) return issues;
   const settings = opts.settings ?? readPharmaSettings();
   const errors: string[] = [];
   for (const l of doc.items) {
     if (!l.name?.trim() || !((Number(l.quantity) || 0) > 0)) continue;
-    if (l.godown_id && opts.nonSaleable.has(l.godown_id)) errors.push(`${l.name}: ${opts.godownName(l.godown_id)} holds non-saleable (expired / breakage) stock — sell from another godown.`);
+    // R8-C (TR-C1): an agency line sells its principal's lot from a consignment godown; our own lines may not.
+    if (l.godown_id && opts.nonSaleable.has(l.godown_id) && !(l.arrival_id && opts.agencyOk?.has(l.godown_id))) errors.push(`${l.name}: ${opts.godownName(l.godown_id)} holds non-saleable (expired / breakage) stock — sell from another godown.`);
     if (settings.enabled && settings.block_above_mrp && opts.mrpOf) {
       const mrp = opts.mrpOf(l);
       const price = linePricePerBase(l);
@@ -138,7 +139,7 @@ export function heldStockGate<T extends Issues>(
   for (const l of doc.items) {
     const q = (Number(l.quantity) || 0) * (Number(l.unit_factor) > 0 ? Number(l.unit_factor) : 1);
     // Unselected optional / alternative lines are not sold.
-    if (!l.name?.trim() || !(q > 0) || ((l.optional || (l.alt_group ?? '').trim()) && !l.selected)) continue;
+    if (!l.name?.trim() || !(q > 0) || ((l.optional || (l.alt_group ?? '').trim()) && !l.selected) || l.arrival_id) continue; // R8-C: agency lines are not our stock
     const godown = l.godown_id || opts.mainId;
     const item = opts.nonSaleable.has(godown) ? undefined : opts.itemOf(l);
     if (!item) continue;

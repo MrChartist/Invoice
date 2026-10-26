@@ -31,6 +31,9 @@ import { s2T } from '../../i18n/areas/sales-r2';
 
 // R2-B3: proposal sections editor, quotations only (lazy).
 const ProposalSectionsCard = lazy(() => import('./ProposalSectionsCard').then((m) => ({ default: m.ProposalSectionsCard })));
+// R8-C (TR-C1): agency lot picker on sales lines (agency pack only, lazy).
+const LotPicker = lazy(() => import('../trade/LotPicker'));
+import { impliedPacks } from '../../lib/shop-mode';
 import styles from './ItemsTable.module.css';
 
 export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) => void }) {
@@ -43,6 +46,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const docId = useInvoiceStore((s) => s.id);
   const issueDate = useInvoiceStore((s) => s.issue_date);
   const docStatus = useInvoiceStore((s) => s.status);
+  const agencyOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('agency'), []); // R8-C
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
   // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
   const [stockTick, setStockTick] = useState(0);
@@ -183,6 +187,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 </div>
               ) : null}
               {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
+              {agencyOn && (docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'BILL_OF_SUPPLY') && <Suspense fallback={null}><LotPicker item={item} index={index} /></Suspense>}
               {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
                 <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>

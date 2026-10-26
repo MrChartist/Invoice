@@ -38,6 +38,8 @@ import styles from './purchases.module.css';
 
 // R4-C3: Bill of Entry duty sheet — lazy, import-of-goods bills only.
 const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
+// R8-C (TR-C2): notified goods from an agriculturist / unregistered supplier → reverse charge prompt (lazy).
+const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 
 export interface BillModalProps {
   open: boolean;
@@ -330,6 +332,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} />
+      {!rcm && !importType && vendor && <Suspense fallback={null}><RcmGoodsNotice lines={lines} date={date} vendor={vendor} onApply={() => setRcm(true)} /></Suspense>}
       <LandedCostFields value={landed} onChange={setLanded} />
 
       <div className={styles.totals} aria-live="polite">

@@ -28,7 +28,10 @@ export interface Godown {
    * Round 4 (set once by R4-A, B's value included): 'wip' = shop floor of production orders (R4-A1), 'qc' = goods
    * held for a quality check (R4-A4), 'transit' = goods on the way between stores (R4-B4). All three are non-saleable.
    */
-  kind?: 'van' | 'expiry' | 'wip' | 'qc' | 'transit' | 'site'; // R5-B6: 'site' = material at a works site (non-saleable)
+  kind?: 'van' | 'expiry' | 'wip' | 'qc' | 'transit' | 'site' // R5-B6: 'site' = material at a works site (non-saleable)
+    // R8-C (TR-C1): 'consignment' = principals' goods held by a commission agent (arrivals). Non-saleable for our own
+    // sales; an agency line (one naming its arrival, `arrival_id`) may sell from it. Not in our stock valuation.
+    | 'consignment';
   created_at?: string;
   updated_at?: string;
 }

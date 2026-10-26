@@ -6,6 +6,9 @@ import { ALL_MODULES, type ModuleId } from '../../lib/shop-mode';
 import { PACK_IDS, activePacks, type PackId } from '../../lib/industry-packs';
 import { FEATURE_ROWS, featureState, type FeatureRow, type FeatureSection } from '../../lib/features-catalog';
 import { featureText } from './feature-text';
+import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
+import { applyTradeKind } from '../../lib/shop-presets';
+import { trT } from '../../i18n/areas/trade-r8c';
 import { can } from '../../lib/access';
 import { useT } from '../../i18n';
 import { discoverT } from '../../i18n/areas/discover-r6';
@@ -89,6 +92,12 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
       <div className={surface.cardBody}>
         <p className={surface.sectionNote}>{discoverT('featSub')}</p>
         {!owner && <p className={controls.hint} role="note">{discoverT('featReadOnly')}</p>}
+        {settings.business_type === 'wholesale' && (
+          <div className={controls.field} data-features-trade>
+            <span className={controls.label}>{trT('tradeTitle')}</span>
+            <TradeKindPicker value={settings.trade_kind} custom disabled={!owner} onPick={(k) => onChange(k ? applyTradeKind(k) : { trade_kind: undefined })} />
+          </div>
+        )}
         <label className={controls.field} style={{ maxWidth: 360 }}>
           <span className={controls.label}>
             <Search size={14} aria-hidden="true" /> {discoverT('featSearch')}

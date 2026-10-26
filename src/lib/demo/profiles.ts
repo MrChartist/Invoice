@@ -23,6 +23,8 @@ export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Pro
       return ctx.packs.includes('transport') ? (await import('./profile-transport')).transportExtras(ctx) : {};
     case 'works':
       return ctx.packs.includes('works') ? (await import('./profile-works')).worksExtras(ctx) : {};
+    case 'trading': // R8-C: the trading packs' rows (agency now; distributor / commodity from TR-A / TR-B)
+      return ['distributor', 'commodity', 'agency'].some((p) => ctx.packs.includes(p)) ? (await import('./profile-trading')).tradingExtras(ctx) : {};
     default:
       return {};
   }

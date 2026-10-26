@@ -49,4 +49,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('reports:profit', 'Profit', 'लाभ', 'A quick profit view from sales and costs.', 'Monthly review.'),
   t('reports:party', 'Party report', 'पार्टी रिपोर्ट', 'Everything with one party: sales, purchases, payments.', 'Before a meeting with them.'),
   t('exports', 'Exports', 'एक्सपोर्ट', 'Files for your CA and other software: Tally XML, Excel, e-Invoice and e-Way JSON, registers.', 'Month end, or when your CA asks.', { statutory: ca(['G27', 'G45']) }),
+  // R8-C (TR-C4)
+  t('reports:stockstatement', 'Bank stock statement', 'बैंक स्टॉक विवरण', 'The monthly stock and book-debts statement for a cash-credit limit: drawing power from your stock (books valuation) less creditors, and debtors up to the age the bank allows.', 'Each month, before the bank\'s due date.', {
+    steps: ['Choose the month-end date and the cash-credit account.', 'Enter the margins and limit from your sanction letter, then Save terms.', 'Print or download the XLSX for the bank.'],
+    statutory: ca(['TR19']),
+  }),
 ];

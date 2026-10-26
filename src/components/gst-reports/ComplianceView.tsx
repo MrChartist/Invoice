@@ -36,6 +36,8 @@ import { nodes } from '../../i18n/areas/nodes';
 const TdsDueCalendar = lazy(() => import('../tds/TdsDueCalendar'));
 // 8D (8.62): returns becoming time-barred (three years from the due date).
 const Gst8dPanel = lazy(() => import('./Gst8dPanel'));
+// R8-C (TR-C2): composition-limit tracker (composition profiles only, lazy).
+const CompositionTracker = lazy(() => import('../trade/CompositionTracker'));
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -191,6 +193,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
       <Suspense fallback={null}>
         <TdsDueCalendar today={today} />
       </Suspense>
+      <Suspense fallback={null}><CompositionTracker invoices={invoices} stateCode={stateCode} today={today} /></Suspense>
       <ul className={local.notes}>
         <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
         <li>{gvT('ncLateFee')}</li>

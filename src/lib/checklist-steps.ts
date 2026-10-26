@@ -14,10 +14,12 @@ import { currentActor, currentRole, requireAccess } from './access';
 import { localDb } from './localDb';
 
 export type StepKind =
-  | 'profile' | 'opening' | 'import' | 'client' | 'item' | 'posbill' | 'invoice' | 'packFirst' | 'whatsapp' | 'payment' | 'gstPeriod' | 'backup';
+  | 'profile' | 'opening' | 'import' | 'client' | 'item' | 'posbill' | 'invoice' | 'packFirst' | 'whatsapp' | 'payment' | 'gstPeriod' | 'backup'
+  // R8-C (TR-C5): trade profile and the trading packs' own steps
+  | 'tradeProfile' | 'schemeScope' | 'weightItem' | 'principal';
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'opening', 'import', 'client', 'item', 'posbill', 'invoice', 'packFirst', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'opening', 'import', 'client', 'item', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -35,6 +37,8 @@ export interface ChecklistCtx {
   role: ChecklistRole;
   /** The active profile has a GSTIN. */
   gstRegistered?: boolean;
+  /** R8-C: `settings.trade_kind` (a wholesale company without one gets "Pick your trade"). */
+  tradeKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -57,6 +61,10 @@ export interface ChecklistFactsV3 {
   packRecords?: Partial<Record<PackId, number>>;
   /** Compliance rows of this company (a return marked filed or a JSON download recorded). */
   gstPeriods?: number;
+  /** R8-C: schemes with a group / party scope, items sold by weight / bags, principals (vendors with a kind). */
+  scopedSchemes?: number;
+  weightItems?: number;
+  principals?: number;
 }
 
 export interface SetupProgress {
@@ -93,6 +101,10 @@ export const PACK_FIRST_TABLE: Readonly<Record<PackId, string>> = {
   nonprofit: 'donations',
   leases: 'leases',
   marketplace: 'sales_channels',
+  // R8-C: trading packs
+  distributor: 'party_rates',
+  commodity: 'trade_charge_heads',
+  agency: 'arrivals',
 };
 
 const isType = (ctx: ChecklistCtx, ...types: string[]) => types.includes(ctx.businessType || 'full');
@@ -107,6 +119,10 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'whatsapp': return isType(ctx, 'services', 'kirana', 'wholesale');
     case 'gstPeriod': return !!ctx.gstRegistered && moduleOn(ctx, 'gst');
     case 'packFirst': return ctx.packs.length > 0;
+    case 'tradeProfile': return isType(ctx, 'wholesale') && !ctx.tradeKind; // R8-C: existing wholesale companies
+    case 'schemeScope': return ctx.packs.includes('distributor');
+    case 'weightItem': return ctx.packs.includes('commodity');
+    case 'principal': return ctx.packs.includes('agency');
     default: return true; // profile, item, payment, backup
   }
 }
@@ -129,6 +145,10 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'payment': return one(f.payments > 0, '/transactions?filter=unpaid&pay=1');
     case 'gstPeriod': return one((f.gstPeriods ?? 0) > 0, '/gst-reports');
     case 'backup': return one(!!f.lastBackup, '/settings?tab=data');
+    case 'tradeProfile': return one(!!ctx.tradeKind, '/settings?tab=features');
+    case 'schemeScope': return one((f.scopedSchemes ?? 0) > 0, '/settings?tab=items');
+    case 'weightItem': return one((f.weightItems ?? 0) > 0, '/inventory');
+    case 'principal': return one((f.principals ?? 0) > 0, '/expenses?tab=vendors');
   }
 }
 
@@ -229,6 +249,10 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     posBills: invoices.filter((i) => i?.pos).length,
     packRecords,
     gstPeriods: peekTable('compliance').length,
+    // R8-C: trading steps (counted only while their pack is on)
+    ...(packs.includes('distributor') ? { scopedSchemes: peekTable<{ scope?: unknown }>('schemes').filter((r) => r?.scope).length } : {}),
+    ...(packs.includes('commodity') ? { weightItems: peekTable<{ sold_by_weight_bags?: unknown }>('stock_items').filter((r) => r?.sold_by_weight_bags).length } : {}),
+    ...(packs.includes('agency') ? { principals: peekTable<{ principal_kind?: unknown }>('vendors').filter((r) => r?.principal_kind).length } : {}),
   };
   const ctx: ChecklistCtx = {
     businessType: typeof settings.business_type === 'string' ? settings.business_type : undefined,
@@ -236,6 +260,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     modules: enabledModules(settings),
     role: currentRole(),
     gstRegistered: Boolean(profile?.companyGstin?.trim()),
+    ...(typeof settings.trade_kind === 'string' ? { tradeKind: settings.trade_kind } : {}),
   };
   return { facts, ctx };
 }
