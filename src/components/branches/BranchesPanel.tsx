@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { branchesDb, type BranchRow } from '../../lib/branch';
+import { priceLevelsDb } from '../../lib/pricing';
+import { defineArea } from '../../i18n/area';
 import { localDb } from '../../lib/localDb';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
@@ -8,6 +10,45 @@ import { branchT } from '../../i18n/areas/extras';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from '../dashboard/tiles.module.css';
+
+// R4-B3: each store's price list (one of the price levels). Inline strings: this tile stays light.
+const storeT = defineArea(
+  { title: 'Store price lists', hint: 'The store’s POS and documents use this price list; a customer’s own price level still wins. Store-wise item rates: Settings → Items → Store prices.', none: 'No price list', saved: 'Price list of {name} saved' } as const,
+  { title: 'स्टोर मूल्य सूची', hint: 'इस स्टोर का POS और दस्तावेज़ यही मूल्य सूची लेते हैं; ग्राहक का अपना मूल्य स्तर फिर भी प्राथमिक है। स्टोर-वार आइटम दरें: सेटिंग्स → आइटम → स्टोर मूल्य।', none: 'कोई मूल्य सूची नहीं', saved: '{name} की मूल्य सूची सहेजी गई' },
+);
+
+function StorePriceLists({ onChanged, notify }: { onChanged: () => void; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }) {
+  const [tick, setTick] = useState(0);
+  const branches = useMemo(() => branchesDb.all(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const levels = useMemo(() => priceLevelsDb.all(), []);
+  if (!branches.length || !levels.length) return null;
+  return (
+    <details>
+      <summary>{storeT('title')}</summary>
+      <div className={own.form}>
+        {branches.map((b) => (
+          <label key={b.id} className={controls.field}>
+            <span className={controls.label}>{b.name}</span>
+            <select className={controls.select} value={b.price_level_id ?? ''} onChange={(e) => {
+              try {
+                branchesDb.save({ ...b, price_level_id: e.target.value || undefined });
+                notify(storeT('saved', { name: b.name }));
+                setTick((x) => x + 1);
+                onChanged();
+              } catch (err) {
+                notify((err as Error).message, 'error');
+              }
+            }}>
+              <option value="">{storeT('none')}</option>
+              {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </label>
+        ))}
+        <p className={controls.hint}>{storeT('hint')}</p>
+      </div>
+    </details>
+  );
+}
 
 /** Branch-wise sales / returns / purchases for the FY, plus the branch master (WP-9, P1-19). */
 export function BranchesPanel({ rows, canEdit, onChanged, notify, icon }: {
@@ -72,6 +113,7 @@ export function BranchesPanel({ rows, canEdit, onChanged, notify, icon }: {
             </div>
           </details>
         )}
+        {canEdit && <StorePriceLists onChanged={onChanged} notify={notify} />}
       </div>
     </section>
   );

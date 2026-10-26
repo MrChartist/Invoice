@@ -24,7 +24,10 @@ import { methodLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 
-const METHODS = ['UPI', 'Bank transfer', 'Cash', 'Cheque', 'Card', 'Other'];
+// R4-B1: 'Gift voucher' pays with a voucher code (no money moves: the ledger debits the voucher liability).
+const GV_METHOD = 'Gift voucher';
+const METHODS = ['UPI', 'Bank transfer', 'Cash', 'Cheque', 'Card', GV_METHOD, 'Other'];
+const GiftVoucherCodeField = lazy(() => import('../retail/GiftVoucherCodeField'));
 
 // "Apply advance" (5.3) and the advances maths load only when this dialog opens.
 const ApplyAdvancePanel = lazy(() => import('../advances/ApplyAdvancePanel'));
@@ -72,6 +75,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const [bankAccountId, setBankAccountId] = useState('');
   const [date, setDate] = useState(todayInput());
   const [reference, setReference] = useState('');
+  const [gvCode, setGvCode] = useState(''); // R4-B1
   /** Realised rate (₹ per unit) on a foreign-currency receipt (6.19). */
   const [realised, setRealised] = useState('');
   const [error, setError] = useState('');
@@ -126,7 +130,12 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
       const settleAmount = settle.choice !== 'leave' && value < balance - 0.005 ? round2(Math.min(Number(settle.amount) || 0, balance - value)) : 0;
       let payment: Payment;
       let note = '';
-      if (settleAmount > 0 && settle.choice !== 'leave') {
+      if (method === GV_METHOD) {
+        // R4-B1: checks code, balance and expiry; records the receipt with its gift_voucher_id (all or nothing).
+        const m = await import('../../lib/retail/gift-vouchers');
+        payment = m.redeemOnInvoice({ invoiceId: live.id, code: gvCode, amount: value, date }).payment;
+        setGvCode('');
+      } else if (settleAmount > 0 && settle.choice !== 'leave') {
         // R2-A2: receipt + financial credit note in one all-or-nothing step.
         const m = await import('../collections/settle-actions');
         const r = m.receiveAndSettle({ ...base, settle: { reason: settle.choice, amount: settleAmount, gst: settle.gst } }, live.currency);
@@ -261,7 +270,11 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               <input className={controls.input} value={reference} onChange={(e) => setReference(e.target.value.trimStart())} placeholder={method === 'Cash' ? t('pay.refPhCash') : t('pay.refPh')} />
             </label>
           </div>
-          <BankAccountSelect id="pay-bank-account" label={t('pay.receivedInto')} method={method} value={bankAccountId} onChange={setBankAccountId} />
+          {method === GV_METHOD ? (
+            <Suspense fallback={null}><GiftVoucherCodeField code={gvCode} onChange={setGvCode} day={date} /></Suspense>
+          ) : (
+            <BankAccountSelect id="pay-bank-account" label={t('pay.receivedInto')} method={method} value={bankAccountId} onChange={setBankAccountId} />
+          )}
           {foreign && (
             <label className={controls.field}>
               <span className={controls.label}>{t('pay.rateRealised', { currency: live.currency })}</span>

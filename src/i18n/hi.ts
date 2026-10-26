@@ -52,6 +52,7 @@ export const hi: Messages = {
   'method.Cash': 'नकद',
   'method.Cheque': 'चेक',
   'method.Card': 'कार्ड',
+  'method.Gift voucher': 'गिफ़्ट वाउचर',
   'method.Other': 'अन्य',
   'role.owner': 'मालिक',
   'role.clerk': 'क्लर्क',

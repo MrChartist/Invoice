@@ -110,6 +110,10 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   qc_results: { entity: 'manufacturing', label: 'QC decision' },
   recall_notices: { entity: 'manufacturing', label: 'Recall notice' },
   landed_cost_vouchers: { entity: 'purchase', label: 'Landed-cost voucher' },
+  // R4-B: gift vouchers (customer liability), store price overrides (master), transfer requests (stock side)
+  gift_vouchers: { entity: 'payment', label: 'Gift voucher' },
+  branch_prices: { entity: 'item', label: 'Store price' },
+  transfer_requests: { entity: 'stock_transfer', label: 'Transfer request' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

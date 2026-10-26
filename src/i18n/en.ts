@@ -57,6 +57,7 @@ export const en = {
   'method.Cash': 'Cash',
   'method.Cheque': 'Cheque',
   'method.Card': 'Card',
+  'method.Gift voucher': 'Gift voucher', // R4-B1
   'method.Other': 'Other',
   'role.owner': 'Owner',
   'role.clerk': 'Clerk',
