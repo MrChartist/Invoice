@@ -509,6 +509,15 @@ export interface LoadDemoOptions {
 
 const AUDIT_KEY = `${DB_PREFIX}audit_log`;
 
+/** R4-C4: sample rows never go to the recycle bin nor keep numbers reserved — both keys are put back as they were. */
+const binSnapshot = () => ['recycle_bin', 'series_counters'].map((t) => [DB_PREFIX + t, readRaw(DB_PREFIX + t)] as const);
+function putBinSnapshot(snap: ReturnType<typeof binSnapshot>): void {
+  for (const [key, raw] of snap) {
+    if (raw === null) removeRaw(key);
+    else writeRaw(key, raw);
+  }
+}
+
 export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
   const status = demoStatus();
   if (status.loaded) return { ok: false, reason: 'already_loaded' };
@@ -527,7 +536,11 @@ export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
   );
   // Sample rows are not real business activity: keep them out of the audit trail entirely.
   const auditBefore = readRaw(AUDIT_KEY);
-  const restoreAudit = () => (auditBefore === null ? removeRaw(AUDIT_KEY) : writeRaw(AUDIT_KEY, auditBefore));
+  const binBefore = binSnapshot();
+  const restoreAudit = () => {
+    putBinSnapshot(binBefore);
+    return auditBefore === null ? removeRaw(AUDIT_KEY) : writeRaw(AUDIT_KEY, auditBefore);
+  };
 
   try {
     // Payments first: `save` keeps the ledger as the floor for what has been received.
@@ -629,6 +642,7 @@ export function removeDemoData(): DemoCounts {
   const schedules = demoScheduleIds();
   // Removal itself must not write history either; the audit log is rebuilt at the end without sample rows.
   const auditRaw = readRaw(AUDIT_KEY);
+  const keepRaw = binSnapshot();
 
   const invoices = getTable<Demo<InvoiceRecord>>(KEYS.invoices);
   const goneInvoices = new Set(invoices.filter((i) => isDemoInvoice(i, schedules)).map((i) => i.id));
@@ -667,6 +681,7 @@ export function removeDemoData(): DemoCounts {
     }
   }
   restoreAuditWithoutDemo(auditRaw, goneInvoices);
+  putBinSnapshot(keepRaw);
   return before;
 }
 

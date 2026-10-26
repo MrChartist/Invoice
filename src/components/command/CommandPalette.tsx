@@ -200,6 +200,11 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   useEffect(() => {
     if (open && !r4bEntries.length) import('../retail/palette-destinations').then((m) => setR4bEntries(m.r4bDestinations()), () => undefined);
   }, [open, r4bEntries.length]);
+  // R4-C: export desk, import register, recently deleted, auditor pack, export everything
+  const [r4cEntries, setR4cEntries] = useState<StaticEntry[]>([]);
+  useEffect(() => {
+    if (open && !r4cEntries.length) import('../trust/palette-destinations').then((m) => setR4cEntries(m.r4cDestinations()), () => undefined);
+  }, [open, r4cEntries.length]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
@@ -217,7 +222,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       return [...base, ...staticRows.map((r) => ({ key: r.id, kind: 'result' as const, result: r }))];
     }
     const found = searchAll(q, {
-      data: { pages: [...pageEntries, ...tallyEntries, ...r2aEntries, ...r2cEntries, ...r2bEntries, ...r3aEntries, ...r3bEntries, ...r3cEntries, ...r4aEntries, ...r4bEntries], actions: actionEntries },
+      data: { pages: [...pageEntries, ...tallyEntries, ...r2aEntries, ...r2cEntries, ...r2bEntries, ...r3aEntries, ...r3bEntries, ...r3cEntries, ...r4aEntries, ...r4bEntries, ...r4cEntries], actions: actionEntries },
       perGroup: 6,
     });
     if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
@@ -225,7 +230,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     return groupResults(found).flatMap((g) =>
       g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
     );
-  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, r4bEntries, actionEntries, allCompanies, peeked]);
+  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, r4bEntries, r4cEntries, actionEntries, allCompanies, peeked]);
   const options = useMemo(() => optionsFor(searchQuery), [optionsFor, searchQuery]);
 
   // Reset on open; remember and restore focus.

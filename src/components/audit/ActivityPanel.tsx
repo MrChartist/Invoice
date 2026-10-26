@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Download, History, ScrollText } from 'lucide-react';
 import { AUDIT_MAX_ROWS, audit } from '../../lib/audit';
 import { useT } from '../../i18n';
@@ -22,6 +22,11 @@ import { formatWhen, toneOf } from './audit-format';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './audit.module.css';
+
+// R4-C5 / C4: auditor pack per FY and the recycle bin (clerks see their own deletes) — lazy dialogs.
+const AuditorPackDialog = lazy(() => import('../trust/AuditorPackDialog'));
+const RecycleBinPanel = lazy(() => import('../trust/RecycleBinPanel'));
+const ActivityTrustButtons = lazy(() => import('../trust/ActivityTrustButtons'));
 
 const PAGE = 100;
 const TAG = { good: styles.tagCreate, bad: styles.tagDanger, lock: styles.tagLock, neutral: '' } as const;
@@ -78,6 +83,11 @@ export function ActivityPanel() {
   const [open, setOpen] = useState<string | null>(null);
   // The signed-in user only changes at the PIN screen, which unmounts Settings.
   const [payrollOk] = useState(() => can('payroll.view'));
+  // R4-C: `?pack=1` / `?bin=1` (command palette, bell) open the dialog directly.
+  const [trust, setTrust] = useState<'pack' | 'bin' | null>(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('pack') === '1' ? 'pack' : p.get('bin') === '1' ? 'bin' : null;
+  });
 
   const all = useMemo(() => {
     void version;
@@ -107,10 +117,18 @@ export function ActivityPanel() {
         <span className={surface.cardHeadIcon}>
           <ScrollText size={16} aria-hidden="true" /> Activity log
         </span>
-        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={exportCsv} disabled={rows.length === 0}>
-          <Download size={14} /> Export CSV
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+          <Suspense fallback={null}><ActivityTrustButtons onOpen={setTrust} /></Suspense>
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={exportCsv} disabled={rows.length === 0}>
+            <Download size={14} /> Export CSV
+          </button>
+        </div>
       </div>
+      {trust && (
+        <Suspense fallback={null}>
+          {trust === 'pack' ? <AuditorPackDialog onClose={() => setTrust(null)} /> : <RecycleBinPanel onClose={() => setTrust(null)} />}
+        </Suspense>
+      )}
       <div className={surface.cardBody}>
         <p className={surface.sectionNote}>
           Every change to documents, payments, clients and settings is recorded on this device — like Tally&apos;s edit log.

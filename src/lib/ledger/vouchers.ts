@@ -17,6 +17,7 @@ import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { withTablesRollback } from '../table-txn';
+import { recordSeries, seriesHigh } from '../series-counters';
 import type { Payment } from '../../types/invoice';
 import { formatMoney } from '../utils';
 import { chartOf, loadUserAccounts, type Account } from './accounts';
@@ -148,7 +149,8 @@ export function validateVoucher(v: ManualVoucherInput, chart: readonly Account[]
 export function nextVoucherNumber(existing: readonly Pick<ManualVoucher, 'number'>[], type: ManualVoucherType, date: string): string {
   const prefix = VOUCHER_PREFIX[type];
   const fy = getIndianFY(date).label;
-  return buildInvoiceNumber(prefix, fy, highestSequence(existing.map((v) => v.number), prefix, fy) + 1);
+  // R4-C4: the number of a deleted voucher stays used (series high-water mark, set when it went to the bin).
+  return buildInvoiceNumber(prefix, fy, Math.max(highestSequence(existing.map((v) => v.number), prefix, fy), seriesHigh(prefix, fy)) + 1);
 }
 
 /** Tolerant read of stored rows; malformed ones are skipped (the ledger warns about unbalanced ones). */
@@ -291,6 +293,7 @@ export function deleteVoucher(id: string): void {
     removeVoucherReceiptRows(id);
     setTable(VOUCHERS_TABLE, all.filter((v) => v.id !== id));
   });
+  recordSeries(row.number); // R4-C4: the deleted voucher (now in the recycle bin) keeps its number
   audit.record({
     entity: 'voucher',
     entity_id: id,

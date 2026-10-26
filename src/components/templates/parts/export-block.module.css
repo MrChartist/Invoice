@@ -1,0 +1,46 @@
+/* R4-C1 export details on the paper: accent / paper variables only (same look as the transport block). */
+.block {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--tpl-accent);
+  background: var(--tpl-soft);
+  border-radius: 4px;
+  break-inside: avoid;
+}
+
+.title {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.grid {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 16px;
+}
+
+.item {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  min-width: 0;
+}
+
+.item dt {
+  color: var(--tpl-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.item dt::after {
+  content: ':';
+}
+
+.item dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

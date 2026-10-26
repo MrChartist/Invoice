@@ -137,6 +137,8 @@ export function YearEndWizard({ open, onClose, notify }: YearEndWizardProps) {
         );
       case 'opening_bills':
         return <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('opening_bills')}>{migT('markReviewed')}</button>;
+      case 'auditor_pack': // R4-C5
+        return <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('auditor_pack')}>{migT('markReviewed')}</button>;
       case 'lock':
         return can('settings.manage') ? (
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => act(() => migT('locked', { date: lockYear(fy) }))}>

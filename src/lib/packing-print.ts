@@ -20,7 +20,14 @@ const kg = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 3, 
 const cbm = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const qty = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 3 });
 
-export function packingListHtml(pl: PackingList, company: PackingPrintCompany, accent?: string): string {
+/** R4-C1: the export fields a packing list shows from its source invoice (read only; no packing-list schema change). */
+export function packingExportMeta(inv: { port_of_loading?: string; port_of_discharge?: string; country_of_destination?: string; marks_numbers?: string } | null | undefined): [string, string][] {
+  if (!inv) return [];
+  const rows: [string, string | undefined][] = [['Port of loading', inv.port_of_loading], ['Port of discharge', inv.port_of_discharge], ['Final destination', inv.country_of_destination], ['Marks & nos.', inv.marks_numbers]];
+  return rows.filter((r): r is [string, string] => !!r[1]?.trim());
+}
+
+export function packingListHtml(pl: PackingList, company: PackingPrintCompany, accent?: string, extraMeta: readonly [string, string][] = []): string {
   const colour = sanitizeHex(accent) ?? '#1a4d94';
   const byId = new Map(pl.lines.map((l) => [l.line_id, l]));
   const t = packingTotals(pl.packages, pl.lines);
@@ -74,6 +81,7 @@ export function packingListHtml(pl: PackingList, company: PackingPrintCompany, a
     <div><b>Against</b>${esc(pl.source.number)} (${esc(pl.source.kind === 'challan' ? 'Delivery challan' : 'Invoice')})</div>
     <div><b>Consignee</b>${esc(pl.party || '—')}</div>
     <div><b>Ship to</b>${esc(pl.ship_to || '—')}</div>
+    ${extraMeta.map(([k, v]) => `<div><b>${esc(k)}</b>${esc(v)}</div>`).join('')}
   </div>
   <table><thead><tr><th>Box no.</th><th>Package</th><th>L × B × H (cm)</th><th>Marks &amp; numbers</th><th>Contents (each)</th><th class="n">Net kg</th><th class="n">Gross kg</th><th class="n">CBM</th></tr></thead>
   <tbody>${pkgRows}

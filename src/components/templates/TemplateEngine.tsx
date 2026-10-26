@@ -35,6 +35,9 @@ const LazyAnnexure = lazy(() => import('./parts/AnnexureBlock'));
 // R3-C2: photo pages and the receiver signature load only for documents that carry them.
 const LazyPhotoPages = lazy(() => import('./parts/PhotoPages'));
 const LazyDeliveryProof = lazy(() => import('./parts/DeliveryProofBlock'));
+// R4-C1: export details (IEC / AD code, Incoterms, ports, countries, marks) — lazy; nothing without export data.
+const LazyExportBlock = lazy(() => import('./parts/ExportBlock'));
+const EXPORT_KEYS = ['incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms'] as const;
 
 export interface TemplateEngineProps extends TemplateProps {
   templateId: string;
@@ -123,6 +126,10 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
     ? `Returnable delivery challan — not a sale. Goods to be returned${invoice.challan_return_by ? ` by ${formatDate(invoice.challan_return_by)}` : ''}.`
     : '';
 
+  const exportBlock = (/^EXPORT/.test(invoice.supply_type ?? '') || /^9[67]$/.test(invoice.place_of_supply ?? '') || EXPORT_KEYS.some((k) => invoice[k])) && (
+    <Suspense fallback={null}><LazyExportBlock invoice={invoice} sender={sender} /></Suspense>
+  );
+
   const layoutBody = (() => {
     // R2-B3: proposal sections and optional items wrap the ruled GST grid / the receipt.
     if ((layout === 'gst' || layout === 'receipt') && !hideAmounts) {
@@ -130,6 +137,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         <>
           <ProposalSections invoice={invoice} place="before" />
           {layout === 'gst' ? <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} /> : <ReceiptBody invoice={invoice} sender={sender} totals={totals} />}
+          {exportBlock}
           <OptionalItemsBlock invoice={invoice} />
           <ProposalSections invoice={invoice} place="after" />
         </>
@@ -150,6 +158,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <StatementStrip invoice={invoice} due={cfg.currency(totals.balance_due, invoice.currency)} />
         )}
         <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
+        {exportBlock}
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
         <ProposalSections invoice={invoice} place="before" />

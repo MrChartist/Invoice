@@ -1,0 +1,56 @@
+/**
+ * R4-C strings needed outside the trade-desk / trust chunks: the GST tab name, palette rows and bell notices.
+ * Kept apart from `trade-trust-r4.ts` so the GST page, the palette and the bell's lazy provider stay small.
+ */
+import { defineArea } from '../area';
+
+export const tlT = defineArea(
+  {
+    tabExportDesk: 'Export desk',
+    group: 'Trade desk & trust',
+    palExportDesk: 'Export desk (realisation, e-BRC, incentives, LUT)',
+    palImportRegister: 'Import register (Bill of Entry duty)',
+    palBin: 'Recently deleted (recycle bin)',
+    palAuditorPack: 'Auditor pack (edit log per FY)',
+    palExportAll: 'Export everything (CSV / Excel)',
+    lutNextTitle: 'No LUT for {fy} yet',
+    lutNextDetail: 'File the LUT (RFD-11) before the first export of {fy} and add its ARN in Settings → Business → Export. Under Rule 96A — verify with your CA.',
+    lutNowTitle: 'Exports in {fy} without an LUT on record',
+    lutNowDetail: '{n} zero-rated invoice(s) this year; add the LUT ARN so new exports fill it in. Under Rule 96A — verify with your CA.',
+    lutCta: 'Add LUT',
+    dueTitle: '{n} shipping bill(s) to realise within 60 days',
+    dueDetail: '{list}. Match the bank IRMs in the export desk.',
+    overdueTitle: '{n} export(s) past the realisation period',
+    overdueDetail: '{list}. Non-realisation can withdraw the export benefit or require GST with interest under Rule 96A — verify with your CA.',
+    sbTitle: '{n} export invoice(s) without a shipping bill',
+    sbDetail: '{list}. The realisation clock is counted from the invoice date until the shipping bill is typed.',
+    deskCta: 'Open export desk',
+    retentionTitle: 'Your edit log goes back more than {n} financial years',
+    retentionDetail: 'Books and the edit log must be kept for 8 financial years (Sec 128(5)). Download an auditor pack before erasing anything — verify with your CA.',
+    retentionCta: 'Auditor pack',
+  } as const,
+  {
+    tabExportDesk: 'निर्यात डेस्क',
+    group: 'व्यापार डेस्क और भरोसा',
+    palExportDesk: 'निर्यात डेस्क (वसूली, e-BRC, प्रोत्साहन, LUT)',
+    palImportRegister: 'आयात रजिस्टर (बिल ऑफ़ एंट्री ड्यूटी)',
+    palBin: 'हाल में हटाए गए (रीसायकल बिन)',
+    palAuditorPack: 'ऑडिटर पैक (हर वित्त वर्ष का एडिट लॉग)',
+    palExportAll: 'सब कुछ निर्यात करें (CSV / Excel)',
+    lutNextTitle: '{fy} के लिए अभी कोई LUT नहीं',
+    lutNextDetail: '{fy} के पहले निर्यात से पहले LUT (RFD-11) दाख़िल करें और उसका ARN सेटिंग्स → व्यवसाय → निर्यात में जोड़ें। नियम 96A के अंतर्गत — अपने CA से जाँच करवाएँ।',
+    lutNowTitle: '{fy} में LUT के बिना निर्यात',
+    lutNowDetail: 'इस वर्ष {n} शून्य-दर इनवॉइस; LUT ARN जोड़ें ताकि नए निर्यात में वह अपने-आप भरे। नियम 96A के अंतर्गत — अपने CA से जाँच करवाएँ।',
+    lutCta: 'LUT जोड़ें',
+    dueTitle: '{n} शिपिंग बिल की वसूली 60 दिन में',
+    dueDetail: '{list}। निर्यात डेस्क में बैंक IRM मिलाएँ।',
+    overdueTitle: '{n} निर्यात वसूली अवधि से आगे',
+    overdueDetail: '{list}। वसूली न होने पर निर्यात लाभ वापस हो सकता है या नियम 96A के अंतर्गत ब्याज सहित GST देना पड़ सकता है — अपने CA से जाँच करवाएँ।',
+    sbTitle: '{n} निर्यात इनवॉइस बिना शिपिंग बिल',
+    sbDetail: '{list}। शिपिंग बिल भरने तक वसूली की अवधि इनवॉइस की तारीख़ से गिनी जाती है।',
+    deskCta: 'निर्यात डेस्क खोलें',
+    retentionTitle: 'आपका एडिट लॉग {n} वित्त वर्षों से पुराना है',
+    retentionDetail: 'खाते और एडिट लॉग 8 वित्त वर्ष तक रखने होते हैं (धारा 128(5))। कुछ भी मिटाने से पहले ऑडिटर पैक डाउनलोड करें — अपने CA से जाँच करवाएँ।',
+    retentionCta: 'ऑडिटर पैक',
+  },
+);

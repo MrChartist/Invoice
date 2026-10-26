@@ -106,6 +106,7 @@ export const migT = defineArea(
     s_opening_bills: 'Opening bills for the new year',
     s_lock: 'Lock the year',
     s_carry_forward: 'Carry-forward report',
+    s_auditor_pack: 'Auditor pack generated', // R4-C5
     showIssues: 'Show problems ({n})',
     markReviewed: 'Mark reviewed',
     postStock: 'Post closing stock journal',
@@ -237,6 +238,7 @@ export const migT = defineArea(
     s_opening_bills: 'नए वर्ष के प्रारंभिक बिल',
     s_lock: 'वर्ष लॉक करें',
     s_carry_forward: 'आगे ले जाने की रिपोर्ट',
+    s_auditor_pack: 'ऑडिटर पैक बनाया गया',
     showIssues: 'समस्याएँ दिखाएँ ({n})',
     markReviewed: 'जाँचा हुआ चिह्नित करें',
     postStock: 'अंतिम स्टॉक जर्नल दर्ज करें',

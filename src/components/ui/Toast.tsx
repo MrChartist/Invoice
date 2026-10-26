@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
 
@@ -8,8 +8,11 @@ export interface ToastProps {
   message: string;
   tone?: ToastTone;
   duration?: number;
-  /** Optional button, e.g. Undo. Clicking it runs `onClick` and closes the toast. */
-  action?: { label: string; onClick: () => void };
+  /**
+   * Optional button, e.g. Undo. Clicking it (or Alt+Z) runs `onClick` and closes the toast. R4-C4: a toast with an
+   * action never auto-dismisses; `onDismiss` runs when it is closed without the action (× or replaced).
+   */
+  action?: { label: string; onClick: () => void; onDismiss?: () => void };
   onClose: () => void;
 }
 
@@ -21,19 +24,33 @@ const TONE = {
 
 export function Toast({ message, tone = 'success', duration = 3200, action, onClose }: ToastProps) {
   const [visible, setVisible] = useState(false);
+  // R4-C4: `done` once closed by the user / the action; `live` while mounted (a StrictMode re-mount is not a dismissal).
+  const st = useRef({ done: false, live: false }).current;
+  const close = (fn?: () => void) => {
+    st.done = true;
+    fn?.();
+    setVisible(false);
+    setTimeout(onClose, 260);
+  };
 
   useEffect(() => {
+    st.live = true;
     // One frame in the hidden state so the entrance transition actually runs.
     const raf = requestAnimationFrame(() => setVisible(true));
-    const timer = setTimeout(() => {
-      setVisible(false);
-      setTimeout(onClose, 260);
-    }, duration);
+    const timer = action ? 0 : setTimeout(close, duration);
+    const key = (e: KeyboardEvent) => {
+      if (e.altKey && e.code === 'KeyZ' && !st.done) close(action!.onClick);
+    };
+    if (action) addEventListener('keydown', key);
     return () => {
+      st.live = false;
       cancelAnimationFrame(raf);
       clearTimeout(timer);
+      removeEventListener('keydown', key);
+      // Replaced by the next toast: not undone (the deleted rows stay in the recycle bin).
+      setTimeout(() => st.live || st.done || ((st.done = true), action?.onDismiss?.()));
     };
-  }, [duration, onClose]);
+  }, [duration, onClose, action]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { icon: Icon, colour } = TONE[tone];
 
@@ -70,11 +87,7 @@ export function Toast({ message, tone = 'success', duration = 3200, action, onCl
       {action && (
         <button
           type="button"
-          onClick={() => {
-            action.onClick();
-            setVisible(false);
-            setTimeout(onClose, 260);
-          }}
+          onClick={() => close(action.onClick)}
           style={{
             background: 'none',
             border: 'none',
@@ -92,10 +105,7 @@ export function Toast({ message, tone = 'success', duration = 3200, action, onCl
       <button
         type="button"
         aria-label="Dismiss notification"
-        onClick={() => {
-          setVisible(false);
-          setTimeout(onClose, 260);
-        }}
+        onClick={() => close(action?.onDismiss)}
         style={{
           background: 'none',
           border: 'none',

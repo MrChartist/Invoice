@@ -105,7 +105,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
   }, [invoice.id]);
   const [precNo, setPrecNo] = useState(original?.invoice_number ?? '');
   const [precDate, setPrecDate] = useState(original?.issue_date?.slice(0, 10) ?? '');
-  const [countryCode, setCountryCode] = useState('');
+  const [countryCode, setCountryCode] = useState(() => /^[A-Z]{2}\b/i.test(invoice.country_of_destination ?? '') ? invoice.country_of_destination!.slice(0, 2).toUpperCase() : ''); // R4-C1: from the export fields (= cntCodeOf)
   const [portCode, setPortCode] = useState(invoice.port_code ?? '');
   const [dirty, setDirty] = useState(false);
 

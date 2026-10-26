@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, FolderOpen, FolderSync, KeyRound, RefreshCw, Unplug } from 'lucide-react';
 import { localDb } from '../../lib/localDb';
@@ -19,7 +19,7 @@ import {
   type SyncConfig,
 } from '../../lib/sync-folder';
 import { GROUP_RE, type SyncDir } from '../../lib/sync-files';
-import { resolveConflict, tableLabel, type RowConflict, type SyncConflict, type SyncReport } from '../../lib/sync-engine';
+import { fieldMerge, resolveConflict, tableLabel, type Resolution, type RowConflict, type SyncConflict, type SyncReport } from '../../lib/sync-engine';
 import { useT } from '../../i18n';
 import { syncT } from '../../i18n/areas/sync';
 import controls from '../../styles/controls.module.css';
@@ -27,6 +27,10 @@ import surface from '../../styles/surface.module.css';
 import styles from './Sync.module.css';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
+
+// R4-C7: labelled, field-level merge per conflict and the bulk actions — lazy, only when there are conflicts.
+const ConflictMerge = lazy(() => import('../trust/ConflictMerge'));
+const BulkMerge = lazy(() => import('../trust/ConflictMerge').then((m) => ({ default: m.BulkMerge })));
 
 const when = (iso?: string) => (iso && !Number.isNaN(Date.parse(iso)) ? new Date(iso).toLocaleString('en-IN') : syncT('never'));
 
@@ -56,7 +60,7 @@ function changedFields(a: unknown, b: unknown): { field: string; mine: string; t
     .map((k) => ({ field: k, mine: show(x[k]), theirs: show(y[k]) }));
 }
 
-function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: string, choice: 'mine' | 'theirs' | 'ack', override?: boolean) => Promise<void> }) {
+function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: string, choice: Resolution, override?: boolean) => Promise<void> }) {
   useT(); // re-render on a language switch (5.4)
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
@@ -117,7 +121,9 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
       <span className={styles.meta}>{reason}</span>
       {rc.local.value === null && isRow && <span className={styles.meta}>{rc.local.meta ? syncT('thisDeviceDeleted') : syncT('thisDeviceAbsent')}</span>}
       {rc.remote.value === null && isRow && <span className={styles.meta}>{syncT('otherDeleted', { device: rc.device_name || syncT('otherDevice') })}</span>}
-      {diff.length > 0 && (
+      {isRow && rc.local.value && rc.remote.value ? (
+        <Suspense fallback={null}><ConflictMerge c={rc} onResolve={onResolve} fm={fieldMerge} /></Suspense>
+      ) : diff.length > 0 && (
         <ul className={styles.diff}>
           {diff.map((d) => (
             <li key={d.field}>
@@ -271,7 +277,7 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
     notify?.(syncT('syncOff'), 'info');
   };
 
-  const onResolve = async (id: string, choice: 'mine' | 'theirs' | 'ack', override = false) => {
+  const onResolve = async (id: string, choice: Resolution, override = false) => {
     const r = await resolveConflict(id, choice, companyDevice(), { override });
     if (!r.ok) setError(r.message ?? syncT('resolveFail'));
     else {
@@ -504,6 +510,9 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
             {conflicts.length > 0 && (
               <>
                 <span className={controls.label}>{syncT('toReviewN', { n: conflicts.length })}</span>
+                <Suspense fallback={null}>
+                  <BulkMerge fm={fieldMerge} conflicts={conflicts} resolve={(id, choice) => resolveConflict(id, choice, companyDevice())} onDone={(msg) => { refresh(); notify?.(msg, 'info'); }} />
+                </Suspense>
                 <ul className={styles.list}>
                   {conflicts.map((c) => (
                     <ConflictItem key={c.id} c={c} onResolve={onResolve} />

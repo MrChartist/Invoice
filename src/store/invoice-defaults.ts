@@ -7,6 +7,7 @@
  */
 
 import type {} from '../types/docs-r3'; // R3-C2: delivery_proof (RECORD_KEYS)
+import type {} from '../types/trade-r4'; // R4-C1: export document fields (RECORD_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -314,6 +315,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.annexure && typeof r.annexure === 'object' && Array.isArray((r.annexure as { rows?: unknown }).rows) ? { annexure: r.annexure as InvoiceRecord['annexure'] } : {}),
     // R3-C2 (additive): receiver signature snapshot (proof of delivery).
     ...(r.delivery_proof && typeof r.delivery_proof === 'object' && (r.delivery_proof as { receiver?: unknown }).receiver ? { delivery_proof: r.delivery_proof as InvoiceRecord['delivery_proof'] } : {}),
+    // R4-C1 (additive): export document fields, absent on legacy rows.
+    ...Object.fromEntries((['incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms'] as const).filter((k) => typeof r[k] === 'string' && r[k]).map((k) => [k, r[k]])),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

@@ -148,9 +148,8 @@ export function Transactions() {
   // 8.106: bulk remind / bulk write-off on the selected (filtered) rows.
   const [bulkCollect, setBulkCollect] = useState<'remind' | 'writeoff' | null>(null);
   const [batchPdf, setBatchPdf] = useState<InvoiceRecord[] | null>(null);
-  // Deletes wait a few seconds behind an Undo toast before they touch storage.
+  // Deletes wait behind an Undo toast (until it is dismissed) before they touch storage.
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(() => new Set());
-  const deleteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingRef = useRef<Set<string>>(pendingDelete);
   useEffect(() => {
     pendingRef.current = pendingDelete;
@@ -294,7 +293,6 @@ export function Transactions() {
 
   /** Actually remove whatever is waiting; errors (e.g. a lock set meanwhile) are reported, the rest still go. */
   const flushDeletes = (ids: Set<string>) => {
-    clearTimeout(deleteTimer.current);
     const failed: string[] = [];
     for (const id of ids) {
       try {
@@ -303,7 +301,7 @@ export function Transactions() {
         failed.push((err as Error).message);
       }
     }
-    setPendingDelete(new Set());
+    setPendingDelete((prev) => new Set([...prev].filter((x) => !ids.has(x))));
     reload();
     if (failed.length) notify(failed[0], 'error');
   };
@@ -325,20 +323,17 @@ export function Transactions() {
         if (issues.warnings.length && !window.confirm(`${n.invoice_number}: ${issues.warnings.join(' ')}\n\nDelete anyway?`)) return;
       }
     }
-    const ids = new Set([...pendingDelete, ...docs.map((d) => d.id)]);
-    clearTimeout(deleteTimer.current);
-    setPendingDelete(ids);
+    // R4-C4: the Undo waits for the user — the delete is committed when the toast is dismissed (×, replaced by the
+    // next toast) or the page is left; a committed delete is still in Settings → Data → Recently deleted.
+    const ids = new Set(docs.map((d) => d.id));
+    setPendingDelete((prev) => new Set([...prev, ...ids]));
     setSelected(new Set());
-    deleteTimer.current = setTimeout(() => flushDeletes(ids), 6000);
     const label = docs.length === 1 ? docs[0].invoice_number : salesT('tx.nDocuments', { n: docs.length });
     notify(salesT('tx.deleted', { label }), 'success', {
-      duration: 6000,
       action: {
         label: salesT('tx.undo'),
-        onClick: () => {
-          clearTimeout(deleteTimer.current);
-          setPendingDelete(new Set());
-        },
+        onClick: () => setPendingDelete((prev) => new Set([...prev].filter((x) => !ids.has(x)))),
+        onDismiss: () => flushDeletes(ids),
       },
     });
   };

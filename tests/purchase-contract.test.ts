@@ -756,3 +756,20 @@ test('R3-C6 practice board reads the real purchase shape (bill date counts as th
   const row = buildPracticeRow({ id: 'c', name: 'C', tables: { purchases: [bill, { ...bill, id: 'p2', date: undefined, bill_date: '2026-05-01' }] } }, '2026-06-01');
   assert.equal(row.lastVoucher, '2026-05-01');
 });
+
+// R4-C: the import register by Bill of Entry reads bills through `readPurchase`; the open-format export flattens
+// the real purchase shape into purchases.csv + purchase_lines.csv keyed by purchase_id.
+test('R4-C readers (import register by BOE, open-format export) read the real purchase shape', async () => {
+  const { computeBoe, applyBoe, importRegister } = await import('../src/lib/trade/boe-duty.ts');
+  const { AssetSink, flattenTable } = await import('../src/lib/trust/open-export.ts');
+  const imp: PurchaseRecord = { ...bill, id: 'imp', vendor_gstin: undefined, place_of_supply: '96', import_type: 'GOODS', boe_number: '7654321', boe_date: '2026-04-13', cgst: 0, sgst: 0, igst: 180, total: 1180 };
+  const d = computeBoe({ date: '2026-04-13', rate: 1, cif: 1000, lines: [{ line_id: 'l1', value: 1000, bcd_pct: 10, igst_pct: 18 }] });
+  const withDuty = { ...imp, ...applyBoe(imp, d) };
+  const rows = importRegister([bill, withDuty]);
+  assert.deepEqual(rows.map((r) => [r.billId, r.boeNo, r.supplier, r.billNo, r.igst, r.duty, r.itcTaken]), [['imp', '7654321', 'Acme Supplies', 'AS/22', 200, 110, 200]], 'domestic bills have no BOE sheet');
+  const [parent, lines] = flattenTable('purchases', [bill], new AssetSink());
+  assert.equal(parent.rows.length, 1);
+  assert.ok(parent.columns.includes('bill_number') && !parent.columns.includes('lines'));
+  assert.deepEqual(lines.columns.slice(0, 3), ['purchase_id', 'line_no', 'id']);
+  assert.deepEqual(lines.rows[0].slice(0, 3), ['p1', 1, 'l1']);
+});

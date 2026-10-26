@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
-import { Toast, type ToastTone } from './Toast';
+import { Toast, type ToastProps, type ToastTone } from './Toast';
 
 interface ToastData {
   key: number;
   message: string;
   tone: ToastTone;
-  action?: { label: string; onClick: () => void };
+  action?: ToastProps['action'];
   duration?: number;
 }
 

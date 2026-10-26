@@ -17,7 +17,8 @@
  */
 
 import type { AuditAction, AuditChange, AuditEntity } from '../types/audit';
-import { DB_PREFIX, readRaw } from './storage';
+import { DB_PREFIX, generateId, peekTable, readRaw, setTable } from './storage';
+import { currentActor } from './access';
 
 export interface WatchedTable {
   entity: AuditEntity;
@@ -114,6 +115,11 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   gift_vouchers: { entity: 'payment', label: 'Gift voucher' },
   branch_prices: { entity: 'item', label: 'Store price' },
   transfer_requests: { entity: 'stock_transfer', label: 'Transfer request' },
+  // R4-C: LUT register, export IRMs (realisation), incentives, realisation write-offs
+  lut_register: { entity: 'settings', label: 'LUT' },
+  export_irms: { entity: 'payment', label: 'IRM' },
+  export_incentives: { entity: 'voucher', label: 'Export incentive' },
+  export_writeoffs: { entity: 'payment', label: 'Export write-off' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */
@@ -305,8 +311,15 @@ export function observeTableWrite(name: string, prevRaw: string | null, rows: re
     if (old === undefined) queue(name, id, null, r as Row);
     else if (old !== s) queue(name, id, parse(old), r as Row);
   }
-  for (const [id, s] of before) if (!next.has(id)) queue(name, id, parse(s), null);
+  const gone: Row[] = [];
+  for (const [id, s] of before) if (!next.has(id)) {
+    const r = parse(s);
+    queue(name, id, r, null);
+    if (r) gone.push(r);
+  }
   seen.set(name, { raw: readRaw(DB_PREFIX + name), byId: next });
+  // R4-C4: whole deleted rows go to the recycle bin (bookkeeping tables aside).
+  if (gone.length && !/^(doc_l|year_e|books_b|gstr)/.test(name)) binRows(name, gone);
   if (pending.size && !scheduled) {
     scheduled = true;
     queueMicrotask(drainEdits);
@@ -382,6 +395,25 @@ export function drainEdits(): void {
     } catch {
       /* best effort */
     }
+  }
+}
+
+/* ── R4-C4 recycle bin capture ─────────────────────────────────── */
+
+export const BIN_TABLE = 'recycle_bin';
+
+/**
+ * Keep whole deleted rows in the recycle bin (restored from Settings → Data → Recently deleted; purged after the
+ * retention period by `trust/recycle-bin.ts`). `attachments` is copied so the files are kept while binned.
+ * Never throws: the bin never breaks a delete.
+ */
+export function binRows(table: string, rows: readonly Row[]): void {
+  try {
+    const deleted_by = currentActor()?.name;
+    const deleted_at = new Date().toISOString();
+    setTable(BIN_TABLE, [...peekTable(BIN_TABLE), ...rows.map((row) => ({ id: generateId(), table, row_id: rowId(row), deleted_at, deleted_by, row, attachments: row.attachments }))]);
+  } catch {
+    /* best effort */
   }
 }
 

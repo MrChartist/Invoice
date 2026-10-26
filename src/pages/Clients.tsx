@@ -34,6 +34,8 @@ import { s2T } from '../i18n/areas/sales-r2';
 import { svcT } from '../i18n/areas/service-r3';
 import { loadQuietSettings, quietCustomers } from '../lib/quiet-customers';
 import { DOC_DEFAULT_COLUMNS, docDefaultsToCells } from '../lib/party-defaults'; // R3-B5 CSV columns
+// R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
+const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
 // Daily khata loop (8A): the quick ₹ Received / ₹ Given sheet and the reminder queue load on first use.
 const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
@@ -439,6 +441,7 @@ export function Clients() {
         onClose={() => setDeleting(null)}
       />
       {toastNode}
+      <Suspense fallback={null}><UndoDeleted /></Suspense>
     </div>
   );
 }
