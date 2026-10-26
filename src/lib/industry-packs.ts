@@ -18,12 +18,15 @@ import type { BusinessType } from './shop-mode';
 export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit' | 'leases'
   | 'hotel' // R7-A
   // R8-C: trading packs (tabs on /distribution; switched on by the `wholesale` trade profile, never by a business type)
-  | 'distributor' | 'commodity' | 'agency';
+  | 'distributor' | 'commodity' | 'agency'
+  // R9 (RT-A1): retail packs (a tab each on /inventory; switched on by the `kirana` retail profile, never by a business type)
+  | 'pharmacy' | 'apparel' | 'electronics' | 'jewellery';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
   'hotel', // R7-A
   'distributor', 'commodity', 'agency', // R8-C
+  'pharmacy', 'apparel', 'electronics', 'jewellery', // R9 (RT-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -119,6 +122,27 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'agency', path: '/distribution?tab=agency&view=arrivals', labelKey: 'r8.arrivals' },
   { pack: 'agency', path: '/distribution?tab=agency&view=pattis', labelKey: 'r8.pattis' },
   { pack: 'agency', path: '/distribution?tab=agency&view=indents', labelKey: 'r8.indents' },
+  // R9: retail packs on Inventory (one desk tab each, sub-views in `&view=`; labels `r9.*` in `palette-destinations.ts`)
+  { pack: 'pharmacy', path: '/inventory?tab=pharmacy', labelKey: 'r9.pharmacy' },
+  { pack: 'pharmacy', path: '/inventory?tab=pharmacy&view=rx', labelKey: 'r9.rx' },
+  { pack: 'pharmacy', path: '/inventory?tab=pharmacy&view=doctors', labelKey: 'r9.doctors' },
+  { pack: 'pharmacy', path: '/inventory?tab=pharmacy&view=registers', labelKey: 'r9.registers' },
+  { pack: 'pharmacy', path: '/inventory?tab=pharmacy&view=refills', labelKey: 'r9.refills' },
+  { pack: 'pharmacy', path: '/inventory?tab=pharmacy&view=prices', labelKey: 'r9.prices' },
+  { pack: 'apparel', path: '/inventory?tab=apparel', labelKey: 'r9.apparel' },
+  { pack: 'apparel', path: '/inventory?tab=apparel&view=matrix', labelKey: 'r9.matrix' },
+  { pack: 'apparel', path: '/inventory?tab=apparel&view=alterations', labelKey: 'r9.alterations' },
+  { pack: 'apparel', path: '/inventory?tab=apparel&view=bands', labelKey: 'r9.bands' },
+  { pack: 'electronics', path: '/inventory?tab=devices', labelKey: 'r9.devices' },
+  { pack: 'electronics', path: '/inventory?tab=devices&view=imei', labelKey: 'r9.imei' },
+  { pack: 'electronics', path: '/inventory?tab=devices&view=finance', labelKey: 'r9.finance' },
+  { pack: 'electronics', path: '/inventory?tab=devices&view=buyback', labelKey: 'r9.buyback' },
+  { pack: 'electronics', path: '/inventory?tab=devices&view=service', labelKey: 'r9.service' },
+  { pack: 'jewellery', path: '/inventory?tab=jewellery', labelKey: 'r9.jewellery' },
+  { pack: 'jewellery', path: '/inventory?tab=jewellery&view=rates', labelKey: 'r9.rates' },
+  { pack: 'jewellery', path: '/inventory?tab=jewellery&view=tags', labelKey: 'r9.tags' },
+  { pack: 'jewellery', path: '/inventory?tab=jewellery&view=oldgold', labelKey: 'r9.oldgold' },
+  { pack: 'jewellery', path: '/inventory?tab=jewellery&view=karigar', labelKey: 'r9.karigar' },
 ];
 
 /**

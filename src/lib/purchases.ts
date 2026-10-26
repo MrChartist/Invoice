@@ -76,7 +76,9 @@ function toItem(l: PurchaseLine): InvoiceItem {
     quantity: num(l.quantity),
     rate: num(l.rate),
     tax_rate: num(l.tax_rate),
-    amount: round2(num(l.quantity) * num(l.rate)),
+    // R9 (RT-A4): the line discount typed on the bill reduces the taxable value; free units (`free_qty`) add none.
+    ...(num(l.discount_percent) > 0 ? { discount_percent: Math.min(num(l.discount_percent), 100) } : {}),
+    amount: round2(num(l.quantity) * num(l.rate) * (1 - Math.min(Math.max(num(l.discount_percent), 0), 100) / 100)),
   };
 }
 

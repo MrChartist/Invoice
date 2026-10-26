@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { getTable } from '../../lib/storage';
+import { DB_PREFIX, getJson, getTable } from '../../lib/storage';
 import type { HsnMasterRow } from '../../lib/hsn-master';
 import type { ImportType, ItcReversalReason, PurchaseRecord, Vendor } from '../../types/purchases';
 import { ITC_REVERSAL_REASONS, PURCHASE_CATEGORIES } from '../../types/purchases';
@@ -95,6 +95,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [pos, setPos] = useState(init?.place_of_supply ?? businessState);
   const [category, setCategory] = useState(purchase?.category ?? 'Purchases');
   const [lines, setLines] = useState(init?.lines?.length ? init.lines : [blankPurchaseLine()]);
+  // R9 (RT-A4): Free / Disc % cells on bill lines (Settings → Items → Retail checks, on for grocery and pharmacy shops).
+  const freeCells = useMemo(() => getJson<{ free_qty?: boolean } | null>(`${DB_PREFIX}retail_settings`, null)?.free_qty === true, []);
   // WP-6: a line's GST rate follows the HSN master when its HSN is typed (LineItemsEditor untouched).
   const hsn = useRef<{ master: HsnMasterRow[]; mod: typeof import('../../lib/hsn-defaults') } | null>(null);
   useEffect(() => {
@@ -215,7 +217,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     let saveLines = real;
     if (stock) {
       const live = liveTrackingInputs();
-      const issues = billTrackingIssues(real, { ...live, purchases: (live.purchases ?? []).filter((p) => p.id !== purchase?.id) }, date);
+      // R9 (RT-A4): free units come in too (one serial per unit received, paid + free).
+      const issues = billTrackingIssues(real.map((l) => (l.free_qty ? { ...l, quantity: l.quantity + l.free_qty } : l)), { ...live, purchases: (live.purchases ?? []).filter((p) => p.id !== purchase?.id) }, date);
       if (issues.length) return setError(issues[0]);
       // Tracked lines left on the godown picker's default are stored with it.
       if (stock.godowns.length > 1) {
@@ -339,7 +342,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       <BranchSelect id="bill-branch" value={branchId} onChange={setBranchId} />
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
-      <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} />
+      <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} freeCells={freeCells || lines.some((l) => l.free_qty || l.discount_percent)} />
       {vendor && ((x) => !!x.trade_discounts || !!x.industry_packs?.some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()) && <Suspense fallback={null}><BillRateHints lines={lines} vendor={vendor} date={date} onRate={(id, rate) => changeLines(lines.map((l) => (l.id === id ? { ...l, rate } : l)))} /></Suspense>}
       {tradeOn && <Suspense fallback={null}><BillTradePanel lines={lines} onLines={changeLines} vendor={vendor} broker={brokerId} onBroker={setBrokerId} isNew={!purchase} /></Suspense>}
       {!rcm && !importType && vendor && <Suspense fallback={null}><RcmGoodsNotice lines={lines} date={date} vendor={vendor} onApply={() => setRcm(true)} /></Suspense>}

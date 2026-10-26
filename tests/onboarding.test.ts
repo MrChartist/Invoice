@@ -54,7 +54,7 @@ const ctxOf = (businessType: string | undefined, over: Partial<ChecklistCtx> = {
 const kinds = (f: ChecklistFactsV3, c: ChecklistCtx) => allSteps(f, c).map((s) => s.key);
 
 test('checklist v3: each business type gets its documented steps', () => {
-  assert.deepEqual(kinds(none, ctxOf('kirana', { modules: new Set(['pos', 'inventory']) })), ['profile', 'item', 'posbill', 'whatsapp', 'payment', 'backup'], 'kirana (no GST module): no client / invoice, a POS bill');
+  assert.deepEqual(kinds(none, ctxOf('kirana', { modules: new Set(['pos', 'inventory']) })), ['profile', 'retailProfile', 'item', 'posbill', 'whatsapp', 'payment', 'backup'], 'kirana (no GST module): no client / invoice, a POS bill; R9: "Pick your shop" until a shop is chosen');
   assert.deepEqual(kinds(none, ctxOf('full')), ['profile', 'opening', 'import', 'client', 'item', 'invoice', 'payment', 'gstPeriod', 'backup']);
   assert.deepEqual(kinds(none, ctxOf(undefined)), kinds(none, ctxOf('full')), 'an existing company without a type is "full"');
   assert.deepEqual(kinds(none, ctxOf('services')), ['profile', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup']);

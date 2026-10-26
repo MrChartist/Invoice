@@ -61,6 +61,7 @@ import {
 import type { AuditEntry } from '../types/audit';
 import './trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
 import './hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
+import './retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -387,6 +388,17 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}arrivals`]: 'date',
   [`${DB_PREFIX}sale_pattis`]: 'date',
   [`${DB_PREFIX}indents`]: 'date',
+  // R9-A: rider settlements, short book; R9-B: refills (next due); R9-C: alterations; R9-D: IMEI checks, finance deals,
+  // service jobs; R9-E: metal rates, karigar moves (RT_DATED in retail/rt-shared.ts)
+  [`${DB_PREFIX}rider_settlements`]: 'date',
+  [`${DB_PREFIX}short_book`]: 'date',
+  [`${DB_PREFIX}rx_refills`]: 'next_due',
+  [`${DB_PREFIX}alteration_jobs`]: 'date',
+  [`${DB_PREFIX}imei_checks`]: 'date',
+  [`${DB_PREFIX}finance_deals`]: 'date',
+  [`${DB_PREFIX}service_jobs`]: 'date',
+  [`${DB_PREFIX}metal_rates`]: 'date',
+  [`${DB_PREFIX}karigar_moves`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -972,6 +984,10 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}arrivals`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}sale_pattis`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}indents`]: { num: 'number', date: 'date' },
+  // R9: alteration slips (ALT/FY…), service jobs (SVC/FY…), karigar issue / receipt (KAR/FY…)
+  [`${DB_PREFIX}alteration_jobs`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}service_jobs`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}karigar_moves`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

@@ -897,3 +897,23 @@ test('R8-B readers (market fee register, brokerage statement) read the real purc
   const st = brokerageStatement({ id: 'b1', name: 'B', rate: 0, basis: 'invoice', kind: 'broker', brokerage_basis: 'percent', brokerage_rate: 1 }, period, { invoices: [], purchases: [withFee] });
   assert.deepEqual(st.lines.map((l) => [l.number, l.base, l.brokerage]), [['AS/22', 1000, 10]]);
 });
+
+test('R9 (RT-A4) free quantity / line discount: stock takes paid + free, every money reader keeps the paid value', async () => {
+  // 10 + 1 free at ₹100 less 10%: taxable ₹900, GST ₹162 (on the paid value only).
+  const free: PurchaseRecord = { ...bill, id: 'pf', lines: [{ ...bill.lines[0], id: 'lf', free_qty: 1, discount_percent: 10 }], taxable: 900, cgst: 81, sgst: 81, total: 1062 };
+  for (const n of [booksNormalize(free as never), exportNormalize(free), gstNormalize(free as never)]) assert.equal(n!.taxable, 900);
+  const c = readPurchase(free)!;
+  assert.deepEqual([c.taxable, c.tax, c.itcEligible], [900, 162, true], 'GSTR-2 / ITC: value only');
+  const [l] = readPurchaseLines(free);
+  assert.deepEqual([l.quantity, l.paidQty, l.freeQty, l.netRate], [11, 10, 1, 90]);
+  assert.equal(Math.round(l.quantity * l.unitCost * 100) / 100, 900);
+  const items = [{ id: 's', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  const ev = collectEvents({ items, moves: [], invoices: [], purchases: [free] } as never).get('s') ?? [];
+  assert.deepEqual(ev.filter((e) => e.kind === 'purchase').map((e) => e.qty), [11], 'the stock engine receives 11');
+  const { purchaseHsnRegister } = await import('../src/lib/hsn-purchase-register.ts');
+  const reg = purchaseHsnRegister([free], { from: '2026-04-01', to: '2026-04-30' });
+  assert.equal(reg.totals.taxable, 900, 'the purchase HSN register keeps the bill value');
+  const { lastSuppliers } = await import('../src/lib/retail/rt-short-book.ts');
+  const s = lastSuppliers([free]).get('name:paper ream')!;
+  assert.deepEqual([s.vendorName, s.rate], ['Acme Supplies', 90], 'short book: last supplier and the rate per paid unit');
+});

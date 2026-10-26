@@ -47,6 +47,7 @@ import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-ca
 import { fxNarration, inrTotals, inrValue } from './fx';
 import { receivableTotal } from './rcm';
 import { NO_CASH_LEDGER, advanceMovements, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts
+import { RIDER_CASH_LEDGER } from './retail/rt-shared'; // R9 (RT-A3)
 import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
 import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
@@ -538,7 +539,9 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       // QA6-1 F4: a row that moved no money debits its own ledger, never the bank (as the app's ledger posts it); an RA
       // deduction row goes through its clearing account, which its journal clears.
       const kind = noCashKind(p);
-      const { ledger: bank, parent: bankParent } = movedNoCash(p) && kind !== 'ra_deduction' ? { ledger: NO_CASH_LEDGER[kind as NoCashKind], parent: kind === 'write_off' ? 'Indirect Expenses' : 'Current Liabilities' } : bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
+      // R9 (RT-A3): COD cash a delivery rider collected sits in "Cash with riders" (Cash-in-Hand) until settled.
+      const riderCash = !!p.rider_id && /^\s*cash\s*$/i.test(String(p.method ?? ''));
+      const { ledger: bank, parent: bankParent } = movedNoCash(p) && kind !== 'ra_deduction' ? { ledger: NO_CASH_LEDGER[kind as NoCashKind], parent: kind === 'write_off' ? 'Indirect Expenses' : kind === 'exchange' ? 'Sundry Creditors' : 'Current Liabilities' } : riderCash ? { ledger: RIDER_CASH_LEDGER, parent: 'Cash-in-Hand' } : bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
       std(bank, bankParent);
       const paise = toPaise(inrValue(num(p.amount), inv));
       const invNo = clean(inv.invoice_number) || String(inv.id);

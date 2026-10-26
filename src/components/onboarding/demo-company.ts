@@ -106,7 +106,7 @@ export async function fillDemo(meta: Omit<DemoPending, 'id'> = {}): Promise<void
   const packs = Array.isArray(shape.industry_packs) ? (shape.industry_packs as string[]) : profile === 'transport' ? ['transport'] : profile === 'works' ? ['works'] : [];
   const today = localDayOf(new Date());
   const { buildDemoDataset } = await import('../../lib/demo-data');
-  const extras = await demoExtras(profile, { today, base: buildDemoDataset(today), packs });
+  const extras = await demoExtras(profile, { today, base: buildDemoDataset(today), packs, businessType: shape.business_type }); // R9: retail rows by shop
   const r = loadDemoData({ confirm: true, today, extras });
   // (Narrowed by hand: the non-strict test project reads this file too.)
   const reason = r.ok ? '' : (r as { reason: string }).reason;

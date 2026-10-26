@@ -5,7 +5,10 @@
  *  - `write_off`             — a bad-debt write-off (8.106);
  *  - `gift_voucher_id`       — paid with a gift voucher (R4-B1); the cash came in when the voucher was sold;
  *  - `deposit_adjustment_id` — settled from a security deposit held (R5-C6);
- *  - `ra_journal_id`         — GST TDS / labour cess the client deducted from an RA bill (R5-B5).
+ *  - `ra_journal_id`         — GST TDS / labour cess the client deducted from an RA bill (R5-B5);
+ *  - `exchange_purchase_id`  — settled by the customer's old goods taken in exchange (R9: old device RT-D3, old gold
+ *                              RT-E3); the URD purchase voucher owes them that value, so the receipt clears debtor
+ *                              against creditor ("Sundry creditors — exchange").
  *
  * Every cash / bank reader (cash book, Today, bank reconciliation, payment modes, Tally / CSV receipts, collection lag,
  * Z report) skips these with `movedNoCash`, or posts them to their own ledger with `noCashKind` / `NO_CASH_LEDGER`.
@@ -19,9 +22,10 @@ export interface NoCashMarkers {
   gift_voucher_id?: unknown;
   deposit_adjustment_id?: unknown;
   ra_journal_id?: unknown;
+  exchange_purchase_id?: unknown;
 }
 
-export type NoCashKind = 'advance' | 'write_off' | 'gift_voucher' | 'deposit' | 'ra_deduction';
+export type NoCashKind = 'advance' | 'write_off' | 'gift_voucher' | 'deposit' | 'ra_deduction' | 'exchange';
 
 /** Why a receipt row moved no money ('' = it did). */
 export function noCashKind(p: NoCashMarkers | null | undefined): NoCashKind | '' {
@@ -31,6 +35,7 @@ export function noCashKind(p: NoCashMarkers | null | undefined): NoCashKind | ''
   if (p.gift_voucher_id) return 'gift_voucher';
   if (p.deposit_adjustment_id) return 'deposit';
   if (p.ra_journal_id) return 'ra_deduction';
+  if (p.exchange_purchase_id) return 'exchange';
   return '';
 }
 
@@ -44,4 +49,5 @@ export const NO_CASH_LEDGER: Readonly<Record<NoCashKind, string>> = {
   gift_voucher: 'Gift vouchers outstanding',
   deposit: 'Security deposits received',
   ra_deduction: 'RA deductions clearing',
+  exchange: 'Sundry creditors — exchange',
 };

@@ -28,6 +28,7 @@ import type { Client, InvoiceItem, QtySlab } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
 import { KEYS, generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
+import { effectiveMrp } from './retail/rt-mrp'; // R9 (RT-A2)
 
 export const PRICE_LEVELS_TABLE = 'price_levels';
 export const SCHEMES_TABLE = 'schemes';
@@ -127,8 +128,8 @@ export function slabFor(slabs: readonly QtySlab[] | undefined, qty: number): Qty
  * rate when it has no MRP or no such percent. The catalogue form stores the result as `rate` too, so
  * importers and conversions see the same price.
  */
-export function mrpLessRate(item: Pick<InvoiceItem, 'rate'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent'>>): number {
-  const mrp = num(item.mrp);
+export function mrpLessRate(item: Pick<InvoiceItem, 'rate'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent' | 'mrp_tax_basis' | 'tax_rate'>>): number {
+  const mrp = item.mrp_tax_basis ? effectiveMrp(num(item.mrp), item.mrp_tax_basis, num(item.tax_rate)) : num(item.mrp); // R9 (RT-A2): GST-cut MRP
   const pct = num(item.mrp_less_percent);
   if (mrp > 0 && pct > 0 && pct < 100) return round2(mrp * (1 - pct / 100));
   return round2(num(item.rate));

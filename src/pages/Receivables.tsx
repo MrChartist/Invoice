@@ -76,7 +76,9 @@ const DonationsTab = lazy(() => import('../components/institutions/r5c-lazy').th
 const donTabT = defineArea({ tab: 'Donations' } as const, { tab: 'दान' });
 // R8-A (TR-A4): party-wise interest on overdue bills and bulk interest invoices (every business, lazy).
 const InterestTab = lazy(() => import('../components/trade/InterestTab'));
-const intTabT = defineArea({ tab: 'Interest' } as const, { tab: 'ब्याज' });
+const intTabT = defineArea({ tab: 'Interest', deliveries: 'Deliveries' } as const, { tab: 'ब्याज', deliveries: 'डिलीवरी' });
+// R9 (RT-A3): home-delivery board, riders and rider cash settlement (every business, lazy).
+const DeliveriesTab = lazy(() => import('../components/retail-r9/DeliveriesTab'));
 
 type Tab = ReceivablesTab;
 // R6-B1: the ids (and packs) live in receivables-tabs.ts; the labels stay here.
@@ -91,6 +93,7 @@ const TAB_LABEL: Record<Tab, () => string> = {
   marketplace: () => mpTabT('tab'), // R5-A
   donations: () => donTabT('tab'), // R5-C
   interest: () => intTabT('tab'), // R8-A
+  deliveries: () => intTabT('deliveries'), // R9 (RT-A3)
 };
 const TABS: { id: Tab; label: () => string; pack?: PackId }[] = RECEIVABLES_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 
@@ -367,6 +370,7 @@ export function Receivables() {
         {tab === 'giftvouchers' && <Suspense fallback={null}><GiftVouchersPanel /></Suspense>}
         {tab === 'marketplace' && <Suspense fallback={<div className={surface.card}><p className={styles.note}>…</p></div>}><MarketplaceTab notify={notify} /></Suspense>}
         {tab === 'donations' && <Suspense fallback={null}><DonationsTab notify={notify} /></Suspense>}
+        {tab === 'deliveries' && <Suspense fallback={null}><DeliveriesTab onDone={(m, e) => notify(m, e ? 'error' : 'success')} /></Suspense>}
         {tab === 'interest' && <Suspense fallback={null}><div className={surface.card}><InterestTab onDone={(m, e) => notify(m, e ? 'error' : 'success')} /></div></Suspense>}
       </div>
       {toastNode}

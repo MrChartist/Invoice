@@ -23,12 +23,15 @@ import {
   buildItemIndex, cleanSerials, collectEvents, invoiceEffect, liveInputs, loadSettings,
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
-import { getTable } from './storage';
+import { KEYS, getTable } from './storage';
 import { memoOnReads } from './table-memo';
 import { lineFactor } from './units';
 import { creditNoteReturnsGoods } from './credit-restock';
 import { GODOWNS_TABLE, TRANSFERS_TABLE, consignmentGodowns, godownList, godownName, nonSaleableGodowns } from './godowns';
 import { batchDelta, dayWindow, eventLabel, firstShortAfter, godownDelta, serialDelta } from './stock-timeline';
+import { effectiveMrp, mrpIssues, withMrpIssues, type MrpIssues } from './retail/rt-mrp'; // R9 (RT-A2)
+import { readRetailSettings } from './retail/rt-settings';
+import { can } from './access';
 
 const EPS = 1e-9;
 const roundQty = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
@@ -331,7 +334,7 @@ export function isOutgoingDoc(docType: string | undefined): boolean {
   return invoiceEffect(docType, 'Sent', true) === 'out';
 }
 
-type DocInput = Pick<InvoiceRecord, 'doc_type' | 'items' | 'issue_date'> & Partial<Pick<InvoiceRecord, 'id' | 'status' | 'goods_returned' | 'notes'>>;
+type DocInput = Pick<InvoiceRecord, 'doc_type' | 'items' | 'issue_date'> & Partial<Pick<InvoiceRecord, 'id' | 'status' | 'goods_returned' | 'notes' | 'invoice_number' | 'discount_type' | 'discount_rate' | 'price_includes_tax'>>;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -805,8 +808,43 @@ export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
           byGodown: (id) => pre().tracking.get(id)?.byGodown,
         })
       : issues;
-    return saleLimitGate(held, doc, { nonSaleable, godownName: named, mrpOf, settings: pharma, agencyOk: consignmentGodowns(godowns) }); // R8-C
+    const limited = saleLimitGate(held, doc, { nonSaleable, godownName: named, mrpOf, settings: pharma, agencyOk: consignmentGodowns(godowns) }); // R8-C
+    // R9 (RT-A2): the MRP guard for every shop (names the pharma option already refused are not reported twice).
+    const already = new Set(limited.errors.filter((e) => / is above the batch MRP /.test(e)).map((e) => e.slice(0, e.indexOf(': price'))));
+    return withMrpIssues(limited, liveMrpIssues(doc, already));
   } catch {
     return { errors: [], expired: [], warnings: [] };
+  }
+}
+
+/**
+ * R9 (RT-A2): the MRP guard on live data — batch MRP (per base unit, from the stock events) else the catalogue MRP,
+ * each lowered by its GST-cut basis (`mrp_tax_basis`). Empty when the guard is off (nothing is read or computed).
+ * Callers without batch / serial / godown tracking (no stock context) call this directly.
+ */
+export function liveMrpIssues(doc: DocInput, already?: ReadonlySet<string>): MrpIssues {
+  const settings = readRetailSettings();
+  const none: MrpIssues = { errors: [], warnings: [], confirm: [] };
+  if (!settings.mrp_guard || settings.mrp_guard === 'off' || doc.status === 'Draft' || doc.status === 'Cancelled') return none;
+  try {
+    const input = sharedTrackingInputs();
+    const index = buildItemIndex(input.items);
+    const catalog = new Map(getTable<InvoiceItem>(KEYS.items).map((c) => [c.name.trim().toLowerCase(), c]));
+    let tracking: TrackingMap | null = null;
+    const mrpOf = (l: { name: string; batch_no?: string; hsn?: string; tax_rate?: number }): number | undefined => {
+      const it = index.find(l.name, l.hsn);
+      if (it?.track_stock && it.track_batches) {
+        tracking ??= computeTracking(input);
+        const batches = tracking.get(it.id)?.batches ?? [];
+        const b = l.batch_no ? batches.find((x) => x.batch.toUpperCase() === l.batch_no!.toUpperCase()) : batches.length === 1 ? batches[0] : undefined;
+        if (b?.mrp && b.mrp > 0) return effectiveMrp(b.mrp, it.mrp_tax_basis, num(l.tax_rate), b.firstIn);
+      }
+      const c = catalog.get(l.name.trim().toLowerCase());
+      if (c?.mrp && c.mrp > 0) return effectiveMrp(c.mrp, c.mrp_tax_basis ?? it?.mrp_tax_basis, num(l.tax_rate));
+      return undefined;
+    };
+    return mrpIssues(doc, { mode: settings.mrp_guard, mrpOf, owner: can('doc.approve'), already });
+  } catch {
+    return none;
   }
 }

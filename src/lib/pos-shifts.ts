@@ -55,6 +55,8 @@ export interface ShiftTotals {
   credit: number;
   returns: number;
   cash_refunds: number;
+  /** R9 (RT-A3): COD cash collected by delivery riders on the shift's bills (outside the drawer). */
+  rider_cash?: number;
 }
 
 /** The person at the counter (signed-in local user, or the owner on a single-user install). */
@@ -95,6 +97,7 @@ export function shiftTotals(z: ZReport): ShiftTotals {
     credit: z.credit,
     returns: round2(z.returns?.value ?? 0),
     cash_refunds: round2(z.returns?.refunds.cash ?? 0),
+    ...(z.riderCash ? { rider_cash: z.riderCash } : {}), // R9 (RT-A3): COD cash with riders, not in the drawer
   };
 }
 

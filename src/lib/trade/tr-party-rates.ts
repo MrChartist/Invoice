@@ -97,8 +97,9 @@ export function lastPurchaseRate(purchases: readonly unknown[], vendor: { id?: s
     const vid = (raw as { vendor_id?: string })?.vendor_id;
     if (!b || b.isExpense || isVoidStatus(b.status) || !(vendor.id && vid ? vid === vendor.id : norm(b.partyName) === norm(vendor.name))) continue;
     for (const l of readPurchaseLines(raw)) {
-      if (norm(l.name) !== norm(itemName) || !(l.unitCost > 0)) continue;
-      if (!best || b.date > best.date) best = { rate: round2(l.unitCost), date: b.date, number: b.number };
+      if (norm(l.name) !== norm(itemName) || !(l.netRate > 0)) continue;
+      // R9 (RT-A4): the rate the supplier charged per paid unit (free units are a scheme, not a lower rate).
+      if (!best || b.date > best.date) best = { rate: round2(l.netRate), date: b.date, number: b.number };
     }
   }
   return best;

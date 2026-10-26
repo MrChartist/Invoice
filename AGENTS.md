@@ -100,6 +100,14 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   `import './tr-registry'`** (`tests/tr-registry.test.ts`). Trade profile = business type `wholesale` + packs
   `distributor` / `commodity` / `agency` (tabs on `/distribution`). Agency (arhatiya) sales post as normal sales and the
   bikri patti journal moves them to the principal; principals' goods sit in `consignment` godowns outside stock costing.
+- Round 9 (retail) company data: names in `src/lib/retail/rt-shared.ts` (12 tables of RT-A … RT-E, object
+  `retail_settings`, series `URD`, `ALT`, `SVC`, `KAR`), all backed up and synced; record / line fields in
+  `src/types/retail-r9.ts` (kept by `R9_RECORD_KEYS` / `R9_LINE_KEYS`). Rights and audit labels are registered at runtime by
+  `src/lib/retail/rt-registry.ts`: **every module that writes a Round 9 table must `import './rt-registry'`**
+  (`tests/rt-registry.test.ts`). Retail profile = business type `kirana` + `settings.retail_kind` + packs `pharmacy` /
+  `apparel` / `electronics` / `jewellery` (one desk tab each on `/inventory`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged).
+  Rule values in `src/lib/retail-rules.ts` (lazy only). `PurchaseLine.free_qty`: stock = paid + free, cost spread over
+  both, GST / ITC on the paid value (`readPurchaseLines` `quantity` / `paidQty` / `freeQty`, docs/features/retail-r9.md).
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
@@ -200,8 +208,10 @@ build-time config must use Vite's `VITE_` prefix.
 - `/practice` reads other companies' databases through `peekCompliance` (`company-peek.ts`): a version-less,
   read-only open that aborts any upgrade, so a missing or older database is never created or upgraded. Keep it that way.
 - `Godown.kind` (`src/types/stock.ts`) is a shared, append-only union (`'van' | 'expiry' | 'wip' | 'qc' | 'transit' |
-  'consignment'`); `nonSaleableGodowns` (`godowns.ts`) treats expiry / wip / qc / transit / consignment as non-saleable (a
-  sale line naming its agency lot `arrival_id` may still sell from consignment) — decide that for any new kind.
+  'site' | 'consignment' | 'used'`); `nonSaleableGodowns` (`godowns.ts`) treats expiry / wip / qc / transit / site /
+  consignment as non-saleable (a sale line naming its agency lot `arrival_id` may still sell from consignment) — decide
+  that for any new kind. R9: `'used'` (second-hand goods bought by exchange / buy-back, old gold) is **saleable**; a sale
+  from it is flagged for the margin scheme (`usedGoodsGodowns`, RT-D3 / RT-E3).
 - Recurring schedules in draft mode create **unnumbered** drafts; the number is taken on issue (`numberOnIssue` in
   `localDb.ts`), so no gap reaches GSTR-1 Table 13. Drafts numbered before QA round 3 keep their numbers.
 - Financial credit notes (`note_kind: 'financial'`, `FCN/FY…`, R2-A) carry no GST by default: GST / e-Invoice / e-Way
@@ -215,7 +225,9 @@ build-time config must use Vite's `VITE_` prefix.
   convert with `lineFactor` / `PurchaseLineCore.unitFactor` (`src/lib/units.ts`).
 - Receipt rows that moved no money: `gift_voucher_id` (R4-B, settles against "Gift vouchers outstanding"),
   `deposit_adjustment_id` (R5-C6, settled from a security deposit), `ra_journal_id` (R5-B5, GST TDS / labour cess on
-  an RA bill), plus `write_off` and `advance_id`. Every cash / bank reader (cash book, Today, bank reco, cash tally, payment
+  an RA bill), `exchange_purchase_id` (R9, settled by the customer's old device / old gold on a URD purchase voucher —
+  "Sundry creditors — exchange"), plus `write_off` and `advance_id`. (R9 COD cash tagged `rider_id` DID move: it posts to
+  the "Cash with riders" ledger until the rider settles — not a no-cash row.) Every cash / bank reader (cash book, Today, bank reco, cash tally, payment
   modes, Z report, Tally / CSV receipts, collection lag) must skip them with the ONE predicate `movedNoCash(p)`
   (`src/lib/no-cash.ts`, imported via `advance-tax.ts`), never its own marker checks; `tests/no-cash-readers.test.ts`
   guards new readers.

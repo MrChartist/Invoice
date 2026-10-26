@@ -7,7 +7,9 @@ import { PACK_IDS, activePacks, type PackId } from '../../lib/industry-packs';
 import { FEATURE_ROWS, featureState, type FeatureRow, type FeatureSection } from '../../lib/features-catalog';
 import { featureText } from './feature-text';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
-import { applyTradeKind } from '../../lib/shop-presets';
+import { applyRetailKind, applyTradeKind } from '../../lib/shop-presets';
+import { RetailKindPicker } from '../retail-r9/RetailKindPicker'; // R9 (RT-A1)
+import { rtaT } from '../../i18n/areas/retail-r9a';
 import { trT } from '../../i18n/areas/trade-r8c';
 import { can } from '../../lib/access';
 import { useT } from '../../i18n';
@@ -96,6 +98,23 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
           <div className={controls.field} data-features-trade>
             <span className={controls.label}>{trT('tradeTitle')}</span>
             <TradeKindPicker value={settings.trade_kind} custom disabled={!owner} onPick={(k) => onChange(k ? applyTradeKind(k) : { trade_kind: undefined })} />
+          </div>
+        )}
+        {settings.business_type === 'kirana' && (
+          <div className={controls.field} data-features-retail>
+            <span className={controls.label}>{rtaT('retailTitle')}</span>
+            <RetailKindPicker
+              value={settings.retail_kind}
+              custom
+              disabled={!owner}
+              onPick={(k) => {
+                if (!k) return onChange({ retail_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applyRetailKind(k, { registered }));
+                // The profile's switches (retail checks; pharma for a medical store) apply at once — they only turn checks on.
+                void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(k)).catch(() => undefined);
+              }}
+            />
           </div>
         )}
         <label className={controls.field} style={{ maxWidth: 360 }}>

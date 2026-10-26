@@ -72,6 +72,12 @@ const NON_SALEABLE: ReadonlySet<string> = new Set(['expiry', 'wip', 'qc', 'trans
 export const nonSaleableGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => !!g.kind && NON_SALEABLE.has(g.kind)).map((g) => g.id));
 /** R8-C (TR-C1): consignment godowns (principals' goods) — the one non-saleable kind an agency line may sell from. */
 export const consignmentGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => g.kind === 'consignment').map((g) => g.id));
+/**
+ * R9 (RT-A decision for the append-only `Godown.kind` union): 'used' (second-hand goods taken in exchange / bought from
+ * customers) is SALEABLE — it is deliberately not in `NON_SALEABLE` — but a sale line drawn from it is offered the
+ * margin scheme (Rule 32(5), RT12) by the RT-D3 / RT-E3 screens through this set.
+ */
+export const usedGoodsGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => g.kind === 'used').map((g) => g.id));
 
 export function godownName(list: readonly Godown[], id: string | undefined): string {
   const key = id || MAIN_GODOWN_ID;
