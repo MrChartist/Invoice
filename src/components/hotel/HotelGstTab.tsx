@@ -18,7 +18,7 @@ import { isPackOn } from '../../lib/industry-packs';
 import { todayIso } from '../../lib/tax-rules';
 import { hotelDb } from '../../lib/hotel/hotel-store';
 import { fyName, fyOfDay, fyRange, hotelGuards, restaurantRate, rupees } from '../../lib/hotel/hotel-gst';
-import { addDecl, premisesNow, removeDecl, setPrevFyValue, type PremisesStatus } from '../../lib/hotel/premises';
+import { addDecl, invoiceProperty, premisesNow, removeDecl, setPrevFyValue, type PremisesStatus } from '../../lib/hotel/premises';
 import { bandReport, hsn9963 } from '../../lib/hotel/band-report';
 import { B, errText } from '../transport/shared';
 import { Fields, Row, type Rec } from './FrontDesk';
@@ -50,11 +50,11 @@ export default function HotelGstTab({ notify }: { notify: (m: string, tone?: 'su
     if (!on) return null;
     const inv = getTable<InvoiceRecord>('invoices');
     const s = hotelDb.settings();
-    const memo = new Map<number, PremisesStatus>();
-    const status = (y: number) => memo.get(y) ?? memo.set(y, premisesNow(y)).get(y)!;
+    const memo = new Map<string, PremisesStatus>();
+    const status = (y: number, p?: string) => memo.get(`${y}|${p}`) ?? memo.set(`${y}|${p}`, premisesNow(y, p)).get(`${y}|${p}`)!;
     const sac = { room: s.sac_room, fnb: s.sac_fnb };
     const { from, to } = fyRange(fy);
-    return { s, status, bands: bandReport(inv, from, to, sac), hsn: hsn9963(inv, from, to), guards: hotelGuards(inv, getTable('purchases'), (y) => status(y).specified, from, to, sac) };
+    return { s, status, bands: bandReport(inv, from, to, sac), hsn: hsn9963(inv, from, to), guards: hotelGuards(inv, getTable('purchases'), (y, i) => status(y, invoiceProperty(i)).specified, from, to, sac) };
   }, [on, fy, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <p className={styles.note} data-hotel-gst-off>{cT('packOff')}</p>;
   const run = (fn: () => void) => {

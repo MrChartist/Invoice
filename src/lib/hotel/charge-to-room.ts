@@ -1,10 +1,11 @@
 /**
  * R7-B2 charge to room from the restaurant (Tables) and the POS. One `fnb` line per order (not per item) for the
  * pre-GST total, with the KOT numbers; the order is settled with `folio_id` (`settleToFolio`, so the day-close blocker
- * treats it as settled) and no invoice is made. The POS "Room" tender posts one `fnb` (restaurant SAC / no HSN) or
- * `misc` line and saves no POS bill, so the Z report counts no cash. Tax is charged by the check-out invoice (B3) at
+ * treats it as settled) and no invoice is made. The POS "Room" tender posts one line per item (QA9 H12) and saves no
+ * POS bill, so the Z report counts no cash. Tax is charged by the check-out invoice (B3) at
  * the C1 restaurant rate. Idempotent: an order already on a folio is not posted again (key `order:<id>`). "Undo"
- * (until the folio line is invoiced) removes the line and reopens the order, logged.
+ * (until the folio line is invoiced) removes the line and reopens the order, logged; voiding the line does the same
+ * (QA9 H13, `voidLine`).
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Folio } from '../../types/hotel-r7';
@@ -14,7 +15,7 @@ import { withTablesRollback } from '../table-txn';
 import { ordersDb, settleToFolio } from '../restaurant/orders-store';
 import { hotelDb, HT } from './hotel-store';
 import { HotelError } from './reservations';
-import { routeCharge, who } from './folio';
+import { reopenOrder, routeCharge } from './folio';
 
 export interface RoomOption {
   resId: string;
@@ -63,21 +64,44 @@ export function undoRoomCharge(orderId: string): TableOrder {
   if (line.src?.invoice_id || f.status === 'invoiced') throw new HotelError('The folio is already invoiced.');
   return withTablesRollback([HT.folios, 'table_orders'], () => {
     hotelDb.putFolios({ ...f, lines: f.lines.filter((l) => l.id !== line.id) });
-    const out: TableOrder = { ...order, status: 'open', log: [...order.log, { at: new Date().toISOString(), by: who(), kind: 'reopen', note: `Room charge undone (${f.name})` }] };
-    delete out.folio_id;
-    delete out.settled_at;
-    ordersDb.put(out);
-    return out;
+    return reopenOrder(order, `Room charge undone (${f.name})`);
   });
 }
 
-/** POS "Room" tender: one line for the bill's pre-GST value (no POS invoice, no Z-report cash). */
+/**
+ * POS "Room" tender (no POS invoice, no Z-report cash). QA9 H12: one folio line per bill item, with its own quantity,
+ * HSN and GST rate and its share of the bill's pre-GST value (item and bill discounts spread by value), so the
+ * check-out invoice taxes each at its own rate and its goods leave stock like a sale (matched by name + HSN). Items
+ * with a restaurant SAC (or none) are F&B at the C1 restaurant rate.
+ */
 export function chargePosToRoom(rec: Pick<InvoiceRecord, 'items' | 'taxable_value'>, target: Pick<RoomOption, 'resId' | 'lineId'>): Folio {
-  const fnb = rec.items.every((i) => !i.hsn || i.hsn.startsWith('9963'));
-  const rate = round2(rec.taxable_value);
-  if (!(rate > 0)) throw new HotelError('The bill is empty.');
-  return post(target, {
-    kind: fnb ? 'fnb' : 'misc', qty: 1, rate, tax_rate: Math.max(0, ...rec.items.map((i) => Number(i.tax_rate) || 0)),
-    desc: `POS · ${rec.items.slice(0, 3).map((i) => i.name).join(', ')}${rec.items.length > 3 ? ' …' : ''}`,
+  const total = round2(rec.taxable_value);
+  const items = rec.items.filter((i) => (Number(i.quantity) || 0) > 0);
+  const gross = items.map((i) => (Number(i.quantity) || 0) * (Number(i.rate) || 0) * (1 - (Number(i.discount_percent) || 0) / 100));
+  const sum = gross.reduce((s, x) => s + x, 0);
+  if (!(total > 0) || !(sum > 0)) throw new HotelError('The bill is empty.');
+  const amounts = gross.map((x) => round2((x * total) / sum));
+  amounts[0] = round2(amounts[0] + total - amounts.reduce((s, x) => s + x, 0));
+  const res = hotelDb.reservation(target.resId);
+  const stay = res?.lines.find((l) => l.id === target.lineId);
+  if (!res || stay?.status !== 'checked_in') throw new HotelError('Pick an in-house room.');
+  const room = hotelDb.rooms().find((r) => r.id === stay.room_id)?.number;
+  const day = hotelDb.settings().business_date;
+  let folios = hotelDb.folios();
+  const changed = new Map<string, Folio>();
+  items.forEach((i, k) => {
+    const hsn = String(i.hsn ?? '').trim();
+    const fnb = !hsn || hsn.startsWith('9963');
+    const qty = Number(i.quantity);
+    const f = routeCharge(folios, res, stay.id, {
+      kind: fnb ? 'fnb' : 'misc', desc: i.name, qty, rate: round2(amounts[k] / qty), room_no: room,
+      sac: fnb ? hsn || hotelDb.settings().sac_fnb : hsn, ...(fnb ? {} : { tax_rate: Number(i.tax_rate) || 0 }),
+    }, day);
+    const last = f.lines[f.lines.length - 1];
+    if (last.amount !== amounts[k]) f.lines[f.lines.length - 1] = { ...last, amount: amounts[k] };
+    changed.set(f.id, f);
+    folios = [...folios.filter((x) => x.id !== f.id), f];
   });
+  hotelDb.putFolios(...changed.values());
+  return [...changed.values()].pop()!;
 }

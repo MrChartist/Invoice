@@ -24,7 +24,7 @@ import { withTotals } from '../pos';
 import { round2 } from '../invoice-calc';
 import { generateId } from '../storage';
 import { shiftDay } from '../dates';
-import { ACCOMMODATION_RATE_RULES, HOTEL_RESTAURANT_RATE_RULES, SPECIFIED_PREMISES_RULES, accommodationBand, ruleAt } from './hotel-rules';
+import { ACCOMMODATION_RATE_RULES, HOTEL_RESTAURANT_RATE_RULES, accommodationBand, bandForInclusive, ruleAt } from './hotel-rules';
 import { NOTE_9_5, isRegistered } from './ota';
 import { nextDay } from './business-date';
 
@@ -36,36 +36,7 @@ const live = (l: FolioLine) => !l.void;
 export const billable = (f: Pick<Folio, 'lines'>, upTo?: string): FolioLine[] =>
   f.lines.filter((l) => live(l) && !l.src?.invoice_id && (!upTo || l.date <= upTo));
 
-const fyStart = (day: string) => (Number(day.slice(5, 7)) >= 4 ? Number(day.slice(0, 4)) : Number(day.slice(0, 4)) - 1);
-const startOf = (key: string) => Number(/\d{4}/.exec(key)?.[0] ?? 0);
-
-/** Highest unit-night value posted in the FY starting `fy` (folios; cancellation charges excluded). */
-export function fyMaxNight(folios: readonly Folio[], fy: number): number {
-  const by = new Map<string, number>();
-  for (const f of folios) for (const l of f.lines) {
-    if (!live(l) || !NIGHT_KINDS.has(l.kind) || l.kind === 'cancellation' || l.kind === 'no_show' || !l.src?.night || fyStart(l.src.night) !== fy) continue;
-    const k = `${l.src.line_id}|${l.src.night}`;
-    by.set(k, (by.get(k) ?? 0) + l.amount);
-  }
-  return Math.max(0, ...[...by.values()].map(round2));
-}
-
-/**
- * Specified premises for the FY of `day` (minimal C1 reading until the GST desk lands `premisesStatus`): clause (a)
- * previous-FY unit-night value above the threshold (typed figure or the folios), else the latest opt-in / opt-out
- * declaration in force (an opt-out never undoes clause (a), D4). Before 1 Apr 2025: not specified.
- */
-export function isSpecified(day: string, hs: Pick<HotelSettings, 'premises' | 'prev_fy_max_value'>, prevMax = 0): boolean {
-  const rule = ruleAt(SPECIFIED_PREMISES_RULES, day);
-  if (!rule) return false;
-  const fy = fyStart(day);
-  const typed = Object.entries(hs.prev_fy_max_value ?? {}).filter(([k]) => startOf(k) === fy - 1).reduce((m, [, v]) => Math.max(m, Number(v) || 0), 0);
-  if (Math.max(typed, prevMax) > rule.threshold) return true;
-  const decl = (hs.premises ?? []).filter((d) => startOf(d.fy) <= fy).sort((a, b) => startOf(a.fy) - startOf(b.fy) || a.filed_on.localeCompare(b.filed_on)).pop();
-  return !!decl && decl.kind !== 'opt_out';
-}
-
-/** F&B rate on `day` (C1 rule rows): 18% in specified premises, else 5%. */
+/** F&B rate on `day` (C1 rule rows): 18% in specified premises (R7-C `premisesStatus`, QA9 H4), else 5%. */
 export const fnbRate = (day: string, specified: boolean): number => {
   const r = ruleAt(HOTEL_RESTAURANT_RATE_RULES, day);
   return (specified ? r.specified : r.other).rate;
@@ -114,6 +85,20 @@ export interface CheckoutDraft {
   lineIds: string[];
 }
 
+/**
+ * Share `total` (≤ 0, an allowance) over `weights` (≥ 0) pro rata, never below zero on any of them; the rounding rest
+ * lands on the largest. What does not fit (total beyond the weights) is left out of the shares.
+ */
+export function spread(total: number, weights: readonly number[]): number[] {
+  const w = weights.reduce((s, x) => s + Math.max(x, 0), 0);
+  if (!(w > 0) || !total) return weights.map(() => 0);
+  const t = Math.max(total, -w);
+  const out = weights.map((x) => round2((t * Math.max(x, 0)) / w));
+  const i = weights.indexOf(Math.max(...weights));
+  out[i] = round2(out[i] + t - out.reduce((s, x) => s + x, 0));
+  return out;
+}
+
 const dm = (d: string) => `${Number(d.slice(8))}/${Number(d.slice(5, 7))}`;
 
 /** One window's invoice draft (unsaved, unnumbered). `lines` default to the window's billable lines. */
@@ -126,45 +111,68 @@ export function buildCheckoutInvoice(folio: Folio, ctx: CheckoutCtx, lines: Foli
   const untaxed = bos || nine5 || !isRegistered(sender);
   // Unit-nights: room-type lines (and allowances linked to a night) keyed by room line × night.
   const nights = new Map<string, FolioLine[]>();
-  let discount = 0;
+  let loose = 0;
   for (const l of lines) {
     const linked = l.src?.line_id && l.src?.night;
     if (NIGHT_KINDS.has(l.kind) || (l.kind === 'allowance' && linked)) {
       const k = l.band_value ? l.id : linked ? `${l.src!.line_id}|${l.src!.night}` : l.id;
       nights.set(k, [...(nights.get(k) ?? []), l]);
-    } else if (l.kind === 'allowance') discount = round2(discount - l.amount);
+    } else if (l.kind === 'allowance') loose = round2(loose + l.amount);
   }
+  // A linked allowance billed without its night (another window / invoice) is spread like an unlinked one.
+  for (const [k, g] of nights) if (!g.some((l) => l.kind !== 'allowance')) {
+    loose = round2(loose + g.reduce((s, l) => s + l.amount, 0));
+    nights.delete(k);
+  }
+  const nightGroups = [...nights.values()];
+  const others = lines.filter((l) => !NIGHT_KINDS.has(l.kind) && l.kind !== 'allowance');
+  // QA9 H5 (D2): an allowance not linked to a night lowers the nights pro rata BEFORE banding (else the other lines);
+  // only what is left over after that becomes a document discount.
+  const net = (g: FolioLine[]) => round2(g.reduce((s, l) => s + l.amount, 0));
+  const onNights = spread(loose, nightGroups.map(net));
+  const onOthers = spread(round2(loose - onNights.reduce((s, x) => s + x, 0)), others.map((l) => Math.max(l.amount, 0)));
+  const discount = Math.max(round2(-(loose - onNights.reduce((s, x) => s + x, 0) - onOthers.reduce((s, x) => s + x, 0))), 0);
   const groups = new Map<string, { item: InvoiceItem; dates: string[] }>();
   const add = (l: FolioLine, amount: number, rate: number, sac: string) => {
     const unit = round2(amount / (l.qty || 1));
     const key = [l.kind, l.room_no, l.desc, unit, rate, sac].join('|');
     const g = groups.get(key);
+    const goods = !!sac && !sac.startsWith('99');
     if (g) {
       g.item.quantity = round2(g.item.quantity + (l.qty || 1));
       g.dates.push(l.src?.night ?? l.date);
-    } else groups.set(key, { item: { id: generateId(), name: l.desc, description: '', type: 'Service', hsn: sac, unit: 'NOS', quantity: l.qty || 1, rate: unit, tax_rate: untaxed ? 0 : rate, discount_percent: 0, amount: 0 }, dates: [l.src?.night ?? l.date] });
+    } else groups.set(key, { item: { id: generateId(), name: l.desc, description: '', type: goods ? 'Product' : 'Service', hsn: sac, unit: 'NOS', quantity: l.qty || 1, rate: unit, tax_rate: untaxed ? 0 : rate, discount_percent: 0, amount: 0 }, dates: [l.src?.night ?? l.date] });
   };
   const bands = new Set<'low' | 'high'>();
   const annexure: AnnexureRow[] = [];
   let changed = 0;
-  for (const group of nights.values()) {
+  nightGroups.forEach((group, gi) => {
     const base = group.filter((l) => l.kind !== 'allowance');
-    const allow = round2(group.filter((l) => l.kind === 'allowance').reduce((s, l) => s + l.amount, 0));
-    const value = round2(group[0].band_value ?? group.reduce((s, l) => s + l.amount, 0));
-    const b = accommodationBand(value, day);
+    const allow = round2(group.filter((l) => l.kind === 'allowance').reduce((s, l) => s + l.amount, 0) + onNights[gi]);
+    const baseSum = round2(base.reduce((s, l) => s + l.amount, 0));
+    let amounts = base.map((l, i) => round2(l.amount + spread(allow, base.map((x) => Math.max(x.amount, 0)))[i]));
+    let b;
+    if (!group[0].band_value && !allow && base.every((l) => l.gross)) {
+      // QA9 H2: a tax-inclusive night keeps its agreed price — the value is re-solved from the gross at the invoice
+      // date's rule (the gap takes the higher band, D6), so value + GST = the plan price. Verify with your CA (HT11).
+      b = bandForInclusive(round2(base.reduce((s, l) => s + l.gross!, 0)), day);
+      const v = b.exempt ? round2(base.reduce((s, l) => s + l.gross!, 0)) : b.value;
+      amounts = base.map((l) => round2((l.amount * v) / (baseSum || 1)));
+      amounts[0] = round2(amounts[0] + v - amounts.reduce((s, x) => s + x, 0));
+    } else b = accommodationBand(round2(group[0].band_value ?? baseSum + allow), day);
     bands.add(b.band);
     const night = group[0].src?.night ?? group[0].date;
     if (ruleFrom(night) !== ruleFrom(day)) changed++;
     base.forEach((l, i) => {
-      const amt = i === 0 ? round2(l.amount + allow) : l.amount; // linked allowance folds into the night's first line
+      const amt = amounts[i];
       if (amt > 0) add(l, amt, b.exempt ? 0 : b.rate, l.sac || ctx.hs.sac_room);
       annexure.push({ date: night, who: l.room_no, description: `${l.kind.replace('_', ' ')} · ${l.desc}`, minutes: 0, billed_minutes: 0, rate: amt, amount: amt });
     });
-  }
-  for (const l of lines) {
-    if (NIGHT_KINDS.has(l.kind) || l.kind === 'allowance') continue;
-    add(l, l.amount, l.kind === 'fnb' ? ctx.fnb : l.tax_rate ?? ctx.settings.defaultTaxRate, l.sac || (l.kind === 'fnb' ? ctx.hs.sac_fnb : ''));
-  }
+  });
+  others.forEach((l, i) => {
+    const amt = round2(l.amount + onOthers[i]);
+    if (amt > 0) add(l, amt, l.kind === 'fnb' ? ctx.fnb : l.tax_rate ?? ctx.settings.defaultTaxRate, l.sac || (l.kind === 'fnb' ? ctx.hs.sac_fnb : ''));
+  });
   const items = [...groups.values()].map(({ item, dates }) => {
     const s = [...dates].sort();
     return { ...item, description: s.length > 1 || item.hsn === ctx.hs.sac_room ? `${s.length} × (${dm(s[0])}–${dm(nextDay(s[s.length - 1]))})` : '', amount: round2(item.quantity * item.rate) };
@@ -185,7 +193,7 @@ export function buildCheckoutInvoice(folio: Folio, ctx: CheckoutCtx, lines: Foli
     discount_type: 'AMOUNT',
     discount_rate: Math.max(discount, 0),
     folio_id: folio.id,
-    ...(res ? { reservation_id: res.id, stay: { arrival: res.arrival, departure: res.departure, rooms: ctx.rooms ?? [], nights: nightSet.size, adults: res.lines.reduce((s, l) => s + l.adults, 0), children: res.lines.reduce((s, l) => s + l.children, 0) } } : {}),
+    ...(res ? { reservation_id: res.id, stay: { arrival: res.arrival, departure: res.lines.map((l) => l.departure || res.departure).sort().pop() ?? res.departure, rooms: ctx.rooms ?? [], nights: nightSet.size, adults: res.lines.reduce((s, l) => s + l.adults, 0), children: res.lines.reduce((s, l) => s + l.children, 0) } } : {}),
     ...(band ? { hotel_band: band } : {}),
     ...(annexure.length ? { annexure: { kind: 'timesheet' as const, rows: annexure.sort((a, b) => a.date.localeCompare(b.date)) } } : {}),
     notes: [ctx.extra?.notes, nine5 ? NOTE_9_5 : '', res ? `${folio.name} · ${res.arrival} → ${res.departure}` : folio.name].filter(Boolean).join('\n'),

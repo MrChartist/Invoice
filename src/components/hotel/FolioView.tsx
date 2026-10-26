@@ -24,7 +24,10 @@ import { VoidPinRequired, openHouseFolio, postCharge, splitLine, stayFolios, tra
 import { TDS_DEFAULTS, billKind, setBillTo, tdsCode, tdsLabel } from '../../lib/hotel/bill-to';
 import { commissionDue } from '../../lib/hotel/agent-commission';
 import { billable, interimDates } from '../../lib/hotel/checkout';
-import { advancesFor, draftFor, saveCheckout } from '../../lib/hotel/checkout-save';
+import { advancesFor, draftFor, nightsToPost, reconcileFolios, saveCheckout } from '../../lib/hotel/checkout-save';
+import { catchUpLine } from '../../lib/hotel/night-audit';
+import { nextDay } from '../../lib/hotel/business-date';
+import { undoRoomCharge } from '../../lib/hotel/charge-to-room';
 import { cancelCharge, chargeCancellation } from '../../lib/hotel/cancellation';
 import { payoutCandidates, payoutPlan, postPayout } from '../../lib/hotel/ota-payout';
 import { B, errText, printHtml } from '../transport/shared';
@@ -51,7 +54,7 @@ export default function FolioView({ ctx }: { ctx: Ctx }) {
 /* ── Folio list and panel (B1, B4) ─────────────────────────────── */
 
 function Folios({ ctx }: { ctx: Ctx }) {
-  const d = useMemo(() => ({ folios: hotelDb.folios(), clients: localDb.clients.getAll().filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const) }), [ctx.tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const d = useMemo(() => (reconcileFolios(), { folios: hotelDb.folios(), clients: localDb.clients.getAll().filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const) }), [ctx.tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const [q, setQ] = useState<Rec>({ q: '', house: '', sel: '' });
   const s = String(q.q).trim().toLowerCase();
   const f = d.folios.find((x) => x.id === q.sel);
@@ -100,6 +103,7 @@ function Panel({ ctx, f, all, clients }: { ctx: Ctx; f: Folio; all: Folio[]; cli
   const ld = res && line ? lineDates(res, line) : null;
   const due = ld ? interimDates(ld.arrival, ld.departure, hs.interim_days, hs.interim_year_end).filter((x) => x <= ctx.day && billable(f).some((l) => l.date < x)) : [];
   const live = f.lines.filter((l) => !l.void);
+  const order = pick.length === 1 ? f.lines.find((l) => l.id === pick[0])?.src?.table_order_id : undefined;
   const print = () => printHtml(`<h2>${esc(localDb.settings.activeProfile()?.companyName)} · ${esc(f.name)}</h2><p><b>${bT('proforma')}</b> · ${esc(f.payer.name)}</p><table border="1" cellpadding="4">${live.map((l) => `<tr><td>${l.date}</td><td>${esc(l.desc)}</td><td>${l.qty}</td><td>${money(l.amount)}</td></tr>`).join('')}</table><p>${hT('total')}: ${money(sum(f, true))}</p>`, f.name);
   return (
     <div className={styles.box} data-folio-panel={f.name}>
@@ -114,6 +118,7 @@ function Panel({ ctx, f, all, clients }: { ctx: Ctx; f: Folio; all: Folio[]; cli
         <button type="button" className={B.os} disabled={pick.length !== 1 || !f.line_id} onClick={() => run(() => splitLine(f.id, pick[0], op.qty ? { qty: num(op.qty) } : { amount: num(op.amount) }, num(op.window)))}><Split size={14} aria-hidden="true" /> {bT('split')}</button>
         <button type="button" className={B.os} onClick={() => run(() => transferLines(f.id, pick, op.to ? { folioId: String(op.to) } : { window: num(op.window) }))}><ArrowLeftRight size={14} aria-hidden="true" /> {bT('transfer')}</button>
         <button type="button" className={B.gs} disabled={pick.length !== 1} onClick={() => void doVoid()}><XCircle size={14} aria-hidden="true" /> {bT('void')}</button>
+        {order && <button type="button" className={B.os} onClick={() => run(() => undoRoomCharge(order))} data-undo-room-charge>{bT('undo')}</button>}
       </Row>}
       <Row>
         <Fields v={c} set={(p) => setC({ ...c, ...p })} spec={[['kind', 'kind', POST_KINDS], ['item', bT('item'), [['', '—'], ...items.map((i) => [i.id, i.name] as const)]], ['desc', bT('desc')], ['qty', bT('qty'), 'n'], ['rate', bT('rate'), 'n'], ['gst', bT('gst'), 'n']]} />
@@ -162,7 +167,8 @@ function BillTo({ ctx, res, clients }: { ctx: Ctx; res: Reservation; clients: re
 
 function Checkout({ ctx, f, res, interim, close }: { ctx: Ctx; f: Folio; res?: Reservation; interim: boolean; close: () => void }) {
   const wins = useMemo(() => (res && f.line_id ? stayFolios(hotelDb.folios(), res.id, f.line_id) : [f]).filter((w) => w.status === 'open').map((w) => ({ w, advs: advancesFor(w, res) })), [f, res]);
-  const [p, setP] = useState<Record<string, Rec>>(() => Object.fromEntries(wins.map(({ w, advs }) => [w.id, { method: 'UPI', ...Object.fromEntries(advs.map((a) => [a.id, true])) }])));
+  const [p, setP] = useState<Record<string, Rec>>(() => Object.fromEntries(wins.map(({ w, advs }) => [w.id, { method: 'UPI', ...Object.fromEntries(advs.map((a) => [a.id, a.own])) }])));
+  const toPost = nightsToPost(f, interim, ctx.day);
   const [done, setDone] = useState<InvoiceRecord[]>([]);
   const rows = wins.map(({ w, advs }) => {
     const s = p[w.id];
@@ -189,6 +195,10 @@ function Checkout({ ctx, f, res, interim, close }: { ctx: Ctx; f: Folio; res?: R
     <Modal open size="lg" onClose={close} title={`${interim ? bT('interim') : hT('checkOut')} · ${f.name}`}
       footer={<>{!done.length && <button type="button" className={B.p} onClick={save} data-checkout-save><ReceiptText size={16} aria-hidden="true" /> {bT('saveInvoices')}</button>}<button type="button" className={B.o} onClick={close}>{hT('close')}</button></>}>
       <div className={styles.stack}>
+        {!done.length && toPost.length > 0 && res && f.line_id && <Row>
+          <span className={styles.warn} data-nights-to-post={toPost.length}>{bT('toPost', { n: toPost.length, d: toPost.join(', ') })}</span>
+          <button type="button" className={B.os} onClick={() => ctx.run(() => { catchUpLine(res.id, f.line_id!, nextDay(toPost[toPost.length - 1])); close(); })}>{bT('postNow')}</button>
+        </Row>}
         {done.length ? <Row>{done.map((i) => <Link key={i.id} className={B.o} to={`/invoice/${i.id}`} data-checkout-invoice>{i.invoice_number}</Link>)}</Row> : rows.map(({ w, s, advs, dr, pay }) => (
           <div key={w.id} className={styles.box} data-checkout-window={w.window}>
             <strong>{w.name} · {w.payer.name}</strong>

@@ -12,7 +12,7 @@ import { calcInputFromRecord, calculateInvoice, round2 } from '../invoice-calc';
 import { isRevenueDoc } from '../stats';
 import { isNonGstFinancialNote } from '../financial-note';
 import { isVoidStatus, readPurchase } from '../purchase-normalize';
-import { ACCOMMODATION_RATE_RULES, HOTEL_RESTAURANT_RATE_RULES, accommodationBand, ruleAt } from './hotel-rules';
+import { ACCOMMODATION_RATE_RULES, HOTEL_RESTAURANT_RATE_RULES, accommodationBand, bandForInclusive, ruleAt } from './hotel-rules';
 
 export {
   ACCOMMODATION_RATE_RULES, HOTEL_RESTAURANT_RATE_RULES, SPECIFIED_PREMISES_RULES, FORM_C_HOURS_RULES,
@@ -96,10 +96,10 @@ const inRange = (d: string | undefined, from: string, to: string) => !!d && d.sl
 /**
  * The desk's guards for invoices dated `from`…`to`: a room line whose rate disagrees with its band (an extra-bed /
  * person line may ride at the rate of a room line that passes), F&B whose rate disagrees with `restaurantRate`, an
- * IGST hotel invoice (F6: place of supply = the property), and ITC claimed on bills while every room-night of the
+ * IGST hotel invoice (F6: place of supply = the property; F&B judged by the invoice's own premises, QA9 H4), and ITC claimed on bills while every room-night of the
  * period sits in a no-ITC band (one row, with the ITC total).
  */
-export function hotelGuards(invoices: readonly InvoiceRecord[], purchases: readonly unknown[], specified: (fy: number) => boolean, from: string, to: string, sac: Sacs = DEFAULT_SACS): Guard[] {
+export function hotelGuards(invoices: readonly InvoiceRecord[], purchases: readonly unknown[], specified: (fy: number, inv: InvoiceRecord) => boolean, from: string, to: string, sac: Sacs = DEFAULT_SACS): Guard[] {
   const out: Guard[] = [];
   let rooms = 0;
   let noItcRooms = 0;
@@ -117,9 +117,12 @@ export function hotelGuards(invoices: readonly InvoiceRecord[], purchases: reado
       rooms++;
       if (noItcValue(l, date)) noItcRooms++;
       // An extra bed / person line rides at a passing room line's higher rate (D2: one unit-day value).
-      if (l.rate !== expect && !(ok.includes(l.rate) && l.rate > expect)) out.push({ kind: 'band', ...g, expect, got: l.rate, amount: l.unit });
+      // QA9 H2: a tax-inclusive night in the band gap is charged at the higher band on a value below the limit — the
+      // app's own check-out (hotel_band high / mixed) passes when that rate is the inclusive solve of its gross.
+      const gap = inv.hotel_band !== 'low' && !!inv.hotel_band && bandForInclusive(round2(l.unit * (1 + l.rate / 100)), date).rate === l.rate;
+      if (l.rate !== expect && !(ok.includes(l.rate) && l.rate > expect) && !gap) out.push({ kind: 'band', ...g, expect, got: l.rate, amount: l.unit });
     }
-    const fnb = restaurantRate({ specified: specified(fyOfDay(date)) }, date).rate;
+    const fnb = restaurantRate({ specified: specified(fyOfDay(date), inv) }, date).rate;
     for (const l of lines) if (l.kind === 'fnb' && l.rate !== fnb) out.push({ kind: 'fnb', ...g, expect: fnb, got: l.rate });
   }
   if (rooms > 0 && noItcRooms === rooms) {

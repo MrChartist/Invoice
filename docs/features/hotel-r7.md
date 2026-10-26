@@ -330,3 +330,45 @@ the `hotel-lazy` preload list, ≈ 0.3 kB each GST page / common credit, ≈ 0.3
 **Over the 8 kB share by ≈ 3.2 kB** after cut-first (C3 reduced, interim notice left to B3, Form C field labels shown as
 the portal's names like A's check-in form, help text trimmed). Next cuts if wanted: the HSN 9963 table (≈ 0.2 kB), the
 arrivals / due-outs / audit bell rows (≈ 0.4 kB), the Excel buttons, the room-type report, shorter Hindi strings.
+
+---
+
+# QA round 9 fixes (H1–H16, `docs/prd/qa-round-9.md`)
+
+Every finding is pinned by `tests/hotel-qa9.test.ts` (one or two tests per finding, named `QA9 Hn: …`; check-outs pass
+`at` so the leave day is fixed). Statutory readings stay working papers — verify with your CA (`docs/CA_REVIEW.md` §7,
+"QA9 notes").
+
+| # | Fix | Where |
+|---|---|---|
+| H1 | A final check-out first posts every un-posted night of the line before the day the guest leaves (`leaveDay` = booked departure, or earlier: the later of the business date and the device's day), with the audit's own idempotent post (`catchUpLine`); windows the catch-up opened are billed too. The dialog lists those nights with a one-tap "Post them now". `markCheckedOut` refuses a line with un-posted nights or unbilled folio lines ("Bill the stay first: Folios → Check out"), so the Reservations / audit check-out buttons only close comp or billed stays | `business-date.ts` `leaveDay`, `night-audit.ts` `postCtx` / `catchUpLine`, `room-post.ts` `pendingNights`, `checkout-save.ts` `stayToPost` / `nightsToPost`, `checkin.ts`, `FolioView.tsx` |
+| H2 | Tax-inclusive nights: folio lines carry their share of the agreed `gross`; check-out re-solves the night's value from the gross with `bandForInclusive` at the **invoice date** (lowest band that fits, else the higher band — the ₹7,875.01–₹8,850 gap is 18% on a value below ₹7,500), so value + GST = the plan price. The snapshot still solves with the night's own rule (booking value, advance). The GST tab's band guard accepts a gap line on the app's own invoices (`hotel_band` high / mixed) | `room-post.ts`, `checkout.ts`, `folio.ts` (split keeps `gross` pro rata), `hotel-gst.ts` |
+| H3 | Meals priced separately: the meal is **inside** the plan rate — the room posts at rate − meal and the meal as one `fnb` line; the folio totals the snapshot `total`, as `premises.ts` reads it | `room-post.ts` `nightLines` |
+| H4 | `isSpecified` / `fyMaxNight` removed: check-out takes F&B from `premisesNow(fy, stayProperty(res, line, rooms)).specified`; `stayProperty` (booking's `property_id`, else its room's) also picks the sender profile. `prevFyMax` reads posted, non-void room-kind folio lines plus linked allowances per room line × night (snapshot only for a night with no folio line). The GST tab judges each invoice's F&B by its own premises (`invoiceProperty`) | `premises.ts`, `checkout-save.ts`, `HotelGstTab.tsx` |
+| H5 | An allowance not linked to a night is spread over the nights pro rata **before** banding (else over the other lines); only a rest beyond every line is a document discount (`spread`) | `checkout.ts` |
+| H6 | An allowance follows the charge it reduces: the window holding its linked night, else the window room charges route to (unless a routing rule names allowances). A window left at ≤ 0 says "move the allowance to the window it discounts" | `folio.ts` `chargeWindow`, `checkout-save.ts` |
+| H7 | Cancellation: the company is the payer (B2B, its GSTIN) when it guaranteed the booking or paid any of its advances; the booking's own advances are adjusted, the rest refunded | `cancellation.ts` |
+| H8 | Check-out offers the booking's own advances and advances taken for no booking, of the window's payer — never another booking's; only the booking's own are pre-ticked (`own`) | `checkout-save.ts` `advancesFor`, `FolioView.tsx` |
+| H9 | An early check-out trims the line: `departure` = the day the guest left (`booked_departure` keeps the booked day), `nightly` = nights stayed — occupancy, ADR, availability and the previous-FY test follow | `checkin.ts` `trimLine` |
+| H10 | On 31 March (business date, before the audit rolls it) the night-audit view offers "Interim invoices dated 31 March" (`yearEndInterims`): the 31 March night is posted first and every in-house stay's interim is dated 31 March in the old FY. A folio's interim on 31 March does the same | `checkout-save.ts`, `FrontDesk.tsx` |
+| H11 | A deleted (recycle bin) or cancelled check-out invoice frees its folio lines (`src.was_invoice_id`) and reopens the folio; a restored invoice gets its lines back while they are free and the folio closes again; the bin refuses the restore once the lines were billed again (recycle-bin `invoices` hook). Reconciled lazily (`reconcileFolios`) on the Folios view and before every check-out save — `localDb` (first paint) is unchanged | `checkout-save.ts`, `trust/recycle-bin.ts` |
+| H12 | POS "Room" tender: one folio line per item with its quantity, HSN, GST rate and its share of the bill's pre-GST value; goods lines become `Product` items on the check-out invoice, so GST, HSN and stock (name + HSN, on the invoice date) see them | `charge-to-room.ts`, `checkout.ts` |
+| H13 | "Undo room charge" on a folio line that came from a restaurant order; voiding such a line reopens the order (`reopenOrder`, logged) | `folio.ts`, `charge-to-room.ts`, `FolioView.tsx` |
+| H14 | The edit log drops nested hidden fields (phone, email, address …) from object values | `audit-edits.ts` `show()` |
+| H15 | Night audit payments by mode add the bookings' advance receipts dated that night and subtract their refunds | `night-audit.ts` |
+| H16 | An in-house booking is lock-checked per changed night (`changedNights`): an extension past a locked arrival month is allowed; a change to a locked night is still refused | `reservations.ts` |
+
+Superseded statements above: R7-B's "`isSpecified` is a stand-in" (now `premisesStatus`), "POS: one `fnb` … or `misc` line for
+the bill's taxable value" (now one line per item), "an allowance … one linked to a night lowers that night's value" (unlinked
+ones are spread too), and R7-A's "meal is information" for meals-separate plans (the room posts net of the meal).
+
+Strings: `bT` `undo`, `toPost`, `postNow`, `yearEndGo` (en + hi). No new table, key, series or icon.
+
+## Bundle (QA9, gzip, `npm run build`, against `692fe40`)
+
+| | Before | After QA9 | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 189,022 B | 189,026 B | +4 B (`audit-edits.ts` replacer) |
+| Total JS | 2,743,437 B | 2,745,934 B | +2,497 B (≈ 2.4 kB) |
+
+FrontDesk chunk 44,748 → 47,792 B; recycle-bin chunk +96 B.

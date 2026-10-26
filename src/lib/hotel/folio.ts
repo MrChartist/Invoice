@@ -11,9 +11,12 @@ import { generateId } from '../storage';
 import { round2 } from '../invoice-calc';
 import { currentActor, currentRole } from '../access';
 import { todayIso } from '../tax-rules';
-import { hotelDb } from './hotel-store';
+import type { TableOrder } from '../../types/restaurant';
+import { withTablesRollback } from '../table-txn';
+import { ordersDb } from '../restaurant/orders-store';
+import { HT, hotelDb } from './hotel-store';
 import { HotelError } from './reservations';
-import { folioOf, newFolio, windowFor } from './room-post';
+import { ROOM_KINDS, folioOf, newFolio, windowFor } from './room-post';
 
 export const who = (): string => currentActor()?.name || 'Owner';
 const live = (l: FolioLine) => !l.void;
@@ -59,9 +62,20 @@ export function windowFolio(folios: readonly Folio[], res: Reservation, lineId: 
   return folioOf(folios, res.id, lineId, window) ?? newFolio(res, { id: lineId }, window, day);
 }
 
+/**
+ * Window of a charge for a stay. QA9 H6: an allowance follows the charge it reduces — the window holding its linked
+ * night's room line, else the window room charges route to — unless a routing rule names allowances.
+ */
+export function chargeWindow(folios: readonly Folio[], res: Reservation, lineId: string, c: Pick<ChargeInput, 'kind' | 'src'>): number {
+  if (c.kind !== 'allowance' || (res.routing ?? []).some((r) => r.kinds.includes('allowance'))) return windowFor(res, c.kind);
+  const night = c.src?.night;
+  const held = night && folios.find((f) => f.reservation_id === res.id && f.line_id === lineId && f.lines.some((l) => !l.void && l.src?.night === night && ROOM_KINDS.has(l.kind)));
+  return held ? held.window : windowFor(res, 'room');
+}
+
 /** Route a charge to its window for a stay (pure): returns the changed folio. */
 export function routeCharge(folios: readonly Folio[], res: Reservation, lineId: string, c: ChargeInput, day: string): Folio {
-  const f = windowFolio(folios, res, lineId, windowFor(res, c.kind), day);
+  const f = windowFolio(folios, res, lineId, chargeWindow(folios, res, lineId, c), day);
   return { ...f, lines: [...f.lines, chargeLine(c, day)] };
 }
 
@@ -106,6 +120,10 @@ export function splitLinePure(src: Folio, dst: Folio, lineId: string, by: { qty?
     if (!(Math.abs(a) > 0 && Math.abs(a) < Math.abs(l.amount))) throw new HotelError('Split an amount below the line amount.');
     part = { ...l, id: generateId(), qty: 1, rate: a, amount: a };
     rest = { ...l, qty: 1, rate: round2(l.amount - a), amount: round2(l.amount - a) };
+  }
+  if (l.gross) {
+    part.gross = round2((l.gross * part.amount) / l.amount);
+    rest.gross = round2(l.gross - part.gross);
   }
   if (part.key) part.key = `${part.key}:s${part.id.slice(-4)}`;
   part.moved_from = src.name;
@@ -161,7 +179,21 @@ export function voidLine(folioId: string, lineId: string, reason: string, opts: 
   if (l.key?.startsWith('stay:') && !ROOM_VOID_REASONS.includes(why.toLowerCase())) throw new HotelError(`A posted room night is voided only as "${ROOM_VOID_REASONS.join('" or "')}".`);
   if (!opts.ownerOk && needsVoidPin(folios, l, who(), currentRole(), hotelDb.settings().clerk_void_cap, at)) throw new VoidPinRequired('Above the void limit — the owner\'s PIN is needed.');
   const out = { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, void: { by: who(), at: at.toISOString(), reason: why } } : x)) };
-  hotelDb.putFolios(out);
+  const order = l.src?.table_order_id ? ordersDb.get(l.src.table_order_id) : undefined;
+  // QA9 H13: voiding a restaurant room charge reopens its order (settle it at the table or charge it again).
+  withTablesRollback([HT.folios, 'table_orders'], () => {
+    hotelDb.putFolios(out);
+    if (order?.folio_id) reopenOrder(order, `Room charge voided (${f.name}): ${why}`);
+  });
+  return out;
+}
+
+/** An order settled to a folio back to open (the room charge was undone or voided), logged. */
+export function reopenOrder(order: TableOrder, note: string): TableOrder {
+  const out: TableOrder = { ...order, status: 'open', log: [...order.log, { at: new Date().toISOString(), by: who(), kind: 'reopen', note }] };
+  delete out.folio_id;
+  delete out.settled_at;
+  ordersDb.put(out);
   return out;
 }
 
