@@ -395,3 +395,24 @@ Acceptance (desktop / phone): SmartFind keystroke p95 < 150 ms / < 400 ms; clien
 `$P/out/suite-desktop.json`, `suite-phone.json`, `suite-desktop-spy-prof.json` (per-step profile top lists and
 JSON-spy groups), `extras-desktop.json`, `extras-phone.json`, `perf-test-5000.txt`, `perf-test-15000.txt`,
 `*.cpuprofile` (open in Chrome DevTools → Performance).
+
+## PERF-1 — after (data layer, background work, save path)
+
+Same dataset and harness, production build, desktop, both builds measured back-to-back at load average ~3
+(`$P/../perf1/out/before3-*`, `after2-*`). Cold start / bell = median of 3 (`extras.mjs`); phone = 1 run.
+
+| Interaction | Before | After | |
+|---|---|---|---|
+| Cold start: main thread quiet | 14.6 s (14.4–16.5), max LT 2.2 s | **6.6 s** (6.4–7.0), max LT 1.2 s | parses of `invoices`: 26 → **1** |
+| Cold start, phone (4× CPU) | 64 s, max LT 13.8 s | **30 s**, max LT 5.0 s | |
+| Bell refresh on focus (unchanged data) | 4.7–5.2 s one long task | **57 ms**, no long task | phone 20–36 s → 63 ms |
+| Save invoice (click → saved / busy) | 13.4 s / 15.0 s, max LT 4.7 s | **5.1 s / 5.9 s**, max LT 3.0 s | parses of `invoices` per save: 24 → **0** |
+| Editor open / item-name typing | 1.35 s / 2.3 s (8 keys) | 0.84 s / 1.45 s | |
+| POS open | 2.1 s | **0.58 s** | |
+| Books P&L | 2.9 s | 1.7 s | |
+| Annual pack open | 1.9–7.0 s | **0.8 s** | |
+| Backup export / pick → dialog | 9.9 s / 3.3 s | 3.4 s / 2.4 s | |
+
+Still open after PERF-1 (owned elsewhere or out of scope): SmartFind (PERF-2), client-name typing (PERF-2
+AdvanceNotice), the one 36 MB stringify per save (~0.5 s) and ~13 audit-log rewrites per save (~2 MB each);
+remaining save time is the editor's own re-render work.

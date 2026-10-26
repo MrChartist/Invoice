@@ -19,7 +19,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
-import { DB_PREFIX, generateId, getJson, setJson } from './storage';
+import { DB_PREFIX, generateId, getJson, peekTable, setJson } from './storage';
 import { num, round2 } from './invoice-calc';
 import { creditNotesFor, readLinks, type DocLink } from './documents';
 import { localDb } from './localDb';
@@ -369,7 +369,7 @@ export function interestInputFor(
 /** Interest for a stored invoice using the saved config of its sender profile. Reads storage. */
 export function accruedInterestFor(invoice: InvoiceRecord, asOf: string | Date = new Date()): InterestResult {
   const config = getLateFeeConfig(invoice.sender?.id);
-  const input = interestInputFor(invoice, localDb.payments.listFor(invoice.id), readLinks(), localDb.invoices.getAll());
+  const input = interestInputFor(invoice, localDb.payments.listFor(invoice.id), readLinks(), peekTable<InvoiceRecord>('invoices') as InvoiceRecord[]); // read-only (PERF-1)
   return computeInterest(input, config, asOf);
 }
 

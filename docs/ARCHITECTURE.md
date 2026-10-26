@@ -62,6 +62,19 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 - **Table-write hook (WP-7).** `setTable` reports each successful write to ONE observer installed with
   `onTableWrite(hook)` — `(name, prevRaw, rows)`; `writeRaw` does not report. Only the audit edit log
   (`src/lib/audit-edits.ts`) uses it; errors in the observer are swallowed so it never breaks a save.
+- **Parsed-rows cache (PERF-1).** Each table is parsed once per stored version (keyed on the identity of the
+  stored string, plus the asset table for snapshot tables), so a `setTable`, `writeRaw`, restore, sync merge or
+  another tab's change is seen by the very next read. `peekTable` returns the shared rows (read-only);
+  `getTable` returns a new array of new top-level rows (`{ ...row }`) over them, so callers may push / splice /
+  sort and assign row fields as before, but must replace nested values (`items`, `sender`, `client` …) rather
+  than mutate them in place. In dev builds and under `node --test` the shared rows are deep-frozen, so such a
+  write throws. `setTable` seeds the next version from the rows it was given (cached rows and
+  unchanged `getTable` copies are reused, other rows go through a JSON round trip), so a save never parses the
+  table back. In `table-memo.ts` (outside the shell): `tableStamp(...)` is a cheap version token, `memoOnTables(id, tables, fn, extra)` /
+  `memoOnReads(id, fn, extra)` memoise derived results (the latter on every key `fn` read, nested memos
+  included) — results are shared and read-only; `storageVersion()` moves on any write (the notification bell
+  reuses its providers' result while it and the day are unchanged, recomputing at least every 5 minutes).
+  `tableParseCount` / `resetParseCounts` are test seams.
 - **Rule for new code.** No module evaluated before `initStorage()` (i.e. statically imported by `main.tsx` /
   `App.tsx`) may read storage at module level; read inside functions, effects or lazily loaded modules.
 
