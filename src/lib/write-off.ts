@@ -12,8 +12,9 @@ import { audit } from './audit';
 import { requireAccess } from './access';
 import { round2 } from './invoice-calc';
 import { localDb } from './localDb';
-import { receivableBalance } from './rcm';
-import { generateId, getTable, setTable } from './storage';
+import { lockState } from './period-lock';
+import { amountDue, linkedCredits, type CreditLinkRow } from './amount-due';
+import { generateId, getTable, peekTable, setTable } from './storage';
 import { withTablesRollback } from './table-txn';
 import { getIndianFY } from './invoice-number';
 import { saveVoucher } from './ledger/vouchers';
@@ -26,11 +27,24 @@ export const isWriteOff = (p: Pick<Payment, 'write_off' | 'method'> | null | und
 
 const WRITABLE = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
 
-/** Why an invoice cannot be written off ('' = it can). */
-export function writeOffBlock(inv: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<InvoiceRecord>): '' | 'type' | 'status' | 'nothing' {
+/** Live credit notes (incl. financial notes) linked to each bill: invoice id → amount (`amount-due.ts`). */
+export function creditsByBill(): Map<string, number> {
+  return linkedCredits(peekTable<CreditLinkRow>('doc_links'), peekTable<InvoiceRecord>('invoices'));
+}
+
+/**
+ * QA5 F2: what a write-off settles — the true amount due (receipts, TDS, linked credit notes and FCNs applied),
+ * the same `amountDue` the receivables and the dialog show, never the gross `total − paid`.
+ */
+export function writeOffAmount(inv: Pick<InvoiceRecord, 'id' | 'status'> & Partial<InvoiceRecord>, credits: ReadonlyMap<string, number> = creditsByBill()): number {
+  return round2(amountDue(inv as InvoiceRecord, credits.get(inv.id)));
+}
+
+/** Why an invoice cannot be written off ('' = it can). Pass `credits` (`creditsByBill`) when checking many bills. */
+export function writeOffBlock(inv: Pick<InvoiceRecord, 'id' | 'doc_type' | 'status'> & Partial<InvoiceRecord>, credits?: ReadonlyMap<string, number>): '' | 'type' | 'status' | 'nothing' {
   if (!WRITABLE.has(inv.doc_type)) return 'type';
   if (inv.status === 'Draft' || inv.status === 'Cancelled' || inv.status === 'Paid') return inv.status === 'Paid' ? 'nothing' : 'status';
-  if (!(receivableBalance(inv as InvoiceRecord) > 0.004)) return 'nothing';
+  if (!(writeOffAmount(inv, credits) > 0.004)) return 'nothing';
   return '';
 }
 
@@ -49,12 +63,14 @@ export function bulkWriteOff(ids: readonly string[], opts: { date: string; reaso
   for (const id of ids) {
     const inv = localDb.invoices.getById(id);
     if (!inv) continue;
-    const block = writeOffBlock(inv);
+    // Fresh credits per bill: an earlier write-off in this run never changes another bill's credits.
+    const credits = creditsByBill();
+    const block = writeOffBlock(inv, credits);
     if (block) {
       out.skipped.push({ id, number: inv.invoice_number, reason: block });
       continue;
     }
-    const amount = round2(receivableBalance(inv));
+    const amount = writeOffAmount(inv, credits);
     try {
       localDb.payments.record({ invoiceId: id, amount, method: WRITE_OFF_METHOD, date: opts.date, note: opts.reason || 'Bad debt written off', writeOff: true });
       out.done.push({ id, number: inv.invoice_number, amount });
@@ -85,7 +101,10 @@ export function bulkWriteOff(ids: readonly string[], opts: { date: string; reaso
  *   same FY     the write-off row is reduced by the amount and the money is recorded as a normal receipt
  *               (the bill's books are as if that part was never written off);
  *   earlier FY  the closed year is left alone: a Receipt voucher Dr Cash / Bank, Cr "Bad debts recovered"
- *               (other income) is posted through `ledger/vouchers.ts`.
+ *               (other income) is posted through `ledger/vouchers.ts`;
+ *   same FY, bill or write-off inside the period lock (QA5 F11)
+ *               posted like an earlier FY (voucher dated the day the money came in), so the locked month is
+ *               never rewritten.
  * Both are logged in `write_off_recoveries` so the register shows what was recovered. Working papers —
  * GST on bad debts is not reversed (there is no output-tax relief for bad debts); income-tax treatment
  * (Sec 36(1)(vii) / 41(4)) — verify with your CA.
@@ -103,8 +122,9 @@ export interface WriteOffRecovery {
   date: string;
   /** FY label of the recovery (e.g. 26-27). */
   fy: string;
-  mode: 'same_fy' | 'prior_fy';
-  /** same_fy: the receipt row recorded; prior_fy: the Receipt voucher. */
+  /** `locked_period`: same FY, but the bill / write-off date is inside the period lock (posted like `prior_fy`). */
+  mode: 'same_fy' | 'prior_fy' | 'locked_period';
+  /** same_fy: the receipt row recorded; prior_fy / locked_period: the Receipt voucher. */
   receipt_id?: string;
   voucher_id?: string;
   method?: string;
@@ -216,9 +236,13 @@ export function recordRecovery(input: RecoveryInput): WriteOffRecovery {
   const fy = getIndianFY(input.date).label;
   const sameFy = rows.find((p) => getIndianFY(p.date).label === fy);
   const base = { id: generateId(), invoice_id: inv.id, invoice_number: inv.invoice_number, party_name: inv.client?.name ?? '', amount, date: input.date, fy, method: input.method, created_at: new Date().toISOString() };
+  // QA5 F11: the same-FY path rewrites the write-off row and records the receipt against the bill, both checked
+  // against the BILL's date. When that is inside the period lock, the recovery is posted as a Receipt voucher
+  // dated the day the money came in (Dr Cash / Bank, Cr Bad debts recovered): only the new receipt's date matters.
+  const billLocked = lockState(inv) === 'locked' || (!!sameFy && lockState({ id: inv.id, issue_date: sameFy.date, invoice_number: inv.invoice_number }) === 'locked');
   return withTablesRollback(['transactions', 'invoices', 'vouchers', 'series_counters', WRITE_OFF_RECOVERIES_TABLE], () => {
     let rec: WriteOffRecovery;
-    if (sameFy && sameFy.amount >= amount - 0.005) {
+    if (sameFy && !billLocked && sameFy.amount >= amount - 0.005) {
       localDb.payments.remove(sameFy.id);
       const left = round2(sameFy.amount - amount);
       if (left > 0.004) localDb.payments.record({ invoiceId: inv.id, amount: left, method: WRITE_OFF_METHOD, date: sameFy.date, note: sameFy.note, writeOff: true });
@@ -229,14 +253,14 @@ export function recordRecovery(input: RecoveryInput): WriteOffRecovery {
       const paise = Math.round(amount * 100);
       const v = saveVoucher({
         type: 'RECEIPT', date: input.date,
-        narration: `Bad debt recovered: ${inv.invoice_number} (${inv.client?.name ?? ''}), written off in an earlier year${input.reference ? ` · ${input.reference}` : ''}`,
+        narration: `Bad debt recovered: ${inv.invoice_number} (${inv.client?.name ?? ''}), written off ${sameFy && billLocked ? 'in a locked period' : 'in an earlier year'}${input.reference ? ` · ${input.reference}` : ''}`,
         lines: [{ account_id: cashAcc, dr: paise, cr: 0 }, { account_id: A.badDebtsRecovered, dr: 0, cr: paise }],
       });
-      rec = { ...base, mode: 'prior_fy', voucher_id: v.id };
+      rec = { ...base, mode: sameFy && billLocked ? 'locked_period' : 'prior_fy', voucher_id: v.id };
     }
     setTable(WRITE_OFF_RECOVERIES_TABLE, [...loadRecoveries(), rec]);
     try {
-      audit.record({ entity: 'payment', entity_id: inv.id, action: 'create', doc_number: inv.invoice_number, summary: `Bad debt recovered on ${inv.invoice_number}: ₹${amount.toFixed(2)} (${rec.mode === 'same_fy' ? 'same year — write-off reduced' : 'earlier year — Bad debts recovered'})` });
+      audit.record({ entity: 'payment', entity_id: inv.id, action: 'create', doc_number: inv.invoice_number, summary: `Bad debt recovered on ${inv.invoice_number}: ₹${amount.toFixed(2)} (${rec.mode === 'same_fy' ? 'same year — write-off reduced' : rec.mode === 'locked_period' ? 'write-off in a locked period — Bad debts recovered' : 'earlier year — Bad debts recovered'})` });
     } catch {
       /* logging never blocks */
     }

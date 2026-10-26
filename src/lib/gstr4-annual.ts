@@ -20,6 +20,7 @@ import { calcInputFromRecord, calculateInvoice, round2 } from './invoice-calc';
 import { inrValue } from './fx';
 import { ecoOf } from './eco';
 import { inPeriod, periodRange, type ReportPeriod } from './gst-reports';
+import { isNonGstFinancialNote } from './financial-note';
 import { buildCmp08, buildGstr4, type CompositionOptions, type Gstr4Report } from './composition-returns';
 import { compositionDueDays, ecoTcsRate } from './tax-rules';
 import { gstInterest, gstr4LateFee, lateDays } from './gst-penalties';
@@ -107,6 +108,7 @@ export function estimateEcoTcs(invoices: readonly InvoiceRecord[], period: Repor
   for (const rec of invoices ?? []) {
     if (!rec || rec.sender?.gst_scheme !== 'composition' || rec.status === 'Draft' || rec.status === 'Cancelled') continue;
     if (!['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'CREDIT_NOTE', 'DEBIT_NOTE'].includes(rec.doc_type)) continue;
+    if (isNonGstFinancialNote(rec)) continue; // QA5 F3: a no-GST financial note is not a supply
     const g = (rec.sender?.companyGstin ?? '').trim().toUpperCase();
     if (want && g && g !== want) continue;
     if (!inPeriod(rec.issue_date, period)) continue;

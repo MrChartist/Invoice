@@ -13,6 +13,7 @@ import type { InvoiceRecord } from '../types/invoice';
 import { currentActor, requireAccess } from './access';
 import { audit } from './audit';
 import { localDb } from './localDb';
+import { assertNoteStillSettles } from './settlement';
 import { generateId, getTable, setJson, setTable } from './storage';
 import { APPROVAL_POLICY_KEY, readApprovalPolicy, rupeeValue, type ApprovalPolicy } from './approval-gate';
 import { formatCurrency } from './utils';
@@ -81,6 +82,9 @@ function decide(id: string, decision: 'approved' | 'rejected', note?: string): I
   const doc = localDb.invoices.getById(id);
   if (!doc || doc.approval?.state !== 'pending') throw new ApprovalError('This document is not waiting for approval.');
   if (decision === 'rejected' && !note?.trim()) throw new ApprovalError('Add a note so the clerk knows what to change.');
+  // QA5 F1: a settlement note (FCN) may only be issued while the bill still owes it (a receipt or another note
+  // may have settled it since the clerk asked). Issuing it re-settles the bill through `invoices.save`.
+  if (decision === 'approved') assertNoteStillSettles(doc);
   const by = currentActor()?.name ?? 'Owner';
   const at = new Date().toISOString();
   const approval = {

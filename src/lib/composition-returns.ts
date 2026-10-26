@@ -20,6 +20,7 @@
 import type { InvoiceRecord } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { inrValue } from './fx';
+import { isNonGstFinancialNote } from './financial-note';
 import { checkGstin } from './gstin';
 import { stateByCode } from './india-states';
 import {
@@ -159,6 +160,9 @@ export function buildCmp08(invoices: InvoiceRecord[], rawPurchases: unknown[], p
 
   for (const rec of invoices ?? []) {
     if (!rec || !SALES_TYPES.has(rec.doc_type) || !inPeriod(rec.issue_date, period) || !senderMatches(rec, gstin)) continue;
+    // QA5 F3: a financial credit note without GST (kasar / settlement / bad debt) is not a GST document, so it never
+    // reduces the turnover (the same rule GSTR-1 applies). Verify with your CA.
+    if (isNonGstFinancialNote(rec)) continue;
     if (rec.status === 'Draft') {
       counts.drafts++;
       continue;

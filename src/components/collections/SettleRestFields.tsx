@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { InvoiceRecord } from '../../types/invoice';
 import { can } from '../../lib/access';
-import { clerkCap, loadCollectionSettings, settlementOptions, type SettleChoice } from '../../lib/settlement';
+import { clerkCap, loadCollectionSettings, rupeeAmount, settlementOptions, type SettleChoice } from '../../lib/settlement';
 import { rupeeValue } from '../../lib/approval-gate';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { useT } from '../../i18n';
@@ -42,7 +42,8 @@ export function SettleRestFields({ invoice, due, amount, date, value, onChange, 
   if (!(opts.rest > 0.004) || !(amount > 0)) return null;
   const cap = clerkCap(rupeeValue(invoice), settings);
   const settleAmount = Number(value.amount) || 0;
-  const overCap = value.choice !== 'leave' && !can('doc.approve') && settleAmount > cap + 0.004;
+  // QA5 F18: the cap is in rupees; the amount is in the bill's currency.
+  const overCap = value.choice !== 'leave' && !can('doc.approve') && rupeeAmount(invoice, settleAmount) > cap + 0.004;
   const pick = (choice: SettleChoice) => {
     const preset = choice === 'settlement_discount' && opts.early ? opts.early.amount : opts.rest;
     onChange({ choice, amount: choice === 'leave' ? '' : String(preset), gst: choice === 'settlement_discount' ? value.gst : false });

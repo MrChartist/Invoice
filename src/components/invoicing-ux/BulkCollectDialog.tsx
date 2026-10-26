@@ -4,7 +4,7 @@ import type { InvoiceRecord } from '../../types/invoice';
 import { buildReminder, suggestStage } from '../../lib/reminders';
 import { whatsappLink } from '../../lib/share';
 import { receivableBalance } from '../../lib/rcm';
-import { bulkWriteOff, writeOffBlock } from '../../lib/write-off';
+import { bulkWriteOff, creditsByBill, writeOffAmount, writeOffBlock } from '../../lib/write-off';
 import { cn, formatCurrency, todayInput } from '../../lib/utils';
 import { round2 } from '../../lib/invoice-calc';
 import { Modal } from '../ui/Modal';
@@ -30,8 +30,10 @@ export function BulkCollectDialog({ mode, invoices, onClose, onDone }: { mode: '
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
   const open = useMemo(() => invoices.filter((i) => receivableBalance(i) > 0.004 && i.status !== 'Draft' && i.status !== 'Cancelled'), [invoices]);
-  const eligible = useMemo(() => invoices.filter((i) => !writeOffBlock(i)), [invoices]);
-  const total = round2(eligible.reduce((s, i) => s + receivableBalance(i), 0));
+  // QA5 F2: the amount each write-off settles is the true due (credit notes and FCNs applied), as in the data layer.
+  const credits = useMemo(() => (mode === 'writeoff' && invoices.length ? creditsByBill() : new Map<string, number>()), [mode, invoices]);
+  const eligible = useMemo(() => invoices.filter((i) => !writeOffBlock(i, credits)), [invoices, credits]);
+  const total = round2(eligible.reduce((s, i) => s + writeOffAmount(i, credits), 0));
 
   if (mode === 'remind') {
     return (

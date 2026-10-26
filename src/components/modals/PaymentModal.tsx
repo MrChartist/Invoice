@@ -346,14 +346,17 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                     {p.realised_rate ? ` · ${t('pay.realisedAt', { rate: p.realised_rate })}` : ''}
                   </span>
                 </div>
-                {!p.advance_id && (
+                {/* QA5 F12: a write-off is not money (no receipt), and only the owner may reverse it. */}
+                {!p.advance_id && !p.write_off && (
                   <button type="button" className={controls.btnIcon} onClick={() => openReceipt(live, p)} aria-label={t('pay.receiptFor', { amount: formatCurrency(p.amount, live.currency) })} title={t('pay.printReceipt')}>
                     <Receipt size={15} />
                   </button>
                 )}
-                <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={t('pay.removeFor', { amount: formatCurrency(p.amount, live.currency) })}>
-                  <Trash2 size={15} />
-                </button>
+                {(!p.write_off || can('doc.deleteIssued')) && (
+                  <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={t('pay.removeFor', { amount: formatCurrency(p.amount, live.currency) })}>
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
