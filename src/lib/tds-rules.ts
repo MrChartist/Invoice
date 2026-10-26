@@ -198,6 +198,17 @@ export function tdsDueDays(periodStart?: string): TdsDueDays {
 export const TCS_27EQ_CODES: readonly { match: RegExp; code: string; label: string }[] = [
   { match: /1H/i, code: '6CR', label: '206C(1H) sale of goods' },
   { match: /1G/i, code: '6CQ', label: '206C(1G) remittance under LRS' },
+  // R8-C (TR-C2): 206C(1) specified goods and 206C(1F) — labels of `tradingTcsPresets` (trade/tr-statutory.ts). The
+  // luxury-goods code is not confirmed: left blank (TR15) — verify with your CA.
+  { match: /206C\(1\) alcoholic liquor/i, code: '6CA', label: '206C(1) alcoholic liquor' },
+  { match: /206C\(1\) timber \(forest lease\)/i, code: '6CB', label: '206C(1) timber under a forest lease' },
+  { match: /206C\(1\) timber \(other mode\)/i, code: '6CC', label: '206C(1) timber by any other mode' },
+  { match: /206C\(1\) other forest produce/i, code: '6CD', label: '206C(1) other forest produce' },
+  { match: /206C\(1\) scrap/i, code: '6CE', label: '206C(1) scrap' },
+  { match: /206C\(1\) tendu/i, code: '6CI', label: '206C(1) tendu leaves' },
+  { match: /206C\(1\) coal/i, code: '6CJ', label: '206C(1) coal / lignite / iron ore' },
+  { match: /206C\(1F\) motor vehicle/i, code: '6CL', label: '206C(1F) motor vehicle' },
+  { match: /206C\(1F\) notified luxury/i, code: '', label: '206C(1F) notified luxury goods (code to confirm — verify with your CA)' },
 ];
 
 /* ── 7R (7.120): Form 27Q — payments to non-residents (Sec 195) ───────────── */

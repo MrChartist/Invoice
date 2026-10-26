@@ -68,6 +68,10 @@ export const ACT_REF_RULES: Readonly<Record<string, readonly Versioned<ActRef>[]
   '206C1G': refRules('206C(1G)', 'Sec 394(1) [Table: Sl. No. 7]', false, `${OFFICIAL_FAQ}, Q18 (Sec 394); ${BILL_TABLE}`),
   // 206C(1H) was omitted from 1 Apr 2025 (Finance Act 2025): no 2025-Act counterpart.
   '206C1H': refRules('206C(1H)', null, true, 'Finance Act 2025'),
+  // R8-C (TR-C2): TCS on specified goods (Sl. 1–5) and on motor vehicles / notified luxury goods (Sl. 6; sources
+  // differ between Sl. 6 and 6.D — TR15). Both unverified.
+  '206C1': refRules('206C(1)', 'Sec 394(1) [Table: Sl. No. 1–5]', false, `${BILL_TABLE}; Finance Act 2026 as reported (TR14)`),
+  '206C1F': refRules('206C(1F)', 'Sec 394(1) [Table: Sl. No. 6]', false, `${BILL_TABLE}; Sl. 6 vs 6.D disputed (TR15)`),
   // R5-C: donee approval for donations (80G → Sec 133(1)(b)(ii)); the donee statement (10BD) is Sec 354(1) / Form 113 — verify.
   '80G': refRules('80G', 'Sec 133(1)(b)(ii)', false, 'Section mapping guide ITA 1961 → 2025 as understood — verify'),
 };
@@ -85,7 +89,7 @@ export function actKey(code: string | undefined): string {
   const raw = String(code ?? '').trim();
   if (ALIASES[raw]) return ALIASES[raw];
   // TCS preset labels: "206C(1G) overseas remittance 20%".
-  const tcs = /206\s*-?\s*C\s*\(\s*(1[GH])\s*\)/i.exec(raw);
+  const tcs = /206\s*-?\s*C\s*\(\s*(1[GHF]?)\s*\)/i.exec(raw); // R8-C: 206C(1) and 206C(1F) too
   if (tcs) return `206C${tcs[1].toUpperCase()}`;
   const n =raw.toUpperCase().replace(/^(U\/S|SEC(TION)?\.?)\s*/, '').replace(/[^0-9A-Z]/g, '');
   if (ACT_REF_RULES[n]) return n;

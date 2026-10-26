@@ -23,6 +23,8 @@ const TracesTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => (
 // R6-A3 / A6: "About this tab" strip and the one-time tip (lazy).
 const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
+// R8-C (TR-C2): our preceding-FY turnover for the 194Q buyer test (lazy).
+const Buyer194qCard = lazy(() => import('../components/trade/TradeStatutory').then((m) => ({ default: m.Buyer194qCard })));
 import { Landmark } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import { helpT } from '../i18n/areas/help-r6';
@@ -142,6 +144,7 @@ export function Tds() {
         )}
         {`${fy + 1}-03-31` >= ITA2025_FROM && <p className={controls.hint} data-ita2025-note>{ita25T('note')}</p>}
         {tab === 'overview' && <OverviewTab data={data} fy={fy} today={today} />}
+        {tab === 'overview' && <Suspense fallback={null}><Buyer194qCard today={today} /></Suspense>}
         {tab === 'deductions' && <DeductionsTab data={data} fy={fy} today={today} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'challans' && <ChallansTab data={data} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'returns' && <ReturnsTab data={data} fy={fy} quarter={quarter} canEdit={canEdit} onChanged={refresh} notify={notify} />}
