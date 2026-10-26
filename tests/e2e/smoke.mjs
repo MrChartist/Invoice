@@ -2789,15 +2789,19 @@ try {
 
   await step('R6-C import openings: a pasted trial balance shows the 1090 difference in the dry run and saves the openings', async () => {
     await page.goto(srv.origin + '/settings?tab=data&import=ledgers');
+    // Earlier steps may have left openings in this company: the dry run shows the difference after the import.
+    const before = await readJson(page, 'ledger_openings', [], () => true);
+    const diff = before.reduce((s, o) => s + (o.dr || 0) - (o.cr || 0), 0) - 10000;
+    const want = `Difference in opening balances: ₹${(Math.abs(diff) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${diff > 0 ? 'Dr' : 'Cr'}`;
     await page.getByRole('button', { name: 'Paste instead' }).click({ timeout: 15000 });
     await page.locator('#import-paste').fill('Name,Group,Debit,Credit\nE2E Partner Capital,Capital Account,,1000\nE2E Current Account,Bank Accounts,900,');
     await page.getByRole('button', { name: 'Use pasted data' }).click();
     for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /^Next/ }).click();
     const note = await page.getByTestId('import-openings-note').textContent({ timeout: 15000 });
-    check(/Difference in opening balances: ₹100\.00 Cr/.test(note ?? ''), 'the dry run shows the difference in opening balances');
+    check(diff !== 0 && (note ?? '').includes(want), `the dry run shows the difference in opening balances (${want}; shown: ${note})`);
     await page.getByRole('button', { name: /^Import 2 records/ }).click();
-    const rows = await readJson(page, 'ledger_openings', [], (v) => v.length >= 2, 10000);
-    check(rows.length >= 2, `the openings are saved (${rows.length})`);
+    const rows = await readJson(page, 'ledger_openings', [], (v) => v.length >= before.length + 2, 10000);
+    check(rows.length >= before.length + 2, `the openings are saved (${rows.length})`);
     const runs = await readJson(page, 'import_runs', [], (v) => v.some((r) => r.kind === 'ledgers'));
     check(runs.some((r) => r.kind === 'ledgers'), 'the import run is recorded');
   });
