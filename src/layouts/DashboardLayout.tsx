@@ -17,6 +17,9 @@ import {
   IdCard,
   Keyboard,
   Landmark,
+  Layers,
+  Truck,
+  Eye,
   Building2,
   LayoutDashboard,
   Lock,
@@ -60,7 +63,10 @@ import type { DeniedState } from '../components/security/RequireAccess';
 import { useTheme } from '../hooks/useTheme';
 import { getLanguage, setLanguage, useT, type MessageKey } from '../i18n';
 import { localDb } from '../lib/localDb';
-import { enabledModules, isPathVisible, SHOP_MODE_EVENT } from '../lib/shop-mode';
+import { enabledModules, impliedPacks, isPathVisible, SHOP_MODE_EVENT } from '../lib/shop-mode';
+import { OPEN_HELP_EVENT } from '../lib/help-event';
+import { pushRoute } from '../lib/route-trail';
+import { readRegistry } from '../lib/companies';
 import { roleLabel } from '../i18n/labels';
 import styles from './DashboardLayout.module.css';
 
@@ -95,6 +101,7 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
       { label: 'nav.recurring', path: '/recurring', icon: Repeat, need: 'books.edit' },
       { label: 'nav.time', path: '/time', icon: Timer, need: 'books.edit' },
       { label: 'nav.receivables', path: '/receivables', icon: Scale },
+      { label: 'nav.distribution', path: '/distribution', icon: Truck }, // R6-B2
     ],
   },
   {
@@ -102,6 +109,7 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
     items: [
       { label: 'nav.expenses', path: '/expenses', icon: Receipt },
       { label: 'nav.inventory', path: '/inventory', icon: Boxes },
+      { label: 'nav.manufacturing', path: '/manufacturing', icon: Layers }, // R6-B2
     ],
   },
   {
@@ -155,11 +163,22 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     // Once the rules are in, re-filter the sidebar (POS-only cashier, per-document rights).
     if (hasRights) void import('../lib/user-rights').then(() => setModeTick((n) => n + 1)).catch(() => undefined);
   }, [hasRights]);
-  const navGroups = useMemo(() => {
-    const modules = enabledModules(localDb.settings.get());
+  const [navGroups, hidden] = useMemo(() => {
+    const s = localDb.settings.get();
+    const modules = enabledModules(s);
+    // R6-B2: a route hosting an active pack's tab stays; the practice desk (a CA tool) needs several companies or "full".
+    const packs = impliedPacks(s);
+    const practice = !s.business_type || s.business_type === 'full' || readRegistry().list.length > 1;
     const posOnly = !!current && current.role !== 'owner' && !!current.rights?.pos_only;
-    const show = (i: NavEntry) => (!i.need || can(i.need)) && isPathVisible(i.path, modules) && (!posOnly || i.path === '/' || i.path === '/pos');
-    return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(show) })).filter((g) => g.items.length > 0);
+    // R6-B2 "N more features": entries this role may use that shop mode hides.
+    let hidden = 0;
+    const show = (i: NavEntry) => {
+      if (i.need && !can(i.need)) return false;
+      if (!isPathVisible(i.path, modules, packs)) return !++hidden;
+      return (practice || i.path !== '/practice') && (!posOnly || i.path === '/' || i.path === '/pos');
+    };
+    const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(show) })).filter((g) => g.items.length > 0);
+    return [groups, posOnly || role === 'viewer' ? 0 : hidden] as const;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, modeTick]);
   // QA-3 F26: a kirana shop bills at the counter, so its phone tab bar offers POS in place of Invoices.
@@ -212,6 +231,14 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setMenuOpen(false), [location.pathname]);
+  // R6-A5 route trail (for "Report a problem").
+  useEffect(() => pushRoute(location), [location]);
+  // R6-B2: empty states and tips open Help through a window event (`help-event.ts`).
+  useEffect(() => {
+    const on = () => openHelp();
+    window.addEventListener(OPEN_HELP_EVENT, on);
+    return () => window.removeEventListener(OPEN_HELP_EVENT, on);
+  }, []);
 
   // Mobile drawer: focus trap, Esc to close, scroll lock, focus restore.
   const drawerActive = isMobile && menuOpen;
@@ -296,6 +323,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'g s': () => navigate('/settings'),
     // 8E (8.146): Alt+P opens the POS counter from anywhere (even while typing in a field).
     'alt+p': { handler: () => navigate('/pos'), allowInInput: true }, // the route itself needs doc.create
+    // R6-B2: F1 opens Help (R6-A2's "On this screen"), except on the POS counter (F1 = recall held bills there) and
+    // the Gateway (Tally keys); never while typing in a field (useHotkeys skips plain keys in inputs).
+    ...(/^\/(pos|gateway)(\/|$)/.test(location.pathname) ? {} : { f1: () => openHelp() }),
   });
   // Tally keys (Phase 7): F2, F4–F9, Ctrl+F8/F9, F11, F12, Alt+G / Ctrl+G, Ctrl+/ — off on /pos and in fields.
   useTallyKeys(navigate, openShortcuts);
@@ -412,6 +442,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
               ))}
             </div>
           ))}
+          {hidden > 0 && (
+            <Link to="/settings?tab=features" className={styles.navItem}>
+              <Eye className={styles.navIcon} size={18} />
+              <span>{t('nav.moreFeatures', { n: hidden })}</span>
+            </Link>
+          )}
         </nav>
 
         <div className={styles.bottom}>

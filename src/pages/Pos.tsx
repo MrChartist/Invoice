@@ -70,6 +70,7 @@ import { saltIndex, saltOf } from '../lib/salt-search'; // 8.84
 import { crT } from '../i18n/areas/credit';
 import { rPosT } from '../i18n/areas/restaurant-pos'; // R3-A
 
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
 // WP-9: return / exchange screen and the exchange-credit banner (own files, loaded on demand).
 const PosReturnModal = lazy(() => import('../components/pos-returns/PosReturnModal').then((m) => ({ default: m.PosReturnModal })));
@@ -798,6 +799,7 @@ export function Pos() {
 
   return (
     <div className={cn(surface.page, styles.page)}>
+      <Suspense fallback={null}><ScreenTip id="pos" /></Suspense>
       <PageHeader
         title={posT('title')}
         subtitle={posT('subtitle', { doc: docLabel, business: sender?.companyName || posT('setUp') })}

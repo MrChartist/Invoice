@@ -63,6 +63,8 @@ import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
 import { receivableBalance, receivableTotal } from '../lib/rcm';
 
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
   import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
@@ -380,6 +382,7 @@ export function Transactions() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="invoices" /></Suspense>
       <PageHeader
         title={salesT('tx.title')}
         subtitle={salesT('tx.subtitle')}

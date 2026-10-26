@@ -438,6 +438,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   trips: 'doc.create',
   ra_measurements: 'doc.create',
   boq_coefficients: 'master.edit',
+  // R6-A1: setup-checklist skips / hidden card (company object, viewing state; owner and clerk)
+  setup_progress: 'doc.create',
 };
 
 let systemDepth = 0;

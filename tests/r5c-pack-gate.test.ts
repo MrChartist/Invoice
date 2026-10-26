@@ -67,11 +67,11 @@ test('no first-paint module or page imports the package statically; hosts go thr
     assert.match(src(f), /import\('\.\.\/(components\/)?institutions\/r5c-lazy'\)/, f);
   }
   assert.match(src('components/command/NotificationBell.tsx'), /function ensureR5cAlerts[\s\S]*?industry_packs[\s\S]*?import\('\.\.\/institutions\/r5c-lazy'\)/);
-  // Every new page tab is pack-filtered.
-  assert.match(src('pages/Recurring.tsx'), /id: 'fees'[^\n]*pack: 'fees'/);
-  assert.match(src('pages/Recurring.tsx'), /id: 'leases'[^\n]*pack: 'leases'/);
-  assert.match(src('pages/Receivables.tsx'), /id: 'donations'[^\n]*pack: 'nonprofit'/);
-  assert.match(src('pages/Books.tsx'), /id: 'funds'[^\n]*pack: 'nonprofit'/);
+  // Every new page tab is pack-filtered (R6-B1: the tab lists moved to src/pages/page-tabs.ts).
+  assert.match(src('pages/page-tabs.ts'), /id: 'fees'[^\n]*pack: 'fees'/);
+  assert.match(src('pages/page-tabs.ts'), /id: 'leases'[^\n]*pack: 'leases'/);
+  assert.match(src('pages/page-tabs.ts'), /id: 'donations'[^\n]*pack: 'nonprofit'/);
+  assert.match(src('pages/page-tabs.ts'), /id: 'funds'[^\n]*pack: 'nonprofit'/);
   assert.ok(GST_TABS.some((t) => t.id === 'common-credit'));
   assert.match(src('components/settings/ProfileEditor.tsx'), /isPackOn\(localDb\.settings\.get\(\), 'nonprofit'\) && <Suspense/);
 });

@@ -7,6 +7,7 @@ import './helpers/shim.ts';
 import test, { afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 
@@ -401,4 +402,30 @@ test('onboarding: composition answer makes the profile a composition dealer (Bil
   const s2 = applyAnswers(s0, { ...a, composition: false });
   assert.equal(s2.profiles.find((x) => x.id === s2.activeProfileId)!.gst_scheme, s0.profiles[0].gst_scheme);
   assert.notEqual(s2.gst_filing_frequency, 'composition');
+});
+
+/* ── R6-B2: sidebar reach ──────────────────────────────────── */
+
+test('R6-B2 sidebar: Manufacturing and Distribution entries; kirana hides features (hint count > 0), full hides none', async () => {
+  const { countHidden, impliedPacks } = await import('../src/lib/shop-mode.ts');
+  const layout = readFileSync(new URL('../src/layouts/DashboardLayout.tsx', import.meta.url), 'utf8');
+  const nav = layout.slice(layout.indexOf('const NAV_GROUPS'), layout.indexOf('const SETTINGS_ENTRY'));
+  const paths = [...nav.matchAll(/path: '([^']+)'/g)].map((m) => m[1]);
+  assert.ok(paths.includes('/manufacturing') && paths.includes('/distribution'));
+  assert.ok(paths.indexOf('/manufacturing') === paths.indexOf('/inventory') + 1, 'Manufacturing sits after Inventory');
+  assert.ok(paths.indexOf('/distribution') === paths.indexOf('/receivables') + 1, 'Distribution sits after Receivables');
+  assert.ok(paths.length <= 26, `sidebar has ${paths.length} entries (Settings is pinned apart)`);
+  const kirana = applyBusinessType('kirana');
+  assert.ok(countHidden(paths, enabledModules(kirana), impliedPacks(kirana)) > 0);
+  assert.equal(countHidden(paths, enabledModules(applyBusinessType('full')), impliedPacks({ business_type: 'full' })), 0);
+  assert.equal(countHidden(paths, null), 0, 'no shop mode = nothing hidden');
+  // A transporter keeps Distribution (its pack's screen) although the preset has no inventory module.
+  const transport = applyBusinessType('transport');
+  assert.equal(isPathVisible('/distribution', enabledModules(transport), impliedPacks(transport)), true);
+  // The hint, F1, the route trail and the help-event listener are wired in the shell.
+  assert.match(layout, /\/settings\?tab=features/);
+  assert.match(layout, /OPEN_HELP_EVENT/);
+  assert.match(layout, /pushRoute\(location\)/);
+  assert.match(layout, /f1:/);
+  assert.match(layout, /'\/practice'/);
 });

@@ -44,6 +44,7 @@ import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
 import { defineArea } from '../i18n/area';
 import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-A
+import { RECEIVABLES_TABS, type ReceivablesTab } from './page-tabs'; // R6-B1
 
 // The TDS register, its 26AS parser and Form 16A tracking load only when opened.
 // Bulk statements / confirmation letters (WP-4): loaded with the PDF stack only when opened.
@@ -74,18 +75,20 @@ const mpTabT = defineArea({ tab: 'Marketplace' } as const, { tab: 'मार्�
 const DonationsTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.DonationsTab })));
 const donTabT = defineArea({ tab: 'Donations' } as const, { tab: 'दान' });
 
-type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds' | 'giftvouchers' | 'marketplace' | 'donations';
-const TABS: { id: Tab; label: () => string; pack?: PackId }[] = [
-  { id: 'aging', label: () => rcvT('tabAging') },
-  { id: 'statements', label: () => rcvT('tabStatements') },
-  { id: 'followups', label: () => colT('tabFollowups') }, // R2-A4
-  { id: 'collections', label: () => rcvT('tabCollections') },
-  { id: 'advances', label: () => rcvT('tabAdvances') },
-  { id: 'tds', label: () => rcvT('tabTds') },
-  { id: 'giftvouchers', label: () => gvTabT('tab') }, // R4-B1
-  { id: 'marketplace', label: () => mpTabT('tab'), pack: 'marketplace' }, // R5-A
-  { id: 'donations', label: () => donTabT('tab'), pack: 'nonprofit' }, // R5-C
-];
+type Tab = ReceivablesTab;
+// R6-B1: the ids (and packs) live in receivables-tabs.ts; the labels stay here.
+const TAB_LABEL: Record<Tab, () => string> = {
+  aging: () => rcvT('tabAging'),
+  statements: () => rcvT('tabStatements'),
+  followups: () => colT('tabFollowups'), // R2-A4
+  collections: () => rcvT('tabCollections'),
+  advances: () => rcvT('tabAdvances'),
+  tds: () => rcvT('tabTds'),
+  giftvouchers: () => gvTabT('tab'), // R4-B1
+  marketplace: () => mpTabT('tab'), // R5-A
+  donations: () => donTabT('tab'), // R5-C
+};
+const TABS: { id: Tab; label: () => string; pack?: PackId }[] = RECEIVABLES_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 
 /** 1 April of the Indian financial year containing `d`. */
 function fyStart(d: Date): Date {
