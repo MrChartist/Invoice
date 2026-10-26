@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { getTable } from '../../lib/storage';
 import type { HsnMasterRow } from '../../lib/hsn-master';
 import type { ImportType, ItcReversalReason, PurchaseRecord, Vendor } from '../../types/purchases';
@@ -35,6 +35,9 @@ import { EditLogButton } from '../audit/EditLogButton';
 import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+
+// R4-C3: Bill of Entry duty sheet — lazy, import-of-goods bills only.
+const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
 
 export interface BillModalProps {
   open: boolean;
@@ -128,6 +131,10 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [boeNumber, setBoeNumber] = useState(purchase?.boe_number ?? '');
   const [boeDate, setBoeDate] = useState(purchase?.boe_date ?? '');
   const [portCode, setPortCode] = useState(purchase?.port_code ?? '');
+  // R4-C3: the applied BOE duty sheet (IGST / cess into the tax fields, BCD / SWS / other duties into landed costs).
+  const [boeDuty, setBoeDuty] = useState(purchase?.boe_duty);
+  const [boeOpen, setBoeOpen] = useState(false);
+
   const wasBlocked = purchase?.itc_eligible === false && purchase.itc_reversal_reason === 'SEC_17_5';
   const [blocked, setBlocked] = useState(wasBlocked);
   const [reversed, setReversed] = useState(wasBlocked ? 0 : purchase?.itc_reversed ?? 0);
@@ -177,10 +184,12 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   // Imports always carry IGST (customs IGST for goods, reverse-charge IGST for services); '96' = other country.
   const taxPos = importType ? '96' : pos;
   const totals = useMemo(() => {
-    const t = computePurchaseTotals(lines, { placeOfSupply: taxPos, businessState });
+    const t0 = computePurchaseTotals(lines, { placeOfSupply: taxPos, businessState });
+    // R4-C3: an applied Bill of Entry sheet sets the customs IGST (on AV + BCD + SWS), not line value × rate.
+    const t = importType === 'GOODS' && boeDuty ? { ...t0, cgst: 0, sgst: 0, igst: boeDuty.totals.igst, tax: boeDuty.totals.igst, total: Math.round((t0.taxable + boeDuty.totals.igst) * 100) / 100 } : t0;
     const c = Math.round(Math.max(cess, 0) * 100) / 100;
     return { ...t, cess: c, total: Math.round((t.total + c) * 100) / 100 };
-  }, [lines, taxPos, businessState, cess]);
+  }, [lines, taxPos, businessState, cess, importType, boeDuty]);
   const interState = !!importType || (!!pos && !!businessState && pos !== businessState);
   const advancedSet = rcm || !!importType || blocked || reversed > 0 || cess > 0;
 
@@ -250,6 +259,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         notes: notes.trim() || undefined,
         landed_costs: cleanLandedCosts(landed.costs.map((c) => ({ label: c.label, amount: Number(c.amount) }))),
         landed_basis: landed.basis === 'qty' && landed.costs.length ? 'qty' : undefined,
+        boe_duty: importType === 'GOODS' ? boeDuty : undefined, // R4-C3
         ...billablePatch(billable),
         cost_centre_id: costCentre,
         branch_id: branchId,
@@ -401,6 +411,24 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
                 <input id="bill-port" className={controls.input} placeholder="INNSA1" maxLength={6} value={portCode} onChange={(e) => setPortCode(e.target.value)} />
               </div>
             </div>
+          )}
+          {importType === 'GOODS' && (
+            <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setBoeOpen(true)} data-boe-open>
+              {purT('boeDuty')}{boeDuty ? ` ✓ ${formatCurrency(boeDuty.totals.duty)}` : ''}
+            </button>
+          )}
+          {boeOpen && (
+            <Suspense fallback={null}>
+              <BoeDutySheet lines={lines} date={boeDate || date} bill={purchase} initial={boeDuty} onClose={() => setBoeOpen(false)} onApply={(d) => {
+                setBoeDuty(d);
+                setCess(d.totals.cess);
+                // Duty rows replace earlier ones; other charges stay (memo amounts: stock cost only).
+                const keep = landed.costs.filter((c) => !['BCD', 'SWS', 'Other customs duties'].includes(c.label));
+                const add = [['BCD', d.totals.bcd], ['SWS', d.totals.sws], ['Other customs duties', d.totals.other]].filter(([, a]) => Number(a) > 0).map(([label, a]) => ({ label: String(label), amount: String(a) }));
+                setLanded({ ...landed, costs: [...keep, ...add] });
+                setBoeOpen(false);
+              }} />
+            </Suspense>
           )}
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bill-cess">{purT('cessAmount')}</label>

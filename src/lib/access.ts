@@ -406,6 +406,12 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   gift_vouchers: 'doc.create',
   branch_prices: 'master.edit',
   transfer_requests: 'doc.create',
+  // R4-C: the LUT register is a settings master; export IRMs / incentives / write-offs are books. `recycle_bin` is
+  // written by every delete (capture) and checked per target table on restore, so it has no entry here.
+  lut_register: 'settings.manage',
+  export_irms: 'books.edit',
+  export_incentives: 'books.edit',
+  export_writeoffs: 'books.edit',
 };
 
 let systemDepth = 0;

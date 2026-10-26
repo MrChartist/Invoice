@@ -35,8 +35,10 @@ export { CLOSING_STOCK_CLASS } from './ledger/closing-stock';
 import { CLOSING_STOCK_CLASS, type ClosingStockMode } from './ledger/closing-stock';
 export const PROVISION_CLASS = 'Year-end provision';
 
-export type YearEndStepId = 'integrity' | 'closing_stock' | 'depreciation' | 'provisions' | 'opening_bills' | 'lock' | 'carry_forward';
-export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'lock', 'carry_forward'];
+export type YearEndStepId = 'integrity' | 'closing_stock' | 'depreciation' | 'provisions' | 'opening_bills' | 'lock' | 'carry_forward'
+  // R4-C5: "Auditor pack generated" (mark only; Settings → Activity → Auditor pack marks it)
+  | 'auditor_pack';
+export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'lock', 'carry_forward', 'auditor_pack'];
 
 export type StepStatus = 'done' | 'todo' | 'warn';
 
@@ -194,6 +196,9 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
 
   /* 7. Carry forward */
   steps.push({ id: 'carry_forward', status: marks.carry_forward ? 'done' : 'todo', facts: ['Opening balances of the new year = closing balances of this year (the profit moves to Reserves & surplus).'] });
+
+  /* 8. Auditor pack (R4-C5, mark only) */
+  steps.push({ id: 'auditor_pack', status: marks.auditor_pack ? 'done' : 'todo', facts: [marks.auditor_pack ? `Auditor pack generated on ${marks.auditor_pack.slice(0, 10)}.` : 'Generate the auditor pack (edit log, deletions, back-dated entries, integrity) in Settings → Activity — Rule 11(g), verify with your CA.'] });
   return steps;
 }
 

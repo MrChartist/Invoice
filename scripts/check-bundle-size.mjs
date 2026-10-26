@@ -35,7 +35,9 @@ const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // distribution / pharma): every new screen is lazy and initial JS stays under its 185 kB budget.
 // Raised to 2400 for rounds 2–3 (collections, sales documents, annual pack, restaurant, service billing, compliance
 // desks): all lazy route / dialog chunks precached for offline; first paint keeps its 185 kB budget.
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 2400);
+// Raised to 2600 for round 4 (trade desk & trust, stores & chains) and the round-5 industry packs: every screen
+// is a lazy chunk; first paint keeps its 185 kB budget.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 2600);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 // De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.

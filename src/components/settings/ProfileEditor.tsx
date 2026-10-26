@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { ImagePlus, Trash2, Upload } from 'lucide-react';
 import { GstinInput } from '../ui/GstinInput';
 import { INDIAN_STATES } from '../../lib/india-states';
@@ -13,6 +13,9 @@ import { setT } from '../../i18n/areas/settings';
 import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import styles from './Settings.module.css';
+
+// R4-C1: IEC / AD code and the LUT register — their own lazy chunk.
+const ExportSettingsPanel = lazy(() => import('../trade/ExportSettingsPanel'));
 
 interface Props {
   profile: SenderProfile;
@@ -209,6 +212,10 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
           </p>
         )}
       </fieldset>
+
+      <Suspense fallback={null}>
+        <ExportSettingsPanel profile={profile} onChange={onChange} />
+      </Suspense>
 
       <fieldset className={styles.group}>
         <legend>{setT('paymentDetails')}</legend>

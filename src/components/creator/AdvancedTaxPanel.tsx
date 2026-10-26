@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,6 +10,8 @@ import {
 } from '../../types/invoice';
 
 const ROUND_MODES: RoundMode[] = ['nearest', 'up', 'down', 'none'];
+// R4-C1: LUT auto-fill from the register + hint (lazy, zero-rated supplies without payment only).
+const LutHint = lazy(() => import('../trade/LutHint'));
 import { tcsPresets, tdsSections } from '../../lib/tax-rules';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
@@ -57,6 +60,7 @@ export function AdvancedTaxPanel() {
                 onChange={(e) => s.setLut(s.lut_number ?? '', e.target.value)} />
             </div>
           )}
+          {(s.supply_type === 'EXPORT_LUT' || s.supply_type === 'SEZ_WITHOUT_PAYMENT') && <Suspense fallback={null}><LutHint /></Suspense>}
           <p className={styles.hint}>
             {edT('atLutHint')}
           </p>

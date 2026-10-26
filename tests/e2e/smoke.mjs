@@ -557,7 +557,9 @@ try {
 
     await page.getByRole('button', { name: /^Delete INV/ }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
-    await page.getByRole('button', { name: 'Undo' }).click();
+    // R4-C4: Alt+Z runs the latest Undo while its toast is shown.
+    await page.getByRole('button', { name: 'Undo' }).waitFor();
+    await page.keyboard.press('Alt+KeyZ');
     await page.waitForTimeout(6500);
     const after = (await readJson(page, 'invoices', [])).length;
     check(after === 1, `Undo keeps the deleted invoice (${after} stored after the undo window)`);
@@ -1612,9 +1614,90 @@ try {
     await page.goto(srv.origin + '/transactions');
     await page.getByRole('button', { name: /^Delete INV/ }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    // R4-C4: an Undo toast waits for the user (no auto-dismiss); the delete is committed once it is dismissed.
     await page.waitForTimeout(6500);
+    const undo = page.getByRole('button', { name: 'Undo' });
+    check(await undo.isVisible(), 'the Undo toast is still there after 6.5 s (no auto-dismiss)');
+    await page.getByRole('button', { name: 'Dismiss notification' }).click();
     const left = (await readJson(page, 'invoices', [], (v) => v.length === 0)).length;
-    check(left === 0, `the delete is committed after the undo window (${left} left)`);
+    check(left === 0, `the delete is committed when the toast is dismissed (${left} left)`);
+  });
+
+  await step('R4-C4: the deleted invoice is in Recently deleted; restoring it brings it back with the same number', async () => {
+    // Later steps expect the books as the delete left them: put invoices / receipts back afterwards.
+    const before = { invoices: await readJson(page, 'invoices', []), transactions: await readJson(page, 'transactions', []) };
+    const binned = await readJson(page, 'recycle_bin', [], (v) => v.some((e) => e.table === 'invoices'));
+    const entry = binned.find((e) => e.table === 'invoices');
+    const number = entry?.row?.invoice_number;
+    check(!!number && binned.some((e) => e.table === 'transactions' && e.row?.invoice_id === entry.row_id), `the invoice ${number} and its receipt are in the recycle bin`);
+    await page.goto(srv.origin + '/settings?tab=data&bin=1');
+    const dlg = page.getByRole('dialog', { name: /Recently deleted/ });
+    await dlg.waitFor();
+    const row = dlg.locator(`[data-bin-row="${number}"]`);
+    await row.waitFor();
+    const linked = binned.filter((e) => e.table === 'transactions' && e.row?.invoice_id === entry.row_id).length;
+    await row.getByRole('button', { name: new RegExp(`Restore with ${linked} linked row`) }).click();
+    const back = await readJson(page, 'invoices', [], (v) => v.length === 1);
+    check(back[0]?.invoice_number === number && back[0]?.id === entry.row_id, `restored with the same number and id (${back[0]?.invoice_number})`);
+    const pays = await readJson(page, 'transactions', [], (v) => v.filter((t) => t.invoice_id === entry.row_id).length === linked);
+    check(pays.filter((t) => t.invoice_id === entry.row_id).length === linked, `its ${linked} receipt(s) came back with it`);
+    check((await readJson(page, 'recycle_bin', [], (v) => !v.some((e) => e.row_id === entry.row_id))).every((e) => e.row_id !== entry.row_id), 'the bin entry is gone');
+    const audit = await readJson(page, 'audit_log', [], (v) => v.some((e) => e.action === 'restore'));
+    check(audit.some((e) => e.action === 'restore' && /recycle bin/.test(e.summary)), 'the restore is in the edit log');
+    await page.keyboard.press('Escape');
+    await writeJson(page, 'invoices', before.invoices);
+    await writeJson(page, 'transactions', before.transactions);
+  });
+
+  await step('R4-C1/C2: an export without an LUT is flagged before filing; LUT added; an IRM realises the shipping bill', async () => {
+    const keys = ['invoices', 'lut_register', 'export_irms'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 10);
+    const pad = (n) => String(n).padStart(2, '0');
+    const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-10`;
+    const fyStart = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    const fy = `FY${String(fyStart).slice(2)}-${String(fyStart + 1).slice(2)}`;
+    const exp = {
+      id: 'e2e-exp', invoice_number: `EXP/${fy}/0001`, doc_type: 'INVOICE', status: 'Sent', issue_date: day, due_date: day, currency: 'USD', exchange_rate: 83,
+      supply_type: 'EXPORT_LUT', place_of_supply: '96', gst_mode: 'IGST', total: 1000, amount_paid: 0, balance_due: 1000, lut_number: '', lut_date: '',
+      shipping_bill_no: '7654321', shipping_bill_date: day, incoterm: 'FOB', country_of_destination: 'AE',
+      sender: { companyName: 'E2E Trader', companyGstin: '27AAPFU0939F1ZV', stateCode: '27', iec: 'AAPFU0939F' },
+      client: { name: 'E2E Gulf Buyer LLC', state: 'Other country' }, items: [{ id: 'x1', name: 'Spice export', hsn: '0904', quantity: 1, rate: 1000, tax_rate: 0, amount: 1000 }],
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), exp]);
+    await page.goto(srv.origin + '/gst-reports');
+    await page.locator('[data-filing-check]').click();
+    await page.locator('[data-preflight-group="issue:LUT_MISSING"]').waitFor();
+    check(/without an LUT/.test(await page.locator('[data-preflight-group="issue:LUT_MISSING"]').innerText()), 'preflight: LUT_MISSING for the zero-rated export');
+    await page.keyboard.press('Escape');
+
+    await page.goto(srv.origin + '/settings');
+    const panel = page.locator('[data-export-settings]');
+    await panel.waitFor();
+    await panel.getByLabel('Financial year').selectOption(fy);
+    await panel.getByLabel('ARN').fill('AD2704260012345');
+    await panel.getByLabel('Filed on').fill(`${fyStart}-03-20`);
+    await panel.getByRole('button', { name: 'Add LUT' }).click();
+    const lut = await readJson(page, 'lut_register', [], (v) => v.length === 1);
+    check(lut[0]?.fy === fy && lut[0]?.arn === 'AD2704260012345', `LUT register row for ${fy}`);
+
+    await page.goto(srv.origin + '/gst-reports?tab=export-desk&view=irms');
+    await page.getByRole('button', { name: 'Add IRM' }).click();
+    const form = page.getByRole('dialog');
+    await form.getByLabel('IRM / FIRC no.').fill('E2EIRM0001');
+    await form.getByLabel('Amount (FCY)').fill('1000');
+    await form.getByLabel('Amount (FCY)').blur();
+    await form.getByRole('button', { name: new RegExp(`^Add ${exp.invoice_number}`) }).click();
+    await form.getByTestId('irm-save').click();
+    const irms = await readJson(page, 'export_irms', [], (v) => v.length === 1);
+    check(irms[0]?.allocations?.[0]?.invoice_id === 'e2e-exp' && irms[0]?.allocations?.[0]?.fcy === 1000, 'the IRM is matched to the export invoice');
+    await page.goto(srv.origin + '/gst-reports?tab=export-desk&view=register');
+    const reg = page.locator(`[data-realisation-row="${exp.invoice_number}"]`);
+    await reg.waitFor();
+    check(/Realised/.test(await reg.innerText()), 'the realisation register shows the shipping bill as realised');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
   await step('composition profile issues a Bill of Supply with the Rule 49 declaration', async () => {

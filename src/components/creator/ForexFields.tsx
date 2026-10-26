@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { loadRates, rateOn } from '../../lib/currency-rates';
 import { reachT } from '../../i18n/areas/reach';
@@ -9,6 +9,9 @@ import { inrValue } from '../../lib/fx';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
+
+// R4-C1: Incoterms / ports / countries / marks — lazy, export documents only.
+const ExportDetailsFields = lazy(() => import('../trade/ExportDetailsFields'));
 
 /**
  * Exchange rate (shown when the document currency is not INR) and, for exports, the
@@ -79,6 +82,7 @@ export function ForexFields() {
           </label>
         </div>
       )}
+      {exportSupply && <Suspense fallback={null}><ExportDetailsFields /></Suspense>}
     </>
   );
 }

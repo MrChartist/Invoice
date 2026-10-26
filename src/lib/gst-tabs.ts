@@ -9,7 +9,9 @@ export type GstTabId =
   | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c'
   | 'rcmdocs' | 'cashref' | 'isd' | 'ewbcons' | 'bygstin' | 'guards'
   // R3-C4 / C5
-  | 'portal-files' | 'eway-desk';
+  | 'portal-files' | 'eway-desk'
+  // R4-C2: export desk (realisation, IRM / e-BRC, incentives, imports by BOE)
+  | 'export-desk';
 
 export type GstTabGroupId = 'gstr1' | 'gstr3b' | 'recon' | 'tools';
 
@@ -56,6 +58,8 @@ export const GST_TABS: readonly GstTab[] = [
   // R3-C4 / C5: GSTR-1 portal files, e-Way desk
   { id: 'portal-files', label: 'Portal files', desk: 'tab.portal' },
   { id: 'eway-desk', label: 'e-Way desk', desk: 'tab.eway' },
+  // R4-C2
+  { id: 'export-desk', label: 'Export desk', key: 'tabExportDesk' },
 ];
 
 /** Display order: GSTR-1 sections, GSTR-3B and payment, reconciliation, then the other tools. */
@@ -63,7 +67,7 @@ export const GST_TAB_GROUPS: readonly { id: GstTabGroupId; tabs: readonly GstTab
   { id: 'gstr1', tabs: ['overview', 'b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'at', 'txpd', 'hsn', 'docs', 'amend', 'eco'] },
   { id: 'gstr3b', tabs: ['gstr3b', 'setoff', 'cashref', 'rcmdocs'] },
   { id: 'recon', tabs: ['gstr2b', 'purhsn', 'recon', 'guards', 'bygstin'] },
-  { id: 'tools', tabs: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons', 'portal-files', 'eway-desk'] },
+  { id: 'tools', tabs: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons', 'portal-files', 'eway-desk', 'export-desk'] },
 ];
 
 /** Tab ids in on-screen order (arrow-key navigation walks this list). */

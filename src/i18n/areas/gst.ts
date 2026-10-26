@@ -31,6 +31,7 @@ export const gstT = defineArea(
     tabIsd: 'ISD / GSTR-6',
     tabEwbCons: 'Consolidated e-Way',
     tabByGstin: 'By GSTIN',
+    tabExportDesk: 'Export desk', // R4-C2
     tabGuards: 'GST guards',
     openSetoff: 'Set-off & payment →',
     otherCountries: '96 - Other Countries',
@@ -193,6 +194,7 @@ export const gstT = defineArea(
     tabIsd: 'ISD / GSTR-6',
     tabEwbCons: 'समेकित ई-वे',
     tabByGstin: 'GSTIN अनुसार',
+    tabExportDesk: 'निर्यात डेस्क',
     tabGuards: 'GST गार्ड',
     openSetoff: 'सेट-ऑफ़ और भुगतान →',
     otherCountries: '96 - अन्य देश',

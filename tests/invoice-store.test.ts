@@ -84,6 +84,9 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     annexure: { kind: 'timesheet', rows: [{ date: '2026-04-09', description: 'Drafting', minutes: 50, billed_minutes: 60, rate: 2000, amount: 2000, ref: 't1' }], taken_at: '2026-04-10T00:00:00Z' },
     // R3-C
     delivery_proof: { receiver: 'Ravi', remark: 'Received in good condition', signed_at: '2026-04-12T05:30:00.000Z', signature: 'asset:abc' },
+    // R4-C1 export document fields
+    incoterm: 'FOB', port_of_loading: 'INNSA1 Nhava Sheva', port_of_discharge: 'Jebel Ali', country_of_origin: 'IN', country_of_destination: 'AE',
+    pre_carriage: 'Road', vessel_flight: 'MSC ANNA V.123', marks_numbers: 'ACME/DXB/1-10', export_payment_terms: 'DA 60 days',
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

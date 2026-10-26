@@ -83,8 +83,8 @@ const LEGACY_TABS = [
   'gstr3b', 'gstr2b', 'composition', 'setoff', 'purhsn', 'recon', 'hsnmaster', 'gstr9c', 'rcmdocs', 'cashref', 'isd', 'ewbcons',
   'bygstin', 'guards',
 ];
-/** Tabs added later (R3-C4 portal files, R3-C5 e-Way desk). */
-const ADDED_TABS = ['portal-files', 'eway-desk'];
+/** Tabs added later (R3-C4 portal files, R3-C5 e-Way desk, R4-C2 export desk). */
+const ADDED_TABS = ['portal-files', 'eway-desk', 'export-desk'];
 
 test('tabs: every previous ?tab= id still resolves and sits in exactly one group', () => {
   for (const id of LEGACY_TABS) assert.equal(resolveGstTab(id), id, id);

@@ -1,0 +1,128 @@
+/* Trust tools (R4-C4–C7): recycle bin, auditor pack, open export, conflict merge. Tokens only. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.note {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--warning);
+  background: var(--card-inner);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.ok {
+  color: var(--profit);
+}
+
+.bad {
+  color: var(--loss);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  max-height: 55vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  background: var(--card-inner);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.hash {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  word-break: break-all;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--card-inner);
+  border: 1px solid var(--border);
+}
+
+.merge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.625rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-inner);
+}
+
+.mergeRow {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 2fr) minmax(0, 2fr);
+  gap: 0.375rem 0.75rem;
+  align-items: start;
+  font-size: var(--text-sm);
+}
+
+.mergeRow > b {
+  font-weight: 600;
+}
+
+.side {
+  display: flex;
+  gap: 0.375rem;
+  align-items: flex-start;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.group {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand-text);
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 640px) {
+  .mergeRow {
+    grid-template-columns: 1fr;
+  }
+}

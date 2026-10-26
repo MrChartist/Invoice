@@ -48,6 +48,8 @@ import { PURCHASE_CATEGORIES, type PurchaseRecord } from '../types/purchases';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
+// R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
+const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
 type Tab = 'bills' | 'orders' | 'vendors' | 'returns' | 'inbox';
 
@@ -442,6 +444,7 @@ export function Expenses() {
         onClose={() => setDeleting(null)}
       />
       {toastNode}
+      <Suspense fallback={null}><UndoDeleted /></Suspense>
     </div>
   );
 }

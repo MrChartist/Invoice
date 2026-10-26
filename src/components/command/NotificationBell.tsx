@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { t } from '../../i18n';
-import { SINGLETON_KEYS, getJson, peekTable, subscribeStorageChanges } from '../../lib/storage';
+import { DB_PREFIX, SINGLETON_KEYS, getJson, peekTable, readRaw, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
 import {
@@ -218,6 +218,8 @@ function runBell(force: boolean, setItems: (list: VisibleNotification[]) => void
   ensureR3cAlerts(reload); // R3-C
   ensureProductionAlerts(reload); // R4-A
   ensureTransferAlerts(reload); // R4-B
+  ensureTradeAlerts(reload); // R4-C
+  ensureTrustAlerts(reload); // R4-C
 }
 
 /** Coalesces refresh requests into one run on the next task (a forced request wins). */
@@ -261,6 +263,22 @@ function ensureTransferAlerts(onReady: () => void): void {
   if (transferAlerts || !peekTable('transfer_requests').length) return;
   transferAlerts = 1;
   import('../../lib/retail/transfer-alerts').then((m) => { m.registerTransferAlerts(); onReady(); }, () => { transferAlerts = 0; });
+}
+
+// R4-C: export desk (LUT + realisation) — lazy, once an LUT row or an export invoice exists.
+let tradeAlerts = 0;
+function ensureTradeAlerts(onReady: () => void): void {
+  if (tradeAlerts || !(peekTable('lut_register').length || peekTable<{ supply_type?: string; place_of_supply?: string }>('invoices').some((i) => /^EXPORT/.test(i?.supply_type ?? '') || /^9[67]$/.test(i?.place_of_supply ?? '')))) return;
+  tradeAlerts = 1;
+  import('../../lib/trade/export-alerts').then((m) => { m.registerTradeAlerts(); onReady(); }, () => { tradeAlerts = 0; });
+}
+
+// R4-C: recycle-bin purge after first paint and the 8-FY edit-log retention notice — lazy, once the bin has rows or the log is old.
+let trustAlerts = 0;
+function ensureTrustAlerts(onReady: () => void): void {
+  if (trustAlerts || !(peekTable('recycle_bin').length || +(/"at":"(\d{4})/.exec(readRaw(DB_PREFIX + 'audit_log')?.slice(0, 400) ?? '')?.[1] ?? 1e4) < new Date().getFullYear() - 8)) return;
+  trustAlerts = 1;
+  import('../../lib/trust/trust-alerts').then((m) => { m.registerTrustAlerts(); onReady(); }, () => { trustAlerts = 0; });
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {

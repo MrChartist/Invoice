@@ -39,7 +39,8 @@ import {
 } from './audit';
 import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
-import { nextReceiptNumber, recordSeries } from './series-counters';
+import { SERIES_TABLE, nextReceiptNumber, recordSeries, type SeriesCounter } from './series-counters';
+import { binRows } from './audit-edits';
 import { receivableTotal } from './rcm';
 import { isRevenueDoc } from './stats';
 import { linkedCredits, settledStatus, type CreditLinkRow } from './amount-due';
@@ -356,7 +357,8 @@ export const localDb = {
     /** Next number in the series, derived from the highest one already issued. */
     nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string) =>
       nextInvoiceNumber({
-        existingNumbers: peekTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
+        // R4-C4: the series high-water marks (`PREFIX/FYyy-yy` + seq) count as issued, so a deleted number is never reused.
+        existingNumbers: [...peekTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number), ...peekTable<SeriesCounter>(SERIES_TABLE).map((r) => `${r.id}/${r.seq}`)],
         dateStr,
         docType,
         customPrefix: prefix ?? readSettings().invoicePrefix,
@@ -483,6 +485,11 @@ export const localDb = {
       const mine = payments.filter((t) => t.invoice_id === id).length;
       setTable(KEYS.invoices, all.filter((i) => i.id !== id));
       setTable(KEYS.transactions, payments.filter((t) => t.invoice_id !== id));
+      // R4-C4: to the recycle bin (before its files are released); its number stays used.
+      if (stored) {
+        binRows('invoices', [stored as unknown as Record<string, unknown>]);
+        recordSeries(stored.invoice_number);
+      }
       if (stored?.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(id);
       if (stored?.attachments?.length) releaseAttachments(stored.attachments.map((a) => a.id));
       if (stored) logSafe(() => invoiceDeleted(stored, mine, overridden ? OVERRIDE_NOTE : ''));
