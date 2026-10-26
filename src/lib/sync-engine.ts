@@ -337,6 +337,11 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}table_orders`]: (r) => str(r.day) || str(r.opened_at).slice(0, 10) || undefined,
   // R3-B: retainers (start day; their period closes stamp time entries)
   [`${DB_PREFIX}retainers`]: 'start',
+  // R4-A: production orders (order date), QC decisions, recall notices, landed-cost vouchers
+  [`${DB_PREFIX}production_orders`]: 'date',
+  [`${DB_PREFIX}qc_results`]: 'date',
+  [`${DB_PREFIX}recall_notices`]: 'date',
+  [`${DB_PREFIX}landed_cost_vouchers`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -902,6 +907,9 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}rcm_documents`]: { num: 'number', date: 'date', scope: 'kind' },
   // R2-C: packing lists (PKL/FY…)
   [`${DB_PREFIX}packing_lists`]: { num: 'number', date: 'date' },
+  // R4-A: production orders (WO/FY…) and landed-cost vouchers (LCV/FY…)
+  [`${DB_PREFIX}production_orders`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}landed_cost_vouchers`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

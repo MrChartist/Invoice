@@ -396,6 +396,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   gst_portal_files: 'books.edit',
   dsc_register: 'books.edit',
   client_checklist: 'books.edit',
+  // R4-A: production orders, QC decisions, recall notices and landed-cost vouchers are books
+  production_orders: 'books.edit',
+  qc_results: 'books.edit',
+  recall_notices: 'books.edit',
+  landed_cost_vouchers: 'books.edit',
 };
 
 let systemDepth = 0;

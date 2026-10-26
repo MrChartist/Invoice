@@ -3,7 +3,7 @@
  * costs, margin and net result per cost centre for the selected period, plus an Unallocated column,
  * reconciling to the overall P&L.
  */
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, lazy, Suspense, useMemo, useState } from 'react';
 import { FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   costCentrePnl,
@@ -37,6 +37,10 @@ import books from '../books.module.css';
 import styles from './planning.module.css';
 import { useT } from '../../../i18n';
 import { planT } from '../../../i18n/areas/books-planning';
+import { peekTable } from '../../../lib/storage';
+
+// R4-A2: memo row "materials used (stock, not posted)" from production orders tagged with a cost centre (lazy).
+const ProjectMaterialsRow = lazy(() => import('../../production/ProjectMaterialsRow'));
 
 const SECTION_KEY = { income: 'secIncome', direct: 'secDirect', indirect: 'secIndirect' } as const;
 const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch' } as const;
@@ -208,6 +212,9 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                     </tr>
                     {totalsRow(planT('secIndirect'), (t) => t.indirectExpenses)}
                     {totalsRow(planT('netProfitLoss'), (t) => t.netProfit, true)}
+                    {peekTable<{ cost_centre_id?: string }>('production_orders').some((o) => o?.cost_centre_id) && (
+                      <Suspense fallback={null}><ProjectMaterialsRow columns={pnl.columns} period={period} cellClass={styles.sticky} /></Suspense>
+                    )}
                   </tbody>
                 </table>
               </div>

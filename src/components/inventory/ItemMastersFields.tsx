@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import type { UnitMaster } from '../../lib/units';
 import type { TreeRow } from '../../lib/stock-groups';
 import { imT } from '../../i18n/areas/inventory-masters';
+import { pLinkT } from '../../i18n/areas/production-r4-links'; // R4-A4
 import controls from '../../styles/controls.module.css';
 import styles from './masters.module.css';
 import inv from './inventory.module.css';
@@ -13,6 +14,8 @@ export interface MastersDraft {
   alt: { unit: string; factor: string }[];
   costs: { from: string; rate: string }[];
   prices: { from: string; rate: string }[];
+  /** R4-A4: hold receipts of this item for QC. */
+  qc?: boolean;
 }
 
 /** Item form section (WP-8): stock group / category, alternate units, standard cost and selling price lists. */
@@ -68,6 +71,10 @@ export function MastersFields({ draft, onChange, baseUnit, trackStock, serialIte
           </select>
         </div>
       </div>
+
+      {trackStock && (
+        <label className={controls.check}><input type="checkbox" checked={!!draft.qc} onChange={(e) => set('qc', e.target.checked)} /> {pLinkT('qcOnReceipt')}</label>
+      )}
 
       {trackStock && (
         <>
