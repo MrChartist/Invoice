@@ -27,6 +27,7 @@ import { toCsv } from '../csv';
 import { ITC_REVERSAL_CLASS } from '../gst-reports';
 import { COMMON_CREDIT_TRUE_UP_RULES, ruleAt } from '../r5c-rules';
 import { COMMON_CREDIT_TABLE, R5cError, paise } from './r5c';
+import { COMPLIANCE_TABLE, type FiledReturn } from '../compliance';
 
 export type Head = 'igst' | 'cgst' | 'sgst' | 'cess';
 export const HEADS: readonly Head[] = ['igst', 'cgst', 'sgst', 'cess'];
@@ -148,6 +149,36 @@ export function trueUp(months: readonly { C2: Heads; nonBusiness: boolean }[], E
   return { annual, posted: postedD, diff, dueBy: `${m >= 4 ? fy + 1 : fy + 2}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-20` };
 }
 
+/* ── True-up date (QA6 F8) ───────────────────────────────────── */
+
+const monthEnd = (y: number, m: number) => `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+
+/**
+ * The days the annual true-up of FY `fy` may be dated in: from the first day after the FY to the end of the last
+ * return month the rule allows (Rule 42(2) / 43: a return up to September following the FY — dated rule). The journal
+ * is dated in the month of the return it is reported in, so it reaches that month's GSTR-3B 4(B)(1), never the
+ * closed year's March return. Working paper — verify with your CA.
+ */
+export function trueUpWindow(fy: number): { from: string; to: string } {
+  const m = ruleAt(COMMON_CREDIT_TRUE_UP_RULES, `${fy + 1}-03-31`).trueUpByMonth;
+  return { from: `${fy + 1}-04-01`, to: monthEnd(m >= 4 ? fy + 1 : fy + 2, m) };
+}
+
+/** The suggested true-up day: today, kept inside `trueUpWindow` (the user confirms or changes it). */
+export function defaultTrueUpDate(fy: number, today: string): string {
+  const w = trueUpWindow(fy);
+  return today < w.from ? w.from : today > w.to ? w.to : today;
+}
+
+/** GSTR-3B of the month (or QRMP quarter) holding `day` is marked filed (GST → Compliance). */
+export function gstr3bFiledOn(day: string, rows: readonly Partial<FiledReturn>[] = peekTable<FiledReturn>(COMPLIANCE_TABLE)): boolean {
+  const y = +day.slice(0, 4);
+  const m = +day.slice(5, 7);
+  const fy = m >= 4 ? y : y - 1;
+  const keys = new Set([day.slice(0, 7), `${fy}-Q${Math.floor(((m + 8) % 12) / 3) + 1}`]);
+  return rows.some((r) => r?.form === 'GSTR3B' && !!r.filed_on && keys.has(String(r.period_key)));
+}
+
 /* ── Runs (posting) ──────────────────────────────────────────── */
 
 export const loadCcRuns = (): CommonCreditRun[] => peekTable<CommonCreditRun>(COMMON_CREDIT_TABLE).filter((r) => r && r.id) as CommonCreditRun[];
@@ -172,6 +203,13 @@ export function reversalLines(heads: Heads): ManualVoucherLine[] {
 export function postReversal(input: { month: string; kind: 'monthly' | 'annual'; heads: Heads; figures: Record<string, number>; date: string }): CommonCreditRun {
   requireAccess('books.edit');
   if (loadCcRuns().some((r) => r.month === input.month && r.kind === input.kind)) throw new R5cError('posted');
+  if (input.kind === 'annual') {
+    // QA6 F8: after the FY (never its already-filed March return), and never in a GSTR-3B already marked filed. The
+    // period lock is enforced by saveVoucher.
+    const fy = Number(/^FY(\d{4})/.exec(input.month)?.[1]);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !(fy > 0) || input.date < trueUpWindow(fy).from) throw new R5cError('trueUpDate');
+    if (gstr3bFiledOn(input.date)) throw new R5cError('trueUpFiled');
+  }
   const lines = reversalLines(input.heads);
   if (lines.length < 2) throw new R5cError('nothing');
   return withTablesRollback([COMMON_CREDIT_TABLE, 'vouchers'], () => {

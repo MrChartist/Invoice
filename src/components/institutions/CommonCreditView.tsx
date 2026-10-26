@@ -10,7 +10,7 @@ import type { ItcUse } from '../../types/institutions-r5';
 import { getTable } from '../../lib/storage';
 import { buildGstReport, type ReportPeriod } from '../../lib/gst-reports';
 import { purchasesDb } from '../../lib/purchases';
-import { HEADS, ITC_USES, figuresOf, headsTotal, inputsFor, itcUseOf, loadCcRuns, postReversal, rule42, trueUp, turnoverOf, unpostReversal, workingCsv, type Heads } from '../../lib/institutions/common-credit';
+import { HEADS, ITC_USES, defaultTrueUpDate, trueUpWindow, figuresOf, headsTotal, inputsFor, itcUseOf, loadCcRuns, postReversal, rule42, trueUp, turnoverOf, unpostReversal, workingCsv, type Heads } from '../../lib/institutions/common-credit';
 import { useT } from '../../i18n';
 import { iT, type IKey } from '../../i18n/areas/packs-institutions-r5';
 import styles from './institutions.module.css';
@@ -44,6 +44,10 @@ export default function CommonCreditView({ notify }: { notify: Notify }) {
   const postedFy = data.runs.find((r) => r.kind === 'annual' && r.month === fyKey);
   const run = (fn: () => void) => attempt(notify, () => { fn(); setTick((n) => n + 1); }, iT('saved'));
   const diff = headsTotal(year.diff);
+  // QA6 F8: the true-up is dated in the open return month it is filed in (after the FY, up to September), not 31 March.
+  const win = trueUpWindow(fy);
+  const [tuPick, setTuPick] = useState<{ fy: number; day: string } | null>(null);
+  const tuDate = tuPick?.fy === fy ? tuPick.day : defaultTrueUpDate(fy, today());
 
   return (
     <div className={styles.stack} data-common-credit>
@@ -70,8 +74,11 @@ export default function CommonCreditView({ notify }: { notify: Notify }) {
       ))}
       <h3>{iT('trueUp')} {fyKey}</h3>
       <p>{iT('trueUpLine', { annual: rs(headsTotal(year.annual)), posted: rs(headsTotal(year.posted)), diff: rs(diff), due: year.dueBy })}</p>
-      <div>{postedFy ? <B l={iT('undo')} on={() => run(() => unpostReversal(postedFy.id))} /> : (
-        <B l={iT('post')} dis={Math.abs(diff) < 0.01} on={() => run(() => postReversal({ month: fyKey, kind: 'annual', heads: year.diff, figures: { annual: headsTotal(year.annual), posted: headsTotal(year.posted), diff }, date: `${fy + 1}-03-31` }))} />
+      <div className={styles.toolbar}>{postedFy ? <><span>{postedFy.date}</span><B l={iT('undo')} on={() => run(() => unpostReversal(postedFy.id))} /></> : (
+        <>
+          <T l={iT('trueUpOn')} t="date" v={tuDate} on={(day) => day && setTuPick({ fy, day })} />
+          <B l={iT('post')} dis={Math.abs(diff) < 0.01 || today() < win.from} on={() => run(() => postReversal({ month: fyKey, kind: 'annual', heads: year.diff, figures: { annual: headsTotal(year.annual), posted: headsTotal(year.posted), diff }, date: tuDate }))} />
+        </>
       )}</div>
     </div>
   );

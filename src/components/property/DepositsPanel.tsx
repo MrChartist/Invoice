@@ -2,8 +2,7 @@
 import { useMemo, useState } from 'react';
 import type { Lease, SecurityDeposit } from '../../types/institutions-r5';
 import { localDb } from '../../lib/localDb';
-import { receivableBalance } from '../../lib/rcm';
-import { adjustAgainstInvoice, applyToCharge, depositBalance, depositScheduleCsv, recordDeposit, refundDeposit, refundReceiptHtml, type DepositInput } from '../../lib/property/deposits';
+import { adjustAgainstInvoice, applyToCharge, depositBalance, depositOpenInvoices, depositScheduleCsv, recordDeposit, refundDeposit, refundReceiptHtml, type DepositInput } from '../../lib/property/deposits';
 import { iT } from '../../i18n/areas/packs-institutions-r5';
 import styles from '../institutions/institutions.module.css';
 import { B, S, T, Tbl } from '../institutions/Views';
@@ -27,7 +26,9 @@ export function DepositsPanel({ deposits, leases, notify, refresh }: { deposits:
       printPage(refundReceiptHtml(out, out.movements[out.movements.length - 1], localDb.settings.activeProfile()?.companyName ?? ''), 'deposit-refund.html');
     }
   });
-  const open = sel ? localDb.invoices.getAll().filter((i) => i.client?.id === sel.d.party_id && i.status !== 'Draft' && i.status !== 'Cancelled' && receivableBalance(i) > 0) : [];
+  // QA6 F3 / F18: the due net of credit notes, read once per picked deposit (shared rows, not a clone per keystroke).
+  const party = sel?.act === 'adjust' ? sel.d.party_id : '';
+  const open = useMemo(() => depositOpenInvoices(party), [party]);
   return (
     <div className={styles.stack} data-deposits>
       <div className={styles.toolbar}>
@@ -47,7 +48,7 @@ export function DepositsPanel({ deposits, leases, notify, refresh }: { deposits:
       {sel && (
         <div className={styles.toolbar}>
           <strong>{iT(`act.${sel.act}`)} · {sel.d.party_name}</strong>
-          {sel.act === 'adjust' && <S l={iT('invoice')} v={sel.inv} o={[['', '—'], ...open.map((i) => [i.id, `${i.invoice_number} · ${rs(receivableBalance(i))}`] as const)]} on={(inv) => setSel({ ...sel, inv })} />}
+          {sel.act === 'adjust' && <S l={iT('invoice')} v={sel.inv} o={[['', '—'], ...open.map(({ inv: i, due }) => [i.id, `${i.invoice_number} · ${rs(due)}`] as const)]} on={(inv) => setSel({ ...sel, inv })} />}
           {(sel.act === 'damages' || sel.act === 'forfeit') && <T l={iT('description')} v={sel.what} on={(what) => setSel({ ...sel, what })} />}
           <T l={iT('amount')} v={sel.amount || ''} on={(v) => setSel({ ...sel, amount: num(v) })} />
           <B p l={iT('confirm')} on={go} />

@@ -14,7 +14,8 @@ export const iT = defineArea(
     phone: 'Phone', purpose: 'Purpose', ref: 'Reference', description: 'Description', status: 'Status', days: 'days', due: 'Due', month: 'Month', all: 'All', nDone: '{n} done',
     'err.input': 'Check the values entered.', 'err.name': 'Give a name.',     'err.shares': 'Shares must add up to 100.', 'err.inUse': 'In use; cannot delete.', 'err.plan': 'Choose the plan and start date.',     'err.nothing': 'Nothing to do.', 'err.posted': 'Already posted.', 'err.amount': 'Enter an amount and date.',
     'err.filed': '10BD filed for this year: cancel and issue a new receipt.',     'err.tenant': 'Choose tenant and property.', 'err.dates': 'End must be after start.',
-    'err.balance': 'More than the balance.',     // C1
+    'err.balance': 'More than the balance.', 'err.trueUpDate': 'Date the true-up after the year ends, in an open month up to the September return — verify with your CA.',
+    'err.trueUpFiled': 'GSTR-3B of that period is marked filed — choose an open month.', trueUpOn: 'Post on',     // C1
     'fees.plans': 'Plans', 'fees.students': 'Students / patients', 'fees.bill': 'Bill instalment', 'fees.dues': 'Dues', newPlan: 'New plan', noPlans: 'No fee plan yet.', planName: 'Plan', plan: 'Plan',
     yearLabel: 'Academic year', preset: 'Preset', 'preset.education': 'Education (exempt)', 'preset.coaching': 'Coaching (18%)', 'preset.clinic': 'Clinic (exempt)',
     presetNote: 'Presets set the tax class only — verify with your CA.', head: 'Head', tax: 'Tax', 'tax.exempt': 'Exempt', 'tax.nil': 'Nil', 'tax.taxable': 'Taxable',
@@ -75,7 +76,8 @@ export const iT = defineArea(
     phone: 'फ़ोन', purpose: 'उद्देश्य', ref: 'संदर्भ', description: 'विवरण', status: 'स्थिति', days: 'दिन', due: 'बकाया', month: 'महीना', all: 'सभी', nDone: '{n} पूरे',
     'err.input': 'भरे गए मान जाँचें।', 'err.name': 'नाम दें।',     'err.shares': 'हिस्से कुल 100 हों।', 'err.inUse': 'उपयोग में; हटा नहीं सकते।', 'err.plan': 'प्लान और तारीख चुनें।',     'err.nothing': 'कुछ करना नहीं।', 'err.posted': 'पहले पोस्ट हो चुका।', 'err.amount': 'राशि और तारीख दें।',
     'err.filed': 'इस वर्ष का 10BD दाखिल: रद्द करके नई रसीद दें।',     'err.tenant': 'किरायेदार और संपत्ति चुनें।', 'err.dates': 'समाप्ति शुरुआत के बाद हो।',
-    'err.balance': 'बैलेंस से अधिक।',     'fees.plans': 'प्लान', 'fees.students': 'छात्र / मरीज़', 'fees.bill': 'किस्त बिल', 'fees.dues': 'बकाया', newPlan: 'नया प्लान', noPlans: 'अभी कोई फ़ीस प्लान नहीं।', planName: 'प्लान', plan: 'प्लान',
+    'err.balance': 'बैलेंस से अधिक।', 'err.trueUpDate': 'मिलान वर्ष समाप्ति के बाद, सितंबर रिटर्न तक किसी खुले महीने में दर्ज करें — verify with your CA.',
+    'err.trueUpFiled': 'उस अवधि का GSTR-3B दाखिल चिह्नित है — खुला महीना चुनें।', trueUpOn: 'पोस्ट तारीख',     'fees.plans': 'प्लान', 'fees.students': 'छात्र / मरीज़', 'fees.bill': 'किस्त बिल', 'fees.dues': 'बकाया', newPlan: 'नया प्लान', noPlans: 'अभी कोई फ़ीस प्लान नहीं।', planName: 'प्लान', plan: 'प्लान',
     yearLabel: 'शैक्षणिक वर्ष', preset: 'प्रीसेट', 'preset.education': 'शिक्षा (छूट)', 'preset.coaching': 'कोचिंग (18%)', 'preset.clinic': 'क्लिनिक (छूट)',
     presetNote: 'प्रीसेट केवल कर श्रेणी तय करते हैं — verify with your CA.', head: 'मद', tax: 'कर', 'tax.exempt': 'छूट', 'tax.nil': 'शून्य', 'tax.taxable': 'कर-योग्य',
     frequency: 'बिलिंग', 'freq.per_instalment': 'हर किस्त', 'freq.once': 'एक बार', sessions: 'सत्र', addHead: 'मद जोड़ें', instalment: 'किस्त', dueDate: 'देय तारीख', share: 'हिस्सा %', nEqual: '{n} बराबर',

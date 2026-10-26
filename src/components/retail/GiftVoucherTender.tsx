@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Gift, X } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
-import { codeShapeIssue, lookupVoucher, readGvSettings, redeemIssue } from '../../lib/retail/gift-voucher-core';
+import { codeShapeIssue, lookupVoucher, promoVoucherIssue, readGvSettings, redeemIssue } from '../../lib/retail/gift-voucher-core';
 import { num, round2 } from '../../lib/invoice-calc';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
@@ -34,6 +34,8 @@ export default function GiftVoucherTender({ day, due, applied, onChange }: { day
     if (shape) return setError(shape);
     const { voucher, state } = lookupVoucher(code, day);
     if (voucher && applied.some((a) => a.id === voucher.id)) return setError(sT('gvTwice'));
+    const second = promoVoucherIssue(applied, voucher); // QA6 F12: a second promo would be listed but never applied
+    if (second) return setError(second);
     const take = round2(num(amount) > 0 ? num(amount) : Math.min(state?.balance ?? 0, Math.max(due, 0)));
     const issue = redeemIssue(voucher, take, day, state, voucher?.promo ? { ...readGvSettings(), allow_partial: true } : readGvSettings());
     if (issue) return setError(issue);

@@ -84,6 +84,18 @@ test('preflight: LUT_MISSING (error) and LUT_OUTSIDE_FY (warning); drafts and pa
   assert.deepEqual(buildPreflight({ exceptions: [], issues: [], gaps: [] }), [], 'no LUT input → nothing new');
 });
 
+test('QA6 F6: LUT_MISSING for an export saved as "Tax Invoice" (or a bill of supply); never for a quotation / proforma', () => {
+  const base = { status: 'Sent' as const, supply_type: 'EXPORT_LUT' as const, issue_date: '2026-05-01', lut_number: '', currency: 'USD', shipping_bill_no: '123' };
+  const invs: Partial<InvoiceRecord>[] = [
+    { ...base, id: 't1', invoice_number: 'EXP/T1', doc_type: 'TAX_INVOICE' },
+    { ...base, id: 'b1', invoice_number: 'EXP/B1', doc_type: 'BILL_OF_SUPPLY' },
+    { ...base, id: 'q1', invoice_number: 'QT/1', doc_type: 'QUOTATION' },
+    { ...base, id: 'p1', invoice_number: 'PF/1', doc_type: 'PROFORMA' },
+    { ...base, id: 'd1', invoice_number: 'DC/1', doc_type: 'DELIVERY_CHALLAN' },
+  ];
+  assert.deepEqual(lutIssues(invs, []).map((i) => [i.code, i.number]), [['LUT_MISSING', 'EXP/T1'], ['LUT_MISSING', 'EXP/B1']]);
+});
+
 test('the LUT store needs settings.manage, refuses duplicates and is audited as a watched table', () => {
   const row = lutDb.save({ fy: 'FY26-27', gstin: '', arn: 'ad270426000123a', filed_on: '2026-03-20' });
   assert.equal(row.arn, 'AD270426000123A');

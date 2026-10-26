@@ -11,7 +11,7 @@ import { getIndianFY } from '../invoice-number';
 import { isoDay } from '../dates';
 import { requireAccess } from '../access';
 import { generateId, getTable, peekTable, setTable } from '../storage';
-import { isLutSupply } from './exporter';
+import { isLutSupply, isSupplyDocType } from './exporter';
 
 export const LUT_TABLE = 'lut_register';
 
@@ -102,7 +102,7 @@ export function lutIssues(invoices: readonly Partial<InvoiceRecord>[], register:
   const out: LutIssue[] = [];
   for (const inv of invoices) {
     if (!inv || !isLutSupply(inv) || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
-    if (inv.doc_type && inv.doc_type !== 'INVOICE' && inv.doc_type !== 'DEBIT_NOTE' && inv.doc_type !== 'CREDIT_NOTE') continue;
+    if (!isSupplyDocType(inv.doc_type)) continue; // QA6 F6: a "Tax Invoice" export needs its LUT too
     const fy = fyOf(inv.issue_date);
     const base = { invoiceId: String(inv.id ?? ''), number: String(inv.invoice_number ?? ''), fy };
     const typed = String(inv.lut_number ?? '').trim().toUpperCase();

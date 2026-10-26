@@ -203,6 +203,26 @@ test('breakage: one journal for expired balances (Dr liability | Cr Unredeemed v
   assert.equal(tb.totals.closingDr, tb.totals.closingCr);
 });
 
+test('QA6 F12: one promotional voucher per POS bill — a second is refused, a sold voucher still tenders', async () => {
+  const { promoVoucherIssue } = await import('../src/lib/retail/gift-voucher-core.ts');
+  const p1 = { id: 'p1', number: 'GV/1', amount: 100, promo: true };
+  assert.equal(promoVoucherIssue([], { promo: true }), '');
+  assert.match(promoVoucherIssue([p1], { promo: true }), /one promotional voucher/i);
+  assert.equal(promoVoucherIssue([p1], { promo: false }), '', 'a sold voucher is a tender');
+  assert.equal(promoVoucherIssue([p1]), '');
+  assert.match(promoVoucherIssue([p1, { ...p1, id: 'p2', amount: 50 }]), /one promotional voucher/i, 'a bill holding two is refused on save');
+});
+
+test('QA6 F10: the breakage journal cannot be dated before the "as at" day (so never before expiry or the sale)', () => {
+  giftVouchersDb.sell({ count: 1, face_value: 800, issued_on: DAY, method: 'Cash', expires_on: '2026-06-30' });
+  assert.throws(() => giftVouchersDb.recogniseBreakage('2026-07-15', '2026-05-01'), /on or after/, 'before the sale');
+  assert.throws(() => giftVouchersDb.recogniseBreakage('2026-07-15', '2026-06-20'), /on or after/, 'before the expiry');
+  assert.throws(() => giftVouchersDb.recogniseBreakage('2026-07-15', '2026-07-14'), /on or after/, 'before the as-at day');
+  assert.equal(loadVouchers().filter((v) => v.type === 'JOURNAL').length, 0, 'no journal written');
+  assert.equal(giftVouchersDb.all()[0].breakage_voucher_id, undefined);
+  assert.equal(giftVouchersDb.recogniseBreakage('2026-07-15', '2026-07-15').amount, 800);
+});
+
 test('period lock and roles: a sale inside a locked period is refused; a viewer cannot sell', () => {
   localDb.settings.save({ ...localDb.settings.get(), lock_until: '2026-05-31' });
   assert.throws(() => giftVouchersDb.sell({ count: 1, face_value: 500, issued_on: DAY }), /lock/i);

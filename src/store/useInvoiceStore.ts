@@ -155,7 +155,7 @@ export const RECORD_KEYS = [
   'annexure', // R3-B (src/types/service-r3.ts)
   'delivery_proof', // R3-C
   'incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms', // R4-C
-  'channel_id', 'channel_order_id', 'channel_import_id', // R5-A
+  'channel_id', 'channel_order_id', 'channel_import_id', 'channel_order_ids', // R5-A, QA6 F2
   'fee_plan_id', 'fee_instalment', // R5-C
   ...R5B_RECORD_KEYS, // R5-B (src/types/transport-works-r5.ts)
 ] as const satisfies readonly (keyof InvoiceRecord)[];

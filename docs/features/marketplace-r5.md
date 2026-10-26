@@ -41,7 +41,10 @@ GST / income-tax portals are the authority — verify with your CA.
   "<channel> customer — <state>" or the B2B GSTIN party. Refund → `CREDIT_NOTE` linked through `doc_links`,
   `goods_returned` false for price adjustments, damaged → the channel's damaged godown; it also opens a returns-desk row.
   Cancellations skipped and listed.
-- Idempotent on (channel, order id, kind, number); summary mode (state × rate × day) suggested above 3,000 rows;
+- Idempotent on (channel, order id, kind, number); summary mode (state × rate × day) suggested above 3,000 rows. A
+  summary document keeps its order ids (`channel_order_ids`, read back from its note for older ones), so a per-order
+  import of the same orders, or a second summary import, reports them "already imported" (QA6 F2); when a summary's order
+  list cannot be read, an order inside its day × state × rate is refused rather than booked twice;
   preview = counts, totals by head, refused rows (unmapped SKU, period lock, number used elsewhere), "file total =
   documents total" to the paisa. Documents are issued (status Sent), never drafts, and never take an app series number.
 - Undo = cancel every document of the batch (`cancelDocument`, credit notes first), refused while any has a payment.
@@ -92,7 +95,7 @@ GST / income-tax portals are the authority — verify with your CA.
 | `mrchartist_inv_settlements` | rows, DATED `deposit_date` | backup, audit, `doc.create` (post: `books.edit`), sync |
 | `mrchartist_inv_eco_credits` | rows, DATED `month`-01 | backup, audit, `books.edit`, sync |
 | `mrchartist_inv_marketplace_returns` | rows, DATED `expected_on` / created | backup, audit, `doc.create`, sync |
-| `InvoiceRecord.channel_id / channel_order_id / channel_import_id` | additive fields | `RECORD_KEYS`, `normalizeRecord` |
+| `InvoiceRecord.channel_id / channel_order_id / channel_import_id / channel_order_ids` | additive fields | `RECORD_KEYS`, `normalizeRecord` |
 | `BankAccount.clearing` | additive field | `bank-accounts.ts` normalise |
 
 Also: open-export schema meanings for the six tables (`trust/open-export-schema.ts`). Lead rows for ROADMAP /

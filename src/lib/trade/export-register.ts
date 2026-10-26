@@ -17,9 +17,10 @@ import { isoDay, parseDay, localDayOf } from '../dates';
 import { round2 } from '../invoice-calc';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
-import { generateId, getTable, setTable } from '../storage';
+import { generateId, getTable, peekTable, setTable } from '../storage';
 import { parseTable } from '../csv';
-import { isExportDoc } from './exporter';
+import { isExportDoc, isSupplyDocType } from './exporter';
+import { linkedCredits, type CreditLinkRow } from '../amount-due';
 import { exportRealisationMonths } from './trade-rules';
 
 export const IRMS_TABLE = 'export_irms';
@@ -79,10 +80,15 @@ export interface RegisterInput {
   writeoffs: readonly ExportWriteOff[];
   /** Local day the register is drawn "as at" (receipts / IRMs / write-offs after it are ignored). */
   today: string;
+  /** `doc_links` rows: live credit notes linked to an export reduce its realisable value (QA6 F15). */
+  links?: readonly CreditLinkRow[];
 }
 
 const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-const live = (i: Partial<InvoiceRecord>) => i.status !== 'Draft' && i.status !== 'Cancelled' && (i.doc_type ?? 'INVOICE') === 'INVOICE';
+// QA6 F6: any issued supply document (an export saved as "Tax Invoice" too) except notes — a debit note is its own
+// receivable, a credit note reduces its invoice (F15).
+const live = (i: Partial<InvoiceRecord>) =>
+  i.status !== 'Draft' && i.status !== 'Cancelled' && isSupplyDocType(i.doc_type) && i.doc_type !== 'CREDIT_NOTE' && i.doc_type !== 'DEBIT_NOTE';
 
 /** Issued export invoices the register follows. */
 export const exportInvoices = (invoices: readonly Partial<InvoiceRecord>[]) => invoices.filter((i) => i && i.id && live(i) && isExportDoc(i as InvoiceRecord));
@@ -105,6 +111,7 @@ export function buildRegister(input: RegisterInput): RealisationRow[] {
       irmBy.set(a.invoice_id, list);
     }
   }
+  const credits = linkedCredits(input.links, input.invoices.filter((i) => i?.id) as Parameters<typeof linkedCredits>[1]);
   const wo = new Map(input.writeoffs.filter((w) => w && (!w.date || w.date <= asAt)).map((w) => [w.invoice_id, w]));
   const rows: RealisationRow[] = [];
   for (const inv of exportInvoices(input.invoices)) {
@@ -115,7 +122,7 @@ export function buildRegister(input: RegisterInput): RealisationRow[] {
     if (!shipDate) continue;
     const months = exportRealisationMonths(shipDate);
     const dueDate = addMonths(shipDate, months);
-    const fcy = round2(n(inv.total));
+    const fcy = round2(Math.max(n(inv.total) - (credits.get(id) ?? 0), 0)); // net of live credit notes (QA6 F15)
     const receivedFcy = round2(received.get(id) ?? 0);
     const irms = irmBy.get(id) ?? [];
     const irmFcy = round2(irms.reduce((s, r) => s + r.fcy, 0));
@@ -436,6 +443,7 @@ export function liveRegister(today: string): RealisationRow[] {
     payments: getTable<Payment>('transactions'),
     irms: irmsDb.all(),
     writeoffs: writeoffsDb.all(),
+    links: peekTable<CreditLinkRow>('doc_links'),
     today,
   });
 }
