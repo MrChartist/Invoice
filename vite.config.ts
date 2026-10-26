@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { CSP_META } from './scripts/security-headers.mjs'
+import { readFileSync } from 'node:fs'
+
+// R6-A4: the version shown in Help, What's new and the diagnostic report comes from package.json.
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
 
 /**
  * Production builds also carry the CSP as a <meta> tag, so hosts that ignore _headers /
@@ -22,6 +26,7 @@ function cspMeta(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), cspMeta()],
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: {
     // jsPDF's optional imports (doc.html / addSvgAsImage only) are never used: see the stub.
     alias: Object.fromEntries(

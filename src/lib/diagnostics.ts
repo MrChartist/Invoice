@@ -23,6 +23,8 @@ export interface DiagnosticsInput {
   pathname: string;
   search: string;
   errors: readonly string[];
+  /** R6-A5: screens visited before this one in the session (already masked, `route-trail.ts`), oldest first. */
+  trail?: readonly string[];
   storage: {
     backend: string;
     vault: boolean;
@@ -62,6 +64,17 @@ export function scrubText(s: string): string {
     .replace(/\d[\d,.\s-]{4,}\d/g, '[number]');
 }
 
+/**
+ * R6-A5: text the tester typed in the report form. `scrubText` plus every run of 4+ digits and "Rs / INR <n>"
+ * amounts, so a phone, an amount or a GSTIN typed by habit does not travel. Names cannot be detected: the form
+ * asks the tester not to type them.
+ */
+export function scrubTyped(s: string): string {
+  return scrubText(s)
+    .replace(/\b(?:rs\.?|inr)\s?\d[\d,]*(?:\.\d+)?/gi, '[amount]')
+    .replace(/\d{4,}/g, '[number]');
+}
+
 /** The current screen without record ids or query values (`/invoice/:id?tab=…`). */
 export function scrubRoute(pathname: string, search: string): string {
   const path = (pathname || '/')
@@ -86,6 +99,7 @@ export function buildDiagnostics(d: DiagnosticsInput): string {
     `Offline-ready: ${d.offlineReady ? 'yes' : 'no'} · Installed app: ${d.standalone ? 'yes' : 'no'} · Online: ${d.online ? 'yes' : 'no'}`,
     `Language: ${d.uiLanguage} · Theme: ${d.theme} · Viewport: ${d.viewport}`,
     `Screen: ${scrubRoute(d.pathname, d.search)}`,
+    ...(d.trail?.length ? ['', `[Screens before] (${d.trail.length}, oldest first)`, ...d.trail.map((r) => `- ${r}`)] : []),
     '',
     '[Browser]',
     d.userAgent || 'unknown',

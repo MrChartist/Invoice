@@ -19,7 +19,11 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   `AGENTS.md`), e.g. Rounds 2–3 `mrchartist_statement_prefs` (R2-A statement style), `mrchartist_display_prefs` (R2-C
   text size / contrast / motion, read by `public/theme-init.js` before first paint), `mrchartist_kot_printers` (R3-A KOT
   printer per station), `mrchartist_editor_layout` (R3-C live preview), `mrchartist_checklist_default` (R3-C) and
-  `mrchartist_pos_branch` (R4-B3 "This counter is branch …"). Rounds 4–5 add no `DEVICE_LOCAL_KEYS` entry.
+  `mrchartist_pos_branch` (R4-B3 "This counter is branch …"); Round 6 (R6-A) `mrchartist_help_strips` ("About this
+  tab" strips on / off), `mrchartist_whats_new_seen` (last What's-new version shown), `mrchartist_feedback_draft`
+  (unsent "Report a problem" draft), `mrchartist_tips_seen` / `mrchartist_tips_off` (one-time screen tips). The R6-B
+  Demo-company flag `mrchartist_demo_pending` may read `id|business_type|pack,pack`. Rounds 4–6 add no
+  `DEVICE_LOCAL_KEYS` entry.
 - **Write-through.** A write updates the map at once and is queued; the queue commits in one IndexedDB
   transaction on the next task, and immediately on `pagehide` / `visibilitychange: hidden`. Paths that reload
   right after a bulk change (restore, erase, forgot-PIN reset, sample data) call `reloadAfterFlush()`.
@@ -264,6 +268,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `export_writeoffs` | export desk (R4-C2) | `ExportWriteOff` unrealised export proceeds written off with a reason; DATED (`date`); `books.edit` |
 | `recycle_bin` | recycle bin (R4-C4, capture `binRows` in `audit-edits.ts`, `src/lib/trust/recycle-bin.ts`) | `{table, row_id, deleted_at, deleted_by?, row, attachments?}`: whole rows deleted from any `WATCHED_TABLES` table (and `localDb.invoices.remove`); restore goes through the target table's own guarded save; purged after `bin_settings.days` / 5 MB. Backed up, **not synced** (`EXCLUDED` in `sync-engine.ts`), no `TABLE_ACTIONS` entry (checked per target table); an `ATTACHMENT_OWNER_TABLES` member, so binned files are kept |
 | `bin_settings` (object) | recycle bin (R4-C4) | `{days}` 7–90 (default 30); `settings.manage` checked in code |
+| `setup_progress` (object) | setup checklist v3 (R6-A1, `src/lib/checklist-steps.ts`) | `{skipped: string[], hidden_at?}`: skipped checklist steps and when the Dashboard card was hidden (done-ness is always derived from data). Backed up; synced as a singleton (non-array value, last writer wins); not audited (viewing state, not in `WATCHED_TABLES`); `TABLE_ACTIONS` `doc.create` |
 | `sales_channels` | marketplace (R5-A2, `src/lib/marketplace/channels.ts`) | `SalesChannel` (`src/types/marketplace-r5.ts`): marketplace, operator GSTIN / TAN, operator party, clearing bank account, saved file mappings, bucket rules, claim windows; `master.edit` (`docs/features/marketplace-r5.md`) |
 | `channel_skus` | marketplace (R5-A2, `src/lib/marketplace/sku-map.ts`) | `ChannelSku` channel SKU / listing id → catalogue item, `qty_per_unit`; `master.edit` |
 | `marketplace_imports` | marketplace (R5-A3, `src/lib/marketplace/sales-import.ts`) | `MarketplaceImport` batch: file, counts, document ids (undo = cancel the batch); DATED (`imported_at` day); `doc.create` |
@@ -336,3 +341,23 @@ Feature modules are **self-contained**: they export a page/component and (option
 `lib` API. The lead wires routes, navigation and cross-links in the shared shell
 (`src/App.tsx`, `src/layouts/DashboardLayout.tsx`, `src/pages/*`). Feature agents must not
 edit shared shell files; describe the exact wiring in `docs/features/<module>.md`.
+
+### Help, discoverability and version (Round 6)
+- **Help registry** (R6-A2, `src/lib/help/registry.ts`): topic ids are `<route>[:<tab>[:<view>]]`, six lazy topic
+  files by area, `helpFor` / `topicById` fall back to the route topic, `helpIndex()` feeds Help search and the Ctrl+K
+  "Help topics" group. `HelpModal` opens on the current screen, on a `topic` / `view` prop, or on the topic asked through
+  `openHelp(topic)` (`src/lib/help-event.ts`, read once with `takeHelpTopic()`). F1 opens it everywhere except `/pos`
+  (F1 = held bills), `/gateway` (Tally keys) and while typing. **A new route or tab needs a help topic**:
+  `tests/help-registry.test.ts` walks every `App.tsx` route, every sidebar entry, `GST_TABS`, `PACK_TABS` and every tab
+  list of `src/pages/page-tabs.ts` (`TAB_PAGES` in `src/lib/palette/tab-index.ts`, the list Ctrl+K indexes).
+- **Tab lists** (R6-B1): page tab registries live in `src/pages/page-tabs.ts` (type imports only), the TDS ids in
+  `tab-index.ts`, the GST rows in `gst-tabs.ts`; a new tab needs a title in `discover-r6-tabs.ts` and a help topic.
+- **Route trail** (R6-A5, `src/lib/route-trail.ts`): the shell pushes every route change; the last 10, ids masked, memory
+  only, for "Report a problem".
+- **Screen tips** (R6-A6, `src/lib/help/tips.ts`): one lazy `<ScreenTip id>` line per page; every tip must be mounted
+  (`tests/help-tips.test.ts`).
+- **Sample data** (R6-B4): always a separate, resettable Demo company (`startDemoCompany`, `SampleDataChooser` on the
+  Dashboard, Settings → Data and the wizard); never rows in a real company.
+- **Version** (R6-A4): `__APP_VERSION__` comes from `package.json` (`vite.config.ts` `define`, `src/lib/app-version.ts`);
+  the newest `WHATS_NEW` entry (`src/lib/whats-new.ts`) must match it — `scripts/check-whats-new.mjs` fails the
+  `postbuild` otherwise, so a version bump needs a notes entry.

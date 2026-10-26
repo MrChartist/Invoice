@@ -33,6 +33,7 @@ import { formatDate, formatMoney, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 import { StatCard } from '../ui/StatCard';
 import { EmptyState } from '../ui/EmptyState';
+import { Term } from '../help/Term';
 import { useT } from '../../i18n';
 import { tdsT } from '../../i18n/areas/tds';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
@@ -65,14 +66,15 @@ export function OverviewTab({ data, fy, today }: { data: TdsData; fy: number; to
   const sum = (list: typeof tds, k: 'deducted' | 'deposited' | 'undeposited' | 'interest') => round2(list.reduce((s, q) => s + q[k], 0));
   const stText = { filed: tdsT('stFiled'), overdue: tdsT('stOverdue'), due: tdsT('stDue'), empty: tdsT('stEmpty') } as const;
   const dueText = { done: tdsT('stDone'), late: tdsT('stLate'), overdue: tdsT('stOverdue'), upcoming: tdsT('stUpcoming') } as const;
-  const table = (title: string, list: typeof tds, word: string) => (
+  // R6-A3: the TDS / TCS heading cells explain themselves (glossary popover).
+  const table = (title: string, list: typeof tds, word: string, term: 'tds' | 'tcs') => (
     <div className={surface.card}>
       <div className={surface.tableWrap}>
         <table className={surface.table}>
           <caption className={surface.srOnly}>{title}</caption>
           <thead>
             <tr>
-              <th scope="col">{title}</th>
+              <th scope="col"><Term id={term}>{title}</Term></th>
               <th scope="col" className={surface.numeric}>{word}</th>
               <th scope="col" className={surface.numeric}>{tdsT('deposited')}</th>
               <th scope="col" className={surface.numeric}>{tdsT('undeposited')}</th>
@@ -106,8 +108,8 @@ export function OverviewTab({ data, fy, today }: { data: TdsData; fy: number; to
         <StatCard label={tdsT('undeposited')} value={inr(sum(tds, 'undeposited'))} icon={CalendarClock} tone={sum(tds, 'undeposited') > 0 ? 'warning' : 'default'} />
         <StatCard label={tdsT('interest')} value={inr(sum(tds, 'interest') + sum(tcs, 'interest'))} icon={FileText} />
       </div>
-      {table(tdsT('kindTds'), tds, tdsT('deducted'))}
-      {table(tdsT('kindTcs'), tcs, tdsT('collected'))}
+      {table(tdsT('kindTds'), tds, tdsT('deducted'), 'tds')}
+      {table(tdsT('kindTcs'), tcs, tdsT('collected'), 'tcs')}
       <div className={surface.card}>
         <div className={surface.tableWrap}>
           <table className={surface.table}>

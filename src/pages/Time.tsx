@@ -49,6 +49,7 @@ import { svcT } from '../i18n/areas/service-r3'; // R3-B
 import { WorkTypesCard } from '../components/time/WorkTypesCard';
 import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-B
 import { defineArea } from '../i18n/area';
+import { TIME_TABS, type TimeTab } from './page-tabs'; // R6-B1
 
 // R3-B2 / B3: the projects board and retainers are their own lazy tab chunks.
 const ProjectsBoard = lazy(() => import('../components/time/ProjectsBoard'));
@@ -57,16 +58,18 @@ const RetainersTab = lazy(() => import('../components/time/RetainersTab'));
 const WorksTab = lazy(() => import('../components/works/WorksTab'));
 const wkT = defineArea({ tab: 'Works' } as const, { tab: 'वर्क्स' });
 
-type Tab = 'timesheet' | 'mileage' | 'billing' | 'projects' | 'retainers' | 'settings' | 'works';
-const TABS: { id: Tab; label: () => string; pack?: PackId }[] = [
-  { id: 'timesheet', label: () => timeT('tabTimesheet') },
-  { id: 'mileage', label: () => timeT('tabMileage') },
-  { id: 'billing', label: () => timeT('tabUnbilled') },
-  { id: 'projects', label: () => svcT('tabProjects') },
-  { id: 'retainers', label: () => svcT('tabRetainers') },
-  { id: 'settings', label: () => timeT('tabSettings') },
-  { id: 'works', label: () => wkT('tab'), pack: 'works' }, // R5-B
-];
+type Tab = TimeTab;
+// R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
+const TAB_LABEL: Record<Tab, () => string> = {
+  timesheet: () => timeT('tabTimesheet'),
+  mileage: () => timeT('tabMileage'),
+  billing: () => timeT('tabUnbilled'),
+  projects: () => svcT('tabProjects'),
+  retainers: () => svcT('tabRetainers'),
+  settings: () => timeT('tabSettings'),
+  works: () => wkT('tab'), // R5-B
+};
+const TABS: { id: Tab; label: () => string; pack?: PackId }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** Weekday column head: English as before, Hindi weekday names for a Hindi interface. */
 const dayName = (ymd: string, i: number, lang: string) =>

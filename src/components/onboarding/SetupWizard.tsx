@@ -14,6 +14,7 @@ import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
 import { BUSINESS_DEFAULTS, BUSINESS_TYPES, applyBusinessDefaults } from '../../lib/shop-presets';
 import { startDemoCompany, useDemoPending } from './demo-company';
 import { companiesSupported } from '../../lib/companies';
+import { discoverT } from '../../i18n/areas/discover-r6';
 import controls from '../../styles/controls.module.css';
 import styles from './SetupWizard.module.css';
 
@@ -45,11 +46,11 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     setDemoBusy(true);
     try {
       // QA-3 F20: keep what was typed for the user's own company (still not set up, so the wizard returns prefilled).
-      // (Only when the demo opens as a separate company; otherwise the sample data lands in this one.)
+      // (R6-B4: sample data only ever goes to a separate Demo company; a browser without one gets none.)
       const draft = companiesSupported() ? wizardDraft(localDb.settings.get(), a) : null;
       if (draft) localDb.settings.save(draft);
       // F27: the company left behind is labelled with the typed business name, not "Main business".
-      startDemoCompany(a.companyName.trim() || undefined);
+      if (!startDemoCompany(a.companyName.trim() || undefined)) throw new Error(discoverT('sampleNoCompanies'));
     } catch (err) {
       setError((err as Error).message);
       setDemoBusy(false);

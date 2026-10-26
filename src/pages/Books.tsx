@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BookOpen } from 'lucide-react';
 import {
   buildVouchers,
   loadBooksData,
@@ -10,7 +11,7 @@ import {
 } from '../lib/books';
 import { setPeriodContext, usePeriodContext } from '../lib/period-context';
 import { getAllReportPrefs, setAllReportPrefs } from '../lib/report-prefs';
-import { StorageWriteError } from '../lib/storage';
+import { StorageWriteError, getTable } from '../lib/storage';
 import { useToast } from '../components/ui/useToast';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PeriodBar } from '../components/books/PeriodBar';
@@ -28,6 +29,12 @@ import controls from '../styles/controls.module.css';
 import { defineArea } from '../i18n/area';
 import { visibleTabs } from '../lib/industry-packs'; // R5-C
 import { localDb } from '../lib/localDb';
+import { BOOKS_TABS, type BooksTab } from './page-tabs'; // R6-B1
+import { EmptyState } from '../components/ui/EmptyState';
+import { LearnMore, booksEmpty } from '../components/discover';
+import { discoverT } from '../i18n/areas/discover-r6';
+
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
@@ -49,29 +56,11 @@ const TallyPanel = lazy(() => import('../components/books/tally/TallyPanel'));
 const TallyImport = lazy(() => import('../components/import/TallyImport').then((m) => ({ default: m.TallyImport })));
 const YearEndWizard = lazy(() => import('../components/year-end/YearEndWizard').then((m) => ({ default: m.YearEndWizard })));
 
-const TABS = [
-  { id: 'day', label: 'tabDay' },
-  { id: 'cash', label: 'tabCash' },
-  { id: 'vch', label: 'tabVch' },
-  { id: 'ledger', label: 'tabLedger' },
-  { id: 'tb', label: 'tabTb' },
-  { id: 'pnl', label: 'tabPnl' },
-  { id: 'bs', label: 'tabBs' },
-  { id: 'cf', label: 'tabCf' },
-  { id: 'rpt', label: 'tabRpt' },
-  { id: 'proj', label: 'tabProj' },
-  { id: 'budget', label: 'tabBudget' },
-  { id: 'coa', label: 'tabCoa' },
-  { id: 'fcst', label: 'tabFcst' },
-  { id: 'fx', label: 'tabFx' },
-  { id: 'billwise', label: 'tabBillwise' },
-  { id: 'vreg', label: 'tabVreg' },
-  { id: 'ratio', label: 'tabRatio' },
-  { id: 'defer', label: 'tabDefer' }, // R2-C2 (label from the books-r2 area)
-  { id: 'funds', label: 'tabFunds', pack: 'nonprofit' }, // R5-C4 (label above)
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+const TABS = BOOKS_TABS; // R6-B1: the list lives in books-tabs.ts (Ctrl+K indexes it)
+type TabId = BooksTab;
 // Day book and P&L read the ledger too (WP-2: one accounting truth); `rpt` = group summary, ratios, registers …
+// R6-B3: tabs that read the books for the period (an empty company sees the first step there).
+const STATEMENT_TABS = new Set<TabId>(['day', 'cash', 'vch', 'ledger', 'tb', 'pnl', 'bs', 'cf', 'rpt', 'billwise', 'vreg', 'ratio']);
 const LEDGER_TABS = new Set<TabId>(['day', 'pnl', 'rpt', 'vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
 
 export function Books() {
@@ -109,6 +98,22 @@ export function Books() {
   }, []);
 
   const vouchers = useMemo(() => buildVouchers(data), [data]);
+  // R6-B3: a statement tab with nothing to show says what fills it (vouchers, manual entries, openings).
+  const empty = useMemo(
+    () =>
+      STATEMENT_TABS.has(tab) &&
+      booksEmpty(
+        {
+          voucherDates: vouchers.map((v) => v.date),
+          manualVouchers: getTable<{ date?: string }>('vouchers'),
+          openings: data.openings,
+          ledgerOpenings: getTable('ledger_openings').length,
+          openingBills: getTable('opening_bills').length,
+        },
+        period,
+      ),
+    [tab, vouchers, data, period],
+  );
 
   const todayIso = toIsoDate(new Date());
   const asOf = period.end > todayIso ? todayIso : period.end;
@@ -163,6 +168,7 @@ export function Books() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="books" /></Suspense>
       <PageHeader
         title={booksT('title')}
         subtitle={booksT('subtitle')}
@@ -230,6 +236,20 @@ export function Books() {
         ))}
       </div>
 
+      {empty && (
+        <EmptyState
+          icon={BookOpen}
+          title={discoverT('booksTitle')}
+          text={discoverT('booksText')}
+          action={
+            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-books-empty>
+              {can('books.edit') && <Link to="/books?tab=coa&m=opening-tb" className={controls.btnPrimary}>{discoverT('booksOpenings')}</Link>}
+              {can('data.restore') && <button type="button" className={controls.btnOutline} onClick={() => setWizard('tally')}>{discoverT('booksTally')}</button>}
+              <LearnMore topic="books" />
+            </div>
+          }
+        />
+      )}
       <div
         role="tabpanel"
         key={viewTick}

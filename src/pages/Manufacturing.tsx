@@ -21,6 +21,7 @@ import { StockReportsTab } from '../components/manufacturing/StockReportsTab';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from '../components/manufacturing/manufacturing.module.css';
+import { MFG_TABS, type MfgTab } from './page-tabs'; // R6-B1
 
 // Phase 7M: job work / ITC-04 and Rejections In load on demand (own chunk).
 const JobWorkTab = lazy(() => import('../components/job-work/JobWorkTab').then((m) => ({ default: m.JobWorkTab })));
@@ -43,8 +44,8 @@ const r4aTabT = defineArea(
 );
 
 type R4aTab = (typeof R4A_TABS)[number];
-type Tab = 'boms' | 'mfg' | 'journal' | 'physical' | 'jobwork' | 'rejections' | 'plan' | 'reorder' | 'reports' | R4aTab;
-const TABS: Tab[] = ['boms', 'mfg', 'orders', 'journal', 'physical', 'jobwork', 'rejections', 'plan', 'costing', 'trace', 'qc', 'landed', 'reorder', 'reports'];
+type Tab = MfgTab;
+const TABS = MFG_TABS; // R6-B1: list in manufacturing-tabs.ts
 const isR4a = (t: Tab): t is R4aTab => (R4A_TABS as readonly string[]).includes(t);
 const LABEL = { boms: 'tabBoms', mfg: 'tabMfg', journal: 'tabSj', physical: 'tabPhysical', jobwork: 'tabJobWork', rejections: 'tabRejections', plan: 'tabPlan', reorder: 'tabReorder', reports: 'tabReports' } as const;
 

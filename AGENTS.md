@@ -79,6 +79,12 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   contrast / motion, applied before first paint by `public/theme-init.js`, R2-C), `mrchartist_kot_printers` (KOT printer
   per kitchen station, R3-A), `mrchartist_editor_layout` (live-preview toggle, R3-C) and `mrchartist_checklist_default`
   (practice-desk default checklist, R3-C); `mrchartist_pos_branch` (POS "This counter is branch", R4-B).
+  Round 6 (R6-A): `mrchartist_help_strips` ("About this tab" strips on / off), `mrchartist_whats_new_seen` (last What's-new
+  version shown), `mrchartist_feedback_draft` (unsent "Report a problem" draft), `mrchartist_tips_seen` /
+  `mrchartist_tips_off` (one-time screen tips). R6-B: `mrchartist_demo_pending` may carry `id|business_type|pack,pack`
+  (a plain id still reads).
+- Round 6 company data: `mrchartist_inv_setup_progress` — object `{skipped, hidden_at?}` (R6-A1 setup checklist v3;
+  backed up, synced as a singleton, not audited, `TABLE_ACTIONS` `doc.create`; done-ness is derived from data).
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
@@ -160,6 +166,13 @@ build-time config must use Vite's `VITE_` prefix.
 - Recycle bin (R4-C4): deletes go through data-layer calls (`setTable` on a watched table, `localDb.invoices.remove`,
   `deleteVoucher`), which copy the row to `recycle_bin`; never delete by `writeRaw` or resurrect rows by hand. A
   deleted invoice / voucher number stays reserved in `series_counters`.
+- Help (Round 6): **a new route or tab needs a help topic** in `src/lib/help/topics-*.ts` — `tests/help-registry.test.ts`
+  walks every route, sidebar entry, GST / pack tab and every list in `src/pages/page-tabs.ts` (page tab lists live
+  there; a new tab also needs its Ctrl+K title in `discover-r6-tabs.ts`). Open Help from anywhere with
+  `openHelp(topic)` (`src/lib/help-event.ts`); F1 opens it except on `/pos`, `/gateway` and in fields.
+- Version (Round 6): `__APP_VERSION__` comes from `package.json`; **the newest `WHATS_NEW` entry
+  (`src/lib/whats-new.ts`) must match the package.json version** (`scripts/check-whats-new.mjs` fails `postbuild`).
+- Sample data goes only into the separate Demo company (`startDemoCompany` / `SampleDataChooser`), never a real one.
 - Every lucide icon lands in the first-paint `vendor-ui` chunk: reuse an icon that is already imported somewhere
   instead of adding a new name.
 - `/practice` reads other companies' databases through `peekCompliance` (`company-peek.ts`): a version-less,

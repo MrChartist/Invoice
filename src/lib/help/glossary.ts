@@ -1,0 +1,91 @@
+/**
+ * R6-A3 glossary: short explanations of GST / TDS / payroll terms, shown by `<Term id="…">`. Its own lazy chunk,
+ * loaded on the first popover. English and Hindi for every term. No statutory value appears without "as the app
+ * applies it" (tests/help-glossary.test.ts); each term names the CA_REVIEW items behind it. Verify with your CA.
+ */
+
+export interface GlossaryTerm {
+  term: string;
+  en: { def: string; app: string };
+  hi: { def: string; app: string };
+  caItems?: readonly string[];
+}
+
+const g = (term: string, def: string, app: string, hiDef: string, hiApp: string, caItems?: readonly string[]): GlossaryTerm => ({
+  term, en: { def, app }, hi: { def: hiDef, app: hiApp }, ...(caItems ? { caItems } : {}),
+});
+
+export const GLOSSARY = {
+  b2b: g('B2B', 'Sales to buyers registered under GST (they have a GSTIN). Reported invoice by invoice in GSTR-1 Table 4.', 'Every non-draft tax invoice to a client with a GSTIN.',
+    'GST में पंजीकृत ख़रीदारों (जिनके पास GSTIN है) को बिक्री। GSTR-1 टेबल 4 में हर इनवॉइस अलग से।', 'GSTIN वाले ग्राहक को हर जारी टैक्स इनवॉइस।', ['G13']),
+  b2cl: g('B2CL', 'Large inter-State sales to unregistered buyers, above a threshold set by notification. GSTR-1 Table 5, invoice by invoice.', 'Invoices above the threshold as the app applies it by invoice date; smaller ones go to B2CS.',
+    'बिना पंजीकरण वाले ख़रीदारों को बड़ी अंतर-राज्यीय बिक्री, अधिसूचित सीमा से ऊपर। GSTR-1 टेबल 5।', 'सीमा, जैसी ऐप इनवॉइस की तारीख़ से लागू करता है; छोटे इनवॉइस B2CS में।', ['G1']),
+  b2cs: g('B2CS', 'Other sales to unregistered buyers, summed by place of supply and rate. GSTR-1 Table 7.', 'All B2C sales that are not B2CL, including POS bills.',
+    'बिना पंजीकरण वाले ख़रीदारों को बाक़ी बिक्री, राज्य और दर के अनुसार जोड़ी गई। GSTR-1 टेबल 7।', 'B2CL के अलावा सभी B2C बिक्री, POS बिल सहित।', ['G1', 'G12']),
+  cdnr: g('CDNR', 'Credit and debit notes issued to registered buyers. GSTR-1 Table 9B.', 'Notes linked to a B2B invoice, in the month of the note.',
+    'पंजीकृत ख़रीदारों को जारी क्रेडिट और डेबिट नोट। GSTR-1 टेबल 9B।', 'B2B इनवॉइस से जुड़े नोट, नोट के महीने में।', ['G8', 'G21']),
+  cdnur: g('CDNUR', 'Credit and debit notes to unregistered buyers where the original was B2CL or an export. GSTR-1 Table 9B.', 'Notes on B2CS invoices reduce B2CS instead of appearing here.',
+    'बिना पंजीकरण वाले ख़रीदारों को नोट, जब मूल इनवॉइस B2CL या निर्यात था। GSTR-1 टेबल 9B।', 'B2CS इनवॉइस पर नोट B2CS को घटाते हैं, यहाँ नहीं दिखते।', ['G8']),
+  exp: g('EXP', 'Exports of goods or services, with payment of IGST or under LUT. GSTR-1 Table 6A.', 'Invoices with supply type export or SEZ, with shipping-bill details if typed.',
+    'माल या सेवाओं का निर्यात, IGST भुगतान के साथ या LUT के अंतर्गत। GSTR-1 टेबल 6A।', 'निर्यात या SEZ वाले इनवॉइस, शिपिंग बिल के विवरण के साथ।', ['X1', 'X8']),
+  nil: g('Nil / exempt / non-GST', 'Nil-rated goods carry a zero rate; exempt supplies are exempted by notification; non-GST supplies are outside GST (e.g. petrol). GSTR-1 Table 8.', 'Lines at a zero rate or marked exempt / non-GST.',
+    'निल-रेटेड पर शून्य दर; छूट वाली आपूर्ति अधिसूचना से छूटी; नॉन-GST आपूर्ति GST से बाहर। GSTR-1 टेबल 8।', 'शून्य दर वाली या छूट / नॉन-GST चिह्नित लाइनें।'),
+  hsn: g('HSN / SAC', 'Codes that classify goods (HSN) and services (SAC). Invoices and the GSTR-1 HSN summary carry them; the digits needed depend on turnover.', 'Digits required as the app applies them from your turnover; the HSN master fills default rates.',
+    'माल (HSN) और सेवाओं (SAC) के वर्गीकरण कोड। ज़रूरी अंक टर्नओवर पर निर्भर।', 'ज़रूरी अंक, जैसे ऐप आपके टर्नओवर से लागू करता है।', ['G16']),
+  uqc: g('UQC', 'Unique quantity code: the unit the GST portal accepts in the HSN summary (NOS, KGS, MTR …).', "Each item's unit is mapped to a UQC; alternate units are converted to the base unit.",
+    'यूनिक क्वांटिटी कोड: HSN सारांश में पोर्टल द्वारा मान्य इकाई (NOS, KGS, MTR …)।', 'हर आइटम की इकाई UQC से जोड़ी जाती है।', ['G17']),
+  itc: g('ITC', 'Input tax credit: GST paid on purchases that you can use to pay GST on sales, subject to conditions.', 'Taken from bills marked eligible, shown in GSTR-3B Table 4.',
+    'इनपुट टैक्स क्रेडिट: ख़रीद पर दिया GST, जिसे शर्तों के साथ बिक्री के GST में इस्तेमाल कर सकते हैं।', 'पात्र चिह्नित बिलों से, GSTR-3B टेबल 4 में।', ['G18', 'G37']),
+  rcm: g('RCM', 'Reverse charge: the buyer, not the seller, pays the GST on certain supplies.', 'Bills marked reverse charge go to 3B 3.1(d) and need a self-invoice when the supplier is unregistered.',
+    'रिवर्स चार्ज: कुछ आपूर्तियों पर GST विक्रेता नहीं, ख़रीदार चुकाता है।', 'रिवर्स चार्ज वाले बिल 3B 3.1(d) में जाते हैं।', ['G13', 'G35']),
+  ims: g('IMS', 'Invoice management system on the GST portal: the buyer accepts, rejects or keeps pending each supplier document before GSTR-2B.', 'The app does not connect to IMS; the 2B match shows what to act on.',
+    'GST पोर्टल का इनवॉइस मैनेजमेंट सिस्टम: GSTR-2B से पहले ख़रीदार हर दस्तावेज़ स्वीकार / अस्वीकार / लंबित करता है।', 'ऐप IMS से नहीं जुड़ता; 2B मिलान बताता है क्या करना है।', ['G26']),
+  gstr2b: g('GSTR-2B', 'A monthly statement of the ITC your suppliers reported for you. It is generated by the portal, not filed.', 'Import the 2B file in the 2B match tab to compare it with your bills.',
+    'सप्लायरों द्वारा आपके लिए बताए ITC का मासिक विवरण। पोर्टल बनाता है, भरा नहीं जाता।', '2B फ़ाइल को 2B मिलान टैब में इम्पोर्ट करें।', ['G26']),
+  'gstr3b-31': g('GSTR-3B 3.1', 'Table 3.1: outward supplies and inward supplies under reverse charge, with tax.', 'Built from the same documents as GSTR-1.',
+    'टेबल 3.1: जावक आपूर्ति और रिवर्स चार्ज वाली आवक आपूर्ति, टैक्स के साथ।', 'GSTR-1 वाले दस्तावेज़ों से ही।', ['G13', 'G21']),
+  'gstr3b-4a': g('GSTR-3B 4(A)', 'Table 4(A): ITC available — imports, reverse charge, ISD and all other ITC.', 'From eligible bills of the period, bills of entry and ISD credit.',
+    'टेबल 4(A): उपलब्ध ITC — आयात, रिवर्स चार्ज, ISD और बाक़ी ITC।', 'अवधि के पात्र बिलों, बिल ऑफ़ एंट्री और ISD से।', ['G37']),
+  'gstr3b-4b1': g('GSTR-3B 4(B)(1)', 'Table 4(B)(1): ITC reversed under Rules 38, 42 and 43 and Section 17(5) — reversals that are permanent.', 'Common-credit journals and blocked credits.',
+    'टेबल 4(B)(1): Rule 38, 42, 43 और धारा 17(5) के तहत स्थायी रूप से वापस ITC।', 'साझा क्रेडिट जर्नल और ब्लॉक्ड क्रेडिट।', ['I22']),
+  'gstr3b-4b2': g('GSTR-3B 4(B)(2)', 'Table 4(B)(2): other reversals, some of which can be reclaimed later.', 'Reversals not covered by 4(B)(1), such as supplier notes.',
+    'टेबल 4(B)(2): अन्य वापसी, जिनमें से कुछ बाद में वापस ली जा सकती हैं।', '4(B)(1) के बाहर की वापसी।', ['G37']),
+  'gstr3b-4c': g('GSTR-3B 4(C)', 'Table 4(C): net ITC available = 4(A) minus 4(B).', 'Shown as it is, even when negative.',
+    'टेबल 4(C): शुद्ध ITC = 4(A) घटा 4(B)।', 'ऋणात्मक हो तब भी वैसा ही दिखाया जाता है।', ['G22']),
+  setoff: g('Set-off', 'Using ITC to pay output tax, in the order the law sets (IGST first, then CGST / SGST), before paying the rest in cash.', 'The order as the app applies it, on the Set-off & payment tab.',
+    'ITC से आउटपुट टैक्स चुकाना, क़ानून के क्रम में, फिर बाक़ी नकद।', 'क्रम, जैसा ऐप सेट-ऑफ़ टैब पर लागू करता है।', ['G28']),
+  pmt06: g('PMT-06', 'The GST challan used to deposit tax, interest or late fee in cash. A CPIN is generated and paid.', 'Record the challan on the Set-off tab.',
+    'नकद में टैक्स, ब्याज या लेट फ़ीस जमा करने का GST चालान।', 'सेट-ऑफ़ टैब पर चालान दर्ज करें।', ['G32']),
+  rule86b: g('Rule 86B', 'Some businesses with large monthly taxable supplies must pay a minimum part of output tax in cash, not ITC.', 'A warning on the Set-off tab, with the limit as the app applies it.',
+    'बड़ी मासिक कर योग्य आपूर्ति वाले कुछ कारोबारों को आउटपुट टैक्स का न्यूनतम हिस्सा नकद देना होता है।', 'सेट-ऑफ़ टैब पर चेतावनी।', ['G29']),
+  iff: g('IFF / QRMP', 'QRMP lets small taxpayers file GSTR-3B quarterly; IFF lets them upload B2B invoices in the first two months so buyers get ITC.', 'IFF JSON in months 1–2 of a quarter when your filing frequency is QRMP.',
+    'QRMP में छोटे करदाता GSTR-3B तिमाही भरते हैं; IFF से पहले दो महीनों में B2B इनवॉइस अपलोड होते हैं।', 'QRMP हो तो तिमाही के पहले दो महीनों में IFF JSON।', ['G23']),
+  aato: g('AATO', 'Annual aggregate turnover: the turnover across all GSTINs on one PAN for a year. It decides e-Invoice, HSN digits and more.', 'Typed on the GST page; thresholds as the app applies them.',
+    'वार्षिक कुल टर्नओवर: एक PAN के सभी GSTIN का साल भर का टर्नओवर।', 'GST पेज पर लिखा जाता है; सीमाएँ जैसी ऐप लागू करता है।', ['G16', 'G45']),
+  irn: g('IRN', 'Invoice reference number from the e-Invoice system (IRP) once an invoice is registered there.', 'The app prepares the e-Invoice JSON; you register it on the IRP and import the response.',
+    'ई-इनवॉइस सिस्टम (IRP) से मिला इनवॉइस रेफ़रेंस नंबर।', 'ऐप JSON बनाता है; IRP पर पंजीकरण के बाद जवाब इम्पोर्ट करें।', ['G45']),
+  'eway-b': g('e-Way Part B', 'The vehicle part of an e-Way bill (vehicle number or transporter document). Validity counts from Part B.', 'Validity as the app applies it on the e-Way desk.',
+    'ई-वे बिल का वाहन वाला हिस्सा। वैधता पार्ट B से गिनी जाती है।', 'वैधता, जैसी ऐप ई-वे डेस्क पर लागू करता है।', ['G46']),
+  lut: g('LUT', 'Letter of undertaking: lets you export or supply to SEZ without paying IGST. Filed once per year.', 'LUT register in Settings; exports without a live LUT are flagged.',
+    'लेटर ऑफ़ अंडरटेकिंग: IGST चुकाए बिना निर्यात या SEZ आपूर्ति। साल में एक बार।', 'सेटिंग्स में LUT रजिस्टर; बिना वैध LUT के निर्यात पर चेतावनी।', ['X2']),
+  isd: g('ISD', 'Input service distributor: an office that receives common service bills and passes the credit to branches.', 'ISD / GSTR-6 tab.',
+    'इनपुट सर्विस डिस्ट्रीब्यूटर: साझा सेवा बिलों का क्रेडिट शाखाओं में बाँटने वाला कार्यालय।', 'ISD / GSTR-6 टैब।', ['G34']),
+  tds: g('TDS', 'Tax deducted at source: the payer deducts income tax from certain payments and deposits it with the government.', 'Deducted on supplier bills or payments; rates and thresholds as the app applies them by date.',
+    'स्रोत पर कर कटौती: भुगतानकर्ता कुछ भुगतानों से आयकर काटकर सरकार में जमा करता है।', 'सप्लायर बिल या भुगतान पर; दरें और सीमाएँ जैसी ऐप तारीख़ से लागू करता है।', ['T1', 'T2']),
+  tcs: g('TCS', 'Tax collected at source: the seller collects tax from the buyer on certain sales. Also GST TCS collected by e-commerce operators.', 'On sales lines with a TCS section; operator TCS in the marketplace pack.',
+    'स्रोत पर कर संग्रह: कुछ बिक्री पर विक्रेता ख़रीदार से टैक्स लेता है।', 'TCS धारा वाली बिक्री पर।', ['T6', 'I4']),
+  '26as': g('26AS / AIS', 'Statements on the income-tax portal showing TDS / TCS deducted for you and other reported transactions.', 'Match them with Receivables → TDS by customers.',
+    'आयकर पोर्टल के विवरण, जिनमें आपके लिए कटा TDS / TCS दिखता है।', 'प्राप्य → ग्राहकों द्वारा TDS से मिलाएँ।', ['T12']),
+  form16a: g('Form 16A', 'The TDS certificate a deductor gives the deductee for non-salary payments, each quarter.', 'Data on the Form 16A tab after the return is filed.',
+    'वेतन के अलावा भुगतानों पर हर तिमाही दिया जाने वाला TDS प्रमाणपत्र।', 'रिटर्न के बाद फ़ॉर्म 16A टैब पर।', ['T5', 'T17']),
+  '206aa': g('206AA', 'Higher TDS when the deductee has not given a valid PAN.', 'Applied when the supplier has no PAN, at the rate as the app applies it.',
+    'वैध PAN न होने पर अधिक TDS।', 'सप्लायर का PAN न हो तो, दर जैसी ऐप लागू करता है।', ['T3']),
+  '43bh': g('43B(h)', 'Payments due to micro and small enterprises are allowed as expense only when paid within the MSMED time limit.', 'MSME suppliers with dues past the limit as the app applies it are flagged.',
+    'सूक्ष्म और लघु उद्यमों को देय राशि ख़र्च तभी मानी जाती है जब MSMED समय-सीमा में चुकाई जाए।', 'सीमा पार देय वाले MSME सप्लायर चिह्नित होते हैं।', ['T20']),
+  udyam: g('Udyam', 'The MSME registration number (UDYAM-XX-00-0000000) that shows a supplier is micro, small or medium.', 'Stored on the supplier; drives the 43B(h) check.',
+    'MSME पंजीकरण संख्या, जिससे पता चलता है कि सप्लायर सूक्ष्म, लघु या मध्यम है।', 'सप्लायर पर दर्ज; 43B(h) जाँच इसी से।', ['T20', 'T21']),
+  sec393: g('Sec 393 (ITA 2025)', 'The Income-tax Act 2025 table of TDS / TCS items that replaces the old 194- sections from 1 April 2026.', 'Labels by document date; stored codes keep the old names.',
+    'आयकर अधिनियम 2025 की TDS / TCS तालिका, जो 1 अप्रैल 2026 से पुरानी 194- धाराओं की जगह लेती है।', 'दस्तावेज़ की तारीख़ से लेबल; दर्ज कोड पुराने नाम पर।', ['T16', 'T17']),
+} satisfies Readonly<Record<string, GlossaryTerm>>;
+
+export type GlossaryId = keyof typeof GLOSSARY;

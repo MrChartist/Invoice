@@ -36,6 +36,7 @@ import { loadQuietSettings, quietCustomers } from '../lib/quiet-customers';
 import { DOC_DEFAULT_COLUMNS, docDefaultsToCells } from '../lib/party-defaults'; // R3-B5 CSV columns
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 
 // Daily khata loop (8A): the quick ₹ Received / ₹ Given sheet and the reminder queue load on first use.
 const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet'));
@@ -153,6 +154,7 @@ export function Clients() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="clients" /></Suspense>
       <PageHeader
         title={salesT('cl.title')}
         subtitle={salesT('cl.subtitle', { n: clients.length })}

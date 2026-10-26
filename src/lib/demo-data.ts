@@ -17,6 +17,12 @@
  *    un-marked rows) and the demo rows are inserted explicitly.
  *  - Loading refuses when real invoices exist unless the caller passes `confirm: true`, and is
  *    idempotent: a second load changes nothing.
+ *
+ * R6-B4: a dataset per business profile (`DemoProfile`). The trading set above is the base of every profile; the
+ * profile modules in `src/lib/demo/` add their own rows (`DemoExtras`: POS bills and a shift, time and a retainer,
+ * LRs and a trip, a BOQ and an RA bill), each split into its own chunk. Extra rows are marked `demo: true` like the
+ * rest and live in `DEMO_EXTRA_TABLES`, so `removeDemoData` takes them out too. The app loads samples only into the
+ * separate Demo company (`components/onboarding/demo-company.ts`).
  */
 
 import type { Client, InvoiceItem, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
@@ -36,6 +42,33 @@ import { REMINDERS_TABLE } from './reminders';
 /** Marker carried by every demo row. */
 export type Demo<T> = T & { demo?: true };
 
+/** R6-B4: which sample business to build. */
+export type DemoProfile = 'counter' | 'services' | 'trading' | 'transport' | 'works';
+export const DEMO_PROFILES: readonly DemoProfile[] = ['counter', 'services', 'trading', 'transport', 'works'];
+
+/** The profile that fits a company: its industry pack first, then its business type; trading otherwise. */
+export function demoProfileFor(s: { business_type?: string; industry_packs?: unknown } | null | undefined): DemoProfile {
+  const t = s?.business_type ?? '';
+  const packs = Array.isArray(s?.industry_packs) ? (s!.industry_packs as unknown[]) : t === 'transport' ? ['transport'] : t === 'contractor' ? ['works'] : [];
+  if (packs.includes('transport')) return 'transport';
+  if (packs.includes('works')) return 'works';
+  if (t === 'kirana' || t === 'restaurant') return 'counter';
+  if (t === 'services') return 'services';
+  return 'trading';
+}
+
+/** Rows a profile adds to the base dataset (all marked `demo: true`). */
+export interface DemoExtras {
+  invoices?: Demo<InvoiceRecord>[];
+  payments?: Demo<Payment>[];
+  /** Other tables (only those in `DEMO_EXTRA_TABLES`), rows appended as they are. */
+  tables?: Partial<Record<DemoExtraTable, Demo<{ id: string }>[]>>;
+}
+
+/** Tables a profile may add sample rows to; removal filters each by `demo: true`. */
+export const DEMO_EXTRA_TABLES = ['stock_items', 'pos_shifts', 'time_entries', 'retainers', 'vehicles', 'consignment_notes', 'trips', 'ra_measurements', 'doc_links'] as const;
+export type DemoExtraTable = (typeof DEMO_EXTRA_TABLES)[number];
+
 export const DEMO_PROFILE_ID = 'demo-profile';
 export const DEMO_PROFILE_NAME = 'Sample Studio (demo)';
 /** Table holding e-Invoice details (owned by the e-Invoice module). */
@@ -54,6 +87,8 @@ export interface DemoCounts {
   vendors: number;
   purchases: number;
   schedules: number;
+  /** R6-B4: rows of the profile tables (`DEMO_EXTRA_TABLES`). */
+  extras: number;
 }
 
 export interface DemoStatus {
@@ -158,7 +193,7 @@ export interface DemoDataset {
   purchasePayments: Demo<PurchasePayment>[];
 }
 
-function applyTotals<T extends InvoiceRecord>(rec: T): T {
+export function applyTotals<T extends InvoiceRecord>(rec: T): T {
   const t = calculateInvoice(calcInputFromRecord(rec));
   return {
     ...rec,
@@ -491,6 +526,7 @@ export function demoStatus(): DemoStatus {
     vendors: peekTable<Demo<Vendor>>(VENDORS_TABLE).filter(isDemo).length,
     purchases: peekTable<Demo<PurchaseRecord>>(PURCHASES_TABLE).filter(isDemo).length,
     schedules: schedules.size,
+    extras: DEMO_EXTRA_TABLES.reduce((n, t) => n + peekTable<unknown>(t).filter(isDemo).length, 0),
   };
   const loaded = Object.values(counts).some((n) => n > 0);
   return { loaded, counts, realInvoices: invoices.length - demoInvoices.length };
@@ -505,6 +541,8 @@ export interface LoadDemoOptions {
   confirm?: boolean;
   /** Anchor for the "last six months" (defaults to now). Tests pass a fixed day. */
   today?: Date | string;
+  /** R6-B4: the profile's own rows (built by `src/lib/demo/profiles.ts` for the same `today`). */
+  extras?: DemoExtras;
 }
 
 const AUDIT_KEY = `${DB_PREFIX}audit_log`;
@@ -544,9 +582,14 @@ export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
 
   try {
     // Payments first: `save` keeps the ledger as the floor for what has been received.
-    setTable(KEYS.transactions, [...getTable<Payment>(KEYS.transactions), ...data.payments]);
+    setTable(KEYS.transactions, [...getTable<Payment>(KEYS.transactions), ...data.payments, ...(opts.extras?.payments ?? [])]);
 
     for (const inv of data.invoices) localDb.invoices.save(inv);
+    // R6-B4: the profile's rows (POS bills, freight / RA bills …) and its own tables.
+    for (const inv of opts.extras?.invoices ?? []) localDb.invoices.save(inv);
+    for (const [table, rows] of Object.entries(opts.extras?.tables ?? {})) {
+      if ((DEMO_EXTRA_TABLES as readonly string[]).includes(table) && rows?.length) setTable(table, [...getTable<unknown>(table), ...rows.map((r) => ({ ...r, demo: true }))]);
+    }
 
     // One credit note, raised through the same validator the app uses.
     const saved = localDb.invoices.getAll() as Demo<InvoiceRecord>[];
@@ -666,6 +709,7 @@ export function removeDemoData(): DemoCounts {
   filterTable<Demo<PurchasePayment>>(PAYMENTS_TABLE, (p) => isDemo(p) || gonePurchases.has(p.purchase_id));
   filterTable<Demo<Vendor>>(VENDORS_TABLE, isDemo);
   filterTable<Demo<RecurringSchedule>>(RECURRING_TABLE, isDemo);
+  for (const t of DEMO_EXTRA_TABLES) filterTable<unknown>(t, isDemo); // R6-B4 profile rows
 
   // Profile(s): keep the settings object otherwise untouched; fix the active id if it pointed at demo.
   if (readRaw(SINGLETON_KEYS.settings) !== null) {

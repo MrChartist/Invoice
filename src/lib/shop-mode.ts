@@ -47,6 +47,7 @@ const PATH_MODULE: Readonly<Record<string, ModuleId>> = {
   '/expenses': 'purchases',
   '/inventory': 'inventory',
   '/manufacturing': 'inventory',
+  '/distribution': 'inventory', // R6-B2
   '/gateway': 'accounts',
   '/books': 'accounts',
   '/reconcile': 'banking',
@@ -81,11 +82,40 @@ export function moduleOfPath(path: string): ModuleId | undefined {
   return Object.prototype.hasOwnProperty.call(PATH_MODULE, seg) ? PATH_MODULE[seg] : undefined;
 }
 
-export function isPathVisible(path: string, modules: ReadonlySet<ModuleId> | null): boolean {
+/**
+ * R6-B2: a route that hosts a tab of an active industry pack stays visible when shop mode hides its module. Inline
+ * copy of `PACK_TABS` / `PACK_OF_TYPE` (`industry-packs.ts` stays out of the shell); `tests/industry-packs.test.ts`
+ * pins both copies.
+ */
+export const PACK_ROUTES: Readonly<Record<string, readonly string[]>> = {
+  '/distribution': ['transport'],
+  '/time': ['works'],
+  '/recurring': ['fees', 'leases'],
+  '/books': ['nonprofit'],
+  '/gst-reports': ['fees', 'nonprofit', 'leases'],
+};
+export const PACK_OF_TYPE_INLINE: Readonly<Record<string, string>> = { ecommerce: 'marketplace', transport: 'transport', contractor: 'works', institution: 'fees', nonprofit: 'nonprofit', property: 'leases' };
+
+/** The company's packs: the explicit `industry_packs` list, else the one its business type implies. */
+export function impliedPacks(s: { business_type?: string; industry_packs?: unknown } | null | undefined): string[] {
+  if (!s) return [];
+  if (Array.isArray(s.industry_packs)) return s.industry_packs.filter((p): p is string => typeof p === 'string');
+  const t = s.business_type;
+  const p = t && Object.prototype.hasOwnProperty.call(PACK_OF_TYPE_INLINE, t) ? PACK_OF_TYPE_INLINE[t] : '';
+  return p ? [p] : [];
+}
+
+export function isPathVisible(path: string, modules: ReadonlySet<ModuleId> | null, packs?: readonly string[]): boolean {
   if (!modules) return true;
   const m = moduleOfPath(path);
-  return !m || modules.has(m);
+  if (!m || modules.has(m)) return true;
+  const hosts = PACK_ROUTES['/' + (path.split(/[?#]/)[0].split('/')[1] ?? '')];
+  return !!packs && !!hosts && hosts.some((p) => packs.includes(p));
 }
+
+/** R6-B2: how many of `paths` (sidebar entries) shop mode hides — the sidebar's "N more features" link. */
+export const countHidden = (paths: readonly string[], modules: ReadonlySet<ModuleId> | null, packs?: readonly string[]): number =>
+  paths.filter((p) => !isPathVisible(p, modules, packs)).length;
 
 /** Fired (on window) after the shop mode changes so the shell re-reads it without a reload. */
 export const SHOP_MODE_EVENT = 'mrc:shop-mode';

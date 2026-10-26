@@ -778,6 +778,44 @@ Spec: `docs/prd/round-5.md` (18 items in three packages). Every vertical sits be
 
 Hands-on audit of Round 4 (R4-B / R4-C), QA round 5 fixes, the Income-tax Act 2025 labels and Round 5.
 
+## Round 6: consolidation and beta-tester productivity (v6.x) · 🟡 in progress
+
+Spec: `docs/prd/round-6.md` (17 items in three packages: R6-A first run, help and feedback; R6-B discoverability;
+R6-C open-roadmap closures and the docs refresh).
+
+### R6-A · First run, help and feedback (`docs/features/help-onboarding-r6.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R6-A1 | ✅ **Setup checklist v3**: steps by business type, packs, modules and role; skip a step, hide the card (Help → Setup checklist brings it back); company object `setup_progress` | `checklist-steps.ts`, `checklist.ts`, `DashboardStart.tsx` | done |
+| R6-A2 | ✅ **"On this screen" help**: registry route + tab → topic, six lazy topic files (~210 topics), Help search, CA checklist ids on statutory topics; coverage test ("a new tab needs a help topic") | `lib/help/registry.ts`, `lib/help/topics-*.ts`, `HelpModal.tsx` | done (F1 wired in the shell at integration) |
+| R6-A3 | ✅ **Statutory explainers**: "About this tab" strips on GST / TDS / payroll, 35-term glossary popovers, GST / TDS empty states, one-line GST working-paper notice | `AboutStrip.tsx`, `Term.tsx`, `lib/help/glossary.ts` | done (verify with your CA) |
+| R6-A4 | ✅ **What's new and the real version** (`__APP_VERSION__` from package.json; `check-whats-new` in postbuild; Dashboard card once after an upgrade) | `whats-new.ts`, `WhatsNewCard.tsx`, `scripts/check-whats-new.mjs` | done |
+| R6-A5 | ✅ **Report a problem v2**: problem / idea / question, scrubbed fields, screens-before trail, Copy / WhatsApp / e-mail / Share with no fixed recipient | `feedback.ts`, `route-trail.ts`, `diagnostics.ts`, `ReportProblemDialog.tsx` | done (the shell pushes the trail) |
+| R6-A6 | ✅ **Beta guide in the app and one-time screen tips** | `lib/help/beta-guide.ts`, `lib/help/tips.ts`, `ScreenTip.tsx` | done |
+
+### R6-B · Discoverability, empty states and sample data (`docs/features/discoverability-r6.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R6-B1 | ✅ **Ctrl+K finds every tab**: a "Tabs" group over every page's tab list with portal terms and short words ("3b", "tb", "lr", "80g"), "(hidden)" for screens shop mode hides, a "Features" group, "help …" searches help topics (once R6-A's registry exists), a "Try:" line on the empty palette | `palette/{tab-index,synonyms}.ts`, `pages/page-tabs.ts`, `command/tab-destinations.ts` | done |
+| R6-B2 | ✅ **Sidebar reach**: Distribution and Manufacturing entries; a screen hosting an active pack's tab stays in shop mode (`PACK_ROUTES`); "N more features — Show"; Practice desk only for CA / several companies; F1 Help, route trail, open-help event | `DashboardLayout.tsx`, `shop-mode.ts`, `help-event.ts` | done |
+| R6-B3 | ✅ **Empty states** with the first step on Books, Inventory, Reports, Exports, Distribution, Practice, Reconcile, Gateway; Inventory → Landed cost link | `empty-states.ts`, `components/discover/*` | done (tips mounted on Books, Inventory, Reports, Gateway, Invoices) |
+| R6-B4 | ✅ **Sample data v2**: one path to a separate, resettable Demo company (never into a real company), dataset by business (counter, services, trading, transport, works), "Reset samples" | `demo-data.ts`, `lib/demo/*`, `demo-company.ts`, `SampleDataChooser.tsx` | done (Dashboard mounts the chooser) |
+| R6-B5 | ✅ **Settings → Features**: every module, pack and 21 advanced options with who needs it, on / off and a switch or a link | `features-catalog.ts`, `FeaturesPanel.tsx` | done |
+
+### R6-C · Open-roadmap closures and the docs refresh (`docs/features/closures-r6.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R6-C1 | ✅ **R4-A follow-ups**: QC hold on goods bills booked without a GRN (new lines only; an edit never re-holds released goods); margin chip and insights cost goods at the landed rate (`liveInputs().purchases`); "Debit note to supplier" from a QC reject of a bill lot opens Returns with the bill and quantities filled (`bill` / `lines` params) | `purchases.ts` `withBillQcHold`, `margin.ts` `liveUnitCosts`, `QcTab`, `ReturnsTab` | done |
+| R6-C2 | ✅ **Payables completeness**: supplier opening bills in bill-wise payables (age from their own date, settle Agst Ref through `vendor_payments.allocations[].opening_bill_id`, typed opening residual "On Account"; payables = ledger creditor balance); customer TDS on a voucher-allocated receipt reaches TDS receivable (`voucherTdsJournal`) and the register; POS refunds credit the original receipt's bank ledger | `billwise.ts`, `opening-bills.ts`, `bill-allocation.ts`, `ledger/postings.ts`, `pos-returns.ts` | done (verify with your CA) |
+| R6-C3 | ✅ **Import suppliers, ledgers and opening balances** (P1-21): kinds `vendors` / `ledgers` / `opening_bills`, presets for Vyapar, Busy, Marg, Tally, QuickBooks, Xero, Zoho, Refrens, ClearOne and a generic trial balance; dry run with the 1090 difference, nearest-primary group mapping with a warning, GSTIN de-duplication; all or nothing with one undo copy; one row per run in table `import_runs` | `import-openings.ts`, `import-mapping.ts`, `ImportWizard` | done |
+| R6-C4 | ✅ **Filing strip & Rule 42 / 43 everywhere**: forms follow the period and filer (GSTR-1 + 3B, IFF in QRMP months 1–2, CMP-08 for a composition quarter); "downloaded" on the compliance row (`downloaded_at`); per-form preflight (IFF without HSN checks, CMP-08 composition checks only); `itcReversals` in GSTR-9 (Table 7C and each month's 3B), 9C, the Compliance interest base and the month-end pack | `FilingStrip.tsx`, `compliance.ts`, `gst-preflight.ts`, `gstr9.ts`, `report-pack.ts` | done (verify with your CA) |
+| R6-C5 | ✅ **Previous-balance block on documents issued outside the editor** (8.7): recurring runs in issue mode, batch runs (one snapshot per party), late fees and conversions issued directly, `issueDraft` | `khata-actions.ts` `withIssueSnapshot`, `recurring.ts`, `batch-invoices.ts`, `late-fee.ts`, `documents.ts` | done |
+| R6-C6 | ✅ **Docs refresh**: stale roadmap rows struck through, BETA_GUIDE known limitations / flows, CA_REVIEW cross-references, feature-doc stale items | `docs/` | done |
+| R6-C7 | ⏳ R6-C follow-ups: issuing a draft from a list row (not the editor) still takes no balance snapshot unless it goes through `issueDraft`; stock opening quantities in the import (PRD §7 Q7); the GSTR-9 7C / 7D split of a combined Rule 42 / 43 journal | — | open (verify with your CA) |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |
@@ -797,20 +835,3 @@ Hands-on audit of Round 4 (R4-B / R4-C), QA round 5 fixes, the Income-tax Act 20
 | v6.x · QA round 6 | Hands-on audit of R4-B / R4-C, QA round 5, ITA 2025 and Round 5 | in progress |
 
 Phases 2 and 3 can run in parallel if two people work on them; neither depends on the other beyond Phase 1.
-
-## Round 6: consolidation and beta-tester productivity (v6.x) · 🟡 in progress
-
-Spec: `docs/prd/round-6.md` (17 items in three packages: R6-A first run & help, R6-B discoverability & sample data,
-R6-C open-roadmap closures & the docs refresh). No new route, vertical or rule table.
-
-### R6-C · Open-roadmap closures and the docs refresh (`docs/features/closures-r6.md`)
-
-| # | Item | Where | Status |
-|---|---|---|---|
-| R6-C1 | ✅ **R4-A follow-ups**: QC hold on goods bills booked without a GRN (new lines only; an edit never re-holds released goods); margin chip and insights cost goods at the landed rate (`liveInputs().purchases`); "Debit note to supplier" from a QC reject of a bill lot opens Returns with the bill and quantities filled (`bill` / `lines` params) | `purchases.ts` `withBillQcHold`, `margin.ts` `liveUnitCosts`, `QcTab`, `ReturnsTab` | done |
-| R6-C2 | ✅ **Payables completeness**: supplier opening bills in bill-wise payables (age from their own date, settle Agst Ref through `vendor_payments.allocations[].opening_bill_id`, typed opening residual "On Account"; payables = ledger creditor balance); customer TDS on a voucher-allocated receipt reaches TDS receivable (`voucherTdsJournal`) and the register; POS refunds credit the original receipt's bank ledger | `billwise.ts`, `opening-bills.ts`, `bill-allocation.ts`, `ledger/postings.ts`, `pos-returns.ts` | done (verify with your CA) |
-| R6-C3 | ✅ **Import suppliers, ledgers and opening balances** (P1-21): kinds `vendors` / `ledgers` / `opening_bills`, presets for Vyapar, Busy, Marg, Tally, QuickBooks, Xero, Zoho, Refrens, ClearOne and a generic trial balance; dry run with the 1090 difference, nearest-primary group mapping with a warning, GSTIN de-duplication; all or nothing with one undo copy; one row per run in table `import_runs` | `import-openings.ts`, `import-mapping.ts`, `ImportWizard` | done |
-| R6-C4 | ✅ **Filing strip & Rule 42 / 43 everywhere**: forms follow the period and filer (GSTR-1 + 3B, IFF in QRMP months 1–2, CMP-08 for a composition quarter); "downloaded" on the compliance row (`downloaded_at`); per-form preflight (IFF without HSN checks, CMP-08 composition checks only); `itcReversals` in GSTR-9 (Table 7C and each month's 3B), 9C, the Compliance interest base and the month-end pack | `FilingStrip.tsx`, `compliance.ts`, `gst-preflight.ts`, `gstr9.ts`, `report-pack.ts` | done (verify with your CA) |
-| R6-C5 | ✅ **Previous-balance block on documents issued outside the editor** (8.7): recurring runs in issue mode, batch runs (one snapshot per party), late fees and conversions issued directly, `issueDraft` | `khata-actions.ts` `withIssueSnapshot`, `recurring.ts`, `batch-invoices.ts`, `late-fee.ts`, `documents.ts` | done |
-| R6-C6 | ✅ **Docs refresh**: stale roadmap rows struck through, BETA_GUIDE known limitations / flows, CA_REVIEW cross-references, feature-doc stale items | `docs/` | done |
-| R6-C7 | ⏳ R6-C follow-ups: issuing a draft from a list row (not the editor) still takes no balance snapshot unless it goes through `issueDraft`; stock opening quantities in the import (PRD §7 Q7); the GSTR-9 7C / 7D split of a combined Rule 42 / 43 journal | — | open (verify with your CA) |

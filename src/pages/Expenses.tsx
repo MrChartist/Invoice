@@ -48,10 +48,12 @@ import { PURCHASE_CATEGORIES, type PurchaseRecord } from '../types/purchases';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
+import { EXPENSES_TABS, type ExpensesTab } from './page-tabs'; // R6-B1
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 
-type Tab = 'bills' | 'orders' | 'vendors' | 'returns' | 'inbox';
+type Tab = ExpensesTab;
 
 // Purchase orders are a separate, rarely-opened tab: load it on demand.
 const PurchaseOrdersTab = lazy(() =>
@@ -64,7 +66,7 @@ const ReturnsTab = lazy(() => import('../components/purchases/ReturnsTab').then(
 const InboxTab = lazy(() => import('../components/capture/InboxTab'));
 // 8I: "Scan bill" chooser (camera QR / photo / file → capture flow) — on demand.
 const ScanBillDialog = lazy(() => import('../components/capture/ScanBillDialog'));
-const TAB_PARAMS: readonly Tab[] = ['orders', 'vendors', 'returns', 'inbox'];
+const TAB_PARAMS: readonly Tab[] = EXPENSES_TABS; // R6-B1: list in expenses-tabs.ts ('bills' is the default)
 
 const KINDS: { id: NonNullable<PurchaseFilter['kind']>; label: 'kindAll' | 'kindBills' | 'kindExpenses' }[] = [
   { id: 'ALL', label: 'kindAll' },
@@ -190,6 +192,7 @@ export function Expenses() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="expenses" /></Suspense>
       <PageHeader
         title={purT('title')}
         subtitle={purT('subtitle')}

@@ -2500,7 +2500,7 @@ try {
     await writeJson(page, 'invoices', prevInvoices);
   });
 
-  await step('QA-3 F4 / F5: "Explore with sample data instead" fills a Demo company; Dashboard "Try with sample data" adds the invoices', async () => {
+  await step('QA-3 F4 / F5: "Explore with sample data instead" fills a Demo company; the Dashboard chooser opens a separate Demo company (R6-B4)', async () => {
     const tableIn = (p, name) => p.evaluate((k) => new Promise((resolve) => {
       const reg = JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null');
       const db = reg?.active && reg.active !== 'default' ? `mrchartist_inv_kv__${reg.active}` : 'mrchartist_inv_kv';
@@ -2560,11 +2560,13 @@ try {
     const b = await fresh();
     await b.p.getByRole('button', { name: /Skip for now/ }).first().click();
     await b.p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ state: 'detached' });
-    const cta = b.p.getByRole('button', { name: 'Try with sample data' });
+    const cta = b.p.getByRole('button', { name: 'Open a separate Demo company (recommended)' });
     await cta.waitFor({ timeout: 15000 });
     await Promise.all([b.p.waitForEvent('load', { timeout: 20000 }), cta.click()]);
-    const sample = await waitRows(b.p, 'invoices', 1);
-    check(sample.length > 0, `Dashboard "Try with sample data" added the invoices (${sample.length})`);
+    await b.p.locator('#company-switch').waitFor({ timeout: 20000 });
+    const sample = await waitRows(b.p, 'invoices', 1, 20000);
+    const activeId = await b.p.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null')?.active ?? 'default');
+    check(sample.length > 0 && activeId !== 'default', `the Dashboard chooser filled a separate Demo company (${sample.length} invoices in ${activeId})`);
     await b.ctx.close();
   });
 
@@ -2675,6 +2677,65 @@ try {
     check(/General fund/.test(text ?? '') && /Donations received/.test(text ?? '') && /5,000\.00/.test(text ?? ''), 'the General fund statement shows the donation');
   });
 
+  await step('R6-B discoverability: Ctrl+K "3b" opens GSTR-3B; kirana "more features" opens Features; empty Books / Inventory say what to do', async () => {
+    // B1: a tab found by its portal short form.
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.locator('[data-palette-try]').waitFor();
+    check(true, 'the empty palette shows the "Try: GSTR-3B · …" line');
+    await palette.getByRole('combobox').fill('3b');
+    await palette.getByRole('option', { name: /GSTR-3B/ }).first().waitFor();
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/gst-reports\?tab=gstr3b/);
+    check(true, 'Ctrl+K "3b" → Enter opens GST reports → GSTR-3B');
+
+    // B2 / B5: kirana shop mode hides features; the sidebar says so and the link opens Settings → Features.
+    const nav = page.getByRole('navigation', { name: /Primary/ });
+    await nav.getByRole('link', { name: 'Distribution' }).waitFor();
+    await nav.getByRole('link', { name: 'Manufacturing' }).waitFor();
+    check(true, 'the sidebar lists Distribution and Manufacturing');
+    await page.goto(srv.origin + '/settings?tab=defaults');
+    await page.getByLabel('Business type').selectOption('kirana');
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    const more = nav.getByRole('link', { name: /more features — Show/ });
+    await more.waitFor();
+    await more.click();
+    await page.waitForURL(/\/settings\?tab=features/);
+    await page.locator('[data-features-panel]').waitFor();
+    check((await page.locator('[data-feature="mod.payroll"]').count()) === 1 && (await page.locator('[data-feature="adv.batches"]').count()) === 1, 'Settings → Features lists modules and advanced options');
+    await page.locator('[data-features-panel]').getByRole('button', { name: 'Show all features' }).click();
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'Books' }).waitFor();
+    check((await nav.getByRole('link', { name: /more features/ }).count()) === 0, '"Show all features" from Features brings every module back; the hint goes');
+
+    // B3: a fresh company's Books and Inventory say what fills them.
+    const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
+    try {
+      const p = await ctx.newPage();
+      watch(p, errors);
+      p.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
+      await p.goto(srv.origin + '/');
+      await p.getByLabel('Full name').fill('E2E Empty');
+      await p.locator('#login-pin').fill('482916');
+      await p.locator('#login-confirm').fill('482916');
+      await p.getByRole('button', { name: /Create account/ }).click();
+      await p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ timeout: 15000 });
+      await p.getByRole('button', { name: /Skip for now/ }).first().click();
+      await p.goto(srv.origin + '/books?tab=tb');
+      await p.locator('[data-books-empty]').getByRole('link', { name: 'Opening balances' }).waitFor();
+      check(true, 'empty Books shows "Opening balances"');
+      await p.goto(srv.origin + '/inventory');
+      await p.getByRole('button', { name: 'Add first item' }).waitFor();
+      await p.locator('[data-inv-import]').waitFor();
+      check(true, 'empty Inventory shows "Add first item" and "Import items"');
+    } finally {
+      await ctx.close();
+    }
+  });
+
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
     // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
     await page.goto(srv.origin + '/settings?tab=data');
@@ -2703,6 +2764,27 @@ try {
     check(/not supported/.test(text ?? '') && /backup/.test(text ?? ''), 'without File System Access: "not supported", use backup / restore');
     const local = await p3.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_sync_device') ?? 'null'));
     check(typeof local?.id === 'string' && (await idbGet(p3, 'mrchartist_inv_sync_device')) === null, 'the device id lives in localStorage only (never in the data store or a backup)');
+  });
+
+  await step('R6-A help: "On this screen", About strip, glossary term, version', async () => {
+    await page.goto(srv.origin + '/gst-reports?tab=cdnur');
+    const strip = page.locator('[data-about-strip="gst-reports:cdnur"]');
+    await strip.waitFor({ timeout: 15000 });
+    check(/credit and debit notes/i.test(await strip.innerText()), 'GST → CDNUR shows its "About this tab" strip');
+    // F1 is wired by the shell (R6-B); the Help button opens the same dialog.
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    const help = page.locator('[data-screen-help="gst-reports:cdnur"]');
+    await help.waitFor({ timeout: 15000 });
+    check(/On this screen: CDNUR/.test(await help.innerText()), 'Help opens on "On this screen: CDNUR"');
+    check(/CA checklist: G8/.test(await help.innerText()), 'the statutory topic names its CA checklist ids');
+    check(/Version \d+\.\d+\.\d+/.test(await page.locator('[data-app-version]').innerText()), 'Help shows the package.json version');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/gst-reports?tab=b2cl');
+    await page.locator('[data-term="b2cl"]').first().click();
+    const pop = page.locator('[data-term-pop="b2cl"]');
+    await pop.waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => /In this app/.test(document.querySelector('[data-term-pop="b2cl"]')?.textContent ?? ''));
+    check(/unregistered/i.test(await pop.innerText()), 'tapping B2CL opens its glossary popover');
   });
 
   await step('R6-C import openings: a pasted trial balance shows the 1090 difference in the dry run and saves the openings', async () => {
