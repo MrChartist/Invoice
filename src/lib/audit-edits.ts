@@ -201,7 +201,7 @@ function show(v: unknown): string | null {
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v === 'number' || typeof v === 'string') return excerpt(String(v).replace(/\s+/g, ' ').trim()) || null;
   if (Array.isArray(v)) return linesText(v) ?? `${v.length} ${v.length === 1 ? 'entry' : 'entries'}`;
-  return excerpt(JSON.stringify(v));
+  return excerpt(JSON.stringify(v, (k, x) => (HIDDEN.test(k) ? void 0 : x))); // QA9 H14: nested phone / email too
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);

@@ -11,7 +11,7 @@
  * and the audit stops at that date. Statistics (D14): complimentary / house-use rooms count as occupied for occupancy
  * but not for ADR; ADR = room revenue ÷ paid occupied rooms; RevPAR = room revenue ÷ rooms available (active − OOO).
  */
-import type { AuditStats, Folio, FolioLineKind, Guest, NightAudit, Reservation, Room } from '../../types/hotel-r7';
+import type { AuditStats, Folio, FolioLineKind, Guest, HotelSettings, NightAudit, RatePlan, Reservation, Room, RoomLine, RoomType } from '../../types/hotel-r7';
 import type { Payment } from '../../types/invoice';
 import { requireAccess } from '../access';
 import { assertUnlocked, isPeriodLockedError } from '../period-lock';
@@ -25,7 +25,7 @@ import { HT, hotelDb } from './hotel-store';
 import { isLiveRes, lineDates, oooOn } from './availability';
 import { HotelError } from './reservations';
 import { auditNights, isYearEnd, nextDay } from './business-date';
-import { ROOM_KINDS, folioBalance, postNight } from './room-post';
+import { ROOM_KINDS, folioBalance, pendingNights, postNight, type PostCtx } from './room-post';
 import { formCMissing } from './guests';
 import { setHk, who } from './housekeeping';
 
@@ -95,6 +95,39 @@ export function nightStats(night: string, rooms: readonly Room[], reservations: 
   });
 }
 
+/** The posting context of a room line (room number, type, plan, SACs). */
+export function postCtx(l: RoomLine, m: { rooms: readonly Room[]; types: readonly RoomType[]; plans: readonly RatePlan[]; settings: Pick<HotelSettings, 'sac_room' | 'sac_fnb'> }): PostCtx {
+  return {
+    roomNo: m.rooms.find((r) => r.id === l.room_id)?.number ?? '', typeName: m.types.find((t) => t.id === l.room_type_id)?.name ?? '',
+    plan: m.plans.find((x) => x.id === l.rate_plan_id), sacRoom: m.settings.sac_room, sacFnb: m.settings.sac_fnb,
+  };
+}
+
+/**
+ * QA9 H1: post every night of an in-house room line before `end` that no audit posted (a missed audit), with the
+ * night audit's own idempotent post — check-out and the 31 March interim run it first, so no stayed night is lost.
+ * A night in a locked period is refused, as the audit would. Returns the nights posted.
+ */
+export function catchUpLine(resId: string, lineId: string, end: string): string[] {
+  requireAccess('doc.create');
+  const res = hotelDb.reservation(resId);
+  const line = res?.lines.find((l) => l.id === lineId);
+  if (!res || !line || line.status !== 'checked_in') return [];
+  let folios = hotelDb.folios();
+  const nights = pendingNights(res, line, folios, end);
+  if (!nights.length) return [];
+  const settings = hotelDb.settings();
+  const ctx = postCtx(line, { rooms: hotelDb.rooms(), types: hotelDb.roomTypes(), plans: hotelDb.ratePlans(), settings });
+  const changed = new Map<string, Folio>();
+  for (const night of nights) {
+    assertUnlocked({ id: `na:${night}`, issue_date: night }, 'create');
+    for (const f of postNight(res, line, night, folios, ctx).changed) changed.set(f.id, f);
+    folios = [...folios.filter((f) => !changed.has(f.id)), ...changed.values()];
+  }
+  if (changed.size) hotelDb.putFolios(...changed.values());
+  return nights;
+}
+
 export interface NightResult {
   audit: NightAudit;
   /** D7: 31 March with guests in house — offer interim invoices (R7-B3). */
@@ -121,11 +154,7 @@ export function runNight(night: string, at: Date = new Date()): NightResult {
     for (const l of res.lines) {
       const d = lineDates(res, l);
       if (l.status !== 'checked_in' || !(d.arrival <= night && night < d.departure)) continue;
-      const room = rooms.find((r) => r.id === l.room_id);
-      const p = postNight(res, l, night, folios, {
-        roomNo: room?.number ?? '', typeName: types.find((t) => t.id === l.room_type_id)?.name ?? '',
-        plan: plans.find((x) => x.id === l.rate_plan_id), sacRoom: settings.sac_room, sacFnb: settings.sac_fnb,
-      });
+      const p = postNight(res, l, night, folios, postCtx(l, { rooms, types, plans, settings }));
       for (const f of p.changed) changed.set(f.id, f);
       folios = [...folios.filter((f) => !changed.has(f.id)), ...changed.values()];
       keys.push(...p.keys);
@@ -133,13 +162,20 @@ export function runNight(night: string, at: Date = new Date()): NightResult {
   }
   const day = (p: Pick<Payment, 'date'>) => String(p.date ?? '').slice(0, 10) === night;
   const payments: Record<string, number> = {};
-  for (const p of localDb.payments.getAll()) if (day(p) && !movedNoCash(p)) payments[p.method || 'Other'] = round2((payments[p.method || 'Other'] ?? 0) + Number(p.amount || 0));
+  const mode = (m: string | undefined, amt: number) => { payments[m || 'Other'] = round2((payments[m || 'Other'] ?? 0) + amt); };
+  for (const p of localDb.payments.getAll()) if (day(p) && !movedNoCash(p)) mode(p.method, Number(p.amount || 0));
+  // QA9 H15: advances taken at the desk for bookings are cash received tonight; their refunds (RFV) are cash paid out.
+  const advIds = new Set(reservations.flatMap((r) => r.advance_ids ?? []));
+  const advances = loadAdvances().filter((a) => advIds.has(a.id));
+  for (const a of advances) {
+    if (a.date === night) mode(a.method, Number(a.amount) || 0);
+    for (const r of a.refunds ?? []) if (r.date === night) mode(r.method, -(Number(r.amount) || 0));
+  }
   const byKind: Partial<Record<FolioLineKind, number>> = {};
   for (const l of folios.flatMap((f) => f.lines)) if (!l.void && l.date === night) byKind[l.kind] = round2((byKind[l.kind] ?? 0) + l.amount);
-  const advIds = new Set(reservations.flatMap((r) => r.advance_ids ?? []));
   const invoices = localDb.invoices.getAll();
   const allPayments = localDb.payments.getAll();
-  const advancesHeld = loadAdvances().filter((a) => advIds.has(a.id)).reduce((s, a) => s + advanceBalance(a, allPayments, invoices).open, 0);
+  const advancesHeld = advances.reduce((s, a) => s + advanceBalance(a, allPayments, invoices).open, 0);
   const audit: NightAudit = {
     id: `na:${night}`, business_date: night, at: at.toISOString(), by: who(), posted_keys: keys,
     no_shows: reservations.filter((r) => r.status === 'no_show' && r.arrival === night).map((r) => r.number),

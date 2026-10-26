@@ -364,6 +364,23 @@ or similar cess on rooms, the app does not know it. Please name any that apply.
 - HT17 — reports count complimentary / house-use rooms as occupied (occupancy %) but not in ADR; a day without a night
   audit is computed from the stays and posted folio lines.
 
+**QA9 notes (hotel fixes, `docs/prd/qa-round-9.md` — please confirm with the item; no id added):**
+- HT1 / HT11 — **tax-inclusive plans.** The guest pays the agreed inclusive price. The booking snapshot solves each night
+  with the rule in force on the night; the check-out invoice taxes at the rule on the **invoice date** and re-solves the
+  value from the inclusive price (value + GST = price). (a) **Band gap:** from 22 Sep 2025 an inclusive price of
+  ₹7,875.01–₹8,850 fits no band (÷ 1.05 is above ₹7,500; ÷ 1.18 is below it). The app takes the higher band: 18% on a
+  value below ₹7,500 (e.g. ₹8,000 → ₹6,779.66 + 18%). Is that right, or should such a price be treated as ₹7,500 + 5%?
+  (b) Nights before 22 Sep 2025 invoiced after it are re-solved at 5% (₹7,000 → ₹6,666.67), so the hotel's net rises.
+- HT2 — an allowance not linked to a night is spread over the stay's nights pro rata before the band is found (D2:
+  value after discount).
+- HT3 — the previous-FY value now reads the folio lines actually posted per room-night (after linked allowances; an
+  early check-out counts only the nights stayed; meals priced separately are F&B and left out), and each premises
+  (branch profile) is judged on its own stays.
+- HT10 — a cancellation of a booking whose company paid the advance is invoiced to the company (its GSTIN) and that
+  advance is adjusted; only the rest is refunded.
+- HT11 (a) — the 31 March interim invoice is taken on 31 March before the night audit and includes the 31 March night
+  (posted early), dated 31 March in the old FY.
+
 ---
 
 ## Round 6 (R6-C) changes that touch existing items

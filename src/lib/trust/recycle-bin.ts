@@ -301,6 +301,11 @@ registerRestoreHook('invoices', (row, _e, live) => {
   const run = str(row.interest_run_id);
   return run && live('interest_runs').some((r) => str(r?.id) === run && str(r?.status) === 'undone') ? { refuse: 'This interest invoice belongs to an interest run that was undone. Raise the interest again in Receivables → Interest.' } : null;
 });
+registerRestoreHook('invoices', (_row, e, live) => {
+  // QA9 H11: a hotel check-out invoice comes back only while the folio lines it billed are still free (reopened).
+  const lines = live('hotel_folios').flatMap((f) => (Array.isArray(f?.lines) ? f.lines : []) as Row[]);
+  return lines.some((l) => isObj(l.src) && str(l.src.was_invoice_id) === e.row_id && str(l.src.invoice_id)) ? { refuse: 'The folio lines this invoice billed were billed again. Cancel that invoice first, or bill the stay again on the folio.' } : null;
+});
 registerRestoreHook('purchase_returns', (row, e, live) => {
   // A supplier note that settled a trade claim comes back only while the claim still names it.
   const m = /^Against claim (\S+)$/.exec(str(row.notes).trim());

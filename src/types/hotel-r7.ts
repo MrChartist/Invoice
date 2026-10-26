@@ -165,6 +165,8 @@ export interface RoomLine {
   /** Own dates when the line differs from the reservation (early departure, extension). */
   arrival?: string;
   departure?: string;
+  /** QA9 H9: the booked departure kept when an early check-out moves `departure` to the day the guest left. */
+  booked_departure?: string;
   /** D14: not a supply — counted as occupied, never posted or invoiced. */
   comp?: 'complimentary' | 'house';
   checked_in_at?: string;
@@ -265,7 +267,8 @@ export interface FolioLine {
   room_no?: string;
   /** Meal share inside a composite room line (information). */
   meal?: number;
-  src?: { table_order_id?: string; invoice_id?: string; night?: string; line_id?: string };
+  /** `was_invoice_id` (QA9 H11): the invoice that billed the line was deleted / cancelled; the line is free again. */
+  src?: { table_order_id?: string; invoice_id?: string; night?: string; line_id?: string; was_invoice_id?: string };
   void?: { by: string; at: string; reason: string };
   moved_from?: string;
 }
@@ -399,4 +402,12 @@ export interface Reservation {
 /** C1 (Annexure VIII): the new registrant's ARN date — the opt-in must be filed within 15 days of it. */
 export interface PremisesDecl {
   arn_on?: string;
+}
+
+/* ── QA9 block (append below) ──────────────────────────────────── */
+
+/** QA9 H2 additive field on folio lines. */
+export interface FolioLine {
+  /** A tax-inclusive night: the agreed price (with GST) this line carries; check-out re-solves its value from it. */
+  gross?: number;
 }
