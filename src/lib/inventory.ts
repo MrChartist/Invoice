@@ -14,7 +14,8 @@
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
 import { round2, num } from './invoice-calc';
-import { DB_PREFIX, generateId, getJson, getTable, peekTable, readRaw, setJson, setTable } from './storage';
+import { DB_PREFIX, generateId, getJson, getTable, peekTable, setJson, setTable } from './storage';
+import { memoOnReads } from './table-memo';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv } from './csv';
 import { creditNoteReturnsGoods } from './credit-restock';
@@ -1367,8 +1368,12 @@ export function liveInputs(): StockInputs {
   };
 }
 
-/** Load everything from localStorage and compute positions. */
+/**
+ * Load everything from storage and compute positions. Without overrides the result is memoised on
+ * every key the engine read (PERF-1) and SHARED: read-only (pass overrides for a private copy).
+ */
 export function loadPositions(overrides: Partial<StockInputs> = {}): StockPosition[] {
+  if (Object.keys(overrides).length === 0) return memoOnReads('inventory:positions', () => computeStock(liveInputs()));
   return computeStock({ ...liveInputs(), ...overrides });
 }
 
@@ -1412,20 +1417,9 @@ export function lowStockCount(): number {
 }
 
 /** Positions without one document, re-computed only when a stock input changed (the editor asks per keystroke). */
-let positionsCache: { key: (string | null)[]; positions: StockPosition[] } | null = null;
-
 function cachedPositionsWithout(docId: string | undefined): StockPosition[] {
-  const key = [
-    docId ?? '',
-    ...['invoices', 'purchases', TABLES.items, TABLES.moves, 'doc_links', 'job_work_in', 'rejections_in', VOUCHER_TABLES.boms].map((t) => readRaw(DB_PREFIX + t)),
-    readRaw(SETTINGS_KEY),
-  ];
-  if (positionsCache && positionsCache.key.length === key.length && positionsCache.key.every((k, i) => k === key[i])) {
-    return positionsCache.positions;
-  }
-  const positions = computeStock({ ...liveInputs(), excludeInvoiceId: docId });
-  positionsCache = { key, positions };
-  return positions;
+  // Memoised on every key `liveInputs` read (PERF-1), so no stock input can be missed; shared, read-only.
+  return memoOnReads('inventory:positionsWithout', () => computeStock({ ...liveInputs(), excludeInvoiceId: docId }), docId ?? '');
 }
 
 /**

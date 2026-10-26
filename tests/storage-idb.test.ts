@@ -15,16 +15,19 @@ import {
   flushStorage,
   getTable,
   initStorage,
+  peekTable,
   readRaw,
   removeRaw,
   resetStorageBackend,
   setTable,
   storageBackend,
   storageFailure,
+  storageVersion,
   subscribeStorageChanges,
   subscribeStorageFailure,
   writeRaw,
 } from '../src/lib/storage.ts';
+import { memoOnReads, tableStamp } from '../src/lib/table-memo.ts';
 import { DATA_STORE, idbGet, idbSet, resetIdbConnection } from '../src/lib/idb-kv.ts';
 import { buildBackup, parseBackup, restoreBackup, wipeAppData } from '../src/lib/backup.ts';
 import { MIGRATIONS, getSchemaVersion, runMigrations, type Migration } from '../src/lib/migrations.ts';
@@ -256,6 +259,35 @@ test('cross-tab: another tab\'s announcement refreshes the cache, except keys wi
   assert.deepEqual(getTable('vendors'), [{ id: 'v-new' }]);
   assert.deepEqual(getTable('clients'), [{ id: 'mine-newer' }], 'local unsaved write wins');
   assert.deepEqual(seen.sort(), [K('clients'), K('vendors')], 'device-local keys are not data');
+  off();
+  ch.close();
+});
+
+test('cross-tab: the parsed-rows cache, stamps and memos never serve the old version (PERF-1)', async () => {
+  await initStorage();
+  setTable('vendors', [{ id: 'v-old' }]);
+  await flushStorage();
+  let runs = 0;
+  const count = () => memoOnReads('xtab:vendors', () => {
+    runs++;
+    return peekTable<{ id: string }>('vendors').map((v) => v.id).join(',');
+  });
+  assert.equal(count(), 'v-old');
+  assert.deepEqual(peekTable('vendors'), [{ id: 'v-old' }]);
+  const stamp = tableStamp('vendors');
+  const version = storageVersion();
+  idbData().set(K('vendors'), '[{"id":"v-new"}]');
+  const seen: string[] = [];
+  const off = subscribeStorageChanges((k) => seen.push(k));
+  const ch = new BroadcastChannel('mrchartist_inv_sync');
+  ch.postMessage({ keys: [K('vendors')] });
+  for (let i = 0; i < 50 && !seen.length; i++) await tick();
+  assert.deepEqual(peekTable('vendors'), [{ id: 'v-new' }]);
+  assert.deepEqual(getTable('vendors'), [{ id: 'v-new' }]);
+  assert.notEqual(tableStamp('vendors'), stamp);
+  assert.ok(storageVersion() > version, 'the bell sees the cross-tab change');
+  assert.equal(count(), 'v-new');
+  assert.equal(runs, 2);
   off();
   ch.close();
 });

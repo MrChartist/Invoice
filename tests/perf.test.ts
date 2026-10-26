@@ -169,7 +169,7 @@ test('storage-backed paths: reading a 5,000-row table repeatedly is not done in 
   setTable('invoices', invoices);
   setTable('transactions', payments);
   // One representative bulk operation per module that reads storage: all must be linear in the table size.
-  timed('localDb.invoices.getAll x 10', 2500, () => {
+  timed('localDb.invoices.getAll x 10', 1200, () => {
     for (let i = 0; i < 10; i++) localDb.invoices.getAll();
   });
   timed('localDb.payments.record x 20 on a 5,000-invoice table', 4000, () => {
@@ -179,7 +179,7 @@ test('storage-backed paths: reading a 5,000-row table repeatedly is not done in 
       localDb.payments.record({ invoiceId: inv.id, amount: 1, method: 'UPI', date: '2026-05-01' });
     }
   });
-  timed('localDb.invoices.nextNumber x 10', 3000, () => {
+  timed('localDb.invoices.nextNumber x 10', 1500, () => {
     for (let i = 0; i < 10; i++) localDb.invoices.nextNumber('2026-06-01');
   });
   timed('calcInputFromRecord + calculateInvoice for every stored invoice (re-derive all)', 4000, () => {

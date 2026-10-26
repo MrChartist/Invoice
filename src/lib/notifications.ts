@@ -15,7 +15,8 @@ import type { Client, InvoiceRecord, Payment, SenderProfile } from '../types/inv
 import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { localDb } from './localDb';
-import { KEYS, appDataSize, generateId, getTable, readRaw, setTable, writeRaw } from './storage';
+import { KEYS, appDataSize, generateId, getTable, peekTable, readRaw, setTable, storageVersion, writeRaw } from './storage';
+import { memoOnReads } from './table-memo';
 import { formatCurrency, formatDate } from './utils';
 import { parseDay } from './dates';
 import { COMPLIANCE_TABLE, FORM_LABELS, pendingReturns, type FiledReturn, type FilerFrequency, type ReturnDue } from './compliance';
@@ -528,18 +529,22 @@ export function recordBackup(now: Date = new Date()): void {
   }
 }
 
+/**
+ * PERF-1: the context holds the SHARED parsed tables (`peekTable`) — providers only read them (they
+ * are deep-frozen in dev / tests) — and the derived maps are memoised on the tables they read.
+ */
 export function buildContext(now: Date = new Date()): NotificationContext {
-  const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+  const invoices = peekTable<InvoiceRecord>(KEYS.invoices) as InvoiceRecord[];
   return {
     now,
     invoices,
-    credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), invoices),
-    clients: getTable<Client>(KEYS.clients),
+    credits: memoOnReads('notifications:credits', () => linkedCredits(peekTable<CreditLinkRow>('doc_links'), peekTable<InvoiceRecord>(KEYS.invoices))),
+    clients: peekTable<Client>(KEYS.clients) as Client[],
     profile: localDb.settings.activeProfile(),
-    gstFiled: getTable<FiledReturn>(COMPLIANCE_TABLE),
+    gstFiled: peekTable<FiledReturn>(COMPLIANCE_TABLE) as FiledReturn[],
     gstFrequency: localDb.settings.get().gst_filing_frequency,
-    cheques: getTable<Cheque>('cheques'),
-    ...promiseContext(invoices),
+    cheques: peekTable<Cheque>('cheques') as Cheque[],
+    ...promiseContext(),
     lastBackup: getLastBackup(),
     storageUsedBytes: appDataSize() * 2,
     storageQuotaBytes: STORAGE_QUOTA_BYTES,
@@ -547,16 +552,42 @@ export function buildContext(now: Date = new Date()): NotificationContext {
 }
 
 /** R2-A4: follow-ups and receipts per party, only read when there are follow-ups at all. */
-function promiseContext(invoices: InvoiceRecord[]): Pick<NotificationContext, 'collectionNotes' | 'partyReceipts'> {
-  const collectionNotes = getTable<CollectionNote>(COLLECTION_NOTES_TABLE).filter((n) => n?.promise);
+function promiseContext(): Pick<NotificationContext, 'collectionNotes' | 'partyReceipts'> {
+  const collectionNotes = peekTable<CollectionNote>(COLLECTION_NOTES_TABLE).filter((n) => n?.promise);
   if (!collectionNotes.length) return {};
-  return { collectionNotes, partyReceipts: receiptsByParty(invoices, getTable<Payment>(KEYS.transactions), getTable<Client>(KEYS.clients)) };
+  const partyReceipts = memoOnReads('notifications:partyReceipts', () =>
+    receiptsByParty(peekTable<InvoiceRecord>(KEYS.invoices), peekTable<Payment>(KEYS.transactions), peekTable<Client>(KEYS.clients)));
+  return { collectionNotes, partyReceipts };
 }
 
 /** Convenience for the bell: current visible notifications from live data. */
 export function loadVisibleNotifications(now: Date = new Date()): VisibleNotification[] {
   const all = collectNotifications(buildContext(now));
   return applyState(all, loadNotifState(), now);
+}
+
+/**
+ * PERF-1 (the bell's poll / focus / cross-tab refresh): the providers' result is reused while nothing
+ * stored through `storage.ts` changed (`storageVersion`), the local day is the same and less than
+ * `NOTIF_RECOMPUTE_MS` passed; read / snooze state is applied fresh every time. `force` recomputes.
+ */
+export const NOTIF_RECOMPUTE_MS = 5 * 60_000;
+let reused: { key: string; at: number; list: AppNotification[] } | null = null;
+
+export function reusableVisibleNotifications(now: Date = new Date(), force = false): VisibleNotification[] {
+  const day = localDayOf(now);
+  const t = now.getTime();
+  if (force || !reused || reused.key !== `${storageVersion()}|${day}` || t - reused.at >= NOTIF_RECOMPUTE_MS || t < reused.at) {
+    const list = collectNotifications(buildContext(now));
+    // Keyed on the version after the run, in case a provider wrote while running.
+    reused = { key: `${storageVersion()}|${day}`, at: t, list };
+  }
+  return applyState(reused.list, loadNotifState(), now);
+}
+
+/** Tests: forget the reused provider result. */
+export function resetNotificationReuse(): void {
+  reused = null;
 }
 
 /** Unique id helper for custom providers that need one-off notices. */

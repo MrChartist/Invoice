@@ -26,7 +26,7 @@ import { gstinChecksumChar } from './gstin';
 import { localDayOf, shiftDay } from './dates';
 import { buildInvoiceNumber, getIndianFY } from './invoice-number';
 import { localDb, blankProfile } from './localDb';
-import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, readRaw, removeRaw, setTable, writeRaw } from './storage';
+import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, peekTable, readRaw, removeRaw, setTable, writeRaw } from './storage';
 import { DOC_LINKS_TABLE, buildCreditNote, type DocLink } from './documents';
 import { PAYMENTS_TABLE, PURCHASES_TABLE, computePurchaseTotals, type PurchasePayment } from './purchases';
 import { VENDORS_TABLE } from './vendors';
@@ -469,7 +469,7 @@ export function buildDemoDataset(today: string): DemoDataset {
 /* ── Status ───────────────────────────────────────────────────── */
 
 function demoScheduleIds(): Set<string> {
-  return new Set(getTable<Demo<RecurringSchedule>>(RECURRING_TABLE).filter(isDemo).map((s) => s.id));
+  return new Set(peekTable<Demo<RecurringSchedule>>(RECURRING_TABLE).filter(isDemo).map((s) => s.id));
 }
 
 function isDemoInvoice(inv: Demo<InvoiceRecord>, schedules: Set<string>): boolean {
@@ -478,18 +478,18 @@ function isDemoInvoice(inv: Demo<InvoiceRecord>, schedules: Set<string>): boolea
 
 export function demoStatus(): DemoStatus {
   const schedules = demoScheduleIds();
-  const invoices = getTable<Demo<InvoiceRecord>>(KEYS.invoices);
+  const invoices = peekTable<Demo<InvoiceRecord>>(KEYS.invoices);
   const demoInvoices = invoices.filter((i) => isDemoInvoice(i, schedules));
   const settings = localDb.settings.get();
   const counts: DemoCounts = {
     profiles: settings.profiles.filter(isDemo).length,
-    clients: getTable<Demo<Client>>(KEYS.clients).filter(isDemo).length,
-    items: getTable<Demo<InvoiceItem>>(KEYS.items).filter(isDemo).length,
+    clients: peekTable<Demo<Client>>(KEYS.clients).filter(isDemo).length,
+    items: peekTable<Demo<InvoiceItem>>(KEYS.items).filter(isDemo).length,
     invoices: demoInvoices.length,
     creditNotes: demoInvoices.filter((i) => i.doc_type === 'CREDIT_NOTE').length,
-    payments: getTable<Demo<Payment>>(KEYS.transactions).filter(isDemo).length,
-    vendors: getTable<Demo<Vendor>>(VENDORS_TABLE).filter(isDemo).length,
-    purchases: getTable<Demo<PurchaseRecord>>(PURCHASES_TABLE).filter(isDemo).length,
+    payments: peekTable<Demo<Payment>>(KEYS.transactions).filter(isDemo).length,
+    vendors: peekTable<Demo<Vendor>>(VENDORS_TABLE).filter(isDemo).length,
+    purchases: peekTable<Demo<PurchaseRecord>>(PURCHASES_TABLE).filter(isDemo).length,
     schedules: schedules.size,
   };
   const loaded = Object.values(counts).some((n) => n > 0);

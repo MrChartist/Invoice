@@ -158,9 +158,44 @@ export const VAULT_PLAIN_BACKUP_MESSAGE =
 
 /** Text of a plain (unencrypted) full backup for a manual download. Owner only; refused in vault mode. */
 export function exportPlainBackup(now: Date = new Date()): string {
+  return plainBackupParts(now).join('');
+}
+
+/**
+ * PERF-1 (H11): the same file as a Blob built from parts, so the 60–70 MB text is never materialised
+ * as one string (the download / save-to-disk paths). Byte-for-byte equal to `exportPlainBackup`.
+ */
+export function exportPlainBackupBlob(now: Date = new Date(), type = 'application/json;charset=utf-8'): Blob {
+  return new Blob(plainBackupParts(now), { type });
+}
+
+function plainBackupParts(now: Date): string[] {
   requireAccess('data.backup');
   if (!plainBackupAllowed()) throw new Error(VAULT_PLAIN_BACKUP_MESSAGE);
-  return JSON.stringify(collectBackup(now), null, 2);
+  return backupTextParts(collectBackup(now));
+}
+
+/** `JSON.stringify(file, null, 2)` as a list of parts (one per stored value): same text when joined. */
+export function backupTextParts(file: BackupFile): string[] {
+  const out: string[] = ['{'];
+  let first = true;
+  for (const [k, v] of Object.entries(file)) {
+    if (v === undefined) continue;
+    out.push(`${first ? '' : ','}\n  ${JSON.stringify(k)}: `);
+    first = false;
+    if (k === 'data' && v && typeof v === 'object') {
+      const entries = Object.entries(v as Record<string, string>).filter(([, x]) => x !== undefined);
+      if (!entries.length) {
+        out.push('{}');
+        continue;
+      }
+      out.push('{');
+      entries.forEach(([dk, dv], i) => out.push(`${i ? ',' : ''}\n    ${JSON.stringify(dk)}: `, JSON.stringify(dv)));
+      out.push('\n  }');
+    } else out.push(JSON.stringify(v, null, 2).replace(/\n/g, '\n  '));
+  }
+  out.push(first ? '}' : '\n}');
+  return out;
 }
 
 export function backupFilename(now: Date = new Date(), encrypted = false): string {
@@ -252,11 +287,30 @@ export async function decryptBackup(
   return parseBackup(plain);
 }
 
-function countRows(raw: string | undefined): number {
+/** Parsed values of a backup's keys, each parsed at most once per check (PERF-1, H11). */
+type BackupParser = (fullKey: string) => { ok: boolean; value: unknown };
+function backupParser(data: Record<string, string>): BackupParser {
+  const seen = new Map<string, { ok: boolean; value: unknown }>();
+  return (key) => {
+    let e = seen.get(key);
+    if (!e) {
+      try {
+        e = { ok: true, value: JSON.parse(data[key]) as unknown };
+      } catch {
+        e = { ok: false, value: null };
+      }
+      seen.set(key, e);
+    }
+    return e;
+  };
+}
+
+function countRows(raw: string | undefined, parsed?: unknown): number {
   if (!raw) return 0;
+  if (parsed !== undefined) return Array.isArray(parsed) ? parsed.length : 0;
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.length : 0;
+    const value = JSON.parse(raw);
+    return Array.isArray(value) ? value.length : 0;
   } catch {
     return 0;
   }
@@ -290,15 +344,17 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
   if (Object.keys(data).length === 0) {
     throw new Error('No invoice data found in this file.');
   }
-  validateBackupData(data);
+  const parse = backupParser(data);
+  validateBackupData(data, parse);
   // Attachment files are checked by content; bad ones are left out, dangling references reported.
-  const files = checkBackupAttachments(data);
+  const files = checkBackupAttachments(data, (k) => (data[k] ? parse(k).value : null));
+  const rowsOf = (key: string) => countRows(data[key], data[key] ? parse(key).value : undefined);
 
   return {
     data,
     summary: {
-      invoices: countRows(data[`${DB_PREFIX}invoices`]),
-      clients: countRows(data[`${DB_PREFIX}clients`]),
+      invoices: rowsOf(`${DB_PREFIX}invoices`),
+      clients: rowsOf(`${DB_PREFIX}clients`),
       keys: Object.keys(data).length,
       ...(files.files ? { attachments: files.files } : {}),
       ...(files.missing ? { missingAttachments: files.missing } : {}),
@@ -450,7 +506,7 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeo
  * (core tables with ids), settings an object, and the schema version not newer than this
  * app understands. Throws a readable Error naming the bad table.
  */
-export function validateBackupData(data: Record<string, string>): void {
+export function validateBackupData(data: Record<string, string>, parse: BackupParser = backupParser(data)): void {
   const version = data[SCHEMA_VERSION_KEY];
   if (version !== undefined) {
     const n = Number(version);
@@ -462,12 +518,9 @@ export function validateBackupData(data: Record<string, string>): void {
   for (const table of RECORD_TABLES) {
     const raw = data[DB_PREFIX + table];
     if (raw === undefined) continue;
-    let rows: unknown;
-    try {
-      rows = JSON.parse(raw);
-    } catch {
-      throw new Error(`The "${table}" table in this backup is damaged (not valid JSON).`);
-    }
+    const p = parse(DB_PREFIX + table);
+    if (!p.ok) throw new Error(`The "${table}" table in this backup is damaged (not valid JSON).`);
+    const rows = p.value;
     if (!Array.isArray(rows)) throw new Error(`The "${table}" table in this backup is not a list.`);
     const needsId = ID_TABLES.has(table);
     // Older versions wrote numeric ids, so a number is fine; a missing id is not.
@@ -478,19 +531,17 @@ export function validateBackupData(data: Record<string, string>): void {
   // Audit archive segments (WP-7, `audit_archive_<n>`): lists of rows like `audit_log` itself.
   for (const key of Object.keys(data)) {
     if (!key.startsWith(`${DB_PREFIX}audit_archive_`)) continue;
-    let rows: unknown;
-    try {
-      rows = JSON.parse(data[key]);
-    } catch {
-      rows = null;
-    }
+    const rows = parse(key).value;
     if (!Array.isArray(rows) || rows.some((r) => !isPlainObject(r))) throw new Error(`The audit archive "${key.slice(DB_PREFIX.length)}" in this backup is damaged.`);
   }
   // Backups are self-contained: every logo/signature reference must resolve inside the file.
   const refs = new Set<string>();
   for (const table of SNAPSHOT_TABLES) {
     const raw = data[DB_PREFIX + table];
-    if (raw !== undefined) referencedAssets(JSON.parse(raw) as unknown[], refs);
+    if (raw === undefined) continue;
+    const p = parse(DB_PREFIX + table);
+    if (!p.ok) JSON.parse(raw); // rethrow the parse error, as before
+    referencedAssets(p.value as unknown[], refs);
   }
   if (refs.size > 0) {
     const assets = parseAssets(data[DB_PREFIX + ASSET_TABLE]);

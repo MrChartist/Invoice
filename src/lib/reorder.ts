@@ -21,6 +21,7 @@ import { purchaseOrderOutstanding } from './receipt-notes';
 import { lineFactor } from './units';
 import { loadTracking, type TrackingMap } from './stock-tracking';
 import { getTable } from './storage';
+import { memoOnReads } from './table-memo';
 
 const EPS = 1e-9;
 const roundQty = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
@@ -159,6 +160,11 @@ export function reorderNotices(rows: readonly ReorderRow[], at: string): AppNoti
 
 /** Live Reorder Status. */
 export function loadReorderStatus(): ReorderRow[] {
+  // PERF-1: memoised on every key it read; shared, read-only.
+  return memoOnReads('reorder:status', computeReorderStatus);
+}
+
+function computeReorderStatus(): ReorderRow[] {
   const positions = loadPositions();
   const items = positions.map((p) => p.item);
   const pending = pendingPoQty(getTable<PurchaseOrder>('purchase_orders'), getTable<PurchaseRecord>('purchases'), items, getTable<ReceiptNote>('receipt_notes'));
