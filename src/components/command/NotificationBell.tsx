@@ -316,6 +316,7 @@ function ensureTransportWorksAlerts(onReady: () => void): void {
   };
   gate('transport', 'transport', () => import('../../lib/transport/transport-alerts')); // registers itself on load
   gate('works', 'contractor', () => import('../../lib/works/works-alerts'));
+  gate('hotel', 'hotel', () => import('../hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => m.registerHotelAlerts())); // R7-C2 ensureHotelAlerts (the pack's chunk)
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {

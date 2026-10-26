@@ -343,6 +343,26 @@ sources: the round-7 research notes (P = primary text read, S = secondary).
 Luxury tax is not computed: it was subsumed into GST from 1 Jul 2017. If a State or local body still levies a tourism
 or similar cess on rooms, the app does not know it. Please name any that apply.
 
+**R7-C build notes (what the GST desk, Form C desk and reports decided — please confirm with the item):**
+- HT1 / HT2 / HT14 — a room line's unit-day value is its taxable value ÷ quantity (unit-nights), tested on the invoice
+  date (D6). An extra-bed / extra-person line on the same invoice may carry a passing room line's higher rate (one
+  unit-day value, D2); any other mismatch is a "wrong band" check. Composition and Bill-of-Supply documents are left out (HT16).
+- HT3 — the previous-FY test reads the stays' night snapshots (room + extra bed / person + plan meals; meals priced
+  separately and complimentary / house-use rooms left out) or a figure typed for a year before the app; invoices are
+  not read. An opt-in / opt-out must be filed 1 Jan – 31 Mar of the calendar year the FY starts in; Annexure VIII within
+  15 days of the ARN date typed with it. The latest valid declaration up to the FY decides and continues until changed;
+  status is per premises (`property_id`; the desk shows the main premises).
+- HT4 — the exempt-like turnover added to E in the Rule 42 / 43 working is the taxable value of rooms at a no-ITC band
+  **and** F&B at the non-specified 5%-no-ITC rate (credit notes net off). Rows before 22 Sep 2025 carry ITC, so
+  nothing is added. The ITC check fires once per FY when every invoiced room-night is in a no-ITC band and any bill
+  claims ITC (not RCM, net of any reversal) — a warning only.
+- HT5 — any IGST hotel invoice is flagged.
+- HT13 — the Form C deadline is the check-in instant + the rule's hours (on the local check-in day), so it runs across
+  midnight; the bell warns from 6 hours before and turns red when overdue; the penalty is shown as "up to ₹50,000 per
+  case (as reported) — verify". The data sheet follows `FORM_C_FIELDS` (portal order as understood).
+- HT17 — reports count complimentary / house-use rooms as occupied (occupancy %) but not in ADR; a day without a night
+  audit is computed from the stays and posted folio lines.
+
 ---
 
 ## Round 6 (R6-C) changes that touch existing items

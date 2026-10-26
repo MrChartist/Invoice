@@ -41,7 +41,7 @@ test('no pack: no R5-C tab is listed (the URL still opens it), no table is read 
   const tabs = [{ id: 'schedules' }, { id: 'fees', pack: 'fees' as const }, { id: 'leases', pack: 'leases' as const }];
   assert.deepEqual(visibleTabs(tabs, s).map((t) => t.id), ['schedules']);
   assert.deepEqual(visibleTabs(tabs, s, 'fees').map((t) => t.id), ['schedules', 'fees'], 'opened by URL');
-  assert.deepEqual(PACK_GST_TABS['common-credit'], ['fees', 'nonprofit', 'leases']);
+  assert.deepEqual(PACK_GST_TABS['common-credit'], ['fees', 'nonprofit', 'leases', 'hotel']); // + R7-C1 (D12)
   registerR5cAlerts();
   let out: ReturnType<typeof collectNotifications> = [];
   assert.deepEqual(traced(() => { out = collectNotifications(buildContext(new Date('2026-06-01T10:00:00'))); }), []);
