@@ -60,6 +60,7 @@ export function forBranch(data: TileData, branch: string | undefined): TileData 
       purchases: purchases as unknown as BooksData['purchases'],
       purchasePayments: data.books.purchasePayments.filter((p) => !p.purchase_id || pids.has(p.purchase_id)),
       advances: branch ? [] : data.books.advances,
+      manualVouchers: [], // QA6-1 F5: manual vouchers are not split by branch here
     },
   };
 }

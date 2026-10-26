@@ -22,6 +22,8 @@ import { readPurchase, isVoidStatus } from './purchase-normalize';
 import { generateId, getTable, setTable } from './storage';
 import type { InvoiceRecord, Payment } from '../types/invoice';
 import { receivableBalance } from './rcm';
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import type { Voucher } from './books';
 
 /* ════════════════════════════════════════════════════════════════
    Types
@@ -655,9 +657,9 @@ export function receiptCandidates(invoices: readonly InvoiceRecord[], payments: 
   for (const p of payments) {
     const amount = round2(Math.abs(num(p.amount)));
     const date = isoDay(p.date);
-    // An advance adjusted against an invoice (5.3) moved no money through the bank.
-    // R5-C6: nor did a receipt settled from a security deposit held; R5-B5: nor a GST TDS / cess deduction row.
-    if (!date || amount === 0 || isCashMethod(p.method) || p.advance_id || p.deposit_adjustment_id || p.ra_journal_id) continue;
+    // QA6-1 F4: an advance adjustment, write-off, gift-voucher redemption, deposit adjustment or RA deduction row moved
+    // no money through the bank (`no-cash.ts`).
+    if (!date || amount === 0 || isCashMethod(p.method) || movedNoCash(p)) continue;
     const inv = byId.get(p.invoice_id);
     out.push({
       kind: 'payment',
@@ -716,6 +718,28 @@ export function payoutCandidates(
     });
   }
   return out;
+}
+
+/**
+ * QA6-1 F5: money a manual voucher moved through a bank account (a marketplace payout contra, a deposit received, a
+ * gift-voucher sale by UPI …), from the cash / bank book stream (`buildVouchers`, entries `mv:…`). Money in is offered
+ * to statement credits (kind 'payment'), money out to debits (kind 'purchase_payment'). Clearing accounts (never on a
+ * statement) are left out by the caller's `skip` set.
+ */
+export function voucherCandidates(stream: readonly Voucher[], skip: ReadonlySet<string> = new Set()): { receipts: Candidate[]; payouts: Candidate[] } {
+  const receipts: Candidate[] = [];
+  const payouts: Candidate[] = [];
+  for (const v of stream) {
+    if (!v.id.startsWith('mv:') || v.account !== 'bank' || (v.bank_account_id && skip.has(v.bank_account_id))) continue;
+    const inflow = v.type === 'Receipt';
+    const amount = round2(inflow ? v.credit : v.debit);
+    if (!amount) continue;
+    (inflow ? receipts : payouts).push({
+      kind: inflow ? 'payment' : 'purchase_payment', id: v.id, date: v.date, amount, method: v.method ?? '', reference: v.number,
+      docNumber: v.number, party: v.party, docId: '', bank_account_id: v.bank_account_id || undefined,
+    });
+  }
+  return { receipts, payouts };
 }
 
 export interface Suggestion {

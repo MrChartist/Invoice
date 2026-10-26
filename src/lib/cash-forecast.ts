@@ -33,6 +33,7 @@ import { isVoidStatus, pickStr, readPurchase, supplierPayableOf } from './purcha
 import { previewOccurrences, scheduleStatus, templateTotals, type RecurringSchedule } from './recurring';
 import { receivableBalance } from './rcm';
 import { openInstalments } from './payment-schedule';
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
 /** Open receivable `inr` split over a document's unpaid instalments (one part on `due_date` without a schedule). */
 function scheduledParts(inv: InvoiceRecord, inr: number): { due: string; label: string; amount: number }[] {
@@ -137,8 +138,9 @@ export function collectionLags(invoices: readonly InvoiceRecord[], payments: rea
     const inv = byId.get(p.invoice_id);
     const due = isoDay(inv?.due_date);
     const paid = isoDay(p.date);
-    // An advance adjustment (5.3) is not a collection: it says nothing about how late the client pays.
-    if (!inv || !due || !paid || p.advance_id) continue;
+    // A row that moved no money (advance adjustment, write-off, gift voucher, deposit, RA deduction — `no-cash.ts`) is
+    // not a collection: it says nothing about how late the client pays.
+    if (!inv || !due || !paid || movedNoCash(p)) continue;
     const amt = Math.abs(num(p.amount)) * (fxRate(inv) ?? 1);
     if (!(amt > 0)) continue;
     const k = clientKey(inv.client);

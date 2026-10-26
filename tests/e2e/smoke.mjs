@@ -1610,17 +1610,23 @@ try {
     check(true, 'an undo copy of the replaced data is offered');
   });
 
-  await step('delete without undo really deletes', async () => {
+  await step('delete without undo really deletes, even when the tab is reloaded with the Undo toast still up', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByRole('button', { name: /^Delete INV/ }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
-    // R4-C4: an Undo toast waits for the user (no auto-dismiss); the delete is committed once it is dismissed.
+    // R4-C4: an Undo toast waits for the user (no auto-dismiss). QA6-1 F16: the delete is committed at once (to the
+    // recycle bin), so a reload that never touches the toast cannot bring the invoice back.
     await page.waitForTimeout(6500);
     const undo = page.getByRole('button', { name: 'Undo' });
     check(await undo.isVisible(), 'the Undo toast is still there after 6.5 s (no auto-dismiss)');
-    await page.getByRole('button', { name: 'Dismiss notification' }).click();
+    const gone = (await readJson(page, 'invoices', [], (v) => v.length === 0)).length;
+    check(gone === 0, `the delete is committed while the toast is up (${gone} left)`);
+    await page.reload();
+    await page.getByRole('heading', { level: 1 }).first().waitFor();
+    await page.waitForTimeout(500);
     const left = (await readJson(page, 'invoices', [], (v) => v.length === 0)).length;
-    check(left === 0, `the delete is committed when the toast is dismissed (${left} left)`);
+    check(left === 0, `still deleted after a reload (${left} left)`);
+    check(await page.getByRole('button', { name: /^Delete INV/ }).count() === 0, 'the list does not show it after the reload');
   });
 
   await step('R4-C4: the deleted invoice is in Recently deleted; restoring it brings it back with the same number', async () => {

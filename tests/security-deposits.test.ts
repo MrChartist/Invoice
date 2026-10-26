@@ -54,7 +54,8 @@ test('regression: an adjustment settles the invoice, moves no money (cash book, 
   assert.equal(localDb.invoices.getById(rent.id)!.status, 'Paid');
   const book = buildVouchers(loadBooksData());
   assert.ok(!book.some((v) => v.type === 'Receipt' && v.invoice_id === rent.id), 'the cash book does not list it');
-  assert.equal(book.filter((v) => v.type === 'Receipt').reduce((s, v) => s + v.credit, 0), 0, 'no receipt at all in the cash book');
+  // QA6-1 F5: the only money in is the deposit itself (its receipt voucher), not the adjustment.
+  assert.equal(book.filter((v) => v.type === 'Receipt').reduce((s, v) => s + v.credit, 0), 100000, 'only the deposit is a receipt in the cash book');
   assert.ok(!receiptCandidates(localDb.invoices.getAll(), localDb.payments.getAll()).some((c) => c.docId === rent.id), 'nor among BRS candidates');
   const tb = trialBalance(loadLedger(), { start: '2026-04-01', end: '2027-03-31' });
   assert.equal(tb.totals.debit, tb.totals.credit);
