@@ -2,8 +2,8 @@ import { reloadAfterFlush } from '../../lib/storage';
 import { useState } from 'react';
 import { FlaskConical } from 'lucide-react';
 import { demoStatus, removeDemoData } from '../../lib/demo-data';
-import { readRegistry, switchCompany } from '../../lib/companies';
-import { isDemoCompanyOpen, resetDemoSamples, useDemoPending } from '../onboarding/demo-company';
+import { switchCompany } from '../../lib/companies';
+import { companyToReturnTo, isDemoCompanyOpen, resetDemoSamples, useDemoPending } from '../onboarding/demo-company';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import controls from '../../styles/controls.module.css';
 import styles from './demo.module.css';
@@ -49,7 +49,7 @@ export function DemoNotice({ compact, onRemoved }: { compact?: boolean; onRemove
     );
   }
   if (inDemo) {
-    const own = readRegistry().list.find((c) => c.name.toLowerCase() !== 'demo');
+    const own = companyToReturnTo(); // QA7: the company the user came from
     return (
       <div className={styles.banner} role="status" data-testid="demo-notice" data-demo-company>
         <FlaskConical size={18} aria-hidden="true" className={styles.icon} />

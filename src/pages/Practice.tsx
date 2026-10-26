@@ -10,7 +10,7 @@ import { ChecklistPanel } from '../components/practice/ChecklistPanel';
 import { buildPracticeBoard, boardCsv, boardTable, peekedCompany, type PeekedCompany, type PracticeRow, type PracticeTables } from '../lib/practice';
 import { checklistDb } from '../lib/client-checklist';
 import { companyDbName } from '../lib/company-registry';
-import { deleteCompany, readRegistry, switchCompany } from '../lib/companies';
+import { activeCompanyId, deleteCompany, readRegistry, realCompanies, switchCompany } from '../lib/companies';
 import { SINGLETON_KEYS, getJson, getTable } from '../lib/storage';
 import { todayIso } from '../lib/tax-rules';
 import { downloadText } from '../lib/download';
@@ -38,11 +38,13 @@ function currentTables(): PracticeTables {
 
 async function loadBoard(): Promise<PeekedCompany[]> {
   const reg = readRegistry();
-  const list = reg.list.length ? reg.list : [{ id: reg.active, name: dkT('pr.thisCompany') }];
+  const here = activeCompanyId();
+  // QA7 G7: the Demo company is not one of the user's companies (shown only while it is the open one).
+  const list = reg.list.filter((c) => !c.demo || c.id === here);
   const out: PeekedCompany[] = [];
   const { peekCompliance } = await import('../lib/company-peek');
   for (const c of list) {
-    if (c.id === reg.active) {
+    if (c.id === here) {
       out.push({ id: c.id, name: c.name, current: true, tables: currentTables() });
       continue;
     }
@@ -88,7 +90,7 @@ export function Practice() {
     <div className={surface.page} data-practice>
       <PageHeader title={dkT('pr.title')} subtitle={dkT('pr.subtitle')} />
       {/* R6-B3: the desk shows every company on the device — with one company, say how to add the next. */}
-      {practiceEmpty(readRegistry().list.length) && (
+      {practiceEmpty(realCompanies().length) && (
         <EmptyState
           icon={Building2}
           title={discoverT('practiceTitle')}

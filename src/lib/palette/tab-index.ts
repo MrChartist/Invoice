@@ -8,6 +8,7 @@
  * and opens. Pure (settings in, rows out); the palette loads this module on its first open.
  */
 import type { StaticEntry } from '../search';
+import type { AccessAction } from '../access';
 import { PACK_TABS, activePacks } from '../industry-packs';
 import { enabledModules, isPathVisible } from '../shop-mode';
 import {
@@ -38,26 +39,30 @@ export interface TabPage {
   key: TabPageKey;
   route: string;
   ids: readonly string[];
+  /** QA7 G8: the route's access action (the sidebar's `need` / `RequireAccess` in `App.tsx`). */
+  need?: AccessAction;
+  /** Per-tab actions (Settings tabs carry their own `need`). */
+  tabNeed?: Readonly<Record<string, AccessAction>>;
 }
 
 const ids = (list: readonly ({ id: string } | string)[]) => list.map((t) => (typeof t === 'string' ? t : t.id));
 
 /** Every page with tabs and its tab ids, in sidebar order. */
 export const TAB_PAGES: readonly TabPage[] = [
-  { key: 'recurring', route: '/recurring', ids: ids(RECURRING_TABS) },
-  { key: 'time', route: '/time', ids: ids(TIME_TABS) },
+  { key: 'recurring', route: '/recurring', ids: ids(RECURRING_TABS), need: 'books.edit' },
+  { key: 'time', route: '/time', ids: ids(TIME_TABS), need: 'books.edit' },
   { key: 'receivables', route: '/receivables', ids: ids(RECEIVABLES_TABS) },
   { key: 'distribution', route: '/distribution', ids: ids(DISTRIBUTION_TABS) },
   { key: 'expenses', route: '/expenses', ids: ids(EXPENSES_TABS) },
   { key: 'inventory', route: '/inventory', ids: ids(INVENTORY_TABS) },
   { key: 'mfg', route: '/manufacturing', ids: ids(MFG_TABS) },
   { key: 'books', route: '/books', ids: ids(BOOKS_TABS) },
-  { key: 'reconcile', route: '/reconcile', ids: ids(RECONCILE_TABS) },
+  { key: 'reconcile', route: '/reconcile', ids: ids(RECONCILE_TABS), need: 'books.edit' },
   { key: 'tds', route: '/tds', ids: TDS_TAB_IDS },
-  { key: 'payroll', route: '/payroll', ids: ids(PAYROLL_TABS) },
+  { key: 'payroll', route: '/payroll', ids: ids(PAYROLL_TABS), need: 'payroll.view' },
   { key: 'reports', route: '/reports', ids: ids(REPORTS_TABS) },
   { key: 'gst', route: '/gst-reports', ids: Object.values(GST_TAB_ROWS).flat() },
-  { key: 'settings', route: '/settings', ids: ids(SETTINGS_TABS) },
+  { key: 'settings', route: '/settings', ids: ids(SETTINGS_TABS), tabNeed: Object.fromEntries(SETTINGS_TABS.map((t) => [t.id, t.need])) },
 ];
 
 export const tabHref = (route: string, id: string): string => `${route}?tab=${id}`;
@@ -75,8 +80,17 @@ export interface TabIndexSettings {
   industry_packs?: unknown;
 }
 
-/** The "Tabs" group rows for a company (its shop mode marks hidden screens). */
-export function buildTabIndex(settings: TabIndexSettings | null | undefined): StaticEntry[] {
+/** QA7 G8: may this role open the tab (the route's `need`, then the tab's own)? */
+export function tabAllowed(page: TabPage, id: string, allow: (a: AccessAction) => boolean): boolean {
+  const tab = page.tabNeed?.[id];
+  return (!page.need || allow(page.need)) && (!tab || allow(tab));
+}
+
+/**
+ * The "Tabs" group rows for a company (its shop mode marks hidden screens). `allow` is the role check (`can`): a tab
+ * the role cannot open is left out, as the sidebar leaves out its page (QA7 G8).
+ */
+export function buildTabIndex(settings: TabIndexSettings | null | undefined, allow: (a: AccessAction) => boolean = () => true): StaticEntry[] {
   const modules = enabledModules(settings as Parameters<typeof enabledModules>[0]);
   const packs = activePacks(settings);
   const out: StaticEntry[] = [];
@@ -85,7 +99,7 @@ export function buildTabIndex(settings: TabIndexSettings | null | undefined): St
     const group = tabsT(`page.${page.key}` as TitleKey);
     for (const id of page.ids) {
       const href = tabHref(page.route, id);
-      if (PACK_HREFS.has(href) || !hasTitle(page.key, id)) continue;
+      if (PACK_HREFS.has(href) || !hasTitle(page.key, id) || !tabAllowed(page, id, allow)) continue;
       const extra = page.key === 'gst' ? GST_GROUP_SYNONYMS[gstRowOf(id)] ?? [] : [];
       out.push({
         id: `tab:${href}`,

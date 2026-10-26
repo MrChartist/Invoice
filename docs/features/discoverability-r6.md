@@ -20,7 +20,9 @@ No new route, rule table, storage key or lucide icon. Strings live in `src/i18n/
 - `src/lib/palette/tab-index.ts` — `TAB_PAGES` (route + ids per page) and `buildTabIndex(settings)`: one `StaticEntry`
   per tab `{ title, subtitle: page name, href: route?tab=id, keywords }`. A tab of a screen shop mode hides still shows,
   marked "(hidden)". Tabs that belong to a pack are the R5 "Industry packs" group's rows (`PACK_TABS`, "(pack off)"
-  there); they are left out of the Tabs group and get the same synonyms through `withSynonyms`.
+  there); they are left out of the Tabs group and get the same synonyms through `withSynonyms`. QA7 G8: a page carries
+  its route's access action (`need`, as the sidebar / `RequireAccess`) and Settings tabs their own; `buildTabIndex(settings,
+  allow)` leaves out what the role cannot open, and `tabDestinations()` / `featureDestinations()` pass `can`.
 - `src/lib/palette/synonyms.ts` — words per tab href: GSTR-1 sections (b2cl / large, cdnur …), 3B / 2B, RCM, LUT, IRN,
   e-Way; TDS (26q, 24q, 27eq, 16a, challan, 194c …, 393); Books (tb, p&l, bs, day book, ledger, brs); packs (lr / bilty /
   consignment, ra bill / boq / retention, 80g / 10bd / donation, fee / tuition, lease / rent / cam, settlement / payout /
@@ -30,8 +32,8 @@ No new route, rule table, storage key or lucide icon. Strings live in `src/i18n/
   Actions groups and after any document group that scores better ("below an exact document match, above other pages");
   a "Features" group follows. The empty palette shows "Try: GSTR-3B · 12.5k · a GSTIN · LR · Alt+P POS · F1 help".
 - Help search: "help <words>" or "? <words>" searches only help topics: R6-A's `helpIndex()` (lazy
-  `lib/help/registry.ts`, loaded on the palette's first open; Hindi title when the interface is Hindi); choosing one
-  calls `openHelp(id)`.
+  `lib/help/registry.ts`, loaded on the palette's first open; Hindi title when the interface is Hindi, mapped on every
+  open by `helpRows(raw, lang)` so a language switch shows at once, QA7 G9); choosing one calls `openHelp(id)`.
 - Tests: `tests/palette-tabs.test.ts` — every tab id of every page registry is findable (Tabs group or pack group) and
   has a title; "3b", "GSTR-3B", "consignment", "LR", "80g", "trial balance" (and tb, p&l, 26q, b2cl, cdnur, ra bill,
   amazon, तलपट) each find their tab; "(hidden)" for a kirana; the pages read `page-tabs.ts`; `page-tabs.ts` has type
@@ -91,6 +93,17 @@ No new route, rule table, storage key or lucide icon. Strings live in `src/i18n/
   builds it again with today's dates; `isDemoCompanyOpen()`. An existing Demo company finishes the pending fill from the
   Dashboard banner (`useDemoPending` in `DemoNotice`), not only from the wizard.
 - `DemoNotice` in the Demo company: "Sample company — nothing here is real · Switch to <my company> · Reset samples".
+  "Switch to" goes back to the company the Demo company was opened from (`from` on its registry entry), else the first
+  own company.
+- QA7 G1/G2 (Demo company marker): the Demo company is the registry entry with `demo: true` (written by
+  `startDemoCompany`, never matched by name; a user's company called "Demo" is a normal company and a new Demo company
+  is then named "Demo 2") AND a database with `settings.demo_company: true` (written by `takePending` on its first open,
+  only while it holds no invoice of the user's own). "Am I in Demo" reads the company this tab's database belongs to
+  (`activeCompanyId()` is pinned when the database opens), never the live registry another tab may have switched;
+  a pending request is taken only by the tab whose database is the requested Demo company. `loadDemoData` refuses
+  (`not_demo_company`) anywhere else, `confirm` or not. A Demo company made by the earlier flow (exactly "Demo", created
+  by that flow: still fresh with the pending request, or holding sample rows only and no profile of its own) is adopted
+  on open. The Demo company is not counted toward "several companies" (Practice desk, All companies search: `realCompanies()`, QA7 G7).
 - `src/lib/demo-data.ts`: `DemoProfile` (`counter | services | trading | transport | works`), `demoProfileFor(settings)`
   (pack first, then type: kirana / restaurant → counter, services → services, else trading), `DemoExtras`, and
   `DEMO_EXTRA_TABLES` (`stock_items`, `pos_shifts`, `time_entries`, `retainers`, `vehicles`, `consignment_notes`,

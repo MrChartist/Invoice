@@ -13,6 +13,7 @@ import {
   removeDemoData,
 } from '../src/lib/demo-data.ts';
 import { localDb } from '../src/lib/localDb.ts';
+import { writeRegistry } from '../src/lib/company-registry.ts';
 import { KEYS, getTable } from '../src/lib/storage.ts';
 import { checkGstin } from '../src/lib/gstin.ts';
 import { summarize, isRevenueDoc } from '../src/lib/stats.ts';
@@ -27,7 +28,19 @@ import type { InvoiceRecord } from '../src/types/invoice.ts';
 const TODAY = '2026-10-07';
 const NOW = new Date(2026, 9, 7);
 
-beforeEach(() => resetStorage());
+/**
+ * QA7 G1/G2: sample data loads only into the app-made Demo company's own database (registry flag + database marker).
+ * Every scenario below runs in one; the guard itself is pinned in tests/qa7-demo-company.test.ts.
+ */
+function openDemoDb(): void {
+  writeRegistry({ active: 'demo1', list: [{ id: 'default', name: 'Main business', created: '' }, { id: 'demo1', name: 'Demo', created: '', demo: true }] });
+  localDb.settings.save({ ...localDb.settings.get(), demo_company: true });
+}
+
+beforeEach(() => {
+  resetStorage();
+  openDemoDb();
+});
 
 function realInvoice(id = 'real-1'): InvoiceRecord {
   const base = {
@@ -365,6 +378,7 @@ test('R6-B4: every profile builds and balances (TB debit = credit), stock never 
   const { DEMO_EXTRA_TABLES } = await import('../src/lib/demo-data.ts');
   for (const profile of ['counter', 'services', 'trading', 'transport', 'works'] as const) {
     resetStorage();
+    openDemoDb();
     const seriesBefore = getTable('series_counters');
     const extras = await loadProfile(profile);
     const tb = trialBalance(buildLedger(loadLedgerInput(undefined, TODAY)), { start: '2000-01-01', end: TODAY });

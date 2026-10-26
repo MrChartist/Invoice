@@ -26,7 +26,10 @@ statutory screens keep "verify with your CA" and cite `docs/CA_REVIEW.md` ids.
   payment only.
 - Help → "Setup checklist" (`components/help/SetupChecklistPanel.tsx`): every step, skipped ones with "Undo skip", and
   "Show the card on the Dashboard again".
-- Storage: company object `mrchartist_inv_setup_progress` `{ skipped: string[], hidden_at?: string }` — backed up and
+- Per user (QA7 G10): the owner's Skip / Hide is the company-level state; a clerk's goes to `byUser[<user id>]` and
+  changes only that clerk's card (`loadSetupProgress` / `saveSetupProgress` pick the slot from the signed-in user).
+- Storage: company object `mrchartist_inv_setup_progress` `{ skipped: string[], hidden_at?: string, byUser?: { [userId]:
+  { skipped, hidden_at? } } }` (`byUser` additive, QA7 G10; an object without it reads as before) — backed up and
   synced like every company key (a non-array value, so the sync engine treats it as a singleton, last writer wins); not
   audited (viewing state); `TABLE_ACTIONS.setup_progress = 'doc.create'` (owner and clerk); described in
   `open-export-schema.ts`. Facts are always derived from data, so work done on another device counts.
@@ -98,11 +101,14 @@ statutory screens keep "verify with your CA" and cite `docs/CA_REVIEW.md` ids.
   the full text preview; **Copy**, **WhatsApp** (`https://wa.me/?text=…`), **E-mail** (`mailto:?subject=…&body=…`) and
   **Share** (Web Share, when the browser has it). No recipient is filled in (lead decision); `FEEDBACK_CONTACT` in
   `src/lib/feedback.ts` is the single empty constant for a future contact.
-- `src/lib/feedback.ts` — `composeTyped` / `composeFeedback`, `capForShare` (link text ≤ 1,800 characters; the
-  diagnostics are shortened first and the full report is copied to the clipboard with a note), `whatsappLink`,
-  `mailtoLink`, `parseDraft`.
-- `src/lib/diagnostics.ts` — `scrubTyped` (the existing scrubber + 4+ digit runs + "Rs / INR <n>" amounts; section codes
-  such as 194C stay readable) and a "[Screens before]" section from the route trail.
+- `src/lib/feedback.ts` — `composeTyped` / `composeFeedback`, `capForShare` (link text ≤ 1,800 characters **once
+  encoded** for the link, QA7 G5; the diagnostics are shortened first, line by line, then the typed text by code points,
+  never inside a surrogate pair, QA7 G4; the full report is copied to the clipboard with a note), `whatsappLink`,
+  `mailtoLink`, `parseDraft`. The dialog builds its links inside try / catch (Copy / Share stay if one fails).
+- `src/lib/diagnostics.ts` — `scrubTyped` (the existing scrubber + 4+ digit runs + "Rs / INR <n>" amounts; QA7 G6:
+  Devanagari digits read as digits, UPI IDs `name@bank`, Indian-grouped amounts "1,250" / "1,25,000", "12.5k" / "2 lakh",
+  numbers next to rupees / रुपये, lower- and mixed-case PANs; section codes such as 194C stay readable) and a
+  "[Screens before]" section from the route trail.
 - `src/lib/route-trail.ts` — the last 10 routes of the session, memory only, ids masked, only `tab` / `view` values
   kept. The shell pushes it on every route change.
 - Device-local unsent draft `mrchartist_feedback_draft` (try / catch), cleared on Share / Clear.
@@ -122,7 +128,7 @@ statutory screens keep "verify with your CA" and cite `docs/CA_REVIEW.md` ids.
 
 | Key | Kind | Backed up | Synced |
 |---|---|---|---|
-| `mrchartist_inv_setup_progress` | company object `{skipped, hidden_at?}` | yes | yes (singleton) |
+| `mrchartist_inv_setup_progress` | company object `{skipped, hidden_at?, byUser?}` | yes | yes (singleton) |
 | `mrchartist_help_strips` | device-local `'on' \| 'off'` | no | no |
 | `mrchartist_whats_new_seen` | device-local version | no | no |
 | `mrchartist_feedback_draft` | device-local JSON draft | no | no |
