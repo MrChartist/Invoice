@@ -1,0 +1,21 @@
+/* R5-B works-contract pack (BOQ, RA bills, retention, sites). Layout classes come from transport.module.css. */
+.qty {
+  max-width: 7rem;
+}
+
+.held {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.due {
+  color: var(--loss);
+  font-weight: 600;
+}
+
+.sum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.875rem;
+}

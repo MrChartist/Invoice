@@ -16,14 +16,17 @@ import { generateId, getTable, setTable } from './storage';
 
 export const COST_CENTRES_TABLE = 'cost_centres';
 
-export type CostCentreKind = 'project' | 'department' | 'branch';
+// Round 5 (one union change, §6): R5-B3 'vehicle' (fleet cost centre) and R5-C4 'fund' (NGO fund accounting).
+export type CostCentreKind = 'project' | 'department' | 'branch' | 'vehicle' | 'fund';
 
-export const COST_CENTRE_KINDS: readonly CostCentreKind[] = ['project', 'department', 'branch'];
+export const COST_CENTRE_KINDS: readonly CostCentreKind[] = ['project', 'department', 'branch', 'vehicle', 'fund'];
 
 export const COST_CENTRE_KIND_LABELS: Record<CostCentreKind, string> = {
   project: 'Project',
   department: 'Department',
   branch: 'Branch',
+  vehicle: 'Vehicle',
+  fund: 'Fund',
 };
 
 /** One row of `cost_centres`. Field names are snake_case and additive-only. */

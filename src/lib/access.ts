@@ -420,6 +420,13 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   settlements: 'doc.create',
   eco_credits: 'books.edit',
   marketplace_returns: 'doc.create',
+  // R5-B: LRs, trips and RA measurements are documents; vehicles and BOQ coefficients are masters; the GTA option is a setting
+  consignment_notes: 'doc.create',
+  gta_options: 'settings.manage',
+  vehicles: 'master.edit',
+  trips: 'doc.create',
+  ra_measurements: 'doc.create',
+  boq_coefficients: 'master.edit',
 };
 
 let systemDepth = 0;

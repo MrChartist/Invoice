@@ -17,7 +17,7 @@ export interface Milestone {
   invoice_id?: string;
 }
 
-export type ProgressBasis = 'percent' | 'amount' | 'lines';
+export type ProgressBasis = 'percent' | 'amount' | 'lines' | 'measured'; // R5-B4: 'measured' = this-bill quantity per BOQ line
 
 /** On a stage invoice: what it bills of which quotation / sales order (B2). */
 export interface ProgressOf {

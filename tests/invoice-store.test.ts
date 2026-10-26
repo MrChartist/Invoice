@@ -89,6 +89,9 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     pre_carriage: 'Road', vessel_flight: 'MSC ANNA V.123', marks_numbers: 'ACME/DXB/1-10', export_payment_terms: 'DA 60 days',
     // R5-A marketplace order link
     channel_id: 'ch1', channel_order_id: '402-111', channel_import_id: 'imp1',
+    // R5-B freight bill LRs, RA bill fields and BOQ terms
+    lr_ids: ['lr1', 'lr2'], ra_no: 3, ra_final: true, boq_id: 'so1', ra_deductions: [{ kind: 'retention', label: 'Retention 5%', base: 1000, rate: 5, amount: 50 }],
+    ra_net_payable: 1130, retention_release_on: '2027-06-30', boq_terms: { deductions: [{ kind: 'retention', rate: 5 }], dlp_months: 12, work_order: 'WO/1' },
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.
