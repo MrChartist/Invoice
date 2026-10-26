@@ -1,7 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { BellRing, CheckCircle2 } from 'lucide-react';
 import type { InvoiceRecord } from '../../types/invoice';
-import { localDb } from '../../lib/localDb';
 import { formatCurrency, formatDate, cn } from '../../lib/utils';
 import {
   pendingReminders,
@@ -13,7 +12,7 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { useReminderLog } from './useReminderLog';
-import { getTable } from '../../lib/storage';
+import { KEYS, peekTable } from '../../lib/storage';
 import { linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
 import { useT } from '../../i18n';
 import { remindT } from '../../i18n/areas/reminders';
@@ -56,12 +55,13 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
   useT(); // re-render on a language switch (5.4)
   const { log, reload } = useReminderLog();
   const [active, setActive] = useState<InvoiceRecord | null>(null);
-  const [all] = useState<InvoiceRecord[]>(() => invoices ?? (localDb.invoices.getAll() as InvoiceRecord[]));
+  // PERF-2: shared parsed rows (read-only: the reminder logic derives new arrays).
+  const [all] = useState<InvoiceRecord[]>(() => invoices ?? (peekTable<InvoiceRecord>(KEYS.invoices) as InvoiceRecord[]));
   const source = invoices ?? all;
   const pending = useMemo(
     // Credit notes linked to an invoice settle part of it: never chased (src/lib/amount-due.ts).
     // R2-A4/A5/A7: company schedule, party reminder mode, promises-to-pay (hold / firm) and payment grades.
-    () => pendingReminders(source, today ?? new Date(), log, { credits: linkedCredits(getTable<CreditLinkRow>('doc_links'), source), ...panelOptions(source, today) }),
+    () => pendingReminders(source, today ?? new Date(), log, { credits: linkedCredits(peekTable<CreditLinkRow>('doc_links'), source), ...panelOptions(source, today) }),
     [source, today, log],
   );
   const shown = pending.slice(0, limit);

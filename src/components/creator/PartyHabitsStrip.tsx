@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, RotateCcw, Undo2 } from 'lucide-react';
-import type { Client, DocumentType, InvoiceItem } from '../../types/invoice';
+import type { Client, DocumentType, InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
-import { generateId, getTable } from '../../lib/storage';
+import { KEYS, generateId, getTable, peekTable } from '../../lib/storage';
 import { num } from '../../lib/invoice-calc';
 import { formatDate, todayInput } from '../../lib/utils';
 import { HABIT_DOC_TYPES, habitKey, lastBill, repeatLines, usualItems, usualLine, type UsualItem } from '../../lib/party-habits';
@@ -22,7 +22,7 @@ const norm = (s: string | undefined) => (s ?? '').trim().toLowerCase();
 const cache = new Map<string, { last: ReturnType<typeof lastBill>; usual: UsualItem[] }>();
 
 function habitsFor(party: Client, docType: DocumentType) {
-  const invoices = localDb.invoices.getAll();
+  const invoices = peekTable<InvoiceRecord>(KEYS.invoices); // PERF-2: shared read-only rows, parsed once per version
   const key = `${habitKey(party)}|${docType}|${invoices.length}`;
   let hit = cache.get(key);
   if (!hit) {

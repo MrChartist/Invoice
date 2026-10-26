@@ -4,8 +4,9 @@ import { HandCoins } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
-import { applyAdvance, canApplyTo, invoiceOpen, loadAdvances, openAdvancesFor } from '../../lib/advances';
-import { localDb } from '../../lib/localDb';
+import { applyAdvance, canApplyTo, invoiceOpen, loadAdvances, openAdvancesFor, samePartyAs } from '../../lib/advances';
+import { KEYS, peekTable } from '../../lib/storage';
+import type { InvoiceRecord, Payment } from '../../types/invoice';
 import { can } from '../../lib/access';
 import { round2 } from '../../lib/invoice-calc';
 import { cn, formatCurrency } from '../../lib/utils';
@@ -29,16 +30,22 @@ export function AdvanceNotice({ onApplied }: { onApplied?: (message: string) => 
   const [part, setPart] = useState<number | null>(null);
   const clientId = s.client?.id;
   const clientName = s.client?.name;
+  const isInvoice = s.doc_type === 'INVOICE' || s.doc_type === 'TAX_INVOICE';
   const context = useMemo(() => {
-    if (!clientName?.trim() && !clientId) return null;
-    const invoices = localDb.invoices.getAll();
-    const open = openAdvancesFor({ id: clientId, name: clientName }, loadAdvances(), localDb.payments.getAll(), invoices);
+    if (!isInvoice || (!clientName?.trim() && !clientId)) return null;
+    // PERF-2: typing the client name re-runs this per key. Most parties have no advance at all: answer from
+    // the small advances table and only then look at invoices / payments (shared read-only rows).
+    const party = { id: clientId, name: clientName };
+    const advances = loadAdvances().filter((a) => samePartyAs(a.client, party));
+    if (!advances.length) return null;
+    const invoices = peekTable<InvoiceRecord>(KEYS.invoices);
+    const open = openAdvancesFor(party, advances, peekTable<Payment>(KEYS.transactions), invoices);
     if (!open.length) return null;
     return { open, stored: s.id ? invoices.find((i) => i.id === s.id) : undefined };
     // amount_paid changes after an apply; tick after our own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, clientName, s.id, s.amount_paid, tick]);
-  if (!context || (s.doc_type !== 'INVOICE' && s.doc_type !== 'TAX_INVOICE')) return null;
+  }, [isInvoice, clientId, clientName, s.id, s.amount_paid, tick]);
+  if (!context || !isInvoice) return null;
 
   const total = round2(context.open.reduce((t, o) => t + o.balance.open, 0));
   const stored = context.stored;

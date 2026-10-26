@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowDown,
@@ -184,10 +184,19 @@ export function Transactions() {
   const hasStages = useMemo(() => invoices.some((i) => i.progress_of?.source_id), [invoices]);
   const [showSuperseded, setShowSuperseded] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
+  // PERF-2: sort once per data / sort change; the filters below keep that order (the sort is stable, so
+  // filtering the sorted list equals sorting the filtered one). Typing filters a deferred query.
+  const sorted = useMemo(() => sortInvoices(invoices, sort.key, sort.dir), [invoices, sort]);
+  const searchText = useMemo(() => {
+    const m = new Map<InvoiceRecord, string[]>();
+    for (const inv of invoices) m.set(inv, [inv.invoice_number, inv.client?.name, inv.client?.company, inv.client?.gstin].filter((f): f is string => !!f).map((f) => f.toLowerCase()));
+    return m;
+  }, [invoices]);
+  const searchQuery = useDeferredValue(query);
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     const inBranch = branchPredicates(branch).invoice;
-    const list = invoices
+    return sorted
       .filter((inv) => !pendingDelete.has(inv.id))
       .filter((inv) => matchesFilter(inv, filter, now))
       .filter((inv) => matchesListFilter(inv, { docType, from, to }))
@@ -195,15 +204,8 @@ export function Transactions() {
       .filter((inv) => docType !== 'SALES_ORDER' || !orderState || orderStates.get(inv.id) === orderState)
       // R2-B3: quotations replaced by a later revision are hidden unless asked for.
       .filter((inv) => showSuperseded || !superseded.has(inv.id))
-      .filter(
-        (inv) =>
-          !q ||
-          [inv.invoice_number, inv.client?.name, inv.client?.company, inv.client?.gstin].some((f) =>
-            f?.toLowerCase().includes(q),
-          ),
-      );
-    return sortInvoices(list, sort.key, sort.dir);
-  }, [invoices, query, filter, docType, orderState, orderStates, from, to, branch, sort, pendingDelete, superseded, showSuperseded]); // eslint-disable-line react-hooks/exhaustive-deps
+      .filter((inv) => !q || (searchText.get(inv) ?? []).some((f) => f.includes(q)));
+  }, [sorted, searchText, searchQuery, filter, docType, orderState, orderStates, from, to, branch, pendingDelete, superseded, showSuperseded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Long lists mount only the rows in view (see useVirtualRows); 100 rows or fewer render as before.
   const rowKeys = useMemo(() => rows.map((r) => r.id), [rows]);

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { CalendarDays, MessageCircle } from 'lucide-react';
 import { localDb } from '../../lib/localDb';
-import { getTable } from '../../lib/storage';
+import { peekTable } from '../../lib/storage';
 import { accountBalanceAt, buildVouchers, type BooksData } from '../../lib/books';
 import { localDayOf } from '../../lib/dates';
 import { todaySummary, todayText } from '../../lib/today';
@@ -24,7 +24,7 @@ export function TodayPanel({ books }: { books: BooksData }) {
     } catch {
       cash = null;
     }
-    return todaySummary({ invoices: books.invoices, payments: books.transactions, purchases: getTable('purchases'), vendors: books.vendors, cashInHand: cash }, day);
+    return todaySummary({ invoices: books.invoices, payments: books.transactions, purchases: peekTable('purchases') as unknown[] /* PERF-2: shared read-only rows */, vendors: books.vendors, cashInHand: cash }, day);
   }, [books, day]);
   const profile = localDb.settings.activeProfile();
   const m = (n: number) => formatCurrency(n, 'INR');
