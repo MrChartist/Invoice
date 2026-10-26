@@ -158,9 +158,11 @@ build-time config must use Vite's `VITE_` prefix.
   bill / GRN / return, POS, stock move, stock transfer, stock journal and job-work lines); every stock reader must
   convert with `lineFactor` / `PurchaseLineCore.unitFactor` (`src/lib/units.ts`).
 - Receipt rows that moved no money: `gift_voucher_id` (R4-B, settles against "Gift vouchers outstanding"),
-  `deposit_adjustment_id` (R5-C6, settled from a security deposit) and `ra_journal_id` (R5-B5, GST TDS / labour cess on
-  an RA bill). Every cash / bank reader (cash book, bank reco, cash tally, payment modes) must skip them, as `books.ts`
-  `buildVouchers` does.
+  `deposit_adjustment_id` (R5-C6, settled from a security deposit), `ra_journal_id` (R5-B5, GST TDS / labour cess on
+  an RA bill), plus `write_off` and `advance_id`. Every cash / bank reader (cash book, Today, bank reco, cash tally, payment
+  modes, Z report, Tally / CSV receipts, collection lag) must skip them with the ONE predicate `movedNoCash(p)`
+  (`src/lib/no-cash.ts`, imported via `advance-tax.ts`), never its own marker checks; `tests/no-cash-readers.test.ts`
+  guards new readers.
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.
 - A 4-6 digit PIN is a lock screen, not encryption of the stored data; optional vault mode (`src/lib/vault.ts`) encrypts the IndexedDB store at rest. Never write the `__vault__` record or sealed (`mcv1:`) values outside `storage.ts`.

@@ -35,6 +35,7 @@ import { withTablesRollback } from './table-txn';
 import { generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
 import { audit } from './audit';
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
 export const FX_BANK_MOVES_TABLE = 'fx_bank_moves';
 
@@ -96,7 +97,7 @@ export function fxMovements(account: BankAccount, data: ForexData): FxMovementRo
   const rows: FxMovementRow[] = [];
   const byId = new Map(data.invoices.map((i) => [i.id, i]));
   for (const t of data.transactions) {
-    if (!t || t.bank_account_id !== account.id || t.advance_id) continue;
+    if (!t || t.bank_account_id !== account.id || movedNoCash(t)) continue; // QA6-1 F4: no money moved (`no-cash.ts`)
     const inv = byId.get(t.invoice_id);
     if (!inv || docCurrency(inv) !== cur) continue;
     const date = isoDay(t.date);
@@ -194,7 +195,7 @@ export function inrOnlyPostings(accountId: string, t: { transactions?: readonly 
   const byId = new Map((t.invoices ?? []).map((i) => [i.id, i]));
   let n = 0;
   for (const p of t.transactions ?? []) {
-    if (p?.bank_account_id !== accountId || p.advance_id) continue;
+    if (p?.bank_account_id !== accountId || movedNoCash(p)) continue;
     const inv = byId.get(p.invoice_id);
     if (!inv || docCurrency(inv) !== cur) n++;
   }

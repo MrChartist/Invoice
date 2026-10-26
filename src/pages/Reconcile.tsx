@@ -18,6 +18,7 @@ import {
   summarizeRecon,
   takenIds,
   unmatchLine,
+  voucherCandidates,
   BULK_CONFIRM_THRESHOLD,
   type BankLine,
   type BankStatement,
@@ -146,16 +147,19 @@ export function Reconcile() {
   // Multi-account BRS: everything below works on the selected bank account's statements and entries.
   const acctStatements = useMemo(() => (multi ? statements.filter((s) => accountIdOf(s) === accountId) : statements), [statements, multi, accountId]);
   const scoped = useMemo(() => (scope === 'all' ? acctStatements : acctStatements.filter((s) => s.id === scope)), [acctStatements, scope]);
+  const vouchers = useMemo(() => buildVouchers(books), [books]);
+  // QA6-1 F5: bank lines of manual vouchers (payout contras, deposits, voucher sales) are book entries too.
+  const fromVouchers = useMemo(() => voucherCandidates(vouchers, new Set(accounts.filter((a) => a.clearing).map((a) => a.id))), [vouchers, accounts]);
   const index = useMemo(
     () => ({
-      payments: new Set(books.transactions.map((t) => t.id)),
-      purchasePayments: new Set(books.purchasePayments.map((p) => String(p.id ?? ''))),
+      payments: new Set([...books.transactions.map((t) => t.id), ...fromVouchers.receipts.map((c) => c.id)]),
+      purchasePayments: new Set([...books.purchasePayments.map((p) => String(p.id ?? '')), ...fromVouchers.payouts.map((c) => c.id)]),
     }),
-    [books],
+    [books, fromVouchers],
   );
   const inAccount = useCallback((c: Candidate) => !multi || accountIdOf(c) === accountId, [multi, accountId]);
-  const receipts = useMemo(() => receiptCandidates(books.invoices, books.transactions).filter(inAccount), [books, inAccount]);
-  const payouts = useMemo(() => payoutCandidates(books.purchases, books.vendors, books.purchasePayments).filter(inAccount), [books, inAccount]);
+  const receipts = useMemo(() => [...receiptCandidates(books.invoices, books.transactions), ...fromVouchers.receipts].filter(inAccount), [books, fromVouchers, inAccount]);
+  const payouts = useMemo(() => [...payoutCandidates(books.purchases, books.vendors, books.purchasePayments), ...fromVouchers.payouts].filter(inAccount), [books, fromVouchers, inAccount]);
   const entries = useMemo(() => new Map<string, Candidate>([...receipts, ...payouts].map((c) => [c.id, c])), [receipts, payouts]);
 
   const allLines = useMemo(
@@ -181,7 +185,6 @@ export function Reconcile() {
   const matchedIds = useMemo(() => new Set(suggestions.keys()), [suggestions]);
 
   const closing = useMemo(() => closingAcross(scoped), [scoped]);
-  const vouchers = useMemo(() => buildVouchers(books), [books]);
   const asOf = closing.asOf;
   const acctBalance = useMemo(
     () => (multi && account && asOf ? bankAccountBalanceAt(vouchers, books.openings, account, asOf) : null),

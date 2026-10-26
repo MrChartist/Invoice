@@ -34,6 +34,7 @@ import { nextPartyBalanceSnapshot } from './party-balance';
 import { partyBalanceSnapshotFor } from './khata-actions';
 import { EXCHANGE_NOTE, applyExchange, openExchange, zReturns, type PosReturn, type ZReturns } from './pos-returns';
 import { liveRedeemIssue, recordPromoUse, stampVoucherPayment } from './retail/gift-voucher-core'; // R4-B1
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
 export const POS_DAY_CLOSE_TABLE = 'pos_day_close';
 export const WALK_IN_NAME = 'Walk-in customer';
@@ -430,8 +431,9 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
       r.exchangeIn += num(p.amount);
       continue;
     }
-    if (p.gift_voucher_id) {
-      r.giftVouchers += num(p.amount);
+    // QA6-1 F4: rows that moved no money are not tenders; a gift voucher is shown on its own line.
+    if (movedNoCash(p)) {
+      if (p.gift_voucher_id) r.giftVouchers += num(p.amount);
       continue;
     }
     r.tenders[methodKey(p.method)] += num(p.amount);

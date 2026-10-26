@@ -209,3 +209,10 @@ export function advanceTaxEvents(
 ): AdvanceMovement[] {
   return advanceMovements(advances, payments, invoices).filter((m) => m.taxed);
 }
+
+/**
+ * QA6-1 F4: the no-cash receipt rule (`no-cash.ts`; an advance adjustment is one case of it). Readers import it from
+ * here so it shares this chunk, which every cash / bank reader's route loads already: a chunk of its own would add an
+ * entry to the first-paint preload map (bundle budget).
+ */
+export { NO_CASH_LEDGER, movedNoCash, noCashKind, type NoCashKind } from './no-cash';

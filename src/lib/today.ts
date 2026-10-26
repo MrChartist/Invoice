@@ -10,6 +10,7 @@ import { isRevenueDoc } from './stats';
 import { receivableBalance } from './rcm';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { formatCurrency } from './utils';
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
 export interface TodaySummary {
   day: string;
@@ -43,7 +44,7 @@ export function todaySummary(input: { invoices: readonly InvoiceRecord[]; paymen
     out.udhaar = round2(out.udhaar + Math.max(receivableBalance(inv), 0));
   }
   for (const p of input.payments) {
-    if (!p || p.advance_id || p.write_off || p.deposit_adjustment_id || p.ra_journal_id || isoDay(p.date) !== day || !inr(byId.get(p.invoice_id))) continue; // R5-C6 / R5-B5: no money moved
+    if (!p || movedNoCash(p) || isoDay(p.date) !== day || !inr(byId.get(p.invoice_id))) continue; // QA6-1 F4: no money moved
     const k = modeOf(p.method);
     out[k] = round2(out[k] + num(p.amount));
   }

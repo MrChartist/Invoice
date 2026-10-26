@@ -1,4 +1,4 @@
-import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowDown,
@@ -51,7 +51,8 @@ import { buildOrderIndex, fulfilmentFromIndex, ORDER_STATES, orderTone, type Ord
 import { amountDue, linkedCredits } from '../lib/amount-due';
 import { bulkMarkPaid, bulkPaidTotal, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
 import { effectiveStatus } from '../lib/invoice-status';
-import { getTable } from '../lib/storage';
+import { getTable, peekTable } from '../lib/storage';
+import type { BinEntry } from '../types/trade-r4';
 import type { CreditLink } from '../lib/stats';
 import { isRevenueDoc, summarize } from '../lib/stats';
 import { downloadText, toCsv } from '../lib/download';
@@ -148,13 +149,6 @@ export function Transactions() {
   // 8.106: bulk remind / bulk write-off on the selected (filtered) rows.
   const [bulkCollect, setBulkCollect] = useState<'remind' | 'writeoff' | null>(null);
   const [batchPdf, setBatchPdf] = useState<InvoiceRecord[] | null>(null);
-  // Deletes wait behind an Undo toast (until it is dismissed) before they touch storage.
-  const [pendingDelete, setPendingDelete] = useState<Set<string>>(() => new Set());
-  const pendingRef = useRef<Set<string>>(pendingDelete);
-  useEffect(() => {
-    pendingRef.current = pendingDelete;
-  }, [pendingDelete]);
-
   const reload = () => setVersion((v) => v + 1);
 
   useEffect(() => {
@@ -196,7 +190,6 @@ export function Transactions() {
     const q = searchQuery.trim().toLowerCase();
     const inBranch = branchPredicates(branch).invoice;
     return sorted
-      .filter((inv) => !pendingDelete.has(inv.id))
       .filter((inv) => matchesFilter(inv, filter, now))
       .filter((inv) => matchesListFilter(inv, { docType, from, to }))
       .filter((inv) => !branch || inBranch(inv))
@@ -204,7 +197,7 @@ export function Transactions() {
       // R2-B3: quotations replaced by a later revision are hidden unless asked for.
       .filter((inv) => showSuperseded || !superseded.has(inv.id))
       .filter((inv) => !q || (searchText.get(inv) ?? []).some((f) => f.includes(q)));
-  }, [sorted, searchText, searchQuery, filter, docType, orderState, orderStates, from, to, branch, pendingDelete, superseded, showSuperseded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sorted, searchText, searchQuery, filter, docType, orderState, orderStates, from, to, branch, superseded, showSuperseded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Long lists mount only the rows in view (see useVirtualRows); 100 rows or fewer render as before.
   const rowKeys = useMemo(() => rows.map((r) => r.id), [rows]);
@@ -291,26 +284,6 @@ export function Transactions() {
     }
   };
 
-  /** Actually remove whatever is waiting; errors (e.g. a lock set meanwhile) are reported, the rest still go. */
-  const flushDeletes = (ids: Set<string>) => {
-    const failed: string[] = [];
-    for (const id of ids) {
-      try {
-        localDb.invoices.remove(id);
-      } catch (err) {
-        failed.push((err as Error).message);
-      }
-    }
-    setPendingDelete((prev) => new Set([...prev].filter((x) => !ids.has(x))));
-    reload();
-    if (failed.length) notify(failed[0], 'error');
-  };
-
-  // Leaving the page commits any delete still waiting for its Undo window.
-  useEffect(() => () => {
-    if (pendingRef.current.size) flushDeletes(pendingRef.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleDelete = async (docs: InvoiceRecord[]) => {
     // Deleting a goods-returning credit note takes its goods out of stock again: refuse when a later
     // document resold its serials, and ask when later documents used its quantities.
@@ -323,17 +296,38 @@ export function Transactions() {
         if (issues.warnings.length && !window.confirm(`${n.invoice_number}: ${issues.warnings.join(' ')}\n\nDelete anyway?`)) return;
       }
     }
-    // R4-C4: the Undo waits for the user — the delete is committed when the toast is dismissed (×, replaced by the
-    // next toast) or the page is left; a committed delete is still in Settings → Data → Recently deleted.
-    const ids = new Set(docs.map((d) => d.id));
-    setPendingDelete((prev) => new Set([...prev, ...ids]));
+    // QA6-1 F16: the delete is committed at once (to the recycle bin), so a reload, a closed tab or a crash cannot bring
+    // it back and no report counts it meanwhile; Undo restores it from the bin (rights, period lock, module checks).
+    const done: string[] = [];
+    for (const d of docs) {
+      try {
+        localDb.invoices.remove(d.id);
+        done.push(d.id);
+      } catch (err) {
+        notify((err as Error).message, 'error');
+      }
+    }
     setSelected(new Set());
-    const label = docs.length === 1 ? docs[0].invoice_number : salesT('tx.nDocuments', { n: docs.length });
+    reload();
+    if (!done.length) return;
+    const gone = docs.filter((d) => done.includes(d.id));
+    const label = gone.length === 1 ? gone[0].invoice_number : salesT('tx.nDocuments', { n: gone.length });
     notify(salesT('tx.deleted', { label }), 'success', {
       action: {
         label: salesT('tx.undo'),
-        onClick: () => setPendingDelete((prev) => new Set([...prev].filter((x) => !ids.has(x)))),
-        onDismiss: () => flushDeletes(ids),
+        onClick: () => {
+          void import('../lib/trust/recycle-bin').then(({ BIN_TABLE, restoreEntries }) => {
+            const ids = new Set(done);
+            const entries = [...peekTable<BinEntry>(BIN_TABLE)].reverse().filter((e) => e.table === 'invoices' && ids.has(e.row_id));
+            const latest = [...new Map(entries.map((e) => [e.row_id, e.id])).values()];
+            try {
+              restoreEntries(latest, { withChildren: true });
+            } catch (err) {
+              notify((err as Error).message, 'error');
+            }
+            reload();
+          });
+        },
       },
     });
   };

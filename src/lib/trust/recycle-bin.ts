@@ -7,6 +7,11 @@
  *  - A deleted number stays used: the capture records the series high-water mark, so the bin never has to compete
  *    with a new document for its number; a restore is still refused if a live row holds the same id or number.
  *  - A child whose parent is gone (a receipt whose invoice was deleted) is restored together with the parent.
+ *  - QA6-1 F1: rows another module owns ask that module first (`RESTORE_HOOKS`, per table): a gift-voucher receipt is
+ *    re-checked against the voucher's balance, a module journal (settlement, RA deduction, breakage, Rule 42, deposit…)
+ *    comes back only while its module still counts it as posted, and paired rows (an RA deduction receipt and its
+ *    journal) come back together or not at all. Anything else is refused with where to redo it.
+ *  - QA6-1 F17: someone else's delete needs the owner's `data.erase`; a document needs the right that deleted it.
  *  - Restores, permanent deletes and purges are audited. Entries in a locked period need the PIN to be deleted.
  *  - Table `recycle_bin`: backed up, never synced (a delete already syncs as a tombstone and a restore as a new
  *    version), excluded from every report, GST and export path. Payroll rows are listed only with `payroll.view`.
@@ -23,10 +28,11 @@ import { releaseAttachments } from '../attachments';
 import { parseSeries } from '../series-counters';
 import { withTablesRollback } from '../table-txn';
 import { round2 } from '../invoice-calc';
-import { localDb } from '../localDb';
+import { isIssued, localDb } from '../localDb';
 import { purchasesDb } from '../purchases';
 import { BIN_RETENTION } from '../trade/trade-rules';
 import { PAYROLL_TABLES } from './payroll-tables';
+import { liveRedeemIssue } from '../retail/gift-voucher-core';
 
 export { BIN_TABLE };
 export const BIN_SETTINGS_KEY = `${DB_PREFIX}bin_settings`;
@@ -133,10 +139,14 @@ export const PARENTS: Readonly<Record<string, { table: string; field: string }>>
   purchase_payments: { table: 'purchases', field: 'purchase_id' },
 };
 
-export type RestoreRefusal = 'exists' | 'numberReused' | 'parentMissing' | 'locked';
+export type RestoreRefusal = 'exists' | 'numberReused' | 'parentMissing' | 'module' | 'locked';
 export interface RestorePlan {
   ok: boolean;
   refusal?: RestoreRefusal;
+  /** Why the owning module refuses (`module`). */
+  message?: string;
+  /** Bin entries that must come back in the same step (an RA deduction receipt and its journal). */
+  companions?: BinEntry[];
   /** The live row holding the number (numberReused). */
   number?: string;
   /** Parent bin entry to restore first (parentMissing with a parent in the bin). */
@@ -153,6 +163,113 @@ const numberOf = (table: string, r: Row): string => {
   const v = table === 'invoices' ? str(r.invoice_number) : str(r.number);
   return table === 'invoices' || parseSeries(v) ? v : '';
 };
+
+/* ── Module restore hooks (QA6-1 F1) ─────────────────────────── */
+
+export interface RestoreHookResult {
+  /** The module refuses: why, and where to redo the action. */
+  refuse?: string;
+  /** Bin entries that must come back in the same step. */
+  companions?: BinEntry[];
+}
+/**
+ * A module's say on restoring one of its rows. Run when the restore is planned (the panel shows a refusal before the
+ * click) and again inside the restore, right before the row is written (so the earlier rows of the same restore count).
+ */
+export type RestoreHook = (row: Row, e: BinEntry, live: LiveReader, bin: readonly BinEntry[]) => RestoreHookResult | null;
+
+/** Per-table hooks (table → hooks). A module registers its own with `registerRestoreHook`; the built-in ones follow. */
+export const RESTORE_HOOKS = new Map<string, RestoreHook[]>();
+export function registerRestoreHook(table: string, hook: RestoreHook): void {
+  RESTORE_HOOKS.set(table, [...(RESTORE_HOOKS.get(table) ?? []), hook]);
+}
+
+/** True when any string value anywhere in `rows` equals `id` (a module row still naming a voucher / receipt). */
+function mentions(rows: readonly unknown[], id: string): boolean {
+  const seen = (v: unknown, depth: number): boolean => {
+    if (v === id) return true;
+    if (!v || typeof v !== 'object' || depth > 6) return false;
+    return (Array.isArray(v) ? v : Object.values(v)).some((x) => seen(x, depth + 1));
+  };
+  return !!id && rows.some((r) => seen(r, 0));
+}
+
+/** Manual-voucher classes a module posts and undoes itself: the tables that name a posted voucher, and where to redo it. */
+const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly string[]; redo: string }[] = [
+  { classes: ['Marketplace settlement'], tables: ['settlements'], redo: 'post the settlement again in Receivables → Marketplace → Settlements' },
+  { classes: ['Gift voucher sale', 'Gift voucher refund'], tables: ['gift_vouchers'], redo: 'sell or cancel the voucher again in Receivables → Gift vouchers' },
+  { classes: ['Gift voucher breakage'], tables: ['gift_vouchers'], redo: 'recognise the breakage again in Receivables → Gift vouchers' },
+  { classes: ['ITC reversal — Rule 42 / 43'], tables: ['common_credit_runs'], redo: 'post the Rule 42 / 43 reversal again in GST → Common credit' },
+  { classes: ['Security deposit'], tables: ['security_deposits'], redo: 'record it again in Recurring → Leases → Deposits' },
+  { classes: ['Donation'], tables: ['donations'], redo: 'record the donation again' },
+  { classes: ['Trip advance'], tables: ['trips'], redo: 'record it again on the trip' },
+  { classes: ['Forex bank'], tables: ['fx_bank_moves'], redo: 'record the forex movement again' },
+  { classes: ['Loan', 'Loan EMI'], tables: ['business_loans'], redo: 'post it again from the loan' },
+  { classes: ['Deferral'], tables: ['deferrals'], redo: 'post it again from the deferral schedule' },
+  { classes: ['GST set-off', 'GST payment (PMT-06)'], tables: ['gst_setoffs', 'gst_challans'], redo: 'post it again in GST → Set-off' },
+  { classes: ['GST refund (RFD)'], tables: ['gst_refunds', 'gst_pmt09'], redo: 'record it again on the refund' },
+  { classes: ['Export incentive'], tables: ['export_incentives'], redo: 'post it again on the export incentive' },
+  { classes: ['Sales commission'], tables: ['commission_postings'], redo: 'post the commission again' },
+  { classes: ['GST TCS credit', 'GST TDS credit'], tables: ['eco_credits'], redo: 'accept the credit again' },
+  { classes: ['Customs duty (BOE)'], tables: ['purchases'], redo: 'post the duty again from the bill of entry' },
+];
+const RA_CLASS = 'RA deduction';
+const SETTLEMENT_METHOD = 'Marketplace settlement'; // as settlement-post.ts records it (not imported: keeps this chunk small)
+
+const inBin = (bin: readonly BinEntry[], table: string, pick: (r: Row) => boolean) => [...bin].reverse().find((b) => b.table === table && isObj(b.row) && pick(b.row));
+const isLive = (live: LiveReader, table: string, id: string) => !!id && live(table).some((x) => str(x?.id) === id);
+const what = (e: BinEntry) => `${describeEntry(e).label} ${describeEntry(e).number}`.trim();
+
+registerRestoreHook('vouchers', (row, e, live, bin) => {
+  const cls = str(row.voucher_class);
+  if (cls === RA_CLASS) {
+    // A deduction journal and its receipt row are one entry: both or neither.
+    if (live('transactions').some((p) => str(p?.ra_journal_id) === e.row_id)) return null;
+    const pair = inBin(bin, 'transactions', (r) => str(r.ra_journal_id) === e.row_id);
+    return pair ? { companions: [pair] } : { refuse: `${what(e)} is the journal of a GST TDS / labour cess deduction whose receipt is gone for good. Record the deduction again from the RA bill.` };
+  }
+  const owner = OWNED_VOUCHERS.find((o) => o.classes.includes(cls));
+  if (!owner) return null;
+  // Restoring repairs a stray delete only while the module still counts the voucher as posted.
+  if (!owner.tables.some((t) => mentions(live(t), e.row_id))) return { refuse: `${what(e)} (${cls}) was undone where it was posted, so restoring it here would post it twice. Instead, ${owner.redo}.` };
+  // Its bill-wise receipt rows (a deposit adjustment) come back with it.
+  const rows = bin.filter((b) => b.table === 'transactions' && isObj(b.row) && str(b.row.voucher_id) === e.row_id);
+  return rows.length ? { companions: rows } : null;
+});
+
+registerRestoreHook('transactions', (row, e, live, bin) => {
+  const journal = str(row.ra_journal_id);
+  if (journal && !isLive(live, 'vouchers', journal)) {
+    const pair = inBin(bin, 'vouchers', (r) => str(r.id) === journal);
+    return pair ? { companions: [pair] } : { refuse: 'This GST TDS / labour cess receipt has lost its journal for good. Record the deduction again from the RA bill.' };
+  }
+  const voucher = str(row.voucher_id);
+  if (row.deposit_adjustment_id && !isLive(live, 'vouchers', voucher)) {
+    const pair = voucher ? inBin(bin, 'vouchers', (r) => str(r.id) === voucher) : undefined;
+    return pair ? { companions: [pair] } : { refuse: 'This receipt was settled from a security deposit whose journal is gone. Adjust the deposit again in Recurring → Leases → Deposits.' };
+  }
+  if (str(row.method) === SETTLEMENT_METHOD && !mentions(live('settlements'), e.row_id)) {
+    return { refuse: 'This receipt was posted from a marketplace settlement that has since been unposted. Post the settlement again in Receivables → Marketplace → Settlements.' };
+  }
+  const gv = str(row.gift_voucher_id);
+  if (gv) {
+    const issue = liveRedeemIssue(gv, Number(row.amount) || 0, str(row.date).slice(0, 10));
+    if (issue) return { refuse: `${issue} The gift voucher was used since this receipt was deleted: restore the bill on its own and take the payment again.` };
+  }
+  return null;
+});
+
+/** The module hooks' verdict on one entry: the first refusal, else every companion. */
+function moduleVerdict(e: BinEntry, live: LiveReader, bin: readonly BinEntry[]): RestoreHookResult {
+  const r = isObj(e.row) ? e.row : {};
+  const companions: BinEntry[] = [];
+  for (const hook of RESTORE_HOOKS.get(e.table) ?? []) {
+    const v = hook(r, e, live, bin);
+    if (v?.refuse) return { refuse: v.refuse };
+    for (const c of v?.companions ?? []) if (c.id !== e.id && !companions.some((x) => x.id === c.id)) companions.push(c);
+  }
+  return { companions };
+}
 
 export function planRestore(e: BinEntry, live: LiveReader, bin: readonly BinEntry[], lockUntil: string = getLockUntil()): RestorePlan {
   const r = isObj(e.row) ? e.row : {};
@@ -176,8 +293,11 @@ export function planRestore(e: BinEntry, live: LiveReader, bin: readonly BinEntr
       return { ok: false, refusal: 'parentMissing', ...(parentEntry ? { parentEntry } : {}), ...base };
     }
   }
-  if (day && isDateLocked(day, lockUntil)) return { ok: false, refusal: 'locked', ...base };
-  return { ok: true, ...base };
+  const verdict = moduleVerdict(e, live, bin);
+  if (verdict.refuse) return { ok: false, refusal: 'module', message: verdict.refuse, ...base };
+  const withCompanions = verdict.companions?.length ? { ...base, companions: verdict.companions } : base;
+  if (day && isDateLocked(day, lockUntil)) return { ok: false, refusal: 'locked', ...withCompanions };
+  return { ok: true, ...withCompanions };
 }
 
 /* ── Restore (guards run in the table's own save path) ────────── */
@@ -194,7 +314,16 @@ export class RestoreError extends Error {
 
 const liveReader: LiveReader = (t) => peekTable<Row>(t);
 
+/** F17: restoring needs the rights of the delete — someone else's entry the owner's `data.erase`, a document its delete right. */
+function assertMayRestore(e: BinEntry): void {
+  if ((e.deleted_by ?? undefined) !== (currentActor()?.name ?? undefined)) requireAccess('data.erase');
+  if (e.table === 'invoices' && isObj(e.row)) requireAccess(isIssued(e.row as unknown as InvoiceRecord) ? 'doc.deleteIssued' : 'doc.deleteDraft');
+}
+
 function putBack(e: BinEntry): void {
+  // F1: the owning module checks again against live data (earlier rows of this restore included).
+  const verdict = moduleVerdict(e, liveReader, peekTable<BinEntry>(BIN_TABLE));
+  if (verdict.refuse) throw new RestoreError('module', verdict.refuse);
   const row = { ...(e.row as Row) };
   if (e.table === 'invoices') {
     // localDb's save runs roles, rights, the period lock, the number check and the audit row.
@@ -236,6 +365,7 @@ const REFUSAL_TEXT: Record<RestoreRefusal, (e: BinEntry, p: RestorePlan) => stri
   exists: (e) => `${tableLabel(e.table)} ${describeEntry(e).number || ''} is already back in the books.`.replace(/\s+/g, ' '),
   numberReused: (_e, p) => `${p.number} has been reused by another record, so this one cannot come back with it.`,
   parentMissing: (e, p) => (p.parentEntry ? `Restore ${describeEntry(p.parentEntry).number || tableLabel(p.parentEntry.table)} first — or restore both together.` : `The record ${tableLabel(e.table).toLowerCase()} belongs to is gone and not in the bin.`),
+  module: (_e, p) => p.message ?? 'The module that owns this record refuses the restore.',
   locked: (_e, p) => `The books are locked up to ${getLockUntil()}; this record is dated ${p.day}. Unlock with the PIN to restore it.`,
 };
 
@@ -245,18 +375,38 @@ const REFUSAL_TEXT: Record<RestoreRefusal, (e: BinEntry, p: RestorePlan) => stri
  * A locked period needs an active PIN override (`grantOverride`) — the save path's own lock check honours it.
  */
 export function restoreEntry(id: string, opts: { withParent?: boolean; withChildren?: boolean } = {}): BinEntry[] {
+  return restoreEntries([id], opts);
+}
+
+/**
+ * Restore several bin entries in ONE all-or-nothing step (the Undo toasts: a bill with its payments, a receipt with
+ * its journal). Companions the owning module asks for (an RA deduction receipt and its journal) come back with them.
+ */
+export function restoreEntries(ids: readonly string[], opts: { withParent?: boolean; withChildren?: boolean } = {}): BinEntry[] {
   const bin = peekTable<BinEntry>(BIN_TABLE);
-  const e = bin.find((b) => b.id === id);
-  if (!e) throw new RestoreError('missing', 'That entry is no longer in the bin.');
-  const plan = planRestore(e, liveReader, bin);
   const order: BinEntry[] = [];
-  if (!plan.ok && plan.refusal !== 'locked') {
-    if (plan.refusal === 'parentMissing' && opts.withParent && plan.parentEntry) order.push(plan.parentEntry);
-    else throw new RestoreError(plan.refusal!, REFUSAL_TEXT[plan.refusal!](e, plan), plan);
+  const has = (x: BinEntry) => order.some((o) => o.id === x.id);
+  const add = (x: BinEntry) => {
+    if (has(x)) return;
+    order.push(x);
+    // A companion's own companions too (a deposit journal and its receipt rows).
+    for (const c of moduleVerdict(x, liveReader, bin).companions ?? []) add(c);
+  };
+  for (const id of ids) {
+    const e = bin.find((b) => b.id === id);
+    if (!e) throw new RestoreError('missing', 'That entry is no longer in the bin.');
+    if (has(e)) continue;
+    const plan = planRestore(e, liveReader, bin);
+    if (!plan.ok && plan.refusal !== 'locked') {
+      const parent = plan.parentEntry;
+      if (plan.refusal === 'parentMissing' && parent && (opts.withParent || ids.includes(parent.id) || has(parent))) add(parent);
+      else throw new RestoreError(plan.refusal!, REFUSAL_TEXT[plan.refusal!](e, plan), plan);
+    }
+    add(e);
+    if (opts.withChildren) for (const c of plan.children) add(c);
   }
-  order.push(e);
-  if (opts.withChildren) order.push(...plan.children);
-  const tables = [...new Set([BIN_TABLE, ...order.map((x) => x.table), 'invoices', 'transactions', 'purchases', 'purchase_payments', 'series_counters'])];
+  for (const x of order) assertMayRestore(x);
+  const tables = [...new Set([BIN_TABLE, ...order.map((x) => x.table), 'invoices', 'transactions', 'purchases', 'purchase_payments', 'series_counters', 'vouchers'])];
   withTablesRollback(tables, () => {
     for (const x of order) putBack(x);
     const done = new Set(order.map((x) => x.id));

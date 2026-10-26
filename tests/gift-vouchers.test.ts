@@ -116,8 +116,8 @@ test('POS: partial redemption as a tender leaves a balance; the Z report shows i
   assert.equal(z.tenders.cash + z.tenders.upi + z.tenders.card + z.tenders.other, 0);
   assert.equal(z.received, 0);
 
-  // Cash / bank book: the redemption moved no money.
-  assert.equal(buildVouchers(loadBooksData()).filter((v) => v.type === 'Receipt').length, 0);
+  // Cash / bank book: the redemption moved no money (the sale voucher's own cash line is there, QA6-1 F5).
+  assert.equal(buildVouchers(loadBooksData()).filter((v) => v.type === 'Receipt' && !v.id.startsWith('mv:')).length, 0);
   // Ledger: Dr Gift vouchers outstanding | Cr Debtors; the liability is down to ₹370 and the TB balances.
   const rcpt = ledger().vouchers.find((v) => v.id === `rcpt:${pay.id}`)!;
   assert.equal(rcpt.lines.find((l) => l.dr > 0)!.account, gvAccount().id);

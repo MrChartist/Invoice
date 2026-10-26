@@ -175,20 +175,28 @@ test('regression: removing a GST TDS / cess receipt removes its journal; trial b
   assert.ok(loadVouchers().some((v) => v.id === again.ra_journal_id));
 });
 
-test('regression (R5-B5 with the R5-C6 cash-reader rule): GST TDS / cess deduction rows move no cash — cash book, BRS, payment modes skip them; trial balance balanced', async () => {
+test('regression (R5-B5 with the R5-C6 cash-reader rule, QA6-1 F4): GST TDS / cess deduction rows and a gift-voucher redemption move no cash — cash book, BRS, payment modes, Today skip them; trial balance balanced', async () => {
   const { loadBooksData, buildVouchers } = await import('../src/lib/books.ts');
   const { receiptCandidates } = await import('../src/lib/bank-recon.ts');
   const { paymentModes } = await import('../src/lib/sales-reports.ts');
   const { trialBalance } = await import('../src/lib/ledger/reports.ts');
+  const { giftVouchersDb, redeemOnInvoice } = await import('../src/lib/retail/gift-vouchers.ts');
+  const { todaySummary } = await import('../src/lib/today.ts');
   const inv = raOne();
   const gst = recordDeductionRow(inv.id, 'gst_tds', { date: '2026-07-20' });
   const cess = recordDeductionRow(inv.id, 'labour_cess', { date: '2026-07-20' });
   assert.ok(gst.ra_journal_id && cess.ra_journal_id);
+  // QA6-1 F4: a gift-voucher redemption on another bill is the same kind of row (no money moved).
+  const [gv] = giftVouchersDb.sell({ count: 1, face_value: 500, issued_on: '2026-07-20', method: 'Cash' }).vouchers;
+  const small = localDb.invoices.save({ ...inv, id: '', invoice_number: '', doc_type: 'INVOICE', status: 'Sent', items: [{ id: 'x', name: 'Misc', type: 'Service', quantity: 1, rate: 500, tax_rate: 0, amount: 500 }], ra_deductions: undefined, ra_no: undefined, boq_id: undefined, progress_of: undefined, tds_enabled: false, tds_amount: 0, issue_date: '2026-07-20' } as never);
+  redeemOnInvoice({ invoiceId: small.id, code: gv.code, amount: 500, date: '2026-07-20' });
   const book = buildVouchers(loadBooksData());
-  assert.ok(!book.some((v) => v.type === 'Receipt' && v.invoice_id === inv.id), 'the cash book does not list them');
+  assert.ok(!book.some((v) => v.type === 'Receipt' && (v.invoice_id === inv.id || v.invoice_id === small.id)), 'the cash book does not list them');
   const pays = getTable<Payment>('transactions');
-  assert.ok(!receiptCandidates(localDb.invoices.getAll(), pays).some((c) => c.docId === inv.id), 'nor BRS candidates');
+  assert.ok(!receiptCandidates(localDb.invoices.getAll(), pays).some((c) => c.docId === inv.id || c.docId === small.id), 'nor BRS candidates');
   assert.equal(paymentModes(pays, localDb.invoices.getAll(), { start: '2026-04-01', end: '2027-03-31' }).count, 0, 'nor payment modes');
+  const today = todaySummary({ invoices: localDb.invoices.getAll(), payments: pays, purchases: [] }, '2026-07-20');
+  assert.deepEqual([today.cash, today.upi, today.bank], [0, 0, 0], 'nor the Today card');
   const tb = trialBalance(loadLedger(), { start: '2026-04-01', end: '2027-03-31' });
   assert.equal(tb.totals.debit, tb.totals.credit);
   assert.equal(tb.rows.filter((r) => r.account.name === 'RA deductions clearing').reduce((s, r) => s + r.closing, 0), 0, 'the clearing account nets to zero');

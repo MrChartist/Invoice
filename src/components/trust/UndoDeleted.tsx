@@ -8,7 +8,7 @@ import type { BinEntry } from '../../types/trade-r4';
 import { useToast } from '../ui/useToast';
 import { currentActor } from '../../lib/access';
 import { peekTable } from '../../lib/storage';
-import { BIN_TABLE, PARENTS, describeEntry, restoreEntry } from '../../lib/trust/recycle-bin';
+import { BIN_TABLE, PARENTS, describeEntry, restoreEntries } from '../../lib/trust/recycle-bin';
 import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 
 export default function UndoDeleted() {
@@ -28,7 +28,8 @@ export default function UndoDeleted() {
           label: trT('undo'),
           onClick: () => {
             try {
-              for (const e of heads) restoreEntry(e.id, { withChildren: true });
+              // One all-or-nothing step through the bin's own path (module checks, rights, period lock — QA6-1 F1 / F17).
+              restoreEntries(heads.map((e) => e.id), { withChildren: true });
               notify(trT('undoDone'));
             } catch (err) {
               notify(trErr(err), 'error');

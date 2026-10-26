@@ -41,6 +41,7 @@ import {
 import { generateTallyExport, type TallyOptions } from './tally-xml';
 import { registerCells, registerColumns } from './custom-fields';
 import { csvCell as baseCsvCell, safeText } from './csv';
+import { NO_CASH_LEDGER, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
 export * from './export-shared';
 
@@ -305,13 +306,15 @@ export function receipts(source: ExportSource, opts: CsvOptions = {}): CsvTable 
   const rows = filterPayments(source.payments, sales, opts.range ?? {}).map((p): Cell[] => {
     const inv = byId.get(p.invoice_id)!;
     const cash = /^\s*cash\s*$/i.test(String(p.method ?? ''));
+    // QA6-1 F4: a row that moved no money is deposited to its own ledger, never to the bank (`no-cash.ts`).
+    const kind = noCashKind(p);
     return [
       fmtDate(isoDate(p.date), df),
       clean(inv.invoice_number),
       partyNameOf(inv.client),
       money(p.amount),
       clean(p.method),
-      cash ? 'Cash' : 'Bank',
+      movedNoCash(p) ? NO_CASH_LEDGER[kind as NoCashKind] : cash ? 'Cash' : 'Bank',
       clean(p.reference),
       clean(p.note),
     ];
