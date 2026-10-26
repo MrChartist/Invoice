@@ -7,10 +7,10 @@
  *  - the composition-limit tracker (FY aggregate turnover against the limit in force).
  * Working papers — verify with your CA (TR13–TR17, TR20).
  */
-import { compositionLimits, ruleAt } from '../tax-rules';
+import { ruleAt } from '../tax-rules';
 import { getIndianFY } from '../invoice-number';
 import {
-  BUYER_194Q_TURNOVER_RULES, COMPOSITION_ALERT_RULES, RCM_NOTIFIED_GOODS_RULES, TCS_1F_RULES, TCS_GOODS, TCS_GOODS_27EQ,
+  BUYER_194Q_TURNOVER_RULES, COMPOSITION_ALERT_RULES, COMPOSITION_GOODS_LIMIT_RULES, RCM_NOTIFIED_GOODS_RULES, TCS_1F_RULES, TCS_GOODS, TCS_GOODS_27EQ,
   TCS_GOODS_TEXT, TCS_NO_PAN_RULES, TCS_SPECIFIED_GOODS_RULES,
   type RcmGoodsRow, type SupplierKind, type Tcs1fKind, type TcsGoods,
 } from '../trading-rules';
@@ -123,7 +123,7 @@ export type TrackerLevel = 'ok' | 'amber' | 'red';
 
 /** FY aggregate turnover so far against the composition limit in force (goods; special-category States lower). */
 export function compositionTracker(turnover: number, date: string, specialState = false): { limit: number; share: number; level: TrackerLevel; optOutDays: number } {
-  const lim = compositionLimits(date);
+  const lim = ruleAt(COMPOSITION_GOODS_LIMIT_RULES, date);
   const limit = specialState ? lim.goodsSpecial : lim.goods;
   const a = ruleAt(COMPOSITION_ALERT_RULES, date);
   const share = limit > 0 ? turnover / limit : 0;

@@ -13,7 +13,7 @@ const ROUND_MODES: RoundMode[] = ['nearest', 'up', 'down', 'none'];
 // R4-C1: LUT auto-fill from the register + hint (lazy, zero-rated supplies without payment only).
 const LutHint = lazy(() => import('../trade/LutHint'));
 // R8-C (TR-C2): Form 27C / 127 declaration, 206C(1F) value check, customer deducts 194Q (lazy).
-const PartyTaxHints = lazy(() => import('../trade/TradeStatutory').then((m) => ({ default: m.PartyTaxHints })));
+const PartyTaxHints = lazy(() => import('../trade/PartyTaxHints'));
 import { tradingTcsPresets } from '../../lib/trade/tr-statutory';
 import { localDb } from '../../lib/localDb';
 import { tcsPresets, tdsSections } from '../../lib/tax-rules';

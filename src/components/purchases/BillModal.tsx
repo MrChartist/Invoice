@@ -39,7 +39,7 @@ import styles from './purchases.module.css';
 // R4-C3: Bill of Entry duty sheet — lazy, import-of-goods bills only.
 const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
 // R8-C (TR-C2): notified goods from an agriculturist / unregistered supplier → reverse charge prompt (lazy).
-const RcmGoodsNotice = lazy(() => import('../trade/TradeStatutory').then((m) => ({ default: m.RcmGoodsNotice })));
+const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 
 export interface BillModalProps {
   open: boolean;

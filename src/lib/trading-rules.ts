@@ -129,7 +129,20 @@ export const RCM_NOTIFIED_GOODS_RULES: readonly Versioned<readonly RcmGoodsRow[]
   },
 ];
 
-/* ── Composition tracker thresholds (limits themselves come from `compositionLimits` in tax-rules.ts) ── */
+/* ── Composition tracker ── */
+
+/**
+ * Composition limits for goods (preceding-FY aggregate turnover, ₹; special-category States lower). The SAME rows as
+ * `COMPOSITION_LIMIT_RULES` in `tax-rules.ts` (`tests/tr-statutory.test.ts` pins them equal): read here because that
+ * export is not used by first paint, and importing it into a lazy screen would pull it into the first-paint chunk.
+ */
+export const COMPOSITION_GOODS_LIMIT_RULES: readonly Versioned<{ goods: number; goodsSpecial: number }>[] = [
+  { from: '2017-07-01', value: { goods: 7.5e6, goodsSpecial: 5e6 }, source: 'Sec 10(1) as enacted' },
+  { from: '2017-10-13', value: { goods: 1e7, goodsSpecial: 7.5e6 }, source: 'Notification 46/2017-CT' },
+  { from: '2019-04-01', value: { goods: 1.5e7, goodsSpecial: 7.5e6 }, source: 'Notification 14/2019-CT' },
+];
+
+/* Thresholds of the tracker */
 
 export const COMPOSITION_ALERT_RULES: readonly Versioned<{ amberAt: number; optOutDays: number }>[] = [
   { from: '2017-07-01', value: { amberAt: 0.8, optOutDays: 7 }, source: 'Rule 6(2): intimate within 7 days of crossing (developers\' reading, TR20); 80% amber is the app\'s own warning' },

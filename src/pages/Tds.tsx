@@ -24,7 +24,7 @@ const TracesTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => (
 const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
 // R8-C (TR-C2): our preceding-FY turnover for the 194Q buyer test (lazy).
-const Buyer194qCard = lazy(() => import('../components/trade/TradeStatutory').then((m) => ({ default: m.Buyer194qCard })));
+const Buyer194qCard = lazy(() => import('../components/trade/Buyer194qCard'));
 import { Landmark } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import { helpT } from '../i18n/areas/help-r6';

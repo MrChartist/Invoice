@@ -9,7 +9,7 @@ import type { BankStatementTerms } from '../../types/trade-r8';
 import { computeStock, computeStockDetailed, liveInputs } from '../inventory';
 import { computeTracking } from '../stock-tracking';
 import { stockGroupsDb } from '../stock-groups';
-import { loadLedger, loadStockValuer } from '../ledger';
+import { loadLedger, loadStockValuer } from '../ledger/index';
 import { closingBalances } from '../ledger/reports';
 import { bankLedgerId } from '../bank-ledgers';
 import { A } from '../ledger/accounts';
@@ -67,7 +67,7 @@ export function loadStockStatementInput(asOf: string, bankAccountId: string, ter
   }
   const valuer = loadStockValuer(undefined, () => computeStockDetailed(liveInputs()).positions);
   const engineTotal = round2([...byGroup.values()].reduce((t, v) => t + v, 0));
-  const stockTotal = valuer ? round2(valuer.value(asOf)) : engineTotal;
+  const stockTotal = valuer ? round2(valuer.value(asOf) / 100) : engineTotal; // the valuer works in paise
   // Principals' goods: lot balance × the lot's average agency sale rate so far (a memo, never in our stock).
   const lots = lotBalances(loadArrivals().filter((a) => a.status !== 'cancelled' && a.date <= asOf), agencySales(getTable<InvoiceRecord>('invoices')), asOf);
   const consignment = round2(lots.reduce((t, l) => t + (l.sold > 0 && l.balance > 0 ? (l.amount / l.sold) * l.balance : 0), 0));

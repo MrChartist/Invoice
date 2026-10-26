@@ -836,3 +836,13 @@ test('R6-C1 readers (margin chip, insights) read the engine copies of the real b
   const gst = (purchases: unknown[]) => buildInsights({ invoices: [], payments: [], purchases }, '2026-04-20').find((c) => c.id === 'gstTrend')?.value;
   assert.equal(gst([copy]), gst([bill]), 'the engine copy keeps the bill\'s tax');
 });
+
+test('R8-C: the bank stock statement counts unpaid goods bills (kind PURCHASE) as creditors for goods, not expenses', async () => {
+  const { resetStorage } = await import('./helpers/shim.ts');
+  const { setTable } = await import('../src/lib/storage.ts');
+  const { creditorsForGoods } = await import('../src/lib/trade/tr-stock-live.ts');
+  resetStorage();
+  setTable('purchases', [bill, { ...bill, id: 'p2', kind: 'EXPENSE', category: 'Rent', bill_number: 'R/1' }]);
+  assert.equal(creditorsForGoods('2026-04-30'), 1180);
+  assert.equal(creditorsForGoods('2026-04-01'), 0, 'a bill dated after the statement date is not owed yet');
+});
