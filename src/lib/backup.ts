@@ -364,6 +364,8 @@ const RECORD_TABLES = [
   'business_loans', 'currency_rates',
   // Round 2 (R2-C): notes to accounts per FY, deferral schedules, packing lists, package types
   'notes_to_accounts', 'deferrals', 'packing_lists', 'package_types',
+  // Round 2 (R2-A): payment terms master, collection follow-ups, bad-debt recoveries
+  'payment_terms', 'collection_notes', 'write_off_recoveries',
   // Round 2 (R2-B): batch invoice runs, proposal section snippets
   'batch_runs', 'proposal_snippets',
   // Round 3 (R3-A): restaurant dining areas, tables, running orders, modifier groups
@@ -402,6 +404,8 @@ const ID_TABLES = new Set([
   'business_loans', 'currency_rates',
   // Round 2 (R2-C)
   'notes_to_accounts', 'deferrals', 'packing_lists', 'package_types',
+  // Round 2 (R2-A)
+  'payment_terms', 'collection_notes', 'write_off_recoveries',
   // Round 2 (R2-B): batch invoice runs, proposal section snippets
   'batch_runs', 'proposal_snippets',
   // Round 3 (R3-A)

@@ -11,7 +11,7 @@
  * notice once a fourth falls overdue.
  */
 
-import type { Client, InvoiceRecord, SenderProfile } from '../types/invoice';
+import type { Client, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { localDb } from './localDb';
@@ -23,6 +23,8 @@ import { todayIso } from './tax-rules';
 import { pdcReminders, validUntil, type PdcKind } from './cheque-reminders';
 import type { Cheque } from '../types/cheques';
 import { amountDue, linkedCredits, type CreditLinkRow, type CreditMap } from './amount-due';
+import { COLLECTION_NOTES_TABLE, promiseNotices, receiptsByParty, type CollectionNote, type PartyReceipt } from './collections';
+import { localDayOf } from './dates';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -58,6 +60,9 @@ export interface NotificationContext {
   cheques?: Cheque[];
   /** Live credit notes per invoice (`linkedCredits`, src/lib/amount-due.ts): what they settle is not chased. */
   credits?: CreditMap;
+  /** R2-A4: collection follow-ups (promises-to-pay) and the money received per party. */
+  collectionNotes?: CollectionNote[];
+  partyReceipts?: PartyReceipt[];
 }
 
 export type NotificationProvider = (ctx: NotificationContext) => AppNotification[];
@@ -343,6 +348,41 @@ export const chequeProvider: NotificationProvider = (ctx) => {
   });
 };
 
+/**
+ * R2-A4: "3 promises due today" / "2 promises broken". The id fingerprints the promises, so dismissing one
+ * notice does not hide a new promise falling due.
+ */
+export const promiseProvider: NotificationProvider = (ctx) => {
+  if (!ctx.collectionNotes?.length) return [];
+  const today = localDayOf(ctx.now);
+  const { due, broken } = promiseNotices(ctx.collectionNotes, ctx.partyReceipts ?? [], today);
+  const names = (rows: CollectionNote[]) => rows.slice(0, 3).map((n) => n.party_name || 'party').join(', ') + (rows.length > 3 ? ` +${rows.length - 3} more` : '');
+  const out: AppNotification[] = [];
+  if (due.length) {
+    out.push({
+      id: `promise-due:${today}:${due.map((n) => n.id).join('|')}`,
+      severity: 'warning',
+      title: `${plural(due.length, 'promise')} to pay due today`,
+      detail: `${names(due)} promised ${formatCurrency(round2(due.reduce((s, n) => s + (n.promise?.amount ?? 0), 0)))} by today.`,
+      href: '/receivables?tab=followups',
+      cta: 'Open follow-ups',
+      at: ctx.now.toISOString(),
+    });
+  }
+  if (broken.length) {
+    out.push({
+      id: `promise-broken:${broken.map((n) => n.id).join('|')}`,
+      severity: 'critical',
+      title: `${plural(broken.length, 'promise')} to pay broken`,
+      detail: `${names(broken)} did not pay what was promised. The next reminder suggests the firm wording.`,
+      href: '/receivables?tab=followups',
+      cta: 'Open follow-ups',
+      at: ctx.now.toISOString(),
+    });
+  }
+  return out;
+};
+
 export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   overdueProvider,
   dueSoonProvider,
@@ -353,6 +393,7 @@ export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   missingGstinProvider,
   gstReturnsProvider,
   chequeProvider,
+  promiseProvider, // R2-A4
 ];
 
 /* ── Registry ───────────────────────────────────────────────── */
@@ -498,10 +539,18 @@ export function buildContext(now: Date = new Date()): NotificationContext {
     gstFiled: getTable<FiledReturn>(COMPLIANCE_TABLE),
     gstFrequency: localDb.settings.get().gst_filing_frequency,
     cheques: getTable<Cheque>('cheques'),
+    ...promiseContext(invoices),
     lastBackup: getLastBackup(),
     storageUsedBytes: appDataSize() * 2,
     storageQuotaBytes: STORAGE_QUOTA_BYTES,
   };
+}
+
+/** R2-A4: follow-ups and receipts per party, only read when there are follow-ups at all. */
+function promiseContext(invoices: InvoiceRecord[]): Pick<NotificationContext, 'collectionNotes' | 'partyReceipts'> {
+  const collectionNotes = getTable<CollectionNote>(COLLECTION_NOTES_TABLE).filter((n) => n?.promise);
+  if (!collectionNotes.length) return {};
+  return { collectionNotes, partyReceipts: receiptsByParty(invoices, getTable<Payment>(KEYS.transactions), getTable<Client>(KEYS.clients)) };
 }
 
 /** Convenience for the bell: current visible notifications from live data. */

@@ -85,6 +85,10 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   deferrals: { entity: 'voucher', label: 'Deferral schedule' },
   packing_lists: { entity: 'invoice', label: 'Packing list' },
   package_types: { entity: 'item', label: 'Package type' },
+  // R2-A
+  payment_terms: { entity: 'settings', label: 'Payment term' },
+  collection_notes: { entity: 'payment', label: 'Collection follow-up' },
+  write_off_recoveries: { entity: 'payment', label: 'Bad debt recovery' },
   // R2-B: batch invoice runs, proposal section snippets
   batch_runs: { entity: 'invoice', label: 'Batch invoice run' },
   proposal_snippets: { entity: 'settings', label: 'Proposal snippet' },

@@ -37,6 +37,9 @@ const ShopModePanel = lazy(() => import('../components/settings/ShopModePanel').
 const CurrencyRatesPanel = lazy(() => import('../components/settings/CurrencyRatesPanel').then((m) => ({ default: m.CurrencyRatesPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
 const DisplayPanel = lazy(() => import('../components/settings/DisplayPanel')); // R2-C6 (Security & device tab)
+// R2-A: payment terms / settlement settings and the reminder schedule, loaded with the Defaults tab.
+const PaymentTermsPanel = lazy(() => import('../components/settings/PaymentTermsPanel'));
+const ReminderSchedulePanel = lazy(() => import('../components/settings/ReminderSchedulePanel'));
 
 type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
 
@@ -279,6 +282,11 @@ export function Settings() {
             profileId={settings.activeProfileId}
             profileName={settings.profiles.find((p) => p.id === settings.activeProfileId)?.companyName}
           />
+          {/* R2-A: payment terms master + settlement settings, reminder schedule & templates */}
+          <Suspense fallback={null}>
+            <PaymentTermsPanel notify={notify} />
+            <ReminderSchedulePanel notify={notify} />
+          </Suspense>
         </>
       )}
       {tab === 'data' && (

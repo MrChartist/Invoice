@@ -513,6 +513,32 @@ try {
       `₹ Received saved one UPI receipt against the bill, tagged with the party (${tx.length} row, ₹${tx[0]?.amount})`);
   });
 
+  await step('R2-A: a receipt ₹10 short settles the rest as kasar — FCN financial credit note, bill Paid', async () => {
+    // Later steps expect one open invoice: snapshot the tables this step writes and put them back afterwards.
+    const keys = ['invoices', 'transactions', 'doc_links', 'series_counters', 'audit_log'].map((n) => `mrchartist_inv_${n}`);
+    const before = await Promise.all(keys.map((k) => idbGet(page, k)));
+    await page.goto(srv.origin + '/transactions');
+    await page.getByRole('button', { name: /^Record payment for INV/ }).first().click();
+    const dlg = page.getByRole('dialog', { name: 'Record payment' });
+    const amount = dlg.getByLabel('Amount', { exact: true });
+    const due = Number(await amount.inputValue());
+    await amount.fill(String(Math.round((due - 10) * 100) / 100));
+    await dlg.locator('[data-settle-rest]').waitFor({ timeout: 10000 });
+    await dlg.locator('[data-settle-choice="short_payment"]').check();
+    check((await dlg.locator('[data-settle-amount]').inputValue()) === '10', 'Settle the rest pre-fills the ₹10 left open');
+    await dlg.getByRole('button', { name: 'Record payment' }).click();
+    const notes = await readJson(page, 'invoices', [], (v) => v.some((i) => i.note_kind === 'financial'));
+    const fcn = notes.filter((i) => i.note_kind === 'financial');
+    check(fcn.length === 1 && /^FCN\/FY\d{2}-\d{2}\/0001$/.test(fcn[0].invoice_number) && fcn[0].total === 10 && fcn[0].financial_reason === 'short_payment' && !fcn[0].tax_amount,
+      `financial credit note ${fcn[0]?.invoice_number} for ₹${fcn[0]?.total}, no GST`);
+    const bill = notes.find((i) => i.invoice_number === fcn[0]?.po_number);
+    check(bill?.status === 'Paid', `the bill is settled (${bill?.status})`);
+    await page.keyboard.press('Escape');
+    for (let i = 0; i < keys.length; i++) await idbPut(page, keys[i], before[i]);
+    await page.goto(srv.origin + '/transactions');
+    await page.getByRole('button', { name: /^Record payment for INV/ }).first().waitFor();
+  });
+
   await step('bulk mark paid, then delete with undo', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByLabel('Select INV/FY', { exact: false }).first().check();

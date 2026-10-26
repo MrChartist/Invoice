@@ -376,6 +376,10 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   deferrals: 'books.edit',
   packing_lists: 'doc.create',
   package_types: 'master.edit',
+  // R2-A: payment terms (master), collection follow-ups (logged with receipts), bad-debt recoveries (owner, in write-off.ts)
+  payment_terms: 'master.edit',
+  collection_notes: 'payment.record',
+  write_off_recoveries: 'books.edit',
   // R2-B: batch invoice runs (written with the invoices they issue), proposal section snippets
   batch_runs: 'doc.create',
   proposal_snippets: 'doc.create',

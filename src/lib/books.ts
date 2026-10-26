@@ -18,6 +18,7 @@
  *      Expense    Cr party        Payment      Dr party
  */
 
+import { FINANCIAL_REASON_LABELS, isFinancialNote } from './financial-note';
 import { DEFAULT_BANK_ID, accountIdOf, type BankAccount } from './bank-accounts';
 import { round2, num, untaxedCharges } from './invoice-calc';
 import { inrRecord, inrValue } from './fx';
@@ -806,6 +807,14 @@ export function pnlEvents(data: BooksData, basis: Basis): PnlEvent[] {
   for (const inv of data.invoices) {
     const date = toIsoDate(inv.issue_date);
     if (!date) continue;
+    if (isFinancialNote(inv)) {
+      // R2-A2: a financial credit note (settlement discount / kasar / bad debt) is an indirect expense on
+      // accrual; on cash basis the discounted part was never received, so it was never income either.
+      if (inv.status !== 'Draft' && inv.status !== 'Cancelled' && basis === 'accrual') {
+        events.push({ date, kind: 'expense', amount: invoiceAmounts(inv).income, category: FINANCIAL_REASON_LABELS[inv.financial_reason ?? 'settlement_discount'], direct: false, ref: inv.id });
+      }
+      continue;
+    }
     if (isCreditNote(inv)) {
       events.push({
         date,

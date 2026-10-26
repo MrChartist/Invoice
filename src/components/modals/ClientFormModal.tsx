@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
 import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
@@ -20,6 +20,9 @@ import { ContactsEditor } from '../clients/ContactsEditor';
 import { AddressBookEditor } from '../clients/AddressBookEditor';
 import { normalizeAddresses, normalizeContacts } from '../../lib/contacts';
 import { s2T } from '../../i18n/areas/sales-r2';
+
+// R2-A: payment term + reminder mode fields, loaded with their own strings.
+const ReminderModeField = lazy(() => import('../collections/ReminderModeField'));
 
 const BLANK: Client = {
   name: '',
@@ -276,6 +279,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           </div>
           <span className={controls.hint}>{salesT('cf.creditHint')}</span>
         </fieldset>
+        <Suspense fallback={null}><ReminderModeField client={form} onChange={(p) => setForm((f) => ({ ...f, ...p }))} /></Suspense> {/* R2-A: payment term + reminder mode */}
         {levels.length > 0 && (
           <label className={controls.field}>
             <span className={controls.label}>{salesT('cf.priceLevel')}</span>
