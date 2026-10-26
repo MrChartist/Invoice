@@ -38,6 +38,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './hotel.module.css';
 import FormCView from './FormCView';
 import ReportsView from './ReportsView';
+import FolioView from './FolioView'; // R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
 
 /* ── Small kit ─────────────────────────────────────────────────── */
 
@@ -95,6 +96,11 @@ export interface Ctx {
 const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {
   formc: FormCView, // R7-C2 (in this chunk: one chunk for the pack)
   reports: ReportsView, // R7-C3
+/** R7-B / R7-C plug their views in here (`folios` is static: see the import), `formc`, `reports`. */
+/** R7-B2: the Tables / POS "Room" button loads through this chunk, so the hotel libs stay in one chunk. */
+export { default as RoomPicker } from './RoomPicker';
+const EXTRA_VIEWS: Partial<Record<string, ComponentType<{ ctx: Ctx }>>> = {
+  folios: FolioView, // R7-B
 };
 
 export default function FrontDesk() {

@@ -859,6 +859,25 @@ test('R7-C1: the hotel GST desk reads the real purchase shape for its ITC guard'
   assert.equal(itc([{ ...bill, status: 'draft' }]), 0);
 });
 
+// R7-B: `agent-commission.ts` and `ota-payout.ts` WRITE commission bills (purchase drafts, posted later as bills); the
+// bill they draft reads back through readPurchase / books / GST / export like any bill.
+test('R7-B commission bills (agent-commission, ota-payout) read back through readPurchase / books / GST / export readers', async () => {
+  const { commissionBill } = await import('../src/lib/hotel/agent-commission.ts');
+  const { billOfDraft } = await import('../src/lib/purchase-drafts.ts');
+  const agentGstin = `29AAPFU0939F1Z${gstinChecksumChar('29AAPFU0939F1Z')}`;
+  const agent = { ...commissionBill({ vendor: { name: 'Travel Co', gstin: agentGstin }, amount: 1000, date: '2026-10-20', home: '27', ref: 'RES/FY26-27/0001', lowBand: false, tds194h: true }), id: 'c1' } as PurchaseRecord;
+  const ota = { ...commissionBill({ vendor: { name: 'Booking.com' }, amount: 500, gst: 90, date: '2026-10-20', home: '27', ref: 'OTA payout', lowBand: true, tds194h: false }), id: 'c2' } as PurchaseRecord;
+  assert.equal(readPurchase(agent)?.total, 1180);
+  assert.equal(booksNormalize(agent as never)!.taxable, 1000);
+  assert.equal(booksNormalize(agent as never)!.itcEligible, true);
+  assert.equal(gstNormalize(agent, '27')!.igst, 180, 'agent in another state → IGST');
+  assert.equal(exportNormalize(agent)!.total, 1180);
+  assert.equal(agent.tds_section, '194H');
+  assert.equal(booksNormalize(ota as never)!.itcEligible, false, 'fully low-band hotel: ITC flagged');
+  const draft = { ...ota, status: 'draft', draft: { source: 'manual', created_at: '' } } as never;
+  assert.equal(readPurchase({ ...billOfDraft(draft), id: 'c3' } as PurchaseRecord)?.total, 590);
+});
+
 test('R8-A: the last purchase rate reads the real bill shape (lines, legacy items, expenses) through readPurchaseLines', async () => {
   const { lastPurchaseRate } = await import('../src/lib/trade/tr-party-rates.ts');
   const legacy = { ...bill, id: 'p3', lines: undefined, items: [{ name: 'Paper ream', quantity: 10, rate: 90 }], date: '2026-03-01' };

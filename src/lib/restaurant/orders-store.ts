@@ -401,6 +401,23 @@ export function settleOrder(orderId: string, tenders: Tender[], opts: { day?: st
 }
 
 /**
+ * R7-B2 hotel "charge to room": the order closes onto a guest folio — no POS bill and no tax now (the check-out
+ * invoice charges F&B at the hotel's restaurant rate). `post` writes the folio line for the pre-GST total and returns
+ * the folio id; both roll back together.
+ */
+export function settleToFolio(orderId: string, post: (order: TableOrder, preTax: number) => string): TableOrder {
+  const order = mustLive(orderId);
+  if (!order.lines.length || order.payers?.length) throw new Error('Nothing to charge, or the order is being settled by payer.');
+  return withTablesRollback([RT.orders, 'hotel_folios'], () => {
+    const folio_id = post(order, previewBill(order).taxable_value);
+    const at = now().toISOString();
+    const out: TableOrder = { ...order, status: 'settled', settled_at: at, folio_id, log: [...order.log, { at, by: who(), kind: 'settle', note: 'Charged to room' }] };
+    ordersDb.put(out);
+    return out;
+  });
+}
+
+/**
  * Equal / custom split: one invoice, settled payer by payer. The first payment saves the invoice (with
  * the rest left due); each next payer is a payment on it; the order is Settled when every row is paid.
  */
