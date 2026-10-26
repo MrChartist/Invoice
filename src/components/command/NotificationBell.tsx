@@ -221,6 +221,7 @@ function runBell(force: boolean, setItems: (list: VisibleNotification[]) => void
   ensureTradeAlerts(reload); // R4-C
   ensureTrustAlerts(reload); // R4-C
   ensureMarketplaceAlerts(reload); // R5-A
+  ensureR5cAlerts(reload); // R5-C
   ensureTransportWorksAlerts(reload); // R5-B
 }
 
@@ -291,6 +292,17 @@ function ensureMarketplaceAlerts(onReady: () => void): void {
   if (!(Array.isArray(s?.industry_packs) ? s.industry_packs.includes('marketplace') : s?.business_type === 'ecommerce')) return;
   marketplaceAlerts = 1;
   import('../../lib/marketplace/marketplace-alerts').then((m) => { m.registerMarketplaceAlerts(); onReady(); }, () => { marketplaceAlerts = 0; });
+}
+
+// R5-C: fee / donation / lease notices — lazy, only with the fees / nonprofit / leases pack on and its table in use.
+let r5cAlerts = 0;
+function ensureR5cAlerts(onReady: () => void): void {
+  if (r5cAlerts) return;
+  const s = getJson<{ industry_packs?: unknown; business_type?: string } | null>(SINGLETON_KEYS.settings, null);
+  const on = Array.isArray(s?.industry_packs) ? s.industry_packs : [({ institution: 'fees', nonprofit: 'nonprofit', property: 'leases' } as Record<string, string>)[s?.business_type ?? '']];
+  if (!(['fee_plans', 'donations', 'leases'] as const).some((t, i) => on.includes(['fees', 'nonprofit', 'leases'][i]) && peekTable(t).length)) return;
+  r5cAlerts = 1;
+  import('../institutions/r5c-lazy').then((l) => l.r5c()).then((m) => { m.registerR5cAlerts(); onReady(); }, () => { r5cAlerts = 0; });
 }
 
 // R5-B: transport / works notices — each loads lazily, only with its pack on (same rule as `industry-packs.ts`).

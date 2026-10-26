@@ -157,8 +157,10 @@ build-time config must use Vite's `VITE_` prefix.
 - Alternate units: a line typed in another unit keeps quantity / rate as typed and snapshots `unit_factor` (invoice,
   bill / GRN / return, POS, stock move, stock transfer, stock journal and job-work lines); every stock reader must
   convert with `lineFactor` / `PurchaseLineCore.unitFactor` (`src/lib/units.ts`).
-- A receipt row with `gift_voucher_id` (R4-B) moved no money: it settles the bill against the "Gift vouchers outstanding"
-  liability. Every cash / bank reader (cash book, bank reco, cash tally) must skip it, as `books.ts` `buildVouchers` does.
+- Receipt rows that moved no money: `gift_voucher_id` (R4-B, settles against "Gift vouchers outstanding"),
+  `deposit_adjustment_id` (R5-C6, settled from a security deposit) and `ra_journal_id` (R5-B5, GST TDS / labour cess on
+  an RA bill). Every cash / bank reader (cash book, bank reco, cash tally, payment modes) must skip them, as `books.ts`
+  `buildVouchers` does.
 - Credit notes are linked to invoices through the `doc_links` table; GSTR credit/debit-note sections
   treat them as standalone documents.
 - A 4-6 digit PIN is a lock screen, not encryption of the stored data; optional vault mode (`src/lib/vault.ts`) encrypts the IndexedDB store at rest. Never write the `__vault__` record or sealed (`mcv1:`) values outside `storage.ts`.

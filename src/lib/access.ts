@@ -420,6 +420,17 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   settlements: 'doc.create',
   eco_credits: 'books.edit',
   marketplace_returns: 'doc.create',
+  // R5-C: plans / properties / leases are masters; fee runs and donations are documents; reversals, 10BD / 10BE
+  // filings and deposits are books
+  fee_plans: 'master.edit',
+  fee_runs: 'doc.create',
+  common_credit_runs: 'books.edit',
+  donations: 'doc.create',
+  form_10bd_filings: 'books.edit',
+  form_10be: 'books.edit',
+  properties: 'master.edit',
+  leases: 'master.edit',
+  security_deposits: 'books.edit',
   // R5-B: LRs, trips and RA measurements are documents; vehicles and BOQ coefficients are masters; the GTA option is a setting
   consignment_notes: 'doc.create',
   gta_options: 'settings.manage',

@@ -22,6 +22,7 @@ export const planT = defineArea(
     kindProject: 'Project',
     kindDepartment: 'Department',
     kindBranch: 'Branch',
+    kindFund: 'Fund', // R5-C4
     active: 'Active',
     inactive: 'Inactive',
     editName: 'Edit {name}',
@@ -217,6 +218,7 @@ export const planT = defineArea(
     kindProject: 'प्रोजेक्ट',
     kindDepartment: 'विभाग',
     kindBranch: 'शाखा',
+    kindFund: 'फ़ंड', // R5-C4
     active: 'सक्रिय',
     inactive: 'निष्क्रिय',
     editName: '{name} बदलें',

@@ -25,6 +25,9 @@ import { br2T } from '../i18n/areas/books-r2';
 import { wireT } from '../i18n/areas/wiring';
 import { useCan } from '../hooks/useCan';
 import controls from '../styles/controls.module.css';
+import { defineArea } from '../i18n/area';
+import { visibleTabs } from '../lib/industry-packs'; // R5-C
+import { localDb } from '../lib/localDb';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
@@ -35,6 +38,9 @@ const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'
 const FxTab = lazy(() => import('../components/books/planning/FxTab'));
 // R2-C2: deferred revenue / prepaid expense schedules (own lazy chunk).
 const DeferralsTab = lazy(() => import('../components/books/planning/DeferralsTab'));
+// R5-C4: funds, fund statement, FCRA / FC-4 (non-profit pack) — listed only with the pack on.
+const FundsTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.FundsTab })));
+const fundsTabT = defineArea({ tab: 'Funds' } as const, { tab: 'फ़ंड' });
 // Tally parity: bill-wise payables, voucher registers, ratio analysis (their own lazy chunk).
 // 8.109: saved views (period + tab + every report's F12 options) and month-end packs.
 const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
@@ -62,6 +68,7 @@ const TABS = [
   { id: 'vreg', label: 'tabVreg' },
   { id: 'ratio', label: 'tabRatio' },
   { id: 'defer', label: 'tabDefer' }, // R2-C2 (label from the books-r2 area)
+  { id: 'funds', label: 'tabFunds', pack: 'nonprofit' }, // R5-C4 (label above)
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 // Day book and P&L read the ledger too (WP-2: one accounting truth); `rpt` = group summary, ratios, registers …
@@ -81,6 +88,8 @@ export function Books() {
   const [openingOpen, setOpeningOpen] = useState(false);
   const { notify, toastNode } = useToast();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // R5-C: pack tabs show only with their pack on (one opened by URL stays listed while shown).
+  const shown = useMemo(() => visibleTabs(TABS, localDb.settings.get(), tab), [tab]);
   const { can } = useCan();
   const openParam = params.get('open');
   const wizard = openParam === 'yearend' && can('books.edit') ? 'yearend' : openParam === 'tally' && can('data.restore') ? 'tally' : null;
@@ -128,16 +137,16 @@ export function Books() {
 
   const onTabKey = (e: React.KeyboardEvent, index: number) => {
     const target: Record<string, number> = {
-      ArrowRight: (index + 1) % TABS.length,
-      ArrowLeft: (index - 1 + TABS.length) % TABS.length,
+      ArrowRight: (index + 1) % shown.length,
+      ArrowLeft: (index - 1 + shown.length) % shown.length,
       Home: 0,
-      End: TABS.length - 1,
+      End: shown.length - 1,
     };
     const next = target[e.key];
     if (next === undefined) return;
     e.preventDefault();
-    selectTab(TABS[next].id);
-    tabRefs.current[TABS[next].id]?.focus();
+    selectTab(shown[next].id);
+    tabRefs.current[shown[next].id]?.focus();
   };
 
   const saveOpenings = (values: Record<CashAccount, { amount: number; as_of: string }>) => {
@@ -200,7 +209,7 @@ export function Books() {
       </div>
 
       <div className={`${styles.tabs} no-print`} role="tablist" aria-label={booksT('tablist')}>
-        {TABS.map((t, i) => (
+        {shown.map((t, i) => (
           <button
             key={t.id}
             ref={(el) => {
@@ -216,7 +225,7 @@ export function Books() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {t.id === 'defer' ? br2T('tabDefer') : booksT(t.label as Parameters<typeof booksT>[0])}
+            {t.id === 'defer' ? br2T('tabDefer') : t.id === 'funds' ? fundsTabT('tab') : booksT(t.label as Parameters<typeof booksT>[0])}
           </button>
         ))}
       </div>
@@ -236,6 +245,11 @@ export function Books() {
             period={period}
             onEditOpening={() => setOpeningOpen(true)}
           />
+        )}
+        {tab === 'funds' && (
+          <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>
+            <FundsTab period={period} notify={notify} />
+          </Suspense>
         )}
         {tab === 'defer' && (
           <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>

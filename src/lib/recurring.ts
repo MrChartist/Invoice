@@ -20,6 +20,7 @@ import { isPeriodLockedError } from './period-lock';
 import { normalizeRecord } from '../store/invoice-defaults';
 import { liveDocTrackingIssues } from './stock-tracking';
 import { loadPaymentTerms, termPatch, type PaymentTerm } from './payment-terms';
+import { leaseLineRates } from './property/escalation'; // R5-C5
 
 export const RECURRING_TABLE = 'recurring';
 /** Most missed occurrences materialised in a single catch-up. */
@@ -441,6 +442,14 @@ export function createSchedule(input: {
   };
 }
 
+/**
+ * R5-C5: the generator's optional line-amount hook. A lease schedule (`lease_id` + `escalation`) bills rent / CAM
+ * escalated from each step date and pro rata by days; every other schedule gets its template lines unchanged.
+ */
+export function amountHook(s: RecurringSchedule, occurrence: string): InvoiceItem[] {
+  return s.lease_id && s.escalation ? leaseLineRates(s.template.items, s.escalation, s.start_date, occurrence, nextOccurrence(s, occurrence)) : s.template.items;
+}
+
 /** Pure: one invoice for one occurrence. No storage access. */
 /** Id of the document generated for one occurrence of a schedule (stable across devices). */
 export const recurringDocId = (scheduleId: string, occurrence: string): string => `rec-${scheduleId}-${occurrence}`;
@@ -463,7 +472,7 @@ export function buildInvoiceFromSchedule(
     due_date: addDays(issue, s.due_in_days),
     status: s.mode === 'issue' ? 'Sent' : 'Draft',
     amount_paid: 0,
-    items: t.items.map((i, n) => ({
+    items: amountHook(s, occurrence).map((i, n) => ({
       ...i,
       id: `${docId}-l${n + 1}`,
       name: applyTokens(i.name, occurrence),

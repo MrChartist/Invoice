@@ -1,0 +1,78 @@
+/**
+ * GST → Common credit (R5-C2): the Rule 42 / 43 working for a month from the bills' ITC use tags and the month's
+ * exempt / total turnover (the GSTR-1 / 3B engine), "Post reversal", the annual true-up and the working-paper CSV.
+ * Lazy; listed with the fees / non-profit / leases packs (its URL always opens it). Verify with your CA.
+ */
+import { useMemo, useState } from 'react';
+import type { InvoiceRecord } from '../../types/invoice';
+import type { PurchaseRecord } from '../../types/purchases';
+import type { ItcUse } from '../../types/institutions-r5';
+import { getTable } from '../../lib/storage';
+import { buildGstReport, type ReportPeriod } from '../../lib/gst-reports';
+import { purchasesDb } from '../../lib/purchases';
+import { HEADS, ITC_USES, figuresOf, headsTotal, inputsFor, itcUseOf, loadCcRuns, postReversal, rule42, trueUp, turnoverOf, unpostReversal, workingCsv, type Heads } from '../../lib/institutions/common-credit';
+import { useT } from '../../i18n';
+import { iT, type IKey } from '../../i18n/areas/packs-institutions-r5';
+import styles from './institutions.module.css';
+import { B, S, T, Tbl } from './Views';
+import { attempt, csv, opts, rs, today, type Notify } from './ui';
+
+const end = (m: string) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).toISOString().slice(0, 10);
+const fyOf = (m: string) => (+m.slice(5, 7) >= 4 ? +m.slice(0, 4) : +m.slice(0, 4) - 1);
+const ROWS = ['T', 'T1', 'T2', 'T3', 'C1', 'T4', 'C2', 'D1', 'D2', 'C3', 'Tm', 'Te', 'reverse'] as const;
+
+export default function CommonCreditView({ notify }: { notify: Notify }) {
+  useT();
+  const [month, setMonth] = useState(today().slice(0, 7));
+  const [tick, setTick] = useState(0);
+  const data = useMemo(() => ({ inv: getTable<InvoiceRecord>('invoices'), pur: getTable<PurchaseRecord>('purchases'), runs: loadCcRuns() }), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ef = (p: ReportPeriod) => turnoverOf(buildGstReport(data.inv, data.pur, { period: p }).gstr3b);
+  const fy = fyOf(month);
+  const res = useMemo(() => {
+    const { E, F } = ef({ kind: 'month', fyStart: fy, month: +month.slice(5, 7) });
+    return rule42(inputsFor(data.pur, `${month}-01`, end(month)), E, F, month);
+  }, [data, month]); // eslint-disable-line react-hooks/exhaustive-deps
+  const year = useMemo(() => {
+    const ms = Array.from({ length: 12 }, (_x, i) => `${i < 9 ? fy : fy + 1}-${String(((i + 3) % 12) + 1).padStart(2, '0')}`).filter((m) => m <= today().slice(0, 7));
+    const { E, F } = ef({ kind: 'fy', fyStart: fy });
+    const done: Heads = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
+    for (const r of data.runs) if (r.kind === 'monthly' && fyOf(r.month) === fy) HEADS.forEach((h) => (done[h] += r.figures[`D_${h}`] ?? 0));
+    return trueUp(ms.map((m) => { const i = inputsFor(data.pur, `${m}-01`, end(m)); return { C2: rule42(i, 0, 1, m).C2, nonBusiness: i.nonBusiness }; }), E, F, done, fy);
+  }, [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fyKey = `FY${fy}-${String(fy + 1).slice(2)}`;
+  const posted = data.runs.find((r) => r.kind === 'monthly' && r.month === month);
+  const postedFy = data.runs.find((r) => r.kind === 'annual' && r.month === fyKey);
+  const run = (fn: () => void) => attempt(notify, () => { fn(); setTick((n) => n + 1); }, iT('saved'));
+  const diff = headsTotal(year.diff);
+
+  return (
+    <div className={styles.stack} data-common-credit>
+      <p className={styles.warn}>{iT('ccNote')}</p>
+      <div className={styles.toolbar}>
+        <T l={iT('month')} t="month" v={month} on={(v) => v && setMonth(v)} />
+        <B l={iT('csv')} on={() => csv(`common-credit-${month}.csv`, workingCsv(res, month, (k) => iT(`cc.${k}` as IKey), iT('verify')))} />
+        {posted ? <B l={iT('undo')} on={() => run(() => unpostReversal(posted.id))} /> : (
+          <B p l={iT('post')} dis={!(headsTotal(res.reverse) > 0)} on={() => run(() => {
+            const figures = figuresOf(res);
+            HEADS.forEach((h) => (figures[`D_${h}`] = res.D1[h] + res.D2[h]));
+            postReversal({ month, kind: 'monthly', heads: res.reverse, figures, date: end(month) });
+          })} />
+        )}
+      </div>
+      <p>E {rs(res.E)} · F {rs(res.F)} · E ÷ F {(res.ratio * 100).toFixed(2)}% · {iT('reverse')} <strong>{rs(headsTotal(res.reverse))}</strong></p>
+      <Tbl h={['', 'IGST', 'CGST', 'SGST', 'Cess', iT('total')]} rows={ROWS.map((k) => [`${k}: ${iT(`cc.${k}`)}`, ...HEADS.map((h) => res[k][h].toFixed(2)), headsTotal(res[k]).toFixed(2)])} />
+      <p className={styles.note}>{iT('cc3b')}</p>
+      {data.pur.filter((p) => (p.date ?? '').slice(0, 7) === month && Number(p.cgst) + Number(p.sgst) + Number(p.igst) > 0).map((p) => (
+        <div key={p.id} className={styles.toolbar}>
+          <span>{p.date} · {p.vendor_name} · {p.bill_number}</span>
+          <S l={iT('itcUse')} v={itcUseOf(p)} o={opts(ITC_USES, 'use.')} on={(v) => run(() => purchasesDb.save({ ...p, itc_use: v as ItcUse }))} />
+        </div>
+      ))}
+      <h3>{iT('trueUp')} {fyKey}</h3>
+      <p>{iT('trueUpLine', { annual: rs(headsTotal(year.annual)), posted: rs(headsTotal(year.posted)), diff: rs(diff), due: year.dueBy })}</p>
+      <div>{postedFy ? <B l={iT('undo')} on={() => run(() => unpostReversal(postedFy.id))} /> : (
+        <B l={iT('post')} dis={Math.abs(diff) < 0.01} on={() => run(() => postReversal({ month: fyKey, kind: 'annual', heads: year.diff, figures: { annual: headsTotal(year.annual), posted: headsTotal(year.posted), diff }, date: `${fy + 1}-03-31` }))} />
+      )}</div>
+    </div>
+  );
+}

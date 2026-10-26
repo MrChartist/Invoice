@@ -68,6 +68,8 @@ export const ACT_REF_RULES: Readonly<Record<string, readonly Versioned<ActRef>[]
   '206C1G': refRules('206C(1G)', 'Sec 394(1) [Table: Sl. No. 7]', false, `${OFFICIAL_FAQ}, Q18 (Sec 394); ${BILL_TABLE}`),
   // 206C(1H) was omitted from 1 Apr 2025 (Finance Act 2025): no 2025-Act counterpart.
   '206C1H': refRules('206C(1H)', null, true, 'Finance Act 2025'),
+  // R5-C: donee approval for donations (80G → Sec 133(1)(b)(ii)); the donee statement (10BD) is Sec 354(1) / Form 113 — verify.
+  '80G': refRules('80G', 'Sec 133(1)(b)(ii)', false, 'Section mapping guide ITA 1961 → 2025 as understood — verify'),
 };
 
 /** Stored internal codes that are not themselves a section family. */

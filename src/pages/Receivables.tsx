@@ -70,8 +70,11 @@ const gvTabT = defineArea({ tab: 'Gift vouchers' } as const, { tab: 'गिफ�
 // R5-A: marketplace seller pack (channels, imports, settlements, TCS / TDS credit, returns) — listed only with the pack on.
 const MarketplaceTab = lazy(() => import('../components/marketplace/MarketplaceTab'));
 const mpTabT = defineArea({ tab: 'Marketplace' } as const, { tab: 'मार्केटप्लेस' });
+// R5-C: donations (non-profit pack) — 80G / 35 receipts, Form 10BD / 10BE.
+const DonationsTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.DonationsTab })));
+const donTabT = defineArea({ tab: 'Donations' } as const, { tab: 'दान' });
 
-type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds' | 'giftvouchers' | 'marketplace';
+type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds' | 'giftvouchers' | 'marketplace' | 'donations';
 const TABS: { id: Tab; label: () => string; pack?: PackId }[] = [
   { id: 'aging', label: () => rcvT('tabAging') },
   { id: 'statements', label: () => rcvT('tabStatements') },
@@ -81,6 +84,7 @@ const TABS: { id: Tab; label: () => string; pack?: PackId }[] = [
   { id: 'tds', label: () => rcvT('tabTds') },
   { id: 'giftvouchers', label: () => gvTabT('tab') }, // R4-B1
   { id: 'marketplace', label: () => mpTabT('tab'), pack: 'marketplace' }, // R5-A
+  { id: 'donations', label: () => donTabT('tab'), pack: 'nonprofit' }, // R5-C
 ];
 
 /** 1 April of the Indian financial year containing `d`. */
@@ -355,6 +359,7 @@ export function Receivables() {
         )}
         {tab === 'giftvouchers' && <Suspense fallback={null}><GiftVouchersPanel /></Suspense>}
         {tab === 'marketplace' && <Suspense fallback={<div className={surface.card}><p className={styles.note}>…</p></div>}><MarketplaceTab notify={notify} /></Suspense>}
+        {tab === 'donations' && <Suspense fallback={null}><DonationsTab notify={notify} /></Suspense>}
       </div>
       {toastNode}
     </div>

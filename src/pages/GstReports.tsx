@@ -52,7 +52,10 @@ const CompositionView = lazy(() => import('../components/gst-reports/Composition
 // E-commerce operators (GSTR-1 Table 14, 3B 3.1.1): loaded when the tab is opened.
 const EcoView = lazy(() => import('../components/gst-reports/EcoView'));
 import { checkGstin } from '../lib/gstin';
-import { GST_TABS, GST_TAB_GROUPS, resolveGstTab, tabForKey, type GstTabGroupId, type GstTabId } from '../lib/gst-tabs';
+import { journalItcReversals } from '../lib/gst-reports'; // R5-C2
+import { GST_TABS, GST_TAB_GROUPS, PACK_GST_TABS, resolveGstTab, tabForKey, type GstTabGroupId, type GstTabId } from '../lib/gst-tabs';
+import { activePacks } from '../lib/industry-packs'; // R5-C
+import { defineArea } from '../i18n/area';
 import { buildPreflight, needsPreflight, preflightCount, type PreflightForm } from '../lib/gst-preflight';
 import type { LutIssue } from '../lib/trade/lut-register';
 import type { LutRow } from '../types/trade-r4';
@@ -101,9 +104,12 @@ const PortalFilesView = lazy(() => import('../components/gst-reports/PortalFiles
 const EwayDesk = lazy(() => import('../components/gst-reports/EwayDesk'));
 const PreflightDialog = lazy(() => import('../components/gst-reports/PreflightDialog'));
 
-const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0]; desk?: 'tab.portal' | 'tab.eway' } | undefined) => (x?.desk ? dkT(x.desk) : x?.key ? gstT(x.key) : x?.label);
+const tabLabel = (x: { id?: string; label: string; key?: Parameters<typeof gstT>[0]; desk?: 'tab.portal' | 'tab.eway' } | undefined) => (x?.desk ? dkT(x.desk) : x?.key ? gstT(x.key) : x?.id === 'common-credit' ? ccTabT('tab') : x?.label);
 // R4-C2: export desk tab (its own lazy chunk).
 const ExportDesk = lazy(() => import('../components/trade/ExportDesk'));
+// R5-C2: Rule 42 / 43 common-credit working (fees / non-profit / leases packs; its own lazy chunk).
+const CommonCreditView = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.CommonCreditView })));
+const ccTabT = defineArea({ tab: 'Common credit (Rule 42 / 43)' } as const, { tab: 'साझा क्रेडिट (Rule 42 / 43)' });
 
 function download(name: string, mime: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
@@ -212,6 +218,8 @@ export function GstReports() {
       purchaseNotes: getTable<PurchaseReturn>('purchase_returns'),
       // 7R: ISD credit received by our unit(s) — 3B 4A(4).
       isdInward: loadIsdInward(),
+      // R5-C2: Rule 42 / 43 common-credit reversal journals → 4B(1).
+      itcReversals: journalItcReversals(getTable('vouchers')),
       // WP-8: user-defined UQCs, and alternate-unit lines summarised in the item's base unit.
       units: unitsDb.stored(),
       items: buildItemIndex(stockDb.items()),
@@ -303,8 +311,12 @@ export function GstReports() {
   };
 
   // Arrow keys move between section tabs across the groups (Tab still walks every tab button).
+  // R5-C: a pack tab is listed only with one of its packs on (or while it is the open tab).
+  const packs = activePacks(localDb.settings.get());
+  const listed = (id: GstTabId) => !PACK_GST_TABS[id] || id === tab || PACK_GST_TABS[id]!.some((p) => packs.includes(p));
   const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const next = tabForKey(tab, e.key);
+    let next = tabForKey(tab, e.key);
+    while (next && !listed(next)) next = tabForKey(next, e.key === 'Home' ? 'ArrowRight' : e.key === 'End' ? 'ArrowLeft' : e.key);
     if (!next) return;
     e.preventDefault();
     setTab(next);
@@ -606,6 +618,12 @@ export function GstReports() {
               : <EwayDesk notify={notify} />}
           </Suspense>
         );
+      case 'common-credit':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <CommonCreditView notify={notify} />
+          </Suspense>
+        );
       case 'export-desk':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
@@ -810,7 +828,7 @@ export function GstReports() {
           {GST_TAB_GROUPS.map((g) => (
             <div key={g.id} className={filing.tabGroup} role="tablist" aria-label={fiT(GROUP_LABEL[g.id])} data-tab-group={g.id}>
               <span className={filing.groupLabel} aria-hidden>{fiT(GROUP_LABEL[g.id])}</span>
-              {g.tabs.map((id) => (
+              {g.tabs.filter(listed).map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -834,7 +852,7 @@ export function GstReports() {
           <select className={controls.select} value={tab} onChange={(e) => setTab(resolveGstTab(e.target.value) ?? 'overview')} data-gst-tab-select>
             {GST_TAB_GROUPS.map((g) => (
               <optgroup key={g.id} label={fiT(GROUP_LABEL[g.id])}>
-                {g.tabs.map((id) => (
+                {g.tabs.filter(listed).map((id) => (
                   <option key={id} value={id}>{tabLabel(TABS.find((x) => x.id === id))}{counts[id] ? ` (${counts[id]})` : ''}</option>
                 ))}
               </optgroup>
