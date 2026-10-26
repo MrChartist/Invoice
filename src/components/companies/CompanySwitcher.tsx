@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { labelMainCompany, readRegistry, switchCompany } from '../../lib/companies';
+import { activeCompanyId, labelMainCompany, readRegistry, switchCompany } from '../../lib/companies';
 import { localDb } from '../../lib/localDb';
 import { useT } from '../../i18n';
 import { pwaT } from '../../i18n/areas/pwa';
@@ -18,7 +18,7 @@ export function CompanySwitcher() {
   return (
     <div className={styles.switcher}>
       <label className={styles.switcherLabel} htmlFor="company-switch">{pwaT('company')}</label>
-      <select id="company-switch" className={controls.select} value={reg.active} onChange={(e) => switchCompany(e.target.value)}>
+      <select id="company-switch" className={controls.select} value={activeCompanyId()} onChange={(e) => switchCompany(e.target.value)}>
         {reg.list.map((c) => (
           <option key={c.id} value={c.id}>{c.name}</option>
         ))}

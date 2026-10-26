@@ -478,7 +478,7 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
     }
     return { backend: 'idb', moved: lsIsTruth ? puts.length : 0 };
   } catch (err) {
-    resetIdbConnection(); // a stuck open must not block later IndexedDB use (safety snapshot, folder backup)
+    resetIdbConnection(true); // a stuck open must not block later IndexedDB use (safety snapshot, folder backup)
     return fail((err as Error)?.message ?? String(err));
   }
 }

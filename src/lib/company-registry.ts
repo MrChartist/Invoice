@@ -20,6 +20,10 @@ export interface CompanyEntry {
   id: string;
   name: string;
   created: string;
+  /** QA7 G1/G2: set only by the Demo-company creator (`demo-company.ts`), never by a name. */
+  demo?: true;
+  /** The company the Demo company was opened from ("Switch to" goes back there). */
+  from?: string;
 }
 
 export interface CompanyRegistry {
@@ -51,7 +55,7 @@ export function readRegistry(): CompanyRegistry {
   for (const e of Array.isArray(r.list) ? r.list : []) {
     if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !ID_RE.test(e.id) || seen.has(e.id)) continue;
     seen.add(e.id);
-    list.push({ id: e.id, name: String(e.name ?? '').slice(0, 80) || 'Company', created: String(e.created ?? '') });
+    list.push({ id: e.id, name: String(e.name ?? '').slice(0, 80) || 'Company', created: String(e.created ?? ''), ...(e.demo === true && { demo: true, from: String(e.from ?? '') }) });
   }
   if (!seen.has(DEFAULT_COMPANY_ID)) list.unshift({ id: DEFAULT_COMPANY_ID, name: DEFAULT_COMPANY_NAME, created: '' });
   const active = typeof r.active === 'string' && seen.has(r.active) ? r.active : DEFAULT_COMPANY_ID;
@@ -62,9 +66,21 @@ export function writeRegistry(reg: CompanyRegistry): void {
   ls()?.setItem(COMPANY_REGISTRY_KEY, JSON.stringify(reg));
 }
 
+let pinned: string | null = null;
+
+/**
+ * The company this tab has open. QA7 G1: fixed when its database is first opened (`pinCompany`, idb-kv.ts), so a
+ * switch in another tab, which rewrites the stored registry, never makes this tab think it holds another company.
+ */
 export function activeCompanyId(): string {
-  return readRegistry().active;
+  return pinned ?? readRegistry().active;
 }
+
+/** idb-kv: pin the company whose database this tab opens (kept until the page reloads); `null` is for tests. */
+export const pinCompany = (id: string | null): string | null => (pinned = id);
+
+/** QA7 G7: the user's own companies, without the Demo company. */
+export const realCompanies = (reg: CompanyRegistry = readRegistry()): CompanyEntry[] => reg.list.filter((c) => !c.demo);
 
 /** IndexedDB database holding a company's data. */
 export function companyDbName(id: string): string {

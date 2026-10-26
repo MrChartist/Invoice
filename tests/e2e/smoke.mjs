@@ -2560,6 +2560,18 @@ try {
     const b = await fresh();
     await b.p.getByRole('button', { name: /Skip for now/ }).first().click();
     await b.p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ state: 'detached' });
+    // QA7 G1: a second tab stays open on the real company while the first one opens the Demo company.
+    const other = await b.ctx.newPage();
+    watch(other, errors);
+    other.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
+    await other.goto(srv.origin + '/');
+    await other.locator('#login-pin, [data-testid="demo-notice"], button:has-text("Open a separate Demo company")').first().waitFor({ timeout: 15000 });
+    if (await other.locator('#login-pin').count()) {
+      await other.locator('#login-pin').fill('482916');
+      await other.keyboard.press('Enter');
+    }
+    await other.getByRole('button', { name: 'Open a separate Demo company (recommended)' }).waitFor({ timeout: 15000 });
+    await b.p.bringToFront();
     const cta = b.p.getByRole('button', { name: 'Open a separate Demo company (recommended)' });
     await cta.waitFor({ timeout: 15000 });
     await Promise.all([b.p.waitForEvent('load', { timeout: 20000 }), cta.click()]);
@@ -2567,6 +2579,29 @@ try {
     const sample = await waitRows(b.p, 'invoices', 1, 20000);
     const activeId = await b.p.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null')?.active ?? 'default');
     check(sample.length > 0 && activeId !== 'default', `the Dashboard chooser filled a separate Demo company (${sample.length} invoices in ${activeId})`);
+    await b.p.locator('[data-demo-company]').getByRole('button', { name: /Switch to/ }).waitFor({ timeout: 15000 });
+    check(true, 'the Demo banner offers the way back to the company the user came from');
+    await other.bringToFront();
+    await other.locator('[data-company-moved]').waitFor({ timeout: 15000 });
+    check(/another company/i.test(await other.locator('[data-company-moved]').innerText()), 'the stale tab says "This tab is on another company — reload"');
+    await other.evaluate(() => { history.pushState({}, '', '/transactions'); dispatchEvent(new PopStateEvent('popstate')); });
+    await other.evaluate(() => { history.pushState({}, '', '/'); dispatchEvent(new PopStateEvent('popstate')); });
+    await other.waitForTimeout(1500);
+    check(await other.locator('[data-demo-company]').count() === 0, 'the stale tab (real company) shows no Demo banner / Reset samples');
+    const mainInvoices = await other.evaluate(() => new Promise((resolve) => {
+      const open = indexedDB.open('mrchartist_inv_kv');
+      open.onsuccess = () => {
+        const d = open.result;
+        const req = d.transaction('data', 'readonly').objectStore('data').get('mrchartist_inv_invoices');
+        req.onsuccess = () => { d.close(); resolve(req.result ? JSON.parse(req.result).length : 0); };
+        req.onerror = () => { d.close(); resolve(-1); };
+      };
+      open.onerror = () => resolve(-1);
+    }));
+    check(mainInvoices === 0, `the real company holds no sample invoice (${mainInvoices})`);
+    await Promise.all([other.waitForEvent('load', { timeout: 20000 }), other.locator('[data-company-moved]').getByRole('button', { name: 'Reload' }).click()]);
+    await other.locator('#company-switch').waitFor({ timeout: 20000 });
+    check(await other.locator('#company-switch').inputValue() === activeId, 'Reload opens the company the device switched to');
     await b.ctx.close();
   });
 
@@ -2785,6 +2820,25 @@ try {
     await pop.waitFor({ timeout: 15000 });
     await page.waitForFunction(() => /In this app/.test(document.querySelector('[data-term-pop="b2cl"]')?.textContent ?? ''));
     check(/unregistered/i.test(await pop.innerText()), 'tapping B2CL opens its glossary popover');
+  });
+
+  await step('QA7 G3: F1 over a form opens nothing; Help stacked over a form closes alone on Escape, the form keeps its text', async () => {
+    await page.goto(srv.origin + '/clients?new=1');
+    const form = page.getByRole('dialog').first();
+    await form.waitFor({ timeout: 15000 });
+    await form.locator('input').first().fill('Asha Stack Test');
+    await form.locator('h2').first().click();
+    await page.keyboard.press('F1');
+    await page.waitForTimeout(800);
+    check(await page.getByRole('dialog').count() === 1, 'F1 does not stack Help over an open dialog');
+    // Help can still be stacked from inside a dialog (a "Learn more" link): one Escape closes only Help.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('mrchartist:open-help', { detail: {} })));
+    await page.locator('[data-app-version]').waitFor({ timeout: 15000 });
+    check(await page.getByRole('dialog').count() === 2, 'Help is open over the form');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(800);
+    check(await page.getByRole('dialog').count() === 1, 'one Escape closes only the top dialog');
+    check(await page.getByRole('dialog').first().locator('input').first().inputValue() === 'Asha Stack Test', 'the form keeps what was typed');
   });
 
   await step('R6-C import openings: a pasted trial balance shows the 1090 difference in the dry run and saves the openings', async () => {

@@ -11,7 +11,7 @@ import {
   switchCompany,
   type CompanyEntry,
 } from '../../lib/companies';
-import { DEFAULT_COMPANY_ID } from '../../lib/company-registry';
+import { DEFAULT_COMPANY_ID, activeCompanyId } from '../../lib/company-registry';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useT } from '../../i18n';
 import { syncT } from '../../i18n/areas/sync';
@@ -25,6 +25,7 @@ type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 export function CompaniesPanel({ notify }: { notify: Notify }) {
   const { t } = useT(); // re-render on a language switch (5.4)
   const [reg, setReg] = useState(readRegistry);
+  const here = activeCompanyId(); // this tab's open company (QA7 G1), not another tab's switch
   const [name, setName] = useState('');
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<CompanyEntry | null>(null);
@@ -87,14 +88,14 @@ export function CompaniesPanel({ notify }: { notify: Notify }) {
                 <>
                   <span className={styles.name}>
                     {c.name}
-                    {c.id === reg.active && <span className={styles.active}>{syncT('open')}</span>}
+                    {c.id === here && <span className={styles.active}>{syncT('open')}</span>}
                   </span>
                   <span className={styles.actions}>
-                    {c.id !== reg.active && (
+                    {c.id !== here && (
                       <button type="button" className={controls.btnOutline} onClick={() => switchCompany(c.id)}>{syncT('switch')}</button>
                     )}
                     <button type="button" className={controls.btnOutline} onClick={() => setRenaming({ id: c.id, name: c.name })}>{syncT('rename')}</button>
-                    {c.id !== reg.active && c.id !== DEFAULT_COMPANY_ID && (
+                    {c.id !== here && c.id !== DEFAULT_COMPANY_ID && (
                       <button type="button" className={controls.btnOutline} onClick={() => setDeleting(c)}>{syncT('delete')}</button>
                     )}
                   </span>

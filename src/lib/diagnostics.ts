@@ -56,7 +56,7 @@ export function scrubText(s: string): string {
     .replace(/data:[^\s"')]+/gi, '[data-url]')
     .replace(/[^\s@"'<>()]+@[^\s@"'<>()]+\.[a-z]{2,}/gi, '[email]')
     .replace(/\b\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]Z[0-9A-Z]\b/gi, '[gstin]')
-    .replace(/\b[A-Z]{5}\d{4}[A-Z]\b/g, '[pan]')
+    .replace(/\b[A-Z]{5}\d{4}[A-Z]\b/gi, '[pan]') // QA7 G6: typed in lower / mixed case too
     .replace(UUID, '[id]')
     .replace(/\b[A-Z]{2,6}\/[A-Z0-9-]+\/\d+\b/gi, '[doc-no]')
     .replace(/"[^"]{1,200}"|'[^']{1,200}'|“[^”]{1,200}”/g, '"…"')
@@ -66,12 +66,17 @@ export function scrubText(s: string): string {
 
 /**
  * R6-A5: text the tester typed in the report form. `scrubText` plus every run of 4+ digits and "Rs / INR <n>"
- * amounts, so a phone, an amount or a GSTIN typed by habit does not travel. Names cannot be detected: the form
- * asks the tester not to type them.
+ * amounts, so a phone, an amount or a GSTIN typed by habit does not travel. QA7 G6: Devanagari digits are read as
+ * digits first; UPI IDs (`name@bank`, no dotted domain), Indian-grouped amounts ("1,250", "1,25,000"), "12.5k" /
+ * "2 lakh" and any number next to "₹ / rs / rupees / रुपये" are masked too. Short codes stay readable ("194C",
+ * "GSTR-3B"). Names cannot be detected: the form asks the tester not to type them.
  */
 export function scrubTyped(s: string): string {
-  return scrubText(s)
-    .replace(/\b(?:rs\.?|inr)\s?\d[\d,]*(?:\.\d+)?/gi, '[amount]')
+  return scrubText(s.replace(/[\u0966-\u096F]/g, (d) => String(d.charCodeAt(0) - 0x966)))
+    .replace(/[\w.-]+@[a-z][a-z0-9.-]*/gi, '[upi]')
+    .replace(/\b(?:rs\.?|inr|rupees?)\s?\d[\d,]*(?:\.\d+)?/gi, '[amount]')
+    .replace(/\d[\d,]*(?:\.\d+)?\s?(?:k|lakhs?|lacs?|cr|crores?|rs\.?|rupees?|रुपये|रुपए|रु\.?)(?![a-z])/gi, '[amount]')
+    .replace(/\b\d{1,3}(?:,\d{2,3})+(?:\.\d+)?/g, '[amount]')
     .replace(/\d{4,}/g, '[number]');
 }
 
