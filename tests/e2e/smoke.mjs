@@ -1570,6 +1570,74 @@ try {
     check(/1,20,000\.00/.test(row ?? '') && /10,000\.00/.test(row ?? ''), `budget vs actual row (${row})`);
   });
 
+  await step('R3-B: project with an hours budget → log time on its task → bill the project with the timesheet annexure → print', async () => {
+    await page.goto(srv.origin + '/time?tab=projects');
+    await page.locator('[data-new-project]').click();
+    const pdlg = page.getByRole('dialog', { name: 'New project' });
+    await pdlg.locator('#pj-name').fill('Mobile app');
+    await pdlg.locator('#pj-client').selectOption({ label: 'Acme Buyers' });
+    await pdlg.locator('#pj-hours').fill('2');
+    await pdlg.locator('[data-save-project]').click();
+    await pdlg.waitFor({ state: 'detached' });
+    const centres = await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'Mobile app'));
+    const proj = centres.find((c) => c.name === 'Mobile app');
+    check(proj?.budget_minutes === 120 && proj?.kind === 'project', `project stored with a 2 h budget (${proj?.budget_minutes})`);
+    await page.locator('[data-project-select]').selectOption({ label: 'Mobile app' });
+    await page.locator('[data-add-task]').click();
+    const tdlg = page.getByRole('dialog', { name: 'Add task' });
+    await tdlg.locator('#tk-title').fill('Wireframes');
+    await tdlg.locator('#tk-est').fill('1');
+    await tdlg.locator('[data-save-task]').click();
+    await tdlg.waitFor({ state: 'detached' });
+    await page.locator('[data-task-id]').filter({ hasText: 'Wireframes' }).waitFor();
+
+    // Log 1:45 on the task: picking the task sets the project.
+    await page.getByRole('button', { name: /Add time/ }).click();
+    await page.locator('#te-client').selectOption({ label: 'Acme Buyers' });
+    await page.locator('#te-task').selectOption({ label: 'Wireframes' });
+    await page.getByLabel('Description').fill('Wireframes v1');
+    await page.getByLabel('Time (h:mm)').fill('1:45');
+    await page.getByLabel('Rate / hour').fill('1200');
+    await page.getByRole('button', { name: 'Add entry' }).click();
+    const logged = await readJson(page, 'time_entries', [], (v) => v.some((e) => e.description === 'Wireframes v1'));
+    const te = logged.find((e) => e.description === 'Wireframes v1');
+    check(!!te?.task_id && te?.cost_centre_id === proj?.id, `entry carries the task and its project (${te?.cost_centre_id === proj?.id})`);
+    await page.reload();
+    await page.locator('[data-project-select]').selectOption({ label: 'Mobile app' });
+    const header = await page.locator('[data-project-header]').innerText();
+    check(/1h 45m of 2h 00m/.test(header) && /87% of the hours budget/.test(header), `header: tracked vs budget and the 80% warning (${header.replace(/\s+/g, ' ').slice(0, 120)})`);
+
+    // Bill the project with the annexure.
+    await page.locator('[data-bill-project]').click();
+    await page.locator('[data-attach-annexure]').check();
+    await page.getByRole('button', { name: 'Create draft invoice' }).click();
+    await page.waitForURL(/\/invoice\/.+/);
+    const id = page.url().split('/invoice/')[1];
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === id && i.annexure))).find((i) => i.id === id);
+    check(inv?.annexure?.rows?.length === 1 && inv.annexure.rows[0].task === 'Wireframes' && inv.annexure.rows[0].billed_minutes === 105,
+      `annexure snapshot on the invoice (${inv?.annexure?.rows?.length} row, task ${inv?.annexure?.rows?.[0]?.task})`);
+    check(inv?.items?.length === 1 && inv.items[0].quantity === 1.75, `one time line of 1.75 h (${inv?.items?.[0]?.quantity})`);
+
+    // Issue it, dismiss the post-save sheet, then print: the annexure is a following page.
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    await page.locator('[data-annexure-actions]').waitFor();
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.waitFor();
+    const annex = dialog.locator('[data-annexure]').first();
+    await annex.waitFor();
+    const text = await annex.innerText();
+    check(/Annexure to INV\/FY\d{2}-\d{2}\/\d{4}/i.test(text) && /Wireframes v1/.test(text), `preview prints the annexure (${text.replace(/\s+/g, ' ').slice(0, 60)}…)`);
+    await dialog.getByRole('button', { name: /^Share/ }).click();
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+    const body = readFileSync(await dl.path()).toString('latin1');
+    const pages = (body.match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
+    check(pages >= 2, `the PDF carries the annexure on a following page (${pages} pages)`);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+  });
+
   await step('cheque register: record a post-dated cheque, see the reminder, clear it against the invoice', async () => {
     const day = (offset) => {
       const d = new Date();

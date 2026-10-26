@@ -77,6 +77,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     revision_of: 'q0', revision_no: 2,
     proposal_sections: [{ id: 's1', place: 'cover', title: 'Scope', body: 'Two floors' }],
     attention: { name: 'R. Iyer', role: 'Accounts' },
+    // R3-B
+    annexure: { kind: 'timesheet', rows: [{ date: '2026-04-09', description: 'Drafting', minutes: 50, billed_minutes: 60, rate: 2000, amount: 2000, ref: 't1' }], taken_at: '2026-04-10T00:00:00Z' },
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

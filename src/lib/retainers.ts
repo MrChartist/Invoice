@@ -354,7 +354,7 @@ export function saveRetainer(input: Omit<Retainer, 'id' | 'closes'> & { id?: str
   const all = loadRetainers();
   const prev = input.id ? all.find((r) => r.id === input.id) : undefined;
   const now = new Date().toISOString();
-  const row = normalizeRetainers([{ ...prev, ...input, id: prev?.id ?? generateId(), closes: prev?.closes ?? input.closes ?? [], created_at: prev?.created_at ?? now, ...(prev ? { updated_at: now } : {}) }])[0];
+  const row = normalizeRetainers([{ ...prev, ...input, id: prev?.id ?? input.id ?? generateId(), closes: prev?.closes ?? input.closes ?? [], created_at: prev?.created_at ?? now, ...(prev ? { updated_at: now } : {}) }])[0];
   setTable(RETAINERS_TABLE, prev ? all.map((r) => (r.id === row.id ? row : r)) : [...all, row]);
   return row;
 }

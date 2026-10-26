@@ -304,6 +304,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(num(r.revision_no) > 0 ? { revision_no: num(r.revision_no) } : {}),
     ...(Array.isArray(r.proposal_sections) && r.proposal_sections.length ? { proposal_sections: r.proposal_sections as InvoiceRecord['proposal_sections'] } : {}),
     ...(r.attention && typeof r.attention === 'object' && (r.attention as { name?: unknown }).name ? { attention: r.attention as InvoiceRecord['attention'] } : {}),
+    // R3-B4 (additive): the timesheet annexure snapshot travels with the document unchanged (Critical Rule 3).
+    ...(r.annexure && typeof r.annexure === 'object' && Array.isArray((r.annexure as { rows?: unknown }).rows) ? { annexure: r.annexure as InvoiceRecord['annexure'] } : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

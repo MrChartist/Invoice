@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, MessageCircle, UserX } from 'lucide-react';
+import { Download, MessageCircle, Users } from 'lucide-react';
 import type { Client } from '../../types/invoice';
 import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
@@ -50,7 +50,7 @@ export default function QuietCustomers({ clients, notify }: { clients: Client[];
   return (
     <section className={surface.card} aria-label={svcT('quietTitle')} data-quiet-customers>
       <div className={surface.cardHead}>
-        <span className={surface.cardHeadIcon}><UserX size={16} /> {svcT('quietTitle')} · {rows.length}</span>
+        <span className={surface.cardHeadIcon}><Users size={16} /> {svcT('quietTitle')} · {rows.length}</span>
         <div className={surface.rowActions}>
           <label className={controls.field} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <span className={controls.label}>{svcT('threshold')}</span>

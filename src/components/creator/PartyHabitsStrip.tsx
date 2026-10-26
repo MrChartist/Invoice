@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Repeat2, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, RotateCcw, Undo2 } from 'lucide-react';
 import type { Client, DocumentType, InvoiceItem } from '../../types/invoice';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
@@ -156,7 +156,7 @@ export default function PartyHabitsStrip({ party }: { party: Client }) {
       {message && <span className={styles.hint} role="status">{message}</span>}
       {habits && (habits.last || habits.usual.length > 0) && phone && (
         <button type="button" className={styles.chip} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {open ? svcT('hideStrip') : svcT('showStrip')}
+          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {open ? svcT('hideStrip') : svcT('showStrip')}
         </button>
       )}
       {showHabits && (
@@ -164,7 +164,7 @@ export default function PartyHabitsStrip({ party }: { party: Client }) {
           {last && (
             <div className={styles.row}>
               <button type="button" className={styles.chip} onClick={repeat} data-repeat-last>
-                <Repeat2 size={14} /> {svcT('repeatLast')}
+                <RotateCcw size={14} /> {svcT('repeatLast')}
               </button>
               <span className={styles.hint}>{svcT('repeatHint', { number: last.invoice_number, date: formatDate(last.issue_date), n: (last.items ?? []).filter((l) => !l.free_of && l.name?.trim()).length })}</span>
             </div>
