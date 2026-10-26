@@ -11,7 +11,9 @@
   purchases/ITC, inventory, books, GSTR-1/3B papers, e-Invoice/e-Way JSON, Tally XML, CSV import,
   PWA + encrypted/auto backups; also POS / restaurant tables & KOT, collections (terms, follow-ups, write-offs),
   projects / retainers / timesheets, payroll, manufacturing & production orders, annual accounts pack, GST portal-file /
-  e-Way / practice desks. Module contract: `docs/ARCHITECTURE.md`; per-module notes: `docs/features/`.
+  e-Way / practice desks, store chains (gift vouchers, store prices, transfer requests), export desk, recycle bin &
+  auditor pack, Income-tax Act 2025 labels, industry packs (marketplace seller, transport / works contracts, fees /
+  non-profits / leases). Module contract: `docs/ARCHITECTURE.md`; per-module notes: `docs/features/`.
 - **Brand source of truth**: mrchartist.com (logo `public/branding/*`, tokens in `src/index.css`; app palette = blue/gold `--pal-*`, orange kept only for the logo and the Ember template).
 
 ## Stack
@@ -76,19 +78,26 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   Rounds 2–3: `mrchartist_statement_prefs` (statement style + ageing strip, R2-A), `mrchartist_display_prefs` (text size /
   contrast / motion, applied before first paint by `public/theme-init.js`, R2-C), `mrchartist_kot_printers` (KOT printer
   per kitchen station, R3-A), `mrchartist_editor_layout` (live-preview toggle, R3-C) and `mrchartist_checklist_default`
-  (practice-desk default checklist, R3-C).
+  (practice-desk default checklist, R3-C); `mrchartist_pos_branch` (POS "This counter is branch", R4-B).
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
-- Rounds 2–4 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
+- Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
   `audit-edits.ts` and, when dated / numbered, `sync-engine.ts`; rows in `docs/ARCHITECTURE.md`):
   R2-A `payment_terms`, `collection_notes`, `write_off_recoveries` + objects `reminder_settings`, `collection_settings`;
   R2-B `batch_runs`, `proposal_snippets`; R2-C `notes_to_accounts`, `deferrals`, `packing_lists`, `package_types`;
   R3-A `dining_areas`, `dining_tables`, `table_orders`, `modifier_groups` + object `restaurant_settings`;
   R3-B `work_types`, `project_tasks`, `retainers` + objects `project_settings`, `quiet_settings`;
   R3-C `gst_portal_files`, `dsc_register`, `client_checklist` + object `checklist_template`;
-  R4-A `production_orders`, `qc_results`, `recall_notices`, `landed_cost_vouchers` + object `qc_settings`.
-  New `series_counters` series: `FCN` (financial credit notes), `PKL`, `WO`, `LCV`. Additive record fields come by
-  declaration merging in each package's types file (`src/types/{sales-r2,contacts,books-r2,restaurant,service-r3,docs-r3,production-r4}.ts`),
+  R4-A `production_orders`, `qc_results`, `recall_notices`, `landed_cost_vouchers` + object `qc_settings`;
+  R4-B `gift_vouchers`, `branch_prices`, `transfer_requests` + object `gift_voucher_settings`;
+  R4-C `lut_register`, `export_irms`, `export_incentives`, `export_writeoffs`, `recycle_bin` (backed up, **not synced**,
+  no `TABLE_ACTIONS` entry) + object `bin_settings`;
+  R5-A `sales_channels`, `channel_skus`, `marketplace_imports`, `settlements`, `eco_credits`, `marketplace_returns`;
+  R5-B `consignment_notes`, `gta_options`, `vehicles`, `trips`, `ra_measurements`, `boq_coefficients`;
+  R5-C `fee_plans`, `fee_runs`, `common_credit_runs`, `donations`, `form_10bd_filings`, `form_10be`, `properties`,
+  `leases`, `security_deposits`. Settings fields `industry_packs`, `npo_admin_accounts`, `npo_accumulated`.
+  New `series_counters` series: `FCN` (financial credit notes), `PKL`, `WO`, `LCV`, `GV`, `TRQ`, `LR`, `TRP`, `DON`. Additive record fields come by
+  declaration merging in each package's types file (`src/types/{sales-r2,contacts,books-r2,restaurant,service-r3,docs-r3,production-r4,stores-r4,trade-r4,marketplace-r5,transport-works-r5,institutions-r5}.ts`),
   e.g. `InvoiceRecord.annexure` / `delivery_proof` / `table_order_id`, `Client.doc_defaults` / `contacts`,
   `TimeEntry.work_type_id / task_id / retainer_id / retainer_period` (R2-A's `payment_terms`, `note_kind` … sit in
   `src/types/invoice.ts`). New `InvoiceRecord` keys must also go into `RECORD_KEYS` and `normalizeRecord`.
@@ -135,11 +144,22 @@ build-time config must use Vite's `VITE_` prefix.
 - Purchases are read through the shared `readPurchase` + `splitLumpTax` (`purchase-normalize.ts`);
   `gst-reports`, `books` and `export-shared` only adapt the result to their own field names.
 - Statutory values that change over time (B2CL threshold, GST slabs, TDS/TCS presets) live in
-  `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones.
+  `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones. Package rule files
+  with the same shape stay out of first paint: `src/lib/eway-validity.ts` (R3-C), `src/lib/trade/trade-rules.ts` (R4-C),
+  `src/lib/transport-works-rules.ts` (R5-B), `src/lib/r5c-rules.ts` (R5-C).
   Exception: GST interest / late-fee tables live in `src/lib/gst-penalties.ts` (same date-keyed shape) so they
   stay out of the early-loading notifications chunk, and payroll statutory values (EPF / ESI / PT / TDS u/s 192) live in
-  `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle. Likewise
-  e-Way validity days / extension window live in `src/lib/eway-validity.ts` (R3-C), outside first-paint `tax-rules.ts`.
+  `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle.
+- Income-tax Act 2025 (from 1 Apr 2026): screens and exports label TDS / TCS sections and forms by the document /
+  transaction date through `src/lib/ita2025.ts` (date-keyed, append-only); stored codes (`194C-1`, `26Q:2026-Q1` …)
+  are never renamed.
+- Industry packs (`src/lib/industry-packs.ts`): an explicit `settings.industry_packs` list wins, else the packs implied
+  by `business_type`, else none. Pack screens are lazy, listed in `PACK_TABS`, and read nothing while their pack is off.
+- Clearing bank accounts (`BankAccount.clearing`: marketplace settlements, "RA deductions clearing") are not real banks:
+  cheque / e-payment / BRS pickers must use `pickableBankAccounts`, which never offers them.
+- Recycle bin (R4-C4): deletes go through data-layer calls (`setTable` on a watched table, `localDb.invoices.remove`,
+  `deleteVoucher`), which copy the row to `recycle_bin`; never delete by `writeRaw` or resurrect rows by hand. A
+  deleted invoice / voucher number stays reserved in `series_counters`.
 - Every lucide icon lands in the first-paint `vendor-ui` chunk: reuse an icon that is already imported somewhere
   instead of adding a new name.
 - `/practice` reads other companies' databases through `peekCompliance` (`company-peek.ts`): a version-less,
