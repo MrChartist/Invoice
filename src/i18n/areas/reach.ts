@@ -96,7 +96,7 @@ export const reachT = defineArea(
     language: 'Language',
     composition: 'Composition scheme (issue Bills of Supply, no tax)',
     demoCta: 'Explore with sample data instead',
-    demoHint: 'Opens a separate “Demo” company filled with sample data; your own company stays empty and untouched.',
+    demoHint: 'Opens a separate “Demo” company filled with sample data. Your own company is kept, with anything you typed here.',
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -183,6 +183,6 @@ export const reachT = defineArea(
     language: 'भाषा',
     composition: 'कंपोज़िशन स्कीम (बिल ऑफ़ सप्लाई, बिना टैक्स)',
     demoCta: 'इसके बजाय सैंपल डेटा से देखें',
-    demoHint: 'सैंपल डेटा वाली एक अलग “Demo” कंपनी खुलती है; आपकी अपनी कंपनी ख़ाली और अछूती रहती है।',
+    demoHint: 'सैंपल डेटा वाली एक अलग “Demo” कंपनी खुलती है। आपकी अपनी कंपनी, यहाँ लिखी जानकारी के साथ, बनी रहती है।',
   },
 );

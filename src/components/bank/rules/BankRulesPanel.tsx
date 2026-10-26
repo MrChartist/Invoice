@@ -4,7 +4,7 @@
  */
 import { useMemo, useState } from 'react';
 import { Plus, Trash2, Wand2 } from 'lucide-react';
-import { GST_SLABS } from '../../../types/invoice';
+import { gstRateOptions } from '../../../lib/tax-rules';
 import { PURCHASE_CATEGORIES } from '../../../types/purchases';
 import { rulesDb, validateRule, type BankRule, type RuleAction, type RuleCondition } from '../../../lib/bank-rules';
 import { chartOf, loadUserAccounts } from '../../../lib/ledger/accounts';
@@ -156,7 +156,7 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
               </label>
               <label className={controls.field}><span className={controls.label}>{capT('gstRate')}</span>
                 <select className={controls.select} value={a.gst_rate ?? 0} onChange={(e) => setA({ gst_rate: Number(e.target.value) })}>
-                  {GST_SLABS.map((s) => <option key={s} value={s}>{s}%</option>)}
+                  {gstRateOptions(undefined, a.gst_rate ?? 0).map((s) => <option key={s} value={s}>{s}%</option>)}
                 </select>
               </label>
             </>

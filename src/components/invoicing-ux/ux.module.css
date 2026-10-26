@@ -52,3 +52,7 @@
   .sheetBackdrop { place-items: end stretch; padding: 0; }
   .sheetPanel { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 }
+
+/* QA-3 F21: document strip — inline type picker; the due chip never wraps on its own line */
+.typePick { width: auto; min-width: 0; max-width: 12rem; font-weight: 600; }
+.nowrap { white-space: nowrap; }

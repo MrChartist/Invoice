@@ -389,6 +389,11 @@ export function InvoiceCreator() {
           <SupplyNotice />
           <GstExtrasFields />
 
+          {/* QA-3 F21: "1 · Document" leads again — a one-line strip (type picker inline) until edited. */}
+          <MetaSummary forceOpen={errors.length > 0} editing={editing}>
+            <DocumentMetaCard editing={editing} saveTick={saveTick} />
+          </MetaSummary>
+
           <section className={surface.card} data-r3c-section="party">
             <div className={surface.cardHead}>{t('editor.parties')}</div>
             <div className={surface.cardBody}>
@@ -415,11 +420,6 @@ export function InvoiceCreator() {
             <StockWarnings />
             <LastRateHints />
           </section>
-
-          {/* A5: customer & items first — document details as a one-line summary below the items. */}
-          <MetaSummary forceOpen={errors.length > 0}>
-            <DocumentMetaCard editing={editing} saveTick={saveTick} />
-          </MetaSummary>
 
           <Suspense fallback={null}>
             <PaymentScheduleCard notify={notify} />
@@ -470,9 +470,10 @@ export function InvoiceCreator() {
                     <Save size={18} /> {saveChoice === 'print' ? uxT('savePrint') : saveChoice === 'whatsapp' ? uxT('saveWhatsapp') : t('editor.saveDoc', { doc: lang === 'en' ? label.toLowerCase() : label })}
                   </button>
                   <select className={cn(controls.select, styles.splitPick)} value={saveChoice} disabled={readOnly} aria-label={uxT('saveChoose')} onChange={(e) => setSaveChoiceState(setSaveChoice(e.target.value as SaveChoice))} data-save-choice>
-                    <option value="save">{uxT('saveOnly')}</option>
-                    <option value="print">{uxT('savePrint')}</option>
-                    <option value="whatsapp">{uxT('saveWhatsapp')}</option>
+                    {/* QA-3 F21: the picker names what happens AFTER saving, so it does not read as another Save. */}
+                    <option value="save">{uxT('saveOptOnly')}</option>
+                    <option value="print">{uxT('saveOptPrint')}</option>
+                    <option value="whatsapp">{uxT('saveOptWhatsapp')}</option>
                   </select>
                 </div>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => save(false, true)} disabled={readOnly}>

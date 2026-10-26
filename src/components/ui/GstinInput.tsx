@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { checkGstin } from '../../lib/gstin';
 import { cn } from '../../lib/utils';
+import { t } from '../../i18n';
 import controls from '../../styles/controls.module.css';
 
 export interface GstinInputProps {
@@ -45,7 +46,7 @@ export function GstinInput({ value, onChange, onStateCode, placeholder = '22AAAA
       {showResult &&
         (result.valid ? (
           <span className={controls.ok}>
-            <CheckCircle2 size={13} /> Valid GSTIN
+            <CheckCircle2 size={13} /> {t('common.validGstin')}
           </span>
         ) : (
           <span className={controls.error}>

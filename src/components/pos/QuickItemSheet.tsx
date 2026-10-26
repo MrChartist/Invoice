@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { createItemFromCode, quickItemDraft } from '../../lib/catalog';
-import { GST_SLABS, UNITS, type InvoiceItem } from '../../types/invoice';
+import { UNITS, type InvoiceItem } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { cn } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { retailT } from '../../i18n/areas/retail';
@@ -74,7 +75,7 @@ export function QuickItemSheet({ code, onClose, onSaved, onSearch, defaultTax = 
           <label className={controls.field}>
             <span className={controls.label}>{retailT('qiGst')}</span>
             <select className={controls.select} value={tax} onChange={(e) => setTax(Number(e.target.value))}>
-              {GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}
+              {gstRateOptions(undefined, tax).map((r) => <option key={r} value={r}>{r}%</option>)}
             </select>
           </label>
         </div>

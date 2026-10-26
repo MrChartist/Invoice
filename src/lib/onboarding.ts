@@ -109,6 +109,17 @@ export function applyAnswers(settings: AppSettings, a: WizardAnswers): AppSettin
   return { ...settings, profiles, onboarded: true, gst_filing_frequency: frequency };
 }
 
+/**
+ * What the wizard keeps when the user leaves it for the Demo company (QA-3 F20): everything typed so far goes into the
+ * active profile, but the account is NOT marked as set up, so the wizard opens again (prefilled) back in this company.
+ * Returns null when nothing was typed (no write needed).
+ */
+export function wizardDraft(settings: AppSettings, a: WizardAnswers): AppSettings | null {
+  const typed = [a.companyName, a.companyAddress, a.city, a.pin, a.companyPhone, a.companyEmail, a.companyGstin, a.upiId, a.bankName, a.accountNumber, a.ifsc].some((v) => String(v ?? '').trim());
+  if (!typed && !a.logo) return null;
+  return { ...applyAnswers(settings, a), onboarded: settings.onboarded };
+}
+
 /** Show the wizard only to a brand-new account: not set up, no invoices yet. */
 export function shouldShowWizard(settings: Pick<AppSettings, 'onboarded'>, invoiceCount: number): boolean {
   return !settings.onboarded && invoiceCount === 0;

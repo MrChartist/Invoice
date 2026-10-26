@@ -2,9 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, FilePlus2, IndianRupee, Mail, MessageCircle, Printer, Share2, X } from 'lucide-react';
 import { localDb } from '../../lib/localDb';
-import { invoiceUpiLink, mailtoLink, normalizePhone, whatsappLink } from '../../lib/share';
-import { partyOutstanding, sendMessage, sheetMessage } from '../../lib/send-summary';
-import { receivableBalance } from '../../lib/rcm';
+import { emailText, invoiceUpiLink, mailtoLink, normalizePhone, whatsappLink } from '../../lib/share';
+import { partyOutstanding, sendMessage, sheetMessage, sheetState } from '../../lib/send-summary';
 import { can } from '../../lib/access';
 import { cn, formatCurrency } from '../../lib/utils';
 import { DOCUMENT_LABELS } from '../../types/invoice';
@@ -48,7 +47,8 @@ export function SendSheet({ invoiceId, onClose, onPreview, onRecordPayment, onNe
   }, [onClose]);
   if (!inv) return null;
   const label = DOCUMENT_LABELS[inv.doc_type] ?? 'Invoice';
-  const balance = Math.max(receivableBalance(inv), 0);
+  // QA-3 F3: a quotation / proforma / order / challan shows no balance and offers no payment.
+  const { balance, canPay, hint } = sheetState(inv);
   const text = sheetMessage(sendMessage(inv, outstanding), balance > 0 ? invoiceUpiLink(inv) : null);
   const clientPhone = inv.client?.phone || '';
   const waPhone = clientPhone || phone;
@@ -79,18 +79,18 @@ export function SendSheet({ invoiceId, onClose, onPreview, onRecordPayment, onNe
           </a>
           <button type="button" className={big} onClick={() => { onClose(); onPreview('share'); }} data-send-pdf><Share2 size={18} /> {uxT('ssSharePdf')}</button>
           <button type="button" className={big} onClick={() => { onClose(); onPreview('print'); }}><Printer size={18} /> {uxT('ssPrint')}</button>
-          {balance > 0 && onRecordPayment && can('payment.record') && (
+          {canPay && onRecordPayment && can('payment.record') && (
             <button type="button" className={big} onClick={() => { onClose(); onRecordPayment(); }} data-send-pay><IndianRupee size={18} /> {uxT('ssRecordPay')}</button>
           )}
           {onNew && <button type="button" className={big} onClick={() => { onClose(); onNew(); }}><FilePlus2 size={18} /> {uxT('ssNew')}</button>}
         </div>
         <div className={ux.row}>
-          <a className={cn(controls.btnGhost, controls.btnSm)} href={mailtoLink({ to: inv.client?.email, subject: `${label} ${inv.invoice_number}`, body: text })}>
+          <a className={cn(controls.btnGhost, controls.btnSm)} href={mailtoLink({ to: inv.client?.email, subject: `${label} ${inv.invoice_number}`, body: emailText(text) })}>
             <Mail size={14} /> {uxT('ssEmail')}
           </a>
           <ShareMenu invoice={inv} hideReminder={inv.doc_type === 'QUOTATION'} />
         </div>
-        <p className={ux.kbdHint}>{uxT('ssHint')}</p>
+        {hint && <p className={ux.kbdHint}>{uxT(hint === 'instalment' ? 'ssHint' : 'ssHintBalance')}</p>}
       </div>
     </div>,
     document.body,

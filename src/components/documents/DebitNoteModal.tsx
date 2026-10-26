@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { createDebitNote, type DebitLine } from '../../lib/documents';
-import { GST_SLABS } from '../../lib/tax-rules';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { round2 } from '../../lib/invoice-calc';
 import { formatCurrency } from '../../lib/utils';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -62,7 +62,7 @@ export function DebitNoteModal({ invoice, open, onClose, onCreated }: DebitNoteM
             <input className={controls.input} aria-label={salesT('dn.lineQty', { n: i + 1 })} type="number" min={0} step="any" value={l.quantity} onChange={(e) => set(i, { quantity: Number(e.target.value) })} />
             <input className={controls.input} aria-label={salesT('dn.lineRate', { n: i + 1 })} type="number" min={0} step="any" value={l.rate || ''} onChange={(e) => set(i, { rate: Number(e.target.value) })} placeholder={salesT('rate')} />
             <select className={controls.select} aria-label={salesT('dn.lineGst', { n: i + 1 })} value={l.tax_rate} onChange={(e) => set(i, { tax_rate: Number(e.target.value) })}>
-              {GST_SLABS.map((r) => <option key={r} value={r}>{r}%</option>)}
+              {gstRateOptions(undefined, l.tax_rate).map((r) => <option key={r} value={r}>{r}%</option>)}
             </select>
             {lines.length > 1 && (
               <button type="button" className={controls.btnDanger} aria-label={salesT('dn.removeLine', { n: i + 1 })} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>

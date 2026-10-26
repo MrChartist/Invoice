@@ -2009,6 +2009,10 @@ try {
     await page.locator('[data-annual-preview] .ap-page').first().waitFor({ timeout: 15000 });
     check(await page.locator('[data-annual-preview] .ap-page').count() === 6, 'annual pack: cover, balance sheet, P&L, cash flow, trial balance, notes');
     check(/verify with your CA/.test((await page.locator('[data-annual-preview]').textContent()) ?? ''), 'annual pack carries the "verify with your CA" draft line');
+    // QA-3 F18: a year still running is an interim pack to date, never "As at 31 Mar" of a year that has not ended.
+    const packText = (await page.locator('[data-annual-preview]').textContent()) ?? '';
+    const fyEnd = await page.evaluate(() => { const d = new Date(); return d.getMonth() === 2 && d.getDate() === 31; });
+    check(fyEnd || (/interim/i.test(packText) && !/For the year ended/.test(packText)), 'annual pack during the year is labelled interim, to date');
   });
 
   await step('R2-B batch invoices: one saved invoice billed to two parties as drafts, numbered in order; undo deletes them', async () => {
@@ -2040,6 +2044,60 @@ try {
     check(true, 'undo removed the run\'s drafts');
     await writeJson(page, 'clients', prevClients);
     await writeJson(page, 'batch_runs', null);
+  });
+
+  await step('QA-3 QA-2: document strip first with the type inline; a quotation offers no payment; one invoice target in Convert; quote "Valid until"; bill Esc asks first', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevClients = await readJson(page, 'clients', []);
+    const prevItems = await readJson(page, 'items_catalog', []);
+    await page.goto(srv.origin + '/invoice');
+    const type = page.locator('[data-meta-type]');
+    await type.waitFor({ timeout: 15000 });
+    const stripFirst = await page.evaluate(() => {
+      const strip = document.querySelector('[data-meta-summary]');
+      const client = document.querySelector('input[aria-label="Client name"], input[placeholder="Client name *"]');
+      return !!strip && !!client && !!(strip.compareDocumentPosition(client) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    check(stripFirst, 'F21: "1 · Document" strip comes before the parties');
+    check((await page.locator('[data-save-choice] option').allInnerTexts()).join('|') === 'Just save|Then print|Then WhatsApp', 'F21: the after-save picker does not read as another Save');
+    await type.selectOption('QUOTATION');
+    await page.getByLabel('Client name').fill('E2E Quote Party');
+    await page.getByLabel('Item 1 name').fill('E2E Chairs');
+    await page.getByLabel('Item 1 rate').fill('1000');
+    await page.keyboard.press('Control+s');
+    const sheet = page.locator('[data-send-sheet]');
+    await sheet.waitFor({ timeout: 10000 });
+    const sheetText = await sheet.innerText();
+    check((await sheet.locator('[data-send-pay]').count()) === 0 && !/Balance on this bill/.test(sheetText), 'F3: the quotation sheet shows no balance and no Record payment');
+    const mail = decodeURIComponent((await sheet.locator('a[href^="mailto:"]').getAttribute('href')) ?? '');
+    check(mail.includes('Quotation') && !mail.includes('*'), 'F23: the e-mail body has no WhatsApp *bold* markers');
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: /^Convert/ }).click();
+    const items = await page.getByRole('menuitem').allInnerTexts();
+    check(items.some((t) => /Convert to Tax Invoice/.test(t)) && !items.some((t) => /Convert to Invoice$/.test(t.trim())), `F22: one invoice target in the Convert menu (${items.filter((t) => /Invoice/.test(t)).join(', ')})`);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/transactions');
+    const row = page.locator('tr', { hasText: 'E2E Quote Party' }).first();
+    await row.waitFor({ timeout: 10000 });
+    check(/Valid until/.test(await row.innerText()), 'F22: the ledger shows a quotation as "Valid until"');
+    await writeJson(page, 'invoices', prevInvoices);
+    await writeJson(page, 'clients', prevClients);
+    await writeJson(page, 'items_catalog', prevItems);
+    // F12: a purchase bill with a typed line asks before Esc throws it away.
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).first().click();
+    const bill = page.getByRole('dialog');
+    await bill.waitFor();
+    await bill.getByLabel(/Line 1 item|line 1/i).first().fill('E2E Steel');
+    let asked = '';
+    page.once('dialog', async (d) => { asked = d.message(); await d.dismiss(); });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    check(/Discard this bill/.test(asked) && (await bill.isVisible()), 'F12: Esc on a filled bill asks, and Cancel keeps it open');
+    page.once('dialog', (d) => d.accept());
+    await page.keyboard.press('Escape');
+    await bill.waitFor({ state: 'detached' });
   });
 
   await step('QA-3 F6: recurring from an invoice starts after it; the list refreshes after the first run; Run now asks before billing early; drafts take no number', async () => {
