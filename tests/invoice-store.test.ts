@@ -75,6 +75,9 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     revision_of: 'q0', revision_no: 2,
     proposal_sections: [{ id: 's1', place: 'cover', title: 'Scope', body: 'Two floors' }],
     attention: { name: 'R. Iyer', role: 'Accounts' },
+    // R3-A
+    table_order_id: 'ord1',
+    split_of: { order_id: 'ord1', part: 2, parts: 3 },
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

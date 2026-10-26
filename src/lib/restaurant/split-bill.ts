@@ -184,6 +184,8 @@ export interface Reconciliation {
   diff: ReconRow;
   /** Tax heads agree to the paisa. */
   taxExact: boolean;
+  /** Total GST + cess agrees to the paisa (CGST / SGST halves may swap a paisa from per-line rounding). */
+  taxTotalExact: boolean;
 }
 
 const row = (r: Pick<InvoiceRecord, 'taxable_value' | 'cgst_amount' | 'sgst_amount' | 'igst_amount' | 'cess_amount' | 'total'>): ReconRow => ({
@@ -198,5 +200,9 @@ export function reconcile(parts: readonly InvoiceRecord[], whole: InvoiceRecord)
   }
   const w = row(whole);
   const diff = Object.fromEntries((Object.keys(sum) as (keyof ReconRow)[]).map((k) => [k, round2(sum[k] - w[k])])) as unknown as ReconRow;
-  return { parts: sum, whole: w, diff, taxExact: diff.cgst === 0 && diff.sgst === 0 && diff.igst === 0 && diff.cess === 0 };
+  return {
+    parts: sum, whole: w, diff,
+    taxExact: diff.cgst === 0 && diff.sgst === 0 && diff.igst === 0 && diff.cess === 0,
+    taxTotalExact: round2(diff.cgst + diff.sgst + diff.igst + diff.cess) === 0,
+  };
 }

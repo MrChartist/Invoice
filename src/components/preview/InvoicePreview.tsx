@@ -22,6 +22,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
 import { receivableBalance } from '../../lib/rcm';
 import { canDocRight } from '../../lib/user-rights';
+import { rPosT } from '../../i18n/areas/restaurant-pos';
 
 
 interface InvoicePreviewModalProps {
@@ -224,6 +225,27 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
     if (result === 'unsupported' || result === 'failed' || result === 'blocked') downloadBlob(name, file);
   };
 
+  /** R3-A5: the first copy as image(s) — shared as files, else downloaded (ZIP for several pages); or copied. */
+  const handleShareImage = async (copy = false) => {
+    if (busy) return;
+    const node = paperRef.current?.querySelector<HTMLElement>('[data-print-copy]') ?? paperRef.current;
+    if (!node) return;
+    setBusy(true);
+    setError('');
+    try {
+      const m = await import('../../lib/share-image');
+      const files = await m.renderBillImages(node, invoice.invoice_number, design);
+      if (copy) {
+        if (!(await m.copyBillImage(files[0]))) await m.shareOrDownloadImages(files.slice(0, 1), invoice.invoice_number);
+      } else await m.shareOrDownloadImages(files, invoice.invoice_number, `${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number}`.trim());
+    } catch (err) {
+      console.error('Image share failed', err);
+      setError(rPosT('imageFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** Share the PDF itself (e.g. into a WhatsApp chat); browsers without file sharing get a download. */
   const shareReady = async (file: File) => {
     const result = await shareFile(file, {
@@ -307,7 +329,7 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
             <Palette size={18} />
           </Link>
           {invoice.id && (
-            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} onSharePdf={canShareFiles() ? handleSharePDF : undefined} onClientCopy={handleClientCopy} />
+            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} onSharePdf={canShareFiles() ? handleSharePDF : undefined} onShareImage={() => void handleShareImage()} onCopyImage={typeof ClipboardItem !== 'undefined' ? () => void handleShareImage(true) : undefined} onClientCopy={handleClientCopy} />
           )}
           {readyToShare && (
             <button type="button" className={controls.btnPrimary} onClick={() => shareReady(readyToShare)}>

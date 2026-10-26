@@ -54,7 +54,7 @@ export const restaurantDb = {
   },
   tables: (): DiningTable[] => {
     const rows = getTable<DiningTable>(RT.tables);
-    return rows.length ? rows : getTable<DiningArea>(RT.areas).length ? [] : starterMasters().tables;
+    return rows.length ? rows : starterMasters().tables;
   },
   saveAreas: (rows: DiningArea[]): void => {
     requireAccess('master.edit');
@@ -365,8 +365,10 @@ export function previewBill(order: TableOrder, day: string = localDay(), items?:
 }
 
 class SettleRefused extends Error {
-  constructor(readonly result: PosSaveResult) {
+  readonly result: PosSaveResult;
+  constructor(result: PosSaveResult) {
     super(result.errors[0] ?? 'The bill could not be saved.');
+    this.result = result;
   }
 }
 

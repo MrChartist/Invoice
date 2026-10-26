@@ -330,3 +330,11 @@ export function printRawReceipt(lines: readonly string[], width: ReceiptWidth, t
   w.print();
   return true;
 }
+
+/* ── R3-A: kitchen tickets ─────────────────────────────────────── */
+
+/** ESC/POS bytes for a short ticket (KOT): every line cut to the roll's columns, then fed and cut. */
+export function ticketBytes(lines: readonly string[], width: ReceiptWidth): Uint8Array {
+  const cols = columnsFor(width);
+  return escposBytes(lines.flatMap((l) => (l.length > cols ? wrap(l, cols) : [l])));
+}

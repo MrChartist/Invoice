@@ -23,6 +23,7 @@ import { nextPartyBalanceSnapshot } from '../lib/party-balance';
 import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import '../types/sales-r2'; // R2-B: declaration-merged record fields (RECORD_KEYS below)
+import type {} from '../types/restaurant'; // R3-A: declaration-merged record fields (type-only, erased)
 import type {
   Client,
   DiscountType,
