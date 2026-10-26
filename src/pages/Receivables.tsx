@@ -5,12 +5,15 @@ import { buildWhatsAppStatement } from '../lib/khata';
 import { khataT } from '../i18n/areas/khata';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, BellRing, ChevronRight, Clock, Copy, Download, FileStack, FileText, ListChecks, Mail, MessageCircle, Percent, Printer, Scale, Send, Wallet,
+  AlertTriangle, Ban, BellRing, ChevronRight, NotebookPen, Clock, Copy, Download, FileStack, FileText, ListChecks, Mail, MessageCircle, Percent, Printer, Scale, Send, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
 import { uxT } from '../i18n/areas/invoicing-ux';
+import { rcv2T as colT } from '../i18n/areas/collections-rcv';
+import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type StatementStyle } from '../lib/statement-styles';
+import type { Payment } from '../types/invoice';
 import { getTable } from '../lib/storage';
 import type { CreditLinkRow } from '../lib/amount-due';
 import type { AdvanceRecord } from '../types/advances';
@@ -50,11 +53,18 @@ const QuickEntrySheet = lazy(() => import('../components/khata/QuickEntrySheet')
 const RemindQueue = lazy(() => import('../components/khata/RemindQueue'));
 // 8.106: bulk remind / write-off on the filtered ageing list.
 const ReceivablesBulk = lazy(() => import('../components/invoicing-ux/ReceivablesBulk'));
+// Round 2 (R2-A): follow-ups & promises, write-off register / single write-off, party timeline — loaded on use.
+const FollowUpsTab = lazy(() => import('../components/collections/FollowUpsTab'));
+const FollowUpDialog = lazy(() => import('../components/collections/FollowUpDialog'));
+const WriteOffRegister = lazy(() => import('../components/collections/WriteOffRegister'));
+const WriteOffDialog = lazy(() => import('../components/collections/WriteOffDialog'));
+const PartyTimeline = lazy(() => import('../components/collections/PartyTimeline'));
 
-type Tab = 'aging' | 'statements' | 'collections' | 'advances' | 'tds';
+type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds';
 const TABS: { id: Tab; label: () => string }[] = [
   { id: 'aging', label: () => rcvT('tabAging') },
   { id: 'statements', label: () => rcvT('tabStatements') },
+  { id: 'followups', label: () => colT('tabFollowups') }, // R2-A4
   { id: 'collections', label: () => rcvT('tabCollections') },
   { id: 'advances', label: () => rcvT('tabAdvances') },
   { id: 'tds', label: () => rcvT('tabTds') },
@@ -111,6 +121,17 @@ export function Receivables() {
   const dso = useMemo(() => computeDso(report, 90, now), [report, now]);
   const efficiency = overallEfficiency(months);
   const fmt = (n: number) => formatCurrency(n, currency);
+  // R2-A7: how each party usually pays (settled bills of the last 12 months, promises kept / broken) — loaded
+  // after the screen renders so the route chunk stays small.
+  const [extras, setExtras] = useState<typeof import('../components/collections/aging-extras') | null>(null);
+  useEffect(() => {
+    import('../components/collections/aging-extras').then((m) => setExtras(m)).catch(() => undefined);
+  }, []);
+  const scores = useMemo(
+    () => (extras ? extras.computeScores({ invoices: data.invoices, payments: data.payments as Payment[], links: data.links, clients: data.clients }, toDateInput(now)) : null),
+    [extras, data, now],
+  );
+  const badge = (key: string): ReactNode => (extras && scores ? <extras.PaymentScoreBadge score={scores.get(key)} /> : null);
 
   // Per-client late-fee terms (roadmap 6.15): overdue bills of such clients get "Add late fee",
   // which creates a NEW draft invoice; the overdue one is never edited.
@@ -240,10 +261,16 @@ export function Receivables() {
 
       <div role="tabpanel" id={`rcv-panel-${tab}`} aria-labelledby={`rcv-tab-${tab}`}>
         {tab === 'aging' && <AgingTab report={report} currency={currency} fmt={fmt} lateFeeRules={lateFeeRules} onLateFee={addLateFee} clients={data.clients}
+          badge={badge} notify={notify} onChanged={() => setData(loadData())}
           onStatement={(p) => { const n = new URLSearchParams(params); n.set('tab', 'statements'); n.set('party', p.key); setParams(n, { replace: true }); }} />}
         {tab === 'statements' && <StatementsTab report={report} data={data} currency={currency} now={now}
           partyKey={params.get('party') ?? ''} onPick={(k) => { const n = new URLSearchParams(params); n.set('party', k); setParams(n, { replace: true }); }}
-          notify={notify} onChanged={() => setData(loadData())} />}
+          notify={notify} onChanged={() => setData(loadData())} badge={badge} />}
+        {tab === 'followups' && (
+          <Suspense fallback={null}>
+            <FollowUpsTab report={report} invoices={data.invoices} payments={data.payments as Payment[]} clients={data.clients} notify={notify} />
+          </Suspense>
+        )}
         {tab === 'collections' && (
           <div className={surface.card}>
             <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('billedVsReceived')}</h2></div>
@@ -275,6 +302,11 @@ export function Receivables() {
               </table>
             </div>
           </div>
+        )}
+        {tab === 'collections' && (
+          <Suspense fallback={null}>
+            <WriteOffRegister notify={notify} onChanged={() => setData(loadData())} />
+          </Suspense>
         )}
         {tab === 'advances' && (
           <Suspense fallback={<div className={surface.card}><p className={styles.note}>{rcvT('loadingAdvances')}</p></div>}>
@@ -310,9 +342,12 @@ function Stat({ label, value, hint, icon, tone }: {
 
 /* ── Aging ────────────────────────────────────────────────────── */
 
-function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee, clients }: {
+function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee, clients, badge, notify, onChanged }: {
   report: ReturnType<typeof buildReceivables>;
   clients: ReturnType<typeof loadData>['clients'];
+  badge: (partyKey: string) => ReactNode;
+  notify: (m: string, tone?: 'success' | 'error' | 'info') => void;
+  onChanged: () => void;
   currency: string;
   fmt: (n: number) => string;
   onStatement: (p: PartyReceivable) => void;
@@ -321,6 +356,9 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
+  const [followUp, setFollowUp] = useState<PartyReceivable | null>(null);
+  const [writeOff, setWriteOff] = useState<{ party: PartyReceivable; bill: PartyReceivable['bills'][number] } | null>(null);
+  const modeOf = (p: PartyReceivable) => clients.find((x) => (p.clientId && x.id === p.clientId) || x.name?.trim().toLowerCase() === p.name.trim().toLowerCase())?.reminder_mode;
   // WhatsApp statement per party row (8.3): wa.me with open bills, net due and a upi:// link.
   const waHref = (p: PartyReceivable) => {
     const c = clients.find((x) => (p.clientId && x.id === p.clientId) || x.name?.trim().toLowerCase() === p.name.trim().toLowerCase());
@@ -403,6 +441,15 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
                             {p.name}
                           </button>
                         ) : <span className={styles.noExpand}>{p.name}</span>}
+                        {badge(p.key)}
+                        {modeOf(p) === 'never' && <span className={`${surface.badge} ${surface.badgeDraft}`}>{colT('rmNeverBadge')}</span>}
+                        {modeOf(p) === 'manual' && <span className={`${surface.badge} ${surface.badgeDraft}`}>{colT('rmManualBadge')}</span>}
+                        {currency === 'INR' && p.net > 0.004 && can('payment.record') && (
+                          <button type="button" className={controls.btnIcon} aria-label={`${colT('fuLog')}: ${p.name}`} title={colT('fuLog')}
+                            onClick={() => setFollowUp(p)} data-log-followup>
+                            <NotebookPen size={14} />
+                          </button>
+                        )}
                         {currency === 'INR' && p.net > 0.004 && (
                           <a href={waHref(p)} target="_blank" rel="noopener noreferrer" className={controls.btnIcon} data-wa-statement
                             aria-label={khataT('waStatementFor', { name: p.name })} title={khataT('waStatement')}>
@@ -418,7 +465,8 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
                     {expanded && (
                       <tr className={styles.billsRow} data-vindex={vrow['data-vindex']} aria-rowindex={rowIndex === undefined ? undefined : rowIndex + 1}>
                         <td colSpan={8}>
-                          <BillsTable party={p} currency={currency} lateFeeRules={lateFeeRules} onLateFee={onLateFee} />
+                          <BillsTable party={p} currency={currency} lateFeeRules={lateFeeRules} onLateFee={onLateFee}
+                            onWriteOff={currency === 'INR' && can('doc.deleteIssued') ? (bill) => setWriteOff({ party: p, bill }) : undefined} />
                         </td>
                       </tr>
                     )}
@@ -437,16 +485,31 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
           </table>
         </div>
       </div>
+      {followUp && (
+        <Suspense fallback={null}>
+          <FollowUpDialog partyKey={followUp.key} partyName={followUp.name}
+            bills={followUp.bills.filter((b) => !b.opening).map((b) => ({ id: b.invoiceId, number: b.number, outstanding: b.outstanding }))}
+            onClose={() => setFollowUp(null)} onSaved={(m) => { notify(m); onChanged(); }} />
+        </Suspense>
+      )}
+      {writeOff && (
+        <Suspense fallback={null}>
+          <WriteOffDialog invoiceId={writeOff.bill.invoiceId} number={writeOff.bill.number} party={writeOff.party.name} outstanding={writeOff.bill.outstanding}
+            onClose={() => setWriteOff(null)} onDone={(m) => { notify(m); onChanged(); }} />
+        </Suspense>
+      )}
     </div>
   );
 }
 
 /** One party's open bills (inside its expanded aging row); long lists are windowed too. */
-function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
+function BillsTable({ party: p, currency, lateFeeRules, onLateFee, onWriteOff }: {
   party: PartyReceivable;
   currency: string;
   lateFeeRules: Map<string, ClientLateFee>;
   onLateFee: (invoiceId: string) => void;
+  /** R2-A3: owner-only single write-off of an invoice's open balance. */
+  onWriteOff?: (bill: PartyReceivable['bills'][number]) => void;
 }) {
   const m = (n: number) => (n ? formatMoney(n, currency) : '—');
   const billKeys = useMemo(() => p.bills.map((b) => b.invoiceId), [p.bills]);
@@ -484,6 +547,12 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
                     <Percent size={14} aria-hidden="true" /> {rcvT('addLateFee')}
                   </button>
                 )}
+                {onWriteOff && !b.opening && b.daysOverdue > 0 && (
+                  <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => onWriteOff(b)}
+                    aria-label={`${colT('woBtn')}: ${b.number}`} data-writeoff-open>
+                    <Ban size={14} aria-hidden="true" /> {colT('woBtn')}
+                  </button>
+                )}
               </td>
             </tr>
           );
@@ -504,7 +573,8 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee }: {
 
 /* ── Statements ───────────────────────────────────────────────── */
 
-function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, onChanged }: {
+function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, onChanged, badge }: {
+  badge: (partyKey: string) => ReactNode;
   report: ReturnType<typeof buildReceivables>;
   data: ReturnType<typeof loadData>;
   currency: string;
@@ -520,6 +590,11 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
   const [to, setTo] = useState(() => toDateInput(now));
   const [viewer, setViewer] = useState(false);
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
+  const [followUp, setFollowUp] = useState(false);
+  const [tlVersion, setTlVersion] = useState(0);
+  // R2-A6: statement style + ageing strip (device-local preference).
+  const [prefs, setPrefs] = useState(loadStatementPrefs);
+  const setStyle = (next: typeof prefs) => { setPrefs(next); saveStatementPrefs(next); };
 
   const ledger = useMemo(() => buildLedger(party, from, to), [party, from, to]);
   const entryKeys = useMemo(() => ledger.entries.map((e, i) => `${e.ref}-${i}`), [ledger.entries]);
@@ -593,8 +668,13 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
 
       <div className={surface.card}>
         <div className={surface.cardHead}>
-          <h2 className={styles.h2}>{party.name}</h2>
+          <h2 className={styles.h2}>{party.name} {badge(party.key)}</h2>
           <div className={surface.pageActions}>
+            {currency === 'INR' && can('payment.record') && (
+              <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setFollowUp(true)} data-log-followup>
+                <NotebookPen size={14} /> {colT('fuLog')}
+              </button>
+            )}
             {currency === 'INR' && client && can('payment.record') && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setEntry('received')}
                 aria-label={khataT('receivedFrom', { name: party.name })}>
@@ -626,6 +706,16 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
               onClick={() => void import('../components/receivables/letters').then((m) => m.printConfirmationLetters([party], data.clients, sender, from, to, currency))}>
               <Printer size={14} /> {printT('letterOne')}
             </button>
+            <label className={styles.inline}>
+              <span className={surface.srOnly}>{colT('stStyle')}</span>
+              <select className={controls.select} value={prefs.style} aria-label={colT('stStyle')} onChange={(e) => setStyle({ ...prefs, style: e.target.value as StatementStyle })} data-statement-style>
+                {STATEMENT_STYLES.map((st) => <option key={st} value={st}>{colT(`st.${st}`)}</option>)}
+              </select>
+            </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={prefs.ageing} onChange={(e) => setStyle({ ...prefs, ageing: e.target.checked })} data-statement-ageing />
+              {colT('stAgeing')}
+            </label>
             <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={() => setViewer(true)} disabled={invalidRange}>
               <FileText size={14} /> {rcvT('printPdf')}
             </button>
@@ -688,8 +778,21 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
         </p>
       </div>
 
+      {currency === 'INR' && (
+        <Suspense fallback={null}>
+          <PartyTimeline partyKey={party.key} invoices={data.invoices} payments={data.payments as Payment[]} clients={data.clients} version={tlVersion} />
+        </Suspense>
+      )}
       <StatementViewer open={viewer} onClose={closeViewer} sender={sender} party={party} client={client}
-        ledger={ledger} currency={currency} onError={(msg) => notify(msg, 'error')} />
+        ledger={ledger} currency={currency} onError={(msg) => notify(msg, 'error')}
+        styleKind={prefs.style} ageing={prefs.ageing ? { asOf: to || toDateInput(now) } : undefined} />
+      {followUp && (
+        <Suspense fallback={null}>
+          <FollowUpDialog partyKey={party.key} partyName={party.name}
+            bills={party.bills.filter((b) => !b.opening).map((b) => ({ id: b.invoiceId, number: b.number, outstanding: b.outstanding }))}
+            onClose={() => setFollowUp(false)} onSaved={(m) => { notify(m); setTlVersion((v) => v + 1); }} />
+        </Suspense>
+      )}
       {entry && client && (
         <Suspense fallback={null}>
           <QuickEntrySheet mode={entry} client={client} party={party} onClose={() => setEntry(null)}

@@ -16,7 +16,7 @@
  *   party.net === Σ open bills - credit notes (not allocated to a linked bill) - advances
  */
 
-import type { Client, DocumentType, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
+import type { Client, DocumentType, FinancialReason, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
 import { round2, num } from './invoice-calc';
 import { agingBucket } from './invoice-status';
 import { daysOverdue, formatMoney, formatDate } from './utils';
@@ -28,6 +28,7 @@ import { advanceMovements } from './advance-tax';
 import { receivableTotal } from './rcm';
 import { linkedCredits, type CreditLinkRow } from './amount-due';
 import { effectiveDueDate } from './payment-schedule';
+import { FINANCIAL_REASON_LABELS, isFinancialNote } from './financial-note';
 
 /** 8.100: ageing follows the earliest unpaid instalment of a payment schedule (else the due date). */
 const dueOf = (inv: InvoiceRecord): string => effectiveDueDate(inv);
@@ -77,6 +78,10 @@ export interface LedgerEntry {
   invoiceId?: string;
   /** True when derived from invoice.amount_paid / Paid status with no payment row. */
   derived?: boolean;
+  /** Additive (R2-A2): a financial credit note (settlement discount / kasar / bad debt) — not a sales return. */
+  financial?: FinancialReason;
+  /** Additive (R2-A3): a bad-debt write-off row (not money received). */
+  writeOff?: boolean;
 }
 
 export interface Bill {
@@ -329,7 +334,9 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     if (isCreditNote(inv)) {
       a.entries.push({
         date: issue, kind: 'credit_note', ref: inv.invoice_number,
-        particulars: 'Credit Note', debit: 0, credit: total, balance: 0, invoiceId: inv.id,
+        particulars: isFinancialNote(inv) ? `${FINANCIAL_REASON_LABELS[inv.financial_reason ?? 'settlement_discount']}${inv.po_number ? ` (against ${inv.po_number})` : ''}` : 'Credit Note',
+        debit: 0, credit: total, balance: 0, invoiceId: inv.id,
+        ...(isFinancialNote(inv) ? { financial: inv.financial_reason ?? 'settlement_discount' } : {}),
       });
       // An allocated note is settled against its bill below (only an unallocated rest stays a credit).
       if (!allocatedNotes.has(inv.id)) a.creditNotes = round2(a.creditNotes + total);
@@ -358,8 +365,9 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       a.entries.push({
         date: dateKey(p.date) || issue, kind: 'payment',
         ref: p.reference || inv.invoice_number,
-        particulars: `Receipt – ${p.method || 'Payment'} (against ${inv.invoice_number})`,
+        particulars: p.write_off ? `Bad debt written off (${inv.invoice_number})` : `Receipt – ${p.method || 'Payment'} (against ${inv.invoice_number})`,
         debit: 0, credit: amt, balance: 0, invoiceId: inv.id,
+        ...(p.write_off ? { writeOff: true } : {}),
       });
     }
     // TDS the customer withholds is settled with the tax office, never paid to us: it
@@ -588,7 +596,7 @@ export function monthlyCollections(report: ReceivablesReport, months = 12, now: 
       if (!r) continue;
       if (e.kind === 'invoice') r.billed = round2(r.billed + e.debit);
       else if (e.kind === 'credit_note') r.credited = round2(r.credited + e.credit);
-      else if (e.kind !== 'opening') r.received = round2(r.received + e.credit);
+      else if (e.kind !== 'opening' && !e.writeOff) r.received = round2(r.received + e.credit);
     }
   }
   for (const r of rows) {
@@ -618,7 +626,8 @@ export function computeDso(report: ReceivablesReport, windowDays = 90, now: Date
     for (const e of p.entries) {
       if (e.date < start || e.date > end) continue;
       if (e.kind === 'invoice') sales += e.debit;
-      else if (e.kind === 'credit_note') sales -= e.credit;
+      // R2-A2/A3: settlement discounts and bad debts are expenses, not a reduction of credit sales.
+      else if (e.kind === 'credit_note' && !e.financial) sales -= e.credit;
     }
   }
   if (sales <= 0) return null;

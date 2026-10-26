@@ -6,6 +6,7 @@
  * are structural + checksum only, not a registration lookup.
  */
 
+import { isNonGstFinancialNote } from './financial-note';
 import type { InvoiceRecord } from '../types/invoice';
 import { checkGstin } from './gstin';
 import { stateByCode } from './india-states';
@@ -123,7 +124,9 @@ export function validateEInvoice(
 
   // ── Source document ──
   if (record) {
-    if (!eInvoiceDocType(record)) {
+    if (isNonGstFinancialNote(record)) {
+      out.push(issue('error', 'DOC_TYPE', 'Document', 'A financial credit note (settlement discount, short payment or bad debt) carries no GST and is not reported to the IRP.'));
+    } else if (!eInvoiceDocType(record)) {
       out.push(issue('error', 'DOC_TYPE', 'Document', `${record.doc_type.replace(/_/g, ' ').toLowerCase()} documents are not reported to the IRP. Only tax invoices and credit/debit notes are.`));
     }
     if (record.status === 'Cancelled') {
@@ -321,6 +324,8 @@ export function preflightEInvoice(
 
 export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now?: Date; skippedServiceLines?: number } = {}): PreflightIssue[] {
   const out: PreflightIssue[] = [];
+  // R2-A2: a financial credit note moves no goods.
+  if (record && isNonGstFinancialNote(record)) out.push(issue('error', 'DOC_TYPE', 'Document', 'A financial credit note moves no goods: no e-Way bill.'));
   const now = opts.now ?? new Date();
 
   if (record && (record.doc_type === 'QUOTATION' || record.doc_type === 'PROFORMA' || record.doc_type === 'SALES_ORDER')) {

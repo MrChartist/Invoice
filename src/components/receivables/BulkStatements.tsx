@@ -13,6 +13,8 @@ import { useT } from '../../i18n';
 import { printT } from '../../i18n/areas/printing';
 import controls from '../../styles/controls.module.css';
 import styles from './StatementViewer.module.css';
+import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, skipInBulk, type StatementStyle } from '../../lib/statement-styles';
+import { rcv2T as colT } from '../../i18n/areas/collections-rcv';
 
 interface Props {
   parties: PartyReceivable[];
@@ -34,8 +36,15 @@ export function BulkStatements({ parties, clients, sender, currency, defaultFrom
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
   const [onlyBalance, setOnlyBalance] = useState(true);
+  // R2-A6: style + ageing strip; parties with no activity in range (or no open balance for open-item) are skipped.
+  const [prefs, setPrefs] = useState(loadStatementPrefs);
+  const setStyle = (next: typeof prefs) => { setPrefs(next); saveStatementPrefs(next); };
   const sorted = useMemo(() => [...parties].sort((a, b) => a.name.localeCompare(b.name)), [parties]);
-  const shown = useMemo(() => sorted.filter((p) => !onlyBalance || Math.abs(buildLedger(p, from, to).closing) >= 0.005), [sorted, onlyBalance, from, to]);
+  const shown = useMemo(() => sorted.filter((p) => {
+    const ledger = buildLedger(p, from, to);
+    if (onlyBalance && Math.abs(ledger.closing) < 0.005) return false;
+    return !skipInBulk(p, ledger, prefs.style);
+  }), [sorted, onlyBalance, from, to, prefs.style]);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(parties.map((p) => p.key)));
   const chosen = shown.filter((p) => picked.has(p.key));
   const [job, setJob] = useState<{ party: PartyReceivable; ledger: Ledger } | null>(null);
@@ -133,6 +142,18 @@ export function BulkStatements({ parties, clients, sender, currency, defaultFrom
           {printT('withBalance')}
         </label>
       </div>
+      <div className={controls.row}>
+        <label className={controls.field}>
+          <span className={controls.label}>{colT('stStyle')}</span>
+          <select className={controls.select} value={prefs.style} onChange={(e) => setStyle({ ...prefs, style: e.target.value as StatementStyle })} data-bulk-style>
+            {STATEMENT_STYLES.map((st) => <option key={st} value={st}>{colT(`st.${st}`)}</option>)}
+          </select>
+        </label>
+        <label className={controls.check}>
+          <input type="checkbox" checked={prefs.ageing} onChange={(e) => setStyle({ ...prefs, ageing: e.target.checked })} />
+          {colT('stAgeing')}
+        </label>
+      </div>
       <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
         <legend className={controls.label}>
           {printT('parties')} · {printT('selected', { n: chosen.length })}{' '}
@@ -158,7 +179,8 @@ export function BulkStatements({ parties, clients, sender, currency, defaultFrom
       {job &&
         createPortal(
           <div style={{ position: 'fixed', left: -12000, top: 0, pointerEvents: 'none' }} aria-hidden="true" className="no-print">
-            <StatementDocument ref={paper} sender={sender} party={job.party} client={clientFor(job.party, clients)} ledger={job.ledger} currency={currency} />
+            <StatementDocument ref={paper} sender={sender} party={job.party} client={clientFor(job.party, clients)} ledger={job.ledger} currency={currency}
+              styleKind={prefs.style} ageing={prefs.ageing ? { asOf: to || todayInput() } : undefined} />
           </div>,
           document.body,
         )}

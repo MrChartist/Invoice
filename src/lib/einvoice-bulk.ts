@@ -31,6 +31,7 @@
  *  - A result with an error / failed status, or with no IRN, writes nothing and is listed.
  */
 
+import { isNonGstFinancialNote } from './financial-note';
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 import {
   EINVOICE_META_TABLE,
@@ -116,6 +117,7 @@ export function bulkCandidates(
   return invoices
     .filter((i) => {
       if (!i || !(E_INVOICE_DOC_TYPES.has(i.doc_type) || (opts.billsOfSupply && EWAY_ONLY_DOC_TYPES.has(i.doc_type)))) return false;
+      if (isNonGstFinancialNote(i)) return false; // R2-A2: no IRN for a financial credit note
       if (i.status === 'Draft' || i.status === 'Cancelled') return false;
       const d = String(i.issue_date ?? '').slice(0, 10);
       return d >= range.from && d <= range.to;
@@ -155,6 +157,7 @@ export function buildBulkEInvoice(invoices: readonly InvoiceRecord[], ctx: BulkC
     const reasons = statusReasons(inv);
     if (EWAY_ONLY_DOC_TYPES.has(inv.doc_type)) reasons.push('Bill of Supply: no e-Invoice (it goes into the e-Way file only, document type BIL).');
     else if (!E_INVOICE_DOC_TYPES.has(inv.doc_type)) reasons.push('Only tax invoices, credit notes and debit notes go to the IRP.');
+    else if (isNonGstFinancialNote(inv)) reasons.push('Financial credit note (no GST): not reported to the IRP.');
     const m = meta.get(inv.id);
     if (m?.irn && !ctx.includeDone) reasons.push(`IRN already recorded (${m.irn.slice(0, 12)}…); generating it again would be rejected as a duplicate.`);
     const key = `${(inv.sender?.companyGstin ?? '').toUpperCase()}|${number.toUpperCase()}`;

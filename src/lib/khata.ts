@@ -15,7 +15,7 @@ import { normalizePhone, upiLink } from './share';
 import { formatCurrency, formatDate } from './utils';
 import { isoDay, localDayOf } from './dates';
 import { billAmount, canCarryPartyBalance } from './party-balance';
-import { fillTemplate, stageForDays, type ReminderChannel, type ReminderRecord, type ReminderStage } from './reminders';
+import { fillTemplate, stageForDays, type ReminderChannel, type ReminderRecord, type ReminderSchedule, type ReminderStage } from './reminders';
 import { PARTY_TEMPLATES, statementLabels, type MessageLang } from './message-langs';
 
 const EPS = 0.005;
@@ -356,10 +356,10 @@ export function partySnoozedUntil(log: readonly ReminderRecord[], partyKey: stri
   return days.length ? days[days.length - 1] : null;
 }
 
-/** Reminder stage for a party, from its oldest overdue bill (the log's `tone`). */
-export function partyStage(party: PartyReceivable): ReminderStage {
+/** Reminder stage for a party, from its oldest overdue bill (the log's `tone`); `schedule` = R2-A5 offsets. */
+export function partyStage(party: PartyReceivable, schedule?: ReminderSchedule): ReminderStage {
   const oldest = oldestOverdueBill(party);
-  return (oldest ? stageForDays(-oldest.daysOverdue) : null) ?? 'upcoming';
+  return (oldest ? stageForDays(-oldest.daysOverdue, schedule) : null) ?? 'upcoming';
 }
 
 export function makePartyLogEntry(
@@ -397,6 +397,9 @@ export interface QueueResult {
   /** Left out: snoozed parties, and parties already reminded inside the cool-down. */
   snoozed: number;
   recent: number;
+  /** R2-A4 / A5: left out because of an open promise-to-pay, or a party set to manual / never remind. */
+  promised?: number;
+  muted?: number;
 }
 
 export interface QueueOptions {
@@ -404,6 +407,8 @@ export interface QueueOptions {
   today?: Date;
   /** Days between two reminders to the same party (default 3; the monthly balance uses 20). */
   cooldownDays?: number;
+  /** R2-A4: parties with an open promise-to-pay (no reminder until the promised date). */
+  heldParties?: ReadonlySet<string>;
 }
 
 const dayNumber = (day: string) => {
@@ -426,10 +431,22 @@ export function partyReminderQueue(
   const byName = new Map(clients.map((c) => [(c.name ?? '').trim().toLowerCase(), c]));
   let snoozed = 0;
   let recent = 0;
+  let promised = 0;
+  let muted = 0;
   const items: QueueItem[] = [];
   for (const party of report.parties) {
     const overdue = overdueOf(party);
     if (kind === 'overdue' ? overdue <= EPS : party.net <= EPS) continue;
+    const master = (party.clientId ? byId.get(party.clientId) : undefined) ?? byName.get(party.name.trim().toLowerCase());
+    // R2-A5: "manual" parties are reminded only on demand, "never" parties not at all.
+    if (master?.reminder_mode === 'manual' || master?.reminder_mode === 'never') {
+      muted++;
+      continue;
+    }
+    if (kind === 'overdue' && opts.heldParties?.has(party.key)) {
+      promised++;
+      continue;
+    }
     const until = partySnoozedUntil(log, party.key);
     if (until && dayNumber(until) > todayN) {
       snoozed++;
@@ -455,7 +472,7 @@ export function partyReminderQueue(
     kind === 'overdue'
       ? b.oldestDays - a.oldestDays || b.amount - a.amount || a.party.name.localeCompare(b.party.name)
       : b.amount - a.amount || a.party.name.localeCompare(b.party.name));
-  return { items, snoozed, recent };
+  return { items, snoozed, recent, promised, muted };
 }
 
 /* ── Party balance snapshot on a bill (8.5) ───────────────────── */

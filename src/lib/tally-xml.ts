@@ -40,6 +40,8 @@
  * Working papers: verify with your CA before importing.
  */
 
+import { financialAccountOf, isFinancialNote } from './financial-note';
+
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { fxNarration, inrTotals, inrValue } from './fx';
@@ -49,6 +51,7 @@ import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
 import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
 import { payrollTallyVouchers } from './tally-payroll';
+
 import {
   clean,
   emptySource,
@@ -66,6 +69,14 @@ import {
   type DateRange,
   type ExportSource,
 } from './export-shared';
+
+/** R2-A2: Tally ledger names for the accounts a financial credit note is debited to. */
+const FINANCIAL_TALLY_LEDGERS: Readonly<Record<string, string>> = {
+  discount_allowed: 'Discount Allowed',
+  bad_debts: 'Bad Debts Written Off',
+  round_off: 'Round Off',
+  other_exp: 'Other Expenses',
+};
 
 /* ── XML primitives ───────────────────────────────────────────── */
 
@@ -413,8 +424,11 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     const party = partyNameOf(inv.client);
     registerParty(inv, party);
 
-    const inventory = o.includeInventory ? lineItems(inv) : [];
-    const salesLedger = credit ? o.creditNoteLedger : o.salesLedger;
+    // R2-A2: a financial credit note posts to its expense ledger (Discount Allowed / Bad Debts), with no stock and,
+    // without the GST variant, no GST ledgers at all.
+    const financial = credit && isFinancialNote(inv);
+    const inventory = o.includeInventory && !financial ? lineItems(inv) : [];
+    const salesLedger = financial ? FINANCIAL_TALLY_LEDGERS[financialAccountOf(inv)] ?? 'Discount Allowed' : credit ? o.creditNoteLedger : o.salesLedger;
     const entries: TallyEntry[] = [];
     const abs = (n: number) => Math.abs(n);
     const absA = {
@@ -445,7 +459,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     push(entries, o.tcsLedger, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.tcs)));
     balanceWithRoundOff(entries, o.roundOffLedger);
 
-    std(salesLedger, 'Sales Accounts');
+    std(salesLedger, financial ? (financialAccountOf(inv) === 'bad_debts_recovered' ? 'Indirect Incomes' : 'Indirect Expenses') : 'Sales Accounts');
     std(o.otherChargesLedger, 'Sales Accounts');
     std(o.roundOffLedger, 'Indirect Expenses');
     std(o.outputCgst, 'Duties & Taxes', 'Central Tax');

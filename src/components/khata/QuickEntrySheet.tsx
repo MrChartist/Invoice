@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { can } from '../../lib/access';
@@ -14,6 +14,11 @@ import { useT } from '../../i18n';
 import { khataT } from '../../i18n/areas/khata';
 import controls from '../../styles/controls.module.css';
 import styles from './khata.module.css';
+import type { SettleValue } from '../collections/SettleRestFields';
+import { colT } from '../../i18n/areas/collections';
+
+// R2-A2: "Settle the rest" of a partly paid bill, loaded only when a bill is left partly open.
+const SettleRestFields = lazy(() => import('../collections/SettleRestFields'));
 
 export type QuickEntryMode = 'received' | 'given';
 
@@ -53,6 +58,7 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
   const [edited, setEdited] = useState<Record<string, string> | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [settle, setSettle] = useState<SettleValue>({ choice: 'leave', amount: '', gst: false });
 
   const bills = useMemo(() => openBillRefs(party), [party]);
   const amount = parseAmount(amountText);
@@ -65,6 +71,17 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
       .filter((a) => a.amount > 0);
   }, [edited, fifo, bills]);
   const allocated = round2(allocations.reduce((s, a) => s + a.amount, 0));
+  // R2-A2: the bill this receipt leaves partly open (the oldest one), if it is an invoice.
+  const partial = useMemo(() => {
+    for (const b of bills) {
+      const a = allocations.find((x) => x.bill_id === b.id)?.amount ?? 0;
+      if (a > 0 && a < b.outstanding - 0.004) {
+        const inv = localDb.invoices.getById(b.id);
+        return inv ? { bill: b, invoice: inv, paid: a } : null;
+      }
+    }
+    return null;
+  }, [bills, allocations]);
   const onAccount = round2(Math.max(amount - allocated, 0));
   const net = party?.net ?? 0;
   const givenMode = givenModeFor(localDb.settings.activeProfile());
@@ -77,7 +94,7 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
     setEdited({ ...base, [id]: value });
   };
 
-  const save = () => {
+  const save = async () => {
     if (busy) return;
     setErrors([]);
     if (mode === 'received') {
@@ -85,11 +102,20 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
       if (issues.length) return setErrors(issues);
       setBusy(true);
       try {
-        savePartyReceipt({
+        const receipt = () => savePartyReceipt({
           client: { id: client.id, name: client.name },
           amount, method, reference: reference.trim() || undefined, note: note.trim() || undefined, date, allocations,
         });
-        onSaved(khataT('savedReceived', { amount: formatCurrency(amount, 'INR'), name: client.name }));
+        const settleAmount = partial && settle.choice !== 'leave' ? round2(Math.min(Number(settle.amount) || 0, partial.bill.outstanding - partial.paid)) : 0;
+        let extra = '';
+        if (partial && settleAmount > 0 && settle.choice !== 'leave') {
+          const m = await import('../collections/settle-actions');
+          extra = m.settleAfter(receipt, { invoiceId: partial.bill.id, reason: settle.choice, amount: settleAmount, date, gst: settle.gst }).message;
+        } else {
+          receipt();
+        }
+        const msg = khataT('savedReceived', { amount: formatCurrency(amount, 'INR'), name: client.name });
+        onSaved(extra ? `${msg} ${extra}` : msg);
         onClose();
       } catch (err) {
         setErrors([(err as Error).message || khataT('couldNotSave')]);
@@ -121,7 +147,7 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
           {khataT('openEditor')}
         </button>
       ) : (
-        <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} onClick={save} disabled={busy || !allowed || !(amount > 0)}>
+        <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} onClick={() => void save()} disabled={busy || !allowed || !(amount > 0)}>
           {khataT('save')}
         </button>
       )}
@@ -130,7 +156,7 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
 
   return (
     <Modal open onClose={onClose} title={title} size="sm" footer={footer}>
-      <form className={styles.sheet} onSubmit={(e) => { e.preventDefault(); if (!gstEditor) save(); }}>
+      <form className={styles.sheet} onSubmit={(e) => { e.preventDefault(); if (!gstEditor) void save(); }}>
         {!allowed && <p className={controls.error} role="alert">{mode === 'received' ? khataT('noAccess') : khataT('noCreateAccess')}</p>}
         {gstEditor ? (
           <p className={styles.notice}>{khataT('givenGst', { name: client.name })}</p>
@@ -216,6 +242,12 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
                 )}
                 {onAccount > 0 && bills.length > 0 && <span className={styles.onAccount}>{khataT('onAccount', { amount: formatCurrency(onAccount, 'INR') })}</span>}
               </div>
+            )}
+            {mode === 'received' && partial && can('payment.record') && (
+              <Suspense fallback={null}>
+                <SettleRestFields invoice={partial.invoice} due={partial.bill.outstanding} amount={partial.paid} date={date} value={settle} onChange={setSettle}
+                  caption={colT('settleBill', { number: partial.bill.ref })} />
+              </Suspense>
             )}
           </>
         )}

@@ -16,7 +16,6 @@ import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
-import { RemindersPanel } from '../components/share/RemindersPanel';
 import { localDb } from '../lib/localDb';
 import { shouldShowWizard } from '../lib/onboarding';
 import { getTable } from '../lib/storage';
@@ -46,6 +45,9 @@ const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').th
 // approvals, AMC, loyalty) — their own chunk, mounted after first paint.
 const DashboardTiles = lazy(() => import('../components/dashboard/DashboardTiles').then((m) => ({ default: m.DashboardTiles })));
 const DashboardStart = lazy(() => import('../components/dashboard/DashboardStart').then((m) => ({ default: m.DashboardStart })));
+// R2-A: the reminders card now follows the reminder schedule, party modes, promises and payment grades; it loads
+// right after first paint with that logic instead of sitting in the shell bundle.
+const RemindersPanel = lazy(() => import('../components/share/RemindersPanel').then((m) => ({ default: m.RemindersPanel })));
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
 // 8.20: "Backed up 2 h ago ✓ / Not backed up — tap to save" where folder backups cannot run (phones).
 const BackupStatusLine = lazy(() => import('../components/pwa/BackupStatusLine').then((m) => ({ default: m.BackupStatusLine })));
@@ -169,7 +171,9 @@ export function Dashboard() {
         />
       </div>
 
-      <RemindersPanel />
+      <Suspense fallback={null}>
+        <RemindersPanel />
+      </Suspense>
 
       <div className={styles.grid}>
         <section className={surface.card}>
