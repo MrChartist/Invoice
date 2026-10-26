@@ -7,7 +7,8 @@ import type { Client, InvoiceRecord, PartyBalanceSnapshot, SenderProfile } from 
 import type { AdvanceRecord } from '../types/advances';
 import { localDb } from './localDb';
 import { getTable, setTable, generateId } from './storage';
-import { buildReceivables, type BuildInput, type ReceiptRow, type ReceivablesReport } from './receivables';
+import { buildReceivables, posRefunds, type BuildInput, type ReceiptRow, type ReceivablesReport } from './receivables';
+import type { PosReturn } from './pos-returns';
 import type { CreditLinkRow } from './amount-due';
 import { loadReceivableOpeningBills } from './opening-bills';
 import { computePartyBalanceSnapshot, type SnapshotOptions } from './khata';
@@ -28,6 +29,8 @@ export function loadReceivablesInput(): BuildInput {
     // Credit notes allocated to the invoice they were raised against (src/lib/amount-due.ts).
     links: getTable<CreditLinkRow>('doc_links'),
     openingBills: loadReceivableOpeningBills(clients),
+    // POS refunds / exchanges pay a credit note back (QA-3 F2).
+    refunds: posRefunds(getTable<PosReturn>('pos_returns')),
   };
 }
 

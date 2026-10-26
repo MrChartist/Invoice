@@ -12,6 +12,8 @@
 
 export const COMPANY_REGISTRY_KEY = 'mrchartist_inv_companies';
 export const DEFAULT_COMPANY_ID = 'default';
+/** Label of the first company until it is named (its profile name replaces it, QA-3 F27). */
+export const DEFAULT_COMPANY_NAME = 'Main business';
 const BASE_DB = 'mrchartist_inv_kv';
 
 export interface CompanyEntry {
@@ -51,7 +53,7 @@ export function readRegistry(): CompanyRegistry {
     seen.add(e.id);
     list.push({ id: e.id, name: String(e.name ?? '').slice(0, 80) || 'Company', created: String(e.created ?? '') });
   }
-  if (!seen.has(DEFAULT_COMPANY_ID)) list.unshift({ id: DEFAULT_COMPANY_ID, name: 'Main business', created: '' });
+  if (!seen.has(DEFAULT_COMPANY_ID)) list.unshift({ id: DEFAULT_COMPANY_ID, name: DEFAULT_COMPANY_NAME, created: '' });
   const active = typeof r.active === 'string' && seen.has(r.active) ? r.active : DEFAULT_COMPANY_ID;
   return { active, list };
 }

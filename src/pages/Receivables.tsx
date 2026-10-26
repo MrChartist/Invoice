@@ -16,12 +16,13 @@ import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type Statemen
 import type { Payment } from '../types/invoice';
 import { getTable } from '../lib/storage';
 import type { CreditLinkRow } from '../lib/amount-due';
+import type { PosReturn } from '../lib/pos-returns';
 import type { AdvanceRecord } from '../types/advances';
 import { loadReceivableOpeningBills } from '../lib/opening-bills';
 import { createLateFeeInvoice, describeClientLateFee, lateFeeRuleFor, type ClientLateFee } from '../lib/late-fee';
 import {
   AGING_BUCKETS, agingCsv, buildLedger, buildReceivables, buildStatementText, computeDso,
-  currenciesIn, debtorShare, monthlyCollections, overallEfficiency, topDebtors,
+  currenciesIn, debtorShare, monthlyCollections, overallEfficiency, posRefunds, topDebtors,
   type PartyReceivable, type ReceiptRow,
 } from '../lib/receivables';
 import { formatMoney, formatCurrency, formatDate, todayInput, toDateInput } from '../lib/utils';
@@ -86,6 +87,8 @@ function loadData() {
     links: getTable<CreditLinkRow>('doc_links'),
     // Bill-wise opening outstandings (WP-1 masters): age and appear in statements like invoices.
     openingBills: loadReceivableOpeningBills(clients),
+    // POS refunds / exchanges pay a credit note back (QA-3 F2).
+    refunds: posRefunds(getTable<PosReturn>('pos_returns')),
   };
 }
 
@@ -232,7 +235,12 @@ export function Receivables() {
 
       <div className={surface.statGrid}>
         <Stat label={rcvT('netOutstanding')} value={fmt(report.totals.net)} icon={Wallet}
-          hint={report.totals.billCount === 1 ? rcvT('openBillsOne') : rcvT('openBillsMany', { n: report.totals.billCount })} />
+          hint={
+            // QA-3 F15: the Dashboard's "Outstanding" is the open bills; say how net differs from it.
+            report.totals.creditNotes + report.totals.advances > 0.004
+              ? rcvT('netOfCredits', { gross: fmt(report.totals.gross), credits: fmt(report.totals.creditNotes + report.totals.advances) })
+              : report.totals.billCount === 1 ? rcvT('openBillsOne') : rcvT('openBillsMany', { n: report.totals.billCount })
+          } />
         <Stat label={rcvT('overdue')} value={fmt(report.totals.overdue)} icon={AlertTriangle} tone="loss"
           hint={report.totals.gross > 0 ? rcvT('pctOfOpen', { pct: Math.round((report.totals.overdue / report.totals.gross) * 100) }) : rcvT('allClear')} />
         <Stat label={rcvT('dso')} value={dso === null ? '—' : rcvT('days', { n: dso })} icon={Clock}

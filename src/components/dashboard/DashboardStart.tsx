@@ -6,7 +6,7 @@ import { localDb } from '../../lib/localDb';
 import { enabledModules } from '../../lib/shop-mode';
 import { DASHBOARD_ACTIONS, quickActions } from '../../lib/quick-create';
 import { buildChecklist } from '../../lib/checklist';
-import { DB_PREFIX, getTable, readRaw } from '../../lib/storage';
+import { DB_PREFIX, getTable, readRaw, reloadAfterFlush } from '../../lib/storage';
 import { QUICK_ICONS } from '../layout/quick-icons';
 import { useT } from '../../i18n';
 import { reachT } from '../../i18n/areas/reach';
@@ -44,7 +44,8 @@ export function DashboardStart({ profileReady }: { profileReady: boolean }) {
       const { loadDemoData } = await import('../../lib/demo-data');
       const r = loadDemoData();
       if (!r.ok) throw new Error(r.reason);
-      window.location.reload();
+      // QA-3 F5: reload only once IndexedDB has the sample data (a bare reload dropped it).
+      reloadAfterFlush();
     } catch (err) {
       setError(reachT('sampleFailed', { message: (err as Error).message }));
       setBusy(false);

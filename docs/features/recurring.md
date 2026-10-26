@@ -64,6 +64,7 @@ Optional ledger badge: invoices with `(inv as {recurring_id?: string}).recurring
 ## Behaviour notes
 - Idempotency: before creating, looks up an invoice with the same `recurring_id` + `recurring_date`; if found it is reused and the schedule is healed. A `navigator.locks` lock additionally serialises tabs.
 - Numbering: `localDb.invoices.nextNumber(issueDate, doc_type)`, so a 1 Apr occurrence starts the new FY series (tested: 31 Mar vs 1 Apr). Date is passed as `T12:00:00` local to avoid UTC parsing shifting the FY in western timezones.
-- Mode `draft` creates status Draft (with number); `issue` creates status Sent.
+- Mode `draft` creates status Draft **without a number** (QA-3 F6): a draft that is deleted or never issued leaves no hole that GSTR-1 Table 13 would report as cancelled. It takes the next number of its FY series when it is issued (editor save, `setStatus`, or a payment that settles it; `numberOnIssue` in `localDb.ts`). Drafts numbered before this change keep their numbers. `issue` creates status Sent, numbered at once.
+- From an invoice, the first date defaults to the next occurrence after the invoice's date (`startAfterInvoice`), never today's period again. "Run now" on a period that is not due yet asks first (`runNow(id, today, { early: true })`); it re-reads the schedule, so a stale card never bills a period twice. The page re-reads after the shell's runner generates (`RECURRING_RAN_EVENT`), and asks the runner for a run when a schedule due today is saved.
 - Resume jumps `next_run` to the first occurrence on/after today (paused period is not back-filled). Skip-next and catch-up overflow increment `skipped_count`, which counts toward `max_runs`.
 - Delete removes the schedule only; generated invoices stay.

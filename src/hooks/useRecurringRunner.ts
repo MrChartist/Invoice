@@ -6,6 +6,10 @@ import { todayInput } from '../lib/utils';
 import type { InvoiceRecord } from '../types/invoice';
 
 const LOCK_NAME = 'mrchartist-recurring-runner';
+/** QA-3 F6: dispatched on window after a run that generated documents (the Recurring page re-reads). */
+export const RECURRING_RAN_EVENT = 'mrchartist:recurring-ran';
+/** Dispatch on window to ask the runner for a run now (e.g. a schedule due today was just saved). */
+export const RECURRING_RUN_EVENT = 'mrchartist:recurring-run';
 
 /** One run, serialised across tabs when the Web Locks API exists. */
 async function runOnce(): Promise<InvoiceRecord[]> {
@@ -55,6 +59,7 @@ export function useRecurringRunner(): {
     let alive = true;
     const tick = () => {
       void runOnce().then((created) => {
+        if (created.length > 0) window.dispatchEvent(new Event(RECURRING_RAN_EVENT));
         if (alive && created.length > 0) setGenerated((prev) => [...prev, ...created]);
       });
     };
@@ -63,10 +68,12 @@ export function useRecurringRunner(): {
       if (document.visibilityState === 'visible') tick();
     };
     window.addEventListener('focus', tick);
+    window.addEventListener(RECURRING_RUN_EVENT, tick);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       alive = false;
       window.removeEventListener('focus', tick);
+      window.removeEventListener(RECURRING_RUN_EVENT, tick);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);

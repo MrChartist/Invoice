@@ -1994,6 +1994,100 @@ try {
     await writeJson(page, 'batch_runs', null);
   });
 
+  await step('QA-3 F6: recurring from an invoice starts after it; the list refreshes after the first run; Run now asks before billing early; drafts take no number', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevSchedules = await readJson(page, 'recurring', []);
+    const src = prevInvoices.find((i) => (i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE') && i.status !== 'Cancelled' && i.status !== 'Draft');
+    check(!!src, 'a saved invoice to make recurring');
+    if (!src) return;
+    const today = await page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
+    await page.goto(srv.origin + '/recurring?from=' + src.id);
+    const first = page.locator('#rec-start');
+    await first.waitFor({ timeout: 15000 });
+    check((await first.inputValue()) > src.issue_date, `the first date defaults to after the invoice (${src.issue_date} -> ${await first.inputValue()})`);
+    await first.fill(today);
+    await page.getByRole('button', { name: 'Create schedule' }).click();
+    const after = await readJson(page, 'invoices', [], (v) => v.some((i) => i.recurring_id && !prevInvoices.some((p) => p.id === i.id)), 15000);
+    const made = after.filter((i) => !prevInvoices.some((p) => p.id === i.id));
+    check(made.length === 1 && made[0].status === 'Draft' && made[0].invoice_number === '', `the first run made one unnumbered draft (${made.map((i) => `${i.status}:${i.invoice_number || '-'}`).join(', ')})`);
+    const card = page.locator('article').filter({ has: page.getByRole('button', { name: 'Run now' }) }).last();
+    await card.getByText('Run history (1)').waitFor({ timeout: 15000 });
+    check(true, 'the schedule card shows the run without a reload');
+    await card.getByRole('button', { name: 'Run now' }).click();
+    const ask = page.getByRole('dialog', { name: 'Bill the next period early?' });
+    await ask.waitFor();
+    await ask.getByRole('button', { name: 'Cancel' }).click();
+    const still = await readJson(page, 'invoices', []);
+    check(still.length === after.length, 'Run now on a period not yet due bills nothing until confirmed');
+    await writeJson(page, 'recurring', prevSchedules);
+    await writeJson(page, 'invoices', prevInvoices);
+  });
+
+  await step('QA-3 F4 / F5: "Explore with sample data instead" fills a Demo company; Dashboard "Try with sample data" adds the invoices', async () => {
+    const tableIn = (p, name) => p.evaluate((k) => new Promise((resolve) => {
+      const reg = JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null');
+      const db = reg?.active && reg.active !== 'default' ? `mrchartist_inv_kv__${reg.active}` : 'mrchartist_inv_kv';
+      const open = indexedDB.open(db);
+      open.onsuccess = () => {
+        const d = open.result;
+        if (!d.objectStoreNames.contains('data')) { d.close(); resolve(null); return; }
+        const req = d.transaction('data', 'readonly').objectStore('data').get(`mrchartist_inv_${k}`);
+        req.onsuccess = () => { d.close(); resolve(req.result ? JSON.parse(req.result) : null); };
+      };
+      open.onerror = () => resolve(null);
+    }), name);
+    const waitRows = async (p, name, min, timeout = 15000) => {
+      const until = Date.now() + timeout;
+      for (;;) {
+        const rows = (await tableIn(p, name)) ?? [];
+        if (rows.length >= min || Date.now() > until) return rows;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    };
+    const fresh = async () => {
+      const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
+      const p = await ctx.newPage();
+      watch(p, errors);
+      p.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
+      await p.goto(srv.origin + '/');
+      await p.getByLabel('Full name').fill('E2E Demo');
+      await p.locator('#login-pin').fill('482916');
+      await p.locator('#login-confirm').fill('482916');
+      await p.getByRole('button', { name: /Create account/ }).click();
+      await p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ timeout: 15000 });
+      return { ctx, p };
+    };
+    // F4: the wizard's demo choice, from its last step.
+    const a = await fresh();
+    await a.p.getByRole('radio', { name: /CA \/ full accounting/ }).click();
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByLabel('Name on invoices *').fill('E2E Demo Traders');
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('radio', { name: 'I have a GSTIN' }).click();
+    await a.p.getByLabel('GSTIN', { exact: true }).fill('27AAPFU0939F1ZV');
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('dialog', { name: 'How clients pay you' }).waitFor();
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('dialog', { name: /Logo/ }).waitFor();
+    await a.p.getByRole('button', { name: 'Explore with sample data instead' }).click();
+    await a.p.locator('#company-switch').waitFor({ timeout: 20000 });
+    const demoInv = await waitRows(a.p, 'invoices', 1);
+    check(demoInv.length > 0, `the Demo company holds the sample invoices (${demoInv.length})`);
+    await a.p.waitForTimeout(500);
+    check(await a.p.getByRole('dialog', { name: 'What do you do?' }).count() === 0, 'the wizard does not start again in the Demo company');
+    await a.ctx.close();
+    // F5: skip the wizard, then the Dashboard card.
+    const b = await fresh();
+    await b.p.getByRole('button', { name: /Skip for now/ }).first().click();
+    await b.p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ state: 'detached' });
+    const cta = b.p.getByRole('button', { name: 'Try with sample data' });
+    await cta.waitFor({ timeout: 15000 });
+    await Promise.all([b.p.waitForEvent('load', { timeout: 20000 }), cta.click()]);
+    const sample = await waitRows(b.p, 'invoices', 1);
+    check(sample.length > 0, `Dashboard "Try with sample data" added the invoices (${sample.length})`);
+    await b.ctx.close();
+  });
+
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
     // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
     await page.goto(srv.origin + '/settings?tab=data');
