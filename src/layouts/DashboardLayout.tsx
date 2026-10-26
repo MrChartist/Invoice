@@ -66,7 +66,7 @@ import { localDb } from '../lib/localDb';
 import { enabledModules, impliedPacks, isPathVisible, SHOP_MODE_EVENT } from '../lib/shop-mode';
 import { OPEN_HELP_EVENT } from '../lib/help-event';
 import { pushRoute } from '../lib/route-trail';
-import { readRegistry } from '../lib/companies';
+import { realCompanies } from '../lib/companies';
 import { roleLabel } from '../i18n/labels';
 import styles from './DashboardLayout.module.css';
 
@@ -168,7 +168,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     const modules = enabledModules(s);
     // R6-B2: a route hosting an active pack's tab stays; the practice desk (a CA tool) needs several companies or "full".
     const packs = impliedPacks(s);
-    const practice = !s.business_type || s.business_type === 'full' || readRegistry().list.length > 1;
+    const practice = !s.business_type || s.business_type === 'full' || realCompanies().length > 1; // QA7 G7: the Demo company does not count
     const posOnly = !!current && current.role !== 'owner' && !!current.rights?.pos_only;
     // R6-B2 "N more features": entries this role may use that shop mode hides.
     let hidden = 0;
@@ -325,7 +325,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'alt+p': { handler: () => navigate('/pos'), allowInInput: true }, // the route itself needs doc.create
     // R6-B2: F1 opens Help (R6-A2's "On this screen"), except on the POS counter (F1 = recall held bills there) and
     // the Gateway (Tally keys); never while typing in a field (useHotkeys skips plain keys in inputs).
-    ...(/^\/(pos|gateway)(\/|$)/.test(location.pathname) ? {} : { f1: () => openHelp() }),
+    // QA7 G3: F1 does nothing while a dialog is open (Help stacked over a form lost it on Escape).
+    ...(/^\/(pos|gateway)(\/|$)/.test(location.pathname) ? {} : { f1: () => { if (!document.querySelector('[aria-modal]')) openHelp(); } }),
   });
   // Tally keys (Phase 7): F2, F4–F9, Ctrl+F8/F9, F11, F12, Alt+G / Ctrl+G, Ctrl+/ — off on /pos and in fields.
   useTallyKeys(navigate, openShortcuts);

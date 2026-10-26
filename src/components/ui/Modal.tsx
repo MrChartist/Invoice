@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { isTopModal, pushModal } from '../../lib/modal-stack';
 import styles from './Modal.module.css';
 
 export const FOCUSABLE =
@@ -77,7 +78,10 @@ export function Modal({
       dialogRef.current;
     initial?.focus({ preventScroll: true });
 
+    const token = {};
+    const unstack = pushModal(token);
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTopModal(token)) return; // QA7 G3: a dialog underneath ignores keys meant for the top one
       if (event.key === 'Escape') {
         event.stopPropagation();
         onCloseRef.current();
@@ -108,6 +112,7 @@ export function Modal({
 
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
+      unstack();
       inerted.forEach((el) => el.removeAttribute('inert'));
       document.removeEventListener('keydown', onKeyDown, true);
       const target = restoreFocusTo.current;

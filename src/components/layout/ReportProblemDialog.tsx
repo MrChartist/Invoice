@@ -161,6 +161,14 @@ export default function ReportProblemDialog({ onClose, area = '' }: { onClose: (
   };
   const report = useMemo(() => (diag ? composeFeedback(draft, diag) : ''), [draft, diag]);
   const capped = useMemo(() => (diag ? capForShare(draft, diag) : { text: '', shortened: false }), [draft, diag]);
+  // QA7 G4: a link that cannot be built (malformed text) leaves Copy / Share, never crashes the app.
+  const links = useMemo(() => {
+    try {
+      return { wa: whatsappLink(capped.text), mail: mailtoLink(subjectFor(draft), capped.text) };
+    } catch {
+      return null;
+    }
+  }, [capped, draft]);
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   const copy = async (): Promise<boolean> => {
@@ -217,12 +225,12 @@ export default function ReportProblemDialog({ onClose, area = '' }: { onClose: (
           <button type="button" className={controls.btnOutline} onClick={() => void copy().then((ok) => setStatus(ok ? 'copied' : 'failed'))} disabled={!report}>
             <Copy size={14} aria-hidden="true" /> {betaT('copy')}
           </button>
-          {report && (
+          {report && links && (
             <>
-              <a className={controls.btnOutline} href={whatsappLink(capped.text)} target="_blank" rel="noopener noreferrer" onClick={viaLink} data-report-whatsapp>
+              <a className={controls.btnOutline} href={links.wa} target="_blank" rel="noopener noreferrer" onClick={viaLink} data-report-whatsapp>
                 <MessageSquare size={14} aria-hidden="true" /> {betaT('whatsapp')}
               </a>
-              <a className={controls.btnOutline} href={mailtoLink(subjectFor(draft), capped.text)} onClick={viaLink} data-report-email>
+              <a className={controls.btnOutline} href={links.mail} onClick={viaLink} data-report-email>
                 {betaT('email')}
               </a>
             </>

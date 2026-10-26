@@ -94,6 +94,11 @@ export interface AppSettings {
   business_type?: BusinessType;
   /** Additive (8H): modules shown in the sidebar / dashboard. Absent = everything (existing companies). */
   modules?: ModuleId[];
+  /**
+   * Additive (QA7 G1/G2): this database is the app-made Demo company. Written once, by the Demo-company flow, into
+   * that company's own database; sample data loads only where it is set (`loadDemoData`).
+   */
+  demo_company?: true;
 }
 
 export const DEFAULT_TERMS =

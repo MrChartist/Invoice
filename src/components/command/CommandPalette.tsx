@@ -12,7 +12,7 @@ import {
 import { createPortal } from 'react-dom';
 import { ArrowRight, Banknote, BookOpen, Building2, CornerDownLeft, FileText, History, Package, Receipt, Search, Truck, Users, Zap } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { companyDbName, readRegistry } from '../../lib/company-registry';
+import { activeCompanyId, companyDbName, readRegistry, realCompanies } from '../../lib/company-registry';
 import {
   GROUP_LABELS,
   clearRecentSearches,
@@ -39,6 +39,7 @@ import { desksR3Destinations } from './desks-r3-destinations'; // R3-C
 import { r4aDestinations } from '../production/palette-destinations'; // R4-A
 import { sfT } from '../../i18n/areas/smart-find';
 import { getLanguage } from '../../i18n';
+import type { HelpIndexRow } from './tab-destinations';
 import { openHelp } from '../../lib/help-event';
 import styles from './CommandPalette.module.css';
 
@@ -82,18 +83,6 @@ interface Option {
   section?: string;
 }
 
-/** R6-B1 / R6-A2: every help topic (`helpIndex()`, lazy registry + topic chunks), loaded on the palette's first open. */
-async function loadHelpTopics(): Promise<StaticEntry[]> {
-  const { helpIndex } = await import('../../lib/help/registry');
-  const hi = getLanguage() === 'hi';
-  return (await helpIndex()).map((r) => ({
-    id: `help:${r.id}`,
-    title: hi && r.hiTitle ? r.hiTitle : r.title,
-    icon: 'page',
-    href: `help:${r.id}`,
-    keywords: [hi ? r.title : r.hiTitle, r.id.replace(/[:-]/g, ' ')],
-  }));
-}
 /** "help gstr" or "? gstr" searches help topics only. */
 const HELP_QUERY = /^(?:help\s+|\?\s*)(.+)$/i;
 
@@ -159,14 +148,14 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   // re-parses storage. Warm it on open so the first keystroke is instant.
   useMemo(() => (open ? searchIndex() : null), [open]);
   // All companies (read-only peek), offered only when the device has more than one company.
-  const multiCompany = useMemo(() => open && readRegistry().list.length > 1, [open]);
+  const multiCompany = useMemo(() => open && realCompanies().length > 1, [open]); // QA7 G7: not the Demo company
   const [allCompanies, setAllCompanies] = useState(false);
   const [peeked, setPeeked] = useState<{ id: string; name: string; data: Parameters<typeof searchPeek>[2] }[] | null>(null);
   const [notice, setNotice] = useState('');
   useEffect(() => {
     if (!allCompanies || peeked) return;
     let live = true;
-    import('../../lib/company-peek').then((m) => m.peekOtherCompanies(readRegistry(), companyDbName)).then((rows) => {
+    import('../../lib/company-peek').then((m) => m.peekOtherCompanies({ active: activeCompanyId(), list: realCompanies() }, companyDbName)).then((rows) => {
       if (live) setPeeked(rows);
     }).catch(() => live && setPeeked([]));
     return () => {
@@ -238,10 +227,12 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   const tabEntries = useMemo(() => (open && disc ? disc.tabDestinations() : []), [open, disc]); // re-read per open (shop mode)
   const featureEntries = useMemo(() => (open && disc ? disc.featureDestinations() : []), [open, disc]);
   const labels = useMemo(() => (disc ? disc.discoverLabels() : null), [disc, open]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [helpEntries, setHelpEntries] = useState<StaticEntry[]>([]);
+  const [helpRaw, setHelpRaw] = useState<HelpIndexRow[]>([]);
   useEffect(() => {
-    if (open && !helpEntries.length) loadHelpTopics().then(setHelpEntries, () => undefined);
-  }, [open, helpEntries.length]);
+    if (open && disc && !helpRaw.length) disc.loadHelpIndex().then(setHelpRaw, () => undefined);
+  }, [open, disc, helpRaw.length]);
+  // QA7 G9: titles follow the language of each open (the raw index is loaded once).
+  const helpEntries = useMemo(() => (open && disc ? disc.helpRows(helpRaw, getLanguage()) : []), [open, disc, helpRaw]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
