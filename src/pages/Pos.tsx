@@ -19,7 +19,7 @@ import { num, round2 } from '../lib/invoice-calc';
 import { makeSuggester } from '../lib/suggest';
 import { addScannedLine, findByCode, findByShortCode } from '../lib/scan';
 import { TABLES, findLevel, loadPositions, type StockItem } from '../lib/inventory';
-import { editorStockContext, serialKey, serialsInStock } from '../lib/stock-tracking';
+import { editorStockContext, liveHeldStock, serialKey, serialsInStock } from '../lib/stock-tracking';
 import { customFieldsDb, snapshotFromMap } from '../lib/custom-fields';
 import {
   catalogItemFor, levelForClient, loadPricing, pricingInUse, resolvePrice, syncSchemeLines,
@@ -115,6 +115,8 @@ function loadCounter() {
     clients: localDb.clients.getAll(),
     pricing: pricingInUse(pricing) ? pricing : null,
     positions: stock.some((s) => s.track_stock) ? loadPositions() : [],
+    // QA5-2 F9: stock held in QC / expiry / transit godowns is not available to sell.
+    held: stock.some((s) => s.track_stock) ? liveHeldStock() : new Map<string, number>(),
     units: unitsDb.stored(),
     salts: saltIndex(stock), // 8.84 substitute search
     ctx: editorStockContext({ doc_type: 'INVOICE', issue_date: todayInput() }),
@@ -234,7 +236,7 @@ export function Pos() {
     [upiOn, record.issue_date, record.doc_type, prefix],
   );
   // Stock on hand by item name (tracked items), for red zero / negative stock in search and tiles.
-  const qtyByName = useMemo(() => new Map(data.positions.filter((p) => p.item.track_stock).map((p) => [p.item.name.trim().toLowerCase(), p.qty])), [data.positions]);
+  const qtyByName = useMemo(() => new Map(data.positions.filter((p) => p.item.track_stock).map((p) => [p.item.name.trim().toLowerCase(), p.qty - (data.held.get(p.item.id) ?? 0)])), [data.positions, data.held]);
   const qtyOf = useCallback((i: InvoiceItem) => qtyByName.get(i.name.trim().toLowerCase()) ?? null, [qtyByName]);
 
   /* ── Lines ─────────────────────────────────────────────────── */
@@ -745,7 +747,7 @@ export function Pos() {
     () => makeSuggester(data.clients, { label: (c) => c.name, extra: (c) => [c.phone, c.company, c.gstin], sub: (c) => [c.phone, c.gstin].filter(Boolean).join(' · ') }),
     [data.clients],
   );
-  const stockOf = (l: InvoiceItem) => (data.positions.length ? findLevel(data.positions, l.name, l.hsn) : null);
+  const stockOf = (l: InvoiceItem) => (data.positions.length ? findLevel(data.positions, l.name, l.hsn, data.held) : null);
   const docLabel = record.doc_type in DOCUMENT_LABELS ? docName(record.doc_type) : DOCUMENT_LABELS.INVOICE;
 
   return (

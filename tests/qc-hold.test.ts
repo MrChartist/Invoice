@@ -7,8 +7,8 @@ import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freezeDate, resetStorage, thawDate } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
-import { blankStockItem, collectEvents, stockDb } from '../src/lib/inventory.ts';
-import { computeTracking, liveDocTrackingIssues, liveTrackingInputs } from '../src/lib/stock-tracking.ts';
+import { blankStockItem, collectEvents, getStockLevel, stockDb, stockWarningForInvoice } from '../src/lib/inventory.ts';
+import { computeTracking, liveDocTrackingIssues, liveHeldStock, liveTrackingInputs } from '../src/lib/stock-tracking.ts';
 import { godownsDb, nonSaleableGodowns, transfersDb } from '../src/lib/godowns.ts';
 import { receiptNotesDb, rejectionLinesFromGrn } from '../src/lib/receipt-notes.ts';
 import { clearOverrides } from '../src/lib/period-lock.ts';
@@ -66,6 +66,27 @@ test('GRN into QC, sale refused, release → saleable with the batch kept', () =
   assert.deepEqual([b.byGodown.main, b.byGodown[qc.id]], [6, 4]);
   assert.equal(qcRows()[0].qty, 4);
   assert.equal(qcResultsDb.all()[0].result, 'pass');
+});
+
+test('QA5-2 F9: QC-held stock is not available, and a sale with no godown cannot draw on it', () => {
+  receive();
+  stockDb.saveItem(blankStockItem({ id: 'fan', name: 'Fan', qc_on_receipt: true }));
+  receiptNotesDb.save({ kind: 'GRN', vendor_name: 'Usha', date: '2026-05-06', lines: [{ id: 'f1', name: 'Fan', item_id: 'fan', quantity: 4, rate: 1000, tax_rate: 18 }] }, []);
+  const qc = qcGodowns(godownsDb.list())[0];
+  const fan = getStockLevel('Fan', undefined, liveHeldStock())!;
+  assert.deepEqual([fan.qty, fan.held], [0, 4], 'held in QC: nothing available to sell (POS / editor availability)');
+  assert.equal(getStockLevel('Fan')!.qty, 4, 'company-wide quantity (stock summary) when asked without the held map');
+  assert.equal(getStockLevel('Cable', undefined, liveHeldStock())!.qty, 5, 'ordinary stock unchanged');
+  assert.deepEqual(stockWarningForInvoice({ doc_type: 'TAX_INVOICE', items: [{ id: 'x', name: 'Fan', quantity: 2, rate: 1500 }] as never }, liveHeldStock()).map((s) => s.available), [0]);
+  // A sale with no godown draws on Main, which holds none: refused (it would drive Main negative).
+  const sale = { doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: '2026-05-10', items: [{ id: 'x', name: 'Fan', quantity: 2, rate: 1500 }] };
+  assert.ok(liveDocTrackingIssues(sale as never).errors.some((e) => /Fan/.test(e) && /QC hold/.test(e)), JSON.stringify(liveDocTrackingIssues(sale as never)));
+  // Once released to Main, the same sale goes through.
+  transfersDb.save({ date: '2026-05-10', from_godown: qc.id, to_godown: 'main', lines: [{ id: 't1', item_id: 'fan', qty: 3 }] });
+  assert.deepEqual(liveDocTrackingIssues(sale as never).errors, []);
+  assert.deepEqual([getStockLevel('Fan', undefined, liveHeldStock())!.qty, getStockLevel('Fan', undefined, liveHeldStock())!.held], [3, 1]);
+  // Items with no held stock keep the old behaviour (a shortfall is a warning, not an error).
+  assert.deepEqual(liveDocTrackingIssues({ ...sale, items: [{ id: 'y', name: 'Cable', quantity: 9, rate: 10 }] } as never).errors, []);
 });
 
 test('reject from a GRN pre-fills Rejections Out with the rejected quantity and batch', () => {

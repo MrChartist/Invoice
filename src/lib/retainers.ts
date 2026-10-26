@@ -48,6 +48,8 @@ export interface RetainerClose {
   /** ISO time of the close. */
   at: string;
   fee_invoice_id?: string;
+  /** Covered minutes per stamped entry id (QA5-2 F4): a partly covered entry keeps its overage billable. */
+  covered?: Record<string, number>;
 }
 
 export interface Retainer {
@@ -203,9 +205,12 @@ export function drawdown(
     let used = 0;
     for (const e of inPeriod) {
       const m = Math.max(billable(e), 0);
-      // A closed period keeps what it stamped; an open one draws down in date order.
+      // A closed period keeps what it stamped (the minutes recorded per entry; a close row from before
+      // QA5-2 F4 has no per-entry split, so its recorded `used` caps the stamps in date order);
+      // an open one draws down in date order.
+      const stamped = !!close && e.retainer_id === r.id && e.retainer_period === period && feeState !== 'cancelled';
       const take = close
-        ? (e.retainer_id === r.id && e.retainer_period === period && feeState !== 'cancelled' ? m : 0)
+        ? (stamped ? Math.min(m, close.covered ? (Object.hasOwn(close.covered, e.id) ? Math.max(num(close.covered[e.id]), 0) : 0) : Math.max(num(close.used) - used, 0)) : 0)
         : Math.min(m, Math.max(allowance - used, 0));
       if (take > 0) covered.set(e.id, take);
       if (m - take > 0) overage.set(e.id, m - take);
@@ -267,7 +272,11 @@ export function closePeriod(
   if (!p) throw new Error('That period is outside the retainer.');
   const earlier = drawdown(r, entries, billable, invoices, today).filter((x) => x.period < period && !x.closed);
   if (earlier.length) throw new Error(`Close ${earlier[0].label} first.`);
-  const row: RetainerClose = { period, used: p.used, rolled: p.rolled_out, forfeited: p.forfeited, at, ...(p.fee_invoice_id ? { fee_invoice_id: p.fee_invoice_id } : {}) };
+  const row: RetainerClose = {
+    period, used: p.used, rolled: p.rolled_out, forfeited: p.forfeited, at,
+    covered: Object.fromEntries(p.covered),
+    ...(p.fee_invoice_id ? { fee_invoice_id: p.fee_invoice_id } : {}),
+  };
   return { retainer: { ...r, closes: [...r.closes, row].sort((a, b) => a.period.localeCompare(b.period)) }, stamp: [...p.covered.keys()], row };
 }
 

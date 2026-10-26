@@ -12,6 +12,7 @@ import { FORM_LABELS, complianceCalendar, daysBetween, filedFor, returnStatus, t
 import { daysToExpiry, nearestExpiry, type DscRow } from './dsc-register';
 import { readPurchase } from './purchase-normalize';
 import { BUILTIN_TEMPLATE, monthChecklist, progress, type ChecklistMonth } from './client-checklist';
+import { toCsv } from './csv';
 
 /** The tables the board reads for one company (all optional: a fresh company has none). */
 export interface PracticeTables {
@@ -32,6 +33,8 @@ export interface PeekedCompany {
   name: string;
   /** Vault-sealed or unreadable: the row shows "Locked — open to see". */
   locked?: boolean;
+  /** Listed in the registry but its database is not on this device (QA5-2 F19): "No data on this device". */
+  missing?: boolean;
   current?: boolean;
   tables?: PracticeTables;
 }
@@ -41,6 +44,8 @@ export interface PracticeRow {
   name: string;
   current: boolean;
   locked: boolean;
+  /** No database on this device for this registry entry. */
+  missing: boolean;
   gstins: string[];
   frequency: FilerFrequency;
   /** Next unfiled, non-optional return due today or later. */
@@ -73,10 +78,10 @@ function frequencyOf(s: Settings): FilerFrequency {
 /** One board row. `today` is a local day YYYY-MM-DD. */
 export function buildPracticeRow(c: PeekedCompany, today: string): PracticeRow {
   const base: PracticeRow = {
-    id: c.id, name: c.name, current: !!c.current, locked: !!c.locked, gstins: [], frequency: 'monthly',
+    id: c.id, name: c.name, current: !!c.current, locked: !!c.locked && !c.missing, missing: !!c.missing, gstins: [], frequency: 'monthly',
     overdue: 0, overdueForms: [], tdsFiledThisFy: 0, drafts: 0, checklist: { done: 0, total: 0 },
   };
-  if (c.locked || !c.tables) return base;
+  if (c.locked || c.missing || !c.tables) return base;
   const t = c.tables;
   const s = (t.settings && typeof t.settings === 'object' ? t.settings : {}) as Settings;
   const gstins = [...new Set((s.profiles ?? []).map((p) => String(p?.companyGstin ?? '').trim().toUpperCase()).filter(Boolean))];
@@ -127,6 +132,16 @@ export function buildPracticeRow(c: PeekedCompany, today: string): PracticeRow {
   };
 }
 
+/**
+ * A registry entry and its peek (`peekCompliance`): null means the database does not exist on this
+ * device (removed elsewhere) — shown as "No data on this device", never as "Locked" (QA5-2 F19).
+ */
+export function peekedCompany(c: { id: string; name: string }, peek: { locked: boolean; tables: unknown } | null): PeekedCompany {
+  if (!peek) return { id: c.id, name: c.name, missing: true };
+  if (peek.locked) return { id: c.id, name: c.name, locked: true };
+  return { id: c.id, name: c.name, tables: peek.tables as PracticeTables };
+}
+
 export function buildPracticeBoard(companies: readonly PeekedCompany[], today: string): PracticeRow[] {
   return companies.map((c) => buildPracticeRow(c, today));
 }
@@ -135,8 +150,13 @@ export function buildPracticeBoard(companies: readonly PeekedCompany[], today: s
 export function boardTable(rows: readonly PracticeRow[]): (string | number)[][] {
   return [
     ['Company', 'GSTIN(s)', 'Filing', 'Next due return', 'Due on', 'Overdue returns', 'Last TDS/TCS return filed', 'TDS/TCS returns filed this FY', 'Last voucher', 'Books locked up to', 'Drafts', 'Checklist done', 'Checklist items', 'Nearest DSC expiry', 'DSC holder', 'Note'],
-    ...rows.map((r) => r.locked
-      ? [r.name, '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Locked — open the company to see']
+    ...rows.map((r) => r.missing || r.locked
+      ? [r.name, '', '', '', '', '', '', '', '', '', '', '', '', '', '', r.missing ? 'No data on this device' : 'Locked — open the company to see']
       : [r.name, r.gstins.join(' '), r.frequency, r.nextDue ? `${r.nextDue.form} ${r.nextDue.label}` : '', r.nextDue?.due ?? '', r.overdue, r.lastTds ?? '', r.tdsFiledThisFy, r.lastVoucher ?? '', r.lockUntil ?? '', r.drafts, r.checklist.done, r.checklist.total, r.dsc?.validTo ?? '', r.dsc?.holder ?? '', 'Due dates as per the standard calendar; check notified extensions — verify with your CA']),
   ];
+}
+
+/** The board as CSV, through the shared formula-injection guard (`csv.ts` `toCsv`, QA5-2 F8). */
+export function boardCsv(rows: readonly PracticeRow[]): string {
+  return toCsv(boardTable(rows)) + '\r\n';
 }

@@ -288,7 +288,9 @@ export function BatchTab() {
                   {drafts.map((d) => (
                     <tr key={d.party.key}>
                       <td>{d.party.client.name}</td>
-                      <td>{formatPlaceOfSupply(d.record.place_of_supply) || '—'}</td>
+                      <td className={d.stateWarning ? styles.warn : undefined} title={d.stateWarning ? s2T('b.noState') : undefined}>
+                        {formatPlaceOfSupply(d.record.place_of_supply) || '—'}{d.stateWarning ? ' ⚠' : ''}
+                      </td>
                       <td>{d.record.gst_mode === 'IGST' ? 'IGST' : d.record.gst_mode === 'CGST_SGST' ? 'CGST + SGST' : '—'}</td>
                       <td className={styles.num}>{formatCurrency(d.record.total, d.record.currency || 'INR')}</td>
                       <td className={d.creditWarning ? styles.warn : styles.muted}>{d.creditWarning || '—'}</td>
@@ -298,6 +300,7 @@ export function BatchTab() {
                 </tbody>
               </table>
             </div>
+            {drafts.some((d) => d.stateWarning) && <p className={styles.warn}>{s2T('b.noState')}</p>}
             <p className={styles.muted}>{s2T('b.einvNote')}</p>
             <div className={styles.actions}>
               {/already issued/.test(error) && (
@@ -330,12 +333,14 @@ export function BatchTab() {
       {result && (
         <section className={surface.card} data-batch-result>
           <div className={styles.body}>
-            <p className={controls.ok}>{s2T('b.issued', { n: result.invoices.length, first: result.invoices[0]?.invoice_number ?? '', last: result.invoices[result.invoices.length - 1]?.invoice_number ?? '' })}</p>
+            {result.invoices.every((i) => !i.invoice_number)
+              ? <p className={controls.ok}>{s2T('b.draftsSaved', { n: result.invoices.length })}</p>
+              : <p className={controls.ok}>{s2T('b.issued', { n: result.invoices.length, first: result.invoices.find((i) => i.invoice_number)?.invoice_number ?? '', last: [...result.invoices].reverse().find((i) => i.invoice_number)?.invoice_number ?? '' })}</p>}
             {result.held.length > 0 && (
               <>
                 <p className={styles.muted}>{s2T('b.held')}</p>
                 <ul className={styles.list}>
-                  {result.held.map((h) => <li key={h.invoice.id}><Link to={`/invoice/${h.invoice.id}`}>{h.invoice.invoice_number}</Link> — {h.reason}</li>)}
+                  {result.held.map((h) => <li key={h.invoice.id}><Link to={`/invoice/${h.invoice.id}`}>{h.invoice.invoice_number || s2T('b.unnumbered')}</Link> — {h.reason}</li>)}
                 </ul>
               </>
             )}

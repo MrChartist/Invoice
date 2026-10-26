@@ -14,7 +14,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
-import { pharmaGate, readPharmaSettings, saleLimitGate } from './pharma-gate';
+import { heldStockGate, pharmaGate, readPharmaSettings, saleLimitGate } from './pharma-gate';
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine } from '../types/stock';
 import type { AppNotification } from './notifications';
 import { num, round2 } from './invoice-calc';
@@ -745,6 +745,28 @@ function buildEditorStockContext(doc: { id?: string; doc_type: string; issue_dat
   }
 }
 
+/**
+ * QA5-2 F9: base quantity per item held in non-saleable godowns (QC hold, expiry, WIP, in transit), without
+ * `excludeInvoiceId`. Availability shown to sell (`findLevel` / `stockWarningForInvoice` in inventory.ts) takes
+ * it off. Empty when no such godown exists (nothing is computed). Shared, read-only.
+ */
+export function liveHeldStock(excludeInvoiceId?: string): ReadonlyMap<string, number> {
+  try {
+    const nonSaleable = nonSaleableGodowns(godownList(getTable<Godown>(GODOWNS_TABLE)));
+    if (!nonSaleable.size) return new Map();
+    return memoOnReads('stock-tracking:held', () => {
+      const out = new Map<string, number>();
+      for (const [id, t] of computeTracking({ ...sharedTrackingInputs(), excludeInvoiceId })) {
+        const q = [...nonSaleable].reduce((s, g) => s + (t.byGodown[g] ?? 0), 0);
+        if (q > 1e-9) out.set(id, roundQty(q));
+      }
+      return out;
+    }, excludeInvoiceId ?? '');
+  } catch {
+    return new Map();
+  }
+}
+
 /** Issue checks for the document open in the editor, from live data. */
 export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
   try {
@@ -772,7 +794,17 @@ export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
           return b?.mrp;
         }
       : undefined;
-    return saleLimitGate(issues, doc, { nonSaleable: nonSaleableGodowns(godowns), godownName: (id) => godownName(godowns, id), mrpOf, settings: pharma });
+    const nonSaleable = nonSaleableGodowns(godowns);
+    const named = (id: string) => godownName(godowns, id);
+    // QA5-2 F9: a sale with no godown (or a saleable one) may not draw on stock held in QC / expiry / transit.
+    const held = nonSaleable.size
+      ? heldStockGate(issues, doc, {
+          nonSaleable, godownName: named, mainId: MAIN_GODOWN_ID,
+          itemOf: (l) => buildItemIndex(sharedTrackingInputs().items.filter((i) => i.track_stock)).find(l.name, l.hsn)?.id,
+          byGodown: (id) => pre().tracking.get(id)?.byGodown,
+        })
+      : issues;
+    return saleLimitGate(held, doc, { nonSaleable, godownName: named, mrpOf, settings: pharma });
   } catch {
     return { errors: [], expired: [], warnings: [] };
   }

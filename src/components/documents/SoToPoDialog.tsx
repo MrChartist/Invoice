@@ -2,14 +2,14 @@ import { useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Vendor } from '../../types/purchases';
-import { buildBackToBackPos, createBackToBackPos, liveStockFns, soToPoRows, type PoPick } from '../../lib/back-to-back';
+import { buildBackToBackPos, createBackToBackPos, liveStockFns, poLinesReceived, soToPoRows, type PoPick } from '../../lib/back-to-back';
 import { orderFulfilment } from '../../lib/sales-orders';
 import { localDb } from '../../lib/localDb';
 import { readLinks } from '../../lib/documents';
 import { getTable } from '../../lib/storage';
 import { localDayOf } from '../../lib/dates';
 import { senderStateCode } from '../../store/invoice-defaults';
-import type { PurchaseOrder } from '../../types/purchases';
+import type { PurchaseOrder, PurchaseRecord, ReceiptNote } from '../../types/purchases';
 import { useT } from '../../i18n';
 import { s2T } from '../../i18n/areas/sales-r2';
 import controls from '../../styles/controls.module.css';
@@ -27,7 +27,10 @@ export function SoToPoDialog({ order, onClose, onDone }: { order: InvoiceRecord;
   const fns = useMemo(() => liveStockFns(), []);
   const rows = useMemo(() => {
     const f = orderFulfilment(order, localDb.invoices.getAll(), readLinks());
-    return soToPoRows(f, order.id, getTable<PurchaseOrder>('purchase_orders'), { ...fns, fullQty: full });
+    const orders = getTable<PurchaseOrder>('purchase_orders');
+    // A short-closed PO counts only what it received (QA5-2 F21).
+    const received = poLinesReceived(orders.filter((po) => po?.so_id === order.id && po.closed_on), getTable<PurchaseRecord>('purchases'), getTable<ReceiptNote>('receipt_notes'));
+    return soToPoRows(f, order.id, orders, { ...fns, fullQty: full, received });
   }, [order, fns, full]);
   const [edits, setEdits] = useState<Record<string, { qty?: string; vendor?: string; rate?: string }>>({});
   const [dropShip, setDropShip] = useState(false);

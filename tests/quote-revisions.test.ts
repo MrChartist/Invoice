@@ -141,3 +141,33 @@ test('storage: revise saves a draft revision and a revised link; the old quote i
   const r3 = reviseQuotation(localDb.invoices.getById(r2.id)!);
   assert.equal(r3.invoice_number, 'QTN/FY26-27/0012-R3');
 });
+
+test('QA5-2 F10: switching a quotation to a tax invoice in the editor drops unselected optional / alternative lines; stock never moves for them', async () => {
+  resetStorage();
+  const { installSettings, createViaStore } = await import('./helpers/world.ts');
+  const { blankStockItem, collectEvents, liveInputs, loadPositions, stockDb } = await import('../src/lib/inventory.ts');
+  const { useInvoiceStore } = await import('../src/store/useInvoiceStore.ts');
+  installSettings();
+  stockDb.saveItem(blankStockItem({ id: 'w', name: 'Widget', hsn: '8471', opening_qty: 10 }));
+  stockDb.saveItem(blankStockItem({ id: 'g', name: 'Gadget', hsn: '8472', opening_qty: 10 }));
+  const q = createViaStore({ docType: 'QUOTATION', date: '2026-10-05', asDraft: true, lines: [
+    { name: 'Service', qty: 1, rate: 1000, tax: 18, hsn: '998311' }, { name: 'Widget', qty: 5, rate: 2000, tax: 18, hsn: '8471' },
+    { name: 'Gadget', qty: 2, rate: 300, tax: 18, hsn: '8472' }, { name: 'Gadget', qty: 3, rate: 400, tax: 18, hsn: '8472' },
+  ] });
+  const st = () => useInvoiceStore.getState();
+  st().loadInvoice(q.id);
+  st().patch({ items: st().items.map((i, k) => (k === 1 ? { ...i, optional: true } : k === 2 ? { ...i, alt_group: 'A', selected: true } : k === 3 ? { ...i, alt_group: 'A' } : i)) });
+  st().setDocType('TAX_INVOICE');
+  assert.deepEqual(st().items.map((i) => [i.name, i.quantity]), [['Service', 1], ['Gadget', 2]]);
+  assert.ok(st().items.every((i) => i.optional === undefined && i.alt_group === undefined && i.selected === undefined), 'flags cleared on kept lines');
+  const res = st().saveInvoice({});
+  assert.ok(res.ok, res.errors.join('; '));
+  assert.equal(res.record!.items.length, 2);
+  assert.equal(res.record!.taxable_value, 1600);
+  const qty = (name: string) => loadPositions().find((p) => p.item.name === name)!.qty;
+  assert.deepEqual([qty('Widget'), qty('Gadget')], [10, 8]);
+  // Defence: a stored bill that still carries an unselected optional line never moves stock for it.
+  const stale = { ...res.record!, id: 'stale', invoice_number: 'X/1', items: [...res.record!.items, { id: 'o', name: 'Widget', hsn: '8471', type: 'Product', quantity: 4, rate: 1, tax_rate: 18, amount: 4, optional: true }] };
+  const ev = collectEvents({ ...liveInputs(), invoices: [stale as InvoiceRecord] }).get('w') ?? [];
+  assert.equal(ev.filter((e) => e.qty < 0).length, 0, 'no stock-out for the excluded line');
+});
