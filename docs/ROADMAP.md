@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: i18n core + Hindi core screens) · Phase 6 (most ✅; 6.7–6.9, 6.21 in progress) · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: Hindi / Marathi core screens, other languages partial) · Phase 6 ✅ · Phase 7 / 8 ✅ (open follow-ups listed) · Round 2 ✅ · Round 3 ✅ + QA round 3 ✅ · Round 4: R4-A ✅, R4-B / R4-C planned, PERF-1 / PERF-2 in progress · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -138,7 +138,7 @@ Larger features, each of which can ship on its own once Phases 1–4 are done.
 | 5.1 | ✅ **GSTR-2B import & matcher**: user loads the portal JSON/Excel locally; match on GSTIN + bill no. + value; IMS Accept/Reject/Pending worksheet; 4A(5) books-vs-2B comparison (`docs/features/gstr2b.md`) | L | Needs 3.2 |
 | 5.2 | ✅ **GSTR-9 annual working paper** from 12 months of GSTR-1/3B + HSN, compared against books (`docs/features/gstr9.md`; 8A typed in from GSTR-2B, since the 5.1 matcher does not keep the 2B file) | M | Needs 3.1, 3.2 |
 | 5.3 | ✅ **Advances / receipt vouchers / Table 11**: ADV/FY receipt vouchers (Rule 50) and RFV refunds (Rule 51), date-keyed GST on service advances (none on goods since Notification 66/2017-CT), apply to invoices through the payments API, GSTR-1 11A/11B + JSON `at`/`txpd`, 3B 3.1(a), GSTR-9 4F, ledger, receivables, Tally (`docs/features/advances.md`) | L | Needs 3.1 |
-| 5.4 | 🟡 partial — **Hindi-first i18n**: ✅ dependency-free `t()` / `useT()` with typed, lazily loaded catalogues and a device-local language switch (Settings, login, vault); ✅ Hindi for the shell, login / vault, Dashboard, editor main surface, payment dialog and list empty states; ✅ amount in words in Hindi on the Bilingual template; ✅ self-hosted Noto Sans Devanagari subset in the precache (PDFs no longer vary by device). Remaining: other screens and `src/lib` messages, then Marathi/Tamil/Gujarati (`docs/features/i18n.md`) | L | |
+| 5.4 | 🟡 partial — **Hindi-first i18n**: ✅ dependency-free `t()` / `useT()` with typed, lazily loaded catalogues and a device-local language switch (Settings, login, vault); ✅ Hindi for the shell, login / vault, Dashboard, editor main surface, payment dialog and list empty states; ✅ amount in words in Hindi on the Bilingual template; ✅ self-hosted Noto Sans Devanagari subset in the precache (PDFs no longer vary by device); ✅ Hindi for Reports, Books, GST reports and exports (round 2); ✅ more languages (8.121): Marathi covers the same core screens as Hindi (QA round 3, F19), Gujarati / Tamil the main labels only ("partial"), Bengali / Telugu / Kannada the shell. Remaining (as `docs/features/i18n.md` § Coverage says): several screens still English in Hindi, `src/lib` messages, and Gujarati / Tamil / Bengali / Telugu / Kannada beyond their current screens | L | |
 | 5.5 | ✅ **POS / thermal quick-bill mode**: one-screen counter billing, walk-in customer, 80 mm auto-print, change calculator (delivered as 6.8: `/pos`, `docs/features/pos-barcode-pricing.md`) | M | Reuses `thermal80` / ReceiptBody |
 | 5.6 | ✅ **Barcode/SKU**: `BarcodeDetector` camera scan with typed fallback, Code128 labels (delivered as 6.7) | M | Pairs with 5.5 |
 | 5.7 | ✅ **Multi-device via a shared folder**: one encrypted snapshot file per device in a Drive/Dropbox/OneDrive/iCloud desktop folder (File System Access API, AES-GCM under a PBKDF2 sync passphrase); merge by table + row id with version vectors / Lamport clocks (not `updated_at`), concurrent edits and duplicate numbers listed for the user, locked-period changes held for the PIN (`docs/features/sync.md`). Limits: Chrome/Edge desktop only, not real-time (start-up + every 5 min), full-snapshot files, settings are one last-writer-wins unit | L | Needs 0.6, 4.2 |
@@ -579,6 +579,125 @@ Vyapar / myBillBook / OkCredit parity for small shops, offline. First-paint JS +
 | 8.129 | ✅ **Wizard step 0 + checklist v2**: language + business type (due days, template, landing on POS for kirana), composition → Bills of Supply, "Explore with sample data instead" in a separate Demo company; checklist adds item, WhatsApp, payment, backup; "Try with sample data" on an empty Dashboard | `onboarding.ts`, `SetupWizard.tsx`, `demo-company.ts`, `checklist.ts` | done |
 | 8.130 | ⏳ 8H follow-ups: more keys for Bengali / Telugu / Kannada and amount in words for them; self-hosted Noto subsets only if a script renders badly; loan prepayment re-schedule and interest certificates; per-voucher-type rights for purchases / vouchers in their own screens; catalogue cart for non-INR | — | open |
 
+## Round 2: what the established suites still do better (v6.x) · ✅ done
+
+Spec: `docs/prd/round-2.md` (Zoho Books / Tally / Busy / Marg / Vyapar survey, 18 items in three packages).
+
+### R2-A · Collections & settlement (`docs/features/collections-r2.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R2-A1 | ✅ **Payment terms master** (Net N, EOM + N, day D of next month, instalments, early-pay discount); editor picker, party default, printed schedule, MSME Sec 43B(h) note; table `payment_terms` | `payment-terms.ts`, `TermsPicker.tsx`, `PaymentTermsPanel.tsx` | done |
+| R2-A2 | ✅ **Settlement discount / short payment (kasar)** on a receipt → financial credit note `FCN/FY…` (no GST by default, optional pro-rata GST variant; clerk cap → approval queue) | `settlement.ts`, `financial-note.ts`, `SettleRestFields.tsx` | done (verify with your CA) |
+| R2-A3 | ✅ **Bad-debt write-off** (single + bulk, owner), register, same-FY / earlier-FY recovery; table `write_off_recoveries` | `write-off.ts`, `WriteOffDialog.tsx`, `WriteOffRegister.tsx` | done |
+| R2-A4 | ✅ **Follow-ups & promise-to-pay**: next action, kept / broken promises hold or escalate reminders, bell notices, party timeline; table `collection_notes` | `collections.ts`, `FollowUpsTab.tsx`, `PartyTimeline.tsx` | done |
+| R2-A5 | ✅ **Reminder schedule**: per-stage start and cooldown, editable templates (English / Hinglish), per-party reminder mode; key `reminder_settings` | `reminders.ts`, `reminder-settings.ts`, `ReminderSchedulePanel.tsx` | done |
+| R2-A6 | ✅ **Statement styles** (balance forward / open items / transactions) + ageing strip | `statement-styles.ts`, `StatementDocument.tsx` | done |
+| R2-A7 | ✅ **Party payment score** (grade A–D, reasons, trend) on ageing rows, statements, editor credit warning, reminder priority | `payment-score.ts`, `PaymentScoreBadge.tsx` | done |
+
+### R2-B · Sales documents (`docs/features/sales-r2.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R2-B1 | ✅ **Batch invoices** from a template to many parties, all-or-nothing, consecutive numbers, re-run guard, undo; table `batch_runs` | `batch-invoices.ts`, `BatchTab.tsx` (`/recurring?tab=batch`) | done |
+| R2-B2 | ✅ **Progress / milestone billing** from quotations and sales orders (stage invoices, remaining-balance invoice, progress report) | `progress-billing.ts`, `ProgressPanel.tsx`, `ProgressReportModal.tsx` | done |
+| R2-B3 | ✅ **Quotation revisions**, optional / alternative lines, proposal sections; table `proposal_snippets` | `quote-revisions.ts`, `proposal-sections.ts`, `RevisionsPanel.tsx` | done |
+| R2-B4 | ✅ **Contact persons & ship-to address book** on parties, Kind attn. on the paper, import / export columns | `contacts.ts`, `ContactsEditor.tsx`, `AddressBookEditor.tsx` | done |
+| R2-B5 | ✅ **Sales order → back-to-back purchase orders** (drop-ship) and a backorders view | `back-to-back.ts`, `SoToPoDialog.tsx`, `BackordersView.tsx` | done |
+
+### R2-C · Books, compliance & output (`docs/features/books-output-r2.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R2-C1 | ✅ **Annual accounts pack** with notes to accounts (BS / P&L with previous FY, cash flow, TB, automatic + text notes; print / PDF / Excel / ZIP); table `notes_to_accounts` | `ledger/annual-pack.ts`, `ledger/notes-auto.ts`, `AnnualPackTab.tsx` | done |
+| R2-C2 | ✅ **Deferred revenue & prepaid expense schedules** (monthly / daily release journals, register); table `deferrals` | `deferrals.ts`, `DeferralsTab.tsx` | done |
+| R2-C3 | ✅ **IMS ITC reduction** and the IMS working file (dated remark rule `IMS_REMARK_RULES`) | `gstr2b.ts`, `ims-file.ts`, `ImsDetails.tsx` | done (layout unverified) |
+| R2-C4 | ✅ **Packing list** `PKL/FY…` with package types, net / gross weight, CBM; tables `packing_lists`, `package_types` | `packing.ts`, `packing-print.ts`, `PackingListDialog.tsx` | done |
+| R2-C5 | ✅ **Design Studio labels** per document type, title suffix, logo-accent swatches | `design-prefs.ts`, `labels.ts`, `logo-colour.ts` | done |
+| R2-C6 | ✅ **Display & accessibility** preferences (text size, high contrast, motion, links, tap targets, focus ring), device-local `mrchartist_display_prefs` | `display-prefs.ts`, `DisplayPanel.tsx`, `public/theme-init.js` | done |
+
+## Round 3: freelancer apps, Indian niche tools, app-store favourites (v6.x) · ✅ done
+
+Spec: `docs/prd/round-3.md` (18 items in three packages; every R3 module is lazy).
+
+### R3-A · Restaurant & counter (`docs/features/restaurant.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R3-A1 | ✅ **Tables & running orders** (`/tables`): dining areas with price level and optional service charge, takeaway / delivery / aggregator tokens (Sec 9(5)), move / merge / transfer, settle as a POS bill; tables `dining_areas`, `dining_tables`, `table_orders`, key `restaurant_settings` | `restaurant/tables.ts`, `orders-store.ts`, `pages/Tables.tsx` | done (verify with your CA) |
+| R3-A2 | ✅ **KOT**: station routing, daily `K<n>`, cancellation tickets with reason and owner-PIN cap, reprint, KOT register with leakage table; device-local `mrchartist_kot_printers` | `restaurant/kot.ts`, `kot-print.ts`, `KotRegister.tsx` | done |
+| R3-A3 | ✅ **Split bill** (equal / custom payers on one invoice; item / seat parts as consecutive invoices; exact GST reconciliation) | `restaurant/split-bill.ts` | done |
+| R3-A4 | ✅ **Modifiers / add-ons and "86"** (item or stock group off for today; optional auto-86, off by default); table `modifier_groups` | `restaurant/modifiers.ts`, `ModifiersPanel.tsx` | done |
+| R3-A5 | ✅ **Share the bill as an image** (JPEG / PNG, A4 slices or one roll image, copy image) from the preview and the POS | `share-image.ts`, `BillImageShare`, `ShareMenu.tsx` | done |
+
+### R3-B · Service billing & party speed (`docs/features/service-billing-r3.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R3-B1 | ✅ **Rate cards** (task → project → client → work type → default) + re-rate unbilled; table `work_types` | `rate-cards.ts`, `WorkTypesCard.tsx` | done |
+| R3-B2 | ✅ **Projects**: hours / fee budget, tasks, board / list, estimate vs actual, 80 / 100% bell; table `project_tasks`, key `project_settings` | `projects.ts`, `ProjectsBoard.tsx`, `project-alerts.ts` | done |
+| R3-B3 | ✅ **Prepaid retainer hours**: drawdown, rollover / forfeit, overage, period close, report; table `retainers` | `retainers.ts`, `RetainersTab.tsx`, `RetainerReport.tsx` | done (verify with your CA) |
+| R3-B4 | ✅ **Timesheet & expense annexure** snapshot (`InvoiceRecord.annexure`), printed as a following page | `annexure.ts`, `AnnexureBlock.tsx`, `AnnexureActions.tsx` | done |
+| R3-B5 | ✅ **Party document defaults** (template, currency, discount, notes / terms, hourly rate, annexure, print language) | `party-defaults.ts`, `DocDefaultsFields.tsx` | done |
+| R3-B6 | ✅ **Repeat last bill (Alt+R) and usual items** in the editor and the POS | `party-habits.ts`, `PartyHabitsStrip.tsx`, `UsualTiles.tsx` | done |
+| R3-B7 | ✅ **Customers gone quiet**: insight, Clients chip, report, WhatsApp nudge; key `quiet_settings` | `quiet-customers.ts`, `QuietCustomers.tsx` | done |
+
+### R3-C · Document polish & compliance desks (`docs/features/docs-compliance-r3.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R3-C1 | ✅ **Live paper preview** (≥ 1280 px, off by default, device-local `mrchartist_editor_layout`) and live template tiles | `editor-layout.ts`, `LivePreviewPane.tsx`, `TemplateThumb.tsx` | done |
+| R3-C2 | ✅ **Job evidence**: item photos on lines, photo pages, receiver signature (`delivery_proof`) | `line-images.ts`, `doc-evidence.ts`, `DeliveryProofDialog.tsx`, `PhotoPages.tsx` | done |
+| R3-C3 | ✅ **Page margins and letterhead / footer artwork**, repeated per PDF page | `design-prefs.ts`, `PagePanel.tsx`, `PageArt.tsx`, `pdf-batch.ts` | done |
+| R3-C4 | ✅ **GST portal file reader** (GSTR-1 error report, downloaded GSTR-1): match, corrected subset JSON, diff; table `gst_portal_files` | `gst-portal-files.ts`, `PortalFilesView.tsx` | done (formats unverified) |
+| R3-C5 | ✅ **e-Way desk**: computed validity (date-keyed `eway-validity.ts`), expiry bell, bulk Part-B / transporter update JSON | `eway-validity.ts`, `eway-desk.ts`, `eway-alerts.ts`, `EwayDesk.tsx` | done (verify with your CA) |
+| R3-C6 | ✅ **Practice desk** (`/practice`, owner): all companies' compliance read-only (`peekCompliance`), DSC register, monthly client checklist; tables `dsc_register`, `client_checklist`, key `checklist_template` | `practice.ts`, `dsc-register.ts`, `client-checklist.ts`, `pages/Practice.tsx` | done |
+
+### QA round 3 fixes (`docs/prd/qa-round-3.md`) · ✅ done
+
+Hands-on audit of the built app after Round 2 (27 findings: 3 P0, 4 P1, 20 P2), fixed in two packages.
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| QA-1 | ✅ **Money and data paths** (F1–F7, F15, F16, F26, F27): shift X/Z counts returns; POS refunds reach the khata and receivables (`posRefunds`, `receivables.md`); no payment against a quotation; Demo company / sample data filled after the flush; recurring drafts unnumbered until issued, "Run now" asks before a future period (`recurring.md`); POS dialogs at 390 px; Dashboard and Receivables agree on outstanding; company switcher name | `pos-shifts.ts`, `receivables.ts`, `localDb.ts`, `recurring.ts`, `stats.ts`, `company-registry.ts` | done |
+| QA-2 | ✅ **Documents, GST, settings, i18n** (F3 UI, F8–F14, F17–F25): HSN rows without HSN, date-keyed slab pickers (`GST_SLAB_RULES` in `tax-rules.ts`), own-GSTIN warning, expense amount label, bill dirty guard, backup / restore copy, Compact preset, interim annual pack, Marathi / Hindi strings (`i18n.md`), editor and document labels, 130% overflow | `gst-reports.ts`, `tax-rules.ts`, `gst-guards.ts`, `design-prefs.ts`, `ledger/annual-pack.ts`, `src/i18n/` | done |
+
+## Round 4: makers, store chains, exporters, trust leaders (v6.x) · in progress
+
+Spec: `docs/prd/round-4.md` (17 items in three packages; combined budget ≤ +0.9 kB gz first paint).
+
+### R4-A · Production, costing & traceability (`docs/features/production-r4.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R4-A1 | ✅ **Production orders** `WO/FY…`: WIP godown, issue / output / return / close (scrap write-off), make to order from a sales order, MRP → orders; table `production_orders` | `production/orders.ts`, `order-alerts.ts`, `/manufacturing?tab=orders` | done |
+| R4-A2 | ✅ **Order costing**: standard vs actual, price / usage / yield / conversion variances, SO margin, cost-centre memo row | `production/costing.ts`, `CostingTab` | done (management working; verify with your CA) |
+| R4-A3 | ✅ **Batch genealogy & recall**: backward / forward trace, recall list, printable notice, block batch; table `recall_notices` | `production/genealogy.ts`, `TraceTab`, `RecallList` | done |
+| R4-A4 | ✅ **QC hold & release** (QC godown, GRN hold for `qc_on_receipt` items, release / reject, bell); table `qc_results`, key `qc_settings` | `production/qc.ts`, `receipt-notes.ts` `applyQcHold`, `QcTab` | done |
+| R4-A5 | ✅ **Landed-cost voucher** `LCV/FY…` across bills / GRNs (value, quantity, weight, equal), restating stock from the receipt date; table `landed_cost_vouchers` | `landed-voucher.ts`, `landed-cost.ts`, `inventory.ts` `liveInputs` | done |
+| R4-A6 | ⏳ R4-A follow-ups: call `applyQcHold` in the purchase-bill save path; feed the margin chip / insights `liveInputs().purchases`; Inventory → "Landed cost" link; pre-filled debit note from a QC reject | — | open |
+
+### R4-B · Stores & chains (`docs/prd/round-4.md` § R4-B) · planned
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R4-B | ⏳ **B1** gift vouchers, **B2** loyalty tiers & points expiry, **B3** store price lists, **B4** transfer requests / in transit / receive with shortage, **B5** store replenishment from the warehouse | `src/lib/retail/*`, `docs/features/stores-r4.md` (planned) | planned |
+
+### R4-C · Trade desk & trust (`docs/prd/round-4.md` § R4-C) · planned
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R4-C | ⏳ **C1** exporter profile, LUT register & export fields, **C2** realisation / e-BRC / incentives register, **C3** Bill of Entry duty, **C4** recycle bin & accessible Undo, **C5** auditor trail pack per FY (Rule 11(g)), **C6** open-format data export, **C7** field-level sync conflicts | `src/lib/trade/*`, `src/lib/trust/*`, `docs/features/trade-trust-r4.md` (planned) | planned |
+
+### Performance round 4 (`docs/prd/perf-round-4.md`) · in progress
+
+Scale audit on a 15k-invoice company; two fix packages with mostly disjoint files.
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| PERF-1 | 🟡 **Data layer, background work, save path** (H1, H2, H3, H6, H10, H11): no re-parse of the big tables per call (stamp-gated memoised reads), coalesced bell refresh, memoised stock engine, copy-on-write save, ledger running-balance index, single-parse backup | `storage.ts`, `localDb.ts`, `notifications.ts`, `inventory.ts`, `books.ts`, `backup.ts` | in progress |
+| PERF-2 | 🟡 **UI layer** (H4, H5, H7, H8, H9, H12): pre-folded SmartFind index, cheap editor typeahead, one peek per Dashboard, grouped receivables scores, collator-based invoice list, peeked reads in POS / GST | `search.ts`, `smart-find.ts`, `suggest.ts`, `Dashboard.tsx`, `Receivables.tsx`, `Transactions.tsx` | in progress |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |
@@ -589,5 +708,9 @@ Vyapar / myBillBook / OkCredit parity for small shops, offline. First-paint JS +
 | v3.4 | GST & accounting depth | 6–8 weeks |
 | v4.0 | IndexedDB, asset storage, scale | 6–8 weeks |
 | v4.x | 2B matching, GSTR-9, Hindi, POS, multi-device | ongoing |
+| v5.x | Competitive parity (Phase 6), Tally parity (Phase 7), 8A–8I daily-use packages | done |
+| v6.x · Round 2 | Collections & settlement, sales documents, books & output (R2-A / R2-B / R2-C) | done |
+| v6.x · Round 3 | Restaurant & counter, service billing, document polish & compliance desks (R3-A / R3-B / R3-C), then QA round 3 fixes (QA-1 / QA-2) | done |
+| v6.x · Round 4 | Production & traceability (R4-A, done); stores & chains (R4-B) and trade desk & trust (R4-C) planned; scale fixes PERF-1 / PERF-2 in progress | in progress |
 
 Phases 2 and 3 can run in parallel if two people work on them; neither depends on the other beyond Phase 1.

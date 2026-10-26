@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Copy, Library, Plus, Trash2 } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { Typeahead } from '../ui/Typeahead';
 import { localDb } from '../../lib/localDb';
-import { suggest } from '../../lib/suggest';
+import { makeSuggester } from '../../lib/suggest';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { type InvoiceItem } from '../../types/invoice';
 import { gstRateOptions } from '../../lib/tax-rules';
@@ -18,7 +18,7 @@ import { useCostCentres } from '../cost-centres/useCostCentres';
 import { LineTracking } from './LineTracking';
 import { editorStockContext } from '../../lib/stock-tracking';
 import { saltIndex, saltOf } from '../../lib/salt-search'; // 8.84 substitutes
-import { getTable } from '../../lib/storage';
+import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, listKeys, readRaw } from '../../lib/storage';
 import { afterLineChange, pickCatalogItem, setLineQuantity, setLineRate } from './pricing-actions';
 import { tNodes, useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
@@ -59,15 +59,35 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const [catalog, setCatalog] = useState<InvoiceItem[]>([]);
   // 8.84: salt / composition of stock items, re-read with the catalogue (typing a salt lists its substitutes).
   const salts = useMemo(() => saltIndex(getTable<{ name: string; salt?: string }>('stock_items')), [catalog]); // eslint-disable-line react-hooks/exhaustive-deps
-  const itemSuggestions = useCallback(
-    (q: string) =>
-      shortCodeFirst(q, catalog, suggest(q, catalog, {
+  // PERF-2: the catalogue is folded once per snapshot (not per keystroke).
+  const itemSuggester = useMemo(
+    () =>
+      makeSuggester(catalog, {
         label: (i) => i.name,
         extra: (i) => [i.hsn, i.short_code, saltOf(salts, i.name)],
         sub: (i) => [i.hsn && `HSN ${i.hsn}`, saltOf(salts, i.name), formatCurrency(i.rate, currency)].filter(Boolean).join(' · '),
-      })),
+      }),
     [catalog, currency, salts],
   );
+  const itemSuggestions = useCallback((q: string) => shortCodeFirst(q, catalog, itemSuggester(q)), [catalog, itemSuggester]);
+  // PERF-2: name focus re-reads the catalogue and live stock only when stored data (or the day) changed since
+  // the last read: another tab's sale still shows, but tabbing through ten lines no longer recomputes stock ten times.
+  const catalogRaw = useRef<string | null | undefined>(undefined);
+  const stockStamp = useRef<(string | null)[] | null>(null);
+  const refreshOnNameFocus = () => {
+    const raw = readRaw(DB_PREFIX + KEYS.items);
+    if (raw !== catalogRaw.current) {
+      catalogRaw.current = raw;
+      setCatalog(localDb.items.getAll());
+    }
+    // The working draft (autosaved while typing) is not a stock input.
+    const keys = listKeys(DB_PREFIX).filter((k) => k !== SINGLETON_KEYS.draft).sort();
+    const stamp: (string | null)[] = [new Date().toDateString(), ...keys, ...keys.map((k) => readRaw(k))];
+    const prev = stockStamp.current;
+    if (prev && prev.length === stamp.length && prev.every((v, i) => v === stamp[i])) return;
+    stockStamp.current = stamp;
+    setStockTick((t) => t + 1);
+  };
   const [cessOpen, setCessOpen] = useState<Record<string, boolean>>({});
   const centres = useCostCentres();
   // A Bill of Supply charges no GST: the rate / cess columns are hidden (Rule 49).
@@ -133,10 +153,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   data-field="name"
                   value={item.name}
                   onChange={(name) => updateItem(item.id, 'name', name)}
-                  onFocus={() => {
-                    setCatalog(localDb.items.getAll());
-                    setStockTick((t) => t + 1);
-                  }}
+                  onFocus={refreshOnNameFocus}
                   getSuggestions={itemSuggestions}
                   onBlur={afterLineChange}
                   onPick={(c) => pickCatalogItem(item.id, c)}

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp } from 'lucide-react';
 import type { BooksData } from '../../lib/books';
-import { getTable } from '../../lib/storage';
+import { peekTable } from '../../lib/storage';
 import { localDayOf } from '../../lib/dates';
 import { buildInsights, type Insight, type StockRow } from '../../lib/insights';
 import { buildUnitCosts } from '../../lib/margin';
@@ -46,14 +46,15 @@ function detail(i: Insight): string {
 export function InsightsPanel({ books, stock }: { books: BooksData; stock: StockRow[] }) {
   useT();
   const cards = useMemo(() => {
-    const purchases = getTable('purchases');
+    // PERF-2: shared, parsed-once rows; the insight builders only read them.
+    const purchases = peekTable('purchases') as unknown[];
     let costs;
     try {
-      costs = buildUnitCosts(purchases, getTable<{ name: string }>('stock_items'), books.vendors);
+      costs = buildUnitCosts(purchases, peekTable<{ name: string }>('stock_items') as { name: string }[], books.vendors);
     } catch {
       costs = undefined;
     }
-    const quiet = { clients: getTable<Client>('clients'), settings: loadQuietSettings() }; // R3-B7
+    const quiet = { clients: peekTable<Client>('clients') as Client[], settings: loadQuietSettings() }; // R3-B7
     return buildInsights({ invoices: books.invoices, payments: books.transactions, purchases, vendors: books.vendors, costs, stock, quiet }, localDayOf(new Date()));
   }, [books, stock]);
   return (

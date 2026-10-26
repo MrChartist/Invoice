@@ -6,7 +6,7 @@ import { localDb } from '../../lib/localDb';
 import { enabledModules } from '../../lib/shop-mode';
 import { DASHBOARD_ACTIONS, quickActions } from '../../lib/quick-create';
 import { buildChecklist } from '../../lib/checklist';
-import { DB_PREFIX, getTable, readRaw, reloadAfterFlush } from '../../lib/storage';
+import { DB_PREFIX, KEYS, peekTable, readRaw, reloadAfterFlush } from '../../lib/storage';
 import { QUICK_ICONS } from '../layout/quick-icons';
 import { useT } from '../../i18n';
 import { reachT } from '../../i18n/areas/reach';
@@ -24,11 +24,12 @@ export function DashboardStart({ profileReady }: { profileReady: boolean }) {
   const { can } = useCan();
   const [facts] = useState(() => ({
     profileReady,
-    clients: localDb.clients.getAll().length,
-    items: localDb.items.getAll().length,
-    invoices: localDb.invoices.getAll().length,
-    messagesSent: getTable<{ channel?: string }>('reminders').filter((r) => r && r.channel !== 'snooze').length,
-    payments: getTable('transactions').length,
+    // PERF-2: counts only, from the shared parsed rows (never copied).
+    clients: peekTable(KEYS.clients).length,
+    items: peekTable(KEYS.items).length,
+    invoices: peekTable(KEYS.invoices).length,
+    messagesSent: peekTable<{ channel?: string }>('reminders').filter((r) => r && r.channel !== 'snooze').length,
+    payments: peekTable(KEYS.transactions).length,
     lastBackup: readRaw(`${DB_PREFIX}last_backup`) ?? '',
   }));
   const [busy, setBusy] = useState(false);

@@ -13,8 +13,8 @@ import { can } from '../lib/access';
 import { uxT } from '../i18n/areas/invoicing-ux';
 import { rcv2T as colT } from '../i18n/areas/collections-rcv';
 import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type StatementStyle } from '../lib/statement-styles';
-import type { Payment } from '../types/invoice';
-import { getTable } from '../lib/storage';
+import type { Client, InvoiceRecord, Payment } from '../types/invoice';
+import { KEYS, getTable, peekTable } from '../lib/storage';
 import type { CreditLinkRow } from '../lib/amount-due';
 import type { PosReturn } from '../lib/pos-returns';
 import type { AdvanceRecord } from '../types/advances';
@@ -76,15 +76,22 @@ function fyStart(d: Date): Date {
   return new Date(d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1, 3, 1);
 }
 
+/*
+ * PERF-2: invoices / receipts / clients / links are the shared, parsed-once rows (`peekTable`). This screen and
+ * the panels it feeds only read them (writes go through localDb / the collections APIs by id, then reload), so
+ * they are typed as plain arrays for the existing props but must never be mutated.
+ */
+const shared = <T,>(name: string) => peekTable<T>(name) as T[];
+
 function loadData() {
-  const clients = localDb.clients.getAll();
+  const clients = shared<Client>(KEYS.clients);
   return {
-    invoices: localDb.invoices.getAll(),
-    payments: localDb.payments.getAll() as ReceiptRow[],
+    invoices: shared<InvoiceRecord>(KEYS.invoices),
+    payments: shared<ReceiptRow>(KEYS.transactions),
     clients,
     advances: getTable<AdvanceRecord>('advances'),
     // Credit notes allocated to the invoice they were raised against (src/lib/amount-due.ts).
-    links: getTable<CreditLinkRow>('doc_links'),
+    links: shared<CreditLinkRow>('doc_links'),
     // Bill-wise opening outstandings (WP-1 masters): age and appear in statements like invoices.
     openingBills: loadReceivableOpeningBills(clients),
     // POS refunds / exchanges pay a credit note back (QA-3 F2).
@@ -99,7 +106,13 @@ export function Receivables() {
   const { t } = useT();
 
   useEffect(() => {
-    const refresh = () => setData(loadData());
+    // Window focus: keep the same data object (and every memo on it) when no table changed.
+    const refresh = () => setData((prev) => {
+      const next = loadData();
+      const same = next.invoices === prev.invoices && next.payments === prev.payments && next.clients === prev.clients && next.links === prev.links
+        && JSON.stringify([next.advances, next.openingBills, next.refunds]) === JSON.stringify([prev.advances, prev.openingBills, prev.refunds]);
+      return same ? prev : next;
+    });
     window.addEventListener('focus', refresh);
     return () => window.removeEventListener('focus', refresh);
   }, []);

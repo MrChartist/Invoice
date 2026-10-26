@@ -10,6 +10,16 @@ export interface TypeaheadProps<T> extends Omit<InputHTMLAttributes<HTMLInputEle
   onPick: (row: T) => void;
 }
 
+/** Last ranking per suggestion source: onChange (auto-highlight) and the render rank the same text once (PERF-2). */
+const lastRank = new WeakMap<object, { q: string; list: unknown[] }>();
+function rank<T>(fn: (query: string) => Suggestion<T>[], q: string): Suggestion<T>[] {
+  const hit = lastRank.get(fn);
+  if (hit && hit.q === q) return hit.list as Suggestion<T>[];
+  const list = fn(q);
+  lastRank.set(fn, { q, list });
+  return list;
+}
+
 /**
  * Text input with an inline suggestion list (ARIA combobox). ↑/↓ move, Enter picks,
  * Esc closes. Keys are only swallowed while the list is open, so the editor's own
@@ -19,7 +29,7 @@ export function Typeahead<T>({ value, onChange, getSuggestions, onPick, onKeyDow
   const id = useId();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const list = useMemo(() => (open ? getSuggestions(value) : []), [open, value, getSuggestions]);
+  const list = useMemo(() => (open ? rank(getSuggestions, value) : []), [open, value, getSuggestions]);
   const shown = open && list.length > 0;
 
   const pick = (s: Suggestion<T>) => {
@@ -67,7 +77,7 @@ export function Typeahead<T>({ value, onChange, getSuggestions, onPick, onKeyDow
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
-          setActive(autoHighlight(e.target.value, getSuggestions(e.target.value)));
+          setActive(autoHighlight(e.target.value, rank(getSuggestions, e.target.value)));
         }}
         onFocus={(e) => {
           onFocus?.(e);

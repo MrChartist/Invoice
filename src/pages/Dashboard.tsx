@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -18,7 +18,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { localDb } from '../lib/localDb';
 import { shouldShowWizard } from '../lib/onboarding';
-import { getTable } from '../lib/storage';
+import { KEYS, getTable, peekTable } from '../lib/storage';
+import type { InvoiceRecord } from '../types/invoice';
 import { pendingReminders, type ReminderRecord } from '../lib/reminders';
 import type { CreditLink } from '../lib/stats';
 import { getCurrentUser, getUser } from '../lib/auth';
@@ -66,15 +67,16 @@ export function Dashboard() {
   const { can } = useCan();
   // Brand-new account: walk through the essentials once (existing users never see it).
   const [wizardOpen, setWizardOpen] = useState(
-    () => can('settings.manage') && shouldShowWizard(localDb.settings.get(), localDb.invoices.getAll().length),
+    () => can('settings.manage') && shouldShowWizard(localDb.settings.get(), peekTable<InvoiceRecord>(KEYS.invoices).length),
   );
+  // PERF-2: one shared, parsed-once read of each table (read-only here: everything below derives new arrays).
   const [{ invoices, clientCount, profileReady, links }] = useState(() => {
     const settings = localDb.settings.get();
     const profile = localDb.settings.activeProfile();
     return {
-      invoices: localDb.invoices.getAll(),
-      clientCount: localDb.clients.getAll().length,
-      links: getTable<CreditLink>('doc_links'),
+      invoices: peekTable<InvoiceRecord>(KEYS.invoices),
+      clientCount: peekTable(KEYS.clients).length,
+      links: peekTable<CreditLink>('doc_links'),
       profileReady:
         settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     };
@@ -101,23 +103,30 @@ export function Dashboard() {
   const lowStock = extras?.lowStock ?? 0;
   const profit = extras?.profit;
 
-  // Derived values are cheap at this scale; recomputing keeps them honest after edits elsewhere.
+  // PERF-2: derived once per data snapshot and day (the rows above are read once per mount), not per render.
   const now = new Date();
   const fy = getIndianFY();
-  const summary = summarize(invoices, now, links, 'INR');
-  const months = monthlyBilled(invoices, 6, now, 'INR');
-  // Foreign-currency documents count in rupees at their exchange rate; without a rate they are left out.
-  const noRate = foreignWithoutRate(invoices);
-  // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
-  // What credit notes settled is never chased (src/lib/amount-due.ts).
-  const credits = linkedCredits(links, invoices);
-  const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders'), { credits }).map((p) => p.invoice.id));
-  const attention = attentionList(invoices, 50, now, credits)
-    .filter((inv) => !chasing.has(inv.id))
-    .slice(0, 5);
-  const recent = [...invoices]
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    .slice(0, 6);
+  const day = now.toDateString();
+  const { summary, months, noRate, credits, attention, recent, chasing } = useMemo(() => {
+    const at = new Date();
+    const summary = summarize(invoices as InvoiceRecord[], at, links as CreditLink[], 'INR');
+    const months = monthlyBilled(invoices as InvoiceRecord[], 6, at, 'INR');
+    // Foreign-currency documents count in rupees at their exchange rate; without a rate they are left out.
+    const noRate = foreignWithoutRate(invoices as InvoiceRecord[]);
+    // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
+    // What credit notes settled is never chased (src/lib/amount-due.ts).
+    const credits = linkedCredits(links, invoices as InvoiceRecord[]);
+    const chasing = new Set(pendingReminders(invoices as InvoiceRecord[], at, getTable<ReminderRecord>('reminders'), { credits }).map((p) => p.invoice.id));
+    const attention = attentionList(invoices as InvoiceRecord[], 50, at, credits)
+      .filter((inv) => !chasing.has(inv.id))
+      .slice(0, 5);
+    const byCreated = new Intl.Collator(); // same order as localeCompare() with no arguments
+    const recent = [...invoices]
+      .sort((a, b) => byCreated.compare(b.created_at || '', a.created_at || ''))
+      .slice(0, 6);
+    return { summary, months, noRate, credits, attention, recent, chasing };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, links, day]);
   const peak = Math.max(...months.map((m) => m.billed), 1);
   const collectedPct = summary.billed > 0 ? Math.round((summary.received / summary.billed) * 100) : 0;
   const hasData = invoices.some(isRevenueDoc);
