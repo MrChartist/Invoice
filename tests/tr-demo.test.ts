@@ -25,7 +25,9 @@ test('a wholesale company with trading packs gets the trading profile; the agent
   assert.equal(demoProfileFor({ business_type: 'wholesale', industry_packs: ['agency', 'commodity'] }), 'trading');
   const base = buildDemoDataset(TODAY);
   assert.deepEqual(await demoExtras('trading', { today: TODAY, base, packs: [] }), {});
-  assert.deepEqual(await demoExtras('trading', { today: TODAY, base, packs: ['distributor'] }), {}, 'distributor rows come with TR-A');
+  const dist = await demoExtras('trading', { today: TODAY, base, packs: ['distributor'] });
+  assert.deepEqual(Object.keys(dist.tables ?? {}).sort(), ['packaging_moves', 'packaging_types', 'party_rates', 'schemes'], 'R8-A distributor rows');
+  assert.ok(Object.values(dist.tables!).every((rows) => rows!.every((r) => r.demo === true)));
   const ex = await demoExtras('trading', { today: TODAY, base, packs: ['agency', 'commodity'] });
   assert.equal(ex.invoices?.length, 2);
   assert.ok(ex.invoices!.every((i) => i.agency && i.items.every((l) => l.arrival_id === 'demo-arrival-1')));

@@ -130,16 +130,29 @@ export function creditGate(doc: InvoiceRecord): void {
   if (!master || partyCreditMode(policy, master) !== 'block') return;
   const a = doc.approval;
   if (a?.state === 'approved' && a.doc_id === doc.id && (a.approved_value === undefined || Math.abs(rupeeValue(doc) - a.approved_value) <= 0.004)) return;
-  const reason = creditStatus(doc, { master, policy })?.blocked ?? '';
+  const credit = creditStatus(doc, { master, policy })?.blocked ?? '';
+  // TR-A1: a line below its minimum margin is held too (reason `margin`), once the trade-discount module registered.
+  const low = credit || !marginCheck ? '' : marginCheck(doc);
+  const reason = credit || low;
   if (!reason) return;
-  if (!can('doc.approve')) return holdForCredit(doc, reason);
+  if (!can('doc.approve')) {
+    holdForCredit(doc, reason);
+    if (low && doc.approval) doc.approval.reason = 'margin';
+    return;
+  }
   try {
-    audit.record({ entity: 'invoice', entity_id: doc.id, action: 'update', doc_number: doc.invoice_number, summary: `Credit limit overridden by ${currentActor()?.name ?? 'the owner'} for ${master.name}: ${reason}` });
+    audit.record({ entity: 'invoice', entity_id: doc.id, action: 'update', doc_number: doc.invoice_number, summary: `${low ? 'Minimum margin' : 'Credit limit'} overridden by ${currentActor()?.name ?? 'the owner'} for ${master.name}: ${reason}` });
   } catch {
     /* logging never blocks */
   }
 }
 registerCreditGate(creditGate);
+
+/** TR-A1: the minimum-margin check (`trade/tr-discounts.ts` registers it when loaded). */
+let marginCheck: ((doc: InvoiceRecord) => string) | null = null;
+export function registerMarginCheck(fn: ((doc: InvoiceRecord) => string) | null): void {
+  marginCheck = fn;
+}
 
 /** Owner only: the company policy (audited). */
 export function saveCreditPolicy(p: CreditPolicy): void {

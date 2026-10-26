@@ -43,7 +43,7 @@ import {
 /* ── Types ─────────────────────────────────────────────────────── */
 
 /** `progress` (R2-B2): stage invoice raised from a quotation / sales order; `revised` (R2-B3): old quote → its revision. */
-export type DocRelation = 'converted' | 'credit_note' | 'debit_note' | 'cancelled' | 'progress' | 'revised';
+export type DocRelation = 'converted' | 'credit_note' | 'debit_note' | 'cancelled' | 'progress' | 'revised' | 'price_drop'; // price_drop: TR-A3 (run note ← bill, provenance only)
 
 export interface DocLink {
   id: string;
@@ -914,7 +914,7 @@ export function startAmendment(invoice: InvoiceRecord, reason = ''): InvoiceReco
 
 export interface ChainNode {
   doc: InvoiceRecord;
-  relation: DocRelation | 'origin';
+  relation: Exclude<DocRelation, 'price_drop'> | 'origin';
   parentId: string | null;
   depth: number;
 }
@@ -957,7 +957,7 @@ export function buildDocumentChain(
     edges
       .filter((e) => e.from_id === docId)
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .forEach((e) => walk(e.to_id, e.relation, docId, depth + 1));
+      .forEach((e) => walk(e.to_id, e.relation as ChainNode['relation'], docId, depth + 1));
   };
   walk(root, 'origin', null, 0);
   return out;

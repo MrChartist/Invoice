@@ -40,7 +40,7 @@ test('dated / numbered tables in the sync engine; the series prefixes are new', 
 });
 
 test('the lazy writers and the R8 modules import the registry; first-paint maps carry no R8 row', () => {
-  for (const f of ['lib/sync-engine.ts', 'lib/trust/recycle-bin.ts', 'lib/trade/tr-arrivals.ts', 'lib/trade/tr-patti.ts', 'lib/trade/tr-indents.ts', 'lib/trade/tr-stock-statement.ts']) assert.ok(/import '\.{1,2}\/(trade\/)?tr-registry'/.test(src(f)), f);
+  for (const f of ['lib/sync-engine.ts', 'lib/trust/recycle-bin.ts', 'lib/trade/tr-arrivals.ts', 'lib/trade/tr-patti.ts', 'lib/trade/tr-indents.ts', 'lib/trade/tr-stock-statement.ts', 'lib/trade/tr-party-rates.ts', 'lib/trade/tr-claims.ts', 'lib/trade/tr-price-drop.ts', 'lib/trade/tr-interest.ts', 'lib/trade/tr-packaging.ts']) assert.ok(/import '\.{1,2}\/(trade\/)?tr-registry'/.test(src(f)), f);
   for (const t of Object.values(TR_TABLES)) {
     assert.ok(!src('lib/access.ts').includes(`  ${t}:`), `${t} not in access.ts (first paint)`);
     assert.ok(!src('lib/audit-edits.ts').includes(`  ${t}:`), `${t} not in audit-edits.ts (first paint)`);

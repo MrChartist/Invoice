@@ -20,7 +20,7 @@ import { PaymentScheduleBlock } from './parts/PaymentScheduleBlock'; // R2-A1
 import { AcceptanceBlock } from './parts/AcceptanceBlock';
 import { OptionalItemsBlock } from './parts/OptionalItemsBlock';
 import { ProposalSections } from './parts/ProposalSections';
-import { rcmTaxNote } from './paper-helpers';
+import { cashDiscountText, rcmTaxNote } from './paper-helpers';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
 import type { EInvoiceMeta } from '../../lib/einvoice';
@@ -114,6 +114,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
 
   // Rule 46(p): tax payable on reverse charge, printed once under every layout (new-style RCM documents).
   const rcmNote = rcmTaxNote(totals, (n) => cfg.currency(n, invoice.currency));
+  const cdNote = cashDiscountText(invoice, totals.total, (n) => cfg.currency(n, invoice.currency)); // TR-A1
 
   const irn = buildIrnPrint(einvoiceMeta === undefined ? resolveEInvoiceMeta(invoice.id) : einvoiceMeta);
 
@@ -212,6 +213,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {irn && <IrnBlock model={irn} />}
           {declaration && <SupplyDeclaration text={declaration} />}
           {rcmNote && <SupplyDeclaration text={rcmNote} />}
+          {cdNote && <SupplyDeclaration text={cdNote} />}
           {returnNote && <SupplyDeclaration text={returnNote} />}
           {/* 8.5: "Previous balance + This bill = Total due" from the bill's own snapshot (off by default). */}
           <PartyBalanceBlock invoice={invoice} compact={layout === 'receipt'} />

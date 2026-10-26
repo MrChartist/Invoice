@@ -49,6 +49,7 @@ export const RECEIVABLES_TABS = [
   { id: 'giftvouchers' }, // R4-B1
   { id: 'marketplace', pack: 'marketplace' }, // R5-A
   { id: 'donations', pack: 'nonprofit' }, // R5-C
+  { id: 'interest' }, // R8-A (TR-A4)
 ] as const;
 export type ReceivablesTab = (typeof RECEIVABLES_TABS)[number]['id'];
 /* ── Reports ── */
