@@ -486,6 +486,8 @@ export function buildVouchers(data: BooksData): Voucher[] {
     // An advance adjusted against an invoice moved no money: the cash came in on the advance.
     // 8.106: neither did a bad-debt write-off.
     if (isAdvanceAdjustment(t) || t.write_off) continue;
+    // R4-B1: a gift-voucher redemption moved no money (the cash came in when the voucher was sold).
+    if ((t as { gift_voucher_id?: string }).gift_voucher_id) continue;
     const date = toIsoDate(t.date);
     const inv = invById.get(t.invoice_id);
     // A receipt against a foreign-currency invoice is booked at the rupees actually realised

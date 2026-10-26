@@ -29,16 +29,54 @@ import { transferInvoiceOf, transferTaxPair } from '../../lib/branch-transfer';
 import { localDb } from '../../lib/localDb';
 import { branchT } from '../../i18n/areas/branch-books';
 import { s7mT } from '../../i18n/areas/inventory-7s-mini';
+import { useSearchParams } from 'react-router-dom';
+import { defineArea } from '../../i18n/area';
 
 // WP-9: Sec 25(4) tax invoice + bill for a transfer between two GSTINs (lazy dialog).
 const BranchTransferDialog = lazy(() => import('../branches/BranchTransferDialog'));
+// R4-B4: transfer requests and goods in transit (one lazy chunk). Inline labels keep this tab light.
+const RequestsTab = lazy(() => import('../retail/transfer-tabs').then((m) => ({ default: m.RequestsTab })));
+const InTransitTab = lazy(() => import('../retail/transfer-tabs').then((m) => ({ default: m.InTransitTab })));
+const viewT = defineArea(
+  { transfers: 'Transfers', requests: 'Requests', transit: 'In transit', views: 'Transfer views' } as const,
+  { transfers: 'ट्रांसफ़र', requests: 'अनुरोध', transit: 'रास्ते में', views: 'ट्रांसफ़र दृश्य' },
+);
+type View = 'transfers' | 'requests' | 'transit';
 
-/** Stock transfer vouchers between godowns (6.10): list, create, delete. */
-export function TransfersTab({ transfers, godowns, items, inputs, onChanged, onError }: {
+/** Stock transfer vouchers between godowns (6.10): list, create, delete. R4-B4: requests and in-transit views. */
+export function TransfersTab(props: {
   transfers: StockTransfer[];
   godowns: Godown[];
   items: StockItem[];
   /** Live stock inputs (transfers included), for availability checks. */
+  inputs: StockInputs;
+  onChanged: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  useT();
+  const [params, setParams] = useSearchParams();
+  const raw = params.get('view');
+  const view: View = raw === 'requests' || raw === 'transit' ? raw : 'transfers';
+  const setView = (v: View) => setParams((p) => { if (v === 'transfers') p.delete('view'); else p.set('view', v); return p; }, { replace: true });
+  const ctx = { godowns: props.godowns, items: props.items, inputs: props.inputs, changed: props.onChanged, error: props.onError };
+  return (
+    <>
+      <div className={cn(controls.segment, styles.lookupHead)} role="tablist" aria-label={viewT('views')} style={{ marginBottom: '0.75rem' }}>
+        {(['transfers', 'requests', 'transit'] as View[]).map((v) => (
+          <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setView(v)} data-transfer-view={v}>{viewT(v)}</button>
+        ))}
+      </div>
+      {view === 'transfers' ? <TransferList {...props} /> : (
+        <Suspense fallback={null}>{view === 'requests' ? <RequestsTab ctx={ctx} /> : <InTransitTab ctx={ctx} />}</Suspense>
+      )}
+    </>
+  );
+}
+
+function TransferList({ transfers, godowns, items, inputs, onChanged, onError }: {
+  transfers: StockTransfer[];
+  godowns: Godown[];
+  items: StockItem[];
   inputs: StockInputs;
   onChanged: (message: string) => void;
   onError: (message: string) => void;

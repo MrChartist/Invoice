@@ -13,12 +13,22 @@
  *    Act — so GST is on the reduced value; verify with your CA). `applyRedemption` /
  *    `removeRedemption` work on any record (POS cart or editor draft).
  *  - Manual corrections: table `loyalty_adjustments` (`master.edit`).
+ *  - R4-B2 (additive, both optional): dated tier sets (`tiers`: Silver / Gold … on rolling 12-month spend, the
+ *    multiplier applies to the base points, rounded down) and `expiry_months` (FIFO lots; oldest points are used
+ *    first and lapse N months after they were earned). Maths in `retail/loyalty-tiers.ts`. With neither set,
+ *    every balance is exactly the single-rate result.
  */
 import type { InvoiceRecord } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { DB_PREFIX, generateId, getJson, getTable, peekTable, setJson, setTable } from './storage';
 import { requireAccess } from './access';
-import { localDayOf } from './dates';
+import { localDayOf, shiftDay } from './dates';
+import {
+  appendTierSet, cleanTierSets, expiringBetween, multiplyPoints, nextExpiry, nextTier, rollingSpend, runLots, tierFor, tiersOn,
+  type LedgerEvent, type Lot, type LoyaltyTier, type SpendEntry, type TierSet,
+} from './retail/loyalty-tiers';
+
+export type { LoyaltyTier, TierSet } from './retail/loyalty-tiers';
 
 export const LOYALTY_PROGRAM_KEY = `${DB_PREFIX}loyalty_program`;
 export const LOYALTY_ADJUSTMENTS_TABLE = 'loyalty_adjustments';
@@ -36,6 +46,10 @@ export interface LoyaltyProgram {
   enabled: boolean;
   rules: LoyaltyRule[];
   min_redeem: number;
+  /** R4-B2: dated tier sets (appended, never overwritten). Absent = no tiers. */
+  tiers?: TierSet[];
+  /** R4-B2: points lapse this many months after they are earned (FIFO). Absent = never. */
+  expiry_months?: number;
 }
 
 export const DEFAULT_PROGRAM: LoyaltyProgram = { enabled: false, rules: [{ from: '2000-01-01', points_per_100: 1, point_value: 1 }], min_redeem: 0 };
@@ -47,11 +61,20 @@ export function readProgram(): LoyaltyProgram {
     .filter((r) => r && /^\d{4}-\d{2}-\d{2}$/.test(r.from) && num(r.points_per_100) >= 0 && num(r.point_value) >= 0)
     .map((r) => ({ from: r.from, points_per_100: num(r.points_per_100), point_value: num(r.point_value) }))
     .sort((a, b) => a.from.localeCompare(b.from));
-  return { enabled: raw.enabled === true, rules: rules.length ? rules : DEFAULT_PROGRAM.rules, min_redeem: Math.max(num(raw.min_redeem), 0) };
+  const tiers = cleanTierSets(raw.tiers);
+  const months = Math.floor(num(raw.expiry_months));
+  return {
+    enabled: raw.enabled === true, rules: rules.length ? rules : DEFAULT_PROGRAM.rules, min_redeem: Math.max(num(raw.min_redeem), 0),
+    ...(tiers.length ? { tiers } : {}),
+    ...(months > 0 ? { expiry_months: months } : {}),
+  };
 }
 
-/** Save the program. A changed rate is APPENDED from `effectiveFrom` (old bills keep theirs). */
-export function saveProgram(next: { enabled: boolean; points_per_100: number; point_value: number; min_redeem: number }, effectiveFrom: string): LoyaltyProgram {
+/** Save the program. A changed rate (R4-B2: or tier list) is APPENDED from `effectiveFrom` (old bills keep theirs). */
+export function saveProgram(
+  next: { enabled: boolean; points_per_100: number; point_value: number; min_redeem: number; tiers?: LoyaltyTier[]; expiry_months?: number },
+  effectiveFrom: string,
+): LoyaltyProgram {
   requireAccess('settings.manage');
   const cur = readProgram();
   const latest = ruleOn(cur, effectiveFrom);
@@ -60,7 +83,17 @@ export function saveProgram(next: { enabled: boolean; points_per_100: number; po
     rules = [...cur.rules.filter((r) => r.from !== effectiveFrom), { from: effectiveFrom, points_per_100: Math.max(num(next.points_per_100), 0), point_value: Math.max(num(next.point_value), 0) }]
       .sort((a, b) => a.from.localeCompare(b.from));
   }
-  const program: LoyaltyProgram = { enabled: !!next.enabled, rules, min_redeem: Math.max(num(next.min_redeem), 0) };
+  let tierSets = cur.tiers;
+  if (next.tiers !== undefined) {
+    const wanted = appendTierSet([], effectiveFrom, next.tiers)[0].tiers;
+    if (JSON.stringify(tiersOn(cur.tiers, effectiveFrom)) !== JSON.stringify(wanted)) tierSets = appendTierSet(cur.tiers, effectiveFrom, wanted);
+  }
+  const months = next.expiry_months !== undefined ? Math.floor(num(next.expiry_months)) : cur.expiry_months ?? 0;
+  const program: LoyaltyProgram = {
+    enabled: !!next.enabled, rules, min_redeem: Math.max(num(next.min_redeem), 0),
+    ...(tierSets?.length ? { tiers: tierSets } : {}),
+    ...(months > 0 ? { expiry_months: months } : {}),
+  };
   setJson(LOYALTY_PROGRAM_KEY, program);
   return program;
 }
@@ -102,16 +135,33 @@ export function eligibleParty(name: string | undefined): boolean {
   return !!k && k !== WALK_IN;
 }
 
-/** Points a document earns (negative for a credit note). Redemption is separate. */
-export function pointsEarned(inv: InvoiceRecord, program: LoyaltyProgram): number {
+const inrTaxable = (inv: InvoiceRecord) => num(inv.taxable_value) * (((inv.currency || 'INR').toUpperCase() !== 'INR' ? num(inv.exchange_rate) : 1) || 0);
+
+/** Points a document earns (negative for a credit note). Redemption is separate. R4-B2: × the tier `multiplier`. */
+export function pointsEarned(inv: InvoiceRecord, program: LoyaltyProgram, multiplier = 1): number {
   if (!program.enabled || inv.status === 'Draft' || inv.status === 'Cancelled' || !eligibleParty(inv.client?.name)) return 0;
   const rule = ruleOn(program, inv.issue_date);
-  const fx = (inv.currency || 'INR').toUpperCase() !== 'INR' ? num(inv.exchange_rate) : 1;
-  const base = num(inv.taxable_value) * (fx || 0);
-  const pts = Math.floor((base * rule.points_per_100) / 100 + 1e-9);
+  const pts = multiplyPoints(Math.floor((inrTaxable(inv) * rule.points_per_100) / 100 + 1e-9), multiplier);
   if (SALES.has(inv.doc_type)) return pts;
   if (inv.doc_type === 'CREDIT_NOTE') return -pts;
   return 0;
+}
+
+/** R4-B2: a customer's live taxable spend entries (sales +, credit notes −), for the rolling 12-month tier. */
+export function spendEntries(docs: readonly InvoiceRecord[]): SpendEntry[] {
+  const out: SpendEntry[] = [];
+  for (const inv of docs) {
+    if (inv.status === 'Draft' || inv.status === 'Cancelled' || !eligibleParty(inv.client?.name)) continue;
+    if (SALES.has(inv.doc_type)) out.push({ date: inv.issue_date, amount: inrTaxable(inv) });
+    else if (inv.doc_type === 'CREDIT_NOTE') out.push({ date: inv.issue_date, amount: -inrTaxable(inv) });
+  }
+  return out;
+}
+
+/** R4-B2: the customer's tier on `day` (spend in the 365 days before it) and that spend. */
+export function tierOn(program: LoyaltyProgram, spend: readonly SpendEntry[], day: string): { tier?: LoyaltyTier; spend: number } {
+  const s = rollingSpend(spend, day);
+  return { tier: tierFor(tiersOn(program.tiers, day), s), spend: s };
 }
 
 export interface LoyaltyEntry {
@@ -122,31 +172,94 @@ export interface LoyaltyEntry {
   redeemed: number;
   balance: number;
   note?: string;
+  /** R4-B2: points that lapsed (an "Expired" row). */
+  expired?: number;
+  /** R4-B2: earn rows — the day these points expire. */
+  expires_on?: string;
+  /** R4-B2: the tier the bill earned at. */
+  tier?: string;
+  kind?: 'earn' | 'redeem' | 'expired';
 }
 
-/** The points ledger of one customer (by name), oldest first, with a running balance. */
-export function pointsLedger(name: string, invoices: readonly InvoiceRecord[], adjustments: readonly LoyaltyAdjustment[], program: LoyaltyProgram): LoyaltyEntry[] {
+/** Ledger rows and the open earn lots of one customer (by name) up to `asOf` (default today). */
+export function pointsLots(
+  name: string, invoices: readonly InvoiceRecord[], adjustments: readonly LoyaltyAdjustment[], program: LoyaltyProgram, asOf: string = localDayOf(new Date()),
+): { rows: LoyaltyEntry[]; lots: Lot[] } {
   const key = partyKey(name);
-  const rows: Omit<LoyaltyEntry, 'balance'>[] = [];
-  for (const inv of invoices) {
-    if (partyKey(inv.client?.name) !== key) continue;
-    const earned = pointsEarned(inv, program);
+  const mine = invoices.filter((inv) => partyKey(inv.client?.name) === key);
+  const spend = program.tiers?.length ? spendEntries(mine) : [];
+  const events: (LedgerEvent & { tier?: string })[] = [];
+  for (const inv of mine) {
+    const tier = program.tiers?.length ? tierOn(program, spend, inv.issue_date).tier : undefined;
+    const earned = pointsEarned(inv, program, tier?.multiplier ?? 1);
     const redeemed = inv.status !== 'Draft' && inv.status !== 'Cancelled' ? Math.max(Math.trunc(num(inv.loyalty_redeem?.points)), 0) : 0;
-    if (earned || redeemed) rows.push({ date: inv.issue_date, ref: inv.invoice_number, doc_id: inv.id, earned, redeemed });
+    if (earned || redeemed) events.push({ date: inv.issue_date, ref: inv.invoice_number, doc_id: inv.id, earned, redeemed, ...(tier ? { tier: tier.name } : {}) });
   }
-  for (const a of adjustments) if (a.party === key) rows.push({ date: a.date, ref: 'Adjustment', earned: a.points, redeemed: 0, note: a.note });
-  rows.sort((a, b) => a.date.localeCompare(b.date) || a.ref.localeCompare(b.ref, undefined, { numeric: true }));
+  for (const a of adjustments) if (a.party === key) events.push({ date: a.date, ref: 'Adjustment', earned: a.points, redeemed: 0, note: a.note });
+  events.sort((a, b) => a.date.localeCompare(b.date) || a.ref.localeCompare(b.ref, undefined, { numeric: true }));
+  const { rows, lots } = runLots(events, program.expiry_months, asOf);
   let bal = 0;
-  return rows.map((r) => {
-    bal += r.earned - r.redeemed;
-    return { ...r, balance: bal };
-  });
+  return {
+    rows: rows.map((r) => {
+      bal += r.earned - r.redeemed - r.expired;
+      const { expired, ...rest } = r;
+      return { ...rest, balance: bal, ...(expired ? { expired } : {}) } as LoyaltyEntry;
+    }),
+    lots,
+  };
 }
 
-export function pointsBalance(name: string, invoices: readonly InvoiceRecord[], adjustments: readonly LoyaltyAdjustment[], program: LoyaltyProgram, excludeDocId?: string): number {
+/** The points ledger of one customer (by name), oldest first, with a running balance (with expiry: "Expired" rows). */
+export function pointsLedger(name: string, invoices: readonly InvoiceRecord[], adjustments: readonly LoyaltyAdjustment[], program: LoyaltyProgram, asOf?: string): LoyaltyEntry[] {
+  return pointsLots(name, invoices, adjustments, program, asOf).rows;
+}
+
+export function pointsBalance(name: string, invoices: readonly InvoiceRecord[], adjustments: readonly LoyaltyAdjustment[], program: LoyaltyProgram, excludeDocId?: string, asOf?: string): number {
   const list = excludeDocId ? invoices.filter((i) => i.id !== excludeDocId) : invoices;
-  const l = pointsLedger(name, list, adjustments, program);
+  const l = pointsLedger(name, list, adjustments, program, asOf);
   return l.length ? l[l.length - 1].balance : 0;
+}
+
+export interface LoyaltyLiability {
+  /** Customers with points. */
+  customers: number;
+  points: number;
+  /** Points × today's point value (₹). */
+  value: number;
+  /** Points lapsing in the rest of this calendar month, and their value. */
+  expiringPoints: number;
+  expiringValue: number;
+  rows: { name: string; points: number; value: number; expiring: number; tier?: string }[];
+}
+
+/** R4-B2: outstanding points × point value, and what lapses this month — a working figure for the CA's provision. */
+export function loyaltyLiability(invoices: readonly InvoiceRecord[], adjustments: readonly LoyaltyAdjustment[], program: LoyaltyProgram, today: string): LoyaltyLiability {
+  const byParty = new Map<string, InvoiceRecord[]>();
+  const names = new Map<string, string>();
+  for (const i of invoices) {
+    if (!eligibleParty(i.client?.name)) continue;
+    const k = partyKey(i.client.name);
+    names.set(k, i.client.name.trim());
+    byParty.set(k, [...(byParty.get(k) ?? []), i]);
+  }
+  for (const a of adjustments) names.set(a.party, a.name);
+  const value = ruleOn(program, today).point_value;
+  const [y, m] = today.split('-').map(Number);
+  const monthEnd = `${today.slice(0, 8)}${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+  const rows: LoyaltyLiability['rows'] = [];
+  for (const [key, name] of names) {
+    const mine = byParty.get(key) ?? [];
+    const { rows: l, lots } = pointsLots(name, mine, adjustments, program, today);
+    const points = l.length ? l[l.length - 1].balance : 0;
+    if (points <= 0) continue;
+    const expiring = program.expiry_months ? expiringBetween(lots, shiftDay(today, 1), monthEnd) : 0;
+    const tier = program.tiers?.length ? tierOn(program, spendEntries(mine), today).tier?.name : undefined;
+    rows.push({ name, points, value: round2(points * value), expiring, ...(tier ? { tier } : {}) });
+  }
+  rows.sort((a, b) => b.points - a.points);
+  const points = rows.reduce((s, r) => s + r.points, 0);
+  const expiringPoints = rows.reduce((s, r) => s + r.expiring, 0);
+  return { customers: rows.length, points, value: round2(points * value), expiringPoints, expiringValue: round2(expiringPoints * value), rows };
 }
 
 /** Top customers by balance (the dashboard tile). */
@@ -224,14 +337,38 @@ export function redeemOnBill(rec: InvoiceRecord, points: number, invoices: reado
   return { ...applyRedemption(rec, points, balance, program), balance };
 }
 
+export interface LoyaltyInfo {
+  enabled: boolean;
+  balance: number;
+  pointValue: number;
+  minRedeem: number;
+  /** R4-B2: the customer's tier today, the next tier and the spend still needed for it. */
+  tier?: string;
+  next?: { name: string; need: number };
+  /** R4-B2: the next points to lapse. */
+  expiring?: { date: string; points: number };
+}
+
 /** Balance and programme state for a customer (what the redeem box shows). */
-export function loyaltyInfo(name: string): { enabled: boolean; balance: number; pointValue: number; minRedeem: number } {
+export function loyaltyInfo(name: string): LoyaltyInfo {
   const program = readProgram();
-  return {
-    enabled: program.enabled && eligibleParty(name),
-    // Read-only view: shown as the customer name is typed, so no re-parse of the invoice table per keystroke.
-    balance: program.enabled ? pointsBalance(name, peekTable<InvoiceRecord>('invoices'), adjustmentsDb.all(), program) : 0,
-    pointValue: ruleOn(program, localDayOf(new Date())).point_value,
-    minRedeem: program.min_redeem,
-  };
+  const today = localDayOf(new Date());
+  const base = { enabled: program.enabled && eligibleParty(name), pointValue: ruleOn(program, today).point_value, minRedeem: program.min_redeem };
+  if (!program.enabled) return { ...base, balance: 0 };
+  // Read-only view: shown as the customer name is typed, so no re-parse of the invoice table per keystroke.
+  const key = partyKey(name);
+  const mine = peekTable<InvoiceRecord>('invoices').filter((i) => partyKey(i.client?.name) === key);
+  const { rows, lots } = pointsLots(name, mine, adjustmentsDb.all(), program, today);
+  const out: LoyaltyInfo = { ...base, balance: rows.length ? rows[rows.length - 1].balance : 0 };
+  if (program.tiers?.length) {
+    const { tier, spend } = tierOn(program, spendEntries(mine), today);
+    if (tier) out.tier = tier.name;
+    const n = nextTier(tiersOn(program.tiers, today), spend);
+    if (n) out.next = { name: n.tier.name, need: n.need };
+  }
+  if (program.expiry_months) {
+    const e = nextExpiry(lots, today);
+    if (e) out.expiring = e;
+  }
+  return out;
 }

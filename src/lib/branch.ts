@@ -81,6 +81,7 @@ export const branchesDb = {
       ...(g ? { gstin: g, state_code: g.slice(0, 2) } : clean(input.state_code) ? { state_code: clean(input.state_code) } : {}),
       ...(input.profile_id ? { profile_id: input.profile_id } : {}),
       ...(input.godown_id ? { godown_id: input.godown_id } : {}),
+      ...(input.price_level_id ? { price_level_id: input.price_level_id } : {}), // R4-B3: the store's price list
       ...(clean(input.address) ? { address: clean(input.address) } : {}),
       ...(input.inactive ? { inactive: true } : {}),
       created_at: all.find((b) => b.id === input.id)?.created_at ?? new Date().toISOString(),

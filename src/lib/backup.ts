@@ -451,6 +451,8 @@ const RECORD_TABLES = [
   'gst_portal_files', 'dsc_register', 'client_checklist',
   // Round 4 (R4-A): production orders, QC decisions, recall notices, landed-cost vouchers
   'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
+  // Round 4 (R4-B): gift vouchers, store price overrides, transfer requests
+  'gift_vouchers', 'branch_prices', 'transfer_requests',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -497,6 +499,8 @@ const ID_TABLES = new Set([
   'gst_portal_files', 'dsc_register', 'client_checklist',
   // Round 4 (R4-A)
   'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
+  // Round 4 (R4-B)
+  'gift_vouchers', 'branch_prices', 'transfer_requests',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

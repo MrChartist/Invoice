@@ -26,8 +26,15 @@ import {
 } from '../lib/pricing';
 import {
   POS_SHORTCUTS, buildPosRecord, fillRest, posShortcut, savePosBill, tenderSummary,
-  type PosAction, type Tender, type TenderMethod,
+  type MoneyTender, type PosAction, type Tender,
 } from '../lib/pos';
+// R4-B1 / B3: promotional gift voucher discount; store price lists and the counter's branch.
+import { applyPromoDiscount } from '../lib/retail/gift-voucher-core';
+import { BRANCH_PRICES_TABLE, branchContext, posBranch, storePricingInUse, writePosBranch } from '../lib/retail/store-prices';
+import { loadBranches, type Branch } from '../lib/branch';
+import { defineArea } from '../i18n/area';
+import type { BranchPrice } from '../types/stores-r4';
+import type { AppliedVoucher } from '../components/retail/GiftVoucherTender';
 // 8E retail speed pack: entry parsing, keymap, scale labels, shifts, customer display, price lists, WhatsApp.
 import { effectiveKeys, loadKeymap, looksLikeCode, parseCounterEntry, rateFromGross, searchTermOf, type PosKeymap } from '../lib/pos-keys';
 import { findByPlu, loadScaleProfile, parseScaleBarcode, scaleLine, type ScaleProfile, type ScaleRead } from '../lib/scale-barcode';
@@ -92,8 +99,12 @@ interface Party {
   phone: string;
 }
 const WALK_IN: Party = { client: null, name: '', phone: '' };
-const NO_TENDER = { Cash: 0, UPI: 0, Card: 0, Cheque: 0, Wallet: 0 } as Record<TenderMethod, number>;
-const TENDER_KEY: Record<TenderMethod, PosAction> = { Cash: 'cash', UPI: 'upi', Card: 'card', Cheque: 'cheque', Wallet: 'wallet' };
+const NO_TENDER = { Cash: 0, UPI: 0, Card: 0, Cheque: 0, Wallet: 0 } as Record<MoneyTender, number>;
+const TENDER_KEY: Record<MoneyTender, PosAction> = { Cash: 'cash', UPI: 'upi', Card: 'card', Cheque: 'cheque', Wallet: 'wallet' };
+// R4-B1: the gift-voucher tender panel loads only when the company has vouchers.
+const GiftVoucherTender = lazy(() => import('../components/retail/GiftVoucherTender'));
+// R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
+const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
 
 /** Everything the counter reads, loaded once per bill. */
 function loadCounter() {
@@ -126,6 +137,15 @@ function loadCounter() {
     posBills: peekTable<InvoiceRecord>(KEYS.invoices).filter((i) => i.pos),
     // 8E (8.145): selling price lists (stock items with dated prices) apply on the POS as in the editor.
     lists: stock.some((s) => s.selling_prices?.length),
+    // R4-B1: show the gift-voucher tender only once the company has vouchers.
+    gv: peekTable('gift_vouchers').length > 0,
+    // R4-B3: store price lists (branches with a price list, or dated store overrides).
+    store: (() => {
+      const branches = loadBranches();
+      const prices = peekTable<BranchPrice>(BRANCH_PRICES_TABLE);
+      return branches.length && storePricingInUse(branches, prices) ? { branches, prices, levels: pricing.levels } : null;
+    })(),
+    branches: loadBranches().filter((b) => !b.inactive),
     // R3-A4: modifier groups (Settings → Tables) and the stock group of each item (for group-linked modifiers).
     modGroups: getTable<ModGroup>('modifier_groups'),
     groupOf: new Map(stock.map((s) => [s.name.trim().toLowerCase(), s.group_id])),
@@ -164,6 +184,7 @@ export function Pos() {
   }
   const [exchange, setExchange] = useState<{ id: string; amount: number; number: string } | null>(null);
   const [redeemPts, setRedeemPts] = useState(0);
+  const [gvApplied, setGvApplied] = useState<AppliedVoucher[]>([]); // R4-B1
   // 8.21: bills on hold (this device, this company).
   const [held, setHeld] = useState<HeldCart[]>(loadHeld);
   const [heldOpen, setHeldOpen] = useState(false);
@@ -205,6 +226,9 @@ export function Pos() {
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
   const day = todayInput();
   const level = data.pricing && party.client ? levelForClient(party.client, data.pricing.levels) : null;
+  // R4-B3: "This counter is branch …" (device-local), defaulting to the branch of the business profile.
+  const [counterId, setCounterId] = useState(() => posBranch(data.branches, sender?.id)?.id ?? '');
+  const counterBranch: Branch | undefined = useMemo(() => data.branches.find((b) => b.id === counterId), [data.branches, counterId]);
 
   const built = useMemo(
     () => buildPosRecord({ items, party: { client: party.client, name: party.name, phone: party.phone }, settings, sender, templateId: localDb.template.get(), day, deliverToClientState: dispatch }),
@@ -212,17 +236,28 @@ export function Pos() {
   );
   // Loyalty points redeemed as an amount discount (WP-9); a refused redemption leaves the bill as built.
   const redeemed = useMemo(() => (redeemPts > 0 && party.client ? redeemOnBill(built, redeemPts) : null), [built, redeemPts, party.client]);
+  // R4-B1: a promotional gift voucher is an amount discount (like loyalty points); a refused one leaves the bill as is.
+  const promoV = gvApplied.find((a) => a.promo);
+  const promo = useMemo(() => {
+    const base = redeemed?.record ?? built;
+    return promoV ? applyPromoDiscount(base, promoV.amount) : { record: base, error: '' };
+  }, [redeemed, built, promoV]);
+  const promoted = promo.record ?? redeemed?.record ?? built;
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
-  const offered = useMemo(() => applyBillOffer(redeemed?.record ?? built, data.pricing?.schemes ?? [], { retotalRecord: true }), [redeemed, built, data.pricing]);
+  const offered = useMemo(() => applyBillOffer(promoted, data.pricing?.schemes ?? [], { retotalRecord: true }), [promoted, data.pricing]);
   const record = useMemo(() => (agentId ? { ...offered, agent_id: agentId } : offered), [offered, agentId]);
   const tenders: Tender[] = useMemo(
-    () => (Object.keys(tender) as TenderMethod[]).map((m) => ({
-      method: m, amount: tender[m],
-      ...(m === 'UPI' && upiRef.trim() ? { reference: upiRef.trim() } : {}),
-      ...(m === 'Cheque' && chequeRef.trim() ? { reference: chequeRef.trim() } : {}),
-      ...(m !== 'Cash' && bankId ? { bank_account_id: bankId } : {}),
-    })),
-    [tender, upiRef, chequeRef, bankId],
+    () => [
+      ...(Object.keys(tender) as MoneyTender[]).map((m) => ({
+        method: m, amount: tender[m],
+        ...(m === 'UPI' && upiRef.trim() ? { reference: upiRef.trim() } : {}),
+        ...(m === 'Cheque' && chequeRef.trim() ? { reference: chequeRef.trim() } : {}),
+        ...(m !== 'Cash' && bankId ? { bank_account_id: bankId } : {}),
+      })),
+      // R4-B1: one tender per sold gift voucher (each keeps its id).
+      ...gvApplied.filter((a) => !a.promo).map((a) => ({ method: 'Gift voucher' as const, amount: a.amount, reference: a.number, gift_voucher_id: a.id })),
+    ],
+    [tender, upiRef, chequeRef, bankId, gvApplied],
   );
   // An exchange credit (WP-9) pays part of the bill; the tenders cover the rest.
   const credit = exchange ? Math.min(exchange.amount, record.total) : 0;
@@ -245,8 +280,9 @@ export function Pos() {
   const finish = useCallback(
     (next: InvoiceItem[], repriceId?: string, force = false, client: Client | null = party.client): InvoiceItem[] => {
       const p = data.pricing;
-      if (!p && !data.lists) return next;
+      if (!p && !data.lists && !data.store) return next;
       const lvl = p && client ? levelForClient(client, p.levels) : null;
+      const store = data.store ? counterBranch : undefined; // R4-B3
       const priced = next.map((l) => {
         if (l.free_of || locked.current.has(l.id) || (repriceId && l.id !== repriceId)) return l;
         const cat = catalogItemFor(p?.catalog ?? data.catalog, l.name);
@@ -255,7 +291,8 @@ export function Pos() {
         if (!cat && list === undefined) return l;
         const base = list ?? num(cat?.rate);
         if (!force && !l.price_basis && num(l.rate) !== base) return l;
-        const q = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(l.quantity), lvl);
+        const branchCtx = store && data.store ? branchContext(store, cat?.id ?? '', day, data.store.prices, data.store.levels) : null;
+        const q = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(l.quantity), lvl, branchCtx);
         const basis = q.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : q.basis;
         const out = { ...l, rate: q.rate, amount: round2(q.rate * num(l.quantity)) };
         if (basis) out.price_basis = basis;
@@ -264,7 +301,7 @@ export function Pos() {
       });
       return p ? syncSchemeLines(priced, p.schemes, day, generateId, p.catalog) : priced;
     },
-    [data.pricing, data.lists, data.catalog, data.stock, party.client, day],
+    [data.pricing, data.lists, data.catalog, data.stock, data.store, counterBranch, party.client, day],
   );
 
   const addSource = useCallback(
@@ -453,8 +490,9 @@ export function Pos() {
 
   /* ── Tender ────────────────────────────────────────────────── */
 
-  const fill = (m: TenderMethod) => {
-    setTender((t) => ({ ...t, [m]: fillRest(payable, (Object.keys(t) as TenderMethod[]).map((k) => ({ method: k, amount: t[k] })), m) }));
+  const fill = (m: MoneyTender) => {
+    const gv = gvApplied.filter((a) => !a.promo).map((a) => ({ method: 'Gift voucher' as const, amount: a.amount }));
+    setTender((t) => ({ ...t, [m]: fillRest(payable, [...(Object.keys(t) as MoneyTender[]).map((k) => ({ method: k, amount: t[k] })), ...gv], m) }));
     setTimeout(() => (document.getElementById(`pos-${m}`) as HTMLInputElement | null)?.select(), 0);
   };
   /** 8E (8.144): On account takes what is still due (saved customers only). */
@@ -476,6 +514,7 @@ export function Pos() {
   const reset = () => {
     setItems([]);
     setRedeemPts(0);
+    setGvApplied([]);
     setParty(WALK_IN);
     setAgentId('');
     setCreditOver(false);
@@ -520,7 +559,7 @@ export function Pos() {
       setCreditOk(true);
       return;
     }
-    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client, exchangeReturnId: exchange?.id });
+    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client, exchangeReturnId: exchange?.id, ...(promoV && promo.record ? { promoVoucher: { id: promoV.id, amount: promoV.amount } } : {}) });
     if (res.expired?.length) {
       setExpiredAsk(res.expired);
       return;
@@ -617,6 +656,7 @@ export function Pos() {
     setTender({ ...NO_TENDER, ...(c.tender ?? {}) });
     setUpiRef(c.upi_ref ?? '');
     setRedeemPts(0);
+    setGvApplied([]);
     setErrors([]);
     setHeldOpen(false);
     notify(parked?.ok ? `${posT('heldRecalled')}. ${posT('heldReplace')}` : posT('heldRecalled'));
@@ -974,6 +1014,18 @@ export function Pos() {
           <section className={surface.card} aria-label={posT('customer')}>
             <div className={surface.cardHead}><span className={surface.cardHeadIcon}><UserRound size={16} /> {posT('customer')} <kbd className={styles.kbd}>F3</kbd></span></div>
             <div className={cn(surface.cardBody, styles.stack)}>
+              {data.store && (
+                <label className={controls.field}>
+                  <span className={controls.label}><Store size={12} aria-hidden="true" /> {storeT('counter')}</span>
+                  <select className={controls.select} value={counterId} data-pos-branch onChange={(e) => {
+                    setCounterId(e.target.value);
+                    writePosBranch(e.target.value);
+                  }}>
+                    <option value="">{storeT('none')}</option>
+                    {data.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </label>
+              )}
               {party.client ? (
                 <div className={styles.picked}>
                   <div>
@@ -1041,7 +1093,7 @@ export function Pos() {
 
           <section className={surface.card} aria-label={posT('payment')}>
             <div className={cn(surface.cardBody, styles.stack)}>
-              {(['Cash', 'UPI', 'Card', 'Cheque', 'Wallet'] as TenderMethod[]).map((m) => (
+              {(['Cash', 'UPI', 'Card', 'Cheque', 'Wallet'] as MoneyTender[]).map((m) => (
                 <div key={m} className={styles.tender}>
                   <label htmlFor={`pos-${m}`} className={styles.tenderLabel}>{m === 'Cash' || m === 'UPI' || m === 'Card' ? posT(`m.${m}`) : retailT(`t.${m}`)} <kbd className={styles.kbd}>{keys[TENDER_KEY[m]]}</kbd></label>
                   <NumberInput id={`pos-${m}`} className={cn(controls.input, controls.inputNumeric)} value={tender[m]} onChange={(v) => setTender((t) => ({ ...t, [m]: v }))} placeholder="0" />
@@ -1055,6 +1107,12 @@ export function Pos() {
                   <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={fillAccount}>{posT('rest')}</button>
                 </div>
               )}
+              {(data.gv || gvApplied.length > 0) && (
+                <Suspense fallback={null}>
+                  <GiftVoucherTender day={record.issue_date} due={summary.due} applied={gvApplied} onChange={setGvApplied} />
+                </Suspense>
+              )}
+              {promo.error && <p className={controls.error} role="alert">{promo.error}</p>}
               {tender.Cheque > 0 && (
                 <input className={controls.input} value={chequeRef} onChange={(e) => setChequeRef(e.target.value)} placeholder={retailT('chequePh')} aria-label={retailT('chequePh')} id="pos-cheque-ref" />
               )}
