@@ -22,7 +22,7 @@ type Row = Record<string, unknown>;
 const isObj = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Per-device bookkeeping that is not company data. */
-const DEVICE_BOOKKEEPING = new Set(['draft', 'timer', 'backup_snooze', 'auto_backup', 'install_dismissed', 'notif_state', 'export_prefs', '__probe', 'schema_version', 'bin_settings']);
+const DEVICE_BOOKKEEPING = new Set(['draft', 'timer', 'backup_snooze', 'auto_backup', 'install_dismissed', 'notif_state', 'export_prefs', '__probe', 'schema_version']);
 const LEFT_OUT = new Set<string>([...SYNC_META_KEYS, ...DEVICE_DRAFT_KEYS]);
 const ATT_PREFIX = `${DB_PREFIX}att_`;
 

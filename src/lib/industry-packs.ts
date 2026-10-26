@@ -53,8 +53,15 @@ export function isPackOn(s: PackSettings | null | undefined, id: PackId): boolea
 /** A pack tab for Ctrl+K: `labelKey` is a key of the package's own i18n area (resolved by the palette group). */
 export interface PackTab {
   pack: PackId;
+  /** Other packs that also turn the row on (a tab shared by several packs, e.g. common credit). */
+  alsoPacks?: readonly PackId[];
   path: string;
   labelKey: string;
+}
+
+/** True when the row's own pack or one of its `alsoPacks` is among `on`. */
+export function packTabOn(t: PackTab, on: readonly PackId[]): boolean {
+  return on.includes(t.pack) || (t.alsoPacks ?? []).some((p) => on.includes(p));
 }
 
 /**
@@ -73,7 +80,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'leases', path: '/recurring?tab=leases', labelKey: 'tab.leases' },
   { pack: 'nonprofit', path: '/receivables?tab=donations', labelKey: 'tab.donations' },
   { pack: 'nonprofit', path: '/books?tab=funds', labelKey: 'tab.funds' },
-  { pack: 'fees', path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' },
+  { pack: 'fees', alsoPacks: ['nonprofit', 'leases'], path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' },
   // R5-B: transport (Distribution → Transport) and works contracts (Time → Works); labels in `packs-transport-works-r5.ts`
   { pack: 'transport', path: '/distribution?tab=transport', labelKey: 'tab.transport' },
   { pack: 'transport', path: '/distribution?tab=transport&view=trips', labelKey: 'view.trips' },
