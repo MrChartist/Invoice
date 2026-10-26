@@ -90,7 +90,9 @@ test('L4: vault on → plain backups are refused; an encrypted one (backup passp
   assert.deepEqual(await setBackupPassphrase('backup passphrase 1'), { ok: true });
   const { getBackupKey } = await import('../src/lib/auto-backup.ts');
   const enc = await backupPayload(new Date(), await getBackupKey(), { scheduled: true });
-  assert.ok(enc.filename.includes('.encrypted') && !enc.text.includes('Acme'));
+  assert.ok(enc.filename.includes('.encrypted'), `encrypted backup file name: ${enc.filename}`);
+  const at = enc.text.indexOf('Acme');
+  assert.equal(at, -1, `client name leaked into the encrypted backup near: ${enc.text.slice(Math.max(0, at - 120), at + 40)}`);
 });
 
 test('M3: connecting, re-entering the passphrase, disconnecting and "Sync now" are owner-only', async () => {
