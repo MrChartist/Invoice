@@ -174,3 +174,22 @@ test('regression: removing a GST TDS / cess receipt removes its journal; trial b
   assert.ok(getTable<Payment>('transactions').some((p) => p.id === again.id));
   assert.ok(loadVouchers().some((v) => v.id === again.ra_journal_id));
 });
+
+test('regression (R5-B5 with the R5-C6 cash-reader rule): GST TDS / cess deduction rows move no cash — cash book, BRS, payment modes skip them; trial balance balanced', async () => {
+  const { loadBooksData, buildVouchers } = await import('../src/lib/books.ts');
+  const { receiptCandidates } = await import('../src/lib/bank-recon.ts');
+  const { paymentModes } = await import('../src/lib/sales-reports.ts');
+  const { trialBalance } = await import('../src/lib/ledger/reports.ts');
+  const inv = raOne();
+  const gst = recordDeductionRow(inv.id, 'gst_tds', { date: '2026-07-20' });
+  const cess = recordDeductionRow(inv.id, 'labour_cess', { date: '2026-07-20' });
+  assert.ok(gst.ra_journal_id && cess.ra_journal_id);
+  const book = buildVouchers(loadBooksData());
+  assert.ok(!book.some((v) => v.type === 'Receipt' && v.invoice_id === inv.id), 'the cash book does not list them');
+  const pays = getTable<Payment>('transactions');
+  assert.ok(!receiptCandidates(localDb.invoices.getAll(), pays).some((c) => c.docId === inv.id), 'nor BRS candidates');
+  assert.equal(paymentModes(pays, localDb.invoices.getAll(), { start: '2026-04-01', end: '2027-03-31' }).count, 0, 'nor payment modes');
+  const tb = trialBalance(loadLedger(), { start: '2026-04-01', end: '2027-03-31' });
+  assert.equal(tb.totals.debit, tb.totals.credit);
+  assert.equal(tb.rows.filter((r) => r.account.name === 'RA deductions clearing').reduce((s, r) => s + r.closing, 0), 0, 'the clearing account nets to zero');
+});

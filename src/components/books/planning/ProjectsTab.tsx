@@ -46,8 +46,8 @@ const ProjectMaterialsRow = lazy(() => import('../../production/ProjectMaterials
 const SiteMaterialsRow = lazy(() => import('../../works/SiteMaterialsRow'));
 
 const SECTION_KEY = { income: 'secIncome', direct: 'secDirect', indirect: 'secIndirect' } as const;
-const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch' } as const;
-// R5-B / R5-C kinds (vehicle, fund) show the master's English label until this area names them.
+const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch', fund: 'kindFund' } as const;
+// R5-B kind (vehicle) shows the master's English label until this area names them.
 const kindLabel = (k: CostCentreKind) => (k in KIND_KEY ? planT(KIND_KEY[k as keyof typeof KIND_KEY]) : COST_CENTRE_KIND_LABELS[k]);
 /** Engine column labels: centre names pass through; the two fixed columns are translated. */
 const columnLabel = (label: string) => (label === 'Unallocated' ? planT('unallocated') : label === 'Deleted cost centre' ? planT('deletedCc') : label);

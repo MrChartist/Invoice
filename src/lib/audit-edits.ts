@@ -127,6 +127,16 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   settlements: { entity: 'payment', label: 'Marketplace settlement' },
   eco_credits: { entity: 'gst', label: 'GST TCS / TDS credit' },
   marketplace_returns: { entity: 'invoice', label: 'Marketplace return' },
+  // R5-C: fee plans, fee runs, Rule 42 / 43 reversals, donations, 10BD / 10BE, properties, leases, security deposits
+  fee_plans: { entity: 'item', label: 'Fee plan' },
+  fee_runs: { entity: 'invoice', label: 'Fee run' },
+  common_credit_runs: { entity: 'gst', label: 'ITC reversal' },
+  donations: { entity: 'payment', label: 'Donation' },
+  form_10bd_filings: { entity: 'settings', label: '10BD' },
+  form_10be: { entity: 'settings', label: '10BE' },
+  properties: { entity: 'item', label: 'Property' },
+  leases: { entity: 'client', label: 'Lease' },
+  security_deposits: { entity: 'payment', label: 'Deposit' },
   // R5-B: consignment notes, GTA option per FY, vehicles, trip sheets, RA measurements, BOQ coefficients
   consignment_notes: { entity: 'invoice', label: 'LR' },
   gta_options: { entity: 'gst', label: 'GTA option' },

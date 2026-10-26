@@ -28,9 +28,23 @@ import styles from './Recurring.module.css';
 import { useT } from '../i18n';
 import { recT } from '../i18n/areas/recurring';
 import { s2T } from '../i18n/areas/sales-r2';
+import { defineArea } from '../i18n/area';
+import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-C
+import { localDb } from '../lib/localDb';
 
 // R2-B1: batch invoices (one template, many parties), loaded on demand.
 const BatchTab = lazy(() => import('../components/recurring/BatchTab').then((m) => ({ default: m.BatchTab })));
+// R5-C: fees (institutions) and leases (property) — listed only with their pack on; the URL always opens them.
+const FeesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.FeesTab })));
+const LeasesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.LeasesTab })));
+const r5cTabT = defineArea({ fees: 'Fees', leases: 'Leases' } as const, { fees: 'फ़ीस', leases: 'लीज़' });
+type RecTab = 'schedules' | 'batch' | 'fees' | 'leases';
+const REC_TABS: { id: RecTab; label: () => string; pack?: PackId }[] = [
+  { id: 'schedules', label: () => s2T('rec.tabSchedules') },
+  { id: 'batch', label: () => s2T('rec.tabBatch') },
+  { id: 'fees', label: () => r5cTabT('fees'), pack: 'fees' }, // R5-C
+  { id: 'leases', label: () => r5cTabT('leases'), pack: 'leases' }, // R5-C
+];
 
 export interface RecurringPageProps {
   /** Open the create modal prefilled from this saved invoice. */
@@ -49,7 +63,7 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
   const [params, setParams] = useSearchParams();
   const queryFrom = params.get('from') ?? undefined;
   const prefillId = fromInvoiceId ?? queryFrom;
-  const tab = params.get('tab') === 'batch' ? 'batch' : 'schedules';
+  const tab: RecTab = REC_TABS.find((t) => t.id === params.get('tab'))?.id ?? 'schedules';
 
   const [schedules, setSchedules] = useState<RecurringSchedule[]>(() => recurringDb.getAll());
   const [editorOpen, setEditorOpen] = useState(Boolean(prefillId));
@@ -184,17 +198,17 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
 
       {/* R2-B1: Schedules | Batch invoices */}
       <div className={controls.segment} role="tablist" aria-label={recT('title')}>
-        {([['schedules', s2T('rec.tabSchedules')], ['batch', s2T('rec.tabBatch')]] as const).map(([k, label]) => (
+        {visibleTabs(REC_TABS, localDb.settings.get(), tab).map(({ id: k, label }) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn}
-            onClick={() => { const next = new URLSearchParams(params); if (k === 'batch') next.set('tab', 'batch'); else next.delete('tab'); setParams(next, { replace: true }); }}>
-            {label}
+            onClick={() => { const next = new URLSearchParams(params); next.delete('view'); if (k !== 'schedules') next.set('tab', k); else next.delete('tab'); setParams(next, { replace: true }); }}>
+            {label()}
           </button>
         ))}
       </div>
 
-      {tab === 'batch' ? (
+      {tab === 'batch' || tab === 'fees' || tab === 'leases' ? (
         <Suspense fallback={null}>
-          <BatchTab />
+          {tab === 'batch' ? <BatchTab /> : tab === 'fees' ? <FeesTab notify={notify} /> : <LeasesTab notify={notify} />}
         </Suspense>
       ) : (
       <>

@@ -323,6 +323,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...Object.fromEntries((['incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms'] as const).filter((k) => typeof r[k] === 'string' && r[k]).map((k) => [k, r[k]])),
     // R5-A3 (additive): marketplace order link survives an edit (idempotent re-import).
     ...(typeof r.channel_id === 'string' ? { channel_id: r.channel_id, channel_order_id: r.channel_order_id as string, channel_import_id: r.channel_import_id as string } : {}),
+    // R5-C1 (additive): fee plan / instalment of a fee document (idempotency of a billing run).
+    ...(typeof r.fee_plan_id === 'string' ? { fee_plan_id: r.fee_plan_id, fee_instalment: r.fee_instalment as number } : {}),
     // R5-B (additive): freight-bill LRs, RA bill number / deductions / retention day, BOQ terms survive an edit.
     ...Object.fromEntries(R5B_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])),
 

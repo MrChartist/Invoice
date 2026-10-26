@@ -156,6 +156,9 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   settlements: 'Marketplace settlements: payout, lines per order and bucket, posting references.',
   eco_credits: 'GST TCS / TDS credit rows from the portal, with the accept / reject decision.',
   marketplace_returns: 'Marketplace returns / RTO / claims desk.',
+  // R5-C: institutions, non-profits & property
+  fee_plans: 'Fee plans.', fee_runs: 'Fee billing runs.', common_credit_runs: 'Rule 42 / 43 reversals.', donations: 'Donation receipts (80G / 35).',
+  form_10bd_filings: 'Form 10BD filings.', form_10be: 'Form 10BE certificates.', properties: 'Properties and units.', leases: 'Leases.', security_deposits: 'Security deposits.',
   // R5-B: transport & works contracts pack
   consignment_notes: 'Consignment notes (LR / bilty).',
   gta_options: 'GTA tax option per FY.',
@@ -185,6 +188,7 @@ export const COLUMN_MEANING: Readonly<Record<string, string>> = {
   id: 'Row id (unique in its table).',
   invoice_id: 'Sales document id (invoices.id).',
   gift_voucher_id: 'Gift voucher redeemed by this receipt (moves no cash).',
+  deposit_adjustment_id: 'Security deposit this receipt was settled from (moves no cash).',
   purchase_id: 'Supplier bill id (purchases.id).',
   voucher_id: 'Voucher id (vouchers.id).',
   vendor_id: 'Supplier id (vendors.id).',
