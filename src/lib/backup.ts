@@ -457,6 +457,8 @@ const RECORD_TABLES = [
   'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
   // Round 5 (R5-A): sales channels, channel SKU map, marketplace imports, settlements, GST TCS / TDS credit rows, returns desk
   'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
+  // Round 5 (R5-B): consignment notes, GTA option per FY, vehicles, trip sheets, RA measurements, BOQ coefficients
+  'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -511,6 +513,8 @@ const ID_TABLES = new Set([
   'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
   // Round 5 (R5-A)
   'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
+  // Round 5 (R5-B)
+  'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

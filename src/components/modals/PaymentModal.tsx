@@ -34,6 +34,8 @@ const ApplyAdvancePanel = lazy(() => import('../advances/ApplyAdvancePanel'));
 // R2-A2 / A3: "Settle the rest" and the bad-debt recovery offer load only when they apply.
 const SettleRestFields = lazy(() => import('../collections/SettleRestFields'));
 const RecoveryOffer = lazy(() => import('../collections/RecoveryOffer'));
+// R5-B5: RA bill deductions / net payable — only for a bill carrying `ra_deductions` (the block checks the works pack).
+const RaReceiptPanel = lazy(() => import('../works/RaReceiptPanel'));
 
 export interface PaymentModalProps {
   invoice: InvoiceRecord | null;
@@ -158,9 +160,11 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     }
   };
 
-  const removePayment = (id: string) => {
+  const removePayment = async (id: string) => {
     try {
-      localDb.payments.remove(id);
+      // R5-B5: a GST TDS / cess deduction receipt goes with its journal (all or nothing).
+      if (payments.find((p) => p.id === id)?.ra_journal_id) (await import('../../lib/works/ra-receivable')).removeDeductionRow(id);
+      else localDb.payments.remove(id);
     } catch (err) {
       setError((err as Error).message);
       return;
@@ -330,6 +334,12 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
         </Suspense>
       )}
 
+      {balance > 0 && !locked && !!live.ra_deductions?.length && can('payment.record') && (
+        <Suspense fallback={null}>
+          <RaReceiptPanel invoice={live} version={version} onPrefill={(v) => setAmount(v > 0 ? String(v) : '')} onError={setError}
+            onDone={(message) => { setVersion((v) => v + 1); refreshEditor(live.id); setError(''); onChanged(message); }} />
+        </Suspense>
+      )}
       {balance > 0 && !locked && can('payment.record') && (live.currency || 'INR').toUpperCase() === 'INR' && (
         <Suspense fallback={null}>
           <ApplyAdvancePanel
@@ -366,7 +376,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                   </button>
                 )}
                 {(!p.write_off || can('doc.deleteIssued')) && (
-                  <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={t('pay.removeFor', { amount: formatCurrency(p.amount, live.currency) })}>
+                  <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => void removePayment(p.id)} aria-label={t('pay.removeFor', { amount: formatCurrency(p.amount, live.currency) })}>
                     <Trash2 size={15} />
                   </button>
                 )}

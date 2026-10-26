@@ -17,6 +17,7 @@ import {
 } from '../../../lib/ledger';
 import {
   COST_CENTRE_KINDS,
+  COST_CENTRE_KIND_LABELS,
   deleteCostCentre,
   loadCostCentres,
   saveCostCentre,
@@ -41,10 +42,13 @@ import { peekTable } from '../../../lib/storage';
 
 // R4-A2: memo row "materials used (stock, not posted)" from production orders tagged with a cost centre (lazy).
 const ProjectMaterialsRow = lazy(() => import('../../production/ProjectMaterialsRow'));
+// R5-B6: memo row "material consumed at works sites" from stock journals tagged with a cost centre (lazy).
+const SiteMaterialsRow = lazy(() => import('../../works/SiteMaterialsRow'));
 
 const SECTION_KEY = { income: 'secIncome', direct: 'secDirect', indirect: 'secIndirect' } as const;
 const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch' } as const;
-const kindLabel = (k: CostCentreKind) => planT(KIND_KEY[k]);
+// R5-B / R5-C kinds (vehicle, fund) show the master's English label until this area names them.
+const kindLabel = (k: CostCentreKind) => (k in KIND_KEY ? planT(KIND_KEY[k as keyof typeof KIND_KEY]) : COST_CENTRE_KIND_LABELS[k]);
 /** Engine column labels: centre names pass through; the two fixed columns are translated. */
 const columnLabel = (label: string) => (label === 'Unallocated' ? planT('unallocated') : label === 'Deleted cost centre' ? planT('deletedCc') : label);
 
@@ -214,6 +218,9 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                     {totalsRow(planT('netProfitLoss'), (t) => t.netProfit, true)}
                     {peekTable<{ cost_centre_id?: string }>('production_orders').some((o) => o?.cost_centre_id) && (
                       <Suspense fallback={null}><ProjectMaterialsRow columns={pnl.columns} period={period} cellClass={styles.sticky} /></Suspense>
+                    )}
+                    {peekTable<{ cost_centre_id?: string }>('stock_journals').some((j) => j?.cost_centre_id) && (
+                      <Suspense fallback={null}><SiteMaterialsRow columns={pnl.columns} period={period} cellClass={styles.sticky} /></Suspense>
                     )}
                   </tbody>
                 </table>

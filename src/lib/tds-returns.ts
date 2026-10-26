@@ -149,6 +149,8 @@ function buildPaper(form: '26Q' | '27EQ', rows: readonly AnyRow[], challans: rea
   list.forEach((r, i) => {
     const ch = byKey.get(r.key);
     if (ch) deposited += r.amount;
+    // R5-B3: a Sec 194C(6) nil row (reason T) has nothing to deposit; it is reported with its no-deduction reason.
+    else if (r.reason === 'T' && !(r.amount > 0)) warnings.push(`${r.name}: no TDS under a Sec 194C(6) declaration (reason T) — keep the declaration and PAN on file; verify with your CA.`);
     else warnings.push(`${r.name}: ₹${amt(r.amount)} deducted on ${r.deductedOn} is not linked to a challan.`);
     if (!r.pan) warnings.push(`${r.name}: PAN missing — the RPU needs "PANNOTAVBL" and the 20% rate (206AA).`);
     const sr = ch ? srOf.get(ch.id) ?? '' : '';
