@@ -65,7 +65,9 @@ export function SummaryPanel() {
   const trOn = useMemo(() => ((x) => !!x.trade_discounts || !!x.returnable_packaging || impliedPacks(x).some((p) => p === 'distributor' || p === 'commodity' || p === 'agency'))(localDb.settings.get()), []); // R8-A
   const hasDelivery = useInvoiceStore((st) => !!st.delivery);
   const deliveryOn = useMemo(() => getJson<{ delivery?: { enabled?: boolean } } | null>(`${DB_PREFIX}retail_settings`, null)?.delivery?.enabled === true, []) || hasDelivery; // R9
-  const tradeOn = useMemo(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency'), []); // R8-B
+  const packOn = useMemo(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency'), []); // R8-B
+  const hasCharges = useInvoiceStore((st) => st.items.some((i) => !!i.charge_head_id)); // QA8 T16: saved charge lines stay live
+  const tradeOn = packOn || hasCharges;
   const extrasOn = useMemo(
     () => getTable('sales_agents').length > 0 || getTable<{ kind?: string }>('schemes').some((x) => x?.kind === 'bill_value') || getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}pharma_settings`, null)?.enabled === true,
     [],

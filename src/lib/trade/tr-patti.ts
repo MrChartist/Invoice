@@ -44,6 +44,16 @@ export function settledKeys(pattis: readonly SalePatti[], exceptId?: string): Se
   return out;
 }
 
+/** Advance of lot `a` already deducted on other live pattis (legacy rows without the split took the whole advance). */
+export function advanceTaken(pattis: readonly SalePatti[], a: Pick<Arrival, 'id' | 'advance'>, exceptId?: string): number {
+  let t = 0;
+  for (const p of pattis) {
+    if (p.status === 'cancelled' || p.id === exceptId || !p.arrival_ids?.includes(a.id)) continue;
+    t += p.advance_by_lot ? num(p.advance_by_lot[a.id]) : Math.max(num(a.advance), 0);
+  }
+  return round2(t);
+}
+
 /** One deduction's amount: % of gross, per bag of the lots, per unit sold, or a fixed ₹. */
 export function deductionAmount(d: Pick<DeductionInput, 'basis' | 'rate' | 'amount'>, base: { gross: number; packages: number; qty: number }): number {
   if (d.amount !== undefined && Number.isFinite(d.amount)) return round2(Math.max(num(d.amount), 0));
@@ -94,7 +104,13 @@ export function buildPatti(
     .filter((d) => String(d.label ?? '').trim() && (num(d.rate) > 0 || num(d.amount) > 0))
     .map((d) => ({ label: d.label.trim(), basis: d.basis, rate: round2(num(d.rate)), amount: deductionAmount(d, base), ...(d.head_id ? { head_id: d.head_id } : {}), ...(d.account_id ? { account_id: d.account_id } : {}), ...(d.aadat ? { aadat: true } : {}) }));
   const total_deductions = round2(deductions.reduce((t, d) => t + d.amount, 0));
-  const advance = round2(lots.reduce((t, a) => t + Math.max(num(a.advance), 0), 0));
+  // QA8 T3: each lot's advance is recovered once — a later patti deducts only what earlier live pattis left.
+  const advance_by_lot: Record<string, number> = {};
+  for (const a of lots) {
+    const left = round2(Math.max(num(a.advance), 0) - advanceTaken(ctx.existing, a, ctx.exceptId));
+    if (left > 0) advance_by_lot[a.id] = left;
+  }
+  const advance = round2(Object.values(advance_by_lot).reduce((t, v) => t + v, 0));
   return {
     date: input.date,
     principal_id: input.principalId,
@@ -105,6 +121,7 @@ export function buildPatti(
     deductions,
     total_deductions,
     advance,
+    ...(Object.keys(advance_by_lot).length ? { advance_by_lot } : {}),
     net_payable: round2(gross - total_deductions - advance),
     commission_gst: lots.every((a) => (a.produce ?? 'agricultural') === 'agricultural') ? 'exempt' : 'taxable',
   };

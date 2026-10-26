@@ -346,16 +346,24 @@ function balanceWithRoundOff(entries: TallyEntry[], roundOffLedger: string): num
   return net;
 }
 
-function lineItems(inv: InvoiceRecord): TallyInventoryLine[] {
+/**
+ * Stock lines of a document, plus (QA8 T13) the paise of lines that are not our stock: bill-charge lines (market fee,
+ * hamali … → the other-charges ledger) and agency lines (a principal's goods → the sales ledger as an accounting line).
+ */
+function lineItems(inv: InvoiceRecord): { stock: TallyInventoryLine[]; charges: number; agency: number } {
   const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
-  if (!items.length) return [];
+  const none = { stock: [], charges: 0, agency: 0 };
+  if (!items.length) return none;
   try {
     const calc = inrTotals(
       calculateInvoice(calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 })),
       inv,
     );
-    return calc.lines
-      .filter((l) => clean(l.name))
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const kind = (id: string) => (byId.get(id)?.charge_head_id ? 'charges' : byId.get(id)?.arrival_id ? 'agency' : '');
+    const sum = (k: string) => calc.lines.filter((l) => kind(l.id) === k).reduce((t, l) => t + toPaise(l.taxable), 0);
+    const stock = calc.lines
+      .filter((l) => clean(l.name) && !kind(l.id))
       .map((l) => ({
         item: clean(l.name),
         hsn: clean(l.hsn),
@@ -365,8 +373,9 @@ function lineItems(inv: InvoiceRecord): TallyInventoryLine[] {
         gstRate: num(l.tax_rate),
         paise: toPaise(l.taxable),
       }));
+    return { stock, charges: sum('charges'), agency: sum('agency') };
   } catch {
-    return [];
+    return none;
   }
 }
 
@@ -429,7 +438,8 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     // R2-A2: a financial credit note posts to its expense ledger (Discount Allowed / Bad Debts), with no stock and,
     // without the GST variant, no GST ledgers at all.
     const financial = credit && isFinancialNote(inv);
-    const inventory = o.includeInventory && !financial ? lineItems(inv) : [];
+    const split = o.includeInventory && !financial ? lineItems(inv) : { stock: [], charges: 0, agency: 0 };
+    const inventory = split.stock;
     const salesLedger = financial ? FINANCIAL_TALLY_LEDGERS[financialAccountOf(inv)] ?? 'Discount Allowed' : credit ? o.creditNoteLedger : o.salesLedger;
     const entries: TallyEntry[] = [];
     const abs = (n: number) => Math.abs(n);
@@ -443,10 +453,14 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
 
     // Party: Dr on a sale, Cr on a credit note.
     push(entries, party, credit ? 'Cr' : 'Dr', total, { name: number, type: 'New Ref' });
-    const taxable = inventory.length
+    const ledgerLines = split.charges + split.agency;
+    const taxable = inventory.length || ledgerLines
       ? inventory.reduce((s, l) => s + l.paise, 0)
       : Math.abs(toPaise(a.chargesTaxed ? round2(a.taxable - a.charges) : a.taxable));
     push(entries, salesLedger, credit ? 'Dr' : 'Cr', taxable);
+    // QA8 T13: charge lines and agency lines are ledger lines, never our stock items.
+    push(entries, o.otherChargesLedger, credit ? 'Dr' : 'Cr', split.charges);
+    push(entries, salesLedger, credit ? 'Dr' : 'Cr', split.agency);
     // WP-7 (P1-22): the document's cost centre on its sales entry.
     const cc = inv.cost_centre_id ? centreName.get(inv.cost_centre_id) : undefined;
     const salesEntry = entries.find((e) => e.ledger === salesLedger && !e.bill);

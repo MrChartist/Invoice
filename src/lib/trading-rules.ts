@@ -99,8 +99,13 @@ export interface RcmGoodsRow {
   /** HSN prefixes (digits). */
   hsn: readonly string[];
   goods: string;
-  /** Supplier kinds the entry covers ('maker': silk yarn from any person who makes it). */
+  /** Supplier kinds the entry covers ('maker': silk yarn from any person who makes it — an explicit vendor flag). */
   from: readonly SupplierKind[];
+  /**
+   * QA8 T14: a line whose HSN is only a shorter heading of `hsn` (e.g. 0801 for 080131) matches only when its
+   * description names the goods (one of these words, case-insensitive). Absent = the heading alone matches.
+   */
+  words?: readonly string[];
   notification: string;
   verified: boolean;
 }
@@ -108,7 +113,7 @@ export const RCM_NOTIFIED_GOODS_RULES: readonly Versioned<readonly RcmGoodsRow[]
   {
     from: '2017-07-01',
     value: [
-      { hsn: ['0801'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
+      { hsn: ['080131'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], words: ['cashew', 'kaju', 'काजू'], notification: 'N 4/2017-CT(R) (0801 31: in shell — QA8 T14)', verified: true },
       { hsn: ['14049010'], goods: 'Bidi wrapper leaves (tendu)', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['2401'], goods: 'Tobacco leaves', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['5004', '5005', '5006'], goods: 'Silk yarn', from: ['maker', 'agriculturist', 'unregistered'], notification: 'N 4/2017-CT(R)', verified: true },
@@ -118,7 +123,7 @@ export const RCM_NOTIFIED_GOODS_RULES: readonly Versioned<readonly RcmGoodsRow[]
   {
     from: '2017-11-15',
     value: [
-      { hsn: ['0801'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
+      { hsn: ['080131'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], words: ['cashew', 'kaju', 'काजू'], notification: 'N 4/2017-CT(R) (0801 31: in shell — QA8 T14)', verified: true },
       { hsn: ['14049010'], goods: 'Bidi wrapper leaves (tendu)', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['2401'], goods: 'Tobacco leaves', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['5004', '5005', '5006'], goods: 'Silk yarn', from: ['maker', 'agriculturist', 'unregistered'], notification: 'N 4/2017-CT(R)', verified: true },

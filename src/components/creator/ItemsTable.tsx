@@ -193,8 +193,9 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                 </div>
               ) : null}
               {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
-              {tradeOn && priced && <Suspense fallback={null}><LineDiscountCell item={item} index={index} /></Suspense>}
-              {weighOn && <Suspense fallback={null}><LineWeightRow item={item} index={index} /></Suspense>}
+              {/* QA8 T16: a saved line that carries the snapshot keeps its reconciler even with the pack off. */}
+              {(tradeOn || !!item.disc_chain?.length || !!item.disc_per_unit) && priced && <Suspense fallback={null}><LineDiscountCell item={item} index={index} /></Suspense>}
+              {(weighOn || !!item.wt) && <Suspense fallback={null}><LineWeightRow item={item} index={index} /></Suspense>}
               {agencyOn && (docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'BILL_OF_SUPPLY') && <Suspense fallback={null}><LotPicker item={item} index={index} /></Suspense>}
               {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (

@@ -21,7 +21,7 @@ beforeEach(() => {
 const strip: PurchaseLine = { id: 'l1', name: 'Paracetamol strip', hsn: '3004', unit: 'STRIP', quantity: 10, free_qty: 1, rate: 80, discount_percent: 5, tax_rate: 5, batch_no: 'PX1', mrp: 120 };
 const bill = (lines: PurchaseLine[] = [strip]): PurchaseRecord => {
   const t = computePurchaseTotals(lines, { placeOfSupply: '27', businessState: '27' });
-  return { id: 'b1', kind: 'PURCHASE', vendor_id: 'v1', vendor_name: 'Pharma Dist', bill_number: 'D-1', date: '2026-07-01', status: 'unpaid', lines, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, amount_paid: 0, itc_eligible: true } as PurchaseRecord;
+  return { id: 'b1', kind: 'PURCHASE', vendor_id: 'v1', vendor_name: 'Pharma Dist', bill_number: 'D-1', date: '2026-07-01', status: 'unpaid', lines, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, amount_paid: 0, itc_eligible: true } as unknown as PurchaseRecord;
 };
 
 test('10 + 1 at ₹80 less 5%: taxable ₹760, GST on ₹760 only', () => {

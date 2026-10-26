@@ -41,6 +41,9 @@ import { lockState } from '../lib/period-lock';
 import { editorStockContext, liveDocTrackingIssues, liveMrpIssues } from '../lib/stock-tracking';
 import { isMrpMessage, withMrpIssues } from '../lib/retail/rt-mrp'; // R9 (RT-A2)
 import { recordMrpOverrides } from '../lib/retail/rt-settings';
+import { can } from '../lib/access';
+import { audit } from '../lib/audit';
+import { trT } from '../i18n/areas/trade-r8c';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { getJson, SINGLETON_KEYS } from '../lib/storage';
 import { cn } from '../lib/utils';
@@ -188,9 +191,13 @@ export function InvoiceCreator() {
             discount_rate: now.discount_rate,
             price_includes_tax: now.price_includes_tax,
           };
-          // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking.
-          const issues = ctx ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
-          if (issues.errors.length) {
+          // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking (or agency lots).
+          const issues: ReturnType<typeof liveDocTrackingIssues> = ctx || st.items.some((i) => i.arrival_id) ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
+          // QA8 T15: only agency-lot errors left — the owner may sell anyway, with a reason (audited).
+          const lotOnly = !!issues.lots?.length && issues.errors.every((e) => issues.lots!.includes(e));
+          const reason = lotOnly && can('settings.manage') ? window.prompt(trT('lotOverride', { list: issues.lots!.join(' ') }))?.trim() : '';
+          if (reason) audit.record({ entity: 'invoice', entity_id: now.id || '', action: 'override', summary: `Agency lot check overridden: ${issues.lots!.join(' ')} Reason: ${reason}` });
+          else if (issues.errors.length) {
             setErrors(issues.errors);
             window.scrollTo?.({ top: 0 });
             notify(issues.errors[0], 'error');

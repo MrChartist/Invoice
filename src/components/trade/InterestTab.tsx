@@ -14,7 +14,7 @@ import { loadReceivableOpeningBills } from '../../lib/opening-bills';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import type { Client, InvoiceRecord, Payment } from '../../types/invoice';
 import type { InterestSettings } from '../../types/trade-r8';
-import { interestText, loadInterestRuns, loadInterestSettings, overlaps, partyInterest, raiseInterest, saveInterestSettings } from '../../lib/trade/tr-interest';
+import { interestText, loadInterestRuns, loadInterestSettings, overlaps, partyInterest, raiseInterest, saveInterestSettings, undoInterestRun } from '../../lib/trade/tr-interest';
 import { downloadCsv } from './desk-shared';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
@@ -48,6 +48,17 @@ export default function InterestTab({ onDone }: { onDone: (msg: string, error?: 
     try {
       const r = raiseInterest(ticked, asOf, todayInput());
       onDone(aT('raised', { n: r.invoice_ids.length, amount: money(r.total) }));
+      setTick((n) => n + 1);
+    } catch (e) {
+      onDone((e as Error).message, true);
+    }
+  };
+  const runs = useMemo(() => (void tick, loadInterestRuns().filter((r) => r.status !== 'undone').slice(-10).reverse()), [tick]);
+  const undo = (id: string) => {
+    if (!window.confirm(aT('undoRunAsk'))) return;
+    try {
+      undoInterestRun(id);
+      onDone(aT('runUndone'));
       setTick((n) => n + 1);
     } catch (e) {
       onDone((e as Error).message, true);
@@ -95,6 +106,19 @@ export default function InterestTab({ onDone }: { onDone: (msg: string, error?: 
         <button type="button" className={controls.btnGhost} onClick={() => window.print()}>{aT('print')}</button>
         <Link to="/expenses" className={controls.btnGhost}>{aT('payables')}</Link>
       </div>
+      {runs.length > 0 && (
+        <div className={own.tableWrap}>
+          <table className={own.table} data-interest-runs>
+            <caption>{aT('runs')}</caption>
+            <tbody>
+              {runs.map((r) => (
+                <tr key={r.id}><td>{r.date}</td><td>{r.as_of}</td><td className={own.num}>{r.bills.length}</td><td className={own.num}>{money(r.total)}</td>
+                  <td><button type="button" className={controls.btnGhost} onClick={() => undo(r.id)} data-interest-undo>{aT('undoRun')}</button></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <p className={own.muted}>{aT('workingPaper')}</p>
     </div>
   );

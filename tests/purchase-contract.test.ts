@@ -901,7 +901,7 @@ test('R8-B readers (market fee register, brokerage statement) read the real purc
 test('R9 (RT-A4) free quantity / line discount: stock takes paid + free, every money reader keeps the paid value', async () => {
   // 10 + 1 free at ₹100 less 10%: taxable ₹900, GST ₹162 (on the paid value only).
   const free: PurchaseRecord = { ...bill, id: 'pf', lines: [{ ...bill.lines[0], id: 'lf', free_qty: 1, discount_percent: 10 }], taxable: 900, cgst: 81, sgst: 81, total: 1062 };
-  for (const n of [booksNormalize(free as never), exportNormalize(free), gstNormalize(free as never)]) assert.equal(n!.taxable, 900);
+  for (const n of [booksNormalize(free as never), exportNormalize(free), gstNormalize(free, '27')]) assert.equal(n!.taxable, 900);
   const c = readPurchase(free)!;
   assert.deepEqual([c.taxable, c.tax, c.itcEligible], [900, 162, true], 'GSTR-2 / ITC: value only');
   const [l] = readPurchaseLines(free);
