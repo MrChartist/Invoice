@@ -1,30 +1,10 @@
 /** R3-B1 helpers shared by the timer and the time-entry form: rate-card masters, pickers, source label. */
-import { useState } from 'react';
-import type { Client } from '../../types/invoice';
-import type { TimePrefs } from '../../types/time';
-import { loadCostCentres, costCentreLabel, type CostCentre } from '../../lib/cost-centres';
-import { loadTasks, type ProjectTask } from '../../lib/projects';
-import { loadWorkTypes, pickableWorkTypes, resolveEntryRate, type RateData, type RateSource, type RateSubject, type WorkType } from '../../lib/rate-cards';
+import { costCentreLabel } from '../../lib/cost-centres';
+import { pickableWorkTypes, type RateSource, type WorkType } from '../../lib/rate-cards';
+import type { RateMasters } from './rate-masters';
 import controls from '../../styles/controls.module.css';
 import styles from './service-r3.module.css';
 import { svcT } from '../../i18n/areas/service-r3';
-
-export interface RateMasters {
-  tasks: ProjectTask[];
-  centres: CostCentre[];
-  workTypes: WorkType[];
-}
-
-/** Masters read once per mounted form (they change on other tabs). */
-export function useRateMasters(): RateMasters {
-  const [m] = useState<RateMasters>(() => ({ tasks: loadTasks(), centres: loadCostCentres(), workTypes: loadWorkTypes() }));
-  return m;
-}
-
-export function rateFor(subject: RateSubject, masters: RateMasters, clients: readonly Client[], prefs: TimePrefs): { rate: number; source: RateSource } {
-  const data: RateData = { ...masters, clients, prefs };
-  return resolveEntryRate(subject, data);
-}
 
 export function RateSourceTag({ source }: { source: RateSource | 'manual' }) {
   return <span className={styles.source} data-rate-source={source}>{svcT(`src.${source}` as const)}</span>;

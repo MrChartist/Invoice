@@ -11,7 +11,8 @@ import controls from '../../styles/controls.module.css';
 import styles from './time.module.css';
 import { useT } from '../../i18n';
 import { timeT } from '../../i18n/areas/time';
-import { RateSourceTag, TaskSelect, WorkTypeSelect, rateFor, useRateMasters } from './rate-ui'; // R3-B1 / B2
+import { RateSourceTag, TaskSelect, WorkTypeSelect } from './rate-ui'; // R3-B1 / B2
+import { rateFor, useRateMasters } from './rate-masters';
 import { svcT } from '../../i18n/areas/service-r3';
 
 /** Start / pause / resume / stop. Stopping turns the clock into a time entry. */
