@@ -99,13 +99,39 @@ export interface PromiseProgress {
   partly: boolean;
 }
 
-/** State of a note's promise on `today` (local day). */
-export function promiseProgress(note: CollectionNote, receipts: readonly PartyReceipt[], today: string): PromiseProgress | null {
+/**
+ * QA5 F20: the party's receipts shared out over its promises, earliest promised date first, each receipt used
+ * once and each promise taking at most its amount — so one ₹5,000 receipt keeps one ₹5,000 promise, not every
+ * overlapping one. Note id → amount allocated.
+ */
+export function promiseAllocation(notes: readonly CollectionNote[], receipts: readonly PartyReceipt[]): Map<string, number> {
+  const out = new Map<string, number>();
+  const rs = [...receipts].sort((a, b) => a.date.localeCompare(b.date));
+  const left = rs.map((r) => r.amount);
+  const key = (n: CollectionNote) => `${n.promise!.date}|${n.date}|${n.created_at}`;
+  for (const n of notes.filter((x) => x.promise?.date && x.promise.amount > 0).sort((a, b) => key(a).localeCompare(key(b)))) {
+    const p = n.promise!;
+    const from = n.date || isoDay(n.created_at);
+    let got = 0;
+    rs.forEach((r, i) => {
+      if (r.party_key !== n.party_key || r.date < from || r.date > p.date || got >= p.amount - EPS) return;
+      const take = Math.min(left[i], p.amount - got);
+      left[i] -= take;
+      got += take;
+    });
+    out.set(n.id, round2(got));
+  }
+  return out;
+}
+
+/** State of a note's promise on `today` (local day). With `alloc` (`promiseAllocation`), receipts are shared out. */
+export function promiseProgress(note: CollectionNote, receipts: readonly PartyReceipt[], today: string, alloc?: ReadonlyMap<string, number>): PromiseProgress | null {
   const p = note.promise;
   if (!p || !(p.amount > 0) || !p.date) return null;
   const from = note.date || isoDay(note.created_at);
   let received = 0;
-  for (const r of receipts) if (r.party_key === note.party_key && r.date >= from && r.date <= p.date) received += r.amount;
+  if (alloc) received = alloc.get(note.id) ?? 0;
+  else for (const r of receipts) if (r.party_key === note.party_key && r.date >= from && r.date <= p.date) received += r.amount;
   received = round2(received);
   if (received >= p.amount - EPS) return { state: 'kept', received, partly: false };
   if (today > p.date) return { state: 'broken', received, partly: received > EPS };
@@ -115,8 +141,9 @@ export function promiseProgress(note: CollectionNote, receipts: readonly PartyRe
 /** Open promises on `today`: party → the promised date and the bills covered (empty set = all). */
 export function openPromises(notes: readonly CollectionNote[], receipts: readonly PartyReceipt[], today: string): Map<string, { until: string; invoiceIds: Set<string> | null }> {
   const out = new Map<string, { until: string; invoiceIds: Set<string> | null }>();
+  const alloc = promiseAllocation(notes, receipts);
   for (const n of notes) {
-    const pr = promiseProgress(n, receipts, today);
+    const pr = promiseProgress(n, receipts, today, alloc);
     if (!pr || pr.state !== 'open') continue;
     const cur = out.get(n.party_key);
     const ids = n.promise?.invoice_ids?.length ? new Set(n.promise.invoice_ids) : null;
@@ -145,7 +172,8 @@ export function brokenPromiseParties(notes: readonly CollectionNote[], receipts:
   }
   const out = new Set<string>();
   const since = shiftDay(today, -days);
-  for (const [k, n] of latest) if (n.promise!.date >= since && promiseProgress(n, receipts, today)?.state === 'broken') out.add(k);
+  const alloc = promiseAllocation(notes, receipts);
+  for (const [k, n] of latest) if (n.promise!.date >= since && promiseProgress(n, receipts, today, alloc)?.state === 'broken') out.add(k);
   return out;
 }
 
@@ -153,9 +181,10 @@ export function brokenPromiseParties(notes: readonly CollectionNote[], receipts:
 export function promiseCounts(partyKey: string, notes: readonly CollectionNote[], receipts: readonly PartyReceipt[], today: string, from = ''): { kept: number; broken: number } {
   let kept = 0;
   let broken = 0;
+  const alloc = promiseAllocation(notes, receipts);
   for (const n of notes) {
     if (n.party_key !== partyKey || !n.promise || (from && n.promise.date < from)) continue;
-    const s = promiseProgress(n, receipts, today)?.state;
+    const s = promiseProgress(n, receipts, today, alloc)?.state;
     if (s === 'kept') kept++;
     else if (s === 'broken') broken++;
   }
@@ -182,6 +211,7 @@ export interface FollowUpLists {
 /** The Follow-ups tab: today / overdue actions, promises due, broken, recently kept (local days). */
 export function followUpsDue(notes: readonly CollectionNote[], receipts: readonly PartyReceipt[], today: string): FollowUpLists {
   const out: FollowUpLists = { today: [], overdue: [], promisesDue: [], broken: [], kept: [] };
+  const alloc = promiseAllocation(notes, receipts);
   // A later note on the same party supersedes earlier next actions.
   const latestAt = new Map<string, string>();
   for (const n of notes) {
@@ -195,7 +225,7 @@ export function followUpsDue(notes: readonly CollectionNote[], receipts: readonl
       if (na.date === today) out.today.push({ note: n });
       else if (na.date < today) out.overdue.push({ note: n });
     }
-    const progress = promiseProgress(n, receipts, today);
+    const progress = promiseProgress(n, receipts, today, alloc);
     if (!progress) continue;
     if (progress.state === 'open' && n.promise!.date <= today) out.promisesDue.push({ note: n, progress });
     else if (progress.state === 'broken') out.broken.push({ note: n, progress });
@@ -212,8 +242,9 @@ export function promiseNotices(notes: readonly CollectionNote[], receipts: reado
   const due: CollectionNote[] = [];
   const broken: CollectionNote[] = [];
   const since = shiftDay(today, -7);
+  const alloc = promiseAllocation(notes, receipts);
   for (const n of notes) {
-    const pr = promiseProgress(n, receipts, today);
+    const pr = promiseProgress(n, receipts, today, alloc);
     if (!pr) continue;
     if (pr.state === 'open' && n.promise!.date === today) due.push(n);
     else if (pr.state === 'broken' && n.promise!.date >= since) broken.push(n);

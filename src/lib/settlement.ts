@@ -105,6 +105,11 @@ export function settlementOptions(invoice: Pick<InvoiceRecord, 'payment_terms'>,
   return { rest, suggested: 'leave' };
 }
 
+/** `amount` in the bill's currency, in rupees (the bill's exchange rate; INR or no rate = as is). */
+export function rupeeAmount(invoice: Pick<InvoiceRecord, 'currency' | 'exchange_rate'>, amount: number): number {
+  return round2(rupeeValue({ total: amount, currency: invoice.currency, exchange_rate: invoice.exchange_rate }));
+}
+
 /** The clerk's cap for a bill: the lower of the rupee cap and the percent of the bill. */
 export function clerkCap(billTotal: number, s: CollectionSettings): number {
   return round2(Math.min(s.clerk_cap_abs, (Math.abs(num(billTotal)) * s.clerk_cap_pct) / 100));
@@ -228,6 +233,46 @@ export function dueOn(invoiceId: string): number {
   return inv ? amountDue(inv, creditedOn(invoiceId)) : 0;
 }
 
+/**
+ * QA5 F1: settlement notes held for the owner's approval (pending drafts) linked to the bill. They are not live yet,
+ * so `amountDue` ignores them, but they reserve that much of the due: a further note cannot settle it twice.
+ */
+export function pendingSettlementOn(invoiceId: string, exceptNoteId?: string): number {
+  const ids = new Set(peekTable<CreditLinkRow>('doc_links').filter((l) => l.relation === 'credit_note' && l.from_id === invoiceId && l.to_id !== exceptNoteId).map((l) => l.to_id));
+  if (!ids.size) return 0;
+  let held = 0;
+  for (const n of peekTable<InvoiceRecord>('invoices')) {
+    if (ids.has(n.id) && isFinancialNote(n) && n.status === 'Draft' && n.approval?.state === 'pending') held += num(n.total);
+  }
+  return round2(held);
+}
+
+/** What a new settlement note may still settle: the due less the notes waiting for approval. */
+export function settleableOn(invoiceId: string): number {
+  return round2(Math.max(dueOn(invoiceId) - pendingSettlementOn(invoiceId), 0));
+}
+
+/**
+ * QA5 F1: on the owner's approval of a pending settlement note, the bill must still owe at least the note
+ * (receipts or other notes may have settled it since the request). Throws when it does not; the owner rejects
+ * the note (or the clerk raises a smaller one).
+ */
+export function assertNoteStillSettles(note: InvoiceRecord): void {
+  if (!isFinancialNote(note)) return;
+  const billId = peekTable<CreditLinkRow>('doc_links').find((l) => l.relation === 'credit_note' && l.to_id === note.id)?.from_id;
+  if (!billId) return;
+  const due = dueOn(billId);
+  const amount = round2(num(note.total));
+  if (amount > due + 0.005) {
+    const bill = peekTable<InvoiceRecord>('invoices').find((i) => i.id === billId);
+    throw new SettlementError(
+      due > 0.004
+        ? `Only ${due.toFixed(2)} is still due on ${bill?.invoice_number ?? 'the bill'}, less than this ${amount.toFixed(2)} settlement. Reject it and raise a new note for ${due.toFixed(2)}.`
+        : `${bill?.invoice_number ?? 'The bill'} is already settled, so this ${amount.toFixed(2)} settlement would leave the party in credit. Reject it.`,
+    );
+  }
+}
+
 export interface FinancialNoteResult {
   note: InvoiceRecord;
   /** True when the note waits for the owner's approval (a clerk over the cap). */
@@ -248,7 +293,14 @@ export function createFinancialNote(invoiceId: string, input: FinancialNoteInput
   const amount = round2(num(input.amount));
   if (!(amount > 0)) throw new SettlementError('Enter an amount above zero to settle.');
   const due = dueOn(invoiceId);
-  if (amount > due + 0.005) throw new SettlementError(`Only ${due.toFixed(2)} is still due on ${invoice.invoice_number}.`);
+  // QA5 F1: notes still waiting for the owner reserve their part of the due.
+  const held = pendingSettlementOn(invoiceId);
+  const free = round2(Math.max(due - held, 0));
+  if (amount > free + 0.005) {
+    throw new SettlementError(held > 0.004
+      ? `Only ${free.toFixed(2)} is still due on ${invoice.invoice_number} once the ${held.toFixed(2)} of settlement waiting for approval is counted.`
+      : `Only ${due.toFixed(2)} is still due on ${invoice.invoice_number}.`);
+  }
   const date = input.date || localDayOf(new Date());
   assertUnlocked({ id: invoice.id, issue_date: date, invoice_number: invoice.invoice_number }, 'create');
   const settings = loadCollectionSettings();
@@ -257,7 +309,8 @@ export function createFinancialNote(invoiceId: string, input: FinancialNoteInput
     const number = nextSeriesNumberFor(FCN_PREFIX, date, peekTable<InvoiceRecord>('invoices').map((i) => i.invoice_number));
     const record = buildFinancialNote(invoice, { ...input, amount, date, gst: input.gst && settings.gst_variant, account }, { id: generateId(), number });
     // R2-A2 (7): a clerk over the cap asks the owner through the approval queue (saved as a pending draft).
-    const capped = input.reason !== 'bad_debt' && !can('doc.approve') && amount > clerkCap(rupeeValue(invoice), settings) + 0.004;
+    // QA5 F18: the cap is in rupees, so a foreign-currency amount is converted at the bill's rate first.
+    const capped = input.reason !== 'bad_debt' && !can('doc.approve') && rupeeAmount(invoice, amount) > clerkCap(rupeeValue(invoice), settings) + 0.004;
     if (capped) {
       record.status = 'Draft';
       record.approval = {
