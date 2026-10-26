@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { History, Keyboard, Minus, Pause, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
-import { Clock, MessageCircle, Monitor, Settings2 } from 'lucide-react';
+import { Camera, Clock, MessageCircle, Monitor, Settings2, Store } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { NumberInput } from '../components/ui/NumberInput';
@@ -61,6 +61,7 @@ import { cleanAltUnits, lineUnitPatch, roundTypedQty, unitChoices, unitsDb } fro
 import { canOverrideCredit, creditStatus, recordCreditOverride } from '../lib/credit-policy'; // 8.80
 import { saltIndex, saltOf } from '../lib/salt-search'; // 8.84
 import { crT } from '../i18n/areas/credit';
+import { rPosT } from '../i18n/areas/restaurant-pos'; // R3-A
 
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
 // WP-9: return / exchange screen and the exchange-credit banner (own files, loaded on demand).
@@ -80,6 +81,10 @@ const BillBrowser = lazy(() => import('../components/pos-retail/BillBrowser').th
 const RetailSettings = lazy(() => import('../components/pos-retail/RetailSettings').then((m) => ({ default: m.RetailSettings })));
 const ShiftPanel = lazy(() => import('../components/pos-retail/ShiftPanel').then((m) => ({ default: m.ShiftPanel })));
 const QuickItemSheet = lazy(() => import('../components/pos/QuickItemSheet').then((m) => ({ default: m.QuickItemSheet })));
+// R3-A: modifier picker (when a linked item is added) and the bill as an image — both load on first use.
+const ModifierPicker = lazy(() => import('../components/restaurant/ModifierPicker').then((m) => ({ default: m.ModifierPicker })));
+const BillImageShare = lazy(() => import('../components/restaurant/BillImageShare').then((m) => ({ default: m.BillImageShare })));
+type ModGroup = import('../types/restaurant').ModifierGroup;
 
 interface Party {
   client: Client | null;
@@ -118,6 +123,9 @@ function loadCounter() {
     posBills: localDb.invoices.getAll().filter((i) => i.pos),
     // 8E (8.145): selling price lists (stock items with dated prices) apply on the POS as in the editor.
     lists: stock.some((s) => s.selling_prices?.length),
+    // R3-A4: modifier groups (Settings → Tables) and the stock group of each item (for group-linked modifiers).
+    modGroups: getTable<ModGroup>('modifier_groups'),
+    groupOf: new Map(stock.map((s) => [s.name.trim().toLowerCase(), s.group_id])),
   };
 }
 
@@ -179,6 +187,9 @@ export function Pos() {
   const [waFor, setWaFor] = useState<InvoiceRecord | null>(null);
   const [waPhone, setWaPhone] = useState('');
   const [changeStrip, setChangeStrip] = useState<{ amount: number; key: number } | null>(null);
+  const [modFor, setModFor] = useState<{ item: InvoiceItem; groups: ModGroup[]; qty?: number } | null>(null); // R3-A4
+  const [imageFor, setImageFor] = useState<InvoiceRecord | null>(null); // R3-A5
+  const [lastShare, setLastShare] = useState<InvoiceRecord | null>(null);
   /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
   const lastLine = useRef<string | null>(null);
   const focusedQty = useRef<string | null>(null);
@@ -271,6 +282,27 @@ export function Pos() {
     [finish, settings.defaultTaxRate],
   );
 
+  /** R3-A4: an item "not available today" asks first; one with modifier groups opens the picker. */
+  const day86 = todayInput();
+  const addPicked = (source: InvoiceItem, qty?: number) => {
+    if (source.unavailable_on === day86 && !window.confirm(rPosT('unavailable', { name: source.name }))) return;
+    const gid = source.group_id ?? data.groupOf.get(source.name.trim().toLowerCase());
+    const groups = data.modGroups.filter((g) => g.item_ids?.includes(source.id) || (gid && g.group_ids?.includes(gid)));
+    if (groups.length) setModFor({ item: source, groups, qty });
+    else addSource(source, qty);
+  };
+  const addWithModifiers = async (m: { item: InvoiceItem; groups: ModGroup[]; qty?: number }, picks: Record<string, string[]>) => {
+    const { modifierLines } = await import('../lib/restaurant/modifiers');
+    setItems((cur) => {
+      const parent = addScannedLine([], m.item, { newId: generateId, qty: m.qty, fallbackTaxRate: settings.defaultTaxRate }).items[0];
+      const r = modifierLines(parent, m.groups, picks, data.catalog, generateId);
+      if (r.note) Object.assign(parent, { note: r.note, description: r.note });
+      const kids: InvoiceItem[] = r.children.map(({ item_id: _i, option_id: _o, ...c }) => ({ ...c, modifier_of: parent.id }));
+      lastLine.current = parent.id;
+      return finish([...cur, parent, ...kids]);
+    });
+  };
+
   // 7M: a typed quantity rounds to its unit's decimal places (units master: 2.5 NOS → 3, 1.2345 KG → 1.235).
   const setQty = (id: string, qty: number) =>
     setItems((cur) => finish(cur.map((l) => {
@@ -306,7 +338,7 @@ export function Pos() {
       out.amount = round2(num(out.quantity) * num(out.rate));
       return out;
     }), id));
-  const removeLine = (id: string) => setItems((cur) => finish(cur.filter((l) => l.id !== id && l.free_of !== id)));
+  const removeLine = (id: string) => setItems((cur) => finish(cur.filter((l) => l.id !== id && l.free_of !== id && l.modifier_of !== id)));
 
   /** 8E (8.140): a weighing-scale label — always its own line; a price label's amount is final. */
   const addScaleLine = (item: InvoiceItem, read: ScaleRead) => {
@@ -404,7 +436,7 @@ export function Pos() {
     }
     const hit = hits[active] ?? hits[0];
     if (hit) {
-      addSource(hit.row, e.loose ? pendingQty ?? undefined : qty);
+      addPicked(hit.row, e.loose ? pendingQty ?? undefined : qty);
       setPendingQty(null);
       setActive(0);
       return { ok: true, message: posT('added', { name: hit.row.name }) };
@@ -500,6 +532,7 @@ export function Pos() {
     // 8E (8.147 / 8.148): the change in a big strip for 3 s; WhatsApp the bill from the toast.
     if (change > 0) setChangeStrip({ amount: change, key: ++stripSeq.current });
     notify(posT('saved', { doc: docName(saved.doc_type), number: saved.invoice_number }), 'success', { action: { label: retailT('whatsapp'), onClick: () => sendWhatsapp(saved) }, duration: 6000 });
+    setLastShare(saved); // R3-A5: "Share as image" in the header for the bill just saved
     postDisplay(thanksMessage(saved.sender?.companyName ?? '', saved.total, change), true);
     setLastBill(res.record);
     setExchange(null);
@@ -734,6 +767,12 @@ export function Pos() {
                 <MessageCircle size={16} /> {retailT('whatsapp')}
               </button>
             ))}
+            {lastShare && (
+              <button type="button" className={controls.btnOutline} onClick={() => setImageFor(lastShare)} data-pos-share-image>
+                <Camera size={16} /> {rPosT('shareImage')}
+              </button>
+            )}
+            <Link className={controls.btnOutline} to="/tables" data-pos-tables><Store size={16} /> {rPosT('tables')}</Link>
             <button type="button" className={controls.btnOutline} onClick={() => setShiftOpen(true)} data-pos-shift>
               <Clock size={16} /> {shift ? retailT('shiftN', { n: shift.number }) : retailT('shift')}
             </button>
@@ -788,7 +827,7 @@ export function Pos() {
                   const cls = stockClass(lvl ? lvl.qty : null);
                   return (
                     <li key={h.row.id} role="option" aria-selected={n === active}>
-                      <button type="button" className={cn(styles.hit, n === active && styles.hitActive, (cls === 'zero' || cls === 'neg') && counter.noStock)} onMouseDown={(e) => e.preventDefault()} onClick={() => { addSource(h.row); setQuery(''); searchRef.current?.focus(); }}>
+                      <button type="button" className={cn(styles.hit, n === active && styles.hitActive, (cls === 'zero' || cls === 'neg' || h.row.unavailable_on === day86) && counter.noStock)} onMouseDown={(e) => e.preventDefault()} onClick={() => { addPicked(h.row); setQuery(''); searchRef.current?.focus(); }}>
                         <span>{h.label}</span>
                         <span className={styles.muted}>{h.sub}{lvl ? posT('inStock', { n: lvl.qty }) : ''}</span>
                       </button>
@@ -918,8 +957,9 @@ export function Pos() {
             groups={data.groups}
             invoices={data.posBills}
             qtyOf={qtyOf}
+            unavailable={(i) => i.unavailable_on === day86}
             onPick={(item) => {
-              addSource(item);
+              addPicked(item);
               searchRef.current?.focus();
             }}
           />
@@ -1163,6 +1203,22 @@ export function Pos() {
             }}
           />
         )}
+      </Suspense>
+      <Suspense fallback={null}>
+        {modFor && (
+          <ModifierPicker
+            name={modFor.item.name}
+            groups={modFor.groups}
+            onClose={() => setModFor(null)}
+            onPick={(picks) => {
+              const m = modFor;
+              setModFor(null);
+              void addWithModifiers(m, picks);
+              searchRef.current?.focus();
+            }}
+          />
+        )}
+        {imageFor && <BillImageShare invoice={imageFor} onDone={(r) => { setImageFor(null); if (!r.ok) notify(r.message ?? posT('saveFailed'), 'error'); }} />}
       </Suspense>
       {waFor && (
         <Modal

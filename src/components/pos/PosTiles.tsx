@@ -15,10 +15,12 @@ export interface PosTilesProps {
   /** Stock on hand of a tracked item (null = not tracked). */
   qtyOf: (item: InvoiceItem) => number | null;
   onPick: (item: InvoiceItem) => void;
+  /** R3-A4: "not available today" items are greyed (still tappable: the caller asks to confirm). */
+  unavailable?: (item: InvoiceItem) => boolean;
 }
 
 /** Favourites + stock-group tabs of tappable items (8.22) for loose goods without a barcode. */
-export function PosTiles({ sources, stock, groups, invoices, qtyOf, onPick }: PosTilesProps) {
+export function PosTiles({ sources, stock, groups, invoices, qtyOf, onPick, unavailable }: PosTilesProps) {
   useT();
   const [favs, setFavs] = useState(loadFavs);
   const [tab, setTab] = useState('fav');
@@ -47,13 +49,15 @@ export function PosTiles({ sources, stock, groups, invoices, qtyOf, onPick }: Po
           const qty = qtyOf(item);
           const cls = stockClass(qty);
           const starred = favs.includes(item.id);
+          const off = !!unavailable?.(item);
           return (
             <div key={item.id} className={styles.tile}>
-              <button type="button" className={cn(styles.tileBtn, (cls === 'zero' || cls === 'neg') && styles.noStock)} onClick={() => onPick(item)} data-pos-tile={item.name} data-stock={cls ?? undefined}>
+              <button type="button" className={cn(styles.tileBtn, (cls === 'zero' || cls === 'neg' || off) && styles.noStock)} onClick={() => onPick(item)} data-pos-tile={item.name} data-stock={cls ?? undefined} data-unavailable={off || undefined}>
                 <span className={styles.tileName}>{item.name}</span>
                 <span className={styles.tileMeta}>
                   {formatCurrency(num(item.rate))}
                   {cls === 'zero' ? ` · ${posT('outOfStock')}` : cls === 'neg' ? ` · ${posT('negStock', { n: qty ?? 0 })}` : ''}
+                  {off ? ` · ${posT('outOfStock')}` : ''}
                 </span>
               </button>
               <button type="button" className={styles.star} onClick={() => star(item.id)} aria-pressed={starred} aria-label={posT(starred ? 'tilesUnstar' : 'tilesStar', { name: item.name })}>

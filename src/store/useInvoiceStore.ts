@@ -23,6 +23,7 @@ import { nextPartyBalanceSnapshot } from '../lib/party-balance';
 import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import '../types/sales-r2'; // R2-B: declaration-merged record fields (RECORD_KEYS below)
+import type {} from '../types/restaurant'; // R3-A: declaration-merged record fields (type-only, erased)
 import type {
   Client,
   DiscountType,
@@ -146,6 +147,8 @@ export const RECORD_KEYS = [
   'payment_schedule', 'acceptance',
   // Round 2 (R2-A): financial credit notes
   'note_kind', 'financial_reason', 'financial_account', 'payment_terms',
+  // R3-A
+  'table_order_id', 'split_of',
   'annexure', // R3-B (src/types/service-r3.ts)
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 

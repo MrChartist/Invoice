@@ -60,6 +60,7 @@ export const hi: Messages = {
   'nav.dashboard': 'डैशबोर्ड',
   'nav.newInvoice': 'नया इनवॉइस',
   'nav.pos': 'POS बिलिंग',
+  'nav.tables': 'टेबल',
   'nav.invoices': 'इनवॉइस',
   'nav.clients': 'ग्राहक',
   'nav.recurring': 'आवर्ती बिल',

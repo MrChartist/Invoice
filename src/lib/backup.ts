@@ -368,6 +368,8 @@ const RECORD_TABLES = [
   'payment_terms', 'collection_notes', 'write_off_recoveries',
   // Round 2 (R2-B): batch invoice runs, proposal section snippets
   'batch_runs', 'proposal_snippets',
+  // Round 3 (R3-A): restaurant dining areas, tables, running orders, modifier groups
+  'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
   // Round 3 (R3-B): work types (rate cards), project tasks, retainers
   'work_types', 'project_tasks', 'retainers',
 ];
@@ -408,6 +410,8 @@ const ID_TABLES = new Set([
   'payment_terms', 'collection_notes', 'write_off_recoveries',
   // Round 2 (R2-B): batch invoice runs, proposal section snippets
   'batch_runs', 'proposal_snippets',
+  // Round 3 (R3-A)
+  'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
   // Round 3 (R3-B): work types (rate cards), project tasks, retainers
   'work_types', 'project_tasks', 'retainers',
 ]);

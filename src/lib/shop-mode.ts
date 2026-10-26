@@ -15,7 +15,7 @@
  * A path or tile this table does not know is always shown (new screens never vanish by accident).
  */
 
-export type BusinessType = 'kirana' | 'wholesale' | 'services' | 'manufacturer' | 'full';
+export type BusinessType = 'kirana' | 'wholesale' | 'services' | 'manufacturer' | 'full' | 'restaurant';
 
 /** Optional modules (invoices, clients, receivables, dashboard and settings are always on). */
 export type ModuleId =
@@ -38,6 +38,7 @@ export const ALL_MODULES: readonly ModuleId[] = ['pos', 'recurring', 'time', 'pu
 /** Route (path without query) → module. Paths not listed are core and always visible. */
 const PATH_MODULE: Readonly<Record<string, ModuleId>> = {
   '/pos': 'pos',
+  '/tables': 'pos',
   '/recurring': 'recurring',
   '/time': 'time',
   '/expenses': 'purchases',

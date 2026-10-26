@@ -1404,6 +1404,54 @@ try {
   });
 
   let backupPath = '';
+  await step('R3-A: open table 1 → add items → Send KOT → split by item → two bills settled with the order link', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog,
+      { id: 'e2e-tikka', name: 'E2E Paneer Tikka', type: 'Product', hsn: '996331', unit: 'NOS', quantity: 1, rate: 200, tax_rate: 5, amount: 0 },
+      { id: 'e2e-naan', name: 'E2E Butter Naan', type: 'Product', hsn: '996331', unit: 'NOS', quantity: 1, rate: 50, tax_rate: 5, amount: 0 },
+    ]);
+    await page.goto(srv.origin + '/tables');
+    await page.locator('[data-print-tickets]').uncheck(); // no print pop-up in the smoke run
+    await page.locator('[data-table="1"]').click();
+    await page.locator('[data-open-order]').click();
+    const search = page.locator('#order-search');
+    await search.waitFor();
+    for (const name of ['E2E Paneer Tikka', 'E2E Butter Naan']) {
+      await search.fill(name);
+      await search.press('Enter');
+      await page.locator(`[data-order-line="${name}"]`).waitFor();
+    }
+    await page.locator('[data-send-kot]').click();
+    await page.getByText(/K\d+ Kitchen sent to the kitchen/).first().waitFor();
+    const sent = await readJson(page, 'table_orders', [], (v) => v.some((o) => o.status === 'open' && o.kots?.length));
+    const order = sent.find((o) => o.status === 'open' && o.kots?.length);
+    check(order?.kots.length === 1 && order.kots[0].number.startsWith('K') && order.kots[0].lines.length === 2, `KOT stored on the order (${order?.kots?.[0]?.number})`);
+    check((await page.locator('[data-table="1"]').getAttribute('data-state')) === 'occupied', 'table 1 shows occupied');
+
+    await page.locator('[data-split]').click();
+    const dlg = page.getByRole('dialog', { name: 'Split the bill' });
+    await dlg.waitFor();
+    await dlg.getByRole('tab', { name: 'By item' }).click();
+    await dlg.locator('[data-split-recon]').waitFor();
+    check((await dlg.locator('[data-recon-exact]').getAttribute('data-recon-exact')) === '1', 'reconciliation strip: GST adds up');
+    await dlg.locator('[data-split-save]').click();
+    await page.getByText(/order settled/).first().waitFor();
+    const bills = (await readJson(page, 'invoices', [], (v) => v.filter((i) => !beforeIds.has(i.id) && i.table_order_id).length === 2))
+      .filter((i) => !beforeIds.has(i.id) && i.table_order_id);
+    check(bills.length === 2 && bills.every((b) => b.pos && b.status === 'Paid' && b.table_order_id === order?.id && b.split_of?.parts === 2),
+      `two POS bills, paid, linked to the order (${bills.map((b) => `${b.invoice_number} ${b.split_of?.part}/${b.split_of?.parts}`).join(', ')})`);
+    const done = (await readJson(page, 'table_orders', [], (v) => v.some((o) => o.id === order?.id && o.status === 'settled'))).find((o) => o.id === order?.id);
+    check(done?.status === 'settled' && done.invoice_ids?.length === 2, 'order settled with both invoice ids');
+    check((await page.locator('[data-table="1"]').getAttribute('data-state')) === 'free', 'table 1 is free again');
+
+    const ids = new Set(bills.map((b) => b.id));
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => !ids.has(t.invoice_id)));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => !ids.has(i.id)));
+    await writeJson(page, 'table_orders', null);
+    await writeJson(page, 'items_catalog', prevCatalog);
+  });
+
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');
     const [download] = await Promise.all([
