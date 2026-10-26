@@ -60,6 +60,7 @@ import {
 } from './sync-files';
 import type { AuditEntry } from '../types/audit';
 import './trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
+import './hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -371,6 +372,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}ra_measurements`]: 'date',
   // R6-C3: import runs (the day the file was imported)
   [`${DB_PREFIX}import_runs`]: (r) => str(r.at).slice(0, 10) || undefined,
+  // R7-A: hotel bookings (arrival), folios (opened on), night audits (business date)
+  [`${DB_PREFIX}hotel_reservations`]: 'arrival',
+  [`${DB_PREFIX}hotel_folios`]: 'opened_on',
+  [`${DB_PREFIX}hotel_night_audits`]: 'business_date',
   // R8-A: trade claims, price-drop runs, interest runs, packaging movements
   [`${DB_PREFIX}trade_claims`]: 'date',
   [`${DB_PREFIX}price_drops`]: 'date',
@@ -958,6 +963,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   // R5-B: consignment notes (LR/FY…) and trip sheets (TRP/FY…)
   [`${DB_PREFIX}consignment_notes`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}trips`]: { num: 'number', date: 'start_date' },
+  // R7-A: hotel reservations (RES/FY…)
+  [`${DB_PREFIX}hotel_reservations`]: { num: 'number', date: 'booked_on' },
   // R8-A: trade claims (TCL/FY…) and price-drop runs (PDR/FY…)
   [`${DB_PREFIX}trade_claims`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}price_drops`]: { num: 'number', date: 'date' },

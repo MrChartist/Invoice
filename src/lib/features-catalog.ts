@@ -120,6 +120,7 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   fees: '/recurring?tab=fees',
   nonprofit: '/receivables?tab=donations',
   leases: '/recurring?tab=leases',
+  hotel: '/tables', // R7-A (the floor links to the front desk; feature rows need a page tab or a route)
   // R8-C: trading packs
   distributor: '/distribution?tab=claims',
   commodity: '/distribution?tab=mandi',

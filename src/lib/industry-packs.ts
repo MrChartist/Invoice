@@ -16,11 +16,13 @@
 import type { BusinessType } from './shop-mode';
 
 export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit' | 'leases'
+  | 'hotel' // R7-A
   // R8-C: trading packs (tabs on /distribution; switched on by the `wholesale` trade profile, never by a business type)
   | 'distributor' | 'commodity' | 'agency';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
+  'hotel', // R7-A
   'distributor', 'commodity', 'agency', // R8-C
 ];
 
@@ -32,6 +34,7 @@ export const PACK_OF_TYPE: Readonly<Partial<Record<BusinessType, readonly PackId
   institution: ['fees'],
   nonprofit: ['nonprofit'],
   property: ['leases'],
+  hotel: ['hotel'], // R7-A
 };
 
 /** What the company settings carry for packs (additive, all optional). */
@@ -93,6 +96,17 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'works', path: '/time?tab=works', labelKey: 'tab.works' },
   { pack: 'works', path: '/time?tab=works&view=retention', labelKey: 'view.retention' },
   { pack: 'works', path: '/time?tab=works&view=sites', labelKey: 'view.sites' },
+  // R7: hotel (Tables → Front desk, sub-views in `&view=`; labels in `hotel-frontdesk-r7.ts`)
+  { pack: 'hotel', path: '/tables?tab=frontdesk', labelKey: 'tab.frontdesk' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=calendar', labelKey: 'view.calendar' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=reservations', labelKey: 'view.reservations' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=folios', labelKey: 'view.folios' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=housekeeping', labelKey: 'view.housekeeping' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=audit', labelKey: 'view.audit' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=guests', labelKey: 'view.guests' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=formc', labelKey: 'view.formc' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=reports', labelKey: 'view.reports' },
+  { pack: 'hotel', path: '/tables?tab=frontdesk&view=setup', labelKey: 'view.setup' },
   // R8: trading packs on Distribution (labels in `trade-r8c.ts`, keys `r8.*`)
   { pack: 'distributor', path: '/distribution?tab=claims', labelKey: 'r8.claims' },
   { pack: 'distributor', path: '/distribution?tab=claims&view=schemes', labelKey: 'r8.schemes' },

@@ -63,6 +63,7 @@ export const hi: Messages = {
   'nav.newInvoice': 'नया इनवॉइस',
   'nav.pos': 'POS बिलिंग',
   'nav.tables': 'टेबल',
+  'nav.frontDesk': 'फ्रंट डेस्क', // R7-A
   'nav.invoices': 'इनवॉइस',
   'nav.clients': 'ग्राहक',
   'nav.recurring': 'आवर्ती बिल',

@@ -8,10 +8,13 @@ export const BUSINESS_TYPES: readonly BusinessType[] = [
   'kirana', 'restaurant', 'wholesale', 'services', 'manufacturer', 'full',
   // R5-A1: industry packs (listed after the existing types)
   'ecommerce', 'transport', 'contractor', 'institution', 'nonprofit', 'property',
+  'hotel', // R7-A
 ];
 
 /** R5-A1: the six industry-pack business types (their labels live in the pack i18n area). */
-export const PACK_BUSINESS_TYPES: readonly BusinessType[] = ['ecommerce', 'transport', 'contractor', 'institution', 'nonprofit', 'property'];
+export const PACK_BUSINESS_TYPES: readonly BusinessType[] = ['ecommerce', 'transport', 'contractor', 'institution', 'nonprofit', 'property',
+  'hotel', // R7-A
+];
 
 export const PRESETS: Readonly<Record<BusinessType, readonly ModuleId[]>> = {
   kirana: ['pos', 'purchases', 'inventory', 'reports'],
@@ -28,6 +31,8 @@ export const PRESETS: Readonly<Record<BusinessType, readonly ModuleId[]>> = {
   institution: ['recurring', 'purchases', 'accounts', 'reports', 'gst', 'payroll'],
   nonprofit: ['recurring', 'purchases', 'accounts', 'banking', 'reports', 'tds', 'payroll'],
   property: ['recurring', 'accounts', 'banking', 'reports', 'gst', 'tds'],
+  // R7-A: hotel / lodge / homestay — the front desk lives on /tables (POS module)
+  hotel: ['pos', 'inventory', 'purchases', 'accounts', 'banking', 'reports', 'gst', 'tds', 'payroll'],
 };
 
 /** Dashboard tile → module. Tiles not listed are always available. */
@@ -81,6 +86,7 @@ export const BUSINESS_DEFAULTS: Readonly<Record<BusinessType, BusinessDefaults>>
   institution: { defaultDueDays: 10, templateId: 'freelancer_light', landing: '/recurring?tab=fees' },
   nonprofit: { defaultDueDays: 0, templateId: 'classic_orange', landing: '/receivables?tab=donations' },
   property: { defaultDueDays: 7, templateId: 'gst_tax_invoice', landing: '/recurring?tab=leases' },
+  hotel: { defaultDueDays: 0, templateId: 'gst_tax_invoice', landing: '/tables?tab=frontdesk' }, // R7-A
 };
 
 /** Settings after the wizard: shop-mode modules plus the type's default due days. */

@@ -157,7 +157,7 @@ const MAX_CHANGES = 15;
 const EXCERPT = 60;
 
 /** Never copied into the log, only flagged as changed. */
-const HIDDEN = /(email|phone|mobile|address|account_no|accountnumber|ifsc|^bank_|beneficiary|upi|notes?$|narration_private|^pan$|password|pin_hash|logo|signature|^data$|serials)/i;
+const HIDDEN = /(email|phone|mobile|address|account_no|accountnumber|ifsc|^bank_|beneficiary|upi|notes?$|narration_private|^pan$|password|pin_hash|logo|signature|^data$|serials|^id_doc$|^foreign$|^dob$)/i; // R7-A: guest ID / passport / visa
 /** Bookkeeping fields that change on every save and say nothing. */
 const IGNORED = new Set(['id', 'created_at', 'updated_at']);
 /** Fields shown on a create / delete row (the rest of the record is in the backup). */
