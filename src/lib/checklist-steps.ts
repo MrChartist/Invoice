@@ -101,6 +101,7 @@ export const PACK_FIRST_TABLE: Readonly<Record<PackId, string>> = {
   nonprofit: 'donations',
   leases: 'leases',
   marketplace: 'sales_channels',
+  hotel: 'hotel_reservations', // R7-A
   // R8-C: trading packs
   distributor: 'party_rates',
   commodity: 'trade_charge_heads',

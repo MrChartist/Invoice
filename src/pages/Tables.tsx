@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ClipboardList, ScanBarcode, Settings2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Modal } from '../components/ui/Modal';
@@ -20,6 +20,7 @@ import { isLive, localDay } from '../lib/restaurant/tables';
 import { autoUnavailable, idsInGroup, isUnavailable } from '../lib/restaurant/modifiers';
 import { RT, openOrder, ordersDb, restaurantDb, set86Items } from '../lib/restaurant/orders-store';
 import { cn } from '../lib/utils';
+import { isPackOn } from '../lib/industry-packs'; // R7-A
 import { useT } from '../i18n';
 import { rT } from '../i18n/areas/restaurant';
 import controls from '../styles/controls.module.css';
@@ -28,6 +29,8 @@ import styles from '../components/restaurant/restaurant.module.css';
 
 const TablesSettings = lazy(() => import('../components/restaurant/TablesSettings').then((m) => ({ default: m.TablesSettings })));
 const KotRegisterModal = lazy(() => import('../components/restaurant/KotRegister').then((m) => ({ default: m.KotRegisterModal })));
+// R7-A: hotel front desk (`?tab=frontdesk`) — loaded only for that tab, and then the floor below is not mounted.
+const FrontDesk = lazy(() => import('../components/hotel/FrontDesk'));
 
 type View = { kind: 'area'; areaId: string } | { kind: 'channel'; channel: Exclude<OrderChannel, 'dine_in'> };
 const CHANNELS: Exclude<OrderChannel, 'dine_in'>[] = ['takeaway', 'delivery', 'aggregator'];
@@ -55,9 +58,17 @@ function loadMenu() {
   };
 }
 
-/** Restaurant floor (R3-A): areas and counter channels, running orders, KOT, split and settle. */
+/** `/tables`: the restaurant floor, or (R7-A, hotel pack) the front desk for `?tab=frontdesk`. */
 export function Tables() {
-  useT();
+  const [params] = useSearchParams();
+  if (params.get('tab') === 'frontdesk') return <Suspense fallback={null}><FrontDesk /></Suspense>;
+  return <RestaurantFloor />;
+}
+
+/** Restaurant floor (R3-A): areas and counter channels, running orders, KOT, split and settle. */
+function RestaurantFloor() {
+  const { t } = useT();
+  const hotel = useMemo(() => isPackOn(localDb.settings.get(), 'hotel'), []); // R7-A
   const { notify, toastNode } = useToast();
   const [tick, setTick] = useState(0);
   const refresh = useCallback(() => setTick((t) => t + 1), []);
@@ -180,6 +191,7 @@ export function Tables() {
       />
 
       <div className={styles.tabs} role="tablist" aria-label={rT('title')}>
+        {hotel && <Link className={styles.tab} to="/tables?tab=frontdesk" data-front-desk>{t('nav.frontDesk')}</Link>}
         {areas.map((a) => (
           <button key={a.id} type="button" role="tab" aria-selected={view.kind === 'area' && view.areaId === a.id} className={cn(styles.tab, view.kind === 'area' && view.areaId === a.id && styles.tabOn)} onClick={() => setView({ kind: 'area', areaId: a.id })}>
             {a.name}

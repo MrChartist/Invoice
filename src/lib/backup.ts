@@ -463,6 +463,8 @@ const RECORD_TABLES = [
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
   // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
   'import_runs',
+  // Round 7 (hotel): room types, rooms, rate plans, reservations, folios, guests, night audits
+  'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits',
   // Round 8 (R8-A): party rates, trade claims, price-drop runs, interest runs, packaging types / moves
   'party_rates', 'trade_claims', 'price_drops', 'interest_runs', 'packaging_types', 'packaging_moves',
   // Round 8 (R8-B): bill-charge heads, brokerage postings
@@ -529,6 +531,8 @@ const ID_TABLES = new Set([
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
   // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
   'import_runs',
+  // Round 7 (hotel): room types, rooms, rate plans, reservations, folios, guests, night audits
+  'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits',
   // Round 8 (R8-A): party rates, trade claims, price-drop runs, interest runs, packaging types / moves
   'party_rates', 'trade_claims', 'price_drops', 'interest_runs', 'packaging_types', 'packaging_moves',
   // Round 8 (R8-B): bill-charge heads, brokerage postings

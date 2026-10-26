@@ -8,6 +8,7 @@
 
 import type {} from '../types/docs-r3'; // R3-C2: delivery_proof (RECORD_KEYS)
 import type {} from '../types/trade-r4'; // R4-C1: export document fields (RECORD_KEYS)
+import type {} from '../types/hotel-r7'; // R7: folio_id / reservation_id / stay / hotel_band (RECORD_KEYS)
 import type {} from '../types/trade-r8'; // R8: trading record / line fields (R8_RECORD_KEYS, R8_LINE_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
@@ -242,6 +243,8 @@ function ecoFields(gstin: unknown, section: unknown): { eco_gstin?: string; eco_
 /** Upgrade any stored record (old or new) to the current `InvoiceRecord` shape. */
 /** R5-B additive record keys: kept by `normalizeRecord`, listed in `RECORD_KEYS` (one spread line). */
 export const R5B_RECORD_KEYS = ['lr_ids', 'ra_no', 'ra_final', 'boq_id', 'ra_deductions', 'ra_net_payable', 'retention_release_on', 'boq_terms'] as const;
+/** R7 hotel additive record keys (src/types/hotel-r7.ts): kept by `normalizeRecord`, listed in `RECORD_KEYS`. */
+export const R7_RECORD_KEYS = ['folio_id', 'reservation_id', 'stay', 'hotel_band'] as const;
 
 export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_orange'): InvoiceRecord {
   const r = (raw ?? {}) as Partial<InvoiceRecord> & Record<string, unknown>;
@@ -337,6 +340,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(typeof r.fee_plan_id === 'string' ? { fee_plan_id: r.fee_plan_id, fee_instalment: r.fee_instalment as number } : {}),
     // R5-B (additive): freight-bill LRs, RA bill number / deductions / retention day, BOQ terms survive an edit.
     ...Object.fromEntries(R5B_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])),
+    ...Object.fromEntries(R7_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])), // R7
     ...Object.fromEntries(R8_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])), // R8-C
 
     discount_type: r.discount_type ?? 'PERCENT',

@@ -18,7 +18,8 @@
 export type BusinessType =
   | 'kirana' | 'wholesale' | 'services' | 'manufacturer' | 'full' | 'restaurant'
   // R5-A1 industry packs (type only; presets in `shop-presets.ts`, packs in `industry-packs.ts`)
-  | 'ecommerce' | 'transport' | 'contractor' | 'institution' | 'nonprofit' | 'property';
+  | 'ecommerce' | 'transport' | 'contractor' | 'institution' | 'nonprofit' | 'property'
+  | 'hotel'; // R7-A
 
 /** Optional modules (invoices, clients, receivables, dashboard and settings are always on). */
 export type ModuleId =
@@ -93,8 +94,9 @@ export const PACK_ROUTES: Readonly<Record<string, readonly string[]>> = {
   '/recurring': ['fees', 'leases'],
   '/books': ['nonprofit'],
   '/gst-reports': ['fees', 'nonprofit', 'leases'],
+  '/tables': ['hotel'], // R7-A
 };
-export const PACK_OF_TYPE_INLINE: Readonly<Record<string, string>> = { ecommerce: 'marketplace', transport: 'transport', contractor: 'works', institution: 'fees', nonprofit: 'nonprofit', property: 'leases' };
+export const PACK_OF_TYPE_INLINE: Readonly<Record<string, string>> = { ecommerce: 'marketplace', transport: 'transport', contractor: 'works', institution: 'fees', nonprofit: 'nonprofit', property: 'leases', hotel: 'hotel' }; // R7-A: hotel
 
 /** The company's packs: the explicit `industry_packs` list, else the one its business type implies. */
 export function impliedPacks(s: { business_type?: string; industry_packs?: unknown } | null | undefined): string[] {

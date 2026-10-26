@@ -14,6 +14,12 @@ import { defineArea } from '../../i18n/area';
 const cT = defineArea({ 'tab.fees': 'Fees', 'tab.leases': 'Leases', 'tab.donations': 'Donations', 'tab.funds': 'Funds', 'tab.commonCredit': 'Common credit (Rule 42 / 43)' } as const, { 'tab.fees': 'फ़ीस', 'tab.leases': 'लीज़', 'tab.donations': 'दान', 'tab.funds': 'फ़ंड', 'tab.commonCredit': 'साझा क्रेडिट (Rule 42 / 43)' });
 
 import { twT } from '../../i18n/areas/packs-transport-works-r5'; // R5-B resolver
+// R7-A: hotel front-desk rows (kept here so the palette does not load the front-desk area)
+const hT = defineArea(
+  { 'tab.frontdesk': 'Front desk', 'view.calendar': 'Room calendar', 'view.reservations': 'Reservations', 'view.folios': 'Folios', 'view.housekeeping': 'Housekeeping', 'view.audit': 'Night audit', 'view.guests': 'Guest register', 'view.formc': 'Form C', 'view.reports': 'Hotel reports', 'view.setup': 'Rooms & rates' } as const,
+  { 'tab.frontdesk': 'फ्रंट डेस्क', 'view.calendar': 'रूम कैलेंडर', 'view.reservations': 'बुकिंग', 'view.folios': 'फ़ोलियो', 'view.housekeeping': 'हाउसकीपिंग', 'view.audit': 'नाइट ऑडिट', 'view.guests': 'गेस्ट रजिस्टर', 'view.formc': 'Form C', 'view.reports': 'होटल रिपोर्ट', 'view.setup': 'कमरे और रेट' },
+);
+
 // R8 rows (kept here so the palette does not load the trade areas).
 const r8T = defineArea(
   { 'r8.claims': 'Claims', 'r8.schemes': 'Scheme claims', 'r8.pricedrop': 'Price drop', 'r8.claimList': 'Claim list', 'r8.packaging': 'Packaging (crates)', 'r8.mandi': 'Mandi charges', 'r8.brokers': 'Brokers', 'r8.agency': 'Agency', 'r8.arrivals': 'Arrivals (agency lots)', 'r8.pattis': 'Bikri patti', 'r8.indents': 'Indents' } as const,
@@ -21,13 +27,13 @@ const r8T = defineArea(
 );
 
 /** A row's label: a key of this package's area, else (B / C rows until they resolve their own) the key text. */
-const label = (key: string): string => (Object.hasOwn(mT.en, key) ? mT(key as keyof typeof mT.en) : Object.hasOwn(twT.en, key) ? twT(key as keyof typeof twT.en) : Object.hasOwn(cT.en, key) ? cT(key as keyof typeof cT.en) : Object.hasOwn(r8T.en, key) ? r8T(key as keyof typeof r8T.en) : key);
+const label = (key: string, pack?: string): string => (pack === 'hotel' && Object.hasOwn(hT.en, key) ? hT(key as keyof typeof hT.en) : Object.hasOwn(mT.en, key) ? mT(key as keyof typeof mT.en) : Object.hasOwn(twT.en, key) ? twT(key as keyof typeof twT.en) : Object.hasOwn(cT.en, key) ? cT(key as keyof typeof cT.en) : Object.hasOwn(r8T.en, key) ? r8T(key as keyof typeof r8T.en) : key);
 
 export function packDestinations(): StaticEntry[] {
   const on = activePacks(localDb.settings.get());
   return PACK_TABS.map((t) => ({
     id: `pack:${t.path}`,
-    title: `${label(t.labelKey)}${packTabOn(t, on) ? '' : ` ${mT('packOff')}`}`,
+    title: `${label(t.labelKey, t.pack)}${packTabOn(t, on) ? '' : ` ${mT('packOff')}`}`,
     subtitle: `${mT('paletteGroup')} · ${reachT(`pack.${t.pack}`)}`,
     icon: 'page',
     href: t.path,
