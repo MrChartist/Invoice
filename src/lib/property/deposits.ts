@@ -23,7 +23,7 @@ import type { RecurringTemplate } from '../recurring';
 import { generateId, getTable, peekTable, setTable } from '../storage';
 import { withTablesRollback } from '../table-txn';
 import { localDb } from '../localDb';
-import { receivableBalance } from '../rcm';
+import { amountDue, linkedCredits, type CreditLinkRow } from '../amount-due';
 import { round2 } from '../invoice-calc';
 import { toCsv } from '../csv';
 import { receiptHtml } from '../receipts';
@@ -119,13 +119,36 @@ function guard(id: string, amount: number, date: string): SecurityDeposit {
   return d;
 }
 
+/**
+ * QA6 F3: what is still due on `inv` — net of its live credit notes (`amount-due.ts`), never the gross balance, so a
+ * deposit never settles more than the party owes. Read-only peeks (no clone of the tables).
+ */
+export function dueForDeposit(inv: InvoiceRecord, links: readonly CreditLinkRow[] = peekTable<CreditLinkRow>('doc_links'), invoices: readonly InvoiceRecord[] = peekTable<InvoiceRecord>('invoices')): number {
+  const mine = links.filter((l) => l.from_id === inv.id);
+  return amountDue(inv, mine.length ? linkedCredits(mine, invoices).get(inv.id) : 0);
+}
+
+/** A party's issued invoices that still have something due (net of credit notes), for the "adjust" pick list. */
+export function depositOpenInvoices(partyId: string): { inv: InvoiceRecord; due: number }[] {
+  if (!partyId) return [];
+  const invoices = peekTable<InvoiceRecord>('invoices');
+  const credits = linkedCredits(peekTable<CreditLinkRow>('doc_links'), invoices);
+  const out: { inv: InvoiceRecord; due: number }[] = [];
+  for (const inv of invoices) {
+    if (inv?.client?.id !== partyId || inv.doc_type === 'CREDIT_NOTE' || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
+    const due = amountDue(inv, credits.get(inv.id));
+    if (due > 0) out.push({ inv, due });
+  }
+  return out;
+}
+
 /** Adjust a deposit we hold against an invoice that already exists (receipt only; no new tax document). */
 export function adjustAgainstInvoice(id: string, invoiceId: string, amount: number, date: string): SecurityDeposit {
   const d = guard(id, amount, date);
   if (d.direction !== 'received') throw new R5cError('direction');
   const inv = localDb.invoices.getById(invoiceId);
   if (!inv) throw new R5cError('invoice');
-  if (money(amount) > Math.max(receivableBalance(inv), 0) + 0.004) throw new R5cError('balance');
+  if (money(amount) > dueForDeposit(inv) + 0.004) throw new R5cError('balance');
   return withTablesRollback([DEPOSITS_TABLE, 'vouchers', 'accounts', 'transactions', 'invoices'], () => settleFromDeposit(d, inv, money(amount), day(date), 'adjust', 'Deposit adjusted'));
 }
 
@@ -156,7 +179,7 @@ export function applyToCharge(id: string, kind: 'adjust' | 'forfeit', amount: nu
   return withTablesRollback([DEPOSITS_TABLE, 'vouchers', 'accounts', 'transactions', 'invoices', 'batch_runs', 'clients', 'items_catalog'], () => {
     const drafts = buildBatchDrafts(tpl, [{ key: `dep:${d.id}`, client }], { date: day(date), dueDays: 0, sender: ctx.sender });
     const inv = issueBatch(drafts, { sourceId: `deposit:${d.id}`, sourceKind: 'invoice', date: day(date), mode: 'issue', force: true }).invoices[0];
-    const pay = Math.min(gross, Math.max(receivableBalance(inv), 0));
+    const pay = Math.min(gross, dueForDeposit(inv));
     const deposit = settleFromDeposit(d, inv, pay, day(date), kind, kind === 'forfeit' ? 'Deposit forfeited' : 'Deposit applied to damages');
     return { deposit, invoice: localDb.invoices.getById(inv.id) ?? inv };
   });

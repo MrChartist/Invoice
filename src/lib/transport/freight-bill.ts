@@ -19,7 +19,7 @@ import { isValidGstin } from '../gstin';
 import { makeDraft, senderStateCode } from '../../store/invoice-defaults';
 import { gtaRate, gtaSac } from '../transport-works-rules';
 import { effectiveStatus, freightOf, LR_TABLE, LrError, payerId } from './consignment-notes';
-import { optionFor, optionLine } from './gta-option';
+import { liablePerson, optionFor, optionLine, recipientKind } from './gta-option';
 import { liableText } from './lr-print';
 import { requireAccess } from '../access';
 import { generateId, getTable, setTable } from '../storage';
@@ -50,13 +50,42 @@ export interface FreightGroup {
   amount: number;
 }
 
-/** Group LRs by billing party, then by the person liable (a mixed selection becomes two bills). */
-export function groupForBills(lrs: readonly ConsignmentNote[]): FreightGroup[] {
+/**
+ * QA6 F14: the person liable on a bill dated `date`. An override typed on the LR stands; otherwise, when the bill falls
+ * in an FY whose GTA option differs from the LR's, the bill's option decides (re-derived for the payer).
+ */
+export function liableOnBill(lr: Pick<ConsignmentNote, 'date' | 'liable' | 'liable_override_reason'>, date: string, party: { gstin?: string } | undefined, options?: readonly GtaOptionRow[]): GstLiable {
+  if (String(lr.liable_override_reason ?? '').trim()) return lr.liable;
+  const now = optionFor(date, options);
+  if (optionFor(lr.date, options) === now) return lr.liable;
+  return liablePerson(now, recipientKind(party), date);
+}
+
+/**
+ * QA6 F7: place of supply of GTA freight (Sec 12(8) IGST Act): a registered payer → its own state; an unregistered
+ * payer → where the goods were handed over for transport (the LR's origin). Working paper — verify with your CA.
+ */
+export const freightPos = (party: Pick<Client, 'gstin' | 'state_code'>, lr: Pick<ConsignmentNote, 'from'>, home: string): string =>
+  isValidGstin(party.gstin ?? '') ? party.gstin!.slice(0, 2) : lr.from?.state || party.state_code || home;
+
+export interface GroupOptions {
+  /** Bill date: the person liable is decided for it (`liableOnBill`). */
+  date?: string;
+  options?: readonly GtaOptionRow[];
+  /** The billing party (registration decides whether the LR's origin splits the bill, F7). */
+  partyOf?: (id: string) => Pick<Client, 'gstin' | 'state_code'> | undefined;
+}
+
+/** Group LRs by billing party, then by the person liable (a mixed selection becomes two bills), then — for an unregistered payer — by origin state. */
+export function groupForBills(lrs: readonly ConsignmentNote[], o: GroupOptions = {}): FreightGroup[] {
   const map = new Map<string, FreightGroup>();
   for (const lr of [...lrs].sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number, undefined, { numeric: true }))) {
     const partyId = payerId(lr);
-    const key = `${partyId}|${lr.liable}`;
-    const g = map.get(key) ?? { key, partyId, liable: lr.liable, lrs: [], amount: 0 };
+    const party = o.partyOf?.(partyId);
+    const liable = o.date ? liableOnBill(lr, o.date, party, o.options) : lr.liable;
+    const origin = party && !isValidGstin(party.gstin ?? '') ? `|${lr.from?.state ?? ''}` : '';
+    const key = `${partyId}|${liable}${origin}`;
+    const g = map.get(key) ?? { key, partyId, liable, lrs: [], amount: 0 };
     g.lrs.push(lr);
     g.amount = round2(g.amount + freightOf(lr).total);
     map.set(key, g);
@@ -87,10 +116,12 @@ const sum = (lr: ConsignmentNote, f: (l: ConsignmentNote['lines'][number]) => nu
 /** Pure: the freight bill for one group (all LRs share the party and the person liable). */
 export function buildFreightBill(lrs: readonly ConsignmentNote[], ctx: FreightBillContext): InvoiceRecord {
   if (!lrs.length) throw new LrError('Choose at least one LR.');
-  const liable = lrs[0].liable;
-  if (lrs.some((l) => l.liable !== liable)) throw new LrError('LRs with different persons liable for GST go on separate bills.');
+  const liable = liableOnBill(lrs[0], ctx.date, ctx.party, ctx.options);
+  if (lrs.some((l) => liableOnBill(l, ctx.date, ctx.party, ctx.options) !== liable)) throw new LrError('LRs with different persons liable for GST go on separate bills.');
   const party = payerId(lrs[0]);
   if (lrs.some((l) => payerId(l) !== party)) throw new LrError('All LRs on one bill must have the same billing party.');
+  const registered = isValidGstin(ctx.party.gstin ?? '');
+  if (!registered && lrs.some((l) => (l.from?.state ?? '') !== (lrs[0].from?.state ?? ''))) throw new LrError('An unregistered party is billed per origin state (place of supply = where the goods were handed over) — bill these LRs separately.');
   const option = optionFor(ctx.date, ctx.options);
   const effective = liable === 'recipient' ? 'rcm' : option === 'rcm' ? 'fcm_5' : option;
   const rate = gtaRate(effective, ctx.date).rate;
@@ -107,10 +138,9 @@ export function buildFreightBill(lrs: readonly ConsignmentNote[], ctx: FreightBi
       if (num(c.amount) > 0) items.push(line(`${c.kind === 'detention' ? 'Detention' : 'Other charges'} — LR ${lr.number}`, lr.pod?.detention_days ? `${lr.pod.detention_days} day(s)` : '', num(c.amount)));
     }
   }
-  const registered = isValidGstin(ctx.party.gstin ?? '');
   const docType: DocumentType = registered ? 'TAX_INVOICE' : 'INVOICE';
   const home = senderStateCode(ctx.sender);
-  const pos = (registered ? ctx.party.gstin!.slice(0, 2) : ctx.party.state_code) || lrs[0].from.state || home;
+  const pos = freightPos(ctx.party, lrs[0], home);
   const draft = makeDraft({ settings: ctx.settings, sender: ctx.sender, docType, templateId: ctx.templateId });
   const rcm = liable === 'recipient';
   return totalsOf({
@@ -126,7 +156,12 @@ export function buildFreightBill(lrs: readonly ConsignmentNote[], ctx: FreightBi
     reverse_charge: rcm,
     ...(rcm ? { rcm_tax_excluded: true } : {}),
     lr_ids: lrs.map((l) => l.id),
-    notes: [`Freight bill for ${lrs.length} consignment note(s).`, `GST payable by: ${liableText({ liable })}.`, optionLine(option, ctx.date)].join('\n'),
+    notes: [
+      `Freight bill for ${lrs.length} consignment note(s).`,
+      `GST payable by: ${liableText({ liable })}.`,
+      optionLine(option, ctx.date),
+      ...(registered ? [] : [`Place of supply: where the goods were handed over for transport (Sec 12(8)(b) IGST Act, unregistered recipient) — verify with your CA.`]),
+    ].join('\n'),
   });
 }
 
@@ -161,7 +196,8 @@ export function createFreightBills(lrIds: readonly string[], date: string): Invo
   }
   return withTablesRollback(['invoices', LR_TABLE, 'clients', 'items_catalog', 'series_counters'], () => {
     const saved: InvoiceRecord[] = [];
-    for (const g of groupForBills(chosen)) {
+    const options = getTable<GtaOptionRow>('gta_options');
+    for (const g of groupForBills(chosen, { date, options, partyOf: (id) => localDb.clients.getById(id) ?? undefined })) {
       const bill = localDb.invoices.save(buildFreightBill(g.lrs, liveContext(date, g.partyId)));
       saved.push(bill);
       const ids = new Set(g.lrs.map((l) => l.id));

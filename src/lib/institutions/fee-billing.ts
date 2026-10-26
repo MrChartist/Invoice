@@ -25,9 +25,13 @@ export interface FeeContext {
   newId?: () => string;
 }
 
-/** The fee document of a student for (plan, instalment, kind), if one is live (not cancelled, not a fine). */
-export function billedDoc(invoices: readonly InvoiceRecord[], studentId: string, planId: string, idx: number, kind: DocumentType): InvoiceRecord | undefined {
-  return invoices.find((i) => i.fee_plan_id === planId && i.fee_instalment === idx && i.client?.id === studentId && i.doc_type === kind && i.status !== 'Cancelled' && !i.late_fee_for);
+/**
+ * The fee document of a student for (plan, instalment, kind), if one is live (not cancelled, not a fine). A Bill of
+ * Supply is matched per `exempt_kind` (QA6 F13), or by holding one of `heads` (one bill made before the split).
+ */
+export function billedDoc(invoices: readonly InvoiceRecord[], studentId: string, planId: string, idx: number, kind: DocumentType, bos?: { exemptKind: string; heads: readonly string[] }): InvoiceRecord | undefined {
+  return invoices.find((i) => i.fee_plan_id === planId && i.fee_instalment === idx && i.client?.id === studentId && i.doc_type === kind && i.status !== 'Cancelled' && !i.late_fee_for
+    && (!bos || (i.exempt_kind ?? 'EXEMPT') === bos.exemptKind || (i.items ?? []).some((it) => bos.heads.includes(it?.name))));
 }
 
 function lineOf(l: DiscountedLine | FeeLine, id: string): InvoiceItem {
@@ -64,11 +68,11 @@ export function planFeeRun(plan: FeePlan, idx: number, students: readonly Client
     const e = s.id ? enrolmentOf(s, plan.id) : undefined;
     if (!e || !s.id) continue;
     const lines = applyConcessions(instalmentLines(plan, idx), e.concessions).filter((l) => l.amount - l.discount > 0);
-    const { bos, tax, exemptKind } = splitByTax(lines);
+    const { tax, byKind } = splitByTax(lines);
     const notes = [`${plan.name}${plan.year_label ? ` (${plan.year_label})` : ''} — ${inst.label}`, s.roll_no ? `Roll no. ${s.roll_no}` : '', s.class_label ? `Class ${s.class_label}` : ''].filter(Boolean).join(' · ');
     const tag = { fee_plan_id: plan.id, fee_instalment: idx } as Partial<InvoiceRecord>;
     const kinds: [DocumentType, (DiscountedLine | FeeLine)[], Partial<InvoiceRecord>][] = [];
-    if (bos.length) kinds.push(['BILL_OF_SUPPLY', bos as DiscountedLine[], { ...tag, exempt_kind: exemptKind }]);
+    for (const g of byKind) kinds.push(['BILL_OF_SUPPLY', g.lines as DiscountedLine[], { ...tag, exempt_kind: g.kind }]);
     if (tax.length) kinds.push(['TAX_INVOICE', tax as DiscountedLine[], tag]);
     if (!kinds.length) {
       out.skipped.push({ student: s, reason: 'empty' });
@@ -76,7 +80,8 @@ export function planFeeRun(plan: FeePlan, idx: number, students: readonly Client
     }
     let made = 0;
     for (const [kind, ls, extra] of kinds) {
-      if (billedDoc(invoices, s.id, plan.id, idx, kind)) continue;
+      const bosKey = kind === 'BILL_OF_SUPPLY' ? { exemptKind: String(extra.exempt_kind), heads: ls.map((l) => l.head.name) } : undefined;
+      if (billedDoc(invoices, s.id, plan.id, idx, kind, bosKey)) continue;
       // The receipt's "for" line reads roll no. / class from the document's party snapshot.
       const who = { ...(s.roll_no ? { roll_no: s.roll_no } : {}), ...(s.class_label ? { class_label: s.class_label } : {}) };
       out.drafts.push(...buildBatchDrafts(template(kind, s, ls, notes, ctx, extra), [{ key: partyKey(s), client: s }], { date: ctx.date, dueDays, sender: ctx.sender, newId: ctx.newId }).map((d) => ({ ...d, record: { ...d.record, client: { ...d.record.client, ...who } } })));

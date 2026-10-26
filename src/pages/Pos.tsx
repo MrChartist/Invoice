@@ -29,7 +29,7 @@ import {
   type MoneyTender, type PosAction, type Tender,
 } from '../lib/pos';
 // R4-B1 / B3: promotional gift voucher discount; store price lists and the counter's branch.
-import { applyPromoDiscount } from '../lib/retail/gift-voucher-core';
+import { applyPromoDiscount, promoVoucherIssue } from '../lib/retail/gift-voucher-core';
 import { BRANCH_PRICES_TABLE, branchContext, posBranch, storePricingInUse, writePosBranch } from '../lib/retail/store-prices';
 import { loadBranches, type Branch } from '../lib/branch';
 import { defineArea } from '../i18n/area';
@@ -238,10 +238,12 @@ export function Pos() {
   const redeemed = useMemo(() => (redeemPts > 0 && party.client ? redeemOnBill(built, redeemPts) : null), [built, redeemPts, party.client]);
   // R4-B1: a promotional gift voucher is an amount discount (like loyalty points); a refused one leaves the bill as is.
   const promoV = gvApplied.find((a) => a.promo);
+  const promoMany = promoVoucherIssue(gvApplied); // QA6 F12: only one promotional voucher is applied and recorded
   const promo = useMemo(() => {
     const base = redeemed?.record ?? built;
+    if (promoMany) return { record: null, error: promoMany };
     return promoV ? applyPromoDiscount(base, promoV.amount) : { record: base, error: '' };
-  }, [redeemed, built, promoV]);
+  }, [redeemed, built, promoV, promoMany]);
   const promoted = promo.record ?? redeemed?.record ?? built;
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
   const offered = useMemo(() => applyBillOffer(promoted, data.pricing?.schemes ?? [], { retotalRecord: true }), [promoted, data.pricing]);
@@ -538,6 +540,10 @@ export function Pos() {
   const save = (expiredOk = false, creditOverride = false) => {
     if (items.length === 0) {
       setErrors([posT('errEmpty')]);
+      return;
+    }
+    if (promoMany) {
+      setErrors([promoMany]);
       return;
     }
     // 8E (8.144): an "On account" amount must be what is left unpaid.

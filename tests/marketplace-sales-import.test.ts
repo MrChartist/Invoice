@@ -141,3 +141,55 @@ test('Meesho file without invoice numbers: numbered from the order id, flagged f
   assert.equal(plan.docs[0].record.place_of_supply, '24');
   assert.ok(plan.warnings.some((w) => /verify with your CA/.test(w.message)));
 });
+
+/* ── QA6 F2: summary ↔ per-order re-import must never double-book ── */
+const salesTaxable = () => Math.round(docs().filter((d) => d.status !== 'Cancelled' && d.doc_type !== 'CREDIT_NOTE').reduce((s, d) => s + d.taxable_value, 0) * 100) / 100;
+const planFile = (summary = false) => {
+  const t = fixture('amazon-mtr.csv');
+  return planSalesImport(t, guessColumns(t.headers, SALES_FIELDS), 'amazon_mtr_b2c', liveSalesContext(ch), { summary });
+};
+const summaries = () => docs().filter((d) => d.channel_order_id?.startsWith('SUMMARY:'));
+
+test('QA6 F2: summary import, then the same file per order, imports nothing new; GSTR-1 counts each sale once', () => {
+  importMtr(ch, { summary: true });
+  assert.equal(salesTaxable(), 500 + 900 + 1000);
+  const again = planFile(false);
+  assert.equal(again.docs.length, 0, 'no document planned');
+  assert.equal(again.counts.already, 4);
+  assert.equal(again.errors.length, 0);
+  assert.equal(salesTaxable(), 500 + 900 + 1000);
+  const g1 = buildGstr1(localDb.invoices.getAll(), { period: { kind: 'month', fyStart: 2026, month: 10 } });
+  const b2cs = g1.gstr1.b2cs.reduce((s, r) => s + r.txval, 0);
+  assert.equal(Math.round(b2cs * 100) / 100, 500 + 900 - 500, 'B2CS counts each sale once (net of the refund)');
+});
+
+test('QA6 F2: summary twice is "already imported", and per order then summary too', () => {
+  importMtr(ch, { summary: true });
+  const twice = planFile(true);
+  assert.equal(twice.docs.length, 0);
+  assert.equal(twice.counts.already, 4);
+  assert.equal(twice.errors.length, 0);
+  ch = setupWorld();
+  importMtr(ch);
+  const sum = planFile(true);
+  assert.equal(sum.docs.length, 0);
+  assert.equal(sum.counts.already, 4);
+});
+
+test('QA6 F2: a summary saved without order ids is matched from its notes; else its covered range refuses the order', () => {
+  importMtr(ch, { summary: true });
+  const strip = (notes?: string) => {
+    for (const d of summaries()) {
+      const legacy: InvoiceRecord = { ...d };
+      delete legacy.channel_order_ids;
+      localDb.invoices.save(notes === undefined ? legacy : { ...legacy, notes });
+    }
+  };
+  strip();
+  assert.ok(summaries().every((d) => !d.channel_order_ids), 'legacy summaries');
+  assert.equal(planFile(false).docs.length, 0, 'order ids read back from the summary notes');
+  strip('edited by hand');
+  const plan = planFile(false);
+  assert.equal(plan.docs.filter((d) => d.record.doc_type === 'INVOICE').length, 0, 'no B2C invoice planned');
+  assert.ok(plan.errors.some((e) => /already covers/i.test(e.message)), plan.errors.map((e) => e.message).join(' | '));
+});

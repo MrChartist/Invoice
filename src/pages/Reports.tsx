@@ -113,6 +113,7 @@ export function Reports() {
       ...books,
       invoices: books.invoices.filter((i) => inr(i.currency)),
       transactions: books.transactions.filter((t) => !foreign.has(t.invoice_id)),
+      manualVouchers: [], // receipts against receipts (payment modes): manual vouchers are not receipts
     };
     const inPeriodInr = invoices.filter((i) => inr(i.currency) && inPeriod(isoDay(i.issue_date), period));
     const dash = summarize(inPeriodInr);

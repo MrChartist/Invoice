@@ -71,7 +71,7 @@ function RegisterView({ rows, today, notify, changed }: { rows: RealisationRow[]
   const parties = useMemo(() => [...new Set(rows.filter((r) => r.outstandingFcy > 0.005).map((r) => r.party))].sort(), [rows]);
   const [party, setParty] = useState('');
   const canBooks = can('books.edit');
-  const unrealised = useMemo(() => unrealisedAt({ invoices: getTable<InvoiceRecord>('invoices'), payments: getTable<Payment>('transactions'), irms: irmsDb.all(), writeoffs: writeoffsDb.all() }, asAt), [asAt, rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  const unrealised = useMemo(() => unrealisedAt({ invoices: getTable<InvoiceRecord>('invoices'), payments: getTable<Payment>('transactions'), irms: irmsDb.all(), writeoffs: writeoffsDb.all(), links: getTable('doc_links') }, asAt), [asAt, rows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rows.length) return <p className={styles.muted}>{trT('noExports')}</p>;
   const sheet = registerSheet(rows);

@@ -145,7 +145,11 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
                   const plan = planRestore(e, (t) => peekTable(t), peekTable<BinEntry>(BIN_TABLE));
                   return (
                     <tr key={e.id} data-bin-row={d.number || e.row_id}>
-                      <td>{d.label}{d.name ? <div className={styles.muted}>{d.name}</div> : null}</td>
+                      <td>
+                        {d.label}{d.name ? <div className={styles.muted}>{d.name}</div> : null}
+                        {/* QA6-1 F1: the module that owns the row refuses — say why and where to redo it. */}
+                        {plan.refusal === 'module' && <div className={styles.note} data-bin-refusal>{plan.message}</div>}
+                      </td>
                       <td>{d.number || '—'}{d.day ? <div className={styles.muted}>{d.day}</div> : null}</td>
                       <td>{when(e.deleted_at)}</td>
                       <td>{e.deleted_by ?? '—'}</td>
@@ -154,7 +158,7 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
                           {plan.refusal === 'parentMissing' && plan.parentEntry ? (
                             <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => restore(e, { withParent: true })}><Undo2 size={14} aria-hidden="true" /> {trT('binRestoreBoth')}</button>
                           ) : (
-                            <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => restore(e)} aria-label={`${trT('binRestore')} ${d.number || d.label}`}><Undo2 size={14} aria-hidden="true" /> {trT('binRestore')}</button>
+                            <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={plan.refusal === 'module'} onClick={() => restore(e)} aria-label={`${trT('binRestore')} ${d.number || d.label}`}><Undo2 size={14} aria-hidden="true" /> {trT('binRestore')}</button>
                           )}
                           {plan.children.length > 0 && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => restore(e, { withChildren: true })}>{trT('binRestoreWith', { n: plan.children.length })}</button>}
                           {owner && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-label={`${trT('binDeleteForGood')} ${d.number || d.label}`} onClick={() => remove([e.id])}><Trash2 size={14} aria-hidden="true" /></button>}

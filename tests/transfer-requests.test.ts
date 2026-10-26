@@ -194,3 +194,23 @@ test('roles, approvals and the period lock', () => {
   assert.equal(getTable('stock_transfers').length, 0, 'nothing half-written');
   assert.throws(() => transferRequestsDb.remove(req.id), (e: unknown) => isPeriodLockedError(e));
 });
+
+test('QA6 F9: a later receipt does not take the batch reported short; the write-off finds it still in transit', () => {
+  const { wh, mall } = world();
+  const req = transferRequestsDb.save({ date: DAY, from_godown: wh.id, to_godown: mall.id, lines: [{ id: 'l1', item_id: 'shirt', qty: 20 }] });
+  const inputs = liveTrackingInputs();
+  transferRequestsDb.dispatch(req.id, { date: DAY, lines: buildDispatchLines(new Map([['shirt', 20]]), stockDb.items(), computeTracking(inputs), DAY, wh.id) }, inputs);
+  const r1 = transferRequestsDb.receive(req.id, { date: DAY, lines: [{ item_id: 'shirt', received: 7, short: 3 }] }, stockDb.items(), liveTrackingInputs());
+  assert.deepEqual(r1.transfer!.lines.map((l) => [l.batch_no, l.qty]), [['OLD', 7]]);
+  assert.deepEqual(r1.request.exceptions!.map((e) => [e.batch_no, e.qty]), [['OLD', 3]]);
+  const r2 = transferRequestsDb.receive(req.id, { date: DAY, lines: [{ item_id: 'shirt', received: 5, damaged: 2 }] }, stockDb.items(), liveTrackingInputs());
+  assert.deepEqual(r2.transfer!.lines.map((l) => [l.batch_no, l.qty]), [['NEW', 5]], 'the short OLD batch stays in transit');
+  assert.deepEqual(r2.request.exceptions!.map((e) => [e.batch_no, e.qty]), [['OLD', 3], ['NEW', 2]], 'the new damage is picked from NEW, not the held OLD');
+  const r3 = transferRequestsDb.receive(req.id, { date: DAY, lines: [{ item_id: 'shirt', received: 3 }] }, stockDb.items(), liveTrackingInputs());
+  assert.deepEqual(r3.transfer!.lines.map((l) => [l.batch_no, l.qty]), [['NEW', 3]]);
+  const p = requestProgress(transferRequestsDb.get(req.id)!, loadRequestDocs());
+  assert.deepEqual(p.transitBatches.get('shirt')!.filter((b) => b.qty > 0).map((b) => [b.batch, b.qty]), [['OLD', 3], ['NEW', 2]], 'transit holds what the exceptions name');
+  const e = transferRequestsDb.get(req.id)!.exceptions![0];
+  transferRequestsDb.writeOff(req.id, e.id, DAY, stockDb.items(), liveTrackingInputs());
+  assert.equal(qtyIn('shirt', transitGodownFor(godownsDb.list(), mall.id)!.id), 2);
+});

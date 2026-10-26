@@ -193,6 +193,15 @@ export function applyPromoDiscount(rec: InvoiceRecord, amount: number): { record
   return { record: retotal({ ...rec, discount_type: 'AMOUNT', discount_rate: round2(already + a) }), error: '' };
 }
 
+/**
+ * QA6 F12: one promotional voucher per bill (the POS applies and records a single promo discount). With `next`, the
+ * voucher about to be applied; without, the vouchers already on the bill.
+ */
+export function promoVoucherIssue(applied: readonly { promo?: boolean }[], next?: { promo?: boolean }): string {
+  const n = applied.filter((a) => a.promo).length + (next?.promo ? 1 : 0);
+  return n > 1 ? 'One promotional voucher per bill — remove the other one first.' : '';
+}
+
 /* ── Live reads and the counter's writes ──────────────────────── */
 
 export const liveVouchers = (): readonly GiftVoucher[] => peekTable<GiftVoucher>(GV_TABLE);

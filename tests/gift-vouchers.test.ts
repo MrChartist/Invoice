@@ -116,8 +116,8 @@ test('POS: partial redemption as a tender leaves a balance; the Z report shows i
   assert.equal(z.tenders.cash + z.tenders.upi + z.tenders.card + z.tenders.other, 0);
   assert.equal(z.received, 0);
 
-  // Cash / bank book: the redemption moved no money.
-  assert.equal(buildVouchers(loadBooksData()).filter((v) => v.type === 'Receipt').length, 0);
+  // Cash / bank book: the redemption moved no money (the sale voucher's own cash line is there, QA6-1 F5).
+  assert.equal(buildVouchers(loadBooksData()).filter((v) => v.type === 'Receipt' && !v.id.startsWith('mv:')).length, 0);
   // Ledger: Dr Gift vouchers outstanding | Cr Debtors; the liability is down to ₹370 and the TB balances.
   const rcpt = ledger().vouchers.find((v) => v.id === `rcpt:${pay.id}`)!;
   assert.equal(rcpt.lines.find((l) => l.dr > 0)!.account, gvAccount().id);
@@ -201,6 +201,26 @@ test('breakage: one journal for expired balances (Dr liability | Cr Unredeemed v
   assert.equal(loadVouchers().some((v) => v.id === jid), false);
   const tb = trialBalance(ledger(), { start: '2026-04-01', end: '2027-03-31' });
   assert.equal(tb.totals.closingDr, tb.totals.closingCr);
+});
+
+test('QA6 F12: one promotional voucher per POS bill — a second is refused, a sold voucher still tenders', async () => {
+  const { promoVoucherIssue } = await import('../src/lib/retail/gift-voucher-core.ts');
+  const p1 = { id: 'p1', number: 'GV/1', amount: 100, promo: true };
+  assert.equal(promoVoucherIssue([], { promo: true }), '');
+  assert.match(promoVoucherIssue([p1], { promo: true }), /one promotional voucher/i);
+  assert.equal(promoVoucherIssue([p1], { promo: false }), '', 'a sold voucher is a tender');
+  assert.equal(promoVoucherIssue([p1]), '');
+  assert.match(promoVoucherIssue([p1, { ...p1, id: 'p2', amount: 50 }]), /one promotional voucher/i, 'a bill holding two is refused on save');
+});
+
+test('QA6 F10: the breakage journal cannot be dated before the "as at" day (so never before expiry or the sale)', () => {
+  giftVouchersDb.sell({ count: 1, face_value: 800, issued_on: DAY, method: 'Cash', expires_on: '2026-06-30' });
+  assert.throws(() => giftVouchersDb.recogniseBreakage('2026-07-15', '2026-05-01'), /on or after/, 'before the sale');
+  assert.throws(() => giftVouchersDb.recogniseBreakage('2026-07-15', '2026-06-20'), /on or after/, 'before the expiry');
+  assert.throws(() => giftVouchersDb.recogniseBreakage('2026-07-15', '2026-07-14'), /on or after/, 'before the as-at day');
+  assert.equal(loadVouchers().filter((v) => v.type === 'JOURNAL').length, 0, 'no journal written');
+  assert.equal(giftVouchersDb.all()[0].breakage_voucher_id, undefined);
+  assert.equal(giftVouchersDb.recogniseBreakage('2026-07-15', '2026-07-15').amount, 800);
 });
 
 test('period lock and roles: a sale inside a locked period is refused; a viewer cannot sell', () => {

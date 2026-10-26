@@ -34,6 +34,7 @@ import { isoDay, localDayOf } from './dates';
 import { isOutwardRcm, supplierView } from './rcm';
 import { toCsv } from './csv';
 import { isFinancialNote } from './financial-note';
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 import {
   inPeriod,
   monthLabel,
@@ -635,7 +636,7 @@ export function paymentModes(payments: readonly Payment[], invoices: readonly In
     const date = isoDay(p.date);
     const amount = round2(Math.abs(num(p.amount)));
     // Advance adjustments (5.3) are not money received in the period.
-    if (!date || amount === 0 || !inPeriod(date, period) || foreign.has(p.invoice_id) || p.advance_id || p.write_off || p.deposit_adjustment_id || p.ra_journal_id) continue; // 8.106: a write-off is not money; R5-C6 nor a deposit adjustment; R5-B5 nor an RA deduction row
+    if (!date || amount === 0 || !inPeriod(date, period) || foreign.has(p.invoice_id) || movedNoCash(p)) continue; // QA6-1 F4: no money moved (`no-cash.ts`)
     const method = canonicalMethod(p.method);
     const r = map.get(method) ?? { method, count: 0, amount: 0, share: 0 };
     r.count++;

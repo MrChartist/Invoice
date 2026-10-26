@@ -154,15 +154,18 @@ test('an unnumbered batch / recurring draft (QA5-2) is binned and restored witho
   assert.deepEqual([back.status, back.invoice_number], ['Draft', '']);
 });
 
-test('a gift-voucher receipt (R4-B) comes back from the bin with its gift_voucher_id', () => {
+test('a gift-voucher receipt (R4-B) comes back from the bin with its gift_voucher_id', async () => {
   installSettings();
+  const { giftVouchersDb } = await import('../src/lib/retail/gift-vouchers.ts');
+  // QA6-1 F1: the voucher must exist and still have the balance (the restore re-checks it).
+  const [gv] = giftVouchersDb.sell({ count: 1, face_value: 100, issued_on: '2026-05-01', method: 'Cash' }).vouchers;
   const b = createViaStore({ date: '2026-05-11', lines: [{ qty: 1, rate: 200 }] });
-  setTable('transactions', [...getTable('transactions'), { id: 'gvp', invoice_id: b.id, amount: 20, method: 'Gift voucher', date: '2026-05-11', gift_voucher_id: 'gv1' }]);
+  setTable('transactions', [...getTable('transactions'), { id: 'gvp', invoice_id: b.id, amount: 20, method: 'Gift voucher', date: '2026-05-11', gift_voucher_id: gv.id }]);
   setTable('transactions', getTable<{ id: string }>('transactions').filter((t) => t.id !== 'gvp'));
   const e = entry('transactions');
-  assert.equal((e.row as { gift_voucher_id?: string }).gift_voucher_id, 'gv1');
+  assert.equal((e.row as { gift_voucher_id?: string }).gift_voucher_id, gv.id);
   restoreEntry(e.id);
-  assert.equal(getTable<{ id: string; gift_voucher_id?: string }>('transactions').find((t) => t.id === 'gvp')?.gift_voucher_id, 'gv1');
+  assert.equal(getTable<{ id: string; gift_voucher_id?: string }>('transactions').find((t) => t.id === 'gvp')?.gift_voucher_id, gv.id);
 });
 
 test('the bin is backed up but never synced', () => {

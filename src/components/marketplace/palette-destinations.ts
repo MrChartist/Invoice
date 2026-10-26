@@ -4,7 +4,7 @@
  * palette's first open only.
  */
 import type { StaticEntry } from '../../lib/search';
-import { PACK_TABS, activePacks } from '../../lib/industry-packs';
+import { PACK_TABS, activePacks, packTabOn } from '../../lib/industry-packs';
 import { localDb } from '../../lib/localDb';
 import { mT } from '../../i18n/areas/packs-marketplace-r5';
 import { reachT } from '../../i18n/areas/reach';
@@ -22,7 +22,7 @@ export function packDestinations(): StaticEntry[] {
   const on = activePacks(localDb.settings.get());
   return PACK_TABS.map((t) => ({
     id: `pack:${t.path}`,
-    title: `${label(t.labelKey)}${on.includes(t.pack) ? '' : ` ${mT('packOff')}`}`,
+    title: `${label(t.labelKey)}${packTabOn(t, on) ? '' : ` ${mT('packOff')}`}`,
     subtitle: `${mT('paletteGroup')} · ${reachT(`pack.${t.pack}`)}`,
     icon: 'page',
     href: t.path,

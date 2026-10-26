@@ -56,6 +56,8 @@ test('left out: device-local, sync, vault, attachments, drafts and prefs; the bi
   assert.deepEqual(exportableKeys(keys, { includeBin: false, includeAttachments: false, payroll: false }), ['audit_archive_0001', 'invoices', 'settings']);
   assert.deepEqual(exportableKeys(keys, { includeBin: true, includeAttachments: true, payroll: true }), ['audit_archive_0001', 'employees', 'invoices', 'recycle_bin', 'settings']);
   assert.ok(PAYROLL_TABLES.has('payroll_runs'));
+  // bin_settings is company data (backed up and synced), so the open export carries it too
+  assert.ok(exportableKeys([`${DB_PREFIX}bin_settings`], { includeBin: false, includeAttachments: false, payroll: false }).includes('bin_settings'));
 });
 
 test('object keys become path / value rows with images as files; README and file name', () => {

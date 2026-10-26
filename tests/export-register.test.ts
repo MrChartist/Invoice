@@ -149,3 +149,21 @@ test('bell: overdue (with the Rule 96A note), due within 60 days', () => {
   assert.deepEqual(n.map((x) => [x.id.split(':')[0], x.severity]), [['exp-overdue', 'critical'], ['exp-due', 'warning']]);
   assert.match(n[0].detail, /Rule 96A — verify with your CA/);
 });
+
+test('QA6 F6: an export saved as "Tax Invoice" is followed for realisation; non-supply documents are not', () => {
+  const rows = reg([exp('1', { doc_type: 'TAX_INVOICE' }), exp('2', { doc_type: 'QUOTATION' }), exp('3', { doc_type: 'PROFORMA' }), exp('4', { doc_type: 'CREDIT_NOTE' })]);
+  assert.deepEqual(rows.map((r) => r.invoiceId), ['1']);
+  assert.equal(unrealisedAt({ invoices: [exp('1', { doc_type: 'TAX_INVOICE' })], payments: [], irms: [], writeoffs: [] }, '2026-03-31').length, 1);
+});
+
+test('QA6 F15: live credit notes linked to an export reduce its realisable value', () => {
+  const cn = (id: string, status: InvoiceRecord['status']): Partial<InvoiceRecord> => ({ id, doc_type: 'CREDIT_NOTE', status, currency: 'USD', total: 2000, place_of_supply: '96', supply_type: 'EXPORT_LUT', issue_date: '2025-11-01' });
+  const links = [{ from_id: '1', to_id: 'c1', relation: 'credit_note' }, { from_id: '1', to_id: 'c2', relation: 'credit_note' }];
+  const [row] = buildRegister({
+    invoices: [exp('1'), cn('c1', 'Sent'), cn('c2', 'Cancelled')], links, payments: [{ invoice_id: '1', amount: 8000, date: '2026-01-05' }],
+    irms: [], writeoffs: [], today: '2027-06-01',
+  });
+  assert.equal(row.fcy, 8000, 'total less the live credit note (the cancelled one is ignored)');
+  assert.equal(row.outstandingFcy, 0);
+  assert.equal(row.status, 'realised', 'not overdue');
+});

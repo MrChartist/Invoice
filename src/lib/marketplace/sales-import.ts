@@ -195,7 +195,7 @@ export interface SalesContext {
   catalogue: readonly CatalogueRow[];
   skuMap: readonly ChannelSku[];
   /** Existing documents (read-only). */
-  invoices: readonly Pick<InvoiceRecord, 'id' | 'invoice_number' | 'doc_type' | 'status' | 'channel_id' | 'channel_order_id' | 'issue_date'>[];
+  invoices: readonly Pick<InvoiceRecord, 'id' | 'invoice_number' | 'doc_type' | 'status' | 'channel_id' | 'channel_order_id' | 'issue_date' | 'channel_order_ids' | 'notes'>[];
   /** True when a document dated `day` is inside the period lock. */
   isLocked: (day: string) => boolean;
   fileName?: string;
@@ -251,6 +251,22 @@ export function profileFor(settings: AppSettings, shipFromCode: string): SenderP
 
 const docTypeFor = (r: SalesRow): DocumentType => (r.kind === 'return' ? 'CREDIT_NOTE' : isValidGstin(r.buyer_gstin) ? 'TAX_INVOICE' : 'INVOICE');
 
+const SUMMARY_PREFIX = 'SUMMARY:';
+const summaryKey = (day: string, pos: string, rate: number) => `${SUMMARY_PREFIX}${day}:${pos}:${rate}`;
+const summaryNote = (channelName: string, ids: readonly string[]) => `Marketplace summary (${channelName}): ${ids.length} orders — ${ids.join(', ')}`;
+
+/**
+ * The order ids a stored summary document covers (QA6 F2): `channel_order_ids`, else read back from the summary note
+ * of a document saved before that field existed. `null` when neither can be read (the note was edited).
+ */
+export function summaryOrderIds(doc: Pick<InvoiceRecord, 'channel_order_ids' | 'notes'>): string[] | null {
+  if (Array.isArray(doc.channel_order_ids) && doc.channel_order_ids.length) return doc.channel_order_ids;
+  const m = /^Marketplace summary \(.*\): (\d+) orders — (.+)$/.exec(doc.notes ?? '');
+  if (!m) return null;
+  const ids = m[2].split(', ').map((x) => x.trim()).filter(Boolean);
+  return ids.length === Number(m[1]) ? ids : null;
+}
+
 /** Idempotency key: channel × order × kind × marketplace number. */
 export const docKey = (channelId: string, orderId: string, docType: string, number: string) =>
   `${channelId}|${orderId.trim().toLowerCase()}|${docType === 'CREDIT_NOTE' ? 'cn' : 'inv'}|${numberKey(number)}`;
@@ -279,6 +295,16 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
     if (!inv?.invoice_number) continue;
     numbers.set(numberKey(inv.invoice_number), inv);
     if (inv.channel_id && inv.channel_order_id && inv.status !== 'Cancelled') existing.set(docKey(inv.channel_id, inv.channel_order_id, inv.doc_type, inv.invoice_number), inv.id);
+  }
+  // QA6 F2: orders a live summary document of this channel already covers (a per-order import must not book them
+  // again, and vice versa), and the day × state × rate range of a summary whose order list cannot be read.
+  const summaryOrders = new Map<string, string>();
+  const summaryRanges = new Map<string, string>();
+  for (const inv of ctx.invoices) {
+    if (inv?.channel_id !== channel.id || !inv.channel_order_id?.startsWith(SUMMARY_PREFIX) || inv.status === 'Cancelled' || inv.doc_type === 'CREDIT_NOTE') continue;
+    const ids = summaryOrderIds(inv);
+    if (ids) for (const id of ids) summaryOrders.set(id.trim().toLowerCase(), inv.invoice_number);
+    else summaryRanges.set(inv.channel_order_id, inv.invoice_number);
   }
 
   interface Group { key: string; type: DocumentType; number: string; rows: SalesRow[]; bad: boolean; summary: boolean }
@@ -316,6 +342,22 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
       already++;
       skipped.push({ line: r.line, message: `Order ${r.order_id} (${number}) already imported.` });
       continue;
+    }
+    if (type !== 'CREDIT_NOTE') {
+      const inSummary = summaryOrders.get(r.order_id.trim().toLowerCase());
+      if (inSummary) {
+        already++;
+        skipped.push({ line: r.line, message: `Order ${r.order_id} already imported in summary document ${inSummary}.` });
+        continue;
+      }
+      if (type === 'INVOICE' && summaryRanges.size) {
+        const pos = stateOf(r.ship_to)?.code ?? senderStateCode(profileFor(ctx.settings, stateOf(r.ship_from)?.code ?? ''));
+        const covering = summaryRanges.get(summaryKey(r.date, pos, r.tax_rate));
+        if (covering) {
+          errors.push({ line: r.line, message: `Order ${r.order_id}: summary document ${covering} already covers ${r.date} · state ${pos || '?'} · GST ${r.tax_rate}% and its order list cannot be read — refused so the sale is not booked twice. Undo that import to re-import per order.` });
+          continue;
+        }
+      }
     }
     const clash = numbers.get(numberKey(number));
     if (clash && !(clash.channel_id === channel.id && clash.status === 'Cancelled')) {
@@ -407,13 +449,14 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
       round_off_enabled: false,
       round_mode: 'none',
       notes: g.summary
-        ? `Marketplace summary (${channel.name}): ${orderIds.length} orders — ${orderIds.join(', ')}`
+        ? summaryNote(channel.name, orderIds)
         : `Imported from the ${channel.name} report${ctx.fileName ? ` (${ctx.fileName})` : ''}. Order ${first.order_id}.`,
       terms: '',
       eco_gstin: operatorGstinFor(channel, shipFrom || homeState) || undefined,
       eco_section: channel.eco_section ?? 'TCS_52',
       channel_id: channel.id,
-      channel_order_id: g.summary ? `SUMMARY:${first.date}:${pos}:${first.tax_rate}` : first.order_id,
+      channel_order_id: g.summary ? summaryKey(first.date, pos, first.tax_rate) : first.order_id,
+      ...(g.summary ? { channel_order_ids: orderIds } : {}),
       ...(g.type === 'CREDIT_NOTE' ? { goods_returned: g.rows.some((r) => r.goods_returned) } : {}),
     });
     if (!rec.eco_gstin) delete rec.eco_gstin;

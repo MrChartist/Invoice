@@ -32,7 +32,7 @@ export function realisationNotices(rows: readonly RealisationRow[], at: string):
   return out;
 }
 
-const TABLES = ['invoices', 'transactions', IRMS_TABLE, WRITEOFFS_TABLE, LUT_TABLE];
+const TABLES = ['invoices', 'transactions', 'doc_links', IRMS_TABLE, WRITEOFFS_TABLE, LUT_TABLE];
 let unregister: (() => void) | null = null;
 let key = '';
 let cached: AppNotification[] = [];
@@ -47,7 +47,7 @@ export function registerTradeAlerts(): void {
     try {
       const at = ctx.now.toISOString();
       const invoices = peekTable<InvoiceRecord>('invoices');
-      const rows = buildRegister({ invoices, payments: peekTable<Payment>('transactions'), irms: peekTable<ExportIrm>(IRMS_TABLE), writeoffs: peekTable<ExportWriteOff>(WRITEOFFS_TABLE), today });
+      const rows = buildRegister({ invoices, payments: peekTable<Payment>('transactions'), irms: peekTable<ExportIrm>(IRMS_TABLE), writeoffs: peekTable<ExportWriteOff>(WRITEOFFS_TABLE), links: peekTable('doc_links'), today });
       cached = [...lutNotices(peekTable<LutRow>(LUT_TABLE), invoices, today, at), ...realisationNotices(rows, at)];
     } catch {
       cached = [];

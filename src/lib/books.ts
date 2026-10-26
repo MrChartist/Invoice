@@ -24,7 +24,7 @@ import { round2, num, untaxedCharges } from './invoice-calc';
 import { inrRecord, inrValue } from './fx';
 import { supplierView } from './rcm';
 import { receiptInr } from './fx-gain';
-import { getTable, setTable, generateId } from './storage';
+import { getTable, peekTable, setTable, generateId } from './storage';
 import { isoDay } from './dates';
 import { toCsv } from './csv';
 import { isVoidStatus, readPurchase, selfAssessedCessOf, selfAssessedTaxOf, splitLumpTax, supplierPayableOf } from './purchase-normalize';
@@ -32,7 +32,7 @@ import type { InvoiceRecord, Payment } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
 import type { PurchaseReturn, VendorPayment } from '../types/purchases';
 import { booksReturnEffects } from './purchase-returns-gst';
-import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment } from './advance-tax';
+import { ADVANCES_TABLE, advanceMovements, isAdvanceAdjustment, movedNoCash } from './advance-tax'; // movedNoCash: no-cash.ts
 import { payrollBooksVouchers, payrollPnlEvents } from './payroll/books-link';
 
 /* ════════════════════════════════════════════════════════════════
@@ -122,6 +122,8 @@ export interface BooksData {
   /** Additive (7P): raw `payroll_runs` / `payroll_payments` — payments in the cash / bank book, salary cost in the P&L. */
   payrollRunRows?: unknown[];
   payrollPaymentRows?: unknown[];
+  /** Additive (QA6-1 F5): raw `vouchers` rows — their cash / bank lines are in the cash / bank book. Optional. */
+  manualVouchers?: readonly ManualVoucherRow[];
 }
 
 export const EMPTY_BOOKS: BooksData = {
@@ -483,15 +485,9 @@ export function buildVouchers(data: BooksData): Voucher[] {
   }
 
   for (const t of data.transactions) {
-    // An advance adjusted against an invoice moved no money: the cash came in on the advance.
-    // 8.106: neither did a bad-debt write-off.
-    if (isAdvanceAdjustment(t) || t.write_off) continue;
-    // R4-B1: a gift-voucher redemption moved no money (the cash came in when the voucher was sold).
-    if ((t as { gift_voucher_id?: string }).gift_voucher_id) continue;
-    // R5-C6: a receipt settled from a security deposit held moved no money either.
-    if (t.deposit_adjustment_id) continue;
-    // R5-B5: nor a GST TDS / labour-cess deduction row (the client kept the money; it posts through a clearing account).
-    if (t.ra_journal_id) continue;
+    // No money moved (QA6-1 F4, `no-cash.ts`): an advance adjustment, a bad-debt write-off, a gift-voucher redemption,
+    // a deposit adjustment or an RA deduction row.
+    if (movedNoCash(t)) continue;
     const date = toIsoDate(t.date);
     const inv = invById.get(t.invoice_id);
     // A receipt against a foreign-currency invoice is booked at the rupees actually realised
@@ -600,6 +596,9 @@ export function buildVouchers(data: BooksData): Voucher[] {
   // Payroll payments (7P): salary, PF / ESI / PT / TDS 192, loans to employees — cash out on the day paid.
   out.push(...payrollBooksVouchers(data.payrollPaymentRows));
 
+  // QA6-1 F5: the cash / bank lines of manual vouchers (gift-voucher sales, donations, deposits, payouts, contras …).
+  out.push(...manualCashVouchers(data.manualVouchers ?? [], data.transactions));
+
   return out.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
@@ -607,6 +606,76 @@ export function buildVouchers(data: BooksData): Voucher[] {
       a.number.localeCompare(b.number) ||
       a.id.localeCompare(b.id),
   );
+}
+
+/** The fields of a stored manual voucher (`vouchers` table, `ledger/vouchers.ts`) the cash / bank book reads. */
+export interface ManualVoucherRow {
+  id?: unknown;
+  type?: unknown;
+  number?: unknown;
+  date?: unknown;
+  narration?: unknown;
+  lines?: unknown;
+  variant?: unknown;
+  post_dated?: unknown;
+  reverse_on?: unknown;
+  voucher_class?: unknown;
+}
+
+/** Ledger id → simple book: 'cash' (3500) or a bank ledger ('bank' = main, 'bank:<id>', `bank-ledgers.ts`). */
+function cashSideOf(accountId: string): { account: CashAccount; bank?: string } | null {
+  if (accountId === 'cash') return { account: 'cash' };
+  if (accountId === 'bank') return { account: 'bank' };
+  return accountId.startsWith('bank:') && accountId.length > 5 ? { account: 'bank', bank: accountId.slice(5) } : null;
+}
+
+/**
+ * QA6-1 F5: one Receipt / Payment entry per cash or bank ledger a manual voucher moves money in (net per ledger, rupees),
+ * as the ledger posts it (`inBooks` / `reversalOf`, `ledger/voucher-variants.ts`): optional and memorandum vouchers and
+ * post-dated ones not yet due stay out; a reversing journal is reversed on its day. Never counted twice:
+ *  - a voucher whose receipt rows are in `transactions` (bill-wise RV, P0-11) is carried by those rows;
+ *  - an RA deduction journal (class "RA deduction") pairs a no-cash row on the clearing account, so both stay out.
+ */
+export function manualCashVouchers(rows: readonly ManualVoucherRow[], transactions: readonly Payment[] = [], today: string = toIsoDate(new Date())): Voucher[] {
+  const carried = new Set(transactions.map((t) => str((t as { voucher_id?: unknown }).voucher_id)).filter(Boolean));
+  const out: Voucher[] = [];
+  const push = (v: ManualVoucherRow, id: string, date: string, number: string, narration: string, sign: 1 | -1) => {
+    const net = new Map<string, number>();
+    for (const l of Array.isArray(v.lines) ? (v.lines as { account_id?: unknown; dr?: unknown; cr?: unknown }[]) : []) {
+      const side = l && cashSideOf(str(l.account_id));
+      if (side) net.set(str(l.account_id), (net.get(str(l.account_id)) ?? 0) + sign * (num(l.dr) - num(l.cr)));
+    }
+    for (const [acc, paise] of net) {
+      const side = cashSideOf(acc)!;
+      const amount = round2(Math.abs(paise) / 100);
+      if (!amount) continue;
+      const inflow = paise > 0;
+      out.push({
+        id: `mv:${id}:${acc}`,
+        date,
+        type: inflow ? 'Receipt' : 'Payment',
+        number,
+        party: str(v.voucher_class) || 'Voucher',
+        narration,
+        debit: inflow ? 0 : amount,
+        credit: inflow ? amount : 0,
+        method: side.account === 'cash' ? 'Cash' : 'Bank transfer',
+        account: side.account,
+        bank_account_id: side.bank,
+        link: '/books?tab=vch',
+      });
+    }
+  };
+  for (const v of rows) {
+    const id = str(v?.id);
+    const date = toIsoDate(v?.date);
+    if (!id || !date || carried.has(id) || v.variant === 'OPTIONAL' || v.variant === 'MEMO' || (v.post_dated === true && date > today)) continue;
+    if (str(v.voucher_class) === 'RA deduction') continue;
+    push(v, id, date, str(v.number), str(v.narration), 1);
+    const rev = toIsoDate(v.reverse_on);
+    if (v.type === 'JOURNAL' && rev && rev > date) push(v, `${id}~rev`, rev, `${str(v.number)}-R`, `Reversal of ${str(v.number)}`, -1);
+  }
+  return out;
 }
 
 export interface DayBook {
@@ -1293,6 +1362,7 @@ export function loadBooksData(): BooksData {
     purchaseReturns: getTable<PurchaseReturn>('purchase_returns'),
     payrollRunRows: getTable<unknown>('payroll_runs'),
     payrollPaymentRows: getTable<unknown>('payroll_payments'),
+    manualVouchers: peekTable<ManualVoucherRow>('vouchers'),
   };
 }
 

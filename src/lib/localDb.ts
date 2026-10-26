@@ -104,6 +104,15 @@ export function isIssued(inv: Pick<InvoiceRecord, 'status'>): boolean {
   return inv.status !== 'Draft';
 }
 
+/**
+ * QA6-1 F11: a gift-voucher receipt may not be removed once the voucher's unredeemed balance was recognised (breakage
+ * journal, `gift_vouchers` row): the value would be stranded in "Gift vouchers outstanding". Undo the breakage first.
+ */
+function assertNoBreakage(rows: readonly Payment[]): void {
+  const v = peekTable<{ id: string; number: string; breakage_voucher_id?: string }>('gift_vouchers').find((x) => x.breakage_voucher_id && rows.some((p) => p.gift_voucher_id === x.id));
+  if (v) throw new Error(`Undo the breakage of gift voucher ${v.number} first`);
+}
+
 export function blankProfile(): SenderProfile {
   return {
     id: generateId(),
@@ -482,7 +491,9 @@ export const localDb = {
       if (stored) checkDocRight(currentActor(), stored.doc_type, 'delete');
       const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
       const payments = getTable<Payment>(KEYS.transactions);
-      const mine = payments.filter((t) => t.invoice_id === id).length;
+      const own = payments.filter((t) => t.invoice_id === id);
+      assertNoBreakage(own);
+      const mine = own.length;
       setTable(KEYS.invoices, all.filter((i) => i.id !== id));
       setTable(KEYS.transactions, payments.filter((t) => t.invoice_id !== id));
       // R4-C4: to the recycle bin (before its files are released); its number stays used.
@@ -668,6 +679,7 @@ export const localDb = {
       requireAccess('payment.record');
       // QA5 F12: removing a write-off row reverses an owner-only, PIN-confirmed write-off (`reverseWriteOff`).
       if (row.write_off) requireAccess('doc.deleteIssued');
+      assertNoBreakage([row]);
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
       const overridden = target ? assertUnlocked(target, 'unpay') === 'overridden' : false;
       setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));

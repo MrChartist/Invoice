@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PACK_IDS, PACK_TABS, activePacks, isPackOn, visibleTabs } from '../src/lib/industry-packs.ts';
+import { PACK_IDS, PACK_TABS, activePacks, isPackOn, packTabOn, visibleTabs } from '../src/lib/industry-packs.ts';
 import { BUSINESS_DEFAULTS, BUSINESS_TYPES, PACK_BUSINESS_TYPES, PRESETS, applyBusinessDefaults, applyBusinessType } from '../src/lib/shop-presets.ts';
 import { enabledModules, isPathVisible, type BusinessType } from '../src/lib/shop-mode.ts';
 
@@ -68,4 +68,11 @@ test('visibleTabs hides a pack tab while its pack is off, but keeps the one bein
   assert.deepEqual(visibleTabs(tabs, {}).map((t) => t.id), ['aging']);
   assert.deepEqual(visibleTabs(tabs, {}, 'marketplace').map((t) => t.id), ['aging', 'marketplace']);
   assert.deepEqual(visibleTabs(tabs, { business_type: 'ecommerce' }).map((t) => t.id), ['aging', 'marketplace']);
+});
+
+test('the Ctrl+K common-credit row is on for every pack that shows the GST tab (fees, nonprofit, leases)', async () => {
+  const { PACK_GST_TABS } = await import('../src/lib/gst-tabs.ts');
+  const row = PACK_TABS.find((t) => t.path.endsWith('tab=common-credit'))!;
+  for (const p of PACK_GST_TABS['common-credit']!) assert.equal(packTabOn(row, [p]), true, p);
+  assert.equal(packTabOn(row, ['marketplace']), false);
 });

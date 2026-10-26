@@ -216,8 +216,13 @@ export const giftVouchersDb = {
   recogniseBreakage(asOf: string, date: string): { journal: string; count: number; amount: number } {
     requireAccess('books.edit');
     if (!isoDay(asOf) || !isoDay(date)) throw new Error('Choose the dates.');
+    // QA6 F10: a balance is unredeemed only once the voucher has expired: never date the income before the "as at" day
+    // (every voucher it covers expired before it, so never before an expiry or a sale either).
+    if (date < asOf) throw new Error('Date the breakage journal on or after the "as at" day — a balance is unredeemed only after the voucher expires.');
     const due = giftVouchersDb.breakageDue(asOf);
     if (!due.length) throw new Error('No expired gift voucher has a balance left to recognise.');
+    const early = due.find((r) => date <= r.voucher.expires_on || date < r.voucher.issued_on);
+    if (early) throw new Error(`Date the breakage journal on or after the "as at" day — ${early.voucher.number} expires on ${early.voucher.expires_on}.`);
     const amount = round2(due.reduce((s, r) => s + r.balance, 0));
     const out = withTablesRollback([GV_TABLE, 'vouchers', 'accounts'], () => {
       const j = saveVoucher({
