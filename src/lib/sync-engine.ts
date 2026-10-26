@@ -15,6 +15,9 @@
  *    client never sees two writers on one file.
  */
 
+import { mergeRows as mergeFields, validateMerged, type FieldPicks } from './trust/field-merge';
+// R4-C7: the conflict screen reads the merge helpers through this module, so they stay in the sync chunk.
+export * as fieldMerge from './trust/field-merge';
 import { AUDIT_MAX_ROWS, audit, canonical } from './audit';
 import { noteExternalChange } from './cross-tab';
 import { attachmentKey, parseStoredAttachment, referencedAttachmentIds, storedAttachmentIds, ATTACHMENT_KEY_PREFIX } from './attachments';
@@ -250,7 +253,8 @@ const sameVersion = (a: RowMeta | null | undefined, b: RowMeta | null | undefine
 
 /** Per-device data and bookkeeping that must not travel between devices. */
 const EXCLUDED = new Set<string>([
-  ...['draft', 'schema_version', 'audit_log', 'timer', 'backup_snooze', 'auto_backup', 'install_dismissed', 'notif_state', 'export_prefs', '__probe'].map((k) => DB_PREFIX + k),
+  // R4-C4: `recycle_bin` — a delete already syncs as a tombstone and a restore as a new version.
+  ...['draft', 'schema_version', 'audit_log', 'recycle_bin', 'timer', 'backup_snooze', 'auto_backup', 'install_dismissed', 'notif_state', 'export_prefs', '__probe'].map((k) => DB_PREFIX + k),
   ...SYNC_META_KEYS,
   ...DEVICE_DRAFT_KEYS, // POS bills on hold (8.21) belong to this counter
   ...DEVICE_LOCAL_KEYS,
@@ -345,6 +349,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   // R4-B: gift vouchers (sale / issue date) and transfer requests (request date)
   [`${DB_PREFIX}gift_vouchers`]: 'issued_on',
   [`${DB_PREFIX}transfer_requests`]: 'date',
+  // R4-C: export IRMs (remittance date), incentives (claim date), realisation write-offs
+  [`${DB_PREFIX}export_irms`]: 'date',
+  [`${DB_PREFIX}export_incentives`]: 'date',
+  [`${DB_PREFIX}export_writeoffs`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -1426,7 +1434,11 @@ export function recordReport(r: SyncReport): void {
 
 /* ── Conflict resolution ───────────────────────────────────────── */
 
-export type Resolution = 'mine' | 'theirs' | 'ack';
+/**
+ * R4-C7: `{ merge }` keeps both versions field by field (masters) or group by group (documents): `merge` maps a
+ * field / group to the side it comes from (`field-merge.ts`). Only for concurrent edits of a row that exists on both.
+ */
+export type Resolution = 'mine' | 'theirs' | 'ack' | { merge: FieldPicks };
 
 export interface ResolveResult {
   ok: boolean;
@@ -1504,7 +1516,17 @@ export function resolveConflict(id: string, choice: Resolution, device: { id: st
       saveMeta(state, rest);
       return { ok: true };
     }
-    const pick = choice === 'theirs' ? c.remote : c.local;
+    // R4-C7: a field-level merge becomes the picked version (validated first; the vector covers both sides as below).
+    let pick: ConflictSide = choice === 'theirs' ? c.remote : c.local;
+    const merge = typeof choice === 'object' ? choice.merge : null;
+    if (merge) {
+      if (c.kind !== 'row' || c.reason !== 'concurrent' || !curValue || !c.remote.value) return { ok: false, message: 'Only a row edited on both devices can be merged field by field.' };
+      const table = c.key.slice(DB_PREFIX.length);
+      const merged = mergeFields(table, curValue, c.remote.value, merge);
+      const bad = validateMerged(table, merged, curValue as Record<string, unknown>, c.remote.value as Record<string, unknown>, merge);
+      if (bad) return { ok: false, message: bad === 'mergeTotals' ? 'The merged document no longer adds up: choose lines and totals from one side.' : 'The merged voucher does not balance: choose its lines from one side.' };
+      pick = { meta: null, value: merged };
+    }
     const settingsW = work.get(SINGLETON_KEYS.settings);
     const lock = lockOf(settingsW?.mode === 'single' ? settingsW.value : null);
     const writesData = c.kind === 'row'
@@ -1559,7 +1581,9 @@ export function resolveConflict(id: string, choice: Resolution, device: { id: st
         ? c.kind === 'row'
           ? `Applied a synced version from ${choice === 'theirs' ? c.device_name || 'another device' : 'this device'} to a ${label} in a locked period`
           : `Took the period-lock change from ${choice === 'theirs' ? c.device_name || 'another device' : 'this device'}`
-        : `Sync conflict on ${label}: kept ${choice === 'theirs' ? `the version from ${c.device_name || 'another device'}` : "this device's version"}`,
+        : merge
+          ? `Sync conflict on ${label}: merged field by field with the version from ${c.device_name || 'another device'} (${Object.entries(merge).filter(([, v]) => v === 'theirs').map(([k]) => k).join(', ') || 'all mine'} from theirs)`
+          : `Sync conflict on ${label}: kept ${choice === 'theirs' ? `the version from ${c.device_name || 'another device'}` : "this device's version"}`,
     });
     noteHighWater(state.clock);
     state.last_written_hash = ''; // the new version must be written out even if no data text changed

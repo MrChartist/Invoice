@@ -453,7 +453,11 @@ const RECORD_TABLES = [
   'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
   // Round 4 (R4-B): gift vouchers, store price overrides, transfer requests
   'gift_vouchers', 'branch_prices', 'transfer_requests',
+  // Round 4 (R4-C): LUT register, export IRMs / incentives / write-offs, recycle bin
+  'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
 ];
+/** R4-C6: the record tables, for the open-format export's schema guard. */
+export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
@@ -501,6 +505,8 @@ const ID_TABLES = new Set([
   'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
   // Round 4 (R4-B)
   'gift_vouchers', 'branch_prices', 'transfer_requests',
+  // Round 4 (R4-C)
+  'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

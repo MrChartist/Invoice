@@ -71,7 +71,7 @@ test('year-end checklist: provisions and closing stock journals (reversed on 1 A
   st = loadYearEnd(FY).steps;
   assert.deepEqual(st.map((x) => [x.id, x.status]), [
     ['integrity', 'done'], ['closing_stock', 'done'], ['depreciation', 'done'], ['provisions', 'done'],
-    ['opening_bills', 'done'], ['lock', 'done'], ['carry_forward', 'done'],
+    ['opening_bills', 'done'], ['lock', 'done'], ['carry_forward', 'done'], ['auditor_pack', 'todo'],
   ]);
   assert.throws(() => postProvisions(FY, [{ account_id: A.rent, amount: 100 }]), /lock/i, 'a locked year refuses new journals');
 });

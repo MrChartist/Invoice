@@ -152,6 +152,7 @@ export const RECORD_KEYS = [
   'table_order_id', 'split_of',
   'annexure', // R3-B (src/types/service-r3.ts)
   'delivery_proof', // R3-C
+  'incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms', // R4-C
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

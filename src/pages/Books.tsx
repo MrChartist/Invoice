@@ -25,6 +25,8 @@ import { br2T } from '../i18n/areas/books-r2';
 import { wireT } from '../i18n/areas/wiring';
 import { useCan } from '../hooks/useCan';
 import controls from '../styles/controls.module.css';
+// R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
+const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
 // The double-entry tabs (6.1–6.4) live in their own lazy chunk with the ledger engine.
 const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'));
@@ -278,6 +280,7 @@ export function Books() {
         defaultAsOf={period.start}
       />
       {toastNode}
+      <Suspense fallback={null}><UndoDeleted /></Suspense>
     </div>
   );
 }

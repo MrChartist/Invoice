@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, type KeyboardEvent } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
@@ -54,6 +54,8 @@ const EcoView = lazy(() => import('../components/gst-reports/EcoView'));
 import { checkGstin } from '../lib/gstin';
 import { GST_TABS, GST_TAB_GROUPS, resolveGstTab, tabForKey, type GstTabGroupId, type GstTabId } from '../lib/gst-tabs';
 import { buildPreflight, needsPreflight, preflightCount, type PreflightForm } from '../lib/gst-preflight';
+import type { LutIssue } from '../lib/trade/lut-register';
+import type { LutRow } from '../types/trade-r4';
 import { aatoFor, gstExceptions } from '../lib/gst-guards';
 import { filedFor, loadFiled, saveFiled, setFiled, type FiledReturn, type ReturnDue } from '../lib/compliance';
 import { todayIso } from '../lib/tax-rules';
@@ -100,6 +102,8 @@ const EwayDesk = lazy(() => import('../components/gst-reports/EwayDesk'));
 const PreflightDialog = lazy(() => import('../components/gst-reports/PreflightDialog'));
 
 const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0]; desk?: 'tab.portal' | 'tab.eway' } | undefined) => (x?.desk ? dkT(x.desk) : x?.key ? gstT(x.key) : x?.label);
+// R4-C2: export desk tab (its own lazy chunk).
+const ExportDesk = lazy(() => import('../components/trade/ExportDesk'));
 
 function download(name: string, mime: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
@@ -223,13 +227,26 @@ export function GstReports() {
 
   // 8I (8.161): what to look at before the JSON leaves the app — GST exceptions, the report's errors / warnings
   // and the Rule 46 series gaps, grouped. Same data as the guards tab, the recon banner and the Documents tab.
+  // R4-C1: zero-rated exports of the period without a live LUT (register in Settings → Business → Export); the LUT
+  // module loads on demand, only when the period has such a supply.
+  const [lutFindings, setLutFindings] = useState<LutIssue[]>([]);
+  useEffect(() => {
+    const { from, to } = periodRange(period);
+    const docs = invoices.filter((i) => (i.supply_type === 'EXPORT_LUT' || i.supply_type === 'SEZ_WITHOUT_PAYMENT') && (i.issue_date ?? '') >= from && (i.issue_date ?? '').slice(0, 10) <= to && (!gstin || (i.sender?.companyGstin ?? '').toUpperCase() === gstin));
+    let live = true;
+    if (!docs.length) setLutFindings((x) => (x.length ? [] : x));
+    else import('../lib/trade/lut-register').then((m) => live && setLutFindings(m.lutIssues(docs, getTable<LutRow>('lut_register'))), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [invoices, period, gstin]);
   const preflight = useMemo(() => {
     const irnIds = new Set(getTable<{ invoice_id?: string; irn?: string }>(EINVOICE_META_TABLE).filter((m) => m?.irn && m.invoice_id).map((m) => m.invoice_id as string));
     const s = localDb.settings.get();
     const active = s.profiles.find((p) => p.id === s.activeProfileId) ?? null;
     const exceptions = gstExceptions(invoices, { ...periodRange(period), irnIds, aato: (inv) => aatoFor(inv, s.profiles, active), today: todayIso(), gstin });
-    return buildPreflight({ exceptions, issues, gaps });
-  }, [invoices, period, gstin, issues, gaps]);
+    return buildPreflight({ exceptions, issues, gaps, lut: lutFindings });
+  }, [invoices, period, gstin, issues, gaps, lutFindings]);
   const checkCount = preflightCount(preflight);
   // R3-C4: unresolved portal errors of this period × GSTIN add an optional step to the filing strip.
   // Same count as `openPortalErrors` (gst-portal-files.ts), inlined so the reader stays in its lazy tab chunk.
@@ -587,6 +604,12 @@ export function GstReports() {
             {tab === 'portal-files'
               ? <PortalFilesView g1={g1} period={period} gstin={gstin} turnover={{ gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }} notify={notify} />
               : <EwayDesk notify={notify} />}
+          </Suspense>
+        );
+      case 'export-desk':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <ExportDesk notify={notify} />
           </Suspense>
         );
       case 'compliance':

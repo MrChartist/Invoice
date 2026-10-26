@@ -190,6 +190,7 @@ export const purT = defineArea(
     importServices: 'Import of services (reverse charge)',
     rcmCheck: 'Reverse charge: GST payable by us',
     boeNo: 'Bill of Entry no.',
+    boeDuty: 'Bill of Entry duty…', // R4-C3
     boeDate: 'BoE date',
     portCode: 'Port code',
     blockedCheck: 'Blocked credit under Sec 17(5) (no ITC; shown in 3B 4A and reversed in 4B(1))',
@@ -488,6 +489,7 @@ export const purT = defineArea(
     importServices: 'सेवाओं का आयात (रिवर्स चार्ज)',
     rcmCheck: 'रिवर्स चार्ज: GST हम चुकाएँगे',
     boeNo: 'बिल ऑफ़ एंट्री नंबर',
+    boeDuty: 'बिल ऑफ़ एंट्री ड्यूटी…',
     boeDate: 'BoE तारीख',
     portCode: 'पोर्ट कोड',
     blockedCheck: 'धारा 17(5) के तहत ब्लॉक क्रेडिट (ITC नहीं; 3B 4A में दिखेगा और 4B(1) में रिवर्स होगा)',

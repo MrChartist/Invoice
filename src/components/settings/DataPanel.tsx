@@ -40,6 +40,11 @@ import { migT } from '../../i18n/areas/migration';
 // WP-7: Tally import and the year-end wizard are separate lazy chunks, loaded on first open.
 const TallyImport = lazy(() => import('../import/TallyImport').then((m) => ({ default: m.TallyImport })));
 const YearEndWizard = lazy(() => import('../year-end/YearEndWizard').then((m) => ({ default: m.YearEndWizard })));
+// R4-C4 / C6: recently deleted (recycle bin) and the open-format export — lazy dialogs; their strings come with them.
+const RecycleBinPanel = lazy(() => import('../trust/RecycleBinPanel'));
+const OpenExportDialog = lazy(() => import('../trust/OpenExportDialog'));
+const TrustCard = lazy(() => import('../trust/TrustCard'));
+const RetentionNote = lazy(() => import('../trust/TrustCard').then((m) => ({ default: m.RetentionNote })));
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
@@ -71,6 +76,11 @@ export function DataPanel({ notify }: Props) {
   const [wipeOpen, setWipeOpen] = useState(false);
   const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
   const [wp7, setWp7] = useState<'tally' | 'yearEnd' | null>(null);
+  // R4-C: `?bin=1` / `?export=1` (command palette) open the dialog directly.
+  const [trust, setTrust] = useState<'bin' | 'export' | null>(() => {
+    const q = new URLSearchParams(window.location.search);
+    return q.get('bin') === '1' ? 'bin' : q.get('export') === '1' ? 'export' : null;
+  });
   const [safety, setSafety] = useState<SafetySnapshot | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [browserQuota, setBrowserQuota] = useState<number | null>(null);
@@ -343,6 +353,15 @@ export function DataPanel({ notify }: Props) {
         </Suspense>
       )}
 
+      <Suspense fallback={null}>
+        <TrustCard onOpen={setTrust} canExport={mayBackup} />
+      </Suspense>
+      {trust && (
+        <Suspense fallback={null}>
+          {trust === 'bin' ? <RecycleBinPanel onClose={() => setTrust(null)} notify={notify} /> : <OpenExportDialog onClose={() => setTrust(null)} />}
+        </Suspense>
+      )}
+
       <SampleDataCard notify={notify} />
 
       <section className={surface.card}>
@@ -391,6 +410,7 @@ export function DataPanel({ notify }: Props) {
         </div>
         <div className={surface.cardBody}>
           <p className={surface.sectionNote}>{setT('dangerText')}</p>
+          <Suspense fallback={null}><RetentionNote /></Suspense>
           <button type="button" className={controls.btnOutline} style={{ alignSelf: 'flex-start', color: 'var(--destructive)' }} onClick={() => setWipeOpen(true)}>
             <Trash2 size={16} /> {setT('eraseAll')}
           </button>

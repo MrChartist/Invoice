@@ -173,7 +173,7 @@ test('editing a bill without a file releases it; a file another record uses is k
   assert.ok(getAttachment(shared.id), 'still used by the other bill');
 });
 
-test('deleting a bill / an invoice deletes its files unless still referenced (including by the draft)', () => {
+test('deleting a bill / an invoice deletes its files unless still referenced (including by the draft and the recycle bin)', async () => {
   installSettings();
   const r1 = putAttachment({ bytes: PDF(), name: 'a.pdf' });
   const r2 = putAttachment({ bytes: JPEG(), name: 'b.jpg' });
@@ -184,6 +184,11 @@ test('deleting a bill / an invoice deletes its files unless still referenced (in
   setJson(SINGLETON_KEYS.draft, { id: '', attachments: [r2] });
   purchasesDb.remove(p.id);
   localDb.invoices.remove(inv.id);
+  // R4-C4: the recycle bin keeps the files while the deleted records are in it; deleting them for good releases them.
+  assert.ok(getAttachment(r1.id), 'kept while the bill is in the recycle bin');
+  const { deleteForGood, BIN_TABLE } = await import('../src/lib/trust/recycle-bin.ts');
+  const { getTable } = await import('../src/lib/storage.ts');
+  deleteForGood(getTable<{ id: string }>(BIN_TABLE).map((e) => e.id));
   assert.equal(getAttachment(r1.id), null);
   assert.ok(getAttachment(r2.id), 'kept: the draft still uses it');
   setJson(SINGLETON_KEYS.draft, null);

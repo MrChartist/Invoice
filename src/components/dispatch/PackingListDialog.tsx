@@ -27,7 +27,7 @@ import {
   type AutoFill,
   type PackingInput,
 } from '../../lib/packing';
-import { packingListHtml } from '../../lib/packing-print';
+import { packingExportMeta, packingListHtml } from '../../lib/packing-print';
 import { printHtmlDocument } from '../../lib/voucher-print';
 import { downloadText } from '../../lib/download';
 import { resolve as resolveDesign } from '../../lib/design-prefs';
@@ -61,7 +61,8 @@ export function PackingListDialog({ invoice, onClose, notify }: { invoice: Invoi
 
   const startNew = () => {
     const base = packingFromDocument(invoice, loadWeightIndex(), todayIso());
-    setDraft({ ...base, packages: autoPackages(base.lines, 'per-line', type) });
+    // R4-C1: the invoice's marks & numbers seed the packages' marks.
+    setDraft({ ...base, packages: autoPackages(base.lines, 'per-line', type).map((p) => (p.marks || !invoice.marks_numbers ? p : { ...p, marks: invoice.marks_numbers })) });
     setError('');
   };
   const edit = (pl: PackingList) => {
@@ -69,7 +70,8 @@ export function PackingListDialog({ invoice, onClose, notify }: { invoice: Invoi
     setError('');
   };
   const print = (pl: PackingList) => {
-    const html = packingListHtml(pl, company, accent);
+    // R4-C1: ports, destination and marks of the source export invoice (read only; no packing-list schema change).
+    const html = packingListHtml(pl, company, accent, packingExportMeta(invoice));
     printHtmlDocument(html, (h) => downloadText(`${safeStem(pl.number)}.html`, h, 'text/html'));
   };
   const excel = async (pl: PackingList) => {

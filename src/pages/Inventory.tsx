@@ -48,6 +48,8 @@ const OrdersOutstandingTab = lazy(() => import('../components/inventory/OrdersOu
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
+// R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
+const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
 type Tab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders' | 'analysis' | 'depth' | 'expiry';
 const TABS: Tab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders', 'analysis', 'depth', 'expiry'];
@@ -600,6 +602,7 @@ export function Inventory() {
         onConfirm={() => deleting && guard(() => stockDb.deleteItem(deleting.id), invT('itemDeleted'))}
       />
       {toastNode}
+      <Suspense fallback={null}><UndoDeleted /></Suspense>
     </div>
   );
 }

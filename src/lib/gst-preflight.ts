@@ -10,6 +10,7 @@
 import type { GstException, GstExceptionCode } from './gst-guards';
 import type { ReconIssue } from './gst-reports';
 import type { SeriesGap } from './invoice-number';
+import type { LutIssue } from './trade/lut-register';
 
 export type PreflightForm = 'GSTR1' | 'GSTR3B' | 'IFF';
 
@@ -40,6 +41,8 @@ export interface PreflightInput {
   exceptions: readonly GstException[];
   issues: readonly ReconIssue[];
   gaps: readonly SeriesGap[];
+  /** R4-C1: LUT findings (`lutIssues` in trade/lut-register.ts) — LUT_MISSING (error), LUT_OUTSIDE_FY (warning). */
+  lut?: readonly LutIssue[];
 }
 
 const docLink = (id: string) => `/invoice/${encodeURIComponent(id)}`;
@@ -51,7 +54,7 @@ export function issueText(i: Pick<ReconIssue, 'message' | 'invoiceNumber' | 'inv
 }
 
 /** Group everything worth a second look before the JSON leaves the app. Errors first, then by size. */
-export function buildPreflight({ exceptions, issues, gaps }: PreflightInput): PreflightGroup[] {
+export function buildPreflight({ exceptions, issues, gaps, lut = [] }: PreflightInput): PreflightGroup[] {
   const groups = new Map<string, PreflightGroup>();
   const group = (id: string, init: Omit<PreflightGroup, 'id' | 'count' | 'items'>) => {
     let g = groups.get(id);
@@ -83,6 +86,17 @@ export function buildPreflight({ exceptions, issues, gaps }: PreflightInput): Pr
     g.count++;
     g.vars.n = g.count;
     g.items.push({ key: i.id, label: i.invoiceNumber || (i.invoiceId ? '—' : issueText(i)), detail: issueText(i), link: i.link ?? (i.invoiceId ? docLink(i.invoiceId) : undefined) });
+  }
+
+  // R4-C1: zero-rated exports without a live LUT (Rule 96A) — verify with your CA.
+  for (const l of lut) {
+    const message = l.code === 'LUT_MISSING'
+      ? 'Zero-rated export without an LUT (Rule 96A) — verify with your CA'
+      : `LUT of ${l.lutFy} on a document of ${l.fy} — verify with your CA`;
+    const g = group(`issue:${l.code}`, { source: 'issue', code: l.code, severity: l.code === 'LUT_MISSING' ? 'error' : 'warning', vars: { n: 0, message } });
+    g.count++;
+    g.vars.n = g.count;
+    g.items.push({ key: `${l.code}:${l.invoiceId}`, label: l.number || '—', detail: message, link: docLink(l.invoiceId) });
   }
 
   // Rule 46: gaps in a series are reported as cancelled in Table 13 — worth explaining before filing.
