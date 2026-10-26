@@ -9,7 +9,9 @@
 - **Features**: invoicing + light accounting for Indian businesses — 26 templates + Design Studio, GST
   (CGST/SGST/IGST, cess, TCS, TDS, export/LUT), credit notes & conversions, recurring, receivables,
   purchases/ITC, inventory, books, GSTR-1/3B papers, e-Invoice/e-Way JSON, Tally XML, CSV import,
-  PWA + encrypted/auto backups. Module contract: `docs/ARCHITECTURE.md`; per-module notes: `docs/features/`.
+  PWA + encrypted/auto backups; also POS / restaurant tables & KOT, collections (terms, follow-ups, write-offs),
+  projects / retainers / timesheets, payroll, manufacturing & production orders, annual accounts pack, GST portal-file /
+  e-Way / practice desks. Module contract: `docs/ARCHITECTURE.md`; per-module notes: `docs/features/`.
 - **Brand source of truth**: mrchartist.com (logo `public/branding/*`, tokens in `src/index.css`; app palette = blue/gold `--pal-*`, orange kept only for the logo and the Ember template).
 
 ## Stack
@@ -71,8 +73,25 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   views and month-end pack schedule). `mrchartist_inv_save_choice` (editor split-Save choice) is in `DEVICE_LOCAL_KEYS`.
   `mrchartist_plus_one_tap` (phone "+" opens a new invoice
   directly, 8H) and `mrchartist_demo_pending` (wizard "explore with sample data" across the Demo-company reload, 8H).
+  Rounds 2–3: `mrchartist_statement_prefs` (statement style + ageing strip, R2-A), `mrchartist_display_prefs` (text size /
+  contrast / motion, applied before first paint by `public/theme-init.js`, R2-C), `mrchartist_kot_printers` (KOT printer
+  per kitchen station, R3-A), `mrchartist_editor_layout` (live-preview toggle, R3-C) and `mrchartist_checklist_default`
+  (practice-desk default checklist, R3-C).
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
+- Rounds 2–4 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
+  `audit-edits.ts` and, when dated / numbered, `sync-engine.ts`; rows in `docs/ARCHITECTURE.md`):
+  R2-A `payment_terms`, `collection_notes`, `write_off_recoveries` + objects `reminder_settings`, `collection_settings`;
+  R2-B `batch_runs`, `proposal_snippets`; R2-C `notes_to_accounts`, `deferrals`, `packing_lists`, `package_types`;
+  R3-A `dining_areas`, `dining_tables`, `table_orders`, `modifier_groups` + object `restaurant_settings`;
+  R3-B `work_types`, `project_tasks`, `retainers` + objects `project_settings`, `quiet_settings`;
+  R3-C `gst_portal_files`, `dsc_register`, `client_checklist` + object `checklist_template`;
+  R4-A `production_orders`, `qc_results`, `recall_notices`, `landed_cost_vouchers` + object `qc_settings`.
+  New `series_counters` series: `FCN` (financial credit notes), `PKL`, `WO`, `LCV`. Additive record fields come by
+  declaration merging in each package's types file (`src/types/{sales-r2,contacts,books-r2,restaurant,service-r3,docs-r3,production-r4}.ts`),
+  e.g. `InvoiceRecord.annexure` / `delivery_proof` / `table_order_id`, `Client.doc_defaults` / `contacts`,
+  `TimeEntry.work_type_id / task_id / retainer_id / retainer_period` (R2-A's `payment_terms`, `note_kind` … sit in
+  `src/types/invoice.ts`). New `InvoiceRecord` keys must also go into `RECORD_KEYS` and `normalizeRecord`.
 
 ## Critical Rules — DO NOT BREAK
 1. **Local-first & serverless.** No backend, DB, or network calls. Do not add axios/express
@@ -119,7 +138,20 @@ build-time config must use Vite's `VITE_` prefix.
   `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones.
   Exception: GST interest / late-fee tables live in `src/lib/gst-penalties.ts` (same date-keyed shape) so they
   stay out of the early-loading notifications chunk, and payroll statutory values (EPF / ESI / PT / TDS u/s 192) live in
-  `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle.
+  `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle. Likewise
+  e-Way validity days / extension window live in `src/lib/eway-validity.ts` (R3-C), outside first-paint `tax-rules.ts`.
+- Every lucide icon lands in the first-paint `vendor-ui` chunk: reuse an icon that is already imported somewhere
+  instead of adding a new name.
+- `/practice` reads other companies' databases through `peekCompliance` (`company-peek.ts`): a version-less,
+  read-only open that aborts any upgrade, so a missing or older database is never created or upgraded. Keep it that way.
+- `Godown.kind` (`src/types/stock.ts`) is a shared, append-only union (`'van' | 'expiry' | 'wip' | 'qc' | 'transit'`);
+  `nonSaleableGodowns` (`godowns.ts`) treats expiry / wip / qc / transit as non-saleable — decide that for any new kind.
+- Recurring schedules in draft mode create **unnumbered** drafts; the number is taken on issue (`numberOnIssue` in
+  `localDb.ts`), so no gap reaches GSTR-1 Table 13. Drafts numbered before QA round 3 keep their numbers.
+- Financial credit notes (`note_kind: 'financial'`, `FCN/FY…`, R2-A) carry no GST by default: GST / e-Invoice / e-Way
+  readers skip them via `isNonGstFinancialNote` (`financial-note.ts`) — new GST outputs must do the same.
+- Landed-cost vouchers (R4-A) reach the stock engine through `liveInputs()` (engine copies of bills / GRNs); readers
+  that take raw bills (the editor margin chip, insights) do not see them yet.
 - The bill / PO / GRN line editor sets `PurchaseLine.item_id` when a stock item is picked (WP-8) and the stock engine
   matches on it first; older lines (and typed names) still match by name + HSN, so keep that fallback.
 - Alternate units: a line typed in another unit keeps quantity / rate as typed and snapshots `unit_factor` (invoice,

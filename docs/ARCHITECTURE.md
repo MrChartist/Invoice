@@ -15,6 +15,10 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   in `storage.ts`: PIN credential, lockout guard, local users `auth_users` + their lockouts `auth_guard_users` (6.21),
   idle timeout, session, `last_backup`, `storage_backend`, interface language `lang` (5.4)) and the
   non-prefixed `theme` always stay in localStorage. Modules must not touch `localStorage` directly for app data.
+  Viewing preferences of one device use keys outside the prefix (`mrchartist_*`, never backed up or synced; full list in
+  `AGENTS.md`), e.g. Rounds 2–3 `mrchartist_statement_prefs` (R2-A statement style), `mrchartist_display_prefs` (R2-C
+  text size / contrast / motion, read by `public/theme-init.js` before first paint), `mrchartist_kot_printers` (R3-A KOT
+  printer per station), `mrchartist_editor_layout` (R3-C live preview) and `mrchartist_checklist_default` (R3-C).
 - **Write-through.** A write updates the map at once and is queued; the queue commits in one IndexedDB
   transaction on the next task, and immediately on `pagehide` / `visibilitychange: hidden`. Paths that reload
   right after a bulk change (restore, erase, forgot-PIN reset, sample data) call `reloadAfterFlush()`.
@@ -79,22 +83,22 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 ## Tables (`mrchartist_inv_<table>`, IndexedDB-backed cache or localStorage)
 | table | owner module | shape |
 |---|---|---|
-| `invoices` | core | `InvoiceRecord` (`src/types/invoice.ts`) |
-| `clients` | core | `Client` |
-| `items_catalog` | core | `InvoiceItem`; additive catalogue-only `barcode` / `sku` / `mrp` (6.7) and `qty_slabs` (6.9) |
+| `invoices` | core | `InvoiceRecord` (`src/types/invoice.ts`); additive Rounds 2–4 fields: `payment_terms` snapshot, `note_kind: 'financial'` / `financial_reason` / `financial_account` (R2-A `FCN/FY…` notes); `milestones`, `progress_of`, `revision_of` / `revision_no`, `proposal_sections`, `attention`, line `optional` / `selected` / `alt_group` / `progress_line_of` (R2-B, `src/types/sales-r2.ts`); `table_order_id`, `split_of`, line `modifier_of` / `note` / `seat` (R3-A); `annexure` timesheet snapshot (R3-B4); `delivery_proof`, line `image` (R3-C2) |
+| `clients` | core | `Client`; additive `payment_terms_id` / `reminder_mode` (R2-A), `contacts` / `addresses` (R2-B), `doc_defaults` (R3-B5) |
+| `items_catalog` | core | `InvoiceItem`; additive catalogue-only `barcode` / `sku` / `mrp` (6.7) and `qty_slabs` (6.9); `net_weight` / `gross_weight` / `weight_unit` (R2-C4); `unavailable_on` (R3-A "86") |
 | `transactions` | core | `Payment` (payments received; `advance_id` marks an advance adjusted against the invoice, not new money; additive `receipt_number` stamped at record time) |
 | `vendors` | purchases | `Vendor` (`src/types/purchases.ts`) |
 | `purchases` | purchases | `PurchaseRecord` |
 | `recurring` | recurring | defined by that module |
 | `reminders` | reminders-share | defined by that module |
 | `doc_links` | documents | defined by that module |
-| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7); additive `aliases` (earlier names, recorded on rename); `min_order_qty` / `reorder_by_godown` (Phase 7); `group_id` / `category_id` / `alt_units` / `standard_costs` / `selling_prices` (WP-8) |
+| `stock_items` | inventory | `StockItem` (`src/lib/inventory.ts`); opt-in `track_batches` / `track_serials` / `warranty_months` / `opening_serials`; additive `barcode` (6.7); additive `aliases` (earlier names, recorded on rename); `min_order_qty` / `reorder_by_godown` (Phase 7); `group_id` / `category_id` / `alt_units` / `standard_costs` / `selling_prices` (WP-8); `net_weight` / `gross_weight` / `weight_unit` (R2-C4); `qc_on_receipt` (R4-A4) |
 | `stock_moves` | inventory | `StockMove` (manual adjustments), additive `godown_id` / `batch_no` / `mfg_date` / `expiry_date` / `serials`; `unit` / `unit_factor` (7M alternate units) |
-| `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed); additive `parent_id` (WP-8 hierarchy); `job_worker` / `vendor_id` (7M: a job worker's premises — still our stock) |
-| `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger; lines take `unit` / `unit_factor` (7M) |
+| `godowns` | inventory (6.10) | `Godown` (`src/types/stock.ts`); the default "Main" godown is implicit (stored only if renamed); additive `parent_id` (WP-8 hierarchy); `job_worker` / `vendor_id` (7M: a job worker's premises — still our stock); `kind` is the shared union `van` / `expiry` / `wip` / `qc` / `transit` (R4-A adds the "Shop floor (WIP)" and "QC hold" godowns); `nonSaleableGodowns` = expiry / wip / qc / transit |
+| `stock_transfers` | inventory (6.10) | `StockTransfer` vouchers `STR/FY<yy-yy>/<seq>` between godowns; quantity only, never posted to Books / ledger; lines take `unit` / `unit_factor` (7M); additive `production_order_id` (R4-A issue / return / QC release) |
 | `boms` | manufacturing (Phase 7, `src/lib/manufacturing.ts`) | `Bom` (`src/types/manufacturing.ts`): components per `batch_qty` finished units (scrap %, godown), by-/co-products / scrap, `is_default` per item |
-| `manufacturing_vouchers` | manufacturing (Phase 7) | `ManufacturingVoucher` `MFG/FY<yy-yy>/<seq>`: finished item + qty, consumed lines (batch / godown), outputs, additional costs, display-only `cost_snapshot`; read by the stock engine, never by Books / ledger |
-| `stock_journals` | manufacturing (Phase 7) | `StockJournal` `SJ/FY<yy-yy>/<seq>`: source → destination lines (conversion / repacking). Godown-only moves are refused here and saved as `stock_transfers` |
+| `manufacturing_vouchers` | manufacturing (Phase 7) | `ManufacturingVoucher` `MFG/FY<yy-yy>/<seq>`: finished item + qty, consumed lines (batch / godown), outputs, additional costs, display-only `cost_snapshot`; read by the stock engine, never by Books / ledger; additive `production_order_id` (R4-A output) |
+| `stock_journals` | manufacturing (Phase 7) | `StockJournal` `SJ/FY<yy-yy>/<seq>`: source → destination lines (conversion / repacking). Godown-only moves are refused here and saved as `stock_transfers`; additive `production_order_id` (R4-A WIP write-off) |
 | `job_work_orders` | job work (7M, `src/lib/job-work.ts`) | `JobWorkOrder` `JWO/FY<yy-yy>/<seq>` (`src/types/job-work.ts`): direction out / in, party, process, goods expected back, BOM (`docs/features/job-work.md`) |
 | `job_work_out` | job work (7M) | `MaterialOut` `JWC/FY…`: Rule 55 challan to a job worker; goods move to the job worker's godown (read by the stock engine through `events-job-work.ts`) |
 | `job_work_in` | job work (7M) | `MaterialIn` `JWR/FY…`: consumed / processed / scrap / returned / lost / 5C-supplied lines, job charges (stock cost only) |
@@ -102,8 +106,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `rejections_in` | sales (7M, `src/lib/rejections-in.ts`) | `RejectionIn` `RJI/FY…`: goods a customer rejected from a delivery challan before invoicing; stock back, challan balance reduced |
 | `physical_stock` | manufacturing (Phase 7) | `PhysicalStockVoucher` `PHY/FY<yy-yy>/<seq>`: counted lines with `book_qty` and `diff` fixed at save; the diff is posted as an adjustment at the end of that day |
 | `production_plans` | manufacturing (7S, `src/lib/mrp.ts`) | `ProductionPlan` `PP/FY<yy-yy>/<seq>`: planned finished items; the material requirement (MRP) is recomputed live from default BOMs, stock and open POs / GRNs — moves no stock, posts nothing |
-| `einvoice_meta` | einvoice | defined by that module |
-| `design_prefs` | templates-studio | defined by that module |
+| `einvoice_meta` | einvoice | defined by that module; additive `eway_generated_at`, `eway_cargo`, `eway_distance_km`, `vehicle_history[]`, `transporter_history[]` (R3-C5 e-Way desk; validity rules in `src/lib/eway-validity.ts`) |
+| `design_prefs` | templates-studio | defined by that module; additive `labels` / `labels_by_type` / `title_suffix` (R2-C5), `show_item_images`, `margins_mm`, `letterhead`, `footer_image` (R3-C; artwork stored in `assets`) |
 | `purchase_payments` | purchases | `{id, purchase_id, amount, date, method, reference}`; additive `tds_amount` (TDS deducted on the payment) and `group_id` (multi-bill payment) (Phase 7) |
 | `purchase_orders` | purchases (POs) | `PurchaseOrder` (`src/types/purchases.ts`); received qty derived from bills with `po_id` (`src/lib/purchase-orders.ts`) |
 | `audit_log` | audit | `AuditEntry` (`src/types/audit.ts`) — written by module calls and, for every books / masters table, by the `onTableWrite` edit log (WP-7, `src/lib/audit-edits.ts`); past 5,000 live rows the oldest move to an archive segment |
@@ -114,8 +118,8 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `export_prefs` | exports | last-used export options |
 | `notif_state` | notifications | read / snoozed / dismissed notice ids |
 | `tds_certificates` | receivables (TDS) | Form 16A received flag per deductor × quarter (`TdsCertificate`, `src/lib/tds-register.ts`) |
-| `gstr2b_actions` | GST reports (2B match) | `Gstr2bAction` IMS decision per return period + section + supplier GSTIN + normalised document no. (`src/lib/gstr2b.ts`) |
-| `time_entries` | time (6.13) | `TimeEntry` (`src/types/time.ts`); billed state derived from `invoiced_in` (`docs/features/time-expenses.md`) |
+| `gstr2b_actions` | GST reports (2B match) | `Gstr2bAction` IMS decision per return period + section + supplier GSTIN + normalised document no. (`src/lib/gstr2b.ts`); additive `itc_reduction` / `declared_itc` / `remark` (R2-C3 IMS) |
+| `time_entries` | time (6.13) | `TimeEntry` (`src/types/time.ts`); billed state derived from `invoiced_in` (`docs/features/time-expenses.md`); additive `work_type_id` / `task_id` (R3-B1/B2) and `retainer_id` / `retainer_period` (stamped on retainer close, R3-B3) |
 | `mileage` | time (6.14) | `MileageEntry` (`src/types/time.ts`), same derived billing |
 | `gstr4_manual` | GST reports (composition, 5.9) | `Gstr4Manual` typed-in GSTR-4 Tables 7-9 (TDS/TCS credit rows, tax / interest / late fee paid, refund claimed, GSTR-4 filing date), one row per FY × GSTIN, `id` = `${fyStart}|${GSTIN}` (`src/lib/gstr4-annual.ts`) |
 | `compliance` | compliance (GST) | `FiledReturn` marks: GST return filed per form / period / GSTIN (`docs/features/compliance.md`) |
@@ -130,7 +134,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `opening_bills` | masters (WP-1) | `OpeningBill` bill-wise opening outstandings per party, receivable / payable (`src/lib/opening-bills.ts`) |
 | `fixed_assets` | ledger | `FixedAsset` register rows (`src/lib/ledger/assets.ts`) |
 | `closing_stock` | reports engine | closing-stock source `{mode?, opening?, entries}` — one JSON object, not rows (`src/lib/ledger/closing-stock.ts`); report prefs / period are device-local outside the prefix |
-| `cost_centres` | cost centres (6.16) | `CostCentre` master (`src/lib/cost-centres.ts`); documents point at it via optional `cost_centre_id` (`docs/features/cost-centres-budgets.md`) |
+| `cost_centres` | cost centres (6.16) | `CostCentre` master (`src/lib/cost-centres.ts`); documents point at it via optional `cost_centre_id` (`docs/features/cost-centres-budgets.md`); additive project fields `hourly_rate` / `budget_minutes` / `fee_budget` / `start` / `due` / `status` (R3-B2) |
 | `budgets` | budgets (6.17) | `Budget` rows: FY × account × optional cost centre, 12 monthly amounts in paise (`src/lib/ledger/budgets.ts`) |
 | `assets` | storage (`src/lib/assets.ts`) | `{id, data}`: logo / signature data URLs stored once, keyed by content hash (schema v3) |
 | `att_<id>` (one key per file) | attachments (6.12, `src/lib/attachments.ts`) | `{id, mime, size, created_at, data}`: a receipt photo / PDF stored once by content hash; referenced by `attachments: AttachmentRef[]` on `invoices` / `purchases` (and the draft). Not a table: one key per file so a write commits only that file (`listKeys` enumerates them) |
@@ -140,7 +144,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `custom_fields` | custom fields (6.23, `src/lib/custom-fields.ts`) | `CustomFieldDef` (`src/types/custom-fields.ts`); values live on the records: `custom_fields` map on clients / vendors / catalogue items, `custom_values` snapshot on invoices and their lines |
 | `price_levels` | pricing (6.9, `src/lib/pricing.ts`) | `PriceLevel {id, name, percent_off?, rates?}` (rates keyed by catalogue item id); clients point at one via optional `price_level` |
 | `schemes` | pricing (6.9) | `Scheme` buy-X-get-Y rows (item, buy / free qty, optional date window, `active`); free goods are ₹0 invoice lines (`scheme_id`, `free_of`) |
-| `series_counters` | numbering (`src/lib/series-counters.ts`) | `SeriesCounter {id: 'STR/FY26-27', seq}`: highest sequence ever issued per voucher series × FY (STR / PO / ADV / RFV / RCPT), so a deleted latest number is never reused. Backed up (`RECORD_TABLES` / `ID_TABLES`); written alongside a guarded save (`TABLE_ACTIONS`: `books.edit`) |
+| `series_counters` | numbering (`src/lib/series-counters.ts`) | `SeriesCounter {id: 'STR/FY26-27', seq}`: highest sequence ever issued per voucher series × FY (STR / PO / ADV / RFV / RCPT; Rounds 2–4 add FCN, PKL, WO, LCV), so a deleted latest number is never reused. Backed up (`RECORD_TABLES` / `ID_TABLES`); written alongside a guarded save (`TABLE_ACTIONS`: `books.edit`) |
 | `employees` / `employee_groups` | payroll (Phase 7, `src/lib/payroll/store.ts`) | `Employee` / `EmployeeGroup` (`src/types/payroll.ts`); owner-only (`payroll.view`) — `docs/features/payroll.md` |
 | `pay_heads` | payroll | `PayHead` (Tally calculation types; starter set `ph_*` used until the first save) |
 | `salary_structures` | payroll | `SalaryStructure` per employee or group with `effective_from` |
@@ -148,7 +152,17 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `payroll_runs` | payroll | `PayrollRun` with a payslip snapshot per employee; final runs post a Payroll voucher (`PRL/FY…`) to the ledger, derived on the fly |
 | `payroll_payments` | payroll | `PayrollPayment` salary / PF / ESI / PT / TDS payments (`PYP/FY…`) clearing the payables |
 | `payroll_settings` (object) | payroll | PF establishment code, ESI employer code, TAN |
+| `payroll_arrears` | payroll depth (7P, `src/lib/payroll/depth-records.ts`) | `ArrearsRecord`: back-dated revision arrears per employee (`from_month`, `pay_month`, per-month earnings / PF / ESI differences), paid with that month's run; `PAYROLL_WRITE` (`books.edit` + `payroll.view`) |
+| `employee_loans` | payroll depth (7P) | `EmployeeLoan` `LOAN/FY…` loan / salary advance to an employee: amount, interest % (reducing), EMI, start month, paid-from ledger, disbursement `payroll_payments` row; sync DATED + NUMBERED (not the business loans of `business_loans`) |
+| `leave_types` | payroll depth (7P) | `LeaveType {id, code, name, paid, accrual, encashable, carry_cap?}` |
+| `leave_entries` | payroll depth (7P) | `LeaveEntry` opening / taken / encash / adjust days per employee × leave type (encashment paid in `month`) |
+| `payroll_adjustments` | payroll depth (7P) | `PayrollAdjustment` one-off earning / deduction (reimbursement, bonus, other) on one employee's payslip of `month` |
+| `perquisites` | payroll depth (7P) | `Perquisite` monthly taxable value (s. 17(2)): accommodation / car / meals / gift / other, `from_month`–`to_month` |
+| `fnf_settlements` | payroll depth (7P) | `FnfSettlement` `FNF/FY…` full & final: reason, notice recover / pay, leave encashment, gratuity, loan recovery, other items, paid with the run of `pay_month`; sync NUMBERED (dated by `pay_month`) |
+| `payroll_relief89` | payroll follow-ups (7T, `src/lib/payroll/followups-records.ts`) | `Relief89Record` relief u/s 89(1) (Form 10E) working per employee × FY of receipt, earlier-year rows, `apply_tds` |
+| `actuarial_valuations` | payroll follow-ups (7T) | `ActuarialValuation` `ACT/FY…` gratuity / leave figures (AS-15 / Ind AS 19) and the journal posted from them (`voucher_id`); sync DATED + NUMBERED |
 | `pos_day_close` | POS (6.8, `src/lib/pos.ts`) | `PosDayClose` cash-drawer count per day (opening float, expected / counted cash, difference, tender totals); POS bills themselves are normal `invoices` with `pos: true` (`docs/features/pos-barcode-pricing.md`) |
+| `pos_shifts` | cashier shifts (8E, `src/lib/pos-shifts.ts`) | shift per cashier: opening float, `bill_ids` billed while open, X / Z (shift) report, closing cash count; sync DATED by `day`; `doc.create` |
 | `tds_challans` | TDS on payables (Phase 7, `src/lib/tds-payables.ts`) | `TdsChallan` ITNS 281 challan (TDS / TCS, BSR code, serial, date, tax / interest / fee / others, `deduction_keys` it deposits); posted to the ledger as a payment (`docs/features/tds-payables.md`) |
 | `tds_deductions` | TDS on payables (Phase 7) | `ManualTdsDeduction` register-only deductions booked outside bills (not posted to the ledger) |
 | `tds_returns` | TDS on payables (Phase 7) | `TdsReturnMark` filed marks `26Q:<fy>-Q<n>` / `27EQ:…` with filing date and token |
@@ -156,6 +170,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `purchase_returns` | purchase returns (WP-3, `src/lib/purchase-returns.ts`) | `PurchaseReturn` (`src/types/purchases.ts`): debit notes `DN/FY…` and supplier credit notes received, Agst Ref the bill via `adjusted_amount` (`docs/features/purchase-returns.md`) |
 | `receipt_notes` | receipt notes (WP-3, `src/lib/receipt-notes.ts`) | `ReceiptNote`: GRN `GRN/FY…` (stock in before the bill) and Rejections Out `RJO/FY…`; billed qty derived from bill lines' `grn_line_id` |
 | `deposit_slips` | banking (WP-5, `src/lib/deposit-slip.ts`) | `DepositSlip` pay-in slips `PIS/FY<yy-yy>/<seq>`: cheque ids, cash denomination counts, totals (`docs/features/banking.md`) |
+| `bank_accounts` | banking (WP-5, `src/lib/bank-accounts.ts`) | `{id, name, number?, opening?, opening_as_of?, active}` (+ `od` for an overdraft account); the main account (`DEFAULT_BANK_ID`, ledger 3510) always exists, others are ledgers `bank:<id>` synthesised in `bank-ledgers.ts`; payments / vouchers / statements carry optional `bank_account_id`; `master.edit` |
 | `fx_bank_moves` | banking 7U (`src/lib/forex-bank.ts`) | Forex bank entries (in / out / revalue) on a foreign-currency bank account, each with its Journal id; key `pharma_settings` and device-local `mrchartist_pos_printer` are 7U too (`docs/features/business-extras.md`) |
 | `epay_batches` | banking 7U (`src/lib/epay-confirm.ts`) | Downloaded e-payment batches `EPB/FY<yy-yy>/<seq>`: rows sent / paid / failed, UTR, payment group id (`docs/features/banking.md`) |
 | `sales_agents` | business extras 7U (`src/lib/sales-commission.ts`) | Agent master: flat % / % by stock group, basis on invoice / on receipt |
@@ -175,6 +190,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `amc_contracts` | AMC (WP-9, `src/lib/amc.ts`) | `AmcContract` with `visits` log, `renewed_from` link |
 | `gst_setoffs` | GST set-off (WP-6, `src/lib/gst-setoff.ts`) | `GstSetOffRecord` per 3B period × GSTIN: posted figures by head + the journal it wrote through `saveVoucher` (`docs/features/gst-setoff.md`) |
 | `gst_challans` | GST set-off (WP-6) | `GstChallan` PMT-06: CPIN, CIN / BRN, dates, major × minor head amounts; a paid challan's payment voucher id |
+| `rcm_documents` | reverse charge (7O, `src/lib/rcm-self-invoice.ts`) | recipient-issued RCM documents: self-invoices `RCM/FY…` (Rule 46, per bill or consolidated per month) and payment vouchers `RPV/FY…` (Rule 52); records only, nothing posts; sync DATED + NUMBERED (series scoped by `kind`); `books.edit` |
 | `hsn_master` | GST depth (WP-6, `src/lib/hsn-master.ts`) | `HsnMasterRow` code, description, UQC, goods / services, dated `rates` history (append-only by convention) |
 | `gst_pmt09` | cash ledger depth (7R, `src/lib/gst-cash-refunds.ts`) | `Pmt09Transfer` PMT-09: date, from / to major × minor head, amount, ARN; nothing posts (one cash-ledger account) |
 | `gst_refunds` | GST refunds (7R) | `GstRefundClaim` RFD-01: category, period, relevant date, ARN, claimed / provisional / sanctioned / rejected by head, status trail, receipt voucher id when paid (`docs/features/gst-setoff.md`) |
@@ -185,6 +201,40 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `gst_followups` | GST guards (8D, `src/lib/gst-followup.ts`) | `FollowUpMark` per 2B period × supplier GSTIN: followed-up day, channel (WhatsApp / e-mail / PDF), items, ITC at risk (`docs/features/gstr2b.md`) |
 | `gstr2b_itc` | GST guards (8D) | `Itc2bPush` 2B effect (books / restricted / at risk / per 2B) pushed to the GSTR-3B view per period × GSTIN |
 | `gstr1_snapshots` | GST guards (8D, `src/lib/gst-guards.ts`) | `Gstr1Snapshot` GSTR-1 as filed (docs, B2CS, 3B Table 3.2) per period × GSTIN → GSTR-1A diff (`docs/features/gst-reports.md`) |
+| `doc_inbox` | bill capture (8C, `src/lib/doc-inbox.ts`) | `InboxDoc`: unprocessed supplier bill / receipt photo or PDF (attachment ref), decoded e-invoice QR, status, intent bill / expense, `draft_id` once drafted; nothing touches the books (`docs/features/bill-capture.md`); `books.edit` |
+| `purchase_drafts` | bill capture (8C, `src/lib/purchase-drafts.ts`) | `PurchaseRecord` shape with `status: 'draft'` + `draft` meta (source capture / recurring / approval / manual, held approval): bills outside the books until posted through `purchasesDb.save`; `books.edit` |
+| `recurring_bills` | recurring bills (8C, `src/lib/recurring-bills.ts`) | `RecurringBill` schedule (rent, subscriptions …) using the recurring-invoice date rules; only ever writes drafts into `purchase_drafts`; `books.edit` |
+| `bank_rules` | bank rules (8C, `src/lib/bank-rules.ts`, writes in `bank-rules-apply.ts`) | rule with ALL / ANY conditions on imported statement lines and one action (expense, voucher, receive against invoices, contra, ignore); memory suggestions are derived, not stored (`docs/features/banking.md` § Bank rules); `books.edit` |
+| `payment_requests` | purchase approvals (8C, `src/lib/purchase-approvals.ts`) | `PaymentRequest` supplier payment held for the owner's approval (bill, amount, TDS, date, method, bank account, requested by); approving records the payment; `books.edit` |
+| `payment_terms` | collections (R2-A1, `src/lib/payment-terms.ts`) | `PaymentTerm` (Net N, EOM + N, day of next month, instalments, early-pay discount); starter set used until the first save; documents snapshot `payment_terms`; `master.edit` (`docs/features/collections-r2.md`) |
+| `collection_notes` | collections (R2-A4, `src/lib/collections.ts`) | `CollectionNote {party_key, kind, outcome, date, promise?, next_action?}`: follow-ups and promises to pay; sync DATED by `date`; `payment.record` |
+| `write_off_recoveries` | collections (R2-A3, `src/lib/write-off.ts`) | `WriteOffRecovery`: same-FY and earlier-FY recoveries of bad debts written off (on the 8G `write_off` payment flag); DATED; `books.edit`, API owner-only |
+| `reminder_settings` (object) | collections (R2-A5, `src/lib/reminder-settings.ts`) | reminder schedule `{upcoming_days, polite_after, firm_after, final_after, cooldowns, templates}`; defaults = the old behaviour |
+| `collection_settings` (object) | collections (R2-A2, `src/lib/settlement.ts`) | `{gst_variant, clerk_cap_abs, clerk_cap_pct, short_pay_account}` for settlement discounts / kasar |
+| `batch_runs` | sales docs (R2-B1, `src/lib/batch-invoices.ts`) | `BatchRun`: issue date, source, party keys, invoice / held ids, totals, status (re-run guard, undo); DATED by `date`; `doc.create` (`docs/features/sales-r2.md`) |
+| `proposal_snippets` | sales docs (R2-B3, `src/lib/proposal-sections.ts`) | `ProposalSnippet {id, title, body, place}`: reusable quotation sections; `doc.create` |
+| `notes_to_accounts` | annual pack (R2-C1, `src/lib/ledger/annual-pack.ts`) | `{id: 'FY25-26', notes: {[noteId]: {text?, extra?}}, entity_type, updated_at}`: edited notes to accounts per FY; `books.edit` (`docs/features/books-output-r2.md`) |
+| `deferrals` | deferrals (R2-C2, `src/lib/deferrals.ts`) | deferred revenue / prepaid expense schedules; journals are ordinary `vouchers` (class `Deferral`) keyed in `posted`; DATED by the source date; `books.edit` |
+| `packing_lists` | packing (R2-C4, `src/lib/packing.ts`) | packing list `PKL/FY<yy-yy>/<seq>` with its own line snapshot (the invoice is never changed); DATED + NUMBERED; `doc.create` |
+| `package_types` | packing (R2-C4) | `PackageType {id, name, length_cm, breadth_cm, height_cm, tare_kg}`; `master.edit` |
+| `dining_areas` / `dining_tables` | restaurant (R3-A, `src/lib/restaurant/orders-store.ts`) | `DiningArea {id, name, price_level_id?, service_charge_pct?, sort?}`, `DiningTable {id, name, seats, area_id, sort?}`; a starter Dine-in area with tables 1–10 is used until the first save; `master.edit` (`docs/features/restaurant.md`) |
+| `table_orders` | restaurant (R3-A) | `TableOrder` (`src/types/restaurant.ts`): running order with lines, KOTs (`K<n>` per local day), event log, payer rows. Not an invoice; settled into POS invoices carrying `table_order_id` / `split_of`. DATED by `day`; `doc.create`; day / shift close refuse while one is open |
+| `modifier_groups` | restaurant (R3-A) | `ModifierGroup` with min / max and options (price, optional `item_id`), linked to items / stock groups; `master.edit` |
+| `restaurant_settings` (object) | restaurant (R3-A) | `service_charge_default`, `token_reset`, `stations`, `station_names`, `cancel_cap`, `auto86` |
+| `work_types` | rate cards (R3-B1, `src/lib/rate-cards.ts`) | `WorkType {id, name, rate, sac?, inactive?}`; `master.edit` (`docs/features/service-billing-r3.md`) |
+| `project_tasks` | projects (R3-B2, `src/lib/projects.ts`) | `ProjectTask` on a project cost centre (column, estimate, assignee, rate, due, sort); "Invoiced" is derived from billed time; `books.edit` |
+| `project_settings` (object) | projects (R3-B2) | `{columns: string[]}` board columns (default To do / Doing / Done) |
+| `retainers` | retainers (R3-B3, `src/lib/retainers.ts`) | `Retainer` per client (hours per period, fee, rollover cap, overage rate, `closes[]`); coverage derived; covered entries stamped `retainer_id` / `retainer_period` on close; DATED by `start`; `books.edit` |
+| `quiet_settings` (object) | quiet customers (R3-B7, `src/lib/quiet-customers.ts`) | `{threshold_days, snoozed: {[party_key]: until}, excluded}` |
+| `gst_portal_files` | portal files (R3-C4, `src/lib/gst-portal-files.ts`) | read GSTR-1 error reports / downloaded GSTR-1: kind, period, GSTIN, file hash, counts, findings (≤ 2,000), resolved; `books.edit` (`docs/features/docs-compliance-r3.md`) |
+| `dsc_register` | practice desk (R3-C6, `src/lib/dsc-register.ts`) | DSC rows `{holder, role, dsc_class?, token?, issuer?, valid_from?, valid_to, notes?}` with an expiry bell; `books.edit` |
+| `client_checklist` | practice desk (R3-C6, `src/lib/client-checklist.ts`) | monthly checklist `{id: 'YYYY-MM', items: {id, label, done_at?, by?, carried?}[]}`; `books.edit` |
+| `checklist_template` (object) | practice desk (R3-C6) | company checklist template (string list); the device default is the device-local `mrchartist_checklist_default` |
+| `production_orders` | production (R4-A1, `src/lib/production/orders.ts`) | `ProductionOrder` `WO/FY<yy-yy>/<seq>` (`src/types/production-r4.ts`): item, BOM, planned qty, due, SO + line, plan, cost centre, WIP / store / output godown, `output_to_qc`, status milestones, exploded `materials`, `log`, `standard_conversion`; issued / output / held derived from STR / MFG / SJ rows tagged `production_order_id`; DATED + NUMBERED; `books.edit` (`docs/features/production-r4.md`) |
+| `qc_results` | QC hold (R4-A4, `src/lib/production/qc.ts`) | `QcResult` pass / fail per lot: item, batch, QC godown, source doc, qty, inspector, release STR / rejection id; DATED; `books.edit` |
+| `qc_settings` (object) | QC hold (R4-A4) | `{hold_all, alert_days}` |
+| `recall_notices` | genealogy (R4-A3, `src/lib/production/genealogy.ts`) | `RecallNotice {id, date, batch_keys, note, notified: {party, at}[]}`; DATED; `books.edit` |
+| `landed_cost_vouchers` | landed cost (R4-A5, `src/lib/landed-voucher.ts`) | `LandedCostVoucher` `LCV/FY<yy-yy>/<seq>`: method, charges (bill line / memo), targets (bill / GRN), `allocation_snapshot`; applied live by `liveInputs()` (engine copies of bills / GRNs with `__landed_extra`), never posted to Books; DATED + NUMBERED; `books.edit` |
 
 ### Snapshot images by reference (schema v3)
 Invoice and recurring `sender` snapshots store `logo` / `signature` as `asset:<id>` instead of the data URL; the
