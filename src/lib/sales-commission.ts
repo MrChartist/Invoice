@@ -12,7 +12,7 @@
  *    on first use, Indirect expenses) | Cr Sundry creditors with the agent as the party — through
  *    `saveVoucher` (period lock, audit, roles). Periods of one agent cannot overlap.
  *
- * TDS u/s 194H on commission is not computed here — verify the threshold and deduction with your CA.
+ * TDS u/s 194H: opt-in on the posting (R8-B, §8 Q18; brokers default to it, `trade/tr-brokers.ts`) — verify with your CA.
  * Pure above "Storage".
  */
 
@@ -27,6 +27,7 @@ import { deleteVoucher, saveVoucher } from './ledger/vouchers';
 import { withTablesRollback } from './table-txn';
 import { generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
+import { deleteManualDeduction, saveManualDeduction, suggestTds, type PriorCredit } from './tds-payables';
 
 export const SALES_AGENTS_TABLE = 'sales_agents';
 export const COMMISSION_POSTINGS_TABLE = 'commission_postings';
@@ -46,6 +47,14 @@ export interface SalesAgent {
   basis: CommissionBasis;
   active?: boolean;
   created_at?: string;
+  /* ── R8-B (TR-B3) brokers, additive; absent kind = salesman ── */
+  kind?: 'agent' | 'broker';
+  brokerage_basis?: 'percent' | 'per_package' | 'per_qtl' | 'per_unit';
+  brokerage_rate?: number;
+  /** `other_party`: memo only (the other side pays the broker, §8 Q17). */
+  paid_by?: 'us' | 'other_party';
+  /** The broker as a payee (`vendors` row). */
+  vendor_id?: string;
 }
 
 export interface CommissionPosting {
@@ -60,6 +69,9 @@ export interface CommissionPosting {
   voucher_id: string;
   voucher_number: string;
   created_at: string;
+  /** R8-B: TDS u/s 194H deducted on this posting (opt-in, §8 Q18) and its TDS-register row. */
+  tds?: number;
+  tds_row_id?: string;
 }
 
 export interface CommissionLine {
@@ -182,6 +194,8 @@ export function validateAgent(a: Pick<SalesAgent, 'id' | 'name' | 'rate' | 'grou
   if (existing.some((x) => x.id !== a.id && norm(x.name) === norm(a.name))) return `An agent called “${a.name.trim()}” already exists.`;
   const bad = (r: number) => !(num(r) >= 0 && num(r) <= 100);
   if (bad(a.rate) || (a.group_rates ?? []).some((g) => bad(g.rate))) return 'Commission rates must be between 0 and 100%.';
+  const b = a as Pick<SalesAgent, 'brokerage_basis' | 'brokerage_rate'>; // R8-B
+  if (num(b.brokerage_rate) < 0 || (b.brokerage_basis === 'percent' && num(b.brokerage_rate) > 100)) return 'Check the brokerage rate.';
   return '';
 }
 
@@ -209,6 +223,8 @@ export const agentsDb = {
       ...((a.group_rates ?? []).filter((g) => g.group_id).length ? { group_rates: (a.group_rates ?? []).filter((g) => g.group_id).map((g) => ({ group_id: g.group_id, rate: round2(num(g.rate)) })) } : {}),
       basis: a.basis === 'receipt' ? 'receipt' : 'invoice',
       ...(a.active === false ? { active: false } : {}),
+      // R8-B (TR-B3): broker fields, kept only on brokers
+      ...(a.kind === 'broker' ? { kind: 'broker' as const, brokerage_basis: a.brokerage_basis ?? 'percent', brokerage_rate: num(a.brokerage_rate), ...(a.paid_by === 'other_party' ? { paid_by: 'other_party' as const } : {}), ...(a.vendor_id ? { vendor_id: a.vendor_id } : {}) } : {}),
       created_at: a.created_at || new Date().toISOString(),
     };
     setTable(SALES_AGENTS_TABLE, all.some((x) => x.id === row.id) ? all.map((x) => (x.id === row.id ? row : x)) : [...all, row]);
@@ -244,7 +260,21 @@ export function ensureCommissionAccount(): string {
 }
 
 /** Post the commission payable for an agent and period: Dr Sales commission | Cr Sundry creditors (agent). */
-export function postCommission(agentId: string, period: { from: string; to: string }, date: string): CommissionPosting {
+/** R8-B: 194H on `base` for a payee with earlier credits `prior` (FY threshold, catch-up, rate by date). Pure. */
+export function tds194h(date: string, base: number, pan: string | undefined, prior: readonly PriorCredit[]) {
+  const s = suggestTds('194H', date, base, { pan }, prior);
+  return { amount: s?.amount ?? 0, rate: s?.rate ?? 0, base: s?.threshold.taxableBase ?? 0 };
+}
+
+/** R8-B: works out 194H for an agent / broker and records it in the TDS register (26Q); the caller posts the journal. */
+export function deduct194h(a: Pick<SalesAgent, 'name' | 'pan' | 'vendor_id'>, date: string, base: number, prior: readonly PriorCredit[]): { amount: number; rate: number; rowId?: string } {
+  const pan = a.pan || getTable<{ id: string; pan?: string }>('vendors').find((v) => v.id === a.vendor_id)?.pan;
+  const t = tds194h(date, base, pan, prior);
+  if (!(t.amount > 0)) return { amount: 0, rate: t.rate };
+  return { amount: t.amount, rate: t.rate, rowId: saveManualDeduction({ vendor_id: a.vendor_id, vendor_name: a.name, pan, section: '194H', date, base: t.base, rate: t.rate, amount: t.amount, notes: 'Commission / brokerage journal (R8-B)' }).id };
+}
+
+export function postCommission(agentId: string, period: { from: string; to: string }, date: string, opts: { tds194h?: boolean } = {}): CommissionPosting {
   requireAccess('books.edit');
   const agent = agentsDb.all().find((a) => a.id === agentId);
   if (!agent) throw new Error('Agent not found.');
@@ -254,20 +284,24 @@ export function postCommission(agentId: string, period: { from: string; to: stri
   if (overlapsPosting(postings, agentId, period)) throw new Error(`Commission for ${agent.name} is already posted for part of this period.`);
   const st = commissionStatement(agent, period, liveCommissionData());
   if (!(st.total > 0)) throw new Error('No commission earned in this period.');
-  return withTablesRollback([COMMISSION_POSTINGS_TABLE, 'vouchers', 'accounts'], () => {
+  return withTablesRollback([COMMISSION_POSTINGS_TABLE, 'vouchers', 'accounts', 'tds_deductions'], () => {
     const expense = ensureCommissionAccount();
     const paise = Math.round(st.total * 100);
+    // R8-B (§8 Q18): opt-in 194H over the agent's earlier postings of the FY; Cr TDS payable, row in the TDS register.
+    const tds: { amount: number; rowId?: string } = opts.tds194h ? deduct194h(agent, date, st.total, postings.filter((p) => p.agent_id === agent.id).map((p) => ({ id: p.id, date: p.to, base: p.amount, tds: num(p.tds), code: '194H' }))) : { amount: 0 };
+    const tdsPaise = Math.round(tds.amount * 100);
     const v = saveVoucher({
       type: 'JOURNAL',
       date,
       narration: `Sales commission payable to ${agent.name} for ${period.from} to ${period.to} (${agent.basis === 'receipt' ? 'on receipt' : 'on invoice'}, ${st.lines.length} document(s)) — TDS u/s 194H: verify with your CA`,
       lines: [
         { account_id: expense, dr: paise, cr: 0 },
-        { account_id: A.creditors, dr: 0, cr: paise, party: agent.name },
+        { account_id: A.creditors, dr: 0, cr: paise - tdsPaise, party: agent.name },
+        ...(tdsPaise > 0 ? [{ account_id: A.tds194h, dr: 0, cr: tdsPaise }] : []),
       ],
       voucher_class: 'Sales commission',
     });
-    const row: CommissionPosting = { id: generateId(), agent_id: agent.id, agent_name: agent.name, from: period.from, to: period.to, date, amount: st.total, voucher_id: v.id, voucher_number: v.number, created_at: new Date().toISOString() };
+    const row: CommissionPosting = { id: generateId(), agent_id: agent.id, agent_name: agent.name, from: period.from, to: period.to, date, amount: st.total, voucher_id: v.id, voucher_number: v.number, created_at: new Date().toISOString(), ...(tdsPaise > 0 ? { tds: tds.amount, tds_row_id: tds.rowId } : {}) };
     setTable(COMMISSION_POSTINGS_TABLE, [...loadCommissionPostings(), row]);
     return row;
   });
@@ -278,8 +312,9 @@ export function deleteCommissionPosting(id: string): void {
   requireAccess('books.edit');
   const row = loadCommissionPostings().find((p) => p.id === id);
   if (!row) return;
-  withTablesRollback([COMMISSION_POSTINGS_TABLE, 'vouchers'], () => {
+  withTablesRollback([COMMISSION_POSTINGS_TABLE, 'vouchers', 'tds_deductions'], () => {
     deleteVoucher(row.voucher_id);
+    if (row.tds_row_id) deleteManualDeduction(row.tds_row_id); // R8-B: the 194H row of the TDS register
     setTable(COMMISSION_POSTINGS_TABLE, loadCommissionPostings().filter((p) => p.id !== id));
   });
 }

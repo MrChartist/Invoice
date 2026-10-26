@@ -1,1 +1,1 @@
-export { default } from './R8Stub'; // TR-B replaces this stub with Distribution → Mandi (bill-charge registers)
+export { MandiTab as default } from './tr-b-hub'; // R8-B: Distribution → Mandi (MandiView.tsx), shipped in the one TR-B chunk

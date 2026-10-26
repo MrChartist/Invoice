@@ -2,6 +2,7 @@ import type { CalcTotals } from '../../lib/invoice-calc';
 import type { InvoiceItem, InvoiceRecord, SenderProfile } from '../../types/invoice';
 import { upiLink } from '../../lib/share';
 import { shiftDay } from '../../lib/dates';
+import { weightText } from '../../lib/trade/tr-weight';
 
 /** `YYYY-MM-DD` → `MM/YYYY`, the way batch dates are printed on packs. */
 function monthYear(day: string): string {
@@ -14,7 +15,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit'>> & { bin?: string }) | undefined): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit'>> & { bin?: string }) | undefined): string {
   if (!item) return '';
   const parts: string[] = [];
   if (discountText(item)) parts.push(discountText(item)); // TR-A1
@@ -24,7 +25,8 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   if (item.batch_no && item.batch_expiry) parts.push(`Exp ${monthYear(item.batch_expiry)}`);
   if (item.serials?.length) parts.push(`S/N: ${item.serials.join(', ')}`);
   if (item.serials?.length && item.warranty_months) parts.push(`Warranty ${item.warranty_months} month${item.warranty_months === 1 ? '' : 's'}`);
-  return parts.join(' · ');
+  if (item.wt) parts.push(weightText(item.wt)); // R8-B (TR-B1): bags and weighing
+  return parts.filter(Boolean).join(' · ');
 }
 
 /** Printed UPI QR. Built by the validating `upiLink`, so a malformed or doctored VPA never reaches a QR. */
@@ -81,3 +83,6 @@ export function cashDiscountText(invoice: Pick<InvoiceRecord, 'cash_discount' | 
   const [y, m, d] = shiftDay(invoice.issue_date, cd.days).split('-');
   return `${cd.percent}% cash discount if paid by ${d}-${m}-${y}: ${money(Math.round(total * cd.percent) / 100)}`;
 }
+
+/** R8-B (TR-B1): "120 BAG · gross 6,072 kg − tare 72 kg − dhalta 60 kg = 5,940 kg" under a weighed line. */
+export { weightText };

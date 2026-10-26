@@ -780,6 +780,9 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     };
   };
   const lines: PLine[] = calc.lines.map(toPLine);
+  // R8-B (TR-B2): a bill-charge line (mandi fee, hamali …) adds value to its goods' HSN row, never quantity.
+  const charge = new Set((rec.items ?? []).filter((i) => i.charge_head_id).map((i) => i.id));
+  if (charge.size) calc.lines.forEach((l, k) => { if (charge.has(l.id)) lines[k] = { ...lines[k], qty: 0, uqc: lines.find((g, j) => !charge.has(calc.lines[j].id) && g.hsn === l.hsn)?.uqc ?? lines[k].uqc }; });
   // Taxable freight / other charges: part of the principal supply's value, so no quantity of its own.
   if (calc.charges_line) lines.push({ ...toPLine(calc.charges_line), qty: 0 });
 
