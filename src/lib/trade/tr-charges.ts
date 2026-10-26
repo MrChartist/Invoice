@@ -23,7 +23,8 @@ import { generateId, getTable, setTable } from '../storage';
 import { lineBags } from './tr-weight';
 
 export const CHARGE_HEADS_TABLE = 'trade_charge_heads'; // TR_TABLES.chargeHeads (tr-shared.ts), literal to stay in one chunk
-export const PURE_AGENT_CHARGE = 'Recovered at actual as a pure agent (Rule 33) — outside the taxable value. Verify with your CA.';
+import { PURE_AGENT_CHARGE } from './pure-agent';
+export { PURE_AGENT_CHARGE };
 /** Usual heads, added with blank rates (§8 Q6). */
 export const USUAL_HEADS = ['Market fee', 'Aadat', 'Hamali', 'Tulai', 'Palledari', 'Bardana', 'Dharmada'] as const;
 

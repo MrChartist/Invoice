@@ -44,8 +44,20 @@ export interface DropSpec {
   client_ids?: string[];
 }
 
-/** `invoiceId|item` pairs already on a live run. */
-export const coveredPairs = (runs: readonly PriceDropRun[]) => new Set(runs.filter((r) => r.status === 'issued').flatMap((r) => r.rows.map((x) => `${x.invoice_id}|${norm(x.item)}`)));
+/**
+ * Rows of an issued run whose note is still live (QA8 T7: a note cancelled by hand frees its bills). Without `live`
+ * every row of an issued run counts.
+ */
+export function liveRunRows(r: PriceDropRun, live?: { invoices: readonly InvoiceRecord[]; links: readonly Link[] }): PriceDropRun['rows'] {
+  if (r.status !== 'issued') return [];
+  if (!live) return r.rows;
+  const ok = new Set(r.note_ids.filter((id) => live.invoices.some((i) => i.id === id && i.status !== 'Cancelled')));
+  return r.rows.filter((x) => live.links.some((l) => l.from_id === x.invoice_id && ok.has(l.to_id)));
+}
+
+/** `invoiceId|item` pairs already on a live run (its note still live, when `live` is given). */
+export const coveredPairs = (runs: readonly PriceDropRun[], live?: { invoices: readonly InvoiceRecord[]; links: readonly Link[] }) =>
+  new Set(runs.flatMap((r) => liveRunRows(r, live).map((x) => `${x.invoice_id}|${norm(x.item)}`)));
 
 /** Pure: the run's rows (one per bill × item with a positive net quantity). */
 export function dropRows(invoices: readonly InvoiceRecord[], links: readonly Link[], spec: DropSpec, covered: ReadonlySet<string> = new Set()): PriceDropRun['rows'] {
@@ -74,7 +86,7 @@ export function gstDropNote(inv: InvoiceRecord, rows: PriceDropRun['rows'], drop
   const items: InvoiceItem[] = rows.map((r) => {
     const l = inv.items.find((x) => norm(x.name) === norm(r.item))!;
     const rate = drops.get(norm(r.item))!;
-    return { ...l, id: generateId(), description: `Rate difference: price drop ₹${rate} per unit`, quantity: r.qty, rate, discount_percent: 0, disc_chain: undefined, disc_per_unit: undefined, amount: round2(r.qty * rate) };
+    return { ...l, id: generateId(), description: `Rate difference: price drop ₹${rate} per unit`, quantity: r.qty, rate, discount_percent: 0, disc_chain: undefined, disc_per_unit: undefined, wt: undefined, amount: round2(r.qty * rate) };
   });
   const rec: InvoiceRecord = {
     ...inv, id: generateId(), invoice_number: '', doc_type: 'CREDIT_NOTE', issue_date: date, due_date: date, status: 'Sent', items, attachments: undefined,
@@ -101,7 +113,8 @@ export function issuePriceDrop(input: RunInput): PriceDropRun {
   if (input.mode === 'gst' && !input.agreed) throw new ClaimError('GST credit notes need the drop agreed before supply; issue financial notes instead.');
   const runs = getTable<PriceDropRun>(PRICE_DROPS_TABLE);
   const invoices = getTable<InvoiceRecord>('invoices');
-  const rows = dropRows(invoices, getTable<Link>('doc_links'), input, coveredPairs(runs));
+  const allLinks = getTable<Link>('doc_links');
+  const rows = dropRows(invoices, allLinks, input, coveredPairs(runs, { invoices, links: allLinks }));
   if (!rows.length) throw new ClaimError('No customer bought these items in the window (or they are already on a price-drop run).');
   if (input.mode === 'gst') {
     const late = rows.find((r) => input.date > sec34Limit(invoices.find((i) => i.id === r.invoice_id)!.issue_date));
@@ -157,9 +170,13 @@ export function undoPriceDrop(id: string): PriceDropRun {
   const all = getTable<PriceDropRun>(PRICE_DROPS_TABLE);
   const r = all.find((x) => x.id === id);
   if (!r || r.status !== 'issued') throw new ClaimError('Only an issued run can be undone.');
-  return withTablesRollback(['invoices', PRICE_DROPS_TABLE], () => {
+  // QA8 T7: the run's claim goes with it — a draft claim is rejected; a claim sent or settled must be dealt with first.
+  const claim = r.claim_id ? getTable<TradeClaim>(TR_TABLES.claims).find((c) => c.id === r.claim_id) : undefined;
+  if (claim && claim.status !== 'draft' && claim.status !== 'rejected') throw new ClaimError(`Claim ${claim.number} on this run is ${claim.status}: ${claim.status === 'sent' ? 'reject it' : 'undo its settlement and reject it'} first.`);
+  return withTablesRollback(['invoices', PRICE_DROPS_TABLE, TR_TABLES.claims], () => {
     for (const n of r.note_ids) if (localDb.invoices.getById(n)?.status !== 'Cancelled') localDb.invoices.setStatus(n, 'Cancelled');
-    const next: PriceDropRun = { ...r, status: 'undone', updated_at: new Date().toISOString() };
+    if (claim?.status === 'draft') setTable(TR_TABLES.claims, getTable<TradeClaim>(TR_TABLES.claims).map((c) => (c.id === claim.id ? { ...c, status: 'rejected' as const, notes: `${c.notes ? `${c.notes} ` : ''}Price-drop run ${r.number} undone.`, updated_at: new Date().toISOString() } : c)));
+    const next: PriceDropRun = { ...r, status: 'undone', claim_id: undefined, updated_at: new Date().toISOString() };
     setTable(PRICE_DROPS_TABLE, all.map((x) => (x.id === id ? next : x)));
     return next;
   });
@@ -179,8 +196,10 @@ export function claimPriceDrop(id: string, principal: { id: string; name: string
   const r = loadPriceDrops().find((x) => x.id === id);
   if (!r || r.status !== 'issued') throw new ClaimError('Only an issued run can be claimed.');
   if (r.claim_id) throw new ClaimError(`Run ${r.number} is already claimed.`);
+  // QA8 T7: only rows whose note is still live are claimed.
+  const rows = liveRunRows(r, { invoices: getTable<InvoiceRecord>('invoices'), links: getTable<Link>('doc_links') });
   return withTablesRollback([TR_TABLES.claims, PRICE_DROPS_TABLE, 'series_counters'], () => {
-    const c = saveClaim({ date, kind: 'price_drop', principal_id: principal.id, principal_name: principal.name, from: r.from, to: r.to, rows: protectionRows(r), price_drop_id: r.id });
+    const c = saveClaim({ date, kind: 'price_drop', principal_id: principal.id, principal_name: principal.name, from: r.from, to: r.to, rows: protectionRows({ ...r, rows }), price_drop_id: r.id });
     setTable(PRICE_DROPS_TABLE, getTable<PriceDropRun>(PRICE_DROPS_TABLE).map((x) => (x.id === id ? { ...x, claim_id: c.id, principal_id: principal.id } : x)));
     return c;
   });

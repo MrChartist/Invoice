@@ -217,6 +217,10 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   // R8-C: agency desk (TR-C1)
   { classes: ['Arrival advance'], tables: ['arrivals'], redo: 'cancel the arrival and enter it again in Distribution → Agency' },
   { classes: ['Bikri patti'], tables: ['sale_pattis'], redo: 'post the patti again in Distribution → Agency → Bikri patti' },
+  // QA8 T2: R8-A / R8-B journals undone by their own module
+  { classes: ['Brokerage'], tables: ['brokerage_postings'], redo: 'restore the brokerage posting itself, or post it again in Distribution → Brokers' },
+  { classes: ['Trade claim'], tables: ['trade_claims'], redo: 'settle the claim again in Distribution → Claims' },
+  { classes: ['Packaging deposit'], tables: ['packaging_moves'], redo: 'restore the packaging movement itself, or record it again in Distribution → Packaging' },
 ];
 const RA_CLASS = 'RA deduction';
 const SETTLEMENT_METHOD = 'Marketplace settlement'; // as settlement-post.ts records it (not imported: keeps this chunk small)
@@ -262,6 +266,48 @@ registerRestoreHook('transactions', (row, e, live, bin) => {
     if (issue) return { refuse: `${issue} The gift voucher was used since this receipt was deleted: restore the bill on its own and take the payment again.` };
   }
   return null;
+});
+
+/* QA8 T2: Round 8 rows that carry their own journal come back with it, never next to a re-post. */
+const companionOr = (live: LiveReader, bin: readonly BinEntry[], table: string, id: string, refuse: string): RestoreHookResult | null => {
+  if (!id || isLive(live, table, id)) return null;
+  const pair = inBin(bin, table, (r) => str(r.id) === id);
+  return pair ? { companions: [pair] } : { refuse };
+};
+registerRestoreHook('brokerage_postings', (row, _e, live, bin) => {
+  const from = str(row.from);
+  const to = str(row.to);
+  const clash = live('brokerage_postings').find((p) => str(p?.broker_id) === str(row.broker_id) && str(p?.from) <= to && str(p?.to) >= from);
+  if (clash) return { refuse: `Brokerage for ${str(row.broker_name)} is already posted again for part of ${from} to ${to}, so restoring this posting would post it twice.` };
+  const v = companionOr(live, bin, 'vouchers', str(row.voucher_id), 'The journal of this brokerage posting is gone for good. Post the brokerage again in Distribution → Brokers.');
+  if (v?.refuse) return v;
+  const t = companionOr(live, bin, 'tds_deductions', str(row.tds_row_id), 'The 194H TDS row of this brokerage posting is gone for good. Post the brokerage again in Distribution → Brokers.');
+  if (t?.refuse) return t;
+  return { companions: [...(v?.companions ?? []), ...(t?.companions ?? [])] };
+});
+registerRestoreHook('tds_deductions', (_row, e, live, bin) => {
+  // A 194H row of an undone brokerage posting comes back only with that posting.
+  const owner = inBin(bin, 'brokerage_postings', (r) => str(r.tds_row_id) === e.row_id);
+  return owner && !mentions(live('brokerage_postings'), e.row_id) ? { refuse: 'This 194H TDS row belongs to an undone brokerage posting: restore the posting itself, or post the brokerage again in Distribution → Brokers.' } : null;
+});
+registerRestoreHook('packaging_moves', (row, _e, live, bin) => {
+  const inv = str(row.charge_invoice_id);
+  if (inv && !live('invoices').some((x) => str(x?.id) === inv && str(x?.status) !== 'Cancelled')) return { refuse: 'This movement closed crates billed on an invoice that is gone or cancelled. Charge the crates again in Distribution → Packaging.' };
+  return companionOr(live, bin, 'vouchers', str(row.voucher_id), 'The deposit voucher of this movement is gone for good. Record the movement again in Distribution → Packaging.');
+});
+registerRestoreHook('invoices', (row, _e, live) => {
+  // QA8 T5: an interest draft of an undone run stays gone (its bills were freed to be charged again).
+  const run = str(row.interest_run_id);
+  return run && live('interest_runs').some((r) => str(r?.id) === run && str(r?.status) === 'undone') ? { refuse: 'This interest invoice belongs to an interest run that was undone. Raise the interest again in Receivables → Interest.' } : null;
+});
+registerRestoreHook('purchase_returns', (row, e, live) => {
+  // A supplier note that settled a trade claim comes back only while the claim still names it.
+  const m = /^Against claim (\S+)$/.exec(str(row.notes).trim());
+  if (!m) return null;
+  const claim = live('trade_claims').find((c) => str(c?.number) === m[1]);
+  if (!claim) return null;
+  const set = isObj(claim.settlement) ? claim.settlement : {};
+  return str(set.return_id) === e.row_id ? null : { refuse: `This supplier credit note settled claim ${m[1]}, which was unsettled since. Settle the claim again in Distribution → Claims.` };
 });
 
 /** The module hooks' verdict on one entry: the first refusal, else every companion. */

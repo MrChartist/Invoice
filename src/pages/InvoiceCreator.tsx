@@ -39,6 +39,9 @@ import { clientToParty } from '../store/invoice-defaults';
 import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
 import { editorStockContext, liveDocTrackingIssues } from '../lib/stock-tracking';
+import { can } from '../lib/access';
+import { audit } from '../lib/audit';
+import { trT } from '../i18n/areas/trade-r8c';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { getJson, SINGLETON_KEYS } from '../lib/storage';
 import { cn } from '../lib/utils';
@@ -172,7 +175,7 @@ export function InvoiceCreator() {
             if (!it.godown_id && it.name.trim() && ctx.find(it.name, it.hsn)) st.patchItem(it.id, { godown_id: ctx.defaultGodown });
           }
         }
-        if (ctx) {
+        if (ctx || st.items.some((i) => i.arrival_id)) {
           const now = useInvoiceStore.getState();
           const issues = liveDocTrackingIssues({
             id: now.id || undefined,
@@ -181,7 +184,11 @@ export function InvoiceCreator() {
             issue_date: now.issue_date,
             items: now.items.filter((i) => i.name.trim() || num(i.rate) > 0),
           });
-          if (issues.errors.length) {
+          // QA8 T15: only agency-lot errors left — the owner may sell anyway, with a reason (audited).
+          const lotOnly = !!issues.lots?.length && issues.errors.every((e) => issues.lots!.includes(e));
+          const reason = lotOnly && can('settings.manage') ? window.prompt(trT('lotOverride', { list: issues.lots!.join(' ') }))?.trim() : '';
+          if (reason) audit.record({ entity: 'invoice', entity_id: now.id || '', action: 'override', summary: `Agency lot check overridden: ${issues.lots!.join(' ')} Reason: ${reason}` });
+          else if (issues.errors.length) {
             setErrors(issues.errors);
             window.scrollTo?.({ top: 0 });
             notify(issues.errors[0], 'error');

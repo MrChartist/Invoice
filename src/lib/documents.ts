@@ -548,6 +548,8 @@ export function buildCreditNote(
       ...line.item,
       quantity: qty,
       amount: round2(qty * num(line.item.rate)),
+      // QA8 T12: the weighing describes the whole sale; a partial credit does not print it.
+      ...(line.item.wt && Math.abs(qty - num(line.item.quantity)) > 0.0005 ? { wt: undefined } : {}),
       // A partial credit returns only as many serials as units: the first ones NOT already returned on an
       // earlier credit note against this line (edit the note to choose others).
       ...(line.item.serials?.length

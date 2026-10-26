@@ -249,6 +249,27 @@ function clientIndex(clients: readonly Client[]) {
   return idx;
 }
 
+type RunLike = { status?: string; invoice_ids?: readonly string[]; bills?: readonly { id: string; to: string; invoice_id?: string }[] };
+
+/**
+ * QA8 T4 / T5: the day each bill is charged to by a LIVE interest run (`interest_runs`, TR-A4). A run's bill counts
+ * only while the interest invoice that charged it is live (not deleted / cancelled) and the run is not undone; a run
+ * saved before the per-bill invoice id counts while any of its invoices is live.
+ */
+export function interestChargedTo(runs: readonly RunLike[], invoices: readonly Pick<InvoiceRecord, 'id' | 'status'>[]): Map<string, string> {
+  const live = new Set(invoices.filter((i) => i && i.status !== 'Cancelled').map((i) => i.id));
+  const out = new Map<string, string>();
+  for (const r of runs) {
+    if (!r || r.status === 'undone') continue;
+    const anyLive = !r.invoice_ids?.length || r.invoice_ids.some((id) => live.has(id));
+    for (const b of r.bills ?? []) {
+      if (!(b.invoice_id ? live.has(b.invoice_id) : anyLive)) continue;
+      if (!out.has(b.id) || b.to > out.get(b.id)!) out.set(b.id, b.to);
+    }
+  }
+  return out;
+}
+
 /** A late-fee invoice already raised for this original (not cancelled), if any. */
 export function lateFeeRaisedFor(originalId: string, invoices: readonly InvoiceRecord[]): InvoiceRecord | undefined {
   return invoices.find((i) => i.late_fee_for === originalId && i.status !== 'Cancelled');
@@ -283,6 +304,9 @@ export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new D
   const all = localDb.invoices.getAll();
   const already = lateFeeRaisedFor(original.id, all);
   if (already) throw new LateFeeError(`A late fee was already raised on ${already.invoice_number}.`);
+  // QA8 T4: a bill already charged interest in a run (Receivables → Interest) is not charged a late fee for the same days.
+  const charged = interestChargedTo(peekTable<RunLike>('interest_runs'), all).get(original.id);
+  if (charged) throw new LateFeeError(`Interest on ${original.invoice_number} was already charged up to ${charged} (Receivables → Interest). Undo that interest run first.`);
   const quote = quoteLateFee(original, fee, { invoices: all }, asOf);
   const item = buildLateFeeItem(quote, fee, original);
   if (!item) throw new LateFeeError(quote.reason ?? 'No late fee is due.');

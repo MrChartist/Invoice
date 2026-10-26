@@ -15,7 +15,8 @@ import './tr-registry';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Godown } from '../../types/stock';
 import type { Arrival, PrincipalKind } from '../../types/trade-r8';
-import { num, round2 } from '../invoice-calc';
+import { calcInputFromRecord, calculateInvoice, isExcludedLine, num, round2 } from '../invoice-calc';
+import { inrTotals } from '../fx';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, peekTable, setTable } from '../storage';
@@ -57,20 +58,28 @@ export interface AgencySaleLine {
 
 const SALE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
 
-/** Agency lines of issued sales documents (drafts and cancelled documents never count). */
-export function agencySales(invoices: readonly Pick<InvoiceRecord, 'id' | 'invoice_number' | 'issue_date' | 'doc_type' | 'status' | 'items' | 'goods_returned'>[]): AgencySaleLine[] {
+type AgencySource = Pick<InvoiceRecord, 'id' | 'invoice_number' | 'issue_date' | 'doc_type' | 'status' | 'items' | 'goods_returned'> & Partial<InvoiceRecord>;
+
+/**
+ * Agency lines of issued sales documents (drafts and cancelled documents never count). Each line is valued at its
+ * taxable value as the invoice engine computes it (QA8 T1): after the line and the document-level discount, net of
+ * GST on tax-inclusive prices, in rupees for a foreign-currency document.
+ */
+export function agencySales(invoices: readonly AgencySource[]): AgencySaleLine[] {
   const out: AgencySaleLine[] = [];
   for (const inv of invoices) {
     if (!inv || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
     const type = inv.doc_type ?? 'INVOICE';
     const sign = SALE_DOCS.has(type) ? 1 : type === 'CREDIT_NOTE' && inv.goods_returned !== false ? -1 : 0;
-    if (!sign) continue;
-    for (const l of inv.items ?? []) {
-      if (!l?.arrival_id) continue;
+    if (!sign || !(inv.items ?? []).some((l) => l?.arrival_id)) continue;
+    const priced = (inv.items ?? []).filter((l) => l && !isExcludedLine(l));
+    const calc = inrTotals(calculateInvoice(calcInputFromRecord({ ...inv, items: priced })), inv);
+    priced.forEach((l, i) => {
+      if (!l.arrival_id) return;
       const qty = num(l.quantity);
-      const amount = qty * num(l.rate) * (1 - Math.min(Math.max(num(l.discount_percent), 0), 100) / 100);
+      const amount = calc.lines[i]?.taxable ?? 0;
       out.push({ invoice_id: inv.id, invoice_number: inv.invoice_number, date: String(inv.issue_date).slice(0, 10), arrival_id: l.arrival_id, qty: roundQty(sign * qty), amount: round2(sign * amount) });
-    }
+    });
   }
   return out;
 }

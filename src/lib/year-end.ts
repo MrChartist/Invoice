@@ -37,8 +37,10 @@ export const PROVISION_CLASS = 'Year-end provision';
 
 export type YearEndStepId = 'integrity' | 'closing_stock' | 'depreciation' | 'provisions' | 'opening_bills' | 'lock' | 'carry_forward'
   // R4-C5: "Auditor pack generated" (mark only; Settings → Activity → Auditor pack marks it)
-  | 'auditor_pack';
-export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'lock', 'carry_forward', 'auditor_pack'];
+  | 'auditor_pack'
+  // QA8 T10 (TR22): agency lots whose sales are not settled on a posted bikri patti (shown whenever arrivals exist)
+  | 'agency_lots';
+export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'agency_lots', 'lock', 'carry_forward', 'auditor_pack'];
 
 export type StepStatus = 'done' | 'todo' | 'warn';
 
@@ -82,6 +84,12 @@ export interface YearEndInput {
   oldOpenBills: { count: number; amount: number };
   record?: YearEndRecord;
   today: string;
+  /**
+   * QA8 T10: lots of principals' goods (TR-C1 arrivals) with agency sales up to 31 March not settled on a posted
+   * bikri patti — their sales still sit in Sales. Absent when the company has no arrivals (the step is left out),
+   * whatever the agency pack's state.
+   */
+  agencyLots?: readonly { number: string; lot_no: string; principal: string }[];
 }
 
 const rs = (p: number) => `₹${(Math.abs(p) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -189,6 +197,18 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
       ...(input.oldOpenBills.count ? [`${input.oldOpenBills.count} opening bill${input.oldOpenBills.count === 1 ? ' is' : 's are'} still open from before this year (${rs(input.oldOpenBills.amount)}): settle or write them off.`] : []),
     ],
   });
+
+  /* 5a. Unsettled agency lots (QA8 T10, TR22) */
+  if (input.agencyLots) {
+    const lots = input.agencyLots;
+    steps.push({
+      id: 'agency_lots',
+      status: !lots.length ? 'done' : marks.agency_lots ? 'done' : 'warn',
+      facts: lots.length
+        ? [`${lots.length} agency lot${lots.length === 1 ? ' has' : 's have'} sales not settled on a posted bikri patti: ${lots.slice(0, 10).map((l) => `${l.lot_no} (${l.number}, ${l.principal})`).join(', ')}${lots.length > 10 ? ' …' : ''}. Their sales still sit in Sales: post the pattis in Distribution → Agency (turn the agency pack on if it is off) — verify with your CA.`]
+        : ['Every agency lot sold up to the year end is settled on a posted bikri patti.'],
+    });
+  }
 
   /* 6. Lock */
   const locked = !!input.lockUntil && input.lockUntil >= end;

@@ -24,6 +24,8 @@ import {
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
 import { getTable } from './storage';
+import { lotIssues } from './trade/lot-gate';
+import type { Arrival } from '../types/trade-r8';
 import { memoOnReads } from './table-memo';
 import { lineFactor } from './units';
 import { creditNoteReturnsGoods } from './credit-restock';
@@ -320,6 +322,8 @@ export interface TrackingIssues {
   expired: string[];
   /** Informational (batch running short). */
   warnings: string[];
+  /** QA8 T15: the agency-lot errors among `errors` (the owner may override them in the editor, with a reason). */
+  lots?: string[];
 }
 
 /**
@@ -781,8 +785,11 @@ export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
         events: collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id }),
       };
     }, doc.id ?? '');
-    const issues = pharmaGate(docTrackingIssues(doc, sharedTrackingInputs(), multi, pre), doc); // 7U pharma pack (off by default)
-    if (doc.status === 'Draft' || doc.status === 'Cancelled') return issues;
+    const tracked = pharmaGate(docTrackingIssues(doc, sharedTrackingInputs(), multi, pre), doc); // 7U pharma pack (off by default)
+    if (doc.status === 'Draft' || doc.status === 'Cancelled') return tracked;
+    // QA8 T15: an agency line may not oversell its lot or sell a cancelled one.
+    const lots = (doc.items ?? []).some((l) => l?.arrival_id) ? lotIssues(doc, getTable<InvoiceRecord>('invoices'), getTable<Arrival>('arrivals')) : [];
+    const issues = lots.length ? { ...tracked, errors: [...tracked.errors, ...lots], lots } : tracked;
     // 8F: no sale from an expiry godown; optional batch-MRP ceiling (tracking computed only when that is on).
     const pharma = readPharmaSettings();
     let tracking: TrackingMap | null = null;

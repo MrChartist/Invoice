@@ -5,7 +5,7 @@ import { rcmGoodsMatches, supplierKinds } from '../../lib/trade/tr-statutory';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
 
-export default function RcmGoodsNotice({ lines, date, vendor, onApply }: { lines: readonly { hsn?: string }[]; date: string; vendor?: { gstin?: string; principal_kind?: string }; onApply: () => void }) {
+export default function RcmGoodsNotice({ lines, date, vendor, onApply }: { lines: readonly { hsn?: string; name?: string; description?: string }[]; date: string; vendor?: { gstin?: string; principal_kind?: string; rcm_maker?: boolean }; onApply: () => void }) {
   useT();
   const kinds = supplierKinds(vendor);
   const hits = rcmGoodsMatches(lines, kinds, date);

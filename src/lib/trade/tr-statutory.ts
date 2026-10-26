@@ -93,25 +93,30 @@ export function customer194qDue(fySales: number, threshold: number): boolean {
 
 /* ── RCM on notified goods ── */
 
-/** The supplier kinds a vendor counts as (no GSTIN = unregistered; a farmer = agriculturist). */
-export function supplierKinds(v: { gstin?: string; principal_kind?: string } | undefined): SupplierKind[] {
+/**
+ * The supplier kinds a vendor counts as (no GSTIN = unregistered; a farmer = agriculturist; QA8 T14: a maker of silk
+ * yarn only when the vendor is flagged `rcm_maker`, never every vendor).
+ */
+export function supplierKinds(v: { gstin?: string; principal_kind?: string; rcm_maker?: boolean } | undefined): SupplierKind[] {
   if (!v) return [];
-  const kinds: SupplierKind[] = ['maker'];
+  const kinds: SupplierKind[] = v.rcm_maker ? ['maker'] : [];
   if (v.principal_kind === 'agriculturist') kinds.push('agriculturist');
   if (v.principal_kind === 'unregistered' || (v.principal_kind !== 'registered' && !String(v.gstin ?? '').trim())) kinds.push('unregistered');
   return kinds;
 }
 
 /** Notified-goods rows matched by the lines' HSN and the supplier kind on `date` (each row once). */
-export function rcmGoodsMatches(lines: readonly { hsn?: string }[], kinds: readonly SupplierKind[], date: string): RcmGoodsRow[] {
+export function rcmGoodsMatches(lines: readonly { hsn?: string; name?: string; description?: string }[], kinds: readonly SupplierKind[], date: string): RcmGoodsRow[] {
   const rows = ruleAt(RCM_NOTIFIED_GOODS_RULES, date);
   const out: RcmGoodsRow[] = [];
   for (const row of rows) {
     if (!row.from.some((k) => kinds.includes(k))) continue;
-    // A line's HSN within the entry (or a 4+ digit heading that contains it, e.g. 1404 for 14049010).
+    // A line's HSN within the entry, or a 4+ digit heading that contains it (1404 for 14049010) — for an entry with
+    // `words` (cashew in 0801, which also holds coconuts and Brazil nuts) only when the line names the goods.
     if (lines.some((l) => {
       const h = String(l.hsn ?? '').replace(/\D/g, '');
-      return h.length >= 4 && row.hsn.some((p) => h.startsWith(p) || p.startsWith(h));
+      const text = `${l.name ?? ''} ${l.description ?? ''}`.toLowerCase();
+      return h.length >= 4 && row.hsn.some((p) => h.startsWith(p) || (p.startsWith(h) && (!row.words || row.words.some((w) => text.includes(w)))));
     })) out.push(row);
   }
   return out;

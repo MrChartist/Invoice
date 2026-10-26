@@ -39,6 +39,7 @@
 import type { InvoiceRecord, GstMode } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, num, round2 } from './invoice-calc';
 import { isNonGstFinancialNote } from './financial-note';
+import { isPureAgentLine } from './trade/pure-agent';
 import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
@@ -783,6 +784,12 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   // R8-B (TR-B2): a bill-charge line (mandi fee, hamali …) adds value to its goods' HSN row, never quantity.
   const charge = new Set((rec.items ?? []).filter((i) => i.charge_head_id).map((i) => i.id));
   if (charge.size) calc.lines.forEach((l, k) => { if (charge.has(l.id)) lines[k] = { ...lines[k], qty: 0, uqc: lines.find((g, j) => !charge.has(calc.lines[j].id) && g.hsn === l.hsn)?.uqc ?? lines[k].uqc }; });
+  // QA8 T9: a pure-agent (Rule 33) reimbursement is not a supply — out of Table 8, 3.1(c) and the HSN summary.
+  const agent = new Set((rec.items ?? []).filter(isPureAgentLine).map((i) => i.id));
+  if (agent.size) {
+    for (let k = lines.length - 1; k >= 0; k--) if (agent.has(calc.lines[k].id)) lines.splice(k, 1);
+    push('info', 'PURE_AGENT', 'pure-agent reimbursement line(s) (Rule 33) are left out of the supply value, Table 8 and the HSN summary; they stay in the invoice value — verify with your CA.');
+  }
   // Taxable freight / other charges: part of the principal supply's value, so no quantity of its own.
   if (calc.charges_line) lines.push({ ...toPLine(calc.charges_line), qty: 0 });
 

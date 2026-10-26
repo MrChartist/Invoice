@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 afterEach(() => as(null));
 
-test('chain maths: 18+4 → 21.28 %, 10+5+2 → 16.21 %, 6-decimal rounding, parse rules', () => {
+test('chain maths: 18+4 → 21.28 %, 10+5+2 → 16.21 %, 10-decimal rounding (QA8 T11), parse rules', () => {
   assert.deepEqual(parseChain('18+4'), [18, 4]);
   assert.deepEqual(parseChain(' 10 + 5 + 2 %'), [10, 5, 2]);
   assert.equal(parseChain('1+2+3+4'), null, 'at most 3 steps');
@@ -37,7 +37,7 @@ test('chain maths: 18+4 → 21.28 %, 10+5+2 → 16.21 %, 6-decimal rounding, par
   assert.equal(chainPercent([18, 4]), 21.28);
   assert.equal(chainPercent([10, 5, 2]), 16.21);
   assert.equal(chainPercent([33.3, 33.3]), 55.5111);
-  assert.equal(chainPercent([12.5, 7.25, 3.333]), 21.548688);
+  assert.equal(chainPercent([12.5, 7.25, 3.333]), 21.5486878125);
   assert.equal(discountLabel({ disc_chain: [18, 4], disc_per_unit: 5 }), '18 + 4 % + ₹5/unit');
   assert.equal(discountText({ disc_chain: [18, 4] }), 'Disc 18 + 4 %');
   assert.equal(discountText({}), '');

@@ -105,13 +105,21 @@ export function recordPackMove(input: MoveInput): PackagingMove {
   });
 }
 
+/** QA8 T8: a charge movement whose invoice is gone (deleted) or cancelled no longer closes any crates. */
+export const orphanCharge = (m: Pick<PackagingMove, 'charge_invoice_id'>, invoices: readonly Pick<InvoiceRecord, 'id' | 'status'>[]): boolean =>
+  !!m.charge_invoice_id && !invoices.some((i) => i.id === m.charge_invoice_id && i.status !== 'Cancelled');
+
+/** Movements that count (orphaned charge movements — their invoice deleted or cancelled — reopen the crates). */
+export const activeMoves = (moves: readonly PackagingMove[], invoices: readonly Pick<InvoiceRecord, 'id' | 'status'>[] = peekTable<InvoiceRecord>('invoices')): PackagingMove[] =>
+  moves.filter((m) => !orphanCharge(m, invoices));
+
 /** Delete a movement (recycle bin through the watched table); its deposit voucher goes too. */
 export function removePackMove(id: string): void {
   requireAccess('doc.create');
   const all = getTable<PackagingMove>(MOVES_TABLE);
   const m = all.find((x) => x.id === id);
   if (!m) return;
-  if (m.charge_invoice_id) throw new Error('This movement closed crates billed on an invoice: cancel that invoice instead.');
+  if (m.charge_invoice_id && !orphanCharge(m, getTable<InvoiceRecord>('invoices'))) throw new Error('This movement closed crates billed on an invoice: cancel that invoice instead.');
   assertUnlocked({ id, issue_date: m.date, invoice_number: m.doc_no ?? '' }, 'delete');
   withTablesRollback([MOVES_TABLE, 'vouchers'], () => {
     if (m.voucher_id) deleteVoucher(m.voucher_id);
@@ -120,7 +128,7 @@ export function removePackMove(id: string): void {
 }
 
 /** Pure: the draft invoice charging `qty` unreturned units of `t` to `client`. */
-export function buildChargeInvoice(t: PackagingType, qty: number, client: Client, date: string, ctx: { settings: ReturnType<typeof localDb.settings.get>; sender: InvoiceRecord['sender'] }): InvoiceRecord {
+export function buildChargeInvoice(t: PackagingType, qty: number, client: Client, date: string, ctx: { settings: ReturnType<typeof localDb.settings.get>; sender: InvoiceRecord['sender']; lastSale?: Pick<InvoiceRecord, 'supply_type' | 'lut_number' | 'lut_date'> }): InvoiceRecord {
   const home = senderStateCode(ctx.sender);
   const pos = (isValidGstin(client.gstin ?? '') ? client.gstin!.slice(0, 2) : client.state_code) || home;
   const draft = makeDraft({ settings: ctx.settings, sender: ctx.sender, docType: isValidGstin(client.gstin ?? '') ? 'TAX_INVOICE' : 'INVOICE' });
@@ -130,6 +138,9 @@ export function buildChargeInvoice(t: PackagingType, qty: number, client: Client
     gst_mode: deriveGstMode({ senderStateCode: home, placeOfSupply: pos, senderHasGstin: !!ctx.sender?.companyGstin?.trim(), taxEnabled: true }),
     items: [{ id: generateId(), name: `${t.name} not returned`, description: 'Returnable packaging not returned — charged as a sale of the packaging (verify with your CA).', type: 'Goods', ...(t.hsn ? { hsn: t.hsn } : {}), unit: t.unit || 'NOS', quantity: qty, rate, tax_rate: num(t.tax_rate), discount_percent: 0, amount: round2(qty * rate) }],
   };
+  // QA8 T6: an SEZ customer's crates follow the supply type of their latest sale (zero-rated under LUT / IGST).
+  const sez = ctx.lastSale?.supply_type?.startsWith('SEZ') ? ctx.lastSale : undefined;
+  if (sez) Object.assign(rec, { supply_type: sez.supply_type, gst_mode: 'IGST', ...(sez.lut_number ? { lut_number: sez.lut_number } : {}), ...(sez.lut_date ? { lut_date: sez.lut_date } : {}) });
   const x = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
   return { ...rec, subtotal: x.subtotal, discount_amount: x.discount_amount, taxable_value: x.taxable_value, cgst_amount: x.cgst_amount, sgst_amount: x.sgst_amount, igst_amount: x.igst_amount, tax_amount: x.tax_amount, round_off: x.round_off, total: x.total, balance_due: x.balance_due, cess_amount: x.cess_amount, tcs_amount: x.tcs_amount, tds_amount: x.tds_amount };
 }
@@ -144,7 +155,8 @@ export function chargeUnreturned(b: Pick<PackBalance, 'party_id' | 'party' | 'ty
   if (!(num(t.charge_rate) > 0)) throw new Error(`Set the charge-if-lost rate of ${t.name} first.`);
   return withTablesRollback(['invoices', MOVES_TABLE, 'items_catalog', 'series_counters', 'vouchers'], () => {
     const catalogue = peekTable<unknown>('items_catalog');
-    const invoice = localDb.invoices.save(buildChargeInvoice(t, qty, client, date, { settings: localDb.settings.get(), sender: localDb.settings.activeProfile() }));
+    const lastSale = localDb.invoices.getAll().filter((i) => i.client?.id === client.id && i.status !== 'Draft' && i.status !== 'Cancelled' && i.doc_type !== 'CREDIT_NOTE' && i.doc_type !== 'QUOTATION').sort((a, b) => b.issue_date.localeCompare(a.issue_date))[0];
+    const invoice = localDb.invoices.save(buildChargeInvoice(t, qty, client, date, { settings: localDb.settings.get(), sender: localDb.settings.activeProfile(), lastSale }));
     if (peekTable<unknown>('items_catalog').length !== catalogue.length) setTable('items_catalog', catalogue as unknown[]);
     const move = recordPackMove({ date, party_kind: 'client', party_id: client.id, party_name: client.name, type_id: t.id, out: 0, in: qty, doc_id: invoice.id, doc_no: invoice.invoice_number, note: 'Charged as not returned' });
     setTable(MOVES_TABLE, getTable<PackagingMove>(MOVES_TABLE).map((m) => (m.id === move.id ? { ...m, charge_invoice_id: invoice.id } : m)));
