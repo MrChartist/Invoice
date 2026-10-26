@@ -2922,6 +2922,52 @@ try {
     await page.keyboard.press('Escape');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+
+  await step('R8-A discounts + claims: a party rate prices the line, "18+4" → 21.28 % printed as "18 + 4 %", a price-drop run makes one financial note, Receivables → Interest lists the party', async () => {
+    const keys = ['settings', 'clients', 'items_catalog', 'invoices', 'party_rates', 'price_drops', 'doc_links', 'series_counters', 'interest_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const ymd = (offset) => page.evaluate((o) => { const d = new Date(); d.setDate(d.getDate() + o); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }, offset);
+    const [today, tomorrow, old] = [await ymd(0), await ymd(1), await ymd(-75)];
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'wholesale', trade_kind: 'distributor', industry_packs: ['distributor'], trade_discounts: true, modules: undefined, lock_until: undefined });
+    const buyer = { id: 'e2e-dist-buyer', name: 'E2E Sharma Traders', email: '', address: 'Pune', city: 'Pune', zip: '', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), buyer]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-mcb', name: 'E2E Havells MCB', type: 'Product', hsn: '8536', unit: 'NOS', quantity: 1, rate: 1000, tax_rate: 18, amount: 0 }]);
+    await writeJson(page, 'party_rates', [{ id: 'e2e-pr', side: 'sale', party_id: buyer.id, party_name: buyer.name, item_id: 'e2e-mcb', item_name: 'E2E Havells MCB', rate: 900, valid_from: old }]);
+    const before = new Set((prev.invoices ?? []).map((i) => i.id));
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Client name').fill(buyer.name);
+    await page.getByLabel('Item 1 name').fill('E2E Havells');
+    await page.getByRole('option', { name: /E2E Havells MCB/ }).first().click({ timeout: 15000 });
+    await page.getByText('Party rate price').first().waitFor({ timeout: 15000 });
+    check((await page.getByLabel('Item 1 rate').inputValue()).startsWith('900'), `the party rate prices the line (${await page.getByLabel('Item 1 rate').inputValue()})`);
+    await page.locator('[data-disc-chain="0"]').fill('18+4');
+    await page.locator('[data-disc-eff="0"]').waitFor({ timeout: 15000 });
+    check(/21\.28%/.test(await page.locator('[data-disc-eff="0"]').innerText()), 'the line shows the effective 21.28 %');
+    await page.getByLabel('Item 1 quantity').fill('10');
+    await page.keyboard.press('Control+s');
+    await page.getByText(/saved/i).first().waitFor();
+    await closeSendSheet(page);
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => !before.has(i.id) && i.client?.name === buyer.name))).find((i) => !before.has(i.id) && i.client?.name === buyer.name);
+    check(inv?.items?.[0]?.discount_percent === 21.28 && inv.items[0].disc_chain?.join('+') === '18+4', `the line stores 21.28 % and the chain (${inv?.items?.[0]?.discount_percent})`);
+    await page.getByRole('button', { name: /Preview/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.getByText('Disc 18 + 4 %').first().waitFor({ timeout: 15000 });
+    check(true, 'the preview prints "Disc 18 + 4 %"');
+    await page.keyboard.press('Escape');
+    await writeJson(page, 'invoices', [...(await readJson(page, 'invoices', [])).map((i) => (i.id === inv.id ? { ...i, status: 'Sent', issue_date: today } : i)), { ...inv, id: 'e2e-old-bill', invoice_number: 'INV/E2E/OLD', status: 'Sent', issue_date: old, due_date: old, items: [{ ...inv.items[0], name: 'E2E Old cable', disc_chain: undefined, discount_percent: 0 }] }]);
+    await page.goto(srv.origin + '/distribution?tab=claims&view=pricedrop');
+    await page.locator('[data-drop-items]').fill('E2E Havells MCB, 50', { timeout: 15000 });
+    await page.locator('input[type="date"]').first().fill(tomorrow);
+    await page.locator('[data-drop-rows]').waitFor({ timeout: 15000 });
+    await page.locator('[data-drop-issue]').click();
+    const notes = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.price_drop_id))).filter((i) => i.price_drop_id);
+    check(notes.length === 1 && notes[0].note_kind === 'financial' && notes[0].total === 500 && /^FCN\//.test(notes[0].invoice_number), `one financial credit note of ₹500 (${notes.map((n) => `${n.invoice_number} ${n.total}`).join(', ')})`);
+    await page.goto(srv.origin + '/receivables?tab=interest');
+    await page.locator('[data-interest-rate]').fill('18', { timeout: 15000 });
+    await page.locator(`[data-interest-party="${buyer.name}"]`).waitFor({ timeout: 15000 });
+    check(true, 'Receivables → Interest lists the party with the overdue bill');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

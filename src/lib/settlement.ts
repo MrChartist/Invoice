@@ -26,7 +26,7 @@ import { localDb, resettleCreditedInvoices } from './localDb';
 import { assertUnlocked } from './period-lock';
 import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { withTablesRollback } from './table-txn';
-import { localDayOf } from './dates';
+import { localDayOf, shiftDay } from './dates';
 import { FCN_PREFIX, FINANCIAL_ACCOUNT_DEFAULTS, FINANCIAL_REASON_LABELS, isFinancialNote } from './financial-note';
 import { rupeeValue } from './approval-gate';
 import { audit } from './audit';
@@ -96,11 +96,17 @@ export interface SettlementOptions {
 }
 
 /** What "Settle the rest" offers for a receipt of `amount` on `date` against `due`. */
-export function settlementOptions(invoice: Pick<InvoiceRecord, 'payment_terms'>, due: number, amount: number, date: string): SettlementOptions {
+export function settlementOptions(invoice: Pick<InvoiceRecord, 'payment_terms'> & Partial<Pick<InvoiceRecord, 'cash_discount' | 'issue_date'>>, due: number, amount: number, date: string): SettlementOptions {
   const rest = round2(Math.max(num(due) - num(amount), 0));
   const offer = invoice.payment_terms?.early_discount;
   if (rest > 0.004 && offer && offer.until && date && date <= offer.until) {
     return { rest, early: { amount: round2(Math.min(offer.amount, rest)), until: offer.until, percent: offer.percent }, suggested: 'settlement_discount' };
+  }
+  // TR-A1: the bill's printed cash-discount term — the percent of what this receipt settles (paid ÷ (1 − p)).
+  const cd = invoice.cash_discount;
+  const until = cd && invoice.issue_date ? shiftDay(invoice.issue_date, num(cd.days)) : '';
+  if (rest > 0.004 && cd && num(cd.percent) > 0 && num(cd.percent) < 100 && date && date <= until) {
+    return { rest, early: { amount: round2(Math.min((num(amount) * num(cd.percent)) / (100 - num(cd.percent)), rest)), until, percent: num(cd.percent) }, suggested: 'settlement_discount' };
   }
   return { rest, suggested: 'leave' };
 }

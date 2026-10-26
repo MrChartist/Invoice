@@ -25,6 +25,10 @@ const EditorExtras = lazy(() => import('../extras7u/EditorExtras'));
 const MarginChip = lazy(() => import('../invoicing-ux/MarginChip'));
 // A3: payment mode + "Fully paid" on Amount received.
 const PayModeChips = lazy(() => import('../invoicing-ux/PayModeChips'));
+// R8-A (TR-A1 / A5): cash-discount term + returnable packaging strip (trade settings or a trading pack, lazy).
+const PackagingStrip = lazy(() => import('../trade/PackagingStrip'));
+import { localDb } from '../../lib/localDb';
+import { impliedPacks } from '../../lib/shop-mode';
 
 const GST_MODES: { id: GstMode; label: MessageKey }[] = [
   { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },
@@ -54,6 +58,7 @@ export function SummaryPanel() {
   const challan = s.doc_type === 'DELIVERY_CHALLAN';
   // Cheap check of the stored programme flag; the loyalty module itself loads only when it is on.
   const loyaltyOn = useMemo(() => getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}loyalty_program`, null)?.enabled === true, []);
+  const trOn = useMemo(() => ((x) => !!x.trade_discounts || !!x.returnable_packaging || impliedPacks(x).some((p) => p === 'distributor' || p === 'commodity' || p === 'agency'))(localDb.settings.get()), []); // R8-A
   const extrasOn = useMemo(
     () => getTable('sales_agents').length > 0 || getTable<{ kind?: string }>('schemes').some((x) => x?.kind === 'bill_value') || getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}pharma_settings`, null)?.enabled === true,
     [],
@@ -164,6 +169,7 @@ export function SummaryPanel() {
           <Suspense fallback={null}>
             <MarginChip />
           </Suspense>
+          {trOn && <Suspense fallback={null}><PackagingStrip /></Suspense>}
           {/* QA-3 F21: no bare "Zero" under an empty bill — words appear once there is an amount. */}
           {t.total !== 0 && (
             <>

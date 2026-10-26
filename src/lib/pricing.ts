@@ -82,7 +82,7 @@ export interface PriceQuote {
   rate: number;
   /** What set the rate, printed as a hint ("Wholesale", "Qty ≥ 10", "Store price (Mall)"); undefined = base rate. */
   basis?: string;
-  source: 'base' | 'level' | 'slab' | 'branch';
+  source: 'base' | 'level' | 'slab' | 'branch' | 'party';
 }
 
 /**
@@ -158,7 +158,10 @@ export function resolvePrice(
   qty: number,
   level?: PriceLevel | null,
   branch?: BranchPriceContext | null,
+  /** TR-A1: the party-item special rate (`trade/tr-party-rates.ts`) — wins over every other source. */
+  partyRate?: number,
 ): PriceQuote {
+  if (num(partyRate) > 0) return { rate: round2(num(partyRate)), basis: 'Party rate', source: 'party' };
   const base = mrpLessRate(item);
   const lvl = levelRate(level, item);
   const store = lvl === undefined && branch ? (branch.override !== undefined ? round2(branch.override) : levelRate(branch.level, item)) : undefined;
@@ -177,7 +180,7 @@ export function schemeActive(s: Scheme, day: string): boolean {
   if (s.active === false) return false;
   if (s.kind === 'bill_value') {
     if (!(s.slabs ?? []).some((x) => num(x.min_value) >= 0 && (num(x.percent) > 0 || num(x.amount) > 0))) return false;
-  } else if (!(num(s.buy_qty) > 0) || !(num(s.free_qty) > 0)) return false;
+  } else if ((!(num(s.buy_qty) > 0) || !(num(s.free_qty) > 0)) && !s.free_slabs?.length) return false; // TR-A2: or free slabs
   if (s.valid_from && day < s.valid_from) return false;
   if (s.valid_to && day > s.valid_to) return false;
   return true;
@@ -190,7 +193,7 @@ export function schemeFor(
   day: string,
 ): Scheme | undefined {
   return schemes.find(
-    (s) => s.kind !== 'bill_value' && schemeActive(s, day) && ((item.id && s.item_id === item.id) || norm(s.item_name) === norm(item.name)),
+    (s) => s.kind !== 'bill_value' && !s.scope && schemeActive(s, day) && ((item.id && s.item_id === item.id) || norm(s.item_name) === norm(item.name)),
   );
 }
 
@@ -223,6 +226,8 @@ export function syncSchemeLines(
   newId: () => string = generateId,
   /** 7U: the catalogue, to give a buy-A-get-B free line item B's HSN / unit / GST rate. */
   catalog: readonly InvoiceItem[] = [],
+  /** TR-A2: scoped schemes (`trade/tr-schemes.ts` `applyScopedSchemes`), given the lines after this pass and before it. */
+  scoped?: (after: InvoiceItem[], before: readonly InvoiceItem[]) => InvoiceItem[],
 ): InvoiceItem[] {
   if (schemes.length === 0 && !items.some((i) => i.free_of)) return items as InvoiceItem[];
   const paidIds = new Set(items.filter((i) => !i.free_of).map((i) => i.id));
@@ -238,7 +243,7 @@ export function syncSchemeLines(
     }
     out.push(line);
     const scheme = line.name.trim() ? schemeFor(schemes, { name: line.name }, day) : undefined;
-    const want = scheme ? freeQty(scheme, num(line.quantity)) : 0;
+    const want = scheme ? (scheme.free_slabs?.length ? Math.max(0, ...scheme.free_slabs.filter((x) => num(line.quantity) >= num(x.min_qty)).map((x) => num(x.free_qty))) : freeQty(scheme, num(line.quantity))) : 0;
     const existing = freeByPaid.get(line.id);
     if (!scheme || want <= 0) {
       if (existing) changed = true;
@@ -271,6 +276,11 @@ export function syncSchemeLines(
     if (!existing || JSON.stringify(existing) !== JSON.stringify(free)) changed = true;
     out.push(free);
   }
+  if (scoped) {
+    const next = scoped(out, items);
+    if (JSON.stringify(next) !== JSON.stringify(items)) return next;
+    return items as InvoiceItem[];
+  }
   return changed ? out : (items as InvoiceItem[]);
 }
 
@@ -293,7 +303,7 @@ export function validateLevel(level: Pick<PriceLevel, 'id' | 'name' | 'percent_o
 }
 
 /** Validation for the scheme form; '' when fine. */
-export function validateScheme(s: Pick<Scheme, 'item_id' | 'item_name' | 'buy_qty' | 'free_qty' | 'valid_from' | 'valid_to'> & Partial<Pick<Scheme, 'kind' | 'free_item_id' | 'free_item_name' | 'slabs'>>): string {
+export function validateScheme(s: Pick<Scheme, 'item_id' | 'item_name' | 'buy_qty' | 'free_qty' | 'valid_from' | 'valid_to'> & Partial<Pick<Scheme, 'kind' | 'free_item_id' | 'free_item_name' | 'slabs' | 'scope' | 'free_slabs'>>): string {
   if (s.kind === 'bill_value') {
     const slabs = s.slabs ?? [];
     if (!slabs.length) return 'Add at least one bill-value slab.';
@@ -306,10 +316,14 @@ export function validateScheme(s: Pick<Scheme, 'item_id' | 'item_name' | 'buy_qt
     if (s.valid_from && s.valid_to && s.valid_to < s.valid_from) return 'The scheme ends before it starts.';
     return '';
   }
-  if (!s.item_id && !s.item_name.trim()) return 'Pick the item the scheme is on.';
+  if (!s.item_id && !s.item_name.trim() && !s.scope) return 'Pick the item the scheme is on.';
   if (s.kind === 'buy_get' && !s.free_item_id && !(s.free_item_name ?? '').trim()) return 'Pick the item given free.';
-  if (!(num(s.buy_qty) > 0) || !Number.isInteger(num(s.buy_qty))) return 'Buy quantity must be a whole number above zero.';
-  if (!(num(s.free_qty) > 0) || !Number.isInteger(num(s.free_qty))) return 'Free quantity must be a whole number above zero.';
+  if (s.free_slabs?.length) {
+    if (s.free_slabs.some((x) => !(num(x.min_qty) > 0) || !(num(x.free_qty) > 0))) return 'Each free slab needs a quantity and a free quantity above zero.';
+  } else {
+    if (!(num(s.buy_qty) > 0) || !Number.isInteger(num(s.buy_qty))) return 'Buy quantity must be a whole number above zero.';
+    if (!(num(s.free_qty) > 0) || !Number.isInteger(num(s.free_qty))) return 'Free quantity must be a whole number above zero.';
+  }
   if (s.valid_from && s.valid_to && s.valid_to < s.valid_from) return 'The scheme ends before it starts.';
   return '';
 }
@@ -421,6 +435,10 @@ export const schemesDb = {
       ...(s.active === false ? { active: false } : {}),
       ...(s.kind && s.kind !== 'same' ? { kind: s.kind } : {}),
       ...(s.kind === 'buy_get' ? { free_item_id: s.free_item_id ?? '', free_item_name: (s.free_item_name ?? '').trim() } : {}),
+      // TR-A2: scope v2, free slabs and the principal's claim terms are kept as entered (Distribution → Claims).
+      ...(s.scope ? { scope: s.scope } : {}),
+      ...(s.free_slabs?.length ? { free_slabs: s.free_slabs } : {}),
+      ...(s.principal_vendor_id ? { principal_vendor_id: s.principal_vendor_id, claim_basis: s.claim_basis, ...(num(s.claim_rate) > 0 ? { claim_rate: num(s.claim_rate) } : {}) } : {}),
       ...(s.kind === 'bill_value' ? { slabs: (s.slabs ?? []).map((x) => ({ min_value: round2(num(x.min_value)), ...(num(x.percent) > 0 ? { percent: num(x.percent) } : { amount: round2(num(x.amount)) }) })).sort((a, b) => a.min_value - b.min_value), ...(s.label?.trim() ? { label: s.label.trim() } : {}) } : {}),
       created_at: s.created_at || new Date().toISOString(),
     };

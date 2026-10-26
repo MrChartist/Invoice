@@ -37,6 +37,7 @@ export const FINANCIAL_ACCOUNT_DEFAULTS: Readonly<Record<FinancialReason, string
   settlement_discount: 'discount_allowed',
   short_payment: 'discount_allowed',
   bad_debt: 'bad_debts',
+  price_drop: 'discount_allowed', // TR-A3
 };
 
 /** The account to debit for `rec` (its snapshot, else the reason's default). */
@@ -48,4 +49,5 @@ export const FINANCIAL_REASON_LABELS: Readonly<Record<FinancialReason, string>> 
   settlement_discount: 'Settlement discount',
   short_payment: 'Short payment (kasar)',
   bad_debt: 'Bad debt written off',
+  price_drop: 'Price drop', // TR-A3
 };
