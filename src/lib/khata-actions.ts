@@ -6,7 +6,7 @@
 import type { Client, InvoiceRecord, PartyBalanceSnapshot, SenderProfile } from '../types/invoice';
 import type { AdvanceRecord } from '../types/advances';
 import { localDb } from './localDb';
-import { getTable, setTable, generateId } from './storage';
+import { getTable, peekTable, setTable, generateId } from './storage';
 import { buildReceivables, posRefunds, type BuildInput, type ReceiptRow, type ReceivablesReport } from './receivables';
 import type { PosReturn } from './pos-returns';
 import type { CreditLinkRow } from './amount-due';
@@ -41,7 +41,24 @@ export function loadKhataReport(now: Date = new Date()): { input: BuildInput; re
 
 /** The balance snapshot for a bill being issued (8.5); see `nextPartyBalanceSnapshot`. */
 export function partyBalanceSnapshotFor(record: InvoiceRecord, opts: SnapshotOptions = {}): PartyBalanceSnapshot | undefined {
-  return computePartyBalanceSnapshot(record, loadReceivablesInput(), opts);
+  return computePartyBalanceSnapshot(record, sharedReceivablesInput(), opts);
+}
+
+/**
+ * PERF-1 (save path): `loadReceivablesInput` over the SHARED parsed tables — no row copies. Only for
+ * readers that never change the rows (`buildReceivables` builds its own report objects).
+ */
+function sharedReceivablesInput(): BuildInput {
+  const clients = peekTable<Client>('clients') as Client[];
+  return {
+    invoices: peekTable<InvoiceRecord>('invoices') as InvoiceRecord[],
+    payments: peekTable<ReceiptRow>('transactions') as ReceiptRow[],
+    clients,
+    advances: peekTable<AdvanceRecord>('advances') as AdvanceRecord[],
+    links: peekTable<CreditLinkRow>('doc_links') as CreditLinkRow[],
+    openingBills: loadReceivableOpeningBills(clients),
+    refunds: posRefunds(peekTable<PosReturn>('pos_returns') as PosReturn[]),
+  };
 }
 
 /* ── "₹ Given" (credit without items) ─────────────────────────── */

@@ -6,7 +6,7 @@ import { Modal } from '../ui/Modal';
 import {
   backupFilename,
   clearSafetySnapshot,
-  exportPlainBackup,
+  exportPlainBackupBlob,
   plainBackupAllowed,
   VAULT_PLAIN_BACKUP_MESSAGE,
   getLastBackup,
@@ -30,7 +30,7 @@ import { assessStorage, formatChars, measureStorage } from '../../lib/storage-he
 import { cleanupUnusedAttachments } from '../../lib/attachments';
 import { isIosSafari, isStandalone, requestPersistentStorage } from '../../lib/pwa';
 import { localDb } from '../../lib/localDb';
-import { downloadText } from '../../lib/download';
+import { downloadBlob } from '../../lib/download';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import type { InvoiceItem } from '../../types/invoice';
 import { useT } from '../../i18n';
@@ -114,7 +114,7 @@ export function DataPanel({ notify }: Props) {
 
   const exportBackup = () => {
     try {
-      downloadText(backupFilename(), exportPlainBackup(), 'application/json');
+      downloadBlob(backupFilename(), exportPlainBackupBlob()); // PERF-1: parts, never one 70 MB string
     } catch (err) {
       return notify((err as Error).message, 'error');
     }
@@ -127,13 +127,13 @@ export function DataPanel({ notify }: Props) {
     const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }> }).showSaveFilePicker;
     if (!picker) return notify(setT('noFolderSave'), 'info');
     try {
-      const text = exportPlainBackup(); // owner only; refused in vault mode — before any file is created
+      const blob = exportPlainBackupBlob(undefined, 'application/json'); // owner only; refused in vault mode — before any file is created
       const handle = await picker({
         suggestedName: backupFilename(),
         types: [{ description: 'Invoice backup', accept: { 'application/json': ['.json'] } }],
       });
       const writable = await handle.createWritable();
-      await writable.write(new Blob([text], { type: 'application/json' }));
+      await writable.write(blob);
       await writable.close();
       markBackupDone();
       setVersion((v) => v + 1);

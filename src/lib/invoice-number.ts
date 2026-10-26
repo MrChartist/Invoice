@@ -142,7 +142,7 @@ export interface NumberedDoc {
 
 /** The OTHER document already using `candidate`, if any. `selfId` is the document being edited. */
 export function findNumberClash<T extends NumberedDoc>(
-  docs: T[],
+  docs: readonly T[],
   candidate: string,
   selfId?: string,
 ): T | undefined {

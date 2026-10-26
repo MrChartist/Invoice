@@ -370,19 +370,21 @@ export const localDb = {
       number: string,
       selfId?: string,
     ): { ok: boolean; clash?: InvoiceRecord; gap: SeriesGap | null } => {
-      const all = getTable<InvoiceRecord>(KEYS.invoices);
+      const all = peekTable<InvoiceRecord>(KEYS.invoices); // read-only (PERF-1)
       const trimmed = (number ?? '').trim();
       if (!trimmed) return { ok: true, gap: null };
       const own = selfId ? all.find((i) => i.id === selfId) : undefined;
       // A document keeps its own number valid, even if legacy data already duplicated it.
       if (own && numberKey(own.invoice_number) === numberKey(trimmed)) return { ok: true, gap: null };
       const clash = findNumberClash(all, trimmed, selfId);
-      if (clash) return { ok: false, clash, gap: null };
+      if (clash) return { ok: false, clash: { ...clash }, gap: null };
       return { ok: true, gap: gapsIfIssued(all.filter((i) => i.id !== selfId).map((i) => i.invoice_number), trimmed) };
     },
 
     save: (invoice: InvoiceRecord): InvoiceRecord => {
-      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
+      // PERF-1: the shared parsed rows with only the saved row replaced (never mutated); setTable then
+      // reuses the untouched rows for the next version, so a save does not re-parse the table.
+      const invoices = peekTable<InvoiceRecord>(KEYS.invoices).slice();
       const idx = invoices.findIndex((i) => i.id === invoice.id);
       const stored = idx >= 0 ? invoices[idx] : undefined;
       // Local roles (6.21): a viewer cannot write documents.
@@ -543,11 +545,12 @@ export const localDb = {
 
   payments: {
     getAll: () => getTable<Payment>(KEYS.transactions),
-    listFor: (invoiceId: string) =>
-      getTable<Payment>(KEYS.transactions).filter((t) => t.invoice_id === invoiceId),
+    // PERF-1: filter the shared rows, copy only the matches (same top-level copies `getTable` gives).
+    listFor: (invoiceId: string): Payment[] =>
+      peekTable<Payment>(KEYS.transactions).filter((t) => t.invoice_id === invoiceId).map((t) => ({ ...t })),
     totalFor: (invoiceId: string) =>
       round2(
-        getTable<Payment>(KEYS.transactions)
+        peekTable<Payment>(KEYS.transactions)
           .filter((t) => t.invoice_id === invoiceId)
           .reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
       ),

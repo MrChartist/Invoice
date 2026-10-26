@@ -127,6 +127,18 @@ const failureListeners = new Set<() => void>();
 const changeListeners = new Set<(key: string) => void>();
 let channel: BroadcastChannel | null = null;
 let listenersInstalled = false;
+/** Moves on every write, removal or cross-tab refresh of any key this module serves (see `storageVersion`). */
+let dataVersion = 0;
+
+/**
+ * A counter that changes whenever anything stored through this module may have changed: every
+ * `writeRaw` / `removeRaw` (so every `setTable` / `setJson`), another tab's IndexedDB change, boot,
+ * unlock and reset. Writes made behind its back (another tab's localStorage write: listen for the
+ * window `storage` event) are not seen.
+ */
+export function storageVersion(): number {
+  return dataVersion;
+}
 
 /* Vault mode (5.8): with a vault, every value in IndexedDB is sealed with `vaultKey`. */
 let vaultKey: CryptoKey | null = null;
@@ -310,6 +322,7 @@ async function onRemoteChange(keys: unknown[]): Promise<void> {
     if (v === null) cache.delete(k);
     else cache.set(k, v);
   });
+  dataVersion++;
   for (const k of wanted) for (const fn of changeListeners) fn(k);
 }
 
@@ -454,6 +467,7 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
     }
 
     for (const [k, v] of target) cache.set(k, v);
+    dataVersion++;
     backend = 'idb';
     installIdbListeners();
     try {
@@ -521,6 +535,7 @@ export async function unlockStorage(passphrase: string): Promise<{ unreadable: s
   cache.clear();
   pending.clear();
   for (const [k, v] of plain) cache.set(k, v);
+  dataVersion++;
   vaultKey = key;
   vaultId = id;
   skippedKeys = unreadable.sort();
@@ -735,6 +750,9 @@ export function resetStorageBackend(): void {
   flushing = null;
   flushError = null;
   assetCache = null;
+  parsedCache.clear();
+  readTrace = null;
+  dataVersion++;
   try {
     channel?.close();
   } catch {
@@ -751,6 +769,7 @@ export function isStorageAvailable(): boolean {
 }
 
 export function readRaw(fullKey: string): string | null {
+  if (readTrace) readTrace.add(fullKey);
   if (inCache(fullKey)) return cache.get(fullKey) ?? null;
   try {
     return store()?.getItem(fullKey) ?? null;
@@ -760,6 +779,7 @@ export function readRaw(fullKey: string): string | null {
 }
 
 export function writeRaw(fullKey: string, value: string): void {
+  dataVersion++;
   if (inCache(fullKey)) {
     if (vaultConflict) throw vaultConflict;
     // While IndexedDB refuses writes for lack of space, refuse anything that grows the data so
@@ -780,6 +800,7 @@ export function writeRaw(fullKey: string, value: string): void {
 }
 
 export function removeRaw(fullKey: string): void {
+  dataVersion++;
   if (inCache(fullKey)) {
     if (!cache.has(fullKey) && !pending.has(fullKey)) return;
     cache.delete(fullKey);
@@ -822,26 +843,128 @@ function assetIndex(): AssetIndex {
   return assetCache.idx;
 }
 
-export function getTable<T>(name: string): T[] {
-  const raw = readRaw(DB_PREFIX + name);
-  if (!raw) return [];
-  let rows: T[];
+/* ── Parsed-rows cache (PERF-1) ────────────────────────────────── */
+
+/**
+ * Every table is parsed once per stored version and the parsed rows are shared:
+ *
+ *  - `peekTable` hands out the shared rows themselves (read-only).
+ *  - `getTable` hands out a NEW array of NEW top-level row objects (`{ ...row }`), so callers may
+ *    push / splice / sort the array and assign any field of a row, exactly as with a fresh parse.
+ *    Nested values (a row's `items`, `sender`, `client` …) are shared with the cache and must not be
+ *    mutated in place — replace them instead (`row.items = row.items.map(...)`). In dev builds and
+ *    under `node --test` every cached row is deep-frozen, so an in-place nested write throws there.
+ *  - The entry is keyed on the identity of the stored string (and, for snapshot tables, of the
+ *    asset table), so a `setTable`, `writeRaw`, restore, sync merge or another tab's change is seen
+ *    by the very next read: there is no separate invalidation to forget.
+ *  - `setTable` seeds the next version from the rows it was given: a row that is the cached row (or
+ *    an unchanged `getTable` copy of it) is reused, every other row goes through a JSON round trip
+ *    (exactly what a parse of the stored text would give), so a save does not re-parse the table.
+ */
+interface ParsedEntry {
+  table: string;
+  raw: string;
+  assets: string | null;
+  rows: readonly unknown[];
+}
+const parsedCache = new Map<string, ParsedEntry>();
+/** Cached row → the entry it belongs to. */
+const rowEntry = new WeakMap<object, ParsedEntry>();
+/** `getTable` copy → the cached row it was copied from. */
+const copyOf = new WeakMap<object, object>();
+const EMPTY_ROWS: readonly unknown[] = Object.freeze([]);
+/** Parses per table since the last `resetParseCounts()` (test seam for the parse-count guard rails). */
+const parseCounts = new Map<string, number>();
+
+/** Freeze shared rows in dev builds and under `node --test`, so an in-place write to a shared row throws. */
+const FREEZE_SHARED: boolean = (() => {
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    rows = parsed as T[];
+    if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) return true;
   } catch {
-    return [];
+    /* no import.meta.env outside Vite */
+  }
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return !!(env && (env.NODE_TEST_CONTEXT || env.MRC_FREEZE_SHARED === '1'));
+})();
+/** True when shared rows / memoised results are deep-frozen (dev builds, tests). */
+export function sharedRowsFrozen(): boolean {
+  return FREEZE_SHARED;
+}
+
+function deepFreeze(v: unknown): void {
+  if (!v || typeof v !== 'object' || Object.isFrozen(v)) return;
+  Object.freeze(v);
+  if (Array.isArray(v)) for (const x of v) deepFreeze(x);
+  else for (const k of Object.keys(v)) deepFreeze((v as Record<string, unknown>)[k]);
+}
+
+/** Deep-freeze `v` in dev builds and tests (a no-op in production). Returns `v`. */
+export function freezeShared<T>(v: T): T {
+  if (FREEZE_SHARED) deepFreeze(v);
+  return v;
+}
+
+function registerEntry(table: string, raw: string, assets: string | null, rows: unknown[]): ParsedEntry {
+  const entry: ParsedEntry = { table, raw, assets, rows };
+  for (const r of rows) if (r && typeof r === 'object') rowEntry.set(r, entry);
+  if (FREEZE_SHARED) deepFreeze(rows);
+  parsedCache.set(table, entry);
+  return entry;
+}
+
+function parseEntry(table: string, raw: string, assets: string | null): ParsedEntry {
+  parseCounts.set(table, (parseCounts.get(table) ?? 0) + 1);
+  let rows: unknown[] = [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) rows = parsed;
+  } catch {
+    /* corrupt: an empty table (fail-soft), cached until the text changes */
   }
   // Snapshot images are stored by reference (assets.ts); readers always get the data URL back.
-  return SNAPSHOT_TABLES.has(name) ? decodeRows(rows, assetIndex()) : rows;
+  if (rows.length && SNAPSHOT_TABLES.has(table)) rows = decodeRows(rows, assetIndex());
+  return registerEntry(table, raw, assets, rows);
+}
+
+/** The current entry of `table` if it still matches the stored text, else null. */
+function liveEntry(table: string): ParsedEntry | null {
+  const hit = parsedCache.get(table);
+  if (!hit) return null;
+  const raw = readRaw(DB_PREFIX + table);
+  if (hit.raw !== raw) return null;
+  if (SNAPSHOT_TABLES.has(table) && hit.assets !== readRaw(DB_PREFIX + ASSET_TABLE)) return null;
+  return hit;
+}
+
+function sharedRows(table: string): readonly unknown[] {
+  const raw = readRaw(DB_PREFIX + table);
+  if (!raw) {
+    parsedCache.delete(table);
+    return EMPTY_ROWS;
+  }
+  const assets = SNAPSHOT_TABLES.has(table) ? readRaw(DB_PREFIX + ASSET_TABLE) : null;
+  const hit = parsedCache.get(table);
+  if (hit && hit.raw === raw && hit.assets === assets) return hit.rows;
+  return parseEntry(table, raw, assets).rows;
 }
 
 /**
- * Perf: parsed rows of a table, re-parsed only when its stored text (or, for snapshot tables, the
- * asset table) changes. Shared between callers, so `peekTable` rows are READ-ONLY.
+ * Rows of a table that the caller may change: a new array of new top-level row objects over the
+ * shared parsed rows (see "Parsed-rows cache" above — nested values must be replaced, not mutated).
  */
-const peekCache = new Map<string, { raw: string; assets: string | null; rows: readonly unknown[] }>();
+export function getTable<T>(name: string): T[] {
+  const rows = sharedRows(name);
+  const out = new Array<T>(rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (r && typeof r === 'object') {
+      const c = Array.isArray(r) ? r.slice() : { ...(r as object) };
+      copyOf.set(c, r);
+      out[i] = c as T;
+    } else out[i] = r as T;
+  }
+  return out;
+}
 
 /**
  * Read-only view of a table for hot paths (lookups, number series, building a new array of rows).
@@ -849,17 +972,94 @@ const peekCache = new Map<string, { raw: string; assets: string | null; rows: re
  * or a row (copy it, e.g. `{ ...row }`, or use `getTable` for rows you will change).
  */
 export function peekTable<T>(name: string): readonly T[] {
-  const raw = readRaw(DB_PREFIX + name);
-  if (!raw) {
-    peekCache.delete(name);
-    return [];
+  return sharedRows(name) as readonly T[];
+}
+
+/** Test seam: how many times `table` was parsed since `resetParseCounts()` (all tables when omitted). */
+export function tableParseCount(table?: string): number {
+  if (table) return parseCounts.get(table) ?? 0;
+  let n = 0;
+  for (const v of parseCounts.values()) n += v;
+  return n;
+}
+
+export function resetParseCounts(): void {
+  parseCounts.clear();
+}
+
+/**
+ * Keys read through `readRaw` (so every `getTable` / `peekTable` / `getJson`) are added to this set
+ * while it is installed: the dependency tracking behind `memoOnReads` (table-memo.ts).
+ */
+let readTrace: Set<string> | null = null;
+
+/** Install (or with null remove) the read trace; returns the previous one. */
+export function setReadTrace(trace: Set<string> | null): Set<string> | null {
+  const prev = readTrace;
+  readTrace = trace;
+  return prev;
+}
+
+/**
+ * Seed the cache with the version `setTable` just wrote, so the next read does not parse it back.
+ * `rows` are the caller's rows, `stored` what was serialised (asset-encoded for snapshot tables).
+ */
+function seedEntry(table: string, raw: string, assets: string | null, prev: ParsedEntry | null, rows: readonly unknown[], stored: readonly unknown[]): void {
+  if (!prev && rows.length > 64) {
+    parsedCache.delete(table); // nothing to reuse: a lazy parse is cheaper than a round trip per row
+    return;
   }
-  const assets = SNAPSHOT_TABLES.has(name) ? readRaw(DB_PREFIX + ASSET_TABLE) : null;
-  const hit = peekCache.get(name);
-  if (hit && hit.raw === raw && hit.assets === assets) return hit.rows as readonly T[];
-  const rows = getTable<T>(name);
-  peekCache.set(name, { raw, assets, rows });
-  return rows;
+  const limit = Math.max(64, rows.length >> 2);
+  const out = new Array<unknown>(rows.length);
+  const fresh: number[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const orig = prev ? reusableRow(r, prev) : undefined;
+    if (orig !== undefined) {
+      out[i] = orig;
+      continue;
+    }
+    if (fresh.length >= limit) {
+      parsedCache.delete(table); // a bulk rewrite: parse lazily instead
+      return;
+    }
+    fresh.push(i);
+  }
+  if (fresh.length) {
+    const copies = fresh.map((i) => {
+      const s = JSON.stringify(stored[i]);
+      return s === undefined ? null : (JSON.parse(s) as unknown);
+    });
+    const decoded = SNAPSHOT_TABLES.has(table) ? decodeRows(copies, assetIndex()) : copies;
+    fresh.forEach((i, k) => (out[i] = decoded[k]));
+  }
+  registerEntry(table, raw, assets, out);
+  if (FREEZE_SHARED) verifySeed(table, raw, out);
+}
+
+/** The cached row `r` stands for, if it can be reused as is: the row itself, or an unchanged `getTable` copy of it. */
+function reusableRow(r: unknown, prev: ParsedEntry): unknown {
+  if (!r || typeof r !== 'object') return r === null || typeof r === 'number' || typeof r === 'string' || typeof r === 'boolean' ? r : undefined;
+  if (rowEntry.get(r) === prev) return r;
+  const orig = copyOf.get(r);
+  if (!orig || rowEntry.get(orig) !== prev) return undefined;
+  if (Array.isArray(r)) return undefined; // (array rows are not app data shapes: round trip)
+  const a = Object.keys(r);
+  const b = Object.keys(orig);
+  if (a.length !== b.length) return undefined;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i] || (r as Record<string, unknown>)[a[i]] !== (orig as Record<string, unknown>)[a[i]]) return undefined;
+  }
+  return orig;
+}
+
+/** Dev / test self-check: the seeded rows serialise to exactly the stored text. */
+function verifySeed(table: string, raw: string, rows: readonly unknown[]): void {
+  const text = SNAPSHOT_TABLES.has(table) ? JSON.stringify(encodeRows(rows as unknown[], assetIndex()).rows) : JSON.stringify(rows);
+  if (text !== raw) {
+    parsedCache.delete(table);
+    throw new Error(`storage: bad seed for ${table}`);
+  }
 }
 
 /**
@@ -890,9 +1090,13 @@ function notifyTableWrite(name: string, prevRaw: string | null, rows: readonly u
 
 export function setTable<T>(name: string, rows: T[]): void {
   requireTableWrite(name); // roles (6.21): clerk / viewer limits, defence in depth
-  const prevRaw = tableWriteHook ? readRaw(DB_PREFIX + name) : null;
+  const key = DB_PREFIX + name;
+  const prevRaw = tableWriteHook ? readRaw(key) : null;
+  const prev = liveEntry(name);
   if (!SNAPSHOT_TABLES.has(name)) {
-    writeRaw(DB_PREFIX + name, JSON.stringify(rows));
+    const raw = JSON.stringify(rows);
+    writeRaw(key, raw);
+    seedAfterWrite(name, raw, null, prev, rows, rows);
     notifyTableWrite(name, prevRaw, rows);
     return;
   }
@@ -909,8 +1113,26 @@ export function setTable<T>(name: string, rows: T[]): void {
       throw err;
     }
   }
-  writeRaw(DB_PREFIX + name, JSON.stringify(encoded.rows));
+  const raw = JSON.stringify(encoded.rows);
+  writeRaw(key, raw);
+  // A new asset could resolve a reference an older cached row left unresolved: parse lazily then.
+  seedAfterWrite(name, raw, readRaw(DB_PREFIX + ASSET_TABLE), encoded.added ? null : prev, rows, encoded.rows);
   notifyTableWrite(name, prevRaw, encoded.rows);
+}
+
+function seedAfterWrite(table: string, raw: string, assets: string | null, prev: ParsedEntry | null, rows: readonly unknown[], stored: readonly unknown[]): void {
+  // The cache holds what `readRaw` returns; on localStorage that is a fresh string per read, so key on it.
+  const current = readRaw(DB_PREFIX + table);
+  if (current !== raw) {
+    parsedCache.delete(table);
+    return;
+  }
+  try {
+    seedEntry(table, current, assets, prev, rows, stored);
+  } catch (err) {
+    parsedCache.delete(table);
+    if (FREEZE_SHARED) throw err;
+  }
 }
 
 export function getJson<T>(fullKey: string, fallback: T): T {
