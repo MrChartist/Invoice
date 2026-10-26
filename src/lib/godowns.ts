@@ -68,7 +68,7 @@ export function isMultiGodown(stored: readonly Godown[]): boolean {
 }
 
 /** 8F: godowns stock may not be sold from (kind 'expiry': expired / breakage stock). */
-const NON_SALEABLE: ReadonlySet<string> = new Set(['expiry', 'wip', 'qc', 'transit']); // R4-A: shop floor, QC hold, in transit
+const NON_SALEABLE: ReadonlySet<string> = new Set(['expiry', 'wip', 'qc', 'transit', 'site']); // R4-A: shop floor, QC hold, in transit; R5-B6: works site
 export const nonSaleableGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => !!g.kind && NON_SALEABLE.has(g.kind)).map((g) => g.id));
 
 export function godownName(list: readonly Godown[], id: string | undefined): string {

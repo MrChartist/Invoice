@@ -159,6 +159,13 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   // R5-C: institutions, non-profits & property
   fee_plans: 'Fee plans.', fee_runs: 'Fee billing runs.', common_credit_runs: 'Rule 42 / 43 reversals.', donations: 'Donation receipts (80G / 35).',
   form_10bd_filings: 'Form 10BD filings.', form_10be: 'Form 10BE certificates.', properties: 'Properties and units.', leases: 'Leases.', security_deposits: 'Security deposits.',
+  // R5-B: transport & works contracts pack
+  consignment_notes: 'Consignment notes (LR / bilty).',
+  gta_options: 'GTA tax option per FY.',
+  vehicles: 'Vehicles and their documents.',
+  trips: 'Trip sheets.',
+  ra_measurements: 'RA bill measurements per BOQ line.',
+  boq_coefficients: 'Material per BOQ unit (theoretical consumption).',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',

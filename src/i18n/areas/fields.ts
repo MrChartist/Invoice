@@ -66,7 +66,8 @@ export const fldT = defineArea(
     'kind.project': 'Project',
     'kind.department': 'Department',
     'kind.branch': 'Branch',
-    'kind.fund': 'Fund', // R5-C4
+    'kind.vehicle': 'Vehicle', // R5-B3
+    'kind.fund': 'Fund', // R5-C4 (added with the one union change, §6)
     inactive: ' (inactive)',
   } as const,
   {
@@ -131,7 +132,8 @@ export const fldT = defineArea(
     'kind.project': 'प्रोजेक्ट',
     'kind.department': 'विभाग',
     'kind.branch': 'शाखा',
-    'kind.fund': 'फ़ंड', // R5-C4
+    'kind.vehicle': 'वाहन',
+    'kind.fund': 'फ़ंड',
     inactive: ' (निष्क्रिय)',
   },
 );

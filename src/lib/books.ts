@@ -490,6 +490,8 @@ export function buildVouchers(data: BooksData): Voucher[] {
     if ((t as { gift_voucher_id?: string }).gift_voucher_id) continue;
     // R5-C6: a receipt settled from a security deposit held moved no money either.
     if (t.deposit_adjustment_id) continue;
+    // R5-B5: nor a GST TDS / labour-cess deduction row (the client kept the money; it posts through a clearing account).
+    if (t.ra_journal_id) continue;
     const date = toIsoDate(t.date);
     const inv = invById.get(t.invoice_id);
     // A receipt against a foreign-currency invoice is booked at the rupees actually realised

@@ -22,6 +22,25 @@ import { billApprovalRequired, readPurchaseApprovalPolicy } from './purchase-app
 import { settleInboxFor, submitBillForApproval } from './purchase-approvals';
 import { formatCurrency, formatDate } from './utils';
 import { capT } from '../i18n/areas/capture';
+import { defineArea } from '../i18n/area';
+import { isPackOn } from './industry-packs';
+import { getIndianFY } from './invoice-number';
+import { SINGLETON_KEYS, getJson, peekTable } from './storage';
+
+// R5-B2: informational ITC caution for a GTA that opted for 5% forward charge without ITC this FY (transport pack only).
+const gtaT = defineArea(
+  { warnGta: 'GTA option FY {fy}: 5% without ITC — check the ITC on this bill (verify with your CA).' } as const,
+  { warnGta: 'GTA विकल्प वित्त वर्ष {fy}: 5% बिना ITC — इस बिल का ITC जाँचें (CA से पुष्टि करें)।' },
+);
+
+function gtaItcCaution(input: BillInput): string {
+  if (!input.itc_eligible || !(num(input.cgst) + num(input.sgst) + num(input.igst) > 0)) return '';
+  if (!isPackOn(getJson(SINGLETON_KEYS.settings, null), 'transport')) return '';
+  const fy = getIndianFY(input.date).label;
+  return peekTable<{ fy?: string; option?: string }>('gta_options').some((o) => o?.fy === fy && o.option === 'fcm_5') ? gtaT('warnGta', { fy }) : '';
+}
+
+const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 export type GuardedSave =
   | { kind: 'warn'; message: string }
@@ -41,6 +60,8 @@ export function billWarnings(input: BillInput, purchases: readonly PurchaseRecor
     out.push(capT('warnTotal', { qr: formatCurrency(draft.expected_total), total: formatCurrency(Number(input.total) || 0) }));
   }
   if (draft?.foreign_buyer) out.push(capT('warnBuyer', { gstin: draft.foreign_buyer }));
+  const gta = gtaItcCaution(input); // R5-B2
+  if (gta) out.push(gta);
   return out;
 }
 

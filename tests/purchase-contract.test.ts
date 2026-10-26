@@ -807,3 +807,18 @@ test('R5-C common-credit reads the real purchase shape', async () => {
   assert.deepEqual(i.T3, { igst: 0, cgst: 90, sgst: 90, cess: 0 });
   assert.equal(rule42(i, 0, 1, '2026-04').C2.cgst, 90);
 });
+
+// R5-B: `trips.ts` WRITES trip expenses / lorry-hire bills and reads them back (`tripExpenses`); `trip-pnl.ts` reads
+// `purchases` for the trip P&L — both through `readPurchase`, so they understand the real purchase shape.
+test('R5-B trip readers (trip expenses, trip P&L) read the real purchase shape', async () => {
+  const { tripExpenses } = await import('../src/lib/transport/trips.ts');
+  const { tripPnl } = await import('../src/lib/transport/trip-pnl.ts');
+  const exp: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE', category: 'Trip — Toll', trip_id: 'trp1', itc_eligible: false, cgst: 0, sgst: 0, taxable: 500, total: 500 };
+  const fuel: PurchaseRecord = { ...bill, id: 'e2', kind: 'EXPENSE', category: 'Trip — Diesel', trip_id: 'trp1' };
+  const hire: PurchaseRecord = { ...bill, id: 'h1', kind: 'EXPENSE', category: 'Lorry hire', trip_id: 'trp1', itc_eligible: false, cgst: 0, sgst: 0, taxable: 20000, total: 20000, tds_section: '194C-1', tds_amount: 200 };
+  const rows = tripExpenses('trp1', [bill, exp, fuel, hire]);
+  assert.deepEqual(rows.map((r) => [r.id, r.amount]), [['e1', 500], ['e2', 1000]], 'ITC-eligible cost at taxable value; hire kept apart');
+  const [p] = tripPnl({ trips: [{ id: 'trp1', number: 'TRP/FY26-27/0001', vehicle_id: 'v1', start_date: '2026-04-12', lr_ids: [], advance_ids: [], status: 'open' }], vehicles: [], lrs: [], invoices: [], purchases: [bill, exp, fuel, hire] });
+  assert.deepEqual([p.expenses, p.hire, p.margin], [1500, 20000, -21500]);
+  assert.equal(readPurchase(hire)?.category, 'Lorry hire');
+});

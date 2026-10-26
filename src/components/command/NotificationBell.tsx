@@ -222,6 +222,7 @@ function runBell(force: boolean, setItems: (list: VisibleNotification[]) => void
   ensureTrustAlerts(reload); // R4-C
   ensureMarketplaceAlerts(reload); // R5-A
   ensureR5cAlerts(reload); // R5-C
+  ensureTransportWorksAlerts(reload); // R5-B
 }
 
 /** Coalesces refresh requests into one run on the next task (a forced request wins). */
@@ -302,6 +303,19 @@ function ensureR5cAlerts(onReady: () => void): void {
   if (!(['fee_plans', 'donations', 'leases'] as const).some((t, i) => on.includes(['fees', 'nonprofit', 'leases'][i]) && peekTable(t).length)) return;
   r5cAlerts = 1;
   import('../institutions/r5c-lazy').then((l) => l.r5c()).then((m) => { m.registerR5cAlerts(); onReady(); }, () => { r5cAlerts = 0; });
+}
+
+// R5-B: transport / works notices — each loads lazily, only with its pack on (same rule as `industry-packs.ts`).
+const twAlerts: Record<string, number> = {};
+function ensureTransportWorksAlerts(onReady: () => void): void {
+  const s = getJson<{ industry_packs?: unknown; business_type?: string } | null>(SINGLETON_KEYS.settings, null);
+  const gate = (p: string, type: string, load: () => Promise<unknown>) => {
+    if (twAlerts[p] || !(Array.isArray(s?.industry_packs) ? s.industry_packs.includes(p) : s?.business_type === type)) return;
+    twAlerts[p] = 1;
+    load().then(onReady, () => { twAlerts[p] = 0; });
+  };
+  gate('transport', 'transport', () => import('../../lib/transport/transport-alerts')); // registers itself on load
+  gate('works', 'contractor', () => import('../../lib/works/works-alerts'));
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {

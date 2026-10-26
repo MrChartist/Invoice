@@ -1741,6 +1741,53 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R5-B: contractor pack on → BOQ → RA bill with retention and 194C → the receivable splits into due now and held', async () => {
+    const keys = ['settings', 'invoices', 'transactions', 'clients', 'doc_links', 'series_counters', 'ra_measurements', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, industry_packs: ['works'], lock_until: undefined });
+    const dept = { id: 'e2e-pwd', name: 'E2E PWD Division', email: '', address: 'Mumbai', city: 'Mumbai', zip: '', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), dept]);
+    // The BOQ is an ordinary issued sales order (the editor flow is covered by the earlier steps).
+    const boq = {
+      id: 'e2e-boq', invoice_number: 'SO/E2E/0001', doc_type: 'SALES_ORDER', issue_date: '2026-05-01', due_date: '2026-05-31', status: 'Sent', currency: 'INR', template_id: 'classic_orange',
+      client: dept, sender: (settings.profiles ?? [])[0] ?? null,
+      items: [
+        { id: 'e2e-l1', name: 'Earthwork excavation', boq_ref: '2.1', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 1000, rate: 250, tax_rate: 18, discount_percent: 0, amount: 250000 },
+        { id: 'e2e-l2', name: 'PCC 1:4:8', boq_ref: '2.2', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 200, rate: 4500, tax_rate: 18, discount_percent: 0, amount: 900000 },
+      ],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 1150000, discount_amount: 0, taxable_value: 1150000, cgst_amount: 103500, sgst_amount: 103500, igst_amount: 0, tax_amount: 207000, round_off: 0, total: 1357000, balance_due: 1357000,
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    await page.goto(srv.origin + '/time');
+    await page.getByRole('tab', { name: 'Works' }).click();
+    await page.locator('[data-works-boq]').selectOption('e2e-boq');
+    await page.locator('[data-ded-on="retention"]').check();
+    await page.locator('[data-ded-rate="retention"]').fill('5');
+    await page.locator('[data-ded-on="it_tds"]').check();
+    await page.locator('[data-ded-save]').click();
+    await readJson(page, 'invoices', [], (v) => (v.find((d) => d.id === 'e2e-boq')?.boq_terms?.deductions ?? []).length === 2);
+    await page.locator('[data-tw-view="ra"]').click();
+    await page.locator('[data-ra-cum="2.1"]').fill('400');
+    await page.locator('[data-ra-save]').click();
+    const docs = await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === 'e2e-boq' && d.ra_no === 1));
+    const ra = docs.find((d) => d.boq_id === 'e2e-boq' && d.ra_no === 1);
+    check(!!ra && ra.total === 118000 && ra.taxable_value === 100000, `RA bill 1: ₹1,00,000 + GST = ₹1,18,000 (${ra?.total})`);
+    const kinds = (ra?.ra_deductions ?? []).map((d) => `${d.kind}:${d.amount}`).join(',');
+    check(kinds === 'retention:5000,it_tds:2000' && ra.tds_amount === 2000 && ra.ra_net_payable === 111000, `deductions retention 5% and 194C 2%, net payable ₹1,11,000 (${kinds})`);
+    await page.locator('[data-ra-register]').waitFor();
+    await page.locator('[data-tw-view="retention"]').click();
+    const row = page.locator(`[data-ra-split="${ra.invoice_number}"]`);
+    await row.waitFor();
+    const due = (await row.locator('[data-ra-due]').innerText()).trim();
+    const held = (await row.locator('[data-ra-held="retention"]').innerText()).trim();
+    check(/1,11,000\.00/.test(due), `due now ₹1,11,000.00 (${due})`);
+    check(/5,000\.00/.test(held), `held: retention ₹5,000.00 (${held})`);
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('composition profile issues a Bill of Supply with the Rule 49 declaration', async () => {
     await page.goto(srv.origin + '/settings');
     await page.getByLabel('GST scheme').selectOption('composition');

@@ -431,6 +431,13 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   properties: 'master.edit',
   leases: 'master.edit',
   security_deposits: 'books.edit',
+  // R5-B: LRs, trips and RA measurements are documents; vehicles and BOQ coefficients are masters; the GTA option is a setting
+  consignment_notes: 'doc.create',
+  gta_options: 'settings.manage',
+  vehicles: 'master.edit',
+  trips: 'doc.create',
+  ra_measurements: 'doc.create',
+  boq_coefficients: 'master.edit',
 };
 
 let systemDepth = 0;

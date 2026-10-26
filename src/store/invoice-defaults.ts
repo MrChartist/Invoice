@@ -181,6 +181,7 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(typeof item.selected === 'boolean' && (item.optional || item.alt_group) ? { selected: item.selected } : {}),
     ...(typeof item.alt_group === 'string' && item.alt_group.trim() ? { alt_group: item.alt_group.trim() } : {}),
     ...(item.progress_line_of ? { progress_line_of: String(item.progress_line_of) } : {}),
+    ...(item.boq_ref ? { boq_ref: String(item.boq_ref) } : {}), // R5-B4: BOQ item no.
     ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
     ...(Array.isArray(item.bill_refs) && item.bill_refs.length ? { bill_refs: item.bill_refs.map(String) } : {}),
     ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
@@ -230,6 +231,9 @@ function ecoFields(gstin: unknown, section: unknown): { eco_gstin?: string; eco_
 }
 
 /** Upgrade any stored record (old or new) to the current `InvoiceRecord` shape. */
+/** R5-B additive record keys: kept by `normalizeRecord`, listed in `RECORD_KEYS` (one spread line). */
+export const R5B_RECORD_KEYS = ['lr_ids', 'ra_no', 'ra_final', 'boq_id', 'ra_deductions', 'ra_net_payable', 'retention_release_on', 'boq_terms'] as const;
+
 export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_orange'): InvoiceRecord {
   const r = (raw ?? {}) as Partial<InvoiceRecord> & Record<string, unknown>;
   const flatTaxRate = num(r.tax_rate);
@@ -321,6 +325,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(typeof r.channel_id === 'string' ? { channel_id: r.channel_id, channel_order_id: r.channel_order_id as string, channel_import_id: r.channel_import_id as string } : {}),
     // R5-C1 (additive): fee plan / instalment of a fee document (idempotency of a billing run).
     ...(typeof r.fee_plan_id === 'string' ? { fee_plan_id: r.fee_plan_id, fee_instalment: r.fee_instalment as number } : {}),
+    // R5-B (additive): freight-bill LRs, RA bill number / deductions / retention day, BOQ terms survive an edit.
+    ...Object.fromEntries(R5B_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

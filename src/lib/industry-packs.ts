@@ -74,6 +74,13 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'nonprofit', path: '/receivables?tab=donations', labelKey: 'tab.donations' },
   { pack: 'nonprofit', path: '/books?tab=funds', labelKey: 'tab.funds' },
   { pack: 'fees', path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' },
+  // R5-B: transport (Distribution → Transport) and works contracts (Time → Works); labels in `packs-transport-works-r5.ts`
+  { pack: 'transport', path: '/distribution?tab=transport', labelKey: 'tab.transport' },
+  { pack: 'transport', path: '/distribution?tab=transport&view=trips', labelKey: 'view.trips' },
+  { pack: 'transport', path: '/distribution?tab=transport&view=vehicles', labelKey: 'view.vehicles' },
+  { pack: 'works', path: '/time?tab=works', labelKey: 'tab.works' },
+  { pack: 'works', path: '/time?tab=works&view=retention', labelKey: 'view.retention' },
+  { pack: 'works', path: '/time?tab=works&view=sites', labelKey: 'view.sites' },
 ];
 
 /**

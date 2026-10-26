@@ -32,7 +32,7 @@ import { saveBillGuarded } from '../../lib/bill-guard';
 import { capT } from '../../i18n/areas/capture';
 import { BranchSelect } from '../branches/BranchSelect';
 import { EditLogButton } from '../audit/EditLogButton';
-import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
+import { billTdsInputFor, priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -150,21 +150,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   // TDS deducted by us (Tally parity). Undefined rate / base / amount follow the suggestion.
-  const [tds, setTds] = useState<BillTdsInput>(() => {
-    const v = vendors.find((x) => x.id === init?.vendor_id);
-    return {
-      section: purchase?.tds_section ?? '',
-      on: purchase?.tds_on ?? 'BILL',
-      pan: purchase?.tds_pan ?? v?.pan ?? '',
-      lowerCert: purchase?.tds_cert_no ?? v?.tds_lower_cert,
-      lowerRate: v?.tds_lower_rate,
-      lowerFrom: v?.tds_lower_from,
-      lowerTo: v?.tds_lower_to,
-      lowerLimit: v?.tds_lower_limit,
-      nonFiler: v?.tds_non_filer,
-      ...(purchase?.tds_section ? { rate: purchase.tds_rate, base: purchase.tds_base, amount: purchase.tds_amount } : {}),
-    };
-  });
+  // R5-B3: `billTdsInputFor` keeps a Sec 194C(6) nil deduction (reason T) on edit.
+  const [tds, setTds] = useState<BillTdsInput>(() => billTdsInputFor(purchase, vendors.find((x) => x.id === init?.vendor_id)));
   // Batch / serial / godown fields appear only for items that opted in, or once a second godown exists.
   const [stock] = useState<BillStockContext | undefined>(() => {
     try {
@@ -296,7 +283,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           const vendorState = v ? resolveStateCode({ code: v.state_code, gstin: v.gstin }) : '';
           if (vendorState) setPos(vendorState);
           if (v) setItc(!!v.gstin);
-          if (v) setTds((t) => ({ ...t, pan: t.pan || v.pan || '', section: t.section || v.tds_section || '', nonFiler: v.tds_non_filer, lowerCert: v.tds_lower_cert, lowerRate: v.tds_lower_rate, lowerFrom: v.tds_lower_from, lowerTo: v.tds_lower_to, lowerLimit: v.tds_lower_limit }));
+          if (v) setTds((t) => ({ ...t, pan: t.pan || v.pan || '', section: t.section || v.tds_section || '', nonFiler: v.tds_non_filer, lowerCert: v.tds_lower_cert, lowerRate: v.tds_lower_rate, lowerFrom: v.tds_lower_from, lowerTo: v.tds_lower_to, lowerLimit: v.tds_lower_limit, transporter194c6: v.transporter_194c6 }));
         }}
       />
 

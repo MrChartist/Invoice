@@ -19,13 +19,14 @@ import {
 } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
-import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoice-defaults';
+import { blankItem, makeDraft, normalizeRecord, R5B_RECORD_KEYS, senderStateCode } from './invoice-defaults';
 import { nextPartyBalanceSnapshot } from '../lib/party-balance';
 import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import '../types/sales-r2'; // R2-B: declaration-merged record fields (RECORD_KEYS below)
 import type {} from '../types/restaurant'; // R3-A: declaration-merged record fields (type-only, erased)
 import type {} from '../types/marketplace-r5'; // R5-A: declaration-merged record fields (type-only, erased)
+import type {} from '../types/transport-works-r5'; // R5-B: declaration-merged record fields (type-only, erased)
 import type {
   Client,
   DiscountType,
@@ -156,6 +157,7 @@ export const RECORD_KEYS = [
   'incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms', // R4-C
   'channel_id', 'channel_order_id', 'channel_import_id', // R5-A
   'fee_plan_id', 'fee_instalment', // R5-C
+  ...R5B_RECORD_KEYS, // R5-B (src/types/transport-works-r5.ts)
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

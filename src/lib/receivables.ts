@@ -30,6 +30,7 @@ import { linkedCredits, type CreditLinkRow } from './amount-due';
 import { effectiveDueDate } from './payment-schedule';
 import { FINANCIAL_REASON_LABELS, isFinancialNote } from './financial-note';
 import type { PosReturn } from './pos-returns';
+import { raDueSplit } from './works/ra-due'; // R5-B5 (pure, tiny)
 
 /** 8.100: ageing follows the earliest unpaid instalment of a payment schedule (else the due date). */
 const dueOf = (inv: InvoiceRecord): string => effectiveDueDate(inv);
@@ -138,6 +139,8 @@ export interface Bill {
   opening?: boolean;
   /** Additive: linked credit notes allocated to this bill (`BuildInput.links`); outstanding is net of it. */
   credited?: number;
+  /** Additive (R5-B5): part of `outstanding` held back on an RA bill (retention, GST TDS, cess …) — not aged. */
+  held?: number;
 }
 
 export interface PartyReceivable {
@@ -482,14 +485,18 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     const outstanding = round2(open - alloc);
     const excess = round2(Math.max(paid - total, 0));
     if (excess > 0) a.advances = round2(a.advances + excess);
+    // R5-B5: an RA bill ages only what is due now; retention / GST TDS / cess held back wait (`raDueSplit`).
+    const held = inv.ra_deductions?.length ? raDueSplit(inv, paidByInvoice.get(inv.id) ?? [], outstanding).heldTotal : 0;
+    const dueNow = outstanding - held > 0.004;
     if (outstanding > 0.004) {
       a.bills.push({
         invoiceId: inv.id, number: inv.invoice_number,
         issueDate: issue, dueDate: dateKey(dueOf(inv)) || issue,
         total, paid, outstanding,
-        daysOverdue: daysOverdue(dueOf(inv), now),
-        bucket: agingBucket(dueOf(inv), now) as AgingBucketLabel,
+        daysOverdue: dueNow ? daysOverdue(dueOf(inv), now) : 0,
+        bucket: (dueNow ? agingBucket(dueOf(inv), now) : 'Not due') as AgingBucketLabel,
         ...(alloc > 0 ? { credited: alloc } : {}),
+        ...(held > 0 ? { held } : {}),
       });
     }
   }
@@ -581,7 +588,8 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     const buckets = emptyBuckets();
     let gross = 0;
     for (const b of bills) {
-      buckets[b.bucket] = round2(buckets[b.bucket] + b.outstanding);
+      buckets[b.bucket] = round2(buckets[b.bucket] + b.outstanding - (b.held ?? 0));
+      if (b.held) buckets['Not due'] = round2(buckets['Not due'] + b.held); // R5-B5: held amounts are not overdue
       gross = round2(gross + b.outstanding);
     }
     return {

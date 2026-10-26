@@ -141,7 +141,8 @@ in `src/lib/r5c-rules.ts` (date-keyed, every source "verify"): `COMMON_CREDIT_TR
 `FCRA_ADMIN_CAP_RULES`, `FC4_DUE_RULES`.
 
 Lead rows for ROADMAP / ARCHITECTURE / AGENTS: the nine tables and fields above; "a receipt row with
-`deposit_adjustment_id` (R5-C6) moved no money: every cash / bank reader skips it, like `gift_voucher_id`"; "Rule 42 / 43
+`deposit_adjustment_id` (R5-C6), or an R5-B5 GST TDS / labour-cess deduction row with `ra_journal_id` (it posts through
+the "RA deductions clearing" account), moved no money: every cash / bank reader skips it, like `gift_voucher_id`"; "Rule 42 / 43
 reversals are journals of class `ITC reversal — Rule 42 / 43`; `buildGstReport` takes them through `itcReversals`".
 
 ## Bundle (vite build, gzip -9; baseline = `claude/elegant-cannon-cwapiv` at 569d492)
@@ -159,7 +160,9 @@ What was done to get here (from +60 kB on the first build): one chunk instead of
 once, −7 kB), the lazy door (−3 kB of preload lists), compact form / table helpers, a shorter area (−4 kB), the
 donation and refund receipts reuse `receipts.ts`, no `import-mapping` / `Settings.module` splits. The PRD's own
 per-item estimates for R5-C add up to ~34 kB (fees 8, common credit 5, donations 8, funds 6, leases + deposits 7);
-getting under 28 kB means dropping a feature or the Hindi strings (~3.5 kB) — a call for the lead.
+getting under 28 kB means dropping a feature or the Hindi strings (~3.5 kB) — a call for the lead. The lead accepted the size.
+After merging R5-B (transport / works) the combined build is initial JS 187,389 B, total JS 2,500,093 B (check:size:
+initial 183.0 / 185 kB, total 2441.5 / 2600 kB).
 
 ## Deviations from the spec
 
@@ -182,8 +185,8 @@ getting under 28 kB means dropping a feature or the Hindi strings (~3.5 kB) — 
 7. **Bulk enrol / 10BE CSV** match headers with a small synonym matcher (`findCol`) instead of `scoreHeader` (keeps
    `import-mapping` out of the chunk).
 8. **10BE bell** fires from the 10BE due date (31 May, `FORM_10BD_DUE_RULES.beBy`) instead of a fixed 30 June.
-9. **Cost-centre kind** `fund` added on its own (R5-B's line will also add `vehicle`); the `fields` / `books-planning`
-   areas and `ProjectsTab` got the `fund` label so the existing kind pickers typecheck.
+9. **Cost-centre kind** `fund` shares the one union change with R5-B's `vehicle` (merged); both labels are in `fields`,
+   `books-planning` has `kindFund`, and `ProjectsTab` falls back to the master's English label for `vehicle`.
 
 ## Verify with your CA
 
@@ -210,6 +213,8 @@ getting under 28 kB means dropping a feature or the Hindi strings (~3.5 kB) — 
 
 - A deposit adjustment settles the invoice through a voucher-tagged receipt row stamped `deposit_adjustment_id`; the
   cash book / cash tally / forecast (`books.ts` `buildVouchers`), BRS receipt candidates, the day summary (`today.ts`),
-  payment modes (`sales-reports.ts`) and export realisation skip it; the ledger posts the journal once.
+  payment modes (`sales-reports.ts`) and export realisation skip it; the ledger posts the journal once. The same readers
+  skip R5-B5's GST TDS / cess deduction rows (`ra_journal_id`): the client kept that money, the row goes into the
+  "RA deductions clearing" account and its journal clears it (retention releases, real receipts, are still counted).
 - GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does).
 - Gifts in kind create no voucher; FC-4 lists totals, not the portal's line items.

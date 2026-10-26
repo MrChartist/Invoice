@@ -13,8 +13,10 @@ import { defineArea } from '../../i18n/area';
 // R5-C rows (kept here so the palette does not load the R5-C area).
 const cT = defineArea({ 'tab.fees': 'Fees', 'tab.leases': 'Leases', 'tab.donations': 'Donations', 'tab.funds': 'Funds', 'tab.commonCredit': 'Common credit (Rule 42 / 43)' } as const, { 'tab.fees': 'फ़ीस', 'tab.leases': 'लीज़', 'tab.donations': 'दान', 'tab.funds': 'फ़ंड', 'tab.commonCredit': 'साझा क्रेडिट (Rule 42 / 43)' });
 
+import { twT } from '../../i18n/areas/packs-transport-works-r5'; // R5-B resolver
+
 /** A row's label: a key of this package's area, else (B / C rows until they resolve their own) the key text. */
-const label = (key: string): string => (Object.hasOwn(mT.en, key) ? mT(key as keyof typeof mT.en) : Object.hasOwn(cT.en, key) ? cT(key as keyof typeof cT.en) : key);
+const label = (key: string): string => (Object.hasOwn(mT.en, key) ? mT(key as keyof typeof mT.en) : Object.hasOwn(twT.en, key) ? twT(key as keyof typeof twT.en) : Object.hasOwn(cT.en, key) ? cT(key as keyof typeof cT.en) : key);
 
 export function packDestinations(): StaticEntry[] {
   const on = activePacks(localDb.settings.get());
