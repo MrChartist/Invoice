@@ -82,6 +82,7 @@ export const tabsT = defineArea(
     'gst.eway-desk': 'e-Way desk',
     'gst.export-desk': 'Export desk (realisation, e-BRC)',
     'gst.common-credit': 'Common credit (Rule 42 / 43)',
+    'gst.hotel-gst': 'Hotel GST (bands, specified premises)',
     // TDS
     'tds.overview': 'TDS overview',
     'tds.deductions': 'TDS deductions',
@@ -278,6 +279,7 @@ export const tabsT = defineArea(
     'gst.eway-desk': 'ई-वे डेस्क',
     'gst.export-desk': 'निर्यात डेस्क (प्राप्ति, e-BRC)',
     'gst.common-credit': 'साझा क्रेडिट (Rule 42 / 43)',
+    'gst.hotel-gst': 'होटल GST (बैंड, स्पेसिफ़ाइड प्रिमाइसेस)',
     'tds.overview': 'TDS सारांश',
     'tds.deductions': 'TDS कटौतियाँ',
     'tds.challans': 'TDS चालान',

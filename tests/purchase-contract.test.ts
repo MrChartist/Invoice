@@ -847,6 +847,18 @@ test('R8-C: the bank stock statement counts unpaid goods bills (kind PURCHASE) a
   assert.equal(creditorsForGoods('2026-04-01'), 0, 'a bill dated after the statement date is not owed yet');
 });
 
+// R7-C1: the hotel GST desk's ITC guard reads bills through `readPurchase` (claimed, not RCM, not reversed, not void).
+test('R7-C1: the hotel GST desk reads the real purchase shape for its ITC guard', async () => {
+  const { hotelGuards } = await import('../src/lib/hotel/hotel-gst.ts');
+  const lowRoom = { id: 'h1', invoice_number: 'H/1', doc_type: 'INVOICE', status: 'Sent', issue_date: '2026-04-10', gst_mode: 'CGST_SGST', items: [{ id: 'i', name: 'Room', type: 'Service', hsn: '996311', quantity: 1, rate: 3000, tax_rate: 5, amount: 3000 }] };
+  const itc = (bills: unknown[]) => hotelGuards([lowRoom as never], bills, () => false, '2026-04-01', '2026-04-30').find((g) => g.kind === 'itc')?.amount ?? 0;
+  assert.equal(itc([bill]), 180);
+  assert.equal(itc([{ ...bill, itc_eligible: false }]), 0);
+  assert.equal(itc([{ ...bill, reverse_charge: true }]), 0);
+  assert.equal(itc([{ ...bill, itc_reversed: 180 }]), 0);
+  assert.equal(itc([{ ...bill, status: 'draft' }]), 0);
+});
+
 test('R8-A: the last purchase rate reads the real bill shape (lines, legacy items, expenses) through readPurchaseLines', async () => {
   const { lastPurchaseRate } = await import('../src/lib/trade/tr-party-rates.ts');
   const legacy = { ...bill, id: 'p3', lines: undefined, items: [{ name: 'Paper ream', quantity: 10, rate: 90 }], date: '2026-03-01' };

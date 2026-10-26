@@ -26,7 +26,7 @@ export const GST_TAB_ROWS: Readonly<Record<'gstr1' | 'gstr3b' | 'recon' | 'tools
   gstr1: ['overview', 'b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'at', 'txpd', 'hsn', 'docs', 'amend', 'eco'],
   gstr3b: ['gstr3b', 'setoff', 'cashref', 'rcmdocs'],
   recon: ['gstr2b', 'purhsn', 'recon', 'guards', 'bygstin'],
-  tools: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons', 'portal-files', 'eway-desk', 'export-desk', 'common-credit'],
+  tools: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons', 'portal-files', 'eway-desk', 'export-desk', 'common-credit', 'hotel-gst'],
 };
 const gstRowOf = (id: string) => (Object.keys(GST_TAB_ROWS) as (keyof typeof GST_TAB_ROWS)[]).find((k) => GST_TAB_ROWS[k].includes(id)) ?? 'tools';
 

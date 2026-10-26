@@ -186,3 +186,12 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+
+/* R7-C reports: inline occupancy bar (CSS width, no chart library). */
+.meter {
+  display: block;
+  min-width: 1px;
+  height: 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+}

@@ -14,7 +14,9 @@ export type GstTabId =
   // R4-C2: export desk (realisation, IRM / e-BRC, incentives, imports by BOE)
   | 'export-desk'
   // R5-C2: Rule 42 / 43 common-credit working
-  | 'common-credit';
+  | 'common-credit'
+  // R7-C1: hotel GST desk (bands, specified premises, declarations)
+  | 'hotel-gst';
 
 export type GstTabGroupId = 'gstr1' | 'gstr3b' | 'recon' | 'tools';
 
@@ -65,17 +67,19 @@ export const GST_TABS: readonly GstTab[] = [
   { id: 'export-desk', label: 'Export desk', key: 'tabExportDesk' },
   // R5-C2 (on-screen name from the institutions area)
   { id: 'common-credit', label: 'Common credit (Rule 42 / 43)' },
+  // R7-C1 (on-screen name from the hotel compliance area)
+  { id: 'hotel-gst', label: 'Hotel GST' },
 ];
 
 /** R5-C: tabs listed only while one of these packs is on (their URL always opens them). */
-export const PACK_GST_TABS: Readonly<Partial<Record<GstTabId, readonly PackId[]>>> = { 'common-credit': ['fees', 'nonprofit', 'leases'] };
+export const PACK_GST_TABS: Readonly<Partial<Record<GstTabId, readonly PackId[]>>> = { 'common-credit': ['fees', 'nonprofit', 'leases', 'hotel'], 'hotel-gst': ['hotel'] };
 
 /** Display order: GSTR-1 sections, GSTR-3B and payment, reconciliation, then the other tools. */
 export const GST_TAB_GROUPS: readonly { id: GstTabGroupId; tabs: readonly GstTabId[] }[] = [
   { id: 'gstr1', tabs: ['overview', 'b2b', 'b2cl', 'b2cs', 'cdnr', 'cdnur', 'exp', 'nil', 'at', 'txpd', 'hsn', 'docs', 'amend', 'eco'] },
   { id: 'gstr3b', tabs: ['gstr3b', 'setoff', 'cashref', 'rcmdocs'] },
   { id: 'recon', tabs: ['gstr2b', 'purhsn', 'recon', 'guards', 'bygstin'] },
-  { id: 'tools', tabs: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons', 'portal-files', 'eway-desk', 'export-desk', 'common-credit'] },
+  { id: 'tools', tabs: ['compliance', 'composition', 'hsnmaster', 'gstr9c', 'isd', 'ewbcons', 'portal-files', 'eway-desk', 'export-desk', 'common-credit', 'hotel-gst'] },
 ];
 
 /** Tab ids in on-screen order (arrow-key navigation walks this list). */

@@ -1794,6 +1794,61 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R7-C: hotel stay. R7-B (folios / check-out) is not on this base yet, so the step stops after the night audit and
+  // Form C; R7-B adds "post laundry → charge to room → check out → one invoice" here.
+  await step('R7 hotel stay: pack on → walk-in a foreign guest (Form C due) → night audit posts 1 night → Form C filed → GST → Hotel "specified" at ₹7,600', async () => {
+    const keys = ['settings', 'invoices', 'advances', 'series_counters', 'audit_log', 'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits', 'hotel_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), industry_packs: ['hotel'], lock_until: undefined });
+    await writeJson(page, 'hotel_room_types', [{ id: 'e2e-dlx', name: 'Deluxe', code: 'DLX', base_occupancy: 2, max_occupancy: 3, max_extra_beds: 1, sac: '996311' }]);
+    await writeJson(page, 'hotel_rooms', [101, 102].map((n) => ({ id: `e2e-r${n}`, number: String(n), room_type_id: 'e2e-dlx', floor: '1', active: true, hk_status: 'clean' })));
+    await writeJson(page, 'hotel_rate_plans', [{ id: 'e2e-ep', name: 'Room only', code: 'EP', meal_plan: 'EP', audience: 'public', active: true, rates: [{ room_type_id: 'e2e-dlx', single: 3000, double: 3000, extra_adult: 0, extra_child: 0, extra_bed: 0 }] }]);
+    await writeJson(page, 'hotel_settings', { business_date: today });
+    for (const k of ['hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits']) await writeJson(page, k, []);
+
+    await page.goto(srv.origin + '/tables?tab=frontdesk');
+    await page.locator('[data-walk-in]').click();
+    const dlg = page.getByRole('dialog');
+    await dlg.locator('[data-f="name"]').first().fill('Jane Doe');
+    await dlg.locator('[data-f="nationality"]').first().fill('GB');
+    await dlg.locator('[data-f="passport_no"]').fill('P1234567');
+    await dlg.locator('[data-check-in-go]').click();
+    const res = await readJson(page, 'hotel_reservations', [], (v) => v.some((r) => r.lines?.[0]?.status === 'checked_in'));
+    const line = res[0].lines[0];
+    check(!!line.form_c?.due_at && Date.parse(line.form_c.due_at) - Date.parse(line.checked_in_at) === 24 * 3600e3, 'a foreign guest starts the 24-hour Form C clock');
+    await page.locator('[data-formc-chip]').first().waitFor();
+    check(true, 'the board shows the Form C countdown chip');
+
+    await page.locator('[data-hotel-view="audit"]').click();
+    await page.locator('[data-run-audit]').click();
+    const audits = await readJson(page, 'hotel_night_audits', [], (v) => v.length === 1);
+    const folios = await readJson(page, 'hotel_folios', []);
+    const room = folios.flatMap((f) => f.lines).filter((l) => l.kind === 'room');
+    check(audits[0].business_date === today && room.length === 1 && room[0].amount === 3000, `night audit posts 1 room night at ₹3,000 (${room.map((l) => l.amount)})`);
+
+    await page.locator('[data-hotel-view="formc"]').click();
+    const row = page.locator('[data-formc-row]').first();
+    check(await row.getAttribute('data-formc-status') === 'due', 'Form C desk lists the guest as due');
+    await row.locator('[data-formc-sheet]').click();
+    check(/P1234567/.test(await row.locator('[data-formc-data]').innerText()), 'the data sheet shows the passport number');
+    await row.locator(`[data-f="${line.id}"]`).fill('FRRO-E2E-1');
+    await row.locator('[data-formc-filed]').click();
+    const filed = await readJson(page, 'hotel_reservations', [], (v) => !!v[0]?.lines?.[0]?.form_c?.filed_at);
+    check(filed[0].lines[0].form_c.ref === 'FRRO-E2E-1', 'Form C marked filed with the reference');
+
+    await page.goto(srv.origin + '/gst-reports?tab=hotel-gst');
+    const card = page.locator('[data-premises]').first();
+    await card.waitFor();
+    check(await card.getAttribute('data-specified') === 'no', 'no previous-FY value: not specified premises');
+    await page.locator('[data-hotel-gst] [data-f="prev"]').fill('7600');
+    await page.locator('[data-prev-save]').click();
+    await page.locator('[data-premises][data-specified="yes"]').first().waitFor();
+    check(await card.locator('[data-fnb-rate]').getAttribute('data-fnb-rate') === '18', 'previous-FY ₹7,600 → specified premises, F&B 18%');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('composition profile issues a Bill of Supply with the Rule 49 declaration', async () => {
     await page.goto(srv.origin + '/settings');
     await page.getByLabel('GST scheme').selectOption('composition');

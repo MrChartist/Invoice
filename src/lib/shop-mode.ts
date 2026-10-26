@@ -93,7 +93,7 @@ export const PACK_ROUTES: Readonly<Record<string, readonly string[]>> = {
   '/time': ['works'],
   '/recurring': ['fees', 'leases'],
   '/books': ['nonprofit'],
-  '/gst-reports': ['fees', 'nonprofit', 'leases'],
+  '/gst-reports': ['fees', 'nonprofit', 'leases', 'hotel'], // R7-C1: common credit + Hotel GST
   '/tables': ['hotel'], // R7-A
 };
 export const PACK_OF_TYPE_INLINE: Readonly<Record<string, string>> = { ecommerce: 'marketplace', transport: 'transport', contractor: 'works', institution: 'fees', nonprofit: 'nonprofit', property: 'leases', hotel: 'hotel' }; // R7-A: hotel

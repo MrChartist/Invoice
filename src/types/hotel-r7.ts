@@ -357,3 +357,8 @@ export interface HotelSettings {
 /* ── R7-B block (append below) ─────────────────────────────────── */
 
 /* ── R7-C block (append below) ─────────────────────────────────── */
+
+/** C1 (Annexure VIII): the new registrant's ARN date — the opt-in must be filed within 15 days of it. */
+export interface PremisesDecl {
+  arn_on?: string;
+}

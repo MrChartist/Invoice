@@ -145,3 +145,85 @@ applied (housekeeping lives on the board) and the views were merged into one mod
 package from ≈ 40 kB to ≈ 24 kB. The total-JS budget (2,700 kB) still has ample headroom; the lead decides whether the
 round's split should move or further cuts are wanted (next candidates: the guest register into C3, the plan editor's
 seasons / weekend rates, shorter Hindi strings).
+
+---
+
+# Round 7 · R7-C — Hotel compliance and reports
+
+Spec: `docs/prd/round-7.md` §4 R7-C1…C3, §6, §7 (D1, D4, D6, D12, D14, D15, D17, D18). Every output is a working paper —
+verify with your CA (`docs/CA_REVIEW.md` §7, HT1–HT17, and the "R7-C build notes" under the §7 table).
+
+## What R7-C ships
+
+| Item | Where |
+|---|---|
+| C1 GST → Hotel (`/gst-reports?tab=hotel-gst`, Tools group, `PACK_GST_TABS['hotel-gst'] = ['hotel']`) | `lib/hotel/{hotel-gst,premises,band-report}.ts`, `components/hotel/HotelGstTab.tsx` |
+| C1 common-credit input (D12) | `exemptLike` → `components/institutions/CommonCreditView.tsx` adds it to E with the pack on; `PACK_GST_TABS['common-credit']` and the `PACK_TABS` common-credit row gain `'hotel'` (and `shop-mode.ts` `PACK_ROUTES['/gst-reports']`) |
+| C2 Form C desk (`view=formc`) and the bell | `lib/hotel/{form-c,hotel-alerts}.ts`, `components/hotel/FormCView.tsx`; Board tiles show a `Form C nh` chip; `NotificationBell.tsx` one `gate('hotel', …)` line |
+| C3 reports (`view=reports`) | `lib/hotel/hotel-reports.ts`, `components/hotel/ReportsView.tsx` |
+| Strings | `src/i18n/areas/hotel-compliance-r7.ts` (`cT`, en + hi); shared words from `hotel-frontdesk-r7.ts` |
+| Help / Ctrl+K | HT ids on every hotel topic (`topics-packs.ts`); `gst-reports:hotel-gst` in `topics-statutory.ts` (the GST area's file — the registry test requires it there); title in `discover-r6-tabs.ts`, synonyms (`specified premises`, `7500`, `hotel gst`, `996311`); `tests/help-registry.test.ts` accepts `HT` ids |
+| e2e | `tests/e2e/smoke.mjs` "R7 hotel stay" (after R5-B): walk-in of a foreign guest → Form C chip → night audit posts ₹3,000 → Form C data sheet + Mark filed → GST → Hotel "specified" after typing ₹7,600 for the previous FY, F&B 18%. Check-out is left for R7-B (not on this base) |
+
+### Behaviour notes
+
+- **Bands** (`hotel-gst.ts`): re-exports `accommodationBand` / `bandForInclusive` / the rule tables from `hotel-rules.ts`
+  (not re-implemented; `hotel-rules.ts` unchanged). Room lines = SAC 996311 (or `sac_room`), F&B = 99633x (or
+  `sac_fnb`); unit-day value = taxable ÷ quantity, rate on the invoice date. Composition / Bill-of-Supply documents are
+  left out (D17, the tab says "composition — bands not applied"); credit notes count negative; financial notes skipped.
+- **Specified premises** (`premises.ts`): `prevFyMax` (stays' night snapshots, meals priced separately and comp rooms
+  left out, per `property_id`; or the typed `prev_fy_max_value['2025-26']`), `premisesStatus(fy, ctx)` →
+  `{specified, basis, prev, decl, optOutIgnored, rule}`; `declWindow` / `declError` (Jan–Mar of the year the FY starts;
+  Annexure VIII within 15 days of `arn_on`, the one `// R7-C` type addition); `addDecl` refuses outside the window.
+  Settings writes keep an un-audited business date unset. The desk shows this and the next FY for the main premises.
+- **Guards**: wrong band (an extra-bed line may ride at its room's higher rate), F&B vs `restaurantRate`, IGST hotel
+  invoice, ITC claimed on bills while every room-night of the FY is no-ITC (reads `purchases` via `readPurchase`;
+  added to `tests/purchase-contract.test.ts`). The 22 Sep 2025 note shows for FY 2025-26. The PRD's "lazy check in the
+  existing GST exceptions" was not added (the guards live on the tab only).
+- **Band report**: per month low / high nights and value, F&B, no-ITC turnover (5% rooms + 5% F&B — exempt-like),
+  turnover with ITC; GSTR-1 HSN / SAC 9963 rows by SAC × rate.
+- **Form C**: due = check-in instant + `FORM_C_HOURS_RULES` hours (24, across midnight); statuses `overdue | due |
+  departed_not_updated | filed | done`; data sheet = personal, `FORM_C_FIELDS` in order, stay; copy per field and
+  "Copy all"; `markFiled(res, line, ref)` / `markCheckoutUpdated` (`doc.create` via `hotelDb.putReservations`).
+- **Bell** (`registerHotelAlerts`, provider re-checks the pack): Form C ≤ 6 h (warning) / overdue (critical),
+  arrivals not in by check-in + 4 h, due-outs past check-out time, night audit not run for a past business date (only
+  once an audit has stored a business date), the declaration window 1 Jan – 31 Mar (id per year, dismiss once). The
+  interim-invoice notice is left to R7-B3's interim builder.
+- **Reports** (cut-first applied): occupancy / ADR / RevPAR by day (audit rows, else `nightStats` from stays) with a
+  CSS-width bar, by month, by room type, source mix (OTA by name), night-audit history (guest ledger and advances held
+  per night), and a link to the printable police / guest register (Guests view). CSV and Excel each. Dropped: revenue
+  by kind, separate guest / advance / city ledgers, OTA summary (needs R7-B5).
+
+### One chunk for the pack
+
+`FormCView` and `ReportsView` are static in `FrontDesk.tsx`'s `EXTRA_VIEWS`; `FrontDesk.tsx` also re-exports
+`HotelGstTab`, `registerHotelAlerts` and `exemptLike`. GST → Hotel, GST → Common credit and the bell load them through
+`components/hotel/hotel-lazy.ts` (`hotelChunk()`, the `r5c-lazy` pattern). Separate lazy chunks made rolldown split
+A's modules (store, rules, reservations, night audit) into small shared chunks and cost ≈ 21 kB instead of ≈ 11.5 kB.
+`FrontDesk.tsx` now exports `Fields`, `Row`, `Tbl`, `Rec`, `Spec` for the R7-C views.
+
+## Tests
+
+`tests/hotel-gst.test.ts` (every rule row at 999.99 / 1000 / 1000.01 / 2500 / 7500 / 7500.01, rate-change days
+2019-10-01 / 2022-07-18 / 2025-09-22, inclusive round trip + gap, premises status incl. ₹7,500.00 vs ₹7,500.01, opt-in
+window, opt-out vs clause (a), Annexure VIII 15 days, per premises, pre-2025, stays / typed source, band report and
+`exemptLike`, HSN 9963, guards, pack gate of the tab), `tests/hotel-form-c.test.ts` (24 h across midnight and month end,
+statuses, rows / Indian guest, data-sheet order, filing, check-out tick, bell rows and thresholds, declaration window
+only Jan–Mar, pack off: no hotel read and the bell's gate checks the pack before importing), `tests/hotel-reports.test.ts`
+(D14 formulas, audit vs stays days, month and room-type roll-ups, source mix = room revenue, no writes). Pins updated:
+`gst-filing` (tab list), `r5c-pack-gate` (common-credit packs), `help-registry` (HT ids).
+
+## Bundle (gzip, `npm run build`, against base `cedc33e`)
+
+| | Base | After R7-C | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 188,997 B | 189,002 B | +5 B (budget +50 B) |
+| Total JS | 2,712,194 B | 2,723,682 B | +11,488 B (≈ 11.2 kB; share 8 kB) |
+
+First paint: `'hotel'` in the common-credit `alsoPacks` and `PACK_ROUTES['/gst-reports']`. The bell gate line sits in
+the lazy NotificationBell chunk. Of the total, ≈ 9.5 kB is the pack chunk (R7-C code + en / hi strings ≈ 2.4 kB), ≈ 0.9 kB
+the `hotel-lazy` preload list, ≈ 0.3 kB each GST page / common credit, ≈ 0.3 kB help topics and palette rows.
+
+**Over the 8 kB share by ≈ 3.2 kB** after cut-first (C3 reduced, interim notice left to B3, Form C field labels shown as
+the portal's names like A's check-in form, help text trimmed). Next cuts if wanted: the HSN 9963 table (≈ 0.2 kB), the
+arrivals / due-outs / audit bell rows (≈ 0.4 kB), the Excel buttons, the room-type report, shorter Hindi strings.

@@ -3,7 +3,7 @@
  * exempt / total turnover (the GSTR-1 / 3B engine), "Post reversal", the annual true-up and the working-paper CSV.
  * Lazy; listed with the fees / non-profit / leases packs (its URL always opens it). Verify with your CA.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { PurchaseRecord } from '../../types/purchases';
 import type { ItcUse } from '../../types/institutions-r5';
@@ -12,6 +12,9 @@ import { buildGstReport, type ReportPeriod } from '../../lib/gst-reports';
 import { purchasesDb } from '../../lib/purchases';
 import { HEADS, ITC_USES, defaultTrueUpDate, trueUpWindow, figuresOf, headsTotal, inputsFor, itcUseOf, loadCcRuns, postReversal, rule42, trueUp, turnoverOf, unpostReversal, workingCsv, type Heads } from '../../lib/institutions/common-credit';
 import { useT } from '../../i18n';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
+import { round2 } from '../../lib/invoice-calc';
 import { iT, type IKey } from '../../i18n/areas/packs-institutions-r5';
 import styles from './institutions.module.css';
 import { B, S, T, Tbl } from './Views';
@@ -26,19 +29,30 @@ export default function CommonCreditView({ notify }: { notify: Notify }) {
   const [month, setMonth] = useState(today().slice(0, 7));
   const [tick, setTick] = useState(0);
   const data = useMemo(() => ({ inv: getTable<InvoiceRecord>('invoices'), pur: getTable<PurchaseRecord>('purchases'), runs: loadCcRuns() }), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ef = (p: ReportPeriod) => turnoverOf(buildGstReport(data.inv, data.pur, { period: p }).gstr3b);
+  // R7-C1 (D12): a hotel's no-ITC (5%) turnover is exempt-like — added to E; F already holds it as taxable.
+  // Loaded from the hotel pack's chunk only with the pack on.
+  const hotel = isPackOn(localDb.settings.get(), 'hotel');
+  const [xl, setXl] = useState<null | ((inv: readonly InvoiceRecord[], from: string, to: string) => number)>(null);
+  useEffect(() => {
+    if (hotel) void import('../hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => setXl(() => m.exemptLike));
+  }, [hotel]);
+  const ef = (p: ReportPeriod) => {
+    const r = turnoverOf(buildGstReport(data.inv, data.pur, { period: p }).gstr3b);
+    const m = p.kind === 'month' ? `${p.month! < 4 ? p.fyStart + 1 : p.fyStart}-${String(p.month).padStart(2, '0')}` : '';
+    return xl ? { E: round2(r.E + xl(data.inv, m ? `${m}-01` : `${p.fyStart}-04-01`, m ? end(m) : `${p.fyStart + 1}-03-31`)), F: r.F } : r;
+  };
   const fy = fyOf(month);
   const res = useMemo(() => {
     const { E, F } = ef({ kind: 'month', fyStart: fy, month: +month.slice(5, 7) });
     return rule42(inputsFor(data.pur, `${month}-01`, end(month)), E, F, month);
-  }, [data, month]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, month, xl]); // eslint-disable-line react-hooks/exhaustive-deps
   const year = useMemo(() => {
     const ms = Array.from({ length: 12 }, (_x, i) => `${i < 9 ? fy : fy + 1}-${String(((i + 3) % 12) + 1).padStart(2, '0')}`).filter((m) => m <= today().slice(0, 7));
     const { E, F } = ef({ kind: 'fy', fyStart: fy });
     const done: Heads = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
     for (const r of data.runs) if (r.kind === 'monthly' && fyOf(r.month) === fy) HEADS.forEach((h) => (done[h] += r.figures[`D_${h}`] ?? 0));
     return trueUp(ms.map((m) => { const i = inputsFor(data.pur, `${m}-01`, end(m)); return { C2: rule42(i, 0, 1, m).C2, nonBusiness: i.nonBusiness }; }), E, F, done, fy);
-  }, [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, fy, xl]); // eslint-disable-line react-hooks/exhaustive-deps
   const fyKey = `FY${fy}-${String(fy + 1).slice(2)}`;
   const posted = data.runs.find((r) => r.kind === 'monthly' && r.month === month);
   const postedFy = data.runs.find((r) => r.kind === 'annual' && r.month === fyKey);

@@ -25,19 +25,20 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:works', 'Works', 'वर्क्स', 'Works-contract pack: BOQ, measured RA bills, retention and deductions.', 'Each running-account bill.', { statutory: ca(['I15', 'I16', 'I17', 'I18', 'I19']) }),
   t('time:works:retention', 'Retention', 'रिटेंशन', 'Retention money held by clients and when it is due back.', 'When retention is released.', { statutory: ca(['I16']) }),
   t('time:works:sites', 'Sites', 'साइट', 'Sites with material issued against the theoretical use per BOQ unit.', 'Weekly on site.'),
-  // R7 hotel (R7-A minimal topics; R7-C extends them with the HT ids)
+  // R7 hotel (R7-A topics; R7-C added the HT ids). Working papers — verify with your CA.
   t('tables:frontdesk', 'Front desk', 'फ्रंट डेस्क', 'Hotel pack board: arrivals, in-house guests, due-outs and room status for the business date.', 'All day at the front desk.', {
-    related: rel(['Room calendar', '/tables?tab=frontdesk&view=calendar'], ['Night audit', '/tables?tab=frontdesk&view=audit']),
+    statutory: ca(['HT1', 'HT2', 'HT5', 'HT13']),
+    related: rel(['Room calendar', '/tables?tab=frontdesk&view=calendar'], ['Night audit', '/tables?tab=frontdesk&view=audit'], ['Hotel GST', '/gst-reports?tab=hotel-gst']),
   }),
   t('tables:frontdesk:calendar', 'Room calendar', 'रूम कैलेंडर', 'Rooms by date: bookings as bars; tap an empty cell to book that room.', 'When a guest asks what is free.'),
-  t('tables:frontdesk:reservations', 'Reservations', 'बुकिंग', 'Bookings with nightly prices, advances and the confirmation message; arrivals, departures and in-house lists.', 'For every booking, change or cancellation.'),
-  t('tables:frontdesk:folios', 'Folios', 'फ़ोलियो', 'Running accounts of in-house guests and companies. A folio is not a tax invoice.', 'Before check-out.'),
+  t('tables:frontdesk:reservations', 'Reservations', 'बुकिंग', 'Bookings with nightly prices, advances and the confirmation message; arrivals, departures and in-house lists.', 'For every booking, change or cancellation.', { statutory: ca(['HT9', 'HT10', 'HT11']) }),
+  t('tables:frontdesk:folios', 'Folios', 'फ़ोलियो', 'Running accounts of in-house guests and companies. A folio is not a tax invoice.', 'Before check-out.', { statutory: ca(['HT6', 'HT7', 'HT11', 'HT12']) }),
   t('tables:frontdesk:housekeeping', 'Housekeeping', 'हाउसकीपिंग', 'Room status by floor: clean, dirty, inspected, out of order.', 'After check-outs and through the day.'),
-  t('tables:frontdesk:audit', 'Night audit', 'नाइट ऑडिट', 'Closes the business date: posts room nights once, lists no-shows and due-outs, and keeps occupancy, ADR and RevPAR.', 'Every night.'),
-  t('tables:frontdesk:guests', 'Guest register', 'गेस्ट रजिस्टर', 'Police / guest register with masked ID numbers, printable and as CSV.', 'When the register is asked for.', { statutory: ca() }),
-  t('tables:frontdesk:formc', 'Form C', 'फ़ॉर्म C', 'Foreign guests whose Form C must be filed on the Bureau of Immigration site.', 'Within the deadline after a foreign guest checks in.', { statutory: ca() }),
-  t('tables:frontdesk:reports', 'Hotel reports', 'होटल रिपोर्ट', 'Occupancy, ADR, RevPAR, source mix and the guest and city ledgers.', 'Month end.'),
-  t('tables:frontdesk:setup', 'Rooms & rates', 'कमरे और रेट', 'Room types, rooms, rate plans (EP / CP / MAP / AP, weekend, seasons) and hotel settings.', 'Once, and when rates change.'),
+  t('tables:frontdesk:audit', 'Night audit', 'नाइट ऑडिट', 'Closes the business date: posts room nights once, lists no-shows and due-outs, and keeps occupancy, ADR and RevPAR.', 'Every night.', { statutory: ca(['HT11', 'HT17']) }),
+  t('tables:frontdesk:guests', 'Guest register', 'गेस्ट रजिस्टर', 'Police / guest register with masked ID numbers, printable and as CSV.', 'When the register is asked for.', { statutory: ca(['HT13']) }),
+  t('tables:frontdesk:formc', 'Form C', 'फ़ॉर्म C', 'Foreign guests whose Form C is filed on boi.gov.in: the data sheet to copy, the clock, and the reference once filed. Nothing is uploaded.', 'Within the deadline after a foreign guest checks in.', { statutory: ca(['HT13'], 'Form C') }),
+  t('tables:frontdesk:reports', 'Hotel reports', 'होटल रिपोर्ट', 'Occupancy, ADR and RevPAR by day, month and room type; source mix; night-audit history.', 'Month end.', { statutory: ca(['HT17']) }),
+  t('tables:frontdesk:setup', 'Rooms & rates', 'कमरे और रेट', 'Room types, rooms, rate plans (EP / CP / MAP / AP, weekend, seasons) and hotel settings.', 'Once, and when rates change.', { statutory: ca(['HT2', 'HT6', 'HT14']) }),
   // R8: trading packs on Distribution (distributor, commodity, agency). Working papers — verify with your CA.
   t('distribution:claims', 'Claims', 'क्लेम', 'Distributor pack: scheme claims and price-protection claims to your principals, and price-drop notes to retailers.', 'Each month, before sending claims to the company.', {
     statutory: ca(['TR2', 'TR3', 'TR4']),
