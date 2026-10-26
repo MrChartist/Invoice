@@ -3,7 +3,7 @@
  * Form 16A tracking and a 26AS / AIS CSV reconciliation. Loaded lazily, so none
  * of this (or the CSV / import-mapping code it pulls in) touches the main bundle.
  */
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { Link } from 'react-router-dom';
 import {
@@ -13,9 +13,11 @@ import type { Client, InvoiceRecord, Payment } from '../../types/invoice';
 import {
   TDS_CERT_TABLE, buildTdsRegister, fyLabel, parseTdsCsv, reconcileTds, setCertificate,
   tdsReconCsv, tdsRegisterCsv, quarterLabel,
-  type CertStatus, type TdsCertificate, type TdsCsvResult, type TdsQuarterBlock, type TdsRecon,
+  type CertStatus, type TdsCertificate, type TdsCsvResult, type TdsExpectedLine, type TdsQuarterBlock, type TdsRecon,
 } from '../../lib/tds-register';
 import { getTable, setTable } from '../../lib/storage';
+import { isPackOn } from '../../lib/industry-packs'; // R5-A5
+import { localDb } from '../../lib/localDb';
 import { isoDay } from '../../lib/dates';
 import { getIndianFY } from '../../lib/invoice-number';
 import { formatCurrency, formatDate, formatMoney, todayInput } from '../../lib/utils';
@@ -31,7 +33,7 @@ import { formText, quarterStart, sectionText } from '../../lib/ita2025';
 import styles from './TdsTab.module.css';
 
 export interface TdsTabProps {
-  data: { invoices: InvoiceRecord[]; payments: Payment[]; clients: Client[] };
+  data: { invoices: InvoiceRecord[]; payments: Payment[]; clients: Client[]; extraExpected?: TdsExpectedLine[] };
   notify: (message: string, tone?: 'success' | 'error') => void;
 }
 
@@ -51,8 +53,15 @@ function loadCerts(): TdsCertificate[] {
   }
 }
 
-export default function TdsTab({ data, notify }: TdsTabProps) {
+export default function TdsTab({ data: rawData, notify }: TdsTabProps) {
   useT(); // re-render on a language switch (5.4)
+  // R5-A5: 194-O deducted by marketplaces (settlement lines) joins the register and the 26AS match — pack on only.
+  const [extra, setExtra] = useState<TdsExpectedLine[]>([]);
+  useEffect(() => {
+    if (!isPackOn(localDb.settings.get(), 'marketplace')) return;
+    import('../../lib/marketplace/tds-194o').then((m) => setExtra(m.liveTds194oLines()), () => undefined);
+  }, []);
+  const data = useMemo(() => (extra.length ? { ...rawData, extraExpected: extra } : rawData), [rawData, extra]);
   const [certs, setCerts] = useState<TdsCertificate[]>(loadCerts);
   const today = isoDay(new Date());
   const all = useMemo(() => buildTdsRegister({ ...data, certificates: certs }, { today }), [data, certs, today]);

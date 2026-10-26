@@ -4,7 +4,14 @@
  */
 import { ALL_MODULES, type BusinessType, type ModuleId, type ShopModeSettings } from './shop-mode';
 
-export const BUSINESS_TYPES: readonly BusinessType[] = ['kirana', 'restaurant', 'wholesale', 'services', 'manufacturer', 'full'];
+export const BUSINESS_TYPES: readonly BusinessType[] = [
+  'kirana', 'restaurant', 'wholesale', 'services', 'manufacturer', 'full',
+  // R5-A1: industry packs (listed after the existing types)
+  'ecommerce', 'transport', 'contractor', 'institution', 'nonprofit', 'property',
+];
+
+/** R5-A1: the six industry-pack business types (their labels live in the pack i18n area). */
+export const PACK_BUSINESS_TYPES: readonly BusinessType[] = ['ecommerce', 'transport', 'contractor', 'institution', 'nonprofit', 'property'];
 
 export const PRESETS: Readonly<Record<BusinessType, readonly ModuleId[]>> = {
   kirana: ['pos', 'purchases', 'inventory', 'reports'],
@@ -14,6 +21,13 @@ export const PRESETS: Readonly<Record<BusinessType, readonly ModuleId[]>> = {
   full: ALL_MODULES,
   // R3-A: café / dhaba / restaurant — tables & KOT live under the POS module.
   restaurant: ['pos', 'inventory', 'reports'],
+  // R5-A1: industry packs — the pack itself (`industry-packs.ts`) adds the vertical's tabs on these modules' routes.
+  ecommerce: ['purchases', 'inventory', 'accounts', 'banking', 'reports', 'gst', 'tds'],
+  transport: ['purchases', 'accounts', 'banking', 'reports', 'gst', 'tds', 'payroll', 'loans'],
+  contractor: ['purchases', 'inventory', 'accounts', 'banking', 'reports', 'gst', 'tds', 'payroll', 'time'],
+  institution: ['recurring', 'purchases', 'accounts', 'reports', 'gst', 'payroll'],
+  nonprofit: ['recurring', 'purchases', 'accounts', 'banking', 'reports', 'tds', 'payroll'],
+  property: ['recurring', 'accounts', 'banking', 'reports', 'gst', 'tds'],
 };
 
 /** Dashboard tile → module. Tiles not listed are always available. */
@@ -60,6 +74,13 @@ export const BUSINESS_DEFAULTS: Readonly<Record<BusinessType, BusinessDefaults>>
   manufacturer: { defaultDueDays: 30, templateId: 'corporate_navy', landing: '/invoice' },
   full: { defaultDueDays: 14, templateId: 'classic_orange', landing: '/invoice' },
   restaurant: { defaultDueDays: 0, templateId: 'compact_receipt', landing: '/tables' },
+  // R5-A1: industry packs land on their pack's tab
+  ecommerce: { defaultDueDays: 0, templateId: 'gst_tax_invoice', landing: '/receivables?tab=marketplace' },
+  transport: { defaultDueDays: 30, templateId: 'gst_tax_invoice', landing: '/distribution?tab=transport' },
+  contractor: { defaultDueDays: 30, templateId: 'corporate_navy', landing: '/time?tab=works' },
+  institution: { defaultDueDays: 10, templateId: 'freelancer_light', landing: '/recurring?tab=fees' },
+  nonprofit: { defaultDueDays: 0, templateId: 'classic_orange', landing: '/receivables?tab=donations' },
+  property: { defaultDueDays: 7, templateId: 'gst_tax_invoice', landing: '/recurring?tab=leases' },
 };
 
 /** Settings after the wizard: shop-mode modules plus the type's default due days. */

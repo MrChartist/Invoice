@@ -220,6 +220,7 @@ function runBell(force: boolean, setItems: (list: VisibleNotification[]) => void
   ensureTransferAlerts(reload); // R4-B
   ensureTradeAlerts(reload); // R4-C
   ensureTrustAlerts(reload); // R4-C
+  ensureMarketplaceAlerts(reload); // R5-A
 }
 
 /** Coalesces refresh requests into one run on the next task (a forced request wins). */
@@ -279,6 +280,16 @@ function ensureTrustAlerts(onReady: () => void): void {
   if (trustAlerts || !(peekTable('recycle_bin').length || +(/"at":"(\d{4})/.exec(readRaw(DB_PREFIX + 'audit_log')?.slice(0, 400) ?? '')?.[1] ?? 1e4) < new Date().getFullYear() - 8)) return;
   trustAlerts = 1;
   import('../../lib/trust/trust-alerts').then((m) => { m.registerTrustAlerts(); onReady(); }, () => { trustAlerts = 0; });
+}
+
+// R5-A: marketplace notices — lazy, only with the marketplace pack on (same rule as `industry-packs.ts`) and a channel.
+let marketplaceAlerts = 0;
+function ensureMarketplaceAlerts(onReady: () => void): void {
+  if (marketplaceAlerts || !peekTable('sales_channels').length) return;
+  const s = getJson<{ industry_packs?: unknown; business_type?: string } | null>(SINGLETON_KEYS.settings, null);
+  if (!(Array.isArray(s?.industry_packs) ? s.industry_packs.includes('marketplace') : s?.business_type === 'ecommerce')) return;
+  marketplaceAlerts = 1;
+  import('../../lib/marketplace/marketplace-alerts').then((m) => { m.registerMarketplaceAlerts(); onReady(); }, () => { marketplaceAlerts = 0; });
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {

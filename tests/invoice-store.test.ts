@@ -87,6 +87,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     // R4-C1 export document fields
     incoterm: 'FOB', port_of_loading: 'INNSA1 Nhava Sheva', port_of_discharge: 'Jebel Ali', country_of_origin: 'IN', country_of_destination: 'AE',
     pre_carriage: 'Road', vessel_flight: 'MSC ANNA V.123', marks_numbers: 'ACME/DXB/1-10', export_payment_terms: 'DA 60 days',
+    // R5-A marketplace order link
+    channel_id: 'ch1', channel_order_id: '402-111', channel_import_id: 'imp1',
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

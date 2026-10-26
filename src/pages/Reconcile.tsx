@@ -26,7 +26,7 @@ import {
 } from '../lib/bank-recon';
 import { accountBalanceAt, bankAccountBalanceAt, buildVouchers, loadBooksData, type BooksData } from '../lib/books';
 import { StorageWriteError } from '../lib/storage';
-import { DEFAULT_BANK_ID, accountIdOf, bankAccountsDb, type BankAccount } from '../lib/bank-accounts';
+import { DEFAULT_BANK_ID, accountIdOf, bankAccountsDb, pickableBankAccounts, type BankAccount } from '../lib/bank-accounts';
 import { BankAccountsCard } from '../components/bank/BankAccountsCard';
 import { formatDate, formatMoney } from '../lib/utils';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -88,7 +88,7 @@ export function Reconcile() {
   const [scope, setScope] = useState('all');
   const [accounts, setAccounts] = useState<BankAccount[]>(() => bankAccountsDb.all());
   const [accountId, setAccountId] = useState(DEFAULT_BANK_ID);
-  const multi = accounts.filter((a) => a.active !== false).length > 1;
+  const multi = pickableBankAccounts('brs', accounts.filter((a) => a.active !== false)).length > 1; // R5-A2: clearing accounts never take a statement
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
   const [filter, setFilter] = useState<Filter>('review');
   const [query, setQuery] = useState('');
@@ -265,7 +265,7 @@ export function Reconcile() {
     <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
       <label className={controls.label} htmlFor="rec-account">{bankT('bankAccount')}</label>
       <select id="rec-account" className={controls.select} value={accountId} onChange={(e) => { setAccountId(e.target.value); setScope('all'); }}>
-        {accounts.filter((a) => a.active !== false || a.id === accountId).map((a) => (
+        {pickableBankAccounts('brs', accounts.filter((a) => a.active !== false || a.id === accountId)).map((a) => (
           <option key={a.id} value={a.id}>{a.name}{a.number ? ` (${a.number})` : ''}</option>
         ))}
       </select>

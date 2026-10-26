@@ -1700,6 +1700,47 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R5-A: e-commerce pack on → channel → import an Amazon MTR and a settlement → post → clearing nets to ₹0.00', async () => {
+    const keys = ['settings', 'invoices', 'transactions', 'vouchers', 'items_catalog', 'clients', 'bank_accounts', 'accounts', 'doc_links', 'series_counters',
+      'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'marketplace_returns'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, industry_packs: ['marketplace'], lock_until: undefined });
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-mug', name: 'E2E Red Mug', sku: 'MUG-RED', hsn: '6912', unit: 'NOS', tax_rate: 18, rate: 500, type: 'Product', quantity: 1, amount: 0 }]);
+    await page.goto(srv.origin + '/receivables');
+    await page.getByRole('tab', { name: 'Marketplace' }).click();
+    await page.locator('[data-mkt-view="channels"]').click();
+    await page.locator('[data-mkt-ch-name]').fill('E2E Amazon');
+    await page.locator('[data-mkt-ch-gstins]').fill('27AAICA3918J1CT');
+    await page.locator('[data-mkt-ch-save]').click();
+    const ch = await readJson(page, 'sales_channels', [], (v) => v.length === 1);
+    const banks = await readJson(page, 'bank_accounts', [], (v) => v.some((b) => b.clearing));
+    check(!!ch[0]?.clearing_bank_id && banks.some((b) => b.id === ch[0].clearing_bank_id && b.clearing), 'the channel has its own clearing account');
+    // The pack-of-3 listing maps to the mug (SKU map row).
+    await writeJson(page, 'channel_skus', [{ id: 'e2e-sku', channel_id: ch[0].id, channel_sku: 'MUG-3PK', listing_id: 'B0MUG3', item_id: 'e2e-mug', qty_per_unit: 3 }]);
+    const fx = (n) => decodeURIComponent(new URL(`../fixtures/marketplace/${n}`, import.meta.url).pathname);
+
+    await page.goto(srv.origin + '/receivables?tab=marketplace&view=import');
+    await page.locator('[data-mkt-sales-file]').setInputFiles(fx('amazon-mtr.csv'));
+    await page.locator('[data-mkt-preview]').waitFor();
+    check(/3 invoices and 1 credit notes/.test(await page.locator('[data-mkt-preview]').innerText()), 'preview: 3 invoices and 1 credit note');
+    await page.locator('[data-mkt-sales-import]').click();
+    const docs = await readJson(page, 'invoices', [], (v) => v.filter((d) => d.channel_id === ch[0].id).length === 4);
+    check(docs.filter((d) => d.channel_id === ch[0].id && d.eco_gstin === '27AAICA3918J1CT').length === 4, 'four documents with the marketplace numbers, tagged to the operator GSTIN');
+
+    await page.goto(srv.origin + '/receivables?tab=marketplace&view=settlements');
+    await page.locator('[data-mkt-settlement-file]').setInputFiles(fx('amazon-settlement-v2.csv'));
+    await page.locator('[data-mkt-settlement-import]').click();
+    await readJson(page, 'settlements', [], (v) => v.length === 1);
+    await page.locator('[data-mkt-post]').click();
+    await readJson(page, 'settlements', [], (v) => !!v[0]?.posted);
+    await page.locator('[data-mkt-clearing-total]').waitFor();
+    const total = await page.locator('[data-mkt-clearing-total]').innerText();
+    check(/₹0\.00/.test(total), `clearing account nets to zero (${total.trim()})`);
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('composition profile issues a Bill of Supply with the Rule 49 declaration', async () => {
     await page.goto(srv.origin + '/settings');
     await page.getByLabel('GST scheme').selectOption('composition');

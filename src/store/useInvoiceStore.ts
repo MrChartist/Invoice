@@ -25,6 +25,7 @@ import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import '../types/sales-r2'; // R2-B: declaration-merged record fields (RECORD_KEYS below)
 import type {} from '../types/restaurant'; // R3-A: declaration-merged record fields (type-only, erased)
+import type {} from '../types/marketplace-r5'; // R5-A: declaration-merged record fields (type-only, erased)
 import type {
   Client,
   DiscountType,
@@ -153,6 +154,7 @@ export const RECORD_KEYS = [
   'annexure', // R3-B (src/types/service-r3.ts)
   'delivery_proof', // R3-C
   'incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms', // R4-C
+  'channel_id', 'channel_order_id', 'channel_import_id', // R5-A
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

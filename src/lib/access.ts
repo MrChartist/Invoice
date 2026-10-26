@@ -412,6 +412,14 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   export_irms: 'books.edit',
   export_incentives: 'books.edit',
   export_writeoffs: 'books.edit',
+  // R5-A: channels and the SKU map are masters; imports / settlements / returns are documents (posting checks
+  // books.edit itself); GST TCS / TDS credit decisions post journals
+  sales_channels: 'master.edit',
+  channel_skus: 'master.edit',
+  marketplace_imports: 'doc.create',
+  settlements: 'doc.create',
+  eco_credits: 'books.edit',
+  marketplace_returns: 'doc.create',
 };
 
 let systemDepth = 0;
