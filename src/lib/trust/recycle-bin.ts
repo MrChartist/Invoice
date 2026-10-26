@@ -33,6 +33,8 @@ import { purchasesDb } from '../purchases';
 import { BIN_RETENTION } from '../trade/trade-rules';
 import { PAYROLL_TABLES } from './payroll-tables';
 import { liveRedeemIssue } from '../retail/gift-voucher-core';
+import '../trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
+import '../hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
 
 export { BIN_TABLE };
 export const BIN_SETTINGS_KEY = `${DB_PREFIX}bin_settings`;
@@ -212,6 +214,9 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Sales commission'], tables: ['commission_postings'], redo: 'post the commission again' },
   { classes: ['GST TCS credit', 'GST TDS credit'], tables: ['eco_credits'], redo: 'accept the credit again' },
   { classes: ['Customs duty (BOE)'], tables: ['purchases'], redo: 'post the duty again from the bill of entry' },
+  // R8-C: agency desk (TR-C1)
+  { classes: ['Arrival advance'], tables: ['arrivals'], redo: 'cancel the arrival and enter it again in Distribution → Agency' },
+  { classes: ['Bikri patti'], tables: ['sale_pattis'], redo: 'post the patti again in Distribution → Agency → Bikri patti' },
 ];
 const RA_CLASS = 'RA deduction';
 const SETTLEMENT_METHOD = 'Marketplace settlement'; // as settlement-post.ts records it (not imported: keeps this chunk small)

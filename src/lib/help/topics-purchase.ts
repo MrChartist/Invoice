@@ -54,4 +54,6 @@ export const TOPICS: readonly HelpTopic[] = [
   t('distribution:van', 'Van & pick list', 'वैन और पिक लिस्ट', 'Load a van godown, sell from it and settle at day end.', 'For van sales.'),
   t('distribution:orders', 'Orders', 'ऑर्डर', 'Orders taken on the order pad, to confirm and bill.', 'After the beat.'),
   t('distribution:credit', 'Credit control', 'क्रेडिट नियंत्रण', 'Credit limits and days per party, and who is over them.', 'Before billing a party with old dues.'),
+  // R8-C (TR-C4)
+  t('inventory:hsn', 'HSN stock', 'HSN अनुसार स्टॉक', 'Closing quantity and value at cost by HSN code and godown on a date.', 'For the bank, the annual return or a stock audit.', { statutory: ca(['TR19']) }),
 ];

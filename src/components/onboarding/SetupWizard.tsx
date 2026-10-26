@@ -11,7 +11,9 @@ import { LANGUAGES, isLang, setLanguage, useT } from '../../i18n';
 import { setupT } from '../../i18n/areas/setup';
 import { reachT } from '../../i18n/areas/reach';
 import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
-import { BUSINESS_DEFAULTS, BUSINESS_TYPES, applyBusinessDefaults } from '../../lib/shop-presets';
+import { BUSINESS_DEFAULTS, BUSINESS_TYPES, TRADE_PROFILES, applyBusinessDefaults, applyTradeKind, isTradeKind, type TradeKindId } from '../../lib/shop-presets';
+import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
+import { trT } from '../../i18n/areas/trade-r8c';
 import { startDemoCompany, useDemoPending } from './demo-company';
 import { companiesSupported } from '../../lib/companies';
 import { discoverT } from '../../i18n/areas/discover-r6';
@@ -34,6 +36,8 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   const [error, setError] = useState('');
   // Shop mode (8H): what the business does; "full" keeps every module (the default).
   const [business, setBusiness] = useState<BusinessType>(() => localDb.settings.get().business_type ?? 'full');
+  // R8-C (TR-C5): the trade under "Wholesale" (business type stays `wholesale`).
+  const [tradeKind, setTradeKind] = useState<TradeKindId | ''>(() => (isTradeKind(localDb.settings.get().trade_kind) ? (localDb.settings.get().trade_kind as TradeKindId) : ''));
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
     setBusiness(b);
@@ -69,10 +73,11 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     if (problem) return setError(problem);
     if (!last) return setStep((s) => s + 1);
     try {
-      localDb.settings.save(applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business));
+      const trade = business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
+      localDb.settings.save({ ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business), ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}) });
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(BUSINESS_DEFAULTS[business].landing);
+      onClose(trade ? TRADE_PROFILES[trade].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -174,6 +179,13 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 </button>
               ))}
             </div>
+            {business === 'wholesale' && (
+              <div className={controls.field} data-wizard-trade>
+                <span className={controls.label}>{trT('tradeTitle')}</span>
+                <span className={controls.hint}>{trT('tradeLede')}</span>
+                <TradeKindPicker value={tradeKind} onPick={setTradeKind} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+              </div>
+            )}
             {/* QA-3 F20: the demo choice belongs on the first step, before any required field. */}
             <div className={controls.field}>
               <button type="button" className={controls.btnOutline} onClick={exploreDemo} disabled={demoBusy} data-wizard-demo>

@@ -72,7 +72,8 @@ Store — `src/lib/hotel/hotel-store.ts`:
   `putReservations / putFolios / putGuests / putAudit` (replace by id, `doc.create`), `saveSettings`
   (`settings.manage`), `setBusinessDate` (night audit only).
 - Registry rows for all seven tables (backup, edit log / recycle bin, roles, sync DATED + NUMBERED `RES`, open export)
-  are in place; B and C do not edit `backup.ts`, `audit-edits.ts`, `access.ts` or `sync-engine.ts`.
+  are in place (rights and edit-log rows at runtime through `hotel-registry.ts`; a new hotel writer imports
+  `hotel-store.ts` or `./hotel-registry`); B and C do not edit `backup.ts`, `audit-edits.ts`, `access.ts` or `sync-engine.ts`.
 
 Rules — `src/lib/hotel/hotel-rules.ts`: `ACCOMMODATION_RATE_RULES`, `HOTEL_RESTAURANT_RATE_RULES`,
 `SPECIFIED_PREMISES_RULES`, `FORM_C_HOURS_RULES` (rows exactly as PRD §4 C1; C appends), `ruleAt`,
@@ -126,15 +127,17 @@ privacy, returning guests, refused rooms, dirty → confirm, check-out → dirty
 by mode via `movedNoCash`, locked period, 31 March, roles, routing / meals / complimentary). Helpers:
 `tests/helpers/hotel.ts`.
 
-## Bundle (gzip, measured against base `5cc25cb` with `npm run build`)
+## Bundle (gzip, measured against base `a5941f5` with `npm run build`)
 
 | | Before | After R7-A | Δ |
 |---|---|---|---|
-| Initial JS (first paint) | 188,740 B (184.32 kB) | 188,977 B (184.55 kB) | +237 B |
-| Total JS | 2,596,928 B | 2,621,616 B | +24,688 B (≈ 24.1 kB) |
+| Initial JS (first paint) | 188,838 B (184.41 kB) | 188,964 B (184.53 kB) | +126 B |
+| Total JS | 2,640,600 B | 2,665,367 B | +24,767 B (≈ 24.2 kB) |
 
-First-paint growth: registry rows in `access.ts` (storage chunk), the `shop-mode.ts` route / type rows, the sidebar label
-ternary, `nav.frontDesk` (en) and the mangled-export shifts they cause — within the lead's ≤ 184.7 kB cap for the round.
+First paint: the `shop-mode.ts` route / type rows, the sidebar label ternary, `nav.frontDesk` (en), the hidden guest-ID
+fields in the edit log and the mangled-export shifts they cause. The hotel rights and edit-log rows are registered at
+runtime by `src/lib/hotel/hotel-registry.ts` (the Round 8 `tr-registry.ts` pattern), imported by `hotel-store.ts`, the
+sync engine and the recycle bin, so `access.ts` / `audit-edits.ts` carry no hotel rows.
 
 R7-A is **over its 13 kB total-JS share**: the front-desk chunk (all views, the engines and the en + hi strings in one
 lazy chunk) is ≈ 21.7 kB gz, plus ≈ 2.4 kB of registry / help / palette rows in existing chunks. Cut-first A5 was

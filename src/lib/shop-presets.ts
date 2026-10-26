@@ -93,3 +93,36 @@ export const BUSINESS_DEFAULTS: Readonly<Record<BusinessType, BusinessDefaults>>
 export function applyBusinessDefaults<S extends ShopModeSettings & { defaultDueDays: number }>(settings: S, type: BusinessType): S {
   return { ...settings, ...applyBusinessType(type), defaultDueDays: BUSINESS_DEFAULTS[type].defaultDueDays };
 }
+
+/* ── R8-C (TR-C5): trade profile under the `wholesale` business type ── */
+
+/** The trade picker's four choices (stored as `settings.trade_kind`); the business type stays `wholesale`. */
+export const TRADE_KINDS = ['distributor', 'wholesaler', 'commodity', 'agent'] as const;
+export type TradeKindId = (typeof TRADE_KINDS)[number];
+
+export interface TradeProfile {
+  modules: readonly ModuleId[];
+  /** Explicit `industry_packs` list (an empty list = none, so a wholesaler gets no trading pack). */
+  packs: readonly ('distributor' | 'commodity' | 'agency')[];
+  landing: string;
+  defaultDueDays: number;
+  templateId: string;
+  trade_discounts: boolean;
+  returnable_packaging: boolean;
+}
+
+export const TRADE_PROFILES: Readonly<Record<TradeKindId, TradeProfile>> = {
+  distributor: { modules: PRESETS.wholesale.filter((m) => m !== 'pos' && m !== 'recurring'), packs: ['distributor'], landing: '/distribution?tab=claims', defaultDueDays: 21, templateId: 'gst_tax_invoice', trade_discounts: true, returnable_packaging: true },
+  wholesaler: { modules: PRESETS.wholesale, packs: [], landing: '/invoice', defaultDueDays: 30, templateId: 'gst_tax_invoice', trade_discounts: true, returnable_packaging: false },
+  commodity: { modules: PRESETS.wholesale, packs: ['commodity'], landing: '/invoice', defaultDueDays: 15, templateId: 'gst_tax_invoice', trade_discounts: false, returnable_packaging: true },
+  agent: { modules: ['purchases', 'inventory', 'accounts', 'banking', 'reports', 'gst', 'tds'], packs: ['agency', 'commodity'], landing: '/distribution?tab=agency', defaultDueDays: 7, templateId: 'gst_tax_invoice', trade_discounts: false, returnable_packaging: true },
+};
+
+export const isTradeKind = (v: unknown): v is TradeKindId => typeof v === 'string' && (TRADE_KINDS as readonly string[]).includes(v);
+
+/** Settings patch for a trade profile: business type `wholesale`, its modules, packs and the two trade switches. */
+export function applyTradeKind(kind: TradeKindId): ShopModeSettings & { trade_kind: TradeKindId; industry_packs: ('distributor' | 'commodity' | 'agency')[]; trade_discounts: boolean; returnable_packaging: boolean } {
+  const p = TRADE_PROFILES[kind];
+  return { business_type: 'wholesale', modules: [...p.modules], trade_kind: kind, industry_packs: [...p.packs], trade_discounts: p.trade_discounts, returnable_packaging: p.returnable_packaging };
+}
+

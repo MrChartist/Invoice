@@ -230,7 +230,9 @@ export function requireAccess(action: AccessAction): void {
 /** Payroll tables (review L1): a write is a books change AND needs payroll access, like the payroll APIs. */
 const PAYROLL_WRITE: readonly AccessAction[] = ['books.edit', 'payroll.view'];
 
-const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessAction[]>> = {
+// R8-C: exported so the Round 8 tables register their rights from `src/lib/trade/tr-registry.ts` (a lazy chunk —
+// this map ships with first paint).
+export const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessAction[]>> = {
   // masters
   items_catalog: 'master.edit',
   clients: 'master.edit',
@@ -442,16 +444,6 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   setup_progress: 'doc.create',
   // R6-C3: import runs (suppliers / ledgers / opening balances)
   import_runs: 'books.edit',
-  // R7-A: hotel masters; bookings, folios, guests, night audits are documents (housekeeping status: doc.create via
-  // `hotelDb.patchRooms`); hotel settings need settings.manage
-  hotel_room_types: 'master.edit',
-  hotel_rooms: 'master.edit',
-  hotel_rate_plans: 'master.edit',
-  hotel_reservations: 'doc.create',
-  hotel_folios: 'doc.create',
-  hotel_guests: 'doc.create',
-  hotel_night_audits: 'doc.create',
-  hotel_settings: 'settings.manage',
 };
 
 let systemDepth = 0;

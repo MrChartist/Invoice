@@ -96,6 +96,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     folio_id: 'fo1', reservation_id: 'res1', stay: { arrival: '2026-10-20', departure: '2026-10-22', rooms: ['101'], nights: 2, adults: 2, children: 0 }, hotel_band: 'low',
     // R5-C1 fee plan / instalment
     fee_plan_id: 'fp1', fee_instalment: 2,
+    // R8 (src/types/trade-r8.ts)
+    cash_discount: { percent: 2, days: 7 }, price_drop_id: 'pd1', interest_run_id: 'ir1', broker_id: 'b1', agency: true,
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

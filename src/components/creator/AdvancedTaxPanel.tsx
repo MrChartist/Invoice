@@ -12,6 +12,10 @@ import {
 const ROUND_MODES: RoundMode[] = ['nearest', 'up', 'down', 'none'];
 // R4-C1: LUT auto-fill from the register + hint (lazy, zero-rated supplies without payment only).
 const LutHint = lazy(() => import('../trade/LutHint'));
+// R8-C (TR-C2): Form 27C / 127 declaration, 206C(1F) value check, customer deducts 194Q (lazy).
+const PartyTaxHints = lazy(() => import('../trade/PartyTaxHints'));
+import { tradingTcsPresets } from '../../lib/trade/tr-statutory';
+import { localDb } from '../../lib/localDb';
 import { tcsPresets, tdsSections } from '../../lib/tax-rules';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
@@ -28,12 +32,12 @@ import styles from './AdvancedTaxPanel.module.css';
 export function AdvancedTaxPanel() {
   useT(); // re-render on a language switch (5.4)
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['currency', 'issue_date', 'lut_date', 'lut_number', 'price_includes_tax', 'round_mode', 'round_off_enabled', 'setLut', 'setPriceIncludesTax', 'setRoundMode', 'setSupplyType', 'setTcs', 'setTds', 'supply_type', 'tcs_base', 'tcs_enabled', 'tcs_label', 'tcs_rate', 'tds_enabled', 'tds_on_taxable', 'tds_rate', 'tds_section', 'totals'])),
+    useShallow((st) => pick(st, ['client', 'currency', 'issue_date', 'lut_date', 'lut_number', 'price_includes_tax', 'round_mode', 'round_off_enabled', 'setLut', 'setPriceIncludesTax', 'setRoundMode', 'setSupplyType', 'setTcs', 'setTds', 'supply_type', 'tcs_base', 'tcs_enabled', 'tcs_label', 'tcs_rate', 'tds_enabled', 'tds_on_taxable', 'tds_rate', 'tds_section', 'totals'])),
   );
   const money = (n: number) => formatCurrency(n, s.currency);
   const roundMode: RoundMode = s.round_mode ?? (s.round_off_enabled ? 'nearest' : 'none');
   const t = s.totals;
-  const TCS_PRESETS = tcsPresets(s.issue_date);
+  const TCS_PRESETS = [...tcsPresets(s.issue_date), ...tradingTcsPresets(s.issue_date, { declaration: !!(s.client?.id && localDb.clients.getById(s.client.id)?.tcs_declaration) })]; // R8-C: 206C(1) / (1F)
   const TDS_SECTIONS = tdsSections(s.issue_date);
   const active =
     s.tcs_enabled || s.tds_enabled || s.price_includes_tax || (s.supply_type ?? 'B2B') !== 'B2B';
@@ -82,9 +86,9 @@ export function AdvancedTaxPanel() {
           </label>
           {s.tcs_enabled && (
             <div className={styles.row}>
-              <select className={styles.field} aria-label={edT('atTcsPreset')} value="" onChange={(e) => e.target.value && s.setTcs({ rate: Number(e.target.value) })}>
+              <select className={styles.field} aria-label={edT('atTcsPreset')} value="" onChange={(e) => { const p = TCS_PRESETS[Number(e.target.value)]; if (e.target.value && p) s.setTcs({ rate: p.rate, ...('section' in p ? { label: p.label } : {}) }); }}>
                 <option value="">{edT('atPreset')}</option>
-                {TCS_PRESETS.map((p) => <option key={p.label} value={p.rate}>{withActRef(p.label, p.label, s.issue_date, ita25Words())}</option>)}
+                {TCS_PRESETS.map((p, i) => <option key={p.label} value={i}>{withActRef(p.label, p.label, s.issue_date, ita25Words())}</option>)}
               </select>
               <input className={styles.field} type="number" min={0} step="0.01" value={s.tcs_rate ?? 0}
                 aria-label={edT('atTcsRate')} onChange={(e) => s.setTcs({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
@@ -129,6 +133,8 @@ export function AdvancedTaxPanel() {
             </>
           )}
         </div>
+
+        <Suspense fallback={null}><PartyTaxHints /></Suspense>
 
         <div className={styles.group}>
           <div className={styles.groupTitle}>{edT('atRounding')}</div>

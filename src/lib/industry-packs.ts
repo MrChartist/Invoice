@@ -16,10 +16,14 @@
 import type { BusinessType } from './shop-mode';
 
 export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit' | 'leases'
-  | 'hotel'; // R7-A
+  | 'hotel' // R7-A
+  // R8-C: trading packs (tabs on /distribution; switched on by the `wholesale` trade profile, never by a business type)
+  | 'distributor' | 'commodity' | 'agency';
 
-export const PACK_IDS: readonly PackId[] = ['marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
+export const PACK_IDS: readonly PackId[] = [
+  'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
   'hotel', // R7-A
+  'distributor', 'commodity', 'agency', // R8-C
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -103,6 +107,18 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'hotel', path: '/tables?tab=frontdesk&view=formc', labelKey: 'view.formc' },
   { pack: 'hotel', path: '/tables?tab=frontdesk&view=reports', labelKey: 'view.reports' },
   { pack: 'hotel', path: '/tables?tab=frontdesk&view=setup', labelKey: 'view.setup' },
+  // R8: trading packs on Distribution (labels in `trade-r8c.ts`, keys `r8.*`)
+  { pack: 'distributor', path: '/distribution?tab=claims', labelKey: 'r8.claims' },
+  { pack: 'distributor', path: '/distribution?tab=claims&view=schemes', labelKey: 'r8.schemes' },
+  { pack: 'distributor', path: '/distribution?tab=claims&view=pricedrop', labelKey: 'r8.pricedrop' },
+  { pack: 'distributor', path: '/distribution?tab=claims&view=claims', labelKey: 'r8.claimList' },
+  { pack: 'distributor', alsoPacks: ['commodity', 'agency'], path: '/distribution?tab=packaging', labelKey: 'r8.packaging' },
+  { pack: 'commodity', alsoPacks: ['agency'], path: '/distribution?tab=mandi', labelKey: 'r8.mandi' },
+  { pack: 'commodity', alsoPacks: ['agency'], path: '/distribution?tab=brokers', labelKey: 'r8.brokers' },
+  { pack: 'agency', path: '/distribution?tab=agency', labelKey: 'r8.agency' },
+  { pack: 'agency', path: '/distribution?tab=agency&view=arrivals', labelKey: 'r8.arrivals' },
+  { pack: 'agency', path: '/distribution?tab=agency&view=pattis', labelKey: 'r8.pattis' },
+  { pack: 'agency', path: '/distribution?tab=agency&view=indents', labelKey: 'r8.indents' },
 ];
 
 /**
@@ -112,4 +128,13 @@ export const PACK_TABS: readonly PackTab[] = [
 export function visibleTabs<T extends { id: string; pack?: PackId }>(tabs: readonly T[], s: PackSettings | null | undefined, current?: string): T[] {
   const on = activePacks(s);
   return tabs.filter((t) => !t.pack || on.includes(t.pack) || t.id === current);
+}
+
+/**
+ * R8-C: like `visibleTabs`, for rows that a tab shares between packs (`alsoPacks`, e.g. Distribution → Mandi for the
+ * commodity and agency packs). A row whose packs are all off is hidden unless it is the tab being shown.
+ */
+export function visiblePackTabs<T extends { id: string; pack?: PackId; alsoPacks?: readonly PackId[] }>(tabs: readonly T[], s: PackSettings | null | undefined, current?: string): T[] {
+  const on = activePacks(s);
+  return tabs.filter((t) => !t.pack || on.includes(t.pack) || (t.alsoPacks ?? []).some((p) => on.includes(p)) || t.id === current);
 }

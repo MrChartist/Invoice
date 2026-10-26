@@ -48,4 +48,6 @@ export const TOPICS: readonly HelpTopic[] = [
   t('pos-display', 'Customer display', 'ग्राहक डिस्प्ले', 'A second screen showing the customer their bill at the counter.', 'Open it on a second monitor or tablet.'),
   t('share-target', 'Shared to the app', 'ऐप में साझा', 'Files shared to the app from another app land here (bills, photos).', 'After you share a file to Mr. Chartist Invoice.'),
   t('design', 'Design Studio', 'डिज़ाइन स्टूडियो', 'Change the look of your invoices: template, colours, fonts and layout.', 'Once, then whenever you want a new look.', { related: rel(['New invoice', '/invoice']) }),
+  // R8-A (TR-A4; topic written by TR-C)
+  t('receivables:interest', 'Interest', 'ब्याज', 'Interest on overdue bills for every party, and one interest invoice per party in a single run.', 'Month end.', { statutory: ca(['G6', 'TR18']) }),
 ];

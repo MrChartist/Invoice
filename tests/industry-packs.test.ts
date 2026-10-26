@@ -19,7 +19,9 @@ test('each new type implies its pack; an explicit list (even empty) beats the ty
   assert.deepEqual(activePacks({ industry_packs: ['leases', 'bogus', '__proto__', 'marketplace'] }), ['marketplace', 'leases']);
   assert.equal(isPackOn({ industry_packs: ['works'] }, 'works'), true);
   assert.equal(isPackOn({ business_type: 'constructor' }, 'marketplace'), false, 'own-key lookup only');
-  assert.equal(PACK_IDS.length, 7); // R7-A: + hotel
+  assert.ok(PACK_IDS.includes('hotel')); // R7-A
+  assert.ok(PACK_IDS.length >= 9, 'six R5 packs + three R8 trading packs'); // R8-C
+  for (const p of ['distributor', 'commodity', 'agency']) assert.ok(PACK_IDS.includes(p as never), p);
 });
 
 test('applyBusinessType / defaults for each new type', () => {

@@ -12,6 +12,7 @@ import type { Folio, Guest, HotelSettings, NightAudit, RatePlan, Reservation, Ro
 import { DB_PREFIX, getJson, getTable, peekTable, setJson, setTable } from '../storage';
 import { asSystem, requireAccess } from '../access';
 import { todayIso } from '../tax-rules';
+import './hotel-registry'; // rights + edit-log rows for the hotel tables (kept out of first paint)
 
 export const HT = {
   roomTypes: 'hotel_room_types',

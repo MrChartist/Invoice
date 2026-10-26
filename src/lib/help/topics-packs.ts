@@ -38,4 +38,28 @@ export const TOPICS: readonly HelpTopic[] = [
   t('tables:frontdesk:formc', 'Form C', 'फ़ॉर्म C', 'Foreign guests whose Form C must be filed on the Bureau of Immigration site.', 'Within the deadline after a foreign guest checks in.', { statutory: ca() }),
   t('tables:frontdesk:reports', 'Hotel reports', 'होटल रिपोर्ट', 'Occupancy, ADR, RevPAR, source mix and the guest and city ledgers.', 'Month end.'),
   t('tables:frontdesk:setup', 'Rooms & rates', 'कमरे और रेट', 'Room types, rooms, rate plans (EP / CP / MAP / AP, weekend, seasons) and hotel settings.', 'Once, and when rates change.'),
+  // R8: trading packs on Distribution (distributor, commodity, agency). Working papers — verify with your CA.
+  t('distribution:claims', 'Claims', 'क्लेम', 'Distributor pack: scheme claims and price-protection claims to your principals, and price-drop notes to retailers.', 'Each month, before sending claims to the company.', {
+    statutory: ca(['TR2', 'TR3', 'TR4']),
+    related: rel(['Schemes', '/distribution?tab=claims&view=schemes'], ['Price drop', '/distribution?tab=claims&view=pricedrop']),
+  }),
+  t('distribution:claims:schemes', 'Schemes', 'स्कीम', 'Group, brand and party schemes with free-quantity slabs, and which principal pays for them.', 'When a company scheme starts.', { statutory: ca(['TR2']) }),
+  t('distribution:claims:pricedrop', 'Price drop', 'प्राइस ड्रॉप', 'One run of notes to every retailer who bought an item before its price fell, and the claim on the company.', 'When a principal cuts a price and protects stock.', { statutory: ca(['TR3']) }),
+  t('distribution:claims:claims', 'Claim list', 'क्लेम सूची', 'Claims sent to principals and how each was settled (credit note or short).', 'When the company settles a claim.', { statutory: ca(['TR4']) }),
+  t('distribution:packaging', 'Packaging', 'पैकेजिंग', 'Returnable crates, cans and bardana given and taken back per party, with deposits.', 'Daily with the bills, monthly for who still holds crates.', { statutory: ca(['TR8']) }),
+  t('distribution:mandi', 'Mandi', 'मंडी', 'Bill charges (market fee, aadat, hamali, tulai, bardana) per document, and the market fee register.', 'Month end, for the mandi return.', { statutory: ca(['TR6', 'TR7']) }),
+  t('distribution:brokers', 'Brokers', 'दलाल', 'Brokerage per broker and period, posted as payable with TDS on brokerage.', 'Month end, when brokers are settled.', { statutory: ca(['TR12']) }),
+  t('distribution:agency', 'Agency', 'आढ़त', 'Commission agent desk: arrivals of principals\' goods, sales on their behalf, bikri patti and the indent register.', 'Daily in the season.', {
+    statutory: ca(['TR9', 'TR10', 'TR21', 'TR22']),
+    related: rel(['Arrivals', '/distribution?tab=agency&view=arrivals'], ['Bikri patti', '/distribution?tab=agency&view=pattis']),
+  }),
+  t('distribution:agency:arrivals', 'Arrivals', 'आवक', 'Lots received from farmers or traders for sale on their behalf. They are kept in the agency godown and never counted as your own stock.', 'When goods arrive at the shop.', {
+    steps: ['Add the farmer or trader under Suppliers.', 'New arrival: lot, item, bags and net quantity; an advance if you paid one.', 'Sell on an invoice: pick the lot on the line.'],
+    statutory: ca(['TR10']),
+  }),
+  t('distribution:agency:pattis', 'Bikri patti', 'बिक्री पट्टी', 'The settlement to a principal: gross sales of their lots less aadat, charges and the advance. Posting moves the sale to the principal and books your commission.', 'After the lots are sold.', {
+    steps: ['Pick the principal and the lots.', 'Enter the aadat and charge rates.', 'Make the patti, check it, then Post.', 'Print or send it on WhatsApp.'],
+    statutory: ca(['TR9', 'TR22']),
+  }),
+  t('distribution:agency:indents', 'Indents', 'इंडेंट', 'Orders placed with mills for buyers, and the commission billed to the mill when the goods go out.', 'When a buyer places an order; month end for commission.', { statutory: ca(['TR21']) }),
 ];

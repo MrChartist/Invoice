@@ -12,7 +12,8 @@ import { HOTEL_SETTINGS_KEY, HOTEL_TABLES, hotelDb } from '../src/lib/hotel/hote
 import { BACKUP_RECORD_TABLES } from '../src/lib/backup.ts';
 import { WATCHED_TABLES } from '../src/lib/audit-edits.ts';
 import { TABLE_MEANING } from '../src/lib/trust/open-export-schema.ts';
-import { requireTableWrite, setActorProvider } from '../src/lib/access.ts';
+import { TABLE_ACTIONS, requireTableWrite, setActorProvider } from '../src/lib/access.ts';
+import { HOTEL_TABLE_ACTIONS, HOTEL_WATCHED } from '../src/lib/hotel/hotel-registry.ts';
 import { docNumberKey, touchesLock } from '../src/lib/sync-engine.ts';
 import { DB_PREFIX, setReadTrace } from '../src/lib/storage.ts';
 import { RECORD_KEYS } from '../src/store/useInvoiceStore.ts';
@@ -55,6 +56,15 @@ test('registries: every hotel table is backed up, edit-logged (recycle bin), rol
     assert.ok(TABLE_MEANING[t], `${t} described`);
   }
   assert.ok(TABLE_MEANING.hotel_settings);
+  // Rights and edit-log rows are registered at runtime (first paint stays small) by every hotel writer and the lazy
+  // whole-company writers (sync engine, recycle bin); first-paint access.ts / audit-edits.ts carry no hotel rows.
+  for (const t of HOTEL_TABLES) {
+    assert.equal(TABLE_ACTIONS[t], HOTEL_TABLE_ACTIONS[t], `${t} rights`);
+    assert.equal(WATCHED_TABLES[t], HOTEL_WATCHED[t], `${t} audited`);
+  }
+  assert.equal(TABLE_ACTIONS.hotel_settings, 'settings.manage');
+  for (const f of ['src/lib/hotel/hotel-store.ts', 'src/lib/sync-engine.ts', 'src/lib/trust/recycle-bin.ts']) assert.match(src(f), /import '[./]*(hotel\/)?hotel-registry'/, f);
+  for (const f of ['src/lib/access.ts', 'src/lib/audit-edits.ts']) assert.ok(!/hotel_(rooms|reservations)/.test(src(f)), f);
   setActorProvider(() => ({ id: 'v', name: 'V', role: 'viewer' }));
   for (const t of HOTEL_TABLES) assert.throws(() => requireTableWrite(t), /cannot/i, t);
   setActorProvider(() => ({ id: 'c', name: 'C', role: 'clerk' }));

@@ -89,7 +89,7 @@ export function moduleOfPath(path: string): ModuleId | undefined {
  * pins both copies.
  */
 export const PACK_ROUTES: Readonly<Record<string, readonly string[]>> = {
-  '/distribution': ['transport'],
+  '/distribution': ['transport', 'distributor', 'commodity', 'agency'], // R8-C
   '/time': ['works'],
   '/recurring': ['fees', 'leases'],
   '/books': ['nonprofit'],

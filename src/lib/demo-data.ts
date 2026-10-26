@@ -70,7 +70,7 @@ export interface DemoExtras {
 }
 
 /** Tables a profile may add sample rows to; removal filters each by `demo: true`. */
-export const DEMO_EXTRA_TABLES = ['stock_items', 'pos_shifts', 'time_entries', 'retainers', 'vehicles', 'consignment_notes', 'trips', 'ra_measurements', 'doc_links'] as const;
+export const DEMO_EXTRA_TABLES = ['stock_items', 'pos_shifts', 'time_entries', 'retainers', 'vehicles', 'consignment_notes', 'trips', 'ra_measurements', 'doc_links', 'godowns', 'arrivals', 'sale_pattis', 'indents'] as const; // R8-C: agency rows
 export type DemoExtraTable = (typeof DEMO_EXTRA_TABLES)[number];
 
 export const DEMO_PROFILE_ID = 'demo-profile';

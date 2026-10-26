@@ -25,7 +25,9 @@ import { isoDay } from './dates';
 import { num, round2 } from './invoice-calc';
 import { assertUnlocked } from './period-lock';
 import { readPurchase, isVoidStatus } from './purchase-normalize';
-import { generateId, getTable, setTable } from './storage';
+import { DB_PREFIX, generateId, getJson, getTable, setTable } from './storage';
+import { buyer194q } from './trade/tr-statutory'; // R8-C (TR-C2)
+import type { TdsSettings } from '../types/trade-r8';
 import { ruleAt } from './tax-rules';
 import {
   TDS_194C6_RULES,
@@ -327,7 +329,13 @@ export interface TdsSuggestion {
   deducteeType: DeducteeType;
   notes: string[];
   threshold: ThresholdResult;
+  /** R8-C (TR-C2): the section does not apply to us at all (194Q under the buyer's ₹10 crore test): nothing is saved. */
+  refused?: boolean;
 }
+
+/** R8-C (TR-C2): company TDS settings (object `tds_settings`, additive). */
+export const TDS_SETTINGS_KEY = `${DB_PREFIX}tds_settings`;
+export const readTdsSettings = (): TdsSettings => getJson<TdsSettings>(TDS_SETTINGS_KEY, {}) ?? {};
 
 /** Everything the bill form shows: rate after 206AA / 206AB / 197, threshold, base and amount. */
 export function suggestTds(code: string, date: string, base: number, payee: Payee, prior: readonly PriorCredit[], excludeId?: string): TdsSuggestion | null {
@@ -336,6 +344,10 @@ export function suggestTds(code: string, date: string, base: number, payee: Paye
   const t = thresholdCheck(code, date, base, prior, excludeId, payee);
   // R5-B3: 194C(6) declaration → nil TDS with reason T (one guarded branch).
   if (transporter194c6Exempt(code, date, payee)) return { applies: false, code, rate: 0, base: round2(Math.max(num(base), 0)), amount: 0, reason: 'T', deducteeType: r.deducteeType, notes: ['No TDS: Sec 194C(6) declaration (≤ 10 goods carriages, PAN furnished).'], threshold: t };
+  // R8-C (TR-C2): 194Q binds only a buyer whose turnover of the preceding FY was above ₹10 crore (`tds_settings`).
+  const q = (payableSection(code)?.family ?? code) === '194Q' ? buyer194q(date, readTdsSettings().turnover_by_fy) : null;
+  if (q?.status === 'below') return { applies: false, code, rate: 0, base: round2(Math.max(num(base), 0)), amount: 0, reason: '', deducteeType: r.deducteeType, notes: [q.message], threshold: t, refused: true };
+  if (q?.status === 'unknown') r.notes.push(q.message);
   let amount = t.applies ? roundTds((t.taxableBase * r.rate) / 100) : 0;
   let rate = r.rate;
   // 7O (7.95): a Sec 197 certificate covers credits only up to its limit; the excess is taxed at the normal
@@ -405,7 +417,7 @@ export function resolveBillTds(v: BillTdsInput, ctx: { date: string; taxable: nu
   const pan = v.pan.trim().toUpperCase();
   const lowerUsed = v.lowerCert?.trim() ? certificateUsed(ctx.prior, v.lowerCert, ctx.date, ctx.excludeId) : 0;
   const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate, lowerFrom: v.lowerFrom, lowerTo: v.lowerTo, lowerLimit: v.lowerLimit, lowerUsed, transporter194c6: v.transporter194c6 }, ctx.prior, ctx.excludeId);
-  if (!suggestion) return { suggestion: null, fields: NO_TDS };
+  if (!suggestion || suggestion.refused) return { suggestion, fields: NO_TDS }; // R8-C: 194Q refused below ₹10 crore
   // R5-B3: a 194C(6) nil deduction is kept on the bill (reason T) so the 26Q paper reports it.
   if (suggestion.reason === 'T' && !(num(v.rate) > 0) && !(num(v.amount) > 0)) return { suggestion, fields: { ...NO_TDS, tds_section: v.section, tds_rate: 0, tds_base: suggestion.base, tds_amount: 0, tds_on: v.on, tds_pan: pan || undefined, tds_deductee_type: suggestion.deducteeType, tds_reason: 'T' } };
   const rate = v.rate ?? suggestion.rate;

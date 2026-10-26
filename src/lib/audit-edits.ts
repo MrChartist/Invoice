@@ -26,7 +26,10 @@ export interface WatchedTable {
   label: string;
 }
 
-/** Books / masters tables whose every row change reaches the audit log. */
+/**
+ * Books / masters tables whose every row change reaches the audit log. R8-C: the Round 8 tables are added at runtime
+ * by `src/lib/trade/tr-registry.ts` (lazy; this map ships with first paint).
+ */
 export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   transactions: { entity: 'payment', label: 'Receipt' },
   clients: { entity: 'client', label: 'Client' },
@@ -146,14 +149,6 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   boq_coefficients: { entity: 'item', label: 'BOQ coefficient' },
   // R6-C3: import runs
   import_runs: { entity: 'voucher', label: 'Import run' },
-  // R7-A: hotel masters, bookings, folios, guests (ID fields hidden), night audits
-  hotel_room_types: { entity: 'item', label: 'Room type' },
-  hotel_rooms: { entity: 'item', label: 'Room' },
-  hotel_rate_plans: { entity: 'item', label: 'Rate plan' },
-  hotel_reservations: { entity: 'invoice', label: 'Reservation' },
-  hotel_folios: { entity: 'invoice', label: 'Folio' },
-  hotel_guests: { entity: 'client', label: 'Guest' },
-  hotel_night_audits: { entity: 'voucher', label: 'Night audit' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

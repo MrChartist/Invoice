@@ -93,6 +93,13 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   open-export schema; the checklist's import step reads it). R6-C4 compliance rows carry `downloaded_at` (portal file
   downloaded, survives reload); only a filled filed date counts as filed. Vendor payment allocations may carry
   `opening_bill_id` (settles a supplier opening bill, R6-C2).
+- Round 8 (trading) company data: names in `src/lib/trade/tr-shared.ts` (tables / objects of all three packages, series
+  `TCL`, `PDR`, `ARR`, `PAT`, `IND`), all backed up and synced; record / line fields in `src/types/trade-r8.ts` (kept by
+  `R8_RECORD_KEYS` / `R8_LINE_KEYS`). Their `TABLE_ACTIONS` rights and audit labels are registered at runtime by
+  `src/lib/trade/tr-registry.ts` (kept off first paint): **every module that writes a Round 8 table must
+  `import './tr-registry'`** (`tests/tr-registry.test.ts`). Trade profile = business type `wholesale` + packs
+  `distributor` / `commodity` / `agency` (tabs on `/distribution`). Agency (arhatiya) sales post as normal sales and the
+  bikri patti journal moves them to the principal; principals' goods sit in `consignment` godowns outside stock costing.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
@@ -160,7 +167,8 @@ build-time config must use Vite's `VITE_` prefix.
 - Statutory values that change over time (B2CL threshold, GST slabs, TDS/TCS presets) live in
   `src/lib/tax-rules.ts`, keyed by effective date — add new values there, never overwrite old ones. Package rule files
   with the same shape stay out of first paint: `src/lib/eway-validity.ts` (R3-C), `src/lib/trade/trade-rules.ts` (R4-C),
-  `src/lib/transport-works-rules.ts` (R5-B), `src/lib/r5c-rules.ts` (R5-C).
+  `src/lib/transport-works-rules.ts` (R5-B), `src/lib/r5c-rules.ts` (R5-C), `src/lib/trading-rules.ts` (R8-C: 206C(1) /
+  206C(1F) / 194Q buyer test / RCM notified goods / composition alerts).
   Exception: GST interest / late-fee tables live in `src/lib/gst-penalties.ts` (same date-keyed shape) so they
   stay out of the early-loading notifications chunk, and payroll statutory values (EPF / ESI / PT / TDS u/s 192) live in
   `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle.
@@ -191,8 +199,9 @@ build-time config must use Vite's `VITE_` prefix.
   instead of adding a new name.
 - `/practice` reads other companies' databases through `peekCompliance` (`company-peek.ts`): a version-less,
   read-only open that aborts any upgrade, so a missing or older database is never created or upgraded. Keep it that way.
-- `Godown.kind` (`src/types/stock.ts`) is a shared, append-only union (`'van' | 'expiry' | 'wip' | 'qc' | 'transit'`);
-  `nonSaleableGodowns` (`godowns.ts`) treats expiry / wip / qc / transit as non-saleable — decide that for any new kind.
+- `Godown.kind` (`src/types/stock.ts`) is a shared, append-only union (`'van' | 'expiry' | 'wip' | 'qc' | 'transit' |
+  'consignment'`); `nonSaleableGodowns` (`godowns.ts`) treats expiry / wip / qc / transit / consignment as non-saleable (a
+  sale line naming its agency lot `arrival_id` may still sell from consignment) — decide that for any new kind.
 - Recurring schedules in draft mode create **unnumbered** drafts; the number is taken on issue (`numberOnIssue` in
   `localDb.ts`), so no gap reaches GSTR-1 Table 13. Drafts numbered before QA round 3 keep their numbers.
 - Financial credit notes (`note_kind: 'financial'`, `FCN/FY…`, R2-A) carry no GST by default: GST / e-Invoice / e-Way
