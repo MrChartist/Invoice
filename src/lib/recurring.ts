@@ -235,6 +235,22 @@ export function firstOccurrenceOnOrAfter(rule: RuleInput, from: string): string 
   return from;
 }
 
+/**
+ * QA-3 F6: default first date of a schedule made from an invoice. The invoice already bills its own
+ * date, so the schedule starts at the next occurrence after it (anchored on that date), and never in
+ * the past (no catch-up run of months that were billed by hand).
+ */
+export function startAfterInvoice(rule: Pick<RecurringSchedule, 'frequency' | 'interval'>, invoiceDate: string, today: string): string {
+  if (!parseYmd(invoiceDate)) return today;
+  const from = addDays(invoiceDate, 1);
+  return firstOccurrenceOnOrAfter({ ...rule, start_date: invoiceDate }, from > today ? from : today);
+}
+
+/** True when "Run now" would bill an occurrence that is not due yet (it asks first). */
+export function runNowIsEarly(s: Pick<RecurringSchedule, 'next_run'>, today: string): boolean {
+  return s.next_run > today;
+}
+
 /** The next `count` occurrences starting at `from` (inclusive) — for the editor preview. */
 export function previewOccurrences(
   rule: RuleInput & Pick<RecurringSchedule, 'end_date' | 'max_runs'>,
@@ -525,13 +541,11 @@ export function generateInvoiceFromSchedule(
   if (existing) return { invoice: existing, created: false };
 
   const issue = issueDate || occurrence;
-  // Midday local time: a bare YYYY-MM-DD is parsed as UTC and can land on the
-  // wrong side of 1 April in timezones west of Greenwich.
-  const invoiceNumber = localDb.invoices.nextNumber(
-    issue,
-    s.template.doc_type,
-    s.template.sender?.invoicePrefix || undefined,
-  );
+  // QA-3 F6: a draft takes no number (a deleted draft would leave a hole that GSTR-1 reports as
+  // cancelled); it is numbered in its FY series when issued (`localDb` numberOnIssue / the editor).
+  const invoiceNumber = s.mode === 'issue'
+    ? localDb.invoices.nextNumber(issue, s.template.doc_type, s.template.sender?.invoicePrefix || undefined)
+    : '';
   let built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
   // Issuing straight away skips the editor, so run its stock checks here; a tracked item that needs a
   // serial / batch (or an expired batch) keeps the invoice a Draft for the user to complete.
@@ -541,7 +555,7 @@ export function generateInvoiceFromSchedule(
     const problems = [...issues.errors, ...issues.expired];
     if (problems.length) {
       heldAsDraft = problems;
-      built = { ...built, status: 'Draft' };
+      built = { ...built, status: 'Draft', invoice_number: '' };
     }
   }
   const saved = localDb.invoices.save(built);
@@ -627,10 +641,15 @@ export { recurringToastMessage } from './recurring-message';
 
 /* ── Manual actions ───────────────────────────────────────────── */
 
-/** Generate the next occurrence immediately, dated `today`. */
-export function runNow(id: string, today: string): GenerateResult | null {
+/**
+ * Generate the next occurrence immediately, dated `today`. An occurrence that is not due yet (a
+ * future period) is billed only with `early` (the page asks first); the schedule is re-read, so a
+ * stale list never bills the same period twice.
+ */
+export function runNow(id: string, today: string, opts: { early?: boolean } = {}): GenerateResult | null {
   const s = recurringDb.getById(id);
   if (!s || isEnded(s)) return null;
+  if (runNowIsEarly(s, today) && !opts.early) throw new Error(`The next invoice is for ${s.next_run}, which is not due yet. Confirm to bill it early.`);
   const occurrence = s.next_run;
   const result = generateInvoiceFromSchedule(s, occurrence, today);
   recordGenerated(s, occurrence, result.invoice);

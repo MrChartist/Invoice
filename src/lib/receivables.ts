@@ -28,6 +28,7 @@ import { advanceMovements } from './advance-tax';
 import { receivableTotal } from './rcm';
 import { linkedCredits, type CreditLinkRow } from './amount-due';
 import { effectiveDueDate } from './payment-schedule';
+import type { PosReturn } from './pos-returns';
 
 /** 8.100: ageing follows the earliest unpaid instalment of a payment schedule (else the due date). */
 const dueOf = (inv: InvoiceRecord): string => effectiveDueDate(inv);
@@ -41,7 +42,46 @@ export type ReceiptRow = Payment & { client_id?: string; client_name?: string; c
 export const AGING_BUCKETS = ['Not due', '1–30 days', '31–60 days', '61–90 days', '90+ days'] as const;
 export type AgingBucketLabel = (typeof AGING_BUCKETS)[number];
 
-export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance' | 'opening';
+export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance' | 'opening' | 'refund';
+
+/**
+ * Money paid back against a credit note (QA-3 F2): a POS return refunded by tender, or an exchange
+ * credit used on a new bill (its PAYMENT voucher is Dr Sundry debtors for the whole credit). It is a
+ * debit to the party and uses up that much of the note's credit, as the books do.
+ */
+export interface CreditRefundInput {
+  credit_note_id: string;
+  /** yyyy-mm-dd */
+  date: string;
+  /** Rupees, > 0. */
+  amount: number;
+  ref?: string;
+  method?: string;
+}
+
+/**
+ * Refund rows of the `pos_returns` table: only returns whose refund voucher was booked (a refund
+ * settlement's tenders; an applied exchange's whole credit, which the voucher debits to the party).
+ */
+export function posRefunds(rows: readonly PosReturn[] | null | undefined): CreditRefundInput[] {
+  const out: CreditRefundInput[] = [];
+  for (const r of rows ?? []) {
+    if (!r?.voucher_id || !r.credit_note_id) continue;
+    const amount = r.settlement === 'exchange'
+      ? round2(num(r.amount))
+      : round2((r.refunds ?? []).reduce((s, t) => s + Math.max(num(t.amount), 0), 0));
+    if (!(amount > 0)) continue;
+    const methods = [...new Set((r.refunds ?? []).map((t) => t.method))];
+    out.push({
+      credit_note_id: r.credit_note_id,
+      date: r.day,
+      amount,
+      ref: r.credit_note_number,
+      method: r.settlement === 'exchange' ? 'Exchange' : methods.join(' + ') || 'Cash',
+    });
+  }
+  return out;
+}
 
 /**
  * A bill-wise opening outstanding (WP-1 `opening_bills`, `src/lib/opening-bills.ts`): owed when the
@@ -154,6 +194,8 @@ export interface BuildInput {
    * Only the unallocated part counts in `creditNotes`. Ledger entries and `net` are unchanged.
    */
   links?: CreditLinkRow[];
+  /** Additive (QA-3 F2): money paid back against live credit notes (`posRefunds`). INR only. */
+  refunds?: CreditRefundInput[];
 }
 
 export interface Ledger {
@@ -213,7 +255,7 @@ function emptyBuckets(): Record<AgingBucketLabel, number> {
   return { 'Not due': 0, '1–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
 }
 
-const KIND_ORDER: Record<LedgerEntryKind, number> = { opening: -1, invoice: 0, credit_note: 1, payment: 2, advance: 2 };
+const KIND_ORDER: Record<LedgerEntryKind, number> = { opening: -1, invoice: 0, credit_note: 1, payment: 2, advance: 2, refund: 3 };
 
 function sortEntries(entries: LedgerEntry[]): LedgerEntry[] {
   return entries
@@ -277,6 +319,33 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   const creditOf = linkedCredits(allocLinks, docs);
   const allocatedNotes = new Set(allocLinks.map((l) => l.to_id));
 
+  // Refunds against live credit notes (capped at the note): that part of the note's credit was paid
+  // back, so only the rest is allocated to its bill or kept as a credit.
+  const refundsByNote = new Map<string, CreditRefundInput[]>();
+  const refundedOf = new Map<string, number>();
+  if (currency === 'INR') {
+    for (const r of input.refunds ?? []) {
+      const note = docById.get(r.credit_note_id);
+      if (!note || !isCreditNote(note) || !(num(r.amount) > 0)) continue;
+      const room = round2(receivableTotal(note) - (refundedOf.get(note.id) ?? 0));
+      const amt = round2(Math.min(num(r.amount), room));
+      if (!(amt > 0)) continue;
+      refundedOf.set(note.id, round2((refundedOf.get(note.id) ?? 0) + amt));
+      refundsByNote.set(note.id, [...(refundsByNote.get(note.id) ?? []), { ...r, amount: amt }]);
+    }
+  }
+  // Credit left on each bill after refunds (`creditOf` stays gross: a Paid bill's settled part).
+  const netCreditOf = new Map(creditOf);
+  if (refundedOf.size) {
+    const seenNotes = new Set<string>();
+    for (const l of allocLinks) {
+      if (seenNotes.has(l.to_id)) continue;
+      seenNotes.add(l.to_id);
+      const refunded = refundedOf.get(l.to_id);
+      if (refunded) netCreditOf.set(l.from_id, round2(Math.max((netCreditOf.get(l.from_id) ?? 0) - refunded, 0)));
+    }
+  }
+
   interface Acc {
     key: string;
     clientId?: string;
@@ -331,8 +400,15 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
         date: issue, kind: 'credit_note', ref: inv.invoice_number,
         particulars: 'Credit Note', debit: 0, credit: total, balance: 0, invoiceId: inv.id,
       });
+      for (const r of refundsByNote.get(inv.id) ?? []) {
+        a.entries.push({
+          date: dateKey(r.date) || issue, kind: 'refund', ref: r.ref || inv.invoice_number,
+          particulars: `Refund – ${r.method || 'Cash'} (against ${inv.invoice_number})`,
+          debit: r.amount, credit: 0, balance: 0, invoiceId: inv.id,
+        });
+      }
       // An allocated note is settled against its bill below (only an unallocated rest stays a credit).
-      if (!allocatedNotes.has(inv.id)) a.creditNotes = round2(a.creditNotes + total);
+      if (!allocatedNotes.has(inv.id)) a.creditNotes = round2(a.creditNotes + total - (refundedOf.get(inv.id) ?? 0));
       continue;
     }
 
@@ -391,9 +467,10 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     }
 
     const open = round2(Math.max(total - paid, 0));
-    // Linked credit notes settle what receipts left open; any rest is an unallocated credit.
-    const alloc = round2(Math.min(credited, open));
-    if (credited - alloc > 0.004) a.creditNotes = round2(a.creditNotes + credited - alloc);
+    // Linked credit notes (net of refunds) settle what receipts left open; any rest is an unallocated credit.
+    const netCredit = netCreditOf.get(inv.id) ?? 0;
+    const alloc = round2(Math.min(netCredit, open));
+    if (netCredit - alloc > 0.004) a.creditNotes = round2(a.creditNotes + netCredit - alloc);
     const outstanding = round2(open - alloc);
     const excess = round2(Math.max(paid - total, 0));
     if (excess > 0) a.advances = round2(a.advances + excess);

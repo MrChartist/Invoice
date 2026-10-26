@@ -40,6 +40,7 @@ import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { nextReceiptNumber, recordSeries } from './series-counters';
 import { receivableTotal } from './rcm';
+import { isRevenueDoc } from './stats';
 import { linkedCredits, settledStatus, type CreditLinkRow } from './amount-due';
 import { assertNotPendingApproval, holdIfApprovalNeeded, holdIfCreditBlocked } from './approval-gate';
 import {
@@ -394,7 +395,7 @@ export const localDb = {
       } else {
         toSave.id = invoice.id || generateId();
         toSave.created_at = now;
-        if (!toSave.invoice_number) {
+        if (!toSave.invoice_number && !isUnnumberedDraft(toSave)) {
           // The snapshotted sender profile's prefix wins, as in the editor (`saveInvoice`).
           toSave.invoice_number = localDb.invoices.nextNumber(
             toSave.issue_date,
@@ -403,6 +404,9 @@ export const localDb = {
           );
         }
       }
+
+      // QA-3 F6: an unnumbered (recurring) draft takes the next number of its series when it is issued.
+      if (stored) Object.assign(toSave, numberOnIssue(toSave, stored.status));
 
       // WP-9 maker-checker: a clerk's document that needs the owner's approval is held as a pending draft.
       holdIfApprovalNeeded(toSave, stored);
@@ -485,7 +489,7 @@ export const localDb = {
       const next: InvoiceRecord = { ...before, status, updated_at: new Date().toISOString() };
       holdIfApprovalNeeded(next, before);
       holdIfCreditBlocked(next, before);
-      invoices[idx] = next;
+      invoices[idx] = numberOnIssue(next, before.status);
       setTable(KEYS.invoices, invoices);
       if (next.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(id);
       logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
@@ -558,6 +562,13 @@ export const localDb = {
       if (input.writeOff) payment.write_off = true;
       // Read-only lookup: the payment never changes this row (syncPaymentState writes a copy).
       const target = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
+      // QA-3 F3: money is received only against a revenue document type. A receipt on a quotation,
+      // proforma or delivery challan would be missing from every total (an advance against a quote goes
+      // through Advances). Only the type is judged here: a receipt on a cancelled bill stays tracked and a
+      // pending draft gets the approval message below. Opening bills have no invoice row.
+      if (target && !isRevenueDoc({ doc_type: target.doc_type, status: 'Sent' })) {
+        throw new Error('Payments are recorded against invoices only. For money received against this document, record an advance receipt for the customer.');
+      }
       // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
       const realised = Number(input.realisedRate);
       if (realised > 0 && Number.isFinite(realised) && (target?.currency || 'INR').toUpperCase() !== 'INR') {
@@ -698,11 +709,30 @@ function syncPaymentState(invoiceId: string, delta: number): void {
   if (idx < 0) return;
   const inv = shared[idx];
   const invoices = shared.slice();
-  invoices[idx] = {
+  invoices[idx] = numberOnIssue({
     ...withPaid(inv, (Number(inv.amount_paid) || 0) + delta),
     updated_at: new Date().toISOString(),
-  };
+  }, inv.status);
   setTable(KEYS.invoices, invoices);
+}
+
+/**
+ * QA-3 F6: a recurring draft is saved without a number, so a draft that is deleted (or never issued)
+ * leaves no hole in the GST series (GSTR-1 Table 13 would report it as cancelled). Every other
+ * document keeps the old behaviour: numbered when first saved.
+ */
+function isUnnumberedDraft(rec: InvoiceRecord): boolean {
+  return rec.status === 'Draft' && !!(rec as InvoiceRecord & { recurring_id?: string }).recurring_id;
+}
+
+/**
+ * An unnumbered draft that is being issued (`wasStatus` Draft, new status anything but Draft /
+ * Cancelled) takes the next number of its series, dated by its issue date. A document that has a
+ * number never changes it, and nothing already issued is touched.
+ */
+function numberOnIssue(rec: InvoiceRecord, wasStatus: InvoiceRecord['status'] | undefined): InvoiceRecord {
+  if (wasStatus !== 'Draft' || rec.invoice_number?.trim() || rec.status === 'Draft' || rec.status === 'Cancelled') return rec;
+  return { ...rec, invoice_number: localDb.invoices.nextNumber(rec.issue_date, rec.doc_type, rec.sender?.invoicePrefix || undefined) };
 }
 
 /**

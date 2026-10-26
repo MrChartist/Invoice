@@ -154,6 +154,7 @@ export function PosReturnModal({ open, onClose, notify, onExchange }: Props) {
             <p className={styles.muted}>
               {returnsT('billLine', { number: bill.invoice_number, date: formatDate(bill.issue_date), party: bill.client?.name || WALK_IN_NAME, total: formatCurrency(bill.total) })}
             </p>
+            <div className={own.lines}>
             <table className={surface.table} aria-label={returnsT('linesLabel')}>
               <thead>
                 <tr>
@@ -187,6 +188,7 @@ export function PosReturnModal({ open, onClose, notify, onExchange }: Props) {
                 ))}
               </tbody>
             </table>
+            </div>
 
             <div className={styles.totals}>
               <div className={styles.grand}><span>{returnsT('creditTotal')}</span><span data-ret-total>{formatCurrency(plan.amount)}</span></div>

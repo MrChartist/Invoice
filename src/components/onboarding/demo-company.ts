@@ -8,13 +8,18 @@
  * Browsers without IndexedDB (no separate companies) load the sample data into the current company.
  */
 import { useEffect } from 'react';
-import { activeCompanyId, companiesSupported, createCompany, readRegistry, switchCompany } from '../../lib/companies';
+import { activeCompanyId, companiesSupported, createCompany, labelMainCompany, readRegistry, switchCompany } from '../../lib/companies';
 import { localDb } from '../../lib/localDb';
-import { readRaw, removeRaw, writeRaw } from '../../lib/storage';
+import { readRaw, reloadAfterFlush, removeRaw, writeRaw } from '../../lib/storage';
 
 export const DEMO_PENDING_KEY = 'mrchartist_demo_pending';
 export const DEMO_COMPANY_NAME = 'Demo';
 
+/**
+ * QA-3 F4: the sample data and `onboarded` sit in the storage cache until IndexedDB commits them, so
+ * the reload waits for that (`reloadAfterFlush`, as Settings → Data does). A bare reload lost them and
+ * the Demo company opened empty with the wizard again.
+ */
 async function fillDemo(): Promise<void> {
   const { loadDemoData } = await import('../../lib/demo-data');
   const r = loadDemoData({ confirm: true });
@@ -22,12 +27,15 @@ async function fillDemo(): Promise<void> {
   localDb.settings.save({ ...localDb.settings.get(), onboarded: true });
 }
 
-export function startDemoCompany(): void {
+/** `ownName`: the business name typed so far (the wizard's), used when no profile is saved yet (F27). */
+export function startDemoCompany(ownName?: string): void {
   if (!companiesSupported()) {
-    void fillDemo().then(() => window.location.reload());
+    void fillDemo().then(reloadAfterFlush);
     return;
   }
   const existing = readRegistry().list.find((c) => c.name.toLowerCase() === DEMO_COMPANY_NAME.toLowerCase());
+  // F27: the company being left keeps its own name in the switcher, not "Main business".
+  labelMainCompany(localDb.settings.activeProfile()?.companyName || ownName);
   const entry = existing ?? createCompany(DEMO_COMPANY_NAME);
   writeRaw(DEMO_PENDING_KEY, entry.id);
   switchCompany(entry.id);
@@ -42,7 +50,7 @@ export function useDemoPending(onClose: (finished: boolean | string) => void): v
     void fillDemo()
       .then(() => {
         onClose(false);
-        window.location.reload();
+        reloadAfterFlush();
       })
       .catch(() => undefined);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
