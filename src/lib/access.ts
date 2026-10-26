@@ -388,6 +388,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   dining_tables: 'master.edit',
   modifier_groups: 'master.edit',
   table_orders: 'doc.create',
+  // R4-A: production orders, QC decisions, recall notices and landed-cost vouchers are books
+  production_orders: 'books.edit',
+  qc_results: 'books.edit',
+  recall_notices: 'books.edit',
+  landed_cost_vouchers: 'books.edit',
 };
 
 let systemDepth = 0;

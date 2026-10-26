@@ -718,3 +718,27 @@ test('R2-B5 back-to-back reader (backorders, cancel warning) reads bills against
   assert.deepEqual(openLinkedPos('so1', [po], [billed], []), []);
   assert.equal(openLinkedPos('so1', [po], [], []).length, 1);
 });
+
+// R4-A: genealogy (bill → batch source), QC desk (receipt lots by source document) and the landed-cost voucher read
+// bills through the engine / `readPurchase` + `readPurchaseLines`.
+test('R4-A readers (genealogy, QC desk, landed-cost voucher) read the real purchase shape', async () => {
+  const { buildGenealogy, traceBackward } = await import('../src/lib/production/genealogy.ts');
+  const { qcStock } = await import('../src/lib/production/qc.ts');
+  const { targetLines, chargeCandidates, applyLandedVouchers } = await import('../src/lib/landed-voucher.ts');
+  const item = { id: 's1', name: 'Paper ream', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, track_batches: true };
+  const withBatch: PurchaseRecord = { ...bill, lines: [{ ...bill.lines[0], batch_no: 'B1', godown_id: 'qc' }] };
+  const draft = { ...withBatch, id: 'd', status: 'Draft' } as unknown as PurchaseRecord;
+  const ev = collectEvents({ items: [item], moves: [], invoices: [], purchases: [withBatch, draft] });
+  const t = traceBackward(buildGenealogy(ev), 's1', 'B1');
+  assert.deepEqual(t.sources.map((s) => [s.refNumber, s.party, s.qty]), [['AS/22', 'Acme Supplies', 10]], 'drafts never source a batch');
+  const lots = qcStock(ev, new Set(['qc']), '2026-04-15');
+  assert.deepEqual(lots.map((l) => [l.source.kind, l.source.number, l.qty, l.ageDays]), [['purchase', 'AS/22', 10, 3]]);
+  const lines = targetLines([{ kind: 'bill', id: 'p1' }], [withBatch], [], [item]);
+  assert.deepEqual(lines.map((l) => [l.lineId, l.quantity, l.unitCost, l.date, l.docNumber]), [['l1', 10, 100, '2026-04-12', 'AS/22']]);
+  const exp: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE', category: 'Freight', lines: [] };
+  assert.deepEqual(chargeCandidates([withBatch, exp], [item], []).map((c) => [c.source.id, c.amount]), [['e1', 1000]], 'a lump expense is a charge; goods lines are not');
+  const lcv = { id: 'v', number: 'LCV/FY26-27/0001', date: '2026-04-20', method: 'value' as const, charges: [{ id: 'c', source: { kind: 'memo' as const }, label: 'CHA', amount: 50 }], targets: [{ kind: 'bill' as const, id: 'p1' }], allocation_snapshot: [] };
+  const applied = applyLandedVouchers([lcv], [withBatch], [], [item]);
+  assert.equal(readPurchaseLines(applied.purchases[0])[0].landedUnit, 5, '₹50 over 10 reams');
+  assert.equal(readPurchaseLines(withBatch)[0].landedUnit, 0, 'the stored bill is untouched');
+});

@@ -370,6 +370,8 @@ const RECORD_TABLES = [
   'batch_runs', 'proposal_snippets',
   // Round 3 (R3-A): restaurant dining areas, tables, running orders, modifier groups
   'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
+  // Round 4 (R4-A): production orders, QC decisions, recall notices, landed-cost vouchers
+  'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
 ];
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
@@ -410,6 +412,8 @@ const ID_TABLES = new Set([
   'batch_runs', 'proposal_snippets',
   // Round 3 (R3-A)
   'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
+  // Round 4 (R4-A)
+  'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

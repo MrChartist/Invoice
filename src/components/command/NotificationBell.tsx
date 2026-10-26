@@ -163,6 +163,27 @@ function ensurePackAlerts(onReady: () => void): void {
     });
 }
 
+// R4-A: production orders past due / completed-not-closed and stock aged in QC — lazy, once an order or a QC godown exists.
+let productionAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureProductionAlerts(onReady: () => void): void {
+  if (productionAlerts !== 'off') return;
+  try {
+    if (!getTable('production_orders').length && !getTable<{ kind?: string }>('godowns').some((g) => g?.kind === 'qc')) return;
+  } catch {
+    return;
+  }
+  productionAlerts = 'loading';
+  import('../../lib/production/order-alerts')
+    .then((m) => {
+      m.registerProductionAlerts();
+      productionAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      productionAlerts = 'off';
+    });
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -195,6 +216,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensureGstGuardAlerts(reload);
     ensureCaptureAlerts(reload);
     ensurePackAlerts(reload);
+    ensureProductionAlerts(reload); // R4-A
   }, []);
 
   useEffect(() => {

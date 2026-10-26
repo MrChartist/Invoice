@@ -158,6 +158,20 @@ export function poLinesFromMrp(rows: readonly MrpRow[], newId: () => string = ge
   }));
 }
 
+/**
+ * R4-A1: production-order drafts for the "make" rows (one per row, base units), instead of opening a journal. The
+ * caller saves them through `productionOrdersDb` (src/lib/production/orders.ts).
+ */
+export function ordersFromMrp(
+  rows: readonly MrpRow[], plan?: Pick<ProductionPlan, 'id' | 'number' | 'due_date'>,
+): { item_id: string; bom_id?: string; planned_qty: number; plan_id?: string; due_date?: string; narration?: string }[] {
+  return rows.filter((r) => r.action === 'make' && r.suggested > EPS).map((r) => ({
+    item_id: r.item.id, ...(r.bomId ? { bom_id: r.bomId } : {}), planned_qty: r.suggested,
+    ...(plan?.id ? { plan_id: plan.id } : {}), ...(plan?.due_date ? { due_date: plan.due_date } : {}),
+    ...(plan?.number ? { narration: `From production plan ${plan.number}` } : {}),
+  }));
+}
+
 /** Last purchase rate and vendor per item from the stock ledger (else average / opening cost). */
 export function lastPurchaseRates(positions: readonly StockPosition[]): Map<string, { rate: number; vendor?: string }> {
   const out = new Map<string, { rate: number; vendor?: string }>();

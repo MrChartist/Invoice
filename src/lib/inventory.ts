@@ -27,6 +27,7 @@ import { jobWorkStockEvents, loadJobWorkStockDocs, type JobWorkStockDocs } from 
 import { kitStockEvents } from './events-kits';
 import { lineFactor } from './units';
 import { itemVoucherReferences } from './item-references';
+import { applyLandedVouchers, loadLandedVouchers } from './landed-voucher'; // R4-A5
 import type {
   Bom, ManufacturingVoucher, PhysicalStockVoucher, StockJournal, VoucherOutputLine, VoucherStockLine,
 } from '../types/manufacturing';
@@ -1337,15 +1338,25 @@ export function blankStockItem(partial: Partial<StockItem> = {}): StockItem {
 
 export function liveInputs(): StockInputs {
   const settings = loadSettings();
+  const items = stockDb.items();
+  let purchases = getTable<PurchaseLike>('purchases');
+  let returnDocs = loadReturnStockDocs();
+  // R4-A5: landed-cost vouchers restate the target bills' / GRNs' stock cost from their receipt date (engine copies only).
+  const lcv = loadLandedVouchers();
+  if (lcv.length) {
+    const applied = applyLandedVouchers(lcv, purchases, returnDocs.receipts, items);
+    purchases = applied.purchases;
+    returnDocs = { ...returnDocs, receipts: applied.receipts };
+  }
   return {
-    items: stockDb.items(),
+    items,
     moves: stockDb.moves(),
     invoices: getTable<InvoiceRecord>('invoices'),
-    purchases: getTable<PurchaseLike>('purchases'),
+    purchases,
     method: settings.method,
     includeChallans: settings.includeChallans,
     links: getTable<{ from_id: string; to_id: string; relation: string; reason?: string }>('doc_links'),
-    returnDocs: loadReturnStockDocs(),
+    returnDocs,
     jobWorkDocs: loadJobWorkStockDocs(),
     kitBoms: getTable<Bom>(VOUCHER_TABLES.boms),
     vouchers: stockVoucherInputs(

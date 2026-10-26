@@ -26,6 +26,7 @@ import { num, round2 } from './invoice-calc';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import type { BillSeed } from './purchase-orders';
 import { generateId, getTable, setTable } from './storage';
+import { applyQcHold } from './production/qc'; // R4-A4
 
 export const RECEIPT_NOTES_TABLE = 'receipt_notes';
 export const GRN_PREFIX = 'GRN';
@@ -304,7 +305,9 @@ export const receiptNotesDb = {
     const all = receiptNotesDb.all();
     const existing = input.id ? all.find((n) => n.id === input.id) : undefined;
     if (existing) receiptNotesDb.assertEditable(existing, purchases);
-    const lines = (input.lines ?? []).filter((l) => l.name.trim() || num(l.quantity) > 0).map((l) => ({ ...l, id: l.id || generateId(), quantity: round2(num(l.quantity)), rate: round2(num(l.rate)) }));
+    const typed = (input.lines ?? []).filter((l) => l.name.trim() || num(l.quantity) > 0).map((l) => ({ ...l, id: l.id || generateId(), quantity: round2(num(l.quantity)), rate: round2(num(l.rate)) }));
+    // R4-A4: default-godown hook — goods held for QC go to the QC hold godown unless the line names a godown.
+    const lines = input.kind === 'GRN' && !existing ? applyQcHold(typed) : typed;
     const draft = { ...input, lines };
     const problem = validateReceiptNote(draft, { purchases, notes: all, excludeId: existing?.id });
     if (problem) throw new ReceiptNoteError(problem);

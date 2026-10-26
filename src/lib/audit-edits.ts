@@ -97,6 +97,11 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   dining_tables: { entity: 'settings', label: 'Dining table' },
   table_orders: { entity: 'invoice', label: 'Table order' },
   modifier_groups: { entity: 'item', label: 'Modifier group' },
+  // R4-A: production orders, QC decisions, recall notices (stock side), landed-cost vouchers (purchase side)
+  production_orders: { entity: 'manufacturing', label: 'Production order' },
+  qc_results: { entity: 'manufacturing', label: 'QC decision' },
+  recall_notices: { entity: 'manufacturing', label: 'Recall notice' },
+  landed_cost_vouchers: { entity: 'purchase', label: 'Landed-cost voucher' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */
