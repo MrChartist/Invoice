@@ -143,7 +143,7 @@ test('room post: keys, routing to the company window, meals priced separately, c
   assert.equal(postNight(res, out.line, '2026-10-20', p.changed, { roomNo: '101', typeName: 'Deluxe', sacRoom: '996311', sacFnb: '996331' }).changed.length, 0);
   const price = { night: '2026-10-20', room: 3500, extra_adult: 0, extra_child: 0, extra_bed: 0, meal: 600, total: 3500 };
   const sep = nightLines({ id: 'l' }, price, '2026-10-20', { roomNo: '1', typeName: 'D', plan: { code: 'CP', meal_plan: 'CP', meals_separate: true }, sacRoom: '996311', sacFnb: '996331' });
-  assert.deepEqual(sep.map((l) => [l.kind, l.amount, l.sac]), [['room', 3500, '996311'], ['fnb', 600, '996331']]);
+  assert.deepEqual(sep.map((l) => [l.kind, l.amount, l.sac]), [['room', 2900, '996311'], ['fnb', 600, '996331']], 'QA9 H3: the meal is inside the rate, posted once');
   const comp = nightLines({ id: 'l', comp: 'complimentary' }, price, '2026-10-20', { roomNo: '1', typeName: 'D', sacRoom: '', sacFnb: '' });
   assert.deepEqual(comp, []);
   assert.equal(folioBalance({ lines: [{ id: 'a', date: '', kind: 'room', desc: '', qty: 1, rate: 100, amount: 100 }, { id: 'b', date: '', kind: 'room', desc: '', qty: 1, rate: 50, amount: 50, void: { by: '', at: '', reason: '' } }], applied: [{ kind: 'advance', id: 'x', amount: 30, date: '' }] }), 70);

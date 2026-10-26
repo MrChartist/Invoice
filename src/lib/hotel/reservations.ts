@@ -4,7 +4,8 @@
  *
  * A booking snapshots each night's price: a later plan edit never reprices it; changing its dates / occupancy prices
  * only the new nights, and "Re-price" (`reprice: true`) recomputes every night. Period lock: creating or editing the
- * terms of a booking whose arrival is in a locked period is refused (status changes — check-in / out — are not).
+ * terms of a booking whose arrival is in a locked period is refused (status changes — check-in / out — are not); an
+ * in-house stay is checked per changed night, so it can be extended past a locked arrival month (QA9 H16).
  */
 import type { NightPrice, RatePlan, Reservation, RoomLine, RoomType } from '../../types/hotel-r7';
 import { generateId } from '../storage';
@@ -87,8 +88,11 @@ export function saveReservation(input: ReservationInput, opts: { reprice?: boole
   const id = prev?.id ?? generateId();
   const booked_on = prev?.booked_on ?? (DAY.test(input.booked_on ?? '') ? input.booked_on : todayIso(opts.now));
   const number = prev?.number ?? nextResNumber(booked_on, all);
-  if (prev) assertUnlocked(lockOf(prev), 'edit');
-  assertUnlocked({ id, issue_date: input.arrival, invoice_number: number }, prev ? 'edit' : 'create');
+  // QA9 H16: an in-house stay is checked night by night — an edit that changes only nights after the lock date (an
+  // extension, a later room move) is allowed; a booking not yet in is checked on its arrival as before.
+  const inHouse = !!prev?.lines.some((l) => l.status === 'checked_in');
+  if (prev && !inHouse) assertUnlocked(lockOf(prev), 'edit');
+  if (!inHouse) assertUnlocked({ id, issue_date: input.arrival, invoice_number: number }, prev ? 'edit' : 'create');
   const lines: RoomLine[] = input.lines.map((l) => {
     const old = l.id ? prev?.lines.find((x) => x.id === l.id) : undefined;
     const d = lineDates(input, l);
@@ -98,6 +102,7 @@ export function saveReservation(input: ReservationInput, opts: { reprice?: boole
       nightly: isLiveLine({ status }) ? priceLine(l, d.arrival, d.departure, m, opts.reprice, old) : (old?.nightly ?? l.nightly ?? []),
     } as RoomLine;
   });
+  if (inHouse) for (const night of changedNights(prev!, { ...input, lines })) assertUnlocked({ id, issue_date: night, invoice_number: number }, 'edit');
   const rooms = hotelDb.rooms();
   const check = checkLines({ arrival: input.arrival, departure: input.departure, lines }, { rooms, reservations: all, exceptResId: id }, (t) => m.types.find((x) => x.id === t)?.name ?? t);
   if (check.error) throw new HotelError(check.error);
@@ -113,6 +118,23 @@ export function saveReservation(input: ReservationInput, opts: { reprice?: boole
   hotelDb.putReservations(res);
   recordSeries(number);
   return { res, warnings: check.warnings };
+}
+
+/** Nights whose terms differ between two versions of a booking (room, plan, occupancy, price, or added / removed). */
+export function changedNights(a: Pick<Reservation, 'arrival' | 'departure' | 'lines'>, b: Pick<Reservation, 'arrival' | 'departure' | 'lines'>): string[] {
+  const terms = (r: typeof a) => {
+    const m = new Map<string, string>();
+    for (const l of r.lines) {
+      const d = lineDates(r, l);
+      for (const n of l.nightly) if (n.night >= d.arrival && n.night < d.departure) m.set(`${l.id}|${n.night}`, JSON.stringify([l.status === 'cancelled', l.room_id, l.rate_plan_id, l.adults, l.children, l.extra_beds, l.comp, n.total]));
+    }
+    return m;
+  };
+  const x = terms(a);
+  const y = terms(b);
+  const out = new Set<string>();
+  for (const k of new Set([...x.keys(), ...y.keys()])) if (x.get(k) !== y.get(k)) out.add(k.split('|')[1]);
+  return [...out].sort();
 }
 
 /** Cancel (or mark a no-show): every line not checked in is released. Charges are R7-B6. */

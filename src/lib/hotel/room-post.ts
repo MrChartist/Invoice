@@ -63,7 +63,12 @@ export interface PostCtx {
   sacFnb: string;
 }
 
-/** Folio lines (with keys) for one night of a room line, from its snapshot. Pure. */
+/**
+ * Folio lines (with keys) for one night of a room line, from its snapshot. Pure. A plan whose meals are priced
+ * separately posts the room at its rate less the meal share and the meal as an `fnb` line, so the night still totals
+ * the snapshot's `total` (QA9 H3: the meal is inside the plan rate, as `pricing.ts` and `premises.ts` read it). A
+ * tax-inclusive night's accommodation lines carry their share of the agreed `gross` (QA9 H2).
+ */
 export function nightLines(line: Pick<RoomLine, 'id' | 'comp'>, price: NightPrice | undefined, night: string, ctx: PostCtx): Omit<FolioLine, 'id'>[] {
   if (!price || line.comp) return [];
   const key = stayKey(line.id, night);
@@ -73,11 +78,24 @@ export function nightLines(line: Pick<RoomLine, 'id' | 'comp'>, price: NightPric
     if (amount > 0) out.push({ ...base, key: part ? `${key}:${part}` : key, kind, desc, rate: round2(amount), amount: round2(amount), sac, ...(meal ? { meal } : {}) });
   };
   const separate = !!ctx.plan?.meals_separate;
-  add('room', '', `Room ${ctx.roomNo} · ${ctx.typeName}${ctx.plan ? ` · ${ctx.plan.meal_plan}` : ''}`, price.room, ctx.sacRoom, separate ? 0 : price.meal);
+  const meal = separate ? Math.min(Math.max(price.meal, 0), price.room) : 0;
+  add('room', '', `Room ${ctx.roomNo} · ${ctx.typeName}${ctx.plan ? ` · ${ctx.plan.meal_plan}` : ''}`, round2(price.room - meal), ctx.sacRoom, separate ? 0 : price.meal);
   add('extra_bed', 'bed', `Extra bed · Room ${ctx.roomNo}`, price.extra_bed, ctx.sacRoom);
   add('extra_person', 'person', `Extra person · Room ${ctx.roomNo}`, round2(price.extra_adult + price.extra_child), ctx.sacRoom);
-  if (separate) add('fnb', 'meal', `${ctx.plan!.meal_plan} meals · Room ${ctx.roomNo}`, price.meal, ctx.sacFnb);
+  if (price.gross && price.total > 0 && out.length) {
+    const g = round2(price.gross * (1 - meal / price.total));
+    for (const l of out) l.gross = round2((l.amount * price.gross) / price.total);
+    out[0].gross = round2(out[0].gross! + g - out.reduce((s, l) => s + l.gross!, 0));
+  }
+  if (meal > 0) add('fnb', 'meal', `${ctx.plan!.meal_plan} meals · Room ${ctx.roomNo}`, meal, ctx.sacFnb);
   return out;
+}
+
+/** QA9 H1: nights of a room line before `end` (and its departure) that no folio holds yet (complimentary: none). */
+export function pendingNights(res: Pick<Reservation, 'arrival' | 'departure'>, line: Pick<RoomLine, 'id' | 'comp' | 'arrival' | 'departure' | 'nightly'>, folios: readonly Folio[], end: string): string[] {
+  if (line.comp) return [];
+  const dep = line.departure || res.departure;
+  return line.nightly.map((n) => n.night).filter((n) => n >= (line.arrival || res.arrival) && n < dep && n < end && !isPosted(folios, line.id, n));
 }
 
 /**
