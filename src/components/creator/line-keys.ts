@@ -4,6 +4,7 @@
  *  - Enter in the LAST field of a line  -> next line's first field (a new line when it was the last line)
  *  - Alt+↑ / Alt+↓                      -> move the current line up / down
  *  - Ctrl/⌘+Enter                       -> save (handled by the page, not here)
+ *  - Alt+R                              -> repeat the party's last bill (R3-B6, new documents only)
  */
 
 import type { Suggestion } from '../../lib/suggest';
@@ -37,6 +38,11 @@ export function lineKeyAction(e: KeyLike, ctx: LineKeyContext): LineKeyAction {
     return ctx.isLastLine ? { type: 'add-line' } : { type: 'next-line' };
   }
   return null;
+}
+
+/** R3-B6: Alt+R repeats the picked party's last bill (handled by PartyHabitsStrip). */
+export function isRepeatShortcut(e: KeyLike): boolean {
+  return Boolean(e.altKey) && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'r' || e.key === 'R' || e.key === '®');
 }
 
 /** Ctrl/⌘+Enter anywhere on the page means "save". */

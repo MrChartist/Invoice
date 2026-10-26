@@ -11,6 +11,9 @@ import { useT } from '../../i18n';
 import { uxT } from '../../i18n/areas/invoicing-ux';
 import surface from '../../styles/surface.module.css';
 import ux from './ux.module.css';
+import { svcT } from '../../i18n/areas/service-r3'; // R3-B7
+import { loadQuietSettings } from '../../lib/quiet-customers';
+import type { Client } from '../../types/invoice';
 
 const fmt = (i: Pick<Insight, 'unit'>, v: number) => (i.unit === 'inr' ? formatCurrency(v, 'INR') : i.unit === 'pct' ? `${v}%` : i.unit === 'days' ? uxT('inDays', { n: v }) : String(v));
 
@@ -34,6 +37,8 @@ function detail(i: Insight): string {
       return i.rows.length ? i.rows.map((r) => (r.extra !== undefined ? uxT('inStockRow', { item: r.label, days: r.extra }) : r.label)).join(' · ') : uxT('inStockNone');
     case 'gstTrend':
       return uxT('inGstD', { avg: fmt(i, i.baseline ?? 0), pct });
+    case 'quietCustomers':
+      return i.rows.length ? i.rows.map((r) => svcT('insightRow', { name: r.label, days: r.value, gap: r.extra ?? 0 })).join(' · ') : svcT('insightNone');
   }
 }
 
@@ -48,7 +53,8 @@ export function InsightsPanel({ books, stock }: { books: BooksData; stock: Stock
     } catch {
       costs = undefined;
     }
-    return buildInsights({ invoices: books.invoices, payments: books.transactions, purchases, vendors: books.vendors, costs, stock }, localDayOf(new Date()));
+    const quiet = { clients: getTable<Client>('clients'), settings: loadQuietSettings() }; // R3-B7
+    return buildInsights({ invoices: books.invoices, payments: books.transactions, purchases, vendors: books.vendors, costs, stock, quiet }, localDayOf(new Date()));
   }, [books, stock]);
   return (
     <div className={surface.card} data-tile="insights">
@@ -57,7 +63,7 @@ export function InsightsPanel({ books, stock }: { books: BooksData; stock: Stock
         <div className={ux.cards}>
           {cards.map((c) => (
             <Link key={c.id} to={c.href} className={c.tone === 'warn' ? ux.cardWarn : c.tone === 'good' ? ux.cardGood : ux.card} data-insight={c.id}>
-              <span className={ux.cardTitle}>{uxT(`in_${c.id}` as const)}</span>
+              <span className={ux.cardTitle}>{c.id === 'quietCustomers' ? svcT('insightTitle') : uxT(`in_${c.id}` as const)}</span>
               <span className={ux.cardValue}>{fmt(c, c.value)}</span>
               <span className={ux.muted}>{detail(c)}</span>
             </Link>

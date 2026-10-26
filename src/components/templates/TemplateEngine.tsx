@@ -30,6 +30,8 @@ import { contrastText, marginVars, paperSize, printPageCss } from '../../lib/des
 import { PageArt } from './parts/PageArt'; // R3-C3
 import styles from './invoice-paper.module.css';
 
+// R3-B4: timesheet annexure page — lazy, so the preview chunk does not grow; renders nothing without data.
+const LazyAnnexure = lazy(() => import('./parts/AnnexureBlock'));
 // R3-C2: photo pages and the receiver signature load only for documents that carry them.
 const LazyPhotoPages = lazy(() => import('./parts/PhotoPages'));
 const LazyDeliveryProof = lazy(() => import('./parts/DeliveryProofBlock'));
@@ -209,6 +211,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <AcceptanceBlock invoice={invoice} compact={layout === 'receipt'} />
           {/* R3-C2: receiver signature ("Received by") right after the signature / acceptance block. */}
           {invoice.delivery_proof && <Suspense fallback={null}><LazyDeliveryProof invoice={invoice} compact={layout === 'receipt'} /></Suspense>}
+          {/* R3-B4: annexure as a following page (never on thermal / receipt paper). */}
+          {invoice.annexure && layout !== 'receipt' && <Suspense fallback={null}><LazyAnnexure invoice={invoice} /></Suspense>}
           {/* R3-C2: photo pages after the totals / annexure (2 × 2 per page). */}
           {invoice.attachments?.some((a) => a.print) && <Suspense fallback={null}><LazyPhotoPages invoice={invoice} /></Suspense>}
         </div>

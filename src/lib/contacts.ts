@@ -204,8 +204,8 @@ export const CLIENT_CSV_HEADERS = [
 ] as const;
 
 /** Client list as CSV (the first contact and address in their own columns; the client import reads them back). */
-export function clientsCsv(clients: readonly Client[]): string {
-  const rows: unknown[][] = [[...CLIENT_CSV_HEADERS]];
+export function clientsCsv(clients: readonly Client[], extra?: { headers: readonly string[]; cells: (c: Client) => unknown[] }): string {
+  const rows: unknown[][] = [[...CLIENT_CSV_HEADERS, ...(extra?.headers ?? [])]];
   for (const c of clients) {
     const ct = primaryContact(c);
     const ad = defaultShipTo(c) ?? c.addresses?.[0];
@@ -214,6 +214,7 @@ export function clientsCsv(clients: readonly Client[]): string {
       c.state_code ? stateByCode(c.state_code)?.name ?? c.state ?? '' : c.state ?? '', c.zip ?? '', c.notes ?? '',
       ct?.name ?? '', ct?.role ?? '', ct?.phone ?? '', ct?.email ?? '',
       ad?.label ?? '', ad?.address ?? '', ad?.city ?? '', ad?.zip ?? '', ad?.state_code ? stateByCode(ad.state_code)?.name ?? ad.state_code : '', ad?.gstin ?? '',
+      ...(extra ? extra.cells(c) : []), // R3-B5 optional columns
     ]);
   }
   return toCsv(rows);

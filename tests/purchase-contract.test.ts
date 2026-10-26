@@ -719,6 +719,14 @@ test('R2-B5 back-to-back reader (backorders, cancel warning) reads bills against
   assert.equal(openLinkedPos('so1', [po], [], []).length, 1);
 });
 
+test('R3-B4 annexure reads the real purchase shape (re-billed cost through expenseLine)', async () => {
+  const { buildAnnexure } = await import('../src/lib/annexure.ts');
+  const billable: PurchaseRecord = { ...bill, id: 'p9', billable_to_client_id: 'c1', markup_percent: 10 };
+  const a = buildAnnexure({ time: [], expenses: [billable, { ...billable, id: 'p10', pure_agent: true }] }, DEFAULT_TIME_PREFS, { tasks: [], centres: [] });
+  assert.deepEqual(a.expenses!.map((x) => [x.ref, x.amount, x.markup_pct, x.pure_agent]), [['p9', 1100, 10, false], ['p10', 1180, 0, true]]);
+  assert.equal(a.expenses![0].amount, expenseLine(billable, DEFAULT_TIME_PREFS).amount, 'same amount as the invoice line');
+});
+
 test('R3-C6 practice board reads the real purchase shape (bill date counts as the last entry)', async () => {
   const { buildPracticeRow } = await import('../src/lib/practice.ts');
   const row = buildPracticeRow({ id: 'c', name: 'C', tables: { purchases: [bill, { ...bill, id: 'p2', date: undefined, bill_date: '2026-05-01' }] } }, '2026-06-01');

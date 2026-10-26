@@ -43,6 +43,7 @@ const AcceptQuoteDialog = lazy(() => import('../invoicing-ux/AcceptQuoteDialog')
 // R3-C2: receiver signature / proof of delivery (dialog + signature pad load on click).
 const DeliveryProofDialog = lazy(() => import('./DeliveryProofDialog'));
 const ActivityTimeline = lazy(() => import('../audit/ActivityTimeline').then((m) => ({ default: m.ActivityTimeline })));
+const AnnexureActions = lazy(() => import('./AnnexureActions')); // R3-B4
 
 /** Everything you can do with an already-saved document, in one place. */
 export function DocumentActions({
@@ -132,6 +133,8 @@ export function DocumentActions({
           </button>
         )}
         <PackingListButton invoice={saved} />
+        {/* R3-B4: download / refresh the timesheet annexure (last action, §6). */}
+        {saved.annexure && <Suspense fallback={null}><AnnexureActions invoice={saved} onChanged={reloadEditor} /></Suspense>}
         {/* R3-C2: Get signature (proof of delivery) — issued invoices / delivery challans; owner may replace. */}
         {proofAllowed(saved) && (
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setProofOpen(true)} disabled={locked} data-get-signature>

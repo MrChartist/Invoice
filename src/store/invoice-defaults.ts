@@ -310,6 +310,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     // R3-A (additive): the table order a POS bill settled, and its split part.
     ...(typeof r.table_order_id === 'string' && r.table_order_id ? { table_order_id: r.table_order_id } : {}),
     ...(r.split_of && typeof r.split_of === 'object' ? { split_of: r.split_of as InvoiceRecord['split_of'] } : {}),
+    // R3-B4 (additive): the timesheet annexure snapshot travels with the document unchanged (Critical Rule 3).
+    ...(r.annexure && typeof r.annexure === 'object' && Array.isArray((r.annexure as { rows?: unknown }).rows) ? { annexure: r.annexure as InvoiceRecord['annexure'] } : {}),
     // R3-C2 (additive): receiver signature snapshot (proof of delivery).
     ...(r.delivery_proof && typeof r.delivery_proof === 'object' && (r.delivery_proof as { receiver?: unknown }).receiver ? { delivery_proof: r.delivery_proof as InvoiceRecord['delivery_proof'] } : {}),
 

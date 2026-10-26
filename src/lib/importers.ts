@@ -19,6 +19,7 @@ import { numberKey } from './invoice-number';
 import { getLockUntil, isDateLocked, prettyDay } from './period-lock';
 import { blankClient, normalizeRecord } from '../store/invoice-defaults';
 import { mergeImported, normalizeAddresses, normalizeContacts } from './contacts';
+import { docDefaultsFromCells } from './party-defaults'; // R3-B5
 
 /* ══════════════════════════════════════════════════════════════
    Scalar parsers
@@ -468,6 +469,8 @@ function buildClientRecord(row: string[], ctx: RowCtx): ClientDraft | null {
     state_code: shipState?.code, gstin: c('address_gstin'), default_ship_to: true,
   }]);
   if (addresses.length) rec.addresses = addresses;
+  const docDefaults = docDefaultsFromCells(c); // R3-B5 optional columns
+  if (docDefaults) rec.doc_defaults = docDefaults;
   return rec;
 }
 
