@@ -252,3 +252,12 @@ export const TDS_194O_RULES: readonly Versioned<{ individualExemption: number; n
   { from: '2020-10-01', value: { individualExemption: 500000, noPanRate: 5 }, source: 'Sec 194-O(2) and Sec 206AA for 194-O (Finance Act 2020) — verify' },
 ];
 
+/**
+ * R5-B3: Sec 194C(6) — no TDS on payments to a contractor in the business of plying, hiring or leasing goods carriages
+ * who owns ten or fewer goods carriages at any time in the year and furnishes a declaration with PAN. The limit is
+ * date-keyed; the 26Q no-deduction reason code is `T` (as understood). From 1 Apr 2026 the 2025-Act table item applies
+ * (labels via `ita2025.ts`). Verify with your CA. Append-only.
+ */
+export const TDS_194C6_RULES: readonly Versioned<{ maxVehicles: number; reason: string } | null>[] = [
+  { from: '2015-06-01', value: { maxVehicles: 10, reason: 'T' }, source: 'Sec 194C(6) as amended by Finance Act 2015 (≤ 10 goods carriages, PAN + declaration) — verify' },
+];

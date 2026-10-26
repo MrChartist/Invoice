@@ -127,6 +127,13 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   settlements: { entity: 'payment', label: 'Marketplace settlement' },
   eco_credits: { entity: 'gst', label: 'GST TCS / TDS credit' },
   marketplace_returns: { entity: 'invoice', label: 'Marketplace return' },
+  // R5-B: consignment notes, GTA option per FY, vehicles, trip sheets, RA measurements, BOQ coefficients
+  consignment_notes: { entity: 'invoice', label: 'LR' },
+  gta_options: { entity: 'gst', label: 'GTA option' },
+  vehicles: { entity: 'item', label: 'Vehicle' },
+  trips: { entity: 'invoice', label: 'Trip' },
+  ra_measurements: { entity: 'invoice', label: 'RA measurement' },
+  boq_coefficients: { entity: 'item', label: 'BOQ coefficient' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

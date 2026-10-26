@@ -146,6 +146,8 @@ export interface ProgressRequest {
   value?: number;
   /** basis lines: percent per source line id. */
   linePercents?: Record<string, number>;
+  /** R5-B4 basis measured: this-bill quantity per source line id (BOQ measurement). */
+  lineQtys?: Record<string, number>;
   /** Bill a milestone of the plan (its percent). */
   milestoneId?: string;
   allowOver?: boolean;
@@ -299,9 +301,10 @@ export function buildProgressInvoice(source: InvoiceRecord, req: ProgressRequest
   const share = (l: LineBilling): number => {
     if (basis === 'percent') return value / 100;
     if (basis === 'amount') return base > 0 ? value / base : 0;
+    if (basis === 'measured') return l.quotedQty > 0 ? num(req.lineQtys?.[l.line.id]) / l.quotedQty : 0; // R5-B4
     return num(req.linePercents?.[l.line.id]) / 100;
   };
-  if (basis !== 'lines' && !(value > 0)) throw new ProgressError(basis === 'percent' ? 'Enter a percent above zero.' : 'Enter an amount above zero.');
+  if (basis !== 'lines' && basis !== 'measured' && !(value > 0)) throw new ProgressError(basis === 'percent' ? 'Enter a percent above zero.' : 'Enter an amount above zero.');
   const over: string[] = [];
   const stage = summary.stages.length + 1;
   const items: InvoiceItem[] = [];
@@ -310,7 +313,7 @@ export function buildProgressInvoice(source: InvoiceRecord, req: ProgressRequest
     const f = share(l);
     if (!(f > 0)) return;
     if (l.fraction + f > 1 + EPS) over.push(`"${l.line.name || 'Item'}" would be ${fmtPct((l.fraction + f) * 100)} billed`);
-    const qty = roundQty(l.quotedQty * f);
+    const qty = basis === 'measured' ? roundQty(num(req.lineQtys?.[l.line.id])) : roundQty(l.quotedQty * f); // R5-B4: the measured quantity as entered
     if (!(qty > 0)) return;
     const line = stageLine(source, l.line, qty, `${ctx.id}-l${k + 1}`, `${fmtPct(f * 100)} of ${Math.round(l.quotedQty * 1e4) / 1e4}${l.line.unit ? ` ${l.line.unit}` : ''}`);
     newValue += lineValue(line);
@@ -322,7 +325,7 @@ export function buildProgressInvoice(source: InvoiceRecord, req: ProgressRequest
   const weight = base > 0 ? newValue / base : 0;
   const pctLabel = basis === 'percent' ? fmtPct(value) : basis === 'amount' ? `₹${round2(value).toLocaleString('en-IN')}` : fmtPct(weight * 100);
   const progress: ProgressOf = {
-    source_id: source.id, basis, value: basis === 'lines' ? round2(weight * 100) : round2(value), stage,
+    source_id: source.id, basis, value: basis === 'lines' || basis === 'measured' ? round2(weight * 100) : round2(value), stage,
     ...(milestone ? { milestone_id: milestone.id } : {}),
     ...(over.length ? { over_reason: String(req.overReason).trim() } : {}),
   };

@@ -47,19 +47,25 @@ import { timeT } from '../i18n/areas/time';
 import { areaNodes } from '../i18n/areas/nodes';
 import { svcT } from '../i18n/areas/service-r3'; // R3-B
 import { WorkTypesCard } from '../components/time/WorkTypesCard';
+import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-B
+import { defineArea } from '../i18n/area';
 
 // R3-B2 / B3: the projects board and retainers are their own lazy tab chunks.
 const ProjectsBoard = lazy(() => import('../components/time/ProjectsBoard'));
 const RetainersTab = lazy(() => import('../components/time/RetainersTab'));
+// R5-B: works-contract pack (BOQ, RA bills, retention, sites, GST TDS credit) — listed only with the pack on.
+const WorksTab = lazy(() => import('../components/works/WorksTab'));
+const wkT = defineArea({ tab: 'Works' } as const, { tab: 'वर्क्स' });
 
-type Tab = 'timesheet' | 'mileage' | 'billing' | 'projects' | 'retainers' | 'settings';
-const TABS: { id: Tab; label: () => string }[] = [
+type Tab = 'timesheet' | 'mileage' | 'billing' | 'projects' | 'retainers' | 'settings' | 'works';
+const TABS: { id: Tab; label: () => string; pack?: PackId }[] = [
   { id: 'timesheet', label: () => timeT('tabTimesheet') },
   { id: 'mileage', label: () => timeT('tabMileage') },
   { id: 'billing', label: () => timeT('tabUnbilled') },
   { id: 'projects', label: () => svcT('tabProjects') },
   { id: 'retainers', label: () => svcT('tabRetainers') },
   { id: 'settings', label: () => timeT('tabSettings') },
+  { id: 'works', label: () => wkT('tab'), pack: 'works' }, // R5-B
 ];
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** Weekday column head: English as before, Hindi weekday names for a Hindi interface. */
@@ -231,7 +237,7 @@ export function Time() {
       </div>
 
       <div className={controls.segment} role="tablist" aria-label={timeT('sections')}>
-        {TABS.map((t) => (
+        {visibleTabs(TABS, localDb.settings.get(), tab).map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
             className={tab === t.id ? controls.segmentBtnActive : controls.segmentBtn}
             onClick={() => setParams(t.id === 'timesheet' ? {} : { tab: t.id }, { replace: true })}>
@@ -405,6 +411,7 @@ export function Time() {
       )}
 
       {tab === 'settings' && <WorkTypesCard notify={notify} />}
+      {tab === 'works' && <Suspense fallback={null}><WorksTab notify={notify} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>

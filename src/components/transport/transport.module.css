@@ -1,0 +1,76 @@
+/* R5-B transport and works-contract packs (LRs, freight bills, vehicles, trips; works reuse it). Tokens only. */
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.view {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.viewActive {
+  composes: view;
+  border-color: var(--primary);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.warn {
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.8125rem;
+}
+
+.bad {
+  color: var(--loss);
+}
+
+.good {
+  color: var(--profit);
+}
+
+.box {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.lineRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.5rem;
+  align-items: end;
+}

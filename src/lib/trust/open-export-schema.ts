@@ -156,6 +156,13 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   settlements: 'Marketplace settlements: payout, lines per order and bucket, posting references.',
   eco_credits: 'GST TCS / TDS credit rows from the portal, with the accept / reject decision.',
   marketplace_returns: 'Marketplace returns / RTO / claims desk.',
+  // R5-B: transport & works contracts pack
+  consignment_notes: 'Consignment notes (LR / bilty).',
+  gta_options: 'GTA tax option per FY.',
+  vehicles: 'Vehicles and their documents.',
+  trips: 'Trip sheets.',
+  ra_measurements: 'RA bill measurements per BOQ line.',
+  boq_coefficients: 'Material per BOQ unit (theoretical consumption).',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',

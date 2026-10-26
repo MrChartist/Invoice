@@ -34,6 +34,8 @@ const ApplyAdvancePanel = lazy(() => import('../advances/ApplyAdvancePanel'));
 // R2-A2 / A3: "Settle the rest" and the bad-debt recovery offer load only when they apply.
 const SettleRestFields = lazy(() => import('../collections/SettleRestFields'));
 const RecoveryOffer = lazy(() => import('../collections/RecoveryOffer'));
+// R5-B5: RA bill deductions / net payable — only for a bill carrying `ra_deductions` (the block checks the works pack).
+const RaReceiptPanel = lazy(() => import('../works/RaReceiptPanel'));
 
 export interface PaymentModalProps {
   invoice: InvoiceRecord | null;
@@ -330,6 +332,12 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
         </Suspense>
       )}
 
+      {balance > 0 && !locked && !!live.ra_deductions?.length && can('payment.record') && (
+        <Suspense fallback={null}>
+          <RaReceiptPanel invoice={live} version={version} onPrefill={(v) => setAmount(v > 0 ? String(v) : '')} onError={setError}
+            onDone={(message) => { setVersion((v) => v + 1); refreshEditor(live.id); setError(''); onChanged(message); }} />
+        </Suspense>
+      )}
       {balance > 0 && !locked && can('payment.record') && (live.currency || 'INR').toUpperCase() === 'INR' && (
         <Suspense fallback={null}>
           <ApplyAdvancePanel

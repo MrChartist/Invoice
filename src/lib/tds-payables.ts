@@ -28,6 +28,7 @@ import { readPurchase, isVoidStatus } from './purchase-normalize';
 import { generateId, getTable, setTable } from './storage';
 import { ruleAt } from './tax-rules';
 import {
+  TDS_194C6_RULES,
   TDS_194O_RULES,
   TDS_206AB_RULES,
   TDS_NO_PAN_RULES,
@@ -130,6 +131,19 @@ export interface Payee {
   lowerLimit?: number;
   /** Credits already covered by this certificate (₹, same FY) — from `certificateUsed`. */
   lowerUsed?: number;
+  /** Additive (R5-B3): Sec 194C(6) declaration of a transporter (vendor master `transporter_194c6`). */
+  transporter194c6?: { declared_on?: string; vehicles_owned?: number; pan?: string };
+}
+
+/**
+ * R5-B3: Sec 194C(6) — a transporter who declared ≤ the date-keyed number of goods carriages (10) with a valid PAN
+ * suffers no 194C deduction; 26Q reason `T`. Unverified — verify with your CA.
+ */
+export function transporter194c6Exempt(code: string, date: string, payee: Payee): boolean {
+  const d = payee.transporter194c6;
+  const rule = ruleAt(TDS_194C6_RULES, date);
+  if (!d || !rule || !code.startsWith('194C')) return false;
+  return isValidPan(d.pan || payee.pan) && num(d.vehicles_owned) >= 0 && num(d.vehicles_owned) <= rule.maxVehicles && !!d.declared_on && d.declared_on <= date;
 }
 
 /** Is the Sec 197 certificate in force on `date` (number present, inside its validity)? */
@@ -308,7 +322,8 @@ export interface TdsSuggestion {
   rate: number;
   base: number;
   amount: number;
-  reason: '' | 'A' | 'C' | 'Y';
+  /** 'T' (R5-B3): no deduction under a Sec 194C(6) transporter declaration. */
+  reason: '' | 'A' | 'C' | 'Y' | 'T';
   deducteeType: DeducteeType;
   notes: string[];
   threshold: ThresholdResult;
@@ -319,6 +334,8 @@ export function suggestTds(code: string, date: string, base: number, payee: Paye
   const r = tdsRateFor(code, date, payee);
   if (!r) return null;
   const t = thresholdCheck(code, date, base, prior, excludeId, payee);
+  // R5-B3: 194C(6) declaration → nil TDS with reason T (one guarded branch).
+  if (transporter194c6Exempt(code, date, payee)) return { applies: false, code, rate: 0, base: round2(Math.max(num(base), 0)), amount: 0, reason: 'T', deducteeType: r.deducteeType, notes: ['No TDS: Sec 194C(6) declaration (≤ 10 goods carriages, PAN furnished).'], threshold: t };
   let amount = t.applies ? roundTds((t.taxableBase * r.rate) / 100) : 0;
   let rate = r.rate;
   // 7O (7.95): a Sec 197 certificate covers credits only up to its limit; the excess is taxed at the normal
@@ -359,6 +376,8 @@ export interface BillTdsInput {
   rate?: number;
   base?: number;
   amount?: number;
+  /** Additive (R5-B3): the vendor's Sec 194C(6) declaration. */
+  transporter194c6?: Payee['transporter194c6'];
 }
 
 export type BillTdsFields = Pick<PurchaseRecordTds, 'tds_section' | 'tds_rate' | 'tds_base' | 'tds_amount' | 'tds_on' | 'tds_pan' | 'tds_deductee_type' | 'tds_reason' | 'tds_cert_no'>;
@@ -385,8 +404,10 @@ export function resolveBillTds(v: BillTdsInput, ctx: { date: string; taxable: nu
   if (!v.section) return { suggestion: null, fields: NO_TDS };
   const pan = v.pan.trim().toUpperCase();
   const lowerUsed = v.lowerCert?.trim() ? certificateUsed(ctx.prior, v.lowerCert, ctx.date, ctx.excludeId) : 0;
-  const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate, lowerFrom: v.lowerFrom, lowerTo: v.lowerTo, lowerLimit: v.lowerLimit, lowerUsed }, ctx.prior, ctx.excludeId);
+  const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate, lowerFrom: v.lowerFrom, lowerTo: v.lowerTo, lowerLimit: v.lowerLimit, lowerUsed, transporter194c6: v.transporter194c6 }, ctx.prior, ctx.excludeId);
   if (!suggestion) return { suggestion: null, fields: NO_TDS };
+  // R5-B3: a 194C(6) nil deduction is kept on the bill (reason T) so the 26Q paper reports it.
+  if (suggestion.reason === 'T' && v.rate === undefined && v.amount === undefined) return { suggestion, fields: { ...NO_TDS, tds_section: v.section, tds_rate: 0, tds_base: suggestion.base, tds_amount: 0, tds_on: v.on, tds_pan: pan || undefined, tds_deductee_type: suggestion.deducteeType, tds_reason: 'T' } };
   const rate = v.rate ?? suggestion.rate;
   const base = v.base ?? suggestion.base;
   const amount = v.amount ?? (v.rate !== undefined || v.base !== undefined ? roundTds((base * rate) / 100) : suggestion.amount);
@@ -653,7 +674,7 @@ export function tdsDeductions(input: RegisterInput): TdsDeductionRow[] {
   }
   const push = (row: Omit<TdsDeductionRow, 'fy' | 'quarter' | 'section' | 'rpu' | 'payeeKey'>) => {
     const fq = fyQuarterOf(row.deductedOn);
-    if (!fq || !(row.amount > 0)) return;
+    if (!fq || !(row.amount > 0 || row.reason === 'T')) return; // R5-B3: 194C(6) nil rows are reported (reason T)
     const sec = payableSection(row.code);
     out.push({ ...row, section: sec?.section ?? row.code, rpu: sec?.rpu ?? '', payeeKey: payeeKeyOf({ pan: row.pan, vendorId: row.vendorId, name: row.payee }), ...fq });
   };
@@ -662,7 +683,7 @@ export function tdsDeductions(input: RegisterInput): TdsDeductionRow[] {
     if (!c || isVoidStatus(c.status)) continue;
     const r = raw as Record<string, unknown>;
     bills.set(c.id, r);
-    if (!(c.tdsAmount > 0) || s(r.tds_on).toUpperCase() === 'PAYMENT') continue;
+    if ((!(c.tdsAmount > 0) && s(r.tds_reason) !== 'T') || s(r.tds_on).toUpperCase() === 'PAYMENT') continue;
     const vendor = vendors.get(s(r.vendor_id));
     const pan = (s(r.tds_pan) || s(vendor?.pan)).toUpperCase();
     const rev = reversed.get(c.id);
