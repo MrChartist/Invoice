@@ -100,3 +100,42 @@ test('ITC caution: a GTA under fcm_5 sees a warning on a bill claiming ITC (pack
   localDb.settings.save({ ...localDb.settings.get(), industry_packs: [] });
   assert.equal(billWarnings(bill, []).length, 0, 'pack off: no warning');
 });
+
+test('QA6 F7: an unregistered payer\'s freight bill takes the place of handover (Sec 12(8)(b)); mixed origins split', () => {
+  localDb.clients.upsert({ id: 'c-guj', name: 'Surat Retail', email: '', address: 'Surat', city: 'Surat', zip: '', state_code: '24' });
+  saveGtaOption({ fy: '26-27', option: 'fcm_5' });
+  const toSurat = { to: { place: 'Surat', state: '24' }, consignee_id: 'c-guj', billing_party_id: 'c-guj' };
+  const pune = saveLr(lrIn({ ...toSurat }), parties());
+  const [bill] = createFreightBills([pune.id], '2026-06-30');
+  assert.equal(bill.place_of_supply, '27', 'Pune, where the goods were handed over');
+  assert.equal(bill.gst_mode, 'CGST_SGST');
+  assert.equal(bill.igst_amount, 0);
+  assert.ok(bill.cgst_amount > 0);
+  assert.match(bill.notes, /handed over.*verify with your CA/i);
+  // A registered payer keeps its own state (Sec 12(8)(a)).
+  const reg = saveLr(lrIn({ consignee_id: 'c-ka', billing_party_id: 'c-ka' }), parties());
+  const [kaBill] = createFreightBills([reg.id], '2026-06-30');
+  assert.equal(kaBill.place_of_supply, '29');
+  // Two origins for one unregistered payer → one bill per origin state.
+  const a = saveLr(lrIn({ ...toSurat, date: '2026-07-01' }), parties());
+  const b = saveLr(lrIn({ ...toSurat, date: '2026-07-02', from: { place: 'Indore', state: '23' } }), parties());
+  const bills = createFreightBills([a.id, b.id], '2026-07-31');
+  assert.deepEqual(bills.map((x) => x.place_of_supply).sort(), ['23', '27']);
+});
+
+test('QA6 F14: an LR booked under last FY\'s RCM option and billed after a forward-charge option follows the bill\'s FY', () => {
+  const lr = saveLr(lrIn({ date: '2027-03-25' }), parties());
+  assert.equal(lr.liable, 'recipient');
+  saveGtaOption({ fy: '27-28', option: 'fcm_18' });
+  const [bill] = createFreightBills([lr.id], '2027-04-05');
+  assert.equal(bill.reverse_charge, false, 'forward charge under the FY 27-28 option');
+  assert.equal(bill.items[0].tax_rate, 18);
+  assert.doesNotMatch(bill.notes, /reverse charge\)/i);
+  assert.match(bill.notes, /paid by the GTA/);
+  // An override typed on the LR stands.
+  saveGtaOption({ fy: '26-27', option: 'fcm_5' });
+  const o = saveLr(lrIn({ date: '2027-03-26', liable_override: 'recipient', liable_override_reason: 'Notified recipient (CA advice)' }), parties());
+  assert.equal(o.liable, 'recipient');
+  const [ob] = createFreightBills([o.id], '2027-04-06');
+  assert.equal(ob.reverse_charge, true);
+});

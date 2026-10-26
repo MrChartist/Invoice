@@ -195,16 +195,35 @@ export function buildDispatchLines(
   return out;
 }
 
-/** Lines taking `want` (base units per item) out of what is in transit for the request: batches oldest first, serials kept. */
-export function transitLines(p: RequestProgress, want: ReadonlyMap<string, number>, newId: () => string = generateId, skip?: ReadonlyMap<string, number>): StockTransferLine[] {
+/**
+ * QA6 F9: batch quantities held in transit by open / claimed exceptions (item → batch key → qty). A receipt must not
+ * take them, or the batch left in transit is not the one the shortage names.
+ */
+export function heldBatches(exceptions: readonly TransferException[] = []): Map<string, Map<string, number>> {
+  const out = new Map<string, Map<string, number>>();
+  for (const e of exceptions) {
+    if ((e.status !== 'open' && e.status !== 'claimed') || !e.batch_no) continue;
+    const m = out.get(e.item_id) ?? new Map<string, number>();
+    m.set(bkey(e.batch_no), rq((m.get(bkey(e.batch_no)) ?? 0) + num(e.qty)));
+    out.set(e.item_id, m);
+  }
+  return out;
+}
+
+/**
+ * Lines taking `want` (base units per item) out of what is in transit for the request: batches oldest first, serials
+ * kept, never the batch quantities `held` by open shortages (F9).
+ */
+export function transitLines(p: RequestProgress, want: ReadonlyMap<string, number>, newId: () => string = generateId, skip?: ReadonlyMap<string, number>, held?: ReadonlyMap<string, ReadonlyMap<string, number>>): StockTransferLine[] {
   const out: StockTransferLine[] = [];
   for (const [itemId, raw] of want) {
     let rest = rq(Math.min(raw, p.inTransit.get(itemId) ?? 0));
     if (!(rest > EPS)) continue;
     // `skip`: units of this item already taken by earlier lines (so two calls do not pick the same batch twice).
     let skipped = skip?.get(itemId) ?? 0;
+    const hold = held?.get(itemId);
     for (const b of p.transitBatches.get(itemId) ?? []) {
-      let avail = b.qty;
+      let avail = rq(b.qty - Math.min(hold?.get(bkey(b.batch)) ?? 0, b.qty));
       const s = Math.min(skipped, avail);
       avail = rq(avail - s);
       skipped = rq(skipped - s);
@@ -485,7 +504,8 @@ export const transferRequestsDb = {
     if (!transit) throw new Error('Nothing has been dispatched yet.');
     const want = new Map<string, number>();
     for (const l of x.lines) if (num(l.received) > EPS) add(want, l.item_id, num(l.received));
-    const lines = transitLines(p, want);
+    const held = heldBatches(r.exceptions);
+    const lines = transitLines(p, want, generateId, undefined, held);
     const taken = new Map(want);
     return withTablesRollback([REQUESTS_TABLE, 'stock_transfers', 'series_counters'], () => {
       let t: StockTransfer | undefined;
@@ -499,7 +519,7 @@ export const transferRequestsDb = {
         for (const kind of ['short', 'damaged'] as const) {
           const q = rq(num(l[kind]));
           if (!(q > EPS)) continue;
-          const pick = transitLines(p, new Map([[l.item_id, q]]), generateId, taken)[0];
+          const pick = transitLines(p, new Map([[l.item_id, q]]), generateId, taken, held)[0];
           add(taken, l.item_id, q);
           exceptions.push({ id: generateId(), date: x.date, item_id: l.item_id, qty: q, kind, ...(t ? { receipt_id: t.id } : {}), ...(pick?.batch_no ? { batch_no: pick.batch_no } : {}), status: 'open', ...(x.note ? { note: x.note } : {}) });
         }

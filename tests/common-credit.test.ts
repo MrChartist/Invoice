@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { setupR5c } from './helpers/r5c.ts';
 import { setTable } from '../src/lib/storage.ts';
 import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
-import { HEADS, figuresOf, headsTotal, inputsFor, loadCcRuns, postReversal, reversalLines, rule42, trueUp, turnoverOf, unpostReversal, workingCsv } from '../src/lib/institutions/common-credit.ts';
+import { HEADS, defaultTrueUpDate, trueUpWindow, figuresOf, headsTotal, inputsFor, loadCcRuns, postReversal, reversalLines, rule42, trueUp, turnoverOf, unpostReversal, workingCsv } from '../src/lib/institutions/common-credit.ts';
 import { A } from '../src/lib/ledger/accounts.ts';
 
 beforeEach(() => setupR5c());
@@ -80,7 +80,7 @@ test('GSTR-3B 4(B)(1): the posted reversal journal feeds the month through itcRe
   const run = postReversal({ month: '2026-05', kind: 'monthly', heads: r.reverse, figures: figuresOf(r), date: '2026-05-31' });
   assert.deepEqual(g3(5), { igst: 20, cgst: 187.5, sgst: 187.5, cess: 0 });
   assert.deepEqual(g3(6), { igst: 0, cgst: 0, sgst: 0, cess: 0 }, 'only in its own month');
-  postReversal({ month: 'FY2026-27', kind: 'annual', heads: { igst: 0, cgst: -50, sgst: -50, cess: 0 }, figures: {}, date: '2026-05-31' });
+  postReversal({ month: 'FY2025-26', kind: 'annual', heads: { igst: 0, cgst: -50, sgst: -50, cess: 0 }, figures: {}, date: '2026-05-31' }); // last FY's true-up, in an open month (QA6 F8)
   assert.deepEqual(g3(5), { igst: 20, cgst: 137.5, sgst: 137.5, cess: 0 }, 'a true-up reclaim reduces 4B(1)');
   unpostReversal(run.id);
   assert.deepEqual(g3(5), { igst: 0, cgst: -50, sgst: -50, cess: 0 }, 'undoing the posting removes it');
@@ -98,7 +98,34 @@ test('annual true-up both ways: reverse more, or reclaim (journal flips)', () =>
   const back = reversalLines(less.diff);
   assert.ok(back.find((l) => l.account_id === A.itcReversed)!.cr === 20000 && back.every((l) => l.account_id === A.itcReversed || l.dr > 0));
   setTable('purchases', []);
-  const run = postReversal({ month: 'FY2026-27', kind: 'annual', heads: less.diff, figures: {}, date: '2027-03-31' });
+  const run = postReversal({ month: 'FY2026-27', kind: 'annual', heads: less.diff, figures: {}, date: '2027-09-30' });
   assert.ok(run.journal_id);
   assert.equal(HEADS.length, 4);
+});
+
+test('QA6 F8: the annual true-up is dated in an open return month after the FY (by September), never in the closed year or a filed / locked period', async () => {
+  const { journalItcReversals } = await import('../src/lib/gst-reports.ts');
+  const { getTable } = await import('../src/lib/storage.ts');
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { COMPLIANCE_TABLE } = await import('../src/lib/compliance.ts');
+  setTable('purchases', []);
+  assert.deepEqual(trueUpWindow(2025), { from: '2026-04-01', to: '2026-09-30' });
+  assert.equal(defaultTrueUpDate(2025, '2026-09-15'), '2026-09-15', 'today, inside the window');
+  assert.equal(defaultTrueUpDate(2025, '2026-11-02'), '2026-09-30', 'capped at the September return');
+  assert.equal(defaultTrueUpDate(2025, '2026-02-01'), '2026-04-01', 'never inside the closed FY');
+  const heads = { igst: 0, cgst: 500, sgst: 500, cess: 0 };
+  const post = (date: string) => postReversal({ month: 'FY2025-26', kind: 'annual', heads, figures: {}, date });
+  assert.throws(() => post('2026-03-31'), /trueUpDate/, 'the closed FY (its March 3B is already filed)');
+  localDb.settings.save({ ...localDb.settings.get(), lock_until: '2026-06-30' });
+  assert.throws(() => post('2026-05-31'), /lock/i, 'a locked month');
+  setTable(COMPLIANCE_TABLE, [{ id: 'GSTR3B:2026-08:', form: 'GSTR3B', period_key: '2026-08', gstin: '', filed_on: '2026-09-20', marked_at: '' }]);
+  assert.throws(() => post('2026-08-31'), /trueUpFiled/, 'a GSTR-3B already marked filed');
+  setTable(COMPLIANCE_TABLE, [{ id: 'GSTR3B:2026-Q2:', form: 'GSTR3B', period_key: '2026-Q2', gstin: '', filed_on: '2026-10-22', marked_at: '' }]);
+  assert.throws(() => post('2026-09-10'), /trueUpFiled/, 'a filed QRMP quarter');
+  setTable(COMPLIANCE_TABLE, []);
+  assert.equal(loadCcRuns().length, 0, 'nothing posted by the refusals');
+  const run = post('2026-09-15');
+  assert.equal(run.month, 'FY2025-26');
+  assert.equal(run.date, '2026-09-15');
+  assert.deepEqual(journalItcReversals(getTable('vouchers')).map((r) => r.date), ['2026-09-15'], 'September 3B 4(B)(1)');
 });

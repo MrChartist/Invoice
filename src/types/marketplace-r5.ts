@@ -12,6 +12,8 @@ declare module './invoice' {
     channel_id?: string;
     /** Additive (R5-A3): the marketplace's order id (Amazon order id, Flipkart order item id, Meesho sub-order). */
     channel_order_id?: string;
+    /** Additive (QA6 F2): a summary document's covered order ids, so a later per-order import of them is "already imported". */
+    channel_order_ids?: string[];
     /** Additive (R5-A3): the `marketplace_imports` row that created this document (undo, idempotency). */
     channel_import_id?: string;
   }

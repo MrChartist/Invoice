@@ -6,7 +6,7 @@ import type { AppNotification } from '../notifications';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { LutRow } from '../../types/trade-r4';
 import { tlT } from '../../i18n/areas/trade-trust-r4-links';
-import { isLutSupply } from './exporter';
+import { isLutSupply, isSupplyDocType } from './exporter';
 import { fyOf } from './lut-register';
 
 export function lutNotices(register: readonly LutRow[], invoices: readonly Partial<InvoiceRecord>[], today: string, at: string): AppNotification[] {
@@ -20,7 +20,7 @@ export function lutNotices(register: readonly LutRow[], invoices: readonly Parti
   }
   const current = fyOf(today);
   if (!has(current)) {
-    const n = invoices.filter((i) => i && isLutSupply(i) && i.status !== 'Draft' && i.status !== 'Cancelled' && fyOf(i.issue_date) === current).length;
+    const n = invoices.filter((i) => i && isLutSupply(i) && isSupplyDocType(i.doc_type) && i.status !== 'Draft' && i.status !== 'Cancelled' && fyOf(i.issue_date) === current).length;
     if (n) out.push({ id: `lut-now:${current}`, severity: 'warning', title: tlT('lutNowTitle', { fy: current }), detail: tlT('lutNowDetail', { n }), href: '/settings?tab=business#export', cta: tlT('lutCta'), at });
   }
   return out;

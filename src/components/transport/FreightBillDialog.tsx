@@ -23,7 +23,8 @@ export default function FreightBillDialog({ notify, refresh, tick }: PanelProps)
   const invoices = useMemo(() => localDb.invoices.getAll(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const clients = useMemo(() => localDb.clients.getAll(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const pickable = pickableLrs(lrs, invoices, range);
-  const groups = groupForBills(pickable.filter((l) => picked.has(l.id)));
+  // The preview groups as the bills will be made: liable person for the bill date, origin state for unregistered payers.
+  const groups = groupForBills(pickable.filter((l) => picked.has(l.id)), { date, partyOf: (id) => clients.find((c) => c.id === id) });
   const bills = invoices.filter((i) => i.lr_ids?.length && i.status !== 'Cancelled');
   const name = (id: string) => clients.find((c) => c.id === id)?.name ?? '—';
   const toggle = (id: string) => setPicked((s) => {

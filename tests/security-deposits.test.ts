@@ -93,3 +93,21 @@ test('period lock refuses a movement; the party schedule CSV lists what is held'
   const csv = depositScheduleCsv(loadDeposits(), '2026-07-31', ['Party', 'Direction', 'Date', 'Amount', 'Adjusted', 'Refunded', 'Balance']);
   assert.equal(csv.split('\r\n')[1], 'Shop Tenant,received,2026-04-05,100000,0,1000,99000');
 });
+
+test('QA6 F3: adjustment is capped at the due net of credit notes; the open-invoice list shows that due', async () => {
+  const { createCreditNote } = await import('../src/lib/documents.ts');
+  const { depositOpenInvoices } = await import('../src/lib/property/deposits.ts');
+  const r = received();
+  const rent = createViaStore({ client: localDb.clients.getById('ten')!, date: '2026-07-01', lines: [{ name: 'Rent', qty: 1, rate: 10000, tax: 0 }], status: 'Sent' });
+  createCreditNote(localDb.invoices.getById(rent.id)!, { reason: 'Rent waiver', lines: [{ itemId: rent.items[0].id, quantity: 0.4 }] });
+  assert.throws(() => adjustAgainstInvoice(r.id, rent.id, 10000, '2026-07-10'), /balance/, 'above the ₹6,000 due');
+  assert.equal(depositBalance(loadDeposits()[0]), 100000, 'nothing taken from the deposit');
+  assert.deepEqual(depositOpenInvoices('ten').map((x) => [x.inv.id, x.due]), [[rent.id, 6000]]);
+  // QA6 F18: the pick list reads the shared rows (no clone of every invoice per keystroke).
+  const { peekTable } = await import('../src/lib/storage.ts');
+  assert.ok(peekTable('invoices').includes(depositOpenInvoices('ten')[0].inv), 'shared row, not a copy');
+  const after = adjustAgainstInvoice(r.id, rent.id, 6000, '2026-07-10');
+  assert.equal(depositBalance(after), 94000);
+  assert.equal(localDb.invoices.getById(rent.id)!.status, 'Paid');
+  assert.deepEqual(depositOpenInvoices('ten'), [], 'nothing left open');
+});

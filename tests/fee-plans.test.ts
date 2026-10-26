@@ -106,6 +106,32 @@ test('GSTR-1 Table 8 shows the fee Bill of Supply as exempt', () => {
   assert.equal(exempt, 9999, '30,000 × 33.33%');
 });
 
+test('QA6 F13: nil-rated and exempt heads go on two Bills of Supply; GSTR-1 Table 8 splits them; a re-run bills neither again', () => {
+  const p = plan({
+    heads: [{ name: 'Consultation', amount: 1000, tax: 'exempt', frequency: 'per_instalment' }, { name: 'Fresh produce', amount: 500, tax: 'nil', frequency: 'per_instalment' }],
+    instalments: [{ label: 'Visit', due_date: '2026-06-10', share: 100 }], fine: undefined,
+  });
+  assert.deepEqual(splitByTax(instalmentLines(p, 0)).byKind.map((g) => [g.kind, g.lines.map((l) => l.head.name)]), [['EXEMPT', ['Consultation']], ['NIL', ['Fresh produce']]]);
+  student('Pat', 'P1', [], p.id);
+  const res = issueFeeRun(p, 0, planFeeRun(p, 0, studentsOf(p.id, localDb.clients.getAll()), [], feeCtx('2026-06-01')), '2026-06-01');
+  assert.deepEqual(res.invoices.map((i) => [i.doc_type, i.exempt_kind, i.total]).sort(), [['BILL_OF_SUPPLY', 'EXEMPT', 1000], ['BILL_OF_SUPPLY', 'NIL', 500]]);
+  const g1 = buildGstReport(localDb.invoices.getAll(), [], { period: periodForDate('month', '2026-06-01') }).gstr1;
+  assert.equal(g1.nil.reduce((s, r) => s + r.exempt, 0), 1000);
+  assert.equal(g1.nil.reduce((s, r) => s + r.nil, 0), 500);
+  const again = planFeeRun(p, 0, studentsOf(p.id, localDb.clients.getAll()), localDb.invoices.getAll(), feeCtx('2026-06-02'));
+  assert.equal(again.drafts.length, 0, 'idempotent per kind');
+});
+
+test('QA6 F13: a student billed before the split (one EXEMPT bill holding the nil head) is not billed the nil head again', () => {
+  const p = plan({
+    heads: [{ name: 'Consultation', amount: 1000, tax: 'exempt', frequency: 'per_instalment' }, { name: 'Fresh produce', amount: 500, tax: 'nil', frequency: 'per_instalment' }],
+    instalments: [{ label: 'Visit', due_date: '2026-06-10', share: 100 }], fine: undefined,
+  });
+  const s = student('Pat', 'P1', [], p.id);
+  const legacy = { id: 'old', invoice_number: 'BOS/1', doc_type: 'BILL_OF_SUPPLY', status: 'Sent', exempt_kind: 'EXEMPT', fee_plan_id: p.id, fee_instalment: 0, client: s, items: [{ name: 'Consultation' }, { name: 'Fresh produce' }] };
+  assert.equal(planFeeRun(p, 0, [s], [legacy as never], feeCtx('2026-06-02')).drafts.length, 0);
+});
+
 test('fines: grace days, per day, cap; shown in dues, added only on click (once)', () => {
   const p = plan();
   assert.equal(fineDue(p.fine, '2026-06-10', '2026-06-15'), 0, 'inside grace');

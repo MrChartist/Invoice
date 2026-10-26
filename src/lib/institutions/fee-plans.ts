@@ -121,11 +121,13 @@ export function instalmentLines(plan: Pick<FeePlan, 'heads' | 'instalments'>, id
 
 /**
  * The documents an instalment needs: exempt / nil heads on a Bill of Supply, taxable heads on a tax invoice — a mixed
- * plan gives TWO documents, never one mixed document (§7 Q8).
+ * plan gives TWO documents, never one mixed document (§7 Q8). Exempt and nil-rated heads go on SEPARATE Bills of
+ * Supply (`byKind`, QA6 F13): the document's `exempt_kind` decides its GSTR-1 Table 8 column.
  */
-export function splitByTax(lines: readonly FeeLine[]): { bos: FeeLine[]; tax: FeeLine[]; exemptKind: 'EXEMPT' | 'NIL' } {
+export function splitByTax(lines: readonly FeeLine[]): { bos: FeeLine[]; tax: FeeLine[]; exemptKind: 'EXEMPT' | 'NIL'; byKind: { kind: 'EXEMPT' | 'NIL'; lines: FeeLine[] }[] } {
   const bos = lines.filter((l) => l.head.tax !== 'taxable');
-  return { bos, tax: lines.filter((l) => l.head.tax === 'taxable'), exemptKind: bos.some((l) => l.head.tax === 'exempt') ? 'EXEMPT' : 'NIL' };
+  const byKind = (['EXEMPT', 'NIL'] as const).map((kind) => ({ kind, lines: bos.filter((l) => (l.head.tax === 'nil' ? 'NIL' : 'EXEMPT') === kind) })).filter((g) => g.lines.length);
+  return { bos, tax: lines.filter((l) => l.head.tax === 'taxable'), exemptKind: bos.some((l) => l.head.tax === 'exempt') ? 'EXEMPT' : 'NIL', byKind };
 }
 
 /** Fine due on `today` for an instalment due on `due` (0 inside the grace days); per-day fines stop at the cap. */

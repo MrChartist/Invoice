@@ -65,6 +65,12 @@ export function isExportDoc(inv: DocLike | null | undefined): boolean {
   const pos = String(inv.place_of_supply ?? '');
   return inv.supply_type === 'EXPORT_LUT' || inv.supply_type === 'EXPORT_WITH_PAYMENT' || pos === '96' || pos === '97';
 }
+/**
+ * QA6 F6: an outward-supply document. Exports are found by supply type / place of supply (`isExportDoc`), whatever
+ * type they were saved as (Invoice, Tax Invoice, Bill of Supply…) — only quotations, proformas, challans and orders
+ * are not supplies.
+ */
+export const isSupplyDocType = (t: string | undefined): boolean => t !== 'QUOTATION' && t !== 'PROFORMA' && t !== 'DELIVERY_CHALLAN' && t !== 'SALES_ORDER';
 /** Zero-rated without payment of IGST: needs a live LUT (Rule 96A). */
 export const isLutSupply = (inv: Pick<InvoiceRecord, 'supply_type'> | null | undefined): boolean =>
   inv?.supply_type === 'EXPORT_LUT' || inv?.supply_type === 'SEZ_WITHOUT_PAYMENT';
