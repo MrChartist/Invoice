@@ -442,6 +442,16 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   setup_progress: 'doc.create',
   // R6-C3: import runs (suppliers / ledgers / opening balances)
   import_runs: 'books.edit',
+  // R7-A: hotel masters; bookings, folios, guests, night audits are documents (housekeeping status: doc.create via
+  // `hotelDb.patchRooms`); hotel settings need settings.manage
+  hotel_room_types: 'master.edit',
+  hotel_rooms: 'master.edit',
+  hotel_rate_plans: 'master.edit',
+  hotel_reservations: 'doc.create',
+  hotel_folios: 'doc.create',
+  hotel_guests: 'doc.create',
+  hotel_night_audits: 'doc.create',
+  hotel_settings: 'settings.manage',
 };
 
 let systemDepth = 0;

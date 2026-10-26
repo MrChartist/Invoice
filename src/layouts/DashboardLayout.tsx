@@ -177,7 +177,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
       if (!isPathVisible(i.path, modules, packs)) return !++hidden;
       return (practice || i.path !== '/practice') && (!posOnly || i.path === '/' || i.path === '/pos');
     };
-    const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(show) })).filter((g) => g.items.length > 0);
+    // R7-A: a hotel's /tables row reads "Front desk"
+    const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(show).map((i) => (i.path === '/tables' && s.business_type === 'hotel' ? { ...i, label: 'nav.frontDesk' as const } : i)) })).filter((g) => g.items.length > 0);
     return [groups, posOnly || role === 'viewer' ? 0 : hidden] as const;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, modeTick]);

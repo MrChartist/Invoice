@@ -463,6 +463,8 @@ const RECORD_TABLES = [
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
   // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
   'import_runs',
+  // Round 7 (hotel): room types, rooms, rate plans, reservations, folios, guests, night audits
+  'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -523,6 +525,8 @@ const ID_TABLES = new Set([
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
   // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
   'import_runs',
+  // Round 7 (hotel): room types, rooms, rate plans, reservations, folios, guests, night audits
+  'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

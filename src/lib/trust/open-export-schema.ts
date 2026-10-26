@@ -167,6 +167,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   ra_measurements: 'RA bill measurements per BOQ line.',
   boq_coefficients: 'Material per BOQ unit (theoretical consumption).',
   import_runs: 'One row per import of suppliers, ledgers or opening balances (R6-C3).',
+  // R7: hotel pack
+  hotel_room_types: 'Hotel room types.', hotel_rooms: 'Hotel rooms with housekeeping status.', hotel_rate_plans: 'Hotel rate plans.',
+  hotel_reservations: 'Hotel reservations (RES/FY…) with room lines and nightly price snapshots.', hotel_folios: 'Hotel folios (running accounts; not tax documents).',
+  hotel_guests: 'Hotel guest register (personal data; Aadhaar masked).', hotel_night_audits: 'Hotel night audits with occupancy, ADR and RevPAR.',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',
@@ -179,6 +183,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   gift_voucher_settings: 'Gift voucher settings.',
   bin_settings: 'Recycle bin retention.',
   setup_progress: 'Setup checklist: skipped steps and when the card was hidden.',
+  hotel_settings: 'Hotel settings: business date, times, SAC codes, premises declarations.', // R7
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

@@ -146,6 +146,14 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   boq_coefficients: { entity: 'item', label: 'BOQ coefficient' },
   // R6-C3: import runs
   import_runs: { entity: 'voucher', label: 'Import run' },
+  // R7-A: hotel masters, bookings, folios, guests (ID fields hidden), night audits
+  hotel_room_types: { entity: 'item', label: 'Room type' },
+  hotel_rooms: { entity: 'item', label: 'Room' },
+  hotel_rate_plans: { entity: 'item', label: 'Rate plan' },
+  hotel_reservations: { entity: 'invoice', label: 'Reservation' },
+  hotel_folios: { entity: 'invoice', label: 'Folio' },
+  hotel_guests: { entity: 'client', label: 'Guest' },
+  hotel_night_audits: { entity: 'voucher', label: 'Night audit' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */
@@ -154,7 +162,7 @@ const MAX_CHANGES = 15;
 const EXCERPT = 60;
 
 /** Never copied into the log, only flagged as changed. */
-const HIDDEN = /(email|phone|mobile|address|account_no|accountnumber|ifsc|^bank_|beneficiary|upi|notes?$|narration_private|^pan$|password|pin_hash|logo|signature|^data$|serials)/i;
+const HIDDEN = /(email|phone|mobile|address|account_no|accountnumber|ifsc|^bank_|beneficiary|upi|notes?$|narration_private|^pan$|password|pin_hash|logo|signature|^data$|serials|^id_doc$|^foreign$|^dob$)/i; // R7-A: guest ID / passport / visa
 /** Bookkeeping fields that change on every save and say nothing. */
 const IGNORED = new Set(['id', 'created_at', 'updated_at']);
 /** Fields shown on a create / delete row (the rest of the record is in the backup). */

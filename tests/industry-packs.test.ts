@@ -19,7 +19,7 @@ test('each new type implies its pack; an explicit list (even empty) beats the ty
   assert.deepEqual(activePacks({ industry_packs: ['leases', 'bogus', '__proto__', 'marketplace'] }), ['marketplace', 'leases']);
   assert.equal(isPackOn({ industry_packs: ['works'] }, 'works'), true);
   assert.equal(isPackOn({ business_type: 'constructor' }, 'marketplace'), false, 'own-key lookup only');
-  assert.equal(PACK_IDS.length, 6);
+  assert.equal(PACK_IDS.length, 7); // R7-A: + hotel
 });
 
 test('applyBusinessType / defaults for each new type', () => {
@@ -30,6 +30,7 @@ test('applyBusinessType / defaults for each new type', () => {
     institution: { modules: ['recurring', 'purchases', 'accounts', 'reports', 'gst', 'payroll'], due: 10, tpl: 'freelancer_light', landing: '/recurring?tab=fees' },
     nonprofit: { modules: ['recurring', 'purchases', 'accounts', 'banking', 'reports', 'tds', 'payroll'], due: 0, tpl: 'classic_orange', landing: '/receivables?tab=donations' },
     property: { modules: ['recurring', 'accounts', 'banking', 'reports', 'gst', 'tds'], due: 7, tpl: 'gst_tax_invoice', landing: '/recurring?tab=leases' },
+    hotel: { modules: ['pos', 'inventory', 'purchases', 'accounts', 'banking', 'reports', 'gst', 'tds', 'payroll'], due: 0, tpl: 'gst_tax_invoice', landing: '/tables?tab=frontdesk' }, // R7-A
   };
   for (const t of PACK_BUSINESS_TYPES) {
     const e = table[t];

@@ -68,6 +68,7 @@ export const en = {
   'nav.newInvoice': 'New invoice',
   'nav.pos': 'POS',
   'nav.tables': 'Tables',
+  'nav.frontDesk': 'Front desk', // R7-A
   'nav.invoices': 'Invoices',
   'nav.clients': 'Clients',
   'nav.recurring': 'Recurring',

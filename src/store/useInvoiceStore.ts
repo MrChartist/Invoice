@@ -19,7 +19,7 @@ import {
 } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
-import { blankItem, makeDraft, normalizeRecord, R5B_RECORD_KEYS, senderStateCode } from './invoice-defaults';
+import { blankItem, makeDraft, normalizeRecord, R5B_RECORD_KEYS, R7_RECORD_KEYS, senderStateCode } from './invoice-defaults';
 import { nextPartyBalanceSnapshot } from '../lib/party-balance';
 import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
@@ -158,6 +158,7 @@ export const RECORD_KEYS = [
   'channel_id', 'channel_order_id', 'channel_import_id', 'channel_order_ids', // R5-A, QA6 F2
   'fee_plan_id', 'fee_instalment', // R5-C
   ...R5B_RECORD_KEYS, // R5-B (src/types/transport-works-r5.ts)
+  ...R7_RECORD_KEYS, // R7 hotel (src/types/hotel-r7.ts)
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

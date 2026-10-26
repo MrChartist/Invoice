@@ -84,6 +84,7 @@ export const PACK_FIRST_TABLE: Readonly<Record<PackId, string>> = {
   nonprofit: 'donations',
   leases: 'leases',
   marketplace: 'sales_channels',
+  hotel: 'hotel_reservations', // R7-A
 };
 
 const isType = (ctx: ChecklistCtx, ...types: string[]) => types.includes(ctx.businessType || 'full');

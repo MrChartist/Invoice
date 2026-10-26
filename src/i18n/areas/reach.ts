@@ -31,6 +31,9 @@ export const reachT = defineArea(
     'hint.institution': 'Fee plans with instalments, concessions and fines; exempt supplies.',
     'hint.nonprofit': '80G receipts, donor register, Form 10BD file, funds.',
     'hint.property': 'Leases with escalation and CAM, 194-I, security deposits.',
+    // R7-A: hotel
+    'type.hotel': 'Hotel / lodge / homestay',
+    'hint.hotel': 'Rooms and rates, bookings, check-in, folios, night audit and hotel GST.',
     packsTitle: 'Industry packs',
     packsSub: 'Packs add a vertical’s work screens as tabs on existing pages. Turning a pack off only hides its tabs and alerts — no data is deleted. “Show all features” does not turn packs on.',
     'pack.marketplace': 'Marketplace seller',
@@ -45,6 +48,8 @@ export const reachT = defineArea(
     'packDesc.fees': 'Fee plans, instalments, concessions, defaulters, exempt-supply credit.',
     'packDesc.nonprofit': 'Donations, 80G receipts, Form 10BD, restricted / FCRA funds.',
     'packDesc.leases': 'Leases, escalation, CAM, 194-I and security deposits.',
+    'pack.hotel': 'Hotel / lodging', // R7-A
+    'packDesc.hotel': 'Front desk: room calendar, check-in and guest register, housekeeping, folios, night audit, Form C.',
     packsFromType: 'Following the business type',
     // Settings panel
     panelTitle: 'Shop mode',
@@ -127,6 +132,7 @@ export const reachT = defineArea(
     'ck.pack.nonprofit': 'Record your first donation',
     'ck.pack.leases': 'Add your first lease',
     'ck.pack.marketplace': 'Add your first sales channel',
+    'ck.pack.hotel': 'Make your first booking', // R7-A
     'ck.skip': 'Skip',
     'ck.skipped': 'skipped',
     'ck.unskip': 'Undo skip',
@@ -166,6 +172,9 @@ export const reachT = defineArea(
     'hint.institution': 'किस्तों, रियायतों और जुर्माने वाली फ़ीस योजनाएँ; छूट प्राप्त आपूर्ति।',
     'hint.nonprofit': '80G रसीदें, दाता रजिस्टर, फ़ॉर्म 10BD फ़ाइल, फ़ंड।',
     'hint.property': 'एस्केलेशन और CAM वाली लीज़, 194-I, सिक्योरिटी डिपॉज़िट।',
+    // R7-A: hotel
+    'type.hotel': 'होटल / लॉज / होमस्टे',
+    'hint.hotel': 'कमरे और रेट, बुकिंग, चेक-इन, folio, नाइट ऑडिट और होटल GST।',
     packsTitle: 'इंडस्ट्री पैक',
     packsSub: 'पैक किसी व्यवसाय की स्क्रीनें मौजूदा पेजों पर टैब के रूप में जोड़ते हैं। पैक बंद करने से केवल उसके टैब और अलर्ट छिपते हैं — कोई डेटा नहीं मिटता। “सभी फ़ीचर दिखाएँ” पैक चालू नहीं करता।',
     'pack.marketplace': 'मार्केटप्लेस विक्रेता',
@@ -180,6 +189,8 @@ export const reachT = defineArea(
     'packDesc.fees': 'फ़ीस योजनाएँ, किस्तें, रियायतें, बकायेदार, छूट-आपूर्ति क्रेडिट।',
     'packDesc.nonprofit': 'दान, 80G रसीदें, फ़ॉर्म 10BD, प्रतिबंधित / FCRA फ़ंड।',
     'packDesc.leases': 'लीज़, एस्केलेशन, CAM, 194-I और सिक्योरिटी डिपॉज़िट।',
+    'pack.hotel': 'होटल / लॉजिंग', // R7-A
+    'packDesc.hotel': 'फ्रंट डेस्क: रूम कैलेंडर, चेक-इन और गेस्ट रजिस्टर, हाउसकीपिंग, folio, नाइट ऑडिट, Form C।',
     packsFromType: 'व्यवसाय के प्रकार के अनुसार',
     panelTitle: 'शॉप मोड',
     panelSub: 'चुनें कि यह कंपनी क्या इस्तेमाल करती है। साइडबार और डैशबोर्ड टाइल सिर्फ़ यही दिखाते हैं; हर स्क्रीन खोज (Ctrl+K) और अपने लिंक से खुलती रहती है।',
@@ -255,6 +266,7 @@ export const reachT = defineArea(
     'ck.pack.nonprofit': 'पहला दान दर्ज करें',
     'ck.pack.leases': 'पहली लीज़ जोड़ें',
     'ck.pack.marketplace': 'पहला सेल्स चैनल जोड़ें',
+    'ck.pack.hotel': 'पहली बुकिंग बनाएँ', // R7-A
     'ck.skip': 'छोड़ें',
     'ck.skipped': 'छोड़ा गया',
     'ck.unskip': 'छोड़ना रद्द करें',
