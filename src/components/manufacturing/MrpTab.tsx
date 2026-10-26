@@ -104,7 +104,7 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
     try {
       const { productionOrdersDb } = await import('../../lib/production/orders');
       const plan = planId ? { id: planId, number, due_date: due || undefined } : undefined;
-      const made = ordersFromMrp(rows, plan).map((d) => productionOrdersDb.save({ date, ...d }, ctx.items, boms));
+      const made = ordersFromMrp(rows, plan).map((d) => productionOrdersDb.save({ date, ...d, due_date: d.due_date && d.due_date >= date ? d.due_date : undefined }, ctx.items, boms));
       ctx.changed(woT('ordersCreatedMrp', { n: made.length, numbers: made.map((o) => o.number).join(', ') }));
     } catch (e) {
       ctx.error((e as Error).message);

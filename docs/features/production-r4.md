@@ -11,7 +11,7 @@ ledger: stock is valued by the stock engine and picked up at report time by `loa
 | A1 Production orders `WO/FY…` | `?tab=orders` (`OrdersTab`, `OrderForm`, `IssueDialog`, `OutputDialog`) | `src/lib/production/orders.ts`, bell `order-alerts.ts` | `production_orders`; additive `production_order_id` on `stock_transfers`, `manufacturing_vouchers`, `stock_journals` |
 | A2 Order costing & SO margin | `?tab=costing` (`CostingTab`, `OrderCostCard`); Books → Projects memo row (`ProjectMaterialsRow`, lazy) | `src/lib/production/costing.ts` | `standard_conversion` on the order |
 | A3 Batch genealogy & recall | `?tab=trace` (`TraceTab`, `RecallList`); "Trace" links in Inventory → Batches and Serial lookup | `src/lib/production/genealogy.ts` | `recall_notices` |
-| A4 QC hold & release | `?tab=qc` (`QcTab`); item-form checkbox "Hold receipts for QC" | `src/lib/production/qc.ts`; GRN default-godown hook in `receipt-notes.ts` | `qc_results`, key `qc_settings`, `StockItem.qc_on_receipt` |
+| A4 QC hold & release | `?tab=qc` (`QcTab`); item-form checkbox "Hold receipts for QC" | `src/lib/production/qc.ts`; GRN default-godown hook `applyQcHold` in `receipt-notes.ts` (re-exported by qc.ts) | `qc_results`, key `qc_settings`, `StockItem.qc_on_receipt` |
 | A5 Landed-cost voucher `LCV/FY…` | `?tab=landed` (`LandedVoucherTab`) | `src/lib/landed-voucher.ts`; `landed-cost.ts` (bases `weight` / `equal`, `allocateLandedAmounts`); `purchase-normalize.ts` (extra-per-line map); `inventory.ts` `liveInputs` hook | `landed_cost_vouchers` |
 
 ### A1 — production orders
@@ -101,7 +101,7 @@ the earliest target date. Audit entity `purchase`.
    alongside. Open orders show the PRD formulas unchanged (yield 0).
 2. **Cost-centre memo** is a memo **row** under the Project P&L (its columns are the cost centres), not a column.
 3. **QC default godown** is applied to GRNs only (`receipt-notes.ts` hook). Purchase-bill lines are entered in the
-   purchases module, which R4-A does not own: the lead can call `applyQcHold(lines)` (qc.ts) in the bill save path.
+   purchases module, which R4-A does not own: the lead can call `applyQcHold(lines)` (receipt-notes.ts) in the bill save path.
 4. **Reject from a bill** opens the debit-note screen (`/expenses?tab=returns&new=dn`) and logs the QC failure; it is not
    pre-filled (the returns screen takes no bill pre-fill parameter).
 5. **Margin chip / insights** (`margin.ts` callers in the editor) read raw bills, so they do not yet include
@@ -110,15 +110,25 @@ the earliest target date. Audit entity `purchase`.
 6. **Inventory → "Landed cost" link** is not added (Inventory.tsx is not R4-A's); the palette and the Manufacturing tab
    reach it. The sale guard message for QC / WIP godowns reuses the existing "non-saleable (expired / breakage)" text
    (pharma-gate.ts is not R4-A's).
-7. Two small extra files: `src/i18n/areas/production-r4-links.ts` (strings for entry points on other areas' screens,
-   so they do not download the whole catalogue) and `src/components/production/palette-destinations.ts`.
+7. Small extra files: `src/i18n/areas/production-r4-links.ts` (strings for the Inventory entry points, so those screens
+   do not download the whole catalogue), `src/components/production/palette-destinations.ts` and `tabs.ts`.
+8. Make to order / MRP: a due date already in the past (an overdue sales order) is dropped from the new order rather
+   than refused.
 
 ## Bundle
 
-| | Before | After | Delta |
+Measured with `npm run build` + gzip level 9 (the `check:size` method), base = `claude/elegant-cannon-cwapiv` after
+QA-2 / R3-B / R3-C merged:
+
+| | Before (base) | After (R4-A merged) | Delta |
 |---|---|---|---|
-| Initial JS (gz) | 183,895 B (179.6 kB) | see commit message / report | ≤ +0.2 kB target |
-| Total JS (gz) | 2,078,462 B (2029.7 kB) | see commit message / report | ≤ +45 kB target |
+| Initial JS (gz) | 185,148 B (180.8 kB) | 185,261 B (180.9 kB) | **+113 B** (target ≤ +0.2 kB) |
+| Total JS (gz) | 2,180,491 B (2129.4 kB) | 2,225,050 B (2172.9 kB) | **+43.5 kB** (target ≤ +45 kB) |
+
+First paint carries only the registry strings (`TABLE_ACTIONS`, `WATCHED_TABLES`) and the bell gate; the five tabs
+are one lazy chunk (`components/production/tabs.ts`), the bell provider imports the engines lazily, the GRN QC hook
+lives in `receipt-notes.ts` itself, and the tab labels / MRP button strings are inline so those screens do not pull
+the production catalogue.
 
 No new lucide icon names (reused `Factory`, `ClipboardCheck`, `ListTree`, `ShieldAlert`, `Scale`, `Plus`, `Pencil`,
 `Trash2`, `Save`, `Download`, `Printer`).

@@ -57,7 +57,7 @@ export function OrdersTab({ ctx }: { ctx: MfgContext }) {
     return { o, p, status: orderStatus(o, p) };
   })() : undefined);
   const open = (id: string | null) => setParams((p) => { if (id) p.set('order', id); else p.delete('order'); return p; }, { replace: true });
-  const soNumbers = useMemo(() => new Map(peekTable<InvoiceRecord>('invoices').filter((d) => d.doc_type === 'SALES_ORDER').map((d) => [d.id, d.invoice_number])), [orders]);
+  const soNumbers = useMemo(() => new Map(peekTable<InvoiceRecord>('invoices').filter((d) => d.doc_type === 'SALES_ORDER').map((d) => [d.id, d.invoice_number])), [ctx.version]); // eslint-disable-line react-hooks/exhaustive-deps
   const soNumber = (id?: string) => (id ? soNumbers.get(id) ?? '—' : '');
 
   const mtoDrafts = useMemo(() => {
@@ -76,7 +76,9 @@ export function OrdersTab({ ctx }: { ctx: MfgContext }) {
   };
   const createMto = () => run(() => {
     const so = salesOrders.find((d) => d.id === soId);
-    const made = mtoDrafts.map((d) => productionOrdersDb.save({ date: todayInput(), ...d }, ctx.items, boms));
+    const date = todayInput();
+    // A sales order already past its delivery date still gets an order today, without the stale due date.
+    const made = mtoDrafts.map((d) => productionOrdersDb.save({ date, ...d, due_date: d.due_date && d.due_date >= date ? d.due_date : undefined }, ctx.items, boms));
     setMto(false);
     setSoId('');
     if (made[0]) open(made[0].id);
