@@ -126,12 +126,15 @@ privacy, returning guests, refused rooms, dirty → confirm, check-out → dirty
 by mode via `movedNoCash`, locked period, 31 March, roles, routing / meals / complimentary). Helpers:
 `tests/helpers/hotel.ts`.
 
-## Bundle (gzip, measured against `6a70f80`)
+## Bundle (gzip, measured against base `5cc25cb` with `npm run build`)
 
 | | Before | After R7-A | Δ |
 |---|---|---|---|
-| Initial JS (first paint) | 188,614 B | see the R7-A report | ≈ +0.2 kB |
-| Total JS | 2,594,721 B | see the R7-A report | ≈ +24 kB |
+| Initial JS (first paint) | 188,740 B (184.32 kB) | 188,977 B (184.55 kB) | +237 B |
+| Total JS | 2,596,928 B | 2,621,616 B | +24,688 B (≈ 24.1 kB) |
+
+First-paint growth: registry rows in `access.ts` (storage chunk), the `shop-mode.ts` route / type rows, the sidebar label
+ternary, `nav.frontDesk` (en) and the mangled-export shifts they cause — within the lead's ≤ 184.7 kB cap for the round.
 
 R7-A is **over its 13 kB total-JS share**: the front-desk chunk (all views, the engines and the en + hi strings in one
 lazy chunk) is ≈ 21.7 kB gz, plus ≈ 2.4 kB of registry / help / palette rows in existing chunks. Cut-first A5 was
