@@ -281,6 +281,9 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
             <label className={controls.check}>
               <input type="checkbox" checked={!!draft.non_resident} onChange={(e) => set({ non_resident: e.target.checked })} /> {o7T('vNonResident')}
             </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!draft.rcm_maker} onChange={(e) => set({ rcm_maker: e.target.checked || undefined })} /> {purT('rcmMaker')}
+            </label>
           </div>
         </div>
         <div className={controls.row}>

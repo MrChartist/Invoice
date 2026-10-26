@@ -272,3 +272,51 @@ trimmed and the screens consolidated into one chunk (from 18.1 kB at first build
   on its posting (§8 Q18). Both write a 194H row in the TDS register (26Q) and undo removes it.
 - TR6 / TR7 (TR-B2): bill charges are part of the goods' value by default (`in_value`, Sec 15(2)); `own_rate` and the
   pure-agent `outside` option (Rule 33, 0% with the note) are per head. No preset rates.
+
+# QA round 8 fixes (docs/prd/qa-round-8.md, T1–T16)
+
+Tests: `tests/qa8-trading.test.ts` (one or more per finding, turned from the QA8 probes); existing `tr-discounts`,
+`tr-interest`, `tr-statutory` and `tr-packaging` tests updated where the behaviour changed.
+
+- **T1** — `agencySales` values each agency line at its `calculateInvoice` taxable value (after the document discount,
+  net of GST on tax-inclusive prices, in rupees via `inrTotals`), so the patti gross equals the sales' taxable value.
+- **T2** — `OWNED_VOUCHERS` adds "Brokerage", "Trade claim" and "Packaging deposit": an undone journal is never restored
+  on its own. Restore hooks: `brokerage_postings` (comes back with its journal and 194H row, refused over a re-post of
+  the period), `tds_deductions` (a brokerage 194H row only with its posting), `packaging_moves` (with its deposit
+  voucher; refused when its charge invoice is gone), `purchase_returns` (a claim's supplier note only while the claim
+  still names it) and `invoices` (an interest draft of an undone run).
+- **T3** — a lot's arrival advance is recovered once: each patti deducts only what other live pattis left
+  (`advance_by_lot` on the patti; legacy pattis count as having taken the whole advance).
+- **T4 / T5** — `interestChargedTo` (`late-fee.ts`): a run's bill counts only while its interest invoice is live and the
+  run is not undone; a live late-fee invoice charges its bill up to its date. `createLateFeeInvoice` refuses a bill on
+  a live interest run. `undoInterestRun` deletes the drafts (refused while one is issued) and marks the run `undone`;
+  Receivables → Interest lists recent runs with Undo.
+- **T6** — interest drafts are split per supply type; an export / SEZ bill's interest keeps its `supply_type`, LUT and
+  place of supply (zero-rated stays zero-rated). A crate charge to a customer whose latest sale is SEZ follows it.
+- **T7** — deleting or rejecting a price-drop claim clears the run's `claim_id`; undo rejects a draft claim and is
+  refused while the claim is sent / settled; settling a claim of an undone run is refused; `coveredPairs` /
+  `liveRunRows` count only rows whose note is live (a hand-cancelled note frees its bills, and is not claimed).
+- **T8** — a charge movement whose invoice is deleted / cancelled is an orphan: `activeMoves` drops it from balances
+  (the crates are open again) and `removePackMove` allows removing it.
+- **T9** — `isPureAgentLine` (`trade/pure-agent.ts`, data only): pure-agent charge lines are left out of GSTR-1 Table 8,
+  3B 3.1(c) and the HSN summary (info issue `PURE_AGENT`, "verify with your CA"), out of the e-Invoice `ItemList`
+  (amount in `OthChrg`, `AssVal` net of it) and the e-Way `itemList` (amount in `OthValue`).
+- **T10** — year-end step `agency_lots` (after opening bills), shown whenever the company has arrivals up to 31 March,
+  whatever the pack; lists the unsettled lots with a link to Distribution → Agency.
+- **T11** — the effective discount % keeps 10 decimals (was 6): exact nets on lines up to ≈ ₹1,000 crore.
+  `invoice-calc.ts` is unchanged; saved 6-decimal lines still reconcile (tolerance 1e-6).
+- **T12** — a partial credit note drops `wt`; the GST rate-difference note never carries it; the print shows the
+  weighing only while it still gives the line quantity (`wtHolds`).
+- **T13** — Tally inventory entries hold our stock only: charge lines post to the other-charges ledger and agency lines
+  to the sales ledger as accounting lines.
+- **T14** — cashew is `080131` (in shell); a shorter heading (0801) matches only when the line names cashew. Silk yarn
+  "maker" is an explicit vendor flag (`rcm_maker`, Vendors → "Makes silk yarn"), no longer every vendor.
+- **T15** — `lotIssues` (`trade/lot-gate.ts`) runs inside `liveDocTrackingIssues`: an issued sale overselling a lot or
+  selling a cancelled / missing lot is an error (editor, POS, recurring, batch). In the editor the owner may override
+  with a reason, recorded as an `override` audit row.
+- **T16** — the discount cell, weight row and charges strip mount for a saved document that carries `disc_chain` /
+  `disc_per_unit`, `wt` or charge lines even when the pack is off, so the snapshots never go stale.
+
+**Sizes** (gz level 9, vs `956e533`): initial JS 188,997 → 189,022 B (**+25 B**, `check:size` 184.6 / 185 kB); total
+JS 2,738,291 → 2,743,437 B (**+5.1 kB**, 2,679.1 / 2,800 kB) — the lot gate in the stock-tracking chunk, the
+pure-agent filter in the GST / e-Invoice / e-Way chunks, interest undo + run list, recycle-bin hooks and strings.

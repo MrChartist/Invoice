@@ -15,7 +15,7 @@ import type { Client, InvoiceItem, InvoiceRecord, Payment } from '../../types/in
 import type { InterestRun, InterestSettings } from '../../types/trade-r8';
 import { calcInputFromRecord, calculateInvoice, deriveGstMode, num, round2 } from '../invoice-calc';
 import { computeInterest, interestInputFor, type InterestInput } from '../interest';
-import { principalItem, principalTaxRate } from '../late-fee';
+import { interestChargedTo, principalItem, principalTaxRate } from '../late-fee';
 import type { DocLink } from '../documents';
 import type { OpeningBillInput } from '../receivables';
 import { requireAccess } from '../access';
@@ -78,8 +78,15 @@ const key = (c: { id?: string; name?: string } | undefined) => c?.id || `n:${Str
 /** Pure: interest per party as of `asOf`. */
 export function partyInterest(asOf: string, s: InterestSettings, d: InterestData): PartyInterest[] {
   const clients = new Map(d.clients.map((c) => [key(c), c]));
-  const chargedTo = new Map<string, string>();
-  for (const r of d.runs) for (const b of r.bills) if (!chargedTo.has(b.id) || b.to > chargedTo.get(b.id)!) chargedTo.set(b.id, b.to);
+  // QA8 T5: only live runs count (their interest invoice still live); T4: a live late-fee invoice charged its bill up
+  // to its own date, so the run starts after that.
+  const chargedTo = interestChargedTo(d.runs, d.invoices);
+  for (const inv of d.invoices) {
+    const of = inv?.late_fee_for;
+    if (!of || inv.status === 'Cancelled') continue;
+    const day = String(inv.issue_date).slice(0, 10);
+    if (!chargedTo.has(of) || day > chargedTo.get(of)!) chargedTo.set(of, day);
+  }
   const parties = new Map<string, PartyInterest>();
   const add = (pk: string, name: string, id: string | undefined, number: string, date: string, due: string, input: InterestInput, inv?: InvoiceRecord) => {
     const c = clients.get(pk);
@@ -115,6 +122,17 @@ export function partyInterest(asOf: string, s: InterestSettings, d: InterestData
 /** Bills of `parties` also charged in an earlier run (the warning list). */
 export const overlaps = (parties: readonly PartyInterest[]) => parties.flatMap((p) => p.bills.filter((b) => b.charged_to).map((b) => `${b.number} (charged to ${b.charged_to})`));
 
+/** Export / SEZ supply types: their interest keeps the bill's supply type (one draft each). */
+const isSpecialSupply = (t: InvoiceRecord['supply_type']) => !!t && t !== 'B2B' && t !== 'B2C';
+const supplyGroup = (b: InterestBill) => (isSpecialSupply(b.invoice?.supply_type) ? b.invoice!.supply_type! : '');
+
+/** Pure: a party's bills split by supply type (export / SEZ bills apart from the rest), totals re-worked. */
+export function splitBySupply(p: PartyInterest): PartyInterest[] {
+  const groups = new Map<string, InterestBill[]>();
+  for (const b of p.bills) groups.set(supplyGroup(b), [...(groups.get(supplyGroup(b)) ?? []), b]);
+  return [...groups.values()].map((bills) => ({ ...p, bills, total: round2(bills.reduce((t, b) => t + b.amount, 0)) }));
+}
+
 /** Pure: the draft interest invoice to one party. */
 export function buildInterestInvoice(p: PartyInterest, ctx: { date: string; asOf: string; client: Client; settings: ReturnType<typeof localDb.settings.get>; sender: InvoiceRecord['sender']; fallbackRate: number }): InvoiceRecord {
   const items: InvoiceItem[] = p.bills.map((b) => {
@@ -136,9 +154,13 @@ export function buildInterestInvoice(p: PartyInterest, ctx: { date: string; asOf
   const home = senderStateCode(ctx.sender);
   const pos = (isValidGstin(ctx.client.gstin ?? '') ? ctx.client.gstin!.slice(0, 2) : ctx.client.state_code) || home;
   const draft = makeDraft({ settings: ctx.settings, sender: ctx.sender, docType: isValidGstin(ctx.client.gstin ?? '') ? 'TAX_INVOICE' : 'INVOICE' });
+  // QA8 T6: interest follows the principal supply — on an export / SEZ bill it is zero-rated (or IGST with payment)
+  // under the same supply type, LUT and place of supply. `raiseInterest` gives each supply type its own draft.
+  const src = p.bills.map((b) => b.invoice).find((i) => i && isSpecialSupply(i.supply_type));
   const rec: InvoiceRecord = {
     ...draft, issue_date: ctx.date, due_date: ctx.date > draft.due_date ? ctx.date : draft.due_date, status: 'Draft', client: { ...ctx.client }, items, place_of_supply: pos,
     gst_mode: deriveGstMode({ senderStateCode: home, placeOfSupply: pos, senderHasGstin: !!ctx.sender?.companyGstin?.trim(), taxEnabled: true }),
+    ...(src ? { supply_type: src.supply_type, place_of_supply: src.place_of_supply || pos, gst_mode: src.gst_mode, ...(src.lut_number ? { lut_number: src.lut_number } : {}), ...(src.lut_date ? { lut_date: src.lut_date } : {}) } : {}),
     notes: `Interest on overdue bills as on ${ctx.asOf} (Sec 15(2)(d) CGST Act: part of the value of the supply — verify with your CA).`,
   };
   const t = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
@@ -157,17 +179,43 @@ export function raiseInterest(parties: readonly PartyInterest[], asOf: string, d
     const settings = localDb.settings.get();
     const catalogue = peekTable<unknown>('items_catalog');
     const ids: string[] = [];
-    for (const p of chosen) {
-      const client = localDb.clients.getById(p.party_id!);
-      if (!client) throw new Error(`${p.party} is not in Clients.`);
+    const bills: InterestRun['bills'] = [];
+    for (const party of chosen) {
+      const client = localDb.clients.getById(party.party_id!);
+      if (!client) throw new Error(`${party.party} is not in Clients.`);
       const latest = [...localDb.invoices.getAll()].filter((i) => i.client?.id === client.id && i.doc_type !== 'CREDIT_NOTE').sort((a, b) => b.issue_date.localeCompare(a.issue_date))[0];
-      const saved = localDb.invoices.save({ ...buildInterestInvoice(p, { date, asOf, client, settings, sender: localDb.settings.activeProfile(), fallbackRate: latest ? principalTaxRate(latest.items) : 0 }), interest_run_id: id });
-      ids.push(saved.id);
+      for (const p of splitBySupply(party)) {
+        const saved = localDb.invoices.save({ ...buildInterestInvoice(p, { date, asOf, client, settings, sender: localDb.settings.activeProfile(), fallbackRate: latest ? principalTaxRate(latest.items) : 0 }), interest_run_id: id });
+        ids.push(saved.id);
+        for (const b of p.bills) bills.push({ id: b.id, party: p.party, from: b.from, to: b.to, amount: b.amount, invoice_id: saved.id });
+      }
     }
     if (peekTable<unknown>('items_catalog').length !== catalogue.length) setTable('items_catalog', catalogue as unknown[]);
-    const run: InterestRun = { id, date, as_of: asOf, bills: chosen.flatMap((p) => p.bills.map((b) => ({ id: b.id, party: p.party, from: b.from, to: b.to, amount: b.amount }))), invoice_ids: ids, total: round2(chosen.reduce((t, p) => t + p.total, 0)), created_at: new Date().toISOString() };
+    const run: InterestRun = { id, date, as_of: asOf, bills, invoice_ids: ids, total: round2(chosen.reduce((t, p) => t + p.total, 0)), created_at: new Date().toISOString() };
     setTable(INTEREST_RUNS_TABLE, [...getTable<InterestRun>(INTEREST_RUNS_TABLE), run]);
     return run;
+  });
+}
+
+/**
+ * QA8 T5: undo an interest run. Its draft invoices are deleted (recycle bin); an issued one must be cancelled first.
+ * The run stays (audited) marked undone, so its bills can be charged again.
+ */
+export function undoInterestRun(runId: string): InterestRun {
+  requireAccess('books.edit');
+  const all = getTable<InterestRun>(INTEREST_RUNS_TABLE);
+  const run = all.find((r) => r.id === runId);
+  if (!run) throw new Error('Interest run not found.');
+  if (run.status === 'undone') return run;
+  const docs = run.invoice_ids.map((i) => localDb.invoices.getById(i)).filter((i): i is InvoiceRecord => !!i && i.status !== 'Cancelled');
+  const issued = docs.find((i) => i.status !== 'Draft');
+  if (issued) throw new Error(`Interest invoice ${issued.invoice_number} is issued: cancel it first, then undo the run.`);
+  assertUnlocked({ id: run.id, issue_date: run.date, invoice_number: '' }, 'delete');
+  return withTablesRollback(['invoices', INTEREST_RUNS_TABLE, 'series_counters'], () => {
+    for (const d of docs) localDb.invoices.remove(d.id);
+    const next: InterestRun = { ...run, status: 'undone', undone_at: new Date().toISOString() };
+    setTable(INTEREST_RUNS_TABLE, getTable<InterestRun>(INTEREST_RUNS_TABLE).map((r) => (r.id === runId ? next : r)));
+    return next;
   });
 }
 

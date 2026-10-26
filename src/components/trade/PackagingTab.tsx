@@ -13,7 +13,9 @@ import { chartOf, loadUserAccounts } from '../../lib/ledger/accounts';
 import { isCashOrBankLedger } from '../../lib/bank-ledgers';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import type { PackagingMove, PackagingType } from '../../types/trade-r8';
-import { chargeUnreturned, loadPackMoves, loadPackTypes, packBalances, recordPackMove, removePackMove, savePackType, type MoveInput } from '../../lib/trade/tr-packaging';
+import type { InvoiceRecord } from '../../types/invoice';
+import { peekTable } from '../../lib/storage';
+import { activeMoves, chargeUnreturned, loadPackMoves, orphanCharge, loadPackTypes, packBalances, recordPackMove, removePackMove, savePackType, type MoveInput } from '../../lib/trade/tr-packaging';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
 
@@ -41,7 +43,7 @@ export default function PackagingTab({ onDone }: { onDone: (msg: string, error?:
   const moves = useMemo(() => (void tick, loadPackMoves()), [tick]);
   const [asOf, setAsOf] = useState(todayInput);
   const [age, setAge] = useState(60);
-  const balances = useMemo(() => packBalances(moves, asOf, age).filter((b) => b.balance || b.deposit), [moves, asOf, age]);
+  const balances = useMemo(() => packBalances(activeMoves(moves), asOf, age).filter((b) => b.balance || b.deposit), [moves, asOf, age]);
   const parties = useMemo(() => [...localDb.clients.getAll().map((c) => ({ kind: 'client' as const, id: c.id!, name: c.name })), ...vendorsDb.all().map((v) => ({ kind: 'vendor' as const, id: v.id, name: v.name }))], []);
   const cash = useMemo(() => chartOf(loadUserAccounts()).filter(isCashOrBankLedger), []);
   const [t, setT] = useState<Omit<PackagingType, 'id'>>({ name: '', unit: 'NOS', deposit: 0, charge_rate: 0, tax_rate: 18, returnable: true });
@@ -129,7 +131,7 @@ export default function PackagingTab({ onDone }: { onDone: (msg: string, error?:
               {[...moves].reverse().slice(0, 100).map((x: PackagingMove) => (
                 <tr key={x.id}>
                   <td>{x.date}</td><td>{x.party_name}</td><td>{typeName(x.type_id)}</td><td className={own.num}>{x.out ? `−${x.out}` : ''}{x.in ? ` +${x.in}` : ''}</td><td>{x.doc_no ?? ''}</td><td className={own.num}>{x.deposit ? formatCurrency(x.deposit) : ''}</td>
-                  <td>{!x.charge_invoice_id && <button type="button" className={controls.btnGhost} onClick={() => window.confirm(aT('deleteAsk')) && run(() => { removePackMove(x.id); return aT('deleted'); })}>{aT('delete')}</button>}</td>
+                  <td>{(!x.charge_invoice_id || orphanCharge(x, peekTable<InvoiceRecord>('invoices'))) && <button type="button" className={controls.btnGhost} onClick={() => window.confirm(aT('deleteAsk')) && run(() => { removePackMove(x.id); return aT('deleted'); })}>{aT('delete')}</button>}</td>
                 </tr>
               ))}
             </tbody>

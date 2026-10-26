@@ -8,6 +8,7 @@
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, pctOf, round2 } from './invoice-calc';
 import { inrTotals } from './fx';
+import { isPureAgentLine } from './trade/pure-agent';
 import { stateByCode, stateByName } from './india-states';
 import {
   extractPin,
@@ -190,8 +191,12 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const shipDiffers = !!(shipTo || options.shipFrom);
 
   // Goods only — e-Way Bills do not apply to services.
-  const goods = calc.lines.filter((l) => !isServiceHsn(l.hsn));
-  const skippedServiceLines = calc.lines.length - goods.length;
+  // QA8 T9: a pure-agent (Rule 33) reimbursement is not goods moved: out of itemList, its amount in other value.
+  const agentIds = new Set((record.items ?? []).filter(isPureAgentLine).map((x) => x.id));
+  const agentTotal = round2(calc.lines.filter((l) => agentIds.has(l.id)).reduce((t, l) => t + l.total, 0));
+  const supplied = calc.lines.filter((l) => !agentIds.has(l.id));
+  const goods = supplied.filter((l) => !isServiceHsn(l.hsn));
+  const skippedServiceLines = supplied.length - goods.length;
   const allGoods = skippedServiceLines === 0;
   // Taxable freight is part of the goods' value: its taxable amount and GST join the totals.
   const valued = allGoods && calc.charges_line ? [...goods, calc.charges_line] : goods;
@@ -206,7 +211,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   const advolOf = (l: (typeof goods)[number]) => pctOf(l.taxable, l.cess_rate);
   const cessAdvol = sum(advolOf);
   const cessFixed = sum((l) => round2(l.cess - advolOf(l)));
-  const other = allGoods ? round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount) : 0;
+  const other = allGoods ? round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount + agentTotal) : 0;
   const totInv = allGoods
     ? calc.total
     : round2(taxable + cgst + sgst + igst + cessAdvol + cessFixed);

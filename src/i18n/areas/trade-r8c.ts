@@ -53,6 +53,7 @@ export const trT = defineArea(
     open: 'Open',
     saved: 'Saved {n}.',
     unsettled: '{n} lot(s) sold but not settled on a posted patti — their sales still sit in Sales (year-end checklist).',
+    lotOverride: '{list} To sell anyway, give the reason (it is recorded in the activity log):',
     none: 'Nothing yet.',
     // Patti
     makePatti: 'Make patti',
@@ -212,6 +213,7 @@ export const trT = defineArea(
     open: 'खुला',
     saved: '{n} सहेजा गया।',
     unsettled: '{n} लॉट बिके हैं पर पोस्ट की गई पट्टी में नहीं — उनकी बिक्री अभी Sales में है (वर्ष-अंत सूची)।',
+    lotOverride: '{list} फिर भी बेचने के लिए कारण लिखें (यह गतिविधि लॉग में दर्ज होगा):',
     none: 'अभी कुछ नहीं।',
     makePatti: 'पट्टी बनाएँ',
     pickLots: 'बिक्री वाले लॉट',

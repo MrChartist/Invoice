@@ -63,7 +63,8 @@ test('pack / setting gate: the editor and bill-modal mounts are lazy and guarded
   assert.match(summary, /const PackagingStrip = lazy\(\(\) => import\('\.\.\/trade\/PackagingStrip'\)\)/);
   assert.match(summary, /\{trOn && <Suspense fallback=\{null\}><PackagingStrip \/>/);
   const items = readFileSync(new URL('../src/components/creator/ItemsTable.tsx', import.meta.url), 'utf8');
-  assert.match(items, /\{tradeOn && priced && <Suspense fallback=\{null\}><LineDiscountCell /);
+  // QA8 T16: the cell also mounts for a saved line that carries the chain snapshot (pack off).
+  assert.match(items, /\{\(tradeOn \|\| !!item\.disc_chain\?\.length \|\| !!item\.disc_per_unit\) && priced && <Suspense fallback=\{null\}><LineDiscountCell /);
   const strip = readFileSync(new URL('../src/components/trade/PackagingStrip.tsx', import.meta.url), 'utf8');
   assert.match(strip, /packOn \? loadPackTypes\(\) : \[\]/);
 });
