@@ -514,6 +514,9 @@ try {
   });
 
   await step('R2-A: a receipt ₹10 short settles the rest as kasar — FCN financial credit note, bill Paid', async () => {
+    // Later steps expect one open invoice: snapshot the tables this step writes and put them back afterwards.
+    const keys = ['invoices', 'transactions', 'doc_links', 'series_counters', 'audit_log'].map((n) => `mrchartist_inv_${n}`);
+    const before = await Promise.all(keys.map((k) => idbGet(page, k)));
     await page.goto(srv.origin + '/transactions');
     await page.getByRole('button', { name: /^Record payment for INV/ }).first().click();
     const dlg = page.getByRole('dialog', { name: 'Record payment' });
@@ -531,6 +534,9 @@ try {
     const bill = notes.find((i) => i.invoice_number === fcn[0]?.po_number);
     check(bill?.status === 'Paid', `the bill is settled (${bill?.status})`);
     await page.keyboard.press('Escape');
+    for (let i = 0; i < keys.length; i++) await idbPut(page, keys[i], before[i]);
+    await page.goto(srv.origin + '/transactions');
+    await page.getByRole('button', { name: /^Record payment for INV/ }).first().waitFor();
   });
 
   await step('bulk mark paid, then delete with undo', async () => {
