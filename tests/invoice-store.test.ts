@@ -77,6 +77,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     revision_of: 'q0', revision_no: 2,
     proposal_sections: [{ id: 's1', place: 'cover', title: 'Scope', body: 'Two floors' }],
     attention: { name: 'R. Iyer', role: 'Accounts' },
+    // R3-C
+    delivery_proof: { receiver: 'Ravi', remark: 'Received in good condition', signed_at: '2026-04-12T05:30:00.000Z', signature: 'asset:abc' },
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

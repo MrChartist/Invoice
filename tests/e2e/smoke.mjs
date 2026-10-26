@@ -2035,7 +2035,7 @@ try {
         req.onsuccess = () => { d.close(); resolve(req.result ? JSON.parse(req.result) : null); };
       };
       open.onerror = () => resolve(null);
-    }), name);
+    }), name).catch(() => null); // the page may be reloading into the Demo company: retry on the next poll
     const waitRows = async (p, name, min, timeout = 15000) => {
       const until = Date.now() + timeout;
       for (;;) {
@@ -2086,6 +2086,80 @@ try {
     const sample = await waitRows(b.p, 'invoices', 1);
     check(sample.length > 0, `Dashboard "Try with sample data" added the invoices (${sample.length})`);
     await b.ctx.close();
+  });
+
+  await step('R3-C: live preview pane at 1366 px follows typing (not loaded at 390 px); GSTR-1 error file round trip', async () => {
+    // C1: the pane is a device toggle on wide screens; typing a line reaches the paper.
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-live-preview-toggle]').click();
+    const pane = page.locator('[data-live-preview]');
+    await pane.waitFor({ timeout: 15000 });
+    await page.getByLabel('Client name').fill('Pane Client R3C');
+    await page.getByLabel('Item 1 name').fill('Pane line R3C');
+    await page.getByLabel('Item 1 quantity').fill('1');
+    await page.getByLabel('Item 1 rate').fill('500');
+    await pane.getByText('Pane line R3C').first().waitFor({ timeout: 10000 });
+    check(true, 'typing a line updates the live preview pane');
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    // Phones never request the pane chunk, even with the toggle remembered on.
+    const asked = [];
+    const onReq = (r) => { if (/LivePreviewPane/.test(r.url())) asked.push(r.url()); };
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.on('request', onReq);
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-meta-summary]').waitFor();
+    await page.waitForTimeout(500);
+    page.off('request', onReq);
+    check(asked.length === 0 && (await page.locator('[data-live-preview]').count()) === 0, `no pane chunk requested at 390 px (${asked.length})`);
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-live-preview-toggle]').click(); // back off for the steps that follow
+    await page.locator('[data-live-preview]').waitFor({ state: 'detached' });
+
+    // C4: a B2B invoice of last month, the portal's error report for it (fixture), corrected JSON of the failed document.
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 10);
+    const mm = String(prev.getMonth() + 1).padStart(2, '0');
+    const day = `${prev.getFullYear()}-${mm}-10`;
+    const fp = `${mm}${prev.getFullYear()}`;
+    const before = await readJson(page, 'invoices', []);
+    const num = 'INV/R3C/0007';
+    await writeJson(page, 'invoices', [...before, {
+      id: 'r3c-b2b', invoice_number: num, doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: day, due_date: day, currency: 'INR',
+      template_id: 'classic_orange', client: { name: 'Portal Buyer', gstin: '27AAACB2230M1ZW', email: '', address: '', city: 'Pune', zip: '', state: 'Maharashtra' },
+      sender: { companyName: 'E2E Trader', companyGstin: '27AAPFU0939F1ZV', stateCode: '27' },
+      items: [{ id: 'l1', name: 'Pump', type: 'Goods', hsn: '8413', quantity: 1, rate: 1000, tax_rate: 18, amount: 1000 }], gst_mode: 'CGST_SGST',
+      place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 18, shipping: 0, other_charges: 0,
+      round_off_enabled: false, amount_paid: 0, notes: '', terms: '', subtotal: 1000, discount_amount: 0, taxable_value: 1000, cgst_amount: 90,
+      sgst_amount: 90, igst_amount: 0, tax_amount: 180, round_off: 0, total: 1180, balance_due: 1180,
+    }]);
+    let fixture = readFileSync(new URL('../fixtures/gstr1-error-report.json', import.meta.url), 'utf8');
+    const vals = { GSTIN: '', FP: fp, CTIN: '27AAACB2230M1ZW', INUM: num.toLowerCase(), IDT: `10-${mm}-${prev.getFullYear()}` };
+    for (const [k, v] of Object.entries(vals)) fixture = fixture.replaceAll(`{{${k}}}`, v);
+    await page.goto(srv.origin + '/gst-reports?tab=portal-files');
+    await page.locator('[data-portal-files]').waitFor({ timeout: 15000 });
+    const upload = () => page.locator('[data-portal-file-input]').setInputFiles({ name: 'GSTR1_error_report.json', mimeType: 'application/json', buffer: Buffer.from(fixture) });
+    await upload();
+    const findings = page.locator('[data-portal-findings]');
+    await findings.waitFor({ timeout: 10000 });
+    check(await findings.getByRole('link', { name: num }).count() > 0, 'the portal error is matched to our invoice (normalised number + GSTIN + date)');
+    const saved = await readJson(page, 'gst_portal_files', [], (v) => v.length === 1);
+    check(saved[0]?.kind === 'gstr1_error' && saved[0].findings.some((f) => f.invoice_id === 'r3c-b2b'), 'the import is saved with its findings');
+    const dlP = page.waitForEvent('download');
+    await page.locator('[data-portal-corrected]').click();
+    if (await page.locator('[data-portal-preflight]').count()) await page.getByRole('button', { name: 'Download anyway' }).click();
+    const dl = await dlP;
+    const body = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+    const invs = (body.b2b ?? []).flatMap((g) => g.inv);
+    check(invs.length === 1 && invs[0].inum === num && body.fp === fp && !body.b2cs, `corrected JSON holds only the failed document (${invs.map((i) => i.inum).join(',')})`);
+    check(await page.locator('[data-filing-portal-errors]').count() === 1, 'the filing strip shows the "Portal files (n)" step');
+    await upload();
+    await page.locator('[data-portal-status]').getByText(/already read/).waitFor();
+    check((await readJson(page, 'gst_portal_files', [])).length === 1, 're-importing the same file is detected, not saved twice');
+    await writeJson(page, 'invoices', before);
+    await writeJson(page, 'gst_portal_files', null);
   });
 
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {

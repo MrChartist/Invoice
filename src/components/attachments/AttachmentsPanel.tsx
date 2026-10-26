@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import { Download, ExternalLink, FileText, Paperclip, Trash2, X } from 'lucide-react';
 import {
   ATTACHMENT_ACCEPT,
@@ -17,6 +17,9 @@ import { fldT } from '../../i18n/areas/fields';
 import controls from '../../styles/controls.module.css';
 import styles from './attachments.module.css';
 
+// R3-C2: "Print on document" flag for image attachments of a sales document (editor only).
+const PrintFlag = lazy(() => import('./PrintFlag'));
+
 export interface AttachmentsPanelProps {
   value: AttachmentRef[] | undefined;
   onChange: (next: AttachmentRef[]) => void;
@@ -24,6 +27,8 @@ export interface AttachmentsPanelProps {
   /** Heading; defaults to "Attachments". */
   label?: string;
   hint?: string;
+  /** R3-C2: offer "Print on document" (caption + Before / After / Other) on image attachments. */
+  printable?: boolean;
 }
 
 /**
@@ -33,7 +38,7 @@ export interface AttachmentsPanelProps {
  * record (the form was cancelled, or the draft dropped them) are released shortly after the
  * panel unmounts — `releaseAttachments` only ever deletes files nothing refers to.
  */
-export function AttachmentsPanel({ value, onChange, disabled, label: labelProp, hint }: AttachmentsPanelProps) {
+export function AttachmentsPanel({ value, onChange, disabled, label: labelProp, hint, printable }: AttachmentsPanelProps) {
   useT(); // re-render on a language switch (5.4)
   const label = labelProp ?? fldT('attachments');
   const refs = value ?? [];
@@ -121,7 +126,7 @@ export function AttachmentsPanel({ value, onChange, disabled, label: labelProp, 
             const stored = getAttachment(ref.id);
             const image = isImageMime(ref.mime);
             return (
-              <li key={ref.id} className={styles.item}>
+              <li key={ref.id} className={styles.item} style={printable && image ? { flexWrap: 'wrap' } : undefined}>
                 {stored && image ? (
                   <button type="button" className={styles.thumbBtn} onClick={() => setPreview(preview === ref.id ? null : ref.id)} aria-label={fldT('preview', { name: ref.name })}>
                     <img src={stored.data} alt="" className={styles.thumb} />
@@ -148,6 +153,11 @@ export function AttachmentsPanel({ value, onChange, disabled, label: labelProp, 
                 <button type="button" className={controls.btnIcon} onClick={() => remove(ref.id)} disabled={disabled} aria-label={fldT('remove', { name: ref.name })} title={fldT('removeTitle')}>
                   <Trash2 size={15} />
                 </button>
+                {printable && image && stored && (
+                  <Suspense fallback={null}>
+                    <PrintFlag refs={refs} target={ref} disabled={disabled} onChange={onChange} />
+                  </Suspense>
+                )}
               </li>
             );
           })}

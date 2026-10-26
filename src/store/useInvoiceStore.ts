@@ -146,6 +146,7 @@ export const RECORD_KEYS = [
   'payment_schedule', 'acceptance',
   // Round 2 (R2-A): financial credit notes
   'note_kind', 'financial_reason', 'financial_account', 'payment_terms',
+  'delivery_proof', // R3-C
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;

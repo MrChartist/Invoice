@@ -718,3 +718,9 @@ test('R2-B5 back-to-back reader (backorders, cancel warning) reads bills against
   assert.deepEqual(openLinkedPos('so1', [po], [billed], []), []);
   assert.equal(openLinkedPos('so1', [po], [], []).length, 1);
 });
+
+test('R3-C6 practice board reads the real purchase shape (bill date counts as the last entry)', async () => {
+  const { buildPracticeRow } = await import('../src/lib/practice.ts');
+  const row = buildPracticeRow({ id: 'c', name: 'C', tables: { purchases: [bill, { ...bill, id: 'p2', date: undefined, bill_date: '2026-05-01' }] } }, '2026-06-01');
+  assert.equal(row.lastVoucher, '2026-05-01');
+});

@@ -1,0 +1,10 @@
+.pad {
+  width: 100%;
+  max-width: 32rem;
+  height: 10rem;
+  border: 1px dashed var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  touch-action: none;
+  cursor: crosshair;
+}

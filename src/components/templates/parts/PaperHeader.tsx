@@ -5,6 +5,8 @@ import type { TemplateMetadata } from '../registry';
 import { DOC_TITLE_HI } from '../labels';
 import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
+import { useHeaderBand } from './header-band';
+import art from './docs-r3-paper.module.css';
 
 interface HeaderProps {
   invoice: InvoiceRecord;
@@ -139,6 +141,19 @@ export function PaperHeader({ invoice, sender, meta }: HeaderProps) {
   // The Ink skin sets its own serif title face in CSS; don't override it inline.
   const titleStyle = layout === 'ink' ? undefined : { fontFamily: meta.fontFamily };
   const number = invoice.invoice_number || 'DRAFT';
+  // R3-C3: a letterhead header band replaces the template's logo / name block; title + number stay.
+  const headerBand = useHeaderBand();
+  if (headerBand) {
+    return (
+      <>
+        <img className={art.bandHead} src={headerBand} alt="" data-letterhead-band />
+        <div className={art.bandTitle} style={titleStyle}>
+          <span>{title}</span>
+          <span>No. {number}</span>
+        </div>
+      </>
+    );
+  }
 
   const band = layout === 'corporate' || layout === 'ember';
   // An explicit logo position pulls the logo out into its own row above the header

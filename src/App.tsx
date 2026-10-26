@@ -40,6 +40,8 @@ const Distribution = lazy(() => import('./pages/Distribution').then((m) => ({ de
 const OrderPad = lazy(() => import('./pages/OrderPad').then((m) => ({ default: m.OrderPad })));
 // 8.143: customer-facing display window (no shell; shows only what the POS tab broadcasts).
 const CustomerDisplay = lazy(() => import('./components/pos-retail/CustomerDisplay').then((m) => ({ default: m.CustomerDisplay })));
+// R3-C6: practice desk (all companies, DSC register, monthly checklist) — owner only.
+const Practice = lazy(() => import('./pages/Practice'));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -123,6 +125,7 @@ function App() {
                 <Route path="/gst-reports" element={<GstReports />} />
                 <Route path="/exports" element={<Exports />} />
                 <Route path="/gateway/*" element={<Gateway />} />
+                <Route path="/practice" element={<RequireAccess action="settings.manage"><Practice /></RequireAccess>} />
                 <Route path="/design" element={<RequireAccess action="settings.manage"><DesignStudio /></RequireAccess>} />
                 {/* Settings opens for every role and shows each role only the tabs it may use (6.21). */}
                 <Route path="/settings" element={<Settings />} />

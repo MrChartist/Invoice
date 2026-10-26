@@ -163,6 +163,24 @@ function ensurePackAlerts(onReady: () => void): void {
     });
 }
 
+// R3-C: e-Way Bill expiry (only once `einvoice_meta` holds an e-Way Bill number) and DSC expiry (only once
+// `dsc_register` has rows) — each provider loads lazily on its own.
+const r3cAlerts: Record<string, 'off' | 'loading' | 'on'> = {};
+function ensureR3cAlerts(onReady: () => void): void {
+  const gate = (id: string, wants: () => boolean, load: () => Promise<void>) => {
+    if (r3cAlerts[id] && r3cAlerts[id] !== 'off') return;
+    try {
+      if (!wants()) return;
+    } catch {
+      return;
+    }
+    r3cAlerts[id] = 'loading';
+    load().then(() => { r3cAlerts[id] = 'on'; onReady(); }, () => { r3cAlerts[id] = 'off'; });
+  };
+  gate('eway', () => getTable<{ eway_no?: string }>('einvoice_meta').some((m) => !!m?.eway_no), () => import('../../lib/eway-alerts').then((m) => m.registerEwayAlerts()));
+  gate('dsc', () => getTable('dsc_register').length > 0, () => import('../../lib/dsc-alerts').then((m) => m.registerDscAlerts()));
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -195,6 +213,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensureGstGuardAlerts(reload);
     ensureCaptureAlerts(reload);
     ensurePackAlerts(reload);
+    ensureR3cAlerts(reload); // R3-C
   }, []);
 
   useEffect(() => {

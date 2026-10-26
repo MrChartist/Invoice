@@ -6,6 +6,7 @@
  * exact total it was issued with (flat `tax_rate` + a single "Tax" line).
  */
 
+import type {} from '../types/docs-r3'; // R3-C2: delivery_proof (RECORD_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -195,6 +196,8 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(item.free_of ? { free_of: String(item.free_of) } : {}),
     // Alternate unit (WP-8): only on lines typed in one, so base-unit lines keep their exact shape.
     ...(num(item.unit_factor) > 0 && num(item.unit_factor) !== 1 ? { unit_factor: num(item.unit_factor) } : {}),
+    // R3-C2 (additive): the catalogue photo reference the line snapshotted at save.
+    ...(typeof item.image === 'string' && item.image.startsWith('asset:') ? { image: item.image } : {}),
   };
 }
 
@@ -304,6 +307,8 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(num(r.revision_no) > 0 ? { revision_no: num(r.revision_no) } : {}),
     ...(Array.isArray(r.proposal_sections) && r.proposal_sections.length ? { proposal_sections: r.proposal_sections as InvoiceRecord['proposal_sections'] } : {}),
     ...(r.attention && typeof r.attention === 'object' && (r.attention as { name?: unknown }).name ? { attention: r.attention as InvoiceRecord['attention'] } : {}),
+    // R3-C2 (additive): receiver signature snapshot (proof of delivery).
+    ...(r.delivery_proof && typeof r.delivery_proof === 'object' && (r.delivery_proof as { receiver?: unknown }).receiver ? { delivery_proof: r.delivery_proof as InvoiceRecord['delivery_proof'] } : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

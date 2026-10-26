@@ -1,0 +1,94 @@
+/* R3-C2 lazy paper parts (photo pages, receiver signature) — accent variable only. */
+
+.photos {
+  break-before: page;
+  page-break-before: always;
+  padding-top: 8px;
+}
+
+.photosHead {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--tpl-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  break-inside: avoid;
+}
+
+.photoGrid + .photoGrid {
+  break-before: page;
+  page-break-before: always;
+  margin-top: 12px;
+}
+
+.photo {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  break-inside: avoid;
+}
+
+.photo img {
+  width: 100%;
+  height: 88mm;
+  object-fit: contain;
+  border: 1px solid var(--tpl-line);
+  border-radius: 4px;
+}
+
+.photo figcaption {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.group {
+  color: var(--tpl-accent);
+  font-weight: 700;
+  margin-right: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.proof {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--tpl-accent);
+  border-radius: 6px;
+  break-inside: avoid;
+  max-width: 260px;
+  margin-left: auto;
+}
+
+.proof p {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.proofHead {
+  font-weight: 700 !important;
+  color: var(--tpl-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.proofSig {
+  display: block;
+  max-width: 100%;
+  height: 48px;
+  object-fit: contain;
+  margin: 4px 0;
+}
+
+.compact {
+  max-width: none;
+  margin-left: 0;
+}

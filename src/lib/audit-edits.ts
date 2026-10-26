@@ -92,6 +92,10 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   // R2-B: batch invoice runs, proposal section snippets
   batch_runs: { entity: 'invoice', label: 'Batch invoice run' },
   proposal_snippets: { entity: 'settings', label: 'Proposal snippet' },
+  // R3-C: GSTR-1 portal file imports, DSC register, monthly client checklist
+  gst_portal_files: { entity: 'gst', label: 'Portal file' },
+  dsc_register: { entity: 'settings', label: 'DSC' },
+  client_checklist: { entity: 'settings', label: 'Checklist' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

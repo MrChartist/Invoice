@@ -25,6 +25,7 @@
  * Pure apart from the storage calls; tested in Node (tests/attachments.test.ts).
  */
 
+import type {} from '../types/docs-r3'; // R3-C2: AttachmentRef.print
 import { DB_PREFIX, SINGLETON_KEYS, listKeys, readRaw, removeRaw, writeRaw } from './storage';
 import { hashContent } from './assets';
 import type { AttachmentMime, AttachmentRef } from '../types/attachments';
@@ -228,6 +229,8 @@ export function readRefs(v: unknown): AttachmentRef[] {
       mime: r.mime as AttachmentMime,
       size: typeof r.size === 'number' ? r.size : 0,
       added_at: typeof r.added_at === 'string' ? r.added_at : '',
+      // R3-C2 (additive): "Print on document" flag (cleaned by `printablePhotos` when printed; images only).
+      ...(r.print ? { print: r.print } : {}),
     });
   }
   return out;

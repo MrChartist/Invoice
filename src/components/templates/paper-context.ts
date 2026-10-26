@@ -1,12 +1,14 @@
 import { createContext, useContext } from 'react';
 import { currencySymbol, formatCurrency, formatDate, formatMoney } from '../../lib/utils';
 import {
+  activeArt,
   fontCss,
   formatDatePref,
   docTitleText,
   formatNumberPref,
   paperSize,
   type DesignPrefs,
+  type LetterheadPrefs,
   type PaperKind,
   type PaperSize,
 } from '../../lib/design-prefs';
@@ -40,6 +42,10 @@ export interface PaperConfig {
   fontOverride?: string;
   /** R2-C5: printed title for a document type — the statutory title plus the design's suffix, if any. */
   title: (baseTitle: string, docType?: DocumentType) => string;
+  /** R3-C2: print catalogue photos on item lines (design toggle; never the GST grid / thermal roll). */
+  itemImages: boolean;
+  /** R3-C3: letterhead / footer artwork to print (null without it, or on pre-printed stationery). */
+  art: { letterhead?: LetterheadPrefs; footer?: string } | null;
 }
 
 export function buildPaperConfig(
@@ -91,6 +97,8 @@ export function buildPaperConfig(
     footerText: d?.footer_text?.trim() ?? '',
     fontOverride: fontCss(d?.font),
     title: (baseTitle, docType) => docTitleText(baseTitle, d, docType),
+    itemImages: d?.show_item_images === true && layout !== 'gst' && layout !== 'receipt' && d.paper !== 'thermal80',
+    art: activeArt(d),
   };
 }
 

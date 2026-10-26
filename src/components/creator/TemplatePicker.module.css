@@ -86,3 +86,8 @@
   bottom: 0.5rem;
   color: var(--brand-text);
 }
+
+/* R3-C1: slot that swaps the static tile for the live one once in view (tile styles in TemplateThumb.module.css). */
+.slot {
+  display: block;
+}
