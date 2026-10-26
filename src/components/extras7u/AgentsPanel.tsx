@@ -33,6 +33,7 @@ export function AgentsPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
   const [agentId, setAgentId] = useState('');
   const [from, setFrom] = useState(() => `${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
+  const [tds194h, setTds194h] = useState(false); // R8-B (§8 Q18): opt-in 194H on the salesman posting
   const agent = agents.find((a) => a.id === (agentId || agents[0]?.id));
   const st = useMemo(() => (agent ? commissionStatement(agent, { from, to }, liveCommissionData()) : null), [agent, from, to, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -125,9 +126,10 @@ export function AgentsPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
               </ul>
             )}
             <p className={own.muted}>{x7T('tdsNote')}</p>
+            <label className={controls.check}><input type="checkbox" checked={tds194h} onChange={(e) => setTds194h(e.target.checked)} /> {x7T('tds194h')}</label>
             <div className={own.tools}>
               <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => downloadText(`commission-${agent.name}-${from}-${to}.csv`, commissionCsv(agent, { from, to }, st), 'text/csv')} disabled={!st.lines.length}><Download size={14} /> CSV</button>
-              {can('books.edit') && <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} disabled={!(st.total > 0)} onClick={() => run(() => { postCommission(agent.id, { from, to }, to > today ? today : to); }, x7T('posted'))}>{x7T('postJournal')}</button>}
+              {can('books.edit') && <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} disabled={!(st.total > 0)} onClick={() => run(() => { postCommission(agent.id, { from, to }, to > today ? today : to, { tds194h }); }, x7T('posted'))}>{x7T('postJournal')}</button>}
             </div>
             {postings.filter((p) => p.agent_id === agent.id).length > 0 && (
               <ul className={own.list}>

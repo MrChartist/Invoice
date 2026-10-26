@@ -1,1 +1,1 @@
-export { default } from './R8Stub'; // TR-B replaces this stub with Distribution → Brokers (brokerage statements)
+export { BrokersTab as default } from './tr-b-hub'; // R8-B: Distribution → Brokers (BrokersView.tsx), shipped in the one TR-B chunk

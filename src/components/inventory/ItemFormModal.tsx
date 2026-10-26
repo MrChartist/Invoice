@@ -15,6 +15,8 @@ import styles from './inventory.module.css';
 import { EditLogButton } from '../audit/EditLogButton';
 import { catalogueEntryFor, setStockShortCode } from '../../lib/catalog';
 import { retailT } from '../../i18n/areas/retail';
+import { impliedPacks } from '../../lib/shop-mode';
+import { localDb } from '../../lib/localDb';
 
 export interface ItemFormModalProps {
   open: boolean;
@@ -32,6 +34,8 @@ interface Draft {
   opening_qty: string; opening_rate: string; reorder_level: string;
   sale_rate: string; tax_rate: string; location: string;
   track_batches: boolean; track_serials: boolean; warranty_months: string; opening_serials: string;
+  /** R8-B (TR-B1): bags / weight sub-row on lines. */
+  sold_by_weight_bags: boolean;
   /** WP-8 masters: group / category, alternate units, price lists. */
   masters: MastersDraft;
 }
@@ -42,7 +46,7 @@ function toDraft(i: StockItem): Draft {
     opening_qty: String(i.opening_qty || ''), opening_rate: String(i.opening_rate || ''),
     reorder_level: String(i.reorder_level || ''), sale_rate: i.sale_rate ? String(i.sale_rate) : '',
     tax_rate: i.tax_rate !== undefined ? String(i.tax_rate) : '', location: i.location ?? '',
-    track_batches: !!i.track_batches, track_serials: !!i.track_serials,
+    track_batches: !!i.track_batches, track_serials: !!i.track_serials, sold_by_weight_bags: !!i.sold_by_weight_bags,
     warranty_months: i.warranty_months ? String(i.warranty_months) : '', opening_serials: (i.opening_serials ?? []).join('\n'),
     masters: {
       group_id: i.group_id ?? '', category_id: i.category_id ?? '',
@@ -63,6 +67,7 @@ export function ItemFormModal(props: ItemFormModalProps) {
 function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormModalProps & { item: StockItem }) {
   useT(); // re-render on a language switch (5.4)
   const [d, setD] = useState<Draft>(() => toDraft(item));
+  const [weighOn] = useState(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency') || !!item.sold_by_weight_bags); // R8-B
   const [touched, setTouched] = useState(false);
   const uid = useId();
   // QA-3 F24: the counter short code lives on the catalogue entry of the same name; it is edited here too.
@@ -122,6 +127,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       standard_costs: cleanPriceList(d.masters.costs.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
       selling_prices: cleanPriceList(d.masters.prices.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
       qc_on_receipt: d.track_stock && d.masters.qc ? true : undefined, // R4-A4
+      sold_by_weight_bags: d.sold_by_weight_bags || undefined, // R8-B
     });
   };
 
@@ -265,6 +271,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
             {touched && serialError && <span className={controls.error} role="alert">{serialError}</span>}
           </>
         )}
+        {weighOn && <label className={controls.check}><input type="checkbox" checked={d.sold_by_weight_bags} onChange={(e) => set('sold_by_weight_bags', e.target.checked)} data-sold-by-weight /> {invT('soldByWeight')}</label>}
         <MastersFields
           draft={d.masters}
           onChange={(m) => set('masters', m)}
