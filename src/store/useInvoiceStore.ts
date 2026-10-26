@@ -144,6 +144,8 @@ export const RECORD_KEYS = [
   'agent_id', 'offer', 'rx',
   'party_balance_snapshot',
   'payment_schedule', 'acceptance',
+  // Round 2 (R2-A): financial credit notes
+  'note_kind', 'financial_reason', 'financial_account', 'payment_terms',
   'annexure', // R3-B (src/types/service-r3.ts)
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 

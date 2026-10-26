@@ -2,7 +2,7 @@
  * Customers gone quiet (R3-B7). A regular customer — at least 3 issued sales invoices in the last 12
  * months — is "quiet" when the days since their last invoice exceed max(threshold, 1.5 × their median
  * gap between invoices). The threshold defaults to 30 days. Walk-in counter bills, parties marked
- * "never remind" (R2-A5, when present), snoozed parties (until a local day) and parties marked "Not a
+ * "never remind" (R2-A5 `reminder_mode: 'never'`), snoozed parties (until a local day) and parties marked "Not a
  * regular" are left out.
  *
  * Shown as a dashboard insight card (`insights.ts`), a Clients chip and the "Customers gone quiet"
@@ -79,11 +79,8 @@ export function partyKeyOf(c: Pick<Client, 'id' | 'name'> | undefined, masters: 
 
 const SALES = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
 
-/** Truthy "never remind" flag from R2-A5, whatever its exact name (absent until R2-A is merged). */
-const neverRemind = (c: Client | undefined) => {
-  const o = (c ?? {}) as Record<string, unknown>;
-  return o.never_remind === true || o.no_reminders === true || o.reminders_off === true;
-};
+/** R2-A5: a party whose reminder mode is "never" is never nudged either. */
+const neverRemind = (c: Client | undefined) => c?.reminder_mode === 'never';
 
 export function snoozedUntil(settings: QuietSettings, key: string, today: string): string | null {
   const until = settings.snoozed[key];

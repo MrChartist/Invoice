@@ -62,6 +62,7 @@ import { payrollVouchers } from '../payroll/postings';
 import type { PayrollPayment, PayrollRun } from '../../types/payroll';
 import type { Branch } from '../branch';
 import { voucherBranches } from './branch-books';
+import { FINANCIAL_REASON_LABELS, financialAccountOf, isFinancialNote } from '../financial-note';
 
 export interface PostingLine {
   account: string;
@@ -235,7 +236,8 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
   l.dr(A.debtors, side * total, party);
   const items = Math.abs(toPaise(a.chargesTaxed ? a.taxable - a.charges : a.taxable));
   // Sec 25(4) branch transfer (WP-9): its own account, so it nets against the receiving branch's bill.
-  const salesAcc = !sale ? A.salesReturns : str(inv.branch_transfer_id) ? A.branchTransferOut : A.sales;
+  // R2-A2: a financial credit note (settlement discount / kasar / bad debt) is an expense, not a sales return.
+  const salesAcc = !sale ? (isFinancialNote(inv) ? financialAccountOf(inv) : A.salesReturns) : str(inv.branch_transfer_id) ? A.branchTransferOut : A.sales;
   for (const [cc, p] of itemsByCostCentre(inv, items)) l.cr(salesAcc, side * p, undefined, cc);
   l.cr(A.freightOut, side * Math.abs(toPaise(a.charges)));
   l.cr(A.outCgst, side * Math.abs(toPaise(a.cgst)));
@@ -246,6 +248,7 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
   l.cr(A.tcsPayable, side * Math.abs(toPaise(a.tcs)));
   l.balanceTo(A.roundOff);
   const kind: LedgerVoucherKind = !sale ? 'Credit Note' : debitNote ? 'Debit Note' : 'Sales';
+  const financial = !sale && isFinancialNote(inv) ? FINANCIAL_REASON_LABELS[inv.financial_reason ?? 'settlement_discount'] : '';
   return {
     id: `${sale ? 'sale' : 'cn'}:${inv.id}`,
     source: 'auto',
@@ -255,6 +258,7 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
     party,
     narration: [
       kind === 'Sales' ? 'Sales invoice' : kind,
+      financial && `${financial} (financial credit note)`,
       fxNarration(num(inv.total), inv),
       // Outward reverse charge: the debtor owes the taxable value; the recipient pays the GST itself.
       a.rcmTax > 0 && `reverse charge: GST ${a.rcmTax.toFixed(2)} payable by the recipient`,
@@ -291,8 +295,8 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
   const amount = Math.abs(toPaise(inrValue(num(t.amount), inv)));
   if (!date || amount === 0) return null;
   const party = inv ? partyOfInvoice(inv) : str((t as { client_name?: unknown }).client_name) || 'Unknown customer';
-  // 8.106: a bad-debt write-off debits Other expenses (bad debts), never cash / bank.
-  const cashAcc = t.write_off ? A.otherExp : accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
+  // 8.106: a bad-debt write-off never touches cash / bank; R2-A3 debits its own "Bad debts written off" ledger.
+  const cashAcc = t.write_off ? A.badDebts : accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
   // Realised exchange difference (6.19): the bank gets the realised rupees, the debtor is
   // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
   const fx = realisedFx(t, inv);

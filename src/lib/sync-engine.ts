@@ -328,6 +328,9 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   // R2-C: deferral schedules (their journals are `vouchers` rows, locked on their own dates) and packing lists
   [`${DB_PREFIX}deferrals`]: (r) => str((r.source as Record<string, unknown> | undefined)?.date) || str(r.start) || undefined,
   [`${DB_PREFIX}packing_lists`]: 'date',
+  // R2-A: collection follow-ups (the day logged) and bad-debt recoveries (the day the money came in)
+  [`${DB_PREFIX}collection_notes`]: 'date',
+  [`${DB_PREFIX}write_off_recoveries`]: 'date',
   // R2-B: batch invoice runs (issue date of the run's invoices)
   [`${DB_PREFIX}batch_runs`]: 'date',
   // R3-B: retainers (start day; their period closes stamp time entries)

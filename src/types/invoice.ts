@@ -274,6 +274,11 @@ export interface Client {
   agent_id?: string;
   /** Per-party credit policy (8.80); absent = the company policy (`credit_policy`). */
   credit_policy?: 'off' | 'warn' | 'block';
+  /* ── Round 2 (R2-A, docs/features/collections-r2.md); additive, master only ── */
+  /** R2-A5: how reminders treat this party — `auto` (default, in the queues), `manual` (on demand only), `never`. */
+  reminder_mode?: ReminderMode;
+  /** R2-A1: default `payment_terms` row for new documents of this party (falls back to `credit_days`). */
+  payment_terms_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -321,6 +326,8 @@ export interface SenderProfile {
    * the 30-day IRP reporting window (AATO ≥ ₹10 crore from 1 Apr 2025). Absent = unknown (no window shown).
    */
   einvoice_aato?: number;
+  /** Additive (R2-A1): the seller's Udyam registration number — enables the MSME 45-day (Sec 43B(h)) note on long terms. */
+  msme_udyam?: string;
 }
 
 /** GST registration type of a sender profile. */
@@ -624,6 +631,25 @@ export interface InvoiceRecord {
    * timestamp) and printed on the quote. Never rewritten by later edits (`src/lib/quote-acceptance.ts`).
    */
   acceptance?: QuoteAcceptance;
+  /* ── Round 2 (R2-A, docs/features/collections-r2.md); additive, never copied to a new document ── */
+  /**
+   * R2-A2: a FINANCIAL credit note (settlement discount / short payment / bad debt) — it settles a bill
+   * without being a GST credit note (`src/lib/financial-note.ts`). Only on `CREDIT_NOTE` rows, series `FCN`.
+   */
+  note_kind?: 'financial';
+  /** R2-A2: why the financial note was raised (with `note_kind`). */
+  financial_reason?: FinancialReason;
+  /**
+   * R2-A2: ledger account the note is debited to (snapshot of the company setting at issue, so a later
+   * change of setting never re-posts an old note). Absent = the default for the reason.
+   */
+  financial_account?: string;
+  /**
+   * R2-A1: snapshot of the named payment term picked on the document (`payment_terms` master), taken on save.
+   * Its instalment dates live in `payment_schedule` (8G, generated from the term); this keeps the term's
+   * name and the early-payment offer as issued, so editing the master never changes a saved document.
+   */
+  payment_terms?: PaymentTermsSnapshot;
 }
 
 /** 8.100: one instalment. Exactly one of `percent` (of the document total) or `amount` is used. */
@@ -649,6 +675,21 @@ export interface QuoteAcceptance {
   amount: number;
   note?: string;
 }
+
+/** R2-A1: payment term frozen on a document. Amounts are in the document currency. */
+export interface PaymentTermsSnapshot {
+  /** `payment_terms` row id ('' for a custom schedule). */
+  id: string;
+  name: string;
+  /** Early-payment discount offered: pay `amount` less by `until` (local day). */
+  early_discount?: { percent: number; until: string; amount: number };
+}
+
+/** R2-A5: per-party reminder mode. */
+export type ReminderMode = 'auto' | 'manual' | 'never';
+
+/** R2-A2: reason of a financial credit note. */
+export type FinancialReason = 'settlement_discount' | 'short_payment' | 'bad_debt';
 
 /** 8.5: rupee figures frozen on the bill at issue (INR only). Total due = previous + bill − paid. */
 export interface PartyBalanceSnapshot {

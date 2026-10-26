@@ -392,6 +392,10 @@ export const A = {
   office: 'office',
   itcReversed: 'itc_reversed',
   otherExp: 'other_exp',
+  // Round 2 (R2-A): settlement discounts / short payments, bad debts and their recovery
+  discountAllowed: 'discount_allowed',
+  badDebts: 'bad_debts',
+  badDebtsRecovered: 'bad_debts_recovered',
 } as const;
 
 const def = (id: string, code: string, name: string, group: PrimaryGroupId): Account => ({ id, code, name, group, system: true });
@@ -491,6 +495,10 @@ export const DEFAULT_ACCOUNTS: readonly Account[] = [
   def(A.itcReversed, '6370', 'GST input credit reversed', 'INDIRECT_EXPENSES'),
   def(A.tdsInterest, '6380', 'Interest & fees on TDS / TCS (not deductible)', 'INDIRECT_EXPENSES'),
   def(A.otherExp, '6390', 'Other expenses', 'INDIRECT_EXPENSES'),
+  // Round 2 (R2-A): financial credit notes (settlement discount / kasar) and bad debts — verify with your CA.
+  def(A.discountAllowed, '6392', 'Discount allowed', 'INDIRECT_EXPENSES'),
+  def(A.badDebts, '6394', 'Bad debts written off', 'INDIRECT_EXPENSES'),
+  def(A.badDebtsRecovered, '4940', 'Bad debts recovered', 'OTHER_INCOME'),
 ];
 
 /** Expense category on a bill (src/types/purchases.ts PURCHASE_CATEGORIES) → default account. */
