@@ -4,7 +4,7 @@
  */
 import { ALL_MODULES, type BusinessType, type ModuleId, type ShopModeSettings } from './shop-mode';
 
-export const BUSINESS_TYPES: readonly BusinessType[] = ['kirana', 'wholesale', 'services', 'manufacturer', 'full'];
+export const BUSINESS_TYPES: readonly BusinessType[] = ['kirana', 'restaurant', 'wholesale', 'services', 'manufacturer', 'full'];
 
 export const PRESETS: Readonly<Record<BusinessType, readonly ModuleId[]>> = {
   kirana: ['pos', 'purchases', 'inventory', 'reports'],
@@ -12,6 +12,8 @@ export const PRESETS: Readonly<Record<BusinessType, readonly ModuleId[]>> = {
   services: ['recurring', 'time', 'purchases', 'reports', 'gst', 'tds', 'design'],
   manufacturer: ['purchases', 'inventory', 'accounts', 'banking', 'reports', 'gst', 'tds', 'payroll', 'loans'],
   full: ALL_MODULES,
+  // R3-A: café / dhaba / restaurant — tables & KOT live under the POS module.
+  restaurant: ['pos', 'inventory', 'reports'],
 };
 
 /** Dashboard tile → module. Tiles not listed are always available. */
@@ -57,6 +59,7 @@ export const BUSINESS_DEFAULTS: Readonly<Record<BusinessType, BusinessDefaults>>
   services: { defaultDueDays: 15, templateId: 'freelancer_light', landing: '/invoice' },
   manufacturer: { defaultDueDays: 30, templateId: 'corporate_navy', landing: '/invoice' },
   full: { defaultDueDays: 14, templateId: 'classic_orange', landing: '/invoice' },
+  restaurant: { defaultDueDays: 0, templateId: 'compact_receipt', landing: '/tables' },
 };
 
 /** Settings after the wizard: shop-mode modules plus the type's default due days. */

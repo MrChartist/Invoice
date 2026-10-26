@@ -448,12 +448,32 @@ export function drawerCount(z: Pick<ZReport, 'tenders'> & { returns?: Pick<ZRetu
   return { expected, difference: round2(num(counted) - expected) };
 }
 
+/**
+ * R3-A: live restaurant orders (open, or bill printed but not settled) opened on or before `day`.
+ * Read straight from `table_orders` so the POS never loads the restaurant module.
+ */
+export function openTableOrders(day?: string): { id: string; label: string }[] {
+  const names = new Map(getTable<{ id: string; name?: string }>('dining_tables').map((t) => [t.id, t.name ?? '']));
+  return getTable<{ id: string; status?: string; day?: string; table_id?: string; token?: number; channel?: string }>('table_orders')
+    .filter((o) => (o.status === 'open' || o.status === 'printed') && (!day || !o.day || o.day <= day))
+    .map((o) => ({ id: o.id, label: o.table_id ? `table ${names.get(o.table_id) || o.table_id.replace(/^tbl_/, '')}` : `token ${o.token ?? '?'}` }));
+}
+
+/** Why the day / shift cannot be closed because of restaurant orders ('' = it can). */
+export function openOrdersBlocker(day?: string): string {
+  const open = openTableOrders(day);
+  if (!open.length) return '';
+  return `${open.length} restaurant order${open.length === 1 ? ' is' : 's are'} still open (${open.slice(0, 6).map((o) => o.label).join(', ')}${open.length > 6 ? ', …' : ''}) — settle or void ${open.length === 1 ? 'it' : 'them'} on the Tables screen (/tables) first.`;
+}
+
 export const dayCloseDb = {
   all: (): PosDayClose[] => getTable<PosDayClose>(POS_DAY_CLOSE_TABLE),
   forDay: (day: string): PosDayClose | undefined => dayCloseDb.all().find((d) => d.day === day),
   /** Close (or re-close) a day: one record per day, the latest count wins. */
   close: (z: ZReport, openingFloat: number, counted: number, note?: string): PosDayClose => {
     requireAccess('payment.record');
+    const blocker = openOrdersBlocker(z.day); // R3-A
+    if (blocker) throw new Error(blocker);
     const { expected, difference } = drawerCount(z, openingFloat, counted);
     const all = dayCloseDb.all();
     const prev = all.find((d) => d.day === z.day);

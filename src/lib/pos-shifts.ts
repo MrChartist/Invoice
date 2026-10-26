@@ -14,7 +14,7 @@
  */
 import type { InvoiceRecord, Payment } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
-import { zReport, type ZReport } from './pos';
+import { openOrdersBlocker, zReport, type ZReport } from './pos';
 import type { PosReturn } from './pos-returns';
 import { currentActor, requireAccess } from './access';
 import { audit } from './audit';
@@ -103,9 +103,9 @@ export function shiftExpected(z: ZReport, openingFloat: number): number {
   return round2(Math.max(num(openingFloat), 0) + z.tenders.cash - num(z.returns?.refunds.cash));
 }
 
-/** Why a shift cannot be closed now ('' = it can). */
-export function closeBlocker(heldBills: number): string {
-  return heldBills > 0 ? `${heldBills} bill${heldBills === 1 ? ' is' : 's are'} on hold — recall and save or drop ${heldBills === 1 ? 'it' : 'them'} before closing the shift.` : '';
+/** Why a shift cannot be closed now ('' = it can). R3-A: live restaurant orders block it too. */
+export function closeBlocker(heldBills: number, openOrders = ''): string {
+  return heldBills > 0 ? `${heldBills} bill${heldBills === 1 ? ' is' : 's are'} on hold — recall and save or drop ${heldBills === 1 ? 'it' : 'them'} before closing the shift.` : openOrders;
 }
 
 /**
@@ -165,7 +165,7 @@ export const shiftsDb = {
   /** Close with the counted cash; refused while bills are on hold. Returns the closed row. */
   close: (shiftId: string, z: ZReport, counted: number, heldBills: number, note?: string): PosShift => {
     requireAccess('doc.create');
-    const blocker = closeBlocker(heldBills);
+    const blocker = closeBlocker(heldBills, openOrdersBlocker());
     if (blocker) throw new Error(blocker);
     const all = shiftsDb.all();
     const idx = all.findIndex((s) => s.id === shiftId);

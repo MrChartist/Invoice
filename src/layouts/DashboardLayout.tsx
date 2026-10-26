@@ -6,6 +6,7 @@ import {
   BookOpen,
   Boxes,
   ScanBarcode,
+  Store,
   FileDown,
   FilePlus2,
   FileSpreadsheet,
@@ -87,6 +88,7 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
     items: [
       { label: 'nav.newInvoice', path: '/invoice', icon: FilePlus2, end: true, need: 'doc.create' },
       { label: 'nav.pos', path: '/pos', icon: ScanBarcode, need: 'doc.create' },
+      { label: 'nav.tables', path: '/tables', icon: Store, need: 'doc.create' }, // R3-A
       { label: 'nav.invoices', path: '/transactions', icon: FileText, match: (p) => p.startsWith('/transactions') || /^\/invoice\/.+/.test(p) },
       { label: 'nav.clients', path: '/clients', icon: Users },
       { label: 'nav.recurring', path: '/recurring', icon: Repeat, need: 'books.edit' },

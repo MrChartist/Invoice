@@ -333,6 +333,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}write_off_recoveries`]: 'date',
   // R2-B: batch invoice runs (issue date of the run's invoices)
   [`${DB_PREFIX}batch_runs`]: 'date',
+  // R3-A: running table orders, dated by the local day they were opened (`day`, else the `opened_at` date)
+  [`${DB_PREFIX}table_orders`]: (r) => str(r.day) || str(r.opened_at).slice(0, 10) || undefined,
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
