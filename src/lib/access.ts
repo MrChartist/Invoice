@@ -401,6 +401,11 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   qc_results: 'books.edit',
   recall_notices: 'books.edit',
   landed_cost_vouchers: 'books.edit',
+  // R4-B: gift vouchers are sold at the counter (cancel checks doc.deleteIssued itself); store prices are a master;
+  // transfer requests are raised by stores (dispatch / receive check books.edit, approve doc.approve)
+  gift_vouchers: 'doc.create',
+  branch_prices: 'master.edit',
+  transfer_requests: 'doc.create',
 };
 
 let systemDepth = 0;

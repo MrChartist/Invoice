@@ -342,6 +342,9 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}qc_results`]: 'date',
   [`${DB_PREFIX}recall_notices`]: 'date',
   [`${DB_PREFIX}landed_cost_vouchers`]: 'date',
+  // R4-B: gift vouchers (sale / issue date) and transfer requests (request date)
+  [`${DB_PREFIX}gift_vouchers`]: 'issued_on',
+  [`${DB_PREFIX}transfer_requests`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -910,6 +913,9 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   // R4-A: production orders (WO/FY…) and landed-cost vouchers (LCV/FY…)
   [`${DB_PREFIX}production_orders`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}landed_cost_vouchers`]: { num: 'number', date: 'date' },
+  // R4-B: gift vouchers (GV/FY…) and transfer requests (TRQ/FY…)
+  [`${DB_PREFIX}gift_vouchers`]: { num: 'number', date: 'issued_on' },
+  [`${DB_PREFIX}transfer_requests`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

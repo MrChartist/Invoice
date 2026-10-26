@@ -217,6 +217,7 @@ function runBell(force: boolean, setItems: (list: VisibleNotification[]) => void
   ensureProjectAlerts(reload); // R3-B
   ensureR3cAlerts(reload); // R3-C
   ensureProductionAlerts(reload); // R4-A
+  ensureTransferAlerts(reload); // R4-B
 }
 
 /** Coalesces refresh requests into one run on the next task (a forced request wins). */
@@ -252,6 +253,14 @@ function ensureProductionAlerts(onReady: () => void): void {
   if (productionAlerts || !(peekTable('production_orders').length || peekTable<{ kind?: string }>('godowns').some((g) => g?.kind === 'qc'))) return;
   productionAlerts = 1;
   import('../../lib/production/order-alerts').then((m) => { m.registerProductionAlerts(onReady); onReady(); }, () => { productionAlerts = 0; });
+}
+
+// R4-B: goods in transit too long and transfer requests past their needed-by date — lazy, once a request exists.
+let transferAlerts = 0;
+function ensureTransferAlerts(onReady: () => void): void {
+  if (transferAlerts || !peekTable('transfer_requests').length) return;
+  transferAlerts = 1;
+  import('../../lib/retail/transfer-alerts').then((m) => { m.registerTransferAlerts(); onReady(); }, () => { transferAlerts = 0; });
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {

@@ -11,7 +11,7 @@ import { suggest } from '../../lib/suggest';
 import { generateId } from '../../lib/storage';
 import { findByCode } from '../../lib/scan';
 import { parseCounterEntry, searchTermOf } from '../../lib/pos-keys';
-import { fillRest, tenderSummary, type Tender, type TenderMethod } from '../../lib/pos';
+import { fillRest, tenderSummary, type Tender, type TenderMethod, type MoneyTender } from '../../lib/pos';
 import { checkPinWithGuard } from '../../lib/auth';
 import { isLive, lineValue, orderSubtotal, serviceChargeOn, serviceChargePct } from '../../lib/restaurant/tables';
 import { CANCEL_REASONS, sentQty } from '../../lib/restaurant/kot';
@@ -33,7 +33,7 @@ const ModifierPicker = lazy(() => import('./ModifierPicker').then((m) => ({ defa
 const PosReceiptPrint = lazy(() => import('../pos/PosReceiptPrint').then((m) => ({ default: m.PosReceiptPrint })));
 const BillImageShare = lazy(() => import('./BillImageShare').then((m) => ({ default: m.BillImageShare })));
 
-const METHODS: TenderMethod[] = ['Cash', 'UPI', 'Card'];
+const METHODS: MoneyTender[] = ['Cash', 'UPI', 'Card'];
 type Notify = (m: string, tone?: 'success' | 'error' | 'info', opts?: { action?: { label: string; onClick: () => void }; duration?: number }) => void;
 
 export interface MenuItem extends InvoiceItem {
@@ -67,7 +67,7 @@ export function OrderPanel(p: OrderPanelProps) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [tender, setTender] = useState<Record<TenderMethod, number>>({ Cash: 0, UPI: 0, Card: 0, Cheque: 0, Wallet: 0 });
+  const [tender, setTender] = useState<Record<MoneyTender, number>>({ Cash: 0, UPI: 0, Card: 0, Cheque: 0, Wallet: 0 });
   const [settleOpen, setSettleOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [modFor, setModFor] = useState<{ item: MenuItem; groups: ModifierGroup[]; qty?: number } | null>(null);
@@ -239,7 +239,7 @@ export function OrderPanel(p: OrderPanelProps) {
     if (!res.ok || !res.records?.length) return notify(res.errors[0] ?? '', 'error');
     afterSaved(res.records);
   };
-  const fill = (m: TenderMethod) => setTender((t) => ({ ...t, [m]: fillRest(bill?.total ?? 0, METHODS.map((k) => ({ method: k, amount: t[k] })), m) }));
+  const fill = (m: MoneyTender) => setTender((t) => ({ ...t, [m]: fillRest(bill?.total ?? 0, METHODS.map((k) => ({ method: k, amount: t[k] })), m) }));
 
   const payRow = (i: number) => {
     const res = payPayer(order.id, i, { method: payerMethod, amount: 0 }, { day: p.day });
