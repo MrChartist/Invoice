@@ -14,6 +14,7 @@
  */
 
 import { DB_PREFIX, DEVICE_DRAFT_KEYS, DEVICE_LOCAL_KEYS, SYNC_META_KEYS, subscribeStorageChanges } from './storage';
+import { COMPANY_REGISTRY_KEY, activeCompanyId, readRegistry } from './company-registry';
 
 /** Keys that change often without being shared data (autosave draft, PIN session, bookkeeping). */
 const IGNORED = new Set([
@@ -33,9 +34,12 @@ export function isSharedDataKey(key: string | null): boolean {
   return key.startsWith(DB_PREFIX) && !IGNORED.has(key);
 }
 
+/** QA7 G1: another tab made a different company the active one; this tab still holds its own company's data. */
+export const companyMoved = (): boolean => readRegistry().active !== activeCompanyId();
+
 /** Record an external change (exported for tests; the `storage` listener calls it). */
 export function noteExternalChange(key: string | null, now: number = Date.now()): void {
-  if (!isSharedDataKey(key)) return;
+  if (!isSharedDataKey(key) && !(key === COMPANY_REGISTRY_KEY && companyMoved())) return;
   version++;
   changedAt.set(key ?? '*', now);
   for (const fn of listeners) fn();

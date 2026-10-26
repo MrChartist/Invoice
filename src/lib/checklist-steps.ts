@@ -2,14 +2,15 @@
  * R6-A1 setup checklist v3: a business-aware step catalogue. Which steps apply depends on the business type, the
  * active industry packs, the shop-mode modules and the role; whether a step is done is derived from the company's
  * data (so work done on another device counts). Only `skipped` and `hidden_at` are stored, in the company object
- * `mrchartist_inv_setup_progress` (backed up, synced as a singleton, not audited — viewing state).
+ * `mrchartist_inv_setup_progress` (backed up, synced as a singleton, not audited — viewing state): the owner's at the
+ * top level, each clerk's under `byUser[<user id>]` (QA7 G10).
  *
  * Pure catalogue + builder (tests/onboarding.test.ts); `loadSetupProgress` / `saveSetupProgress` do the storage.
  */
 import { PACK_TABS, activePacks, type PackId } from './industry-packs';
 import { enabledModules, type ModuleId } from './shop-mode';
 import { DB_PREFIX, KEYS, getJson, peekTable, readRaw, setJson } from './storage';
-import { currentRole, requireAccess } from './access';
+import { currentActor, currentRole, requireAccess } from './access';
 import { localDb } from './localDb';
 
 export type StepKind =
@@ -61,6 +62,14 @@ export interface ChecklistFactsV3 {
 export interface SetupProgress {
   skipped: string[];
   hidden_at?: string;
+}
+
+/**
+ * The stored object. The top level is the owner's (company-level) state, unchanged since R6-A1; QA7 G10 adds
+ * `byUser`: each clerk's own skips and Hide, keyed by the local user id, so a clerk never changes the owner's card.
+ */
+export interface StoredSetupProgress extends SetupProgress {
+  byUser?: Record<string, SetupProgress>;
 }
 
 export interface ChecklistStepV3 {
@@ -155,13 +164,41 @@ export function normalizeProgress(v: unknown): SetupProgress {
   return typeof o.hidden_at === 'string' && o.hidden_at ? { skipped, hidden_at: o.hidden_at } : { skipped };
 }
 
-export const loadSetupProgress = (): SetupProgress => normalizeProgress(getJson<unknown>(SETUP_PROGRESS_KEY, null));
+/** The whole stored object: the owner's state plus each clerk's (`byUser`, dropped when empty). */
+export function normalizeStored(v: unknown): StoredSetupProgress {
+  const top = normalizeProgress(v);
+  const raw = v && typeof v === 'object' ? (v as StoredSetupProgress).byUser : undefined;
+  const byUser: Record<string, SetupProgress> = {};
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) for (const [id, p] of Object.entries(raw)) if (id) byUser[id] = normalizeProgress(p);
+  return Object.keys(byUser).length ? { ...top, byUser } : top;
+}
 
-/** Skip / un-skip a step, hide / un-hide the card. Clerks may write it (`doc.create`); viewers may not. */
+/** QA7 G10: whose slot this tab reads and writes — a non-owner's own id, else the company level (owner, no PIN). */
+const progressUser = (): string | null => {
+  const actor = currentActor();
+  return actor && actor.role !== 'owner' ? actor.id : null;
+};
+
+const loadStored = (): StoredSetupProgress => normalizeStored(getJson<unknown>(SETUP_PROGRESS_KEY, null));
+
+/** The signed-in user's view: the owner's company-level state, or a clerk's own (empty until they act). */
+export const loadSetupProgress = (): SetupProgress => {
+  const stored = loadStored();
+  const user = progressUser();
+  return user ? (stored.byUser?.[user] ?? { skipped: [] }) : normalizeProgress(stored);
+};
+
+/**
+ * Skip / un-skip a step, hide / un-hide the card. Clerks may write it (`doc.create`); viewers may not. A clerk's
+ * change goes to their own `byUser` slot (QA7 G10); the owner's goes to the top level, as before.
+ */
 export function saveSetupProgress(next: SetupProgress): SetupProgress {
   requireAccess('doc.create');
   const clean = normalizeProgress(next);
-  setJson(SETUP_PROGRESS_KEY, clean);
+  const stored = loadStored();
+  const user = progressUser();
+  const { byUser } = stored;
+  setJson(SETUP_PROGRESS_KEY, user ? { ...normalizeProgress(stored), byUser: { ...byUser, [user]: clean } } : { ...clean, ...(byUser && { byUser }) });
   return clean;
 }
 

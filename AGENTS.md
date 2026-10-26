@@ -55,7 +55,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   lockouts (6.21). Device-local, never in backups. Role checks: `can()` / `requireAccess()` in `src/lib/access.ts`
   (convenience access control, not security); new destructive data-layer calls should call `requireAccess`.
 - `mrchartist_inv_companies` — device-local company registry (6.20); each company is its own IndexedDB database
-  (`mrchartist_inv_kv`, `mrchartist_inv_kv__<id>`) with the same keys inside.
+  (`mrchartist_inv_kv`, `mrchartist_inv_kv__<id>`) with the same keys inside. A tab is pinned to the company whose
+  database it opened (`activeCompanyId()`, QA7 G1): another tab's switch never changes it; the tab shows "This tab is on
+  another company — reload" (`companyMoved()`, `CrossTabNotice`). Entries may carry `demo: true` + `from` (QA7 G2,
+  additive, set only by `demo-company.ts`).
 - Folder sync (5.7, `docs/features/sync.md`): `mrchartist_inv_sync_device` (device-local id/name), and per company
   `sync_state` / `sync_conflicts` / `sync_audit` (`SYNC_META_KEYS`: never in a backup, removed by restore/erase).
 - `mrchartist_inv_lang` — device-local interface language (`en` default / `hi`, 5.4); never in backups. UI strings go
@@ -83,7 +86,8 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   version shown), `mrchartist_feedback_draft` (unsent "Report a problem" draft), `mrchartist_tips_seen` /
   `mrchartist_tips_off` (one-time screen tips). R6-B: `mrchartist_demo_pending` may carry `id|business_type|pack,pack`
   (a plain id still reads).
-- Round 6 company data: `mrchartist_inv_setup_progress` — object `{skipped, hidden_at?}` (R6-A1 setup checklist v3;
+- Round 6 company data: `mrchartist_inv_setup_progress` — object `{skipped, hidden_at?, byUser?}` (R6-A1 setup checklist v3;
+  top level = the owner's; QA7 G10 `byUser[<local user id>]` = each clerk's own skips / Hide;
   backed up, synced as a singleton, not audited, `TABLE_ACTIONS` `doc.create`; done-ness is derived from data).
   R6-C3 table `import_runs` (one row per import run of every kind; backed up, synced, audited, in `TABLE_ACTIONS` and the
   open-export schema; the checklist's import step reads it). R6-C4 compliance rows carry `downloaded_at` (portal file
@@ -177,6 +181,12 @@ build-time config must use Vite's `VITE_` prefix.
 - Version (Round 6): `__APP_VERSION__` comes from `package.json`; **the newest `WHATS_NEW` entry
   (`src/lib/whats-new.ts`) must match the package.json version** (`scripts/check-whats-new.mjs` fails `postbuild`).
 - Sample data goes only into the separate Demo company (`startDemoCompany` / `SampleDataChooser`), never a real one.
+  The Demo company is identified by a durable marker, never by its name (QA7 G1/G2): `demo: true` on its registry entry
+  AND `settings.demo_company: true` inside its own database, both written only by `demo-company.ts`. `loadDemoData`
+  refuses (`not_demo_company`) unless `demoDatabaseOpen()` — `confirm` never bypasses it. The Demo company does not count
+  as one of the user's companies (`realCompanies()`: Practice desk, All companies search).
+- Dialogs (QA7 G3): every `Modal` registers in `src/lib/modal-stack.ts`; only the top one acts on Escape / Tab, and F1
+  does nothing while an `[aria-modal]` dialog is open.
 - Every lucide icon lands in the first-paint `vendor-ui` chunk: reuse an icon that is already imported somewhere
   instead of adding a new name.
 - `/practice` reads other companies' databases through `peekCompliance` (`company-peek.ts`): a version-less,

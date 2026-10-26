@@ -17,6 +17,9 @@
  *    un-marked rows) and the demo rows are inserted explicitly.
  *  - Loading refuses when real invoices exist unless the caller passes `confirm: true`, and is
  *    idempotent: a second load changes nothing.
+ *  - QA7 G1/G2: loading refuses outright unless this tab's open database is the Demo company
+ *    (`demoDatabaseOpen`: `settings.demo_company` plus the registry entry's `demo` flag, both written only by
+ *    `demo-company.ts`).
  *
  * R6-B4: a dataset per business profile (`DemoProfile`). The trading set above is the base of every profile; the
  * profile modules in `src/lib/demo/` add their own rows (`DemoExtras`: POS bills and a shift, time and a retainer,
@@ -38,6 +41,7 @@ import { PAYMENTS_TABLE, PURCHASES_TABLE, computePurchaseTotals, type PurchasePa
 import { VENDORS_TABLE } from './vendors';
 import { RECURRING_TABLE, createSchedule, templateFromInvoice, type RecurringSchedule } from './recurring';
 import { REMINDERS_TABLE } from './reminders';
+import { activeCompanyId, readRegistry } from './company-registry';
 
 /** Marker carried by every demo row. */
 export type Demo<T> = T & { demo?: true };
@@ -101,7 +105,7 @@ export interface DemoStatus {
 
 export type DemoLoadResult =
   | { ok: true; counts: DemoCounts }
-  | { ok: false; reason: 'already_loaded' | 'has_real_data'; realInvoices?: number };
+  | { ok: false; reason: 'already_loaded' | 'has_real_data' | 'not_demo_company'; realInvoices?: number };
 
 /* ── Deterministic building blocks ────────────────────────────── */
 
@@ -556,7 +560,18 @@ function putBinSnapshot(snap: ReturnType<typeof binSnapshot>): void {
   }
 }
 
+/**
+ * QA7 G1/G2: the database THIS tab has open is the app-made Demo company: its own marker (`settings.demo_company`)
+ * and the creator's flag on its registry entry. Never a name, never the live registry's `active` (another tab's).
+ */
+export function demoDatabaseOpen(): boolean {
+  const here = activeCompanyId();
+  return localDb.settings.get().demo_company === true && readRegistry().list.some((c) => c.id === here && c.demo);
+}
+
 export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
+  // QA7 G1/G2: samples go only into the Demo company's own database; `confirm` never bypasses this.
+  if (!demoDatabaseOpen()) return { ok: false, reason: 'not_demo_company' };
   const status = demoStatus();
   if (status.loaded) return { ok: false, reason: 'already_loaded' };
   if (status.realInvoices > 0 && !opts.confirm) {

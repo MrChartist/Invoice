@@ -182,7 +182,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   qc_settings: 'QC hold settings.',
   gift_voucher_settings: 'Gift voucher settings.',
   bin_settings: 'Recycle bin retention.',
-  setup_progress: 'Setup checklist: skipped steps and when the card was hidden.',
+  setup_progress: 'Setup checklist: skipped steps and when the card was hidden (the owner at the top level, each clerk under byUser).',
   hotel_settings: 'Hotel settings: business date, times, SAC codes, premises declarations.', // R7
 };
 

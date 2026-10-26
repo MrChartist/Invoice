@@ -27,7 +27,10 @@ export const FEEDBACK_CONTACT: { readonly whatsapp: string; readonly email: stri
 /** Device-local unsent draft (`try / catch` around every read / write). */
 export const FEEDBACK_DRAFT_KEY = 'mrchartist_feedback_draft';
 
-/** WhatsApp / mailto bodies are kept under this many characters (long URLs fail on some phones). */
+/**
+ * WhatsApp / mailto bodies are kept under this many characters ONCE ENCODED for the link (QA7 G5: a space is 3
+ * characters there and a Devanagari letter 9; long URLs fail on some phones).
+ */
 export const SHARE_CAP = 1800;
 
 const KIND_TEXT: Record<FeedbackKind, string> = { problem: 'Problem', idea: 'Idea', question: 'Question' };
@@ -53,25 +56,41 @@ export function composeFeedback(d: FeedbackDraft, diagnostics: string): string {
   return `${composeTyped(d)}\n\n${diagnostics}`.trim();
 }
 
+/** Lone UTF-16 surrogates (a half emoji pasted in) become U+FFFD, so `encodeURIComponent` never throws. */
+export const wellFormed = (s: string): string =>
+  s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+
+/** Length of `s` inside a link (`encodeURIComponent`); the text is well-formed by then. */
+export const encodedLength = (s: string): number => encodeURIComponent(s).length;
+
 /**
- * Text for a WhatsApp / e-mail link: the full text when it fits `cap`, else the typed part with the diagnostics
- * shortened first (line by line from the end) and a note that the full report was copied.
+ * Text for a WhatsApp / e-mail link: the full text when its ENCODED length fits `cap` (QA7 G5), else the typed part
+ * with the diagnostics shortened line by line from the end and a note that the full report was copied. When the
+ * typed part alone is too long it is cut by code points (QA7 G4: never inside an emoji's surrogate pair).
  */
 export function capForShare(d: FeedbackDraft, diagnostics: string, cap = SHARE_CAP): { text: string; shortened: boolean } {
-  const full = composeFeedback(d, diagnostics);
-  if (full.length <= cap) return { text: full, shortened: false };
+  const typed = wellFormed(composeTyped(d));
+  const full = wellFormed(`${typed}\n\n${diagnostics}`.trim()); // = composeFeedback, scrubbed once
+  if (encodedLength(full) <= cap) return { text: full, shortened: false };
   const note = '\n… (diagnostics shortened — the full report was copied; paste it below)';
-  const typed = composeTyped(d);
-  const room = cap - typed.length - note.length - 2;
-  if (room <= 0) return { text: (typed.slice(0, cap - note.length - 1) + '…' + note).slice(0, cap), shortened: true };
-  const kept: string[] = [];
-  let used = 0;
-  for (const line of diagnostics.split('\n')) {
-    if (used + line.length + 1 > room) break;
-    kept.push(line);
-    used += line.length + 1;
+  const lines = wellFormed(diagnostics).split('\n');
+  while (lines.length > 1) {
+    lines.pop();
+    const text = `${typed}\n\n${lines.join('\n')}${note}`;
+    if (encodedLength(text) <= cap) return { text, shortened: true };
   }
-  return { text: `${typed}\n\n${kept.join('\n')}${note}`, shortened: true };
+  if (encodedLength(typed + note) <= cap) return { text: typed + note, shortened: true };
+  // The typed part alone is too long: its longest code-point prefix that fits (binary search).
+  const chars = Array.from(typed);
+  const fits = (n: number) => encodedLength(chars.slice(0, n).join('') + '…' + note) <= cap;
+  let lo = 0;
+  let hi = chars.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (fits(mid)) lo = mid;
+    else hi = mid - 1;
+  }
+  return { text: chars.slice(0, lo).join('') + '…' + note, shortened: true };
 }
 
 export const subjectFor = (d: FeedbackDraft): string => `Mr. Chartist Invoice beta — ${KIND_TEXT[d.kind]}${d.area ? `: ${scrubTyped(d.area)}` : ''}`;
