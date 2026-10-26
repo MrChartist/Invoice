@@ -120,6 +120,10 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   fees: '/recurring?tab=fees',
   nonprofit: '/receivables?tab=donations',
   leases: '/recurring?tab=leases',
+  // R8-C: trading packs
+  distributor: '/distribution?tab=claims',
+  commodity: '/distribution?tab=mandi',
+  agency: '/distribution?tab=agency',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

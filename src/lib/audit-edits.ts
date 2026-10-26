@@ -26,7 +26,10 @@ export interface WatchedTable {
   label: string;
 }
 
-/** Books / masters tables whose every row change reaches the audit log. */
+/**
+ * Books / masters tables whose every row change reaches the audit log. R8-C: the Round 8 tables are added at runtime
+ * by `src/lib/trade/tr-registry.ts` (lazy; this map ships with first paint).
+ */
 export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   transactions: { entity: 'payment', label: 'Receipt' },
   clients: { entity: 'client', label: 'Client' },

@@ -8,6 +8,7 @@
 
 import type {} from '../types/docs-r3'; // R3-C2: delivery_proof (RECORD_KEYS)
 import type {} from '../types/trade-r4'; // R4-C1: export document fields (RECORD_KEYS)
+import type {} from '../types/trade-r8'; // R8: trading record / line fields (R8_RECORD_KEYS, R8_LINE_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -157,6 +158,13 @@ export function advancedTaxDefaults(): Partial<InvoiceRecord> {
   };
 }
 
+/**
+ * R8-C (shared for TR-A / TR-B / TR-C, src/types/trade-r8.ts): additive record and line keys, kept as stored when
+ * present (snapshots — never recomputed here).
+ */
+export const R8_RECORD_KEYS = ['cash_discount', 'price_drop_id', 'interest_run_id', 'broker_id', 'agency'] as const;
+export const R8_LINE_KEYS = ['disc_chain', 'disc_per_unit', 'wt', 'charge_head_id', 'arrival_id'] as const;
+
 function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
   const item = (raw ?? {}) as Partial<InvoiceItem>;
   const quantity = num(item.quantity, 1);
@@ -200,6 +208,7 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(num(item.unit_factor) > 0 && num(item.unit_factor) !== 1 ? { unit_factor: num(item.unit_factor) } : {}),
     // R3-C2 (additive): the catalogue photo reference the line snapshotted at save.
     ...(typeof item.image === 'string' && item.image.startsWith('asset:') ? { image: item.image } : {}),
+    ...Object.fromEntries(R8_LINE_KEYS.filter((k) => item[k] != null).map((k) => [k, item[k]])), // R8-C
   };
 }
 
@@ -328,6 +337,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(typeof r.fee_plan_id === 'string' ? { fee_plan_id: r.fee_plan_id, fee_instalment: r.fee_instalment as number } : {}),
     // R5-B (additive): freight-bill LRs, RA bill number / deductions / retention day, BOQ terms survive an edit.
     ...Object.fromEntries(R5B_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])),
+    ...Object.fromEntries(R8_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])), // R8-C
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

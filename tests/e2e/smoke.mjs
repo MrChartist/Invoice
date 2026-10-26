@@ -2859,6 +2859,69 @@ try {
     const runs = await readJson(page, 'import_runs', [], (v) => v.some((r) => r.kind === 'ledgers'));
     check(runs.some((r) => r.kind === 'ledgers'), 'the import run is recorded');
   });
+  await step('R8-C trade profile + agency: Wholesale → Commission agent, an arrival of 80 bags, an agency sale from the lot, a bikri patti with its net payable; Ctrl+K "patti"; F1 help', async () => {
+    const keys = ['settings', 'vendors', 'clients', 'invoices', 'arrivals', 'sale_pattis', 'godowns', 'vouchers', 'accounts', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, business_type: 'wholesale', modules: undefined, industry_packs: undefined, trade_kind: undefined, lock_until: undefined });
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-trade-kind-card="agent"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.trade_kind === 'agent');
+    check(st.trade_kind === 'agent' && st.business_type === 'wholesale' && st.industry_packs?.includes('agency') && !st.modules?.includes('pos'), 'Commission agent: wholesale, agency + commodity packs, no POS module');
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-farmer', name: 'E2E Ram Singh', principal_kind: 'agriculturist' }]);
+    await page.goto(srv.origin + '/distribution?tab=agency');
+    await page.locator('[data-agency-tab]').waitFor({ timeout: 15000 });
+    check((await page.locator('a[href="/pos"]').count()) === 0, 'the sidebar has no POS entry');
+    await page.locator('[data-arrival-form] summary').click();
+    await page.locator('[data-arrival-principal]').selectOption('e2e-farmer');
+    await page.locator('[data-arrival-lot]').fill('E2E-L1');
+    await page.locator('[data-arrival-item]').fill('E2E Mustard');
+    await page.locator('[data-arrival-packages]').fill('80');
+    await page.locator('[data-arrival-qty]').fill('40');
+    await page.locator('[data-arrival-save]').click();
+    const arrivals = await readJson(page, 'arrivals', [], (v) => v.some((a) => a.lot_no === 'E2E-L1'));
+    const arr = arrivals.find((a) => a.lot_no === 'E2E-L1');
+    const godowns = await readJson(page, 'godowns', []);
+    check(/^ARR\/FY\d{2}-\d{2}\/\d+$/.test(arr?.number ?? '') && godowns.some((g) => g.id === arr.godown_id && g.kind === 'consignment'), `arrival ${arr?.number} in the consignment godown`);
+    // The editor offers the lot on a sale line (the sale itself is saved directly; the editor flow is covered above).
+    await page.goto(srv.origin + '/invoice');
+    const picker = page.locator('[data-lot-picker="0"]');
+    await picker.waitFor({ timeout: 15000 });
+    check((await picker.locator('option', { hasText: 'E2E-L1' }).count()) === 1, 'the editor line offers the lot');
+    const buyer = { id: 'e2e-buyer', name: 'E2E Grain Buyer', email: '', address: 'Jaipur', city: 'Jaipur', zip: '', state_code: '08' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), buyer]);
+    const sale = {
+      id: 'e2e-agency-sale', invoice_number: 'INV/E2E/AG1', doc_type: 'INVOICE', issue_date: arr.date, due_date: arr.date, status: 'Sent', currency: 'INR', template_id: 'classic_orange', client: buyer, sender: (settings.profiles ?? [])[0] ?? null,
+      items: [{ id: 'e2e-ag-l1', name: 'E2E Mustard', type: 'Goods', hsn: '1207', unit: 'QTL', quantity: 25, rate: 5800, tax_rate: 0, discount_percent: 0, amount: 145000, arrival_id: arr.id, godown_id: arr.godown_id }],
+      gst_mode: 'CGST_SGST', place_of_supply: '08', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false, amount_paid: 0, agency: true,
+      subtotal: 145000, discount_amount: 0, taxable_value: 145000, cgst_amount: 0, sgst_amount: 0, igst_amount: 0, tax_amount: 0, round_off: 0, total: 145000, balance_due: 145000,
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), sale]);
+    await page.goto(srv.origin + '/distribution?tab=agency&view=pattis');
+    await page.locator('[data-patti-principal]').selectOption('e2e-farmer', { timeout: 15000 });
+    await page.locator('[data-patti-lot="E2E-L1"]').check();
+    await page.locator('[data-patti-rate="0"]').fill('2.5');
+    await page.locator('[data-patti-make]').click();
+    const pattis = await readJson(page, 'sale_pattis', [], (v) => v.some((p) => p.principal_id === 'e2e-farmer'));
+    const pt = pattis.find((p) => p.principal_id === 'e2e-farmer');
+    check(pt?.gross === 145000 && pt?.net_payable === 141375, `patti ${pt?.number}: gross ₹1,45,000 less aadat 2.5% = ₹1,41,375 (${pt?.net_payable})`);
+    await page.locator(`[data-patti="${pt.number}"] [data-patti-view]`).click();
+    const print = await page.locator('[data-patti-print]').innerText();
+    check(/Net payable/.test(print) && /1,41,375/.test(print), 'the patti print shows the net payable');
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('patti');
+    await palette.getByRole('option', { name: /Bikri patti/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "patti" finds Agency → Bikri patti');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help="distribution:agency:pattis"]').waitFor({ timeout: 15000 });
+    check(true, 'Help opens on the Bikri patti topic');
+    await page.keyboard.press('Escape');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

@@ -8,7 +8,7 @@ import { distT } from '../i18n/areas/distribution';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import own from '../components/distribution/dist.module.css';
-import { visibleTabs } from '../lib/industry-packs'; // R5-B
+import { visiblePackTabs } from '../lib/industry-packs'; // R5-B, R8-C (alsoPacks)
 import { localDb } from '../lib/localDb';
 import { defineArea } from '../i18n/area';
 import { DISTRIBUTION_TABS, type DistributionTab } from './page-tabs'; // R6-B1
@@ -16,6 +16,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { LearnMore, distributionEmpty } from '../components/discover';
 import { getTable } from '../lib/storage';
 import { discoverT } from '../i18n/areas/discover-r6';
+import { trT as r8T } from '../i18n/areas/trade-r8c';
 
 const DistMasters = lazy(() => import('../components/distribution/DistMasters'));
 const DistReports = lazy(() => import('../components/distribution/DistReports'));
@@ -25,16 +26,24 @@ const CreditPolicyCard = lazy(() => import('../components/distribution/CreditPol
 // R5-B: transport pack (LRs, freight bills, trips, vehicles, GTA option) — listed only with the pack on; its URL still opens it.
 const TransportTab = lazy(() => import('../components/transport/TransportTab'));
 const trT = defineArea({ tab: 'Transport' } as const, { tab: 'ट्रांसपोर्ट' });
+// R8: trading packs (A: claims, packaging; B: mandi, brokers; C: agency). Listed only with a pack on; URLs still open.
+const ClaimsTab = lazy(() => import('../components/trade/ClaimsTab'));
+const PackagingTab = lazy(() => import('../components/trade/PackagingTab'));
+const MandiTab = lazy(() => import('../components/trade/MandiTab'));
+const BrokersTab = lazy(() => import('../components/trade/BrokersTab'));
+const AgencyTab = lazy(() => import('../components/trade/AgencyTab'));
+const R8_TABS: ReadonlySet<string> = new Set(['claims', 'packaging', 'mandi', 'brokers', 'agency']);
 
 type Tab = DistributionTab;
 const TABS = DISTRIBUTION_TABS; // R6-B1: list in distribution-tabs.ts
+const IDS: readonly string[] = TABS.map((t) => t.id);
 
 /** Distribution (8F): areas / beats / routes, salesman reports, beat plan, van sales, order-pad import, credit control. */
 export function Distribution() {
   useT();
   const [params, setParams] = useSearchParams();
   const asked = params.get('tab') as Tab | null;
-  const [tab, setTabState] = useState<Tab>(asked && TABS.includes(asked) ? asked : 'masters');
+  const [tab, setTabState] = useState<Tab>(asked && IDS.includes(asked) ? asked : 'masters');
   const { notify, toastNode } = useToast();
   const setTab = (t: Tab) => {
     setTabState(t);
@@ -43,7 +52,7 @@ export function Distribution() {
     setParams(next, { replace: true });
   };
   const onDone = (msg: string, error?: boolean) => notify(msg, error ? 'error' : undefined);
-  const shown = useMemo(() => visibleTabs(TABS.map((id) => ({ id, ...(id === 'transport' ? { pack: 'transport' as const } : {}) })), localDb.settings.get(), tab), [tab]);
+  const shown = useMemo(() => visiblePackTabs(TABS, localDb.settings.get(), tab), [tab]);
   return (
     <div className={surface.page} data-distribution>
       <PageHeader
@@ -55,7 +64,7 @@ export function Distribution() {
         <div className={controls.segment} role="tablist" aria-label={distT('title')}>
           {shown.map(({ id: t }) => (
             <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(t)}>
-              {t === 'transport' ? trT('tab') : distT(`tab_${t}`)}
+              {t === 'transport' ? trT('tab') : R8_TABS.has(t) ? r8T(`tab.${t}` as 'tab.agency') : distT(`tab_${t as 'masters'}`)}
             </button>
           ))}
         </div>
@@ -84,6 +93,11 @@ export function Distribution() {
               {tab === 'orders' && <DistOrders onDone={onDone} />}
               {tab === 'credit' && <CreditPolicyCard onDone={onDone} />}
               {tab === 'transport' && <TransportTab onDone={onDone} />}
+              {tab === 'claims' && <ClaimsTab onDone={onDone} />}
+              {tab === 'packaging' && <PackagingTab onDone={onDone} />}
+              {tab === 'mandi' && <MandiTab onDone={onDone} />}
+              {tab === 'brokers' && <BrokersTab onDone={onDone} />}
+              {tab === 'agency' && <AgencyTab onDone={onDone} />}
             </Suspense>
           </div>
         </section>

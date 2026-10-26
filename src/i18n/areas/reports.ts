@@ -18,6 +18,7 @@ export const repT = defineArea(
     tabExpenses: 'Expenses',
     tabProfit: 'Item profit',
     tabParty: 'Party profit',
+    tabStockStatement: 'Bank stock statement', // R8-C (TR-C4)
 
     statNetSales: 'Net sales',
     statNetSalesHint: 'excl. GST, net of credit notes',
@@ -187,6 +188,7 @@ export const repT = defineArea(
     tabExpenses: 'खर्च',
     tabProfit: 'आइटम मुनाफ़ा',
     tabParty: 'पार्टी मुनाफ़ा',
+    tabStockStatement: 'बैंक स्टॉक विवरण',
 
     statNetSales: 'शुद्ध बिक्री',
     statNetSalesHint: 'GST के बिना, क्रेडिट नोट घटाकर',

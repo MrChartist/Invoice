@@ -59,6 +59,7 @@ import {
   type SyncKey,
 } from './sync-files';
 import type { AuditEntry } from '../types/audit';
+import './trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -370,6 +371,17 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}ra_measurements`]: 'date',
   // R6-C3: import runs (the day the file was imported)
   [`${DB_PREFIX}import_runs`]: (r) => str(r.at).slice(0, 10) || undefined,
+  // R8-A: trade claims, price-drop runs, interest runs, packaging movements
+  [`${DB_PREFIX}trade_claims`]: 'date',
+  [`${DB_PREFIX}price_drops`]: 'date',
+  [`${DB_PREFIX}interest_runs`]: 'date',
+  [`${DB_PREFIX}packaging_moves`]: 'date',
+  // R8-B: brokerage postings (period end)
+  [`${DB_PREFIX}brokerage_postings`]: 'to',
+  // R8-C: arrivals, bikri pattis, indents
+  [`${DB_PREFIX}arrivals`]: 'date',
+  [`${DB_PREFIX}sale_pattis`]: 'date',
+  [`${DB_PREFIX}indents`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -946,6 +958,13 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   // R5-B: consignment notes (LR/FY…) and trip sheets (TRP/FY…)
   [`${DB_PREFIX}consignment_notes`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}trips`]: { num: 'number', date: 'start_date' },
+  // R8-A: trade claims (TCL/FY…) and price-drop runs (PDR/FY…)
+  [`${DB_PREFIX}trade_claims`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}price_drops`]: { num: 'number', date: 'date' },
+  // R8-C: arrivals (ARR/FY…), bikri pattis (PAT/FY…), indents (IND/FY…)
+  [`${DB_PREFIX}arrivals`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}sale_pattis`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}indents`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

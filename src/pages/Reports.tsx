@@ -51,6 +51,7 @@ import { discoverT } from '../i18n/areas/discover-r6';
 import controls from '../styles/controls.module.css';
 
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+const StockStatementTab = lazy(() => import('../components/trade/StockStatementTab')); // R8-C (TR-C4)
 
 // 8.109: saved views + month-end packs (own chunk).
 const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
@@ -252,6 +253,7 @@ export function Reports() {
         {tab === 'expenses' && <ExpensesTab rep={expenses} period={period} />}
         {tab === 'profit' && <ItemProfitTab rep={itemProfit} period={period} />}
         {tab === 'party' && <PartyProfitTab rep={partyProfit} period={period} />}
+        {tab === 'stockstatement' && <Suspense fallback={null}><StockStatementTab /></Suspense>}
       </div>
 
       <CrossChecks checks={checks} />

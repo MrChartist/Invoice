@@ -463,6 +463,12 @@ const RECORD_TABLES = [
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
   // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
   'import_runs',
+  // Round 8 (R8-A): party rates, trade claims, price-drop runs, interest runs, packaging types / moves
+  'party_rates', 'trade_claims', 'price_drops', 'interest_runs', 'packaging_types', 'packaging_moves',
+  // Round 8 (R8-B): bill-charge heads, brokerage postings
+  'trade_charge_heads', 'brokerage_postings',
+  // Round 8 (R8-C): arrivals, bikri pattis, indents
+  'arrivals', 'sale_pattis', 'indents',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -523,6 +529,12 @@ const ID_TABLES = new Set([
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
   // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
   'import_runs',
+  // Round 8 (R8-A): party rates, trade claims, price-drop runs, interest runs, packaging types / moves
+  'party_rates', 'trade_claims', 'price_drops', 'interest_runs', 'packaging_types', 'packaging_moves',
+  // Round 8 (R8-B): bill-charge heads, brokerage postings
+  'trade_charge_heads', 'brokerage_postings',
+  // Round 8 (R8-C): arrivals, bikri pattis, indents
+  'arrivals', 'sale_pattis', 'indents',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

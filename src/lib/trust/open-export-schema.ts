@@ -167,6 +167,13 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   ra_measurements: 'RA bill measurements per BOQ line.',
   boq_coefficients: 'Material per BOQ unit (theoretical consumption).',
   import_runs: 'One row per import of suppliers, ledgers or opening balances (R6-C3).',
+  // R8-A: distributor pricing, claims, collections
+  party_rates: 'Party-item special rates and discounts.', trade_claims: 'Scheme and price-protection claims to principals.', price_drops: 'Price-drop note runs.',
+  interest_runs: 'Interest-on-overdue runs.', packaging_types: 'Returnable packaging types (crates, bardana).', packaging_moves: 'Returnable packaging given / taken back per party.',
+  // R8-B: commodity and mandi trade
+  trade_charge_heads: 'Bill-charge heads (market fee, aadat, hamali …).', brokerage_postings: 'Brokerage postings per broker and period.',
+  // R8-C: agents
+  arrivals: 'Arrivals of principals\' goods (agency lots).', sale_pattis: 'Bikri pattis (settlements to principals).', indents: 'Indent register.',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',
@@ -179,6 +186,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   gift_voucher_settings: 'Gift voucher settings.',
   bin_settings: 'Recycle bin retention.',
   setup_progress: 'Setup checklist: skipped steps and when the card was hidden (the owner at the top level, each clerk under byUser).',
+  interest_settings: 'Interest-on-overdue defaults (R8-A).', bank_statement_settings: 'Bank stock-statement terms per bank account (R8-C).', tds_settings: 'TDS settings: our turnover per FY for 194Q (R8-C).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

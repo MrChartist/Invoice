@@ -94,6 +94,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     ra_net_payable: 1130, retention_release_on: '2027-06-30', boq_terms: { deductions: [{ kind: 'retention', rate: 5 }], dlp_months: 12, work_order: 'WO/1' },
     // R5-C1 fee plan / instalment
     fee_plan_id: 'fp1', fee_instalment: 2,
+    // R8 (src/types/trade-r8.ts)
+    cash_discount: { percent: 2, days: 7 }, price_drop_id: 'pd1', interest_run_id: 'ir1', broker_id: 'b1', agency: true,
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

@@ -230,7 +230,9 @@ export function requireAccess(action: AccessAction): void {
 /** Payroll tables (review L1): a write is a books change AND needs payroll access, like the payroll APIs. */
 const PAYROLL_WRITE: readonly AccessAction[] = ['books.edit', 'payroll.view'];
 
-const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessAction[]>> = {
+// R8-C: exported so the Round 8 tables register their rights from `src/lib/trade/tr-registry.ts` (a lazy chunk —
+// this map ships with first paint).
+export const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessAction[]>> = {
   // masters
   items_catalog: 'master.edit',
   clients: 'master.edit',

@@ -53,6 +53,8 @@ import { INVENTORY_TABS, type InventoryTab } from './page-tabs'; // R6-B1
 import { discoverT } from '../i18n/areas/discover-r6';
 
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+const HsnStockTab = lazy(() => import('../components/trade/HsnStockTab')); // R8-C (TR-C4)
+import { trT } from '../i18n/areas/trade-r8c';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
@@ -132,6 +134,7 @@ export function Inventory() {
     ...(showSerials ? [['serials', invT('tabSerials')]] : []),
     ['query', imT('tabQuery')], ['orders', imT('tabOrders')],
     ['analysis', skT('tabAnalysis')], ['depth', skT('tabDepth')], ...(showBatches ? [['expiry', skT('tabExpiry')]] : []),
+    ['hsn', trT('hsnTitle')], // R8-C (TR-C4)
   ] as [Tab, string][]);
   // Stock groups / categories (WP-8): filters appear once any exist.
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -521,6 +524,8 @@ export function Inventory() {
                 {activeTab === 'orders' && <OrdersOutstandingTab version={version} today={today} />}
               </Suspense>
             )}
+
+            {activeTab === 'hsn' && <Suspense fallback={null}><HsnStockTab today={today} /></Suspense>}
 
             {(activeTab === 'analysis' || activeTab === 'depth' || activeTab === 'expiry') && (
               <Suspense fallback={null}>
