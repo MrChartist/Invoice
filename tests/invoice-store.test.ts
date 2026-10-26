@@ -43,7 +43,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     id: 'x1', invoice_number: 'INV/FY26-27/0042', doc_type: 'QUOTATION', issue_date: '2026-04-10', due_date: '2026-04-20',
     status: 'Sent', currency: 'INR', template_id: 'minimal_clean', gst_mode: 'IGST', place_of_supply: '29', reverse_charge: true,
     discount_type: 'FLAT', discount_rate: 5, tax_rate: 0, shipping: 10, other_charges: 2, round_off_enabled: true, amount_paid: 1,
-    notes: 'n', terms: 't', po_number: 'PO1', recurring_id: 'r1', recurring_date: '2026-04-10', supply_type: 'B2B', lut_number: 'L',
+    notes: 'n', terms: 't', po_number: 'PO1', recurring_id: 'r1', recurring_date: '2026-04-10', batch_run_id: 'run1', supply_type: 'B2B', lut_number: 'L',
     lut_date: '2026-01-01', price_includes_tax: true, round_mode: 'up', tcs_enabled: true, tcs_rate: 1, tcs_base: 'taxable',
     tcs_label: 'TCS x', tds_enabled: true, tds_section: '194C-1', tds_rate: 1, tds_on_taxable: false, quote_status: 'Declined',
     ship_to: { name: 'WH', address: 'A', city: 'C', zip: '400001', state_code: '27' }, charges_taxable: true, exchange_rate: 83.25,

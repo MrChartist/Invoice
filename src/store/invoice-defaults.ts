@@ -344,6 +344,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     po_number: r.po_number ?? '',
     recurring_id: r.recurring_id,
     recurring_date: r.recurring_date,
+    batch_run_id: r.batch_run_id,
 
     subtotal: num(r.subtotal),
     discount_amount: num(r.discount_amount),

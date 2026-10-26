@@ -113,3 +113,17 @@ test('ageing alert after N days (default 3); settings are owner-only and audited
   saveQcSettings({ hold_all: true, alert_days: 7 });
   assert.deepEqual(loadQcSettings(), { hold_all: true, alert_days: 7 });
 });
+
+test('QA5-2 F9: stock in transit (R4-B transit godown) is not available, and a no-godown sale cannot draw on it', async () => {
+  const { ensureTransitGodown } = await import('../src/lib/retail/transfer-requests.ts');
+  stockDb.saveItem(blankStockItem({ id: 'lamp', name: 'Lamp', opening_qty: 5 }));
+  const shop = godownsDb.save({ name: 'Mall' });
+  const transit = ensureTransitGodown(shop.id);
+  assert.equal(transit.kind, 'transit');
+  transfersDb.save({ date: '2026-05-10', from_godown: 'main', to_godown: transit.id, lines: [{ id: 't1', item_id: 'lamp', qty: 4 }] });
+  const lamp = getStockLevel('Lamp', undefined, liveHeldStock())!;
+  assert.deepEqual([lamp.qty, lamp.held], [1, 4], 'only the 1 left in Main is for sale');
+  const sale = { doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: '2026-05-10', items: [{ id: 'x', name: 'Lamp', quantity: 2, rate: 500 }] };
+  assert.ok(liveDocTrackingIssues(sale as never).errors.some((e) => /Lamp/.test(e) && /transit/i.test(e)), JSON.stringify(liveDocTrackingIssues(sale as never)));
+  assert.deepEqual(liveDocTrackingIssues({ ...sale, items: [{ id: 'y', name: 'Lamp', quantity: 1, rate: 500 }] } as never).errors, []);
+});
