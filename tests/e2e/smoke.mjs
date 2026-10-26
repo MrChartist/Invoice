@@ -1687,6 +1687,74 @@ try {
     check(/1,20,000\.00/.test(row ?? '') && /10,000\.00/.test(row ?? ''), `budget vs actual row (${row})`);
   });
 
+  await step('R3-B: project with an hours budget → log time on its task → bill the project with the timesheet annexure → print', async () => {
+    await page.goto(srv.origin + '/time?tab=projects');
+    await page.locator('[data-new-project]').click();
+    const pdlg = page.getByRole('dialog', { name: 'New project' });
+    await pdlg.locator('#pj-name').fill('Mobile app');
+    await pdlg.locator('#pj-client').selectOption({ label: 'Acme Buyers' });
+    await pdlg.locator('#pj-hours').fill('2');
+    await pdlg.locator('[data-save-project]').click();
+    await pdlg.waitFor({ state: 'detached' });
+    const centres = await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'Mobile app'));
+    const proj = centres.find((c) => c.name === 'Mobile app');
+    check(proj?.budget_minutes === 120 && proj?.kind === 'project', `project stored with a 2 h budget (${proj?.budget_minutes})`);
+    await page.locator('[data-project-select]').selectOption(proj.id);
+    await page.locator('[data-add-task]').click();
+    const tdlg = page.getByRole('dialog', { name: 'Add task' });
+    await tdlg.locator('#tk-title').fill('Wireframes');
+    await tdlg.locator('#tk-est').fill('1');
+    await tdlg.locator('[data-save-task]').click();
+    await tdlg.waitFor({ state: 'detached' });
+    await page.locator('[data-task-id]').filter({ hasText: 'Wireframes' }).waitFor();
+
+    // Log 1:45 on the task: picking the task sets the project.
+    await page.getByRole('button', { name: /Add time/ }).click();
+    await page.locator('#te-client').selectOption({ label: 'Acme Buyers' });
+    await page.locator('#te-task').selectOption({ label: 'Wireframes' });
+    await page.getByLabel('Description').fill('Wireframes v1');
+    await page.getByLabel('Time (h:mm)').fill('1:45');
+    await page.getByLabel('Rate / hour').fill('1200');
+    await page.getByRole('button', { name: 'Add entry' }).click();
+    const logged = await readJson(page, 'time_entries', [], (v) => v.some((e) => e.description === 'Wireframes v1'));
+    const te = logged.find((e) => e.description === 'Wireframes v1');
+    check(!!te?.task_id && te?.cost_centre_id === proj?.id, `entry carries the task and its project (${te?.cost_centre_id === proj?.id})`);
+    await page.reload();
+    await page.locator('[data-project-select]').selectOption(proj.id);
+    const header = await page.locator('[data-project-header]').innerText();
+    check(/1h 45m of 2h 00m/.test(header) && /87% of the hours budget/.test(header), `header: tracked vs budget and the 80% warning (${header.replace(/\s+/g, ' ').slice(0, 120)})`);
+
+    // Bill the project with the annexure.
+    await page.locator('[data-bill-project]').click();
+    await page.locator('[data-attach-annexure]').check();
+    await page.getByRole('button', { name: 'Create draft invoice' }).click();
+    await page.waitForURL(/\/invoice\/.+/);
+    const id = page.url().split('/invoice/')[1];
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === id && i.annexure))).find((i) => i.id === id);
+    check(inv?.annexure?.rows?.length === 1 && inv.annexure.rows[0].task === 'Wireframes' && inv.annexure.rows[0].billed_minutes === 105,
+      `annexure snapshot on the invoice (${inv?.annexure?.rows?.length} row, task ${inv?.annexure?.rows?.[0]?.task})`);
+    check(inv?.items?.length === 1 && inv.items[0].quantity === 1.75, `one time line of 1.75 h (${inv?.items?.[0]?.quantity})`);
+
+    // Issue it, dismiss the post-save sheet, then print: the annexure is a following page.
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    await page.locator('[data-annexure-actions]').waitFor();
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.waitFor();
+    const annex = dialog.locator('[data-annexure]').first();
+    await annex.waitFor();
+    const text = await annex.innerText();
+    check(/Annexure to INV\/FY\d{2}-\d{2}\/\d{4}/i.test(text) && /Wireframes v1/.test(text), `preview prints the annexure (${text.replace(/\s+/g, ' ').slice(0, 60)}…)`);
+    await dialog.getByRole('button', { name: /^Share/ }).click();
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+    const body = readFileSync(await dl.path()).toString('latin1');
+    const pages = (body.match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
+    check(pages >= 2, `the PDF carries the annexure on a following page (${pages} pages)`);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+  });
+
   await step('cheque register: record a post-dated cheque, see the reminder, clear it against the invoice', async () => {
     const day = (offset) => {
       const d = new Date();
@@ -2072,6 +2140,10 @@ try {
     await page.locator('[data-annual-preview] .ap-page').first().waitFor({ timeout: 15000 });
     check(await page.locator('[data-annual-preview] .ap-page').count() === 6, 'annual pack: cover, balance sheet, P&L, cash flow, trial balance, notes');
     check(/verify with your CA/.test((await page.locator('[data-annual-preview]').textContent()) ?? ''), 'annual pack carries the "verify with your CA" draft line');
+    // QA-3 F18: a year still running is an interim pack to date, never "As at 31 Mar" of a year that has not ended.
+    const packText = (await page.locator('[data-annual-preview]').textContent()) ?? '';
+    const fyEnd = await page.evaluate(() => { const d = new Date(); return d.getMonth() === 2 && d.getDate() === 31; });
+    check(fyEnd || (/interim/i.test(packText) && !/For the year ended/.test(packText)), 'annual pack during the year is labelled interim, to date');
   });
 
   await step('R2-B batch invoices: one saved invoice billed to two parties as drafts, numbered in order; undo deletes them', async () => {
@@ -2103,6 +2175,60 @@ try {
     check(true, 'undo removed the run\'s drafts');
     await writeJson(page, 'clients', prevClients);
     await writeJson(page, 'batch_runs', null);
+  });
+
+  await step('QA-3 QA-2: document strip first with the type inline; a quotation offers no payment; one invoice target in Convert; quote "Valid until"; bill Esc asks first', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevClients = await readJson(page, 'clients', []);
+    const prevItems = await readJson(page, 'items_catalog', []);
+    await page.goto(srv.origin + '/invoice');
+    const type = page.locator('[data-meta-type]');
+    await type.waitFor({ timeout: 15000 });
+    const stripFirst = await page.evaluate(() => {
+      const strip = document.querySelector('[data-meta-summary]');
+      const client = document.querySelector('input[aria-label="Client name"], input[placeholder="Client name *"]');
+      return !!strip && !!client && !!(strip.compareDocumentPosition(client) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    check(stripFirst, 'F21: "1 · Document" strip comes before the parties');
+    check((await page.locator('[data-save-choice] option').allInnerTexts()).join('|') === 'Just save|Then print|Then WhatsApp', 'F21: the after-save picker does not read as another Save');
+    await type.selectOption('QUOTATION');
+    await page.getByLabel('Client name').fill('E2E Quote Party');
+    await page.getByLabel('Item 1 name').fill('E2E Chairs');
+    await page.getByLabel('Item 1 rate').fill('1000');
+    await page.keyboard.press('Control+s');
+    const sheet = page.locator('[data-send-sheet]');
+    await sheet.waitFor({ timeout: 10000 });
+    const sheetText = await sheet.innerText();
+    check((await sheet.locator('[data-send-pay]').count()) === 0 && !/Balance on this bill/.test(sheetText), 'F3: the quotation sheet shows no balance and no Record payment');
+    const mail = decodeURIComponent((await sheet.locator('a[href^="mailto:"]').getAttribute('href')) ?? '');
+    check(mail.includes('Quotation') && !mail.includes('*'), 'F23: the e-mail body has no WhatsApp *bold* markers');
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: /^Convert/ }).click();
+    const items = await page.getByRole('menuitem').allInnerTexts();
+    check(items.some((t) => /Convert to Tax Invoice/.test(t)) && !items.some((t) => /Convert to Invoice$/.test(t.trim())), `F22: one invoice target in the Convert menu (${items.filter((t) => /Invoice/.test(t)).join(', ')})`);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/transactions');
+    const row = page.locator('tr', { hasText: 'E2E Quote Party' }).first();
+    await row.waitFor({ timeout: 10000 });
+    check(/Valid until/.test(await row.innerText()), 'F22: the ledger shows a quotation as "Valid until"');
+    await writeJson(page, 'invoices', prevInvoices);
+    await writeJson(page, 'clients', prevClients);
+    await writeJson(page, 'items_catalog', prevItems);
+    // F12: a purchase bill with a typed line asks before Esc throws it away.
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).first().click();
+    const bill = page.getByRole('dialog');
+    await bill.waitFor();
+    await bill.getByLabel(/Line 1 item|line 1/i).first().fill('E2E Steel');
+    let asked = '';
+    page.once('dialog', async (d) => { asked = d.message(); await d.dismiss(); });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    check(/Discard this bill/.test(asked) && (await bill.isVisible()), 'F12: Esc on a filled bill asks, and Cancel keeps it open');
+    page.once('dialog', (d) => d.accept());
+    await page.keyboard.press('Escape');
+    await bill.waitFor({ state: 'detached' });
   });
 
   await step('QA-3 F6: recurring from an invoice starts after it; the list refreshes after the first run; Run now asks before billing early; drafts take no number', async () => {
@@ -2200,6 +2326,80 @@ try {
     const sample = await waitRows(b.p, 'invoices', 1);
     check(sample.length > 0, `Dashboard "Try with sample data" added the invoices (${sample.length})`);
     await b.ctx.close();
+  });
+
+  await step('R3-C: live preview pane at 1366 px follows typing (not loaded at 390 px); GSTR-1 error file round trip', async () => {
+    // C1: the pane is a device toggle on wide screens; typing a line reaches the paper.
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-live-preview-toggle]').click();
+    const pane = page.locator('[data-live-preview]');
+    await pane.waitFor({ timeout: 15000 });
+    await page.getByLabel('Client name').fill('Pane Client R3C');
+    await page.getByLabel('Item 1 name').fill('Pane line R3C');
+    await page.getByLabel('Item 1 quantity').fill('1');
+    await page.getByLabel('Item 1 rate').fill('500');
+    await pane.getByText('Pane line R3C').first().waitFor({ timeout: 10000 });
+    check(true, 'typing a line updates the live preview pane');
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    // Phones never request the pane chunk, even with the toggle remembered on.
+    const asked = [];
+    const onReq = (r) => { if (/LivePreviewPane/.test(r.url())) asked.push(r.url()); };
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.on('request', onReq);
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-meta-summary]').waitFor();
+    await page.waitForTimeout(500);
+    page.off('request', onReq);
+    check(asked.length === 0 && (await page.locator('[data-live-preview]').count()) === 0, `no pane chunk requested at 390 px (${asked.length})`);
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-live-preview-toggle]').click(); // back off for the steps that follow
+    await page.locator('[data-live-preview]').waitFor({ state: 'detached' });
+
+    // C4: a B2B invoice of last month, the portal's error report for it (fixture), corrected JSON of the failed document.
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 10);
+    const mm = String(prev.getMonth() + 1).padStart(2, '0');
+    const day = `${prev.getFullYear()}-${mm}-10`;
+    const fp = `${mm}${prev.getFullYear()}`;
+    const before = await readJson(page, 'invoices', []);
+    const num = 'INV/R3C/0007';
+    await writeJson(page, 'invoices', [...before, {
+      id: 'r3c-b2b', invoice_number: num, doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: day, due_date: day, currency: 'INR',
+      template_id: 'classic_orange', client: { name: 'Portal Buyer', gstin: '27AAACB2230M1ZW', email: '', address: '', city: 'Pune', zip: '', state: 'Maharashtra' },
+      sender: { companyName: 'E2E Trader', companyGstin: '27AAPFU0939F1ZV', stateCode: '27' },
+      items: [{ id: 'l1', name: 'Pump', type: 'Goods', hsn: '8413', quantity: 1, rate: 1000, tax_rate: 18, amount: 1000 }], gst_mode: 'CGST_SGST',
+      place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 18, shipping: 0, other_charges: 0,
+      round_off_enabled: false, amount_paid: 0, notes: '', terms: '', subtotal: 1000, discount_amount: 0, taxable_value: 1000, cgst_amount: 90,
+      sgst_amount: 90, igst_amount: 0, tax_amount: 180, round_off: 0, total: 1180, balance_due: 1180,
+    }]);
+    let fixture = readFileSync(new URL('../fixtures/gstr1-error-report.json', import.meta.url), 'utf8');
+    const vals = { GSTIN: '', FP: fp, CTIN: '27AAACB2230M1ZW', INUM: num.toLowerCase(), IDT: `10-${mm}-${prev.getFullYear()}` };
+    for (const [k, v] of Object.entries(vals)) fixture = fixture.replaceAll(`{{${k}}}`, v);
+    await page.goto(srv.origin + '/gst-reports?tab=portal-files');
+    await page.locator('[data-portal-files]').waitFor({ timeout: 15000 });
+    const upload = () => page.locator('[data-portal-file-input]').setInputFiles({ name: 'GSTR1_error_report.json', mimeType: 'application/json', buffer: Buffer.from(fixture) });
+    await upload();
+    const findings = page.locator('[data-portal-findings]');
+    await findings.waitFor({ timeout: 10000 });
+    check(await findings.getByRole('link', { name: num }).count() > 0, 'the portal error is matched to our invoice (normalised number + GSTIN + date)');
+    const saved = await readJson(page, 'gst_portal_files', [], (v) => v.length === 1);
+    check(saved[0]?.kind === 'gstr1_error' && saved[0].findings.some((f) => f.invoice_id === 'r3c-b2b'), 'the import is saved with its findings');
+    const dlP = page.waitForEvent('download');
+    await page.locator('[data-portal-corrected]').click();
+    if (await page.locator('[data-portal-preflight]').count()) await page.getByRole('button', { name: 'Download anyway' }).click();
+    const dl = await dlP;
+    const body = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+    const invs = (body.b2b ?? []).flatMap((g) => g.inv);
+    check(invs.length === 1 && invs[0].inum === num && body.fp === fp && !body.b2cs, `corrected JSON holds only the failed document (${invs.map((i) => i.inum).join(',')})`);
+    check(await page.locator('[data-filing-portal-errors]').count() === 1, 'the filing strip shows the "Portal files (n)" step');
+    await upload();
+    await page.locator('[data-portal-status]').getByText(/already read/).waitFor();
+    check((await readJson(page, 'gst_portal_files', [])).length === 1, 're-importing the same file is detected, not saved twice');
+    await writeJson(page, 'invoices', before);
+    await writeJson(page, 'gst_portal_files', null);
   });
 
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {

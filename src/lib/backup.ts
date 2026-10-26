@@ -85,6 +85,23 @@ export interface BackupSummary {
   missingAttachments?: number;
   /** Damaged or disallowed attachment files left out of the restore. */
   droppedAttachments?: number;
+  /** Business name of the active profile in the backup (QA-3 F14: the restore confirm names it). */
+  business?: string;
+  /** When the backup file was made (ISO), if it says. */
+  exportedAt?: string;
+}
+
+/** The active sender profile's business name in a backup's settings ('' when there is none). */
+export function backupBusinessName(data: Record<string, string>): string {
+  try {
+    const s = JSON.parse(data[`${DB_PREFIX}settings`] ?? 'null') as { profiles?: { id?: string; companyName?: string }[]; activeProfileId?: string; companyName?: string } | null;
+    if (!s || typeof s !== 'object') return '';
+    const profiles = Array.isArray(s.profiles) ? s.profiles : [];
+    const active = profiles.find((p) => p?.id === s.activeProfileId) ?? profiles[0];
+    return String(active?.companyName ?? s.companyName ?? '').trim().slice(0, 120);
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -286,6 +303,8 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
       ...(files.files ? { attachments: files.files } : {}),
       ...(files.missing ? { missingAttachments: files.missing } : {}),
       ...(files.dropped ? { droppedAttachments: files.dropped } : {}),
+      ...(backupBusinessName(data) ? { business: backupBusinessName(data) } : {}),
+      ...(typeof root.exportedAt === 'string' && /^\d{4}-\d{2}-\d{2}/.test(root.exportedAt) ? { exportedAt: root.exportedAt } : {}),
     },
   };
 }
@@ -370,6 +389,10 @@ const RECORD_TABLES = [
   'batch_runs', 'proposal_snippets',
   // Round 3 (R3-A): restaurant dining areas, tables, running orders, modifier groups
   'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
+  // Round 3 (R3-B): work types (rate cards), project tasks, retainers
+  'work_types', 'project_tasks', 'retainers',
+  // Round 3 (R3-C): GSTR-1 portal file imports, DSC register, monthly client checklist
+  'gst_portal_files', 'dsc_register', 'client_checklist',
   // Round 4 (R4-A): production orders, QC decisions, recall notices, landed-cost vouchers
   'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
 ];
@@ -412,6 +435,10 @@ const ID_TABLES = new Set([
   'batch_runs', 'proposal_snippets',
   // Round 3 (R3-A)
   'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
+  // Round 3 (R3-B): work types (rate cards), project tasks, retainers
+  'work_types', 'project_tasks', 'retainers',
+  // Round 3 (R3-C): GSTR-1 portal file imports, DSC register, monthly client checklist
+  'gst_portal_files', 'dsc_register', 'client_checklist',
   // Round 4 (R4-A)
   'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
 ]);

@@ -5,7 +5,9 @@ import { Typeahead } from '../ui/Typeahead';
 import { localDb } from '../../lib/localDb';
 import { suggest } from '../../lib/suggest';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
-import { GST_SLABS, type InvoiceItem } from '../../types/invoice';
+import { type InvoiceItem } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
+import { edT } from '../../i18n/areas/editor';
 import { liveUnits } from '../../lib/units-live';
 import { lineFactor, lineUnitPatch } from '../../lib/units';
 import { unitT } from '../../i18n/areas/units';
@@ -167,7 +169,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
               {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
                 <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>
-                  + Add cess
+                  + {edT('addCess')}
                 </button>
               )}
               {showTax && priced && (item.cess_rate || item.cess_per_unit || cessOpen[item.id]) ? (
@@ -254,7 +256,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   onChange={(e) => updateItem(item.id, 'tax_rate', Number(e.target.value))}
                   aria-label={t('items.itemGst', { n: index + 1 })}
                 >
-                  {GST_SLABS.map((r) => (
+                  {gstRateOptions(issueDate, item.tax_rate).map((r) => (
                     <option key={r} value={r}>
                       {r}%
                     </option>

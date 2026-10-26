@@ -34,6 +34,7 @@ export const en = {
   'common.notSaved': 'Not saved: {message}',
   'common.createInvoice': 'Create an invoice',
   'common.language': 'Language',
+  'common.validGstin': 'Valid GSTIN',
 
   // ── Document types / statuses / payment methods ───────────────────
   'doc.INVOICE': 'Invoice',
@@ -85,6 +86,7 @@ export const en = {
   'nav.gateway': 'Gateway',
   'nav.accountsInfo': 'Accounts Info',
   'nav.designStudio': 'Design studio',
+  'nav.practice': 'Practice desk',
   'nav.settings': 'Settings',
   'nav.groupSales': 'Sales',
   'nav.groupPurchases': 'Purchases & stock',
@@ -96,6 +98,8 @@ export const en = {
   'shell.closeMenu': 'Close menu',
   'shell.home': 'Mr. Chartist Invoice home',
   'shell.search': 'Search',
+  'shell.notifications': 'Notifications',
+  'shell.notificationsUnread': 'Notifications, {n} unread',
   'shell.searchPlaceholder': 'Search invoices, clients, pages…',
   'shell.lightMode': 'Light mode',
   'shell.darkMode': 'Dark mode',

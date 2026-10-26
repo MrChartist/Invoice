@@ -20,7 +20,9 @@ import {
 } from '../../lib/recurring';
 import { blankItem, makeDraft, senderStateCode } from '../../store/invoice-defaults';
 import { cn, formatCurrency, formatDate, todayInput } from '../../lib/utils';
-import { GST_SLABS, type InvoiceRecord } from '../../types/invoice';
+import { type InvoiceRecord } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
+import { isRecurringSource } from '../../lib/documents';
 import controls from '../../styles/controls.module.css';
 import styles from './recurring.module.css';
 import { dateLocale, getLanguage, useT } from '../../i18n';
@@ -82,7 +84,7 @@ function EditorBody({
   useT(); // re-render on a language switch (5.4)
   const today = todayInput();
   const savedInvoices = useMemo(
-    () => localDb.invoices.getAll().filter((i) => i.doc_type !== 'QUOTATION' && i.doc_type !== 'DELIVERY_CHALLAN' && i.doc_type !== 'SALES_ORDER'),
+    () => localDb.invoices.getAll().filter((i) => isRecurringSource(i.doc_type)),
     [],
   );
   const clients = useMemo(() => localDb.clients.getAll(), []);
@@ -352,7 +354,7 @@ function EditorBody({
                   value={item.tax_rate ?? 0}
                   onChange={(e) => patchItem(item.id, { tax_rate: num(e.target.value) })}
                 >
-                  {GST_SLABS.map((s) => (
+                  {gstRateOptions(undefined, item.tax_rate ?? 0).map((s) => (
                     <option key={s} value={s}>{s}%</option>
                   ))}
                 </select>

@@ -1,0 +1,59 @@
+/* R3-C paper parts: item photos, photo pages, receiver signature, letterhead artwork. Accent variable only. */
+
+.itemThumb {
+  float: left;
+  width: 16mm;
+  height: 16mm;
+  margin: 0 8px 2px 0;
+  object-fit: contain;
+  border: 1px solid var(--tpl-line);
+  border-radius: 3px;
+}
+
+.bandHead {
+  display: block;
+  width: calc(100% + var(--tpl-px) + var(--tpl-pr, var(--tpl-px)));
+  margin: calc(-1 * var(--tpl-pt)) calc(-1 * var(--tpl-pr, var(--tpl-px))) 12px calc(-1 * var(--tpl-px));
+  height: auto;
+}
+
+.bandTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 2px solid var(--tpl-accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bandTitle span:last-child {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.background {
+  position: absolute;
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: 100%;
+  max-height: var(--r3c-page-h, 100%);
+  object-fit: fill;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.footerBand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+  z-index: 0;
+  pointer-events: none;
+}

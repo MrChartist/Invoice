@@ -61,7 +61,7 @@ p.muted { margin: 0; }
 
 .timerForm {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.75rem;
   align-items: end;
   padding: 1rem 1.25rem;

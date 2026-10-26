@@ -11,6 +11,10 @@ import type { Period } from '../../../lib/books';
 import { toCsv } from '../../../lib/csv';
 import { formatDate } from '../../../lib/utils';
 import { reportsT } from '../../../i18n/areas/reports-engine';
+import { purCategory } from '../../../i18n/areas/purchases';
+
+/** QA-3 F19: voucher types and expense heads in the interface language (stored values stay English). */
+const kindLabel = (k: string): string => (`vk.${k}` in reportsT.en ? reportsT(`vk.${k}` as never) : k);
 import { useT } from '../../../i18n';
 import { EmptyState } from '../../ui/EmptyState';
 import { useDrillRows, useReportPrefs } from './drill-hooks';
@@ -49,7 +53,7 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
         </button>
         {all.kinds.map((k) => (
           <button key={k} type="button" className={kinds.includes(k) ? books.chipActive : books.chip} aria-pressed={kinds.includes(k)} onClick={() => toggle(k)}>
-            {k}
+            {kindLabel(k)}
           </button>
         ))}
       </div>
@@ -85,10 +89,10 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
                       <tr {...nav.row(i)}>
                         <td>{showDate ? formatDate(v.date) : ''}</td>
                         <td>
-                          <div>{v.party || `${e.debitAccount} / ${e.creditAccount}`}</div>
+                          <div>{v.party || `${purCategory(e.debitAccount)} / ${purCategory(e.creditAccount)}`}</div>
                           {prefs.showNarration && v.narration && <div className={books.narration}>{v.narration}</div>}
                         </td>
-                        <td><span className={v.source === 'manual' ? styles.badgeManual : styles.badge}>{v.kind}</span></td>
+                        <td><span className={v.source === 'manual' ? styles.badgeManual : styles.badge}>{kindLabel(v.kind)}</span></td>
                         <td>
                           {target.type === 'none' ? (
                             <span className={surface.mono}>{v.number || '—'}</span>

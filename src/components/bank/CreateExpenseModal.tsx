@@ -3,6 +3,7 @@ import { guessCounterparty, inferMode, nameOverlap, referenceFor, documentNumber
 import { round2 } from '../../lib/invoice-calc';
 import { balanceOf, purchasesDb } from '../../lib/purchases';
 import { formatDate, formatMoney } from '../../lib/utils';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { readPurchase } from '../../lib/purchase-normalize';
 import { PURCHASE_CATEGORIES, type PurchaseRecord } from '../../types/purchases';
 import { Modal } from '../ui/Modal';
@@ -22,7 +23,6 @@ export interface CreateExpenseModalProps {
   onSettled: (line: BankLine, paymentId: string) => void;
 }
 
-const GST_RATES = [0, 5, 12, 18, 28];
 
 export function CreateExpenseModal({ line, onClose, onChanged, onSettled }: CreateExpenseModalProps) {
   useT(); // re-render on a language switch (5.4)
@@ -117,7 +117,7 @@ function NewExpense({ line, onError, onChanged, onSettled, onClose }: PartProps)
         <div className={controls.field}>
           <label className={controls.label} htmlFor="ex-gst">{bankT('gstIncluded', { amount: `₹${formatMoney(line.debit)}` })}</label>
           <select id="ex-gst" className={controls.select} value={rate} onChange={(e) => setRate(+e.target.value)}>
-            {GST_RATES.map((r) => <option key={r} value={r}>{r === 0 ? bankT('noGst') : `${r}%`}</option>)}
+            {gstRateOptions(line.date, rate).map((r) => <option key={r} value={r}>{r === 0 ? bankT('noGst') : `${r}%`}</option>)}
           </select>
         </div>
         <label className={controls.check} style={{ alignSelf: 'end', minHeight: 40 }}>

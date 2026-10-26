@@ -17,6 +17,7 @@ import {
   IdCard,
   Keyboard,
   Landmark,
+  Building2,
   LayoutDashboard,
   Lock,
   Menu,
@@ -122,7 +123,10 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
   },
   {
     title: 'nav.groupSetup',
-    items: [{ label: 'nav.designStudio', path: '/design', icon: Palette, need: 'settings.manage' }],
+    items: [
+      { label: 'nav.designStudio', path: '/design', icon: Palette, need: 'settings.manage' },
+      { label: 'nav.practice', path: '/practice', icon: Building2, need: 'settings.manage' }, // R3-C6
+    ],
   },
 ];
 

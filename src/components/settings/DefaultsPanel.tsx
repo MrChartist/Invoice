@@ -1,5 +1,5 @@
 import { CURRENCIES } from '../../lib/utils';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import type { AppSettings } from '../../lib/localDb';
 import { useTheme } from '../../hooks/useTheme';
 import { LockBooksCard } from './LockBooksCard';
@@ -37,7 +37,7 @@ export function DefaultsPanel({ settings, onChange }: Props) {
             <label className={controls.field}>
               <span className={controls.label}>{setT('defaultGst')}</span>
               <select className={controls.select} value={settings.defaultTaxRate} onChange={(e) => onChange({ defaultTaxRate: Number(e.target.value) })}>
-                {GST_SLABS.map((r) => (
+                {gstRateOptions(undefined, settings.defaultTaxRate).map((r) => (
                   <option key={r} value={r}>
                     {r === 0 ? setT('exempt') : `${r}%`}
                   </option>

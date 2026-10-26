@@ -150,8 +150,35 @@ export function tcsPresets(date?: string): TcsPreset[] {
 
 // ── GST rate slabs offered in pickers ────────────────────────────────────────
 
-/** 0 doubles as exempt/nil-rated. 40% is the GST 2.0 demerit slab (from 22 Sep 2025). */
+/** Every slab any version below has carried (0 doubles as exempt/nil-rated). For lookups, not for pickers. */
 export const GST_SLABS = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28, 40] as const;
+
+/**
+ * Rates (%) a document line may carry on a date. Before 22 Sep 2025: the 2017 schedules (0, 0.1, 0.25, 1, 1.5, 3, 5,
+ * 6, 12, 18, 28). From 22 Sep 2025 (GST rate rationalisation, 56th GST Council; Notification 9/2025-CT(R) as
+ * understood): 5 / 18 / 40 replace 12 and 28 — 28% stays only for tobacco / pan masala until compensation cess ends.
+ * The special rates (0.1, 0.25, 1, 1.5, 3, 6) are kept. A rate outside the list is an exception to REVIEW, not an
+ * error (gst-guards). Append a version when the schedule changes; never edit an old one. Verify with your CA.
+ */
+export const GST_SLAB_RULES: readonly Versioned<readonly number[]>[] = [
+  { from: '2017-07-01', value: [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28], source: 'Notifications 1/2017-CT(R), 11/2017-CT(R) and later amendments' },
+  { from: '2025-09-22', value: [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 18, 28, 40], source: 'GST rate rationalisation from 22 Sep 2025 (28% only for tobacco / pan masala) — verify' },
+];
+
+export const slabsAt = (date?: string): readonly number[] => ruleAt(GST_SLAB_RULES, date);
+export const rateInSlabs = (rate: number, date?: string): boolean => slabsAt(date).some((s) => Math.abs(s - rate) < 1e-9);
+
+/**
+ * GST rates a picker offers for a document dated `date` (today when absent): the slabs in force that day (QA-3 F9).
+ * A `current` rate that is no longer in the table (12% on an old bill being edited) is kept, so the picker still shows
+ * what the document holds instead of silently changing it.
+ */
+export function gstRateOptions(date?: string, current?: number | null): number[] {
+  const list = [...slabsAt(date)];
+  const c = Number(current);
+  if (current !== undefined && current !== null && Number.isFinite(c) && !list.some((s) => Math.abs(s - c) < 1e-9)) list.push(c);
+  return list.sort((a, b) => a - b);
+}
 
 // ── GST on advances received (time of supply, CGST Act Sec 12 / 13) ───────────
 

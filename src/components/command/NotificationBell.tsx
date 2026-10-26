@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { t } from '../../i18n';
 import { SINGLETON_KEYS, getJson, getTable, peekTable, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
@@ -163,6 +164,45 @@ function ensurePackAlerts(onReady: () => void): void {
     });
 }
 
+// R3-B2: project budget warnings (80% / 100%) — the provider loads only once `project_tasks` has rows.
+let projectAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureProjectAlerts(onReady: () => void): void {
+  if (projectAlerts !== 'off') return;
+  try {
+    if (!getTable('project_tasks').length) return;
+  } catch {
+    return;
+  }
+  projectAlerts = 'loading';
+  import('../../lib/project-alerts')
+    .then((m) => {
+      m.registerProjectAlerts();
+      projectAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      projectAlerts = 'off';
+    });
+}
+
+// R3-C: e-Way Bill expiry (only once `einvoice_meta` holds an e-Way Bill number) and DSC expiry (only once
+// `dsc_register` has rows) — each provider loads lazily on its own.
+const r3cAlerts: Record<string, 'off' | 'loading' | 'on'> = {};
+function ensureR3cAlerts(onReady: () => void): void {
+  const gate = (id: string, wants: () => boolean, load: () => Promise<void>) => {
+    if (r3cAlerts[id] && r3cAlerts[id] !== 'off') return;
+    try {
+      if (!wants()) return;
+    } catch {
+      return;
+    }
+    r3cAlerts[id] = 'loading';
+    load().then(() => { r3cAlerts[id] = 'on'; onReady(); }, () => { r3cAlerts[id] = 'off'; });
+  };
+  gate('eway', () => getTable<{ eway_no?: string }>('einvoice_meta').some((m) => !!m?.eway_no), () => import('../../lib/eway-alerts').then((m) => m.registerEwayAlerts()));
+  gate('dsc', () => getTable('dsc_register').length > 0, () => import('../../lib/dsc-alerts').then((m) => m.registerDscAlerts()));
+}
+
 // R4-A: production orders past due / completed-not-closed and stock aged in QC — lazy, once an order or a QC godown exists.
 let productionAlerts = 0;
 function ensureProductionAlerts(onReady: () => void): void {
@@ -203,6 +243,8 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     ensureGstGuardAlerts(reload);
     ensureCaptureAlerts(reload);
     ensurePackAlerts(reload);
+    ensureProjectAlerts(reload); // R3-B
+    ensureR3cAlerts(reload); // R3-C
     ensureProductionAlerts(reload); // R4-A
   }, []);
 
@@ -262,7 +304,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     }
   };
 
-  const label = unread ? `Notifications, ${unread} unread` : 'Notifications';
+  const label = unread ? t('shell.notificationsUnread', { n: unread }) : t('shell.notifications');
 
   return (
     <div ref={rootRef} className={cn(styles.root, className)}>

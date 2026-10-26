@@ -36,10 +36,6 @@
 .cardValue { font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
 .cardWarn { composes: card; border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
 .cardGood { composes: card; border-color: color-mix(in srgb, var(--profit) 40%, var(--border)); }
-.sigPad {
-  width: 100%; max-width: 32rem; height: 10rem; border: 1px dashed var(--input-border); border-radius: var(--radius-sm);
-  background: var(--card); touch-action: none; cursor: crosshair;
-}
 .sheet { display: grid; gap: 0.75rem; }
 .kbdHint { font-size: var(--text-xs); color: var(--muted-foreground); }
 @media print { .noPrint { display: none !important; } }
@@ -56,3 +52,7 @@
   .sheetBackdrop { place-items: end stretch; padding: 0; }
   .sheetPanel { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 }
+
+/* QA-3 F21: document strip — inline type picker; the due chip never wraps on its own line */
+.typePick { width: auto; min-width: 0; max-width: 12rem; font-weight: 600; }
+.nowrap { white-space: nowrap; }

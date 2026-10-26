@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Car, ChevronLeft, ChevronRight, Clock, Download, FileSpreadsheet, IndianRupee, Pencil, Plus, ReceiptText, Timer, Trash2 } from 'lucide-react';
 import type { MileageEntry, TimeEntry, TimePrefs } from '../types/time';
@@ -22,6 +22,7 @@ import {
   unbilledTime,
   weekGrid,
   weekStart,
+  currentCover,
 } from '../lib/timesheets';
 import { localDb } from '../lib/localDb';
 import { purchasesDb } from '../lib/purchases';
@@ -44,12 +45,20 @@ import styles from '../components/time/time.module.css';
 import { dateLocale, useT } from '../i18n';
 import { timeT } from '../i18n/areas/time';
 import { areaNodes } from '../i18n/areas/nodes';
+import { svcT } from '../i18n/areas/service-r3'; // R3-B
+import { WorkTypesCard } from '../components/time/WorkTypesCard';
 
-type Tab = 'timesheet' | 'mileage' | 'billing' | 'settings';
+// R3-B2 / B3: the projects board and retainers are their own lazy tab chunks.
+const ProjectsBoard = lazy(() => import('../components/time/ProjectsBoard'));
+const RetainersTab = lazy(() => import('../components/time/RetainersTab'));
+
+type Tab = 'timesheet' | 'mileage' | 'billing' | 'projects' | 'retainers' | 'settings';
 const TABS: { id: Tab; label: () => string }[] = [
   { id: 'timesheet', label: () => timeT('tabTimesheet') },
   { id: 'mileage', label: () => timeT('tabMileage') },
   { id: 'billing', label: () => timeT('tabUnbilled') },
+  { id: 'projects', label: () => svcT('tabProjects') },
+  { id: 'retainers', label: () => svcT('tabRetainers') },
   { id: 'settings', label: () => timeT('tabSettings') },
 ];
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -84,7 +93,7 @@ export function Time() {
   const [editEntry, setEditEntry] = useState<TimeEntry | null | undefined>(undefined);
   const [editTrip, setEditTrip] = useState<MileageEntry | null | undefined>(undefined);
   const [confirm, setConfirm] = useState<{ kind: 'entry' | 'trip'; id: string } | null>(null);
-  const [billTarget, setBillTarget] = useState<{ key: string; name: string } | null>(null);
+  const [billTarget, setBillTarget] = useState<{ key: string; name: string; projectId?: string } | null>(null);
 
   const reload = useCallback(() => {
     setEntries(timeDb.all());
@@ -104,6 +113,8 @@ export function Time() {
   const numbers = useMemo(() => new Map(invoices.map((i) => [i.id, i.invoice_number])), [invoices]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const purchases = useMemo(() => purchasesDb.all(), [tick]);
+  // R3-B3: minutes covered by a retainer are not unbilled.
+  const cover = useMemo(() => currentCover(prefs, entries, invoices), [prefs, entries, invoices]);
 
   const grid = useMemo(() => weekGrid(entries, week), [entries, week]);
   const weekEntries = useMemo(
@@ -118,7 +129,7 @@ export function Time() {
       map.set(key, r);
       return r;
     };
-    for (const e of unbilledTime(entries, live)) {
+    for (const e of unbilledTime(entries, live, cover, prefs)) {
       const r = row(clientKey(e), e.client_name);
       r.minutes += e.minutes;
       r.time = round2(r.time + entryAmount(e, prefs));
@@ -135,7 +146,7 @@ export function Time() {
       r.expenses = round2(r.expenses + expenseLine(p, prefs).amount);
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, trips, purchases, live, prefs]);
+  }, [entries, trips, purchases, live, prefs, cover]);
 
   const stats = useMemo(() => {
     const amount = unbilled.reduce((s, u) => s + u.time + u.expenses + u.mileage, 0);
@@ -154,6 +165,7 @@ export function Time() {
     if (by) {
       return <Link to={`/invoice/${by}`} className={cn(surface.badge, surface.badgePaid)}>{timeT('billed', { number: numbers.get(by) ?? '' })}</Link>;
     }
+    if (cover?.covered.has(row.id)) return <span className={cn(surface.badge, surface.badgeSent)}>{svcT('coveredBadge')}</span>;
     return <span className={cn(surface.badge, surface.badgeDraft)}>{timeT('unbilled')}</span>;
   };
 
@@ -369,6 +381,30 @@ export function Time() {
           )}
         </section>
       )}
+
+      {tab === 'projects' && (
+        <Suspense fallback={null}>
+          <ProjectsBoard
+            clients={clients}
+            prefs={prefs}
+            entries={entries}
+            invoices={invoices}
+            projectId={params.get('project') ?? undefined}
+            onSelect={(id) => setParams(id ? { tab: 'projects', project: id } : { tab: 'projects' }, { replace: true })}
+            onBill={(target) => setBillTarget(target)}
+            notify={notify}
+            onChanged={reload}
+          />
+        </Suspense>
+      )}
+
+      {tab === 'retainers' && (
+        <Suspense fallback={null}>
+          <RetainersTab clients={clients} prefs={prefs} entries={entries} invoices={invoices} notify={notify} onChanged={reload} />
+        </Suspense>
+      )}
+
+      {tab === 'settings' && <WorkTypesCard notify={notify} />}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>

@@ -63,3 +63,9 @@ export function panFromGstin(raw?: string): string {
   const check = checkGstin(raw);
   return check.pan ?? '';
 }
+
+/** True when the buyer's GSTIN is the supplier's own (a B2B row to yourself, QA-3 F10). Case and spaces ignored. */
+export function isOwnGstin(clientGstin: unknown, senderGstin: unknown): boolean {
+  const c = String(clientGstin ?? '').replace(/\s/g, '').toUpperCase();
+  return c.length === 15 && c === String(senderGstin ?? '').replace(/\s/g, '').toUpperCase();
+}

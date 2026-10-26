@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { cleanAltUnits, compoundUnits, unitSymbols, unitsDb, validateAltUnits } from '../../lib/units';
 import { stockCategoriesDb, stockGroupsDb, treeRows } from '../../lib/stock-groups';
 import { cleanPriceList, validatePriceList } from '../../lib/stock-query';
@@ -13,6 +13,8 @@ import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 import { EditLogButton } from '../audit/EditLogButton';
+import { catalogueEntryFor, setStockShortCode } from '../../lib/catalog';
+import { retailT } from '../../i18n/areas/retail';
 
 export interface ItemFormModalProps {
   open: boolean;
@@ -63,6 +65,9 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const [d, setD] = useState<Draft>(() => toDraft(item));
   const [touched, setTouched] = useState(false);
   const uid = useId();
+  // QA-3 F24: the counter short code lives on the catalogue entry of the same name; it is edited here too.
+  const [shortCode, setShortCode] = useState(() => catalogueEntryFor(item.name)?.short_code ?? '');
+  const [shortError, setShortError] = useState('');
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
   const name = d.name.trim();
@@ -89,6 +94,8 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const submit = () => {
     setTouched(true);
     if (!valid) return;
+    const sc = setStockShortCode({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, shortCode);
+    if (!sc.ok) return setShortError(sc.error.message);
     onSave({
       ...item,
       name,
@@ -163,6 +170,11 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
             <input id={`${uid}-barcode`} className={controls.input} value={d.barcode} onChange={(e) => set('barcode', e.target.value)} placeholder={invT('scanOrType')} />
           </div>
           <div className={controls.field}>
+            <label className={controls.label} htmlFor={`${uid}-short`}>{retailT('shortCode')}</label>
+            <input id={`${uid}-short`} className={`${controls.input} ${controls.inputMono}`} value={shortCode} maxLength={12} onChange={(e) => { setShortCode(e.target.value.replace(/\s/g, '')); setShortError(''); }} placeholder={retailT('shortCodePh')} aria-invalid={!!shortError} data-stock-short-code />
+            {shortError && <span className={controls.error} role="alert">{shortError}</span>}
+          </div>
+          <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-hsn`}>{invT('hsn')}</label>
             <input
               id={`${uid}-hsn`} className={controls.input} inputMode="numeric" value={d.hsn}
@@ -192,7 +204,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
               list={`${uid}-slabs`} value={d.tax_rate} onChange={(e) => set('tax_rate', e.target.value)}
               aria-invalid={taxBad}
             />
-            <datalist id={`${uid}-slabs`}>{GST_SLABS.map((s) => <option key={s} value={s} />)}</datalist>
+            <datalist id={`${uid}-slabs`}>{gstRateOptions().map((s) => <option key={s} value={s} />)}</datalist>
             {taxBad && <span className={controls.error} role="alert">{invT('errGst')}</span>}
           </div>
           <div className={controls.field}>

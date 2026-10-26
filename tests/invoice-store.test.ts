@@ -80,6 +80,10 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     // R3-A
     table_order_id: 'ord1',
     split_of: { order_id: 'ord1', part: 2, parts: 3 },
+    // R3-B
+    annexure: { kind: 'timesheet', rows: [{ date: '2026-04-09', description: 'Drafting', minutes: 50, billed_minutes: 60, rate: 2000, amount: 2000, ref: 't1' }], taken_at: '2026-04-10T00:00:00Z' },
+    // R3-C
+    delivery_proof: { receiver: 'Ravi', remark: 'Received in good condition', signed_at: '2026-04-12T05:30:00.000Z', signature: 'asset:abc' },
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

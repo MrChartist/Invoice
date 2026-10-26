@@ -388,6 +388,14 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   dining_tables: 'master.edit',
   modifier_groups: 'master.edit',
   table_orders: 'doc.create',
+  // R3-B: work types are a master; project tasks and retainers are time books (like time_entries)
+  work_types: 'master.edit',
+  project_tasks: 'books.edit',
+  retainers: 'books.edit',
+  // R3-C: GSTR-1 portal file imports, DSC register, monthly client checklist
+  gst_portal_files: 'books.edit',
+  dsc_register: 'books.edit',
+  client_checklist: 'books.edit',
   // R4-A: production orders, QC decisions, recall notices and landed-cost vouchers are books
   production_orders: 'books.edit',
   qc_results: 'books.edit',

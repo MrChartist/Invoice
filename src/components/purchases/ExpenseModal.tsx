@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import { PURCHASE_CATEGORIES } from '../../types/purchases';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { computePurchaseTotals, expenseLine, paymentsDb, purchasesDb, PAYMENT_METHODS } from '../../lib/purchases';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { supplierPayable } from '../../lib/purchase-normalize';
@@ -16,6 +16,7 @@ import type { AttachmentRef } from '../../types/attachments';
 import { useT } from '../../i18n';
 import { methodLabel } from '../../i18n/labels';
 import { purT, purCategory } from '../../i18n/areas/purchases';
+import { expenseAmountLabel } from '../../lib/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
 import { saveBillGuarded } from '../../lib/bill-guard';
 import { capT } from '../../i18n/areas/capture';
@@ -57,7 +58,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
   const [category, setCategory] = useState(expense?.category ?? 'Rent');
   const [amount, setAmount] = useState(first ? first.rate : 0);
   const [taxRate, setTaxRate] = useState(first?.tax_rate ?? 0);
-  const [inclusive, setInclusive] = useState(false);
+  // QA-3 F11: a receipt shows what was paid, so a new expense takes the amount as GST-inclusive (an edit keeps the stored taxable rate).
+  const [inclusive, setInclusive] = useState(!expense);
   const [date, setDate] = useState(expense?.date ?? todayInput());
   const [vendorId, setVendorId] = useState(expense?.vendor_id ?? '');
   const [vendorName, setVendorName] = useState(expense && !expense.vendor_id ? expense.vendor_name : '');
@@ -176,13 +178,13 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
 
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="exp-amt">{purT('amountRs')}</label>
+          <label className={controls.label} htmlFor="exp-amt">{purT(expenseAmountLabel(taxRate, inclusive))}</label>
           <NumberInput id="exp-amt" className={controls.inputNumeric} value={amount} placeholder="0.00" onChange={setAmount} autoFocus />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="exp-tax">{purT('gstRate')}</label>
           <select id="exp-tax" className={controls.select} value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))}>
-            {GST_SLABS.map((s) => (
+            {gstRateOptions(date, taxRate).map((s) => (
               <option key={s} value={s}>{s === 0 ? purT('noGst') : `${s}%`}</option>
             ))}
           </select>

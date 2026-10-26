@@ -97,6 +97,14 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   dining_tables: { entity: 'settings', label: 'Dining table' },
   table_orders: { entity: 'invoice', label: 'Table order' },
   modifier_groups: { entity: 'item', label: 'Modifier group' },
+  // R3-B: work types (rate cards), project tasks, retainers
+  work_types: { entity: 'item', label: 'Work type' },
+  project_tasks: { entity: 'cost_centre', label: 'Project task' },
+  retainers: { entity: 'client', label: 'Retainer' },
+  // R3-C: GSTR-1 portal file imports, DSC register, monthly client checklist
+  gst_portal_files: { entity: 'gst', label: 'Portal file' },
+  dsc_register: { entity: 'settings', label: 'DSC' },
+  client_checklist: { entity: 'settings', label: 'Checklist' },
   // R4-A: production orders, QC decisions, recall notices (stock side), landed-cost vouchers (purchase side)
   production_orders: { entity: 'manufacturing', label: 'Production order' },
   qc_results: { entity: 'manufacturing', label: 'QC decision' },

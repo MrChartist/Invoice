@@ -94,6 +94,15 @@ export const IMPORT_SCHEMAS: Record<ImportKind, FieldDef[]> = {
     { key: 'address_pin', label: 'Ship-to PIN', type: 'text', synonyms: ['address_pin', 'Shipping Code', 'Shipping PIN', 'Ship To PIN', 'Delivery PIN'], example: ['410501', ''] },
     { key: 'address_state', label: 'Ship-to state', type: 'state', synonyms: ['address_state', 'Shipping State', 'Ship To State', 'Delivery State'], example: ['Maharashtra', ''] },
     { key: 'address_gstin', label: 'Ship-to GSTIN', type: 'gstin', synonyms: ['address_gstin', 'Shipping GSTIN', 'Ship To GSTIN', 'Consignee GSTIN'], example: ['', ''] },
+    // R3-B5: party document defaults (optional columns; src/lib/party-defaults.ts).
+    { key: 'default_template', label: 'Default template', type: 'text', synonyms: ['default_template', 'Default Template', 'Template'], example: ['corporate_navy', ''] },
+    { key: 'default_currency', label: 'Default currency', type: 'text', synonyms: ['default_currency', 'Default Currency', 'Customer Currency', 'Currency Code'], example: ['USD', ''] },
+    { key: 'default_discount_percent', label: 'Default line discount %', type: 'text', synonyms: ['default_discount_percent', 'Default Discount', 'Discount %', 'Customer Discount'], example: ['5', ''] },
+    { key: 'default_notes', label: 'Default notes', type: 'text', synonyms: ['default_notes', 'Default Notes', 'Customer Notes'], example: ['', ''] },
+    { key: 'default_terms', label: 'Default terms', type: 'text', synonyms: ['default_terms', 'Default Terms', 'Terms and Conditions'], example: ['', ''] },
+    { key: 'hourly_rate', label: 'Hourly rate', type: 'text', synonyms: ['hourly_rate', 'Hourly Rate', 'Billing Rate', 'Rate per Hour'], example: ['2500', ''] },
+    { key: 'attach_annexure', label: 'Attach timesheet annexure', type: 'text', synonyms: ['attach_annexure', 'Attach Annexure', 'Timesheet Annexure'], example: ['yes', ''] },
+    { key: 'print_lang', label: 'Print language', type: 'text', synonyms: ['print_lang', 'Print Language', 'Invoice Language'], example: ['', 'hi'] },
   ],
 
   items: [

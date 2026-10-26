@@ -29,6 +29,7 @@ export const hi: Messages = {
   'common.notSaved': 'सेव नहीं हुआ: {message}',
   'common.createInvoice': 'इनवॉइस बनाएँ',
   'common.language': 'भाषा',
+  'common.validGstin': 'मान्य GSTIN',
 
   // ── Document types / statuses / payment methods ───────────────────
   'doc.INVOICE': 'इनवॉइस',
@@ -80,6 +81,7 @@ export const hi: Messages = {
   'nav.gateway': 'गेटवे',
   'nav.accountsInfo': 'खाता जानकारी',
   'nav.designStudio': 'डिज़ाइन स्टूडियो',
+  'nav.practice': 'प्रैक्टिस डेस्क',
   'nav.settings': 'सेटिंग्स',
   'nav.groupSales': 'बिक्री',
   'nav.groupPurchases': 'खरीद और स्टॉक',
@@ -91,6 +93,8 @@ export const hi: Messages = {
   'shell.closeMenu': 'मेन्यू बंद करें',
   'shell.home': 'Mr. Chartist Invoice होम',
   'shell.search': 'खोजें',
+  'shell.notifications': 'सूचनाएँ',
+  'shell.notificationsUnread': 'सूचनाएँ, {n} बिना पढ़ी',
   'shell.searchPlaceholder': 'इनवॉइस, ग्राहक, पेज खोजें…',
   'shell.lightMode': 'लाइट मोड',
   'shell.darkMode': 'डार्क मोड',

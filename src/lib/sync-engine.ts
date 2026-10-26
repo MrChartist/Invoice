@@ -335,6 +335,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}batch_runs`]: 'date',
   // R3-A: running table orders, dated by the local day they were opened (`day`, else the `opened_at` date)
   [`${DB_PREFIX}table_orders`]: (r) => str(r.day) || str(r.opened_at).slice(0, 10) || undefined,
+  // R3-B: retainers (start day; their period closes stamp time entries)
+  [`${DB_PREFIX}retainers`]: 'start',
   // R4-A: production orders (order date), QC decisions, recall notices, landed-cost vouchers
   [`${DB_PREFIX}production_orders`]: 'date',
   [`${DB_PREFIX}qc_results`]: 'date',

@@ -1,0 +1,97 @@
+/* R3-B4 timesheet annexure page. Colours come from the template variables (accent only, Critical Rule 5). */
+
+.annexure {
+  break-before: page;
+  page-break-before: always;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--tpl-body);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--tpl-accent);
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.meta {
+  font-size: 10px;
+  color: var(--tpl-muted);
+}
+
+.section {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+  margin-top: 6px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5px;
+}
+
+.table th,
+.table td {
+  padding: 3px 5px;
+  border-bottom: 1px solid var(--tpl-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tpl-muted);
+}
+
+.table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.n {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total td {
+  font-weight: 700;
+  color: var(--tpl-ink);
+  border-top: 1px solid var(--tpl-accent);
+}
+
+.flag {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--tpl-accent);
+}
+
+.foot {
+  font-size: 8.5px;
+  color: var(--tpl-muted);
+}
+
+/* The PDF spacer only matters for the sliced capture; printing uses break-before. */
+.spacer { flex: none; }
+
+@media print {
+  .spacer { display: none; }
+}

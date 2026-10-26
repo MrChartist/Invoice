@@ -23,6 +23,7 @@ import { s2T } from '../../i18n/areas/sales-r2';
 
 // R2-A: payment term + reminder mode fields, loaded with their own strings.
 const ReminderModeField = lazy(() => import('../collections/ReminderModeField'));
+const DocDefaultsFields = lazy(() => import('../clients/DocDefaultsFields')); // R3-B5
 
 const BLANK: Client = {
   name: '',
@@ -292,6 +293,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         )}
         <ContactsEditor value={form.contacts ?? []} onChange={(v) => set('contacts', v)} />
         <AddressBookEditor value={form.addresses ?? []} onChange={(v) => set('addresses', v)} />
+        <Suspense fallback={null}><DocDefaultsFields value={form.doc_defaults} onChange={(v) => set('doc_defaults', v)} /></Suspense>
         <label className={controls.field}>
           <span className={controls.label}>{reachT('msgLang')}</span>
           <select className={controls.select} value={form.message_lang ?? ''} onChange={(e) => set('message_lang', isMessageLang(e.target.value) ? e.target.value : undefined)}>

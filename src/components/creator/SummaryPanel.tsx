@@ -162,9 +162,14 @@ export function SummaryPanel() {
           <Suspense fallback={null}>
             <MarginChip />
           </Suspense>
-          <p className={styles.words}>{amountInWords(t.total, cur)}</p>
-          {lang === 'hi' && <p className={styles.words} lang="hi">{amountInWordsHi(t.total, cur)}</p>}
-          {isWordsLang(lang) && <p className={styles.words} lang={lang}>{amountInWordsIn(lang, t.total, cur)}</p>}
+          {/* QA-3 F21: no bare "Zero" under an empty bill — words appear once there is an amount. */}
+          {t.total !== 0 && (
+            <>
+              <p className={styles.words}>{amountInWords(t.total, cur)}</p>
+              {lang === 'hi' && <p className={styles.words} lang="hi">{amountInWordsHi(t.total, cur)}</p>}
+              {isWordsLang(lang) && <p className={styles.words} lang={lang}>{amountInWordsIn(lang, t.total, cur)}</p>}
+            </>
+          )}
 
           <div className={styles.inputRow}>
             <span>{tr('summary.amountReceived')}</span>

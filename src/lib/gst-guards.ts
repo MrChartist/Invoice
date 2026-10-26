@@ -13,10 +13,11 @@
  */
 
 import { isNonGstFinancialNote } from './financial-note';
-import { ruleAt, type Versioned, b2clThreshold } from './tax-rules';
+import { ruleAt, type Versioned, b2clThreshold, rateInSlabs } from './tax-rules';
 import { complianceCalendar, daysBetween, filedFor, type CalendarOptions, type FiledReturn, type ReturnDue, type ReturnForm } from './compliance';
 import { shiftDay } from './dates';
 import { getTable, setTable } from './storage';
+import { isOwnGstin } from './gstin';
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -217,24 +218,14 @@ export function timeBarList(o: CalendarOptions, filed: readonly FiledReturn[], g
 
 /* ── GST rate slabs by date ──────────────────────────────────────────── */
 
-/**
- * Rates (%) a document line may carry on a date. Before 22 Sep 2025: the 2017 schedules (0, 0.1, 0.25, 1, 1.5, 3, 5,
- * 6, 12, 18, 28). From 22 Sep 2025 (GST rate rationalisation, 56th GST Council; Notification 9/2025-CT(R) as
- * understood): 5 / 18 / 40 replace 12 and 28 — 28% stays only for tobacco / pan masala until compensation cess ends.
- * The special rates (0.1, 0.25, 1, 1.5, 3, 6) are kept. A rate outside the list is an exception to REVIEW, not an
- * error. Verify with your CA.
- */
-export const GST_SLAB_RULES: readonly Versioned<readonly number[]>[] = [
-  { from: '2017-07-01', value: [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28], source: 'Notifications 1/2017-CT(R), 11/2017-CT(R) and later amendments' },
-  { from: '2025-09-22', value: [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 18, 28, 40], source: 'GST rate rationalisation from 22 Sep 2025 (28% only for tobacco / pan masala) — verify' },
-];
-
-export const slabsAt = (date?: string) => ruleAt(GST_SLAB_RULES, date);
-export const rateInSlabs = (rate: number, date?: string) => slabsAt(date).some((s) => Math.abs(s - rate) < 1e-9);
+// The date-keyed slab table lives in tax-rules.ts (QA-3 F9: the rate pickers read it too).
+export { GST_SLAB_RULES, slabsAt, rateInSlabs } from './tax-rules';
 
 /* ── Exceptions ("uncertain transactions") ───────────────────────────── */
 
-export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE';
+export { isOwnGstin } from './gstin';
+
+export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN';
 
 export interface GstException {
   code: GstExceptionCode;
@@ -288,6 +279,8 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
         else push('IRN_MISSING', 'error', { deadline: w ? w.deadline : '' });
       }
     }
+    // The buyer GSTIN is our own: not a supply to a registered recipient — usually a typo or the wrong party.
+    if (b2b && isOwnGstin(ctin, sg)) push('OWN_GSTIN', 'warning', { gstin: ctin });
     if (b2b) {
       const noHsn = lines.filter((it) => !String(it.hsn ?? '').trim()).length;
       if (noHsn) push('B2B_NO_HSN', 'warning', { n: noHsn });

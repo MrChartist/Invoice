@@ -6,6 +6,7 @@
  * exact total it was issued with (flat `tax_rate` + a single "Tax" line).
  */
 
+import type {} from '../types/docs-r3'; // R3-C2: delivery_proof (RECORD_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -195,6 +196,8 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(item.free_of ? { free_of: String(item.free_of) } : {}),
     // Alternate unit (WP-8): only on lines typed in one, so base-unit lines keep their exact shape.
     ...(num(item.unit_factor) > 0 && num(item.unit_factor) !== 1 ? { unit_factor: num(item.unit_factor) } : {}),
+    // R3-C2 (additive): the catalogue photo reference the line snapshotted at save.
+    ...(typeof item.image === 'string' && item.image.startsWith('asset:') ? { image: item.image } : {}),
   };
 }
 
@@ -307,6 +310,10 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     // R3-A (additive): the table order a POS bill settled, and its split part.
     ...(typeof r.table_order_id === 'string' && r.table_order_id ? { table_order_id: r.table_order_id } : {}),
     ...(r.split_of && typeof r.split_of === 'object' ? { split_of: r.split_of as InvoiceRecord['split_of'] } : {}),
+    // R3-B4 (additive): the timesheet annexure snapshot travels with the document unchanged (Critical Rule 3).
+    ...(r.annexure && typeof r.annexure === 'object' && Array.isArray((r.annexure as { rows?: unknown }).rows) ? { annexure: r.annexure as InvoiceRecord['annexure'] } : {}),
+    // R3-C2 (additive): receiver signature snapshot (proof of delivery).
+    ...(r.delivery_proof && typeof r.delivery_proof === 'object' && (r.delivery_proof as { receiver?: unknown }).receiver ? { delivery_proof: r.delivery_proof as InvoiceRecord['delivery_proof'] } : {}),
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

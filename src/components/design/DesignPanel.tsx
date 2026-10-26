@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { DEFAULT_TEMPLATE_ID, templateById } from '../templates/registry';
@@ -28,6 +28,8 @@ import { calculateInvoice } from '../../lib/invoice-calc';
 import { designForDoc, GLOBAL_PROFILE_ID } from '../../lib/design-prefs';
 import { localDb } from '../../lib/localDb';
 import { DesignLabels, LogoAccentSuggest } from './DesignLabels';
+// R3-C2 / C3: page margins, letterhead artwork and the item-photo toggle (lazy, with their own strings).
+const PagePanel = lazy(() => import('./PagePanel'));
 import { dlT } from '../../i18n/areas/design-r2';
 import { cn } from '../../lib/utils';
 import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
@@ -168,6 +170,12 @@ function LivePreview({
   );
 }
 
+const PRESET_KEYS = ['classic', 'compact', 'minimal', 'receipt'] as const;
+/** Preset card text in the interface language (the preset table itself stays English data). */
+function presetText(id: string, part: 'name' | 'desc', fallback: string): string {
+  return (PRESET_KEYS as readonly string[]).includes(id) ? desT(`preset.${id as (typeof PRESET_KEYS)[number]}.${part}`) : fallback;
+}
+
 /**
  * Controlled editor for one DesignPrefs row. The parent owns persistence
  * (see lib/design-prefs `saveDesign`), so it can debounce, confirm, or save
@@ -231,8 +239,8 @@ export function DesignPanel({
           <div className={styles.presets}>
             {presets.map((p) => (
               <button key={p.id} type="button" className={styles.preset} onClick={() => onChange(applyPreset(design, p.id))}>
-                <span className={styles.presetName}>{p.name}</span>
-                <span className={styles.presetDesc}>{p.description}</span>
+                <span className={styles.presetName}>{presetText(p.id, 'name', p.name)}</span>
+                <span className={styles.presetDesc}>{presetText(p.id, 'desc', p.description)}</span>
               </button>
             ))}
           </div>
@@ -360,6 +368,11 @@ export function DesignPanel({
             />
           </div>
         </Section>
+
+        {/* R3-C2 / C3: margins, letterhead / footer artwork, item photos on lines. */}
+        <Suspense fallback={null}>
+          <PagePanel design={design} onChange={set} sectionClass={styles.section} titleClass={styles.sectionTitle} />
+        </Suspense>
 
         <Section title={desT('itemColumns')}>
           <div className={styles.checks}>

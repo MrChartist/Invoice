@@ -67,6 +67,7 @@ import styles from './GstReports.module.css';
 import local from '../components/gst-reports/gst-reports.module.css';
 import { useT } from '../i18n';
 import { gstT } from '../i18n/areas/gst';
+import { dkT } from '../i18n/areas/desks-r3'; // R3-C4 / C5 tab names
 import { nodes } from '../i18n/areas/nodes';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
@@ -93,9 +94,12 @@ type TabId = GstTabId;
 const TABS = GST_TABS;
 const GROUP_LABEL: Record<GstTabGroupId, Parameters<typeof fiT>[0]> = { gstr1: 'groupGstr1', gstr3b: 'groupGstr3b', recon: 'groupRecon', tools: 'groupTools' };
 // 8I: the check before a JSON download — loaded when there is something to show.
+// R3-C4 / C5: GSTR-1 portal files and the e-Way desk (lazy tabs; working papers).
+const PortalFilesView = lazy(() => import('../components/gst-reports/PortalFilesView'));
+const EwayDesk = lazy(() => import('../components/gst-reports/EwayDesk'));
 const PreflightDialog = lazy(() => import('../components/gst-reports/PreflightDialog'));
 
-const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0] } | undefined) => (x?.key ? gstT(x.key) : x?.label);
+const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0]; desk?: 'tab.portal' | 'tab.eway' } | undefined) => (x?.desk ? dkT(x.desk) : x?.key ? gstT(x.key) : x?.label);
 
 function download(name: string, mime: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
@@ -226,6 +230,11 @@ export function GstReports() {
     return buildPreflight({ exceptions, issues, gaps });
   }, [invoices, period, gstin, issues, gaps]);
   const checkCount = preflightCount(preflight);
+  // R3-C4: unresolved portal errors of this period × GSTIN add an optional step to the filing strip.
+  // Same count as `openPortalErrors` (gst-portal-files.ts), inlined so the reader stays in its lazy tab chunk.
+  const portalErrors = (() => getTable<{ kind?: string; period?: string; gstin?: string; findings?: { key: string }[]; resolved?: Record<string, true> }>('gst_portal_files')
+      .filter((r) => r?.kind === 'gstr1_error' && r.period === g1.fp && (!gstin || !r.gstin || r.gstin === gstin))
+      .reduce((n, r) => n + (r.findings ?? []).filter((f) => !r.resolved?.[f.key]).length, 0))();
   const navigate = useNavigate();
   const [pending, setPending] = useState<null | { form: PreflightForm | null; run?: () => boolean }>(null);
   const [downloaded, setDownloaded] = useState('');
@@ -570,6 +579,15 @@ export function GstReports() {
             <Gstr2bView period={period} gstin={gstin} filerStateCode={filerStateCode} notify={notify} />
           </Suspense>
         );
+      case 'portal-files':
+      case 'eway-desk':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            {tab === 'portal-files'
+              ? <PortalFilesView g1={g1} period={period} gstin={gstin} turnover={{ gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }} notify={notify} />
+              : <EwayDesk notify={notify} />}
+          </Suspense>
+        );
       case 'compliance':
         return <ComplianceView invoices={invoices} purchases={purchases} gstin={gstin} stateCode={filerStateCode} turnover={lastFyTurnover} notify={notify} />;
       default:
@@ -725,6 +743,11 @@ export function GstReports() {
               {fiT('stepCheck')} ({checkCount})
             </button>
           </li>
+          {portalErrors > 0 && (
+            <li className={filing.stepWarn} data-filing-portal-errors>
+              <button type="button" className={filing.stepBtn} onClick={() => setTab('portal-files')}>{dkT('tab.portal')} ({portalErrors})</button>
+            </li>
+          )}
           <li className={downloaded === periodTag ? filing.stepDone : filing.step}>
             <span className={filing.stepName}>{fiT('stepDownload')}</span>
             <span className={filing.stepBtns}>
