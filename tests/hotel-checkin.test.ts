@@ -2,7 +2,7 @@
 import './helpers/shim.ts';
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { booking, setupHotel } from './helpers/hotel.ts';
+import { booking, checkOutStay, setupHotel } from './helpers/hotel.ts';
 import { NeedsConfirm, checkIn, markCheckedOut, walkIn } from '../src/lib/hotel/checkin.ts';
 import { saveReservation } from '../src/lib/hotel/reservations.ts';
 import { cleanGuest, formCMissing, guestRegister, maskAadhaar, matchGuest, shownId } from '../src/lib/hotel/guests.ts';
@@ -98,7 +98,9 @@ test('check-in refused on an OOO / occupied / other-type room; a dirty room need
 test('check-out → room dirty, booking closed; guest register lists the stay', () => {
   setupHotel('2026-10-20');
   const out = walkIn({ booking: { guest: { name: 'Asha Rao' }, departure: '2026-10-21', guarantee: 'none', lines: [{ room_type_id: 'dlx', rate_plan_id: 'ep', adults: 1, children: 0, extra_beds: 0 }] } as never, roomId: 'r101', guests: [guest(), guest({ name: 'Ravi Rao', phone: '' })], at: AT });
-  const after = markCheckedOut(out.res.id, out.line.id, new Date('2026-10-21T10:00:00'));
+  assert.throws(() => markCheckedOut(out.res.id, out.line.id, new Date('2026-10-21T10:00:00')), /Bill the stay first/, 'QA9 H1: never closed with an unbilled night');
+  checkOutStay(out.res.id, out.line.id, new Date('2026-10-21T10:00:00'));
+  const after = hotelDb.reservation(out.res.id)!;
   assert.equal(after.status, 'checked_out');
   assert.equal(hotelDb.rooms().find((r) => r.id === 'r101')!.hk_status, 'dirty');
   const reg = guestRegister(hotelDb.reservations(), hotelDb.guests(), (id) => (id === 'r101' ? '101' : ''), '2026-10-01', '2026-10-31');

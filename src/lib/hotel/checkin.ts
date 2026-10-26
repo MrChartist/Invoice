@@ -12,10 +12,13 @@ import type { Folio, Reservation, RoomLine } from '../../types/hotel-r7';
 import { requireAccess } from '../access';
 import { withTablesRollback } from '../table-txn';
 import { hotelDb, HT } from './hotel-store';
-import { checkLines, oooOn } from './availability';
+import { checkLines, lineDates, oooOn } from './availability';
 import { HotelError, saveReservation, type ReservationInput } from './reservations';
 import { cleanGuest, formCMissing, isIndian, type GuestInput } from './guests';
-import { openFolios } from './room-post';
+import { openFolios, pendingNights } from './room-post';
+import { leaveDay } from './business-date';
+import { billable } from './checkout';
+import { todayIso } from '../tax-rules';
 import { formCRule } from './hotel-rules';
 import { readyForCheckIn, setHk } from './housekeeping';
 
@@ -96,14 +99,44 @@ export function walkIn(input: WalkInInput): CheckInResult {
   });
 }
 
-/** Line out (R7-B3 calls this after billing): `checked_out_at`, room dirty; the booking closes when no line is in. */
+/**
+ * QA9 H9: an early check-out ends the line on the day the guest left — `departure` moves there (the booked day kept in
+ * `booked_departure`) and the nightly snapshot keeps only the nights stayed, so occupancy, availability and the
+ * previous-FY test read what was supplied. Pure; no change when the guest leaves on the booked day.
+ */
+export function trimLine(res: Reservation, lineId: string, leave: string): Reservation {
+  const line = res.lines.find((l) => l.id === lineId);
+  if (!line) return res;
+  const d = lineDates(res, line);
+  if (!(leave > d.arrival && leave < d.departure)) return res;
+  const cut: RoomLine = { ...line, departure: leave, booked_departure: line.booked_departure ?? d.departure, nightly: line.nightly.filter((n) => n.night < leave) };
+  return { ...res, lines: res.lines.map((l) => (l.id === lineId ? cut : l)) };
+}
+
+/** The day a checked-in line's guest leaves if checked out now (QA9 H1 / H9). */
+export function lineLeaveDay(res: Reservation, line: RoomLine, at: Date = new Date()): string {
+  const d = lineDates(res, line);
+  return leaveDay(d.arrival, d.departure, hotelDb.settings().business_date, todayIso(at));
+}
+
+/**
+ * Line out (R7-B3's check-out calls this after billing): `checked_out_at`, room dirty; the booking closes when no line
+ * is in. QA9 H1: refused while the line has nights not yet posted before the day the guest leaves, or unbilled folio
+ * lines — a line never closes with unbilled nights (bill it on Folios → Check out). An early check-out trims the line (H9).
+ */
 export function markCheckedOut(resId: string, lineId: string, at: Date = new Date()): Reservation {
   requireAccess('doc.create');
   const res = hotelDb.reservation(resId);
   const line = res?.lines.find((l) => l.id === lineId);
   if (!res || !line || line.status !== 'checked_in') throw new HotelError('This room is not checked in.');
-  const lines = res.lines.map((l) => (l.id === lineId ? { ...l, status: 'checked_out' as const, checked_out_at: at.toISOString() } : l));
-  const next: Reservation = { ...res, lines, status: lines.some((l) => l.status === 'checked_in' || l.status === 'booked') ? res.status : 'checked_out', updated_at: at.toISOString() };
+  const leave = lineLeaveDay(res, line, at);
+  const folios = hotelDb.folios();
+  if (pendingNights(res, line, folios, leave).length || folios.some((f) => f.line_id === lineId && f.status === 'open' && billable(f).length)) {
+    throw new HotelError('Bill the stay first: Folios → Check out.');
+  }
+  const cut = trimLine(res, lineId, leave);
+  const lines = cut.lines.map((l) => (l.id === lineId ? { ...l, status: 'checked_out' as const, checked_out_at: at.toISOString() } : l));
+  const next: Reservation = { ...cut, lines, status: lines.some((l) => l.status === 'checked_in' || l.status === 'booked') ? res.status : 'checked_out', updated_at: at.toISOString() };
   hotelDb.putReservations(next);
   if (line.room_id) setHk([line.room_id], 'dirty', at);
   return next;

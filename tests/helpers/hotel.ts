@@ -5,6 +5,7 @@ import { hotelDb, HOTEL_SETTINGS_KEY } from '../../src/lib/hotel/hotel-store.ts'
 import { getJson, setJson } from '../../src/lib/storage.ts';
 import type { RatePlan, Room, RoomType } from '../../src/types/hotel-r7.ts';
 import type { ReservationInput } from '../../src/lib/hotel/reservations.ts';
+import { saveCheckout } from '../../src/lib/hotel/checkout-save.ts';
 
 export const DLX: RoomType = { id: 'dlx', name: 'Deluxe', code: 'DLX', base_occupancy: 2, max_occupancy: 3, max_extra_beds: 1 };
 export const STE: RoomType = { id: 'ste', name: 'Suite', code: 'STE', base_occupancy: 2, max_occupancy: 4, max_extra_beds: 1 };
@@ -37,4 +38,10 @@ export function booking(arrival: string, departure: string, line: Partial<Reserv
     lines: [{ room_type_id: 'dlx', rate_plan_id: 'ep', adults: 2, children: 0, extra_beds: 0, ...line }],
     ...over,
   };
+}
+
+/** Bill every open window of a room line and check it out (QA9 H1: `markCheckedOut` alone refuses unbilled nights). */
+export function checkOutStay(resId: string, lineId: string, at?: Date) {
+  const windows = hotelDb.folios().filter((f) => f.reservation_id === resId && f.line_id === lineId && f.status === 'open').map((f) => ({ folioId: f.id }));
+  return saveCheckout({ windows, checkout: { resId, lineId }, at });
 }

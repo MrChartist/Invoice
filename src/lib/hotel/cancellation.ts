@@ -5,7 +5,7 @@
  * night's band (F8, D13 — "pct" takes the band of the booked night value, not of the charge). The booking's advances
  * are applied to the invoice and what is left is refunded with the existing refund voucher (`RFV`, Rule 51). A waiver
  * or an edited amount needs a reason; a waived charge makes no invoice. A company-guaranteed booking with no advance
- * is invoiced to the company on credit. Working paper — verify with your CA.
+ * is invoiced to the company on credit; so is one whose company paid an advance (QA9 H7). Working paper — verify with your CA.
  */
 import type { CancelPolicy, Folio, FolioLine, RatePlan, Reservation } from '../../types/hotel-r7';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -14,7 +14,7 @@ import { round2 } from '../invoice-calc';
 import { requireAccess } from '../access';
 import { withTablesRollback } from '../table-txn';
 import { todayIso } from '../tax-rules';
-import { loadAdvances, refundAdvance, advanceBalance } from '../advances';
+import { loadAdvances, refundAdvance, advanceBalance, samePartyAs } from '../advances';
 import { localDb } from '../localDb';
 import { hotelDb } from './hotel-store';
 import { HotelError } from './reservations';
@@ -91,7 +91,10 @@ export function chargeCancellation(resId: string, input: CancelInput = {}): { re
   return withTablesRollback(SAVE_TABLES, () => {
     let invoice: InvoiceRecord | undefined;
     const advIds = new Set(res.advance_ids ?? []);
-    const company = res.guarantee === 'company' && res.bill_to && !advIds.size;
+    // QA9 H7: the company is the payer when it guaranteed the booking or paid any of its advances (B2B on its GSTIN),
+    // so its advance is adjusted against the charge and only the rest is refunded.
+    const coPaid = !!res.bill_to && loadAdvances().some((a) => advIds.has(a.id) && samePartyAs(a.client, { id: res.bill_to!.client_id, name: res.bill_to!.name }));
+    const company = !!res.bill_to && (coPaid || (res.guarantee === 'company' && !advIds.size));
     const folio: Folio = {
       id: generateId(), name: `${res.number} · ${kind === 'no_show' ? 'No-show' : 'Cancellation'}`, reservation_id: res.id, window: 1, opened_on: day, status: 'open',
       payer: company ? { kind: 'client', client_id: res.bill_to!.client_id, name: res.bill_to!.name } : { kind: 'guest', name: res.guest.name },
@@ -102,7 +105,8 @@ export function chargeCancellation(resId: string, input: CancelInput = {}): { re
     };
     if (amount > 0) {
       const draft = draftFor(folio, day);
-      const adv = advancesFor(folio, res).filter((a) => advIds.has(a.id)).map((a) => ({ id: a.id, amount: a.open }));
+      // The booking's own advances by id (H8), of the invoice's payer.
+      const adv = advancesFor(folio, res).filter((a) => a.own).map((a) => ({ id: a.id, amount: a.open }));
       invoice = saveAndSettle(draft.record, { advances: adv }, todayIso(at));
       hotelDb.putFolios({ ...folio, status: 'invoiced', invoice_ids: [invoice.id], lines: folio.lines.map((l) => ({ ...l, src: { ...l.src, invoice_id: invoice!.id } })) });
     }

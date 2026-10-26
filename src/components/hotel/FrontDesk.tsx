@@ -23,7 +23,9 @@ import { shiftDay } from '../../lib/dates';
 import { todayIso } from '../../lib/tax-rules';
 import { hotelDb, usingStarter } from '../../lib/hotel/hotel-store';
 import { freeRooms, isLiveLine, isLiveRes, lineDates, oooOn } from '../../lib/hotel/availability';
-import { auditNights, nightsBetween } from '../../lib/hotel/business-date';
+import { auditNights, isYearEnd, nightsBetween } from '../../lib/hotel/business-date';
+import { yearEndInterims } from '../../lib/hotel/checkout-save';
+import { bT } from '../../i18n/areas/hotel-billing-r7';
 import { advanceRate, arrivalsOn, closeReservation, departuresOn, inHouseOn, priceLine, reservationValue, saveReservation, searchReservations, takeAdvance } from '../../lib/hotel/reservations';
 import { NeedsConfirm, checkIn, markCheckedOut, walkIn } from '../../lib/hotel/checkin';
 import { FORM_C_FIELDS, ID_TYPES, guestRegister, isIndian, matchGuest, shownId, type GuestInput } from '../../lib/hotel/guests';
@@ -464,14 +466,14 @@ function Register({ ctx }: { ctx: Ctx }) {
 function Audit({ ctx }: { ctx: Ctx }) {
   const nights = auditNights(ctx.day, todayIso());
   const d = useMemo(() => ({ res: hotelDb.reservations(), guests: hotelDb.guests(), audits: hotelDb.audits().slice(-15).reverse() }), [ctx.tick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [yearEnd, setYearEnd] = useState(false);
+  // QA9 H10: 31 March interim invoices are offered while the business date is 31 March (before the roll), dated 31 March.
+  const yearEnd = isYearEnd(ctx.day) && hotelDb.settings().interim_year_end && d.res.some((r) => r.lines.some((l) => l.status === 'checked_in'));
   const pc = nights.length ? preCheck(nights[0], d.res, d.guests) : null;
   const go = () => {
     if (nights.length > 1 && !window.confirm(hT('catchUp', { n: nights.length, list: nights.join(', ') }))) return;
     const r = runAudit();
     if (r.done.length) ctx.notify(hT('auditDone', { d: r.done.map((x) => x.audit.business_date).join(', ') }));
     if (r.stopped) ctx.notify(hT('stopped', { d: r.stopped.night, reason: r.stopped.reason }), 'error');
-    setYearEnd(r.done.some((x) => x.yearEnd));
     ctx.refresh();
   };
   const list = (k: HKey, rows: LineRef[], fix?: (x: LineRef) => ReactNode) => rows.length > 0 && (
@@ -501,7 +503,8 @@ function Audit({ ctx }: { ctx: Ctx }) {
         <button type="button" className={B.os} onClick={() => csvDownload('night-audits.csv', [head, ...rows])}>{hT('csv')}</button>
         <button type="button" className={B.os} onClick={() => printHtml(`<h2>${hT('view.audit')}</h2>${table(head, rows)}`, 'night-audits')}>{hT('print')}</button>
       </Row>
-      {yearEnd && <p className={styles.warn}>{hT('yearEnd')}</p>}
+      {yearEnd && <Row><span className={styles.warn}>{hT('yearEnd')}</span>
+        <button type="button" className={B.o} onClick={() => ctx.run(() => yearEndInterims(ctx.day))} data-year-end-interims>{bT('yearEndGo')}</button></Row>}
       <Tbl head={head} rows={rows} />
     </div>
   );

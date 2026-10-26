@@ -26,3 +26,14 @@ export function auditNights(businessDate: string, today: string = todayIso()): s
 
 /** D7: 31 March — the audit offers interim invoices for in-house guests. */
 export const isYearEnd = (day: string): boolean => day.slice(5) === '03-31';
+
+/**
+ * QA9 H1 / H9: the day a guest checking out now leaves — the booked departure, or earlier (an early check-out) — read
+ * from the business date and the device's day, whichever is later (a missed audit leaves the business date behind).
+ * A stay bills at least its first night.
+ */
+export function leaveDay(arrival: string, departure: string, businessDate: string, today: string = todayIso()): string {
+  const now = businessDate > today ? businessDate : today;
+  const d = now < departure ? now : departure;
+  return d > arrival ? d : nextDay(arrival);
+}
