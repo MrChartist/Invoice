@@ -132,7 +132,7 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   gta_options: { entity: 'gst', label: 'GTA option' },
   vehicles: { entity: 'item', label: 'Vehicle' },
   trips: { entity: 'invoice', label: 'Trip' },
-  ra_measurements: { entity: 'invoice', label: 'RA measurement' },
+  ra_measurements: { entity: 'invoice', label: 'RA bill' },
   boq_coefficients: { entity: 'item', label: 'BOQ coefficient' },
 };
 

@@ -262,6 +262,8 @@ declare module './invoice' {
     trip_id?: string;
     /** R5-B5: the RA deduction this row settles (GST TDS, cess, retention release, advance recovery). */
     ra_kind?: RaDeductionKind;
+    /** R5-B5: the journal (Dr GST TDS receivable / labour cess | Cr clearing) recorded with this deduction receipt. */
+    ra_journal_id?: string;
   }
 }
 

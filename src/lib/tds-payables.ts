@@ -407,7 +407,7 @@ export function resolveBillTds(v: BillTdsInput, ctx: { date: string; taxable: nu
   const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate, lowerFrom: v.lowerFrom, lowerTo: v.lowerTo, lowerLimit: v.lowerLimit, lowerUsed, transporter194c6: v.transporter194c6 }, ctx.prior, ctx.excludeId);
   if (!suggestion) return { suggestion: null, fields: NO_TDS };
   // R5-B3: a 194C(6) nil deduction is kept on the bill (reason T) so the 26Q paper reports it.
-  if (suggestion.reason === 'T' && v.rate === undefined && v.amount === undefined) return { suggestion, fields: { ...NO_TDS, tds_section: v.section, tds_rate: 0, tds_base: suggestion.base, tds_amount: 0, tds_on: v.on, tds_pan: pan || undefined, tds_deductee_type: suggestion.deducteeType, tds_reason: 'T' } };
+  if (suggestion.reason === 'T' && !(num(v.rate) > 0) && !(num(v.amount) > 0)) return { suggestion, fields: { ...NO_TDS, tds_section: v.section, tds_rate: 0, tds_base: suggestion.base, tds_amount: 0, tds_on: v.on, tds_pan: pan || undefined, tds_deductee_type: suggestion.deducteeType, tds_reason: 'T' } };
   const rate = v.rate ?? suggestion.rate;
   const base = v.base ?? suggestion.base;
   const amount = v.amount ?? (v.rate !== undefined || v.base !== undefined ? roundTds((base * rate) / 100) : suggestion.amount);
@@ -425,6 +425,43 @@ export function resolveBillTds(v: BillTdsInput, ctx: { date: string; taxable: nu
       tds_reason: (v.rate === undefined && suggestion.reason !== 'Y' ? suggestion.reason : '') || undefined,
       tds_cert_no: v.lowerCert?.trim() || undefined,
     },
+  };
+}
+
+/** The vendor-master fields the bill / expense form's TDS block starts from. */
+export interface VendorTdsSource {
+  pan?: string;
+  tds_section?: string;
+  tds_non_filer?: boolean;
+  tds_lower_cert?: string;
+  tds_lower_rate?: number;
+  tds_lower_from?: string;
+  tds_lower_to?: string;
+  tds_lower_limit?: number;
+  transporter_194c6?: Payee['transporter194c6'];
+}
+
+/**
+ * The TDS block of the bill / expense form for a stored bill (or a new one) and its vendor. A stored rate / base /
+ * amount is kept as typed, except for a Sec 194C(6) nil deduction (reason `T`, R5-B3): that one keeps following the
+ * declaration — the vendor's, or (when the vendor master lost it) the one the bill was saved under — so an edit keeps
+ * reason `T` and nil TDS.
+ */
+export function billTdsInputFor(p: (Partial<PurchaseRecordTds> & { date?: string }) | null | undefined, v?: VendorTdsSource): BillTdsInput {
+  const nilT = p?.tds_reason === 'T';
+  const decl = v?.transporter_194c6 ?? (nilT && p?.date ? { declared_on: p.date, vehicles_owned: 0, pan: p.tds_pan || v?.pan } : undefined);
+  return {
+    section: p?.tds_section ?? '',
+    on: p?.tds_on ?? 'BILL',
+    pan: p?.tds_pan ?? v?.pan ?? '',
+    lowerCert: p?.tds_cert_no ?? v?.tds_lower_cert,
+    lowerRate: v?.tds_lower_rate,
+    lowerFrom: v?.tds_lower_from,
+    lowerTo: v?.tds_lower_to,
+    lowerLimit: v?.tds_lower_limit,
+    nonFiler: v?.tds_non_filer,
+    ...(decl ? { transporter194c6: decl } : {}),
+    ...(p?.tds_section && !nilT ? { rate: p.tds_rate, base: p.tds_base, amount: p.tds_amount } : {}),
   };
 }
 

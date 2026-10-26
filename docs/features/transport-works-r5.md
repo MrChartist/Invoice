@@ -143,8 +143,8 @@ clearing" is a clearing account (pickers must use `pickableBankAccounts`).
 
 | | before | after | delta |
 |---|---|---|---|
-| Initial JS (first paint) | 187,014 B (182.6 kB) | 187,215 B (182.8 kB) | **+201 B (0.196 kB)** — budget +0.2 kB |
-| Total JS | 2,404,240 B | 2,457,219 B | **+53.0 kB** (51.7 KiB) — package budget 34 kB: **over by ≈18–19 kB, needs the lead** |
+| Initial JS (first paint) | 187,014 B (182.6 kB) | 187,207 B (182.8 kB) | **+193 B (0.19 kB)** — budget +0.2 kB |
+| Total JS | 2,404,240 B | 2,458,739 B | **+54.5 kB** (53.2 KiB) — package budget 34 kB: over by ≈20 kB; **accepted by the lead** (global cap 2600 kB holds) |
 
 Where it goes (gz): TransportTab chunk 12.8 kB (LR, freight bill, vehicles, trips, GTA UI + `consignment-notes`,
 `freight-bill`, `lr-print`, `trip-pnl`), WorksTab 11.9 kB (BOQ, deductions, RA, retention, sites UI + `boq`,
@@ -183,8 +183,10 @@ from the first-paint `tdsSections` (avoids splitting `tds-rules`).
 
 - **Bundle**: total-JS delta is over the package budget (see table); first paint is within +0.2 kB.
 - `transporter_194c6` is kept on the **vendor** (the lorry owner is a supplier: the hire bill is a purchase), not on
-  `clients` as the PRD listed. The vehicle form saves it on the owner's vendor record. BillModal does not read it yet: a
-  hire bill edited in Bills recomputes TDS without the declaration — hire bills are created from the trip sheet.
+  `clients` as the PRD listed. The vehicle form saves it on the owner's vendor record. The hire bill is a supplier bill (`PURCHASE`, opens in
+  BillModal); BillModal and ExpenseModal start their TDS block from `billTdsInputFor` (`tds-payables.ts`), which reads the
+  vendor's declaration and keeps a stored reason-`T` nil deduction on edit (also when the vendor master lost the
+  declaration).
 - BOQ terms are grouped in one additive field `boq_terms` (instead of `ra_deduction_set` / `dlp_months` / `advance_id`
   separately), so `RECORD_KEYS` gains 8 keys (7 in the PRD + `boq_terms`).
 - `ProgressBasis` is a type alias, so `'measured'` was added in `types/sales-r2.ts` (one token) — declaration merging
@@ -194,5 +196,7 @@ from the first-paint `tdsSections` (avoids splitting `tds-rules`).
 - B's statutory values live in `src/lib/transport-works-rules.ts` (date-keyed `Versioned` rows, "verify"), not appended
   to `tax-rules.ts`, which is in the first-paint bundle (appending them there alone would cost ≈0.4 kB of first paint).
 - One bell gate function (`ensureTransportWorksAlerts`) with two lazy imports, each checked against its own pack.
-- A GST TDS / cess receipt removed from the payment dialog leaves its journal (delete it in Books → Vouchers).
+- A GST TDS / cess receipt carries `ra_journal_id`; removing it from the payment dialog removes its journal with it
+  (`removeDeductionRow`: one `withTablesRollback`, period lock on both, recycle bin through `payments.remove` /
+  `deleteVoucher`). Other screens that delete receipts (cheques, write-offs) never hold these rows.
 - RA numbers: a cancelled RA bill's number is issued again (the invoice number is not).

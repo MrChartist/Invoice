@@ -236,7 +236,7 @@ export function recordLorryHire(tripId: string, h: { date: string; vendorId: str
   );
   return withTablesRollback([PURCHASES_TABLE, TRIPS_TABLE], () => {
     const bill = purchasesDb.save({
-      kind: 'EXPENSE', vendor_id: vendor.id, vendor_name: vendor.name, vendor_gstin: vendor.gstin, bill_number: h.billNumber?.trim() || trip.number, date: h.date,
+      kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, vendor_gstin: vendor.gstin, bill_number: h.billNumber?.trim() || trip.number, date: h.date,
       category: HIRE_CATEGORY, lines: [line], taxable: totals.taxable, cgst: 0, sgst: 0, igst: 0, total: totals.total, itc_eligible: false, amount_paid: 0,
       trip_id: tripId, ...fields,
     });

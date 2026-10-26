@@ -15,7 +15,7 @@ import { addTripExpense, closeTrip, giveDriverAdvance, loadTrips, recordLorryHir
 import { lrIncome, rollup, tripPnl } from '../src/lib/transport/trip-pnl.ts';
 import { saveLr, loadLrs, type LrInput } from '../src/lib/transport/consignment-notes.ts';
 import { createFreightBills } from '../src/lib/transport/freight-bill.ts';
-import { suggestTds, tdsDeductions, transporter194c6Exempt } from '../src/lib/tds-payables.ts';
+import { billTdsInputFor, priorCreditsFor, resolveBillTds, suggestTds, tdsDeductions, transporter194c6Exempt } from '../src/lib/tds-payables.ts';
 import { form26Q } from '../src/lib/tds-returns.ts';
 import { transportNotices } from '../src/lib/transport/transport-alerts.ts';
 import { sectionText } from '../src/lib/ita2025.ts';
@@ -118,4 +118,35 @@ test('194C(6): nil TDS only with a declaration, PAN and ≤ 10 vehicles, on or a
   assert.ok(!paper.warnings.some((w) => /Kamal Roadlines: ₹0\.00 deducted/.test(w)));
   // The label follows the Income-tax Act 2025 from 1 Apr 2026.
   assert.match(sectionText('194C-1', '2026-06-10'), /Sec 393\(1\).*6\(i\).*\[old 194C\]/);
+});
+
+test('regression: editing a lorry-hire bill in the bill form keeps reason T and nil TDS (194C(6))', () => {
+  const decl = { declared_on: '2026-04-01', vehicles_owned: 6, pan: 'ABCPK1234F' };
+  const owner = vendorsDb.save({ name: 'Kamal Roadlines', pan: 'ABCPK1234F', deductee_type: 'INDIVIDUAL', tds_section: '194C-1', transporter_194c6: decl });
+  const hired = saveVehicle({ reg_no: 'MH14XY9999', own: false, owner_id: owner.id, docs: [] });
+  const t = saveTrip({ vehicle_id: hired.id, start_date: '2026-06-10' });
+  const bill = recordLorryHire(t.id, { date: '2026-06-10', vendorId: owner.id, amount: 40000 });
+  assert.equal(bill.kind, 'PURCHASE', 'a supplier bill: it opens in BillModal');
+  // What BillModal does: open (TDS block from the stored bill + vendor), edit a field, resolve, save.
+  const edit = (vendor: typeof owner | undefined) => {
+    const stored = purchasesDb.get(bill.id)!;
+    const input = billTdsInputFor(stored, vendor);
+    const { fields } = resolveBillTds(input, { date: stored.date, taxable: 45000, prior: priorCreditsFor(purchasesDb.all(), { id: owner.id, name: owner.name, pan: input.pan }), excludeId: stored.id });
+    return purchasesDb.save({ ...stored, notes: 'Edited: extra halt', lines: [{ ...stored.lines[0], rate: 45000 }], taxable: 45000, total: 45000, ...fields });
+  };
+  const saved = edit(vendorsDb.get(owner.id));
+  assert.equal(saved.tds_reason, 'T');
+  assert.equal(saved.tds_amount, 0);
+  assert.equal(saved.tds_section, '194C-1');
+  assert.equal(saved.notes, 'Edited: extra halt');
+  // Also when the vendor master no longer carries the declaration: the bill's own reason T is kept.
+  vendorsDb.save({ ...vendorsDb.get(owner.id)!, transporter_194c6: undefined });
+  const again = edit(vendorsDb.get(owner.id));
+  assert.equal(again.tds_reason, 'T');
+  assert.equal(again.tds_amount, 0);
+  const row = tdsDeductions({ purchases: purchasesDb.all(), payments: [], vendors: vendorsDb.all() }).find((r) => r.purchaseId === bill.id)!;
+  assert.deepEqual([row.amount, row.reason], [0, 'T']);
+  // An ordinary 194C bill keeps its typed figures on edit (unchanged behaviour).
+  const plain = billTdsInputFor({ tds_section: '194C-2', tds_rate: 2, tds_base: 1000, tds_amount: 20, tds_on: 'BILL', date: '2026-06-10' }, { pan: 'AAACB1234C' });
+  assert.deepEqual([plain.rate, plain.base, plain.amount, plain.transporter194c6], [2, 1000, 20, undefined]);
 });

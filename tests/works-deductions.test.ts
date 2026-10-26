@@ -9,7 +9,9 @@ import { computeDeductions, netPayable } from '../src/lib/works/deductions.ts';
 import { saveBoqTerms } from '../src/lib/works/boq.ts';
 import { saveRaBill } from '../src/lib/works/measurements.ts';
 import { raDueSplit } from '../src/lib/works/ra-due.ts';
-import { receiptPlan, recordDeductionRow, recoverAdvance, releaseHeld, GST_TDS_RECEIVABLE_ACCOUNT } from '../src/lib/works/ra-receivable.ts';
+import { receiptPlan, recordDeductionRow, recoverAdvance, releaseHeld, removeDeductionRow, GST_TDS_RECEIVABLE_ACCOUNT } from '../src/lib/works/ra-receivable.ts';
+import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
+import { isPeriodLockedError } from '../src/lib/period-lock.ts';
 import { heldRegister, worksNotices } from '../src/lib/works/works-alerts.ts';
 import { buildReceivables } from '../src/lib/receivables.ts';
 import { buildGstr1 } from '../src/lib/gst-reports.ts';
@@ -137,4 +139,38 @@ test('advance recovery is the existing advance adjustment, tagged; retention bel
   assert.equal(worksNotices(localDb.invoices.getAll(), getTable<Payment>('transactions'), '2027-05-01', 'now').length, 0);
   assert.equal(worksNotices(localDb.invoices.getAll(), getTable<Payment>('transactions'), '2027-06-10', 'now')[0].severity, 'info');
   assert.equal(worksNotices(localDb.invoices.getAll(), getTable<Payment>('transactions'), '2027-07-10', 'now')[0].severity, 'warning');
+});
+
+test('regression: removing a GST TDS / cess receipt removes its journal; trial balance back to before; period lock respected', () => {
+  const inv = raOne();
+  localDb.payments.record({ invoiceId: inv.id, amount: 108000, method: 'Bank transfer', date: '2026-07-20' });
+  const balances = () => {
+    const out = new Map<string, number>();
+    for (const l of loadLedger().vouchers.flatMap((v) => v.lines)) out.set(l.account, (out.get(l.account) ?? 0) + l.dr - l.cr);
+    return [...out].filter(([, v]) => v !== 0).sort(([a], [b]) => a.localeCompare(b));
+  };
+  const before = balances();
+  const vouchersBefore = loadVouchers().length;
+  const gst = recordDeductionRow(inv.id, 'gst_tds', { date: '2026-07-20' });
+  const cess = recordDeductionRow(inv.id, 'labour_cess', { date: '2026-07-20' });
+  assert.ok(gst.ra_journal_id && cess.ra_journal_id);
+  assert.equal(getTable<Payment>('transactions').find((p) => p.id === gst.id)?.ra_journal_id, gst.ra_journal_id);
+  assert.equal(loadVouchers().length, vouchersBefore + 2);
+  assert.notDeepEqual(balances(), before);
+  removeDeductionRow(gst.id);
+  removeDeductionRow(cess.id);
+  assert.ok(!getTable<Payment>('transactions').some((p) => p.id === gst.id || p.id === cess.id));
+  assert.equal(loadVouchers().length, vouchersBefore, 'no orphan journal');
+  assert.ok(!loadVouchers().some((v) => v.id === gst.ra_journal_id || v.id === cess.ra_journal_id));
+  assert.deepEqual(balances(), before, 'trial balance unchanged from before the receipts');
+  const bin = getTable<{ table?: string }>('recycle_bin');
+  assert.ok(bin.some((b) => b.table === 'vouchers'), 'the journal went to the recycle bin');
+  const live = localDb.invoices.getById(inv.id)!;
+  assert.deepEqual(raDueSplit(live, getTable<Payment>('transactions'), amountDue(live, 0)).held.map((h) => h.kind), ['retention', 'gst_tds', 'labour_cess'], 'held again');
+  // Period lock: a locked journal / bill refuses the removal and nothing changes.
+  const again = recordDeductionRow(inv.id, 'gst_tds', { date: '2026-07-25' });
+  localDb.settings.save({ ...localDb.settings.get(), lock_until: '2026-07-31' });
+  assert.throws(() => removeDeductionRow(again.id), (e) => isPeriodLockedError(e));
+  assert.ok(getTable<Payment>('transactions').some((p) => p.id === again.id));
+  assert.ok(loadVouchers().some((v) => v.id === again.ra_journal_id));
 });

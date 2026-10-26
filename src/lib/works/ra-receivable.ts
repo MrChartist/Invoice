@@ -8,9 +8,9 @@
  *    it to the cash ledger (2360);
  *  - labour cess → the same with "Labour cess deducted" (expense, or a recoverable — chosen on the BOQ);
  *  - retention / security deposit → stay held; "Release" records the later receipt tagged with the kind.
- * Every row goes through the data layer (roles, period lock, receipt numbers, audit). Removing such a receipt from the
- * payment dialog leaves its journal (the clearing account then shows the difference) — delete the journal in Books →
- * Vouchers too. Accounts are created by their fixed names (§6). Verify with your CA.
+ * Every row goes through the data layer (roles, period lock, receipt numbers, audit). A deduction receipt carries its
+ * journal id (`ra_journal_id`); `removeDeductionRow` removes both at once. Accounts are created by their fixed names
+ * (§6). Verify with your CA.
  */
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import type { RaDeductionKind } from '../../types/transport-works-r5';
@@ -20,7 +20,8 @@ import { generateId, getTable, setTable } from '../storage';
 import { withTablesRollback } from '../table-txn';
 import { localDb } from '../localDb';
 import { chartOf, loadUserAccounts, saveUserAccount, type PrimaryGroupId } from '../ledger/accounts';
-import { rupeesToPaise, saveVoucher } from '../ledger/vouchers';
+import { deleteVoucher, loadVouchers, rupeesToPaise, saveVoucher } from '../ledger/vouchers';
+import { assertUnlocked } from '../period-lock';
 import { bankAccountsDb } from '../bank-accounts';
 import { bankLedgerId } from '../bank-ledgers';
 import { applyAdvance } from '../advances';
@@ -66,9 +67,9 @@ export function receiptPlan(inv: InvoiceRecord, payments: readonly Pay[], outsta
   return { cash: round2(Math.max(split.dueNow, 0)), rows, held: split.held.filter((h) => !rows.some((r) => r.kind === h.kind)) };
 }
 
-function tag(ids: readonly string[], kind: RaDeductionKind): void {
+function tag(ids: readonly string[], kind: RaDeductionKind, journalId?: string): void {
   const want = new Set(ids);
-  setTable('transactions', getTable<Payment>('transactions').map((p) => (want.has(p.id) ? { ...p, ra_kind: kind } : p)));
+  setTable('transactions', getTable<Payment>('transactions').map((p) => (want.has(p.id) ? { ...p, ra_kind: kind, ...(journalId ? { ra_journal_id: journalId } : {}) } : p)));
 }
 
 /** "RA deductions clearing": a clearing bank account (never a real bank; hidden from cheque / BRS pickers). */
@@ -104,8 +105,28 @@ export function recordDeductionRow(invoiceId: string, kind: 'gst_tds' | 'labour_
       lines: [{ account_id: account, dr: p, cr: 0 }, { account_id: bankLedgerId(clearing), dr: 0, cr: p }],
     });
     const pay = localDb.payments.record({ invoiceId, amount, method: kind === 'gst_tds' ? GST_TDS_METHOD : CESS_METHOD, date: opts.date, bankAccountId: clearing, reference: inv.invoice_number, note: `${label} — journal ${v.number}` });
-    tag([pay.id], kind);
-    return { ...pay, ra_kind: kind };
+    tag([pay.id], kind, v.id);
+    return { ...pay, ra_kind: kind, ra_journal_id: v.id };
+  });
+}
+
+/**
+ * Remove a GST TDS / cess deduction receipt together with its journal, all or nothing: role, the period lock of the
+ * bill ('unpay') and of the journal ('delete'), the recycle bin and the audit trail all run through the data-layer calls
+ * (`localDb.payments.remove`, `deleteVoucher`), so the books stay balanced and the clearing account at zero.
+ */
+export function removeDeductionRow(paymentId: string): void {
+  requireAccess('payment.record');
+  const pay = getTable<Payment>('transactions').find((p) => p.id === paymentId);
+  if (!pay) return;
+  const journal = pay.ra_journal_id && loadVouchers().find((v) => v.id === pay.ra_journal_id);
+  withTablesRollback(['transactions', 'invoices', 'vouchers', 'series_counters', 'recycle_bin'], () => {
+    if (journal) {
+      requireAccess('books.edit');
+      assertUnlocked({ id: journal.id, issue_date: journal.date, invoice_number: journal.number }, 'delete');
+    }
+    localDb.payments.remove(paymentId);
+    if (journal) deleteVoucher(journal.id);
   });
 }
 

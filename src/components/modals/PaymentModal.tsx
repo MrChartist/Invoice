@@ -160,9 +160,11 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     }
   };
 
-  const removePayment = (id: string) => {
+  const removePayment = async (id: string) => {
     try {
-      localDb.payments.remove(id);
+      // R5-B5: a GST TDS / cess deduction receipt goes with its journal (all or nothing).
+      if (payments.find((p) => p.id === id)?.ra_journal_id) (await import('../../lib/works/ra-receivable')).removeDeductionRow(id);
+      else localDb.payments.remove(id);
     } catch (err) {
       setError((err as Error).message);
       return;
@@ -374,7 +376,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
                   </button>
                 )}
                 {(!p.write_off || can('doc.deleteIssued')) && (
-                  <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => removePayment(p.id)} aria-label={t('pay.removeFor', { amount: formatCurrency(p.amount, live.currency) })}>
+                  <button type="button" className={controls.btnDanger} disabled={locked} onClick={() => void removePayment(p.id)} aria-label={t('pay.removeFor', { amount: formatCurrency(p.amount, live.currency) })}>
                     <Trash2 size={15} />
                   </button>
                 )}

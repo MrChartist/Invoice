@@ -20,7 +20,7 @@ import { expenseAmountLabel } from '../../lib/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
 import { saveBillGuarded } from '../../lib/bill-guard';
 import { capT } from '../../i18n/areas/capture';
-import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
+import { billTdsInputFor, priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -77,13 +77,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
   const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? seeded ?? []);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
-  const [tds, setTds] = useState<BillTdsInput>(() => ({
-    section: expense?.tds_section ?? '',
-    on: expense?.tds_on ?? 'BILL',
-    pan: expense?.tds_pan ?? '',
-    lowerCert: expense?.tds_cert_no,
-    ...(expense?.tds_section ? { rate: expense.tds_rate, base: expense.tds_base, amount: expense.tds_amount } : {}),
-  }));
+  // R5-B3: a Sec 194C(6) nil deduction (reason T) keeps following the declaration on edit.
+  const [tds, setTds] = useState<BillTdsInput>(() => billTdsInputFor(expense, { transporter_194c6: vendors.find((v) => v.id === expense?.vendor_id)?.transporter_194c6 }));
 
   const vendor = vendors.find((v) => v.id === vendorId);
   const line = useMemo(() => expenseLine(category, amount, taxRate, inclusive), [category, amount, taxRate, inclusive]);
