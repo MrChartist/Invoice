@@ -11,6 +11,7 @@ import {
   deriveGstMode,
   effectiveGstMode,
   EMPTY_TOTALS,
+  isExcludedLine,
   isIgstZeroRated,
   num,
   round2,
@@ -126,7 +127,7 @@ export const RECORD_KEYS = [
   'id', 'invoice_number', 'doc_type', 'issue_date', 'due_date', 'status', 'currency', 'template_id',
   'client', 'sender', 'items', 'gst_mode', 'place_of_supply', 'reverse_charge', 'discount_type',
   'discount_rate', 'tax_rate', 'shipping', 'other_charges', 'round_off_enabled', 'amount_paid', 'notes',
-  'terms', 'po_number', 'recurring_id', 'recurring_date', 'subtotal', 'discount_amount', 'taxable_value',
+  'terms', 'po_number', 'recurring_id', 'recurring_date', 'batch_run_id', 'subtotal', 'discount_amount', 'taxable_value',
   'cgst_amount', 'sgst_amount', 'igst_amount', 'tax_amount', 'round_off', 'total', 'balance_due',
   'supply_type', 'lut_number', 'lut_date', 'price_includes_tax', 'round_mode', 'tcs_enabled', 'tcs_rate',
   'tcs_base', 'tcs_label', 'tds_enabled', 'tds_section', 'tds_rate', 'tds_on_taxable', 'cess_amount',
@@ -309,6 +310,16 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     setStatus: (status) => apply({ status }),
     setDocType: (doc_type) => {
       const prev = get().doc_type;
+      // QA5-2 F10: optional / alternative lines exist only on a quotation. Leaving it keeps the selected
+      // lines (flags cleared) and drops the rest, as conversion does (`keepSelectedLines` in documents.ts).
+      if (prev === 'QUOTATION' && doc_type !== 'QUOTATION' && get().items.some((i) => i.optional || i.alt_group || i.selected !== undefined)) {
+        const kept = get().items.filter((i) => !isExcludedLine(i)).map((i) => {
+          const { optional: _o, selected: _s, alt_group: _g, ...rest } = i;
+          void [_o, _s, _g];
+          return rest;
+        });
+        apply({ items: kept.length ? kept : [blankItem(get().tax_rate)] });
+      }
       if (doc_type === 'BILL_OF_SUPPLY') {
         // No tax on a Bill of Supply (Rule 49); reverse charge does not arise either.
         apply({ doc_type, gst_mode: 'NONE', reverse_charge: false, rcm_tax_excluded: undefined });

@@ -106,6 +106,12 @@ test('bulk payload shapes (snapshot) and history on einvoice_meta', () => {
   assert.equal(vehicleUpdateCsv(['321000000001'], input).split('\n')[1], '321000000001,MH12AB1234,Nashik,27,1,Due to break down,LR9,06/05/2026,1');
   assert.deepEqual(transporterUpdateJson(['321000000001'], '27aabcu9603r1zx'), { version: '1.0.0621', transporterUpdtList: [{ ewbNo: 321000000001, transporterId: '27AABCU9603R1ZX' }] });
   assert.equal(transporterUpdateCsv(['1'], 'x').trim(), 'ewbNo,transporterId\n1,X');
+  // QA5-2 F8: free text is neutralised against spreadsheet formula injection, like every other export.
+  const evil = vehicleUpdateCsv(['321000000001'], { ...input, reason: 'others', remark: '=HYPERLINK("http://x","Click")', docNo: '@SUM(A1)' }).split('\n')[1];
+  assert.ok(evil.includes(`"'=HYPERLINK(""http://x"",""Click"")"`), evil);
+  assert.ok(evil.includes("'@SUM(A1)"), evil);
+  assert.ok(!/,=|,@/.test(evil), 'no cell starts with = or @');
+  assert.ok(!/(^|,)[=@]/.test(transporterUpdateCsv(['1'], '=cmd').split('\n')[1]));
 
   resetStorage();
   const meta: EInvoiceMeta[] = [{ invoice_id: 'a', eway_no: '321000000001', vehicle: 'KA01AA0001' }, { invoice_id: 'b', eway_no: '321000000002' }, { invoice_id: 'c' }];

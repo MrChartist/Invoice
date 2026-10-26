@@ -13,7 +13,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
-import { round2, num } from './invoice-calc';
+import { isExcludedLine, round2, num } from './invoice-calc';
 import { DB_PREFIX, generateId, getJson, getTable, peekTable, setJson, setTable } from './storage';
 import { memoOnReads } from './table-memo';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
@@ -497,6 +497,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     const date = dayOf(inv.issue_date);
     const clientName = inv.client?.name ? ` · ${inv.client.name}` : '';
     for (const line of inv.items ?? []) {
+      if (isExcludedLine(line)) continue; // QA5-2 F10: an unselected optional / alternative line is not supplied
       const it = index.find(line.name, line.hsn);
       const factor = lineFactor(line); // WP-8: a line typed in an alternate unit (2 BOX = 24 NOS)
       const q = num(line.quantity) * factor;
@@ -1138,7 +1139,7 @@ export function shortfallsFor(
 }
 
 /** `shortfallsFor` over positions already computed without the document. */
-export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, positions: StockPosition[]): StockShortfall[] {
+export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, positions: StockPosition[], held?: HeldStock): StockShortfall[] {
   const index = buildItemIndex(positions.map((p) => p.item).filter((i) => i.track_stock));
   const byId = new Map(positions.map((p) => [p.item.id, p]));
   const wanted = new Map<string, number>();
@@ -1151,7 +1152,7 @@ export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, posit
   for (const [id, requested] of wanted) {
     const p = byId.get(id);
     if (!p) continue;
-    const available = Math.max(p.qty, 0);
+    const available = Math.max(p.qty - (held?.get(id) ?? 0), 0);
     if (requested > available + EPS) {
       out.push({
         itemId: id, name: p.item.name, unit: p.item.unit, requested: roundQty(requested),
@@ -1385,23 +1386,32 @@ export interface StockLevel {
   value: number;
   reorderLevel: number;
   status: StockStatus;
+  /** QA5-2 F9: quantity held in non-saleable godowns (QC hold, expiry …), already taken off `qty`. */
+  held?: number;
 }
 
-/** Find a level in a pre-computed list (use this in loops instead of getStockLevel). */
-export function findLevel(positions: StockPosition[], itemName: string, hsn?: string): StockLevel | null {
+/** Item id → quantity held in non-saleable godowns (`liveHeldStock` in stock-tracking.ts). */
+export type HeldStock = ReadonlyMap<string, number>;
+
+/**
+ * Find a level in a pre-computed list (use this in loops instead of getStockLevel). With `held`, `qty` is
+ * what is available to sell (QA5-2 F9: stock in QC hold / expiry / transit godowns is not).
+ */
+export function findLevel(positions: StockPosition[], itemName: string, hsn?: string, held?: HeldStock): StockLevel | null {
   const it = buildItemIndex(positions.map((p) => p.item).filter((i) => i.track_stock)).find(itemName, hsn);
   const p = it && positions.find((x) => x.item.id === it.id);
   if (!p) return null;
+  const h = held?.get(p.item.id) ?? 0;
   return {
-    itemId: p.item.id, qty: p.qty, unit: p.item.unit, avgCost: p.avgCost, value: p.value,
-    reorderLevel: num(p.item.reorder_level), status: p.status,
+    itemId: p.item.id, qty: h ? roundQty(p.qty - h) : p.qty, unit: p.item.unit, avgCost: p.avgCost, value: p.value,
+    reorderLevel: num(p.item.reorder_level), status: p.status, ...(h ? { held: h } : {}),
   };
 }
 
-/** Current stock level for an item name (null when not a tracked stock item). */
-export function getStockLevel(itemName: string, hsn?: string): StockLevel | null {
+/** Current stock level for an item name (null when not a tracked stock item); `held` as in `findLevel`. */
+export function getStockLevel(itemName: string, hsn?: string, held?: HeldStock): StockLevel | null {
   try {
-    return findLevel(loadPositions(), itemName, hsn);
+    return findLevel(loadPositions(), itemName, hsn, held);
   } catch {
     return null;
   }
@@ -1429,6 +1439,7 @@ function cachedPositionsWithout(docId: string | undefined): StockPosition[] {
  */
 export function stockWarningForInvoice(
   invoice: Pick<InvoiceRecord, 'doc_type' | 'items'> & Partial<Pick<InvoiceRecord, 'id'>>,
+  held?: HeldStock,
 ): StockShortfall[] {
   try {
     if (invoiceEffect(invoice.doc_type, 'Sent', true) !== 'out') return [];
@@ -1438,7 +1449,7 @@ export function stockWarningForInvoice(
     const index = buildItemIndex(tracked);
     if (!(invoice.items ?? []).some((l) => num(l.quantity) > 0 && index.find(l.name, l.hsn))) return [];
     if (invoice.doc_type === 'DELIVERY_CHALLAN' && !loadSettings().includeChallans) return [];
-    return shortfallsFromPositions(invoice, cachedPositionsWithout(invoice.id));
+    return shortfallsFromPositions(invoice, cachedPositionsWithout(invoice.id), held);
   } catch {
     return [];
   }

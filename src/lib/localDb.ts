@@ -739,11 +739,11 @@ function syncPaymentState(invoiceId: string, delta: number): void {
 
 /**
  * QA-3 F6: a recurring draft is saved without a number, so a draft that is deleted (or never issued)
- * leaves no hole in the GST series (GSTR-1 Table 13 would report it as cancelled). Every other
- * document keeps the old behaviour: numbered when first saved.
+ * leaves no hole in the GST series (GSTR-1 Table 13 would report it as cancelled). A batch-run draft
+ * (QA5-2 F15) follows the same rule. Every other document keeps the old behaviour: numbered when first saved.
  */
 function isUnnumberedDraft(rec: InvoiceRecord): boolean {
-  return rec.status === 'Draft' && !!(rec as InvoiceRecord & { recurring_id?: string }).recurring_id;
+  return rec.status === 'Draft' && !!(rec.recurring_id || rec.batch_run_id);
 }
 
 /**

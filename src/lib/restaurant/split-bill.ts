@@ -7,7 +7,8 @@
  *    through `buildSettleRecord`), numbered consecutively in the POS series when saved together.
  *  - A line can be split across parts by quantity (1 of 3 naan). Fractional quantities only for items
  *    sold by weight; otherwise the part gets a "share" line — same name, HSN and GST rate, quantity 1,
- *    rate = its share of the line amount.
+ *    rate = its share of the line amount. An add-on follows its parent by quantity only when its own
+ *    pieces are whole; else it becomes share lines too (QA5-2 F17).
  *  - Share amounts are chosen in steps whose GST (and CGST / SGST halves, and cess) is exact in paise,
  *    with the last share taking the remainder, so the sub-bills' tax adds up to the unsplit tax. Any
  *    paisa that still differs (charges, odd rates) is shown on the reconciliation strip and ends in the
@@ -134,8 +135,11 @@ export function partLines(order: Pick<TableOrder, 'lines'>, picks: readonly Part
     const byQty = qtys.every((q) => line.sold_by_weight || isWhole(q)) && Math.abs(sumQ - total) < 1e-9;
     for (const member of family) {
       const value = paise(num(member.quantity) * num(member.rate) * (1 - num(member.discount_percent) / 100));
-      if (byQty) {
-        const ratio = num(member.quantity) / (total || 1);
+      const ratio = num(member.quantity) / (total || 1);
+      // QA5-2 F17: an add-on with its own quantity (1 butter on 3 naan) would split into 0.33 pieces that
+      // lose paise: it takes the share-line path unless its pieces are whole (or it is sold by weight).
+      const memberByQty = byQty && (member === line || !!member.sold_by_weight || qtys.every((q) => isWhole(q * ratio)));
+      if (memberByQty) {
         mine.forEach((p, i) => {
           const q = round2(qtys[i] * ratio);
           if (q > 0) out[p.part - 1].push({ ...member, id: `${member.id}~${p.part}`, ...(member.modifier_of ? { modifier_of: `${member.modifier_of}~${p.part}` } : {}), quantity: q, amount: round2(q * num(member.rate)) });

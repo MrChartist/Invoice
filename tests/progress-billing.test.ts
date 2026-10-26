@@ -146,3 +146,41 @@ test('storage: stage invoices save with a progress link, tick the milestone, the
   assert.equal(rows[0].percent, 100);
   assert.match(progressSummaryCsv(rows), /QTN\/FY26-27\/0012,2026-05-01,1200000,1200000,0,0,100,2,Yes/);
 });
+
+test('QA5-2 F16: 33.333% bills 33.333% (no ₹10 "0.0001" stage); the balance stage absorbs the round-off; the over-cap message shows the real share', () => {
+  const lump = quote({ items: [{ id: 'a', name: 'Lump', type: 'service', hsn: '995411', unit: 'LOT', quantity: 1, rate: 100000, tax_rate: 18, amount: 100000 }] });
+  const stages: InvoiceRecord[] = [];
+  const links: LinkLike[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const s = buildProgressInvoice(lump, { basis: 'percent', value: 33.333 }, ctx(`s${i}`, [lump, ...stages], links));
+    stages.push(s);
+    links.push({ from_id: 'q1', to_id: s.id, relation: 'progress' });
+  }
+  assert.deepEqual(stages.map((s) => s.taxable_value), [33333, 33333, 33333]);
+  const bal = buildBalanceInvoice(lump, ctx('s4', [lump, ...stages], links));
+  assert.equal(bal.taxable_value, 1, 'the balance is the 0.001% actually left');
+
+  // Round-off on: each stage rounds on its own, the balance stage takes up the difference.
+  const q = quote({ round_off_enabled: true, round_mode: 'nearest', items: [
+    { id: 'a', name: 'A', type: 'service', hsn: '995411', unit: 'NOS', quantity: 7, rate: 333.33, tax_rate: 18, amount: 2333.31, discount_percent: 7.5 },
+    { id: 'b', name: 'B', type: 'service', hsn: '995461', unit: 'NOS', quantity: 3, rate: 1234.57, tax_rate: 5, amount: 3703.71 },
+    { id: 'c', name: 'C', type: 'service', hsn: '995462', unit: 'NOS', quantity: 1, rate: 99999.99, tax_rate: 12, amount: 99999.99 },
+  ], discount_type: 'AMOUNT', discount_rate: 1000, shipping: 500 });
+  const quoteTotal = progressSummary(q, [q], []).quotedTotal;
+  const st: InvoiceRecord[] = [];
+  const ln: LinkLike[] = [];
+  for (const id of ['r1', 'r2']) {
+    const s = buildProgressInvoice(q, { basis: 'percent', value: 33.33 }, ctx(id, [q, ...st], ln));
+    st.push(s);
+    ln.push({ from_id: 'q1', to_id: s.id, relation: 'progress' });
+  }
+  const fin = buildBalanceInvoice(q, ctx('r3', [q, ...st], ln));
+  assert.equal(Math.round((st[0].total + st[1].total + fin.total) * 100) / 100, quoteTotal, 'the stages add up to the quotation total');
+  // The stored stage recomputes to the same total (no hand-written round-off).
+  const re = progressSummary({ ...fin, doc_type: 'QUOTATION', id: 'x' } as InvoiceRecord, [], []).quotedTotal;
+  assert.equal(re, fin.total);
+
+  // 40.0001% after 60% is refused with the real figure, not "100%".
+  const s60 = buildProgressInvoice(quote(), { basis: 'percent', value: 60 }, ctx('t1', [quote()], []));
+  assert.throws(() => buildProgressInvoice(quote(), { basis: 'percent', value: 40.0001 }, ctx('t2', [quote(), s60], [{ from_id: 'q1', to_id: 't1', relation: 'progress' }])), /would be 100\.0001% billed/);
+});

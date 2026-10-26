@@ -79,7 +79,8 @@ test('issue: consecutive numbering across the FY boundary, one run row, idempote
   assert.ok(r1.invoices.every((i) => i.status === 'Sent'));
   const april = buildBatchDrafts(t, parties(list), { date: '2026-04-01', dueDays: 10, sender });
   const r2 = issueBatch(april, { sourceId: 'src', sourceKind: 'invoice', date: '2026-04-01', mode: 'draft' });
-  assert.deepEqual(r2.invoices.map((i) => i.invoice_number), ['INV/FY26-27/0001', 'INV/FY26-27/0002', 'INV/FY26-27/0003']);
+  // QA5-2 F15: drafts take no number (numbered in their FY series when issued, like recurring drafts).
+  assert.deepEqual(r2.invoices.map((i) => i.invoice_number), ['', '', '']);
   assert.ok(r2.invoices.every((i) => i.status === 'Draft'));
   assert.equal(batchRunsDb.all().length, 2);
   assert.equal(r2.run.run_key, runKey('src', '2026-04-01', ['a', 'b', 'c']));
@@ -91,6 +92,41 @@ test('issue: consecutive numbering across the FY boundary, one run row, idempote
   assert.equal(localDb.invoices.getAll().length, 2);
   // Once undone, the same batch may run again.
   assert.equal(issueBatch(april, { sourceId: 'src', sourceKind: 'invoice', date: '2026-04-01', mode: 'draft' }).invoices.length, 3);
+});
+
+test('QA5-2 F15: a draft run consumes no FY numbers; undo leaves no reused number; issuing numbers the draft', () => {
+  resetStorage();
+  const t = templateFromDocument(source());
+  issueBatch(buildBatchDrafts(t, parties([member('z')]), { date: '2026-06-01', dueDays: 10, sender }), { sourceId: 'src0', sourceKind: 'invoice', date: '2026-06-01', mode: 'issue' });
+  const list = [member('a'), member('b'), member('c'), member('d')];
+  const r = issueBatch(buildBatchDrafts(t, parties(list), { date: '2026-06-02', dueDays: 10, sender }), { sourceId: 'src', sourceKind: 'invoice', date: '2026-06-02', mode: 'draft' });
+  assert.ok(r.invoices.every((i) => i.status === 'Draft' && i.invoice_number === ''));
+  assert.equal(localDb.invoices.nextNumber('2026-06-03', 'TAX_INVOICE'), 'INV/FY26-27/0002', 'no number taken by the drafts');
+  // Issuing one draft numbers it next in the series.
+  const first = localDb.invoices.getById(r.invoices[0].id)!;
+  const issued = localDb.invoices.save({ ...first, status: 'Sent' });
+  assert.equal(issued.invoice_number, 'INV/FY26-27/0002');
+  undoBatch(r.run.id);
+  assert.equal(localDb.invoices.nextNumber('2026-06-03', 'TAX_INVOICE'), 'INV/FY26-27/0003', 'the issued number is never handed out again');
+});
+
+test('QA5-2 F7 / F14: a party with no state gets the seller state (with a warning); the source PO is not copied', () => {
+  resetStorage();
+  // Source billed to a Karnataka party (IGST, place of supply 29) with its own PO.
+  const t = templateFromDocument(source({ place_of_supply: '29', gst_mode: 'IGST', po_number: 'KA-PO-77' }));
+  assert.equal(t.po_number, undefined, 'the template carries no PO number');
+  const list = [member('mh'), member('none', { state_code: '', state: '', gstin: '' }), member('gj', { state_code: '', state: 'Gujarat' })];
+  const drafts = buildBatchDrafts(t, parties(list, { gj: { po_number: 'GJ-1' } }), { date: '2026-06-01', dueDays: 10, sender });
+  assert.deepEqual(drafts.map((d) => d.record.place_of_supply), ['27', '27', '24']);
+  assert.deepEqual(drafts.map((d) => d.record.gst_mode), ['CGST_SGST', 'CGST_SGST', 'IGST']);
+  assert.equal(drafts[1].record.igst_amount, 0);
+  assert.deepEqual(drafts.map((d) => !!d.stateWarning), [false, true, false]);
+  assert.deepEqual(drafts.map((d) => d.record.po_number ?? ''), ['', '', 'GJ-1']);
+  // An export keeps the source's own place of supply (the foreign party has no Indian state).
+  const exp = templateFromDocument(source({ supply_type: 'EXPORT_LUT', place_of_supply: '96', gst_mode: 'IGST' } as Partial<InvoiceRecord>));
+  const [x] = buildBatchDrafts(exp, parties([member('us', { state_code: '', state: '', country: 'USA' } as Partial<Client>)]), { date: '2026-06-01', dueDays: 10, sender });
+  assert.equal(x.record.place_of_supply, '96');
+  assert.equal(x.stateWarning, '');
 });
 
 test('undo of issued invoices: never deleted — kept, or cancelled with a reason', () => {

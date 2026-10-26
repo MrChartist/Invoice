@@ -2,13 +2,19 @@
  * R2-B1: batch invoices — one template × many parties (QuickBooks batch invoicing).
  *
  * A source (saved invoice, quotation or recurring template) is billed to many parties at once, with
- * optional per-party overrides of the first line's quantity / rate, the notes and the PO number.
+ * optional per-party overrides of the first line's quantity / rate, the notes and the PO number (the
+ * source's own PO is never copied: it is another customer's order reference — QA5-2 F14).
  * Each draft takes the party's own place of supply (state code → GSTIN → state name) and the GST split
- * is re-derived from it (CGST + SGST inside the sender's state, IGST outside). Issue saves every
- * invoice in one all-or-nothing step (`withTablesRollback`), numbered consecutively in the Indian FY
- * series of the issue date through `localDb.invoices.save` — so the period lock, approvals and the
- * credit-limit gate apply and the sender profile is snapshotted on every invoice (Critical Rule 3).
- * Invoices held for approval or for missing serial / batch picks stay Drafts and are listed.
+ * is re-derived from it (CGST + SGST inside the sender's state, IGST outside). A domestic party with
+ * no state and no GSTIN never inherits the source's place of supply: it falls back to the seller's
+ * state (intra-state, as the editor does for a walk-in) and the draft carries a `stateWarning` so the
+ * user can pick the state before issuing (QA5-2 F7). Exports / SEZ keep the source's place of supply.
+ * Issue saves every invoice in one all-or-nothing step (`withTablesRollback`), numbered consecutively
+ * in the Indian FY series of the issue date through `localDb.invoices.save` — so the period lock,
+ * approvals and the credit-limit gate apply and the sender profile is snapshotted on every invoice
+ * (Critical Rule 3). A draft run (and an invoice held for a serial / batch pick) takes NO number: it
+ * is numbered in its series when issued, like recurring drafts, so undoing it leaves no hole and no
+ * number is handed out twice (QA5-2 F15). Invoices held for approval stay numbered Drafts and are listed.
  *
  * A `batch_runs` row records each run. Undo deletes the run's drafts; issued invoices are only ever
  * cancelled (with a reason), never deleted silently. The same source × date × party list cannot be
@@ -95,6 +101,7 @@ export function partySnapshot(c: Client): Client {
 /** A batch template from a saved document (serials / batches dropped, unselected optional lines left out). */
 export function templateFromDocument(doc: InvoiceRecord): RecurringTemplate {
   const t = templateFromInvoice({ ...doc, items: (doc.items ?? []).filter((i) => !isExcludedLine(i)) });
+  delete t.po_number;
   t.items = t.items.map((i) => {
     const { optional: _o, selected: _s, alt_group: _g, order_line_id: _l, progress_line_of: _p, bill_refs: _b, ...rest } = i;
     void [_o, _s, _g, _l, _p, _b];
@@ -127,7 +134,11 @@ export interface BatchDraft {
   creditWarning: string;
   /** e-Invoice applies (B2B party and the sender's AATO over the mandate on the date); unknown without an AATO. */
   einvoice: EInvoiceFlag;
+  /** Non-empty when the party has no state or GSTIN and the seller's state was used as the place of supply. */
+  stateWarning: string;
 }
+
+export const NO_STATE_WARNING = "The party has no state or GSTIN: your own state is used (CGST + SGST). Set the party's state if the supply is inter-state.";
 
 function totalsOf(rec: InvoiceRecord): InvoiceRecord {
   const r = rec.reverse_charge && rec.doc_type !== 'BILL_OF_SUPPLY' ? { ...rec, rcm_tax_excluded: true } : rec;
@@ -154,8 +165,11 @@ export function buildBatchDrafts(template: RecurringTemplate, parties: readonly 
   const newId = ctx.newId ?? generateId;
   return parties.map((party) => {
     const client = partySnapshot(party.client);
-    const pos = resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state }) || template.place_of_supply || fromState;
     const zeroOrExport = template.supply_type && template.supply_type !== 'B2B' && template.supply_type !== 'B2C';
+    const own = resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state });
+    // Never the source party's state for a domestic party (QA5-2 F7); an export keeps the source's.
+    const pos = own || (zeroOrExport ? template.place_of_supply : '') || fromState;
+    const stateWarning = !own && !zeroOrExport ? NO_STATE_WARNING : '';
     const gst_mode = docType === 'BILL_OF_SUPPLY' || template.gst_mode === 'NONE' || template.gst_mode === 'SINGLE' || zeroOrExport
       ? (docType === 'BILL_OF_SUPPLY' ? 'NONE' : template.gst_mode)
       : deriveGstMode({ senderStateCode: fromState, placeOfSupply: pos, senderHasGstin: !!clean(sender?.companyGstin), taxEnabled: true });
@@ -187,14 +201,14 @@ export function buildBatchDrafts(template: RecurringTemplate, parties: readonly 
       place_of_supply: pos,
       gst_mode,
       notes: clean(o.notes) || template.notes,
-      po_number: clean(o.po_number) || template.po_number,
+      po_number: clean(o.po_number),
       ...(docType === 'BILL_OF_SUPPLY' ? { reverse_charge: false } : {}),
     };
     const record = totalsOf(normalizeRecord(raw, template.template_id));
     const b2b = isGstinShaped(client.gstin);
     const aato = Number(sender?.einvoice_aato) > 0 ? Number(sender?.einvoice_aato) : undefined;
     const einvoice: EInvoiceFlag = !b2b || docType === 'BILL_OF_SUPPLY' || sender?.gst_scheme === 'composition' ? 'no' : aato === undefined ? 'unknown' : einvoiceMandatory(aato, ctx.date) ? 'yes' : 'no';
-    return { party, record, creditWarning: ctx.creditWarning?.(record) ?? '', einvoice };
+    return { party, record, creditWarning: ctx.creditWarning?.(record) ?? '', einvoice, stateWarning };
   });
 }
 
@@ -253,14 +267,14 @@ export function issueBatch(drafts: readonly BatchDraft[], opts: { sourceId: stri
   const key = runKey(opts.sourceId, opts.date, keys);
   const prior = batchRunsDb.all().find((r) => r.run_key === key && r.status !== 'undone');
   if (prior && !opts.force) throw new BatchError(`This batch was already issued on ${prior.created_at.slice(0, 10)} (${prior.invoice_ids.length} invoices). Undo that run first, or choose "Issue again".`);
+  const runId = generateId();
   return withTablesRollback([KEYS.invoices, BATCH_RUNS_TABLE, KEYS.clients, KEYS.items], () => {
     const saved: InvoiceRecord[] = [];
     const held: IssueResult['held'] = [];
     for (const d of drafts) {
       // The due date keeps its distance from the issue date when the run is dated differently from the preview.
       const termDays = Math.max(Math.round((Date.parse(`${d.record.due_date}T00:00:00Z`) - Date.parse(`${d.record.issue_date}T00:00:00Z`)) / 864e5) || 0, 0);
-      const rec: InvoiceRecord = { ...d.record, issue_date: opts.date, due_date: addDays(opts.date, termDays), status: opts.mode === 'issue' ? 'Sent' : 'Draft' };
-      rec.invoice_number = localDb.invoices.nextNumber(opts.date, rec.doc_type, rec.sender?.invoicePrefix || undefined);
+      const rec: InvoiceRecord = { ...d.record, issue_date: opts.date, due_date: addDays(opts.date, termDays), status: opts.mode === 'issue' ? 'Sent' : 'Draft', batch_run_id: runId };
       let reason = '';
       if (rec.status !== 'Draft') {
         const issues = liveDocTrackingIssues(rec);
@@ -270,13 +284,15 @@ export function issueBatch(drafts: readonly BatchDraft[], opts: { sourceId: stri
           rec.status = 'Draft';
         }
       }
+      // Number on issue (QA5-2 F15): a draft stays unnumbered until it is issued.
+      rec.invoice_number = rec.status === 'Draft' ? '' : localDb.invoices.nextNumber(opts.date, rec.doc_type, rec.sender?.invoicePrefix || undefined);
       const out = localDb.invoices.save(rec);
       if (!reason && opts.mode === 'issue' && out.approval?.state === 'pending') reason = out.approval.reason === 'credit' ? 'Held: over the credit limit (owner approval).' : 'Held for approval.';
       if (reason) held.push({ invoice: out, reason });
       saved.push(out);
     }
     const run: BatchRun = {
-      id: generateId(), created_at: new Date().toISOString(), date: opts.date, source_id: opts.sourceId, source_kind: opts.sourceKind,
+      id: runId, created_at: new Date().toISOString(), date: opts.date, source_id: opts.sourceId, source_kind: opts.sourceKind,
       ...(opts.sourceLabel ? { source_label: opts.sourceLabel } : {}),
       party_keys: keys, invoice_ids: saved.map((s) => s.id), ...(held.length ? { held_ids: held.map((h) => h.invoice.id) } : {}),
       totals: { count: saved.length, taxable: round2(saved.reduce((s, i) => s + num(i.taxable_value), 0)), total: round2(saved.reduce((s, i) => s + num(i.total), 0)) },

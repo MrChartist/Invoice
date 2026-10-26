@@ -26,13 +26,15 @@ import type { Deferral, DeferralMethod } from '../types/books-r2';
 import { requireAccess } from './access';
 import { audit } from './audit';
 import { isoDay } from './dates';
-import { round2 } from './invoice-calc';
-import { isPeriodLockedError } from './period-lock';
+import { allocateProportionally, calcInputFromRecord, calculateInvoice, isExcludedLine, round2 } from './invoice-calc';
+import { inrValue } from './fx';
+import { assertUnlocked, isPeriodLockedError } from './period-lock';
+import { withTablesRollback } from './table-txn';
 import { readPurchase, readPurchaseLines } from './purchase-normalize';
 import { generateId, getTable, setTable } from './storage';
 import { formatMoney } from './utils';
 import { A, EXPENSE_CATEGORY_ACCOUNTS, chartOf, loadUserAccounts, saveUserAccount, type Account } from './ledger/accounts';
-import { deleteVoucher, loadVouchers, saveVoucher, type ManualVoucher } from './ledger/vouchers';
+import { VOUCHERS_TABLE, deleteVoucher, loadVouchers, saveVoucher, type ManualVoucher } from './ledger/vouchers';
 
 export const DEFERRALS_TABLE = 'deferrals';
 export const DEFERRAL_CLASS = 'Deferral';
@@ -155,7 +157,10 @@ export interface SourceLine {
   name: string;
   /** Document date (time of supply) — the initial deferral is posted on it. */
   date: string;
-  /** Line value before tax, rupees. */
+  /**
+   * Line taxable value in rupees: after the line and invoice-level discounts (allocated pro-rata as the
+   * invoice calc does), with tax backed out of a tax-inclusive price, converted at the document's rate.
+   */
   amount: number;
   cancelled: boolean;
 }
@@ -165,17 +170,27 @@ export function invoiceSourceLines(inv: InvoiceRecord): SourceLine[] {
   if (!['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(inv.doc_type)) return [];
   const date = isoDay(inv.issue_date);
   if (!date) return [];
-  return (inv.items ?? []).map((it, i) => ({
-    kind: 'invoice' as const,
-    id: inv.id,
-    line_index: i,
-    number: inv.invoice_number,
-    party: inv.client?.company || inv.client?.name || '',
-    name: it.name,
-    date,
-    amount: round2((Number(it.quantity) || 0) * (Number(it.rate) || 0) * (1 - Math.min(Math.max(Number(it.discount_percent) || 0, 0), 100) / 100)),
-    cancelled: inv.status === 'Cancelled',
-  })).filter((l) => l.amount > 0);
+  // The calc lines mirror the items minus unselected optional / alternative lines (QA5-2 F5).
+  const calcLines = calculateInvoice(calcInputFromRecord(inv, { amount_paid: 0 })).lines;
+  const out: SourceLine[] = [];
+  let k = 0;
+  (inv.items ?? []).forEach((it, i) => {
+    if (isExcludedLine(it)) return;
+    const cl = calcLines[k++];
+    if (!cl) return;
+    out.push({
+      kind: 'invoice',
+      id: inv.id,
+      line_index: i,
+      number: inv.invoice_number,
+      party: inv.client?.company || inv.client?.name || '',
+      name: it.name,
+      date,
+      amount: inrValue(cl.taxable, inv),
+      cancelled: inv.status === 'Cancelled',
+    });
+  });
+  return out.filter((l) => l.amount > 0);
 }
 
 /** Deferrable lines of a purchase bill / expense, read through the shared purchase reader. */
@@ -195,6 +210,12 @@ export function purchaseSourceLines(raw: unknown): SourceLine[] {
     amount: round2(l.quantity * l.unitCost),
     cancelled,
   }));
+  // A bill-level discount (lines worth more than the bill's taxable value) is spread pro-rata (QA5-2 F5).
+  const linesValue = round2(out.reduce((s, l) => s + l.amount, 0));
+  if (out.length && c.taxable > 0 && linesValue > c.taxable + 0.01) {
+    const shares = allocateProportionally(out.map((l) => l.amount), c.taxable);
+    out.forEach((l, i) => { l.amount = round2(shares[i]); });
+  }
   // A lump-sum expense without lines: the whole taxable value is one line.
   if (!out.length && c.taxable > 0) out.push({ kind: 'purchase', id: c.id, line_index: 0, number: c.number, party: c.partyName, name: c.category || 'Expense', date: c.date, amount: c.taxable, cancelled });
   return out.filter((l) => l.amount > 0);
@@ -241,6 +262,9 @@ export function createDeferral(input: DeferralInput, purchaseRaw?: unknown): Sto
   requireAccess('books.edit');
   const errors = validateDeferral(input);
   if (errors.length) throw new DeferralError(errors[0]);
+  // The initial deferral is posted on the source date: a schedule that could only release (its first
+  // entry falls in the period lock) is refused, never half-posted (QA5-2 F6).
+  assertUnlocked({ issue_date: isoDay(input.source.date) || isoDay(input.start), invoice_number: input.source.number }, 'create');
   const kind: Deferral['kind'] = input.source.kind === 'invoice' ? 'revenue' : 'expense';
   const chart = chartOf(loadUserAccounts());
   const holding = ensureHoldingAccount(kind, chart);
@@ -322,6 +346,8 @@ export interface PostResult {
 /**
  * Write every due entry (date ≤ `upTo`) that is not yet posted. Idempotent: an entry is posted once
  * (its voucher id is kept under its key). Entries inside the period lock are skipped and counted.
+ * No release is posted while the initial deferral is unposted (it would move income that was never
+ * deferred): such releases are held and counted with the locked entries (QA5-2 F6).
  */
 export function postDue(upTo: string, ids?: readonly string[]): PostResult {
   const res: PostResult = { posted: 0, locked: 0, errors: [] };
@@ -336,6 +362,10 @@ export function postDue(upTo: string, ids?: readonly string[]): PostResult {
     for (const [k, v] of Object.entries(posted)) if (!live.has(v)) delete posted[k];
     for (const e of plannedEntries({ ...d, posted })) {
       if (posted[e.key] || e.date > upTo || e.amount <= 0) continue;
+      if (e.kind === 'release' && !posted.init) {
+        res.locked++;
+        continue;
+      }
       try {
         const v = saveVoucher(voucherFor(d, e));
         posted[e.key] = v.id;
@@ -368,13 +398,24 @@ export function stopDeferral(id: string, on: string): PostResult {
   return postDue(day, [id]);
 }
 
-/** Delete a schedule and every voucher it wrote (refused by the period lock for locked vouchers). */
+/**
+ * Delete a schedule and every voucher it wrote — all or nothing (QA5-2 F22): every journal's lock is
+ * checked before any is deleted, and the two tables roll back together if a delete still fails.
+ */
 export function deleteDeferral(id: string): void {
   requireAccess('books.edit');
   const d = loadDeferrals().find((x) => x.id === id);
   if (!d) return;
-  for (const v of d.voucher_ids) deleteVoucher(v);
-  setTable(DEFERRALS_TABLE, loadDeferrals().filter((x) => x.id !== id));
+  const own = new Set(d.voucher_ids);
+  for (const v of loadVouchers()) {
+    if (!own.has(v.id)) continue;
+    assertUnlocked({ id: v.id, issue_date: v.date, invoice_number: v.number }, 'delete');
+    if (v.reverse_on) assertUnlocked({ id: v.id, issue_date: v.reverse_on, invoice_number: v.number }, 'delete');
+  }
+  withTablesRollback([VOUCHERS_TABLE, DEFERRALS_TABLE], () => {
+    for (const v of d.voucher_ids) deleteVoucher(v);
+    setTable(DEFERRALS_TABLE, loadDeferrals().filter((x) => x.id !== id));
+  });
   audit.record({ entity: 'voucher', entity_id: id, action: 'delete', doc_number: d.source.number, summary: `Deferral schedule for ${d.source.number ?? ''} deleted with its journals` });
 }
 

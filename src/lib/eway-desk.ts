@@ -8,6 +8,7 @@
  * published in a form we could verify. Nothing is uploaded.
  */
 
+import { csvCell } from './csv';
 import type { EInvoiceMeta } from './einvoice';
 import type { InvoiceRecord } from '../types/invoice';
 import type { TransporterChange, VehicleChange } from '../types/docs-r3';
@@ -148,11 +149,6 @@ export const TRANSPORTER_ID = /^[0-9]{2}[0-9A-Z]{13}$/;
 export function transporterUpdateJson(ewbNos: readonly string[], transporterId: string): Record<string, unknown> {
   return { version: EWAY_VERSION, transporterUpdtList: ewbNos.map((n) => ({ ewbNo: Number(n), transporterId: transporterId.trim().toUpperCase() })) };
 }
-
-const csvCell = (v: unknown) => {
-  const s = String(v ?? '');
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
 
 /** CSV beside the JSON (same rows), for the dispatcher's records. */
 export function vehicleUpdateCsv(ewbNos: readonly string[], input: VehicleUpdateInput): string {
