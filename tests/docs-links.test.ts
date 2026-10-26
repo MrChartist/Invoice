@@ -19,9 +19,14 @@ test('every docs/features/*.md path named in the roadmap exists', () => {
 
 test('CA_REVIEW ids are unique, and every id the help cites exists there', () => {
   const full = read('docs/CA_REVIEW.md');
-  const ca = full.slice(0, full.indexOf('## Round 6 (R6-C)') > 0 ? full.indexOf('## Round 6 (R6-C)') : undefined); // later sections cite ids
+  // The R6-C notes section only cites ids; every other section defines them (Rounds 7–8 append HT / TR sections).
+  const notesAt = full.indexOf('## Round 6 (R6-C)');
+  const notesEnd = notesAt < 0 ? -1 : full.indexOf('\n## ', notesAt + 1);
+  const ca = notesAt < 0 ? full : full.slice(0, notesAt) + (notesEnd < 0 ? '' : full.slice(notesEnd));
   const rows = [...ca.matchAll(/^\| ([A-Z]{1,2}\d+)(?: ★)? \|/gm)].map((m) => m[1]);
-  assert.equal(rows.length, 160, 'the pack keeps its 160 items (R6-C adds notes, not ids)');
+  const total = Number(/^\| \*\*Total\*\* \| \| \*\*(\d+)\*\* \|/m.exec(full)?.[1]);
+  assert.ok(rows.length >= 160, 'the pack keeps at least its 160 Round 2–5 items');
+  assert.equal(rows.length, total, 'the summary table total matches the id rows');
   assert.equal(new Set(rows).size, rows.length, 'no id twice');
   const ids = new Set(rows);
   const helpDir = 'src/lib/help';

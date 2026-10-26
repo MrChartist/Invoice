@@ -12,7 +12,7 @@
  * set/del/clear -> false. Data-store helpers reject so storage.ts can react.
  */
 
-import { activeCompanyId, companyDbName } from './company-registry';
+import { activeCompanyId, companyDbName, pinCompany } from './company-registry';
 
 
 // v3 (vault mode, 5.8): no schema change. The bump makes tabs still running an older build lose their
@@ -42,7 +42,7 @@ export function openDb(): Promise<IDBDatabase> {
     let req: IDBOpenDBRequest;
     try {
       // One database per company (6.20); the main company keeps `mrchartist_inv_kv`.
-      req = indexedDB.open(companyDbName(activeCompanyId()), DB_VERSION);
+      req = indexedDB.open(companyDbName(pinCompany(activeCompanyId())!), DB_VERSION);
     } catch (err) {
       reject(err as Error);
       return;
@@ -154,11 +154,14 @@ export async function idbClear(): Promise<boolean> {
 
 /**
  * Forget the shared connection (closing it once it opens). Used when an open did not answer in
- * time, so a later call starts afresh instead of waiting on the stuck request; also a test seam.
+ * time, so a later call starts afresh instead of waiting on the stuck request (`keepCompany`: the tab
+ * stays pinned to its company, QA7 G1, so the reopen never follows another tab's switch); also a test
+ * seam for a reload (which forgets the pin, as a real reload does).
  */
-export function resetIdbConnection(): void {
+export function resetIdbConnection(keepCompany?: boolean): void {
   const p = conn;
   conn = null;
+  if (!keepCompany) pinCompany(null);
   p?.then(
     (db) => db.close(),
     () => {},

@@ -185,7 +185,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   qc_settings: 'QC hold settings.',
   gift_voucher_settings: 'Gift voucher settings.',
   bin_settings: 'Recycle bin retention.',
-  setup_progress: 'Setup checklist: skipped steps and when the card was hidden.',
+  setup_progress: 'Setup checklist: skipped steps and when the card was hidden (the owner at the top level, each clerk under byUser).',
   interest_settings: 'Interest-on-overdue defaults (R8-A).', bank_statement_settings: 'Bank stock-statement terms per bank account (R8-C).', tds_settings: 'TDS settings: our turnover per FY for 194Q (R8-C).',
 };
 
