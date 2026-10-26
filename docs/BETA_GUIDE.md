@@ -46,8 +46,10 @@ version. Your data is not touched by an update.
 2. **Better: test in a separate company.** Use the company switcher at the top of the sidebar to add a company
    such as "Beta test". Each company is a separate data store on the device, so testing never touches your real
    books. Switch back at any time.
-3. **Sample data.** *Settings → Data & backup* → *Try with sample data* fills a company with realistic demo
-   documents, and *Remove sample data* takes them out again.
+3. **Sample data.** *Try with sample data* (Dashboard or *Settings → Data & backup*) opens a separate **Demo
+   company** with a business like yours (shop counter, services, trading, transport or works contract) and today's
+   dates. A banner says "Sample company — nothing here is real", with *Switch to my company* and *Reset samples*.
+   Sample data never goes into your own company.
 4. Optional: turn on automatic backups to a folder (Chrome / Edge) in the same panel.
 
 ## 5. Roles on a shared device
@@ -64,12 +66,20 @@ Roles are a convenience lock on a shared computer, not security: anyone with the
 tools can read the stored data. Please test each role and tell us about anything a role can do that it should
 not (or cannot do that it should).
 
-## 6. Hindi (हिंदी)
+## 6. Interface languages
 
 Switch the interface language in *Settings* → *Language / भाषा*, or on the PIN screen. The choice is kept on
-this device only. The shell, Dashboard, invoice editor, payment dialog and many screens are in Hindi; some
-screens and messages are still English (roadmap 5.4). Please report untranslated text, awkward wording and
-any layout that breaks with Hindi text.
+this device only. The app offers eight languages:
+
+| Language | Coverage |
+|---|---|
+| English | Everything. |
+| हिन्दी (Hindi) | The shell, Dashboard, invoice editor, payment dialog and most screens. |
+| मराठी (Marathi) | Core screens (shell, Dashboard, editor, payments, khata). |
+| ગુજરાતી (Gujarati), தமிழ் (Tamil), বাংলা (Bengali), తెలుగు (Telugu), ಕನ್ನಡ (Kannada) | Partial: the core screens through a phrase glossary; other text shows in English (roadmap 5.4 / 8.130). |
+
+Statutory wording that is not certain stays in English ("verify with your CA"). Please report untranslated text,
+awkward wording and any layout that breaks with longer text.
 
 ## 7. What to test first
 
@@ -106,6 +116,23 @@ Work through these flows end to end. After each step, check the numbers on the n
 1. *Payroll* (owner only): employees, salary structures, a monthly payroll run with EPF / ESI / PT / TDS.
 2. Pay the run, check the payslips and the payroll postings in *Books*.
 
+### F. Industry pack
+1. In a test company, pick one pack in *Settings → Defaults → Shop mode* (marketplace seller, transporter, works
+   contractor, school / clinic, non-profit or landlord).
+2. Work through its screens (for example: import a marketplace sales file and its settlement; or an LR, a freight
+   bill and a trip; or a BOQ and an RA bill with retention).
+3. Check where the figures land: *Receivables*, *Books*, GSTR-1 / 3B and the TDS screens. Switch the pack off and
+   check that its tabs and bell notices go away and nothing else changes.
+
+### G. Bring your openings over
+1. In a test company, *Settings → Data & backup → Import data*: import your supplier list (Vyapar / Busy / Marg /
+   Tally / QuickBooks / Xero / Zoho exports, or any Excel sheet), then your 31 March trial balance (*Ledgers & opening
+   balances*, preset "Trial balance") and the unpaid bills of that day (*Opening bills*).
+2. Read the dry run: the difference in opening balances (it goes to "Opening balance difference"), the groups the app
+   mapped for you, and the suppliers it matched instead of adding twice.
+3. Check *Books → Opening trial balance*, *Receivables* ageing and *Books → Tally → Bill-wise payables*. An import can
+   be undone in one step from the undo copy (*Settings → Data & backup*).
+
 Also useful: install / offline (section 2–3), backup and restore into a new company, two tabs open at once,
 and a phone-sized screen.
 
@@ -118,26 +145,35 @@ and a phone-sized screen.
   Data & backup*) through a folder you already sync (Google Drive, OneDrive, Dropbox …).
 - The 4–6 digit PIN is a lock screen; to encrypt the data at rest, turn on vault mode in *Settings → Security*.
 - Hindi is partial (section 6).
-- Open roadmap items are listed in [`docs/ROADMAP.md`](ROADMAP.md), rows marked ⏳ or 🟡. Main ones:
-  5.4 (more languages and screens), 7.19 (bill-wise references on Gateway voucher entry), 7.28 (GSTR-9C
-  Table 12 split), 7.49 (Tally import of inventory vouchers, Excel trial-balance template, per-FY auditor
-  export), 7.131 (Form 15CA / 15CB, 27Q extras, ISD postings, some GSTR-9 tables), 7.149 (payroll
-  perquisite and Form 12BA follow-ups), 7.158 (EEFC payments, POS extras) and 7.167 (MRP lead times, price
-  lists on POS, ITC-04 JSON check). Please do not report these as bugs, but do tell us if one blocks you.
+- Open roadmap items are listed in [`docs/ROADMAP.md`](ROADMAP.md), rows marked ⏳ or 🟡. The ten most likely to
+  affect your testing (please do not report these as bugs, but do tell us if one blocks you):
+  1. More languages and screens are still partly English (5.4, 8.130).
+  2. Gateway voucher entry has no bill-wise references or voucher classes (7.19).
+  3. Tally import brings no inventory quantities; no TDS challans in the Tally export (7.49).
+  4. Form 15CA / 15CB, 27Q extras, ISD postings, GSTR-6 amendments and some GSTR-9 tables are not built (7.131).
+  5. The TDS receivable register: credit notes do not reduce the TDS expected (`receivables.md`, CA item T12).
+  6. The cash-flow forecast ignores GST, TDS, loans and salaries (`cash-planning.md`).
+  7. A refund paid in a later marketplace settlement shows the customer in credit on *Receivables* (R5-A7).
+  8. A cancelled RA bill's number is issued again (R5-B7).
+  9. Custom fields are not on bills, expenses or recurring documents (`attachments-custom-fields.md`).
+  10. Editing a supplier bill below the quantity already returned is not blocked (`purchase-returns.md`).
 
 ## 9. How to report a problem
 
-1. Open **Help & about** (the **?** button in the bar at the top right, or *More → Help & about* on a phone).
-2. Choose **Report a problem**. The app builds a short diagnostic report on your device: app version and build,
-   your browser, the screen you were on (record ids masked), the last 20 error messages (with names, numbers,
-   amounts, GSTINs and e-mail addresses masked) and a storage health summary. **It contains no business data,
-   and nothing is sent anywhere.** Read it before you share it.
-3. Choose **Copy report** and paste it into the beta feedback channel, below a short description:
-   - what you did (the steps, in order),
-   - what you expected,
-   - what happened instead,
-   - a screenshot or screen recording if you can (check it for real customer data first).
-4. If the app does not open at all, tell us the browser and device and what the screen shows.
+1. Open **Help & about** (the **?** button in the bar at the top right, F1 outside the POS, or *More → Help & about*
+   on a phone) and choose **Report a problem**.
+2. Pick the **kind** — Problem, Idea or Question — and the **area** (the screen you were on is filled in). For a
+   problem, write what you did, what you expected and what happened instead, and how bad it is (Blocks me /
+   Annoying / Cosmetic).
+3. The app adds a short diagnostic block built on your device: app version and build, your browser, the screens you
+   visited (record ids masked), the last errors and a storage summary. Numbers, amounts, GSTINs and e-mail addresses
+   — also in what you type — are masked. **It contains no business data. Do not type customer names.** Read it
+   before you share it.
+4. **Nothing is sent until you tap Share.** Share opens your device's share sheet; *WhatsApp* and *E-mail* (when this
+   build has the beta channel set) open a message to the beta WhatsApp group or the e-mail address you were given;
+   *Copy* puts the report on the clipboard. Add a screenshot or recording if you can (check it for real customer
+   data first). An unsent draft stays on this device until you send or clear it.
+5. If the app does not open at all, tell us the browser and device and what the screen shows.
 
 Never send a backup file or screenshots of real customer data unless we ask and you are comfortable with it.
 A copy of the sample-data company that shows the problem is the best evidence.

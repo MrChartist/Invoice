@@ -34,6 +34,8 @@ import { withTablesRollback } from './table-txn';
 import { requireAccess } from './access';
 import { liveDocTrackingIssues } from './stock-tracking';
 import { cancelDocument } from './documents';
+import { withIssueSnapshot } from './khata-actions'; // R6-C5
+import type { PartyBalanceSnapshot } from '../types/invoice';
 import { createSchedule, recurringDb, RECURRING_TABLE, templateFromInvoice, type Frequency, type RecurringMode, type RecurringTemplate } from './recurring';
 
 export const BATCH_RUNS_TABLE = 'batch_runs';
@@ -271,6 +273,7 @@ export function issueBatch(drafts: readonly BatchDraft[], opts: { sourceId: stri
   return withTablesRollback([KEYS.invoices, BATCH_RUNS_TABLE, KEYS.clients, KEYS.items], () => {
     const saved: InvoiceRecord[] = [];
     const held: IssueResult['held'] = [];
+    const snapshots = new Map<string, PartyBalanceSnapshot | null>(); // R6-C5: one balance snapshot per party
     for (const d of drafts) {
       // The due date keeps its distance from the issue date when the run is dated differently from the preview.
       const termDays = Math.max(Math.round((Date.parse(`${d.record.due_date}T00:00:00Z`) - Date.parse(`${d.record.issue_date}T00:00:00Z`)) / 864e5) || 0, 0);
@@ -286,7 +289,7 @@ export function issueBatch(drafts: readonly BatchDraft[], opts: { sourceId: stri
       }
       // Number on issue (QA5-2 F15): a draft stays unnumbered until it is issued.
       rec.invoice_number = rec.status === 'Draft' ? '' : localDb.invoices.nextNumber(opts.date, rec.doc_type, rec.sender?.invoicePrefix || undefined);
-      const out = localDb.invoices.save(rec);
+      const out = localDb.invoices.save(rec.status === 'Draft' ? rec : withIssueSnapshot(rec, undefined, snapshots));
       if (!reason && opts.mode === 'issue' && out.approval?.state === 'pending') reason = out.approval.reason === 'credit' ? 'Held: over the credit limit (owner approval).' : 'Held for approval.';
       if (reason) held.push({ invoice: out, reason });
       saved.push(out);

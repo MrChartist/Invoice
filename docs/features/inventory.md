@@ -193,9 +193,10 @@ Every check runs on the dated event list, never on the end state:
   new sale), so auto-issued recurring invoices of batch items reduce the unbatched bucket.
 - Bill lines picked from the stock list carry `item_id` and match on it first (WP-8); typed / older lines still match by
   name + HSN. Invoice lines match by name + HSN only.
-- **Tally XML does not export batch or godown allocations** (`BATCHALLOCATIONS.LIST` / `GODOWNNAME` need godown and
+- ~~**Tally XML does not export batch or godown allocations** (`BATCHALLOCATIONS.LIST` / `GODOWNNAME` need godown and
   batch-enabled stock-item masters we do not export); Tally books everything to its main location. Stock transfers are
-  not exported (they would be Stock Journal vouchers).
+  not exported (they would be Stock Journal vouchers).~~ Done in 7.46: `BATCHALLOCATIONS.LIST` and transfers as Stock
+  Journal vouchers (stale note struck by R6-C6).
 - Godown pickers on purchase-order lines are not offered (a PO is not a stock document).
 
 ## Barcodes (6.7)

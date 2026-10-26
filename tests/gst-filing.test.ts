@@ -136,3 +136,62 @@ test('scan bill: a camera QR drafts the bill and returns the inbox route; junk t
   assert.equal(r.route, `/expenses?tab=inbox&doc=${encodeURIComponent(row.id)}`);
   assert.equal(draftsDb.all().find((d) => d.id === row.draft_id)?.bill_number, 'AS/2026/0042');
 });
+
+/* ── R6-C4: the filing strip follows the period and the filer; "downloaded" survives a reload ── */
+
+test('R6-C4 strip forms: monthly → GSTR-1 + 3B; QRMP month 1–2 → IFF, month 3 → the quarter; composition → CMP-08', async () => {
+  const { stripForms, stripReturn } = await import('../src/lib/compliance.ts');
+  const may = periodForDate('month', '2026-05-10');
+  const jun = periodForDate('month', '2026-06-10');
+  const q1 = periodForDate('quarter', '2026-05-10');
+  assert.deepEqual(stripForms(may, 'monthly'), ['GSTR1', 'GSTR3B']);
+  assert.deepEqual(stripForms(may, 'qrmp'), ['IFF'], 'QRMP month 1–2 shows IFF');
+  assert.deepEqual(stripForms(jun, 'qrmp'), ['GSTR1', 'GSTR3B']);
+  assert.deepEqual(stripForms(q1, 'composition'), ['CMP08'], 'a composition quarter shows CMP-08');
+  assert.deepEqual(stripForms(may, 'composition'), []);
+  assert.deepEqual(stripForms(periodForDate('fy', '2026-05-10'), 'monthly'), []);
+  // Same ids as the Compliance calendar.
+  assert.equal(stripReturn(may, 'IFF', 'qrmp', periodRange(may), 'May').id, 'IFF:2026-05');
+  assert.equal(stripReturn(jun, 'GSTR3B', 'qrmp', periodRange(jun), 'Jun').id, 'GSTR3B:2026-Q1');
+  assert.equal(stripReturn(q1, 'CMP08', 'composition', periodRange(q1), 'Q1').id, 'CMP08:2026-Q1');
+  assert.equal(stripReturn(may, 'GSTR1', 'monthly', periodRange(may), 'May').id, 'GSTR1:2026-05');
+});
+
+test('R6-C4 downloaded_at round-trips on the compliance row, is not a filed mark, and survives filing / un-filing', async () => {
+  const { downloadedFor, filedFor, loadFiled, rememberDownload, setFiled, saveFiled, stripReturn, pendingReturns } = await import('../src/lib/compliance.ts');
+  const may = periodForDate('month', '2026-05-10');
+  const iff = stripReturn(may, 'IFF', 'qrmp', periodRange(may), 'May 2026');
+  assert.equal(rememberDownload(iff, SELLER_GSTIN), true);
+  // "Reload": read the table back.
+  let rows = loadFiled();
+  assert.ok(downloadedFor(rows, iff, SELLER_GSTIN), 'downloaded_at survives a reload');
+  assert.equal(filedFor(rows, iff, SELLER_GSTIN), undefined, 'a download is not a filed mark');
+  const g3 = stripReturn(periodForDate('month', '2026-06-10'), 'GSTR3B', 'qrmp', periodRange(periodForDate('month', '2026-06-10')), 'Q1');
+  rememberDownload(g3, SELLER_GSTIN);
+  assert.equal(pendingReturns({ frequency: 'qrmp', today: '2026-08-30', since: '2026-04-01', monthsBack: 6 }, loadFiled(), SELLER_GSTIN).overdue.some((r) => r.id === g3.id), true, 'still overdue until marked filed');
+  saveFiled(setFiled(loadFiled(), iff, SELLER_GSTIN, '2026-06-11'));
+  rows = loadFiled();
+  assert.equal(filedFor(rows, iff, SELLER_GSTIN)?.filed_on, '2026-06-11');
+  assert.ok(downloadedFor(rows, iff, SELLER_GSTIN), 'filing keeps the download');
+  saveFiled(setFiled(loadFiled(), iff, SELLER_GSTIN, null));
+  rows = loadFiled();
+  assert.equal(filedFor(rows, iff, SELLER_GSTIN), undefined);
+  assert.ok(downloadedFor(rows, iff, SELLER_GSTIN), 'clearing the mark keeps the download');
+  // The amendment check and the GSTR-4 late-fee reader never treat a download-only row as filed.
+  const { amendmentCheck } = await import('../src/lib/amendments.ts');
+  const inv = { id: 'x', doc_type: 'TAX_INVOICE', status: 'Sent', invoice_number: 'A/1', issue_date: '2026-05-05', sender: { companyGstin: SELLER_GSTIN }, client: { name: 'B', gstin: '27AAACB2230M1ZT' }, items: [] };
+  assert.notEqual(amendmentCheck(inv as never, { filed: rows, lockUntil: '' }).reason, 'filed');
+});
+
+test('R6-C4 per-form preflight: IFF skips the HSN checks; CMP-08 runs only the composition checks', () => {
+  installSettings();
+  createViaStore({ client: clientMH, date: '2025-08-06', lines: [{ qty: 1, rate: 100, tax: 18, hsn: '' }] });
+  const period = periodForDate('month', '2025-08-10');
+  const invoices = readInvoices();
+  const { issues } = buildGstReport(JSON.parse(JSON.stringify(invoices)), [], { period, gstin: SELLER_GSTIN });
+  const exceptions = gstExceptions(invoices, { ...periodRange(period), irnIds: new Set(), aato: () => undefined, today: '2025-08-10', gstin: SELLER_GSTIN });
+  const input = { exceptions, issues, gaps: [] };
+  assert.ok(buildPreflight(input, 'GSTR1').some((g) => g.code === 'B2B_NO_HSN'));
+  assert.equal(buildPreflight(input, 'IFF').some((g) => ['B2B_NO_HSN', 'HSN_MISSING', 'HSN_DIGITS'].includes(String(g.code))), false, 'the IFF preflight has no HSN rule');
+  assert.deepEqual(buildPreflight(input, 'CMP08').filter((g) => !['COMPOSITION_DOCS', 'BOS_TAXED_LINES', 'DRAFTS', 'SERIES_GAP', 'SERIES_CANCELLED', 'CANCELLED'].includes(String(g.code))), []);
+});

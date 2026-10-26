@@ -16,6 +16,7 @@ import { releaseAttachments, releaseDropped } from './attachments';
 import { supplierPayable } from './purchase-normalize';
 import { assertRemovable, liveRemovalIssues } from './stock-timeline';
 import { assertBillApproval } from './purchase-approval-gate';
+import { applyQcHold } from './receipt-notes'; // R6-C1: QC hold on bill-only receipts
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -359,6 +360,43 @@ function writeBill(input: Omit<PurchaseRecord, 'id'> & { id?: string }): Purchas
   return record;
 }
 
+/**
+ * R6-C1: a goods bill booked without a GRN receives its stock itself, so its new stock lines follow the GRN rule
+ * (`applyQcHold`: a `qc_on_receipt` item with no godown goes to the QC hold godown). Lines that bill a GRN line
+ * (goods came in on the GRN) and lines already on the bill before this edit are left alone, so an edit never moves
+ * goods that were held or released.
+ */
+export function withBillQcHold<B extends { kind?: string; lines?: PurchaseLine[] }>(bill: B, existing?: { lines?: PurchaseLine[] }): B {
+  if (bill.kind === 'EXPENSE' || !bill.lines?.length) return bill;
+  const before = new Set((existing?.lines ?? []).map((l) => l.id).filter(Boolean));
+  const fresh = bill.lines.filter((l) => !l.grn_line_id && !before.has(l.id));
+  if (!fresh.length) return bill;
+  const held = new Map(applyQcHold(fresh).map((l, i) => [fresh[i], l]));
+  return { ...bill, lines: bill.lines.map((l) => held.get(l) ?? l) };
+}
+
+/* ── R6-C1: QC reject → pre-filled debit note ───────────────────── */
+
+/** `/expenses?tab=returns&new=dn&bill=<id>&lines=<lineId>:<qty>,…` — a debit note on the bill with the rejected lines. */
+export function debitNotePrefillHref(billId: string, lines: readonly { id: string; quantity: number }[]): string {
+  const spec = lines.filter((l) => l.id && num(l.quantity) > 0).map((l) => `${l.id}:${round2(num(l.quantity))}`).join(',');
+  return `/expenses?tab=returns&new=dn&bill=${encodeURIComponent(billId)}${spec ? `&lines=${encodeURIComponent(spec)}` : ''}`;
+}
+
+/** Reads `bill` / `lines` back (unknown or malformed parts are dropped; quantities must be positive). */
+export function parseDebitNotePrefill(params: { get(name: string): string | null }): { billId?: string; qty: Record<string, number> } {
+  const billId = (params.get('bill') ?? '').trim() || undefined;
+  const qty: Record<string, number> = {};
+  for (const part of (params.get('lines') ?? '').split(',')) {
+    const at = part.lastIndexOf(':');
+    if (at <= 0) continue;
+    const id = part.slice(0, at).trim();
+    const q = Number(part.slice(at + 1));
+    if (id && Number.isFinite(q) && q > 0) qty[id] = round2(q);
+  }
+  return { billId, qty };
+}
+
 export const purchasesDb = {
   all: (): PurchaseRecord[] => getTable<PurchaseRecord>(PURCHASES_TABLE),
   get: (id: string): PurchaseRecord | undefined => purchasesDb.all().find((p) => p.id === id),
@@ -375,7 +413,7 @@ export const purchasesDb = {
     void _draft;
     const bill = { ...rest };
     if ((bill as { status?: unknown }).status === 'draft') delete bill.status; // other legacy statuses (cancelled) are kept
-    return writeBill(bill);
+    return writeBill(withBillQcHold(bill, existing));
   },
 
   /**

@@ -42,8 +42,10 @@ export interface StockRow {
 export interface InsightInput {
   invoices: readonly InvoiceRecord[];
   payments: readonly Payment[];
+  /** R6-C1: pass `liveCostPurchases()` (margin.ts) — the stock engine's copies, landed-cost vouchers applied. */
   purchases: readonly unknown[];
   vendors?: readonly unknown[];
+  /** R6-C1: `liveUnitCosts()` (margin.ts), so margin erosion uses the landed cost the stock reports use. */
   costs?: ReadonlyMap<string, UnitCost>;
   stock?: readonly StockRow[];
   /** R3-B7: clients and the quiet-customer settings (the card is left out without them). */

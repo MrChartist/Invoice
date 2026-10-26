@@ -156,28 +156,94 @@ export interface FiledReturn {
   period_key: string;
   /** Filer GSTIN the mark belongs to ('' = any). */
   gstin: string;
-  /** Day the return was filed, `YYYY-MM-DD`. */
+  /** Day the return was filed, `YYYY-MM-DD`; '' on a row that only remembers the download (R6-C4). */
   filed_on: string;
   /** ISO timestamp of the click. */
   marked_at: string;
+  /** Additive (R6-C4): ISO timestamp the return's JSON was downloaded from the filing strip (survives reloads). */
+  downloaded_at?: string;
 }
 
 const sameGstin = (a: string, b: string) => !a || !b || a.toUpperCase() === b.toUpperCase();
 
+const markOf = (rows: readonly FiledReturn[], r: Pick<ReturnDue, 'form' | 'periodKey'>, gstin: string) =>
+  rows.find((x) => x && x.form === r.form && x.period_key === r.periodKey && sameGstin(x.gstin ?? '', gstin));
+
+/** The filed mark of `r` (a row that only remembers a download is not one). */
 export function filedFor(rows: readonly FiledReturn[], r: ReturnDue, gstin = ''): FiledReturn | undefined {
-  return rows.find((x) => x && x.form === r.form && x.period_key === r.periodKey && sameGstin(x.gstin ?? '', gstin));
+  return rows.find((x) => x && !!x.filed_on && x.form === r.form && x.period_key === r.periodKey && sameGstin(x.gstin ?? '', gstin));
 }
 
-/** Marks `r` filed on `filedOn`, or clears the mark when `filedOn` is null. Pure. */
+/** Marks `r` filed on `filedOn`, or clears the mark when `filedOn` is null (a remembered download stays). Pure. */
 export function setFiled(rows: readonly FiledReturn[], r: ReturnDue, gstin: string, filedOn: string | null, now = new Date()): FiledReturn[] {
   const g = gstin.trim().toUpperCase();
+  const prev = markOf(rows, r, g);
   const rest = rows.filter((x) => !(x && x.form === r.form && x.period_key === r.periodKey && sameGstin(x.gstin ?? '', g)));
-  if (!filedOn) return rest;
-  return [...rest, { id: `${r.id}:${g}`, form: r.form, period_key: r.periodKey, gstin: g, filed_on: filedOn.slice(0, 10), marked_at: now.toISOString() }];
+  const downloaded = prev?.downloaded_at ? { downloaded_at: prev.downloaded_at } : {};
+  if (!filedOn) return prev?.downloaded_at ? [...rest, { ...prev, filed_on: '', ...downloaded }] : rest;
+  return [...rest, { id: `${r.id}:${g}`, form: r.form, period_key: r.periodKey, gstin: g, filed_on: filedOn.slice(0, 10), marked_at: now.toISOString(), ...downloaded }];
+}
+
+/** R6-C4: when the JSON of `r` was downloaded from the filing strip ('' = never). */
+export function downloadedFor(rows: readonly FiledReturn[], r: Pick<ReturnDue, 'form' | 'periodKey'>, gstin = ''): string {
+  return markOf(rows, r, gstin)?.downloaded_at ?? '';
+}
+
+/** R6-C4: remember the download of `r` on its compliance row (created with `filed_on: ''` when not filed yet). Pure. */
+export function setDownloaded(rows: readonly FiledReturn[], r: ReturnDue, gstin: string, now = new Date()): FiledReturn[] {
+  const g = gstin.trim().toUpperCase();
+  const prev = markOf(rows, r, g);
+  const rest = rows.filter((x) => x !== prev);
+  return [...rest, prev ? { ...prev, downloaded_at: now.toISOString() } : { id: `${r.id}:${g}`, form: r.form, period_key: r.periodKey, gstin: g, filed_on: '', marked_at: now.toISOString(), downloaded_at: now.toISOString() }];
+}
+
+/**
+ * R6-C4: the forms the GST filing strip offers for a period — GSTR-1 + GSTR-3B (a monthly period, or a QRMP quarter),
+ * IFF in QRMP months 1–2, CMP-08 for a composition quarter. A whole FY offers none (mark per period).
+ */
+export function stripForms(period: { kind: 'month'; month: number } | { kind: 'quarter' } | { kind: string }, frequency: FilerFrequency): ReturnForm[] {
+  if (frequency === 'composition') return period.kind === 'quarter' ? ['CMP08'] : [];
+  if (period.kind === 'month') {
+    const m = (period as { month: number }).month;
+    if (frequency === 'qrmp' && m % 3 !== 0) return ['IFF'];
+    return ['GSTR1', 'GSTR3B']; // monthly; in QRMP the quarter's last month files the quarter's GSTR-1 / 3B
+  }
+  if (period.kind === 'quarter') return ['GSTR1', 'GSTR3B'];
+  return [];
+}
+
+/**
+ * R6-C4: the compliance row a filing-strip button marks — IFF by month; CMP-08 and a QRMP filer's GSTR-1 / 3B by FY
+ * quarter (a QRMP quarter's last month files the quarter); otherwise by month. Same ids as the Compliance calendar.
+ */
+export function stripReturn(
+  period: { kind: string; fyStart: number; month?: number; quarter?: number },
+  form: ReturnForm,
+  frequency: FilerFrequency,
+  range: { from: string; to: string },
+  label: string,
+): ReturnDue {
+  const monthKey = range.from.slice(0, 7);
+  const m = +range.from.slice(5, 7);
+  const quarterOfMonth = Math.floor(((m - 4 + 12) % 12) / 3) + 1;
+  const quarterKey = `${period.fyStart}-Q${period.kind === 'quarter' ? period.quarter : quarterOfMonth}`;
+  const byQuarter = form === 'CMP08' || (form !== 'IFF' && (period.kind === 'quarter' || (frequency === 'qrmp' && m % 3 === 0)));
+  const periodKey = byQuarter ? quarterKey : monthKey;
+  return { id: `${form}:${periodKey}`, form, periodKey, label, from: range.from, to: range.to, due: range.to, optional: form === 'IFF' };
 }
 
 export const loadFiled = (): FiledReturn[] => getTable<FiledReturn>(COMPLIANCE_TABLE);
 export const saveFiled = (rows: FiledReturn[]): void => setTable(COMPLIANCE_TABLE, rows);
+
+/** R6-C4: remember the download of `r` for this GSTIN (fail-soft: the file already went out). */
+export function rememberDownload(r: ReturnDue, gstin: string): boolean {
+  try {
+    saveFiled(setDownloaded(loadFiled(), r, gstin));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export type ReturnStatus = 'filed' | 'overdue' | 'due-soon' | 'upcoming';
 

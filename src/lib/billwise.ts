@@ -22,14 +22,23 @@ import { assertUnlocked } from './period-lock';
 import { isVoidStatus, readPurchase, supplierPayable } from './purchase-normalize';
 import { balanceOf, paymentsDb, purchasesDb, type PurchasePayment } from './purchases';
 import { generateId, getTable, setTable } from './storage';
+import type { OpeningBillInput } from './receivables';
+import { loadPayableOpeningBills } from './opening-bills';
 
 export const VENDOR_PAYMENTS_TABLE = 'vendor_payments';
 
 /* ── Pure ─────────────────────────────────────────────────────── */
 
+/** R6-C2: bill-wise key of a payable opening bill (`BillRef.purchaseId`, allocation plans). */
+export const OPENING_REF = 'opening:';
+export const openingRefKey = (openingBillId: string) => `${OPENING_REF}${openingBillId}`;
+export const isOpeningRef = (key: string) => key.startsWith(OPENING_REF);
+/** The bill-wise key an allocation settles: a purchase id, or `opening:<opening bill id>`. */
+export const allocationKey = (a: { purchase_id: string; opening_bill_id?: string }) => (a.opening_bill_id ? openingRefKey(a.opening_bill_id) : a.purchase_id);
+
 /** What is still unadjusted on an advance / on-account payment (allocations to deleted bills ignored). */
 export function unallocatedOf(vp: VendorPayment, billIds?: ReadonlySet<string>): number {
-  const used = (vp.allocations ?? []).filter((a) => !billIds || billIds.has(a.purchase_id)).reduce((s, a) => s + num(a.amount), 0);
+  const used = (vp.allocations ?? []).filter((a) => !billIds || billIds.has(allocationKey(a))).reduce((s, a) => s + num(a.amount), 0);
   return round2(Math.max(num(vp.amount) - used, 0));
 }
 
@@ -60,6 +69,8 @@ export interface BillRef {
   allocations: { date: string; amount: number; kind: 'payment' | 'adjustment'; ref: string }[];
   /** MSMED Act Sec 16 interest (micro / small suppliers only), ₹. */
   msmeInterest: number;
+  /** R6-C2: a supplier opening bill (`purchaseId` = `opening:<id>`); settled only by `vendor_payments` allocations. */
+  opening?: boolean;
 }
 
 export interface OpenAdvance {
@@ -71,6 +82,8 @@ export interface OpenAdvance {
   unallocated: number;
   /** WP-3: set when this open item is the on-account part of a purchase return / supplier note (not adjustable here). */
   noteId?: string;
+  /** R6-C2: a debit opening bill of the supplier (money with them when the books began); managed on the party's openings. */
+  openingId?: string;
 }
 
 export interface PartyPayables {
@@ -97,6 +110,8 @@ export interface PayablesInput {
   includeSettled?: boolean;
   /** WP-3: purchase returns / supplier notes — an Agst Ref adjustment on their bill, any excess on account. */
   returns?: readonly PurchaseReturn[];
+  /** R6-C2: payable opening bills (`loadPayableOpeningBills`); they age from their own date and settle Agst Ref. */
+  openingBills?: readonly OpeningBillInput[];
 }
 
 const emptyBuckets = (): Record<AgeBucket, number> => ({ notDue: 0, d0_30: 0, d31_60: 0, d61_90: 0, d90plus: 0 });
@@ -105,13 +120,15 @@ const partyKey = (vendorId: string | undefined, name: string) => (vendorId ? `id
 /** Outstanding payables bill-wise, party by party, as of `asOf`. */
 export function billwisePayables(input: PayablesInput): PartyPayables[] {
   const asOf = input.asOf;
-  const billIds = new Set(input.purchases.map((p) => p.id));
+  const openings = input.openingBills ?? [];
+  const billIds = new Set([...input.purchases.map((p) => p.id), ...openings.map((b) => openingRefKey(b.id))]);
   const payByBill = new Map<string, PurchasePayment[]>();
   for (const p of input.payments) payByBill.set(p.purchase_id, [...(payByBill.get(p.purchase_id) ?? []), p]);
   const adjByBill = new Map<string, { date: string; amount: number; ref: string }[]>();
   for (const vp of input.vendorPayments) {
     for (const a of vp.allocations ?? []) {
-      adjByBill.set(a.purchase_id, [...(adjByBill.get(a.purchase_id) ?? []), { date: a.date, amount: num(a.amount), ref: vp.kind === 'NEW_REF' ? vp.ref_name || 'New ref' : vp.kind === 'ADVANCE' ? 'Advance' : 'On account' }]);
+      const key = allocationKey(a);
+      adjByBill.set(key, [...(adjByBill.get(key) ?? []), { date: a.date, amount: num(a.amount), ref: vp.kind === 'NEW_REF' ? vp.ref_name || 'New ref' : vp.kind === 'ADVANCE' ? 'Advance' : 'On account' }]);
     }
   }
   for (const n of input.returns ?? []) {
@@ -165,9 +182,30 @@ export function billwisePayables(input: PayablesInput): PartyPayables[] {
     p.billsTotal = round2(p.billsTotal + balance);
     p.buckets[ref.bucket] = round2(p.buckets[ref.bucket] + balance);
   }
+  // R6-C2: supplier opening bills (Cr = owed, aged from their own date); a Dr opening is money with the supplier.
+  for (const ob of openings) {
+    if (ob.date > asOf) continue;
+    const key = openingRefKey(ob.id);
+    const p = party(ob.party_id, ob.party_name);
+    if (ob.dr_cr === 'Dr') {
+      p.advances.push({ id: key, kind: 'ON_ACCOUNT', date: ob.date, ref: ob.ref_no, amount: round2(ob.amount), unallocated: round2(ob.amount), openingId: ob.id });
+      p.advancesTotal = round2(p.advancesTotal + ob.amount);
+      continue;
+    }
+    const allocations: BillRef['allocations'] = (adjByBill.get(key) ?? []).filter((a) => a.date <= asOf).map((a) => ({ date: a.date, amount: round2(a.amount), kind: 'adjustment' as const, ref: a.ref })).sort((a, b) => a.date.localeCompare(b.date));
+    const settled = round2(allocations.reduce((s, a) => s + a.amount, 0));
+    const balance = round2(Math.max(ob.amount - settled, 0));
+    if (balance <= 0.004 && !input.includeSettled) continue;
+    const due = (input.ageBy ?? 'due') === 'bill' ? ob.date : ob.due_date || ob.date;
+    const overdueDays = Math.max(daysBetween(due, asOf), 0);
+    const ref: BillRef = { purchaseId: key, number: ob.ref_no, date: ob.date, due, payable: round2(ob.amount), settled, balance, overdueDays, bucket: bucketOf(due < asOf ? overdueDays : 0), allocations, msmeInterest: 0, opening: true };
+    p.bills.push(ref);
+    p.billsTotal = round2(p.billsTotal + balance);
+    p.buckets[ref.bucket] = round2(p.buckets[ref.bucket] + balance);
+  }
   for (const vp of input.vendorPayments) {
     if (!isoDay(vp.date) || vp.date > asOf) continue;
-    const used = (vp.allocations ?? []).filter((a) => billIds.has(a.purchase_id) && a.date <= asOf).reduce((s, a) => s + num(a.amount), 0);
+    const used = (vp.allocations ?? []).filter((a) => billIds.has(allocationKey(a)) && a.date <= asOf).reduce((s, a) => s + num(a.amount), 0);
     const unallocated = round2(Math.max(num(vp.amount) - used, 0));
     if (unallocated <= 0.004 && !input.includeSettled) continue;
     const p = party(vp.vendor_id, vp.vendor_name);
@@ -267,9 +305,18 @@ export interface SupplierPaymentInput {
   refName?: string;
 }
 
+/** R6-C2: open balance of each payable (Cr) opening bill, keyed `opening:<id>`, net of `vendor_payments` allocations. */
+export function openingBillBalances(vendorPayments: readonly VendorPayment[] = vendorPaymentsDb.all(), openings: readonly OpeningBillInput[] = loadPayableOpeningBills(getTable<Vendor>('vendors'))): Map<string, number> {
+  const used = new Map<string, number>();
+  for (const vp of vendorPayments) for (const a of vp.allocations ?? []) if (a.opening_bill_id) used.set(a.opening_bill_id, (used.get(a.opening_bill_id) ?? 0) + num(a.amount));
+  return new Map(openings.filter((b) => b.dr_cr === 'Cr').map((b) => [openingRefKey(b.id), round2(Math.max(b.amount - (used.get(b.id) ?? 0), 0))]));
+}
+
 /**
  * Record one supplier payment allocated bill-wise: an Agst Ref `purchase_payments` row per bill
  * (same `group_id`) and, for any remainder, a `vendor_payments` row (New Ref / Advance / On Account).
+ * R6-C2: allocations to supplier opening bills (`opening:<id>`) ride on that `vendor_payments` row as
+ * `allocations[].opening_bill_id` (the opening bill is not a document, so it has no payment rows).
  * Each part goes through the usual access check and period lock.
  */
 export function recordSupplierPayment(input: SupplierPaymentInput): { groupId: string; payments: PurchasePayment[]; remainder?: VendorPayment } {
@@ -280,19 +327,28 @@ export function recordSupplierPayment(input: SupplierPaymentInput): { groupId: s
   if (!input.vendorName.trim()) throw new BillwiseError('Choose the supplier.');
   const allocated = round2(input.allocations.reduce((s, a) => s + num(a.amount), 0));
   if (allocated > amount + 0.004) throw new BillwiseError('The bill allocations exceed the amount paid.');
-  for (const a of input.allocations) {
+  const toOpenings = input.allocations.filter((a) => isOpeningRef(a.purchaseId) && num(a.amount) > 0);
+  const toBills = input.allocations.filter((a) => !isOpeningRef(a.purchaseId));
+  for (const a of toBills) {
     const bill = purchasesDb.get(a.purchaseId);
     if (!bill) throw new BillwiseError('A bill in the allocation no longer exists.');
     if (round2(num(a.amount)) > balanceOf(bill) + 0.004) throw new BillwiseError(`Bill ${bill.bill_number || bill.id}: the allocation exceeds its balance of ${balanceOf(bill).toFixed(2)}.`);
   }
+  const openBal = toOpenings.length ? openingBillBalances() : new Map<string, number>();
+  for (const a of toOpenings) {
+    const bal = openBal.get(a.purchaseId);
+    if (bal === undefined) throw new BillwiseError('An opening bill in the allocation no longer exists.');
+    if (round2(num(a.amount)) > bal + 0.004) throw new BillwiseError(`Opening bill: the allocation exceeds its balance of ${bal.toFixed(2)}.`);
+  }
   assertUnlocked({ issue_date: input.date }, 'pay');
   const groupId = generateId();
   const payments: PurchasePayment[] = [];
-  for (const a of input.allocations) {
+  for (const a of toBills) {
     if (!(num(a.amount) > 0)) continue;
     payments.push(paymentsDb.record(a.purchaseId, { amount: round2(num(a.amount)), date: input.date, method: input.method, reference: input.reference, bankAccountId: input.bankAccountId, groupId }));
   }
-  const left = round2(amount - allocated);
+  const billAllocated = round2(toBills.reduce((s, a) => s + Math.max(num(a.amount), 0), 0));
+  const left = round2(amount - billAllocated);
   let remainder: VendorPayment | undefined;
   if (left > 0.004) {
     remainder = {
@@ -306,17 +362,18 @@ export function recordSupplierPayment(input: SupplierPaymentInput): { groupId: s
       ...(input.bankAccountId && input.method.toLowerCase() !== 'cash' ? { bank_account_id: input.bankAccountId } : {}),
       kind: input.remainderKind ?? 'ON_ACCOUNT',
       ...(input.refName?.trim() ? { ref_name: input.refName.trim() } : {}),
-      allocations: [],
+      allocations: toOpenings.map((a) => ({ purchase_id: '', opening_bill_id: a.purchaseId.slice(OPENING_REF.length), amount: round2(num(a.amount)), date: input.date })),
       group_id: groupId,
       created_at: new Date().toISOString(),
     };
     setTable(VENDOR_PAYMENTS_TABLE, [...vendorPaymentsDb.all(), remainder]);
+    const opened = round2(toOpenings.reduce((s, a) => s + num(a.amount), 0));
     audit.record({
       entity: 'vendor_payment',
       entity_id: remainder.id,
       action: 'create',
       doc_number: remainder.reference ?? remainder.ref_name ?? '',
-      summary: `${remainder.kind === 'ADVANCE' ? 'Advance' : remainder.kind === 'NEW_REF' ? 'New ref' : 'On-account payment'} of ₹${left.toFixed(2)} to ${remainder.vendor_name} on ${remainder.date}`,
+      summary: `${opened > 0 ? `₹${opened.toFixed(2)} against opening bills${left - opened > 0.004 ? ' and ' : ''}` : ''}${left - opened > 0.004 || !(opened > 0) ? `${remainder.kind === 'ADVANCE' ? 'Advance' : remainder.kind === 'NEW_REF' ? 'New ref' : 'On-account payment'} of ₹${round2(left - opened).toFixed(2)}` : ''} to ${remainder.vendor_name} on ${remainder.date}`,
     });
   }
   return { groupId, payments, remainder };
@@ -327,13 +384,14 @@ export function adjustAgainstBill(vendorPaymentId: string, purchaseId: string, a
   requireAccess('books.edit');
   const all = vendorPaymentsDb.all();
   const vp = all.find((v) => v.id === vendorPaymentId);
+  if (isOpeningRef(purchaseId)) return adjustAgainstOpening(all, vp, purchaseId, amount, date);
   const bill = purchasesDb.get(purchaseId);
   if (!vp || !bill) throw new BillwiseError('Payment or bill not found.');
   const day = isoDay(date);
   if (!day) throw new BillwiseError('Choose the adjustment date.');
   if (day < vp.date) throw new BillwiseError('An advance cannot be adjusted before it was paid.');
   const a = round2(num(amount));
-  const billIds = new Set(purchasesDb.all().map((p) => p.id));
+  const billIds = new Set([...purchasesDb.all().map((p) => p.id), ...openingBillBalances(all).keys()]);
   if (!(a > 0)) throw new BillwiseError('Enter the amount to adjust.');
   if (a > unallocatedOf(vp, billIds) + 0.004) throw new BillwiseError(`Only ₹${unallocatedOf(vp, billIds).toFixed(2)} of this payment is unadjusted.`);
   if (a > balanceOf(bill) + 0.004) throw new BillwiseError(`The bill balance is ₹${balanceOf(bill).toFixed(2)}.`);
@@ -346,6 +404,26 @@ export function adjustAgainstBill(vendorPaymentId: string, purchaseId: string, a
   return next;
 }
 
+/** R6-C2: adjust an advance / on-account payment against a supplier opening bill (no money moves; no bill row changes). */
+function adjustAgainstOpening(all: VendorPayment[], vp: VendorPayment | undefined, key: string, amount: number, date: string): VendorPayment {
+  const balances = openingBillBalances(all);
+  const bal = balances.get(key);
+  if (!vp || bal === undefined) throw new BillwiseError('Payment or opening bill not found.');
+  const day = isoDay(date);
+  if (!day) throw new BillwiseError('Choose the adjustment date.');
+  if (day < vp.date) throw new BillwiseError('An advance cannot be adjusted before it was paid.');
+  const a = round2(num(amount));
+  const ids = new Set([...purchasesDb.all().map((p) => p.id), ...balances.keys()]);
+  if (!(a > 0)) throw new BillwiseError('Enter the amount to adjust.');
+  if (a > unallocatedOf(vp, ids) + 0.004) throw new BillwiseError(`Only ₹${unallocatedOf(vp, ids).toFixed(2)} of this payment is unadjusted.`);
+  if (a > bal + 0.004) throw new BillwiseError(`The opening bill balance is ₹${bal.toFixed(2)}.`);
+  assertUnlocked({ issue_date: day }, 'pay');
+  const next: VendorPayment = { ...vp, allocations: [...(vp.allocations ?? []), { purchase_id: '', opening_bill_id: key.slice(OPENING_REF.length), amount: a, date: day }] };
+  setTable(VENDOR_PAYMENTS_TABLE, all.map((v) => (v.id === vp.id ? next : v)));
+  audit.record({ entity: 'vendor_payment', entity_id: vp.id, action: 'update', doc_number: vp.reference ?? '', summary: `₹${a.toFixed(2)} of the payment to ${vp.vendor_name} adjusted against an opening bill on ${day}` });
+  return next;
+}
+
 /** Remove an advance / on-account payment and undo its adjustments on the bills. */
 export function deleteVendorPayment(id: string): void {
   const all = vendorPaymentsDb.all();
@@ -355,7 +433,7 @@ export function deleteVendorPayment(id: string): void {
   assertUnlocked({ issue_date: vp.date }, 'unpay');
   for (const a of vp.allocations ?? []) assertUnlocked({ issue_date: a.date }, 'unpay');
   const undo = new Map<string, number>();
-  for (const a of vp.allocations ?? []) undo.set(a.purchase_id, (undo.get(a.purchase_id) ?? 0) + num(a.amount));
+  for (const a of vp.allocations ?? []) if (!a.opening_bill_id) undo.set(a.purchase_id, (undo.get(a.purchase_id) ?? 0) + num(a.amount));
   if (undo.size) setTable('purchases', purchasesDb.all().map((p) => (undo.has(p.id) ? { ...p, amount_paid: Math.max(round2(num(p.amount_paid) - (undo.get(p.id) ?? 0)), 0) } : p)));
   setTable(VENDOR_PAYMENTS_TABLE, all.filter((v) => v.id !== id));
   audit.record({ entity: 'vendor_payment', entity_id: id, action: 'delete', doc_number: vp.reference ?? '', summary: `Deleted ₹${num(vp.amount).toFixed(2)} ${vp.kind === 'ADVANCE' ? 'advance' : 'on-account payment'} to ${vp.vendor_name} dated ${vp.date}` });

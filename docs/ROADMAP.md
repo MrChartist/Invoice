@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: Hindi / Marathi core screens, other languages partial) · Phase 6 ✅ · Phase 7 / 8 ✅ (open follow-ups listed) · Round 2 ✅ · Round 3 ✅ + QA round 3 ✅ · Round 4 ✅ (R4-A / R4-B / R4-C, PERF-1 / PERF-2) + QA round 5 ✅ · Income-tax Act 2025 labels ✅ (23a–23d open) · Round 5 ✅ (R5-A / R5-B / R5-C industry packs) · QA round 6 in progress · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24, updated 2026-10-26
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: Hindi / Marathi core screens, other languages partial) · Phase 6 ✅ · Phase 7 / 8 ✅ (open follow-ups listed) · Round 2 ✅ · Round 3 ✅ + QA round 3 ✅ · Round 4 ✅ (R4-A / R4-B / R4-C, PERF-1 / PERF-2) + QA round 5 ✅ · Income-tax Act 2025 labels ✅ (23a–23d open) · Round 5 ✅ (R5-A / R5-B / R5-C industry packs) · QA round 6 in progress · Round 6 in progress (R6-C ✅) · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24, updated 2026-10-26
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -216,7 +216,7 @@ documents in `docs/features/` keep their own WP ids). Gap ids refer to `docs/GAP
 | 7.6 | ✅ **Ratio analysis** from the ledger with drill-down (`src/lib/ledger/ratios.ts`) | Ratio Analysis | done |
 | 7.7 | ✅ (Sec 194-O / 194R / 194S presets, certificate limits / validity: done in 7O — 7.95, 7.97) Form 27Q working paper with DTAA vs Act rate and TRACES justification import: done in 7R (7.120) | — | done |
 | 7.8 | ✅ Vendor-form fields for PAN / deductee type / 206AB / Sec 197, TDS dates in the compliance calendar / notification bell — done in 7O (7.95, 7.96) | — | done |
-| 7.9 | ✅ **Masters & openings ("Accounts Info")**: user groups / sub-groups under the Schedule III primaries (nature and gross-profit effect inherited), Group / Ledger Create · Alter · Display with Tally keys (Enter / Ctrl+A / Esc, Alt+C hook), ledger and party opening balances on a books-beginning date posted as an Opening voucher with the difference in opening balances reported, bill-wise opening outstandings in receivables ageing and statements, opening trial balance screen, ledger interest parameters (lib), bill allocation on manual receipts — `docs/features/masters.md` | Groups, Ledgers, Opening balances, Bill-wise details (WP-1: P0-1, P0-2, P0-11, P1-7 lib) | done (P1-21 import kinds, P2 cost categories: open) |
+| 7.9 | ✅ **Masters & openings ("Accounts Info")**: user groups / sub-groups under the Schedule III primaries (nature and gross-profit effect inherited), Group / Ledger Create · Alter · Display with Tally keys (Enter / Ctrl+A / Esc, Alt+C hook), ledger and party opening balances on a books-beginning date posted as an Opening voucher with the difference in opening balances reported, bill-wise opening outstandings in receivables ageing and statements, opening trial balance screen, ledger interest parameters (lib), bill allocation on manual receipts — `docs/features/masters.md` | Groups, Ledgers, Opening balances, Bill-wise details (WP-1: P0-1, P0-2, P0-11, P1-7 lib) | done (~~P1-21 import kinds~~ ✅ R6-C3; P2 cost categories: open) |
 | 7.10 | ✅ **Payroll** (WIP-A): employees, pay heads (Tally calculation types), salary structures, attendance / production, Auto fill payroll run → Payroll voucher in the ledger, salary / PF / ESI / PT / TDS (192) payments, payslips, PF ECR, ESI, PT, Form 24Q / Form 16 Part B working papers (`/payroll`, `src/lib/payroll/`, `docs/features/payroll.md`) | Payroll | done |
 
 ### 7B · Keyboard-first accounting (Gateway)
@@ -253,7 +253,7 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.25 | ✅ **Supplier credit note received** (supplier's number / date, value only or with goods, with or without a bill); GSTR-3B ITC net of notes (`itcAdjustmentsFromNotes`), GSTR-2B CDNR matching (`bookBills` notes), Tally Debit Note voucher (`tally-debit-notes.ts`) | Debit Note with supplier ref | done |
 | 7.26 | ✅ **Receipt note (GRN)** → bill (PO → GRN → bill), **Rejections Out**, "Goods received not billed" (`src/lib/receipt-notes.ts`, stock source `events-returns.ts`) | Receipt Note (Alt+F9), Rejections Out | done |
 | 7.27 | ✅ **Purchase order outstanding** report (GRN-accepted + directly billed vs ordered, overdue days) | Purchase Order Outstandings | done |
-| 7.28 | ✅ Job work in / out + **ITC-04** and Rejections In: see 7M (7.70–7.73); sales-order outstanding (WP-8, 7.63); GSTR-9 Table 6 / 9 use of supplier notes and TDS adjustment on a return of a TDS bill: done in 7O (7.93, 7.94). Still open: 9C Table 12 split of supplier notes | Job Work Out / In Orders, Material Out / In, ITC-04 | done (one item open) |
+| 7.28 | ✅ Job work in / out + **ITC-04** and Rejections In: see 7M (7.70–7.73); sales-order outstanding (WP-8, 7.63); GSTR-9 Table 6 / 9 use of supplier notes and TDS adjustment on a return of a TDS bill: done in 7O (7.93, 7.94). ~~Still open: 9C Table 12 split of supplier notes~~ (done in 7.127, `gstr9c-extra.ts`) | Job Work Out / In Orders, Material Out / In, ITC-04 | done |
 
 ### 7E · Printing & documents output (WP-4)
 
@@ -429,7 +429,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.155 | ✅ **Offers**: `schemes` extended with `kind` — buy A get B (₹0 line of item B with its HSN / rate) and bill-value slabs (% / ₹ off, best slab) applied after the price is chosen as an amount discount with its own line in the editor, POS and receipt (`offer`); GST on the net value (Sec 15(3)(a), Circular 92/11/2019) — verify with your CA | `offers.ts`, `pricing.ts`, `OffersPanel.tsx`, `EditorExtras.tsx` | done |
 | 7.156 | ✅ **ESC/POS**: per-device printer mode (browser default / raw 58–80 mm text receipt / ESC-POS over Web Serial, feature-detected, user-picked port), cash-drawer kick on cash bills only in serial mode, fallback to browser print; no network | `escpos.ts`, `PosPrinter.tsx` | done |
 | 7.157 | ✅ **Pharma pack**: drug licence numbers on the profile (printed), Schedule H / H1 / X on stock items, prescription on the bill, Schedule H1 register (CSV), near-expiry list, block expired / near-expiry sales option in every stock check | `pharma.ts`, `pharma-gate.ts`, `PharmaPanel.tsx` | done |
-| 7.158 | ⏳ 7U follow-ups: foreign-currency supplier payments from an EEFC account, bank-specific response presets, revaluation reversal option, TDS 194H on commission, agent on POS bills, per-customer offers, ESC/POS QR / logo, Schedule X register book format | — | open |
+| 7.158 | ⏳ 7U follow-ups: foreign-currency supplier payments from an EEFC account, bank-specific response presets, revaluation reversal option, TDS 194H on commission, ~~agent on POS bills~~ (done in 8.81), per-customer offers, ESC/POS QR / logo, Schedule X register book format | — | open |
 
 
 ### 7S · Inventory, manufacturing, job work & branch stock follow-ups (`docs/features/manufacturing.md`, `docs/features/job-work.md`)
@@ -443,7 +443,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.164 | ✅ **Selling price lists in the editor**: the item's selling price in force on the document date becomes the line rate on pick ("Price list"); a customer level's own rate still wins, % levels apply to it, slabs below it apply, typed rates and credit / debit notes untouched (`price-list.ts`, `pricing-actions.ts`) | 7.66, P2 | done |
 | 7.165 | ✅ **Group / category filters** on Reorder Status, Movement Analysis and Stock Ageing (incl. by batch); **alternate units** on Manufacturing Journal component lines (FEFO in base units) and Physical Stock counts (`counted_typed`, base units stored) | 7.66, P1-10 | done |
 | 7.166 | ✅ **Branch stock**: per-godown closing-stock valuation for branch statements in Books and Gateway (branch godowns × company-wide unit cost; "No branch" takes the rest so branches add up — `ledger/branch-stock.ts`); Alt+C on manufacturing / stock-journal line grids (items, godowns) and the bill godown select; the Sec 25(4) tax invoice + bill dialog opens automatically when a transfer between two GSTINs is saved | 7.84, P1-19 | done |
-| 7.167 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), price lists on POS, ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
+| 7.167 | ⏳ 7S follow-ups: serial counts on Physical Stock, MRP lead times / dated demand buckets and open plans as scheduled receipts, e-Way JSON for goods returned to a principal (sub-type 6), ~~price lists on POS~~ (done in 8.145, `priceListRate` in `Pos.tsx`), ITC-04 JSON checked against the offline tool, cost-centre closing stock | — | open |
 
 ### 8A · Daily khata loop (`docs/features/khata.md`)
 
@@ -457,7 +457,7 @@ What Khatabook / OkCredit / Vyapar / myBillBook users do every day, offline: `wa
 | 8.4 | ✅ **Party reminders + "Remind all overdue"**: `buildPartyReminder` (total overdue, oldest bill, UPI link; English / Hinglish / Hindi), full-screen stepper one tap per party with skip / snooze / copy, logged in `reminders` with additive `party_key`; **Send everyone their balance** monthly preset | `khata.ts`, `RemindQueue.tsx` | done |
 | 8.5 | ✅ **Party balance on the bill**: Design Studio toggle (`show_party_balance`, per profile) prints *Previous balance + This bill = Total due* on every template and the thermal / POS receipt from `party_balance_snapshot` frozen at first issue (reprints never change; legacy prints nothing); accent variable only | `party-balance.ts`, `PartyBalanceBlock.tsx`, store / POS save | done |
 | 8.6 | ✅ **Due dates in shop use**: the party's credit days set the due date of a new document; the editor nudges for a due date on an unpaid bill | `useInvoiceStore.ts`, `DocumentMetaCard.tsx` | done |
-| 8.7 | ⏳ 8A follow-ups: balance snapshot on recurring / converted / late-fee documents issued outside the editor, per-party reminder language, statement web page from list rows, non-INR khata | — | open |
+| 8.7 | ⏳ 8A follow-ups: ~~balance snapshot on recurring / converted / late-fee documents issued outside the editor~~ (✅ R6-C5), ~~per-party reminder language~~ (done in 8.121, `message-langs.ts`), statement web page from list rows, non-INR khata | — | open |
 
 ### 8D · GST guards 2025–26 (`docs/features/einvoice.md`, `docs/features/gst-reports.md`, `docs/features/gstr2b.md`, `docs/features/compliance.md`)
 
@@ -512,7 +512,7 @@ From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Vali
 | 8.161 | ✅ **Check before JSON download**: GSTR-1 / GSTR-3B / IFF JSON first run the GST exceptions, the report's errors / warnings and the Rule 46 series gaps; anything found → lazy dialog grouped by problem with Fix links, "Download anyway" / "Review"; clean → straight download; "· n ⚠" badge on the JSON buttons | `gst-preflight.ts`, `PreflightDialog.tsx`, `GstReports.tsx` | done |
 | 8.162 | ✅ **Filing mode**: steps strip (Period ✓ → Check (n) → Download JSON → Mark filed, marks shared with the Compliance tab) and the 29 GST tabs grouped GSTR-1 / GSTR-3B / Reconcile / Tools (grouped tablists with ←/→ on desktop, a select on phones); every old `?tab=` id still resolves | `gst-tabs.ts`, `GstReports.tsx`, `filing.module.css` | done |
 | 8.163 | ✅ Phones: the record-payment row button in the Invoices list shows a visible "₹ Received" label | `Transactions.tsx` | done |
-| 8.164 | ⏳ 8I follow-ups: per-form preflight rules (3B without HSN checks), "Mark filed" for IFF / CMP-08, remembering the downloaded step across reloads | — | open |
+| 8.164 | ✅ ~~8I follow-ups: per-form preflight rules (3B without HSN checks), "Mark filed" for IFF / CMP-08, remembering the downloaded step across reloads~~ — done in R6-C4 (`FilingStrip.tsx`, `compliance.ts` `downloaded_at`, `gst-preflight.ts` per form) | — | done |
 
 ### 8F · Distribution, pharma, stock depth (`docs/features/distribution.md`)
 
@@ -526,7 +526,7 @@ From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Vali
 | 8.85 | ✅ **Item variants** (attribute grid → child items with SKUs / barcodes) and **kits** consuming BOM components on sale (`variants.ts`, `events-kits.ts`) | — | done |
 | 8.86 | ✅ **Bin / rack** on items and batches, snapshotted on delivery challan lines and printed on pick lists (`bins.ts`) | — | done |
 | 8.87 | ✅ **Thermal roll labels**: 50×25, 38×25 2-up, 100×50 presets; raw TSPL / EPL / ZPL over Web Serial or file; weighed-goods EAN-13 with embedded price (`label-sheet.ts`, `label-raw.ts`) | — | done |
-| 8.88 | ⏳ 8F follow-ups: one debit note spanning several bills of a supplier, POS decoding of weighed-goods codes, kit shortfall warnings, order-pad partial import / camera QR scan | — | open |
+| 8.88 | ⏳ 8F follow-ups: one debit note spanning several bills of a supplier, ~~POS decoding of weighed-goods codes~~ (done in 8.140, `parseScaleBarcode`), kit shortfall warnings, order-pad partial import / camera QR scan | — | open |
 ### 8E · Retail speed (`docs/features/pos-barcode-pricing.md` § 8E)
 
 | # | Item | Where | Status |
@@ -675,7 +675,7 @@ Spec: `docs/prd/round-4.md` (17 items in three packages; combined budget ≤ +0.
 | R4-A3 | ✅ **Batch genealogy & recall**: backward / forward trace, recall list, printable notice, block batch; table `recall_notices` | `production/genealogy.ts`, `TraceTab`, `RecallList` | done |
 | R4-A4 | ✅ **QC hold & release** (QC godown, GRN hold for `qc_on_receipt` items, release / reject, bell); table `qc_results`, key `qc_settings` | `production/qc.ts`, `receipt-notes.ts` `applyQcHold`, `QcTab` | done |
 | R4-A5 | ✅ **Landed-cost voucher** `LCV/FY…` across bills / GRNs (value, quantity, weight, equal), restating stock from the receipt date; table `landed_cost_vouchers` | `landed-voucher.ts`, `landed-cost.ts`, `inventory.ts` `liveInputs` | done |
-| R4-A6 | ⏳ R4-A follow-ups: call `applyQcHold` in the purchase-bill save path; feed the margin chip / insights `liveInputs().purchases`; Inventory → "Landed cost" link; pre-filled debit note from a QC reject | — | open |
+| R4-A6 | ✅ ~~R4-A follow-ups: call `applyQcHold` in the purchase-bill save path; feed the margin chip / insights `liveInputs().purchases`; Inventory → "Landed cost" link; pre-filled debit note from a QC reject~~ — done in R6-C1 (the Inventory link is R6-B's header line) | `purchases.ts`, `margin.ts`, `insights.ts`, `QcTab`, `ReturnsTab` | done |
 
 ### R4-B · Stores & chains (`docs/features/retail-chains-r4.md`)
 
@@ -772,7 +772,7 @@ Spec: `docs/prd/round-5.md` (18 items in three packages). Every vertical sits be
 | R5-C4 | ✅ **Funds and FCRA** (cost-centre kind `fund`, `BankAccount.fcra`, FC-4, Sec 11 application) | `nonprofit/{funds,fund-statement,fcra-checks,fc4,application}.ts` | done (verify with your CA) |
 | R5-C5 | ✅ **Leases**: rent, CAM, escalation, GST class, 194-I; tables `properties`, `leases` | `property/{properties,leases,escalation,lease-gst}.ts` | done (verify with your CA) |
 | R5-C6 | ✅ **Security deposits** (adjustment receipts `deposit_adjustment_id`, no money moved); table `security_deposits` | `property/deposits.ts` | done |
-| R5-C7 | ⏳ R5-C follow-ups: GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does); gifts in kind create no voucher; FC-4 lists totals, not the portal's line items | — | open |
+| R5-C7 | ⏳ R5-C follow-ups: ~~GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does)~~ (✅ R6-C4); gifts in kind create no voucher; FC-4 lists totals, not the portal's line items | — | open |
 
 ## QA round 6 · 🟡 in progress
 
@@ -803,6 +803,18 @@ R6-C open-roadmap closures and the docs refresh).
 | R6-B3 | ✅ **Empty states** with the first step on Books, Inventory, Reports, Exports, Distribution, Practice, Reconcile, Gateway; Inventory → Landed cost link | `empty-states.ts`, `components/discover/*` | done (tips mounted on Books, Inventory, Reports, Gateway, Invoices) |
 | R6-B4 | ✅ **Sample data v2**: one path to a separate, resettable Demo company (never into a real company), dataset by business (counter, services, trading, transport, works), "Reset samples" | `demo-data.ts`, `lib/demo/*`, `demo-company.ts`, `SampleDataChooser.tsx` | done (Dashboard mounts the chooser) |
 | R6-B5 | ✅ **Settings → Features**: every module, pack and 21 advanced options with who needs it, on / off and a switch or a link | `features-catalog.ts`, `FeaturesPanel.tsx` | done |
+
+### R6-C · Open-roadmap closures and the docs refresh (`docs/features/closures-r6.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R6-C1 | ✅ **R4-A follow-ups**: QC hold on goods bills booked without a GRN (new lines only; an edit never re-holds released goods); margin chip and insights cost goods at the landed rate (`liveInputs().purchases`); "Debit note to supplier" from a QC reject of a bill lot opens Returns with the bill and quantities filled (`bill` / `lines` params) | `purchases.ts` `withBillQcHold`, `margin.ts` `liveUnitCosts`, `QcTab`, `ReturnsTab` | done |
+| R6-C2 | ✅ **Payables completeness**: supplier opening bills in bill-wise payables (age from their own date, settle Agst Ref through `vendor_payments.allocations[].opening_bill_id`, typed opening residual "On Account"; payables = ledger creditor balance); customer TDS on a voucher-allocated receipt reaches TDS receivable (`voucherTdsJournal`) and the register; POS refunds credit the original receipt's bank ledger | `billwise.ts`, `opening-bills.ts`, `bill-allocation.ts`, `ledger/postings.ts`, `pos-returns.ts` | done (verify with your CA) |
+| R6-C3 | ✅ **Import suppliers, ledgers and opening balances** (P1-21): kinds `vendors` / `ledgers` / `opening_bills`, presets for Vyapar, Busy, Marg, Tally, QuickBooks, Xero, Zoho, Refrens, ClearOne and a generic trial balance; dry run with the 1090 difference, nearest-primary group mapping with a warning, GSTIN de-duplication; all or nothing with one undo copy; one row per run in table `import_runs` | `import-openings.ts`, `import-mapping.ts`, `ImportWizard` | done |
+| R6-C4 | ✅ **Filing strip & Rule 42 / 43 everywhere**: forms follow the period and filer (GSTR-1 + 3B, IFF in QRMP months 1–2, CMP-08 for a composition quarter); "downloaded" on the compliance row (`downloaded_at`); per-form preflight (IFF without HSN checks, CMP-08 composition checks only); `itcReversals` in GSTR-9 (Table 7C and each month's 3B), 9C, the Compliance interest base and the month-end pack | `FilingStrip.tsx`, `compliance.ts`, `gst-preflight.ts`, `gstr9.ts`, `report-pack.ts` | done (verify with your CA) |
+| R6-C5 | ✅ **Previous-balance block on documents issued outside the editor** (8.7): recurring runs in issue mode, batch runs (one snapshot per party), late fees and conversions issued directly, `issueDraft` | `khata-actions.ts` `withIssueSnapshot`, `recurring.ts`, `batch-invoices.ts`, `late-fee.ts`, `documents.ts` | done |
+| R6-C6 | ✅ **Docs refresh**: stale roadmap rows struck through, BETA_GUIDE known limitations / flows, CA_REVIEW cross-references, feature-doc stale items | `docs/` | done |
+| R6-C7 | ⏳ R6-C follow-ups: issuing a draft from a list row (not the editor) still takes no balance snapshot unless it goes through `issueDraft`; stock opening quantities in the import (PRD §7 Q7); the GSTR-9 7C / 7D split of a combined Rule 42 / 43 journal | — | open (verify with your CA) |
 
 ## Summary timeline
 

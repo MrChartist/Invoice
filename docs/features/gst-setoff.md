@@ -269,5 +269,5 @@ default rate now fills invoice / bill lines when an HSN is typed (`src/lib/hsn-d
   posting when paid (the carried credit in the set-off plan does not yet net filed ITC refund claims).
 - ISD: no ledger postings; the Rule 39 turnover basis is typed; Table 6 / 7 / 9 amendments of GSTR-6 not built.
 - 9C rate-wise Table 9 has no books column (documents vs GSTR-9 only); Table 14 heads are a keyword mapping.
-- HSN master defaults are not yet applied automatically in the invoice / bill line editors (`resolveGstRate` is ready
-  for them).
+- ~~HSN master defaults are not yet applied automatically in the invoice / bill line editors (`resolveGstRate` is ready
+  for them).~~ Done: `useHsnDefaultRate` in the invoice editor and `hsn-defaults` in `BillModal.tsx` (stale note struck by R6-C6).

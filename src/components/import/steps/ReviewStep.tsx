@@ -55,7 +55,7 @@ export function ReviewStep({ state, table, preview, rows, writable, dispatch }: 
             </select>
           </label>
         )}
-        {(kind === 'clients' || kind === 'invoices') && (
+        {(kind === 'clients' || kind === 'invoices' || kind === 'vendors' || kind === 'ledgers') && (
           <label className={ctl.check}>
             <input type="checkbox" checked={!strictGstin} onChange={(e) => dispatch({ type: 'setStrictGstin', strict: !e.target.checked })} />
             <span>Import rows with an invalid GSTIN anyway</span>

@@ -2786,6 +2786,21 @@ try {
     await page.waitForFunction(() => /In this app/.test(document.querySelector('[data-term-pop="b2cl"]')?.textContent ?? ''));
     check(/unregistered/i.test(await pop.innerText()), 'tapping B2CL opens its glossary popover');
   });
+
+  await step('R6-C import openings: a pasted trial balance shows the 1090 difference in the dry run and saves the openings', async () => {
+    await page.goto(srv.origin + '/settings?tab=data&import=ledgers');
+    await page.getByRole('button', { name: 'Paste instead' }).click({ timeout: 15000 });
+    await page.locator('#import-paste').fill('Name,Group,Debit,Credit\nE2E Partner Capital,Capital Account,,1000\nE2E Current Account,Bank Accounts,900,');
+    await page.getByRole('button', { name: 'Use pasted data' }).click();
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /^Next/ }).click();
+    const note = await page.getByTestId('import-openings-note').textContent({ timeout: 15000 });
+    check(/Difference in opening balances: ₹100\.00 Cr/.test(note ?? ''), 'the dry run shows the difference in opening balances');
+    await page.getByRole('button', { name: /^Import 2 records/ }).click();
+    const rows = await readJson(page, 'ledger_openings', [], (v) => v.length >= 2, 10000);
+    check(rows.length >= 2, `the openings are saved (${rows.length})`);
+    const runs = await readJson(page, 'import_runs', [], (v) => v.some((r) => r.kind === 'ledgers'));
+    check(runs.some((r) => r.kind === 'ledgers'), 'the import run is recorded');
+  });
 } catch {
   /* already reported */
 } finally {

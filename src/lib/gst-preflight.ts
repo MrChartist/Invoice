@@ -12,7 +12,12 @@ import type { ReconIssue } from './gst-reports';
 import type { SeriesGap } from './invoice-number';
 import type { LutIssue } from './trade/lut-register';
 
-export type PreflightForm = 'GSTR1' | 'GSTR3B' | 'IFF';
+export type PreflightForm = 'GSTR1' | 'GSTR3B' | 'IFF' | 'CMP08';
+
+/** R6-C4: HSN-summary findings — IFF has no HSN table, so its preflight skips them. */
+export const HSN_CODES: ReadonlySet<string> = new Set(['B2B_NO_HSN', 'HSN_MISSING', 'HSN_DIGITS']);
+/** R6-C4: the checks CMP-08 runs (a composition dealer's quarterly statement): composition documents and series. */
+export const COMPOSITION_CODES: ReadonlySet<string> = new Set(['COMPOSITION_DOCS', 'BOS_TAXED_LINES', 'DRAFTS', 'SERIES_GAP', 'SERIES_CANCELLED', 'CANCELLED']);
 
 export interface PreflightItem {
   key: string;
@@ -54,7 +59,15 @@ export function issueText(i: Pick<ReconIssue, 'message' | 'invoiceNumber' | 'inv
 }
 
 /** Group everything worth a second look before the JSON leaves the app. Errors first, then by size. */
-export function buildPreflight({ exceptions, issues, gaps, lut = [] }: PreflightInput): PreflightGroup[] {
+export function buildPreflight({ exceptions, issues, gaps, lut = [] }: PreflightInput, form?: PreflightForm): PreflightGroup[] {
+  const all = buildAllGroups({ exceptions, issues, gaps, lut });
+  // R6-C4: per-form preflight. IFF skips the HSN checks; CMP-08 runs only the composition checks.
+  if (form === 'IFF') return all.filter((g) => !HSN_CODES.has(String(g.code)));
+  if (form === 'CMP08') return all.filter((g) => COMPOSITION_CODES.has(String(g.code)));
+  return all;
+}
+
+function buildAllGroups({ exceptions, issues, gaps, lut = [] }: PreflightInput): PreflightGroup[] {
   const groups = new Map<string, PreflightGroup>();
   const group = (id: string, init: Omit<PreflightGroup, 'id' | 'count' | 'items'>) => {
     let g = groups.get(id);

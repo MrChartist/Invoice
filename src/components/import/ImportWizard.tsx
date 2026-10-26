@@ -4,7 +4,7 @@ import { Modal } from '../ui/Modal';
 import { cn } from '../../lib/utils';
 import { localDb } from '../../lib/localDb';
 import { parseTable } from '../../lib/csv';
-import { invoiceAmountMapped, missingRequired, type ImportKind } from '../../lib/import-mapping';
+import { invoiceAmountMapped, isOpeningsKind, missingRequired, type ImportKind } from '../../lib/import-mapping';
 import {
   applyImport,
   buildPreview,
@@ -14,6 +14,8 @@ import {
   type PreviewRow,
 } from '../../lib/importers';
 import { senderStateCode } from '../../store/invoice-defaults';
+import { applyOpeningsImport, buildOpeningsPreview, differenceNote, loadOpeningsContext, recordImportRun, type OpeningsContext } from '../../lib/import-openings';
+import { saveSafetySnapshot } from '../../lib/backup';
 import { initialWizardState, wizardReducer, type ExistingData } from './wizard-state';
 import { ChooseFileStep } from './steps/ChooseFileStep';
 import { MapColumnsStep } from './steps/MapColumnsStep';
@@ -67,13 +69,28 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
     };
   }, [duplicateMode, strictGstin]);
 
+  // R6-C3: suppliers / ledgers / opening bills read their own context (re-read with `existing`, i.e. per review).
+  const openingsCtx = useMemo<OpeningsContext | null>(() => {
+    void existing; // re-read when the review step opens (as `existing` is)
+    return isOpeningsKind(kind) ? { ...loadOpeningsContext(), strictGstin, duplicateMode } : null;
+  }, [kind, existing, strictGstin, duplicateMode]);
+  const openingsPreview = useMemo(
+    () => (table && step >= 2 && openingsCtx && isOpeningsKind(kind) ? buildOpeningsPreview({ kind, table, mapping, ctx: openingsCtx, skipped }) : null),
+    [table, step, kind, mapping, openingsCtx, skipped],
+  );
   const preview = useMemo(
     () =>
-      table && step >= 2
+      openingsPreview ??
+      (table && step >= 2 && !isOpeningsKind(kind)
         ? buildPreview({ kind, table, mapping, existing, options, skipped })
-        : null,
-    [table, step, kind, mapping, existing, options, skipped],
+        : null),
+    [openingsPreview, table, step, kind, mapping, existing, options, skipped],
   );
+  const openingsNote = openingsPreview
+    ? [openingsPreview.locked ? `The opening day (${openingsPreview.openingDay}) is locked.` : '', differenceNote(openingsPreview), openingsPreview.summary.error ? 'All or nothing: fix or skip the rows with errors first.' : '']
+        .filter(Boolean)
+        .join(' ')
+    : '';
 
   const missing = missingRequired(kind, mapping);
   const amountMissing = kind === 'invoices' && !invoiceAmountMapped(mapping);
@@ -141,11 +158,23 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
     dispatch({ type: 'runStarted' });
     cancelRef.current = false;
     try {
-      const result = await applyImport(preview, createLocalSink(), {
-        chunkSize: 250,
-        onProgress: (done) => dispatch({ type: 'runProgress', done }),
-        shouldCancel: () => cancelRef.current,
-      });
+      let result: ImportReport;
+      if (openingsPreview) {
+        // R6-C3: one undo copy first (like the Tally import), then all or nothing.
+        if (!(await saveSafetySnapshot('import')) && !window.confirm('An undo copy could not be saved. Import anyway?')) {
+          dispatch({ type: 'runEnded' });
+          return;
+        }
+        result = applyOpeningsImport(openingsPreview, { fileName: state.fileName });
+      } else {
+        result = await applyImport(preview, createLocalSink(), {
+          chunkSize: 250,
+          onProgress: (done) => dispatch({ type: 'runProgress', done }),
+          shouldCancel: () => cancelRef.current,
+        });
+        // R6-C3: every import run is recorded (the setup checklist's "import" step reads it).
+        recordImportRun({ kind, ...(state.fileName ? { file_name: state.fileName } : {}), created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length });
+      }
       dispatch({ type: 'runSucceeded', report: result, existing: readExisting() });
       onDone?.(result, kind);
     } catch (e) {
@@ -186,7 +215,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
           <button type="button" className={cn(ctl.btn, ctl.btnOutline)} disabled={running} onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} disabled={running || writable === 0} onClick={run}>
+          <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} disabled={running || writable === 0 || (openingsPreview?.summary.error ?? 0) > 0} onClick={run}>
             <Upload size={15} /> {running ? 'Importing…' : `Import ${writable.toLocaleString('en-IN')} record${writable === 1 ? '' : 's'}`}
           </button>
         </>
@@ -204,7 +233,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
           <FileSpreadsheet size={18} /> Import data
         </>
       }
-      subtitle="Bring clients, items and opening invoices over from Excel, Vyapar, Zoho Books, Tally or Busy. Everything stays in this browser."
+      subtitle="Bring clients, suppliers, items, opening invoices, ledgers and opening balances over from Excel, Vyapar, Zoho Books, Tally or Busy. Everything stays in this browser."
       footer={footer}
     >
       <ol className={styles.steps} aria-label="Import progress">
@@ -252,6 +281,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
           progress={state.progress}
           writable={writable}
           saveError={state.saveError}
+          note={openingsNote}
         />
       )}
     </Modal>

@@ -66,6 +66,8 @@ view. Spec: `docs/prd/round-2.md` §4 R2-B1–B5.
 
 ## Verify with your CA
 
+Consolidated in `docs/CA_REVIEW.md` (ids T6); answers are logged there with the date and the PR.
+
 - Time of supply for stage invoices of continuous services / works contracts (Sec 13, Sec 31(5)); the date is the user's.
 - e-Invoice applicability shown in the batch preview (B2B party + AATO over the mandate on the date) and the IRP
   30-day window for many stage / batch invoices.

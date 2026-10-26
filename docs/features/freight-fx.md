@@ -67,7 +67,7 @@ Working papers — verify with your CA before filing or importing.
 - Realised exchange gain/loss (6.19): enter the realised rate on the receipt and the ledger posts the difference to 4930
   (`docs/features/cash-planning.md`). The Tally export still books receipts at the invoice rate.
 - Sales reports (`src/lib/sales-reports.ts`) and the TDS register stay INR-only, as before. Foreign documents are counted as excluded.
-- There is no per-date rate table, so the rate is typed per invoice. The country code for `ExpDtls.CntCode` is still entered in the e-Invoice modal.
+- ~~There is no per-date rate table, so the rate is typed per invoice.~~ Done in 8.125: the currency master `currency-rates.ts` (stale note struck by R6-C6). The country code for `ExpDtls.CntCode` is still entered in the e-Invoice modal.
 - Charges cannot be marked tax-inclusive. A credit note still never credits charges (see `docs/qa/logic.md`).
 
 ## Currency master — dated reference rates (8H, roadmap 8.125)

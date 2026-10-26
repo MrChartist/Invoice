@@ -13,6 +13,7 @@ import { receiptNotesDb, rejectionLinesFromGrn } from '../../lib/receipt-notes';
 import { saveConsumeOnlyJournal } from '../../lib/manufacturing';
 import { loadQcSettings, qcGodowns, qcResultsDb, qcStock, rejectionFromQc, releaseLines, saveQcSettings, type QcRow } from '../../lib/production/qc';
 import type { PurchaseRecord } from '../../types/purchases';
+import { debitNotePrefillHref } from '../../lib/purchases';
 import { useT } from '../../i18n';
 import { pT } from '../../i18n/areas/production-r4';
 import { qtyText, type MfgContext } from '../manufacturing/context';
@@ -110,6 +111,13 @@ function QcDecision({ ctx, row, mode, onClose }: { ctx: MfgContext; row: QcRow; 
   const [error, setError] = useState('');
   const item = ctx.items.find((i) => i.id === row.itemId);
   const inspector = currentActor()?.name;
+  // R6-C1: a lot received on a bill (no GRN) → "Debit note to supplier" with the rejected lines filled in.
+  const dnHref = useMemo(() => {
+    if (mode !== 'reject' || row.source.kind !== 'purchase' || !row.source.id) return '/expenses?tab=returns&new=dn';
+    const bill = getTable<PurchaseRecord>('purchases').find((p) => p.id === row.source.id);
+    if (!bill) return '/expenses?tab=returns&new=dn';
+    return debitNotePrefillHref(bill.id, rejectionFromQc(bill.lines ?? [], row, num(qty), item?.name ?? ''));
+  }, [mode, row, qty, item?.name]);
   const base = { date, item_id: row.itemId, ...(row.batch ? { batch_no: row.batch } : {}), godown_id: row.godownId, source: { kind: row.source.kind, ...(row.source.id ? { id: row.source.id } : {}), ...(row.source.number ? { number: row.source.number } : {}) }, qty: num(qty), ...(note.trim() ? { note: note.trim() } : {}), ...(inspector ? { inspector } : {}) };
 
   const submit = () => {
@@ -179,7 +187,7 @@ function QcDecision({ ctx, row, mode, onClose }: { ctx: MfgContext; row: QcRow; 
         )}
         {mode === 'reject' && (
           <p className={mfg.muted}>
-            {row.source.kind === 'grn' ? pT('rejectGrnHint') : row.source.kind === 'purchase' ? <>{pT('rejectBillHint')} <Link to="/expenses?tab=returns&new=dn">{pT('openDebitNote')}</Link></> : pT('rejectScrapHint')}
+            {row.source.kind === 'grn' ? pT('rejectGrnHint') : row.source.kind === 'purchase' ? <>{pT('rejectBillHint')} <Link to={dnHref} data-testid="qc-debit-note">{pT('openDebitNote')}</Link></> : pT('rejectScrapHint')}
           </p>
         )}
         <div className={controls.field}>

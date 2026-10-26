@@ -69,9 +69,10 @@ Profit & loss for the period (tested; the toolbar shows "Ties to the P&L"). CSV 
 - CSV (with period and scope rows) and Excel (`src/lib/xlsx.ts`, loaded on click).
 
 ## Not done / limits
-- **Tally XML does not export cost-centre allocations.** Tally needs cost-centre masters, "cost centres applicable"
+- ~~**Tally XML does not export cost-centre allocations.** Tally needs cost-centre masters, "cost centres applicable"
   on each ledger and `CATEGORYALLOCATIONS.LIST` → `COSTCENTREALLOCATIONS.LIST` per ledger entry; emitting that
-  without being able to validate imports in Tally risks rejected vouchers, so vouchers are exported without it.
+  without being able to validate imports in Tally risks rejected vouchers, so vouchers are exported without it.~~
+  Done in 7.46: `tally-xml.ts` emits `COSTCENTREALLOCATIONS.LIST` (stale note struck by R6-C6).
   Accounting CSVs do not carry the centre either.
 - No percentage split of one bill / line across several centres (one centre per line); one level of grouping only.
 - The GST reports, Books (cash basis) P&L and dashboard ignore cost centres.

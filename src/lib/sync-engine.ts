@@ -368,6 +368,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}consignment_notes`]: 'date',
   [`${DB_PREFIX}trips`]: 'start_date',
   [`${DB_PREFIX}ra_measurements`]: 'date',
+  // R6-C3: import runs (the day the file was imported)
+  [`${DB_PREFIX}import_runs`]: (r) => str(r.at).slice(0, 10) || undefined,
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

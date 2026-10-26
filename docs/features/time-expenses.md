@@ -89,4 +89,4 @@ inter-state client, re-bill link inside a locked period, CSV rows, backup valida
 
 - Rows billed onto an invoice stay linked even if their lines are edited out of it.
 - Pure-agent costs still appear as an expense in Books / P&L (and the reimbursement as income).
-- No per-client or per-project default rates (one default rate + per-entry override).
+- ~~No per-client or per-project default rates (one default rate + per-entry override).~~ Done in R3-B1: rate cards (`rate-cards.ts`) — stale note struck by R6-C6.

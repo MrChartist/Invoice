@@ -1,5 +1,5 @@
 import { useRef, type Dispatch, type DragEvent } from 'react';
-import { AlertTriangle, Download, Package, ReceiptText, Upload, Users } from 'lucide-react';
+import { AlertTriangle, BookOpen, Download, Package, ReceiptText, Truck, Upload, Users, Wallet } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { writeCsv } from '../../../lib/csv';
 import { KIND_LABELS, templateFileName, templateRows, type ImportKind } from '../../../lib/import-mapping';
@@ -12,6 +12,10 @@ const KIND_META: Record<ImportKind, { icon: typeof Users; text: string }> = {
   clients: { icon: Users, text: 'Customers and parties with GSTIN, state and contact details.' },
   items: { icon: Package, text: 'Products and services with HSN/SAC, rate and GST %.' },
   invoices: { icon: ReceiptText, text: 'Past invoices and outstanding balances, keeping their numbers and amounts.' },
+  // R6-C3 (P1-21)
+  vendors: { icon: Truck, text: 'Suppliers with GSTIN, PAN and an opening balance. Customer rows of a party export go to Clients.' },
+  ledgers: { icon: BookOpen, text: 'Your opening trial balance: ledger, group and Dr / Cr. The difference is shown before saving.' },
+  opening_bills: { icon: Wallet, text: 'Unpaid bills on the day the books begin, party by party, for receivables and payables ageing.' },
 };
 
 interface Props {

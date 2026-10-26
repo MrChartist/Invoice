@@ -232,8 +232,11 @@ export interface VendorPayment {
   kind: 'ADVANCE' | 'ON_ACCOUNT' | 'NEW_REF';
   /** Reference name for a New Ref (e.g. the supplier's proforma number). */
   ref_name?: string;
-  /** Adjustments against bills (Agst Ref), oldest first. */
-  allocations?: { purchase_id: string; amount: number; date: string }[];
+  /**
+   * Adjustments against bills (Agst Ref), oldest first. Additive (R6-C2): `opening_bill_id` = an `opening_bills` row
+   * (or `onacc:<vendorId>`, the typed opening not split into bills) settled by this payment; `purchase_id` is '' then.
+   */
+  allocations?: { purchase_id: string; amount: number; date: string; opening_bill_id?: string }[];
   /** Groups the rows of one multi-bill payment (the `purchase_payments` rows carry the same id). */
   group_id?: string;
   created_at?: string;

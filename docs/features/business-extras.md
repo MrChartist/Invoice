@@ -238,7 +238,8 @@ the editor item picker and the POS; optional *block sale above batch MRP* (`bloc
   (batch-wise MRP check: 8F).
 - Receivables statements read invoices / payments only, so a refund voucher does not appear there: a refunded walk-in
   return shows as a credit on the Walk-in customer statement (the ledger / TB / Books are right).
-- The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).
+- ~~The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).~~ Done in R6-C2: each
+  non-cash tender carries `bank_account_id` (the original receipt's account) and credits that bank's own ledger.
 - ~~Branch-wise closing stock is not apportioned~~ — 7S: per-godown valuation (`docs/features/reports-engine.md`).
 - ~~The Sec 25(4) pair is raised by hand from the transfer list~~ — 7S: saving a transfer between godowns of two branches
   with different GSTINs opens the "Tax invoice + bill" dialog at once (the list button stays for later); the e-invoice /

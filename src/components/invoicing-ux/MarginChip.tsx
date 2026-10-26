@@ -3,9 +3,8 @@ import { TrendingUp } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
-import { peekTable } from '../../lib/storage';
 import { can } from '../../lib/access';
-import { buildUnitCosts, documentMargin, marginTone } from '../../lib/margin';
+import { documentMargin, liveUnitCosts, marginTone } from '../../lib/margin';
 import { formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { uxT } from '../../i18n/areas/invoicing-ux';
@@ -24,7 +23,7 @@ export function MarginChip() {
   const items = useDeferredValue(s.items);
   const costs = useMemo(() => {
     try {
-      return buildUnitCosts(peekTable('purchases'), peekTable<{ name: string }>('stock_items'), peekTable('vendors'));
+      return liveUnitCosts(); // R6-C1: landed-cost vouchers count
     } catch {
       return new Map();
     }

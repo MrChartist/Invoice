@@ -79,6 +79,7 @@ export function amendmentCheck(rec: Pick<InvoiceRecord, 'issue_date' | 'sender' 
   const mark = (ctx.filed ?? []).find(
     (x) =>
       x &&
+      !!x.filed_on && // R6-C4: a row that only remembers a download is not a filed mark
       (x.form === 'GSTR1' || x.form === 'IFF') &&
       (x.period_key === monthKey || x.period_key === quarterKey) &&
       (!x.gstin || !gstin || x.gstin.toUpperCase() === gstin),
