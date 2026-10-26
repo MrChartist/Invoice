@@ -38,7 +38,7 @@ export const setupT = defineArea(
     designsAvailable: '{n} designs are available in the editor and Design Studio.',
     // Help & about (layout/HelpModal)
     helpTitle: 'Help & about',
-    version: 'Version 3.0 · Offline-first',
+    version: 'Version {v} · Offline-first',
     privateTitle: 'Private by design',
     privateText: 'Everything is stored in this browser. No server, no tracking, no network calls.',
     gstTitle: 'GST-ready documents',
@@ -87,7 +87,7 @@ export const setupT = defineArea(
     design: 'इनवॉइस डिज़ाइन',
     designsAvailable: 'एडिटर और डिज़ाइन स्टूडियो में {n} डिज़ाइन उपलब्ध हैं।',
     helpTitle: 'मदद और जानकारी',
-    version: 'वर्ज़न 3.0 · ऑफ़लाइन-फ़र्स्ट',
+    version: 'वर्ज़न {v} · ऑफ़लाइन-फ़र्स्ट',
     privateTitle: 'शुरू से निजी',
     privateText: 'सब कुछ इसी ब्राउज़र में रहता है। न सर्वर, न ट्रैकिंग, न नेटवर्क कॉल।',
     gstTitle: 'GST के लिए तैयार दस्तावेज़',

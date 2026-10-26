@@ -74,6 +74,10 @@ import { useT } from '../i18n';
 import { gstT } from '../i18n/areas/gst';
 import { dkT } from '../i18n/areas/desks-r3'; // R3-C4 / C5 tab names
 import { nodes } from '../i18n/areas/nodes';
+import { helpT } from '../i18n/areas/help-r6';
+import { Term } from '../components/help/Term';
+import { EmptyState } from '../components/ui/EmptyState';
+import type { GlossaryId } from '../lib/help/glossary';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 // Same table as `EINVOICE_META_TABLE` in einvoice.ts — read directly so the e-invoice builder stays out of this chunk.
@@ -110,6 +114,13 @@ const ExportDesk = lazy(() => import('../components/trade/ExportDesk'));
 // R5-C2: Rule 42 / 43 common-credit working (fees / non-profit / leases packs; its own lazy chunk).
 const CommonCreditView = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.CommonCreditView })));
 const ccTabT = defineArea({ tab: 'Common credit (Rule 42 / 43)' } as const, { tab: 'साझा क्रेडिट (Rule 42 / 43)' });
+// R6-A3 / A6: "About this tab" strip and the one-time tip (lazy); glossary terms on section headings.
+const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
+const TAB_TERM: Partial<Record<GstTabId, GlossaryId>> = {
+  b2b: 'b2b', b2cl: 'b2cl', b2cs: 'b2cs', cdnr: 'cdnr', cdnur: 'cdnur', exp: 'exp', nil: 'nil', hsn: 'hsn',
+  setoff: 'setoff', gstr2b: 'gstr2b', isd: 'isd', 'eway-desk': 'eway-b', 'export-desk': 'lut',
+};
 
 function download(name: string, mime: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
@@ -162,7 +173,7 @@ export function GstReports() {
     return periodForDate('month', new Date(now.getFullYear(), now.getMonth() - 1, 1));
   });
   const [gstin, setGstin] = useState<string>(() => gstins[0] ?? '');
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   // A composition profile files CMP-08 / GSTR-4, not GSTR-1 / 3B (Sec 10; Rule 62).
   const compositionProfile = useMemo(() => {
     const prof = gstin ? profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin) : localDb.settings.activeProfile();
@@ -174,6 +185,13 @@ export function GstReports() {
     const prof = gstins[0] ? profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstins[0]) : localDb.settings.activeProfile();
     return prof?.gst_scheme === 'composition' ? 'composition' : 'overview';
   });
+  // R6-A2: keep `?tab=` in step with the shown tab, so Help (F1), the About strip and a copied link follow it.
+  useEffect(() => {
+    if (params.get('tab') === tab) return;
+    const next = new URLSearchParams(params);
+    next.set('tab', tab);
+    setParams(next, { replace: true });
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   // Aggregate turnover for the JSON header — entered by the filer, remembered on this device.
   const [turnover, setTurnover] = useState<{ gt: string; curGt: string }>(() => {
     try {
@@ -727,7 +745,7 @@ export function GstReports() {
         </Suspense>
       )}
 
-      <section className={`${surface.card} ${styles.filters}`} aria-label={gstT('filters')}>
+      <section className={`${surface.card} ${styles.filters}`} aria-label={gstT('filters')} data-gst-filters>
         <PeriodPicker value={period} onChange={setPeriod} fyOptions={fyOptions} />
         <label className={local.periodField}>
           <span className={controls.label}>{gstT('filerGstin')}</span>
@@ -758,12 +776,31 @@ export function GstReports() {
         )}
       </section>
 
-      <div className={`${surface.card} ${local.disclaimer}`} role="note">
+      {/* R6-A3: one fixed line; the scope / limits text moved behind "Scope and limits" and into Help on this screen. */}
+      <div className={`${surface.card} ${local.disclaimer}`} role="note" data-gst-working-paper>
         <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
-        <span>
-          <strong>{gstT('disclaimerStrong')}</strong> {gstT('disclaimer')}
-        </span>
+        <details>
+          <summary>{helpT('workingPaper')} <strong>{gstT('disclaimerStrong')}</strong> {helpT('scope')}</summary>
+          {gstT('disclaimer')}
+        </details>
       </div>
+      <Suspense fallback={null}><ScreenTip id="gst" /></Suspense>
+      {!hasData && !g3.purchasesConsidered && (
+        <div className={surface.card} data-gst-empty>
+          <EmptyState
+            icon={Files}
+            title={helpT('gstEmptyTitle', { period: label })}
+            text={helpT('gstEmptyText')}
+            action={
+              <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
+                <button type="button" className={controls.btnOutline} onClick={() => document.querySelector<HTMLElement>('[data-gst-filters] select, [data-gst-filters] input')?.focus()}>{helpT('changePeriod')}</button>
+                <Link to="/invoice" className={controls.btnOutline}>{helpT('newInvoice')}</Link>
+                <Link to="/expenses?tab=bills" className={controls.btnOutline}>{helpT('addBill')}</Link>
+              </span>
+            }
+          />
+        </div>
+      )}
 
       {compositionProfile && (
         <div className={`${surface.card} ${local.disclaimer}`} role="note" data-composition-banner>
@@ -859,9 +896,10 @@ export function GstReports() {
             ))}
           </select>
         </label>
+        <Suspense fallback={null}><AboutStrip /></Suspense>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>
           <div className={local.toolbar}>
-            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' || tab === 'rcmdocs' || tab === 'isd' || tab === 'ewbcons' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
+            <h2 className={local.tbHeading}>{TAB_TERM[tab] ? <Term id={TAB_TERM[tab]!}>{tabLabel(TABS.find((x) => x.id === tab))}</Term> : tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' || tab === 'rcmdocs' || tab === 'isd' || tab === 'ewbcons' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>

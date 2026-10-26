@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fyQuarterOf, loadChallans, loadManualDeductions, loadPayrollTdsChallans, loadReturnMarks, tdsDeductions, type TdsQuarter } from '../lib/tds-payables';
 import { tcsCollections } from '../lib/tds-returns';
 import { purchasesDb, paymentsDb } from '../lib/purchases';
@@ -20,6 +20,12 @@ import { ITA2025_FROM } from '../lib/ita2025';
 // 7R (7.120): Form 27Q (non-residents) and the TRACES justification import — loaded when their tab opens.
 const Form27qTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => ({ default: m.Form27qTab })));
 const TracesTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => ({ default: m.TracesTab })));
+// R6-A3 / A6: "About this tab" strip and the one-time tip (lazy).
+const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
+import { Landmark } from 'lucide-react';
+import { EmptyState } from '../components/ui/EmptyState';
+import { helpT } from '../i18n/areas/help-r6';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Books.module.css';
@@ -81,6 +87,7 @@ export function Tds() {
   return (
     <div className={surface.page}>
       <PageHeader title={tdsT('title')} subtitle={tdsT('subtitle')} />
+      <Suspense fallback={null}><ScreenTip id="tds" /></Suspense>
       <div className={`${styles.tabs} no-print`}>
         <label className={controls.field}>
           <span className={controls.label}>{tdsT('fy')}</span>
@@ -124,8 +131,15 @@ export function Tds() {
           </button>
         ))}
       </div>
+      <Suspense fallback={null}><AboutStrip /></Suspense>
       <div role="tabpanel" id={`tds-panel-${tab}`} aria-labelledby={`tds-tab-${tab}`} tabIndex={0} className={styles.panel}>
         {!canEdit && tab !== 'overview' && <p className={controls.hint}>{tdsT('readOnly')}</p>}
+        {tab === 'overview' && data.rows.length === 0 && data.tcs.length === 0 && (
+          <div className={surface.card} data-tds-empty>
+            <EmptyState icon={Landmark} title={helpT('tdsEmptyTitle')} text={helpT('tdsEmptyText')}
+              action={<Link to="/expenses?tab=bills" className={controls.btnOutline}>{helpT('addBillTds')}</Link>} />
+          </div>
+        )}
         {`${fy + 1}-03-31` >= ITA2025_FROM && <p className={controls.hint} data-ita2025-note>{ita25T('note')}</p>}
         {tab === 'overview' && <OverviewTab data={data} fy={fy} today={today} />}
         {tab === 'deductions' && <DeductionsTab data={data} fy={fy} today={today} canEdit={canEdit} onChanged={refresh} notify={notify} />}

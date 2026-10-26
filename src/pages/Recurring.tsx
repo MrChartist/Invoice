@@ -31,6 +31,7 @@ import { s2T } from '../i18n/areas/sales-r2';
 import { defineArea } from '../i18n/area';
 import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-C
 import { localDb } from '../lib/localDb';
+import { RECURRING_TABS, type RecurringTab } from './page-tabs'; // R6-B1
 
 // R2-B1: batch invoices (one template, many parties), loaded on demand.
 const BatchTab = lazy(() => import('../components/recurring/BatchTab').then((m) => ({ default: m.BatchTab })));
@@ -38,13 +39,15 @@ const BatchTab = lazy(() => import('../components/recurring/BatchTab').then((m) 
 const FeesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.FeesTab })));
 const LeasesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.LeasesTab })));
 const r5cTabT = defineArea({ fees: 'Fees', leases: 'Leases' } as const, { fees: 'फ़ीस', leases: 'लीज़' });
-type RecTab = 'schedules' | 'batch' | 'fees' | 'leases';
-const REC_TABS: { id: RecTab; label: () => string; pack?: PackId }[] = [
-  { id: 'schedules', label: () => s2T('rec.tabSchedules') },
-  { id: 'batch', label: () => s2T('rec.tabBatch') },
-  { id: 'fees', label: () => r5cTabT('fees'), pack: 'fees' }, // R5-C
-  { id: 'leases', label: () => r5cTabT('leases'), pack: 'leases' }, // R5-C
-];
+type RecTab = RecurringTab;
+// R6-B1: the ids (and packs) live in recurring-tabs.ts; the labels stay here.
+const TAB_LABEL: Record<RecTab, () => string> = {
+  schedules: () => s2T('rec.tabSchedules'),
+  batch: () => s2T('rec.tabBatch'),
+  fees: () => r5cTabT('fees'), // R5-C
+  leases: () => r5cTabT('leases'), // R5-C
+};
+const REC_TABS: { id: RecTab; label: () => string; pack?: PackId }[] = RECURRING_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 
 export interface RecurringPageProps {
   /** Open the create modal prefilled from this saved invoice. */

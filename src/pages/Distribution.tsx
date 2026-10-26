@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FilePlus2 } from 'lucide-react';
+import { FilePlus2, Truck } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
@@ -11,6 +11,11 @@ import own from '../components/distribution/dist.module.css';
 import { visibleTabs } from '../lib/industry-packs'; // R5-B
 import { localDb } from '../lib/localDb';
 import { defineArea } from '../i18n/area';
+import { DISTRIBUTION_TABS, type DistributionTab } from './page-tabs'; // R6-B1
+import { EmptyState } from '../components/ui/EmptyState';
+import { LearnMore, distributionEmpty } from '../components/discover';
+import { getTable } from '../lib/storage';
+import { discoverT } from '../i18n/areas/discover-r6';
 
 const DistMasters = lazy(() => import('../components/distribution/DistMasters'));
 const DistReports = lazy(() => import('../components/distribution/DistReports'));
@@ -21,8 +26,8 @@ const CreditPolicyCard = lazy(() => import('../components/distribution/CreditPol
 const TransportTab = lazy(() => import('../components/transport/TransportTab'));
 const trT = defineArea({ tab: 'Transport' } as const, { tab: 'ट्रांसपोर्ट' });
 
-type Tab = 'masters' | 'reports' | 'plan' | 'van' | 'orders' | 'credit' | 'transport';
-const TABS: Tab[] = ['masters', 'reports', 'plan', 'van', 'orders', 'credit', 'transport'];
+type Tab = DistributionTab;
+const TABS = DISTRIBUTION_TABS; // R6-B1: list in distribution-tabs.ts
 
 /** Distribution (8F): areas / beats / routes, salesman reports, beat plan, van sales, order-pad import, credit control. */
 export function Distribution() {
@@ -54,6 +59,22 @@ export function Distribution() {
             </button>
           ))}
         </div>
+        {/* R6-B3: no area / beat / route yet — what beats are for, and where to start. */}
+        {tab === 'masters' && distributionEmpty(getTable('dist_areas').length, getTable('dist_beats').length, getTable('dist_routes').length) && (
+          <EmptyState
+            icon={Truck}
+            title={discoverT('distTitle')}
+            text={discoverT('distText')}
+            action={
+              <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-dist-empty>
+                <button type="button" className={controls.btnPrimary} onClick={() => document.querySelector<HTMLElement>('[data-distribution] section input')?.focus()}>
+                  {discoverT('distAdd')}
+                </button>
+                <LearnMore topic="distribution" />
+              </div>
+            }
+          />
+        )}
         <section className={surface.card}>
           <div className={surface.cardBody}>
             <Suspense fallback={null}>
