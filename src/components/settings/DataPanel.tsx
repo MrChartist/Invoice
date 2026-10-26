@@ -25,6 +25,8 @@ import { forgetDeviceData } from '../../lib/auto-backup';
 import { requireAccess } from '../../lib/access';
 import { useCan } from '../../hooks/useCan';
 import { ImportWizard } from '../import/ImportWizard';
+import { KIND_LABELS, type ImportKind } from '../../lib/import-mapping';
+import { c6T } from '../../i18n/areas/closures-r6';
 import { SampleDataCard } from '../demo/SampleDataCard';
 import { assessStorage, formatChars, measureStorage } from '../../lib/storage-health';
 import { cleanupUnusedAttachments } from '../../lib/attachments';
@@ -74,7 +76,11 @@ export function DataPanel({ notify }: Props) {
   const [version, setVersion] = useState(0);
   const [pending, setPending] = useState<PendingRestore | null>(null);
   const [wipeOpen, setWipeOpen] = useState(false);
-  const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
+  // R6-C3: `?import=1` (setup checklist) opens the wizard; `?import=<kind>` picks the kind.
+  const [importKind, setImportKind] = useState<ImportKind | null>(() => {
+    const v = new URLSearchParams(window.location.search).get('import');
+    return !v ? null : v === '1' ? 'clients' : (Object.keys(KIND_LABELS) as ImportKind[]).includes(v as ImportKind) ? (v as ImportKind) : null;
+  });
   const [wp7, setWp7] = useState<'tally' | 'yearEnd' | null>(null);
   // R4-C: `?bin=1` / `?export=1` (command palette) open the dialog directly.
   const [trust, setTrust] = useState<'bin' | 'export' | null>(() => {
@@ -316,6 +322,10 @@ export function DataPanel({ notify }: Props) {
             <button type="button" className={styles.action} onClick={() => setImportKind('invoices')}>
               <strong>{setT('impInvoices')}</strong>
               <span>{setT('impInvoicesText')}</span>
+            </button>
+            <button type="button" className={styles.action} onClick={() => setImportKind('ledgers')} data-import-openings>
+              <strong>{c6T('impOpenings')}</strong>
+              <span>{c6T('impOpeningsText')}</span>
             </button>
           </div>
         </div>

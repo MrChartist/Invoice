@@ -64,12 +64,20 @@ Roles are a convenience lock on a shared computer, not security: anyone with the
 tools can read the stored data. Please test each role and tell us about anything a role can do that it should
 not (or cannot do that it should).
 
-## 6. Hindi (हिंदी)
+## 6. Interface languages
 
 Switch the interface language in *Settings* → *Language / भाषा*, or on the PIN screen. The choice is kept on
-this device only. The shell, Dashboard, invoice editor, payment dialog and many screens are in Hindi; some
-screens and messages are still English (roadmap 5.4). Please report untranslated text, awkward wording and
-any layout that breaks with Hindi text.
+this device only. The app offers eight languages:
+
+| Language | Coverage |
+|---|---|
+| English | Everything. |
+| हिन्दी (Hindi) | The shell, Dashboard, invoice editor, payment dialog and most screens. |
+| मराठी (Marathi) | Core screens (shell, Dashboard, editor, payments, khata). |
+| ગુજરાતી (Gujarati), தமிழ் (Tamil), বাংলা (Bengali), తెలుగు (Telugu), ಕನ್ನಡ (Kannada) | Partial: the core screens through a phrase glossary; other text shows in English (roadmap 5.4 / 8.130). |
+
+Statutory wording that is not certain stays in English ("verify with your CA"). Please report untranslated text,
+awkward wording and any layout that breaks with longer text.
 
 ## 7. What to test first
 
@@ -106,6 +114,23 @@ Work through these flows end to end. After each step, check the numbers on the n
 1. *Payroll* (owner only): employees, salary structures, a monthly payroll run with EPF / ESI / PT / TDS.
 2. Pay the run, check the payslips and the payroll postings in *Books*.
 
+### F. Industry pack
+1. In a test company, pick one pack in *Settings → Defaults → Shop mode* (marketplace seller, transporter, works
+   contractor, school / clinic, non-profit or landlord).
+2. Work through its screens (for example: import a marketplace sales file and its settlement; or an LR, a freight
+   bill and a trip; or a BOQ and an RA bill with retention).
+3. Check where the figures land: *Receivables*, *Books*, GSTR-1 / 3B and the TDS screens. Switch the pack off and
+   check that its tabs and bell notices go away and nothing else changes.
+
+### G. Bring your openings over
+1. In a test company, *Settings → Data & backup → Import data*: import your supplier list (Vyapar / Busy / Marg /
+   Tally / QuickBooks / Xero / Zoho exports, or any Excel sheet), then your 31 March trial balance (*Ledgers & opening
+   balances*, preset "Trial balance") and the unpaid bills of that day (*Opening bills*).
+2. Read the dry run: the difference in opening balances (it goes to "Opening balance difference"), the groups the app
+   mapped for you, and the suppliers it matched instead of adding twice.
+3. Check *Books → Opening trial balance*, *Receivables* ageing and *Books → Tally → Bill-wise payables*. An import can
+   be undone in one step from the undo copy (*Settings → Data & backup*).
+
 Also useful: install / offline (section 2–3), backup and restore into a new company, two tabs open at once,
 and a phone-sized screen.
 
@@ -118,12 +143,18 @@ and a phone-sized screen.
   Data & backup*) through a folder you already sync (Google Drive, OneDrive, Dropbox …).
 - The 4–6 digit PIN is a lock screen; to encrypt the data at rest, turn on vault mode in *Settings → Security*.
 - Hindi is partial (section 6).
-- Open roadmap items are listed in [`docs/ROADMAP.md`](ROADMAP.md), rows marked ⏳ or 🟡. Main ones:
-  5.4 (more languages and screens), 7.19 (bill-wise references on Gateway voucher entry), 7.28 (GSTR-9C
-  Table 12 split), 7.49 (Tally import of inventory vouchers, Excel trial-balance template, per-FY auditor
-  export), 7.131 (Form 15CA / 15CB, 27Q extras, ISD postings, some GSTR-9 tables), 7.149 (payroll
-  perquisite and Form 12BA follow-ups), 7.158 (EEFC payments, POS extras) and 7.167 (MRP lead times, price
-  lists on POS, ITC-04 JSON check). Please do not report these as bugs, but do tell us if one blocks you.
+- Open roadmap items are listed in [`docs/ROADMAP.md`](ROADMAP.md), rows marked ⏳ or 🟡. The ten most likely to
+  affect your testing (please do not report these as bugs, but do tell us if one blocks you):
+  1. More languages and screens are still partly English (5.4, 8.130).
+  2. Gateway voucher entry has no bill-wise references or voucher classes (7.19).
+  3. Tally import brings no inventory quantities; no TDS challans in the Tally export (7.49).
+  4. Form 15CA / 15CB, 27Q extras, ISD postings, GSTR-6 amendments and some GSTR-9 tables are not built (7.131).
+  5. The TDS receivable register: credit notes do not reduce the TDS expected (`receivables.md`, CA item T12).
+  6. The cash-flow forecast ignores GST, TDS, loans and salaries (`cash-planning.md`).
+  7. A refund paid in a later marketplace settlement shows the customer in credit on *Receivables* (R5-A7).
+  8. A cancelled RA bill's number is issued again (R5-B7).
+  9. Custom fields are not on bills, expenses or recurring documents (`attachments-custom-fields.md`).
+  10. Editing a supplier bill below the quantity already returned is not blocked (`purchase-returns.md`).
 
 ## 9. How to report a problem
 

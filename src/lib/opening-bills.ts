@@ -228,3 +228,39 @@ export function loadReceivableOpeningBills(clients: readonly Pick<Client, 'id' |
   if (!bills.length && !openings.size) return [];
   return receivableOpeningBills(bills, openings, clients, loadBooksBegin(today));
 }
+
+/**
+ * R6-C2: the payable mirror of `receivableOpeningBills` — every payable opening bill, plus an "On Account" line per
+ * vendor whose typed opening balance (`party:creditor:<id>`, debit-positive PAISE) differs from its bill total, so
+ * bill-wise payables (`billwisePayables`) agree with the ledger's creditor balance. Read helper only.
+ */
+export function payableOpeningBills(
+  bills: readonly OpeningBill[],
+  openings: ReadonlyMap<string, number>,
+  vendors: readonly { id?: string; name: string }[],
+  booksBegin: string,
+): OpeningBillInput[] {
+  const out: OpeningBillInput[] = [];
+  const pay = bills.filter((b) => b.side === 'payable');
+  for (const b of pay) {
+    out.push({ id: b.id, party_id: b.party_id, party_name: b.party_name, ref_no: b.ref_no, date: b.date, due_date: b.due_date ?? b.date, amount: b.amount, dr_cr: b.dr_cr });
+  }
+  const onAccountDate = booksBegin ? addDays(booksBegin, -1) : '';
+  for (const v of vendors) {
+    if (!v.id) continue;
+    const typed = openings.get(`party:creditor:${v.id}`);
+    if (typed === undefined) continue;
+    const residual = round2(typed / 100 - billsTotal(pay.filter((b) => b.party_id === v.id)));
+    if (Math.abs(residual) < 0.005) continue;
+    out.push({ id: `onacc:${v.id}`, party_id: v.id, party_name: v.name, ref_no: 'On Account', date: onAccountDate, due_date: onAccountDate, amount: Math.abs(residual), dr_cr: residual > 0 ? 'Dr' : 'Cr', on_account: true });
+  }
+  return out;
+}
+
+/** `payableOpeningBills` from storage (bill-wise payables, the supplier payment picker). */
+export function loadPayableOpeningBills(vendors: readonly { id?: string; name: string }[], today: string = isoDay(new Date())): OpeningBillInput[] {
+  const openings = new Map(loadOpenings().map((o) => [o.ledger_id, signedOpening(o)]));
+  const bills = loadOpeningBills();
+  if (!bills.some((b) => b.side === 'payable') && ![...openings.keys()].some((k) => k.startsWith('party:creditor:'))) return [];
+  return payableOpeningBills(bills, openings, vendors, loadBooksBegin(today));
+}

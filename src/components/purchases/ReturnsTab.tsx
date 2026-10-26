@@ -7,6 +7,7 @@ import { noteItc } from '../../lib/purchase-returns-gst';
 import { billSeedFromGrn, goodsReceivedNotBilled, grnStatus, purchaseOrderOutstanding, receiptNotesDb, type GrnState } from '../../lib/receipt-notes';
 import type { BillSeed } from '../../lib/purchase-orders';
 import { can } from '../../lib/access';
+import { parseDebitNotePrefill } from '../../lib/purchases';
 import { downloadText, toCsv } from '../../lib/download';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
 import { EmptyState } from '../ui/EmptyState';
@@ -44,6 +45,8 @@ export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCrea
   // `new=grn` a receipt note; read once on mount.
   const [params] = useSearchParams();
   const deepNew = can('books.edit') ? params.get('new') : null;
+  // R6-C1: `bill` / `lines` (a QC reject) pre-fill the debit note; additive, read once on mount.
+  const [prefill] = useState(() => (deepNew === 'dn' ? parseDebitNotePrefill(params) : parseDebitNotePrefill(new URLSearchParams())));
   const [section, setSection] = useState<Section>(deepNew === 'grn' ? 'grn' : 'notes');
   const [noteKind, setNoteKind] = useState<PurchaseReturn['kind'] | null>(deepNew === 'dn' ? 'DEBIT_NOTE' : null);
   const [grnMode, setGrnMode] = useState<GrnModalProps['mode']>(deepNew === 'grn' ? { kind: 'GRN' } : null);
@@ -310,6 +313,8 @@ export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCrea
         purchases={purchases}
         vendors={vendors}
         notes={notes}
+        billId={prefill.billId}
+        initialQty={prefill.qty}
         onClose={() => setNoteKind(null)}
         onSaved={(m) => {
           setNoteKind(null);

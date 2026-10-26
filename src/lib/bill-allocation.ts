@@ -13,6 +13,7 @@
 import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import { requireAccess } from './access';
 import { round2 } from './invoice-calc';
+import { receivableTotal } from './rcm';
 import type { Account } from './ledger/accounts';
 import {
   VOUCHERS_TABLE,
@@ -33,7 +34,12 @@ import { withTablesRollback } from './table-txn';
 import { audit } from './audit';
 import { nextReceiptNumber, recordSeries, SERIES_TABLE } from './series-counters';
 
-export type VoucherReceipt = Payment & { voucher_id?: string; client_id?: string; client_name?: string };
+/**
+ * `tds_amount` (R6-C2): the customer's TDS on the bill, stamped on the allocation row that clears the bill's cash part
+ * (as an invoice receipt books it). Informational on the row: the ledger books Dr TDS receivable from the invoice's
+ * own `tds_amount` (`postings.ts` `voucherTdsJournal`) and the TDS register reads the invoice.
+ */
+export type VoucherReceipt = Payment & { voucher_id?: string; client_id?: string; client_name?: string; tds_amount?: number };
 
 export interface ReceiptAllocation {
   /** Invoice id or opening bill id. */
@@ -51,6 +57,8 @@ export interface OpenRef {
   /** Rupees still due (before this voucher's own allocations). */
   outstanding: number;
   opening: boolean;
+  /** R6-C2: TDS the customer withholds on this bill (the invoice's `tds_amount`); `outstanding` is already net of it. */
+  tds?: number;
 }
 
 const fold = (s: string | undefined) => (s ?? '').trim().toLowerCase();
@@ -86,9 +94,13 @@ export function openRefsFor(party: string, voucherId?: string, now: Date = new D
   const payments = voucherId ? all.filter((p) => (p as VoucherReceipt).voucher_id !== voucherId) : all;
   const report = buildReceivables({ invoices: localDb.invoices.getAll(), payments, clients, openingBills: loadReceivableOpeningBills(clients), links: getTable<CreditLinkRow>('doc_links'), refunds: posRefunds(getTable<PosReturn>('pos_returns')) }, { now });
   const p = report.parties.find((x) => x.key === client.id);
+  const tdsOf = (id: string) => round2(Math.max(Number(localDb.invoices.getById(id)?.tds_amount) || 0, 0));
   return (p?.bills ?? [])
     .filter((b) => !b.invoiceId.startsWith('onacc:'))
-    .map((b) => ({ id: b.invoiceId, ref: b.number, date: b.issueDate, due: b.dueDate, outstanding: b.outstanding, opening: !!b.opening }));
+    .map((b) => {
+      const tds = b.opening ? 0 : tdsOf(b.invoiceId);
+      return { id: b.invoiceId, ref: b.number, date: b.issueDate, due: b.dueDate, outstanding: b.outstanding, opening: !!b.opening, ...(tds > 0 ? { tds } : {}) };
+    });
 }
 
 /** Problems with an allocation set (empty = fine). `total` is the party line's credit in rupees. */
@@ -140,12 +152,38 @@ export function syncVoucherReceipts(
       const p = localDb.payments.record({ invoiceId: a.bill_id, amount: round2(a.amount), method, reference: voucher.number, date: voucher.date });
       ids.add(p.id);
     }
-    const rows = getTable<VoucherReceipt>('transactions').map((r) => (ids.has(r.id) ? { ...r, ...tag } : r));
+    const rows = stampVoucherTds(getTable<VoucherReceipt>('transactions').map((r) => (ids.has(r.id) ? { ...r, ...tag } : r)), ids);
     const rest = round2(total - used.reduce((s, a) => s + a.amount, 0));
     if (rest > 0.004) rows.push({ id: generateId(), invoice_id: '', amount: rest, method, reference: voucher.number, note: 'On account', date: voucher.date, ...tag });
     setTable('transactions', rows);
     return voucherReceipts(voucher.id, rows);
   });
+}
+
+/**
+ * R6-C2: stamp the bill's TDS on the voucher row (of `ids`) whose amount takes the bill's receipts past total − TDS —
+ * the same receipt `postings.ts` `tdsSettlements` books TDS receivable on. Pure over `rows`.
+ */
+export function stampVoucherTds(rows: VoucherReceipt[], ids: ReadonlySet<string>, invoiceOf: (id: string) => InvoiceRecord | undefined = (id) => localDb.invoices.getById(id)): VoucherReceipt[] {
+  const targets = new Set(rows.filter((r) => ids.has(r.id) && r.invoice_id).map((r) => r.invoice_id));
+  const stamp = new Map<string, number>();
+  for (const invoiceId of targets) {
+    const inv = invoiceOf(invoiceId);
+    const tds = round2(Math.max(Number(inv?.tds_amount) || 0, 0));
+    if (!inv || !(tds > 0)) continue;
+    const cashDue = round2(Math.abs(receivableTotal(inv)) - tds);
+    let paid = 0;
+    const mine = rows.filter((r) => r.invoice_id === invoiceId).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
+    for (const r of mine) {
+      const before = paid;
+      paid = round2(paid + Math.abs(Number(r.amount) || 0));
+      if (before < cashDue - 0.004 && paid >= cashDue - 0.004) {
+        if (ids.has(r.id)) stamp.set(r.id, tds);
+        break;
+      }
+    }
+  }
+  return stamp.size ? rows.map((r) => (stamp.has(r.id) ? { ...r, tds_amount: stamp.get(r.id) } : r)) : rows;
 }
 
 /** Remove every receipt row of a voucher (voucher deleted, or allocations cleared). */

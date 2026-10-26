@@ -336,6 +336,25 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number,
  * One voucher per advance movement. For an 'adjusted' movement `inv` is the invoice and `tds` the
  * customer's TDS when that payment row is the one that settles it (exactly as on a cash receipt).
  */
+/** R6-C2: TDS the customer withheld on a bill cleared by a manual receipt voucher's allocation (Dr TDS receivable, Cr the debtor). */
+function voucherTdsJournal(t: Payment, inv: InvoiceRecord | undefined, tds: number): LedgerVoucher | null {
+  const date = toIsoDate(t.date);
+  if (!date || !inv || !(tds > 0)) return null;
+  const party = partyOfInvoice(inv);
+  const l = new Lines().dr(A.tdsReceivable, tds).cr(A.debtors, tds, party);
+  return {
+    id: `rcpt-tds:${t.id}`,
+    source: 'auto',
+    kind: 'Journal',
+    date,
+    number: str(t.reference) || str(inv.invoice_number),
+    party,
+    narration: `TDS ${(tds / 100).toFixed(2)} withheld against ${inv.invoice_number || 'invoice'}${str(inv.tds_section) ? ` u/s ${sectionText(str(inv.tds_section), str(inv.issue_date))}` : ''} (receipt voucher ${str(t.reference)})`,
+    lines: l.lines,
+    link: `/invoice/${inv.id}`,
+  };
+}
+
 function advanceVoucher(m: AdvanceMovement, inv: InvoiceRecord | undefined, tds: number): LedgerVoucher | null {
   const gross = Math.abs(toPaise(m.gross));
   if (!m.date || gross === 0) return null;
@@ -651,6 +670,8 @@ export function buildLedger(input: LedgerInput): Ledger {
   const allocatedBy = new Set(input.manual.map((m) => m.id));
   const gvAcc = gvLiabilityId(input.userAccounts); // R4-B1
   for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0, gvAcc));
+  // R6-C2: the voucher posts the money, but the customer's TDS on the bill it clears is booked here, as for an invoice receipt.
+  for (const t of input.transactions) if (allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id)) && (tds.get(String(t.id)) ?? 0) > 0) push(voucherTdsJournal(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
   for (const m of advanceMovements(input.advances ?? [], input.transactions, input.invoices)) {
     push(advanceVoucher(m, m.invoiceId ? invById.get(m.invoiceId) : undefined, m.kind === 'adjusted' ? tds.get(m.sourceId) ?? 0 : 0));
   }

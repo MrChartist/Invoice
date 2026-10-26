@@ -159,6 +159,8 @@ from the first-paint `tdsSections` (avoids splitting `tds-rules`).
 
 ## Verify with your CA
 
+Consolidated in `docs/CA_REVIEW.md` (ids I10–I19); answers are logged there with the date and the PR.
+
 1. GTA rates and options: RCM 5%; forward charge 5% without ITC; 18% with ITC from 22 Sep 2025 (12% before) — the
    notification and dates (`GTA_RATE_RULES`). SAC 996791 as the default.
 2. Annexure V / VI window (1 Jan – 31 Mar of the preceding FY) and whether the option continues by default; the notified

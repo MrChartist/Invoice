@@ -33,6 +33,8 @@ export interface ReturnModalProps {
   notes: PurchaseReturn[];
   /** Pre-select a bill. */
   billId?: string;
+  /** R6-C1: quantities to return per bill line id (a QC reject's pre-filled debit note). */
+  initialQty?: Record<string, number>;
   onClose: () => void;
   onSaved: (message: string) => void;
 }
@@ -55,7 +57,7 @@ export function ReturnModal({ kind, onClose, ...rest }: ReturnModalProps) {
 
 type FormProps = Omit<ReturnModalProps, 'kind'> & { kind: PurchaseNoteKind };
 
-function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved }: FormProps) {
+function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClose, onSaved }: FormProps) {
   const bills = useMemo(
     () =>
       purchases
@@ -71,7 +73,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved 
   const [date, setDate] = useState(todayInput());
   const [reason, setReason] = useState<NoteReasonCode>(kind === 'DEBIT_NOTE' ? '01' : '02');
   const [goods, setGoods] = useState(kind === 'DEBIT_NOTE');
-  const [qty, setQty] = useState<Record<string, number>>({});
+  const [qty, setQty] = useState<Record<string, number>>(() => ({ ...(initialQty ?? {}) }));
   const [rates, setRates] = useState<Record<string, number>>({});
   const [valueName, setValueName] = useState('');
   const [value, setValue] = useState(0);

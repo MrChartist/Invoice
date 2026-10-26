@@ -5,6 +5,7 @@ import { buildGstr9 } from '../../lib/gstr9';
 import { buildGstr9c, type Gstr9cAdjustments, type Gstr9cLine } from '../../lib/gstr9c';
 import { gstr9cRateWise, gstr9cTable14, notesItcForFy } from '../../lib/gstr9c-extra';
 import { loadIsdInward } from '../../lib/isd';
+import { journalItcReversals } from '../../lib/gst-reports'; // R6-C4
 import { r7T } from '../../i18n/areas/gst-tds-7r';
 import { fyPeriod, gstSummary, itcWithCess, loadBooksData, profitAndLoss } from '../../lib/books';
 import { advanceTaxEvents } from '../../lib/advance-tax';
@@ -54,6 +55,7 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
       advances: advanceTaxEvents(books.advances ?? [], books.transactions, books.invoices),
       purchaseNotes: books.purchaseReturns ?? [],
       isdInward: loadIsdInward(),
+      itcReversals: journalItcReversals(getTable('vouchers')), // R6-C4
       turnover: turnover || 0,
     });
     const g = gstSummary(books, period);

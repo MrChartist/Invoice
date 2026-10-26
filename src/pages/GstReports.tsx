@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, type KeyboardEvent } from
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
-import { CalendarRange, CheckCircle2, Download, FileJson, FileSpreadsheet, Files, Printer, ShieldAlert } from 'lucide-react';
+import { CalendarRange, Download, FileJson, FileSpreadsheet, Files, Printer, ShieldAlert } from 'lucide-react';
 import { getTable, peekTable, readRaw, writeRaw } from '../lib/storage';
 import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
@@ -60,7 +60,8 @@ import { buildPreflight, needsPreflight, preflightCount, type PreflightForm } fr
 import type { LutIssue } from '../lib/trade/lut-register';
 import type { LutRow } from '../types/trade-r4';
 import { aatoFor, gstExceptions } from '../lib/gst-guards';
-import { filedFor, loadFiled, saveFiled, setFiled, type FiledReturn, type ReturnDue } from '../lib/compliance';
+import { rememberDownload, stripReturn, type FilerFrequency } from '../lib/compliance';
+import { FilingStrip } from '../components/gst-reports/FilingStrip'; // R6-C4
 import { todayIso } from '../lib/tax-rules';
 import { fiT } from '../i18n/areas/filing';
 import filing from '../components/gst-reports/filing.module.css';
@@ -248,13 +249,14 @@ export function GstReports() {
       live = false;
     };
   }, [invoices, period, gstin]);
-  const preflight = useMemo(() => {
+  const preflightInput = useMemo(() => {
     const irnIds = new Set(getTable<{ invoice_id?: string; irn?: string }>(EINVOICE_META_TABLE).filter((m) => m?.irn && m.invoice_id).map((m) => m.invoice_id as string));
     const s = localDb.settings.get();
     const active = s.profiles.find((p) => p.id === s.activeProfileId) ?? null;
     const exceptions = gstExceptions(invoices, { ...periodRange(period), irnIds, aato: (inv) => aatoFor(inv, s.profiles, active), today: todayIso(), gstin });
-    return buildPreflight({ exceptions, issues, gaps, lut: lutFindings });
+    return { exceptions, issues, gaps, lut: lutFindings };
   }, [invoices, period, gstin, issues, gaps, lutFindings]);
+  const preflight = useMemo(() => buildPreflight(preflightInput), [preflightInput]);
   const checkCount = preflightCount(preflight);
   // R3-C4: unresolved portal errors of this period × GSTIN add an optional step to the filing strip.
   // Same count as `openPortalErrors` (gst-portal-files.ts), inlined so the reader stays in its lazy tab chunk.
@@ -263,8 +265,14 @@ export function GstReports() {
       .reduce((n, r) => n + (r.findings ?? []).filter((f) => !r.resolved?.[f.key]).length, 0))();
   const navigate = useNavigate();
   const [pending, setPending] = useState<null | { form: PreflightForm | null; run?: () => boolean }>(null);
-  const [downloaded, setDownloaded] = useState('');
-  const FORM_NAME: Record<PreflightForm, string> = { GSTR1: 'GSTR-1 JSON', GSTR3B: 'GSTR-3B JSON', IFF: 'IFF JSON' };
+  const FORM_NAME: Record<PreflightForm, string> = { GSTR1: 'GSTR-1 JSON', GSTR3B: 'GSTR-3B JSON', IFF: 'IFF JSON', CMP08: 'CMP-08' };
+  // R6-C4: the filing strip (FilingStrip.tsx) keeps "downloaded" / "filed" on the period's compliance rows.
+  const filerFrequency: FilerFrequency = compositionProfile ? 'composition' : (localDb.settings.get().gst_filing_frequency ?? 'monthly');
+  const [stripVersion, setStripVersion] = useState(0);
+  const downloaded = (form: PreflightForm) => {
+    rememberDownload(stripReturn(period, form, filerFrequency, periodRange(period), label), gstin);
+    setStripVersion((v) => v + 1);
+  };
   const downloadGstr1 = () => {
     download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1, { gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }), null, 2));
     return true;
@@ -284,31 +292,12 @@ export function GstReports() {
     download(`GSTR3B_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildGstr3bJson(g3, gstin, g1.fp), null, 2));
     return true;
   };
-  const periodTag = `${g1.fp}|${gstin}`;
-  /** Clean → download now; otherwise show the grouped problems first ("Download anyway" / "Review"). */
+  /** Clean → download now; otherwise show the grouped problems first ("Download anyway" / "Review"). R6-C4: per form. */
   const guarded = (form: PreflightForm, run: () => boolean) => {
-    if (needsPreflight(preflight)) return setPending({ form, run });
-    if (run()) setDownloaded(periodTag);
+    if (needsPreflight(buildPreflight(preflightInput, form))) return setPending({ form, run });
+    if (run()) downloaded(form);
   };
   const badge = checkCount > 0 ? <span className={filing.badge} title={fiT('badgeTitle', { n: checkCount })} data-json-badge>· {checkCount} ⚠</span> : null;
-
-  // Step 4: mark GSTR-1 / GSTR-3B filed for this period (same `compliance` table as the Compliance tab).
-  const [filedRows, setFiledRows] = useState<FiledReturn[]>(() => loadFiled());
-  const periodKey = period.kind === 'month' ? periodRange(period).from.slice(0, 7) : period.kind === 'quarter' ? `${period.fyStart}-Q${period.quarter}` : '';
-  const returnFor = (form: 'GSTR1' | 'GSTR3B'): ReturnDue => {
-    const { from, to } = periodRange(period);
-    return { id: `${form}:${periodKey}`, form, periodKey, label, from, to, due: to, optional: false };
-  };
-  const isFiled = (form: 'GSTR1' | 'GSTR3B') => !!periodKey && !!filedFor(filedRows, returnFor(form), gstin);
-  const toggleFiled = (form: 'GSTR1' | 'GSTR3B') => {
-    const next = setFiled(filedRows, returnFor(form), gstin, isFiled(form) ? null : todayIso());
-    setFiledRows(next);
-    try {
-      saveFiled(next);
-    } catch {
-      notify(fiT('markFailed'), 'error');
-    }
-  };
 
   // Arrow keys move between section tabs across the groups (Tab still walks every tab button).
   // R5-C: a pack tab is listed only with one of its packs on (or while it is the open tab).
@@ -711,12 +700,12 @@ export function GstReports() {
         <Suspense fallback={null}>
           <PreflightDialog
             form={pending.form ? FORM_NAME[pending.form] : null}
-            groups={preflight}
+            groups={pending.form ? buildPreflight(preflightInput, pending.form) : preflight}
             onClose={() => setPending(null)}
             onDownload={pending.run ? () => {
-              const run = pending.run;
+              const { run, form } = pending;
               setPending(null);
-              if (run?.()) setDownloaded(periodTag);
+              if (run?.() && form) downloaded(form);
             } : undefined}
             onReview={() => {
               setPending(null);
@@ -774,42 +763,10 @@ export function GstReports() {
         </div>
       )}
 
-      {!compositionProfile && (
-        <ol className={`${surface.card} ${filing.strip}`} aria-label={fiT('stripLabel')} data-filing-strip>
-          <li className={filing.stepDone}>
-            <span className={filing.stepName}>{fiT('stepPeriod')}</span>
-            <span className={filing.stepSub}>{label}{gstin ? ` · ${gstin}` : ''}</span>
-          </li>
-          <li className={checkCount ? filing.stepWarn : filing.stepDone}>
-            <button type="button" className={filing.stepBtn} onClick={() => setPending({ form: null })} title={fiT('checkTitle')} data-filing-check>
-              {fiT('stepCheck')} ({checkCount})
-            </button>
-          </li>
-          {portalErrors > 0 && (
-            <li className={filing.stepWarn} data-filing-portal-errors>
-              <button type="button" className={filing.stepBtn} onClick={() => setTab('portal-files')}>{dkT('tab.portal')} ({portalErrors})</button>
-            </li>
-          )}
-          <li className={downloaded === periodTag ? filing.stepDone : filing.step}>
-            <span className={filing.stepName}>{fiT('stepDownload')}</span>
-            <span className={filing.stepBtns}>
-              <button type="button" className={filing.stepBtn} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin1') : undefined} onClick={() => guarded('GSTR1', downloadGstr1)}>GSTR-1</button>
-              <button type="button" className={filing.stepBtn} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin3b') : undefined} onClick={() => guarded('GSTR3B', downloadGstr3b)}>GSTR-3B</button>
-            </span>
-          </li>
-          <li className={isFiled('GSTR1') && isFiled('GSTR3B') ? filing.stepDone : filing.step}>
-            <span className={filing.stepName}>{fiT('stepFiled')}</span>
-            <span className={filing.stepBtns}>
-              {(['GSTR1', 'GSTR3B'] as const).map((f) => (
-                <button key={f} type="button" className={filing.stepBtn} aria-pressed={isFiled(f)} disabled={!periodKey}
-                  title={periodKey ? fiT('markHint') : fiT('markFyHint')} onClick={() => toggleFiled(f)}>
-                  {isFiled(f) ? <CheckCircle2 size={14} aria-hidden /> : null} {fiT(f === 'GSTR1' ? 'markG1' : 'markG3')}
-                </button>
-              ))}
-            </span>
-          </li>
-        </ol>
-      )}
+      <FilingStrip period={period} label={label} gstin={gstin} frequency={filerFrequency} checkCount={checkCount} onCheck={() => setPending({ form: null })}
+        portalErrors={portalErrors} portalLabel={dkT('tab.portal')} onPortalErrors={() => setTab('portal-files')} canDownload={hasData && !!gstin}
+        onDownload={(f) => guarded(f, f === 'GSTR1' ? downloadGstr1 : f === 'IFF' ? downloadIff : downloadGstr3b)} version={stripVersion}
+        needGstinTitle={!gstin ? { GSTR1: gstT('needGstin1'), IFF: gstT('needGstin1'), GSTR3B: gstT('needGstin3b') } : undefined} onError={(m) => notify(m, 'error')} />
 
       <ReconBanner issues={issues} />
 

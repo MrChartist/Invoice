@@ -336,3 +336,36 @@ test('P0-11: a manual receipt allocated bill-wise settles the opening bill once 
   assert.equal(voucherReceipts(v.id).length, 0);
   assert.equal(loadVouchers().length, 1);
 });
+
+test('R6-C2: the customer TDS on a bill cleared by a voucher allocation reaches the register and TDS receivable', async () => {
+  const { syncVoucherReceipts, openRefsFor, voucherReceipts, stampVoucherTds } = await import('../src/lib/bill-allocation.ts');
+  const { saveVoucher } = await import('../src/lib/ledger/index.ts');
+  const { tdsInvoiceLines } = await import('../src/lib/tds-register.ts');
+  setTable('clients', [asha]);
+  const inv = {
+    id: 'i1', doc_type: 'TAX_INVOICE', status: 'Sent', invoice_number: 'INV/FY26-27/0001', issue_date: '2026-05-01', due_date: '2026-05-31', currency: 'INR',
+    client: { id: 'c1', name: 'Asha', company: 'Asha Traders' }, items: [{ id: 'l', name: 'Audit fee', quantity: 1, rate: 100_000, tax_rate: 18, amount: 100_000 }],
+    subtotal: 100_000, taxable_value: 100_000, cgst_amount: 9_000, sgst_amount: 9_000, igst_amount: 0, tax_amount: 18_000, total: 118_000,
+    tds_amount: 10_000, tds_section: '194J', amount_paid: 0, balance_due: 108_000, gst_mode: 'CGST_SGST',
+  };
+  setTable('invoices', [inv]);
+  const refs = openRefsFor('Asha Traders', undefined, new Date(2026, 5, 30));
+  assert.deepEqual(refs.map((r) => [r.ref, r.outstanding, r.tds]), [['INV/FY26-27/0001', 108_000, 10_000]], 'the allocation screen shows the TDS');
+  const v = saveVoucher({
+    type: 'RECEIPT', date: '2026-06-10', narration: 'Received net of TDS',
+    lines: [{ account_id: A.bank, dr: 108_000_00, cr: 0 }, { account_id: A.debtors, dr: 0, cr: 108_000_00, party: 'Asha Traders' }],
+  });
+  syncVoucherReceipts(v, 'Asha Traders', 108_000, [{ bill_id: 'i1', ref: inv.invoice_number, amount: 108_000 }], 'Bank Transfer');
+  const [row] = voucherReceipts(v.id);
+  assert.equal(row.tds_amount, 10_000, 'the row that clears the cash part carries the TDS');
+  // Register: the bill is settled (cash + TDS = total).
+  const lines = tdsInvoiceLines({ invoices: getTable('invoices') as never, payments: getTable('transactions') as never, clients: [asha] as never });
+  assert.deepEqual(lines.map((l) => [l.tds, l.settled]), [[10_000, true]]);
+  // Ledger: Dr TDS receivable, Cr the debtor — the party balance is nil, as for an invoice receipt.
+  const ledger = buildLedger(loadLedgerInput({ ...EMPTY_BOOKS, invoices: getTable('invoices') as never, transactions: getTable('transactions') as never }, '2026-10-25'));
+  assert.equal(accountStatement(ledger, A.tdsReceivable, FY)!.closing, 10_000_00);
+  assert.equal(accountStatement(ledger, A.debtors, FY, 'Asha Traders')!.closing, 0);
+  // A partial allocation that does not reach total − TDS stamps nothing.
+  const partial = stampVoucherTds([{ id: 'x', invoice_id: 'i1', amount: 50_000, method: 'Bank', date: '2026-06-10' }], new Set(['x']), () => inv as never);
+  assert.equal(partial[0].tds_amount, undefined);
+});

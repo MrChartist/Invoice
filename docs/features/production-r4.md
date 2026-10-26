@@ -79,6 +79,8 @@ the earliest target date. Audit entity `purchase`.
 
 ## Verify with your CA
 
+Consolidated in `docs/CA_REVIEW.md` (ids G38, AC9, AC10, I36); answers are logged there with the date and the PR.
+
 - **Order costing** is a management working from the stock engine (weighted average / FIFO). Standards cover
   materials plus a typed conversion rate; BOM additional costs are not stored as standard. Variances are not posted
   to the ledger (stock is not valued there). Confirm the method and any use in the books (PRD open question 7).
@@ -102,13 +104,15 @@ the earliest target date. Audit entity `purchase`.
 2. **Cost-centre memo** is a memo **row** under the Project P&L (its columns are the cost centres), not a column.
 3. **QC default godown** is applied to GRNs only (`receipt-notes.ts` hook). Purchase-bill lines are entered in the
    purchases module, which R4-A does not own: the lead can call `applyQcHold(lines)` (receipt-notes.ts) in the bill save path.
+   **Closed in R6-C1**: `purchasesDb.save` applies it to new stock lines without a `grn_line_id` (`withBillQcHold`).
 4. **Reject from a bill** opens the debit-note screen (`/expenses?tab=returns&new=dn`) and logs the QC failure; it is not
-   pre-filled (the returns screen takes no bill pre-fill parameter).
+   pre-filled (the returns screen takes no bill pre-fill parameter). **Closed in R6-C1**: the link carries
+   `bill=<id>&lines=<lineId>:<qty>,…` and the Returns tab pre-fills the debit note.
 5. **Margin chip / insights** (`margin.ts` callers in the editor) read raw bills, so they do not yet include
    landed-cost vouchers; the stock engine, stock reports and `loadStockValuer()` do. The lead can feed them
-   `liveInputs().purchases`.
+   `liveInputs().purchases`. **Closed in R6-C1**: `liveCostPurchases` / `liveUnitCosts` in `margin.ts`.
 6. **Inventory → "Landed cost" link** is not added (Inventory.tsx is not R4-A's); the palette and the Manufacturing tab
-   reach it. The sale guard message for QC / WIP godowns reuses the existing "non-saleable (expired / breakage)" text
+   reach it (R6-B adds the header link to `/manufacturing?tab=landed`). The sale guard message for QC / WIP godowns reuses the existing "non-saleable (expired / breakage)" text
    (pharma-gate.ts is not R4-A's).
 7. Small extra files: `src/i18n/areas/production-r4-links.ts` (strings for the Inventory entry points, so those screens
    do not download the whole catalogue), `src/components/production/palette-destinations.ts` and `tabs.ts`.

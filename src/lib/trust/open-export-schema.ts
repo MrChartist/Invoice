@@ -166,6 +166,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   trips: 'Trip sheets.',
   ra_measurements: 'RA bill measurements per BOQ line.',
   boq_coefficients: 'Material per BOQ unit (theoretical consumption).',
+  import_runs: 'One row per import of suppliers, ledgers or opening balances (R6-C3).',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',

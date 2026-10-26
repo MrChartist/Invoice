@@ -143,6 +143,8 @@ the data), desks and the practice page are all lazy.
 
 ## Verify with your CA (statutory points — every screen carries the wording)
 
+Consolidated in `docs/CA_REVIEW.md` (ids G27, G46, AC18); answers are logged there with the date and the PR.
+
 - **e-Way validity day boundary (Rule 138(10), Explanation).** Assumed: validity is counted from generation and each
   day expires at midnight of the day after generation, so N days end at 23:59:59 local time on generation date + N.
   Distances assumed: from 1 Jan 2021 one day per 200 km or part (20 km for over-dimensional cargo and multimodal

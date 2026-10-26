@@ -438,6 +438,8 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessActio
   trips: 'doc.create',
   ra_measurements: 'doc.create',
   boq_coefficients: 'master.edit',
+  // R6-C3: import runs (suppliers / ledgers / opening balances)
+  import_runs: 'books.edit',
 };
 
 let systemDepth = 0;

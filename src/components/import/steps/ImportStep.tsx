@@ -18,10 +18,12 @@ interface Props {
   progress: number;
   writable: number;
   saveError: string;
+  /** R6-C3: opening-balance difference / lock note for ledger and opening imports. */
+  note?: string;
 }
 
 /** Step 4: confirm, watch progress, then the result with downloadable problem rows. */
-export function ImportStep({ kind, table, preview, dry, report, running, progress, writable, saveError }: Props) {
+export function ImportStep({ kind, table, preview, dry, report, running, progress, writable, saveError, note }: Props) {
   return (
     <div className={styles.stack}>
       {!report ? (
@@ -33,6 +35,7 @@ export function ImportStep({ kind, table, preview, dry, report, running, progres
             <Stat label="Skipped" value={preview.summary.skip} />
             <Stat label="Rows with errors" value={preview.summary.error} tone={preview.summary.error ? 'bad' : undefined} />
           </div>
+          {note && <p className={ctl.hint} role="note" data-testid="import-openings-note"><AlertTriangle size={14} /> {note}</p>}
           <p className={ctl.hint}>
             Data is written to this browser only. Existing invoices are never overwritten — a number that already exists is skipped.
             Take a backup from Settings first if you are unsure.

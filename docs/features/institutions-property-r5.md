@@ -190,6 +190,8 @@ initial 183.0 / 185 kB, total 2441.5 / 2600 kB).
 
 ## Verify with your CA
 
+Consolidated in `docs/CA_REVIEW.md` (ids I20–I30); answers are logged there with the date and the PR.
+
 1. Education / health: entry 66 / entry 74 presets; coaching 18%; two documents for a mixed fee (vs an invoice-cum-bill
    of supply); whether a late fine on an exempt fee is exempt (built: the fine follows the plan's main head).
 2. Rule 42 / 43: the formulas (D1 = E/F × C2, D2 = 5% × C2, Tc ÷ 60), exports / zero-rated and outward RCM counted as
@@ -216,5 +218,6 @@ initial 183.0 / 185 kB, total 2441.5 / 2600 kB).
   payment modes (`sales-reports.ts`) and export realisation skip it; the ledger posts the journal once. The same readers
   skip R5-B5's GST TDS / cess deduction rows (`ra_journal_id`): the client kept that money, the row goes into the
   "RA deductions clearing" account and its journal clears it (retention releases, real receipts, are still counted).
-- GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does).
+- ~~GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does).~~ Done in R6-C4: GSTR-9
+  (Table 7C and each month's 3B), 9C, the Compliance interest base and the month-end pack pass them.
 - Gifts in kind create no voucher; FC-4 lists totals, not the portal's line items.

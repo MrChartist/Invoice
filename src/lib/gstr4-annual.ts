@@ -155,7 +155,7 @@ export function cmp08Interest(g4: Gstr4Report, filed: readonly FiledReturn[] = [
     const nm = (Number(to.slice(5, 7)) % 12) + 1;
     const due = `${ny}-${String(nm).padStart(2, '0')}-${String(compositionDueDays(from).cmp08).padStart(2, '0')}`;
     const mark = filed.find(
-      (f) => f && f.form === 'CMP08' && f.period_key === `${g4.fyStart}-Q${quarter}` && (!f.gstin || !gstin || f.gstin.toUpperCase() === gstin),
+      (f) => f && !!f.filed_on && f.form === 'CMP08' && f.period_key === `${g4.fyStart}-Q${quarter}` && (!f.gstin || !gstin || f.gstin.toUpperCase() === gstin),
     );
     // Not marked filed: late only once the as-of day is past the due date.
     const paidOn = mark?.filed_on ?? '';

@@ -163,3 +163,23 @@ test('backup round-trip carries every WP-9 table and the policy keys', () => {
   assert.equal(readProgram().enabled, true);
   assert.throws(() => validateBackupData({ ...data, [DB_PREFIX + 'branches']: JSON.stringify([{ name: 'no id' }]) }), /branches/);
 });
+
+test('R6-C2: a POS refund goes out of the bank account the bill was paid into (multi-account BRS)', async () => {
+  const { refundVoucherLines, suggestRefund, tagRefundBanks } = await import('../src/lib/pos-returns.ts');
+  const { bankLedgerId } = await import('../src/lib/bank-ledgers.ts');
+  const { A } = await import('../src/lib/ledger/accounts.ts');
+  const bill = sale('b1', 'Ravi', 1000, { total: 1000 });
+  const pays = [
+    { id: 'p1', invoice_id: 'b1', amount: 600, method: 'UPI', date: '2026-05-01', bank_account_id: 'hdfc' },
+    { id: 'p2', invoice_id: 'b1', amount: 400, method: 'Cash', date: '2026-05-01' },
+  ];
+  // Back the way it was paid: the UPI part names the HDFC account.
+  assert.deepEqual(suggestRefund(bill, pays as never, 1000), [{ method: 'Cash', amount: 400 }, { method: 'UPI', amount: 600, bank_account_id: 'hdfc' }]);
+  // A tender typed without an account takes the original receipt's (same method first, else any non-cash receipt).
+  assert.deepEqual(tagRefundBanks([{ method: 'Card', amount: 100 }, { method: 'Cash', amount: 50 }], pays as never), [{ method: 'Card', amount: 100, bank_account_id: 'hdfc' }, { method: 'Cash', amount: 50 }]);
+  assert.deepEqual(tagRefundBanks([{ method: 'UPI', amount: 100, bank_account_id: 'sbi' }], pays as never), [{ method: 'UPI', amount: 100, bank_account_id: 'sbi' }], 'an explicit account wins');
+  assert.deepEqual(tagRefundBanks([{ method: 'UPI', amount: 100 }], [{ method: 'Cash' }]), [{ method: 'UPI', amount: 100 }], 'no bank receipt → the main account');
+  // The voucher credits that bank's own ledger.
+  const lines = refundVoucherLines('Ravi', [{ method: 'UPI', amount: 600, bank_account_id: 'hdfc' }, { method: 'Cash', amount: 400 }, { method: 'Card', amount: 10 }]);
+  assert.deepEqual(lines.map((l) => [l.account_id, l.dr, l.cr]), [[A.debtors, 101_000, 0], [bankLedgerId('hdfc'), 0, 60_000], [A.cash, 0, 40_000], [A.bank, 0, 1_000]]);
+});

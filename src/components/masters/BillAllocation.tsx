@@ -7,6 +7,7 @@ import { openRefsFor, type ReceiptAllocation } from '../../lib/bill-allocation';
 import { formatDate, formatMoney } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { mastersT } from '../../i18n/areas/masters';
+import { c6T } from '../../i18n/areas/closures-r6';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
@@ -78,7 +79,10 @@ export default function BillAllocation({ party, total, voucherId, value, onChang
                   <td>{mastersT('agstRef')}</td>
                   <td>{r.ref}{r.opening ? ` · ${mastersT('openingTag')}` : ''}</td>
                   <td>{formatDate(r.due)}</td>
-                  <td className={surface.numeric}>{formatMoney(r.outstanding)}</td>
+                  <td className={surface.numeric}>
+                    {formatMoney(r.outstanding)}
+                    {r.tds ? <div className={styles.note} data-testid="alloc-tds">{c6T('allocTds', { amount: formatMoney(r.tds) })}</div> : null}
+                  </td>
                   <td>
                     <input
                       className={`${controls.input} ${styles.cellInput}`}

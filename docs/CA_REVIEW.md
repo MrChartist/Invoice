@@ -312,6 +312,29 @@ Round 5 statutory values live in `src/lib/transport-works-rules.ts` (transport, 
 
 ---
 
+## Round 6 (R6-C) changes that touch existing items
+
+R6-C closed roadmap follow-ups without changing any statutory value. These items now reach more screens; the question
+asked is unchanged, so no id is added and the count stays 160.
+
+| Id | What changed in R6-C | Where |
+|---|---|---|
+| I22 | The Rule 42 / 43 common-credit journals now also reach **GSTR-9** (each month's 3B and **Table 7C**), GSTR-9C, the Compliance tab's interest base and the month-end pack — not only the GSTR-3B tab. One journal covers both rules, so the app puts the total in 7C; please say whether a 7C / 7D split is expected. | `gstr9.ts` (`itcReversals`), `report-pack.ts`, `ComplianceView.tsx` |
+| T12 | A customer's TDS on an invoice cleared by a **manual receipt voucher's bill allocation** is now booked Dr TDS receivable / Cr the debtor, on the receipt that clears the cash part (same rule as an invoice receipt), and appears settled in the register. | `bill-allocation.ts` (`stampVoucherTds`), `ledger/postings.ts` (`voucherTdsJournal`) |
+| AC12 | The **opening trial balance import** (CSV / XLSX) shows the difference in opening balances before saving and posts it to 1090 like typed openings; unknown groups map to the nearest Schedule III primary with a warning. | `import-openings.ts` |
+| AC10 | The editor's margin chip and the insights tile now cost goods at the **landed** rate (landed-cost vouchers included), as the stock reports do. | `margin.ts` (`liveUnitCosts`) |
+| G23, G41 | The GST filing strip offers **IFF** in QRMP months 1–2 and **CMP-08** for a composition quarter, with "Mark filed" and a remembered download; the IFF pre-download check skips HSN checks and CMP-08 runs only the composition checks. | `FilingStrip.tsx`, `compliance.ts`, `gst-preflight.ts` |
+
+## Answers log
+
+Each CA answer is added here as one row — date, id, answer (OK / Change / Depends, with the value and source) and the
+PR that applied it as a new dated rule row.
+
+| Date | Id | Answer | PR |
+|---|---|---|---|
+
+---
+
 ## Counting note
 
 Each id is counted once, in the area where it is listed. Points raised in several documents (for example the

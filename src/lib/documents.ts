@@ -28,6 +28,7 @@ import { liveRemovalIssues, assertRemovable } from './stock-timeline';
 import { ADVANCES_TABLE, advanceBalance } from './advance-tax';
 import { doubleBilledRows, liveInvoiceIds, mileageDb, timeDb } from './timesheets';
 import { purchasesDb } from './purchases';
+import { withIssueSnapshot } from './khata-actions'; // R6-C5
 import { REJECTIONS_IN_TABLE, rejectedByLine } from './rejections-in';
 import type { RejectionIn } from '../types/job-work';
 import type { AdvanceRecord } from '../types/advances';
@@ -373,7 +374,7 @@ export function statusAfterConversion(
 }
 
 /** Creates, saves and links a new draft. Returns the saved record. */
-export function convertDocument(source: InvoiceRecord, target: DocumentType): InvoiceRecord {
+export function convertDocument(source: InvoiceRecord, target: DocumentType, opts: { issue?: boolean } = {}): InvoiceRecord {
   const today = localIsoDate();
   const settings = localDb.settings.get();
   let order: Pick<ConvertContext, 'pending' | 'carryCharges'> = {};
@@ -400,7 +401,8 @@ export function convertDocument(source: InvoiceRecord, target: DocumentType): In
     dueDays: num(settings.defaultDueDays, 14),
     ...order,
   });
-  const saved = localDb.invoices.save(draft);
+  // R6-C5 (8.7): converted straight to an issued invoice, it freezes the party's previous balance at this moment.
+  const saved = localDb.invoices.save(opts.issue && isInvoiceType(target) ? withIssueSnapshot({ ...draft, status: 'Sent' }) : draft);
   addLink({ from_id: source.id, to_id: saved.id, relation: 'converted' });
 
   const nextStatus = statusAfterConversion(source);
