@@ -1241,6 +1241,69 @@ try {
     await writeJson(page, 'pos_day_close', null);
   });
 
+  await step('R4-B: sell a gift voucher, redeem it as a POS tender; transfer request → dispatch → receive with a shortage', async () => {
+    const keys = ['items_catalog', 'invoices', 'transactions', 'gift_vouchers', 'vouchers', 'accounts', 'series_counters', 'godowns', 'stock_items', 'stock_transfers', 'transfer_requests'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    // 1. Sell one ₹500 voucher: a receipt voucher to the liability ledger, no invoice.
+    await page.goto(srv.origin + '/receivables?tab=giftvouchers');
+    await page.locator('[data-gv-face]').fill('500');
+    await page.locator('[data-gv-face]').blur();
+    await page.locator('[data-gv-sell-save]').click();
+    await page.getByText(/1 voucher\(s\) sold — receipt RV\/FY\d\d-\d\d\/\d+/).waitFor();
+    const [gv] = await readJson(page, 'gift_vouchers', [], (v) => v.length > 0);
+    const rv = (await readJson(page, 'vouchers', [], (v) => v.some((x) => x.voucher_class === 'Gift voucher sale'))).find((x) => x.voucher_class === 'Gift voucher sale');
+    check(/^GV\/FY\d\d-\d\d\/0001$/.test(gv?.number ?? '') && /^\d{11}-[A-Z2-9]{4}$/.test(gv?.code ?? '') && rv?.lines?.[0]?.dr === 50000, `voucher sold as a liability (${gv?.number} ${gv?.code})`);
+    await page.locator('[data-gv-register]').getByText(gv.number).waitFor();
+
+    // 2. Redeem it at the counter for a ₹236 bill: the voucher pays, ₹264 stays on it.
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-gv-soap', name: 'E2E GV Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 200, tax_rate: 18, amount: 0, barcode: '8901030865299' }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.fill('8901030865299');
+    await scan.press('Enter');
+    await page.getByLabel('Quantity of E2E GV Soap (line 1)').waitFor();
+    await page.locator('[data-gv-code]').fill(gv.code);
+    await page.locator('[data-gv-code]').press('Enter');
+    await page.getByText(/^GV\/FY\d\d-\d\d\/0001$/).waitFor();
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    const pay = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.invoice_id === bill?.id))).find((t) => t.invoice_id === bill?.id);
+    check(bill?.status === 'Paid' && pay?.method === 'Gift voucher' && pay.gift_voucher_id === gv.id && pay.amount === 236, `POS bill paid by the voucher (${bill?.status}, ${pay?.method} ${pay?.amount})`);
+
+    // 3. A store asks the warehouse (Main) for 10; 10 go into transit; 9 arrive, 1 short.
+    await writeJson(page, 'godowns', [{ id: 'e2e-mall', name: 'E2E Mall' }]);
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-tee', name: 'E2E Tee', unit: 'PCS', track_stock: true, opening_qty: 20, opening_rate: 150, reorder_level: 0 }]);
+    await page.goto(srv.origin + '/inventory?tab=transfers&view=requests');
+    await page.locator('[data-trq-new]').click();
+    await page.locator('[data-trq-to]').selectOption('e2e-mall');
+    await page.locator('[data-trq-item]').selectOption('e2e-tee');
+    await page.locator('[data-trq-qty]').fill('10');
+    await page.locator('[data-trq-qty]').blur();
+    await page.locator('[data-trq-save]').click();
+    await page.getByText(/Transfer request TRQ\/FY\d\d-\d\d\/0001 raised/).waitFor();
+    await page.locator('[data-trq-dispatch]').click();
+    await page.locator('[data-trq-dispatch-save]').click();
+    await page.getByText(/Dispatched on STR\/FY\d\d-\d\d\/\d+/).waitFor();
+    await page.locator('[data-trq-receive]').click();
+    await page.locator('[data-trq-received]').fill('9');
+    await page.locator('[data-trq-short]').fill('1');
+    await page.locator('[data-trq-short]').blur();
+    await page.locator('[data-trq-receive-save]').click();
+    await page.getByText(/1 shortage\(s\) to resolve/).waitFor();
+    const strs = await readJson(page, 'stock_transfers', [], (v) => v.filter((t) => t.request_id).length === 2);
+    const out = strs.find((t) => t.leg === 'out');
+    const got = strs.find((t) => t.leg === 'in');
+    const [req] = await readJson(page, 'transfer_requests', [], (v) => v[0]?.exceptions?.length === 1);
+    check(out?.lines?.[0]?.qty === 10 && got?.lines?.[0]?.qty === 9 && got.to_godown === 'e2e-mall' && out.to_godown === got.from_godown, 'dispatch into transit, receipt out of transit into the store');
+    check(req?.exceptions?.[0]?.kind === 'short' && req.exceptions[0].qty === 1 && req.exceptions[0].status === 'open', 'the short unit stays in transit as an open exception');
+    await page.locator('[data-trq-detail]').waitFor();
+    check(await page.locator('[data-trq-exception="open"]').count() === 1, 'the request details offer write-off / claim / found');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('8B: POS calculator qty, hold & recall across a reload, UPI QR for the exact amount with the bill number', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     await writeJson(page, 'items_catalog', [...prevCatalog, {

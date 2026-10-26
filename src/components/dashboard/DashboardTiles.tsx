@@ -21,6 +21,7 @@ import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './tiles.module.css';
+import { defineArea } from '../../i18n/area';
 
 const ApprovalsPanel = lazy(() => import('../approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalsPanel })));
 const BranchesPanel = lazy(() => import('../branches/BranchesPanel').then((m) => ({ default: m.BranchesPanel })));
@@ -33,8 +34,9 @@ const OffersPanel = lazy(() => import('../extras7u/OffersPanel').then((m) => ({ 
 const TodayPanel = lazy(() => import('../invoicing-ux/TodayPanel'));
 const InsightsPanel = lazy(() => import('../invoicing-ux/InsightsPanel'));
 const PharmaPanel = lazy(() => import('../extras7u/PharmaPanel').then((m) => ({ default: m.PharmaPanel })));
+const GiftVoucherTile = lazy(() => import('../retail/GiftVoucherTile')); // R4-B1
 
-const TILE_LABEL: Record<Exclude<TileId, 'today' | 'insights'>, Parameters<typeof tilesT>[0]> = {
+const TILE_LABEL: Record<Exclude<TileId, 'today' | 'insights' | 'giftVouchers'>, Parameters<typeof tilesT>[0]> = {
   receivables: 'receivables',
   payables: 'payables',
   cashBank: 'cashBank',
@@ -49,7 +51,8 @@ const TILE_LABEL: Record<Exclude<TileId, 'today' | 'insights'>, Parameters<typeo
   offers: 'offers',
   pharma: 'pharma',
 };
-const tileLabel = (t: TileId) => (t === 'today' ? uxT('tdTitle') : t === 'insights' ? uxT('inTitle') : tilesT(TILE_LABEL[t]));
+const gvTileT = defineArea({ tile: 'Gift vouchers' } as const, { tile: 'गिफ़्ट वाउचर' }); // R4-B1
+const tileLabel = (t: TileId) => (t === 'today' ? uxT('tdTitle') : t === 'insights' ? uxT('inTitle') : t === 'giftVouchers' ? gvTileT('tile') : tilesT(TILE_LABEL[t]));
 
 /**
  * Configurable dashboard tiles (WP-9, P1-17). Mounted lazily below the dashboard's own content,
@@ -201,6 +204,7 @@ export function DashboardTiles() {
           {on('agents') && <div data-tile="agents"><AgentsPanel notify={notify} icon={<TrendingUp size={16} />} /></div>}
           {on('offers') && <div data-tile="offers"><OffersPanel notify={notify} icon={<Receipt size={16} />} /></div>}
           {on('pharma') && <div data-tile="pharma"><PharmaPanel notify={notify} icon={<Boxes size={16} />} /></div>}
+          {on('giftVouchers') && <div data-tile="giftVouchers"><GiftVoucherTile /></div>}
         </Suspense>
       </div>
       <p className={controls.hint}>{tilesT('footnote')}</p>

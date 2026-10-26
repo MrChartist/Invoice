@@ -33,7 +33,9 @@ const CostingTab = lazy(() => import('../components/production/tabs').then((m) =
 const TraceTab = lazy(() => import('../components/production/tabs').then((m) => ({ default: m.TraceTab })));
 const QcTab = lazy(() => import('../components/production/tabs').then((m) => ({ default: m.QcTab })));
 const LandedVoucherTab = lazy(() => import('../components/production/tabs').then((m) => ({ default: m.LandedVoucherTab })));
-const R4A_TABS = ['orders', 'costing', 'trace', 'qc', 'landed'] as const;
+// R4-B5: store replenishment from the warehouse, under Reorder Status (own chunk).
+const ReplenishTab = lazy(() => import('../components/retail/ReplenishTab'));
+const R4A_TABS =['orders', 'costing', 'trace', 'qc', 'landed'] as const;
 // Tab labels only (inline, so the page does not load the production catalogue before a tab is opened).
 const r4aTabT = defineArea(
   { orders: 'Production orders', costing: 'Order costing', trace: 'Trace & recall', qc: 'QC desk', landed: 'Landed cost' } as const,
@@ -99,6 +101,7 @@ export function Manufacturing() {
               {tab === 'journal' && <StockJournalTab ctx={ctx} />}
               {tab === 'physical' && <PhysicalStockTab ctx={ctx} />}
               {tab === 'reorder' && <ReorderTab ctx={ctx} />}
+              {tab === 'reorder' && ctx.godowns.length > 1 && <Suspense fallback={null}><ReplenishTab ctx={ctx} /></Suspense>}{/* R4-B5 */}
               {tab === 'reports' && <StockReportsTab ctx={ctx} />}
               {(tab === 'jobwork' || tab === 'rejections' || tab === 'plan') && (
                 <Suspense fallback={<p className={styles.muted}>{mfgT('loading')}</p>}>

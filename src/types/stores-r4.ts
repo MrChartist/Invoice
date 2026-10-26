@@ -38,6 +38,13 @@ declare module './stock' {
   }
 }
 
+declare module './manufacturing' {
+  interface StockJournal {
+    /** Additive (R4-B4): goods lost / damaged in transit written off for this transfer request. */
+    request_id?: string;
+  }
+}
+
 /* ── Gift vouchers (R4-B1) ───────────────────────────────────── */
 
 export type GiftVoucherStatus = 'active' | 'redeemed' | 'expired' | 'cancelled';
@@ -128,12 +135,24 @@ export interface TransferRequestLog {
   note?: string;
 }
 
-/** A transporter claim for goods short / damaged in transit (a note; nothing is posted). */
-export interface TransferClaim {
+/**
+ * Goods reported short or damaged on a receipt. They stay in the in-transit godown until resolved: written off
+ * (consume-only stock journal), claimed from the transporter (a note — still in transit), or found (received later).
+ */
+export interface TransferException {
   id: string;
   date: string;
   item_id: string;
   qty: number;
+  kind: 'short' | 'damaged';
+  /** The receipt STR it was reported on. */
+  receipt_id?: string;
+  /** Batch still in transit (batch items). */
+  batch_no?: string;
+  serials?: string[];
+  status: 'open' | 'claimed' | 'written_off' | 'found';
+  /** Stock journal / receipt STR / claim note that resolved it. */
+  ref?: string;
   note?: string;
 }
 
@@ -158,7 +177,8 @@ export interface TransferRequest {
   receipt_ids: string[];
   /** Consume-only stock journals writing off goods lost in transit. */
   writeoff_ids?: string[];
-  claims?: TransferClaim[];
+  /** Short / damaged goods reported on receipts and how each was resolved. */
+  exceptions?: TransferException[];
   /** Sec 25(4) path: the requesting and supplying godowns belong to branches with different GSTINs. */
   inter_gstin?: boolean;
   notes?: string;

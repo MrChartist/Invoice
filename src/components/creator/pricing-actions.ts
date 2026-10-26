@@ -17,6 +17,9 @@ import {
 import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import { LAST_RATE_BASIS, lastRateFor, lastRateToApply } from '../../lib/last-rate';
 import { PRICE_LIST_BASIS, priceListRate } from '../../lib/price-list';
+import { BRANCH_PRICES_TABLE, branchContext, storePricingInUse } from '../../lib/retail/store-prices'; // R4-B3
+import { BRANCHES_TABLE, branchOfInvoice, type Branch } from '../../lib/branch';
+import type { BranchPrice } from '../../types/stores-r4';
 
 /** Notes don't take part: a credit / debit note re-states an earlier price. */
 const pricedDoc = () => {
@@ -27,15 +30,29 @@ const pricedDoc = () => {
 export interface EditorPricing {
   data: PricingData;
   level: PriceLevel | null;
+  /** R4-B3: the document's store (branch) when it has a price list or store overrides. */
+  store?: { branch: Branch; prices: readonly BranchPrice[] };
+}
+
+/** R4-B3: the document's branch (its own, else the branch of its business profile) when store pricing applies. */
+function editorStore(): EditorPricing['store'] {
+  const prices = peekTable<BranchPrice>(BRANCH_PRICES_TABLE);
+  const branches = peekTable<Branch>(BRANCHES_TABLE);
+  if (!branches.length || !storePricingInUse(branches, prices)) return undefined;
+  const st = useInvoiceStore.getState();
+  const id = branchOfInvoice({ branch_id: st.branch_id, sender: st.sender }, branches);
+  const branch = branches.find((b) => b.id === id);
+  return branch ? { branch, prices } : undefined;
 }
 
 /** Pricing data and the current party's level, or null when the user has not set pricing up. */
 export function editorPricing(): EditorPricing | null {
   const data = editorPricingData();
-  if (!pricingInUse(data) || !pricedDoc()) return null;
+  const store = pricedDoc() ? editorStore() : undefined;
+  if ((!pricingInUse(data) && !store) || !pricedDoc()) return null;
   const st = useInvoiceStore.getState();
   const level = levelForClient(masterClient(peekTable<Client>(KEYS.clients), st.client), data.levels);
-  return { data, level };
+  return { data, level, ...(store ? { store } : {}) };
 }
 
 /**
@@ -74,7 +91,8 @@ function reprice(lineId: string, ctx: EditorPricing | null, force = false): void
   const base = list ?? num(cat?.rate);
   // A typed rate (no basis) is the user's choice: leave it, unless asked to re-price.
   if (!force && !line.price_basis && num(line.rate) !== base) return;
-  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(line.quantity), ctx?.level); // 8E: an MRP level reads the MRP
+  const branch = ctx?.store ? branchContext(ctx.store.branch, cat?.id ?? '', st.issue_date, ctx.store.prices, ctx.data.levels) : null; // R4-B3
+  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(line.quantity), ctx?.level, branch); // 8E: an MRP level reads the MRP
   const basis = quote.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : quote.basis;
   if (quote.rate !== num(line.rate) || basis !== line.price_basis) {
     st.patchItem(lineId, { rate: quote.rate, price_basis: basis });

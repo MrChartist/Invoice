@@ -69,8 +69,8 @@ export function voucherNumberDigits(date: string, seq: number): string {
 }
 
 /** `CHECK_LENGTH` random characters from `crypto.getRandomValues` (a test may pass its own byte source). */
-export function randomCheck(fill: (bytes: Uint8Array) => void = (b) => crypto.getRandomValues(b)): string {
-  const bytes = new Uint8Array(CHECK_LENGTH);
+export function randomCheck(fill: (bytes: Uint8Array<ArrayBuffer>) => void = (b) => crypto.getRandomValues(b)): string {
+  const bytes = new Uint8Array(new ArrayBuffer(CHECK_LENGTH));
   fill(bytes);
   let out = '';
   for (const b of bytes) out += CHECK_ALPHABET[b % CHECK_ALPHABET.length];
@@ -146,8 +146,9 @@ export function voucherState(v: GiftVoucher, payments: readonly Payment[], day: 
   const balance = round2(Math.max(num(v.face_value) - redeemed - promoUsed - breakage, 0));
   let status: GiftVoucherStatus = 'active';
   if (v.status === 'cancelled') status = 'cancelled';
+  else if (v.breakage_voucher_id) status = 'expired';
   else if (balance <= 0.004 && redeemed + promoUsed > 0) status = 'redeemed';
-  else if (v.breakage_voucher_id || (v.expires_on && day > v.expires_on)) status = 'expired';
+  else if (v.expires_on && day > v.expires_on) status = 'expired';
   return { redeemed, promoUsed, breakage, balance, status, payments: mine };
 }
 
