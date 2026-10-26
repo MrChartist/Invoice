@@ -33,6 +33,7 @@ import { formatCurrency, formatDate } from './utils';
 import { nextPartyBalanceSnapshot } from './party-balance';
 import { partyBalanceSnapshotFor } from './khata-actions';
 import { EXCHANGE_NOTE, applyExchange, openExchange, zReturns, type PosReturn, type ZReturns } from './pos-returns';
+import { liveRedeemIssue, recordPromoUse, stampVoucherPayment } from './retail/gift-voucher-core'; // R4-B1
 
 export const POS_DAY_CLOSE_TABLE = 'pos_day_close';
 export const WALK_IN_NAME = 'Walk-in customer';
@@ -40,8 +41,10 @@ export const WALK_IN_NAME = 'Walk-in customer';
 /* ── Tender maths ────────────────────────────────────────────── */
 
 /** 8E (8.144): Cheque and Wallet (Paytm / PhonePe wallet, gift card) join the counter tenders; non-cash like UPI. */
-export type TenderMethod = 'Cash' | 'UPI' | 'Card' | 'Cheque' | 'Wallet';
-export const TENDER_METHODS: TenderMethod[] = ['Cash', 'UPI', 'Card', 'Cheque', 'Wallet'];
+export type TenderMethod = 'Cash' | 'UPI' | 'Card' | 'Cheque' | 'Wallet' | 'Gift voucher';
+export const TENDER_METHODS: TenderMethod[] = ['Cash', 'UPI', 'Card', 'Cheque', 'Wallet', 'Gift voucher'];
+/** R4-B1: the counter's money tenders (a gift voucher is entered by code, one row per voucher). */
+export type MoneyTender = Exclude<TenderMethod, 'Gift voucher'>;
 
 export interface Tender {
   method: TenderMethod;
@@ -49,6 +52,8 @@ export interface Tender {
   reference?: string;
   /** UPI / card: the bank account the money lands in (multi-account BRS). */
   bank_account_id?: string;
+  /** R4-B1: the `gift_vouchers` row a 'Gift voucher' tender takes its amount from. */
+  gift_voucher_id?: string;
 }
 
 export interface TenderSummary {
@@ -60,8 +65,8 @@ export interface TenderSummary {
   change: number;
   /** Still unpaid after every tender (0 when fully paid). */
   due: number;
-  /** What is recorded as payments: one row per method with an amount, cash net of change. */
-  payments: { method: TenderMethod; amount: number; reference?: string; bank_account_id?: string }[];
+  /** What is recorded as payments: one row per method with an amount, cash net of change (one row per gift voucher). */
+  payments: { method: TenderMethod; amount: number; reference?: string; bank_account_id?: string; gift_voucher_id?: string }[];
   /** Blocking problems ("UPI and card are more than the bill"). */
   errors: string[];
 }
@@ -71,16 +76,21 @@ export function tenderSummary(total: number, tenders: readonly Tender[]): Tender
   const t = round2(Math.max(num(total), 0));
   const by = (m: TenderMethod) => round2(tenders.filter((x) => x.method === m).reduce((s, x) => s + Math.max(num(x.amount), 0), 0));
   const cash = by('Cash');
-  const nonCash = round2(by('UPI') + by('Card') + by('Cheque') + by('Wallet'));
+  const nonCash = round2(by('UPI') + by('Card') + by('Cheque') + by('Wallet') + by('Gift voucher'));
   const tendered = round2(cash + nonCash);
   const errors: string[] = [];
-  if (nonCash > t + 0.004) errors.push('UPI, card, cheque and wallet together are more than the bill — only cash can be given back as change.');
+  if (nonCash > t + 0.004) errors.push('UPI, card, cheque, wallet and gift vouchers together are more than the bill — only cash can be given back as change.');
   const change = nonCash > t ? 0 : round2(Math.max(tendered - t, 0));
   const due = round2(Math.max(t - tendered, 0));
   const payments: TenderSummary['payments'] = [];
   for (const m of TENDER_METHODS) {
     const rows = tenders.filter((x) => x.method === m && num(x.amount) > 0);
     if (!rows.length) continue;
+    if (m === 'Gift voucher') {
+      // R4-B1: one receipt per voucher (each carries its gift_voucher_id); never change from a voucher.
+      for (const r of rows) payments.push({ method: m, amount: round2(num(r.amount)), ...(r.reference ? { reference: r.reference } : {}), ...(r.gift_voucher_id ? { gift_voucher_id: r.gift_voucher_id } : {}) });
+      continue;
+    }
     let amount = by(m);
     if (m === 'Cash') amount = round2(amount - change);
     if (amount <= 0) continue;
@@ -230,6 +240,8 @@ export interface PosSaveInput {
   allowCredit?: boolean;
   /** Exchange (WP-9): an open `pos_returns` exchange whose credit pays part of this bill. */
   exchangeReturnId?: string;
+  /** R4-B1: a promotional gift voucher already applied to `record` as an amount discount (noted on the voucher on save). */
+  promoVoucher?: { id: string; amount: number };
 }
 
 export interface PosSaveResult {
@@ -263,6 +275,11 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
   const credit = exchange ? Math.min(exchange.amount, rec.total) : 0;
   const summary = tenderSummary(round2(rec.total - credit), input.tenders);
   const errors = posIssues(rec, summary, !!input.allowCredit);
+  // R4-B1: every gift-voucher tender is checked (balance, expiry, cancelled) before anything is written.
+  for (const p of summary.payments) if (p.method === 'Gift voucher') {
+    const issue = p.gift_voucher_id ? liveRedeemIssue(p.gift_voucher_id, p.amount, rec.issue_date) : 'Scan or type the gift voucher code.';
+    if (issue) errors.push(issue);
+  }
   if (errors.length) return { ok: false, errors, summary };
 
   if (ctx) {
@@ -305,18 +322,20 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
       if (x.payment) payments.push(x.payment);
     }
     for (const p of summary.payments) {
-      payments.push(
-        localDb.payments.record({
-          invoiceId: saved.id,
-          amount: p.amount,
-          method: p.method,
-          reference: p.reference,
-          date: saved.issue_date,
-          note: 'POS',
-          bankAccountId: p.bank_account_id,
-        }),
-      );
+      const row = localDb.payments.record({
+        invoiceId: saved.id,
+        amount: p.amount,
+        method: p.method,
+        reference: p.reference,
+        date: saved.issue_date,
+        note: 'POS',
+        bankAccountId: p.bank_account_id,
+      });
+      // R4-B1: the receipt paid with a gift voucher carries its id (ledger: Dr Gift vouchers outstanding).
+      if (p.gift_voucher_id) stampVoucherPayment(row.id, p.gift_voucher_id);
+      payments.push(p.gift_voucher_id ? { ...row, gift_voucher_id: p.gift_voucher_id } : row);
     }
+    if (input.promoVoucher) recordPromoUse(input.promoVoucher.id, { invoice_id: saved.id, number: saved.invoice_number, date: saved.issue_date, amount: round2(input.promoVoucher.amount) });
   } catch (err) {
     return {
       ok: false,
@@ -356,6 +375,8 @@ export interface ZReport {
   returns: ZReturns;
   /** Exchange credit used to pay the day's bills (not new money: left out of the tenders). */
   exchangeIn: number;
+  /** R4-B1: gift vouchers redeemed on the day's bills (not new money: left out of the tenders and the drawer). */
+  giftVouchers: number;
   /** Net sales less the day's returns. */
   netAfterReturns: number;
 }
@@ -386,6 +407,7 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
     credit: 0,
     returns: zReturns(day, returns, invoices),
     exchangeIn: 0,
+    giftVouchers: 0,
     netAfterReturns: 0,
   };
   const lines: CalcLine[] = [];
@@ -408,12 +430,17 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
       r.exchangeIn += num(p.amount);
       continue;
     }
+    if (p.gift_voucher_id) {
+      r.giftVouchers += num(p.amount);
+      continue;
+    }
     r.tenders[methodKey(p.method)] += num(p.amount);
   }
   for (const k of Object.keys(r.tenders) as (keyof ZReport['tenders'])[]) r.tenders[k] = round2(r.tenders[k]);
   for (const k of ['gross', 'discounts', 'taxable', 'tax', 'cess', 'roundOff', 'net'] as const) r[k] = round2(r[k]);
   r.received = round2(r.tenders.cash + r.tenders.upi + r.tenders.card + r.tenders.other);
   r.exchangeIn = round2(r.exchangeIn);
+  r.giftVouchers = round2(r.giftVouchers);
   r.netAfterReturns = round2(r.net - r.returns.value);
   r.credit = round2(live.reduce((s, i) => s + Math.max(num(i.balance_due), 0), 0));
   return r;
@@ -532,6 +559,7 @@ export function zReportCsv(z: ZReport, close?: PosDayClose): string {
     ['Other', z.tenders.other],
     ['Received', z.received],
     ['On account', z.credit],
+    ...(z.giftVouchers ? [['Gift vouchers redeemed', z.giftVouchers]] : []),
   ];
   if (z.returns?.count) {
     rows.push(
@@ -606,6 +634,7 @@ ${z.tenders.other ? row('Other', m(z.tenders.other)) : ''}
 ${row('Received', m(z.received), true)}
 ${z.credit ? row('On account', m(z.credit)) : ''}
 ${z.exchangeIn ? row('Exchange credit used', m(z.exchangeIn)) : ''}
+${z.giftVouchers ? row('Gift vouchers redeemed', m(z.giftVouchers)) : ''}
 </table>
 ${z.returns?.count ? `<h2>Returns</h2>
 <table>

@@ -80,10 +80,26 @@ export interface BillSlab {
 
 export interface PriceQuote {
   rate: number;
-  /** What set the rate, printed as a hint ("Wholesale", "Qty ≥ 10"); undefined = base rate. */
+  /** What set the rate, printed as a hint ("Wholesale", "Qty ≥ 10", "Store price (Mall)"); undefined = base rate. */
   basis?: string;
-  source: 'base' | 'level' | 'slab';
+  source: 'base' | 'level' | 'slab' | 'branch';
 }
+
+/**
+ * R4-B3: the store (branch) a line is priced for — its dated override for the item and its price list. Built by
+ * `retail/store-prices.ts` (`branchContext`).
+ */
+export interface BranchPriceContext {
+  /** Store name, for the line note "Store price (Mall)". */
+  name: string;
+  /** The store's own rate for the item on the date. */
+  override?: number;
+  /** The store's price list (rate or % off). */
+  level?: PriceLevel | null;
+}
+
+/** "Store price (Mall)" — the line note of a rate set by a store's price list or override. */
+export const storeBasis = (name: string): string => `Store price (${name})`;
 
 const norm = (s: string | undefined) => (s ?? '').trim().toLowerCase();
 
@@ -131,15 +147,24 @@ export function levelRate(level: PriceLevel | null | undefined, item: Pick<Invoi
   return undefined;
 }
 
-/** Price of `qty` units of a catalogue item for a party at `level` (see the module comment for the order). */
+/**
+ * Price of `qty` units of a catalogue item for a party at `level` (see the module comment for the order).
+ * R4-B3 precedence with a store (`branch`): typed rate (caller) → customer's level → store's dated override → store's
+ * price list → `item.rate` (the caller passes the selling price-list rate there when one is in force) → catalogue
+ * rate. A lower quantity slab still applies to the result.
+ */
 export function resolvePrice(
   item: Pick<InvoiceItem, 'id' | 'rate' | 'qty_slabs'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent'>>,
   qty: number,
   level?: PriceLevel | null,
+  branch?: BranchPriceContext | null,
 ): PriceQuote {
   const base = mrpLessRate(item);
   const lvl = levelRate(level, item);
-  let quote: PriceQuote = lvl !== undefined ? { rate: lvl, basis: level!.name, source: 'level' } : { rate: base, source: 'base' };
+  const store = lvl === undefined && branch ? (branch.override !== undefined ? round2(branch.override) : levelRate(branch.level, item)) : undefined;
+  let quote: PriceQuote = lvl !== undefined
+    ? { rate: lvl, basis: level!.name, source: 'level' }
+    : store !== undefined ? { rate: store, basis: storeBasis(branch!.name), source: 'branch' } : { rate: base, source: 'base' };
   const slab = slabFor(item.qty_slabs, num(qty));
   if (slab && slab.rate < quote.rate) {
     quote = { rate: slab.rate, basis: `Qty ≥ ${slab.min_qty}`, source: 'slab' };

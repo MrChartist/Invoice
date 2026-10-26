@@ -42,6 +42,7 @@ import { useVirtualRows } from '../hooks/useVirtualRows';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
+import { defineArea } from '../i18n/area';
 
 // The TDS register, its 26AS parser and Form 16A tracking load only when opened.
 // Bulk statements / confirmation letters (WP-4): loaded with the PDF stack only when opened.
@@ -61,7 +62,11 @@ const WriteOffRegister = lazy(() => import('../components/collections/WriteOffRe
 const WriteOffDialog = lazy(() => import('../components/collections/WriteOffDialog'));
 const PartyTimeline = lazy(() => import('../components/collections/PartyTimeline'));
 
-type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds';
+// R4-B1: gift vouchers (a customer liability, like advances) — sell, register, breakage; loaded when opened.
+const GiftVouchersPanel = lazy(() => import('../components/retail/GiftVouchersPanel'));
+const gvTabT = defineArea({ tab: 'Gift vouchers' } as const, { tab: 'गिफ़्ट वाउचर' });
+
+type Tab = 'aging' | 'statements' | 'followups' | 'collections' | 'advances' | 'tds' | 'giftvouchers';
 const TABS: { id: Tab; label: () => string }[] = [
   { id: 'aging', label: () => rcvT('tabAging') },
   { id: 'statements', label: () => rcvT('tabStatements') },
@@ -69,6 +74,7 @@ const TABS: { id: Tab; label: () => string }[] = [
   { id: 'collections', label: () => rcvT('tabCollections') },
   { id: 'advances', label: () => rcvT('tabAdvances') },
   { id: 'tds', label: () => rcvT('tabTds') },
+  { id: 'giftvouchers', label: () => gvTabT('tab') }, // R4-B1
 ];
 
 /** 1 April of the Indian financial year containing `d`. */
@@ -174,7 +180,7 @@ export function Receivables() {
     }
   };
 
-  if (report.parties.length === 0 && tab !== 'advances') {
+  if (report.parties.length === 0 && tab !== 'advances' && tab !== 'giftvouchers') {
     return (
       <div className={surface.page}>
         <Header />
@@ -339,6 +345,7 @@ export function Receivables() {
             <TdsTab data={data} notify={notify} />
           </Suspense>
         )}
+        {tab === 'giftvouchers' && <Suspense fallback={null}><GiftVouchersPanel /></Suspense>}
       </div>
       {toastNode}
     </div>

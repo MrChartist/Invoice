@@ -1,5 +1,10 @@
-import { useMemo, useState } from 'react';
-import { Gift, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { Gift, Pencil, Plus, Store, Tags, Trash2 } from 'lucide-react';
+import { defineArea } from '../../i18n/area';
+
+// R4-B3: store price grid (own chunk).
+const StorePricesGrid = lazy(() => import('../retail/StorePricesGrid'));
+const storeBtnT = defineArea({ open: 'Store prices' } as const, { open: 'स्टोर मूल्य' });
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -39,6 +44,8 @@ export function PricingPanel({ notify }: { notify: Notify }) {
   }, [version]);
   const catalog = useMemo(() => listCatalog().sort((a, b) => a.name.localeCompare(b.name)), []);
 
+  const hasBranches = useMemo(() => getTable('branches').length > 0, []);
+  const [gridOpen, setGridOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('storeprices') === '1');
   const [level, setLevel] = useState<PriceLevel | null>(null);
   const [scheme, setScheme] = useState<Scheme | null>(null);
   const [error, setError] = useState('');
@@ -76,6 +83,12 @@ export function PricingPanel({ notify }: { notify: Notify }) {
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => { setError(''); setScheme(blankScheme()); }} disabled={catalog.length === 0}>
             <Gift size={14} /> {setT('addScheme')}
           </button>
+          {/* R4-B3: item × store price grid (lazy), when the business has branches. */}
+          {hasBranches && (
+            <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setGridOpen(true)} data-store-prices>
+              <Store size={14} /> {storeBtnT('open')}
+            </button>
+          )}
         </div>
       </div>
       <p className={cn(surface.sectionNote, styles.note)}>
@@ -277,6 +290,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
         }}
         onClose={() => setRemoving(null)}
       />
+      {gridOpen && <Suspense fallback={null}><StorePricesGrid onClose={() => setGridOpen(false)} notify={notify} /></Suspense>}
     </section>
   );
 }
