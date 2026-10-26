@@ -498,6 +498,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     const clientName = inv.client?.name ? ` · ${inv.client.name}` : '';
     for (const line of inv.items ?? []) {
       if (isExcludedLine(line)) continue; // QA5-2 F10: an unselected optional / alternative line is not supplied
+      if ((line as { arrival_id?: string }).arrival_id) continue; // R8-C (TR-C1): agency line — the principal's goods, never our stock
       const it = index.find(line.name, line.hsn);
       const factor = lineFactor(line); // WP-8: a line typed in an alternate unit (2 BOX = 24 NOS)
       const q = num(line.quantity) * factor;

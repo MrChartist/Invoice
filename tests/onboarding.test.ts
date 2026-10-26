@@ -58,7 +58,8 @@ test('checklist v3: each business type gets its documented steps', () => {
   assert.deepEqual(kinds(none, ctxOf('full')), ['profile', 'opening', 'import', 'client', 'item', 'invoice', 'payment', 'gstPeriod', 'backup']);
   assert.deepEqual(kinds(none, ctxOf(undefined)), kinds(none, ctxOf('full')), 'an existing company without a type is "full"');
   assert.deepEqual(kinds(none, ctxOf('services')), ['profile', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup']);
-  assert.deepEqual(kinds(none, ctxOf('wholesale')), ['profile', 'opening', 'import', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup']);
+  assert.deepEqual(kinds(none, ctxOf('wholesale')), ['profile', 'tradeProfile', 'opening', 'import', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup'], 'R8-C: "Pick your trade" until a trade profile is chosen');
+  assert.deepEqual(kinds(none, ctxOf('wholesale', { tradeKind: 'wholesaler' })), ['profile', 'opening', 'import', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup']);
   assert.deepEqual(kinds(none, ctxOf('restaurant')), ['profile', 'client', 'item', 'posbill', 'invoice', 'payment', 'gstPeriod', 'backup']);
   assert.deepEqual(kinds(none, ctxOf('manufacturer', { gstRegistered: false })), ['profile', 'opening', 'client', 'item', 'invoice', 'payment', 'backup'], 'no GSTIN: no GST step');
   const item = allSteps(none, ctxOf('services', { modules: new Set(['recurring']) })).find((s) => s.kind === 'item')!;

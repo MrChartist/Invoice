@@ -62,14 +62,29 @@ export const REPORTS_TABS = [
   { id: 'expenses', label: 'tabExpenses' },
   { id: 'profit', label: 'tabProfit' },
   { id: 'party', label: 'tabParty' },
+  { id: 'stockstatement', label: 'tabStockStatement' }, // R8-C (TR-C4, lazy tab)
 ] as const;
 export type ReportsTab = (typeof REPORTS_TABS)[number]['id'];
 /* ── Inventory ── */
-export type InventoryTab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders' | 'analysis' | 'depth' | 'expiry';
-export const INVENTORY_TABS: readonly InventoryTab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders', 'analysis', 'depth', 'expiry'];
+export type InventoryTab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders' | 'analysis' | 'depth' | 'expiry' | 'hsn';
+export const INVENTORY_TABS: readonly InventoryTab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders', 'analysis', 'depth', 'expiry', 'hsn']; // 'hsn': R8-C (TR-C4)
 /* ── Distribution ── */
-export type DistributionTab = 'masters' | 'reports' | 'plan' | 'van' | 'orders' | 'credit' | 'transport';
-export const DISTRIBUTION_TABS: readonly DistributionTab[] = ['masters', 'reports', 'plan', 'van', 'orders', 'credit', 'transport'];
+export const DISTRIBUTION_TABS = [
+  { id: 'masters' },
+  { id: 'reports' },
+  { id: 'plan' },
+  { id: 'van' },
+  { id: 'orders' },
+  { id: 'credit' },
+  { id: 'transport', pack: 'transport' }, // R5-B
+  // R8: trading packs (`visiblePackTabs` in industry-packs.ts reads `alsoPacks`)
+  { id: 'claims', pack: 'distributor' }, // R8-A (views schemes / pricedrop / claims)
+  { id: 'packaging', pack: 'distributor', alsoPacks: ['commodity', 'agency'] }, // R8-A
+  { id: 'mandi', pack: 'commodity', alsoPacks: ['agency'] }, // R8-B
+  { id: 'brokers', pack: 'commodity', alsoPacks: ['agency'] }, // R8-B
+  { id: 'agency', pack: 'agency' }, // R8-C (views arrivals / pattis / indents)
+] as const;
+export type DistributionTab = (typeof DISTRIBUTION_TABS)[number]['id'];
 /* ── Time ── */
 export const TIME_TABS = [
   { id: 'timesheet' },

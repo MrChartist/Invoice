@@ -27,7 +27,7 @@ import { getTable } from './storage';
 import { memoOnReads } from './table-memo';
 import { lineFactor } from './units';
 import { creditNoteReturnsGoods } from './credit-restock';
-import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList, godownName, nonSaleableGodowns } from './godowns';
+import { GODOWNS_TABLE, TRANSFERS_TABLE, consignmentGodowns, godownList, godownName, nonSaleableGodowns } from './godowns';
 import { batchDelta, dayWindow, eventLabel, firstShortAfter, godownDelta, serialDelta } from './stock-timeline';
 
 const EPS = 1e-9;
@@ -374,6 +374,7 @@ export function docTrackingIssues(
   const batchUse = new Map<string, number>();
 
   for (const line of doc.items ?? []) {
+    if (line.arrival_id) continue; // R8-C (TR-C1): an agency line sells a principal's lot, not our stock
     const item = index.find(line.name, line.hsn);
     const q = num(line.quantity) * lineFactor(line); // base units (WP-8 alternate units)
     if (!item || q <= 0) continue;
@@ -804,7 +805,7 @@ export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
           byGodown: (id) => pre().tracking.get(id)?.byGodown,
         })
       : issues;
-    return saleLimitGate(held, doc, { nonSaleable, godownName: named, mrpOf, settings: pharma });
+    return saleLimitGate(held, doc, { nonSaleable, godownName: named, mrpOf, settings: pharma, agencyOk: consignmentGodowns(godowns) }); // R8-C
   } catch {
     return { errors: [], expired: [], warnings: [] };
   }
