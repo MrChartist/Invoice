@@ -13,6 +13,7 @@ import {
 } from '../lib/inventory';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmptyState } from '../components/ui/EmptyState';
+import { LearnMore } from '../components/discover';
 import { useToast } from '../components/ui/useToast';
 import { can } from '../lib/access';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -48,11 +49,13 @@ const OrdersOutstandingTab = lazy(() => import('../components/inventory/OrdersOu
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
+import { INVENTORY_TABS, type InventoryTab } from './page-tabs'; // R6-B1
+import { discoverT } from '../i18n/areas/discover-r6';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
-type Tab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders' | 'analysis' | 'depth' | 'expiry';
-const TABS: Tab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders', 'analysis', 'depth', 'expiry'];
+type Tab = InventoryTab;
+const TABS = INVENTORY_TABS; // R6-B1: list in inventory-tabs.ts
 type Filter = 'all' | 'low' | 'out' | 'negative' | 'untracked';
 
 function download(filename: string, csv: string) {
@@ -223,6 +226,8 @@ export function Inventory() {
           <>
             {/* Phase 7: BOM, Manufacturing / Stock Journal, Physical Stock, Reorder Status, stock reports */}
             <Link to="/manufacturing" className={controls.btnOutline}>{invT('manufacturing')}</Link>
+            {/* R6-C1 (line added by R6-B): landed cost vouchers live under Manufacturing. */}
+            <Link to="/manufacturing?tab=landed" className={controls.btnOutline} data-landed-link>{discoverT('invLanded')}</Link>
             <button type="button" className={controls.btnOutline} onClick={() => download(`stock-summary-${todayInput()}.csv`, stockSummaryCsv(positions))} disabled={!hasItems}>
               <Download size={16} aria-hidden="true" /> {invT('exportCsv')}
             </button>
@@ -380,6 +385,9 @@ export function Inventory() {
                 {catalogueMissing.length > 0 && (
                   <button type="button" className={controls.btnOutline} onClick={importCatalogue}><ArrowDownToLine size={16} /> {invT('importFromCatalogue')}</button>
                 )}
+                {/* R6-B3: items can also come from a CSV / XLSX file (Settings → Data → Import). */}
+                <Link to="/settings?tab=data" className={controls.btnOutline} data-inv-import>{discoverT('invImport')}</Link>
+                <LearnMore topic="inventory" />
               </div>
             }
           />

@@ -778,6 +778,20 @@ Spec: `docs/prd/round-5.md` (18 items in three packages). Every vertical sits be
 
 Hands-on audit of Round 4 (R4-B / R4-C), QA round 5 fixes, the Income-tax Act 2025 labels and Round 5.
 
+## Round 6: consolidation and beta-tester productivity (v6.x) · 🟡 in progress
+
+Spec: `docs/prd/round-6.md` (17 items in three packages: R6-A help, R6-B discoverability, R6-C closures).
+
+### R6-B · Discoverability, empty states and sample data (`docs/features/discoverability-r6.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R6-B1 | ✅ **Ctrl+K finds every tab**: a "Tabs" group over every page's tab list with portal terms and short words ("3b", "tb", "lr", "80g"), "(hidden)" for screens shop mode hides, a "Features" group, "help …" searches help topics (once R6-A's registry exists), a "Try:" line on the empty palette | `palette/{tab-index,synonyms}.ts`, `pages/page-tabs.ts`, `command/tab-destinations.ts` | done |
+| R6-B2 | ✅ **Sidebar reach**: Distribution and Manufacturing entries; a screen hosting an active pack's tab stays in shop mode (`PACK_ROUTES`); "N more features — Show"; Practice desk only for CA / several companies; F1 Help, route trail, open-help event | `DashboardLayout.tsx`, `shop-mode.ts`, `help-event.ts` | done |
+| R6-B3 | ✅ **Empty states** with the first step on Books, Inventory, Reports, Exports, Distribution, Practice, Reconcile, Gateway; Inventory → Landed cost link | `empty-states.ts`, `components/discover/*` | done (A6 tip mounts: R6-A) |
+| R6-B4 | ✅ **Sample data v2**: one path to a separate, resettable Demo company (never into a real company), dataset by business (counter, services, trading, transport, works), "Reset samples" | `demo-data.ts`, `lib/demo/*`, `demo-company.ts`, `SampleDataChooser.tsx` | done (Dashboard mount: R6-A) |
+| R6-B5 | ✅ **Settings → Features**: every module, pack and 21 advanced options with who needs it, on / off and a switch or a link | `features-catalog.ts`, `FeaturesPanel.tsx` | done |
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |

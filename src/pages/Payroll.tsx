@@ -24,9 +24,10 @@ import { payrollT as pT } from '../i18n/areas/payroll';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/payroll/Payroll.module.css';
+import { PAYROLL_TABS, type PayrollTab } from './page-tabs'; // R6-B1
 
-const TABS = ['employees', 'heads', 'structures', 'attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports', 'more'] as const;
-type Tab = (typeof TABS)[number];
+const TABS = PAYROLL_TABS; // R6-B1: list in payroll-tabs.ts
+type Tab = PayrollTab;
 const TAB_KEY = {
   employees: 'tabs.employees',
   heads: 'tabs.heads',
