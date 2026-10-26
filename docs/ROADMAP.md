@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: Hindi / Marathi core screens, other languages partial) · Phase 6 ✅ · Phase 7 / 8 ✅ (open follow-ups listed) · Round 2 ✅ · Round 3 ✅ + QA round 3 ✅ · Round 4: R4-A ✅, R4-B / R4-C planned, PERF-1 / PERF-2 in progress · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: Hindi / Marathi core screens, other languages partial) · Phase 6 ✅ · Phase 7 / 8 ✅ (open follow-ups listed) · Round 2 ✅ · Round 3 ✅ + QA round 3 ✅ · Round 4 ✅ (R4-A / R4-B / R4-C, PERF-1 / PERF-2) + QA round 5 ✅ · Income-tax Act 2025 labels ✅ (23a–23d open) · Round 5 ✅ (R5-A / R5-B / R5-C industry packs) · QA round 6 in progress · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24, updated 2026-10-26
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -296,7 +296,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.46 | ✅ **Tally export of every voucher** (WP-7, P0-12 / P1-22): supplier payments (TDS on payment) and advances, manual Journal / Contra / Payment / Receipt with cost-centre allocations and reversals, fixed-asset + depreciation journals, stock transfers as Stock Journal; group / cost-centre / godown masters, ledger openings with bill-wise opening bills (`src/lib/tally-books.ts`) | Tally import of our XML | done |
 | 7.47 | ✅ **Year-end wizard** (WP-7, P1-20): integrity, closing stock (shows the report-time valuation when it is on; a journal reversed on 1 April only when it is off — never both, 7.60), depreciation check, provisions journal, opening bills review, lock the year, carry-forward report / CSV (`src/lib/year-end.ts`, `year-end-store.ts`, `components/year-end/YearEndWizard.tsx`) | "Start new year" / Split Company Data | done |
 | 7.48 | ✅ **Books integrity check** (WP-7, P2): TB and voucher balance, opening difference, orphaned receipts / supplier payments / allocations / document links / opening bills, negative cash days (`src/lib/books-integrity.ts`) | — | done |
-| 7.49 | ⏳ WP-7 follow-ups: Tally import of inventory vouchers (quantities), Excel TB template path, audit segment compression, per-FY auditor export with chain head, archive of old FYs to a "history" company, TDS challans in the Tally export | — | open |
+| 7.49 | ⏳ WP-7 follow-ups: Tally import of inventory vouchers (quantities), Excel TB template path, audit segment compression, ~~per-FY auditor export with chain head~~ (✅ R4-C5 auditor pack), archive of old FYs to a "history" company, TDS challans in the Tally export | — | open |
 
 ### 7I · Reports engine & Tally report grammar (WP-2)
 
@@ -415,7 +415,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.128 | ✅ **GSTR-9 Part V** (Tables 10–12, 14 from next-FY notes / amendments / supplier notes up to the date-keyed cut-off; 13 noted) | `gstr9-partv.ts`, `gstr9.ts` | done |
 | 7.129 | ✅ **GSTR-1 Table 14A(a)** from amendment rows with the operator GSTIN; Table 14A(b) / Table 15 / 3B 3.1.1(i) documented as operator rows (nil in a supplier's return) | `eco-amend.ts`, `EcoView.tsx` | done |
 | 7.130 | ✅ **GSTR-1 / 3B by GSTIN** — one column per registration (branches / profiles), bills by branch GSTIN or place-of-supply State, unassigned listed, CSV | `gst-by-gstin.ts`, tab "By GSTIN" | done |
-| 7.131 | ⏳ 7R follow-ups: Form 15CA / 15CB, surcharge and Sec 195A grossing-up on 27Q; 27Q FVU text; TRACES flags in the Deductions tab; refund of IGST on goods exports (shipping-bill route); filed ITC refunds netted in the carried credit; ISD ledger postings and GSTR-6 amendments; books column on 9C rate-wise Table 9; Table 13 of GSTR-9 Part V; operator-side Table 15 / 3.1.1(i) | — | open |
+| 7.131 | ⏳ 7R follow-ups: Form 15CA / 15CB, surcharge and Sec 195A grossing-up on 27Q; 27Q FVU text; TRACES flags in the Deductions tab; ~~refund of IGST on goods exports (shipping-bill route)~~ (✅ R4-C2, tracked as an export-incentive row); filed ITC refunds netted in the carried credit; ISD ledger postings and GSTR-6 amendments; books column on 9C rate-wise Table 9; Table 13 of GSTR-9 Part V; operator-side Table 15 / 3.1.1(i) | — | open |
 
 ### 7U · Banking & business-extras follow-ups (`docs/features/banking.md`, `docs/features/business-extras.md`)
 
@@ -662,7 +662,7 @@ Hands-on audit of the built app after Round 2 (27 findings: 3 P0, 4 P1, 20 P2), 
 | QA-1 | ✅ **Money and data paths** (F1–F7, F15, F16, F26, F27): shift X/Z counts returns; POS refunds reach the khata and receivables (`posRefunds`, `receivables.md`); no payment against a quotation; Demo company / sample data filled after the flush; recurring drafts unnumbered until issued, "Run now" asks before a future period (`recurring.md`); POS dialogs at 390 px; Dashboard and Receivables agree on outstanding; company switcher name | `pos-shifts.ts`, `receivables.ts`, `localDb.ts`, `recurring.ts`, `stats.ts`, `company-registry.ts` | done |
 | QA-2 | ✅ **Documents, GST, settings, i18n** (F3 UI, F8–F14, F17–F25): HSN rows without HSN, date-keyed slab pickers (`GST_SLAB_RULES` in `tax-rules.ts`), own-GSTIN warning, expense amount label, bill dirty guard, backup / restore copy, Compact preset, interim annual pack, Marathi / Hindi strings (`i18n.md`), editor and document labels, 130% overflow | `gst-reports.ts`, `tax-rules.ts`, `gst-guards.ts`, `design-prefs.ts`, `ledger/annual-pack.ts`, `src/i18n/` | done |
 
-## Round 4: makers, store chains, exporters, trust leaders (v6.x) · in progress
+## Round 4: makers, store chains, exporters, trust leaders (v6.x) · ✅ done
 
 Spec: `docs/prd/round-4.md` (17 items in three packages; combined budget ≤ +0.9 kB gz first paint).
 
@@ -677,26 +677,106 @@ Spec: `docs/prd/round-4.md` (17 items in three packages; combined budget ≤ +0.
 | R4-A5 | ✅ **Landed-cost voucher** `LCV/FY…` across bills / GRNs (value, quantity, weight, equal), restating stock from the receipt date; table `landed_cost_vouchers` | `landed-voucher.ts`, `landed-cost.ts`, `inventory.ts` `liveInputs` | done |
 | R4-A6 | ⏳ R4-A follow-ups: call `applyQcHold` in the purchase-bill save path; feed the margin chip / insights `liveInputs().purchases`; Inventory → "Landed cost" link; pre-filled debit note from a QC reject | — | open |
 
-### R4-B · Stores & chains (`docs/prd/round-4.md` § R4-B) · planned
+### R4-B · Stores & chains (`docs/features/retail-chains-r4.md`)
 
 | # | Item | Where | Status |
 |---|---|---|---|
-| R4-B | ⏳ **B1** gift vouchers, **B2** loyalty tiers & points expiry, **B3** store price lists, **B4** transfer requests / in transit / receive with shortage, **B5** store replenishment from the warehouse | `src/lib/retail/*`, `docs/features/stores-r4.md` (planned) | planned |
+| R4-B1 | ✅ **Gift vouchers** `GV/FY…`: Luhn-checked code + random suffix, bulk issue, sale as a receipt voucher to "Gift vouchers outstanding" (no invoice, no GST), redemption as a POS tender or payment method (`Payment.gift_voucher_id`, no money moved), promotional vouchers as a discount, breakage to Other income; tables `gift_vouchers`, key `gift_voucher_settings` | `retail/gift-vouchers.ts`, `gift-voucher-core.ts`, `/receivables?tab=giftvouchers` | done (verify with your CA) |
+| R4-B2 | ✅ **Loyalty tiers & points expiry** (FIFO expiry, tier multipliers, liability report); key `loyalty_program` gains `tiers` / `expiry_months` | `retail/loyalty-tiers.ts`, `LoyaltyTiers`, `LoyaltyLiability` | done |
+| R4-B3 | ✅ **Store price lists**: branch precedence in `resolvePrice`, dated store overrides, item × store grid with CSV, POS counter branch (device-local `mrchartist_pos_branch`); table `branch_prices`, `Branch.price_level_id` | `retail/store-prices.ts`, `StorePricesGrid`, `BranchesPanel` | done |
+| R4-B4 | ✅ **Transfer requests** `TRQ/FY…`: approve, dispatch to an in-transit godown, receive with shortage (write-off journal), Rule 55 challan, own-use e-Way JSON; table `transfer_requests`, `StockTransfer.request_id` / `leg` | `retail/transfer-requests.ts`, `transfer-challan.ts`, `/inventory?tab=transfers&view=requests` | done (verify with your CA) |
+| R4-B5 | ✅ **Store replenishment** from the warehouse (`Godown.replenish_from`, netting pending and in-transit, remainder to a PO with MOQ) | `reorder.ts`, `ReplenishTab` | done |
 
-### R4-C · Trade desk & trust (`docs/prd/round-4.md` § R4-C) · planned
+### R4-C · Trade desk & trust (`docs/features/trade-trust-r4.md`)
 
 | # | Item | Where | Status |
 |---|---|---|---|
-| R4-C | ⏳ **C1** exporter profile, LUT register & export fields, **C2** realisation / e-BRC / incentives register, **C3** Bill of Entry duty, **C4** recycle bin & accessible Undo, **C5** auditor trail pack per FY (Rule 11(g)), **C6** open-format data export, **C7** field-level sync conflicts | `src/lib/trade/*`, `src/lib/trust/*`, `docs/features/trade-trust-r4.md` (planned) | planned |
+| R4-C1 | ✅ **Exporter profile, LUT register & export fields** (IEC / AD code, Incoterm, ports, countries …; `LUT_MISSING` / `LUT_OUTSIDE_FY` preflight, LUT bell); table `lut_register` | `trade/{exporter,lut-register,lut-alerts}.ts` | done |
+| R4-C2 | ✅ **Export desk**: realisation register, IRMs / e-BRC, write-offs, RoDTEP / drawback / IGST-refund claims and scrips (realisation months in date-keyed `trade/trade-rules.ts`); tables `export_irms`, `export_incentives`, `export_writeoffs` | `trade/{export-register,export-incentives,export-alerts}.ts`, `/gst-reports?tab=export-desk` | done (verify with your CA) |
+| R4-C3 | ✅ **Bill of Entry duty** (BCD / SWS / other duties into stock cost, IGST / cess into ITC, `PurchaseRecord.boe_duty`, duty journal, pay with a RoDTEP scrip) | `trade/{boe-duty,boe-post}.ts`, `BoeDutySheet` | done (verify with your CA) |
+| R4-C4 | ✅ **Recycle bin & accessible Undo**: every watched delete captured (`binRows`), restore through the table's own guarded path, retention 7–90 days (`bin_settings`); deleted invoice / voucher numbers stay reserved in `series_counters`; table `recycle_bin` (backed up, not synced) | `audit-edits.ts`, `trust/recycle-bin.ts`, `UndoDeleted`, Settings → Data → Recently deleted | done |
+| R4-C5 | ✅ **Auditor pack** per FY (audit log, deletions, back-dated, overrides, integrity hash, users; year-end mark `auditor_pack`) — closes the 7.49 "per-FY auditor export with chain head" part | `trust/auditor-pack.ts` | done |
+| R4-C6 | ✅ **Export everything** (one CSV per table / object, child line CSVs, optional workbook, `schema.json`) | `trust/{open-export,open-export-schema}.ts` | done |
+| R4-C7 | ✅ **Field-level sync conflicts** (`Resolution` `{ merge: picks }`, bulk actions) | `trust/field-merge.ts`, `ConflictMerge` | done |
+| R4-C8 | ⏳ R4-C follow-ups: bin capture of rows replaced by a restore or a sync "Use theirs"; 3-way field merge with base rows in `sync_state` (non-overlapping masters are approximated today); signed PDF summary in the auditor pack if Rule 11(g) needs it; second dated realisation rule for INR-settled exports | — | open (verify with your CA) |
 
-### Performance round 4 (`docs/prd/perf-round-4.md`) · in progress
+### Performance round 4 (`docs/prd/perf-round-4.md`) · ✅ done
 
 Scale audit on a 15k-invoice company; two fix packages with mostly disjoint files.
 
 | # | Item | Where | Status |
 |---|---|---|---|
-| PERF-1 | 🟡 **Data layer, background work, save path** (H1, H2, H3, H6, H10, H11): no re-parse of the big tables per call (stamp-gated memoised reads), coalesced bell refresh, memoised stock engine, copy-on-write save, ledger running-balance index, single-parse backup | `storage.ts`, `localDb.ts`, `notifications.ts`, `inventory.ts`, `books.ts`, `backup.ts` | in progress |
-| PERF-2 | 🟡 **UI layer** (H4, H5, H7, H8, H9, H12): pre-folded SmartFind index, cheap editor typeahead, one peek per Dashboard, grouped receivables scores, collator-based invoice list, peeked reads in POS / GST | `search.ts`, `smart-find.ts`, `suggest.ts`, `Dashboard.tsx`, `Receivables.tsx`, `Transactions.tsx` | in progress |
+| PERF-1 | ✅ **Data layer, background work, save path** (H1, H2, H3, H6, H10, H11): parsed-rows cache (one parse per stored version, `peekTable`, copy-on-write `getTable`), `table-memo.ts` memoised derived results, quiet stamp-gated bell, memoised stock engine, save without re-parse, ledger running-balance index, single-parse backup. Cold start 14.6 s → 6.6 s, bell 5 s → 57 ms, parses of `invoices` per save 24 → 0 | `storage.ts`, `table-memo.ts`, `localDb.ts`, `notifications.ts`, `inventory.ts`, `books.ts`, `backup.ts` | done |
+| PERF-2 | ✅ **UI layer** (H4, H5, H7, H8, H9, H12): pre-folded SmartFind index, cheap editor typeahead, one peek per Dashboard, grouped receivables scores, collator-based invoice list, peeked reads in POS / GST | `search.ts`, `smart-find.ts`, `suggest.ts`, `Dashboard.tsx`, `Receivables.tsx`, `Transactions.tsx` | done |
+| PERF-3 | ⏳ Still open after PERF-1: the one full stringify of the `invoices` table per save (~0.5 s on 36 MB) and ~13 audit-log rewrites per save; the rest of save time is the editor's own re-render | `storage.ts`, `audit.ts` | open |
+
+### QA round 5 fixes (`docs/prd/qa-round-5.md`) · ✅ done
+
+Hands-on audit of Rounds 2–4 and the perf work (22 findings: 8 P0, 3 P1, 11 P2), fixed in two packages.
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| QA5-1 | ✅ **Collections, write-off and composition money paths** (F1, F2, F3, F11, F12, F13, F18, F20): pending settlement notes count against the due; write-off of the net due after credit notes / FCNs; no FCN in CMP-08 / GSTR-4 turnover; same-FY recovery in a locked month; clerks cannot remove a write-off row; FCNs out of "Sales by customer"; clerk cap in rupees; one receipt keeps only the promise it meets | `settlement.ts`, `approvals.ts`, `write-off.ts`, `composition-returns.ts`, `gstr4-annual.ts`, `localDb.ts`, `sales-reports.ts`, `collections.ts` | done |
+| QA5-2 | ✅ **Books, service, sales documents, production, restaurant, CSV security** (F4–F10, F14–F17, F19, F21, F22): retainer overage kept; deferral basis = taxable value in INR and never a release before the initial deferral; atomic schedule delete; batch place of supply / PO number / draft numbering; CSV formula guard on practice / e-Way exports; QC / transit-held stock not saleable; unselected optional lines dropped on a tax invoice; progress-billing rounding; split add-on paise; practice ghost company; SO → PO free stock | `retainers.ts`, `deferrals.ts`, `batch-invoices.ts`, `Practice.tsx`, `eway-desk.ts`, `inventory.ts`, `stock-tracking.ts`, `useInvoiceStore.ts`, `progress-billing.ts`, `split-bill.ts`, `back-to-back.ts` | done |
+
+## Income-tax Act 2025 labels (`docs/features/income-tax-act-2025.md`, `docs/prd/round-5.md` §7 Q1) · ✅ done
+
+From 1 Apr 2026 TDS / TCS sections and forms show the 2025-Act reference with the old code in brackets, by the
+document / transaction date; stored codes, return marks and keys are unchanged.
+
+| # | Item | Status |
+|---|---|---|
+| 23 | ✅ Income-tax Act 2025 section / form labels across TDS, TCS, receivables, payroll, editor and exports (date-keyed, append-only `ACT_REF_RULES` / `FORM_REF_RULES` / `OLD_CODE_SHOWN_RULES` in `src/lib/ita2025.ts`) | done: labels only, stored codes unchanged |
+| 23a | ⏳ Confirm the Sec 393 / 394 table items against the enacted Act and flip `verified` with new dated entries | open (verify with your CA) |
+| 23b | ⏳ 2025-Act RPU section codes for Forms 140 / 143 / 144 (add to `tds-rules.ts` once the Protean RPU format is confirmed) | open, waiting for the RPU file format |
+| 23c | ⏳ Form 143 due dates (15th vs 31st; `TDS_DUE_RULES` keeps the 15th) | open |
+| 23d | ⏳ Finance Act 2026 TCS rates (tour package / LRS education 2%), as new `TCS_PRESET_RULES` entries when such presets are offered | open |
+
+## Round 5: industry packs for Indian SMB verticals (v6.x) · ✅ done
+
+Spec: `docs/prd/round-5.md` (18 items in three packages). Every vertical sits behind an **industry pack**
+(`src/lib/industry-packs.ts`): an explicit `settings.industry_packs` list wins, else the packs implied by
+`business_type`, else none — existing companies see no change. A pack that is off hides its tabs and bell notices only.
+
+### R5-A · Industry packs & marketplace seller (`docs/features/marketplace-r5.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R5-A1 | ✅ **Industry packs**: six business types, pack switch in Settings → Defaults → Shop mode, `PACK_TABS` palette group "Industry packs" | `industry-packs.ts`, `shop-presets.ts`, `palette-destinations.ts` | done |
+| R5-A2 | ✅ **Sales channels, clearing account, channel-SKU map** (`BankAccount.clearing`, never offered by cheque / e-pay / BRS pickers via `pickableBankAccounts`); tables `sales_channels`, `channel_skus` | `marketplace/{channels,sku-map}.ts`, `bank-accounts.ts` | done |
+| R5-A3 | ✅ **Marketplace sales / returns import** (Amazon / Flipkart / Meesho presets, marketplace numbers, summary mode, undo); table `marketplace_imports`, `InvoiceRecord.channel_*` | `marketplace/sales-import.ts` | done (verify with your CA) |
+| R5-A4 | ✅ **Settlement import & payout reconciliation**, post / unpost through the clearing account; table `settlements` | `marketplace/settlement-{import,recon,post}.ts` | done |
+| R5-A5 | ✅ **GST TCS / TDS credit** (GSTR-8 / GSTR-7 accept / reject) and **194-O** matching; table `eco_credits` | `marketplace/{tcs-credit,tds-194o}.ts` | done (verify with your CA) |
+| R5-A6 | ✅ **Returns / RTO / claims desk** with claim windows; table `marketplace_returns` | `marketplace/returns-desk.ts` | done |
+| R5-A7 | ⏳ R5-A follow-ups: a refund paid in a later settlement than the sale shows the customer in credit on Receivables; per-order months above 3,000 rows are slow (summary mode offered) | — | open |
+
+### R5-B · Transport & works contracts (`docs/features/transport-works-r5.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R5-B1 | ✅ **Consignment notes** `LR/FY…` and the GTA option per FY (RCM / forward charge); tables `consignment_notes`, `gta_options` | `transport/{consignment-notes,gta-option,lr-print}.ts` | done (verify with your CA) |
+| R5-B2 | ✅ **Freight bills from LRs** (`InvoiceRecord.lr_ids`, LR annexure) | `transport/freight-bill.ts` | done |
+| R5-B3 | ✅ **Vehicles, trips** `TRP/FY…`, **hired lorries** with 194C(6) nil TDS (`Vendor.transporter_194c6`, reason `T`); cost-centre kind `vehicle`; tables `vehicles`, `trips` | `transport/{vehicles,trips,trip-pnl}.ts`, `tds-payables.ts` | done (verify with your CA) |
+| R5-B4 | ✅ **BOQ and measured RA bills** (`ProgressBasis 'measured'`, `boq_terms`, `InvoiceItem.boq_ref`); tables `ra_measurements`, `boq_coefficients` | `works/{boq,measurements,ra-abstract}.ts` | done |
+| R5-B5 | ✅ **RA deductions**: retention, advance recovery, 194C, GST TDS (Sec 51), labour cess; deduction receipts (`ra_journal_id`) through the "RA deductions clearing" account | `works/{deductions,ra-receivable,ra-due}.ts` | done (verify with your CA) |
+| R5-B6 | ✅ **Sites**: material at site (`Godown.kind 'site'`, non-saleable) and site cost | `works/sites.ts` | done |
+| R5-B7 | ⏳ R5-B follow-ups: a cancelled RA bill's RA number is issued again; RA abstract / LR annexure print as their own pages, not through the annexure component | — | open |
+
+### R5-C · Institutions, non-profits & property (`docs/features/institutions-property-r5.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R5-C1 | ✅ **Fee plans**: heads, instalments, concessions, fines, enrolments, fee runs; tables `fee_plans`, `fee_runs` | `institutions/{fee-plans,enrolments,fee-billing,fee-dues}.ts` | done (verify with your CA) |
+| R5-C2 | ✅ **Rule 42 / 43 common credit** (journals of class "ITC reversal — Rule 42 / 43" → GSTR-3B 4(B)(1) via `itcReversals`); table `common_credit_runs` | `institutions/common-credit.ts`, `gst-reports.ts` | done (verify with your CA) |
+| R5-C3 | ✅ **Donations** `DON/FY…`, 80G / 35 receipts, Form 10BD / 10BE; tables `donations`, `form_10bd_filings`, `form_10be` | `nonprofit/{donations,donation-receipt,form-10bd}.ts` | done (verify with your CA) |
+| R5-C4 | ✅ **Funds and FCRA** (cost-centre kind `fund`, `BankAccount.fcra`, FC-4, Sec 11 application) | `nonprofit/{funds,fund-statement,fcra-checks,fc4,application}.ts` | done (verify with your CA) |
+| R5-C5 | ✅ **Leases**: rent, CAM, escalation, GST class, 194-I; tables `properties`, `leases` | `property/{properties,leases,escalation,lease-gst}.ts` | done (verify with your CA) |
+| R5-C6 | ✅ **Security deposits** (adjustment receipts `deposit_adjustment_id`, no money moved); table `security_deposits` | `property/deposits.ts` | done |
+| R5-C7 | ⏳ R5-C follow-ups: GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does); gifts in kind create no voucher; FC-4 lists totals, not the portal's line items | — | open |
+
+## QA round 6 · 🟡 in progress
+
+Hands-on audit of Round 4 (R4-B / R4-C), QA round 5 fixes, the Income-tax Act 2025 labels and Round 5.
 
 ## Summary timeline
 
@@ -711,6 +791,9 @@ Scale audit on a 15k-invoice company; two fix packages with mostly disjoint file
 | v5.x | Competitive parity (Phase 6), Tally parity (Phase 7), 8A–8I daily-use packages | done |
 | v6.x · Round 2 | Collections & settlement, sales documents, books & output (R2-A / R2-B / R2-C) | done |
 | v6.x · Round 3 | Restaurant & counter, service billing, document polish & compliance desks (R3-A / R3-B / R3-C), then QA round 3 fixes (QA-1 / QA-2) | done |
-| v6.x · Round 4 | Production & traceability (R4-A, done); stores & chains (R4-B) and trade desk & trust (R4-C) planned; scale fixes PERF-1 / PERF-2 in progress | in progress |
+| v6.x · Round 4 | Production & traceability (R4-A), stores & chains (R4-B), trade desk & trust (R4-C), scale fixes PERF-1 / PERF-2, then QA round 5 fixes (QA5-1 / QA5-2) | done |
+| v6.x · ITA 2025 | Income-tax Act 2025 section / form labels by date (23); 23a–23d open | done |
+| v6.x · Round 5 | Industry packs: marketplace seller (R5-A), transport & works contracts (R5-B), institutions, non-profits & property (R5-C) | done |
+| v6.x · QA round 6 | Hands-on audit of R4-B / R4-C, QA round 5, ITA 2025 and Round 5 | in progress |
 
 Phases 2 and 3 can run in parallel if two people work on them; neither depends on the other beyond Phase 1.
