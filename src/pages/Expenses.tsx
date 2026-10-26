@@ -50,6 +50,7 @@ import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 
 type Tab = 'bills' | 'orders' | 'vendors' | 'returns' | 'inbox';
 
@@ -190,6 +191,7 @@ export function Expenses() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="expenses" /></Suspense>
       <PageHeader
         title={purT('title')}
         subtitle={purT('subtitle')}

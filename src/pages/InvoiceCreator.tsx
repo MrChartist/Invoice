@@ -52,6 +52,7 @@ import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
 
 // Lock banner (+ PIN dialog) and the saved toast only matter occasionally: keep them out of the entry chunk.
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 const LockBanner = lazy(() => import('../components/creator/LockBanner').then((m) => ({ default: m.LockBanner })));
 const SavedToast = lazy(() => import('../components/creator/SavedToast').then((m) => ({ default: m.SavedToast })));
 
@@ -354,6 +355,7 @@ export function InvoiceCreator() {
         </Suspense>
       ) : null}
 
+      <Suspense fallback={null}><ScreenTip id="editor" /></Suspense>
       {s.approval && s.approval.state !== 'approved' && (
         <Suspense fallback={null}>
           <ApprovalBanner approval={s.approval} />

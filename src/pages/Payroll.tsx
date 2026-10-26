@@ -19,6 +19,9 @@ const ExtrasTab = lazy(() => import('../components/payroll/ExtrasTab').then((m) 
 const FnfTab = lazy(() => import('../components/payroll/FnfTab').then((m) => ({ default: m.FnfTab })));
 // 7T: relief u/s 89 (Form 10E), Rule 3 perquisite valuation, actuarial valuations, PT option, payroll access.
 const MoreTab = lazy(() => import('../components/payroll/MoreTab').then((m) => ({ default: m.MoreTab })));
+// R6-A3 / A6: "About this tab" strip and the one-time tip (lazy).
+const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
 import { useT } from '../i18n';
 import { payrollT as pT } from '../i18n/areas/payroll';
 import controls from '../styles/controls.module.css';
@@ -75,6 +78,7 @@ export function Payroll() {
           ) : undefined
         }
       />
+      <Suspense fallback={null}><ScreenTip id="payroll" /></Suspense>
       <div className={styles.tabs} role="tablist" aria-label={pT('title')}>
         {TABS.map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => set('tab', t)}>
@@ -82,6 +86,7 @@ export function Payroll() {
           </button>
         ))}
       </div>
+      <Suspense fallback={null}><AboutStrip /></Suspense>
       <div role="tabpanel">
         {tab === 'employees' && <EmployeesTab {...common} />}
         {tab === 'heads' && <PayHeadsTab {...common} />}

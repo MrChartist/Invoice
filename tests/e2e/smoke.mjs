@@ -2698,6 +2698,27 @@ try {
     const local = await p3.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_sync_device') ?? 'null'));
     check(typeof local?.id === 'string' && (await idbGet(p3, 'mrchartist_inv_sync_device')) === null, 'the device id lives in localStorage only (never in the data store or a backup)');
   });
+
+  await step('R6-A help: "On this screen", About strip, glossary term, version', async () => {
+    await page.goto(srv.origin + '/gst-reports?tab=cdnur');
+    const strip = page.locator('[data-about-strip="gst-reports:cdnur"]');
+    await strip.waitFor({ timeout: 15000 });
+    check(/credit and debit notes/i.test(await strip.innerText()), 'GST → CDNUR shows its "About this tab" strip');
+    // F1 is wired by the shell (R6-B); the Help button opens the same dialog.
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    const help = page.locator('[data-screen-help="gst-reports:cdnur"]');
+    await help.waitFor({ timeout: 15000 });
+    check(/On this screen: CDNUR/.test(await help.innerText()), 'Help opens on "On this screen: CDNUR"');
+    check(/CA checklist: G8/.test(await help.innerText()), 'the statutory topic names its CA checklist ids');
+    check(/Version \d+\.\d+\.\d+/.test(await page.locator('[data-app-version]').innerText()), 'Help shows the package.json version');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/gst-reports?tab=b2cl');
+    await page.locator('[data-term="b2cl"]').first().click();
+    const pop = page.locator('[data-term-pop="b2cl"]');
+    await pop.waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => /In this app/.test(document.querySelector('[data-term-pop="b2cl"]')?.textContent ?? ''));
+    check(/unregistered/i.test(await pop.innerText()), 'tapping B2CL opens its glossary popover');
+  });
 } catch {
   /* already reported */
 } finally {
