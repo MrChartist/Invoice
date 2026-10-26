@@ -603,7 +603,7 @@ export function Transactions() {
                       <td className={cn(styles.nowrap, styles.cDate)}>
                         {formatDate(inv.issue_date)}
                         <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
-                          {salesT('tx.due', { date: formatDate(inv.due_date) || '—' })}
+                          {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '—' })}
                         </div>
                       </td>
                       <td className={styles.cStatus}>

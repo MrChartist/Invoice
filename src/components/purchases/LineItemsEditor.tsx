@@ -2,7 +2,7 @@ import { Fragment, useCallback, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { BillLineTracking, type BillStockContext } from './BillLineTracking';
 import type { PurchaseLine } from '../../types/purchases';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { blankPurchaseLine as blankLine } from '../../lib/purchases';
 import { round2 } from '../../lib/invoice-calc';
 import { formatCurrency } from '../../lib/utils';
@@ -26,6 +26,8 @@ export interface LineItemsEditorProps {
   onChange: (lines: PurchaseLine[]) => void;
   /** Bills only: batch / serial / godown fields for tracked stock items (6.6 / 6.10 / 6.11). */
   stock?: BillStockContext;
+  /** Document date: the GST rate list offers the slabs in force that day (QA-3 F9). Today when absent. */
+  date?: string;
 }
 
 /** True when a bill line is a tracked stock item and needs the extra batch / serial / godown row. */
@@ -36,7 +38,7 @@ function needsTracking(line: PurchaseLine, ctx: BillStockContext | undefined): b
 }
 
 /** Editable bill lines: item, HSN/SAC, qty, rate, GST%. */
-export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps) {
+export function LineItemsEditor({ lines, onChange, stock, date }: LineItemsEditorProps) {
   useT(); // re-render on a language switch (5.4)
   const patch = (id: string, change: Partial<PurchaseLine>) =>
     onChange(lines.map((l) => {
@@ -162,7 +164,7 @@ export function LineItemsEditor({ lines, onChange, stock }: LineItemsEditorProps
                     aria-label={purT('lineGst', { n: i + 1 })}
                     onChange={(e) => patch(l.id, { tax_rate: Number(e.target.value) })}
                   >
-                    {GST_SLABS.map((s) => (
+                    {gstRateOptions(date, l.tax_rate).map((s) => (
                       <option key={s} value={s}>{s}%</option>
                     ))}
                   </select>

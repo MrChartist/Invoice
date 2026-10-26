@@ -78,6 +78,11 @@ export function shouldNudge(opts: {
   return opts.now.getTime() - last > (opts.afterDays ?? NUDGE_AFTER_DAYS) * DAY;
 }
 
+/** No backup has ever been taken on this device: the nudge says so instead of "over a week" (QA-3 F13). */
+export function neverBackedUp(lastIso: string | null | undefined): boolean {
+  return parseTime(lastIso) === null;
+}
+
 /** Short human text: "just now", "3 hours ago", "5 days ago". */
 export function describeAge(iso: string | null | undefined, now: Date): string {
   const t = parseTime(iso);

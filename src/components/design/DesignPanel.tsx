@@ -170,6 +170,12 @@ function LivePreview({
   );
 }
 
+const PRESET_KEYS = ['classic', 'compact', 'minimal', 'receipt'] as const;
+/** Preset card text in the interface language (the preset table itself stays English data). */
+function presetText(id: string, part: 'name' | 'desc', fallback: string): string {
+  return (PRESET_KEYS as readonly string[]).includes(id) ? desT(`preset.${id as (typeof PRESET_KEYS)[number]}.${part}`) : fallback;
+}
+
 /**
  * Controlled editor for one DesignPrefs row. The parent owns persistence
  * (see lib/design-prefs `saveDesign`), so it can debounce, confirm, or save
@@ -233,8 +239,8 @@ export function DesignPanel({
           <div className={styles.presets}>
             {presets.map((p) => (
               <button key={p.id} type="button" className={styles.preset} onClick={() => onChange(applyPreset(design, p.id))}>
-                <span className={styles.presetName}>{p.name}</span>
-                <span className={styles.presetDesc}>{p.description}</span>
+                <span className={styles.presetName}>{presetText(p.id, 'name', p.name)}</span>
+                <span className={styles.presetDesc}>{presetText(p.id, 'desc', p.description)}</span>
               </button>
             ))}
           </div>

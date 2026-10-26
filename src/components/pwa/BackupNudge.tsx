@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { ShieldAlert, X } from 'lucide-react';
-import { getLastBackup, getSnooze, hasBackupWorthyData, shouldNudge, snoozeNudge } from '../../lib/auto-backup-schedule';
+import { getLastBackup, getSnooze, hasBackupWorthyData, neverBackedUp, shouldNudge, snoozeNudge } from '../../lib/auto-backup-schedule';
 // The backup builder / folder writer loads only when the user acts on the nudge.
 import type { BackupResult } from '../../lib/auto-backup';
 import { useT } from '../../i18n';
@@ -71,7 +71,7 @@ function FolderBackupNudge({ onResult }: BackupNudgeProps) {
         </span>
         <div className={styles.text}>
           <p className={styles.title}>{pwaT('backupTitle')}</p>
-          <p className={styles.desc}>{pwaT('backupDesc')}</p>
+          <p className={styles.desc}>{pwaT(neverBackedUp(getLastBackup()) ? 'backupDescNever' : 'backupDesc')}</p>
           <div className={styles.actions}>
             <button
               type="button"

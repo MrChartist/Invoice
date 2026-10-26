@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { Repeat, Trash2 } from 'lucide-react';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { PURCHASE_CATEGORIES } from '../../types/purchases';
 import type { Frequency } from '../../lib/recurring';
 import { recurringBillsAll, recurringBillTotals, removeRecurringBill, saveRecurringBill, setRecurringBillActive } from '../../lib/recurring-bills';
@@ -132,7 +132,7 @@ export default function RecurringBillsPanel({ businessState, onChanged }: { busi
               <label className={controls.field}><span className={controls.label}>{capT('recAmount')}</span><NumberInput className={cn(controls.input, controls.inputNumeric)} value={f.amount} onChange={(v) => set({ amount: v })} /></label>
               <label className={controls.field}><span className={controls.label}>{capT('gstRate')}</span>
                 <select className={controls.select} value={f.rate} onChange={(e) => set({ rate: Number(e.target.value) })}>
-                  {GST_SLABS.map((s) => <option key={s} value={s}>{s}%</option>)}
+                  {gstRateOptions(undefined, f.rate).map((s) => <option key={s} value={s}>{s}%</option>)}
                 </select>
               </label>
               <label className={controls.field}><span className={controls.label}>{capT('recFreq')}</span>

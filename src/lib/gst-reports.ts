@@ -1004,7 +1004,9 @@ function addLine(target: Acc, l: PLine, sign: number) {
 
 function addHsn(map: Map<string, HsnRow>, l: PLine, sign: number) {
   const hsn = l.hsn || 'NA';
-  const key = `${hsn}|${l.uqc}|${l.rate}`;
+  // A line without HSN has nothing to group on: keep one row per item, so "NA · Steel rack" never also holds
+  // the Banquet chairs (QA-3 F8). Lines with an HSN still group by HSN + UQC + rate as the portal does.
+  const key = `${hsn}|${l.uqc}|${l.rate}${l.hsn ? '' : `|${String(l.desc ?? '').trim().toLowerCase()}`}`;
   const h =
     map.get(key) ??
     { hsn, description: l.desc, uqc: l.uqc, qty: 0, value: 0, taxable: 0, rate: l.rate, igst: 0, cgst: 0, sgst: 0, cess: 0 };

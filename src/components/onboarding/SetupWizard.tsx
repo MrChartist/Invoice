@@ -6,13 +6,14 @@ import { ImageSlot } from '../settings/ProfileEditor';
 import { TEMPLATES } from '../templates/registry';
 import { INDIAN_STATES } from '../../lib/india-states';
 import { localDb } from '../../lib/localDb';
-import { WIZARD_STEPS, answersFrom, applyAnswers, stepProblem, type WizardAnswers } from '../../lib/onboarding';
+import { WIZARD_STEPS, answersFrom, applyAnswers, stepProblem, wizardDraft, type WizardAnswers } from '../../lib/onboarding';
 import { LANGUAGES, isLang, setLanguage, useT } from '../../i18n';
 import { setupT } from '../../i18n/areas/setup';
 import { reachT } from '../../i18n/areas/reach';
 import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
 import { BUSINESS_DEFAULTS, BUSINESS_TYPES, applyBusinessDefaults } from '../../lib/shop-presets';
 import { startDemoCompany, useDemoPending } from './demo-company';
+import { companiesSupported } from '../../lib/companies';
 import controls from '../../styles/controls.module.css';
 import styles from './SetupWizard.module.css';
 
@@ -43,7 +44,12 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   const exploreDemo = () => {
     setDemoBusy(true);
     try {
-      startDemoCompany();
+      // QA-3 F20: keep what was typed for the user's own company (still not set up, so the wizard returns prefilled).
+      // (Only when the demo opens as a separate company; otherwise the sample data lands in this one.)
+      const draft = companiesSupported() ? wizardDraft(localDb.settings.get(), a) : null;
+      if (draft) localDb.settings.save(draft);
+      // F27: the company left behind is labelled with the typed business name, not "Main business".
+      startDemoCompany(a.companyName.trim() || undefined);
     } catch (err) {
       setError((err as Error).message);
       setDemoBusy(false);
@@ -153,7 +159,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
         {current === 'start' && (
           <>
             <label className={controls.field}>
-              <span className={controls.label}>{reachT('language')} / भाषा</span>
+              <span className={controls.label}>{lang === 'en' ? `${reachT('language')} / भाषा` : reachT('language')}</span>
               <select className={controls.select} value={lang} onChange={(e) => isLang(e.target.value) && void setLanguage(e.target.value).catch(() => undefined)}>
                 {LANGUAGES.map((l) => <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>)}
               </select>
@@ -166,6 +172,13 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                   <span>{reachT(`hint.${b}`)}</span>
                 </button>
               ))}
+            </div>
+            {/* QA-3 F20: the demo choice belongs on the first step, before any required field. */}
+            <div className={controls.field}>
+              <button type="button" className={controls.btnOutline} onClick={exploreDemo} disabled={demoBusy} data-wizard-demo>
+                {reachT('demoCta')}
+              </button>
+              <span className={controls.hint}>{reachT('demoHint')}</span>
             </div>
           </>
         )}

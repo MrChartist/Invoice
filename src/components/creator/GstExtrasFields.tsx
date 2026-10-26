@@ -6,6 +6,7 @@ import { pick } from '../../store/pick';
 import { ECO_SECTION_LABELS, ecoWarnings } from '../../lib/eco';
 import type { ChallanPurpose, EcoSection } from '../../types/invoice';
 import { reachT } from '../../i18n/areas/reach';
+import { edT } from '../../i18n/areas/editor';
 import controls from '../../styles/controls.module.css';
 import styles from './SupplyNotice.module.css';
 
@@ -85,7 +86,7 @@ export function GstExtrasFields() {
           }}
         />
         <Store size={14} aria-hidden="true" />
-        <span>Sold through an e-commerce operator</span>
+        <span>{edT('ecoSold')}</span>
       </label>
       {on && (
         <div className={styles.kind}>
@@ -94,8 +95,8 @@ export function GstExtrasFields() {
             style={{ width: '16ch' }}
             maxLength={15}
             value={s.eco_gstin ?? ''}
-            placeholder="Operator GSTIN"
-            aria-label="E-commerce operator GSTIN"
+            placeholder={edT('ecoGstinPh')}
+            aria-label={edT('ecoGstinAria')}
             onChange={(e) => {
               const v = e.target.value.toUpperCase().replace(/\s/g, '');
               s.patch({ eco_gstin: v || undefined, eco_section: v ? s.eco_section : undefined });
@@ -105,13 +106,13 @@ export function GstExtrasFields() {
             className={controls.select}
             value={s.eco_section ?? 'TCS_52'}
             onChange={(e) => s.patch({ eco_section: e.target.value as EcoSection })}
-            aria-label="How the operator is involved"
+            aria-label={edT('ecoHowAria')}
           >
             {(Object.keys(ECO_SECTION_LABELS) as EcoSection[]).map((k) => (
               <option key={k} value={k}>{ECO_SECTION_LABELS[k]}</option>
             ))}
           </select>
-          <span className={styles.muted}>GSTR-1 Table 14{s.eco_section === 'PAY_9_5' ? '(b) and GSTR-3B 3.1.1(ii), value only' : '(a), with the operator GSTIN in B2B / B2C'}.</span>
+          <span className={styles.muted}>{edT(s.eco_section === 'PAY_9_5' ? 'ecoTable14b' : 'ecoTable14a')}</span>
         </div>
       )}
       {warnings.map((w) => (

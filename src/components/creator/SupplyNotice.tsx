@@ -10,6 +10,7 @@ import {
   senderCompositionRate,
 } from '../../lib/bill-of-supply';
 import { amendmentLabel } from '../../lib/amendments';
+import { isOwnGstin } from '../../lib/gstin';
 import type { ExemptKind } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
@@ -23,11 +24,13 @@ import styles from './SupplyNotice.module.css';
  */
 export function SupplyNotice() {
   useT(); // re-render on a language switch (5.4)
-  const s = useInvoiceStore(useShallow((st) => pick(st, ['amends', 'doc_type', 'exempt_kind', 'issue_date', 'items', 'patch', 'place_of_supply', 'sender'])));
+  const s = useInvoiceStore(useShallow((st) => pick(st, ['amends', 'client', 'doc_type', 'exempt_kind', 'issue_date', 'items', 'patch', 'place_of_supply', 'sender'])));
   const composition = isComposition(s.sender);
   const bos = s.doc_type === 'BILL_OF_SUPPLY';
   const warnings = compositionWarnings(s);
-  if (!composition && !bos && !s.amends) return null;
+  // QA-3 F10: billing your own GSTIN (a B2B row to yourself) — warn, never block.
+  const ownGstin = isOwnGstin(s.client?.gstin, s.sender?.companyGstin);
+  if (!composition && !bos && !s.amends && !ownGstin) return null;
   const rate = senderCompositionRate(s.sender, s.issue_date);
 
   return (
@@ -55,6 +58,12 @@ export function SupplyNotice() {
           </select>
           <span className={styles.muted}>{edT('snReported')}</span>
         </label>
+      )}
+      {ownGstin && (
+        <p className={styles.warn} data-own-gstin>
+          <AlertTriangle size={14} aria-hidden="true" />
+          <span>{edT('snOwnGstin')}</span>
+        </p>
       )}
       {warnings.map((w) => (
         <p key={w.code} className={styles.warn}>

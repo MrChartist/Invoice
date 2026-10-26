@@ -16,7 +16,7 @@ import {
 import type { InvoiceRecord } from '../../types/invoice';
 import { useToast } from '../ui/useToast';
 import { cn } from '../../lib/utils';
-import { invoiceSummaryText, invoiceUpiLink, mailtoLink, smsLink, whatsappLink } from '../../lib/share';
+import { emailText, invoiceSummaryText, invoiceUpiLink, mailtoLink, smsLink, whatsappLink } from '../../lib/share';
 import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
@@ -146,7 +146,7 @@ export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onShareImage, on
             type="button"
             role="menuitem"
             className={styles.menuItem}
-            onClick={run(() => openLink(mailtoLink({ to: client?.email, subject, body: summary })))}
+            onClick={run(() => openLink(mailtoLink({ to: client?.email, subject, body: emailText(summary) })))}
           >
             <Mail size={16} className={styles.menuIcon} /> {shareT('email')}
           </button>
