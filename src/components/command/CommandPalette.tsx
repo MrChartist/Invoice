@@ -38,6 +38,7 @@ import { serviceR3Destinations } from './service-r3-destinations'; // R3-B
 import { desksR3Destinations } from './desks-r3-destinations'; // R3-C
 import { r4aDestinations } from '../production/palette-destinations'; // R4-A
 import { sfT } from '../../i18n/areas/smart-find';
+import { openHelp } from '../../lib/help-event';
 import styles from './CommandPalette.module.css';
 
 export interface PaletteAction {
@@ -76,7 +77,24 @@ interface Option {
   kind: 'result' | 'recent';
   result?: SearchResult;
   text?: string;
+  /** R6-B1: the heading of a lazy group (Tabs / Features / Help topics) instead of the result group's. */
+  section?: string;
 }
+
+/** R6-B1 / R6-A2: the help registry, read through a guarded glob so the palette builds before R6-A merges. */
+type HelpTopicRow = { id: string; title: string; keywords?: readonly string[] };
+const HELP_MODULES = import.meta.glob<{ helpIndex?: () => readonly HelpTopicRow[] | Promise<readonly HelpTopicRow[]> }>('../../lib/help/{registry,index}.ts');
+async function loadHelpTopics(): Promise<StaticEntry[]> {
+  for (const load of Object.values(HELP_MODULES)) {
+    const m = await load();
+    if (typeof m.helpIndex !== 'function') continue;
+    const rows = await m.helpIndex();
+    return rows.map((r) => ({ id: `help:${r.id}`, title: r.title, icon: 'page', href: `help:${r.id}`, keywords: r.keywords ? [...r.keywords] : undefined }));
+  }
+  return [];
+}
+/** "help gstr" or "? gstr" searches help topics only. */
+const HELP_QUERY = /^(?:help\s+|\?\s*)(.+)$/i;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -206,10 +224,23 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     if (open && !r4cEntries.length) import('../trust/palette-destinations').then((m) => setR4cEntries(m.r4cDestinations()), () => undefined);
   }, [open, r4cEntries.length]);
   // R5-A: the "Industry packs" group — every pack tab (rows of a pack that is off say so), loaded on first open
-  const [packEntries, setPackEntries] = useState<StaticEntry[]>([]);
+  const [rawPackEntries, setPackEntries] = useState<StaticEntry[]>([]);
   useEffect(() => {
     if (open) import('../marketplace/palette-destinations').then((m) => setPackEntries(m.packDestinations()), () => undefined);
   }, [open]); // re-read on every open: a pack switched on / off since shows at once
+  // R6-B1: the "Tabs" and "Features" groups (every page tab, portal terms, feature rows) and help topics (R6-A2).
+  const [disc, setDisc] = useState<typeof import('./tab-destinations') | null>(null);
+  useEffect(() => {
+    if (open && !disc) import('./tab-destinations').then(setDisc, () => undefined);
+  }, [open, disc]);
+  const packEntries = useMemo(() => (disc ? disc.withSynonyms(rawPackEntries) : rawPackEntries), [disc, rawPackEntries]);
+  const tabEntries = useMemo(() => (open && disc ? disc.tabDestinations() : []), [open, disc]); // re-read per open (shop mode)
+  const featureEntries = useMemo(() => (open && disc ? disc.featureDestinations() : []), [open, disc]);
+  const labels = useMemo(() => (disc ? disc.discoverLabels() : null), [disc, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [helpEntries, setHelpEntries] = useState<StaticEntry[]>([]);
+  useEffect(() => {
+    if (open && !helpEntries.length) loadHelpTopics().then(setHelpEntries, () => undefined);
+  }, [open, helpEntries.length]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
@@ -226,16 +257,30 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       ];
       return [...base, ...staticRows.map((r) => ({ key: r.id, kind: 'result' as const, result: r }))];
     }
+    const asHelp = q.match(HELP_QUERY);
+    if (asHelp && disc && labels) {
+      // R6-B1: "help <words>" / "? <words>" — help topics only.
+      return disc.searchRows(asHelp[1], helpEntries, 8).map((r) => ({ key: r.id, kind: 'result' as const, result: r, section: labels.help }));
+    }
     const found = searchAll(q, {
       data: { pages: [...pageEntries, ...tallyEntries, ...r2aEntries, ...r2cEntries, ...r2bEntries, ...r3aEntries, ...r3bEntries, ...r3cEntries, ...r4aEntries, ...r4bEntries, ...r4cEntries, ...packEntries], actions: actionEntries },
       perGroup: 6,
     });
     if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
     // Render order follows group relevance, so flatten through groupResults.
-    return groupResults(found).flatMap((g) =>
-      g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
-    );
-  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, r4bEntries, r4cEntries, packEntries, actionEntries, allCompanies, peeked]);
+    const groups = groupResults(found).map((g) => g.items.map((r): Option => ({ key: r.id, kind: 'result', result: r })));
+    if (disc && labels) {
+      // R6-B1: Tabs rank below a document that matches better and above the other pages; Features follow.
+      const tabs = disc.searchRows(q, tabEntries).map((r): Option => ({ key: r.id, kind: 'result', result: r, section: labels.tabs }));
+      const feats = disc.searchRows(q, featureEntries, 4).map((r): Option => ({ key: r.id, kind: 'result', result: r, section: labels.features }));
+      const best = tabs[0]?.result?.score ?? 0;
+      let at = groups.findIndex((g) => ['pages', 'actions', 'companies'].includes(g[0].result!.group) || (g[0].result!.score ?? 0) < best);
+      if (at < 0) at = groups.length;
+      if (tabs.length) groups.splice(at, 0, tabs);
+      if (feats.length) groups.push(feats);
+    }
+    return groups.flat();
+  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, r4bEntries, r4cEntries, packEntries, actionEntries, allCompanies, peeked, disc, labels, tabEntries, featureEntries, helpEntries]);
   const options = useMemo(() => optionsFor(searchQuery), [optionsFor, searchQuery]);
 
   // Reset on open; remember and restore focus.
@@ -276,6 +321,12 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
         // Read-only peek: another company's record cannot open here.
         const name = readRegistry().list.find((c) => c.id === r.company)?.name ?? '';
         setNotice(sfT('switchTo', { name }));
+        return;
+      }
+      if (r.href?.startsWith('help:')) {
+        // R6-B1: a help topic opens Help on it (R6-A2 handles the topic).
+        onClose();
+        setTimeout(() => openHelp(r.href!.slice(5)), 0);
         return;
       }
       if (r.actionId) {
@@ -346,7 +397,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   // Build grouped view over the flat option list (indices stay global).
   const sections: { label: string; id: string; rows: { opt: Option; index: number }[] }[] = [];
   options.forEach((opt, index) => {
-    const label = opt.kind === 'recent' ? 'Recent searches' : GROUP_LABELS[opt.result!.group];
+    const label = opt.kind === 'recent' ? 'Recent searches' : opt.section ?? GROUP_LABELS[opt.result!.group];
     const last = sections[sections.length - 1];
     if (last && last.label === label) last.rows.push({ opt, index });
     else sections.push({ label, id: `${uid}-g${sections.length}`, rows: [{ opt, index }] });
@@ -398,6 +449,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
         )}
         {notice && <p className={styles.emptyHint} role="status" style={{ padding: '0 1rem' }}>{notice}</p>}
 
+        {!query.trim() && labels && <p className={styles.emptyHint} style={{ padding: '0.25rem 1rem' }} data-palette-try>{labels.tryHint}</p>}
         <div ref={listRef} id={listId} className={styles.list} role="listbox" aria-label="Results">
           {options.length === 0 && (
             <div className={styles.empty} role="presentation">

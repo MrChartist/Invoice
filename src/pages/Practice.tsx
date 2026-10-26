@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Download, Lock, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LearnMore, practiceEmpty } from '../components/discover';
+import { discoverT } from '../i18n/areas/discover-r6';
 import { DscRegister } from '../components/practice/DscRegister';
 import { ChecklistPanel } from '../components/practice/ChecklistPanel';
 import { buildPracticeBoard, boardCsv, boardTable, peekedCompany, type PeekedCompany, type PracticeRow, type PracticeTables } from '../lib/practice';
@@ -84,6 +87,20 @@ export function Practice() {
   return (
     <div className={surface.page} data-practice>
       <PageHeader title={dkT('pr.title')} subtitle={dkT('pr.subtitle')} />
+      {/* R6-B3: the desk shows every company on the device — with one company, say how to add the next. */}
+      {practiceEmpty(readRegistry().list.length) && (
+        <EmptyState
+          icon={Building2}
+          title={discoverT('practiceTitle')}
+          text={discoverT('practiceText')}
+          action={
+            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-practice-empty>
+              <Link to="/settings?tab=data" className={controls.btnPrimary}>{discoverT('practiceAdd')}</Link>
+              <LearnMore topic="practice" />
+            </div>
+          }
+        />
+      )}
       <section className={styles.section}>
         <h2 className={styles.head}><Building2 size={16} aria-hidden /> {dkT('pr.board')}</h2>
         <p className={styles.note}>{dkT('pr.caNote')}</p>

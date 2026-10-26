@@ -76,3 +76,58 @@ test('the Ctrl+K common-credit row is on for every pack that shows the GST tab (
   for (const p of PACK_GST_TABS['common-credit']!) assert.equal(packTabOn(row, [p]), true, p);
   assert.equal(packTabOn(row, ['marketplace']), false);
 });
+
+/* ── R6-B2: pack routes stay in the sidebar ─────────────────── */
+
+test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_TABS / PACK_OF_TYPE', async () => {
+  const { PACK_ROUTES, PACK_OF_TYPE_INLINE, moduleOfPath } = await import('../src/lib/shop-mode.ts');
+  const { PACK_OF_TYPE } = await import('../src/lib/industry-packs.ts');
+  const want = new Map<string, Set<string>>();
+  for (const t of PACK_TABS) {
+    const route = t.path.split('?')[0];
+    if (!moduleOfPath(route)) continue; // core routes (e.g. /receivables) are always visible
+    const set = want.get(route) ?? new Set<string>();
+    for (const p of [t.pack, ...(t.alsoPacks ?? [])]) set.add(p);
+    want.set(route, set);
+  }
+  assert.deepEqual(Object.keys(PACK_ROUTES).sort(), [...want.keys()].sort());
+  for (const [route, packs] of want) assert.deepEqual([...PACK_ROUTES[route]].sort(), [...packs].sort(), route);
+  const inline: Record<string, string[]> = Object.fromEntries(Object.entries(PACK_OF_TYPE_INLINE).map(([k, v]) => [k, [v]]));
+  assert.deepEqual(inline, Object.fromEntries(Object.entries(PACK_OF_TYPE).map(([k, v]) => [k, [...(v ?? [])]])));
+});
+
+test('R6-B2: impliedPacks agrees with activePacks for every business type and explicit lists', async () => {
+  const { impliedPacks } = await import('../src/lib/shop-mode.ts');
+  for (const t of [...BUSINESS_TYPES, undefined]) assert.deepEqual(impliedPacks({ business_type: t }), activePacks({ business_type: t }), String(t));
+  assert.deepEqual(impliedPacks({ business_type: 'transport', industry_packs: ['works'] }), ['works']);
+  assert.deepEqual(impliedPacks({ business_type: 'constructor' }), []);
+  assert.deepEqual(impliedPacks(null), []);
+});
+
+test('R6-B2: a transport company sees /distribution; a contractor sees /time with time off; packs off hide them', async () => {
+  const { impliedPacks } = await import('../src/lib/shop-mode.ts');
+  const transport = applyBusinessType('transport');
+  const tm = enabledModules(transport);
+  assert.equal(isPathVisible('/distribution', tm), false, 'no inventory module, no pack argument');
+  assert.equal(isPathVisible('/distribution', tm, impliedPacks(transport)), true);
+  assert.equal(isPathVisible('/distribution?tab=transport', tm, impliedPacks(transport)), true);
+  const contractor = { ...applyBusinessType('contractor'), modules: PRESETS.contractor.filter((m) => m !== 'time') };
+  const cm = enabledModules(contractor);
+  assert.equal(isPathVisible('/time', cm), false);
+  assert.equal(isPathVisible('/time', cm, impliedPacks(contractor)), true);
+  // A kirana with no pack: Books stays hidden even with the argument; the nonprofit pack keeps /books.
+  const kirana = enabledModules(applyBusinessType('kirana'));
+  assert.equal(isPathVisible('/books', kirana, []), false);
+  assert.equal(isPathVisible('/books', kirana, ['nonprofit']), true);
+  assert.equal(isPathVisible('/gst-reports', kirana, ['leases']), true, 'common credit is shared by fees / nonprofit / leases');
+  assert.equal(isPathVisible('/payroll', kirana, ['fees', 'nonprofit', 'leases', 'transport', 'works', 'marketplace']), false);
+});
+
+test('R6-B2: isPathVisible without packs is unchanged for every existing path', () => {
+  const paths = ['/', '/invoice', '/pos', '/tables', '/transactions', '/clients', '/recurring', '/time', '/receivables', '/expenses', '/inventory', '/manufacturing', '/books', '/reconcile', '/cheques', '/tds', '/loans', '/payroll', '/reports', '/gst-reports', '/exports', '/gateway', '/design', '/settings', '/practice'];
+  for (const type of BUSINESS_TYPES) {
+    const m = enabledModules(applyBusinessType(type));
+    for (const p of paths) assert.equal(isPathVisible(p, m, []), isPathVisible(p, m), `${type} ${p}`);
+  }
+  assert.equal(isPathVisible('/distribution', enabledModules(applyBusinessType('wholesale'))), true, 'wholesale keeps inventory');
+});

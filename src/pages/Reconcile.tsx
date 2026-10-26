@@ -33,6 +33,7 @@ import { formatDate, formatMoney } from '../lib/utils';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
+import { LearnMore } from '../components/discover';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { ImportPanel } from '../components/bank/ImportPanel';
@@ -53,6 +54,8 @@ import type { BankDoc } from '../components/bank/docs/BankingDocs';
 import type { RulePrompt } from '../components/bank/rules/RuleSuggestions';
 import { capT } from '../i18n/areas/capture';
 import { paymentsDb, purchasesDb } from '../lib/purchases';
+import { RECONCILE_TABS, type ReconcileTab } from './page-tabs'; // R6-B1
+import { discoverT } from '../i18n/areas/discover-r6';
 
 // WP-5: deposit slip, payment advice, e-payments, cash tally — loaded only when the tab opens.
 const BankingDocs = lazy(() => import('../components/bank/docs/BankingDocs'));
@@ -61,15 +64,8 @@ const BANK_DOCS: readonly BankDoc[] = ['deposit', 'advice', 'epay', 'cash', 'for
 const BankRulesPanel = lazy(() => import('../components/bank/rules/BankRulesPanel'));
 const RuleSuggestions = lazy(() => import('../components/bank/rules/RuleSuggestions'));
 
-const TABS = [
-  { id: 'reconcile', label: 'tabReconcile' },
-  { id: 'brs', label: 'tabBrs' },
-  { id: 'statements', label: 'tabStatements' },
-  { id: 'import', label: 'tabImport' },
-  { id: 'documents', label: 'tabDocuments' },
-  { id: 'rules', label: 'tabRules' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+const TABS = RECONCILE_TABS; // R6-B1: list in reconcile-tabs.ts
+type TabId = ReconcileTab;
 
 type Filter = 'review' | 'matched' | 'ignored' | 'all';
 const FILTERS: { id: Filter; label: 'fReview' | 'fMatched' | 'fIgnored' | 'fAll' }[] = [
@@ -291,9 +287,28 @@ export function Reconcile() {
     return (
       <div className={surface.page}>
         {header}
-        {accountsCard}
+        {/* R6-B3: nothing imported yet — what the screen needs, and the two first steps. */}
+        <EmptyState
+          icon={Landmark}
+          title={discoverT('reconTitle')}
+          text={discoverT('reconText')}
+          action={
+            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-recon-empty>
+              <button type="button" className={controls.btnPrimary} onClick={() => document.querySelector<HTMLElement>('[data-recon-import] input, [data-recon-import] button')?.focus()}>
+                {bankT('importStatement')}
+              </button>
+              <button type="button" className={controls.btnOutline} onClick={() => document.querySelector<HTMLElement>('[data-recon-accounts] button')?.focus()}>
+                {discoverT('reconAccount')}
+              </button>
+              <LearnMore topic="reconcile" />
+            </div>
+          }
+        />
+        <div data-recon-accounts>{accountsCard}</div>
         {accountPicker}
-        <ImportPanel existing={statements} onImport={importStatement} />
+        <div data-recon-import>
+          <ImportPanel existing={statements} onImport={importStatement} />
+        </div>
         {toastNode}
       </div>
     );
