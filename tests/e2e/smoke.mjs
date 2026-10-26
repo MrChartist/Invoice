@@ -1404,6 +1404,54 @@ try {
   });
 
   let backupPath = '';
+  await step('R3-A: open table 1 → add items → Send KOT → split by item → two bills settled with the order link', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog,
+      { id: 'e2e-tikka', name: 'E2E Paneer Tikka', type: 'Product', hsn: '996331', unit: 'NOS', quantity: 1, rate: 200, tax_rate: 5, amount: 0 },
+      { id: 'e2e-naan', name: 'E2E Butter Naan', type: 'Product', hsn: '996331', unit: 'NOS', quantity: 1, rate: 50, tax_rate: 5, amount: 0 },
+    ]);
+    await page.goto(srv.origin + '/tables');
+    await page.locator('[data-print-tickets]').uncheck(); // no print pop-up in the smoke run
+    await page.locator('[data-table="1"]').click();
+    await page.locator('[data-open-order]').click();
+    const search = page.locator('#order-search');
+    await search.waitFor();
+    for (const name of ['E2E Paneer Tikka', 'E2E Butter Naan']) {
+      await search.fill(name);
+      await search.press('Enter');
+      await page.locator(`[data-order-line="${name}"]`).waitFor();
+    }
+    await page.locator('[data-send-kot]').click();
+    await page.getByText(/K\d+ Kitchen sent to the kitchen/).first().waitFor();
+    const sent = await readJson(page, 'table_orders', [], (v) => v.some((o) => o.status === 'open' && o.kots?.length));
+    const order = sent.find((o) => o.status === 'open' && o.kots?.length);
+    check(order?.kots.length === 1 && order.kots[0].number.startsWith('K') && order.kots[0].lines.length === 2, `KOT stored on the order (${order?.kots?.[0]?.number})`);
+    check((await page.locator('[data-table="1"]').getAttribute('data-state')) === 'occupied', 'table 1 shows occupied');
+
+    await page.locator('[data-split]').click();
+    const dlg = page.getByRole('dialog', { name: 'Split the bill' });
+    await dlg.waitFor();
+    await dlg.getByRole('tab', { name: 'By item' }).click();
+    await dlg.locator('[data-split-recon]').waitFor();
+    check((await dlg.locator('[data-recon-exact]').getAttribute('data-recon-exact')) === '1', 'reconciliation strip: GST adds up');
+    await dlg.locator('[data-split-save]').click();
+    await page.getByText(/order settled/).first().waitFor();
+    const bills = (await readJson(page, 'invoices', [], (v) => v.filter((i) => !beforeIds.has(i.id) && i.table_order_id).length === 2))
+      .filter((i) => !beforeIds.has(i.id) && i.table_order_id);
+    check(bills.length === 2 && bills.every((b) => b.pos && b.status === 'Paid' && b.table_order_id === order?.id && b.split_of?.parts === 2),
+      `two POS bills, paid, linked to the order (${bills.map((b) => `${b.invoice_number} ${b.split_of?.part}/${b.split_of?.parts}`).join(', ')})`);
+    const done = (await readJson(page, 'table_orders', [], (v) => v.some((o) => o.id === order?.id && o.status === 'settled'))).find((o) => o.id === order?.id);
+    check(done?.status === 'settled' && done.invoice_ids?.length === 2, 'order settled with both invoice ids');
+    check((await page.locator('[data-table="1"]').getAttribute('data-state')) === 'free', 'table 1 is free again');
+
+    const ids = new Set(bills.map((b) => b.id));
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => !ids.has(t.invoice_id)));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => !ids.has(i.id)));
+    await writeJson(page, 'table_orders', null);
+    await writeJson(page, 'items_catalog', prevCatalog);
+  });
+
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');
     const [download] = await Promise.all([
@@ -1992,6 +2040,103 @@ try {
     check(true, 'undo removed the run\'s drafts');
     await writeJson(page, 'clients', prevClients);
     await writeJson(page, 'batch_runs', null);
+  });
+
+  await step('QA-3 F6: recurring from an invoice starts after it; the list refreshes after the first run; Run now asks before billing early; drafts take no number', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevSchedules = await readJson(page, 'recurring', []);
+    const src = prevInvoices.find((i) => (i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE') && i.status !== 'Cancelled' && i.status !== 'Draft');
+    check(!!src, 'a saved invoice to make recurring');
+    if (!src) return;
+    const today = await page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
+    await page.goto(srv.origin + '/recurring?from=' + src.id);
+    const first = page.locator('#rec-start');
+    await first.waitFor({ timeout: 15000 });
+    check((await first.inputValue()) > src.issue_date, `the first date defaults to after the invoice (${src.issue_date} -> ${await first.inputValue()})`);
+    await first.fill(today);
+    await page.getByRole('button', { name: 'Create schedule' }).click();
+    const after = await readJson(page, 'invoices', [], (v) => v.some((i) => i.recurring_id && !prevInvoices.some((p) => p.id === i.id)), 15000);
+    const made = after.filter((i) => !prevInvoices.some((p) => p.id === i.id));
+    check(made.length === 1 && made[0].status === 'Draft' && made[0].invoice_number === '', `the first run made one unnumbered draft (${made.map((i) => `${i.status}:${i.invoice_number || '-'}`).join(', ')})`);
+    const card = page.locator('article').filter({ has: page.getByRole('button', { name: 'Run now' }) }).last();
+    await card.getByText('Run history (1)').waitFor({ timeout: 15000 });
+    check(true, 'the schedule card shows the run without a reload');
+    await card.getByRole('button', { name: 'Run now' }).click();
+    const ask = page.getByRole('dialog', { name: 'Bill the next period early?' });
+    await ask.waitFor();
+    await ask.getByRole('button', { name: 'Cancel' }).click();
+    const still = await readJson(page, 'invoices', []);
+    check(still.length === after.length, 'Run now on a period not yet due bills nothing until confirmed');
+    await writeJson(page, 'recurring', prevSchedules);
+    await writeJson(page, 'invoices', prevInvoices);
+  });
+
+  await step('QA-3 F4 / F5: "Explore with sample data instead" fills a Demo company; Dashboard "Try with sample data" adds the invoices', async () => {
+    const tableIn = (p, name) => p.evaluate((k) => new Promise((resolve) => {
+      const reg = JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null');
+      const db = reg?.active && reg.active !== 'default' ? `mrchartist_inv_kv__${reg.active}` : 'mrchartist_inv_kv';
+      const open = indexedDB.open(db);
+      open.onsuccess = () => {
+        const d = open.result;
+        if (!d.objectStoreNames.contains('data')) { d.close(); resolve(null); return; }
+        const req = d.transaction('data', 'readonly').objectStore('data').get(`mrchartist_inv_${k}`);
+        req.onsuccess = () => { d.close(); resolve(req.result ? JSON.parse(req.result) : null); };
+      };
+      open.onerror = () => resolve(null);
+    }), name);
+    const waitRows = async (p, name, min, timeout = 15000) => {
+      const until = Date.now() + timeout;
+      for (;;) {
+        // The demo flow reloads (twice for the wizard path): a poll caught mid-navigation just retries.
+        const rows = (await tableIn(p, name).catch(() => null)) ?? [];
+        if (rows.length >= min || Date.now() > until) return rows;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    };
+    const fresh = async () => {
+      const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
+      const p = await ctx.newPage();
+      watch(p, errors);
+      p.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
+      await p.goto(srv.origin + '/');
+      await p.getByLabel('Full name').fill('E2E Demo');
+      await p.locator('#login-pin').fill('482916');
+      await p.locator('#login-confirm').fill('482916');
+      await p.getByRole('button', { name: /Create account/ }).click();
+      await p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ timeout: 15000 });
+      return { ctx, p };
+    };
+    // F4: the wizard's demo choice, from its last step.
+    const a = await fresh();
+    await a.p.getByRole('radio', { name: /CA \/ full accounting/ }).click();
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByLabel('Name on invoices *').fill('E2E Demo Traders');
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('radio', { name: 'I have a GSTIN' }).click();
+    await a.p.getByLabel('GSTIN', { exact: true }).fill('27AAPFU0939F1ZV');
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('dialog', { name: 'How clients pay you' }).waitFor();
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('dialog', { name: /Logo/ }).waitFor();
+    await a.p.getByRole('button', { name: 'Explore with sample data instead' }).click();
+    await a.p.locator('#company-switch').waitFor({ timeout: 20000 });
+    const demoInv = await waitRows(a.p, 'invoices', 1);
+    check(demoInv.length > 0, `the Demo company holds the sample invoices (${demoInv.length})`);
+    await a.p.waitForLoadState('load');
+    await a.p.locator('#company-switch').waitFor({ timeout: 20000 });
+    await a.p.waitForTimeout(500);
+    check(await a.p.getByRole('dialog', { name: 'What do you do?' }).count() === 0, 'the wizard does not start again in the Demo company');
+    await a.ctx.close();
+    // F5: skip the wizard, then the Dashboard card.
+    const b = await fresh();
+    await b.p.getByRole('button', { name: /Skip for now/ }).first().click();
+    await b.p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ state: 'detached' });
+    const cta = b.p.getByRole('button', { name: 'Try with sample data' });
+    await cta.waitFor({ timeout: 15000 });
+    await Promise.all([b.p.waitForEvent('load', { timeout: 20000 }), cta.click()]);
+    const sample = await waitRows(b.p, 'invoices', 1);
+    check(sample.length > 0, `Dashboard "Try with sample data" added the invoices (${sample.length})`);
+    await b.ctx.close();
   });
 
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {

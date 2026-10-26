@@ -23,6 +23,11 @@ export function posBillPhone(bill: Pick<InvoiceRecord, 'client'>, typed?: string
   return normalizePhone(typed?.trim() || bill.client?.phone || '');
 }
 
+/** R3-A5: file name of a counter bill shared as an image (thermal roll → PNG): "INV-FY26-27-0012.png". */
+export function posBillImageName(bill: Pick<InvoiceRecord, 'invoice_number'>): string {
+  return `${(bill.invoice_number || 'bill').replace(/[\\/:*?"<>|\s]+/g, '-').replace(/^-+|-+$/g, '') || 'bill'}.png`;
+}
+
 /** wa.me link for the bill, or null without a usable phone. */
 export function posWhatsappHref(bill: InvoiceRecord, typed?: string): string | null {
   const phone = posBillPhone(bill, typed);

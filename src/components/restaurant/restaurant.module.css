@@ -1,0 +1,202 @@
+/* R3-A restaurant screens: floor grid, order panel, dialogs. Tokens only. */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+@media (min-width: 1080px) {
+  .layout { grid-template-columns: minmax(0, 1fr) minmax(380px, 460px); align-items: start; }
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.tab {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.tab:hover { color: var(--foreground); }
+.tabOn {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--foreground);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.table:hover { border-color: var(--ring); }
+.table:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.tableName { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; }
+.tableMeta { font-size: var(--text-xs); color: var(--muted-foreground); }
+.tableAmt { margin-top: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.occupied { border-color: var(--primary); background: var(--brand-soft); }
+.printed { border-color: var(--warning); }
+.settling { border-color: var(--info); }
+.selected { box-shadow: 0 0 0 2px var(--ring); }
+
+.state {
+  align-self: flex-start;
+  font-size: var(--text-xs);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.stateOccupied { background: var(--primary); color: var(--primary-foreground); }
+.statePrinted { background: var(--warning); color: var(--foreground); }
+.stateSettling { background: var(--info); color: var(--primary-foreground); }
+
+.panel { display: flex; flex-direction: column; gap: 12px; }
+.panelHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.panelTitle { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; margin: 0; }
+.muted { color: var(--muted-foreground); font-size: var(--text-sm); }
+.small { font-size: var(--text-xs); color: var(--muted-foreground); }
+
+.search { position: relative; }
+.hits {
+  position: absolute;
+  z-index: 5;
+  inset-inline: 0;
+  top: 100%;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: 280px;
+  overflow: auto;
+}
+.hit {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.hit:hover, .hitOn { background: var(--muted); }
+.off { opacity: 0.5; text-decoration: line-through; }
+
+.lines { display: flex; flex-direction: column; gap: 6px; }
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.child { padding-inline-start: 18px; }
+.lineName { display: flex; flex-direction: column; min-width: 0; }
+.lineName strong { overflow-wrap: anywhere; }
+.qty { display: flex; align-items: center; gap: 4px; }
+.qtyInput { width: 56px; text-align: center; }
+.amt { font-variant-numeric: tabular-nums; min-width: 72px; text-align: right; }
+.lineExtra { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.seatInput { width: 64px; }
+.noteInput { flex: 1; min-width: 120px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  color: var(--muted-foreground);
+  width: fit-content;
+}
+
+.totals { display: flex; flex-direction: column; gap: 4px; font-variant-numeric: tabular-nums; }
+.totals > div { display: flex; justify-content: space-between; gap: 8px; }
+.grand { font-weight: 700; font-size: var(--text-lg); border-top: 1px solid var(--border); padding-top: 6px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.tenders { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; }
+
+.strip {
+  display: grid;
+  grid-template-columns: auto repeat(5, minmax(0, 1fr));
+  gap: 2px 8px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.strip span:nth-child(6n + 1) { color: var(--muted-foreground); }
+.stripOk { color: var(--profit); }
+.stripDiff { color: var(--warning); }
+
+.parts { display: flex; flex-direction: column; gap: 8px; }
+.partRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+
+.kotList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.kotList li { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: var(--text-sm); }
+
+.settingsGrid { display: flex; flex-direction: column; gap: 10px; }
+.editRow { display: flex; flex-wrap: wrap; gap: 6px; align-items: end; }
+.editRow > label { flex: 1 1 120px; }
+.narrow { max-width: 110px; }
+.groupCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.checks { display: flex; flex-wrap: wrap; gap: 4px 12px; max-height: 140px; overflow: auto; }
+
+.regTable { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.regTable th, .regTable td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.regWrap { overflow-x: auto; }
+
+.offscreen {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  background: var(--card);
+  pointer-events: none;
+}
+
+.warn { color: var(--warning); font-size: var(--text-sm); }
+.error { color: var(--destructive); font-size: var(--text-sm); margin: 0; }

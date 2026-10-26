@@ -32,6 +32,7 @@ const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.C
 const Tds = lazy(() => import('./pages/Tds').then((m) => ({ default: m.Tds })));
 const Loans = lazy(() => import('./pages/Loans').then((m) => ({ default: m.Loans })));
 const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
+const Tables = lazy(() => import('./pages/Tables')); // R3-A restaurant floor
 const Gateway = lazy(() => import('./pages/Gateway').then((m) => ({ default: m.Gateway })));
 // 8.20 / 8.23: files shared into the installed app (Web Share Target, POSTed to the service worker).
 const ShareTarget = lazy(() => import('./pages/ShareTarget').then((m) => ({ default: m.ShareTarget })));
@@ -103,6 +104,7 @@ function App() {
                 <Route path="/invoice" element={<RequireAccess action="doc.create" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
                 <Route path="/invoice/:id" element={<RequireAccess action="doc.edit" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
                 <Route path="/pos" element={<RequireAccess action="doc.create" fallback="/transactions"><Pos /></RequireAccess>} />
+                <Route path="/tables" element={<RequireAccess action="doc.create" fallback="/transactions"><Tables /></RequireAccess>} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/recurring" element={<RequireAccess action="books.edit"><Recurring /></RequireAccess>} />

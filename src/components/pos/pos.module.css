@@ -317,6 +317,24 @@
   gap: 1rem;
 }
 
+/* QA-3 F7: label / value pairs fit a 390px phone (the shared table has a 640px minimum). */
+table.zTable {
+  min-width: 0;
+}
+
+table.zTable th,
+table.zTable td {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 640px) {
+  table.zTable th,
+  table.zTable td {
+    padding: 0.5rem 0.4rem;
+  }
+}
+
 .zTable th {
   text-align: left;
   font-weight: 500;

@@ -14,7 +14,7 @@
  */
 import type { InvoiceRecord, Payment } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
-import { zReport, type ZReport } from './pos';
+import { openOrdersBlocker, zReport, type ZReport } from './pos';
 import type { PosReturn } from './pos-returns';
 import { currentActor, requireAccess } from './access';
 import { audit } from './audit';
@@ -77,7 +77,11 @@ export function shiftReport(shift: PosShift, invoices: readonly InvoiceRecord[],
   const pays = payments.filter((p) => ids.has(p.invoice_id) && p.date <= closeDay && p.date >= shift.day).map((p) => ({ ...p, date: shift.day }));
   const until = shift.closed_at ?? now;
   const rets = returns.filter((r) => r.created_at >= shift.opened_at && r.created_at <= until).map((r) => ({ ...r, day: shift.day }));
-  return zReport(shift.day, bills, pays, rets);
+  // QA-3 F1: `zReturns` values each return from its credit note, so the shift's return CNs go in with
+  // its bills (a CN carries no `pos` flag, so it is never counted as a bill).
+  const cnIds = new Set(rets.map((r) => r.credit_note_id));
+  const cns = invoices.filter((i) => cnIds.has(i.id) && !ids.has(i.id));
+  return zReport(shift.day, [...bills, ...cns], pays, rets);
 }
 
 export function shiftTotals(z: ZReport): ShiftTotals {
@@ -99,9 +103,18 @@ export function shiftExpected(z: ZReport, openingFloat: number): number {
   return round2(Math.max(num(openingFloat), 0) + z.tenders.cash - num(z.returns?.refunds.cash));
 }
 
-/** Why a shift cannot be closed now ('' = it can). */
-export function closeBlocker(heldBills: number): string {
-  return heldBills > 0 ? `${heldBills} bill${heldBills === 1 ? ' is' : 's are'} on hold — recall and save or drop ${heldBills === 1 ? 'it' : 'them'} before closing the shift.` : '';
+/** Why a shift cannot be closed now ('' = it can). R3-A: live restaurant orders block it too. */
+export function closeBlocker(heldBills: number, openOrders = ''): string {
+  return heldBills > 0 ? `${heldBills} bill${heldBills === 1 ? ' is' : 's are'} on hold — recall and save or drop ${heldBills === 1 ? 'it' : 'them'} before closing the shift.` : openOrders;
+}
+
+/**
+ * QA-3 F16: the drawer's opening float for the day Z report: the float of the day's first shift (one
+ * drawer: later shifts take over the cash already in it). 0 when no shift was opened that day.
+ */
+export function dayOpeningFloat(shifts: readonly PosShift[], day: string): number {
+  const first = shifts.filter((s) => s.day === day).sort((a, b) => (a.number || 0) - (b.number || 0))[0];
+  return first ? round2(Math.max(num(first.opening_float), 0)) : 0;
 }
 
 /** Next shift number for `day`. */
@@ -152,7 +165,7 @@ export const shiftsDb = {
   /** Close with the counted cash; refused while bills are on hold. Returns the closed row. */
   close: (shiftId: string, z: ZReport, counted: number, heldBills: number, note?: string): PosShift => {
     requireAccess('doc.create');
-    const blocker = closeBlocker(heldBills);
+    const blocker = closeBlocker(heldBills, openOrdersBlocker());
     if (blocker) throw new Error(blocker);
     const all = shiftsDb.all();
     const idx = all.findIndex((s) => s.id === shiftId);

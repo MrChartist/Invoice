@@ -25,7 +25,8 @@ import {
 import { localDb } from './localDb';
 import { loadReceivableOpeningBills } from './opening-bills';
 import { assertUnlocked } from './period-lock';
-import { buildReceivables, type ReceiptRow } from './receivables';
+import { buildReceivables, posRefunds, type ReceiptRow } from './receivables';
+import type { PosReturn } from './pos-returns';
 import type { CreditLinkRow } from './amount-due';
 import { generateId, getTable, setTable } from './storage';
 import { withTablesRollback } from './table-txn';
@@ -83,7 +84,7 @@ export function openRefsFor(party: string, voucherId?: string, now: Date = new D
   if (!client?.id) return [];
   const all = localDb.payments.getAll() as ReceiptRow[];
   const payments = voucherId ? all.filter((p) => (p as VoucherReceipt).voucher_id !== voucherId) : all;
-  const report = buildReceivables({ invoices: localDb.invoices.getAll(), payments, clients, openingBills: loadReceivableOpeningBills(clients), links: getTable<CreditLinkRow>('doc_links') }, { now });
+  const report = buildReceivables({ invoices: localDb.invoices.getAll(), payments, clients, openingBills: loadReceivableOpeningBills(clients), links: getTable<CreditLinkRow>('doc_links'), refunds: posRefunds(getTable<PosReturn>('pos_returns')) }, { now });
   const p = report.parties.find((x) => x.key === client.id);
   return (p?.bills ?? [])
     .filter((b) => !b.invoiceId.startsWith('onacc:'))

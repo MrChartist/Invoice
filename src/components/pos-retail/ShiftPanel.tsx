@@ -50,7 +50,13 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const today = useMemo(() => shiftsDb.all().filter((s) => s.day === todayInput()), [tick, open]);
   const [float, setFloat] = useState(0);
-  const [counted, setCounted] = useState(0);
+  const [counted, setCountedValue] = useState(0);
+  // QA-3 F16: no difference (and no close) until the cash is counted: a blank count is not ₹0.
+  const [countedTyped, setCountedTyped] = useState(false);
+  const setCounted = (n: number) => {
+    setCountedValue(n);
+    setCountedTyped(true);
+  };
   const [note, setNote] = useState('');
   const z = useMemo(
     () => (current ? shiftReport(current, localDb.invoices.getAll(), localDb.payments.getAll(), posReturnsDb.all()) : null),
@@ -76,6 +82,8 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
     try {
       const s = shiftsDb.close(current.id, z, counted, held, note);
       setTick((t) => t + 1);
+      setCountedValue(0);
+      setCountedTyped(false);
       onChanged(undefined);
       notify(retailT('shiftClosed', { n: s.number, diff: formatCurrency(s.difference ?? 0) }));
       printHtml(zReportHtml(z, { business, close: asClose(s, s.expected_cash ?? 0, s.counted_cash ?? 0), title: retailT('zShiftTitle', { n: s.number, user: s.user_name }) }), `shift-${s.day}-${s.number}`);
@@ -97,7 +105,7 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
             <button type="button" className={controls.btnOutline} onClick={() => z && printHtml(zReportHtml(z, { business, title: retailT('xTitle', { n: current.number, user: current.user_name }) }), `x-report-${current.day}-${current.number}`)}>
               <Printer size={16} /> {retailT('printX')}
             </button>
-            <button type="button" className={controls.btnPrimary} onClick={doClose} disabled={!!blocker} data-shift-close>{retailT('closeShift')}</button>
+            <button type="button" className={controls.btnPrimary} onClick={doClose} disabled={!!blocker || !countedTyped} title={countedTyped ? undefined : retailT('expectedNoCount', { float: formatCurrency(current.opening_float), amount: formatCurrency(expected) })} data-shift-close>{retailT('closeShift')}</button>
           </>
         ) : (
           <button type="button" className={controls.btnPrimary} onClick={doOpen} data-shift-open>{retailT('openShift')}</button>
@@ -136,7 +144,9 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
               </label>
             </div>
             <p className={styles.muted} data-x="expected">
-              {retailT('expectedCash', { float: formatCurrency(current!.opening_float), amount: formatCurrency(expected), diff: formatCurrency(Math.round((counted - expected) * 100) / 100) })}
+              {countedTyped
+                ? retailT('expectedCash', { float: formatCurrency(current!.opening_float), amount: formatCurrency(expected), diff: formatCurrency(Math.round((counted - expected) * 100) / 100) })
+                : retailT('expectedNoCount', { float: formatCurrency(current!.opening_float), amount: formatCurrency(expected) })}
             </p>
             {blocker && <p className={styles.warn} role="alert" data-shift-blocked>{blocker}</p>}
           </>
