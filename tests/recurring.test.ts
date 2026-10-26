@@ -189,7 +189,9 @@ test('pause, resume (no back-fill), skip next, stop', () => {
 test('runNow issues the next occurrence dated today, once', () => {
   const s = schedule({ start_date: '2025-09-01', next_run: '2025-09-01' });
   R.recurringDb.save(s);
-  const res = R.runNow(s.id, '2025-08-20')!;
+  // QA-3 F6: a period that is not due yet is billed only once the user confirms (early).
+  assert.throws(() => R.runNow(s.id, '2025-08-20'), /not due yet/);
+  const res = R.runNow(s.id, '2025-08-20', { early: true })!;
   assert.equal(res.created, true);
   assert.equal(res.invoice.issue_date, '2025-08-20');
   assert.equal(R.recurringDb.getById(s.id)!.next_run, '2025-10-01');

@@ -198,3 +198,26 @@
 .tileBtn.noStock {
   border-color: var(--loss);
 }
+
+/* QA-3 F26: the POS header tools. Desktop: they wrap as before. Phone: one row that scrolls sideways
+   (about 44px instead of about 300px), so the cart total, tenders and Save bill stay above the fold. */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .tools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: calc(100vw - 2rem);
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+  }
+
+  .tools > * {
+    flex: 0 0 auto;
+  }
+}

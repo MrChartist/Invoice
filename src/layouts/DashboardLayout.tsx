@@ -156,6 +156,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(show) })).filter((g) => g.items.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, modeTick]);
+  // QA-3 F26: a kirana shop bills at the counter, so its phone tab bar offers POS in place of Invoices.
+  const posTab = useMemo(() => {
+    const s = localDb.settings.get();
+    return s.business_type === 'kirana' && can('doc.create') && isPathVisible('/pos', enabledModules(s));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, modeTick]);
   const { theme, toggle } = useTheme();
   const { t, lang } = useT();
   const { notify, toastNode } = useToast();
@@ -473,10 +479,17 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <LayoutDashboard size={20} aria-hidden="true" />
             <span>{t('shell.tabHome')}</span>
           </NavLink>
-          <NavLink to="/transactions" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
-            <FileText size={20} aria-hidden="true" />
-            <span>{t('nav.invoices')}</span>
-          </NavLink>
+          {posTab ? (
+            <NavLink to="/pos" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)} data-tab-pos>
+              <ScanBarcode size={20} aria-hidden="true" />
+              <span>{t('nav.pos')}</span>
+            </NavLink>
+          ) : (
+            <NavLink to="/transactions" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
+              <FileText size={20} aria-hidden="true" />
+              <span>{t('nav.invoices')}</span>
+            </NavLink>
+          )}
           {can('doc.create') && (
             // 8H: "+" opens the quick-create sheet; the device preference `PLUS_ONE_TAP_KEY` keeps the old one tap.
             <button

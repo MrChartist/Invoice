@@ -14,12 +14,14 @@ import {
   recurringDb,
   resumeSchedule,
   runNow,
+  runNowIsEarly,
   scheduleStatus,
   skipNext,
   stopSchedule,
   type RecurringSchedule,
 } from '../lib/recurring';
 import { formatCurrency, formatDate, todayInput } from '../lib/utils';
+import { RECURRING_RAN_EVENT, RECURRING_RUN_EVENT } from '../hooks/useRecurringRunner';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Recurring.module.css';
@@ -39,6 +41,7 @@ type Confirm =
   | { kind: 'delete'; schedule: RecurringSchedule }
   | { kind: 'stop'; schedule: RecurringSchedule }
   | { kind: 'skip'; schedule: RecurringSchedule }
+  | { kind: 'early'; schedule: RecurringSchedule }
   | null;
 
 export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
@@ -59,7 +62,12 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
   useEffect(() => {
     const onFocus = () => reload();
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    // QA-3 F6: the shell's runner generated documents (e.g. the first run of a schedule just saved).
+    window.addEventListener(RECURRING_RAN_EVENT, onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener(RECURRING_RAN_EVENT, onFocus);
+    };
   }, [reload]);
 
   const today = todayInput();
@@ -102,16 +110,25 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
     }
   };
 
-  const onRunNow = (s: RecurringSchedule) =>
+  const runAndTell = (id: string, early: boolean) =>
     guard(() => {
-      const res = runNow(s.id, today);
+      const res = runNow(id, today, { early });
       if (!res) notify(recT('ended'), 'error');
-      else notify(res.created ? recT('created', { number: res.invoice.invoice_number }) : recT('exists'), res.created ? 'success' : 'info');
+      else notify(res.created ? recT('created', { number: res.invoice.invoice_number || recT('draftShort') }) : recT('exists'), res.created ? 'success' : 'info');
     });
+  // QA-3 F6: judged on the stored schedule (the card may be stale); a period not due yet asks first.
+  const onRunNow = (s: RecurringSchedule) => {
+    const fresh = recurringDb.getById(s.id) ?? s;
+    if (runNowIsEarly(fresh, today)) {
+      reload();
+      setConfirm({ kind: 'early', schedule: fresh });
+    } else runAndTell(s.id, false);
+  };
 
   const runConfirmed = () => {
     if (!confirm) return;
     const { kind, schedule } = confirm;
+    if (kind === 'early') return runAndTell(schedule.id, true);
     guard(() => {
       if (kind === 'delete') {
         recurringDb.remove(schedule.id);
@@ -138,6 +155,12 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
       message: recT('stopMsg', { name: confirm.schedule.name }),
       label: recT('stopLabel'),
       destructive: true,
+    },
+    early: {
+      title: recT('earlyTitle'),
+      message: recT('earlyMsg', { date: formatDate(confirm.schedule.next_run) }),
+      label: recT('earlyLabel'),
+      destructive: false,
     },
     skip: {
       title: recT('skipTitle'),
@@ -224,6 +247,8 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
         onSaved={(s) => {
           notify(editing ? recT('updated') : recT('createdSchedule', { name: s.name }));
           reload();
+          // A schedule due today runs now; the list re-reads when the runner reports back.
+          if (s.next_run <= today) window.dispatchEvent(new Event(RECURRING_RUN_EVENT));
         }}
       />
 

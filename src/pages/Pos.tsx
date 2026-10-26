@@ -718,7 +718,8 @@ export function Pos() {
         title={posT('title')}
         subtitle={posT('subtitle', { doc: docLabel, business: sender?.companyName || posT('setUp') })}
         actions={
-          <>
+          // QA-3 F26: on a phone the counter tools are one scrolling row, so the cart total and Save stay in view.
+          <div className={counter.tools} data-pos-tools>
             {lastBill && (
               <button type="button" className={controls.btnOutline} onClick={() => setPrinting(lastBill)}>
                 <Printer size={16} /> {posT('reprint', { number: lastBill.invoice_number })}
@@ -755,7 +756,7 @@ export function Pos() {
             <button type="button" className={controls.btnOutline} onClick={() => setZOpen(true)}>
               <ReceiptText size={16} /> {posT('zReport')}
             </button>
-          </>
+          </div>
         }
       />
 

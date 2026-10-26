@@ -45,9 +45,29 @@
   color: var(--foreground);
 }
 
+/* QA-3 F7: the lines table fits the dialog (the shared table's 640px minimum made the whole body
+   scroll sideways on a phone); it scrolls inside its own wrapper if a long name still needs room. */
+.lines {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.lines table {
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .find,
   .refunds {
     grid-template-columns: 1fr;
+  }
+
+  .lines table th,
+  .lines table td {
+    padding: 0.5rem 0.4rem;
+  }
+
+  .lines table th {
+    white-space: normal;
   }
 }

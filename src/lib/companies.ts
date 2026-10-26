@@ -5,6 +5,7 @@
 
 import {
   DEFAULT_COMPANY_ID,
+  DEFAULT_COMPANY_NAME,
   companyDbName,
   readRegistry,
   writeRegistry,
@@ -47,6 +48,22 @@ export function renameCompany(id: string, name: string): void {
   const n = cleanName(name);
   if (reg.list.some((c) => c.id !== id && c.name.toLowerCase() === n.toLowerCase())) throw new Error('A company with this name already exists.');
   writeRegistry({ ...reg, list: reg.list.map((c) => (c.id === id ? { ...c, name: n } : c)) });
+}
+
+/**
+ * QA-3 F27: while the main company is open and still carries the placeholder label, label it with
+ * its business profile name (what the user knows it by). A label only: never renames a company the
+ * user named, and skips a name another company already has. Returns true when it changed.
+ */
+export function labelMainCompany(profileName: string | null | undefined): boolean {
+  const reg = readRegistry();
+  const n = (profileName ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!n || reg.active !== DEFAULT_COMPANY_ID) return false;
+  const main = reg.list.find((c) => c.id === DEFAULT_COMPANY_ID);
+  if (!main || main.name !== DEFAULT_COMPANY_NAME) return false;
+  if (reg.list.some((c) => c.id !== DEFAULT_COMPANY_ID && c.name.toLowerCase() === n.toLowerCase())) return false;
+  writeRegistry({ ...reg, list: reg.list.map((c) => (c.id === DEFAULT_COMPANY_ID ? { ...c, name: n } : c)) });
+  return true;
 }
 
 /** Save pending writes, make `id` the active company and reload into it. */
