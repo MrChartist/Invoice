@@ -156,6 +156,9 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   settlements: 'Marketplace settlements: payout, lines per order and bucket, posting references.',
   eco_credits: 'GST TCS / TDS credit rows from the portal, with the accept / reject decision.',
   marketplace_returns: 'Marketplace returns / RTO / claims desk.',
+  // R5-C: institutions, non-profits & property
+  fee_plans: 'Fee plans.', fee_runs: 'Fee billing runs.', common_credit_runs: 'Rule 42 / 43 reversals.', donations: 'Donation receipts (80G / 35).',
+  form_10bd_filings: 'Form 10BD filings.', form_10be: 'Form 10BE certificates.', properties: 'Properties and units.', leases: 'Leases.', security_deposits: 'Security deposits.',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',

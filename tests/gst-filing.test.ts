@@ -84,7 +84,7 @@ const LEGACY_TABS = [
   'bygstin', 'guards',
 ];
 /** Tabs added later (R3-C4 portal files, R3-C5 e-Way desk, R4-C2 export desk). */
-const ADDED_TABS = ['portal-files', 'eway-desk', 'export-desk'];
+const ADDED_TABS = ['portal-files', 'eway-desk', 'export-desk', 'common-credit']; // + R5-C2 common credit
 
 test('tabs: every previous ?tab= id still resolves and sits in exactly one group', () => {
   for (const id of LEGACY_TABS) assert.equal(resolveGstTab(id), id, id);

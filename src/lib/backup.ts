@@ -457,6 +457,8 @@ const RECORD_TABLES = [
   'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
   // Round 5 (R5-A): sales channels, channel SKU map, marketplace imports, settlements, GST TCS / TDS credit rows, returns desk
   'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
+  // Round 5 (R5-C): fee plans / runs, common-credit runs, donations, 10BD filings, 10BE, properties, leases, security deposits
+  'fee_plans', 'fee_runs', 'common_credit_runs', 'donations', 'form_10bd_filings', 'form_10be', 'properties', 'leases', 'security_deposits',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -511,6 +513,8 @@ const ID_TABLES = new Set([
   'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
   // Round 5 (R5-A)
   'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
+  // Round 5 (R5-C)
+  'fee_plans', 'fee_runs', 'common_credit_runs', 'donations', 'form_10bd_filings', 'form_10be', 'properties', 'leases', 'security_deposits',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

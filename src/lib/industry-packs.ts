@@ -68,6 +68,12 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'marketplace', path: '/receivables?tab=marketplace&view=settlements', labelKey: 'view.settlements' },
   { pack: 'marketplace', path: '/receivables?tab=marketplace&view=tcs', labelKey: 'view.tcs' },
   { pack: 'marketplace', path: '/receivables?tab=marketplace&view=returns', labelKey: 'view.returns' },
+  // R5-C: fees, leases, donations, funds, common credit (labels in `packs-institutions-r5.ts`)
+  { pack: 'fees', path: '/recurring?tab=fees', labelKey: 'tab.fees' },
+  { pack: 'leases', path: '/recurring?tab=leases', labelKey: 'tab.leases' },
+  { pack: 'nonprofit', path: '/receivables?tab=donations', labelKey: 'tab.donations' },
+  { pack: 'nonprofit', path: '/books?tab=funds', labelKey: 'tab.funds' },
+  { pack: 'fees', path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' },
 ];
 
 /**

@@ -16,14 +16,15 @@ import { generateId, getTable, setTable } from './storage';
 
 export const COST_CENTRES_TABLE = 'cost_centres';
 
-export type CostCentreKind = 'project' | 'department' | 'branch';
+export type CostCentreKind = 'project' | 'department' | 'branch' | 'fund';
 
-export const COST_CENTRE_KINDS: readonly CostCentreKind[] = ['project', 'department', 'branch'];
+export const COST_CENTRE_KINDS: readonly CostCentreKind[] = ['project', 'department', 'branch', 'fund'];
 
 export const COST_CENTRE_KIND_LABELS: Record<CostCentreKind, string> = {
   project: 'Project',
   department: 'Department',
   branch: 'Branch',
+  fund: 'Fund',
 };
 
 /** One row of `cost_centres`. Field names are snake_case and additive-only. */
@@ -81,6 +82,7 @@ function projectFields(o: Record<string, unknown>): Partial<CostCentre> {
   if (DAY.test(str(o.start))) out.start = str(o.start);
   if (DAY.test(str(o.due))) out.due = str(o.due);
   if (PROJECT_STATUSES.includes(o.status as ProjectStatus)) out.status = o.status as ProjectStatus;
+  if (o.fund && typeof o.fund === 'object') out.fund = o.fund as CostCentre['fund']; // R5-C4: fund details (kind 'fund')
   return out;
 }
 

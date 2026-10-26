@@ -78,6 +78,7 @@ function clean(rows: unknown[]): BankAccount[] {
       ...(id !== DEFAULT_BANK_ID && typeof o.currency === 'string' && /^[A-Za-z]{3}$/.test(o.currency.trim()) && o.currency.trim().toUpperCase() !== 'INR' ? { currency: o.currency.trim().toUpperCase() } : {}),
       ...(Number.isFinite(Number(o.fcy_opening)) && o.fcy_opening !== undefined && o.fcy_opening !== '' ? { fcy_opening: round2(Number(o.fcy_opening)) } : {}),
       ...(id !== DEFAULT_BANK_ID && o.clearing === true ? { clearing: true } : {}), // R5-A2: marketplace settlement clearing
+      ...(o.fcra === 'designated' || o.fcra === 'utilisation' ? { fcra: o.fcra } : {}), // R5-C4: FCRA account
     });
   }
   if (!seen.has(DEFAULT_BANK_ID)) out.unshift({ ...MAIN });

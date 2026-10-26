@@ -794,3 +794,16 @@ test('R5-A fee bill written by settlement-post reads back through readPurchase /
   assert.equal(Math.round((g!.cgst + g!.sgst + g!.igst) * 100) / 100, 30.6);
   assert.equal(exportNormalize(fee)!.total, 250.6);
 });
+
+// R5-C: `common-credit.ts` READS bills (Rule 42 / 43 inputs) through readPurchase — ITC by head, the itc_use tag, void bills skipped.
+test('R5-C common-credit reads the real purchase shape', async () => {
+  const { inputsFor, rule42 } = await import('../src/lib/institutions/common-credit.ts');
+  const tagged = { ...bill, id: 'p2', itc_use: 'exempt_only' } as PurchaseRecord;
+  const blocked = { ...bill, id: 'p3', itc_eligible: false } as PurchaseRecord;
+  const draft = { ...bill, id: 'p4', status: 'draft' } as unknown as PurchaseRecord;
+  const i = inputsFor([bill, tagged, blocked, draft], '2026-04-01', '2026-04-30');
+  assert.deepEqual(i.T, { igst: 0, cgst: 270, sgst: 270, cess: 0 });
+  assert.deepEqual(i.T2, { igst: 0, cgst: 90, sgst: 90, cess: 0 });
+  assert.deepEqual(i.T3, { igst: 0, cgst: 90, sgst: 90, cess: 0 });
+  assert.equal(rule42(i, 0, 1, '2026-04').C2.cgst, 90);
+});

@@ -12,10 +12,14 @@ import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
 import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
 import styles from './Settings.module.css';
 
 // R4-C1: IEC / AD code and the LUT register — their own lazy chunk.
 const ExportSettingsPanel = lazy(() => import('../trade/ExportSettingsPanel'));
+// R5-C3: non-profit registrations (PAN, 12AB, 80G URN, 35(1), FCRA) — only with the non-profit pack on.
+const NpoRegistrationsPanel = lazy(() => import('../institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.NpoRegistrationsPanel })));
 
 interface Props {
   profile: SenderProfile;
@@ -216,6 +220,7 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
       <Suspense fallback={null}>
         <ExportSettingsPanel profile={profile} onChange={onChange} />
       </Suspense>
+      {isPackOn(localDb.settings.get(), 'nonprofit') && <Suspense fallback={null}><NpoRegistrationsPanel profile={profile} onChange={onChange} /></Suspense>}
 
       <fieldset className={styles.group}>
         <legend>{setT('paymentDetails')}</legend>

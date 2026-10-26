@@ -358,6 +358,12 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}settlements`]: 'deposit_date',
   [`${DB_PREFIX}eco_credits`]: (r) => (/^\d{4}-\d{2}$/.test(str(r.month)) ? `${str(r.month)}-01` : undefined),
   [`${DB_PREFIX}marketplace_returns`]: (r) => str(r.expected_on) || str(r.created_at).slice(0, 10) || undefined,
+  // R5-C: fee runs (issue date), common-credit runs (journal date), donations, leases (start), security deposits
+  [`${DB_PREFIX}fee_runs`]: 'date',
+  [`${DB_PREFIX}common_credit_runs`]: 'date',
+  [`${DB_PREFIX}donations`]: 'date',
+  [`${DB_PREFIX}leases`]: 'start',
+  [`${DB_PREFIX}security_deposits`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -929,6 +935,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   // R4-B: gift vouchers (GV/FY…) and transfer requests (TRQ/FY…)
   [`${DB_PREFIX}gift_vouchers`]: { num: 'number', date: 'issued_on' },
   [`${DB_PREFIX}transfer_requests`]: { num: 'number', date: 'date' },
+  // R5-C3: donation receipts (DON/FY…)
+  [`${DB_PREFIX}donations`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

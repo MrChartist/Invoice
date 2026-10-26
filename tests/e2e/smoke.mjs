@@ -2589,6 +2589,39 @@ try {
     await writeJson(page, 'gst_portal_files', null);
   });
 
+  await step('R5-C non-profit pack: turn it on, issue a donation receipt, see its Form 10BD CSV row and the fund statement', async () => {
+    await page.goto(srv.origin + '/settings?tab=defaults');
+    const box = page.locator('[data-industry-packs] label', { hasText: 'Non-profit' }).locator('input');
+    await box.waitFor({ timeout: 15000 });
+    if (!(await box.isChecked())) await box.check();
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => Array.isArray(v.industry_packs) && v.industry_packs.includes('nonprofit'));
+    check(st.industry_packs?.includes('nonprofit'), 'the non-profit pack is on');
+    const before = await readJson(page, 'donations', []);
+    await page.goto(srv.origin + '/receivables?tab=donations');
+    await page.locator('[data-donation-new]').click({ timeout: 15000 });
+    await page.locator('[data-donor-name]').fill('E2E Donor Trust');
+    await page.locator('[data-donor-id]').fill('ABCPD1234F');
+    await page.locator('[data-donation-amount]').fill('5000');
+    await page.locator('[data-donation-save]').click();
+    const after = await readJson(page, 'donations', [], (v) => v.length === before.length + 1);
+    const don = after.find((d) => !before.some((b) => b.id === d.id));
+    check(/^DON\/FY\d{2}-\d{2}\/\d{4}$/.test(don?.number ?? '') && !!don?.voucher_id, `donation receipt ${don?.number} with its receipt voucher`);
+    await page.locator('[data-r5c-view="form10bd"]').click();
+    const t = new Date();
+    const fy = t.getMonth() >= 3 ? t.getFullYear() : t.getFullYear() - 1;
+    await page.locator('[data-10bd-panel] select').first().selectOption(String(fy));
+    await page.locator('[data-10bd-rows]', { hasText: 'E2E Donor Trust' }).waitFor();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-10bd-csv]').click()]);
+    const csv = readFileSync(await dl.path(), 'utf8');
+    check(/Unique Identification Number/.test(csv) && /Permanent Account Number,ABCPD1234F,Section 80G,.*E2E Donor Trust.*,5000/.test(csv), 'the 10BD CSV has the donor row in template column order');
+    await page.goto(srv.origin + '/books?tab=funds&view=statement');
+    const stmt = page.locator('[data-fund-statement]');
+    await stmt.waitFor({ timeout: 15000 });
+    const text = await stmt.textContent();
+    check(/General fund/.test(text ?? '') && /Donations received/.test(text ?? '') && /5,000\.00/.test(text ?? ''), 'the General fund statement shows the donation');
+  });
+
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
     // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
     await page.goto(srv.origin + '/settings?tab=data');

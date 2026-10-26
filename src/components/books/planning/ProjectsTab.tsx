@@ -43,7 +43,7 @@ import { peekTable } from '../../../lib/storage';
 const ProjectMaterialsRow = lazy(() => import('../../production/ProjectMaterialsRow'));
 
 const SECTION_KEY = { income: 'secIncome', direct: 'secDirect', indirect: 'secIndirect' } as const;
-const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch' } as const;
+const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch', fund: 'kindFund' } as const;
 const kindLabel = (k: CostCentreKind) => planT(KIND_KEY[k]);
 /** Engine column labels: centre names pass through; the two fixed columns are translated. */
 const columnLabel = (label: string) => (label === 'Unallocated' ? planT('unallocated') : label === 'Deleted cost centre' ? planT('deletedCc') : label);
