@@ -8,7 +8,8 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Godown } from '../../types/stock';
-import type { Arrival, Indent, SalePatti } from '../../types/trade-r8';
+import type { Arrival, Indent, PackagingMove, PackagingType, PartyRate, SalePatti } from '../../types/trade-r8';
+import type { Scheme } from '../pricing';
 import { applyTotals, type Demo, type DemoExtras } from '../demo-data';
 import { deriveGstMode } from '../invoice-calc';
 import { shiftDay } from '../dates';
@@ -101,7 +102,22 @@ function agencyExtras({ today, base }: ProfileContext): DemoExtras {
   return { invoices: sales, tables: { godowns: [godown], arrivals: [arrival], sale_pattis: [patti], indents: [indent(0, false), indent(1, true)] } };
 }
 
+/** R8-A: a party special rate (18 + 4 %), a brand scheme paid by a principal, crates with one customer. */
+function distributorExtras({ today, base }: ProfileContext): DemoExtras {
+  const item = base.items[0];
+  const client = base.clients[0];
+  const principal = base.vendors[0];
+  const from = shiftDay(today, -30);
+  const rate: Demo<PartyRate> = { id: 'demo-party-rate-1', demo: true, side: 'sale', party_id: client.id!, party_name: client.name, item_id: item.id, item_name: item.name, disc_chain: [18, 4], valid_from: from };
+  const scheme: Demo<Scheme> = { id: 'demo-scheme-brand', demo: true, item_id: '', item_name: '', buy_qty: 10, free_qty: 1, scope: { brand: item.name.split(/\s+/)[0] }, valid_from: from, principal_vendor_id: principal.id, claim_basis: 'free_goods_at_cost' };
+  const crate: Demo<PackagingType> = { id: 'demo-crate', demo: true, name: 'Crate (demo)', unit: 'NOS', deposit: 50, charge_rate: 150, hsn: '3923', tax_rate: 18, returnable: true };
+  const move = (n: number, out: number, back: number, days: number): Demo<PackagingMove> => ({ id: `demo-crate-move-${n}`, demo: true, date: shiftDay(today, -days), party_kind: 'client', party_id: client.id, party_name: client.name, type_id: crate.id, out, in: back, created_at: `${shiftDay(today, -days)}T10:00:00.000Z` });
+  return { tables: { party_rates: [rate], schemes: [scheme], packaging_types: [crate], packaging_moves: [move(1, 40, 0, 75), move(2, 0, 35, 70), move(3, 20, 0, 5)] } };
+}
+
 export function tradingExtras(ctx: ProfileContext): DemoExtras {
-  // R8-C: the agency rows; TR-A (distributor) and TR-B (commodity) append theirs below.
-  return ctx.packs.includes('agency') ? agencyExtras(ctx) : {};
+  // R8-C: the agency rows; R8-A: the distributor rows; TR-B (commodity) appends theirs below.
+  const a = ctx.packs.includes('agency') ? agencyExtras(ctx) : {};
+  const d = ctx.packs.includes('distributor') ? distributorExtras(ctx) : {};
+  return a.tables && d.tables ? { ...a, tables: { ...a.tables, ...d.tables } } : a.tables ? a : d;
 }

@@ -20,6 +20,11 @@ import { PRICE_LIST_BASIS, priceListRate } from '../../lib/price-list';
 import { BRANCH_PRICES_TABLE, branchContext, storePricingInUse } from '../../lib/retail/store-prices'; // R4-B3
 import { BRANCHES_TABLE, branchOfInvoice, type Branch } from '../../lib/branch';
 import type { BranchPrice } from '../../types/stores-r4';
+import type { ScopeCtx } from '../../lib/trade/tr-pricing';
+
+// TR-A1 / A2: party rates and scoped schemes, loaded with the editor as their own chunk (until then: none apply).
+let tr: typeof import('../../lib/trade/tr-pricing') | null = null;
+import('../../lib/trade/tr-pricing').then((m) => { tr = m; }, () => {});
 
 /** Notes don't take part: a credit / debit note re-states an earlier price. */
 const pricedDoc = () => {
@@ -87,23 +92,32 @@ function reprice(lineId: string, ctx: EditorPricing | null, force = false): void
   if (!force && line.price_basis === LAST_RATE_BASIS) return;
   const cat = ctx ? catalogItemFor(ctx.data.catalog, line.name) : undefined;
   const list = listRateFor(line);
-  if (!cat && list === undefined) return;
-  const base = list ?? num(cat?.rate);
+  // TR-A1: the party's special rate / discount for this item wins over levels, lists and slabs.
+  const pr = pricedDoc() && tr ? tr.partyRateFor(tr.loadPartyRates(), 'sale', st.client, { id: cat?.id, name: line.name }, st.issue_date) : undefined;
+  if (!cat && list === undefined && !pr) return;
+  const base = list ?? (cat ? num(cat.rate) : num(line.rate));
   // A typed rate (no basis) is the user's choice: leave it, unless asked to re-price.
   if (!force && !line.price_basis && num(line.rate) !== base) return;
   const branch = ctx?.store ? branchContext(ctx.store.branch, cat?.id ?? '', st.issue_date, ctx.store.prices, ctx.data.levels) : null; // R4-B3
-  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(line.quantity), ctx?.level, branch); // 8E: an MRP level reads the MRP
-  const basis = quote.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : quote.basis;
-  if (quote.rate !== num(line.rate) || basis !== line.price_basis) {
-    st.patchItem(lineId, { rate: quote.rate, price_basis: basis });
+  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(line.quantity), ctx?.level, branch, pr?.rate); // 8E: an MRP level reads the MRP
+  const basis = quote.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : quote.source === 'base' && pr ? 'Party rate' : quote.basis;
+  const disc = pr && (pr.disc_chain?.length || pr.disc_per_unit) ? { disc_chain: pr.disc_chain, disc_per_unit: pr.disc_per_unit, discount_percent: tr!.effectivePercent(pr.disc_chain, pr.disc_per_unit, quote.rate) } : {};
+  if (quote.rate !== num(line.rate) || basis !== line.price_basis || ('discount_percent' in disc && disc.discount_percent !== line.discount_percent)) {
+    st.patchItem(lineId, { rate: quote.rate, price_basis: basis, ...disc });
   }
 }
 
 function syncSchemes(ctx: EditorPricing | null): void {
   const st = useInvoiceStore.getState();
   if (!ctx && !st.items.some((i) => i.free_of)) return;
-  const next = syncSchemeLines(st.items, ctx?.data.schemes ?? [], st.issue_date, generateId, ctx?.data.catalog ?? []);
+  const scoped = tr && ctx?.data.schemes.some((x) => x.scope) ? scopeCtx(ctx) : null; // TR-A2
+  const next = syncSchemeLines(st.items, ctx?.data.schemes ?? [], st.issue_date, generateId, ctx?.data.catalog ?? [], scoped ? (after, before) => tr!.applyScopedSchemes(after, before, ctx!.data.schemes, st.issue_date, scoped, generateId, ctx!.data.catalog) : undefined);
   if (next !== st.items) st.patch({ items: next });
+}
+
+/** TR-A2: what a scoped scheme needs to know about the party and the items. */
+function scopeCtx(ctx: EditorPricing): ScopeCtx {
+  return { clientId: masterClient(peekTable<Client>(KEYS.clients), useInvoiceStore.getState().client)?.id, levelId: ctx.level?.id, ...tr!.liveScopeItems(ctx.data.catalog) };
 }
 
 /** Catalogue pick (typeahead or picker): fills the line, then applies level / slab / scheme. */

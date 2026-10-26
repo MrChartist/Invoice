@@ -40,6 +40,8 @@ import styles from './purchases.module.css';
 const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
 // R8-C (TR-C2): notified goods from an agriculturist / unregistered supplier → reverse charge prompt (lazy).
 const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
+// R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
+const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 
 export interface BillModalProps {
   open: boolean;
@@ -332,6 +334,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} />
+      {vendor && ((x) => !!x.trade_discounts || !!x.industry_packs?.some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()) && <Suspense fallback={null}><BillRateHints lines={lines} vendor={vendor} date={date} onRate={(id, rate) => changeLines(lines.map((l) => (l.id === id ? { ...l, rate } : l)))} /></Suspense>}
       {!rcm && !importType && vendor && <Suspense fallback={null}><RcmGoodsNotice lines={lines} date={date} vendor={vendor} onApply={() => setRcm(true)} /></Suspense>}
       <LandedCostFields value={landed} onChange={setLanded} />
 

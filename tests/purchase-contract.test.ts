@@ -846,3 +846,10 @@ test('R8-C: the bank stock statement counts unpaid goods bills (kind PURCHASE) a
   assert.equal(creditorsForGoods('2026-04-30'), 1180);
   assert.equal(creditorsForGoods('2026-04-01'), 0, 'a bill dated after the statement date is not owed yet');
 });
+
+test('R8-A: the last purchase rate reads the real bill shape (lines, legacy items, expenses) through readPurchaseLines', async () => {
+  const { lastPurchaseRate } = await import('../src/lib/trade/tr-party-rates.ts');
+  const legacy = { ...bill, id: 'p3', lines: undefined, items: [{ name: 'Paper ream', quantity: 10, rate: 90 }], date: '2026-03-01' };
+  assert.deepEqual(lastPurchaseRate([bill, legacy], { name: 'Acme Supplies' }, 'paper ream'), { rate: 100, date: '2026-04-12', number: 'AS/22' });
+  assert.equal(lastPurchaseRate([{ ...bill, kind: 'EXPENSE' }], { name: 'Acme Supplies' }, 'Paper ream'), null, 'expenses are not goods bought');
+});
