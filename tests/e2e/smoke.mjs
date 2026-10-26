@@ -2087,7 +2087,8 @@ try {
     const waitRows = async (p, name, min, timeout = 15000) => {
       const until = Date.now() + timeout;
       for (;;) {
-        const rows = (await tableIn(p, name)) ?? [];
+        // The demo flow reloads (twice for the wizard path): a poll caught mid-navigation just retries.
+        const rows = (await tableIn(p, name).catch(() => null)) ?? [];
         if (rows.length >= min || Date.now() > until) return rows;
         await new Promise((r) => setTimeout(r, 200));
       }
@@ -2121,6 +2122,8 @@ try {
     await a.p.locator('#company-switch').waitFor({ timeout: 20000 });
     const demoInv = await waitRows(a.p, 'invoices', 1);
     check(demoInv.length > 0, `the Demo company holds the sample invoices (${demoInv.length})`);
+    await a.p.waitForLoadState('load');
+    await a.p.locator('#company-switch').waitFor({ timeout: 20000 });
     await a.p.waitForTimeout(500);
     check(await a.p.getByRole('dialog', { name: 'What do you do?' }).count() === 0, 'the wizard does not start again in the Demo company');
     await a.ctx.close();
