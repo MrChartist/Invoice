@@ -58,8 +58,8 @@ export const BETA_GUIDE: readonly GuideSection[] = [
     ],
   },
   {
-    heading: '6. Hindi (हिंदी)', hiHeading: '6. हिंदी',
-    lines: ['Switch the language in Settings → Language / भाषा or on the PIN screen. Some screens are still English: please report untranslated or awkward text.'],
+    heading: '6. Interface languages', hiHeading: '6. इंटरफ़ेस की भाषाएँ',
+    lines: ['Switch the language in Settings → Language / भाषा or on the PIN screen: English, हिन्दी, मराठी, ગુજરાતી, தமிழ், বাংলা, తెలుగు, ಕನ್ನಡ. Hindi and Marathi cover most screens; the others are partial. Please report untranslated or awkward text.'],
   },
   {
     heading: '7. What to test first', hiHeading: '7. पहले क्या टेस्ट करें',
@@ -69,6 +69,8 @@ export const BETA_GUIDE: readonly GuideSection[] = [
       'C. Books and the Gateway: day book, ledgers, trial balance, P&L; vouchers with F4–F9 on the Gateway.',
       'D. Inventory and manufacturing: stock items, sales and bills of tracked items, a BOM and a manufacturing journal.',
       'E. Payroll: employees, structures, a monthly run, payment and the postings in Books.',
+      'F. Industry pack: turn on one pack in a test company and follow its figures to Receivables, Books and GST.',
+      'G. Bring your openings over: import suppliers, the 31 March trial balance and unpaid bills; check the dry-run difference.',
     ],
     links: [
       { label: 'A · New invoice', href: '/invoice' },
@@ -76,6 +78,7 @@ export const BETA_GUIDE: readonly GuideSection[] = [
       { label: 'C · Books', href: '/books' },
       { label: 'D · Inventory', href: '/inventory' },
       { label: 'E · Payroll', href: '/payroll' },
+      { label: 'G · Import openings', href: '/settings?tab=data&import=ledgers' },
     ],
   },
   {

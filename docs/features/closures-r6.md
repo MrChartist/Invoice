@@ -103,7 +103,7 @@ plus the documents refresh. No new route, vertical or rule table; every screen i
   `khata`, `printing`, `purchase-returns`, `time-expenses`) and R6-C closures noted (`masters`, `business-extras`,
   `production-r4`, `institutions-property-r5`). Each "Verify with your CA" section points at the consolidated pack.
 - `docs/BETA_GUIDE.md`: §6 every interface language, §7 flows F (industry pack) and G (bring your openings over), §8
-  known limitations regenerated (top 10 open rows).
+  known limitations regenerated (top 10 open rows), §4 / §9 matched to R6-B4 / R6-A5.
 - `docs/CA_REVIEW.md`: R6-C notes on I22, T12, AC12, AC10, G23 / G41 (no new id) and an answers log.
 
 ## Verify with your CA
@@ -120,7 +120,7 @@ Consolidated in `docs/CA_REVIEW.md` (ids I22, T12, AC10, AC12, G23, G41); answer
 2. A draft issued from a list without the editor takes a snapshot only through `issueDraft`; the list screens still open
    the editor to issue (which snapshots), so no user path loses it today.
 3. Stock opening quantities are not imported (PRD §7 Q7 left open).
-4. BETA_GUIDE §4 (Demo company) and §9 (Report a problem v2) follow R6-B4 / R6-A5; they are folded in after those merge.
+4. BETA_GUIDE §4 (Demo company) and §9 (Report a problem v2) were folded in after merging R6-A / R6-B.
 5. `amendments.ts` and `gstr4-annual.ts` (not in C's file list) gained a one-condition guard so a download-only
    compliance row is never read as filed; `ledger/postings.ts` gained `voucherTdsJournal`; `settings/DataPanel.tsx`
    gained the import entry point.

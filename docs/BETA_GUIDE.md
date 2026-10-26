@@ -46,8 +46,10 @@ version. Your data is not touched by an update.
 2. **Better: test in a separate company.** Use the company switcher at the top of the sidebar to add a company
    such as "Beta test". Each company is a separate data store on the device, so testing never touches your real
    books. Switch back at any time.
-3. **Sample data.** *Settings → Data & backup* → *Try with sample data* fills a company with realistic demo
-   documents, and *Remove sample data* takes them out again.
+3. **Sample data.** *Try with sample data* (Dashboard or *Settings → Data & backup*) opens a separate **Demo
+   company** with a business like yours (shop counter, services, trading, transport or works contract) and today's
+   dates. A banner says "Sample company — nothing here is real", with *Switch to my company* and *Reset samples*.
+   Sample data never goes into your own company.
 4. Optional: turn on automatic backups to a folder (Chrome / Edge) in the same panel.
 
 ## 5. Roles on a shared device
@@ -158,17 +160,20 @@ and a phone-sized screen.
 
 ## 9. How to report a problem
 
-1. Open **Help & about** (the **?** button in the bar at the top right, or *More → Help & about* on a phone).
-2. Choose **Report a problem**. The app builds a short diagnostic report on your device: app version and build,
-   your browser, the screen you were on (record ids masked), the last 20 error messages (with names, numbers,
-   amounts, GSTINs and e-mail addresses masked) and a storage health summary. **It contains no business data,
-   and nothing is sent anywhere.** Read it before you share it.
-3. Choose **Copy report** and paste it into the beta feedback channel, below a short description:
-   - what you did (the steps, in order),
-   - what you expected,
-   - what happened instead,
-   - a screenshot or screen recording if you can (check it for real customer data first).
-4. If the app does not open at all, tell us the browser and device and what the screen shows.
+1. Open **Help & about** (the **?** button in the bar at the top right, F1 outside the POS, or *More → Help & about*
+   on a phone) and choose **Report a problem**.
+2. Pick the **kind** — Problem, Idea or Question — and the **area** (the screen you were on is filled in). For a
+   problem, write what you did, what you expected and what happened instead, and how bad it is (Blocks me /
+   Annoying / Cosmetic).
+3. The app adds a short diagnostic block built on your device: app version and build, your browser, the screens you
+   visited (record ids masked), the last errors and a storage summary. Numbers, amounts, GSTINs and e-mail addresses
+   — also in what you type — are masked. **It contains no business data. Do not type customer names.** Read it
+   before you share it.
+4. **Nothing is sent until you tap Share.** Share opens your device's share sheet; *WhatsApp* and *E-mail* (when this
+   build has the beta channel set) open a message to the beta WhatsApp group or the e-mail address you were given;
+   *Copy* puts the report on the clipboard. Add a screenshot or recording if you can (check it for real customer
+   data first). An unsent draft stays on this device until you send or clear it.
+5. If the app does not open at all, tell us the browser and device and what the screen shows.
 
 Never send a backup file or screenshots of real customer data unless we ask and you are comfortable with it.
 A copy of the sample-data company that shows the problem is the best evidence.
