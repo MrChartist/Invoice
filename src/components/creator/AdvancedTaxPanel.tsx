@@ -15,6 +15,8 @@ const LutHint = lazy(() => import('../trade/LutHint'));
 import { tcsPresets, tdsSections } from '../../lib/tax-rules';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
+import { ita25Words } from '../../i18n/areas/ita2025';
+import { sectionText, withActRef } from '../../lib/ita2025';
 import styles from './AdvancedTaxPanel.module.css';
 
 
@@ -82,7 +84,7 @@ export function AdvancedTaxPanel() {
             <div className={styles.row}>
               <select className={styles.field} aria-label={edT('atTcsPreset')} value="" onChange={(e) => e.target.value && s.setTcs({ rate: Number(e.target.value) })}>
                 <option value="">{edT('atPreset')}</option>
-                {TCS_PRESETS.map((p) => <option key={p.label} value={p.rate}>{p.label}</option>)}
+                {TCS_PRESETS.map((p) => <option key={p.label} value={p.rate}>{withActRef(p.label, p.label, s.issue_date, ita25Words())}</option>)}
               </select>
               <input className={styles.field} type="number" min={0} step="0.01" value={s.tcs_rate ?? 0}
                 aria-label={edT('atTcsRate')} onChange={(e) => s.setTcs({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
@@ -111,7 +113,7 @@ export function AdvancedTaxPanel() {
                     const sec = TDS_SECTIONS.find((x) => x.section === e.target.value);
                     s.setTds({ section: e.target.value, ...(sec && sec.section !== 'CUSTOM' ? { rate: sec.rate } : {}) });
                   }}>
-                  {TDS_SECTIONS.map((x) => <option key={x.section} value={x.section}>{x.label}</option>)}
+                  {TDS_SECTIONS.map((x) => <option key={x.section} value={x.section}>{withActRef(x.label, x.section, s.issue_date, ita25Words())}</option>)}
                 </select>
                 <input className={styles.field} type="number" min={0} step="0.01" value={s.tds_rate ?? 0}
                   aria-label={edT('atTdsRate')} onChange={(e) => s.setTds({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)), section: 'CUSTOM' })} />
@@ -139,7 +141,7 @@ export function AdvancedTaxPanel() {
           <div className={styles.group}>
             {t.cess_amount > 0 && <div className={styles.result}><span>{edT('atCess')}</span><span>{money(t.cess_amount)}</span></div>}
             {t.tcs_amount > 0 && <div className={styles.result}><span>{s.tcs_label || 'TCS'}</span><span>{money(t.tcs_amount)}</span></div>}
-            {t.tds_amount > 0 && <div className={styles.result}><span>TDS ({s.tds_section})</span><span>-{money(t.tds_amount)}</span></div>}
+            {t.tds_amount > 0 && <div className={styles.result}><span>TDS ({sectionText(s.tds_section, s.issue_date, ita25Words())})</span><span>-{money(t.tds_amount)}</span></div>}
             <div className={`${styles.result} ${styles.resultStrong}`}><span>{edT('atNet')}</span><span>{money(t.payable)}</span></div>
           </div>
         )}

@@ -14,6 +14,8 @@ import { ChallansTab, DeductionsTab, Form16aTab, OverviewTab, ReturnsTab, type T
 import { useT } from '../i18n';
 import { tdsT, type TdsKey } from '../i18n/areas/tds';
 import { r7T } from '../i18n/areas/gst-tds-7r';
+import { ita25T } from '../i18n/areas/ita2025';
+import { ITA2025_FROM } from '../lib/ita2025';
 
 // 7R (7.120): Form 27Q (non-residents) and the TRACES justification import — loaded when their tab opens.
 const Form27qTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => ({ default: m.Form27qTab })));
@@ -124,6 +126,7 @@ export function Tds() {
       </div>
       <div role="tabpanel" id={`tds-panel-${tab}`} aria-labelledby={`tds-tab-${tab}`} tabIndex={0} className={styles.panel}>
         {!canEdit && tab !== 'overview' && <p className={controls.hint}>{tdsT('readOnly')}</p>}
+        {`${fy + 1}-03-31` >= ITA2025_FROM && <p className={controls.hint} data-ita2025-note>{ita25T('note')}</p>}
         {tab === 'overview' && <OverviewTab data={data} fy={fy} today={today} />}
         {tab === 'deductions' && <DeductionsTab data={data} fy={fy} today={today} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'challans' && <ChallansTab data={data} canEdit={canEdit} onChanged={refresh} notify={notify} />}

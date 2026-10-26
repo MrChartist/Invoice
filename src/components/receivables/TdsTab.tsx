@@ -26,6 +26,8 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { rcvT } from '../../i18n/areas/receivables';
+import { ita25Words } from '../../i18n/areas/ita2025';
+import { formText, quarterStart, sectionText } from '../../lib/ita2025';
 import styles from './TdsTab.module.css';
 
 export interface TdsTabProps {
@@ -172,7 +174,7 @@ function QuarterCard({ block, onToggle }: {
               <th scope="col" className={surface.numeric}>{rcvT('tdsExpected')}</th>
               <th scope="col" className={surface.numeric}>{rcvT('settled')}</th>
               <th scope="col" className={surface.numeric}>{rcvT('pending')}</th>
-              <th scope="col">Form 16A</th>
+              <th scope="col">{formText('16A', quarterStart(block.fy, block.quarter), ita25Words())}</th>
             </tr>
           </thead>
           <tbody>
@@ -190,7 +192,7 @@ function QuarterCard({ block, onToggle }: {
                       ) : <span>{rcvT('noTan')}</span>}
                     </span>
                   </th>
-                  <td className={surface.mono}>{r.section || '—'}</td>
+                  <td className={surface.mono}>{r.section ? sectionText(r.section, quarterStart(block.fy, block.quarter), ita25Words()) : '—'}</td>
                   <td className={surface.numeric} title={r.invoices.map((l) => l.number).join(', ')}>{r.invoiceCount}</td>
                   <td className={surface.numeric}>{money(r.taxable)}</td>
                   <td className={surface.numeric}>{money(r.total)}</td>

@@ -27,6 +27,7 @@ import { scoreHeader } from './import-mapping';
 import { parseDate, parseNumber } from './importers';
 import { isValidTan } from './validators';
 import { receivableTotal } from './rcm';
+import { oldCodeOf } from './ita2025';
 
 /* ── Periods ──────────────────────────────────────────────────── */
 
@@ -487,6 +488,9 @@ const TAN_IN_TEXT = /\b([A-Z]{4}[0-9]{5}[A-Z])\b/;
 
 /** "194J - Fees for professional services", "Sec 194-C", "194JB" → "194J" / "194C" / "194JB". */
 export function sectionCode(raw: string): string {
+  // Income-tax Act 2025 reference in a Form 168 / AIS export ("393(1) Table Sl. No. 6(iii)") → its 1961 family.
+  const old = oldCodeOf(raw);
+  if (old) return old;
   const m = /\b(19\d|206)\s*-?\s*([A-Z]{0,3})\b/i.exec(raw ?? '');
   if (m) return `${m[1]}${m[2]}`.toUpperCase();
   return (raw ?? '').trim().split(/\s+/)[0] ?? '';
