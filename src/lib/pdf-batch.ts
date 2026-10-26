@@ -10,7 +10,8 @@
  * ZIP output reuses the dependency-free writer in `zip.ts` (STORE: PDFs are already compressed).
  */
 
-import { pageSlices, paperSize, type DesignPrefs } from './design-prefs';
+import { activeArt, pageSlices, paperSize, type DesignPrefs, type PageBands } from './design-prefs';
+import { itemImageData } from './item-images';
 import { ensureDevanagariFont } from './fonts-ready';
 import { writeZip } from './zip';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../types/invoice';
@@ -54,10 +55,12 @@ export class PdfBuilder {
   }
 
   /** Capture `node` (a TemplateEngine paper at its natural width) and append its pages. */
-  async addPaper(node: HTMLElement, design?: Pick<DesignPrefs, 'paper'> | null): Promise<number> {
+  async addPaper(node: HTMLElement, design?: (Pick<DesignPrefs, 'paper'> & Partial<Pick<DesignPrefs, 'preprinted' | 'letterhead' | 'footer_image'>>) | null): Promise<number> {
     const size = paperSize(design);
     await ensureDevanagariFont(node.textContent);
     const height = Math.max(node.offsetHeight, size.height);
+    // R3-C3: a footer band / every-page header band is drawn on each PDF page instead of once in the paper.
+    const art = size.autoHeight ? null : await loadBands(design, size.width);
     const dataUrl = await this.toJpeg(node, {
       quality: 0.92,
       pixelRatio: 2.5,
@@ -66,15 +69,31 @@ export class PdfBuilder {
       height,
       backgroundColor: '#ffffff',
       style: { transform: 'none', transformOrigin: 'top left' },
+      ...(art?.footer ? { filter: (n: HTMLElement) => !(n instanceof Element && n.hasAttribute('data-page-footer')) } : {}),
     });
     const place = placePaper(height, design);
-    for (let page = 0; page < place.pages; page++) {
+    const pxToMm = place.pageWmm / size.width;
+    const slices = art ? pageSlices(height, design, art.bands) : null;
+    const pages = slices ? slices.length : place.pages;
+    for (let page = 0; page < pages; page++) {
       if (!this.pdf) this.pdf = new this.JsPDF({ orientation: 'portrait', unit: 'mm', format: [place.pageWmm, place.pageHmm] });
       else this.pdf.addPage([place.pageWmm, place.pageHmm], 'portrait');
-      this.pdf.addImage(dataUrl, 'JPEG', 0, -page * place.pageHmm, place.pageWmm, place.imgHmm, undefined, 'FAST');
+      const slice = slices?.[page];
+      const y = slice ? ((slice.offset ?? 0) - slice.top) * pxToMm : -page * place.pageHmm;
+      this.pdf.addImage(dataUrl, 'JPEG', 0, y, place.pageWmm, place.imgHmm, undefined, 'FAST');
+      if (slice && art) {
+        // Cover what spills outside this page's content window, then draw the bands on top.
+        this.pdf.setFillColor(255, 255, 255);
+        const top = (slice.offset ?? 0) * pxToMm;
+        const bottom = (top + slice.height * pxToMm);
+        if (top > 0) this.pdf.rect(0, 0, place.pageWmm, top, 'F');
+        if (bottom < place.pageHmm) this.pdf.rect(0, bottom, place.pageWmm, place.pageHmm - bottom, 'F');
+        if (top > 0 && art.header) this.pdf.addImage(art.header.data, art.header.kind, 0, 0, place.pageWmm, art.header.h * pxToMm, undefined, 'FAST');
+        if (art.footer) this.pdf.addImage(art.footer.data, art.footer.kind, 0, place.pageHmm - art.footer.h * pxToMm, place.pageWmm, art.footer.h * pxToMm, undefined, 'FAST');
+      }
       this.pageCount++;
     }
-    return place.pages;
+    return pages;
   }
 
   /** The finished PDF (throws when nothing was added). */
@@ -125,4 +144,43 @@ export async function zipFiles(files: readonly { name: string; data: Uint8Array 
 /** Wait for React to commit and the browser to paint (two animation frames), plus a tick for images. */
 export function nextPaint(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 30))));
+}
+
+interface Band { data: string; kind: 'PNG' | 'JPEG'; h: number }
+
+/** Height in CSS px of an image drawn at the paper width (keeps its aspect). */
+async function band(ref: string | undefined, width: number): Promise<Band | undefined> {
+  const data = itemImageData(ref);
+  if (!data) return undefined;
+  const img = new Image();
+  img.src = data;
+  try {
+    await img.decode();
+  } catch {
+    return undefined;
+  }
+  if (!img.naturalWidth) return undefined;
+  // jsPDF draws PNG and JPEG; WebP / GIF artwork is re-encoded through a canvas once.
+  let out = data;
+  let kind: Band['kind'] = data.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
+  if (!/^data:image\/(png|jpeg)/.test(data)) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    c.getContext('2d')?.drawImage(img, 0, 0);
+    out = c.toDataURL('image/png');
+    kind = 'PNG';
+  }
+  return { data: out, kind, h: (img.naturalHeight / img.naturalWidth) * width };
+}
+
+/** R3-C3: the repeated artwork of a design, or null when there is none to repeat. */
+async function loadBands(design: Parameters<PdfBuilder['addPaper']>[1], width: number): Promise<{ bands: PageBands; header?: Band; footer?: Band } | null> {
+  const art = activeArt(design as DesignPrefs | null);
+  if (!art) return null;
+  const every = art.letterhead?.mode === 'header' && art.letterhead.every_page;
+  const header = every ? await band(art.letterhead?.image, width) : undefined;
+  const footer = await band(art.footer, width);
+  if (!header && !footer) return null;
+  return { bands: { header: header?.h, everyPage: !!header, footer: footer?.h }, header, footer };
 }

@@ -25,6 +25,9 @@ import { einvT } from '../../i18n/areas/einvoice';
 import { IrpWindowNote } from './IrpWindowNote';
 import { cancelState } from '../../lib/einvoice-cancel';
 import { ggT } from '../../i18n/areas/gst-guards';
+import { computeValidity, effectiveValidity, parseLocal } from '../../lib/eway-validity'; // R3-C5
+import type { EwayCargo } from '../../types/docs-r3';
+import { dkT } from '../../i18n/areas/desks-r3';
 
 export interface EInvoiceModalProps {
   invoice: InvoiceRecord;
@@ -429,6 +432,34 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                     <input className={controls.input} type="date" value={meta.eway_valid_upto ?? ''} onChange={(e) => patch({ eway_valid_upto: e.target.value })} />
                   </Field>
                 </div>
+                {/* R3-C5: generation time, cargo and distance → Rule 138(10) validity beside the typed value. */}
+                <div className={styles.grid3}>
+                  <Field label={dkT('ev.generatedAt')}>
+                    <input className={controls.input} type="datetime-local" value={(meta.eway_generated_at ?? '').slice(0, 16)} onChange={(e) => patch({ eway_generated_at: e.target.value || undefined })} data-eway-generated />
+                  </Field>
+                  <Field label={dkT('ev.cargo')}>
+                    <select className={controls.select} value={meta.eway_cargo ?? 'normal'} onChange={(e) => patch({ eway_cargo: e.target.value === 'normal' ? undefined : (e.target.value as EwayCargo) })}>
+                      <option value="normal">{dkT('ev.cargo.normal')}</option>
+                      <option value="odc">{dkT('ev.cargo.odc')}</option>
+                      <option value="multimodal_ship">{dkT('ev.cargo.ship')}</option>
+                    </select>
+                  </Field>
+                  <Field label={dkT('ev.distance')}>
+                    <input className={controls.input} type="number" min={0} inputMode="numeric" value={meta.eway_distance_km ?? meta.distance ?? ''} onChange={(e) => patch({ eway_distance_km: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value) || 0) })} />
+                  </Field>
+                </div>
+                {(() => {
+                  const v = effectiveValidity(meta);
+                  const gen = parseLocal(meta.eway_generated_at) ?? parseLocal(meta.eway_date);
+                  if (!gen) return <p className={controls.hint}>{dkT('ev.needGen')}</p>;
+                  const c = computeValidity(gen, Number(meta.eway_distance_km ?? meta.distance) || 0, meta.eway_cargo);
+                  return (
+                    <p className={controls.hint} data-eway-computed>
+                      {dkT('ev.computed', { day: c.day, n: c.days })}
+                      {v.differs ? ` ${dkT('ev.differs', { typed: v.typedDay ?? '' })}` : ''} {dkT('ev.verify')}
+                    </p>
+                  );
+                })()}
               </div>
               {metaIssues.length > 0 && (
                 <ReadinessList

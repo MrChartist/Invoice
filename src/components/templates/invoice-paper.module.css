@@ -46,7 +46,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-gap);
-  padding: var(--tpl-pt) var(--tpl-px) var(--tpl-pb);
+  /* R3-C3: --tpl-pr (Design Studio right margin) falls back to the side padding. */
+  padding: var(--tpl-pt) var(--tpl-pr, var(--tpl-px)) var(--tpl-pb) var(--tpl-px);
 }
 
 /* Layout skins */

@@ -83,6 +83,8 @@ const LEGACY_TABS = [
   'gstr3b', 'gstr2b', 'composition', 'setoff', 'purhsn', 'recon', 'hsnmaster', 'gstr9c', 'rcmdocs', 'cashref', 'isd', 'ewbcons',
   'bygstin', 'guards',
 ];
+/** Tabs added later (R3-C4 portal files, R3-C5 e-Way desk). */
+const ADDED_TABS = ['portal-files', 'eway-desk'];
 
 test('tabs: every previous ?tab= id still resolves and sits in exactly one group', () => {
   for (const id of LEGACY_TABS) assert.equal(resolveGstTab(id), id, id);
@@ -90,8 +92,8 @@ test('tabs: every previous ?tab= id still resolves and sits in exactly one group
   assert.equal(resolveGstTab(null), null);
   const grouped = GST_TAB_GROUPS.flatMap((g) => g.tabs);
   assert.equal(new Set(grouped).size, grouped.length, 'no tab in two groups');
-  assert.deepEqual([...grouped].sort(), [...LEGACY_TABS].sort());
-  assert.deepEqual(GST_TABS.map((t) => t.id).sort(), [...LEGACY_TABS].sort());
+  assert.deepEqual([...grouped].sort(), [...LEGACY_TABS, ...ADDED_TABS].sort());
+  assert.deepEqual(GST_TABS.map((t) => t.id).sort(), [...LEGACY_TABS, ...ADDED_TABS].sort());
   assert.equal(groupOfTab('b2b'), 'gstr1');
   assert.equal(groupOfTab('setoff'), 'gstr3b');
   assert.equal(groupOfTab('gstr2b'), 'recon');
