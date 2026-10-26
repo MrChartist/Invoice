@@ -461,6 +461,8 @@ const RECORD_TABLES = [
   'fee_plans', 'fee_runs', 'common_credit_runs', 'donations', 'form_10bd_filings', 'form_10be', 'properties', 'leases', 'security_deposits',
   // Round 5 (R5-B): consignment notes, GTA option per FY, vehicles, trip sheets, RA measurements, BOQ coefficients
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
+  // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
+  'import_runs',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -519,6 +521,8 @@ const ID_TABLES = new Set([
   'fee_plans', 'fee_runs', 'common_credit_runs', 'donations', 'form_10bd_filings', 'form_10be', 'properties', 'leases', 'security_deposits',
   // Round 5 (R5-B)
   'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
+  // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
+  'import_runs',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

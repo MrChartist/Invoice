@@ -21,6 +21,7 @@ import { normalizeRecord } from '../store/invoice-defaults';
 import { liveDocTrackingIssues } from './stock-tracking';
 import { loadPaymentTerms, termPatch, type PaymentTerm } from './payment-terms';
 import { leaseLineRates } from './property/escalation'; // R5-C5
+import { withIssueSnapshot } from './khata-actions'; // R6-C5
 
 export const RECURRING_TABLE = 'recurring';
 /** Most missed occurrences materialised in a single catch-up. */
@@ -578,6 +579,8 @@ export function generateInvoiceFromSchedule(
       built = { ...built, status: 'Draft', invoice_number: '' };
     }
   }
+  // R6-C5 (8.7): an occurrence issued straight away freezes the party's previous balance, as the editor does.
+  if (built.status !== 'Draft') built = withIssueSnapshot(built);
   const saved = localDb.invoices.save(built);
   return { invoice: saved, created: true, ...(heldAsDraft ? { heldAsDraft } : {}) };
 }

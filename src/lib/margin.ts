@@ -8,6 +8,8 @@
 import type { InvoiceItem } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
+import { liveInputs } from './inventory';
+import { peekTable } from './storage';
 
 export type CostBasis = 'purchase' | 'standard' | 'opening';
 export interface UnitCost {
@@ -48,6 +50,20 @@ export function buildUnitCosts(purchases: readonly unknown[], stockItems: readon
   }
   for (const [k, v] of latest) out.set(k, v);
   return out;
+}
+
+/**
+ * R6-C1: purchases as the stock engine sees them (`liveInputs().purchases`): engine copies with the landed-cost
+ * vouchers (R4-A5) applied, so the chip and the insights cost goods at the landed rate the stock reports use.
+ * Stored bills never change.
+ */
+export function liveCostPurchases(): unknown[] {
+  return [...(liveInputs().purchases ?? [])] as unknown[];
+}
+
+/** R6-C1: `buildUnitCosts` over `liveCostPurchases()` and the live stock items (margin chip, insights tile). */
+export function liveUnitCosts(vendors: readonly unknown[] = peekTable('vendors')): Map<string, UnitCost> {
+  return buildUnitCosts(liveCostPurchases(), peekTable<StockItemLike>('stock_items'), vendors);
 }
 
 export interface MarginResult {

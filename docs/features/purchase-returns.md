@@ -78,8 +78,8 @@ reports. Everything GST-related is a **working paper — verify with your CA**.
 - ~~Job work in / out + ITC-04 (P1-9), Rejections In (customer side)~~ — done in Phase 7M (`docs/features/job-work.md`).
   Sales-order outstanding is done (WP-8, Inventory → Order outstanding).
 - Editing a note (delete and record again); serial selection on returns of serial-tracked lines (lib supports `serials`, UI does not).
-- TDS on a bill with TDS deducted at booking is not adjusted by a return; GSTR-9 / 9C and the compliance late-fee
-  estimate do not read notes yet; cash-basis Books P&L ignores notes.
+- ~~TDS on a bill with TDS deducted at booking is not adjusted by a return; GSTR-9 / 9C and the compliance late-fee
+  estimate do not read notes yet~~ (done in 7O, 7.93 / 7.94 — stale note struck by R6-C6); cash-basis Books P&L ignores notes.
 - Editing a bill below the quantities already returned is not blocked.
 - An existing user account with code 5010 would share the code with "Purchase returns".
 

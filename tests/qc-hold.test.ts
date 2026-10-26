@@ -127,3 +127,41 @@ test('QA5-2 F9: stock in transit (R4-B transit godown) is not available, and a n
   assert.ok(liveDocTrackingIssues(sale as never).errors.some((e) => /Lamp/.test(e) && /transit/i.test(e)), JSON.stringify(liveDocTrackingIssues(sale as never)));
   assert.deepEqual(liveDocTrackingIssues({ ...sale, items: [{ id: 'y', name: 'Lamp', quantity: 1, rate: 500 }] } as never).errors, []);
 });
+
+/* ── R6-C1: QC hold on bills booked without a GRN ─────────────── */
+
+const billInput = (lines: object[], extra: object = {}) => ({
+  kind: 'PURCHASE' as const, vendor_name: 'Sony Dist', bill_number: 'SD/9', date: '2026-05-06', category: 'Purchases',
+  lines: lines as never, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0, amount_paid: 0, itc_eligible: true, ...extra,
+});
+
+test('R6-C1: a bill-only receipt of a qc_on_receipt item lands in the QC godown; other lines and GRN-billed lines do not', async () => {
+  const { purchasesDb } = await import('../src/lib/purchases.ts');
+  stockDb.saveItem(blankStockItem({ id: 'tv', name: 'TV', qc_on_receipt: true }));
+  stockDb.saveItem(blankStockItem({ id: 'cable', name: 'Cable' }));
+  const b = purchasesDb.save(billInput([
+    { id: 'l1', name: 'TV', item_id: 'tv', quantity: 3, rate: 20000, tax_rate: 18 },
+    { id: 'l2', name: 'Cable', quantity: 5, rate: 100, tax_rate: 18 },
+    { id: 'l3', name: 'TV', item_id: 'tv', quantity: 1, rate: 20000, tax_rate: 18, grn_line_id: 'g9' },
+    { id: 'l4', name: 'TV', item_id: 'tv', quantity: 1, rate: 20000, tax_rate: 18, godown_id: 'main' },
+  ]));
+  const qc = qcGodowns(godownsDb.list())[0];
+  assert.ok(qc, 'QC hold godown created');
+  assert.deepEqual(b.lines.map((l) => l.godown_id), [qc.id, undefined, undefined, 'main']);
+  assert.equal(qcRows()[0]?.source.kind, 'purchase');
+  assert.equal(getStockLevel('TV', undefined, liveHeldStock())!.held, 3);
+  // An expense never moves stock and is left alone.
+  const e = purchasesDb.save(billInput([{ id: 'e1', name: 'TV', item_id: 'tv', quantity: 1, rate: 10, tax_rate: 0 }], { kind: 'EXPENSE', bill_number: 'X' }));
+  assert.equal(e.lines[0].godown_id, undefined);
+});
+
+test('R6-C1: an edit does not re-hold released goods; only lines added by the edit follow the rule', async () => {
+  const { purchasesDb } = await import('../src/lib/purchases.ts');
+  stockDb.saveItem(blankStockItem({ id: 'tv', name: 'TV', qc_on_receipt: true }));
+  const b = purchasesDb.save(billInput([{ id: 'l1', name: 'TV', item_id: 'tv', quantity: 3, rate: 20000, tax_rate: 18 }]));
+  const qc = qcGodowns(godownsDb.list())[0];
+  // The user moved the line's goods to Main (released) and edits the bill later.
+  const released = { ...b, lines: [{ ...b.lines[0], godown_id: undefined }] };
+  const edited = purchasesDb.save({ ...released, lines: [...released.lines, { id: 'l2', name: 'TV', item_id: 'tv', quantity: 1, rate: 20000, tax_rate: 18 }] } as never);
+  assert.deepEqual(edited.lines.map((l) => l.godown_id), [undefined, qc.id], 'the existing line keeps its godown; the new line is held');
+});

@@ -115,6 +115,8 @@ routes add no new preload entry). The pack type/pack-name strings live in `reach
 
 ## Verify with your CA
 
+Consolidated in `docs/CA_REVIEW.md` (ids I1–I9); answers are logged there with the date and the PR.
+
 1. Importing marketplace-generated invoices with the marketplace's own numbers as the seller's Rule 46 record; files
    without an invoice number (Meesho GST report) are recorded as `<prefix>/<order id>` — confirm or replace.
 2. E-invoicing of B2B orders invoiced by the marketplace in the seller's name (no IRN is created here).

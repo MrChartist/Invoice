@@ -291,3 +291,78 @@ test('editor: a client picked from the master sets the due date from its credit 
   useInvoiceStore.getState().setClient({ name: clientMH.name });
   assert.equal(useInvoiceStore.getState().due_date, '2026-10-05');
 });
+
+/* ── R6-C5 (8.7): documents issued outside the editor take the snapshot too ── */
+
+/** The party's open balance right now (what "previous balance" must show on the next document). */
+const openBalance = () => loadKhataReport(NOW).report.parties.find((p) => p.key === clientMH.id)?.net ?? 0;
+
+test('R6-C5: a recurring issue, a conversion, a late-fee issue and an issued draft each freeze the previous balance', async () => {
+  const { createSchedule, generateInvoiceFromSchedule, templateFromInvoice } = await import('../src/lib/recurring.ts');
+  const { convertDocument } = await import('../src/lib/documents.ts');
+  const { createLateFeeInvoice } = await import('../src/lib/late-fee.ts');
+  const { issueDraft } = await import('../src/lib/khata-actions.ts');
+  const { freezeDate, thawDate } = await import('./helpers/shim.ts');
+  freezeDate('2026-10-25T10:00:00');
+  try {
+  const first = createViaStore({ date: '2026-09-01', due: '2026-09-10', lines: [{ qty: 1, rate: 1000, tax: 0 }] });
+
+  // Recurring run in "issue" mode.
+  const s = createSchedule({ name: 'Monthly', template: templateFromInvoice(first), frequency: 'monthly', start_date: '2026-10-01', mode: 'issue' });
+  let prev = openBalance();
+  const rec = generateInvoiceFromSchedule(s, '2026-10-01').invoice;
+  assert.equal(rec.status, 'Sent');
+  assert.deepEqual([rec.party_balance_snapshot?.previous, rec.party_balance_snapshot?.bill], [prev, rec.total]);
+  assert.equal(prev, 1000);
+
+  // A draft run takes none (it is numbered and snapshotted when issued).
+  const draftRun = generateInvoiceFromSchedule({ ...createSchedule({ name: 'D', template: templateFromInvoice(first), frequency: 'monthly', start_date: '2026-10-02', mode: 'draft' }) }, '2026-10-02').invoice;
+  assert.equal(draftRun.status, 'Draft');
+  assert.equal(draftRun.party_balance_snapshot, undefined, 'a draft carries none');
+
+  // A quotation converted straight to an issued invoice.
+  const quote = createViaStore({ docType: 'QUOTATION', date: '2026-10-03', lines: [{ qty: 1, rate: 300, tax: 0 }] });
+  prev = openBalance();
+  const conv = convertDocument(quote, 'INVOICE', { issue: true });
+  assert.equal(conv.status, 'Sent');
+  assert.equal(conv.party_balance_snapshot?.previous, prev);
+  const convDraft = convertDocument(quote, 'PROFORMA');
+  assert.equal(convDraft.party_balance_snapshot, undefined, 'a converted draft carries none');
+
+  // A late fee issued straight away.
+  localDb.clients.upsert({ ...clientMH, id: clientMH.id, late_fee: { mode: 'flat', rate: 500, graceDays: 7 } });
+  prev = openBalance();
+  const fee = createLateFeeInvoice(reload(first.id), new Date(2026, 9, 25), { issue: true });
+  assert.equal(fee.status, 'Sent');
+  assert.equal(fee.party_balance_snapshot?.previous, prev);
+
+  // The recurring draft issued later from the list (no editor): snapshot at that moment.
+  const issued = issueDraft(draftRun.id);
+  assert.ok(issued.invoice_number, 'numbered on issue');
+  // The previous balance is the party's ledger up to the document's own date (2 Oct): the two September / 1 Oct bills.
+  assert.equal(issued.party_balance_snapshot?.previous, 2000);
+
+  // A reprint after a later payment is unchanged.
+  savePartyReceipt({ client: { id: clientMH.id, name: clientMH.name }, amount: 1000, method: 'Cash', date: '2026-10-21', allocations: [{ bill_id: first.id, ref: first.invoice_number, amount: 1000 }] });
+  assert.equal(reload(rec.id).party_balance_snapshot?.previous, 1000);
+  const resaved = localDb.invoices.save({ ...reload(conv.id), notes: 'reprint' });
+  assert.equal(resaved.party_balance_snapshot?.previous, conv.party_balance_snapshot?.previous);
+  } finally {
+    thawDate();
+  }
+});
+
+test('R6-C5: a batch run takes one snapshot per party — the balance before the run, not its own earlier bills', async () => {
+  const { withIssueSnapshot } = await import('../src/lib/khata-actions.ts');
+  createViaStore({ date: '2026-09-01', lines: [{ qty: 1, rate: 1000, tax: 0 }] });
+  const prev = openBalance();
+  const cache = new Map();
+  const base = { ...reload(localDb.invoices.getAll()[0].id), id: 'n1', invoice_number: 'B/1', issue_date: '2026-10-01', party_balance_snapshot: undefined } as InvoiceRecord;
+  const a = withIssueSnapshot(base, undefined, cache);
+  localDb.invoices.save(a);
+  const b = withIssueSnapshot({ ...base, id: 'n2', invoice_number: 'B/2', total: 250, balance_due: 250 }, undefined, cache);
+  assert.equal(a.party_balance_snapshot?.previous, prev);
+  assert.equal(b.party_balance_snapshot?.previous, prev, 'the second bill of the party in the run shows the same previous balance');
+  assert.equal(b.party_balance_snapshot?.bill, 250);
+  assert.equal(withIssueSnapshot({ ...base, id: 'n3', status: 'Draft' }, undefined, cache).party_balance_snapshot, undefined);
+});

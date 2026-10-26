@@ -144,6 +144,8 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   trips: { entity: 'invoice', label: 'Trip' },
   ra_measurements: { entity: 'invoice', label: 'RA bill' },
   boq_coefficients: { entity: 'item', label: 'BOQ coefficient' },
+  // R6-C3: import runs
+  import_runs: { entity: 'voucher', label: 'Import run' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

@@ -27,6 +27,7 @@ import { buildCreditNote, createCreditNote, creditableLines, isInvoiceType, read
 import { VOUCHERS_TABLE, saveVoucher, rupeesToPaise, type ManualVoucherLine } from './ledger/vouchers';
 import { withTablesRollback } from './table-txn';
 import { A } from './ledger/accounts';
+import { bankLedgerId } from './bank-ledgers'; // R6-C2: refund tenders credit their bank ledger
 import { receivableTotal } from './rcm';
 import { localDayOf } from './dates';
 
@@ -41,6 +42,8 @@ export interface RefundTender {
   method: RefundMethod;
   amount: number;
   reference?: string;
+  /** Additive (R6-C2): bank account a UPI / card refund goes out of (multi-account BRS); missing = the main account. */
+  bank_account_id?: string;
 }
 
 export interface PosReturn {
@@ -169,16 +172,19 @@ export function suggestRefund(bill: InvoiceRecord, payments: readonly Payment[],
   let rest = round2(amount);
   const out: RefundTender[] = [];
   const by = new Map<RefundMethod, number>();
+  const bankOf = new Map<RefundMethod, string>();
   for (const p of payments.filter((x) => x.invoice_id === bill.id && !(x.note || '').startsWith(EXCHANGE_NOTE))) {
     const m = (REFUND_METHODS.find((r) => r.toLowerCase() === (p.method || '').toLowerCase()) ?? 'Cash') as RefundMethod;
     by.set(m, round2((by.get(m) ?? 0) + num(p.amount)));
+    if (m !== 'Cash' && p.bank_account_id && !bankOf.has(m)) bankOf.set(m, p.bank_account_id); // R6-C2
   }
   if (by.size === 0) by.set('Cash', rest);
   for (const m of REFUND_METHODS) {
     const have = by.get(m);
     if (!have || rest <= 0) continue;
     const take = round2(Math.min(have, rest));
-    out.push({ method: m, amount: take });
+    const bank = bankOf.get(m);
+    out.push({ method: m, amount: take, ...(bank ? { bank_account_id: bank } : {}) });
     rest = round2(rest - take);
   }
   if (rest > 0.004) {
@@ -208,14 +214,29 @@ export interface PosReturnResult {
 }
 
 const partyOf = (inv: InvoiceRecord) => (inv.client?.company || inv.client?.name || 'Cash sale').trim();
-const cashAccount = (m: string) => (m.toLowerCase() === 'cash' ? A.cash : A.bank);
+/** R6-C2: a non-cash tender credits its own bank ledger (main account = 3510 `bank`). */
+const cashAccount = (m: string, bankAccountId?: string) => (m.toLowerCase() === 'cash' ? A.cash : bankLedgerId(bankAccountId));
+
+/**
+ * R6-C2: give each non-cash refund tender a bank account — the one it already names, else the bank account of the
+ * original receipt by the same method (else any non-cash receipt on the bill), else none (the main account).
+ */
+export function tagRefundBanks(tenders: readonly RefundTender[], billPayments: readonly Pick<Payment, 'method' | 'bank_account_id'>[]): RefundTender[] {
+  const nonCash = billPayments.filter((p) => (p.method || '').toLowerCase() !== 'cash' && p.bank_account_id);
+  return tenders.map((t) => {
+    if (t.method === 'Cash' || t.bank_account_id) return t;
+    const bank = (nonCash.find((p) => (p.method || '').toLowerCase() === t.method.toLowerCase()) ?? nonCash[0])?.bank_account_id;
+    return bank ? { ...t, bank_account_id: bank } : t;
+  });
+}
 
 /** Refund voucher lines: Dr debtors (party) for the total, Cr cash / bank per tender. */
 export function refundVoucherLines(party: string, tenders: readonly RefundTender[]): ManualVoucherLine[] {
   const credits = new Map<string, number>();
   for (const t of tenders) {
     const p = rupeesToPaise(t.amount);
-    if (p > 0) credits.set(cashAccount(t.method), (credits.get(cashAccount(t.method)) ?? 0) + p);
+    const acc = cashAccount(t.method, t.bank_account_id);
+    if (p > 0) credits.set(acc, (credits.get(acc) ?? 0) + p);
   }
   const total = [...credits.values()].reduce((s, n) => s + n, 0);
   if (total === 0) return [];
@@ -251,7 +272,10 @@ export function savePosReturn(input: PosReturnInput): PosReturnResult {
   const bill = ctx.invoices.find((i) => i.id === input.bill.id) ?? input.bill;
   const plan = planReturn(bill, input.lines, ctx);
   if (plan.errors.length || !plan.credit) return { ok: false, errors: plan.errors };
-  const refunds = (input.refunds ?? []).filter((r) => num(r.amount) > 0).map((r) => ({ ...r, amount: round2(num(r.amount)) }));
+  const refunds = tagRefundBanks(
+    (input.refunds ?? []).filter((r) => num(r.amount) > 0).map((r) => ({ ...r, amount: round2(num(r.amount)) })),
+    ctx.payments.filter((p) => p.invoice_id === bill.id && !(p.note || '').startsWith(EXCHANGE_NOTE)),
+  );
   if (input.settlement === 'refund') {
     const issues = refundIssues(plan.amount, plan.refundable, refunds);
     if (issues.length) return { ok: false, errors: issues };

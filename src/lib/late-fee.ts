@@ -26,6 +26,7 @@ import { computeInterest, interestInputFor, type InterestInput, type InterestRes
 import { readLinks, type DocLink } from './documents';
 import { KEYS, generateId, peekTable } from './storage';
 import { localDb } from './localDb';
+import { withIssueSnapshot } from './khata-actions'; // R6-C5
 import { isoDay, shiftDay } from './dates';
 import { inrValue } from './fx';
 import { isDateLocked, getLockUntil, lockMessage } from './period-lock';
@@ -276,7 +277,7 @@ export class LateFeeError extends Error {
  * Throws `LateFeeError` when the client has no rule, nothing is due, one was already raised,
  * or today falls inside the locked period (the save would also refuse it).
  */
-export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new Date()): InvoiceRecord {
+export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new Date(), opts: { issue?: boolean } = {}): InvoiceRecord {
   const fee = lateFeeRuleFor(original);
   if (!fee) throw new LateFeeError('This client has no late-fee terms. Add them on the client first.');
   const all = localDb.invoices.getAll();
@@ -295,5 +296,6 @@ export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new D
     today,
     dueDays: num(localDb.settings.get().defaultDueDays, 14),
   });
-  return localDb.invoices.save(rec);
+  // R6-C5 (8.7): issued straight away (not left as a draft), it freezes the party's previous balance like the editor.
+  return localDb.invoices.save(opts.issue ? withIssueSnapshot({ ...rec, status: 'Sent' }) : rec);
 }

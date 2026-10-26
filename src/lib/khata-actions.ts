@@ -12,6 +12,7 @@ import type { PosReturn } from './pos-returns';
 import type { CreditLinkRow } from './amount-due';
 import { loadReceivableOpeningBills } from './opening-bills';
 import { computePartyBalanceSnapshot, type SnapshotOptions } from './khata';
+import { billAmount, nextPartyBalanceSnapshot } from './party-balance';
 import { REMINDERS_TABLE, type ReminderRecord } from './reminders';
 import { blankItem, clientToParty, makeDraft } from '../store/invoice-defaults';
 import { calcInputFromRecord, calculateInvoice, round2 } from './invoice-calc';
@@ -59,6 +60,43 @@ function sharedReceivablesInput(): BuildInput {
     openingBills: loadReceivableOpeningBills(clients),
     refunds: posRefunds(peekTable<PosReturn>('pos_returns') as PosReturn[]),
   };
+}
+
+/**
+ * R6-C5 (8.7): the snapshot for a document issued OUTSIDE the editor (a recurring run, a batch run, a late-fee or a
+ * converted document issued directly, `issueDraft`). Same rule as the editor's save (`nextPartyBalanceSnapshot`):
+ * a draft takes none, an issued document keeps the one it has, a document being issued now takes a fresh one.
+ * `cache` (party key → snapshot) gives every document of a party in one run the same "previous balance" — the
+ * balance before the run — so a batch never counts its own earlier bills as "previous" (R2-B1, one per party).
+ */
+export function withIssueSnapshot(record: InvoiceRecord, stored?: InvoiceRecord, cache?: Map<string, PartyBalanceSnapshot | null>): InvoiceRecord {
+  const key = cache ? (record.client?.id || record.client?.name?.trim().toLowerCase() || '') : '';
+  const snap = nextPartyBalanceSnapshot(record, stored, () => {
+    if (cache && key && cache.has(key)) {
+      const hit = cache.get(key);
+      return hit ? { ...hit, bill: billAmount(record) } : undefined;
+    }
+    const fresh = partyBalanceSnapshotFor(record);
+    if (cache && key) cache.set(key, fresh ?? null);
+    return fresh;
+  });
+  if (snap) return { ...record, party_balance_snapshot: snap };
+  if (!record.party_balance_snapshot) return record;
+  const { party_balance_snapshot: _drop, ...rest } = record;
+  void _drop;
+  return rest as InvoiceRecord;
+}
+
+/**
+ * R6-C5: issue a stored draft without opening the editor (status Sent; an unnumbered recurring / batch draft takes its
+ * number in `localDb`), freezing its party-balance snapshot at this moment. Roles, period lock, approval and audit
+ * are `localDb.invoices.save`'s.
+ */
+export function issueDraft(id: string): InvoiceRecord {
+  const stored = localDb.invoices.getById(id);
+  if (!stored) throw new Error('Document not found.');
+  if (stored.status !== 'Draft') return stored;
+  return localDb.invoices.save(withIssueSnapshot({ ...stored, status: 'Sent' }, stored));
 }
 
 /* ── "₹ Given" (credit without items) ─────────────────────────── */

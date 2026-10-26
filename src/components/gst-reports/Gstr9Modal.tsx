@@ -10,7 +10,7 @@ import { fyPeriod, gstSummary, itcWithCess, loadBooksData } from '../../lib/book
 import { advanceTaxEvents } from '../../lib/advance-tax';
 import { buildItemIndex, stockDb } from '../../lib/inventory';
 import { unitsDb } from '../../lib/units';
-import { periodForDate } from '../../lib/gst-reports';
+import { journalItcReversals, periodForDate } from '../../lib/gst-reports';
 import { formatMoney } from '../../lib/utils';
 import {
   buildGstr9,
@@ -156,6 +156,8 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
         purchaseNotes: data.books.purchaseReturns ?? [],
         // 7R: ISD credit received (6G) and Part V from the next FY's documents up to the cut-off.
         isdInward: loadIsdInward(),
+        // R6-C4: Rule 42 / 43 common-credit journals reach Table 7 and each month's 3B, as on the GST page.
+        itcReversals: journalItcReversals(getTable('vouchers')),
         nextFy: true,
         today: todayIso(),
         turnover: Number(turnover) || 0,

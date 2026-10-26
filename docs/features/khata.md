@@ -130,6 +130,7 @@ unchanged.
 ## Not done / follow-ups
 
 - Recurring invoices, conversions and late-fee drafts do not take a balance snapshot when issued outside the editor.
-- No per-party default reminder language (the queue starts in the app language).
+- ~~No per-party default reminder language (the queue starts in the app language).~~ Done in 8.121: `message-langs.ts` (stale note struck by R6-C6).
+- ~~Documents issued outside the editor (recurring, conversions, late fees, batches) take no balance snapshot.~~ Done in R6-C5: `withIssueSnapshot` / `issueDraft` in `khata-actions.ts`.
 - Statement web page / Share PDF are in the statement viewer only (not on list rows).
 - The khata views are INR only.

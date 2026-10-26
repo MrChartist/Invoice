@@ -151,6 +151,9 @@ Registered in `backup.ts` (`RECORD_TABLES` / `ID_TABLES`), `access.ts` (`TABLE_A
 9. R2-B's `partyRecipients` (contact persons) is not used by the reminder templates yet.
 
 ## Verify with your CA
+
+Consolidated in `docs/CA_REVIEW.md` (ids G8, G9, T13, T21, T22, AC7, AC17); answers are logged there with the date and the PR.
+
 - **Settlement discount and GST** — default financial note carries no GST (Circular 92/11/2019-GST as understood);
   the GST variant is only for discounts agreed before / at supply with ITC reversed by the buyer (Sec 15(3)(b)).
 - **Bad debts** — no output-GST relief; income-tax deduction on write-off (Sec 36(1)(vii)); recovery taxed (Sec 41(4));

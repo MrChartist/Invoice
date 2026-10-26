@@ -184,6 +184,12 @@ export interface Gstr9Options {
   nextFy?: boolean;
   /** With `nextFy`: today's date — the window never runs past it. */
   today?: string;
+  /**
+   * Additive (R6-C4): Rule 42 / 43 common-credit reversals posted by journal (`journalItcReversals`). Each month's 3B
+   * 4(B)(1) carries them (as on the GST page), and Table 7C takes the FY's total — one journal covers both rules, so
+   * the 7C / 7D split is for your CA to confirm.
+   */
+  itcReversals?: BuildOptions['itcReversals'];
 }
 
 export interface Gstr9Report {
@@ -310,6 +316,7 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       items: opts.items,
       ...(opts.purchaseNotes ? { purchaseNotes: opts.purchaseNotes } : {}),
       ...(opts.isdInward ? { isdInward: opts.isdInward } : {}),
+      ...(opts.itcReversals ? { itcReversals: opts.itcReversals } : {}),
     });
     return { period, label: periodLabel(period), gstr1: rep.gstr1, gstr3b: rep.gstr3b };
   });
@@ -532,6 +539,9 @@ export function buildGstr9(invoices: InvoiceRecord[], rawPurchases: unknown[], o
       inward.set(key, h);
     }
   }
+
+  // R6-C4: Rule 42 / 43 common-credit journals of the FY → 7C (the months' 3B 4(B)(1) already carry them).
+  for (const r of opts.itcReversals ?? []) if (inFy(r.date, fyStart)) addTo(r7.C, { igst: r.igst, cgst: r.cgst, sgst: r.sgst, cess: r.cess });
 
   // 7O (7.93): supplier notes (purchase returns / credit notes received) of the FY reduce the ITC availed,
   // in the bucket of the bill they are against (snapshot flags on the note; capital / services share of the bill).

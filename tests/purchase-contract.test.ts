@@ -822,3 +822,17 @@ test('R5-B trip readers (trip expenses, trip P&L) read the real purchase shape',
   assert.deepEqual([p.expenses, p.hire, p.margin], [1500, 20000, -21500]);
   assert.equal(readPurchase(hire)?.category, 'Lorry hire');
 });
+
+// R6-C1: `margin.ts` (editor margin chip) and `insights.ts` (margin erosion, stock at risk) read purchases through
+// `liveInputs().purchases` (`liveCostPurchases`): the stock engine's copies of the real bill shape, with landed-cost
+// vouchers left on them as `LANDED_EXTRA_KEY`. Totals / tax are the bill's own, so the GST and expense cards agree.
+test('R6-C1 readers (margin chip, insights) read the engine copies of the real bill shape (landed cost included)', async () => {
+  const { buildUnitCosts } = await import('../src/lib/margin.ts');
+  const { buildInsights } = await import('../src/lib/insights.ts');
+  const { LANDED_EXTRA_KEY } = await import('../src/lib/purchase-normalize.ts');
+  const copy = { ...bill, [LANDED_EXTRA_KEY]: { l1: 5 } };
+  assert.equal(buildUnitCosts([bill], []).get('paper ream')?.cost, 100);
+  assert.equal(buildUnitCosts([copy], []).get('paper ream')?.cost, 105, 'landed ₹5 a ream from a voucher');
+  const gst = (purchases: unknown[]) => buildInsights({ invoices: [], payments: [], purchases }, '2026-04-20').find((c) => c.id === 'gstTrend')?.value;
+  assert.equal(gst([copy]), gst([bill]), 'the engine copy keeps the bill\'s tax');
+});

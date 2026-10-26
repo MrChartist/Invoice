@@ -95,7 +95,7 @@ outputs keep the "working paper — verify with your CA" wording.
 - New default ledger account `fx_gain` (code 4930) — constants, nothing stored.
 
 ## Known gaps
-- Cheques link to one document; a cheque covering several invoices must be recorded unlinked and payments entered by hand.
+- ~~Cheques link to one document; a cheque covering several invoices must be recorded unlinked and payments entered by hand.~~ Done in WP-5: `Cheque.allocations` (`types/cheques.ts`) — stale note struck by R6-C6.
 - Clearing does not auto-record against foreign-currency invoices (record the receipt in that currency from the invoice).
 - No bank charges on bounce; post them as an expense / journal.
 - Bank-specific leaf positions are not known exactly — the offsets exist for that.

@@ -85,6 +85,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (a plain id still reads).
 - Round 6 company data: `mrchartist_inv_setup_progress` — object `{skipped, hidden_at?}` (R6-A1 setup checklist v3;
   backed up, synced as a singleton, not audited, `TABLE_ACTIONS` `doc.create`; done-ness is derived from data).
+  R6-C3 table `import_runs` (one row per import run of every kind; backed up, synced, audited, in `TABLE_ACTIONS` and the
+  open-export schema; the checklist's import step reads it). R6-C4 compliance rows carry `downloaded_at` (portal file
+  downloaded, survives reload); only a filled filed date counts as filed. Vendor payment allocations may carry
+  `opening_bill_id` (settles a supplier opening bill, R6-C2).
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,

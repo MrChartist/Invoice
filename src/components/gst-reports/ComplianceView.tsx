@@ -15,7 +15,7 @@ import {
   type ReturnStatus,
 } from '../../lib/compliance';
 import { estimateFor } from '../../lib/gst-penalties';
-import { buildGstReport, periodForDate } from '../../lib/gst-reports';
+import { buildGstReport, journalItcReversals, periodForDate } from '../../lib/gst-reports';
 import { compositionLateInputs } from '../../lib/gstr4-annual';
 import { localDb } from '../../lib/localDb';
 import { QRMP_TURNOVER_LIMIT, todayIso } from '../../lib/tax-rules';
@@ -88,6 +88,8 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
     const links = readLinks();
     // 7O (7.93): supplier notes reduce the month's ITC, so the late-fee / interest base follows the 3B.
     const purchaseNotes = getTable<PurchaseReturn>('purchase_returns');
+    // R6-C4: Rule 42 / 43 common-credit journals raise the 3B tax payable in cash, so the interest base follows.
+    const itcReversals = journalItcReversals(getTable('vouchers'));
     return complianceCalendar({ frequency, stateCode, today, since })
       .map((r) => {
         const filed = filedFor(filedRows, r, gstin);
@@ -97,7 +99,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
         let nil = false;
         if (!r.optional && filedOn > r.due && (r.form === 'GSTR1' || r.form === 'GSTR3B')) {
           const period = periodForDate(r.periodKey.includes('-Q') ? 'quarter' : 'month', r.from);
-          const rep = buildGstReport(invoices, purchases, { period, gstin, filerStateCode: stateCode, links, purchaseNotes });
+          const rep = buildGstReport(invoices, purchases, { period, gstin, filerStateCode: stateCode, links, purchaseNotes, itcReversals });
           const p = rep.gstr3b.payment;
           cashTax = p.cash.igst + p.cash.cgst + p.cash.sgst + (p.cess ?? 0);
           nil = rep.gstr1.counts.included === 0 && (r.form === 'GSTR1' || rep.gstr3b.purchasesConsidered === 0);

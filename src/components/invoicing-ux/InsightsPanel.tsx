@@ -5,7 +5,7 @@ import type { BooksData } from '../../lib/books';
 import { peekTable } from '../../lib/storage';
 import { localDayOf } from '../../lib/dates';
 import { buildInsights, type Insight, type StockRow } from '../../lib/insights';
-import { buildUnitCosts } from '../../lib/margin';
+import { liveCostPurchases, liveUnitCosts } from '../../lib/margin';
 import { formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { uxT } from '../../i18n/areas/invoicing-ux';
@@ -47,10 +47,11 @@ export function InsightsPanel({ books, stock }: { books: BooksData; stock: Stock
   useT();
   const cards = useMemo(() => {
     // PERF-2: shared, parsed-once rows; the insight builders only read them.
-    const purchases = peekTable('purchases') as unknown[];
+    // R6-C1: the engine's copies (landed-cost vouchers applied; totals / tax unchanged).
+    const purchases = liveCostPurchases();
     let costs;
     try {
-      costs = buildUnitCosts(purchases, peekTable<{ name: string }>('stock_items') as { name: string }[], books.vendors);
+      costs = liveUnitCosts(books.vendors); // R6-C1: margin erosion at the landed cost
     } catch {
       costs = undefined;
     }

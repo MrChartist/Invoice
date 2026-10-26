@@ -9,7 +9,7 @@ import { loadLedger, loadStockValuer } from './ledger';
 import { balanceSheetLedgerCsv, ledgerBalanceSheet, ledgerProfitAndLoss, type LedgerProfitLoss } from './ledger/reports';
 import { agingCsv, buildReceivables, type ReceiptRow } from './receivables';
 import { loadReceivableOpeningBills } from './opening-bills';
-import { buildGstReport, periodForDate, periodLabel } from './gst-reports';
+import { buildGstReport, journalItcReversals, periodForDate, periodLabel } from './gst-reports';
 import { buildSummaryHtml, gstr3bCsv, sectionCsv, type SectionId } from './gstr-json';
 import { toCsv } from './csv';
 import { localDb } from './localDb';
@@ -64,6 +64,7 @@ export function buildPackFiles(month: string, now: Date = new Date()): PackFile[
     filerStateCode: profile?.stateCode,
     links: getTable('doc_links'),
     purchaseNotes: getTable('purchase_returns'),
+    itcReversals: journalItcReversals(getTable('vouchers')), // R6-C4: Rule 42 / 43 journals in the pack's 3B
   });
   for (const id of GST_SECTIONS) files.push({ name: `GSTR1_${month}_${id}.csv`, text: sectionCsv(rep.gstr1, id) });
   files.push({ name: `GSTR3B_${month}.csv`, text: gstr3bCsv(rep.gstr3b) });

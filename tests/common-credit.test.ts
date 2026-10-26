@@ -129,3 +129,28 @@ test('QA6 F8: the annual true-up is dated in an open return month after the FY (
   assert.equal(run.date, '2026-09-15');
   assert.deepEqual(journalItcReversals(getTable('vouchers')).map((r) => r.date), ['2026-09-15'], 'September 3B 4(B)(1)');
 });
+
+test('R6-C4: GSTR-9 Table 7 includes the journal reversal and agrees with the month\'s 3B 4(B)(1); the month-end pack carries it', async () => {
+  const { buildGstReport, journalItcReversals } = await import('../src/lib/gst-reports.ts');
+  const { buildGstr9 } = await import('../src/lib/gstr9.ts');
+  const { getTable } = await import('../src/lib/storage.ts');
+  setTable('purchases', FIXTURE);
+  const r = rule42(inputsFor(FIXTURE, '2026-05-01', '2026-05-31'), 20000, 100000, '2026-05');
+  postReversal({ month: '2026-05', kind: 'monthly', heads: r.reverse, figures: figuresOf(r), date: '2026-05-31' });
+  const itcReversals = journalItcReversals(getTable('vouchers'));
+  const g3 = buildGstReport([], FIXTURE, { period: { kind: 'month', fyStart: 2026, month: 5 }, itcReversals }).gstr3b.itc.reversedRules;
+  const g9 = buildGstr9([], FIXTURE, { fyStart: 2026, itcReversals });
+  const row = (id: string) => g9.table7.find((x) => x.id === id)!;
+  assert.deepEqual([row('7C').igst, row('7C').cgst, row('7C').sgst], [g3.igst, g3.cgst, g3.sgst], 'Table 7C = the month\'s 3B 4(B)(1)');
+  assert.deepEqual([row('7C').cgst, row('7I').cgst], [187.5, 187.5]);
+  const without = buildGstr9([], FIXTURE, { fyStart: 2026 });
+  assert.equal(without.table7.find((x) => x.id === '7C')!.cgst, 0, 'without the option nothing is added');
+  assert.equal(g9.months.find((m) => m.period.month === 5)!.gstr3b.itc.reversedRules.cgst, 187.5, 'each month\'s 3B in GSTR-9 carries it');
+  // The month-end pack, GSTR-9C and the Compliance interest base pass the same option (report-pack.ts imports a
+  // directory module Node's test loader cannot resolve, so this is a source check).
+  const { readFileSync } = await import('node:fs');
+  for (const f of ['src/lib/report-pack.ts', 'src/components/gst-reports/Gstr9Modal.tsx', 'src/components/gst-reports/Gstr9cView.tsx', 'src/components/gst-reports/ComplianceView.tsx']) {
+    assert.match(readFileSync(f, 'utf8'), /itcReversals(: journalItcReversals\(getTable\('vouchers'\)\)|\b)/, f);
+    assert.match(readFileSync(f, 'utf8'), /journalItcReversals\(getTable\('vouchers'\)\)/, f);
+  }
+});
