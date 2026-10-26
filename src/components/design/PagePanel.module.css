@@ -1,0 +1,8 @@
+.wrap { display: grid; gap: 0.75rem; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.art { display: grid; gap: 0.375rem; }
+.artPreview { max-width: 100%; max-height: 5rem; object-fit: contain; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card); }
+.hint { margin: 0; font-size: var(--text-xs); color: var(--muted-foreground); }
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.625rem; border-radius: var(--radius-sm); background: var(--muted); font-size: var(--text-xs); }
+.disabled { opacity: 0.5; pointer-events: none; }

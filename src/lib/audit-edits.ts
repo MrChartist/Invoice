@@ -97,6 +97,10 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   dining_tables: { entity: 'settings', label: 'Dining table' },
   table_orders: { entity: 'invoice', label: 'Table order' },
   modifier_groups: { entity: 'item', label: 'Modifier group' },
+  // R3-C: GSTR-1 portal file imports, DSC register, monthly client checklist
+  gst_portal_files: { entity: 'gst', label: 'Portal file' },
+  dsc_register: { entity: 'settings', label: 'DSC' },
+  client_checklist: { entity: 'settings', label: 'Checklist' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */

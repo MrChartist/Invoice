@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { DEFAULT_TEMPLATE_ID, templateById } from '../templates/registry';
@@ -28,6 +28,8 @@ import { calculateInvoice } from '../../lib/invoice-calc';
 import { designForDoc, GLOBAL_PROFILE_ID } from '../../lib/design-prefs';
 import { localDb } from '../../lib/localDb';
 import { DesignLabels, LogoAccentSuggest } from './DesignLabels';
+// R3-C2 / C3: page margins, letterhead artwork and the item-photo toggle (lazy, with their own strings).
+const PagePanel = lazy(() => import('./PagePanel'));
 import { dlT } from '../../i18n/areas/design-r2';
 import { cn } from '../../lib/utils';
 import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
@@ -360,6 +362,11 @@ export function DesignPanel({
             />
           </div>
         </Section>
+
+        {/* R3-C2 / C3: margins, letterhead / footer artwork, item photos on lines. */}
+        <Suspense fallback={null}>
+          <PagePanel design={design} onChange={set} sectionClass={styles.section} titleClass={styles.sectionTitle} />
+        </Suspense>
 
         <Section title={desT('itemColumns')}>
           <div className={styles.checks}>

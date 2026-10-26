@@ -85,6 +85,7 @@ export const en = {
   'nav.gateway': 'Gateway',
   'nav.accountsInfo': 'Accounts Info',
   'nav.designStudio': 'Design studio',
+  'nav.practice': 'Practice desk',
   'nav.settings': 'Settings',
   'nav.groupSales': 'Sales',
   'nav.groupPurchases': 'Purchases & stock',

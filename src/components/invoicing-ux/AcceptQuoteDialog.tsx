@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { InvoiceRecord } from '../../types/invoice';
 import { acceptIssues, buildAcceptance, setQuoteAcceptance } from '../../lib/quote-acceptance';
 import { cn, formatCurrency } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
+import { SignaturePad, type SignaturePadHandle } from '../ui/SignaturePad';
 import { useT } from '../../i18n';
 import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
@@ -16,60 +17,16 @@ import ux from './ux.module.css';
  */
 export function AcceptQuoteDialog({ quote, open, onClose, onDone }: { quote: InvoiceRecord; open: boolean; onClose: () => void; onDone: () => void }) {
   useT();
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
+  const pad = useRef<SignaturePadHandle>(null);
   const [inked, setInked] = useState(false);
   const [signer, setSigner] = useState(quote.client?.name ?? '');
   const [method, setMethod] = useState<'counter' | 'remote'>('counter');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const c = canvas.current;
-    if (!open || !c) return;
-    const ratio = window.devicePixelRatio || 1;
-    c.width = c.clientWidth * ratio;
-    c.height = c.clientHeight * ratio;
-    const ctx = c.getContext('2d');
-    if (!ctx) return;
-    ctx.scale(ratio, ratio);
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = getComputedStyle(c).color || 'black';
-  }, [open, method]);
-
-  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    return [e.clientX - r.left, e.clientY - r.top] as const;
-  };
-  const down = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const ctx = e.currentTarget.getContext('2d');
-    if (!ctx) return;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    drawing.current = true;
-    const [x, y] = point(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return;
-    const ctx = e.currentTarget.getContext('2d');
-    if (!ctx) return;
-    const [x, y] = point(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    if (!inked) setInked(true);
-  };
-  const up = () => {
-    drawing.current = false;
-  };
-  const clear = () => {
-    const c = canvas.current;
-    c?.getContext('2d')?.clearRect(0, 0, c.width, c.height);
-    setInked(false);
-  };
+  const clear = () => pad.current?.clear();
 
   const accept = () => {
-    const signature = method === 'counter' && inked ? canvas.current?.toDataURL('image/png') : undefined;
+    const signature = method === 'counter' && inked ? pad.current?.toDataUrl() : undefined;
     const issues = acceptIssues(quote, { signer, signature, method });
     if (issues.length) {
       setError(uxT(`acc_${issues[0]}` as const));
@@ -109,16 +66,7 @@ export function AcceptQuoteDialog({ quote, open, onClose, onDone }: { quote: Inv
         {method === 'counter' && (
           <>
             <span className={controls.label}>{uxT('accSignHere')}</span>
-            <canvas
-              ref={canvas}
-              className={ux.sigPad}
-              aria-label={uxT('accSignHere')}
-              onPointerDown={down}
-              onPointerMove={move}
-              onPointerUp={up}
-              onPointerLeave={up}
-              data-signature-pad
-            />
+            <SignaturePad ref={pad} label={uxT('accSignHere')} onInk={setInked} />
             <div className={ux.row}>
               <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={clear}>{uxT('accClear')}</button>
               <span className={ux.muted}>{uxT('accSnapshotNote')}</span>

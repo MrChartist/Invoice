@@ -7,6 +7,7 @@
  * it and appends a row to the `transactions` table.
  */
 
+import type {} from '../types/docs-r3'; // R3-C2: InvoiceRecord.delivery_proof
 import type {
   Client,
   DocumentType,
@@ -387,6 +388,9 @@ export const localDb = {
       if (stored && assertUnlocked(stored, action) === 'overridden') overridden = true;
       if (assertUnlocked({ ...toSave, id: toSave.id || stored?.id }, stored ? 'edit' : 'create') === 'overridden') overridden = true;
 
+      // R3-C2: the receiver signature is written only by setDeliveryProof — kept from the stored row, never copied to a new one.
+      toSave.delivery_proof = stored?.delivery_proof;
+      if (!toSave.delivery_proof) delete toSave.delivery_proof;
       if (stored) {
         toSave.created_at = stored.created_at ?? now;
         // 8.101: a signed acceptance is a snapshot — an edit of the quote never rewrites or drops it.
