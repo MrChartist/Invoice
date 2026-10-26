@@ -21,7 +21,7 @@ import type { LandedAllocationRow, LandedCostVoucher, LandedMethod, LandedVouche
 import { allocateLandedAmounts, type LandedBasis } from './landed-cost';
 import { LANDED_EXTRA_KEY, isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { round2 } from './invoice-calc';
-import { generateId, getTable, setTable } from './storage';
+import { generateId, peekTable, setTable } from './storage';
 import { requireAccess } from './access';
 import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
@@ -269,7 +269,7 @@ export function earliestTargetDate(lines: readonly TargetLine[]): string {
    Storage
    ================================================================ */
 
-export const loadLandedVouchers = (): LandedCostVoucher[] => getTable<LandedCostVoucher>(LCV_TABLE).filter((v) => v && typeof v.id === 'string');
+export const loadLandedVouchers = (): LandedCostVoucher[] => peekTable<LandedCostVoucher>(LCV_TABLE).filter((v) => v && typeof v.id === 'string');
 
 export function newCharge(partial: Partial<LandedVoucherCharge> = {}): LandedVoucherCharge {
   return { id: generateId(), source: { kind: 'memo' }, label: '', amount: 0, ...partial };

@@ -8,12 +8,19 @@ import { generateId, getTable } from '../../lib/storage';
 import { computeStock } from '../../lib/inventory';
 import { bomsDb } from '../../lib/manufacturing';
 import { pendingPoQty } from '../../lib/reorder';
-import { lastPurchaseRates, poLinesFromMrp, productionPlansDb, runMrp } from '../../lib/mrp';
+import { lastPurchaseRates, ordersFromMrp, poLinesFromMrp, productionPlansDb, runMrp } from '../../lib/mrp';
 import { poTotals, purchaseOrdersDb, validatePo } from '../../lib/purchase-orders';
 import { businessContext } from '../../lib/purchases-context';
 import type { ProductionPlan, ProductionPlanLine } from '../../types/manufacturing';
 import type { PurchaseOrder, PurchaseRecord, ReceiptNote, Vendor } from '../../types/purchases';
 import { s7T } from '../../i18n/areas/inventory-7s';
+import { defineArea } from '../../i18n/area';
+
+// R4-A1: "Create production orders" (inline strings, so the MRP tab does not load the production catalogue).
+const woT = defineArea(
+  { createOrdersMrp: 'Create production orders ({n})', ordersCreatedMrp: '{n} production order(s) created: {numbers}' } as const,
+  { createOrdersMrp: 'उत्पादन ऑर्डर बनाएँ ({n})', ordersCreatedMrp: '{n} उत्पादन ऑर्डर बने: {numbers}' },
+);
 import { money, qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
@@ -87,6 +94,18 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
         taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, notes: `Raised from production plan${number ? ` ${number}` : ''}`,
       });
       ctx.changed(s7T('poCreated', { number: po.po_number }));
+    } catch (e) {
+      ctx.error((e as Error).message);
+    }
+  };
+
+  // R4-A1: one production order per "make" row, instead of opening a journal (the orders module loads on demand).
+  const createOrders = async () => {
+    try {
+      const { productionOrdersDb } = await import('../../lib/production/orders');
+      const plan = planId ? { id: planId, number, due_date: due || undefined } : undefined;
+      const made = ordersFromMrp(rows, plan).map((d) => productionOrdersDb.save({ date, ...d }, ctx.items, boms));
+      ctx.changed(woT('ordersCreatedMrp', { n: made.length, numbers: made.map((o) => o.number).join(', ') }));
     } catch (e) {
       ctx.error((e as Error).message);
     }
@@ -184,6 +203,13 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {ctx.canBooks && rows.some((r) => r.action === 'make' && r.suggested > 0) && (
+        <div className={styles.bar} style={{ marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+          <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => void createOrders()} data-testid="mrp-orders">
+            <Factory size={14} aria-hidden="true" /> {woT('createOrdersMrp', { n: rows.filter((r) => r.action === 'make' && r.suggested > 0).length })}
+          </button>
         </div>
       )}
       {ctx.canBooks && buy.some((r) => r.suggested > 0) && (

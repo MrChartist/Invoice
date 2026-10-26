@@ -15,6 +15,11 @@
  * Cycle-safe (visited set). Pure; the caller passes `collectEvents(liveTrackingInputs())` (tests/genealogy.test.ts).
  */
 import type { StockEvent } from '../inventory';
+import type { RecallNotice } from '../../types/production-r4';
+import { generateId, peekTable, setTable } from '../storage';
+import { requireAccess } from '../access';
+import { assertUnlocked } from '../period-lock';
+import { audit } from '../audit';
 
 export interface TraceRef {
   refType: string;
@@ -269,3 +274,56 @@ export function recallMessageLinks(r: Pick<RecallRow, 'phone' | 'email' | 'party
     ...(r.email?.includes('@') ? { mail: `mailto:${r.email}?subject=${encodeURIComponent('Product recall notice')}&body=${encodeURIComponent(text)}` } : {}),
   };
 }
+
+/* ── Block batch (into the QC hold godown) ─────────────────────── */
+
+type BlockTracking = ReadonlyMap<string, { item: { id: string; track_batches?: boolean }; batches: { batch: string; byGodown: Record<string, number> }[] }>;
+
+/**
+ * Transfer drafts that move every unit of the reached batches out of saleable godowns into the QC hold godown, one per
+ * source godown ("Block batch": the existing non-saleable guard then refuses sales). Pure over the tracking map.
+ */
+export function blockBatchTransfers(
+  tracking: BlockTracking, keys: readonly { itemId: string; batch: string }[], nonSaleable: ReadonlySet<string>, qcId: string, newId: () => string,
+): { from_godown: string; to_godown: string; lines: { id: string; item_id: string; qty: number; batch_no: string }[] }[] {
+  const byFrom = new Map<string, { id: string; item_id: string; qty: number; batch_no: string }[]>();
+  for (const k of keys) {
+    const t = tracking.get(k.itemId);
+    if (!t?.item.track_batches) continue;
+    const b = t.batches.find((x) => x.batch.trim().toUpperCase() === k.batch.trim().toUpperCase());
+    if (!b) continue;
+    for (const [g, q] of Object.entries(b.byGodown)) {
+      if (!(q > 1e-9) || g === qcId || nonSaleable.has(g)) continue;
+      const list = byFrom.get(g) ?? [];
+      list.push({ id: newId(), item_id: k.itemId, qty: rq(q), batch_no: b.batch });
+      byFrom.set(g, list);
+    }
+  }
+  return [...byFrom].map(([from, lines]) => ({ from_godown: from, to_godown: qcId, lines }));
+}
+
+/* ================================================================
+   Storage: recall notices (who was told)
+   ================================================================ */
+
+export const RECALL_TABLE = 'recall_notices';
+
+export const recallNoticesDb = {
+  all: (): RecallNotice[] => peekTable<RecallNotice>(RECALL_TABLE).filter((r) => r && typeof r.id === 'string'),
+  /** Log a recall (books.edit, period lock on its date, audited). */
+  save(input: Omit<RecallNotice, 'id' | 'created_at'> & { id?: string }): RecallNotice {
+    requireAccess('books.edit');
+    const id = input.id || generateId();
+    const state = assertUnlocked({ id, issue_date: input.date }, 'create');
+    const rows = recallNoticesDb.all();
+    const existing = rows.find((r) => r.id === id);
+    const row: RecallNotice = { ...existing, ...input, id, created_at: existing?.created_at ?? new Date().toISOString() };
+    setTable(RECALL_TABLE, existing ? rows.map((r) => (r.id === id ? row : r)) : [...rows, row]);
+    try {
+      audit.record({ entity: 'manufacturing', entity_id: id, action: existing ? 'update' : 'create', summary: `Recall notice for ${input.batch_keys.length} batch(es): ${input.notified.length} customer(s) told${state === 'overridden' ? ' (period lock overridden)' : ''}` });
+    } catch {
+      /* logging never breaks a save */
+    }
+    return row;
+  },
+};

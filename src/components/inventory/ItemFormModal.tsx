@@ -47,6 +47,7 @@ function toDraft(i: StockItem): Draft {
       alt: (i.alt_units ?? []).map((a) => ({ unit: a.unit, factor: String(a.factor) })),
       costs: (i.standard_costs ?? []).map((e) => ({ from: e.from, rate: String(e.rate) })),
       prices: (i.selling_prices ?? []).map((e) => ({ from: e.from, rate: String(e.rate) })),
+      qc: !!i.qc_on_receipt, // R4-A4
     },
   };
 }
@@ -113,6 +114,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       alt_units: d.track_stock ? cleanAltUnits(altList, d.unit) : undefined,
       standard_costs: cleanPriceList(d.masters.costs.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
       selling_prices: cleanPriceList(d.masters.prices.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
+      qc_on_receipt: d.track_stock && d.masters.qc ? true : undefined, // R4-A4
     });
   };
 

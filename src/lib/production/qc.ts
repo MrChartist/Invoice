@@ -14,7 +14,7 @@
 import type { StockEvent, StockItem } from '../inventory';
 import type { Godown } from '../../types/stock';
 import type { QcResult, QcSettings, QcSourceKind } from '../../types/production-r4';
-import { DB_PREFIX, generateId, getJson, getTable, setJson, setTable } from '../storage';
+import { DB_PREFIX, generateId, getJson, peekTable, setJson, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { audit } from '../audit';
@@ -159,20 +159,8 @@ export function ensureQcGodown(): Godown {
   return godownsDb.save({ name: taken ? `${QC_GODOWN_NAME} 2` : QC_GODOWN_NAME, kind: 'qc' });
 }
 
-/**
- * Default-godown hook for receipts (GRN): lines without a godown whose item is held for QC go to the QC hold godown
- * (created on first use). A line that names a godown keeps it.
- */
-export function applyQcHold<L extends { godown_id?: string; item_id?: string; name?: string }>(lines: L[]): L[] {
-  const settings = loadQcSettings();
-  const items = getTable<StockItem>('stock_items');
-  if (!settings.hold_all && !items.some((i) => i.qc_on_receipt)) return lines;
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const byName = new Map(items.map((i) => [String(i.name ?? '').trim().toLowerCase(), i]));
-  const itemOf = (l: L) => (l.item_id ? byId.get(l.item_id) : undefined) ?? byName.get(String(l.name ?? '').trim().toLowerCase());
-  if (!lines.some((l) => !l.godown_id && holdsForQc(itemOf(l), settings))) return lines;
-  return withQcGodown(lines, ensureQcGodown().id, itemOf, settings);
-}
+/** Default-godown hook for receipts (GRN); lives in receipt-notes.ts so the purchases screens do not load this module. */
+export { applyQcHold } from '../receipt-notes';
 
 export function loadQcSettings(): QcSettings {
   const s = getJson<Partial<QcSettings>>(QC_SETTINGS_KEY, {});
@@ -192,7 +180,7 @@ export function saveQcSettings(s: QcSettings): void {
 }
 
 export const qcResultsDb = {
-  all: (): QcResult[] => getTable<QcResult>(QC_RESULTS_TABLE).filter((r) => r && typeof r.id === 'string'),
+  all: (): QcResult[] => peekTable<QcResult>(QC_RESULTS_TABLE).filter((r) => r && typeof r.id === 'string'),
   /** Record a decision (books.edit, period lock on its date, audited). */
   save(input: Omit<QcResult, 'id' | 'created_at'> & { id?: string }): QcResult {
     requireAccess('books.edit');

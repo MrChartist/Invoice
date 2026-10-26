@@ -4,20 +4,21 @@
  *  - orders past their due date and not completed;
  *  - orders Completed but not Closed for more than 7 days;
  *  - stock waiting in a QC godown for more than `qc_settings.alert_days` (default 3).
+ *
+ * This module imports almost nothing statically, so the bell's lazy chunk stays tiny; the order and stock engines load
+ * on the first refresh (their own chunks) and the notices are cached until the data changes.
  */
 import type { ProductionOrder } from '../../types/production-r4';
-import type { Godown } from '../../types/stock';
 import { registerNotificationProvider, type AppNotification } from '../notifications';
-import { getTable } from '../storage';
+import { peekTable } from '../storage';
 import { localDayOf, shiftDay } from '../dates';
-import { liveStatus, loadOrderDocs, ordersStore, overdueOrders } from './orders';
-import { collectEvents, stockDb } from '../inventory';
-import { liveTrackingInputs } from '../stock-tracking';
-import { loadQcSettings, qcGodowns, qcNotices, qcStock } from './qc';
 
 export const COMPLETED_GRACE_DAYS = 7;
 
 let unregister: (() => void) | null = null;
+let cacheKey = '';
+let cached: AppNotification[] = [];
+let running = false;
 
 /** Day the order reached Completed (its "complete" log row, else its last output), or ''. */
 export function completedOn(o: Pick<ProductionOrder, 'log'>): string {
@@ -26,10 +27,13 @@ export function completedOn(o: Pick<ProductionOrder, 'log'>): string {
   return last ? localDayOf(new Date(last.at)) : '';
 }
 
-/** Pure: the order notices for `today`. */
+/** Pure: the order notices for `today` (`status` = the live status of an order). */
 export function orderNotices(orders: readonly ProductionOrder[], status: (o: ProductionOrder) => string, today: string, at: string): AppNotification[] {
   const out: AppNotification[] = [];
-  const late = overdueOrders(orders, status as (o: ProductionOrder) => ProductionOrder['status'], today);
+  const late = orders.filter((o) => {
+    const s = status(o);
+    return !!o.due_date && o.due_date < today && (s === 'planned' || s === 'released' || s === 'in_progress');
+  });
   if (late.length) {
     out.push({
       id: `wo-late:${late.map((o) => o.id).sort().join(',')}`, severity: 'warning',
@@ -50,35 +54,41 @@ export function orderNotices(orders: readonly ProductionOrder[], status: (o: Pro
   return out;
 }
 
-export function registerProductionAlerts(): void {
-  if (unregister) return;
-  unregister = registerNotificationProvider((ctx) => {
-    const at = ctx.now.toISOString();
-    const today = localDayOf(ctx.now);
-    const out: AppNotification[] = [];
-    const orders = ordersStore.all();
-    if (orders.length) {
-      const docs = loadOrderDocs();
-      out.push(...orderNotices(orders, (o) => liveStatus(o, docs), today, at));
+const TABLES = ['production_orders', 'godowns', 'stock_transfers', 'manufacturing_vouchers', 'stock_journals', 'receipt_notes', 'purchases', 'invoices'];
+
+async function refresh(now: Date, onChange?: () => void): Promise<void> {
+  running = true;
+  try {
+    const [orders, qc, inv, st] = await Promise.all([import('./orders'), import('./qc'), import('../inventory'), import('../stock-tracking')]);
+    const at = now.toISOString();
+    const today = localDayOf(now);
+    const list = orders.ordersStore.all();
+    const docs = orders.loadOrderDocs();
+    const out = orderNotices(list, (o) => orders.liveStatus(o, docs), today, at);
+    const qcIds = new Set(qc.qcGodowns(peekTable('godowns')).map((g) => g.id));
+    if (qcIds.size) {
+      const events = inv.collectEvents({ ...st.liveTrackingInputs(), includeTransfers: true });
+      const names = new Map(inv.stockDb.items().map((i) => [i.id, i.name]));
+      out.push(...qc.qcNotices(qc.qcStock(events, qcIds, today), qc.loadQcSettings().alert_days, (id) => names.get(id) ?? 'Item', at));
     }
-    out.push(...qcCache.notices(today, at));
-    return out;
-  });
+    const changed = JSON.stringify(out.map((n) => n.id)) !== JSON.stringify(cached.map((n) => n.id));
+    cached = out;
+    if (changed) onChange?.();
+  } catch {
+    /* a failed refresh keeps the last notices */
+  } finally {
+    running = false;
+  }
 }
 
-/** QC ageing runs the stock engine: cached per day and data version. */
-const qcCache = {
-  key: '',
-  rows: [] as AppNotification[],
-  notices(today: string, at: string): AppNotification[] {
-    const godowns = qcGodowns(getTable<Godown>('godowns'));
-    if (!godowns.length) return [];
-    const key = ['stock_transfers', 'receipt_notes', 'purchases', 'manufacturing_vouchers', 'invoices'].map((t) => getTable(t).length).join('|') + `|${today}`;
-    if (key === this.key) return this.rows;
-    this.key = key;
-    const events = collectEvents({ ...liveTrackingInputs(), includeTransfers: true });
-    const items = new Map(stockDb.items().map((i) => [i.id, i.name]));
-    this.rows = qcNotices(qcStock(events, new Set(godowns.map((g) => g.id)), today), loadQcSettings().alert_days, (id) => items.get(id) ?? 'Item', at);
-    return this.rows;
-  },
-};
+export function registerProductionAlerts(onChange?: () => void): void {
+  if (unregister) return;
+  unregister = registerNotificationProvider((ctx) => {
+    const key = `${localDayOf(ctx.now)}|${TABLES.map((t) => peekTable(t).length).join('|')}|${peekTable<{ updated_at?: string }>('production_orders').map((o) => o.updated_at ?? '').join(',')}`;
+    if (key !== cacheKey && !running) {
+      cacheKey = key;
+      void refresh(ctx.now, onChange);
+    }
+    return cached;
+  });
+}

@@ -1126,6 +1126,69 @@ try {
     await writeJson(page, 'stock_items', prev.stock);
   });
 
+  await step('R4-A: production order from a sales order → issue → partial output → close with write-off → variance report', async () => {
+    const keys = ['stock_items', 'boms', 'invoices', 'godowns', 'stock_transfers', 'manufacturing_vouchers', 'stock_journals', 'production_orders', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [
+      item('e2e-leg', 'E2E Leg', { opening_qty: 20, opening_rate: 30 }),
+      item('e2e-top', 'E2E Top', { opening_qty: 5, opening_rate: 200 }),
+      item('e2e-table', 'E2E Table'),
+    ]);
+    await writeJson(page, 'boms', [{ id: 'e2e-bom', item_id: 'e2e-table', name: 'Standard', batch_qty: 1, is_default: true, components: [{ id: 'c1', item_id: 'e2e-leg', qty: 4 }, { id: 'c2', item_id: 'e2e-top', qty: 1 }] }]);
+    const so = {
+      id: 'e2e-wo-so', invoice_number: 'SO/FY26-27/0099', doc_type: 'SALES_ORDER', status: 'Sent', issue_date: '2026-04-01', due_date: '2026-04-30',
+      client: { name: 'E2E Furniture Buyer' }, items: [{ id: 'e2e-wo-line', name: 'E2E Table', quantity: 2, rate: 1500, amount: 3000 }],
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), so]);
+    await page.goto(srv.origin + '/manufacturing?tab=orders');
+    await page.getByRole('button', { name: 'Make to order' }).click();
+    await page.locator('#mto-so').selectOption('e2e-wo-so');
+    await page.getByTestId('mto-create').click();
+    await page.getByText(/1 production order\(s\) created for SO\/FY26-27\/0099/).waitFor();
+    const detail = page.getByTestId('wo-detail');
+    await detail.getByRole('button', { name: 'Release', exact: true }).click();
+    await page.getByText(/^Released WO\/FY\d\d-\d\d\/0001/).waitFor();
+    check(/\b8\b/.test(await detail.getByTestId('wo-materials').getByRole('row').filter({ hasText: 'E2E Leg' }).innerText()), 'release explodes the BOM: 8 legs required for 2 tables');
+
+    await detail.getByRole('button', { name: 'Issue materials' }).click();
+    await page.getByTestId('wo-issue-save').click();
+    await page.getByText(/Materials issued on STR\/FY\d\d-\d\d\/\d+/).waitFor();
+    const strs = await readJson(page, 'stock_transfers', [], (v) => v.some((t) => t.production_order_id));
+    const issue = strs.find((t) => t.production_order_id);
+    check(issue?.lines?.length === 2 && issue.lines.some((l) => l.item_id === 'e2e-leg' && l.qty === 8), 'the issue is a normal stock transfer into the shop-floor godown, tagged with the order');
+
+    await detail.getByRole('button', { name: 'Report output' }).click();
+    const made = page.getByLabel(/Quantity made/);
+    await made.fill('1');
+    await made.blur();
+    await page.getByTestId('wo-output-save').click();
+    await page.getByText(/MFG\/FY\d\d-\d\d\/\d+ saved: 1 made/).waitFor();
+    const mfgRows = await readJson(page, 'manufacturing_vouchers', [], (v) => v.some((m) => m.production_order_id));
+    const out = mfgRows.find((m) => m.production_order_id);
+    check(out?.qty === 1 && out.components.some((c) => c.item_id === 'e2e-leg' && c.qty === 4 && c.godown_id === issue?.to_godown), 'partial output: a manufacturing journal consuming 4 legs from the shop floor');
+    await detail.getByText('In progress').first().waitFor();
+
+    await detail.getByRole('button', { name: 'Close order' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/Write off as scrap/).check();
+    await dialog.getByRole('button', { name: 'Close order' }).click();
+    await page.getByText(/WO\/FY\d\d-\d\d\/0001 closed/).waitFor();
+    const orders = await readJson(page, 'production_orders', [], (v) => v.some((o) => o.status === 'closed'));
+    const journals = await readJson(page, 'stock_journals', [], (v) => v.some((j) => j.production_order_id));
+    check(orders[0]?.status === 'closed' && journals.some((j) => j.production_order_id === orders[0]?.id && j.produce.length === 0), 'close writes the shop-floor balance off (consume-only stock journal) and closes the order');
+
+    await page.goto(srv.origin + '/manufacturing?tab=costing');
+    const costRow = page.getByTestId('costing-table').getByRole('row').filter({ hasText: orders[0].number });
+    await costRow.waitFor();
+    check(/50%/.test(await costRow.innerText()), 'variance report: 1 of 2 made → yield 50%');
+    await costRow.getByRole('button', { name: /Details/ }).click();
+    await page.getByText('Yield variance').first().waitFor();
+    check(true, 'the order drill-down shows the variance split');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('POS: typed barcode, split cash + UPI, bill saved Paid, Z report shows the totals', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));

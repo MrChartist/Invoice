@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { SINGLETON_KEYS, getJson, getTable, subscribeStorageChanges } from '../../lib/storage';
+import { SINGLETON_KEYS, getJson, getTable, peekTable, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
 import {
@@ -164,24 +164,11 @@ function ensurePackAlerts(onReady: () => void): void {
 }
 
 // R4-A: production orders past due / completed-not-closed and stock aged in QC — lazy, once an order or a QC godown exists.
-let productionAlerts: 'off' | 'loading' | 'on' = 'off';
+let productionAlerts = 0;
 function ensureProductionAlerts(onReady: () => void): void {
-  if (productionAlerts !== 'off') return;
-  try {
-    if (!getTable('production_orders').length && !getTable<{ kind?: string }>('godowns').some((g) => g?.kind === 'qc')) return;
-  } catch {
-    return;
-  }
-  productionAlerts = 'loading';
-  import('../../lib/production/order-alerts')
-    .then((m) => {
-      m.registerProductionAlerts();
-      productionAlerts = 'on';
-      onReady();
-    })
-    .catch(() => {
-      productionAlerts = 'off';
-    });
+  if (productionAlerts || !(peekTable('production_orders').length || peekTable<{ kind?: string }>('godowns').some((g) => g?.kind === 'qc'))) return;
+  productionAlerts = 1;
+  import('../../lib/production/order-alerts').then((m) => { m.registerProductionAlerts(onReady); onReady(); }, () => { productionAlerts = 0; });
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {

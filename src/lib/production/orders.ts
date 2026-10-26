@@ -26,7 +26,7 @@ import { lineFactor } from '../units';
 import { buildItemIndex, type StockInputs, type StockItem } from '../inventory';
 import { fefoAllocate, serialsInStock, transferIssues, type TrackingMap } from '../stock-tracking';
 import type { OrderFulfilment } from '../sales-orders';
-import { generateId, getTable, setTable } from '../storage';
+import { generateId, peekTable, setTable } from '../storage';
 import { currentActor, requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { audit } from '../audit';
@@ -408,14 +408,14 @@ export function overdueOrders(orders: readonly ProductionOrder[], status: (o: Pr
 
 export function loadOrderDocs(): OrderDocs {
   return {
-    transfers: getTable<StockTransfer>('stock_transfers'),
-    mfg: getTable<ManufacturingVoucher>('manufacturing_vouchers'),
-    journals: getTable<StockJournal>('stock_journals'),
+    transfers: peekTable<StockTransfer>('stock_transfers'),
+    mfg: peekTable<ManufacturingVoucher>('manufacturing_vouchers'),
+    journals: peekTable<StockJournal>('stock_journals'),
   };
 }
 
 export const ordersStore = {
-  all: (): ProductionOrder[] => getTable<ProductionOrder>(ORDERS_TABLE).filter((o) => o && typeof o.id === 'string'),
+  all: (): ProductionOrder[] => peekTable<ProductionOrder>(ORDERS_TABLE).filter((o) => o && typeof o.id === 'string'),
   get: (id: string): ProductionOrder | undefined => ordersStore.all().find((o) => o.id === id),
   /** Writes one order (callers hold the guards). */
   put(order: ProductionOrder): void {

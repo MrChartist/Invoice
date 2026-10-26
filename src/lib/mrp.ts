@@ -163,7 +163,7 @@ export function poLinesFromMrp(rows: readonly MrpRow[], newId: () => string = ge
  * caller saves them through `productionOrdersDb` (src/lib/production/orders.ts).
  */
 export function ordersFromMrp(
-  rows: readonly MrpRow[], plan?: Pick<ProductionPlan, 'id' | 'number' | 'due_date'>,
+  rows: readonly MrpRow[], plan?: Partial<Pick<ProductionPlan, 'id' | 'number' | 'due_date'>>,
 ): { item_id: string; bom_id?: string; planned_qty: number; plan_id?: string; due_date?: string; narration?: string }[] {
   return rows.filter((r) => r.action === 'make' && r.suggested > EPS).map((r) => ({
     item_id: r.item.id, ...(r.bomId ? { bom_id: r.bomId } : {}), planned_qty: r.suggested,
