@@ -40,7 +40,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 5. Industry packs | I1–I36 | 36 | 6 |
 | 6. Exports and customs | X1–X10 | 10 | 3 |
 | 7. Hotel and lodging pack (Round 7, planned) | HT1–HT17 | 17 | 6 |
-| **Total** | | **177** | **40** |
+| 8. Trading businesses (Round 8, planned) | TR1–TR22 | 22 | 8 |
+| **Total** | | **199** | **48** |
 
 ---
 
@@ -357,7 +358,7 @@ asked is unchanged, so no id is added and the count stays 160.
 | AC10 | The editor's margin chip and the insights tile now cost goods at the **landed** rate (landed-cost vouchers included), as the stock reports do. | `margin.ts` (`liveUnitCosts`) |
 | G23, G41 | The GST filing strip offers **IFF** in QRMP months 1–2 and **CMP-08** for a composition quarter, with "Mark filed" and a remembered download; the IFF pre-download check skips HSN checks and CMP-08 runs only the composition checks. | `FilingStrip.tsx`, `compliance.ts`, `gst-preflight.ts` |
 
-## 7. Trading businesses (Round 8, ids TR1–TR22)
+## 8. Trading businesses (Round 8, ids TR1–TR22)
 
 Added with `docs/prd/round-8.md` (distributors, wholesalers, commodity traders, commission agents, brokers). These
 are **planned** behaviours: the files named under "Where" are the ones Round 8 will create (`src/lib/trading-rules.ts`,
