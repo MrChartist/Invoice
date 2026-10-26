@@ -9,6 +9,8 @@ import { useT } from '../i18n';
 import { isApplePlatform } from '../hooks/useHotkeys';
 import { discoverT } from '../i18n/areas/discover-r6';
 
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+
 // The ledger-backed screens are their own chunks: opening the menu does not load the ledger engine.
 const VoucherEntry = lazy(() => import('../components/gateway/VoucherEntry'));
 const DisplayReport = lazy(() => import('../components/gateway/DisplayReport'));
@@ -24,6 +26,7 @@ export function Gateway() {
   const first = getTable('vouchers').length === 0;
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="gateway" /></Suspense>
       {first && (
         <p className={controls.hint} role="note" data-gateway-hint>
           {discoverT('gatewayHint')}{' '}

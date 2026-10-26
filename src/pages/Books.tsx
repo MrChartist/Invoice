@@ -33,6 +33,8 @@ import { BOOKS_TABS, type BooksTab } from './page-tabs'; // R6-B1
 import { EmptyState } from '../components/ui/EmptyState';
 import { LearnMore, booksEmpty } from '../components/discover';
 import { discoverT } from '../i18n/areas/discover-r6';
+
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
@@ -166,6 +168,7 @@ export function Books() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="books" /></Suspense>
       <PageHeader
         title={booksT('title')}
         subtitle={booksT('subtitle')}

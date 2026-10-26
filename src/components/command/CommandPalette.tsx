@@ -38,6 +38,7 @@ import { serviceR3Destinations } from './service-r3-destinations'; // R3-B
 import { desksR3Destinations } from './desks-r3-destinations'; // R3-C
 import { r4aDestinations } from '../production/palette-destinations'; // R4-A
 import { sfT } from '../../i18n/areas/smart-find';
+import { getLanguage } from '../../i18n';
 import { openHelp } from '../../lib/help-event';
 import styles from './CommandPalette.module.css';
 
@@ -81,17 +82,17 @@ interface Option {
   section?: string;
 }
 
-/** R6-B1 / R6-A2: the help registry, read through a guarded glob so the palette builds before R6-A merges. */
-type HelpTopicRow = { id: string; title: string; keywords?: readonly string[] };
-const HELP_MODULES = import.meta.glob<{ helpIndex?: () => readonly HelpTopicRow[] | Promise<readonly HelpTopicRow[]> }>('../../lib/help/{registry,index}.ts');
+/** R6-B1 / R6-A2: every help topic (`helpIndex()`, lazy registry + topic chunks), loaded on the palette's first open. */
 async function loadHelpTopics(): Promise<StaticEntry[]> {
-  for (const load of Object.values(HELP_MODULES)) {
-    const m = await load();
-    if (typeof m.helpIndex !== 'function') continue;
-    const rows = await m.helpIndex();
-    return rows.map((r) => ({ id: `help:${r.id}`, title: r.title, icon: 'page', href: `help:${r.id}`, keywords: r.keywords ? [...r.keywords] : undefined }));
-  }
-  return [];
+  const { helpIndex } = await import('../../lib/help/registry');
+  const hi = getLanguage() === 'hi';
+  return (await helpIndex()).map((r) => ({
+    id: `help:${r.id}`,
+    title: hi && r.hiTitle ? r.hiTitle : r.title,
+    icon: 'page',
+    href: `help:${r.id}`,
+    keywords: [hi ? r.title : r.hiTitle, r.id.replace(/[:-]/g, ' ')],
+  }));
 }
 /** "help gstr" or "? gstr" searches help topics only. */
 const HELP_QUERY = /^(?:help\s+|\?\s*)(.+)$/i;

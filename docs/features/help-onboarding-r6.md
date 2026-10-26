@@ -52,8 +52,9 @@ statutory screens keep "verify with your CA" and cite `docs/CA_REVIEW.md` ids.
   Distribution / Recurring / Time / Reconcile resolve to their own topic; ids are unique and sit in the file their area
   loads; every `caItems` id exists in `CA_REVIEW.md`; Hindi titles present; no ₹ / % value without "as the app applies
   it". **A new tab needs a help topic.**
-- F1 / the help event / the route trail push are R6-B's shell lines (§6). Until R6-B merges, Help opens from the "?"
-  button and the phone menu as before.
+- F1 (not on `/pos`, `/gateway` or in fields), the help event and the route-trail push are the shell's lines (R6-B).
+  `HelpModal` reads a topic asked through `openHelp(topic)` with `takeHelpTopic()` when it opens; the `topic` prop wins.
+  The coverage test reads the tab lists from R6-B's `src/pages/page-tabs.ts` (`TAB_PAGES`) and every sidebar entry.
 
 ## A3 Statutory tab explainers, glossary, empty states
 
@@ -103,7 +104,7 @@ statutory screens keep "verify with your CA" and cite `docs/CA_REVIEW.md` ids.
 - `src/lib/diagnostics.ts` — `scrubTyped` (the existing scrubber + 4+ digit runs + "Rs / INR <n>" amounts; section codes
   such as 194C stay readable) and a "[Screens before]" section from the route trail.
 - `src/lib/route-trail.ts` — the last 10 routes of the session, memory only, ids masked, only `tab` / `view` values
-  kept. The shell pushes it (R6-B's line); until then the trail is empty and the section is left out.
+  kept. The shell pushes it on every route change.
 - Device-local unsent draft `mrchartist_feedback_draft` (try / catch), cleared on Share / Clear.
 
 ## A6 In-app beta guide and one-time screen tips
@@ -113,8 +114,9 @@ statutory screens keep "verify with your CA" and cite `docs/CA_REVIEW.md` ids.
   rewrites the guide, update the TypeScript copy with it.
 - `src/lib/help/tips.ts` + `components/help/ScreenTip.tsx` — one dismissible line in normal flow (never an overlay),
   once per device (`mrchartist_tips_seen`), "Don't show tips" turns all off (`mrchartist_tips_off`). Mounted by R6-A on
-  Dashboard, GST reports, TDS, Payroll, Clients, Expenses, POS and the editor (one lazy line each). The tips for Books,
-  Inventory, Gateway and Invoices (`books`, `inventory`, `gateway`, `invoices`) exist and are mounted by R6-B on its pages.
+  Dashboard, GST reports, TDS, Payroll, Clients, Expenses, POS and the editor (one lazy line each); Books, Inventory,
+  Reports, Gateway and Invoices (`books`, `inventory`, `reports`, `gateway`, `invoices`) at integration. Every tip must
+  be mounted (`tests/help-tips.test.ts`).
 
 ## Storage summary
 
@@ -152,12 +154,8 @@ or cut the Hindi "in this app" lines of the glossary and the older What's-new en
 - e2e `tests/e2e/smoke.mjs` step "R6-A help" (About strip on CDNUR, Help "On this screen: CDNUR" with CA ids, version,
   B2CL popover).
 
-## Follow-ups for the lead / other packages
+## Follow-ups
 
-- R6-B: F1 → `openHelp()` (skip `/pos`, `/gateway` and fields), `pushRoute(location)` from `src/lib/route-trail.ts`
-  (A's real implementation is in this branch), `<HelpModal topic=… />` for the `mrchartist:open-help` event, the palette
-  "Help topics" group via `helpIndex()`, `SampleDataChooser` mount in `DashboardStart.tsx` (A owns the file; the old inline
-  "Try with sample data" button is still there), tip mounts on Books / Inventory / Gateway / Invoices.
 - R6-C3: append a row to `import_runs` per import run so the checklist's `import` step completes.
-- Lead: AGENTS.md / ARCHITECTURE.md storage keys above, the `__APP_VERSION__` / what's-new rule, the help-coverage rule;
-  `.env.example` is not needed (no `VITE_BETA_*` variables, per the decision on open question 1).
+- Integration (done): F1, `pushRoute`, `takeHelpTopic()` in `HelpModal`, the palette "Help topics" group, the
+  `SampleDataChooser` mount in `DashboardStart.tsx`, tip mounts on R6-B's pages, AGENTS.md / ARCHITECTURE.md keys and rules.

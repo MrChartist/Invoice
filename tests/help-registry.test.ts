@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { GST_TABS } from '../src/lib/gst-tabs.ts';
 import { PACK_TABS } from '../src/lib/industry-packs.ts';
+import { TAB_PAGES } from '../src/lib/palette/tab-index.ts';
 import { HELP_AREAS, areaOf, candidates, helpFor, hrefOfKey, keyOfHref, topicKey } from '../src/lib/help/registry.ts';
 import type { HelpTopic } from '../src/lib/help/types.ts';
 import { TOPICS as sales } from '../src/lib/help/topics-sales.ts';
@@ -27,34 +28,14 @@ const BY_ID = new Map(ALL.map((x) => [x.id, x]));
 /** Route paths of App.tsx (`*` excluded). */
 const appRoutes = (): string[] => [...src('src/App.tsx').matchAll(/<Route path="([^"]+)"/g)].map((m) => m[1]).filter((p) => p !== '*');
 
-/** Tab ids of a page: the block starting at `start` up to its closing `]` / `;`. */
-function tabIds(file: string, start: RegExp): string[] {
-  const text = src(file);
-  const m = start.exec(text);
-  assert.ok(m, `${file}: tab list ${start} not found`);
-  const rest = text.slice(m.index);
-  const end = rest.search(/\];|\] as const;|;\n/);
-  const block = rest.slice(0, end > 0 ? end + 1 : 400);
-  const ids = /id: '/.test(block) ? [...block.matchAll(/id: '([^']+)'/g)].map((x) => x[1]) : [...block.matchAll(/'([a-z0-9-]+)'/g)].map((x) => x[1]);
-  assert.ok(ids.length > 1, `${file}: no tab ids read`);
-  return ids;
-}
+/**
+ * Every page with tabs, from R6-B's registries (`src/pages/page-tabs.ts` + the TDS ids and GST rows in
+ * `tab-index.ts`, which `tests/palette-tabs.test.ts` pins to the pages) — the same list Ctrl+K indexes.
+ */
+const PAGE_TABS = TAB_PAGES.map((p) => [p.route.slice(1), p.ids] as const);
 
-const PAGE_TABS: [route: string, file: string, start: RegExp][] = [
-  ['tds', 'src/pages/Tds.tsx', /const TABS: readonly/],
-  ['payroll', 'src/pages/Payroll.tsx', /const TABS = \[/],
-  ['books', 'src/pages/Books.tsx', /const TABS = \[/],
-  ['manufacturing', 'src/pages/Manufacturing.tsx', /const TABS: Tab\[\] = \[/],
-  ['expenses', 'src/pages/Expenses.tsx', /type Tab = /],
-  ['receivables', 'src/pages/Receivables.tsx', /type Tab = /],
-  ['reports', 'src/pages/Reports.tsx', /const TABS = \[/],
-  ['settings', 'src/pages/Settings.tsx', /type Tab = /],
-  ['inventory', 'src/pages/Inventory.tsx', /type Tab = /],
-  ['distribution', 'src/pages/Distribution.tsx', /const TABS: Tab\[\] = \[/],
-  ['recurring', 'src/pages/Recurring.tsx', /const REC_TABS:/],
-  ['time', 'src/pages/Time.tsx', /const TABS: \{/],
-  ['reconcile', 'src/pages/Reconcile.tsx', /const TABS = \[/],
-];
+/** Sidebar entries of the shell (`path: '/…'` rows in DashboardLayout, incl. R6-B2's Distribution and Manufacturing). */
+const sidebarPaths = (): string[] => [...src('src/layouts/DashboardLayout.tsx').matchAll(/\bpath: '(\/[^']*)'/g)].map((m) => m[1]);
 
 test('topic ids are unique and each lives in the file its area loads', () => {
   assert.equal(BY_ID.size, ALL.length, 'duplicate topic ids');
@@ -76,8 +57,20 @@ test('every App.tsx route has its own topic', () => {
 test('every GST tab, every PACK_TABS row and every main-page tab has its own topic', () => {
   for (const t of GST_TABS) assert.ok(BY_ID.has(`gst-reports:${t.id}`), `GST tab ${t.id} has no topic`);
   for (const p of PACK_TABS) assert.ok(BY_ID.has(keyOfHref(p.path)), `pack tab ${p.path} has no topic`);
-  for (const [route, file, start] of PAGE_TABS) {
-    for (const id of tabIds(file, start)) assert.ok(BY_ID.has(`${route}:${id}`), `${route}?tab=${id} (${file}) has no topic`);
+  assert.ok(PAGE_TABS.length >= 14, `read ${PAGE_TABS.length} tab pages`);
+  for (const [route, ids] of PAGE_TABS) {
+    for (const id of ids) assert.ok(BY_ID.has(`${route}:${id}`), `/${route}?tab=${id} (page-tabs.ts) has no topic`);
+  }
+});
+
+test('every sidebar entry (incl. Distribution and Manufacturing) opens on its own topic', () => {
+  const paths = sidebarPaths();
+  for (const p of ['/distribution', '/manufacturing']) assert.ok(paths.includes(p), `sidebar entry ${p} not found`);
+  for (const p of paths) {
+    const [path, query = ''] = p.split('?');
+    const id = topicKey(path, query ? `?${query}` : '');
+    const own = id.split(':').slice(0, 2).join(':');
+    assert.ok(BY_ID.has(own), `sidebar ${p} → ${own} has no topic`);
   }
 });
 

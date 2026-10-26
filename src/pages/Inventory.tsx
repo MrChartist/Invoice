@@ -51,6 +51,8 @@ import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
 import { INVENTORY_TABS, type InventoryTab } from './page-tabs'; // R6-B1
 import { discoverT } from '../i18n/areas/discover-r6';
+
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
@@ -219,6 +221,7 @@ export function Inventory() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="inventory" /></Suspense>
       <PageHeader
         title={invT('title')}
         subtitle={invT('subtitle')}

@@ -14,6 +14,7 @@ import { setupT } from '../../i18n/areas/setup';
 import { helpT } from '../../i18n/areas/help-r6';
 import { APP_VERSION } from '../../lib/app-version';
 import { topicById, topicKey } from '../../lib/help/registry';
+import { takeHelpTopic } from '../../lib/help-event';
 import type { HelpTopic } from '../../lib/help/types';
 import { ScreenHelp } from '../help/ScreenHelp';
 import { topicTitle } from '../help/labels';
@@ -43,6 +44,9 @@ const SHORTCUTS = [
   ['Esc', 'scClose'],
 ] as const;
 
+/** The topic `openHelp(topic)` asked for, kept until the dialog closes (survives a StrictMode effect re-run). */
+let askedTopic: string | undefined;
+
 export function HelpModal({ open, onClose, topic: topicId, view: initialView }: { open: boolean; onClose: () => void; topic?: string; view?: Exclude<View, 'main'> }) {
   useT(); // re-render on a language switch (5.4)
   const { pathname, search } = useLocation();
@@ -51,21 +55,28 @@ export function HelpModal({ open, onClose, topic: topicId, view: initialView }: 
   const [shortcuts, setShortcuts] = useState(false);
   const [view, setView] = useState<View>(initialView ?? 'main');
   const [picked, setPicked] = useState<HelpTopic | null>(null);
-  const [state, setState] = useState<{ key: string; topic: HelpTopic | null } | null>(null);
+  // `req` is the screen key the load was started for; `key` the topic shown (an asked topic can differ from it).
+  const [state, setState] = useState<{ req: string; key: string; topic: HelpTopic | null } | null>(null);
   const [strips, setStripsOn] = useState(stripsOn);
-  const key = topicId || topicKey(pathname, search);
+  const req = topicId || topicKey(pathname, search);
 
   useEffect(() => {
     if (!open) return;
+    // R6-B2: a topic asked through `openHelp(topic)` (empty states' "Learn more", Ctrl+K "Help topics"), read once on
+    // open; an explicit `topic` prop still wins.
+    askedTopic = takeHelpTopic() ?? askedTopic;
+    const key = topicId || askedTopic || req;
     let alive = true;
-    topicById(key).then((topic) => alive && setState({ key, topic }), () => alive && setState({ key, topic: null }));
+    topicById(key).then((topic) => alive && setState({ req, key, topic }), () => alive && setState({ req, key, topic: null }));
     return () => {
       alive = false;
     };
-  }, [open, key]);
+  }, [open, req, topicId]);
 
   const close = () => {
     setView('main');
+    setState(null);
+    askedTopic = undefined;
     setPicked(null);
     onClose();
   };
@@ -73,7 +84,9 @@ export function HelpModal({ open, onClose, topic: topicId, view: initialView }: 
     close();
     navigate(href);
   };
-  const current = state?.key === key ? state.topic : null;
+  const loaded = state?.req === req ? state : null;
+  const key = loaded?.key ?? req;
+  const current = loaded?.topic ?? null;
   const statutory = /^(gst-reports|tds|payroll)\b/.test(key);
 
   const LINKS = [
@@ -106,7 +119,7 @@ export function HelpModal({ open, onClose, topic: topicId, view: initialView }: 
                 <ScreenHelp topic={picked} onNavigate={go} heading={topicTitle(picked)} />
               </>
             ) : (
-              <ScreenHelp topic={current} loading={!state || state.key !== key} onNavigate={go} />
+              <ScreenHelp topic={current} loading={!loaded} onNavigate={go} />
             )}
             {statutory && !strips && (
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} style={{ justifySelf: 'start' }} onClick={() => { setStrips(true); setStripsOn(true); }}>

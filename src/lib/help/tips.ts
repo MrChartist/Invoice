@@ -4,7 +4,7 @@
  * or synced). Pure helpers take the stored strings (tests/help-tips.test.ts); `ScreenTip` does the storage.
  */
 
-export type TipId = 'dashboard' | 'invoices' | 'editor' | 'pos' | 'clients' | 'expenses' | 'books' | 'gst' | 'gateway' | 'inventory' | 'tds' | 'payroll';
+export type TipId = 'dashboard' | 'invoices' | 'editor' | 'pos' | 'clients' | 'expenses' | 'books' | 'reports' | 'gst' | 'gateway' | 'inventory' | 'tds' | 'payroll';
 
 export interface Tip {
   id: TipId;
@@ -22,6 +22,7 @@ export const TIPS: readonly Tip[] = [
   { id: 'clients', route: '/clients', en: 'Tip: ₹ Received records a payment and Remind sends a reminder, right from the client row.', hi: 'टिप: ग्राहक की पंक्ति से ही ₹ प्राप्त से भुगतान दर्ज करें और याद दिलाएँ से रिमाइंडर भेजें।' },
   { id: 'expenses', route: '/expenses', en: 'Tip: Scan bill reads a photo or PDF of a supplier bill into a draft.', hi: 'टिप: बिल स्कैन, सप्लायर बिल की फ़ोटो या PDF से ड्राफ़्ट बनाता है।' },
   { id: 'books', route: '/books', en: 'Tip: Alt+F2 changes the period of every report; F12 opens its options.', hi: 'टिप: Alt+F2 हर रिपोर्ट की अवधि बदलता है; F12 विकल्प खोलता है।' },
+  { id: 'reports', route: '/reports', en: 'Tip: Saved views remember a tab and period; the cross-checks at the bottom compare the Dashboard with Books.', hi: 'टिप: सेव्ड व्यू टैब और अवधि याद रखते हैं; नीचे के क्रॉस-चेक डैशबोर्ड का मिलान बही से करते हैं।' },
   { id: 'gst', route: '/gst-reports', en: 'Tip: follow the filing strip — period, check, download, mark filed.', hi: 'टिप: फ़ाइलिंग पट्टी के क्रम में चलें — अवधि, जाँच, डाउनलोड, फ़ाइल चिह्नित।' },
   { id: 'gateway', route: '/gateway', en: 'Tip: Ctrl+/ lists every Gateway key.', hi: 'टिप: Ctrl+/ गेटवे की सभी कुंजियाँ दिखाता है।' },
   { id: 'inventory', route: '/inventory', en: 'Tip: stock groups and units keep a long item list tidy.', hi: 'टिप: स्टॉक ग्रुप और इकाइयाँ लंबी आइटम सूची को व्यवस्थित रखते हैं।' },

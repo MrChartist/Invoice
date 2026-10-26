@@ -11,6 +11,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('settings:items', 'Items', 'आइटम', 'The item catalogue: name, HSN / SAC, rate and GST rate used in the editor.', 'Before billing, or when prices change.'),
   t('settings:fields', 'Custom fields', 'कस्टम फ़ील्ड', 'Extra fields on invoices and clients (PO number, vehicle, site …).', 'When your documents need more fields.'),
   t('settings:defaults', 'Defaults', 'डिफ़ॉल्ट', 'Numbering, terms, notes, business type, packs and "Show all features".', 'Once, then rarely.'),
+  t('settings:features', 'Features', 'फ़ीचर', 'Every module, industry pack and advanced option, who needs it, whether it is on, and the switch or the screen where it is set.', 'When a screen seems missing, or to turn on something your business needs.', {
+    steps: ['Search for a feature, or scroll the modules, packs and advanced options.', 'Turn on / off, then Save; "Open settings" goes to where an advanced option lives.'],
+  }),
   t('settings:data', 'Data & backup', 'डेटा और बैकअप', 'Backup and restore, automatic backups, imports, folder sync and storage health.', 'Take a backup every week, and before trying something new.', {
     steps: ['Download backup (or an encrypted one) and keep the file safe.', 'Restore brings everything back exactly.'],
   }),

@@ -29,9 +29,9 @@ No new route, rule table, storage key or lucide icon. Strings live in `src/i18n/
   `searchRows`). `CommandPalette.tsx`: one dynamic import on first open; Tabs results are inserted before the Pages /
   Actions groups and after any document group that scores better ("below an exact document match, above other pages");
   a "Features" group follows. The empty palette shows "Try: GSTR-3B · 12.5k · a GSTIN · LR · Alt+P POS · F1 help".
-- Help search: "help <words>" or "? <words>" searches only help topics. R6-A's `helpIndex()` is read through
-  `import.meta.glob('../../lib/help/{registry,index}.ts')`, so the group is simply empty until R6-A merges (rows
-  `{ id, title, keywords? }`; choosing one calls `openHelp(id)`).
+- Help search: "help <words>" or "? <words>" searches only help topics: R6-A's `helpIndex()` (lazy
+  `lib/help/registry.ts`, loaded on the palette's first open; Hindi title when the interface is Hindi); choosing one
+  calls `openHelp(id)`.
 - Tests: `tests/palette-tabs.test.ts` — every tab id of every page registry is findable (Tabs group or pack group) and
   has a title; "3b", "GSTR-3B", "consignment", "LR", "80g", "trial balance" (and tb, p&l, 26q, b2cl, cdnur, ra bill,
   amazon, तलपट) each find their tab; "(hidden)" for a kirana; the pages read `page-tabs.ts`; `page-tabs.ts` has type
@@ -46,8 +46,8 @@ No new route, rule table, storage key or lucide icon. Strings live in `src/i18n/
 - Practice desk (a CA tool) shows only for a company without a business type (existing companies), `full`, or when the
   device has more than one company (U10).
 - Shell key lines (§6): F1 opens Help (not on `/pos`, where F1 recalls held bills, and not while typing; Alt+F1 in Books
-  is untouched); `pushRoute(location)` for R6-A5's route trail — `src/lib/route-trail.ts` is committed as a stub
-  (`pushRoute() {}`) that R6-A replaces; the `mrchartist:open-help` window listener.
+  is untouched; not on `/gateway`, which has its own Tally keys); `pushRoute(location)` into R6-A5's route trail
+  (`src/lib/route-trail.ts`); the `mrchartist:open-help` window listener.
 - `src/lib/help-event.ts`: `OPEN_HELP_EVENT`, `openHelp(topic?)` (dispatches the event) and `takeHelpTopic()` (the topic
   the last `openHelp` asked for, cleared once read) — R6-A's `HelpModal` calls `takeHelpTopic()` when it opens.
 - `src/lib/shop-mode.ts`: `PATH_MODULE['/distribution'] = 'inventory'`; `PACK_ROUTES` (route → packs, from `PACK_TABS`
@@ -72,10 +72,10 @@ No new route, rule table, storage key or lucide icon. Strings live in `src/i18n/
 
 - Exports checks the whole company, not the export period (the period lives inside `ExportCenter`, not a B file).
 - "Learn more" (`components/discover/LearnMore.tsx`) calls `openHelp(topic)` with topics `books`, `inventory`,
-  `distribution`, `practice`, `reconcile`; it is hidden while the build has no help registry (same guarded glob).
+  `distribution`, `practice`, `reconcile` (all in the R6-A registry).
   `components/discover/index.ts` is the one door for `LearnMore` and the predicates (one shared chunk).
-- Not done here: the A6 `ScreenTip` mount lines on Books, Inventory, Reports, Gateway and Invoices — `ScreenTip` is
-  R6-A's component and does not exist on this branch; R6-A adds the one-line mounts when it rebases (§6).
+- R6-A6 `ScreenTip` lines are mounted on Books, Inventory, Reports (tip `reports`, added at integration), Gateway and
+  Invoices (`Transactions.tsx`).
 - Tests: `tests/empty-states.test.ts` (each predicate with a non-empty counter-case).
 
 ## B4 Sample data v2: one Demo-company path, per business type
@@ -135,9 +135,8 @@ No new route, rule table, storage key or lucide icon. Strings live in `src/i18n/
 the sidebar has Distribution and Manufacturing; kirana → "more features" → Settings → Features → Show all features; a
 fresh company's Books shows "Opening balances" and Inventory "Add first item" / "Import items".
 
-The existing step "QA-3 F4 / F5" still clicks the Dashboard's old "Try with sample data" button in `DashboardStart.tsx`
-(R6-A's file). When R6-A mounts `SampleDataChooser` there, that step must click "Open a separate Demo company
-(recommended)" and read the Demo company's invoices (the old button wrote into the current company).
+The step "QA-3 F4 / F5" clicks the Dashboard's "Open a separate Demo company (recommended)" (`SampleDataChooser`,
+mounted in `DashboardStart.tsx` in place of the old inline button) and reads the Demo company's invoices.
 
 ## Size (gzip, `npm run build && npm run check:size`)
 
@@ -159,8 +158,5 @@ The existing step "QA-3 F4 / F5" still clicks the Dashboard's old "Try with samp
 
 ## Open / follow-ups
 
-- Help topics in Ctrl+K and "Learn more" stay empty / hidden until R6-A's registry exists at
-  `src/lib/help/registry.ts` (or `index.ts`) exporting `helpIndex()`; topic ids used by B: `books`, `inventory`,
-  `distribution`, `practice`, `reconcile`.
 - §7 Q6 (move samples already loaded into a real company to a Demo company) is not built: such a company sees "Remove
   sample data" only.

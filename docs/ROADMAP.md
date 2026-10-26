@@ -788,10 +788,10 @@ R6-C open-roadmap closures and the docs refresh).
 | # | Item | Where | Status |
 |---|---|---|---|
 | R6-A1 | ✅ **Setup checklist v3**: steps by business type, packs, modules and role; skip a step, hide the card (Help → Setup checklist brings it back); company object `setup_progress` | `checklist-steps.ts`, `checklist.ts`, `DashboardStart.tsx` | done |
-| R6-A2 | ✅ **"On this screen" help**: registry route + tab → topic, six lazy topic files (~210 topics), Help search, CA checklist ids on statutory topics; coverage test ("a new tab needs a help topic") | `lib/help/registry.ts`, `lib/help/topics-*.ts`, `HelpModal.tsx` | done (F1 key is R6-B's shell line) |
+| R6-A2 | ✅ **"On this screen" help**: registry route + tab → topic, six lazy topic files (~210 topics), Help search, CA checklist ids on statutory topics; coverage test ("a new tab needs a help topic") | `lib/help/registry.ts`, `lib/help/topics-*.ts`, `HelpModal.tsx` | done (F1 wired in the shell at integration) |
 | R6-A3 | ✅ **Statutory explainers**: "About this tab" strips on GST / TDS / payroll, 35-term glossary popovers, GST / TDS empty states, one-line GST working-paper notice | `AboutStrip.tsx`, `Term.tsx`, `lib/help/glossary.ts` | done (verify with your CA) |
 | R6-A4 | ✅ **What's new and the real version** (`__APP_VERSION__` from package.json; `check-whats-new` in postbuild; Dashboard card once after an upgrade) | `whats-new.ts`, `WhatsNewCard.tsx`, `scripts/check-whats-new.mjs` | done |
-| R6-A5 | ✅ **Report a problem v2**: problem / idea / question, scrubbed fields, screens-before trail, Copy / WhatsApp / e-mail / Share with no fixed recipient | `feedback.ts`, `route-trail.ts`, `diagnostics.ts`, `ReportProblemDialog.tsx` | done (trail push is R6-B's shell line) |
+| R6-A5 | ✅ **Report a problem v2**: problem / idea / question, scrubbed fields, screens-before trail, Copy / WhatsApp / e-mail / Share with no fixed recipient | `feedback.ts`, `route-trail.ts`, `diagnostics.ts`, `ReportProblemDialog.tsx` | done (the shell pushes the trail) |
 | R6-A6 | ✅ **Beta guide in the app and one-time screen tips** | `lib/help/beta-guide.ts`, `lib/help/tips.ts`, `ScreenTip.tsx` | done |
 
 ### R6-B · Discoverability, empty states and sample data (`docs/features/discoverability-r6.md`)
@@ -800,8 +800,8 @@ R6-C open-roadmap closures and the docs refresh).
 |---|---|---|---|
 | R6-B1 | ✅ **Ctrl+K finds every tab**: a "Tabs" group over every page's tab list with portal terms and short words ("3b", "tb", "lr", "80g"), "(hidden)" for screens shop mode hides, a "Features" group, "help …" searches help topics (once R6-A's registry exists), a "Try:" line on the empty palette | `palette/{tab-index,synonyms}.ts`, `pages/page-tabs.ts`, `command/tab-destinations.ts` | done |
 | R6-B2 | ✅ **Sidebar reach**: Distribution and Manufacturing entries; a screen hosting an active pack's tab stays in shop mode (`PACK_ROUTES`); "N more features — Show"; Practice desk only for CA / several companies; F1 Help, route trail, open-help event | `DashboardLayout.tsx`, `shop-mode.ts`, `help-event.ts` | done |
-| R6-B3 | ✅ **Empty states** with the first step on Books, Inventory, Reports, Exports, Distribution, Practice, Reconcile, Gateway; Inventory → Landed cost link | `empty-states.ts`, `components/discover/*` | done (A6 tip mounts: R6-A) |
-| R6-B4 | ✅ **Sample data v2**: one path to a separate, resettable Demo company (never into a real company), dataset by business (counter, services, trading, transport, works), "Reset samples" | `demo-data.ts`, `lib/demo/*`, `demo-company.ts`, `SampleDataChooser.tsx` | done (Dashboard mount: R6-A) |
+| R6-B3 | ✅ **Empty states** with the first step on Books, Inventory, Reports, Exports, Distribution, Practice, Reconcile, Gateway; Inventory → Landed cost link | `empty-states.ts`, `components/discover/*` | done (tips mounted on Books, Inventory, Reports, Gateway, Invoices) |
+| R6-B4 | ✅ **Sample data v2**: one path to a separate, resettable Demo company (never into a real company), dataset by business (counter, services, trading, transport, works), "Reset samples" | `demo-data.ts`, `lib/demo/*`, `demo-company.ts`, `SampleDataChooser.tsx` | done (Dashboard mounts the chooser) |
 | R6-B5 | ✅ **Settings → Features**: every module, pack and 21 advanced options with who needs it, on / off and a switch or a link | `features-catalog.ts`, `FeaturesPanel.tsx` | done |
 
 ## Summary timeline

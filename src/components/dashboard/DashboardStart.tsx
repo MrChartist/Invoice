@@ -1,13 +1,12 @@
 import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Circle, Store } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Circle } from 'lucide-react';
 import { useCan } from '../../hooks/useCan';
 import { localDb } from '../../lib/localDb';
 import { enabledModules } from '../../lib/shop-mode';
 import { DASHBOARD_ACTIONS, quickActions } from '../../lib/quick-create';
 import { buildChecklist } from '../../lib/checklist';
 import { loadSetupProgress, readChecklistInputs, saveSetupProgress, showCard, withSkipped, type SetupProgress } from '../../lib/checklist-steps';
-import { reloadAfterFlush } from '../../lib/storage';
 import { QUICK_ICONS } from '../layout/quick-icons';
 import { stepLabel } from '../help/labels';
 import { useT } from '../../i18n';
@@ -20,11 +19,13 @@ import styles from '../../pages/Dashboard.module.css';
 const WhatsNewCard = lazy(() => import('./WhatsNewCard'));
 const ScreenTip = lazy(() => import('../help/ScreenTip'));
 const HelpModal = lazy(() => import('../layout/HelpModal').then((m) => ({ default: m.HelpModal })));
+// R6-B4: sample data only ever goes to the separate Demo company (never into this, real, company).
+const SampleDataChooser = lazy(() => import('../demo/SampleDataChooser'));
 
 /**
  * Dashboard start (8H, R6-A): the quick-action row (New invoice, ₹ Received, POS, Expense — by role and shop mode),
  * the business-aware setup checklist v3 (skip a step, hide the card; Help → Setup checklist brings it back), the
- * What's-new card and, on an empty company, "Try with sample data". Lazy, so the Dashboard's first paint is unchanged.
+ * What's-new card and, on an empty company, R6-B4's sample-data chooser (a separate Demo company). Lazy, so the Dashboard's first paint is unchanged.
  */
 export function DashboardStart({ profileReady }: { profileReady: boolean }) {
   useT();
@@ -34,7 +35,6 @@ export function DashboardStart({ profileReady }: { profileReady: boolean }) {
     return { ...x, facts: { ...x.facts, profileReady } };
   });
   const [progress, setProgress] = useState<SetupProgress>(loadSetupProgress);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [helpView, setHelpView] = useState(false);
   const actions = quickActions(can, enabledModules(localDb.settings.get()), DASHBOARD_ACTIONS);
@@ -51,20 +51,6 @@ export function DashboardStart({ profileReady }: { profileReady: boolean }) {
   };
   const hide = () => {
     if (window.confirm(reachT('ck.hideConfirm'))) save({ ...progress, hidden_at: new Date().toISOString() });
-  };
-
-  const loadSample = async () => {
-    setBusy(true);
-    try {
-      const { loadDemoData } = await import('../../lib/demo-data');
-      const r = loadDemoData();
-      if (!r.ok) throw new Error(r.reason);
-      // QA-3 F5: reload only once IndexedDB has the sample data (a bare reload dropped it).
-      reloadAfterFlush();
-    } catch (err) {
-      setError(reachT('sampleFailed', { message: (err as Error).message }));
-      setBusy(false);
-    }
   };
 
   return (
@@ -88,10 +74,9 @@ export function DashboardStart({ profileReady }: { profileReady: boolean }) {
       )}
       {facts.invoices === 0 && can('settings.manage') && (
         <div className={own.sample}>
-          <button type="button" className={controls.btnOutline} onClick={() => void loadSample()} disabled={busy}>
-            <Store size={16} /> {reachT('sampleCta')}
-          </button>
-          <span>{reachT('sampleHint')}</span>
+          <Suspense fallback={null}>
+            <SampleDataChooser />
+          </Suspense>
         </div>
       )}
       {error && <p role="alert">{error}</p>}

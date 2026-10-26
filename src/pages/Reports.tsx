@@ -50,6 +50,8 @@ import { can } from '../lib/access';
 import { discoverT } from '../i18n/areas/discover-r6';
 import controls from '../styles/controls.module.css';
 
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+
 // 8.109: saved views + month-end packs (own chunk).
 const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
 
@@ -150,6 +152,7 @@ export function Reports() {
   const t = customers.totals;
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="reports" /></Suspense>
       <PageHeader
         title={repT('title')}
         subtitle={repT('subtitle')}

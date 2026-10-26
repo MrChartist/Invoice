@@ -323,8 +323,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'g s': () => navigate('/settings'),
     // 8E (8.146): Alt+P opens the POS counter from anywhere (even while typing in a field).
     'alt+p': { handler: () => navigate('/pos'), allowInInput: true }, // the route itself needs doc.create
-    // R6-B2: F1 opens Help, except on the POS counter (F1 = recall held bills there).
-    ...(location.pathname.startsWith('/pos') ? {} : { f1: () => openHelp() }),
+    // R6-B2: F1 opens Help (R6-A2's "On this screen"), except on the POS counter (F1 = recall held bills there) and
+    // the Gateway (Tally keys); never while typing in a field (useHotkeys skips plain keys in inputs).
+    ...(/^\/(pos|gateway)(\/|$)/.test(location.pathname) ? {} : { f1: () => openHelp() }),
   });
   // Tally keys (Phase 7): F2, F4–F9, Ctrl+F8/F9, F11, F12, Alt+G / Ctrl+G, Ctrl+/ — off on /pos and in fields.
   useTallyKeys(navigate, openShortcuts);

@@ -2500,7 +2500,7 @@ try {
     await writeJson(page, 'invoices', prevInvoices);
   });
 
-  await step('QA-3 F4 / F5: "Explore with sample data instead" fills a Demo company; Dashboard "Try with sample data" adds the invoices', async () => {
+  await step('QA-3 F4 / F5: "Explore with sample data instead" fills a Demo company; the Dashboard chooser opens a separate Demo company (R6-B4)', async () => {
     const tableIn = (p, name) => p.evaluate((k) => new Promise((resolve) => {
       const reg = JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null');
       const db = reg?.active && reg.active !== 'default' ? `mrchartist_inv_kv__${reg.active}` : 'mrchartist_inv_kv';
@@ -2560,11 +2560,13 @@ try {
     const b = await fresh();
     await b.p.getByRole('button', { name: /Skip for now/ }).first().click();
     await b.p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ state: 'detached' });
-    const cta = b.p.getByRole('button', { name: 'Try with sample data' });
+    const cta = b.p.getByRole('button', { name: 'Open a separate Demo company (recommended)' });
     await cta.waitFor({ timeout: 15000 });
     await Promise.all([b.p.waitForEvent('load', { timeout: 20000 }), cta.click()]);
-    const sample = await waitRows(b.p, 'invoices', 1);
-    check(sample.length > 0, `Dashboard "Try with sample data" added the invoices (${sample.length})`);
+    await b.p.locator('#company-switch').waitFor({ timeout: 20000 });
+    const sample = await waitRows(b.p, 'invoices', 1, 20000);
+    const activeId = await b.p.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null')?.active ?? 'default');
+    check(sample.length > 0 && activeId !== 'default', `the Dashboard chooser filled a separate Demo company (${sample.length} invoices in ${activeId})`);
     await b.ctx.close();
   });
 

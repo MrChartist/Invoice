@@ -20,11 +20,11 @@ test('every tip belongs to a real route, ids are unique, English and Hindi', () 
 
 test('every tip id is mounted on its page', () => {
   const mounted = new Set<string>();
-  for (const f of ['pages/GstReports.tsx', 'pages/Tds.tsx', 'pages/Payroll.tsx', 'pages/Clients.tsx', 'pages/Expenses.tsx', 'pages/Pos.tsx', 'pages/InvoiceCreator.tsx', 'components/dashboard/DashboardStart.tsx']) {
+  for (const f of ['pages/GstReports.tsx', 'pages/Tds.tsx', 'pages/Payroll.tsx', 'pages/Clients.tsx', 'pages/Expenses.tsx', 'pages/Pos.tsx', 'pages/InvoiceCreator.tsx', 'components/dashboard/DashboardStart.tsx', 'pages/Books.tsx', 'pages/Inventory.tsx', 'pages/Reports.tsx', 'pages/Gateway.tsx', 'pages/Transactions.tsx']) {
     for (const m of readFileSync(join(root, 'src', f), 'utf8').matchAll(/<ScreenTip id="([^"]+)"/g)) mounted.add(m[1]);
   }
-  // Books, Inventory, Gateway and Invoices are mounted by their owner (R6-B, §6 of the Round 6 PRD).
-  for (const id of ['gst', 'tds', 'payroll', 'clients', 'expenses', 'pos', 'editor', 'dashboard']) assert.ok(mounted.has(id), `${id} not mounted`);
+  // Books, Inventory, Reports, Gateway and Invoices: R6-B's pages (§6 of the Round 6 PRD), mounted at integration.
+  for (const t of TIPS) assert.ok(mounted.has(t.id), `${t.id} not mounted`);
   for (const id of mounted) assert.ok(TIPS.some((t) => t.id === id), `unknown tip ${id}`);
 });
 
