@@ -51,6 +51,7 @@ import styles from './Expenses.module.css';
 import { EXPENSES_TABS, type ExpensesTab } from './page-tabs'; // R6-B1
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 
 type Tab = ExpensesTab;
 
@@ -191,6 +192,7 @@ export function Expenses() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="expenses" /></Suspense>
       <PageHeader
         title={purT('title')}
         subtitle={purT('subtitle')}

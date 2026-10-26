@@ -780,7 +780,19 @@ Hands-on audit of Round 4 (R4-B / R4-C), QA round 5 fixes, the Income-tax Act 20
 
 ## Round 6: consolidation and beta-tester productivity (v6.x) · 🟡 in progress
 
-Spec: `docs/prd/round-6.md` (17 items in three packages: R6-A help, R6-B discoverability, R6-C closures).
+Spec: `docs/prd/round-6.md` (17 items in three packages: R6-A first run, help and feedback; R6-B discoverability;
+R6-C open-roadmap closures and the docs refresh).
+
+### R6-A · First run, help and feedback (`docs/features/help-onboarding-r6.md`)
+
+| # | Item | Where | Status |
+|---|---|---|---|
+| R6-A1 | ✅ **Setup checklist v3**: steps by business type, packs, modules and role; skip a step, hide the card (Help → Setup checklist brings it back); company object `setup_progress` | `checklist-steps.ts`, `checklist.ts`, `DashboardStart.tsx` | done |
+| R6-A2 | ✅ **"On this screen" help**: registry route + tab → topic, six lazy topic files (~210 topics), Help search, CA checklist ids on statutory topics; coverage test ("a new tab needs a help topic") | `lib/help/registry.ts`, `lib/help/topics-*.ts`, `HelpModal.tsx` | done (F1 key is R6-B's shell line) |
+| R6-A3 | ✅ **Statutory explainers**: "About this tab" strips on GST / TDS / payroll, 35-term glossary popovers, GST / TDS empty states, one-line GST working-paper notice | `AboutStrip.tsx`, `Term.tsx`, `lib/help/glossary.ts` | done (verify with your CA) |
+| R6-A4 | ✅ **What's new and the real version** (`__APP_VERSION__` from package.json; `check-whats-new` in postbuild; Dashboard card once after an upgrade) | `whats-new.ts`, `WhatsNewCard.tsx`, `scripts/check-whats-new.mjs` | done |
+| R6-A5 | ✅ **Report a problem v2**: problem / idea / question, scrubbed fields, screens-before trail, Copy / WhatsApp / e-mail / Share with no fixed recipient | `feedback.ts`, `route-trail.ts`, `diagnostics.ts`, `ReportProblemDialog.tsx` | done (trail push is R6-B's shell line) |
+| R6-A6 | ✅ **Beta guide in the app and one-time screen tips** | `lib/help/beta-guide.ts`, `lib/help/tips.ts`, `ScreenTip.tsx` | done |
 
 ### R6-B · Discoverability, empty states and sample data (`docs/features/discoverability-r6.md`)
 
