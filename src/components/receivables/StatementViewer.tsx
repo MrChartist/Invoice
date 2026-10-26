@@ -15,6 +15,9 @@ import { useT } from '../../i18n';
 import { rcvT } from '../../i18n/areas/receivables';
 import { khataT } from '../../i18n/areas/khata';
 import styles from './StatementViewer.module.css';
+import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type StatementStyle } from '../../lib/statement-styles';
+import { rcv2T as colT } from '../../i18n/areas/collections-rcv';
+import { localDayOf } from '../../lib/dates';
 
 export interface StatementViewerProps extends StatementDocumentProps {
   open: boolean;
@@ -32,6 +35,21 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
   const paperRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState<File | null>(null);
+  // R2-A6: style and ageing strip can be switched here too (remembered on this device).
+  const [styleKind, setStyleKind] = useState<StatementStyle>(doc.styleKind ?? loadStatementPrefs().style);
+  const [ageingOn, setAgeingOn] = useState<boolean>(doc.ageing ? true : loadStatementPrefs().ageing);
+  useEffect(() => {
+    if (!open) return;
+    setStyleKind(doc.styleKind ?? loadStatementPrefs().style);
+    setAgeingOn(doc.ageing ? true : loadStatementPrefs().ageing);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const remember = (style: StatementStyle, ageing: boolean) => {
+    setStyleKind(style);
+    setAgeingOn(ageing);
+    saveStatementPrefs({ style, ageing });
+  };
+  const asOf = doc.ageing?.asOf || doc.ledger.to || localDayOf(new Date());
 
   useEffect(() => {
     if (!open) return;
@@ -119,6 +137,13 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
       <div className={`${styles.toolbar} no-print`}>
         <span className={styles.title}>{rcvT('svTitle')}</span>
         <div className={styles.actions}>
+          <select className={controls.select} value={styleKind} aria-label={colT('stStyle')} onChange={(e) => remember(e.target.value as StatementStyle, ageingOn)} data-viewer-style>
+            {STATEMENT_STYLES.map((st) => <option key={st} value={st}>{colT(`st.${st}`)}</option>)}
+          </select>
+          <label className={controls.check}>
+            <input type="checkbox" checked={ageingOn} onChange={(e) => remember(styleKind, e.target.checked)} />
+            {colT('stAgeing')}
+          </label>
           {inr && (
             <a className={btn} href={whatsappLink(doc.client?.phone, waText)} target="_blank" rel="noopener noreferrer" data-wa-statement>
               <MessageCircle size={14} /> {khataT('whatsapp')}
@@ -147,7 +172,7 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
       </div>
       <div className={styles.scroll}>
         <div className={styles.paperShadow}>
-          <StatementDocument ref={paperRef} {...doc} />
+          <StatementDocument ref={paperRef} {...doc} styleKind={styleKind} ageing={ageingOn ? { asOf } : undefined} />
         </div>
       </div>
     </div>,

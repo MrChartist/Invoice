@@ -12,6 +12,7 @@
  * strings (AGENTS.md rule 8). Working papers only: nothing is sent to a portal — verify with your CA.
  */
 
+import { isNonGstFinancialNote } from './financial-note';
 import { ruleAt, type Versioned, b2clThreshold } from './tax-rules';
 import { complianceCalendar, daysBetween, filedFor, type CalendarOptions, type FiledReturn, type ReturnDue, type ReturnForm } from './compliance';
 import { shiftDay } from './dates';
@@ -265,7 +266,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
   const out: GstException[] = [];
   const g = (o.gstin ?? '').trim().toUpperCase();
   for (const inv of invoices) {
-    if (!inv?.id || !TAX_DOCS.has(inv.doc_type) || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
+    if (!inv?.id || !TAX_DOCS.has(inv.doc_type) || inv.status === 'Draft' || inv.status === 'Cancelled' || isNonGstFinancialNote(inv)) continue;
     if (inv.sender?.gst_scheme === 'composition') continue;
     const date = day10(inv.issue_date);
     if (date < o.from || date > o.to) continue;

@@ -438,7 +438,7 @@ export const localDb = {
       if (toSave.client?.name?.trim()) {
         // Credit terms (6.25) live on the client master only: an old snapshot must never reset them.
         // 8F: so do the distribution fields (area / beat / default agent / credit policy).
-        const { credit_limit: _limit, credit_days: _days, area_id: _a, beat_id: _b, agent_id: _g, credit_policy: _p, ...snapshot } = toSave.client;
+        const { credit_limit: _limit, credit_days: _days, area_id: _a, beat_id: _b, agent_id: _g, credit_policy: _p, reminder_mode: _rm, payment_terms_id: _pt, ...snapshot } = toSave.client;
         localDb.clients.upsert(snapshot);
       }
       localDb.items.upsertMany(

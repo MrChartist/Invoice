@@ -14,6 +14,7 @@ import { buildReceipt, receiptHtml, referenceLabel } from '../../lib/receipts';
 import { downloadText } from '../../lib/download';
 import { ReminderModal } from '../share/ReminderModal';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
+import type { SettleValue } from '../collections/SettleRestFields';
 import { realisedFx } from '../../lib/fx-gain';
 import { fxRate, isForeignCurrency } from '../../lib/fx';
 import { BankAccountSelect } from '../bank/BankAccountSelect';
@@ -27,6 +28,9 @@ const METHODS = ['UPI', 'Bank transfer', 'Cash', 'Cheque', 'Card', 'Other'];
 
 // "Apply advance" (5.3) and the advances maths load only when this dialog opens.
 const ApplyAdvancePanel = lazy(() => import('../advances/ApplyAdvancePanel'));
+// R2-A2 / A3: "Settle the rest" and the bad-debt recovery offer load only when they apply.
+const SettleRestFields = lazy(() => import('../collections/SettleRestFields'));
+const RecoveryOffer = lazy(() => import('../collections/RecoveryOffer'));
 
 export interface PaymentModalProps {
   invoice: InvoiceRecord | null;
@@ -74,6 +78,8 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   /** Set right after a payment clears the balance: offer the receipt and a thank-you. */
   const [settled, setSettled] = useState<Payment | null>(null);
   const [thanksOpen, setThanksOpen] = useState(false);
+  /** R2-A2: settle what this receipt leaves open with a financial credit note. */
+  const [settle, setSettle] = useState<SettleValue>({ choice: 'leave', amount: '', gst: false });
 
   // Always read the live row — a payment changes the balance under us.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,6 +102,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     setRealised('');
     setError('');
     setSettled(null);
+    setSettle({ choice: 'leave', amount: '', gst: false });
     // Reset the form only when a different document is opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice?.id]);
@@ -106,7 +113,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const foreign = isForeignCurrency(live) && fxRate(live) !== null;
   const preview = foreign ? realisedFx({ amount: Number(amount) || 0, realised_rate: Number(realised) || undefined }, live) : null;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (locked) return setError(t('pay.errLocked'));
     const value = Number(amount);
@@ -115,14 +122,28 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     try {
       const rate = Number(realised);
       if (realised.trim() && !(rate > 0)) return setError(t('pay.errRate'));
-      const payment = localDb.payments.record({ invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date, realisedRate: foreign && rate > 0 ? rate : undefined, bankAccountId: bankAccountId || undefined });
+      const base = { invoiceId: live.id, amount: value, method, reference: reference.trim() || undefined, date, realisedRate: foreign && rate > 0 ? rate : undefined, bankAccountId: bankAccountId || undefined };
+      const settleAmount = settle.choice !== 'leave' && value < balance - 0.005 ? round2(Math.min(Number(settle.amount) || 0, balance - value)) : 0;
+      let payment: Payment;
+      let note = '';
+      if (settleAmount > 0 && settle.choice !== 'leave') {
+        // R2-A2: receipt + financial credit note in one all-or-nothing step.
+        const m = await import('../collections/settle-actions');
+        const r = m.receiveAndSettle({ ...base, settle: { reason: settle.choice, amount: settleAmount, gst: settle.gst } }, live.currency);
+        payment = r.payment;
+        note = r.message;
+      } else {
+        payment = localDb.payments.record(base);
+      }
       setVersion((v) => v + 1);
       refreshEditor(live.id);
       setError('');
-      const cleared = value >= balance - 0.005;
-      onChanged(cleared ? t('pay.markedPaid', { number: live.invoice_number }) : t('pay.recorded', { amount: formatCurrency(value, live.currency) }));
+      setSettle({ choice: 'leave', amount: '', gst: false });
+      const cleared = value + settleAmount >= balance - 0.005;
+      const msg = cleared ? t('pay.markedPaid', { number: live.invoice_number }) : t('pay.recorded', { amount: formatCurrency(value, live.currency) });
+      onChanged(note ? `${msg} ${note}` : msg);
       if (cleared) setSettled(payment);
-      else setAmount(String(Math.max(round2(balance - value), 0)));
+      else setAmount(String(Math.max(round2(balance - value - settleAmount), 0)));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -138,6 +159,21 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
     setVersion((v) => v + 1);
     if (live) refreshEditor(live.id);
     onChanged(t('pay.removed'));
+    // R2-A2 (8): removing a receipt never cancels its settlement note by itself — offer it.
+    if (live && localDb.invoices.getAll().some((i) => i.note_kind === 'financial' && i.po_number === live.invoice_number && i.status !== 'Cancelled')) {
+      void import('../collections/settle-actions').then((m) => {
+        try {
+          const done = m.offerCancelSettlement(live.id);
+          if (done.length) {
+            setVersion((v) => v + 1);
+            refreshEditor(live.id);
+            onChanged(done.join(' '));
+          }
+        } catch (err) {
+          setError((err as Error).message);
+        }
+      });
+    }
   };
 
   return (
@@ -250,6 +286,11 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               </span>
             </label>
           )}
+          {can('payment.record') && Number(amount) > 0 && Number(amount) < balance - 0.005 && (
+            <Suspense fallback={null}>
+              <SettleRestFields invoice={live} due={balance} amount={Number(amount)} date={date} value={settle} onChange={setSettle} />
+            </Suspense>
+          )}
           {error && <p className={controls.error} role="alert">{error}</p>}
         </form>
       ) : locked ? null : settled ? (
@@ -269,6 +310,12 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
         <p className={controls.ok}>{t('pay.fullyPaid')}</p>
       )}
       {thanksOpen && <ReminderModal invoice={live} open onClose={() => setThanksOpen(false)} />}
+      {/* R2-A3: money received on a written-off bill is recorded as a bad debt recovery (owner). */}
+      {balance <= 0 && !locked && payments.some((p) => p.write_off) && can('doc.deleteIssued') && (
+        <Suspense fallback={null}>
+          <RecoveryOffer invoice={live} onDone={(message) => { setVersion((v) => v + 1); refreshEditor(live.id); onChanged(message); }} />
+        </Suspense>
+      )}
 
       {balance > 0 && !locked && can('payment.record') && (live.currency || 'INR').toUpperCase() === 'INR' && (
         <Suspense fallback={null}>

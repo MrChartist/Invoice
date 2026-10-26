@@ -9,6 +9,7 @@
  * under node:test.
  */
 
+import { isNonGstFinancialNote } from './financial-note';
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, round2, type CalcLine } from './invoice-calc';
 import { docCurrency, inrTotals, missingFxRate } from './fx';
@@ -357,9 +358,11 @@ export function sanitiseFileStem(s: string): string {
 }
 
 /** The document types the IRP accepts. Quotes, proformas and challans are not e-invoiceable. */
-export function eInvoiceDocType(record: Pick<InvoiceRecord, 'doc_type'>, override?: EInvoiceDocType) {
+export function eInvoiceDocType(record: Pick<InvoiceRecord, 'doc_type'> & Partial<InvoiceRecord>, override?: EInvoiceDocType) {
   // A Bill of Supply is outside e-invoicing (Rule 48(4) covers tax invoices and notes only), even with an override.
   if (record.doc_type === 'BILL_OF_SUPPLY') return null;
+  // R2-A2: a financial credit note without GST (settlement discount / kasar / bad debt) is not reported to the IRP.
+  if (isNonGstFinancialNote(record)) return null;
   if (override) return override;
   if (record.doc_type === 'CREDIT_NOTE') return 'CRN' as const;
   if (record.doc_type === 'DEBIT_NOTE') return 'DBN' as const;

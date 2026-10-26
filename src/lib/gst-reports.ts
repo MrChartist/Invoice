@@ -38,6 +38,7 @@
 
 import type { InvoiceRecord, GstMode } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, num, round2 } from './invoice-calc';
+import { isNonGstFinancialNote } from './financial-note';
 import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
@@ -575,7 +576,14 @@ export interface PDoc {
 export const isEco95 = (d: Pick<PDoc, 'ecoSection' | 'isExport'>) => d.ecoSection === 'PAY_9_5' && !d.isExport;
 
 /** Documents GSTR-1 reports. A Bill of Supply (5.9) is a tax document with no tax: Table 8 + Table 13. */
-const TAX_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
+const TAX_DOC_TYPES_BASE = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
+/**
+ * R2-A2: a financial credit note without GST (settlement discount / kasar / bad debt) is not a GST
+ * document — never in CDNR / CDNUR, HSN, Table 13 or GSTR-3B. Its GST variant (Sec 15(3)) is reported.
+ */
+const TAX_DOC_TYPES = {
+  has: (t: string, rec?: InvoiceRecord) => TAX_DOC_TYPES_BASE.has(t) && !isNonGstFinancialNote(rec),
+};
 
 /** The sender snapshot is a composition profile: no GSTR-1 / 3B (CMP-08 / GSTR-4 instead). */
 export function isCompositionDoc(rec: Pick<InvoiceRecord, 'sender'>): boolean {
@@ -939,7 +947,7 @@ function buildDocIssue(all: InvoiceRecord[], vouchers: readonly AdvanceMovement[
       buckets.set(key, b);
       continue;
     }
-    if (!TAX_DOC_TYPES.has(rec.doc_type)) continue;
+    if (!TAX_DOC_TYPES.has(rec.doc_type, rec)) continue;
     // A draft was never issued. Left out of the range, it is counted as a gap (cancelled) when it sits
     // between issued numbers, and does not stretch the "to" number when it is the latest one.
     if (rec.status === 'Draft') continue;
@@ -1035,7 +1043,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
 
   const docs: PDoc[] = [];
   for (const rec of inScope) {
-    if (!TAX_DOC_TYPES.has(rec.doc_type)) {
+    if (!TAX_DOC_TYPES.has(rec.doc_type, rec)) {
       counts.notTaxDocs++;
       continue;
     }
@@ -1278,7 +1286,7 @@ function buildAmendments(
   const effects: AmendEffect[] = [];
   const periodEnd = periodRange(opts.period).to;
   const amended = invoices.filter(
-    (r) => r?.amends && inPeriod(r.amends.amended_on, opts.period) && TAX_DOC_TYPES.has(r.doc_type) && !isCompositionDoc(r) && sameFiler(r),
+    (r) => r?.amends && inPeriod(r.amends.amended_on, opts.period) && TAX_DOC_TYPES.has(r.doc_type, r) && !isCompositionDoc(r) && sameFiler(r),
   );
   const isB2cs = (d: PDoc) => !d.isExport && !isEco95(d) && !d.registered && !(d.supply === 'INTER' && largeB2c(d));
   const section = (d: PDoc) => (isEco95(d) ? 'ECO 9(5)' : d.isExport ? 'EXP' : d.registered ? 'B2B' : isB2cs(d) ? 'B2CS' : 'B2CL');
@@ -1339,7 +1347,7 @@ function buildAmendments(
     const revised = new Map<string, B2csaRow>();
     const omon = periodFp(month);
     for (const r of invoices) {
-      if (!r || !TAX_DOC_TYPES.has(r.doc_type) || isCompositionDoc(r) || !sameFiler(r)) continue;
+      if (!r || !TAX_DOC_TYPES.has(r.doc_type, r) || isCompositionDoc(r) || !sameFiler(r)) continue;
       const asFiledRec = asFiled(r);
       if (!inPeriod(asFiledRec.issue_date, month)) continue;
       const amendedByNow = !!r.amends && r.amends.amended_on.slice(0, 10) <= periodEnd;

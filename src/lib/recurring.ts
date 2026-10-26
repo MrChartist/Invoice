@@ -19,6 +19,7 @@ import { generateId, getTable, setTable } from './storage';
 import { isPeriodLockedError } from './period-lock';
 import { normalizeRecord } from '../store/invoice-defaults';
 import { liveDocTrackingIssues } from './stock-tracking';
+import { loadPaymentTerms, termPatch, type PaymentTerm } from './payment-terms';
 
 export const RECURRING_TABLE = 'recurring';
 /** Most missed occurrences materialised in a single catch-up. */
@@ -103,6 +104,8 @@ export interface RecurringSchedule {
   /** Occurrences deliberately skipped (skip-next, catch-up overflow). */
   skipped_count?: number;
   due_in_days: number;
+  /** Additive (R2-A1): payment term applied to every generated document (its schedule / snapshot are recomputed on issue). */
+  payment_terms_id?: string;
   mode: RecurringMode;
   active: boolean;
   history: RecurringHistoryEntry[];
@@ -429,7 +432,7 @@ export const recurringDocId = (scheduleId: string, occurrence: string): string =
 export function buildInvoiceFromSchedule(
   s: RecurringSchedule,
   occurrence: string,
-  opts: { invoiceNumber: string; issueDate?: string },
+  opts: { invoiceNumber: string; issueDate?: string; terms?: readonly PaymentTerm[] },
 ): GeneratedInvoice {
   const t = s.template;
   const issue = opts.issueDate || occurrence;
@@ -474,7 +477,15 @@ export function buildInvoiceFromSchedule(
     tds_amount: totals.tds_amount,
     recurring_id: s.id,
     recurring_date: occurrence,
+    // R2-A1: the term is recomputed for this issue date (a copied snapshot / schedule would carry stale dates).
+    ...termFields(s, issue, totals.total, totals.tds_amount, opts.terms),
   };
+}
+
+function termFields(s: RecurringSchedule, issue: string, total: number, tds: number | undefined, terms?: readonly PaymentTerm[]): Partial<InvoiceRecord> {
+  const term = s.payment_terms_id ? (terms ?? []).find((t) => t.id === s.payment_terms_id) : undefined;
+  if (!term) return s.payment_terms_id ? { payment_terms: undefined } : {};
+  return termPatch(term, { issue_date: issue, total, tds_amount: tds ?? 0 });
 }
 
 /* ── Persistence ──────────────────────────────────────────────── */
@@ -532,7 +543,7 @@ export function generateInvoiceFromSchedule(
     s.template.doc_type,
     s.template.sender?.invoicePrefix || undefined,
   );
-  let built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue });
+  let built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue, terms: s.payment_terms_id ? loadPaymentTerms() : undefined });
   // Issuing straight away skips the editor, so run its stock checks here; a tracked item that needs a
   // serial / batch (or an expired batch) keeps the invoice a Draft for the user to complete.
   let heldAsDraft: string[] | undefined;
