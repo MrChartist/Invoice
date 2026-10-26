@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
 import { installSettings, createViaStore, reload, SELLER, clientUS } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
-import { getTable } from '../src/lib/storage.ts';
+import { getTable, setTable } from '../src/lib/storage.ts';
 import { setActorProvider } from '../src/lib/access.ts';
 import { createFinancialNote, dueOn, recordReceiptAndSettle } from '../src/lib/settlement.ts';
 import { approveDocument } from '../src/lib/approvals.ts';
@@ -113,6 +113,17 @@ test('F2: a write-off after a receipt and a kasar FCN writes off the due; fully 
   // A bill whose due is fully covered by credits (status not yet re-derived) is nothing to write off.
   const credited = { ...reload(inv.id), status: 'Sent' as const };
   assert.equal(writeOffBlock(credited, new Map([[inv.id, 11800]])), 'nothing');
+});
+
+test('F2 + R4-B: a gift-voucher receipt still counts as paid — the write-off settles only the rest', () => {
+  const inv = createViaStore({ date: '2026-10-05', lines: [{ qty: 1, rate: 10000, tax: 0 }], gstMode: 'NONE', status: 'Sent' });
+  const gv = localDb.payments.record({ invoiceId: inv.id, amount: 2500, method: 'Gift voucher', date: '2026-10-06' });
+  // The receipt as the gift-voucher redemption stamps it (moves no cash; `gift_voucher_id` on the row).
+  setTable('transactions', getTable<Record<string, unknown>>('transactions').map((p) => (p.id === gv.id ? { ...p, gift_voucher_id: 'gv1' } : p)));
+  assert.equal(dueOn(inv.id), 7500);
+  assert.equal(writeOffBill(inv.id, { date: '2026-10-25', reason: 'gone' }).total, 7500);
+  assert.equal(reload(inv.id).status, 'Paid');
+  assert.equal(localDb.payments.getAll().find((p) => p.id === gv.id)?.amount, 2500, 'the voucher receipt is untouched');
 });
 
 test('F3: CMP-08 keeps the turnover when a no-GST kasar FCN settles a bill of supply', () => {
