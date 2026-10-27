@@ -5,7 +5,7 @@
  * grocery block; RT-B … RT-E fill their own block functions. Pure. Extra tables must be in `DEMO_EXTRA_TABLES`.
  */
 import type { InvoiceRecord } from '../../types/invoice';
-import type { DeliveryRider, ShortBookEntry } from '../../types/retail-r9';
+import type { AlterationJob, DeliveryRider, ShortBookEntry } from '../../types/retail-r9';
 import type { StockItem } from '../inventory';
 import { applyTotals, type Demo, type DemoExtras } from '../demo-data';
 import { shiftDay } from '../dates';
@@ -58,8 +58,31 @@ function groceryBlock({ today, base }: ProfileContext): DemoExtras {
 
 /* ── RT-B: pharmacy (scheduled drugs, two doctors, an Rx bill, a refill) — filled by RT-B ── */
 const pharmacyBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
-/* ── RT-C: apparel (a 4 × 3 style, a band-crossing discount, an alteration) — filled by RT-C ── */
-const apparelBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
+/* ── RT-C: apparel (a 4 × 3 style, a band-crossing discount, an alteration) ── */
+function apparelBlock({ today, base }: ProfileContext): DemoExtras {
+  const at = `${shiftDay(today, -45)}T00:00:00.000Z`;
+  const axes = [{ name: 'Size', values: ['S', 'M', 'L', 'XL'] }, { name: 'Colour', values: ['Red', 'Blue', 'Green'] }];
+  const style: Demo<StockItem> = { id: 'demo-krt-104', demo: true, name: 'Kurta KRT-104 (demo)', sku: 'KRT-104', hsn: '6211', unit: 'PCS', track_stock: true, opening_qty: 0, opening_rate: 1400, reorder_level: 0, sale_rate: 2799, tax_rate: 18, gst_band: 'apparel', variant_axes: axes, created_at: at };
+  const kids: Demo<StockItem>[] = axes[0].values.flatMap((size, i) => axes[1].values.map((colour, j) => ({
+    id: `demo-krt-104-${size}-${colour}`.toLowerCase(), demo: true as const, name: `${style.name} - ${size} / ${colour}`, sku: `KRT-104-${size}-${colour.slice(0, 3).toUpperCase()}`, hsn: '6211', unit: 'PCS', track_stock: true,
+    opening_qty: size === 'XL' && colour === 'Green' ? 0 : 2 + ((i + j) % 3), opening_rate: 1400, reorder_level: 1, sale_rate: 2799, tax_rate: 18, gst_band: 'apparel' as const, variant_of: style.id, variant_attrs: { Size: size, Colour: colour }, created_at: at,
+  })));
+  const fy = getIndianFY(today).label;
+  // ₹2,799 less 15% = ₹2,379.15 per piece → the 5% band (from 22 Sep 2025; verify with your CA).
+  const sale = applyTotals({
+    ...base.invoices[0],
+    id: 'demo-apparel-1', demo: true, invoice_number: buildInvoiceNumber('DEMOAPP', fy, 1), issue_date: today, due_date: today, status: 'Paid',
+    client: { id: 'demo-walkin-app', name: 'Mr. Khan (demo)', email: '', address: '', city: 'Mumbai', zip: '', state_code: '27', phone: '9800000003' },
+    items: [{ id: 'demo-apparel-1-l1', name: kids[4].name, type: 'Goods', hsn: '6211', unit: 'PCS', quantity: 1, rate: 2799, tax_rate: 5, discount_percent: 15, amount: 2379.15, band_rate: { kind: 'apparel', value_per_piece: 2379.15, rate: 5 } }],
+    gst_mode: 'CGST_SGST', place_of_supply: '27', discount_rate: 0, amount_paid: 0, pos: true, notes: 'Festive 15% off: the price band is decided after the discount (demo).',
+  } as Demo<InvoiceRecord>);
+  sale.amount_paid = sale.total;
+  const alteration: Demo<AlterationJob> = {
+    id: 'demo-alt-1', demo: true, number: buildInvoiceNumber('DEMOALT', fy, 1), date: today, customer: 'Mr. Khan (demo)', phone: '9800000003', invoice_id: sale.id, invoice_number: sale.invoice_number,
+    garment: 'Kurta KRT-104 M / Blue', notes: 'Sleeves 1 inch shorter', tailor_name: 'Imran (demo tailor)', due: shiftDay(today, 3), charge: 0, tailor_rate: 60, status: 'with_tailor', created_at: `${today}T10:00:00.000Z`,
+  };
+  return { invoices: [sale], tables: { stock_items: [style, ...kids], alteration_jobs: [alteration] } };
+}
 /* ── RT-D: electronics (phones with IMEIs, a finance sale, a buy-back) — filled by RT-D ── */
 const electronicsBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
 /* ── RT-E: jewellery (today's rates, five tags, a sale with old gold) — filled by RT-E ── */

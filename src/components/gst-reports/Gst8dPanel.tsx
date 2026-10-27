@@ -85,6 +85,7 @@ function Guards({ period, gstin, g1, g3, invoices, notify }: Extract<Gst8dProps,
     return (inv: InvoiceRecord | null) => aatoFor(inv, s?.profiles ?? [], active);
   }, [rev]);
   const pending = useMemo(() => irnWindowList(invoices, irnIds, aato, today, 60), [invoices, irnIds, aato, today]);
+  // R9 (RT-C1): the price-band check is loaded by the page, which remounts this view once it is ready.
   const exceptions = useMemo(() => gstExceptions(invoices, { ...range, irnIds, aato, today, gstin }), [invoices, range, irnIds, aato, today, gstin]);
   const known = aato(null) !== undefined || invoices.some((i) => aato(i) !== undefined);
 

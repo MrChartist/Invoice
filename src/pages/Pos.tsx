@@ -1070,7 +1070,7 @@ export function Pos() {
                 <PosDistExtras client={party.client} record={record} unpaid={summary.due} agentId={agentId} onAgent={setAgentId} />
               </Suspense>
               {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
-              {settings.industry_packs?.includes('apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
+              {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
               {party.client ? null : (
                 <>
                   <Typeahead

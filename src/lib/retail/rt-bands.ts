@@ -6,15 +6,13 @@
  * tax-inclusive (MRP) prices the band is solved without a loop: the lower band if MRP ÷ (1 + low rate) ≤ the limit,
  * else the higher one. The line keeps the snapshot `band_rate` and its `tax_rate` (so every calc reader is unchanged);
  * a rate the user types makes the line `manual`; credit / debit notes keep the original line's rate. Pure, except the
- * live lookup at the end. Working paper — verify with your CA (RT1, RT2).
+ * live lookup at the end (`setBands`, the write, is in `rt-matrix.ts`). Working paper — verify with your CA (RT1, RT2).
  */
 import { PRICE_BAND_RULES, type PriceBand, type PriceBandKind } from '../retail-rules';
 import { ruleAt } from '../tax-rules';
 import { calcInputFromRecord, calculateInvoice, num, round2, type CalcLine } from '../invoice-calc';
 import { lineFactor } from '../units';
-import { getTable, peekTable, setTable } from '../storage';
-import { requireAccess } from '../access';
-import type { StockItem } from '../inventory';
+import { peekTable } from '../storage';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { BandRate } from '../../types/retail-r9';
 
@@ -49,7 +47,7 @@ export function bandLookup(rows: readonly { name?: string; gst_band?: PriceBandK
 }
 
 type BandDoc = Partial<InvoiceRecord> & Pick<InvoiceRecord, 'items'>;
-const noBands = (rec: BandDoc) => rec.doc_type === 'CREDIT_NOTE' || rec.doc_type === 'DEBIT_NOTE' || rec.doc_type === 'BILL_OF_SUPPLY' || (rec.gst_mode ?? 'NONE') === 'NONE';
+const noBands = (rec: BandDoc) => rec.doc_type === 'CREDIT_NOTE' || rec.doc_type === 'DEBIT_NOTE' || rec.doc_type === 'BILL_OF_SUPPLY' || rec.gst_mode === 'NONE';
 
 /** Value per piece after discounts (incl. the invoice discount share) of each calc line, by line id. */
 function perPieceOf(rec: BandDoc): Map<string, { line: CalcLine; perPiece: number; grossPerPiece: number }> {
@@ -140,26 +138,3 @@ export function liveBandLookup(): BandLookup {
 
 /** The exceptions-view hook (`gst-guards.ts` loads this lazily). */
 export const liveBandExceptions = (inv: InvoiceRecord): BandFinding[] => bandExceptions(inv, liveBandLookup());
-
-/**
- * Set (or clear, `band` undefined) the price band of stock items; a style's children follow it unless listed
- * themselves. `master.edit`. Returns how many items changed.
- */
-export function setBands(updates: readonly { id: string; band?: PriceBandKind }[]): number {
-  requireAccess('master.edit');
-  const all = getTable<StockItem>('stock_items');
-  const want = new Map(updates.map((u) => [u.id, u.band]));
-  for (const i of all) if (i.variant_of && want.has(i.variant_of) && !want.has(i.id)) want.set(i.id, want.get(i.variant_of));
-  let n = 0;
-  const next = all.map((i) => {
-    if (!want.has(i.id) || i.gst_band === want.get(i.id)) return i;
-    n++;
-    const b = want.get(i.id);
-    const out: StockItem = { ...i };
-    if (b) out.gst_band = b;
-    else delete out.gst_band;
-    return out;
-  });
-  if (n) setTable('stock_items', next);
-  return n;
-}

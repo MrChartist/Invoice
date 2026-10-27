@@ -252,9 +252,16 @@ export interface ExceptionOptions {
   gstin?: string;
 }
 
-// R9 (RT-C1): price-band lines (rate vs the band, near the limit, decided by a discount) — one lazy check.
-let bandCheck: ((inv: InvoiceRecord) => { code: GstExceptionCode; vars: Record<string, string | number> }[]) | null = null;
-export const bandCheckReady = import('./retail/rt-bands').then((m) => { bandCheck = m.liveBandExceptions; }, () => {});
+// R9 (RT-C1): price-band lines (rate vs the band, near the limit, decided by a discount) — one lazy check. The caller
+// passes the loader (its chunk already lists the deps); loaded only for a company with band lines or the apparel pack.
+type BandCheck = (inv: InvoiceRecord) => { code: GstExceptionCode; vars: Record<string, string | number> }[];
+let bandCheck: BandCheck | null = null;
+let bandLoad: Promise<boolean> | null = null;
+/** Resolves true once the check has just loaded (re-run the exceptions then). */
+export function loadBandCheck(invoices: readonly InvoiceRecord[], force: boolean, load: () => Promise<{ liveBandExceptions: BandCheck }>): Promise<boolean> {
+  if (bandCheck || (!force && !invoices.some((i) => i?.items?.some((l) => l?.band_rate)))) return Promise.resolve(false);
+  return (bandLoad ??= load().then((m) => { bandCheck = m.liveBandExceptions; return true; }, () => false));
+}
 
 /** GST exceptions for documents dated in [from, to]. Errors first, then by date. */
 export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOptions): GstException[] {

@@ -4,16 +4,17 @@
  * sets one line per non-zero cell (updated, never duplicated). *Create missing* makes the absent children through
  * `generateVariants` (`master.edit`), carrying the style's price band.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Boxes } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { rtcT } from '../../i18n/areas/retail-r9c';
 import { stockDb, type StockItem } from '../../lib/inventory';
 import { generateId } from '../../lib/storage';
-import { generateVariants } from '../../lib/variants';
-import { gridAxes, gridCells, gridParents, gridToLines, linesToGrid, type GridQty } from '../../lib/retail/rt-matrix';
-import { setBands } from '../../lib/retail/rt-bands';
+import { generateVariants, type VariantAxis } from '../../lib/variants';
+import { gridAxes, gridCells, gridParents, gridToLines, linesToGrid, purchaseLine, setBands, type GridQty } from '../../lib/retail/rt-matrix';
+import { useT } from '../../i18n';
+import type { PurchaseLine } from '../../types/purchases';
 import { num } from '../../lib/invoice-calc';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -75,34 +76,7 @@ export default function MatrixEntryDialog<L extends AnyLine>({ open, onClose, li
     onApply(r.lines, q.filter((c) => c.qty > 0).length);
     onClose();
   };
-  const set = (key: string, patch: { qty?: number; rate?: number }) => setCells((c) => ({ ...c, [key]: { qty: c[key]?.qty ?? 0, ...c[key], ...patch } }));
-
-  const [rowAx, colAx, tabAx] = axes;
-  const table = (tabVal?: string) => (
-    <div className={surface.tableWrap} key={tabVal ?? '-'}>
-      {tabVal && <strong>{tabAx.name}: {tabVal}</strong>}
-      <table className={surface.table} data-grid-table>
-        <thead><tr><th>{rowAx.name}</th>{(colAx?.values ?? ['']).map((c) => <th key={c} className={surface.numeric}>{c || '—'}</th>)}</tr></thead>
-        <tbody>
-          {rowAx.values.map((r) => (
-            <tr key={r}>
-              <th>{r}</th>
-              {(colAx?.values ?? ['']).map((c) => {
-                const cell = grid.find((g) => g.attrs[rowAx.name] === r && (!colAx || g.attrs[colAx.name] === c) && (!tabAx || g.attrs[tabAx.name] === tabVal));
-                if (!cell) return <td key={c} />;
-                return (
-                  <td key={c} className={surface.numeric} title={cell.child?.name}>
-                    <NumberInput className={controls.input} style={{ maxWidth: 72, opacity: cell.child ? 1 : 0.5 }} value={cells[cell.key]?.qty ?? 0} onChange={(n) => set(cell.key, { qty: n })} aria-label={`${r} ${c}`} data-grid-cell={cell.key} />
-                    {perCell && <NumberInput className={controls.input} style={{ maxWidth: 72 }} value={cells[cell.key]?.rate ?? 0} onChange={(n) => set(cell.key, { rate: n })} placeholder="₹" aria-label={`${r} ${c} ₹`} />}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const set = (key: string, patch: { qty?: number; rate?: number }) => setCells((c) => ({ ...c, [key]: { ...c[key], ...patch, qty: patch.qty ?? c[key]?.qty ?? 0 } }));
 
   return (
     <Modal open={open} onClose={onClose} size="lg" title={<><Boxes size={16} aria-hidden="true" /> {rtcT('gridTitle')}{parent ? ` — ${parent.name}` : ''}</>}
@@ -122,10 +96,59 @@ export default function MatrixEntryDialog<L extends AnyLine>({ open, onClose, li
             <label className={controls.check}><input type="checkbox" checked={perCell} onChange={(e) => setPerCell(e.target.checked)} /> {rtcT('gridCellRate')}</label>
           </div>
           {missing.length > 0 && <p className={controls.hint}>{rtcT('gridMissing', { list: missing.map((m) => Object.values(m.attrs).join(' / ')).join(', ') })} <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={createMissing}>{rtcT('gridCreate')}</button></p>}
-          {parent && rowAx && (tabAx ? tabAx.values.map((v) => table(v)) : table())}
+          {parent && (
+            <GridTables axes={axes} cells={grid} render={(cell) => (
+              <>
+                <NumberInput className={controls.input} style={{ maxWidth: 72, opacity: cell.child ? 1 : 0.5 }} value={cells[cell.key]?.qty ?? 0} onChange={(n) => set(cell.key, { qty: n })} aria-label={Object.values(cell.attrs).join(' ')} data-grid-cell={cell.key} />
+                {perCell && <NumberInput className={controls.input} style={{ maxWidth: 72 }} value={cells[cell.key]?.rate ?? 0} onChange={(n) => set(cell.key, { rate: n })} placeholder="₹" aria-label={`${Object.values(cell.attrs).join(' ')} ₹`} />}
+              </>
+            )} />
+          )}
           {err && <p className={controls.hint} role="status">{err}</p>}
         </>
       )}
     </Modal>
+  );
+}
+
+/** Rows = axis 1, columns = axis 2, one table per value of a third axis; `render` fills a cell (shared with the stock grid). */
+export function GridTables<C extends { key: string; attrs: Record<string, string> }>({ axes, cells, render }: { axes: readonly VariantAxis[]; cells: readonly C[]; render: (cell: C) => ReactNode }) {
+  const [rowAx, colAx, tabAx] = axes;
+  if (!rowAx) return null;
+  const cols = colAx?.values ?? [''];
+  return (
+    <>
+      {(tabAx?.values ?? ['']).map((tv) => (
+        <div className={surface.tableWrap} key={tv}>
+          {tabAx && <strong>{tabAx.name}: {tv}</strong>}
+          <table className={surface.table} data-grid-table>
+            <thead><tr><th>{rowAx.name}</th>{cols.map((c) => <th key={c} className={surface.numeric}>{c || '—'}</th>)}</tr></thead>
+            <tbody>
+              {rowAx.values.map((r) => (
+                <tr key={r}>
+                  <th>{r}</th>
+                  {cols.map((c) => {
+                    const cell = cells.find((g) => g.attrs[rowAx.name] === r && (!colAx || g.attrs[colAx.name] === c) && (!tabAx || g.attrs[tabAx.name] === tv));
+                    return <td key={c} className={surface.numeric} title={cell ? Object.values(cell.attrs).join(' / ') : undefined}>{cell && render(cell)}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** Supplier bill: the Grid button (one grid → one line per non-zero cell, stock-in by item id). */
+export function BillGrid({ lines, onChange, date }: { lines: PurchaseLine[]; onChange: (lines: PurchaseLine[]) => void; date?: string }) {
+  useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setOpen(true)} data-grid-open><Boxes size={14} aria-hidden="true" /> {rtcT('gridBtn')}</button>
+      {open && <MatrixEntryDialog<PurchaseLine> open lines={lines} rateOf={(p) => num(p.opening_rate)} onClose={() => setOpen(false)} make={(c, p, q, r) => purchaseLine(c, p, q, r, generateId(), date)} onApply={onChange} />}
+    </>
   );
 }

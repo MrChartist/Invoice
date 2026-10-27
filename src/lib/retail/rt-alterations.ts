@@ -19,6 +19,7 @@ import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { RT_SERIES, RT_TABLES } from './rt-shared';
+import { draftsDb } from '../purchase-drafts';
 
 export const ALTERATION_TABLE = RT_TABLES.alterationJobs;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -153,7 +154,6 @@ export async function makeTailorBill(tailor: { id: string; name: string }, from:
   const all = loadAlterations();
   const jobs = tailorJobs(all, tailor.id, from, to);
   if (!jobs.length) throw new Error('No delivered, unbilled jobs for this tailor in the period.');
-  const { draftsDb } = await import('../purchase-drafts');
   const lines = tailorBillLines(jobs, generateId);
   const total = round2(lines.reduce((s, l) => s + l.rate * l.quantity, 0));
   const draft = draftsDb.save({

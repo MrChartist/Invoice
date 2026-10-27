@@ -345,7 +345,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} freeCells={freeCells || lines.some((l) => l.free_qty || l.discount_percent)} />
-      {impliedPacks(localDb.settings.get()).includes('apparel') && <Suspense fallback={null}><BillGrid lines={lines} onChange={changeLines} /></Suspense>}
+      {impliedPacks(localDb.settings.get()).includes('apparel') && <Suspense fallback={null}><BillGrid lines={lines} onChange={changeLines} date={date} /></Suspense>}
       {vendor && ((x) => !!x.trade_discounts || !!x.industry_packs?.some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()) && <Suspense fallback={null}><BillRateHints lines={lines} vendor={vendor} date={date} onRate={(id, rate) => changeLines(lines.map((l) => (l.id === id ? { ...l, rate } : l)))} /></Suspense>}
       {tradeOn && <Suspense fallback={null}><BillTradePanel lines={lines} onLines={changeLines} vendor={vendor} broker={brokerId} onBroker={setBrokerId} isNew={!purchase} /></Suspense>}
       {!rcm && !importType && vendor && <Suspense fallback={null}><RcmGoodsNotice lines={lines} date={date} vendor={vendor} onApply={() => setRcm(true)} /></Suspense>}

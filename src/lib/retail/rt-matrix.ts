@@ -3,13 +3,17 @@
  * its HSN / GST, one rate or a rate per cell; a price-band item's line is marked for the band, RT-C1), and back
  * (the grid opens with the bill's current quantities; a changed cell updates its line, a cleared cell removes it — never
  * a duplicate line). The stock grid of a style reads the stock engine per child and godown, with the units sold in the
- * last 30 days. Variant children come from `variants.ts` (8.85); nothing new is stored. Pure, except nothing.
+ * last 30 days. Variant children come from `variants.ts` (8.85); nothing new is stored. Pure, except `setBands` (price band of a style and its children, `master.edit`).
  */
 import { cleanAxes, combinations, type VariantAxis } from '../variants';
 import type { StockItem } from '../inventory';
 import { num, round2 } from '../invoice-calc';
 import { lineFactor } from '../units';
 import { shiftDay } from '../dates';
+import { bandRate } from './rt-bands';
+import { getTable, setTable } from '../storage';
+import { requireAccess } from '../access';
+import type { PriceBandKind } from '../retail-rules';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { PurchaseLine } from '../../types/purchases';
 
@@ -110,9 +114,14 @@ export function saleLine(child: StockItem, parent: StockItem, qty: number, rate:
   };
 }
 
-/** A new supplier-bill line for a child (stock-in by `item_id`). */
-export function purchaseLine(child: StockItem, parent: StockItem, qty: number, rate: number, id: string): PurchaseLine {
-  return { id, name: child.name, hsn: child.hsn ?? parent.hsn ?? '', unit: child.unit || parent.unit || 'PCS', quantity: qty, rate, tax_rate: num(child.tax_rate ?? parent.tax_rate), item_id: child.id };
+/**
+ * A new supplier-bill / PO / GRN line for a child (stock-in by `item_id`). A price-band item takes the band of the cost
+ * per piece on the bill date (the supplier's own transaction value, RT-C1); else the item's rate.
+ */
+export function purchaseLine(child: StockItem, parent: StockItem, qty: number, rate: number, id: string, date?: string): PurchaseLine {
+  const band = child.gst_band ?? parent.gst_band;
+  const tax_rate = band && date && rate > 0 ? bandRate(band, rate, date).rate : num(child.tax_rate ?? parent.tax_rate);
+  return { id, name: child.name, hsn: child.hsn ?? parent.hsn ?? '', unit: child.unit || parent.unit || 'PCS', quantity: qty, rate, tax_rate, item_id: child.id };
 }
 
 /* ── Stock grid ── */
@@ -150,4 +159,29 @@ export function stockGridCsv(parent: StockItem, cells: readonly StockCell[]): st
   const axes = gridAxes(parent);
   const q = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
   return [[...axes.map((a) => a.name), 'Item', 'In stock', 'Sold (30 days)'].map(q).join(','), ...cells.map((c) => [...axes.map((a) => c.attrs[a.name]), c.child?.name ?? '', c.qty, c.sold].map(q).join(','))].join('\n');
+}
+
+/* ── RT-C1 bands on items (kept here, with the other stock-item writes of the desk) ── */
+
+/**
+ * Set (or clear, `band` undefined) the price band of stock items; a style's children follow it unless listed
+ * themselves. `master.edit`. Returns how many items changed.
+ */
+export function setBands(updates: readonly { id: string; band?: PriceBandKind }[]): number {
+  requireAccess('master.edit');
+  const all = getTable<StockItem>('stock_items');
+  const want = new Map(updates.map((u) => [u.id, u.band]));
+  for (const i of all) if (i.variant_of && want.has(i.variant_of) && !want.has(i.id)) want.set(i.id, want.get(i.variant_of));
+  let n = 0;
+  const next = all.map((i) => {
+    if (!want.has(i.id) || i.gst_band === want.get(i.id)) return i;
+    n++;
+    const b = want.get(i.id);
+    const out: StockItem = { ...i };
+    if (b) out.gst_band = b;
+    else delete out.gst_band;
+    return out;
+  });
+  if (n) setTable('stock_items', next);
+  return n;
 }

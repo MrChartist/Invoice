@@ -3128,6 +3128,67 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+
+  await step('R9-C apparel: Garments profile, a ₹2,799 kurta less 15% → 5% band, no discount → 18%; a 4 × 3 size grid on a supplier bill makes 12 lines; alteration slip ALT/FY…/0001 prints', async () => {
+    const keys = ['settings', 'items_catalog', 'stock_items', 'alteration_jobs', 'series_counters', 'retail_settings', 'invoices'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="apparel"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'apparel');
+    check(st.retail_kind === 'apparel' && st.industry_packs?.includes('apparel'), 'Garments: the apparel pack is on');
+    const sizes = ['S', 'M', 'L', 'XL'];
+    const colours = ['Red', 'Blue', 'Green'];
+    const style = { id: 'e2e-krt', name: 'E2E KRT-104', hsn: '6211', unit: 'PCS', track_stock: true, opening_qty: 0, opening_rate: 1400, reorder_level: 0, sale_rate: 2799, tax_rate: 18, gst_band: 'apparel', variant_axes: [{ name: 'Size', values: sizes }, { name: 'Colour', values: colours }] };
+    const kids = sizes.flatMap((sz) => colours.map((c) => ({ id: `e2e-krt-${sz}-${c}`, name: `E2E KRT-104 - ${sz} / ${c}`, hsn: '6211', unit: 'PCS', track_stock: true, opening_qty: 0, opening_rate: 1400, reorder_level: 0, sale_rate: 2799, tax_rate: 18, gst_band: 'apparel', variant_of: 'e2e-krt', variant_attrs: { Size: sz, Colour: c } })));
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), style, ...kids]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-kurta', name: 'E2E Kurta KRT-104', type: 'Product', hsn: '6211', unit: 'PCS', quantity: 1, rate: 2799, tax_rate: 18, amount: 0, gst_band: 'apparel' }]);
+    // RT-C1: the band follows the price per piece after the discount.
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Item 1 name').fill('E2E Kurta');
+    await page.getByRole('option', { name: /E2E Kurta KRT-104/ }).first().click({ timeout: 15000 });
+    await page.locator('[data-band-chip="18"]').waitFor({ timeout: 15000 });
+    await page.getByLabel('Item 1 discount percent').fill('15');
+    await page.locator('[data-band-chip="5"]').waitFor({ timeout: 15000 });
+    check(await page.getByLabel('Item 1 GST rate').inputValue() === '5', '₹2,799 less 15% = ₹2,379.15 a piece → GST 5%');
+    await page.getByLabel('Item 1 discount percent').fill('0');
+    await page.locator('[data-band-chip="18"]').waitFor({ timeout: 15000 });
+    check(await page.getByLabel('Item 1 GST rate').inputValue() === '18', 'without the discount → GST 18%');
+    // RT-C2: one 4 × 3 grid on a supplier bill → 12 lines.
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click({ timeout: 15000 });
+    const dlg = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await dlg.locator('[data-grid-open]').click({ timeout: 15000 });
+    const grid = page.getByRole('dialog', { name: /Size × colour grid/ });
+    await grid.locator('[data-grid-style]').selectOption('e2e-krt', { timeout: 15000 });
+    const cells = grid.locator('[data-grid-cell]');
+    await cells.first().waitFor({ timeout: 15000 });
+    check(await cells.count() === 12, `the grid has 12 cells (${await cells.count()})`);
+    for (let i = 0; i < 12; i++) await cells.nth(i).fill(String(1 + (i % 3)));
+    await grid.locator('[data-grid-apply]').click();
+    await grid.waitFor({ state: 'detached' });
+    const names = await dlg.getByLabel(/^Line \d+ item$/).evaluateAll((els) => els.map((e) => e.value));
+    check(names.length === 12 && names.every((n) => n.startsWith('E2E KRT-104 - ')), `the grid made 12 bill lines (${names.length})`);
+    await page.keyboard.press('Escape');
+    // RT-C3: an alteration slip ALT/FY…/0001 prints.
+    await writeJson(page, 'alteration_jobs', []);
+    await writeJson(page, 'series_counters', (prev.series_counters ?? []).filter((r) => !String(r?.id ?? '').startsWith('ALT')));
+    await page.goto(srv.origin + '/inventory?tab=apparel&view=alterations');
+    await page.locator('[data-alt-customer]').fill('E2E Ravi', { timeout: 15000 });
+    await page.locator('[data-alt-garment]').fill('Trousers — shorten 2 cm');
+    await page.locator('[data-alt-save]').click();
+    const slip = page.locator('[data-alt-slip]');
+    await slip.waitFor({ timeout: 15000 });
+    const number = await slip.getAttribute('data-alt-slip');
+    check(/^ALT\/FY\d{2}-\d{2}\/0001$/.test(number ?? ''), `the slip is numbered ${number}`);
+    await page.evaluate(() => { window.__slipHtml = ''; window.open = () => ({ document: { write: (h) => { window.__slipHtml += h; }, close() {} }, print() {} }); });
+    await slip.locator('[data-alt-print]').click();
+    const printed = await page.evaluate(() => window.__slipHtml);
+    check(printed.includes(number) && /Customer copy/.test(printed) && /Shop copy/.test(printed), 'the slip prints with the customer and shop copies');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

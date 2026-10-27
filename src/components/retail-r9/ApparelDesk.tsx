@@ -3,7 +3,7 @@
  * the hosts' preload map): views *Alterations* (slips, board, tailor bill), *Size × colour* (stock grid) and *Price
  * bands* (band per item, bulk by HSN, the band table); and the parts the editor, the POS and the supplier bill mount
  * lazily: `EditorApparel` (band hook + Grid button), `BandChip`, `PosApparel` (band hook, chips, alterations due) and
- * `BillGrid`. Working papers — verify with your CA (RT1–RT3).
+ * `BillGrid` (defined in `MatrixEntryDialog.tsx`). Working papers — verify with your CA (RT1–RT3).
  */
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,8 +11,8 @@ import { Boxes, Package, Percent } from 'lucide-react';
 import { useT } from '../../i18n';
 import { rtcT } from '../../i18n/areas/retail-r9c';
 import { PRICE_BAND_RULES, type PriceBandKind } from '../../lib/retail-rules';
-import { BAND_KINDS, bandAt, bandForHsn, liveBandLookup, setBands, syncBands } from '../../lib/retail/rt-bands';
-import { gridAxes, gridParents, parentOfName, purchaseLine, saleLine, soldLast30, stockGrid, stockGridCsv, type StockCell } from '../../lib/retail/rt-matrix';
+import { BAND_KINDS, bandAt, bandForHsn, liveBandLookup, syncBands } from '../../lib/retail/rt-bands';
+import { gridAxes, gridParents, parentOfName, saleLine, setBands, soldLast30, stockGrid, stockGridCsv } from '../../lib/retail/rt-matrix';
 import { addAlteration, alterationRule, billedJobs, chargeLine, deleteAlteration, dueJobs, loadAlterations, makeTailorBill, moveAlteration, nextStatus, readyLink } from '../../lib/retail/rt-alterations';
 import { stockDb } from '../../lib/inventory';
 import { loadTracking } from '../../lib/stock-tracking';
@@ -26,10 +26,11 @@ import { shiftDay } from '../../lib/dates';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { downloadTextFile } from '../receivables/exportUtils';
 import { NumberInput } from '../ui/NumberInput';
-import MatrixEntryDialog from './MatrixEntryDialog';
+import MatrixEntryDialog, { GridTables } from './MatrixEntryDialog';
+// The supplier bill's Grid button lives beside the dialog; re-exported so the hosts load this one chunk.
+export { BillGrid } from './MatrixEntryDialog';
 import AlterationSlip from './AlterationSlip';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
-import type { PurchaseLine } from '../../types/purchases';
 import type { AlterationJob, AlterationStatus } from '../../types/retail-r9';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -146,18 +147,6 @@ export function EditorApparel({ gridOn }: { gridOn: boolean }) {
   );
 }
 
-/** Supplier bill: the Grid button (one grid → one line per non-zero cell, stock-in by item id). */
-export function BillGrid({ lines, onChange }: { lines: PurchaseLine[]; onChange: (lines: PurchaseLine[]) => void }) {
-  useT();
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button type="button" className={sm} onClick={() => setOpen(true)} data-grid-open><Boxes size={14} aria-hidden="true" /> {rtcT('gridBtn')}</button>
-      {open && <MatrixEntryDialog<PurchaseLine> open lines={lines} rateOf={(p) => num(p.opening_rate)} onClose={() => setOpen(false)} make={(c, p, q, r) => purchaseLine(c, p, q, r, generateId())} onApply={onChange} />}
-    </>
-  );
-}
-
 /** POS: bands on the cart (after offers / loyalty / voucher discounts), their chips, and today's due alterations. */
 export function PosApparel({ record, setItems }: { record: InvoiceRecord; setItems: Dispatch<SetStateAction<InvoiceItem[]>> }) {
   useT();
@@ -193,22 +182,6 @@ function MatrixView() {
   const today = todayInput();
   const sold = useMemo(() => soldLast30(getTable<InvoiceRecord>('invoices'), all, today), [all, today]);
   const cells = parent ? stockGrid(parent, all, (id) => { const t = tracking.get(id); return godown ? t?.byGodown[godown] ?? 0 : t?.qty ?? 0; }, sold) : [];
-  const axes = parent ? gridAxes(parent) : [];
-  const [rowAx, colAx, tabAx] = axes;
-  const cell = (c: StockCell | undefined) => !c ? <td /> : (
-    <td className={surface.numeric} data-matrix-cell={c.key} style={c.qty <= 0 ? { color: 'var(--loss)' } : undefined} title={c.child?.name}>
-      <strong>{c.qty}</strong>{c.qty <= 0 && <small> {rtcT('soldOut')}</small>}<br /><small>{rtcT('sold30', { n: c.sold })}</small>
-    </td>
-  );
-  const table = (tabVal?: string) => (
-    <div className={surface.tableWrap} key={tabVal ?? '-'}>
-      {tabVal && <strong>{tabAx.name}: {tabVal}</strong>}
-      <table className={surface.table}>
-        <thead><tr><th>{rowAx.name}</th>{(colAx?.values ?? ['']).map((c) => <th key={c} className={surface.numeric}>{c || '—'}</th>)}</tr></thead>
-        <tbody>{rowAx.values.map((r) => <tr key={r}><th>{r}</th>{(colAx?.values ?? ['']).map((c) => <td key={c} style={{ padding: 0 }}>{cell(cells.find((x) => x.attrs[rowAx.name] === r && (!colAx || x.attrs[colAx.name] === c) && (!tabAx || x.attrs[tabAx.name] === tabVal)))}</td>)}</tr>)}</tbody>
-      </table>
-    </div>
-  );
   return (
     <>
       <h3 className={surface.cardHeadIcon}><Boxes size={16} aria-hidden="true" /> {rtcT('matrixTitle')}</h3>
@@ -225,7 +198,13 @@ function MatrixView() {
             )}
             {parent && <button type="button" className={sm} onClick={() => downloadTextFile(`Stock_grid_${parent.name.replace(/\W+/g, '_')}_${today}.csv`, stockGridCsv(parent, cells))}>{rtcT('csv')}</button>}
           </div>
-          {parent && rowAx && (tabAx ? tabAx.values.map((x) => table(x)) : table())}
+          {parent && (
+            <GridTables axes={gridAxes(parent)} cells={cells} render={(c) => (
+              <span data-matrix-cell={c.key} style={c.qty <= 0 ? { color: 'var(--loss)' } : undefined}>
+                <strong>{c.qty}</strong>{c.qty <= 0 && <small> {rtcT('soldOut')}</small>}<br /><small>{rtcT('sold30', { n: c.sold })}</small>
+              </span>
+            )} />
+          )}
         </>
       )}
     </>
@@ -234,7 +213,7 @@ function MatrixView() {
 
 /* ── RT-C3 alterations ── */
 
-const BLANK = { customer: '', phone: '', garment: '', notes: '', tailor_id: '', due: '', charge: 0, tailor_rate: 0 };
+const BLANK = { customer: '', phone: '', garment: '', notes: '', tailor_id: '', invoice_number: '', due: '', charge: 0, tailor_rate: 0 };
 
 function AlterationsView({ onDone }: { onDone: Done }) {
   const navigate = useNavigate();
@@ -242,7 +221,6 @@ function AlterationsView({ onDone }: { onDone: Done }) {
   const [tick, setTick] = useState(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const jobs = useMemo(() => loadAlterations().sort((a, b) => a.due.localeCompare(b.due) || a.number.localeCompare(b.number)), [tick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const billed = useMemo(() => billedJobs(jobs, getTable<InvoiceRecord>('invoices')), [jobs]);
   const tailors = useMemo(() => vendorsDb.all(), []);
   const [form, setForm] = useState({ ...BLANK, due: shiftDay(day, 3) });
@@ -255,7 +233,10 @@ function AlterationsView({ onDone }: { onDone: Done }) {
   };
   const save = () => run(() => {
     const t = tailors.find((x) => x.id === form.tailor_id);
-    const job = addAlteration({ ...form, date: day, ...(t ? { tailor_id: t.id, tailor_name: t.name } : { tailor_id: undefined }) });
+    const no = form.invoice_number.trim();
+    const inv = no ? getTable<InvoiceRecord>('invoices').find((i) => i?.invoice_number?.toUpperCase() === no.toUpperCase()) : undefined;
+    if (no && !inv) throw new Error(rtcT('noInvoice', { number: no }));
+    const job = addAlteration({ ...form, date: day, ...(t ? { tailor_id: t.id, tailor_name: t.name } : { tailor_id: undefined }), ...(inv ? { invoice_id: inv.id, invoice_number: inv.invoice_number } : { invoice_number: undefined }) });
     setShown(job.id);
     setForm({ ...BLANK, due: shiftDay(day, 3) });
     return rtcT('saved', { number: job.number });
@@ -281,6 +262,7 @@ function AlterationsView({ onDone }: { onDone: Done }) {
         <label className={controls.field}><span className={controls.label}>{rtcT('customer')}</span><input className={controls.input} value={form.customer} onChange={f('customer')} data-alt-customer /></label>
         <label className={controls.field}><span className={controls.label}>{rtcT('phone')}</span><input className={controls.input} inputMode="tel" value={form.phone} onChange={f('phone')} /></label>
         <label className={controls.field}><span className={controls.label}>{rtcT('garment')}</span><input className={controls.input} value={form.garment} onChange={f('garment')} data-alt-garment /></label>
+        <label className={controls.field} style={{ maxWidth: 150 }}><span className={controls.label}>{rtcT('invoiceNo')}</span><input className={controls.input} value={form.invoice_number} onChange={f('invoice_number')} /></label>
         <label className={controls.field}><span className={controls.label}>{rtcT('notes')}</span><input className={controls.input} value={form.notes} onChange={f('notes')} /></label>
         <label className={controls.field}><span className={controls.label}>{rtcT('tailor')}</span>
           <select className={controls.select} value={form.tailor_id} onChange={f('tailor_id')}><option value="">{rtcT('tailorNone')}</option>{tailors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
@@ -292,7 +274,7 @@ function AlterationsView({ onDone }: { onDone: Done }) {
       </div>
       {slip && <AlterationSlip job={slip} shop={shop} />}
       <div className={controls.segment} style={{ margin: '0.75rem 0 0.25rem' }}>
-        {(['open', 'all'] as const).map((x) => <button key={x} type="button" className={x === filter ? `${controls.segmentBtn} ${controls.segmentBtnActive}` : controls.segmentBtn} onClick={() => setFilter(x)}>{x === 'open' ? `${rtcT('st.received')} / ${rtcT('st.with_tailor')} / ${rtcT('st.ready')}` : '∑'}</button>)}
+        {(['open', 'all'] as const).map((x) => <button key={x} type="button" className={x === filter ? `${controls.segmentBtn} ${controls.segmentBtnActive}` : controls.segmentBtn} onClick={() => setFilter(x)}>{rtcT(x)}</button>)}
       </div>
       {list.length === 0 ? <p className={controls.hint}>{rtcT('empty')}</p> : (
         <div className={surface.tableWrap}>
