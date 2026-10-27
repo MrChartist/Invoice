@@ -194,8 +194,9 @@ function StatementView({ staff, plans, run, tick }: { staff: ServiceStaff[]; pla
           <table className={surface.table} data-statement>
             <thead><tr><th>{svT('date')}</th><th>#</th><th>{svT('service')}</th><th>{svT('base')}</th><th>{svT('rate')}</th><th>{svT('amount')}</th></tr></thead>
             <tbody>
-              {st.lines.map((l, i) => <tr key={i}><td>{l.date}</td><td>{l.number}</td><td>{l.item}{l.role === 'assist' ? ' (assist)' : ''}</td><td>{formatCurrency(l.base)}</td><td>{l.rate}</td><td>{formatCurrency(l.amount)}</td></tr>)}
+              {st.lines.map((l, i) => <tr key={i}><td>{l.date}</td><td>{l.number}</td><td>{l.item}{l.role === 'assist' ? ' (assist)' : ''}</td><td>{formatCurrency(l.base)}</td><td>{l.tip ? svT('tip') : l.rate}</td><td>{formatCurrency(l.amount)}</td></tr>)}
               {!!st.uplift && <tr><td colSpan={5}>{svT('uplift')}</td><td>{formatCurrency(st.uplift)}</td></tr>}
+              {!!st.tips && <tr><td colSpan={5}>{svT('tips')}</td><td data-statement-tips>{formatCurrency(st.tips)}</td></tr>}
               <tr><td colSpan={3}><strong>{svT('total')}</strong></td><td>{formatCurrency(st.base)}</td><td /><td><strong data-statement-total>{formatCurrency(st.total)}</strong></td></tr>
             </tbody>
           </table>

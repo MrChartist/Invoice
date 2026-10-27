@@ -15,6 +15,7 @@ import { localDb } from '../../lib/localDb';
 import { bookableStaff } from '../../lib/services/sv-staff';
 import { readServiceSettings } from '../../lib/services/sv-settings';
 import { SV_CLASSES, classPatch, offerSplit, rule46aApplies } from '../../lib/services/sv-tax';
+import { withStaff } from '../../lib/services/sv-pos';
 import { useT } from '../../i18n';
 import { svT } from '../../i18n/areas/services-r10a';
 import controls from '../../styles/controls.module.css';
@@ -37,7 +38,7 @@ export function SvLineRow({ item, index, date }: { item: InvoiceItem; index: num
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }} data-sv-line={index}>
       {!!staff.length && (
         <select className={controls.ghost} value={sv.staff_id ?? ''} aria-label={`${svT('e.staff')} ${index + 1}`} data-sv-staff={index}
-          onChange={(e) => setSv({ staff_id: e.target.value || undefined, staff_name: staff.find((s) => s.id === e.target.value)?.name })}>
+          onChange={(e) => patch({ sv: withStaff(item, staff.find((s) => s.id === e.target.value), !!readServiceSettings().print_staff).sv })}>
           <option value="">{svT('e.staff')}: —</option>
           {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>

@@ -4354,6 +4354,7 @@ try {
     await page.goto(srv.origin + '/inventory?tab=members&view=shares');
     await page.locator('[data-agd="member"]').selectOption('e2e-mem', { timeout: 15000 });
     await page.locator('[data-agd="shares"]').fill('10');
+    await page.locator('[data-agd="paid"]').selectOption('bank'); // QA13: no application money is recorded here
     await page.locator('[data-agd-b="save-share"]').click();
     const sh = (await readJson(page, 'member_shares', [], (v) => v.length === 1))[0];
     check(/^SHC\/FY\d{2}-\d{2}\/0001$/.test(sh?.certificate_no ?? '') && sh.shares === 10, `10 shares allotted, certificate ${sh?.certificate_no}`);

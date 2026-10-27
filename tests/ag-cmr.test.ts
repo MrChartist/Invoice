@@ -14,7 +14,7 @@ import { normalizeRecord } from '../src/store/invoice-defaults.ts';
 import { openSlip, recordTare, loadSlips } from '../src/lib/agri/ag-weighbridge.ts';
 import {
   addDelivery, addPaddyLot, cmrAccount, cmrSnapshot, defaultOutturn, deleteAgreement, jobMillingInvoice, jobMillingRate, loadAgreements, millingChargesInvoice,
-  paddyName, pdsTest, removeDelivery, removePaddyLot, saveAgreement,
+  cmrBilling, paddyName, pdsTest, removeDelivery, removePaddyLot, saveAgreement,
 } from '../src/lib/agri/ag-cmr.ts';
 
 const AGENCY = { ...clientMH, id: 'c-fci', name: 'State Civil Supplies Corp' };
@@ -88,14 +88,18 @@ test('Circular 153: goods ≤ 25% exempt (boundary in), above → 5%; the millin
   assert.deepEqual([pdsTest(25, 100).exempt, pdsTest(25, 100).rate], [true, 0]);
   assert.deepEqual([pdsTest(25.01, 100).exempt, pdsTest(25.01, 100).rate, pdsTest(25.01, 100).suggestion], [false, 5, 'job_work_5']);
   const a = agreement();
-  addPaddyLot(a.id, { date: '2026-10-27', qty: 50 });
+  addPaddyLot(a.id, { date: '2026-10-27', qty: 70 });
+  addDelivery(a.id, { date: '2026-10-27', qty: 20, lot_no: 'L1' });
   // 20 qtl × ₹40 = 800 service; goods 200 → 20% → exempt bill of supply.
   const ex = millingChargesInvoice(a.id, { date: '2026-10-27', qty: 20, goods_value: 200 });
   assert.deepEqual([ex.test.goodsPct, ex.test.exempt, ex.invoice.doc_type, ex.invoice.tax_amount, ex.invoice.items.length], [20, true, 'BILL_OF_SUPPLY', 0, 2]);
   assert.equal(ex.invoice.ag?.kind, 'cmr');
   assert.equal(ex.invoice.ag?.cmr?.goods_pct, 20);
   assert.match(ex.invoice.notes ?? '', /entry 3A/);
-  // goods 30% of the whole value → 5%.
+  // goods 30% of the whole value → 5% (a second delivery: the first is billed).
+  addDelivery(a.id, { date: '2026-10-27', qty: 13, lot_no: 'L2' });
+  assert.throws(() => millingChargesInvoice(a.id, { date: '2026-10-27', qty: 20, goods_value: 342.86 }), /Only 13 qtl/);
+  addDelivery(a.id, { date: '2026-10-27', qty: 7, lot_no: 'L3' });
   const t = millingChargesInvoice(a.id, { date: '2026-10-27', qty: 20, goods_value: 342.86 });
   assert.deepEqual([t.test.goodsPct, t.test.rate, t.invoice.doc_type, t.invoice.items[0].tax_rate], [30, 5, 'TAX_INVOICE', 5]);
   assert.ok(t.invoice.tax_amount > 0);
@@ -113,4 +117,33 @@ test('job milling: 5% for a registered principal; unregistered → typed rate re
   assert.throws(() => jobMillingInvoice({ client_id: 'c-farmer', date: '2026-10-27', qty: 2, rate: 60, registered: false }), /type the GST rate/);
   const own = jobMillingInvoice({ client_id: 'c-farmer', date: '2026-10-27', qty: 2, rate: 60, registered: false, tax_rate: 0 });
   assert.equal(own.doc_type, 'BILL_OF_SUPPLY');
+});
+
+test('QA13: a milling-charges bill is tied to its deliveries; billing the same rice twice is refused', () => {
+  const a = agreement();
+  addPaddyLot(a.id, { date: '2026-10-27', qty: 60 });
+  assert.throws(() => millingChargesInvoice(a.id, { date: '2026-10-27', qty: 10 }), /already billed/, 'nothing delivered yet');
+  const d1 = addDelivery(a.id, { date: '2026-10-27', qty: 10, lot_no: 'L1' });
+  const d2 = addDelivery(a.id, { date: '2026-10-28', qty: 15, lot_no: 'L2' });
+  // Bill the first delivery only: qty defaults to its rice.
+  const b1 = millingChargesInvoice(a.id, { date: '2026-10-28', delivery_ids: [d1.id] });
+  assert.deepEqual([b1.invoice.items[0].quantity, b1.invoice.ag?.cmr?.agreement_id, b1.invoice.ag?.cmr?.delivery_ids, b1.invoice.ag?.cmr?.billed_qtl], [10, a.id, [d1.id], 10]);
+  assert.match(b1.invoice.items[0].name, new RegExp(d1.number.replace(/\//g, '\\/')));
+  // The same delivery again, or more rice than is left unbilled: refused.
+  assert.throws(() => millingChargesInvoice(a.id, { date: '2026-10-28', delivery_ids: [d1.id] }), /already billed on/);
+  assert.throws(() => millingChargesInvoice(a.id, { date: '2026-10-28', qty: 25 }), /Only 15 qtl of delivered rice is not billed/);
+  // A delivery on a live bill cannot be removed.
+  assert.throws(() => removeDelivery(a.id, d1.id), /cancel the bill first/);
+  // The rest (default = every unbilled delivery) bills once; then nothing is left.
+  const b2 = millingChargesInvoice(a.id, { date: '2026-10-28' });
+  assert.deepEqual([b2.invoice.items[0].quantity, b2.invoice.ag?.cmr?.delivery_ids], [15, [d2.id]]);
+  assert.throws(() => millingChargesInvoice(a.id, { date: '2026-10-28', qty: 1 }), /All rice delivered on this agreement is already billed/);
+  const acc = cmrBilling(loadAgreements()[0], localDb.invoices.getAll());
+  assert.deepEqual([acc.billed, acc.unbilled, acc.billedBy.get(d2.id)], [25, 0, b2.invoice.invoice_number || '—']);
+  // A cancelled bill frees its deliveries: the rice can be billed again.
+  localDb.invoices.save({ ...localDb.invoices.getById(b2.invoice.id)!, status: 'Cancelled' });
+  const again = millingChargesInvoice(a.id, { date: '2026-10-28' });
+  assert.deepEqual(again.invoice.ag?.cmr?.delivery_ids, [d2.id]);
+  // The link survives the editor's load → save.
+  assert.deepEqual(normalizeRecord(localDb.invoices.getById(again.invoice.id)).ag?.cmr?.delivery_ids, [d2.id]);
 });

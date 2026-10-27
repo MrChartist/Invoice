@@ -44,15 +44,15 @@ bundle numbers.
 - **Freelance payout** posts a journal (Dr Staff commission, Cr Sundry creditors with the staff as party, opt-in TDS in
   the register) instead of a purchase bill — the `sales-commission.ts` pattern, with the same undo. Employees on payroll
   get a payroll adjustment tagged `bonus` (the `AdjustmentTag` union has no `incentive`; payroll types not edited).
-- **Tips** (A3.6) are not built: the type `Payment.tip_staff` and the setting `tips` exist; the POS tip tender, the
-  "Tips payable" liability and the payout of tips are left for a later package (default is off anyway).
-- **POS**: no staff picker on the POS line and no "staff required" block yet; lines from the appointment carry their
+- **Tips** (A3.6): shipped later as a 0% non-GST tip line (see "Deferred items — shipped" below), not a POS tender;
+  `Payment.tip_staff` stays unused and there is no "Tips payable" liability (SV70 / SV71).
+- **POS**: the staff picker per POS line shipped later (below); no "staff required" block yet; lines from the appointment carry their
   staff. The customer-display "Now serving" line (`pos-display.ts`) is not wired; the queue view prints it.
 - **Split into a tax invoice and a Bill of Supply** for a registered recipient is a note in the editor (two documents
-  recommended), not an automatic split. Staff names on paper (`print_staff`) are not printed yet.
+  recommended), not an automatic split. Staff names on paper (`print_staff`) shipped later (below).
 - **Hours**: the desk settings edit one open / close time for every day plus closed days (the stored shape keeps seven
-  rows). Resize by drag is not built (edit minutes in the dialog). Deposit (`advance_id`) is a stored field; the dialog
-  does not pick an advance yet.
+  rows). Resize by drag is not built (edit minutes in the dialog). Deposit (`advance_id`): the dialog picks one of the
+  client's open advances (shipped later, below).
 - **Item form** `sv_class` select is not added to Settings → Items; the class is picked per line in the editor and per
   service in the appointment dialog (the line snapshots `sv.cls`). The catalogue field `sv_class` is read when present.
 - **Client form** birthday / anniversary: set in the appointment dialog for a saved client (not in the client form).
@@ -109,7 +109,8 @@ the 3,000 kB budget (2,934 kB); SV-B / C / D then have ≈ 66 kB, above their pl
 
 ### Deviations from the PRD (SV-B)
 
-- Patient search by UHID / phone works in the clinic desk pickers, not yet in every client picker of the app.
+- Patient search by UHID / phone works in the clinic desk pickers and (shipped later) in the editor's client picker while
+  the clinic pack is on.
 - Consultant payout posts SV-A's journal (Dr Staff commission, Cr the doctor) with opt-in 194J, not a purchase bill.
 - Referral payments post a journal to the disallowable ledger (Cr Sundry creditors, party = doctor), not a `staff_payouts`
   row; there is no tax-audit disallowance list in the app yet — the ledger name carries "disallowable (Sec 37)".
@@ -171,7 +172,7 @@ front desk / claims / pharmacy chunks) ≈ +1.5 net.
   wait-list per class. Attendance is taken per class and day for coaching batches; gym check-ins can carry `class_id`.
 - **Item form** sub-row "Products used per service" not added (the existing Kit + BOM screens set the recipe); the
   bill-line override `sv.recipe_qty` is read by the report only (stock follows the BOM). Variance vs physical count: not built.
-- **Fee increase** warning: `feeIncreaseWarning` exists (tested) but `FeePlanForm` (R5-C) does not call it yet.
+- **Fee increase** warning: `FeePlanForm` (R5-C) now calls `feeIncreaseWarning` after saving an edited plan (shipped later, below).
 - **Coaching refund** records the request on the enrolment (no new table) and credits by value: the credited line keeps
   quantity 1 on a new line id, so the R5-C "creditable quantity" tracking is untouched; the total-credit cap still holds.
 - **CA ids** SV44–SV48 (not sequential after SV26: SV27+ is SV-B's, SV41–SV43 SV-D's).
@@ -245,3 +246,18 @@ By module (minified + gzip, each alone): desk UI 6.8, strings en + hi 3.1, estim
 reminders 1.3, assets + settings 1.5, jobs layer 1.5, labour + clocks 1.1, parts issue 0.9, prints 0.8, rules rows 0.4
 (together ≈ 21 kB alone, ≈ 15 kB in one chunk). The PRD's 9 kB assumed the job board came from RT-D4; the workshop board,
 the six views and both languages of their strings are new. Total JS stays under the 3,000 kB budget (2,950.2 kB).
+
+## Deferred items — shipped (after QA round 13)
+
+| Item | Where |
+|---|---|
+| SV-A staff on POS lines | `services-r10/PosStaff.tsx` (lazy; `Pos.tsx` mounts it only with a `salon` / `fitness` / `clinic` / `workshop` pack and lines on the bill): one select per line sets `sv.staff_id` / `staff_name` through `services/sv-pos.ts` `withStaff`. The editor's `SvLineRow` uses the same helper. |
+| SV-A staff name on paper | Desk settings "Print the staff name under each line of the bill" (`service_settings.print_staff`). While on, a line given a staff (POS, editor, appointment `billLines`) snapshots `sv.staff_print`; the paper prints "Staff: <name>" under the line (`paper-helpers.ts` `staffText`, in `trackingText` and the 80 mm `ReceiptBody`) **only from that snapshot**, so plain invoices and bills made with the switch off print unchanged. |
+| SV-A tips | Desk settings "Tips on the bill" (`tips: 'pass-through'`, default off). The POS strip adds one line "Tip — <staff>" (0%, `sv.tip`, `sv.exempt: 'NON_GST'`, the staff on it; `sv-pos.ts` `tipLine` / `setTip`, never two). Commission (`sv-commission.ts`): a tip line never earns commission and stays out of the base and the slab; the statement adds it in full (`Statement.tips`, inside `total`; on receipt basis it counts on the bill's date), a "Tips passed through" CSV row. Payout (`sv-payouts.ts`): the journal / payroll earning pays commission + tips, the row keeps `tips`, the freelancer TDS suggestion is on the commission only. Fee-share (`sv-referrals.ts`) keeps tips separate from per-visit amounts. GST and books treatment: **SV70 ★ / SV71**. |
+| SV-A deposit | `AppointmentDialog.tsx`: for a saved client, a "Deposit (advance)" select of the client's open advances (`advances.ts` `openAdvancesFor`) stored in `advance_id`. The advance is applied to the bill the usual way (Receipts → Advances); nothing posts from the appointment. |
+| SV-B client picker search | `services/sv-find.ts` (`uhidOf`, `patientMatch`, storage-free) is shared by the clinic desk's `findPatients` and `modals/ClientSearchModal.tsx`, which matches UHID / phone (4+ digits) and shows the UHID only while the `clinic` pack is on. |
+| SV-C fee increase | `FeePlanForm.tsx` calls `feeIncreaseWarning` (lazy import after the save of an edited plan) and shows "Fee increased during the course: n enrolled student(s)…". |
+
+Strings in English and Hindi (`services-r10a.ts`, `sales.ts`, `packs-institutions-r5.ts`); help wording updated
+(`time:appointments`, `time:commission`, `time:clinic:patients`). Tests: `tests/sv-deferred.test.ts`. Bundle: see the
+QA13 follow-up note in `docs/prd/qa-round-13.md` (first paint +37 B for the whole follow-up, total JS +4.4 kB).

@@ -117,6 +117,7 @@ const PosJewel = lazy(() => import('../components/retail-r9/JewelleryDesk').then
 const PosAppointment = lazy(() => import('../components/services-r10/PosAppointment')); // R10 (SV-A2) `?appt=` bill from the front desk
 const PosInputsStrip = lazy(() => import('../components/agri/PosInputsStrip')); // R12 (AG-D4) PoS txn no., farmer ID, credit till harvest
 const PosPackages = lazy(() => import('../components/services-r10/SvRedeem').then((m) => ({ default: m.PosPackages }))); // R10 (SV-C1) "Use package"
+const PosStaff = lazy(() => import('../components/services-r10/PosStaff')); // R10 (SV-A) staff per line, tip
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
 
@@ -1110,6 +1111,7 @@ export function Pos() {
               {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
               {pharmaOn && <Suspense fallback={null}><RxStrip record={record} value={rxPos} onChange={setRxPos} /></Suspense>}
               {params.get('appt') && <Suspense fallback={null}><PosAppointment id={params.get('appt')!} onLoad={(lines, p) => { setItems(lines); setParty(p); setParams((q) => { q.delete('appt'); return q; }, { replace: true }); }} /></Suspense>}
+              {!!items.length && (['salon', 'fitness', 'clinic', 'workshop'] as const).some((k) => isPackOn(settings, k)) && <Suspense fallback={null}><PosStaff items={items} setItems={setItems} /></Suspense>}
               {party.client && (isPackOn(settings, 'salon') || isPackOn(settings, 'fitness')) && <Suspense fallback={null}><PosPackages client={party.client} items={items} setItems={setItems} notify={notify} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
               {isPackOn(settings, 'agri_inputs') && <Suspense fallback={null}><PosInputsStrip key={lastBill?.id} record={record} onChange={setAgPos} /></Suspense>}

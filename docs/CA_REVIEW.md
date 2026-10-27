@@ -42,11 +42,11 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 7. Hotel and lodging pack (Round 7, planned) | HT1–HT17 | 17 | 6 |
 | 8. Trading businesses (Round 8, planned) | TR1–TR22 | 22 | 8 |
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
-| 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62 | 41 | 12 |
+| 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62, SV70–SV71 | 43 | 13 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
-| 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84 | 64 | 15 |
+| 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF32 | 32 | 11 |
-| **Total** | | **393** | **104** |
+| **Total** | | **396** | **105** |
 
 ---
 
@@ -609,6 +609,13 @@ Ids start at SV60 so they cannot clash with ids the packages may still add. Find
 | SV61 | **Exempt plans in Table 8 (QA12 S5).** A membership / package of an exempt class (charitable yoga u/e 12AB, education, health care) is now reported in the **exempt** column of GSTR-1 Table 8 and 3B 3.1(c), not as nil-rated. Right column? | Exempt. | `services/sv-memberships.ts` `planLine`; `gst-reports.ts` (line column) | 2017-07-01 | N 12/2017-CT(R) (recalled) |
 | SV62 | **Commission on receipt basis (QA12 S4).** For staff paid on collection, the app now treats a bill settled from the customer's wallet (advance), a gift voucher, a deposit or an exchange as **paid** (the money came in earlier), and a write-off as not paid; a prepaid package session redeemed on a ₹0 line earns on the day it is redeemed. Is that the basis you would accept for the commission expense / payroll working (no tax effect beyond 194H / 194J on the payout)? | As stated. | `services/sv-commission.ts` `commissionFor` | — | — (design) |
 
+### 10.10 Added with the Round 10 deferred items (after QA round 13)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| SV70 ★ | **Tips collected on the bill (pass-through).** With "Tips on the bill" on, the POS adds one line "Tip — <staff>" at 0%, reported as **non-GST** (Table 8 non-GST column, 3B 3.1(e)), and the whole tip is paid to the named staff member with the month's commission. Is a tip collected on the supplier's own bill consideration for the supply (taxable at the service's rate, e.g. 5% / 18%), or a voluntary gratuity outside GST when passed on in full? Would a separate receipt (not on the tax invoice) change the answer? | Non-GST pass-through line; the setting is off by default; the typed rate on the line wins. | `services/sv-pos.ts` `tipLine`; `services-r10/PosStaff.tsx` | — | — (design; no source checked) |
+| SV71 | **Tips in the books and TDS.** The tip line is booked with the bill's sales (no separate "Tips payable" liability) and leaves through the payout journal (Dr Staff commission, Cr the staff member) or the payroll earning "Commission … (incl. tips)". For a freelancer the TDS suggestion (194H / 194J) is on the commission **excluding** tips; for an employee the payroll earning includes them (salary TDS u/s 192). Are tips outside the 194H / 194J base, and should they be credited to a "Tips payable" liability instead of sales? | As stated. | `services/sv-commission.ts` (`Statement.tips`); `services/sv-payouts.ts` `postPayout` | — | — (design) |
+
 ---
 
 ## 11. Construction (Round 11, ids CN1–CN35)
@@ -805,6 +812,7 @@ fishery farms.
 | AG82 | **e-Way bill for nil / exempt goods (QA13 G5).** When every goods line of a bill is at nil, the e-Way preflight shows "may not be needed for exempt goods — verify (AG12)". Rule 138(14) lists goods in its Annexure and goods exempt under N 2/2017-CT(R) (except de-oiled cake); nil-rated goods outside that notification still need one. Is a note on any all-nil bill acceptable, or should it be limited to N 2/2017 goods (by HSN)? | Note on any all-nil bill; nothing is blocked. | `einvoice-validate.ts` (`EWB_EXEMPT`); `agri/ag-packing.ts` `ewayHint` | 2018-04-01 | Rule 138(14) CGST Rules (as recalled) |
 | AG83 | **Milk sold to the union: stock vs bill (QA13 G4).** Stock leaves at the sent litres (the dispatch's stock journal); the bill to the union is on its received figures (kg, fat, SNF) and moves no stock; the transit difference is a memo in the reconciliation, absorbed in the cost of milk sold. Right, or should a transit loss above tolerance be written off separately? | As stated. | `agri/ag-dispatch.ts`, `inventory.ts`, `ag-milk-reco.ts` | — | AS 2 (developers' reading) |
 | AG84 | **194Q with pooled cycles (QA13 G14).** A farmer's purchases for the 194Q threshold now add his amounts on closed pooled cycles (paid through the centre's pooled bill) to his own vouchers in the FY. Is the per-farmer split the right base, given the pooled bill is booked in the centre's name? | Per farmer, cycle lines + own vouchers, by the cycle's end date. | `agri/ag-vouchers.ts` `fyPurchasesOf` | 2021-07-01 | Sec 194Q (2025-Act label from `ita2025.ts`) |
+| AG90 | **Allotment from share application money (QA13 follow-up).** An allotment paid from application money is now refused above what is available on its date: the credit balance of "Share application money — members" is the ceiling; a member's own share deductions from pooled cycles are his, and only the rest of the ledger (receipts not tied to a cycle) is open to any member. Is that attribution right (e.g. should a member's own application receipt be tagged to him), and should money held beyond the period allowed for allotment be shown as refundable? | As stated. | `agri/ag-members.ts` `allotShares`, `applicationAvailable` | — | Companies Act 2013 Sec 42 / Sec 378A (producer companies) — as recalled |
 
 ## 13. Manufacturing MSMEs (Round 13, ids MF1–MF32)
 

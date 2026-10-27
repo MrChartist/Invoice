@@ -21,8 +21,10 @@ import {
   resetStorageBackend,
   setTable,
   storageFailure,
+  subscribeStorageChanges,
   unlockStorage,
   vaultEnabled,
+  vaultSeal,
   writeRaw,
 } from '../src/lib/storage.ts';
 import { DATA_STORE, KV_STORE, resetIdbConnection } from '../src/lib/idb-kv.ts';
@@ -243,4 +245,54 @@ test('erase drops the vault so the next boot starts fresh; forgot-passphrase era
   assert.equal(localStorage.getItem(K('auth')), null);
   assert.equal((await reboot()).backend, 'idb');
   assert.equal(readRaw(K('clients')), null);
+});
+
+test('QA12: a remote value still being decrypted never replaces this tab\'s newer write of the same key', async () => {
+  await seeded();
+  await enableVault(PASS);
+  // Another tab commits an older clients list and announces it...
+  idbData().set(K('clients'), await vaultSeal(K('clients'), '[{"id":"theirs"}]'));
+  const subtle = globalThis.crypto.subtle;
+  const real = subtle.decrypt;
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  const inDecrypt = new Promise<void>((r) => (entered = r));
+  Object.defineProperty(subtle, 'decrypt', {
+    configurable: true,
+    writable: true,
+    value: async (...a: Parameters<SubtleCrypto['decrypt']>) => {
+      entered();
+      await gate;
+      return real.apply(subtle, a);
+    },
+  });
+  const seen: string[] = [];
+  const off = subscribeStorageChanges((k) => seen.push(k));
+  const ch = new BroadcastChannel('mrchartist_inv_sync');
+  try {
+    ch.postMessage({ keys: [K('clients')] });
+    await inDecrypt;
+    // ...while the slow decrypt runs, this tab writes and flushes a newer list.
+    setTable('clients', [{ id: 'mine-newer' }]);
+    await flushStorage();
+    release();
+    for (let i = 0; i < 100 && !seen.includes(K('clients')); i++) await new Promise((r) => setTimeout(r, 5));
+    assert.ok(seen.includes(K('clients')), 'the remote change was processed');
+    assert.deepEqual(getTable('clients'), [{ id: 'mine-newer' }], 'the older remote value is skipped');
+  } finally {
+    delete (subtle as unknown as { decrypt?: unknown }).decrypt;
+    off();
+    ch.close();
+  }
+  // A remote value written after this tab's write was sent is applied as before.
+  idbData().set(K('clients'), await vaultSeal(K('clients'), '[{"id":"theirs-later"}]'));
+  const seen2: string[] = [];
+  const off2 = subscribeStorageChanges((k) => seen2.push(k));
+  const ch2 = new BroadcastChannel('mrchartist_inv_sync');
+  ch2.postMessage({ keys: [K('clients')] });
+  for (let i = 0; i < 100 && !seen2.length; i++) await new Promise((r) => setTimeout(r, 5));
+  assert.deepEqual(getTable('clients'), [{ id: 'theirs-later' }]);
+  off2();
+  ch2.close();
 });

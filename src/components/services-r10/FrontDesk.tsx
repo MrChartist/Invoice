@@ -261,6 +261,7 @@ function DeskSettings({ settings, onClose, onSaved, notify }: { settings: Servic
     resources: (settings.resources ?? []).map((r) => r.name).join(', '),
     confirm: settings.messages?.confirm ?? '', reminder: settings.messages?.reminder ?? '', birthday: settings.messages?.birthday ?? '',
     rule46a: !!settings.rule46a, itc_caution: settings.itc_caution !== false, no_itc_as_exempt: settings.no_itc_as_exempt !== false, staff_required: !!settings.staff_required,
+    print_staff: !!settings.print_staff, tips: settings.tips === 'pass-through',
   });
   const set = (p: Partial<typeof s>) => setS((x) => ({ ...x, ...p }));
   const save = () => {
@@ -272,13 +273,14 @@ function DeskSettings({ settings, onClose, onSaved, notify }: { settings: Servic
         resources: s.resources.split(',').map((n) => n.trim()).filter(Boolean).map((name) => keep.find((r) => r.name === name) ?? { id: '', name, kind: 'other' as const }),
         messages: { confirm: s.confirm, reminder: s.reminder, birthday: s.birthday },
         rule46a: s.rule46a, itc_caution: s.itc_caution, no_itc_as_exempt: s.no_itc_as_exempt, staff_required: s.staff_required,
+        print_staff: s.print_staff, tips: s.tips ? 'pass-through' : 'off',
       });
       onSaved();
     } catch (e) {
       notify((e as Error).message, 'error');
     }
   };
-  const check = (k: 'rule46a' | 'itc_caution' | 'no_itc_as_exempt' | 'staff_required', label: SvKey) => (
+  const check = (k: 'rule46a' | 'itc_caution' | 'no_itc_as_exempt' | 'staff_required' | 'print_staff' | 'tips', label: SvKey) => (
     <label className={controls.check}><input type="checkbox" checked={s[k]} onChange={(e) => set({ [k]: e.target.checked })} /> {svT(label)}</label>
   );
   return (
@@ -299,6 +301,8 @@ function DeskSettings({ settings, onClose, onSaved, notify }: { settings: Servic
       {check('itc_caution', 'itcCaution')}
       {check('no_itc_as_exempt', 'noItcExempt')}
       {check('staff_required', 'staffRequired')}
+      {check('print_staff', 'printStaff')}
+      {check('tips', 'tipsOn')}
     </Modal>
   );
 }

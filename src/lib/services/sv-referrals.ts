@@ -63,7 +63,7 @@ export const referralCsvRows = (rows: readonly ReferralRow[]): (string | number)
 
 /** Fee-share statement of a visiting consultant for a month (lines carrying the doctor's staff link). */
 export function feeShare(doctor: Pick<Doctor, 'staff_id' | 'share'>, month: string, invoices: readonly InvoiceRecord[], payments: readonly Payment[] = []): Statement {
-  const empty: Statement = { lines: [], base: 0, serviceBase: 0, commission: 0, uplift: 0, total: 0 };
+  const empty: Statement = { lines: [], base: 0, serviceBase: 0, commission: 0, uplift: 0, tips: 0, total: 0 };
   if (!doctor.staff_id || !(num(doctor.share?.pct) > 0 || num(doctor.share?.per_visit) > 0)) return empty;
   const pct = num(doctor.share?.pct);
   const plan: CommissionPlan = { id: 'fee-share', name: 'Fee share', basis: 'invoice', rules: [{ kind: 'service', pct }, { kind: 'product', pct: 0 }], created_at: '' };
@@ -71,13 +71,13 @@ export function feeShare(doctor: Pick<Doctor, 'staff_id' | 'share'>, month: stri
   if (pct > 0) return st;
   // ₹ per visit: one per bill (a credit note takes one back).
   const bills = new Map<string, number>();
-  for (const l of st.lines) bills.set(l.invoice_id, Math.sign(l.base) || 1);
+  for (const l of st.lines) if (!l.tip) bills.set(l.invoice_id, Math.sign(l.base) || 1);
   const per = num(doctor.share?.per_visit);
-  const lines = st.lines.map((l) => ({ ...l, rate: `₹${per} / visit`, amount: 0 }));
+  const lines = st.lines.map((l) => (l.tip ? l : { ...l, rate: `₹${per} / visit`, amount: 0 }));
   const seen = new Set<string>();
-  for (const l of lines) if (!seen.has(l.invoice_id)) { seen.add(l.invoice_id); l.amount = round2(per * (bills.get(l.invoice_id) ?? 1)); }
-  const total = round2(lines.reduce((s, l) => s + l.amount, 0));
-  return { ...st, lines, commission: total, uplift: 0, total };
+  for (const l of lines) if (!l.tip && !seen.has(l.invoice_id)) { seen.add(l.invoice_id); l.amount = round2(per * (bills.get(l.invoice_id) ?? 1)); }
+  const total = round2(lines.reduce((s, l) => s + (l.tip ? 0 : l.amount), 0));
+  return { ...st, lines, commission: total, uplift: 0, total: round2(total + st.tips) };
 }
 
 /** Pay a consultant's month through `staff_payouts` (journal; opt-in TDS 194J for a freelance doctor). */

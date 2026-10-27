@@ -46,7 +46,7 @@ function ensureAccount(): string {
 const TDS_ACCOUNT: Record<string, string> = { '194J': A.tds194j, '194H': A.tds194h, '194C': A.tds194c };
 
 /** Post a month's commission for one staff member. */
-export function postPayout(staff: ServiceStaff, month: string, st: Pick<Statement, 'total' | 'lines'>, opts: { date: string; payrollOn: boolean; tds?: boolean }): StaffPayout {
+export function postPayout(staff: ServiceStaff, month: string, st: Pick<Statement, 'total' | 'lines'> & Partial<Pick<Statement, 'tips'>>, opts: { date: string; payrollOn: boolean; tds?: boolean }): StaffPayout {
   requireAccess('books.edit');
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Choose the month.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.date)) throw new Error('Choose the payout date.');
@@ -55,10 +55,11 @@ export function postPayout(staff: ServiceStaff, month: string, st: Pick<Statemen
   const amount = round2(st.total);
   if (!(amount > 0)) throw new Error('No commission earned in this month.');
   const route = payoutRoute(staff, opts.payrollOn);
-  const base = { id: generateId(), staff_id: staff.id, staff_name: staff.name, month, date: opts.date, amount, route, created_at: new Date().toISOString() };
+  const tips = round2(Math.min(Math.max(st.tips ?? 0, 0), amount));
+  const base = { id: generateId(), staff_id: staff.id, staff_name: staff.name, month, date: opts.date, amount, route, ...(tips ? { tips } : {}), created_at: new Date().toISOString() };
   if (route === 'payroll') {
     return withTablesRollback([SV_TABLES.payouts, ADJ], () => {
-      const adj: PayrollAdjustment = { id: generateId(), employee_id: staff.employee_id!, month, kind: 'earning', tag: 'bonus', name: `Commission ${month}`, amount, reference: base.id, created_at: base.created_at };
+      const adj: PayrollAdjustment = { id: generateId(), employee_id: staff.employee_id!, month, kind: 'earning', tag: 'bonus', name: `Commission ${month}${tips ? ` (incl. tips ₹${tips})` : ''}`, amount, reference: base.id, created_at: base.created_at };
       setTable(ADJ, [...getTable<PayrollAdjustment>(ADJ), adj]);
       const row: StaffPayout = { ...base, adjustment_id: adj.id };
       setTable(SV_TABLES.payouts, [...all, row]);
@@ -72,8 +73,9 @@ export function postPayout(staff: ServiceStaff, month: string, st: Pick<Statemen
     let tdsRow: string | undefined;
     if (opts.tds && staff.employment === 'freelance') {
       const vendor = getTable<{ id: string; pan?: string; name?: string }>('vendors').find((v) => v.id === staff.vendor_id);
-      const prior = all.filter((p) => p.staff_id === staff.id).map((p) => ({ id: p.id, date: p.date, base: p.amount, tds: p.tds ?? 0, code: section }));
-      const s = suggestTds(section, opts.date, amount, { pan: vendor?.pan }, prior);
+      // Tips are passed through: outside the TDS base (SV70 — verify with your CA).
+      const prior = all.filter((p) => p.staff_id === staff.id).map((p) => ({ id: p.id, date: p.date, base: round2(p.amount - (p.tips ?? 0)), tds: p.tds ?? 0, code: section }));
+      const s = suggestTds(section, opts.date, round2(amount - tips), { pan: vendor?.pan }, prior);
       if (s && s.amount > 0) {
         tds = s.amount;
         tdsRow = saveManualDeduction({ vendor_id: staff.vendor_id, vendor_name: vendor?.name || staff.name, pan: vendor?.pan, section, date: opts.date, base: s.threshold.taxableBase, rate: s.rate, amount: s.amount, notes: `Staff commission ${month} (SV-A3)` }).id;
@@ -84,7 +86,7 @@ export function postPayout(staff: ServiceStaff, month: string, st: Pick<Statemen
     const v = saveVoucher({
       type: 'JOURNAL',
       date: opts.date,
-      narration: `Commission payable to ${staff.name} for ${month} (${st.lines.length} line(s))${tds ? ` — TDS u/s ${section}` : ''}: verify with your CA`,
+      narration: `Commission payable to ${staff.name} for ${month} (${st.lines.length} line(s))${tips ? `, incl. tips ₹${tips} passed through` : ''}${tds ? ` — TDS u/s ${section}` : ''}: verify with your CA`,
       lines: [
         { account_id: expense, dr: paise, cr: 0 },
         { account_id: A.creditors, dr: 0, cr: paise - tdsPaise, party: staff.name },
