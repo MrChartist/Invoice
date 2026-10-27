@@ -1,0 +1,48 @@
+/** R10 (SV-B) clinic desk strings: patients, OPD, in-patients, lab, tests, referrals, rate list. Lazy (clinic chunk). */
+import { defineArea } from '../area';
+
+export const bT = defineArea(
+  {
+    'v.opd': 'OPD', 'v.patients': 'Patients', 'v.ipd': 'In-patients', 'v.lab': 'Lab', 'v.tests': 'Tests', 'v.referrals': 'Referrals', 'v.rates': 'Rate list',
+    find: 'Find (UHID / phone / name)', patient: 'Patient', doctor: 'Doctor', referredBy: 'Referred by', name: 'Name', uhid: 'UHID', auto: 'Automatic', phone: 'Phone', age: 'Age', dob: 'Date of birth', sex: 'Sex', guardian: 'Guardian / attendant', blood: 'Blood group', allergies: 'Allergies (never printed)', uhidPrefix: 'UHID prefix',
+    register: 'Register patient', patientSaved: 'Patient saved', bills: 'Bills', balance: 'Balance', date: 'Date', time: 'Time',
+    newVisit: 'Give token', visitSaved: 'Token given', arrived: 'Arrived from appointments', noVisits: 'No OPD visits on this day.', noDoctor: 'No doctor', token: 'Token', kind: 'Kind', 'k.new': 'New', 'k.fu': 'Follow-up', fee: 'Fee', status: 'Status',
+    'vs.waiting': 'Waiting', 'vs.with_doctor': 'With doctor', 'vs.done': 'Done', 'vs.billed': 'Billed', addItem: 'Procedure / test', billed: 'Draft bill made — check and issue it', openBill: 'Open bill',
+    doctors: 'Doctors', qual: 'Qualification', council: 'Council', regNo: 'Registration no.', speciality: 'Speciality', consultFee: 'Consultation fee ₹', fuFee: 'Follow-up fee ₹', fuDays: 'Follow-up within (days)', staffLink: 'Staff (commission / fee share)', inHouse: 'In-house', sharePct: 'Visiting: fee share %', sharePer: 'Visiting: ₹ per visit',
+    room: 'Room / bed', claim: 'Payer claim', admit: 'Admit', admitted: 'Admitted', charges: 'Charges', deposits: 'Deposits', 'as.admitted': 'Admitted', 'as.discharged': 'Discharged', 'as.billed': 'Billed', exempt: 'exempt',
+    medicine: 'Medicine / consumable (stock)', charge: 'Charge', qty: 'Qty', rate: 'Rate', addCharge: 'Add charge', deposit: 'Deposit ₹', takeDeposit: 'Take deposit', depositSaved: 'Deposit receipt (advance) saved',
+    interim: 'Interim bill (print)', discharge: 'Discharge now', finalBill: 'Final bill', applyDeposits: 'Apply deposits', refund: 'Refund excess deposit',
+    roomsSetup: 'Rooms and in-patient settings', roomsHint: 'Rooms, one per line: name, kind (general / private / icu / ccu / iccu / nicu), rate per day', roomDay: 'Room-day', midnight: 'Midnight census', h24: 'Every 24 hours', depositAlert: 'Bell when charges exceed deposits by ₹ (0 = off)',
+    order: 'Book order', ordered: 'Order booked', samples: 'Samples', report: 'Report', amended: 'Amended', 'ss.to_collect': 'To collect', 'ss.collected': 'Collected', 'ss.received': 'Received', 'ss.in_process': 'In process', 'ss.done': 'Done',
+    'rs.pending': 'Pending', 'rs.partial': 'Partial', 'rs.final': 'Final', 'rs.delivered': 'Delivered', critical: 'Critical values: {list}. Save anyway?', csvPaste: 'Paste analyser CSV (parameter code, value)', applyCsv: 'Apply CSV', unknown: 'Unknown codes: {list}', verifiedBy: 'Verified by', sentWa: 'Sent on WhatsApp',
+    outsourced: 'Outsourced tests — reference lab bill', from: 'From', to: 'To', billNo: "Lab's bill no.", bookBill: 'Book bill',
+    code: 'Code', dept: 'Department', sample: 'Sample', tat: 'TAT (hours)', price: 'Price ₹', refLab: 'Outsourced to', refCost: 'Outsourced cost ₹', interp: 'Interpretation (printed)', panelOf: 'Panel of', panel: 'Panel', params: 'parameters', importCsv: 'Import CSV',
+    paramsHint: 'Parameters, one per line: code, name, unit, ranges (13-17; M 14-18; F 0-12y 11-14; <200; or text), critical low, critical high',
+    patients: 'Patients', documents: 'Visits / orders / admissions', value: 'Bill value ₹', feeShare: 'Visiting consultants — fee share', visit: 'visit',
+    refPay: 'Referral payments', refSwitch: 'Record referral payments (to "{ledger}")', refCash: 'Payment', refKind: 'Benefit in kind', book: 'Book',
+    r194: 'Benefits to this doctor pass ₹20,000 this year: check TDS u/s 194R with your CA.',
+    lang: 'Second language', stale: 'Rate list out of date — reprint.', noRates: 'Give your services a health tax class (in the editor or the appointment dialog) to list them here.',
+  } as const,
+  {
+    'v.opd': 'OPD', 'v.patients': 'मरीज़', 'v.ipd': 'भर्ती मरीज़', 'v.lab': 'लैब', 'v.tests': 'जाँचें', 'v.referrals': 'रेफ़रल', 'v.rates': 'रेट सूची',
+    find: 'खोजें (UHID / फ़ोन / नाम)', patient: 'मरीज़', doctor: 'डॉक्टर', referredBy: 'रेफ़र करने वाले', name: 'नाम', uhid: 'UHID', auto: 'अपने-आप', phone: 'फ़ोन', age: 'उम्र', dob: 'जन्म तिथि', sex: 'लिंग', guardian: 'अभिभावक / साथी', blood: 'ब्लड ग्रुप', allergies: 'एलर्जी (कभी नहीं छपती)', uhidPrefix: 'UHID उपसर्ग',
+    register: 'मरीज़ दर्ज करें', patientSaved: 'मरीज़ सहेजा गया', bills: 'बिल', balance: 'बाकी', date: 'तारीख़', time: 'समय',
+    newVisit: 'टोकन दें', visitSaved: 'टोकन दिया', arrived: 'अपॉइंटमेंट से आए', noVisits: 'इस दिन कोई OPD विज़िट नहीं।', noDoctor: 'डॉक्टर नहीं', token: 'टोकन', kind: 'प्रकार', 'k.new': 'नया', 'k.fu': 'फ़ॉलो-अप', fee: 'फ़ीस', status: 'स्थिति',
+    'vs.waiting': 'इंतज़ार में', 'vs.with_doctor': 'डॉक्टर के पास', 'vs.done': 'हो गया', 'vs.billed': 'बिल हुआ', addItem: 'प्रक्रिया / जाँच', billed: 'ड्राफ़्ट बिल बना — जाँचकर जारी करें', openBill: 'बिल खोलें',
+    doctors: 'डॉक्टर', qual: 'योग्यता', council: 'काउंसिल', regNo: 'रजिस्ट्रेशन नं.', speciality: 'विशेषज्ञता', consultFee: 'परामर्श फ़ीस ₹', fuFee: 'फ़ॉलो-अप फ़ीस ₹', fuDays: 'फ़ॉलो-अप अवधि (दिन)', staffLink: 'स्टाफ (कमीशन / फ़ीस हिस्सा)', inHouse: 'इन-हाउस', sharePct: 'विज़िटिंग: फ़ीस हिस्सा %', sharePer: 'विज़िटिंग: ₹ प्रति विज़िट',
+    room: 'कमरा / बेड', claim: 'भुगतानकर्ता क्लेम', admit: 'भर्ती करें', admitted: 'भर्ती हुआ', charges: 'शुल्क', deposits: 'जमा', 'as.admitted': 'भर्ती', 'as.discharged': 'छुट्टी', 'as.billed': 'बिल हुआ', exempt: 'छूट',
+    medicine: 'दवा / उपभोग्य (स्टॉक)', charge: 'शुल्क', qty: 'मात्रा', rate: 'दर', addCharge: 'शुल्क जोड़ें', deposit: 'जमा ₹', takeDeposit: 'जमा लें', depositSaved: 'जमा रसीद (अग्रिम) सहेजी',
+    interim: 'अंतरिम बिल (प्रिंट)', discharge: 'अभी छुट्टी दें', finalBill: 'अंतिम बिल', applyDeposits: 'जमा समायोजित करें', refund: 'अतिरिक्त जमा लौटाएँ',
+    roomsSetup: 'कमरे और भर्ती सेटिंग', roomsHint: 'कमरे, हर पंक्ति में एक: नाम, प्रकार (general / private / icu / ccu / iccu / nicu), प्रति दिन दर', roomDay: 'कमरा-दिन', midnight: 'आधी रात गिनती', h24: 'हर 24 घंटे', depositAlert: 'शुल्क जमा से ₹ अधिक हो तो घंटी (0 = बंद)',
+    order: 'ऑर्डर बुक करें', ordered: 'ऑर्डर बुक हुआ', samples: 'सैंपल', report: 'रिपोर्ट', amended: 'संशोधित', 'ss.to_collect': 'लेना है', 'ss.collected': 'लिया', 'ss.received': 'मिला', 'ss.in_process': 'जाँच में', 'ss.done': 'हो गया',
+    'rs.pending': 'बाकी', 'rs.partial': 'आंशिक', 'rs.final': 'अंतिम', 'rs.delivered': 'दी गई', critical: 'गंभीर मान: {list}। फिर भी सहेजें?', csvPaste: 'एनालाइज़र CSV चिपकाएँ (पैरामीटर कोड, मान)', applyCsv: 'CSV लगाएँ', unknown: 'अनजान कोड: {list}', verifiedBy: 'सत्यापनकर्ता', sentWa: 'WhatsApp पर भेजी',
+    outsourced: 'बाहर भेजी जाँचें — रेफ़रेंस लैब बिल', from: 'से', to: 'तक', billNo: 'लैब का बिल नं.', bookBill: 'बिल दर्ज करें',
+    code: 'कोड', dept: 'विभाग', sample: 'सैंपल', tat: 'TAT (घंटे)', price: 'कीमत ₹', refLab: 'बाहर भेजी', refCost: 'बाहरी लागत ₹', interp: 'व्याख्या (छपती है)', panelOf: 'पैनल में', panel: 'पैनल', params: 'पैरामीटर', importCsv: 'CSV आयात',
+    paramsHint: 'पैरामीटर, हर पंक्ति में एक: कोड, नाम, इकाई, रेंज (13-17; M 14-18; F 0-12y 11-14; <200; या टेक्स्ट), गंभीर निम्न, गंभीर उच्च',
+    patients: 'मरीज़', documents: 'विज़िट / ऑर्डर / भर्ती', value: 'बिल मूल्य ₹', feeShare: 'विज़िटिंग कंसल्टेंट — फ़ीस हिस्सा', visit: 'विज़िट',
+    refPay: 'रेफ़रल भुगतान', refSwitch: 'रेफ़रल भुगतान दर्ज करें ("{ledger}" में)', refCash: 'भुगतान', refKind: 'वस्तु रूप में लाभ', book: 'दर्ज करें',
+    r194: 'इस डॉक्टर को इस साल लाभ ₹20,000 से ऊपर: धारा 194R का TDS अपने CA से जाँचें।',
+    lang: 'दूसरी भाषा', stale: 'रेट सूची पुरानी है — दोबारा छापें।', noRates: 'यहाँ दिखाने के लिए सेवाओं को स्वास्थ्य कर वर्ग दें (एडिटर या अपॉइंटमेंट में)।',
+  },
+);
+export type BKey = Parameters<typeof bT>[0];

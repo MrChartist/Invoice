@@ -24,6 +24,7 @@ import { ruleAt } from '../tax-rules';
 import { advanceBalance, applyAdvance, invoiceOpen, loadAdvances } from '../advances';
 import { localDb } from '../localDb';
 import { esc } from '../voucher-print';
+import { fefoBatch, loadTracking } from '../stock-tracking';
 import { doctorsDb } from '../retail/rt-pharmacy-rx';
 import { billClaim, loadClaims } from './sv-claims';
 import { doctorStaff } from './sv-opd';
@@ -113,10 +114,11 @@ const edit = (id: string, fn: (a: Admission) => Admission): Admission => {
   return row;
 };
 
-/** Add a charge to the running list (medicines: a stock item with its batch). */
+/** Add a charge to the running list (a stock item gets its FEFO batch unless one is given). */
 export function addCharge(id: string, c: Omit<IpdCharge, 'id'>): Admission {
   if (!c.name.trim() || !(num(c.qty) > 0) || num(c.rate) < 0) throw new Error('Give the charge a name, a quantity and a rate.');
-  return edit(id, (a) => ({ ...a, charges: [...(a.charges ?? []), { ...c, name: c.name.trim(), id: generateId() }] }));
+  const batch = c.item_id && !c.batch_no ? fefoBatch(loadTracking().get(c.item_id), c.date)?.batch : undefined;
+  return edit(id, (a) => ({ ...a, charges: [...(a.charges ?? []), { ...c, ...(batch ? { batch_no: batch } : {}), name: c.name.trim(), id: generateId() }] }));
 }
 export const removeCharge = (id: string, chargeId: string): Admission => edit(id, (a) => ({ ...a, charges: a.charges.filter((c) => c.id !== chargeId) }));
 export const attachDeposit = (id: string, advanceId: string): Admission => edit(id, (a) => ({ ...a, deposits: [...new Set([...(a.deposits ?? []), advanceId])] }));

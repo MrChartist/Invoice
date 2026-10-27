@@ -252,3 +252,44 @@ export function bookOutsourcedBill(vendorKey: string, from: string, to: string, 
     return bill;
   });
 }
+
+/* ── Ranges as text, master CSV ── */
+
+/** "13-17; M 14-18; F 0-12y 11-14; <200; Negative" → ranges (a non-numeric part is a text range). */
+export function parseRanges(text: string): LabRange[] {
+  return text.split(';').map((s) => s.trim()).filter(Boolean).map((s) => {
+    const m = /^(?:([MF])\s+)?(?:(\d+)-(\d+)y\s+)?(?:(-?[\d.]+)\s*-\s*(-?[\d.]+)|<\s*(-?[\d.]+)|>\s*(-?[\d.]+))$/i.exec(s);
+    if (!m) return { text: s };
+    const r: LabRange = {};
+    if (m[1]) r.sex = m[1].toUpperCase() as 'M' | 'F';
+    if (m[2]) Object.assign(r, { age_from: +m[2], age_to: +m[3] });
+    const low = m[4] ?? m[7];
+    const high = m[5] ?? m[6];
+    if (low != null) r.low = +low;
+    if (high != null) r.high = +high;
+    return r;
+  });
+}
+
+export const rangesText = (rs: readonly LabRange[] = []): string =>
+  rs.map((r) => r.text ?? [r.sex, r.age_from != null ? `${r.age_from}-${r.age_to}y` : '', r.low != null && r.high != null ? `${r.low}-${r.high}` : r.high != null ? `<${r.high}` : r.low != null ? `>${r.low}` : ''].filter(Boolean).join(' ')).join('; ');
+
+const CSV_HEAD = ['Code', 'Name', 'Department', 'Sample', 'TAT hours', 'Price', 'Param code', 'Param name', 'Unit', 'Ranges', 'Critical low', 'Critical high'];
+/** The master as CSV rows (one per parameter). Panels are not exported. */
+export const testsCsvRows = (tests: readonly LabTest[]): (string | number)[][] => [CSV_HEAD, ...tests.filter((t) => !t.panel?.length).flatMap((t) => (t.params.length ? t.params : [undefined]).map((p) => [t.code, t.name, t.dept ?? '', t.sample ?? '', t.tat ?? '', t.price, p?.code ?? '', p?.name ?? '', p?.unit ?? '', rangesText(p?.ranges), p?.crit_low ?? '', p?.crit_high ?? '']))];
+
+/** Tests from CSV rows (header first); rows of one code are one test; a text range makes a text parameter. */
+export function testsFromCsv(rows: readonly string[][]): TestInput[] {
+  const by = new Map<string, TestInput>();
+  for (const r of rows.slice(1)) {
+    const [code, name, dept, sample, tat, price, pc, pn, unit, ranges, cl, ch] = r.map((x) => String(x ?? '').trim());
+    if (!code || !name) continue;
+    const t = by.get(code.toUpperCase()) ?? { code, name, ...(dept ? { dept } : {}), ...(sample ? { sample } : {}), ...(Number(tat) > 0 ? { tat: Number(tat) } : {}), price: Number(price) || 0, params: [] };
+    if (pc && pn) {
+      const rs = parseRanges(ranges ?? '');
+      t.params.push({ code: pc, name: pn, ...(unit ? { unit } : {}), kind: rs.some((x) => x.text) ? 'text' : 'numeric', ranges: rs, ...(cl ? { crit_low: Number(cl) } : {}), ...(ch ? { crit_high: Number(ch) } : {}) });
+    }
+    by.set(code.toUpperCase(), t);
+  }
+  return [...by.values()];
+}
