@@ -235,6 +235,8 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Secured advance'], tables: ['secured_advances'], redo: 'record the secured advance again in Time → Works → Advances' },
   // QA10 R17: a rider settlement's journal comes back only with its settlement row
   { classes: ['Rider settlement'], tables: ['rider_settlements'], redo: 'restore the rider settlement itself, or settle the rider again in Inventory → Deliveries' },
+  // QA13 G2: a farmer cycle's deductions journal is undone when the cycle is reopened
+  { classes: ['Farmer cycle deductions'], tables: ['farmer_cycles'], redo: 'close the cycle again in Inventory → Farm → Cycles' },
 ];
 const RA_CLASS = 'RA deduction';
 /** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */
@@ -348,6 +350,19 @@ registerRestoreHook('realty_bookings', () => ({ refuse: 'Deleting the booking fr
 // not next to a re-made card of the same customer and month.
 registerRestoreHook('milk_dispatches', (row, _e, live, bin) => companionOr(live, bin, 'stock_journals', str(row.sj_id), 'The stock journal of this dispatch is gone for good. Enter the dispatch again in Inventory → Dairy → Dispatch.'));
 registerRestoreHook('milk_cards', (row, e, live) => (live('milk_cards').some((c) => str(c?.id) !== e.row_id && str(c?.client_id) === str(row.client_id) && str(c?.month) === str(row.month)) ? { refuse: 'This customer has a card for the month again; restoring this one would bill the month twice.' } : null));
+// QA13 G2: a pooled cycle bill (and a set-off receipt on it) comes back only while its cycle still names it — reopening
+// the cycle undid them, and closing it again made new ones.
+const AG_UNDONE = 'Its farmer cycle was reopened since. Close the cycle again in Inventory → Farm → Cycles.';
+registerRestoreHook('purchases', (row, e, live) => {
+  const cy = isObj(row.ag) ? str(row.ag.cycle_id) : '';
+  return cy && !live('farmer_cycles').some((c) => str(c?.id) === cy && str(c?.purchase_id) === e.row_id) ? { refuse: AG_UNDONE } : null;
+});
+registerRestoreHook('transactions', (row, e, live, bin) => {
+  const urd = str(row.exchange_purchase_id);
+  const bill = urd ? live('purchases').find((x) => str(x?.id) === urd) ?? inBin(bin, 'purchases', (r) => str(r.id) === urd)?.row : undefined;
+  return isObj(bill) && isObj(bill.ag) && str(bill.ag.cycle_id) && !mentions(live('farmer_cycles'), e.row_id) ? { refuse: AG_UNDONE } : null;
+});
+registerRestoreHook('farmer_cycles', (row, e, live) => (str(row.source) === 'milk' && live('farmer_cycles').some((c) => str(c?.id) !== e.row_id && str(c?.source) === 'milk' && str(c?.centre_id) === str(row.centre_id) && str(c?.period_from) <= str(row.period_to) && str(c?.period_to) >= str(row.period_from)) ? { refuse: 'A milk bill for this centre and period was made again since; restoring this one would pay the milk twice.' } : null));
 registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
 // R11 (CN-D): a sub-contractor bill made from a measurement comes back only while that measurement still names it
 // (cancelling it removed the bill and its deductions journal — measure again).

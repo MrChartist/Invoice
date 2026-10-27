@@ -15,7 +15,7 @@
  * stays used. Working paper — verify with your CA (AG26, AG27).
  */
 import './ag-registry';
-import type { FarmerCycle, FarmerCycleLine } from '../../types/agri-r12';
+import type { FarmerCycle, FarmerCycleLine, MilkShift } from '../../types/agri-r12';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import type { PurchaseLine, Vendor } from '../../types/purchases';
 import { generateId, getTable, setTable } from '../storage';
@@ -95,6 +95,19 @@ function purchaseLines(lines: readonly FarmerCycleLine[], source: FarmerCycle['s
   return [...by.entries()].map(([unit, g]) => ({ id: generateId(), name: source === 'milk' ? 'Milk (pooled from farmers)' : 'Farm produce (pooled from farmers)', unit, quantity: g.qty, rate: g.qty > 0 ? Number((g.amount / g.qty).toFixed(4)) : g.amount, tax_rate: 0 }));
 }
 
+/**
+ * QA13 G3: a milk draft closes only while its shifts are what it was made from — every shift tagged with it closed and
+ * each farmer's accepted amount equal to his line (a shift reopened and changed after the draft refuses: make it again).
+ */
+function milkDraftFresh(c: FarmerCycle): void {
+  const shifts = getTable<MilkShift>(AG_TABLES.shifts).filter((s) => s?.cycle_id === c.id);
+  if (!shifts.length) return; // a milk cycle typed by hand (no shift sheet)
+  const by = new Map<string, number>();
+  for (const s of shifts) for (const e of s.closed_at ? s.entries ?? [] : []) if (!e.rejected) by.set(e.farmer_id, round2((by.get(e.farmer_id) ?? 0) + num(e.amount)));
+  const stale = shifts.some((s) => !s.closed_at) || by.size !== c.lines.length || c.lines.some((l) => Math.abs((by.get(l.farmer_id) ?? -1) - num(l.amount)) > 0.005);
+  if (stale) throw new Error(`The milk shifts of ${c.number} changed after it was made: make the milk bill again (Dairy → Milk bills).`);
+}
+
 /** Close a draft: the pooled purchase, the set-off receipts and the deductions journal (`books.edit`). */
 export function closeCycle(id: string, centreName?: string): FarmerCycle {
   requireAccess('books.edit');
@@ -103,6 +116,7 @@ export function closeCycle(id: string, centreName?: string): FarmerCycle {
   if (c.status !== 'draft') throw new Error(`${c.number} is already closed.`);
   if (!c.lines.length) throw new Error('Add the farmers\' lines first.');
   assertUnlocked({ id: c.id, issue_date: c.period_to }, 'create');
+  if (c.source === 'milk') milkDraftFresh(c);
   const lines = settleLines(c.lines);
   const t = cycleTotals({ lines });
   const invoices = getTable<InvoiceRecord>('invoices');
