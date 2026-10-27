@@ -1,10 +1,11 @@
 /** AG-C1 Mill → Intake: gate entry and weighbridge slips (first / second weighing), the slip print, use, daily intake. */
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { WbsPartyKind, WbsReadings, WbsUse } from '../../types/agri-r12';
 import { getTable } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
-import { cancelSlip, dailyIntake, deleteSlip, loadSlips, localStamp, openSlip, receiveForJob, recordTare, slipHtml } from '../../lib/agri/ag-weighbridge';
+import { cancelSlip, dailyIntake, deleteSlip, loadSlips, localStamp, openSlip, receiveForJob, recordTare, slipHtml, voucherFromSlip } from '../../lib/agri/ag-weighbridge';
+import { qualityTableFor } from '../../lib/agri/ag-quality';
+import type { Vendor } from '../../types/purchases';
 import { addPaddyLot, loadAgreements } from '../../lib/agri/ag-cmr';
 import { B, printHtml, today } from '../transport/shared';
 import { Num, Sel, Table, Txt } from './mill-ui';
@@ -27,11 +28,12 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
   const [tick, run] = useRun(onDone);
   const [day, setDay] = useState(today());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const d = useMemo(() => ({ slips: loadSlips(), vendors: getTable<{ id: string; name: string }>('vendors'), clients: localDb.clients.getAll(), agreements: loadAgreements().filter((a) => a.status === 'open') }), [tick]);
+  const d = useMemo(() => ({ slips: loadSlips(), vendors: getTable<Vendor>('vendors'), clients: localDb.clients.getAll(), agreements: loadAgreements().filter((a) => a.status === 'open') }), [tick]);
   const [f, setF] = useState({ vehicle: '', kind: 'farmer' as WbsPartyKind, party: '', name: '', commodity: 'Paddy', gross: '', bags: '', moisture: '', foreign: '', damaged: '', use: 'purchase' as WbsUse });
   const [tare, setTare] = useState<Record<string, string>>({});
   const [cmr, setCmr] = useState<Record<string, string>>({});
   const [job, setJob] = useState<Record<string, string>>({});
+  const [vr, setVr] = useState<Record<string, { rate: string; tare: string }>>({});
   const parties = f.kind === 'agency' ? d.clients.map((c) => ({ id: c.id ?? '', name: c.name })) : d.vendors;
   const scale = (set: (v: string) => void) => void readScale().then((r) => {
     if (!r) return onDone(T('noScale'), true);
@@ -86,7 +88,11 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
         <span key="a" style={row}>
           <button type="button" className={B.gs} onClick={() => printHtml(slipHtml(s, business()), s.number)}>{W('print')}</button>
           {s.status === 'done' && !s.ref_id && <>
-            <Link className={B.os} to={`/inventory?tab=farm&view=vouchers&wbs=${s.id}`} data-ml-voucher>{T('makeVoucher')}</Link>
+            {s.party_kind === 'farmer' && d.vendors.some((v) => v.id === s.party_id) && <>
+              <input className={controls.input} style={{ maxWidth: 90 }} type="number" placeholder={W('rate')} aria-label={W('rate')} value={vr[s.id]?.rate ?? ''} onChange={(e) => setVr({ ...vr, [s.id]: { tare: vr[s.id]?.tare ?? '', rate: e.target.value } })} data-ml="voucher-rate" />
+              <input className={controls.input} style={{ maxWidth: 90 }} type="number" placeholder={T('bagTare')} aria-label={T('bagTare')} value={vr[s.id]?.tare ?? ''} onChange={(e) => setVr({ ...vr, [s.id]: { rate: vr[s.id]?.rate ?? '', tare: e.target.value } })} />
+              <button type="button" className={B.os} data-ml-voucher onClick={() => run(() => T('voucherMade', { n: voucherFromSlip(s.id, { vendor: d.vendors.find((v) => v.id === s.party_id)!, rate: n(vr[s.id]?.rate ?? ''), tare_per_bag: n(vr[s.id]?.tare ?? ''), params: qualityTableFor(s.commodity)?.params }).bill_number ?? '' }))}>{T('makeVoucher')}</button>
+            </>}
             {d.agreements.length > 0 && <><select className={controls.select} style={{ maxWidth: 170 }} aria-label={T('forCmr')} value={cmr[s.id] ?? ''} onChange={(e) => setCmr({ ...cmr, [s.id]: e.target.value })}>{opt(d.agreements, (a) => a.id, (a) => `${a.agency_name} · ${a.season}`).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
               <button type="button" className={B.os} disabled={!cmr[s.id]} onClick={() => run(() => { addPaddyLot(cmr[s.id], { date: s.date, wbs_id: s.id }); return T('lotAdded'); })}>{T('forCmr')}</button></>}
             <input className={controls.input} style={{ maxWidth: 150 }} placeholder={W('principal')} aria-label={W('principal')} value={job[s.id] ?? name(s)} onChange={(e) => setJob({ ...job, [s.id]: e.target.value })} />

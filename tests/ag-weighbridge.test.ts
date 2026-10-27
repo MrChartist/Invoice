@@ -13,7 +13,7 @@ import { TABLE_MEANING } from '../src/lib/trust/open-export-schema.ts';
 import { readFileSync } from 'node:fs';
 import '../src/lib/agri/ag-cmr.ts';
 import {
-  cancelSlip, cleanReadings, dailyIntake, deleteSlip, hoursBetween, loadSlips, openSlip, openSlips, receiveForJob, recordTare, setReadings, slipHtml, slipNet, voucherPrefill,
+  cancelSlip, cleanReadings, voucherFromSlip, dailyIntake, deleteSlip, hoursBetween, loadSlips, openSlip, openSlips, receiveForJob, recordTare, setReadings, slipHtml, slipNet, voucherPrefill,
 } from '../src/lib/agri/ag-weighbridge.ts';
 import { weighNet } from '../src/lib/trade/tr-weight.ts';
 
@@ -115,4 +115,18 @@ test('daily intake: by commodity / party / use, net-weighted moisture; open slip
   assert.equal(hoursBetween('2026-10-27T09:00', '2026-10-27T13:30'), 4);
   assert.ok(a.status === 'done');
   assert.equal(getTable('weighbridge_slips').length, 4);
+});
+
+test('make voucher: the AG-A3 FPV voucher from the slip (bag tare, moisture cut) and the slip is marked used', () => {
+  const d = recordTare(first().id, 6000);
+  const vendor = { id: 'v-gs', name: 'Gurdev Singh', principal_kind: 'agriculturist' } as never;
+  const params = [{ key: 'moisture' as const, norm_pct: 17, mode: 'weight' as const, per_point_pct: 1 }];
+  const bill = voucherFromSlip(d.id, { vendor, rate: 2300, tare_per_bag: 0.5, params });
+  assert.match(bill.bill_number ?? '', /^FPV\/FY26-27\//);
+  assert.equal(bill.ag?.voucher?.wbs_id, d.id);
+  assert.equal(bill.ag?.voucher?.cut_kg, 57.508, '2,614 kg after bag tare, 2.2 points over the norm');
+  assert.equal(bill.lines?.[0]?.quantity, 25.565);
+  const after = loadSlips().find((s) => s.id === d.id);
+  assert.deepEqual([after?.use, after?.ref_id], ['purchase', bill.id]);
+  assert.throws(() => voucherFromSlip(d.id, { vendor, rate: 2300 }), /already used/);
 });

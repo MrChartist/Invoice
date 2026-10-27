@@ -4147,6 +4147,59 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R12-C mill desk: Mill (rice) profile; a weighbridge slip 9,000 / 4,000 kg → net 5,000 kg done; a 100 qtl milling batch → the yield panel shows outturn 68% against 67%; a CMR agreement on 50 qtl paddy → rice due 33.5 qtl, a delivery CMR/FY…/0001; the 25% test: goods 16.7% → exempt, 33.3% → 5%', async () => {
+    const keys = ['settings', 'clients', 'weighbridge_slips', 'cmr_agreements', 'job_work_principal', 'stock_items', 'boms', 'production_orders', 'manufacturing_vouchers', 'invoices', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', agri_kind: 'mill', mill_kind: 'rice', industry_packs: ['agri', 'mill', 'commodity'], modules: undefined, lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-agency', name: 'E2E State Civil Supplies', email: '', phone: '', address: '', gstin: '', state_code: '27' }]);
+    // C1: first weighing, then the tare → net = gross − tare.
+    await page.goto(srv.origin + '/inventory?tab=mill&view=intake');
+    await page.locator('[data-ml="vehicle"]').fill('PB10AB1234', { timeout: 15000 });
+    await page.locator('[data-ml="gross"]').fill('9000');
+    await page.locator('[data-ml="moisture"]').fill('19.2');
+    await page.locator('[data-ml-open-slip]').click();
+    await page.locator('[data-ml="tare"]').first().fill('4000', { timeout: 15000 });
+    await page.locator('[data-ml-tare]').first().click();
+    const slip = (await readJson(page, 'weighbridge_slips', [], (v) => v.some((s) => s.status === 'done'), 15000)).find((s) => s.status === 'done');
+    check(/^WBS\/FY/.test(slip?.number ?? '') && slip.net_kg === 5000 && slip.readings?.moisture === 19.2, `weighbridge slip done: net ${slip?.net_kg} kg (${slip?.number})`);
+    // C2: a batch of 100 qtl paddy → 64 rice + 4 broken + 7 bran + 22 husk; the yield panel on the order.
+    const items = [['e2e-paddy', 'E2E Paddy', 'paddy'], ['e2e-rice', 'E2E Rice', 'cereal_loose'], ['e2e-broken', 'E2E Broken', 'broken_rice'], ['e2e-bran', 'E2E Bran', 'rice_bran_feed'], ['e2e-husk', 'E2E Husk', 'rice_husk']]
+      .map(([id, name, ag_class]) => ({ id, name, unit: 'QTL', track_stock: true, opening_qty: id === 'e2e-paddy' ? 500 : 0, opening_rate: 2300, reorder_level: 0, ag_class }));
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), ...items]);
+    await writeJson(page, 'production_orders', [...(prev.production_orders ?? []), { id: 'e2e-wo', number: 'WO/FY26-27/9001', date: '2026-10-27', item_id: 'e2e-rice', planned_qty: 64, wip_godown_id: '', status: 'in_progress', log: [], ag: { mill: { standard_outturn_pct: 67, std_source: 'cmr', input_moisture: 14, output_moisture: 13 } } }]);
+    await writeJson(page, 'manufacturing_vouchers', [...(prev.manufacturing_vouchers ?? []), {
+      id: 'e2e-mfg', number: 'MFG/FY26-27/9001', date: '2026-10-27', item_id: 'e2e-rice', qty: 64, production_order_id: 'e2e-wo', costs: [],
+      components: [{ id: 'c1', item_id: 'e2e-paddy', qty: 100 }],
+      outputs: [{ id: 'o1', item_id: 'e2e-broken', qty: 4, kind: 'co_product', cost_pct: 5 }, { id: 'o2', item_id: 'e2e-bran', qty: 7, kind: 'by_product', rate: 1500 }, { id: 'o3', item_id: 'e2e-husk', qty: 22, kind: 'by_product', rate: 400 }],
+    }]);
+    await page.goto(srv.origin + '/manufacturing?tab=orders&order=e2e-wo');
+    const outturn = await page.locator('[data-ml-yield]').getAttribute('data-ml-yield', { timeout: 15000 });
+    check(outturn === '68', `the yield panel shows outturn 68% (${outturn})`);
+    check((await page.locator('[data-ml-yield]').innerText()).includes('67'), 'against the 67% standard');
+    // C3: CMR agreement, 50 qtl paddy → 33.5 qtl rice due; one delivery; the Circular 153 test.
+    await page.goto(srv.origin + '/inventory?tab=mill&view=cmr');
+    await page.locator('[data-ml="agency"]').selectOption('e2e-agency', { timeout: 15000 });
+    await page.locator('[data-ml="season"]').fill('Kharif 2026-27');
+    await page.locator('[data-ml="milling-rate"]').fill('40');
+    await page.locator('[data-ml-save-agreement]').click();
+    await page.locator('[data-ml="paddy-qty"]').fill('50', { timeout: 15000 });
+    await page.locator('[data-ml-add-lot]').click();
+    check((await page.locator('[data-ml-account]').getAttribute('data-ml-account', { timeout: 15000 })) === '33.5', 'rice due 33.5 qtl on 50 qtl paddy at 67%');
+    await page.locator('[data-ml="deliver-qty"]').fill('10');
+    await page.locator('[data-ml="lot-no"]').fill('L-1');
+    await page.locator('[data-ml-deliver]').click();
+    const agr = (await readJson(page, 'cmr_agreements', [], (v) => v.some((a) => a.deliveries?.length), 15000))[0];
+    check(/^CMR\/FY\d{2}-\d{2}\/0001$/.test(agr?.deliveries?.[0]?.number ?? ''), `delivery numbered ${agr?.deliveries?.[0]?.number}`);
+    const jwp = await readJson(page, 'job_work_principal', []);
+    check(jwp.some((r) => r.kind === 'receipt') && jwp.some((r) => r.kind === 'return'), 'paddy in and rice out on the principal\'s register (never our stock)');
+    await page.locator('[data-ml="bill-qty"]').fill('10');
+    await page.locator('[data-ml="goods"]').fill('80');
+    check((await page.locator('[data-ml-pds]').getAttribute('data-ml-pds', { timeout: 15000 })) === 'exempt', 'goods 16.7% of the value → exempt');
+    await page.locator('[data-ml="goods"]').fill('200');
+    check((await page.locator('[data-ml-pds]').getAttribute('data-ml-pds')) === '5', 'goods 33.3% of the value → 5%');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

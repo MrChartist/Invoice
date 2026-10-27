@@ -11,7 +11,8 @@
  * Pure helpers above the "Storage" divider (tests/ag-weighbridge.test.ts).
  */
 import './ag-registry';
-import type { WbsReadings, WbsReadingKey, WbsUse, WeighbridgeSlip } from '../../types/agri-r12';
+import type { QualityParam, WbsReadings, WbsReadingKey, WbsUse, WeighbridgeSlip } from '../../types/agri-r12';
+import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import type { LineWeight } from '../../types/trade-r8';
 import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
@@ -22,6 +23,7 @@ import { withTablesRollback } from '../table-txn';
 import { principalDb } from '../job-work';
 import { esc } from '../voucher-print';
 import { AG_SERIES, AG_TABLES } from './ag-shared';
+import { saveVoucher } from './ag-vouchers';
 
 export const WBS = AG_SERIES.wbs;
 export const WBS_TABLE = AG_TABLES.weighbridge;
@@ -295,5 +297,22 @@ export function receiveForJob(id: string, principal: { name: string; client_id?:
       lines: [{ id: generateId(), name: s.commodity, qty: r3(num(s.net_kg) / 100), unit: 'QTL' }], narration: `Job milling — weighbridge slip ${s.number}, vehicle ${s.vehicle}`,
     });
     return { slip: markUsed(s.id, 'job', r.id), jwpId: r.id, jwpNumber: r.number };
+  });
+}
+
+/**
+ * "Make voucher": AG-A3's farmer purchase voucher (`saveVoucher`, FPV/FY…) straight from a done slip — net weight,
+ * bags (tare per bag typed), readings → the commodity's quality cuts — at `rate` per quintal; the slip is marked used.
+ */
+export function voucherFromSlip(id: string, x: { vendor: Vendor; rate: number; tare_per_bag?: number; params?: readonly QualityParam[]; item_id?: string; acceptReject?: boolean }): PurchaseRecord {
+  const p = voucherPrefill(mustGet(id));
+  if (mustGet(id).ref_id) throw new Error(`Slip ${p.wbs_number} is already used.`);
+  return withTablesRollback([WBS_TABLE, 'purchases', 'series_counters'], () => {
+    const bill = saveVoucher({
+      vendor: x.vendor, date: p.date, commodity: p.line.name, item: { name: p.line.name, unit: p.line.unit, ...(x.item_id ? { item_id: x.item_id } : {}) },
+      wt: { ...p.line.wt, tare_per_package: Math.max(num(x.tare_per_bag), 0) }, rate: num(x.rate), params: x.params, readings: p.readings, vehicle: p.vehicle, wbs_id: p.wbs_id,
+    }, { acceptReject: x.acceptReject });
+    markUsed(id, 'purchase', bill.id);
+    return bill;
   });
 }
