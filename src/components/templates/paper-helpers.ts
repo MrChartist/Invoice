@@ -6,6 +6,7 @@ import { upiLink } from '../../lib/share';
 import { shiftDay } from '../../lib/dates';
 import { weightText, wtHolds } from '../../lib/trade/tr-weight';
 import type { JewelLine } from '../../types/retail-r9';
+import type { AgSnapshot } from '../../types/agri-r12';
 
 /** R9 (RT-E2) gold fineness by karat, for "22K (916)" on the bill (BIS Reg. 5(11); same table as `rt-jewel-rates.ts`). */
 const KARAT: Readonly<Record<string, number>> = { '24K': 999, '23K': 958, '22K': 916, '21K': 875, '20K': 833, '18K': 750, '14K': 585, '9K': 375 };
@@ -41,7 +42,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw'>> & { bin?: string }) | undefined): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id'>> & { bin?: string }) | undefined, ag?: AgSnapshot): string {
   if (!item) return '';
   if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
@@ -53,6 +54,7 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   if (item.serials?.length) parts.push(`S/N: ${item.serials.map((s) => (item.serial_pairs?.[s] ? `${s} / ${item.serial_pairs[s]}` : s)).join(', ')}`); // R9 (RT-D1) dual IMEI
   if (item.serials?.length && item.warranty_months) parts.push(`Warranty ${item.warranty_months} month${item.warranty_months === 1 ? '' : 's'}`);
   if (item.wt && (item.quantity === undefined || wtHolds(item))) parts.push(weightText(item.wt)); // R8-B (TR-B1); QA8 T12 / T16: only while it still gives the quantity
+  parts.push(agriLineText(item, ag)); // R12 (AG-A5): '' without the `ag` snapshot
   return parts.filter(Boolean).join(' · ');
 }
 
@@ -146,4 +148,35 @@ export function svDocTitle(inv: Pick<InvoiceRecord, 'doc_type' | 'client' | 'ite
   if (!inv.sv?.rule46a || (inv.doc_type !== 'INVOICE' && inv.doc_type !== 'TAX_INVOICE') || String(inv.client?.gstin ?? '').trim()) return '';
   const items = (inv.items ?? []).filter((i) => i && (Number(i.rate) || Number(i.quantity)));
   return items.some((i) => Number(i.tax_rate) > 0) && items.some((i) => Number(i.tax_rate) === 0) ? 'Invoice-cum-Bill of Supply' : '';
+}
+
+/**
+ * R12 (AG-A5): the agri sub-line under a bill line, from the document's `ag` snapshot only — "Fat 6.8% · SNF 9.0% ·
+ * 412.5 L" / "Lot CSR/26-27/0042 · 120 bags × ₹180 (season 2026)" / "Batch UR2611 · Exp 03/2028 · MRP ₹266.50 / bag".
+ * '' without `ag`, so other documents print as before. Kept inline: the paper loads no Round 12 code.
+ */
+export function agriLineText(item: { id?: string } | undefined, ag: AgSnapshot | undefined): string {
+  const l = item?.id ? ag?.lines?.[item.id] : undefined;
+  if (!l) return '';
+  return [
+    l.fat !== undefined && `Fat ${l.fat}%`, l.snf !== undefined && `SNF ${l.snf}%`, l.litres !== undefined && `${l.litres} L`,
+    l.lot && `Lot ${l.lot}`, l.bags !== undefined && `${l.bags} bags${l.rate_bag !== undefined ? ` × ${rs(l.rate_bag)}` : ''}${l.season ? ` (season ${l.season})` : ''}`,
+    l.batch && `Batch ${l.batch}`, l.exp && `Exp ${l.exp}`, l.mrp_bag !== undefined && `MRP ${rs(l.mrp_bag)} / bag`, l.text,
+  ].filter(Boolean).join(' · ');
+}
+
+/** R12 (AG-A5 / A3): classes that are agricultural produce sold loose (same list as `agri/ag-tax.ts` `isLooseProduce`). */
+const AG_LOOSE = ['cereal_loose', 'pulses_loose', 'flour_loose', 'paddy', 'veg_fruit_fresh', 'potato', 'milk_fresh', 'curd_loose', 'broken_rice'];
+
+/**
+ * R12 (AG-A5): the agri declaration of a document — its snapshot's own text, else "Agricultural produce — not
+ * pre-packaged and labelled" on a bill of supply with loose produce, "Exempt — storage of agricultural produce" on an
+ * exempt rent bill, "Interest on loan — exempt" on an interest bill. '' otherwise. Verify with your CA (AG1, AG5, AG8, AG24).
+ */
+export function agriDeclaration(inv: Pick<InvoiceRecord, 'doc_type' | 'items' | 'ag'>): string {
+  const ag = inv.ag;
+  if (ag?.declaration) return ag.declaration;
+  if (ag?.kind === 'rent' && ag.rent?.exempt) return 'Exempt — storage of agricultural produce (N 12/2017-CT(R) entry 54(e); verify with your CA, AG8).';
+  if (ag?.kind === 'interest') return 'Interest on loan — exempt (verify with your CA, AG24).';
+  return inv.doc_type === 'BILL_OF_SUPPLY' && (inv.items ?? []).some((i) => i?.ag_class && AG_LOOSE.includes(i.ag_class)) ? 'Agricultural produce — not pre-packaged and labelled.' : '';
 }

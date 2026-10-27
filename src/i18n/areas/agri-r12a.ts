@@ -23,6 +23,7 @@ export const agT = defineArea(
     saveDraft: 'Save draft', draftSaved: 'Cycle {no} saved as a draft.', bankPreset: 'Bank file format', debitAccount: 'Our account to debit', farmers: 'Farmers',
     'st.draft': 'Draft', 'st.closed': 'Closed', 'st.paid': 'Paid', close: 'Close cycle', closedOk: 'Cycle closed: one purchase bill, set-offs and the deductions journal posted.', bankFile: 'Bank file', bankFileOk: 'Bank file: {n} row(s), {total}. Check the format with your bank; record the payment after it confirms.',
     reopen: 'Reopen', reopened: 'Reopened: its bill, set-offs and journal went to the recycle bin.', slip: 'Slip', bonusPerUnit: 'Bonus ₹ per unit', bonusRun: 'Bonus run (CSV)',
+    useFpv: 'Use our farmer voucher number (FPV)',
   } as const,
   {
     none: 'अभी कुछ नहीं।', wp: 'कार्य पत्र — अपने CA से जाँच लें।',
@@ -45,5 +46,6 @@ export const agT = defineArea(
     saveDraft: 'ड्राफ़्ट सहेजें', draftSaved: 'चक्र {no} ड्राफ़्ट में सहेजा।', bankPreset: 'बैंक फ़ाइल प्रारूप', debitAccount: 'हमारा खाता (डेबिट)', farmers: 'किसान',
     'st.draft': 'ड्राफ़्ट', 'st.closed': 'बंद', 'st.paid': 'चुकाया', close: 'चक्र बंद करें', closedOk: 'चक्र बंद: एक ख़रीद बिल, समायोजन और कटौती जर्नल दर्ज।', bankFile: 'बैंक फ़ाइल', bankFileOk: 'बैंक फ़ाइल: {n} पंक्ति, {total}। प्रारूप बैंक से जाँचें; बैंक की पुष्टि के बाद भुगतान दर्ज करें।',
     reopen: 'फिर खोलें', reopened: 'फिर खोला: उसका बिल, समायोजन और जर्नल रीसायकल बिन में।', slip: 'पर्ची', bonusPerUnit: 'बोनस ₹ प्रति इकाई', bonusRun: 'बोनस गणना (CSV)',
+    useFpv: 'हमारा किसान वाउचर नंबर (FPV) लें',
   },
 );

@@ -3,6 +3,7 @@
  * Only lazy screens (setup wizard, Settings, Dashboard tiles) import this; the shell needs only `shop-mode.ts`.
  */
 import { ALL_MODULES, type BusinessType, type ModuleId, type ShopModeSettings } from './shop-mode';
+import type { PackId } from './industry-packs';
 
 export const BUSINESS_TYPES: readonly BusinessType[] = [
   'kirana', 'restaurant', 'wholesale', 'services', 'manufacturer', 'full',
@@ -270,6 +271,7 @@ export function applyServiceKind(kind: ServiceKindId, opts: { registered?: boole
 export const AGRI_KINDS = ['fpo', 'coop', 'dairy', 'mill', 'cold', 'inputs', 'farm', 'other'] as const;
 export type AgriKindId = (typeof AGRI_KINDS)[number];
 export const MILL_KINDS = ['rice', 'flour', 'dal', 'oil'] as const;
+export type MillKindId = (typeof MILL_KINDS)[number];
 type AgriPackId = 'agri' | 'dairy' | 'mill' | 'coldstore' | 'agri_inputs' | 'fpo' | 'commodity';
 
 export interface AgriProfile {
@@ -303,13 +305,13 @@ export const isAgriKind = (v: unknown): v is AgriKindId => typeof v === 'string'
  * not fire. `other` keeps the type and modules and adds `agri` to the packs the company has (`current`). The profile's
  * switches (`agri_settings`) are written by `agri/ag-profile.ts`.
  */
-export function applyAgriKind(kind: AgriKindId, opts: { registered?: boolean; mill_kind?: string; currentPacks?: readonly string[] } = {}): ShopModeSettings & { agri_kind: AgriKindId; mill_kind?: string; industry_packs: string[]; retail_kind?: 'general' } {
+export function applyAgriKind(kind: AgriKindId, opts: { registered?: boolean; mill_kind?: string; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { agri_kind: AgriKindId; mill_kind?: MillKindId; industry_packs: PackId[]; retail_kind?: 'general' } {
   const p = AGRI_PROFILES[kind];
-  const packs: string[] = kind === 'other' ? [...new Set([...(opts.currentPacks ?? []), 'agri'])] : [...p.packs];
-  const out: ShopModeSettings & { agri_kind: AgriKindId; mill_kind?: string; industry_packs: string[]; retail_kind?: 'general' } = { agri_kind: kind, industry_packs: packs };
+  const packs: PackId[] = kind === 'other' ? [...new Set<PackId>([...(opts.currentPacks ?? []), 'agri'])] : [...p.packs];
+  const out: ShopModeSettings & { agri_kind: AgriKindId; mill_kind?: MillKindId; industry_packs: PackId[]; retail_kind?: 'general' } = { agri_kind: kind, industry_packs: packs };
   if (p.type) out.business_type = p.type;
   if (p.modules) out.modules = opts.registered && !p.modules.includes('gst') ? [...p.modules, 'gst'] : [...p.modules];
-  if (kind === 'mill') out.mill_kind = (MILL_KINDS as readonly string[]).includes(opts.mill_kind ?? '') ? opts.mill_kind : 'rice';
+  if (kind === 'mill') out.mill_kind = (MILL_KINDS as readonly string[]).includes(opts.mill_kind ?? '') ? (opts.mill_kind as MillKindId) : 'rice';
   if (kind === 'inputs') out.retail_kind = 'general';
   return out;
 }

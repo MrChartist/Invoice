@@ -218,6 +218,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   workshop_settings: 'Workshop settings: inspection checklist, job-card terms, vehicle classes, labour rates, depreciation table, service interval (R10).',
   service_assets: 'Vehicles and appliances: registration / serial no., make, model, owner, insurer and policy, odometer readings, next service (R10).',
   labour_ops: 'Labour operations: code, description, SAC, standard hours per vehicle class or flat price, service interval (R10).',
+  // R12-A
+  agri_settings: 'Agri profile settings: centres / clusters, payment cycles, switches; B–D add milk, chambers, licences, seasons (R12).',
+  farm_batches: 'Farm batches (flock / pond / herd / crop): placed, events (mortality, feed, weight, harvest), cost centre (R12).',
+  quality_cut_tables: 'Quality-cut tables per commodity: norm, cut per point on weight or price, cap, reject line (R12).',
+  farmer_cycles: 'Pooled farmer cycle bills (CYB/FY…): period, farmer-wise qty / amount / deductions / net, the purchase and journal they made (R12).',
   // R11-A
   construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
   // R11-C
